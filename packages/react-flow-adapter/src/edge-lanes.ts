@@ -34,7 +34,7 @@ export interface GraphLane {
   /**
    * Whether the Edge runs anchor to anchor rather than stopping short. An Edge
    * stops short only beside an Active Graph's Edge joining the same two
-   * Resources; every other Edge connects (ADR 0100, ADR 0142).
+   * Resources; every other Edge connects.
    */
   readonly connects: boolean;
 }
