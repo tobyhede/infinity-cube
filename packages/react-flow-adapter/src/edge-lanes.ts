@@ -53,6 +53,10 @@ export interface GraphLane {
  * Edges are given; where the Active Graph has no Edge in the pair, the first of
  * them keeps the centre.
  *
+ * Whether an Edge connects is decided per pair too: the Active Graph's Edges
+ * connect, the other Edges of a pair the Active Graph joins stop short beside
+ * them, and every Edge of a pair it does not join connects.
+ *
  * The offset's sign is the screen's, not the Edge's (see `laneBezier`), so an
  * Edge and its reverse stack the same way.
  */

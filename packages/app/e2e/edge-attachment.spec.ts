@@ -1,6 +1,7 @@
 import { COLLAPSED_RESOURCE_SIZE } from '@project/core';
 import { expect, test, type Page } from './fixtures';
 import {
+  activateGraph,
   authoringHandle,
   connectHandles,
   dragBy,
@@ -85,6 +86,8 @@ const MID = '00000000-0000-4000-8000-000000000024';
 const SHORT = '00000000-0000-4000-8000-000000000025';
 const RESOURCE_A = '00000000-0000-4000-8000-000000000002';
 const RESOURCE_B = '00000000-0000-4000-8000-000000000003';
+const RESOURCE_D = '00000000-0000-4000-8000-000000000006';
+const RESOURCE_A_PRIME = '00000000-0000-4000-8000-00000000000c';
 const A_TO_B = `${LONG}::${RESOURCE_A}::${RESOURCE_B}`;
 const A_TO_A = `${LONG}::${RESOURCE_A}::${RESOURCE_A}`;
 
@@ -270,6 +273,30 @@ test('several Graphs over one pair of Resources run as parallel lines below the 
     expect(line[6]!, 'stops short of B').toBeLessThan(active[6]!);
   }
   expect(levels.size, 'each in its own lane').toBe(2);
+});
+
+test('another Graph stops short only beside the Active Graph, and connects elsewhere', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  const d = nodeByTitle(page, 'D').first();
+  const aPrime = nodeByTitle(page, 'A′').first();
+  await expect(d).toBeVisible();
+  await activateGraph(page, 'Mid');
+  await settled(page);
+
+  // With Mid active, Long's A → B runs beside Mid's and stops short (ADR 0100),
+  // but Mid never joins D and A′, so Long's D → A′ is that pair's only line and
+  // runs anchor to anchor.
+  const besideMid = await endsOf(page, A_TO_B);
+  const midAToB = await endsOf(page, `${MID}::${RESOURCE_A}::${RESOURCE_B}`);
+  expect(besideMid.from.x, 'Long’s A → B stops short of A').toBeGreaterThan(midAToB.from.x + 1);
+  expect(besideMid.to.x, 'Long’s A → B stops short of B').toBeLessThan(midAToB.to.x - 1);
+
+  const alone = await endsOf(page, `${LONG}::${RESOURCE_D}::${RESOURCE_A_PRIME}`);
+  near(alone.from, anchorAt(await positionOf(d), 'right'), 'Long’s D → A′ leaving D');
+  near(alone.to, anchorAt(await positionOf(aPrime), 'left'), 'Long’s D → A′ entering A′');
 });
 
 /** The colour the page paints at a point on screen, as `[r, g, b]`. */
