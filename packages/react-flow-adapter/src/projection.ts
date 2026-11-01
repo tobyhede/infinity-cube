@@ -395,7 +395,7 @@ export function projectGraphEdges(
 ): RoutedFlowEdge[] {
   const activeGraphId = options.activeGraphId ?? null;
 
-  const lanes = graphLanes(graphRenderEdges);
+  const lanes = graphLanes(graphRenderEdges, activeGraphId);
 
   // React Flow paints Edges in the order it is given them, so the Active Graph
   // goes last: wherever it crosses another Graph's Edge, its stroke is the one

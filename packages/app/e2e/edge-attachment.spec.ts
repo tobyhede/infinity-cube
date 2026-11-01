@@ -275,46 +275,42 @@ test('several Graphs over one pair of Resources run as parallel lines below the 
   expect(levels.size, 'each in its own lane').toBe(2);
 });
 
-test('lane and length follow Graph order, whichever Graph is active', async ({ page }) => {
+test('the Active Graph runs full length, the rest shorten in Graph order, lanes stay', async ({
+  page,
+}) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
+  const a = nodeByTitle(page, 'A').first();
   const d = nodeByTitle(page, 'D').first();
   const aPrime = nodeByTitle(page, 'A′').first();
   await expect(d).toBeVisible();
   await settled(page);
 
-  const pathsOverAB = () =>
+  const overAB = () =>
     Promise.all(
-      [LONG, MID, SHORT].map((graph) =>
-        page
-          .locator(
-            `.react-flow__edge[data-id="${graph}::${RESOURCE_A}::${RESOURCE_B}"] .react-flow__edge-path`,
-          )
-          .getAttribute('d'),
-      ),
+      [LONG, MID, SHORT].map((graph) => endsOf(page, `${graph}::${RESOURCE_A}::${RESOURCE_B}`)),
     );
-  const withLong = await pathsOverAB();
+  const [longFirst, midFirst, shortFirst] = await overAB();
 
-  // Activating Mid changes which Graph is emphasised and nothing about where
-  // or how long any Edge is drawn.
+  // Long, Mid and Short all run A → B. With Long active, Long runs anchor to
+  // anchor, Mid a step shorter at each end and Short a step shorter again.
+  near(longFirst!.from, anchorAt(await positionOf(a), 'right'), 'active Long leaving A');
+  expect(midFirst!.from.x, 'Mid starts after Long').toBeGreaterThan(longFirst!.from.x + 1);
+  expect(shortFirst!.from.x, 'Short starts after Mid').toBeGreaterThan(midFirst!.from.x + 1);
+
+  // Activating Mid makes Mid the one at full length; Long follows a step
+  // shorter and Short a step shorter again. No line changes lane.
   await activateGraph(page, 'Mid');
   await settled(page);
-  expect(await pathsOverAB(), 'the same lines with Mid active').toEqual(withLong);
-
-  // Long, Mid and Short all run A → B, in that order: Long anchor to anchor,
-  // Mid a step shorter at each end and Short a step shorter again.
-  const [long, mid, short] = await Promise.all(
-    [LONG, MID, SHORT].map((graph) => endsOf(page, `${graph}::${RESOURCE_A}::${RESOURCE_B}`)),
-  );
-  near(
-    long!.from,
-    anchorAt(await positionOf(nodeByTitle(page, 'A').first()), 'right'),
-    'Long leaving A',
-  );
-  expect(mid!.from.x, 'Mid starts after Long').toBeGreaterThan(long!.from.x + 1);
-  expect(short!.from.x, 'Short starts after Mid').toBeGreaterThan(mid!.from.x + 1);
-  expect(mid!.to.x, 'Mid ends before Long').toBeLessThan(long!.to.x - 1);
-  expect(short!.to.x, 'Short ends before Mid').toBeLessThan(mid!.to.x - 1);
+  const [long, mid, short] = await overAB();
+  near(mid!.from, { x: longFirst!.from.x, y: midFirst!.from.y }, 'active Mid leaving A');
+  near(mid!.to, { x: longFirst!.to.x, y: midFirst!.to.y }, 'active Mid entering B');
+  // On a level line a step's trim is the same length on every lane, so Long now
+  // starts and ends where Mid did, on its own lane.
+  near(long!.from, { x: midFirst!.from.x, y: longFirst!.from.y }, 'Long a step short of A');
+  near(long!.to, { x: midFirst!.to.x, y: longFirst!.to.y }, 'Long a step short of B');
+  near(short!.from, shortFirst!.from, 'Short unchanged at A');
+  near(short!.to, shortFirst!.to, 'Short unchanged at B');
 
   // Only Long joins D and A′, so its Edge there is first in its direction and
   // runs anchor to anchor although Long is not active.

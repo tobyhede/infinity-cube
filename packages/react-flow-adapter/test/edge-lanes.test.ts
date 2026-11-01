@@ -80,6 +80,30 @@ describe('graphLanes', () => {
     expect(lanes.get(`${BLUE}::a::b`)?.endTrim).toBe(2 * END_TRIM_STEP);
   });
 
+  it('counts the Active Graph first for length without moving any lane', () => {
+    const lanes = graphLanes(
+      [RED!, BLUE!, GREEN!].map((g) => edge(g, 'a', 'b')),
+      GREEN,
+    );
+
+    expect([...lanes.values()]).toEqual([
+      { offset: 0, reach: 2 * GRAPH_LANE_SPACING, endTrim: END_TRIM_STEP },
+      { offset: GRAPH_LANE_SPACING, reach: 2 * GRAPH_LANE_SPACING, endTrim: 2 * END_TRIM_STEP },
+      { offset: 2 * GRAPH_LANE_SPACING, reach: 2 * GRAPH_LANE_SPACING, endTrim: 0 },
+    ]);
+  });
+
+  it('counts the Active Graph first only in the directions it runs', () => {
+    const lanes = graphLanes(
+      [edge(RED!, 'a', 'b'), edge(BLUE!, 'b', 'a'), edge(GREEN!, 'b', 'a')],
+      GREEN,
+    );
+
+    expect(lanes.get(`${RED}::a::b`)?.endTrim).toBe(0);
+    expect(lanes.get(`${GREEN}::b::a`)?.endTrim).toBe(0);
+    expect(lanes.get(`${BLUE}::b::a`)?.endTrim).toBe(END_TRIM_STEP);
+  });
+
   it('bundles an Edge with its reverse', () => {
     const lanes = graphLanes([edge(RED!, 'a', 'b'), edge(BLUE!, 'b', 'a')]);
 

@@ -33,8 +33,9 @@ export interface GraphLane {
   readonly reach: number;
   /**
    * What fraction of its length the Edge leaves undrawn at each end: zero for
-   * the first Edge in its direction between the pair, one `END_TRIM_STEP` more
-   * for each Edge before it in that direction, up to `MAX_END_TRIM`.
+   * the first Edge in its direction between the pair (the Active Graph's, where
+   * it has one there), one `END_TRIM_STEP` more for each Edge ranked before it
+   * in that direction, up to `MAX_END_TRIM`.
    */
   readonly endTrim: number;
 }
@@ -59,15 +60,19 @@ export const MAX_END_TRIM = 0.3;
  * keeps the centre and each other runs one spacing further out on the positive
  * side.
  *
- * Length follows the same order, separately in each direction: the first Edge
- * from one Resource to the other runs anchor to anchor, and each further Edge
- * in that direction stops a step shorter. Neither lane nor length depends on
- * which Graph is active; the Active Graph is told apart by emphasis alone.
+ * Length is ranked separately in each direction, with the Active Graph's Edge
+ * counted first and the rest in the order given: the first Edge from one
+ * Resource to the other runs anchor to anchor, and each further Edge in that
+ * direction stops a step shorter. The lane does not depend on which Graph is
+ * active.
  *
  * The offset's sign is the screen's, not the Edge's (see `laneBezier`), so an
  * Edge and its reverse stack the same way.
  */
-export function graphLanes(edges: readonly LaneEdge[]): ReadonlyMap<string, GraphLane> {
+export function graphLanes(
+  edges: readonly LaneEdge[],
+  activeGraphId: GraphId | null = null,
+): ReadonlyMap<string, GraphLane> {
   const bundles = new Map<string, LaneEdge[]>();
   for (const edge of edges) {
     const key = pairKey(edge);
@@ -79,17 +84,27 @@ export function graphLanes(edges: readonly LaneEdge[]): ReadonlyMap<string, Grap
   const lanes = new Map<string, GraphLane>();
   for (const bundle of bundles.values()) {
     const reach = (bundle.length - 1) * GRAPH_LANE_SPACING;
+    // The Active Graph counts first for length in each direction it runs;
+    // the others follow in the order given.
+    const byLength = [
+      ...bundle.filter((edge) => edge.graphId === activeGraphId),
+      ...bundle.filter((edge) => edge.graphId !== activeGraphId),
+    ];
+    const rankOf = new Map<string, number>();
     const before = new Map<string, number>();
-    bundle.forEach((edge, lane) => {
+    for (const edge of byLength) {
       const direction = `${edge.source}|${edge.target}`;
       const rank = before.get(direction) ?? 0;
       before.set(direction, rank + 1);
+      rankOf.set(edge.id, rank);
+    }
+    bundle.forEach((edge, lane) =>
       lanes.set(edge.id, {
         offset: lane * GRAPH_LANE_SPACING,
         reach,
-        endTrim: Math.min(rank * END_TRIM_STEP, MAX_END_TRIM),
-      });
-    });
+        endTrim: Math.min((rankOf.get(edge.id) ?? 0) * END_TRIM_STEP, MAX_END_TRIM),
+      }),
+    );
   }
   return lanes;
 }
