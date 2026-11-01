@@ -42,8 +42,8 @@ export type RoutedEdgeData = {
   laneReach: number;
   /**
    * What fraction of its length the Edge leaves undrawn at each end. Zero for
-   * an Edge that connects; another Graph's Edge beside an Active Graph's Edge
-   * joining the same two Resources stops short.
+   * an Edge that connects; each further Edge in the same direction between two
+   * Resources stops a step shorter (`graphLanes`).
    */
   endTrim: number;
   /**

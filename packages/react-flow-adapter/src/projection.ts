@@ -22,7 +22,7 @@ import type {
 } from '@project/graph';
 import { ROUTED_EDGE_TYPE, type RoutedEdgeData, type RoutedFlowEdge } from './RoutedEdge';
 import { AUTHORING_HANDLE_DIAMETER } from './authoring-handle';
-import { DETACHED_END_TRIM, graphLanes } from './edge-lanes';
+import { graphLanes } from './edge-lanes';
 import { graphHeadMarkerId } from './GraphHeadMarkers';
 
 const FALLBACK_COLOR = FALLBACK_GRAPH_COLOR;
@@ -395,7 +395,7 @@ export function projectGraphEdges(
 ): RoutedFlowEdge[] {
   const activeGraphId = options.activeGraphId ?? null;
 
-  const lanes = graphLanes(graphRenderEdges, activeGraphId);
+  const lanes = graphLanes(graphRenderEdges);
 
   // React Flow paints Edges in the order it is given them, so the Active Graph
   // goes last: wherever it crosses another Graph's Edge, its stroke is the one
@@ -404,13 +404,13 @@ export function projectGraphEdges(
     const color = colors[edge.graphId] ?? FALLBACK_COLOR;
     const isActiveGraph = edge.graphId === activeGraphId;
     const emphasized = isActiveGraph || activeGraphId === null;
-    const lane = lanes.get(edge.id) ?? { offset: 0, reach: 0, connects: true };
+    const lane = lanes.get(edge.id) ?? { offset: 0, reach: 0, endTrim: 0 };
 
     const data: RoutedEdgeData = {
       graphId: edge.graphId,
       laneOffset: lane.offset,
       laneReach: lane.reach,
-      endTrim: lane.connects ? 0 : DETACHED_END_TRIM,
+      endTrim: lane.endTrim,
       headShape: options.headShapes?.[edge.graphId] ?? DEFAULT_GRAPH_HEAD_SHAPE,
     };
     if (edge.title !== undefined) data.title = edge.title;
