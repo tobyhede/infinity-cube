@@ -69,6 +69,16 @@ describe('graphLanes', () => {
     });
   });
 
+  it('stops another Graph short beside the Active Graph whichever way each runs', () => {
+    const lanes = graphLanes([edge(BLUE!, 'a', 'b'), edge(RED!, 'b', 'a')], BLUE!);
+
+    expect(lanes.get(`${RED}::b::a`)).toEqual({
+      offset: GRAPH_LANE_SPACING,
+      reach: GRAPH_LANE_SPACING,
+      connects: false,
+    });
+  });
+
   it('splits the centre between both directions of a pair the Active Graph holds', () => {
     const lanes = graphLanes(
       [edge(RED!, 'a', 'b'), edge(BLUE!, 'b', 'a'), edge(BLUE!, 'a', 'b')],
