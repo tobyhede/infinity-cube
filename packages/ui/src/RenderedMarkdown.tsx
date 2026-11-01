@@ -42,7 +42,7 @@ const comparable = (text: string): string => text.trim().replace(/\s+/g, ' ').to
 /** The source's tokens without a first heading whose text is `name`, ignoring case and spacing. */
 function withoutRepeatedName(tokens: TokensList, name: string | undefined): TokensList {
   if (name === undefined) return tokens;
-  const first = tokens.findIndex((token) => token.type !== 'space');
+  const first = tokens.findIndex((token) => token.raw.trim() !== '');
   const heading = tokens[first];
   if (heading?.type !== 'heading') return tokens;
   // `marked`'s token union carries a generic member, so `text` is untyped here.
