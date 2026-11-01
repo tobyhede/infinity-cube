@@ -560,7 +560,7 @@ export function SpaceCanvas({
     [view.space, getZoom, setCenter, authoring],
   );
   /**
-   * Open on the canvas's own Map, front to back like a card: a Resource whose
+   * Open on the canvas's own Map, front to back: a Resource whose
    * kind opens to fit and that was never resized Opens grown to its content, as
    * Open and expand does, so it is read in the box rather than in two lines of
    * the Closed Size; one the author has sized Opens at that size. Answers
