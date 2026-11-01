@@ -20,7 +20,9 @@ const numbers = (path: string): number[] =>
   (path.match(/-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/gi) ?? []).map(Number);
 
 describe('graphLanes', () => {
-  const [RED, BLUE] = ['1', '2'].map((id) => uuid(`00000000-0000-4000-8000-00000000020${id}`));
+  const [RED, BLUE, GREEN] = ['1', '2', '3'].map((id) =>
+    uuid(`00000000-0000-4000-8000-00000000020${id}`),
+  );
   const edge = (graphId: GraphId, source: string, target: string) => ({
     id: `${graphId}::${source}::${target}`,
     graphId,
@@ -87,10 +89,28 @@ describe('graphLanes', () => {
     expect(lanes.get(`${RED}::a::b`)).toEqual({ offset: reach, reach, connects: false });
   });
 
-  it('keeps the centre for another Graph where the Active Graph has no Edge in the pair', () => {
+  it('keeps the centre, connecting, for another Graph where the Active Graph has no Edge in the pair', () => {
     const lanes = graphLanes([edge(RED!, 'a', 'b')], BLUE!);
 
-    expect(lanes.get(`${RED}::a::b`)).toEqual({ offset: 0, reach: 0, connects: false });
+    expect(lanes.get(`${RED}::a::b`)).toEqual({ offset: 0, reach: 0, connects: true });
+  });
+
+  it('connects every Edge of a pair the Active Graph does not join', () => {
+    const lanes = graphLanes(
+      [edge(BLUE!, 'a', 'b'), edge(RED!, 'b', 'c'), edge(GREEN!, 'c', 'b')],
+      BLUE!,
+    );
+
+    expect(lanes.get(`${RED}::b::c`)).toEqual({
+      offset: 0,
+      reach: GRAPH_LANE_SPACING,
+      connects: true,
+    });
+    expect(lanes.get(`${GREEN}::c::b`)).toEqual({
+      offset: GRAPH_LANE_SPACING,
+      reach: GRAPH_LANE_SPACING,
+      connects: true,
+    });
   });
 
   it('gives every Edge of a pair how far out the pair’s outermost lane runs', () => {

@@ -32,9 +32,9 @@ export interface GraphLane {
    */
   readonly reach: number;
   /**
-   * Whether the Edge runs anchor to anchor rather than stopping short. The
-   * Active Graph's Edges connect, and while no Graph is active every Edge does;
-   * any other Edge runs beside them and stops short (ADR 0100).
+   * Whether the Edge runs anchor to anchor rather than stopping short. An Edge
+   * stops short only beside an Active Graph's Edge joining the same two
+   * Resources; every other Edge connects (ADR 0100, ADR 0142).
    */
   readonly connects: boolean;
 }
@@ -91,7 +91,9 @@ export function graphLanes(
       lanes.set(edge.id, {
         offset: (outermost + 1 + lane) * GRAPH_LANE_SPACING,
         reach,
-        connects: activeGraphId === null,
+        // Beside an Active Graph's Edge it is a reading of which Graphs also
+        // join the pair; with none, it is the pair's only connection.
+        connects: active.length === 0,
       }),
     );
   }
@@ -115,9 +117,10 @@ export interface LaneGeometry {
 }
 
 /**
- * How much of its length an Edge that is not the Active Graph's leaves undrawn
- * at each end, as a fraction. The Active Graph's Edge is the one that connects;
- * the others run beside it as a reading of which Graphs also join the pair.
+ * How much of its length an Edge that runs beside an Active Graph's Edge leaves
+ * undrawn at each end, as a fraction. The Active Graph's Edge is the one that
+ * connects; the others run beside it as a reading of which Graphs also join
+ * the pair.
  */
 export const DETACHED_END_TRIM = 0.2;
 

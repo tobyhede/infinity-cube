@@ -525,9 +525,9 @@ describe('projectGraphEdges', () => {
         laneOffset: GRAPH_LANE_SPACING,
         endTrim: DETACHED_END_TRIM,
       });
-      // Green joins a different pair, so it is alone in its lane — and still
-      // stops short, being another Graph's.
-      expect(dataOf(edges, GREEN!)).toMatchObject({ laneOffset: 0, endTrim: DETACHED_END_TRIM });
+      // Green joins a pair the Active Graph does not, so it is alone in its
+      // lane and connects: nothing on the Active Graph stands in for it.
+      expect(dataOf(edges, GREEN!)).toMatchObject({ laneOffset: 0, endTrim: 0 });
     });
 
     it('splits the centre between both directions of a pair the Active Graph holds', () => {
@@ -556,7 +556,7 @@ describe('projectGraphEdges', () => {
         headShapes: { [uuid(BLUE!)]: 'dot', [uuid(RED!)]: 'diamond' },
       });
 
-      // Blue connects; Red stops short beside it and Green stops short alone.
+      // Blue connects; Red stops short beside it and Green, alone, connects.
       // Each still ends in its own Graph's head shape (ADR 0105), and Green,
       // storing none, ends in an arrow.
       expect(dataOf(edges, BLUE!)).toMatchObject({ endTrim: 0, headShape: 'dot' });
@@ -564,10 +564,7 @@ describe('projectGraphEdges', () => {
         endTrim: DETACHED_END_TRIM,
         headShape: 'diamond',
       });
-      expect(dataOf(edges, GREEN!)).toMatchObject({
-        endTrim: DETACHED_END_TRIM,
-        headShape: 'arrow',
-      });
+      expect(dataOf(edges, GREEN!)).toMatchObject({ endTrim: 0, headShape: 'arrow' });
     });
 
     it("names its Graph's one head marker as the Edge's end marker", () => {
