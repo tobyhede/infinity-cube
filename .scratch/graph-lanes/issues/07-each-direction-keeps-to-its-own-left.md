@@ -4,7 +4,7 @@
 
 **Blocked by:** 06 (The Active Graph takes the centre, and lanes alternate outwards from it).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] A positive lane offset is the Edge's left as it travels from source to target. The lane geometry turns it into a screen side for rightward, leftward, downward and upward travel. Bridges, spans and the translate fallback (ADR 0103) take the converted offset unchanged, and loops keep their own geometry.
 - [x] The lane module places a pair holding both directions at +(rank + ½) lanes in each direction, so the opposite direction lands on the opposite side by travel rather than by Resource id. A one-direction bundle's first alternate now falls on the keep-left side.
@@ -13,7 +13,7 @@
 - [x] The browser spec draws a B → A Edge on Collection 1. It checks that B → A runs below the A → B Edges, from half a lane out and full length, and that the A → B stack moves up to start half a lane above the centre. It also checks that the sides hold while a Resource is dragged.
 - [x] The canvas rendering guide's lanes section covers the two-direction case, if 06 did not already.
 - [x] Screenshots of the two-direction case with each Graph active.
-- [ ] Targeted local checks pass on Node 26, and `CI passed` is green on #455.
+- [x] Targeted local checks pass on Node 26, and `CI passed` is green on #455.
 
 ## Answer
 
