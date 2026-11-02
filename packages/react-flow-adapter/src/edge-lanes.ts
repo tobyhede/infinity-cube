@@ -36,7 +36,7 @@ export interface GraphLane {
   readonly reach: number;
   /**
    * What fraction of its length the Edge leaves undrawn at each end: none for
-   * the first Edge in its direction, `END_TRIM_STEP` more for each Edge ranked
+   * the first Edge in its direction, `END_TRIM_INCREMENT` more for each Edge ranked
    * before it there, up to `MAX_END_TRIM`.
    */
   readonly endTrim: number;
@@ -46,7 +46,7 @@ export interface GraphLane {
  * How much more of its length each further Edge in the same direction between
  * two Resources leaves undrawn at each end, as a fraction.
  */
-export const END_TRIM_STEP = 0.1;
+export const END_TRIM_INCREMENT = 0.1;
 
 /** The most of its length an Edge leaves undrawn at each end, as a fraction. */
 export const MAX_END_TRIM = 0.3;
@@ -62,7 +62,7 @@ export const MAX_END_TRIM = 0.3;
  *
  * Each direction of a pair is ranked on its own: the Active Graph's Edge first,
  * then the rest in the order given, which is the Map's Graph order. The first
- * runs anchor to anchor and each one after it is a step shorter. Where the pair
+ * runs anchor to anchor and each one after it is one trim increment shorter. Where the pair
  * runs one way, the first takes the centre and the rest alternate outwards,
  * the keep-left side first. Where it runs both ways, each direction stacks on
  * its own left from half a lane out. Loops on one Resource nest outwards from
@@ -112,7 +112,7 @@ export function graphLanes(
       lanes.set(edge.id, {
         offset: lane * GRAPH_LANE_SPACING,
         reach,
-        endTrim: Math.min(rank * END_TRIM_STEP, MAX_END_TRIM),
+        endTrim: Math.min(rank * END_TRIM_INCREMENT, MAX_END_TRIM),
       });
     }
   }

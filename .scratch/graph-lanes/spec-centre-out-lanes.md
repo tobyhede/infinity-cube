@@ -15,10 +15,10 @@ Where several Graphs join the same pair of Resources, each Graph's Edge is drawn
 
 Lanes are laid out from the centre out, and length is ranked in each direction separately.
 
-- **Rank.** In each direction between two Resources, the Active Graph's Edge counts first, then the other Graphs' Edges in the Map's Graph order. The first runs anchor to anchor. Each one after it leaves one more tenth of its length undrawn at each end, up to three tenths. That is the same step and cap as today.
+- **Rank.** In each direction between two Resources, the Active Graph's Edge counts first, then the other Graphs' Edges in the Map's Graph order. The first runs anchor to anchor. Each one after it leaves one more tenth of its length undrawn at each end, up to three tenths. Both values are new: today every Edge outside the Active Graph leaves a flat fifth undrawn at each end (ADR 0100).
 - **One direction only.** Where every Edge in the pair runs the same way, the first takes the exact centre. The rest alternate outwards one lane apart, starting on the keep-left side.
 - **Both directions.** Where the pair has Edges both ways, each direction stacks on its own left of travel. The first in each direction runs half a lane from the centre, and each further one runs a lane further out. A rightward Edge sits above its reverse, and a downward Edge sits on the screen's right of its reverse. Where the Active Graph holds both directions, both its Edges are the innermost pair.
-- **Loops.** Several Graphs' self-Edges on one Resource nest outwards from the Resource. The Active Graph's loop is innermost and full length, and the rest follow in Graph order, a step shorter each.
+- **Loops.** Several Graphs' self-Edges on one Resource nest outwards from the Resource. The Active Graph's loop is innermost and full length, and the rest follow in Graph order, one trim increment shorter each.
 - **Activation moves lanes.** Changing the Active Graph brings its Edges to the centre. Colour, opacity, stroke width, paint order and head shapes do not change.
 
 This is recorded as ADR 0142, which refines ADR 0100 (lane order and which Edges shorten) and ADR 0103 (the side of an offset follows the direction of travel).
@@ -31,7 +31,7 @@ This is recorded as ADR 0142, which refines ADR 0100 (lane order and which Edges
 4. As an author, I want the Active Graph's arrowhead to land on the middle of the target's anchor, so that its head reads as reaching that Resource.
 5. As an author, I want the Active Graph's Edge Title and toolbar to sit on the centre line, so that its controls are where its connection is.
 6. As an author, I want the other Graphs on a pair to fan out evenly on both sides of the centre, so that the bundle stays centred between its two Resources.
-7. As an author, I want each further Graph on a pair to be a step shorter than the one before it in that direction, so that I can tell the bundle's Edges apart by length as well as colour.
+7. As an author, I want each further Graph on a pair to be one trim increment shorter than the one before it in that direction, so that I can tell the bundle's Edges apart by length as well as colour.
 8. As an author, I want the shortening to stop at three tenths at each end, so that even a large bundle's shortest Edge still visibly spans its pair.
 9. As an author, I want the Graphs after the Active one to take their places in the Map's Graph order, so that the bundle follows the order I authored.
 10. As an author, I want the Active Graph's Edge to move to the centre when I activate its Graph, so that the emphasised connection is always the centred one.
@@ -58,7 +58,7 @@ This is recorded as ADR 0142, which refines ADR 0100 (lane order and which Edges
   - **one direction:** rank 0 at offset 0, then ranks 1, 2, 3 … at +1, −1, +2, −2 … lanes. Positive is the keep-left side, so rank 1 sits on the keep-left side.
   - **both directions:** rank r at +(r + ½) lanes in each direction. The opposite direction lands on the opposite side because the sign is relative to travel.
   - **loops (source equals target):** rank r at r lanes, nesting outwards, as loops do today.
-  - **trim:** rank × the step, capped. The step and cap keep their current values.
+  - **trim:** rank × the trim increment of a tenth, capped at three tenths. Both values are new, and they replace the flat fifth (`DETACHED_END_TRIM`) every Edge outside the Active Graph leaves today.
   - **reach:** the largest magnitude of any offset in the pair, so every lane of a pair is offset over the same stretch of curve (ADR 0103).
 - **An offset is relative to the direction of travel.** A positive offset is the Edge's left as it travels from source to target. The lane geometry turns that into a screen side from the sides and positions it resolves while drawing. A rightward or upward Edge runs on the opposite screen side from its leftward or downward reverse. Today the sign is fixed to the screen whichever way the Edge travels, so that conversion is the one geometric change. Bridges, spans and the translate fallback (ADR 0103) take the converted offset exactly as they take one today. Loops keep their own geometry.
 - **The projection copies the lane.** `projectGraphEdges` hands each Edge its offset, reach and trim, and keeps colour, opacity, stroke width, paint order and head marker as they are. Graph order reaches the lane module as the order the Map's Graphs give their Edges, which it already does.
@@ -92,7 +92,7 @@ This is recorded as ADR 0142, which refines ADR 0100 (lane order and which Edges
 ## Out of Scope
 
 - Colour, receding opacity, stroke widths, paint order and head shapes.
-- Lane spacing, the trim step and the trim cap.
+- Lane spacing.
 - Edge receding while the Active Graph has no Edges, and the gathering of Graph drawing policy into one module. Both were discussed in the earlier `graphDrawing` design and are separate work.
 - Edge anchors and the facing rule (ADR 0087, ADR 0110).
 

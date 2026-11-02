@@ -294,15 +294,15 @@ test('activating a Graph brings its Edge to the centre, anchor to anchor', async
   near(first.long.from, leavingA, 'active Long leaving A');
 
   // With Mid active, Mid runs on the centre from A's anchor; Long, next in
-  // Graph order, runs a lane above, on the left of its travel, and a step
-  // short; Short a lane below and two steps short.
+  // Graph order, runs a lane above, on the left of its travel, and one trim
+  // increment short; Short a lane below and two short.
   await activateGraph(page, 'Mid');
   await settled(page);
   const withMid = await overAB();
   near(withMid.mid.from, leavingA, 'active Mid leaving A');
   expect(withMid.long.from.y, 'Long a lane above').toBeCloseTo(centre - 8, 1);
   expect(withMid.short.from.y, 'Short a lane below').toBeCloseTo(centre + 8, 1);
-  expect(withMid.long.from.x, 'Long a step short of A').toBeGreaterThan(leavingA.x + 1);
+  expect(withMid.long.from.x, 'Long one trim increment short of A').toBeGreaterThan(leavingA.x + 1);
   expect(withMid.short.from.x, 'Short shorter than Long').toBeGreaterThan(withMid.long.from.x + 1);
 
   // Only Long joins D and A′, so its Edge there runs anchor to anchor on the

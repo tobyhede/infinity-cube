@@ -44,7 +44,7 @@ describe('graphLanes', () => {
     expect(laneOf(lanes, RED, 'a', 'b')).toEqual({ offset: 0, reach: 0, endTrim: 0 });
   });
 
-  it('centres the Active Graph and alternates the rest outwards in Graph order, a step shorter each', () => {
+  it('centres the Active Graph and alternates the rest outwards in Graph order, one trim increment shorter each', () => {
     const lanes = graphLanes(
       [RED, BLUE, GREEN].map((graph) => edge(graph, 'a', 'b')),
       GREEN!,
