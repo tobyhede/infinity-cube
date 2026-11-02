@@ -430,13 +430,13 @@ describe('projectGraphEdges', () => {
     // The Edge data is the Graph id, its lane, how far out its pair's lanes
     // reach, and its end trim, and no geometry
     // (ADR 0086). Both fixture Graphs join the same two Resources, Alt in the other
-    // direction, so each direction stacks from half a lane out and each, first
+    // direction, so each stacks on its own left from half a lane out and each, first
     // in its direction, runs full length (ADR 0142). A Map has nowhere
     // to store waypoints, so the bezier the Edge draws between the two anchors
     // it attaches to is the only Edge geometry.
     expect(edges.find((e) => e.id === MAIN_EDGE_ID)!.data).toEqual({
       graphId: uuid('00000000-0000-4000-8000-000000000004'),
-      laneOffset: -GRAPH_LANE_SPACING / 2,
+      laneOffset: GRAPH_LANE_SPACING / 2,
       laneReach: GRAPH_LANE_SPACING / 2,
       endTrim: 0,
       headShape: 'arrow',

@@ -22,7 +22,10 @@ export interface LaneEdge {
 
 /** Where an Edge is drawn beside the others joining its pair, and how much of it is drawn. */
 export interface GraphLane {
-  /** How far from the centre line the Edge runs, and to which side. Zero for a lone Edge. */
+  /**
+   * How far from the centre line the Edge runs: positive on its left as it
+   * travels, negative on its right. Zero for a lone Edge.
+   */
   readonly offset: number;
   /**
    * How far from the centre line the outermost lane of this Edge's pair runs,
@@ -60,12 +63,14 @@ export const MAX_END_TRIM = 0.3;
  * Each direction of a pair is ranked on its own: the Active Graph's Edge first,
  * then the rest in the order given, which is the Map's Graph order. The first
  * runs anchor to anchor and each one after it is a step shorter. Where the pair
- * runs one way, the first takes the centre and the rest alternate outwards, the
- * positive side first. Where it runs both ways, each direction stacks from half
- * a lane out, the direction whose source sorts first on the negative side.
- * Loops on one Resource nest outwards from it.
+ * runs one way, the first takes the centre and the rest alternate outwards,
+ * the keep-left side first. Where it runs both ways, each direction stacks on
+ * its own left from half a lane out. Loops on one Resource nest outwards from
+ * it.
  *
- * The offset's sign is the screen's, not the Edge's (see `laneBezier`).
+ * A positive offset is the Edge's left as it travels from source to target;
+ * `laneBezier` turns it into a side of the screen as it draws, so the side
+ * holds while a Resource is dragged.
  */
 export function graphLanes(
   edges: readonly LaneEdge[],
@@ -87,16 +92,16 @@ export function graphLanes(
 
   const lanes = new Map<string, GraphLane>();
   for (const bundle of bundles.values()) {
-    const directions = [...new Set(bundle.map((edge) => edge.source))]
-      .sort()
-      .map((source) => ranked(bundle.filter((edge) => edge.source === source)));
-    const placed = directions.flatMap((direction, index) =>
+    const directions = [...new Set(bundle.map((edge) => edge.source))].map((source) =>
+      ranked(bundle.filter((edge) => edge.source === source)),
+    );
+    const placed = directions.flatMap((direction) =>
       direction.map((edge, rank) => ({
         edge,
         rank,
         lane:
           directions.length === 2
-            ? (index === 0 ? -1 : 1) * (rank + 0.5)
+            ? rank + 0.5
             : edge.source === edge.target
               ? rank
               : alternate(rank),
@@ -246,13 +251,14 @@ interface LaneCurve {
  */
 function laneCurve(
   attachment: EdgeAttachment,
-  offset: number,
+  leftward: number,
   reach: number,
 ): LaneCurve | undefined {
   const { sourcePosition, targetPosition } = attachment;
   if (HORIZONTAL.has(sourcePosition) !== HORIZONTAL.has(targetPosition)) {
-    return movedCurve(attachment, selfEdgeMoves(sourcePosition, targetPosition, offset));
+    return movedCurve(attachment, selfEdgeMoves(sourcePosition, targetPosition, leftward));
   }
+  const offset = leftward * screenSideOfLeft(sourcePosition);
 
   const [path, labelX, labelY] = getBezierPath(attachment);
   const centre = cubicOf(path);
@@ -691,6 +697,19 @@ function outward(side: Position, distance: number): [number, number] {
 }
 
 const HORIZONTAL = new Set([Position.Left, Position.Right]);
+
+/**
+ * Which way along the screen axis an anchor's side lies on — +1 below or to the
+ * right, −1 above or to the left — the left of an Edge's travel falls, read
+ * from the side it leaves: the Edge leaves along the direction that side
+ * faces, and its left is that direction turned a quarter anticlockwise on the
+ * screen.
+ */
+function screenSideOfLeft(sourcePosition: Position): 1 | -1 {
+  const [tx, ty] = outward(sourcePosition, 1);
+  const [lx, ly] = [ty, -tx];
+  return (HORIZONTAL.has(sourcePosition) ? ly : lx) > 0 ? 1 : -1;
+}
 
 /** How far, and which way on the screen, a self-Edge's lane moves its source and target. */
 function selfEdgeMoves(

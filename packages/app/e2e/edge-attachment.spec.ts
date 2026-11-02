@@ -216,7 +216,8 @@ test('several Graphs over one pair of Resources run as parallel lines either sid
 
   // Long, Mid and Short all carry A → B, and A and B sit level. Long is active,
   // so it runs anchor to anchor on the centre line (asserted against the anchors
-  // above); Mid runs one lane below it and Short one lane above (ADR 0142) —
+  // above); Mid runs one lane above it, on the left of its rightward travel, and
+  // Short one lane below (ADR 0142) —
   // each a level line of its own, in its own colour, stopping short of both
   // Resources, Short further than Mid. Every line ends in its Graph's
   // head shape (ADR 0105): Long stores none and ends in an arrow, Mid a dot and
@@ -266,8 +267,8 @@ test('several Graphs over one pair of Resources run as parallel lines either sid
   const lineOf = (graph: string) =>
     pointsOf(lines.find((line) => line.id === `${graph}::${RESOURCE_A}::${RESOURCE_B}`)!.d);
   const [mid, short] = [lineOf(MID), lineOf(SHORT)];
-  expect(levelOf(mid), 'Mid runs one lane below Long').toBeCloseTo(activeLevel + 8, 1);
-  expect(levelOf(short), 'Short runs one lane above Long').toBeCloseTo(activeLevel - 8, 1);
+  expect(levelOf(mid), 'Mid runs one lane above Long').toBeCloseTo(activeLevel - 8, 1);
+  expect(levelOf(short), 'Short runs one lane below Long').toBeCloseTo(activeLevel + 8, 1);
   expect(mid[0]!, 'Mid stops short of A').toBeGreaterThan(active[0]! + 1);
   expect(mid[6]!, 'Mid stops short of B').toBeLessThan(active[6]! - 1);
   expect(short[0]!, 'Short stops shorter of A than Mid').toBeGreaterThan(mid[0]! + 1);
@@ -293,14 +294,14 @@ test('activating a Graph brings its Edge to the centre, anchor to anchor', async
   near(first.long.from, leavingA, 'active Long leaving A');
 
   // With Mid active, Mid runs on the centre from A's anchor; Long, next in
-  // Graph order, runs a lane below and a step short; Short a lane above and
-  // two steps short.
+  // Graph order, runs a lane above, on the left of its travel, and a step
+  // short; Short a lane below and two steps short.
   await activateGraph(page, 'Mid');
   await settled(page);
   const withMid = await overAB();
   near(withMid.mid.from, leavingA, 'active Mid leaving A');
-  expect(withMid.long.from.y, 'Long a lane below').toBeCloseTo(centre + 8, 1);
-  expect(withMid.short.from.y, 'Short a lane above').toBeCloseTo(centre - 8, 1);
+  expect(withMid.long.from.y, 'Long a lane above').toBeCloseTo(centre - 8, 1);
+  expect(withMid.short.from.y, 'Short a lane below').toBeCloseTo(centre + 8, 1);
   expect(withMid.long.from.x, 'Long a step short of A').toBeGreaterThan(leavingA.x + 1);
   expect(withMid.short.from.x, 'Short shorter than Long').toBeGreaterThan(withMid.long.from.x + 1);
 
@@ -323,8 +324,70 @@ test('activating a Graph brings its Edge to the centre, anchor to anchor', async
   await settled(page);
   const withShort = await overAB();
   near(withShort.short.from, leavingA, 'active Short leaving A');
-  expect(withShort.long.from.y, 'Long a lane below').toBeCloseTo(centre + 8, 1);
-  expect(withShort.mid.from.y, 'Mid a lane above').toBeCloseTo(centre - 8, 1);
+  expect(withShort.long.from.y, 'Long a lane above').toBeCloseTo(centre - 8, 1);
+  expect(withShort.mid.from.y, 'Mid a lane below').toBeCloseTo(centre + 8, 1);
+});
+
+test('Edges running both ways between two Resources each keep to their own left', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  const a = nodeByTitle(page, 'A').first();
+  const b = nodeByTitle(page, 'B').first();
+  await expect(a).toBeVisible();
+  await settled(page);
+
+  // Draw B → A into Long, the Active Graph, beside the A → B Edges Long, Mid
+  // and Short already carry.
+  const before = await page.locator('.react-flow__edge').count();
+  await b.hover();
+  await connectHandles(
+    page,
+    authoringHandle(b, 'source', 'left'),
+    authoringHandle(a, 'target', 'right'),
+  );
+  await expect(page.locator('.react-flow__edge')).toHaveCount(before + 1);
+  await settled(page);
+
+  // Where a lane starts and ends, whatever runs between: a lane bridged to its
+  // offset draws more than one cubic.
+  const endpointsOf = async (edge: string) => {
+    const d = await page
+      .locator(`.react-flow__edge[data-id="${edge}"] .react-flow__edge-path`)
+      .getAttribute('d');
+    const n = (d?.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
+    expect(n.length, `${edge} draws a path`).toBeGreaterThanOrEqual(8);
+    return { from: { x: n[0]!, y: n[1]! }, to: { x: n.at(-2)!, y: n.at(-1)! } };
+  };
+  const B_TO_A = `${LONG}::${RESOURCE_B}::${RESOURCE_A}`;
+  const atAB = (graph: string) => endpointsOf(`${graph}::${RESOURCE_A}::${RESOURCE_B}`);
+
+  // B → A travels left, so its left is below: it runs half a lane below the
+  // centre, anchor to anchor, first in its direction. The A → B stack travels
+  // right and moves up to start half a lane above the centre, each further
+  // Graph a lane further out (ADR 0142).
+  const centre = anchorAt(await positionOf(a), 'right').y;
+  const back = await endpointsOf(B_TO_A);
+  near(back.from, { ...anchorAt(await positionOf(b), 'left'), y: centre + 4 }, 'B → A leaving B');
+  near(back.to, { ...anchorAt(await positionOf(a), 'right'), y: centre + 4 }, 'B → A entering A');
+  const [long, mid, short] = await Promise.all([LONG, MID, SHORT].map(atAB));
+  expect(long!.from.y, 'Long A → B half a lane above').toBeCloseTo(centre - 4, 1);
+  expect(mid!.from.y, 'Mid A → B a lane and a half above').toBeCloseTo(centre - 12, 1);
+  expect(short!.from.y, 'Short A → B two and a half lanes above').toBeCloseTo(centre - 20, 1);
+
+  // Halfway through a drag that takes B round below A, A → B leaves A's
+  // bottom travelling down and B → A leaves B's top travelling up. Each keeps
+  // to its own left: A → B to the screen's right of the centre and B → A to
+  // its left. The projection does not run during a drag, so the side has to
+  // come from the travel as the lane is drawn.
+  await dragBy(page, b, -840, 600, async () => {
+    const [from, to] = [await positionOf(a), await positionOf(b)];
+    const [downward, upward] = [await atAB(LONG), await endpointsOf(B_TO_A)];
+    const [leaving, returning] = [anchorAt(from, 'bottom'), anchorAt(to, 'top')];
+    near(downward.from, { ...leaving, x: leaving.x + 4 }, 'A → B mid-drag, on the right');
+    near(upward.from, { ...returning, x: returning.x - 4 }, 'B → A mid-drag, on the left');
+  });
 });
 
 /** The colour the page paints at a point on screen, as `[r, g, b]`. */
