@@ -42,14 +42,14 @@ export type RoutedEdgeData = {
   laneReach: number;
   /**
    * What fraction of its length the Edge leaves undrawn at each end. Zero for
-   * an Edge that connects; a Graph other than the Active one runs beside it and
-   * stops short.
+   * the first Edge in its direction between two Resources; each further one
+   * stops a step shorter (`graphLanes`).
    */
   endTrim: number;
   /**
    * Its Graph's head shape (ADR 0105), which the canvas's one marker for the
-   * Graph draws (`GraphHeadMarkers`) at the end of the line as drawn, whether or
-   * not it connects.
+   * Graph draws (`GraphHeadMarkers`) at the end of the line as drawn, however
+   * short.
    */
   headShape: GraphHeadShape;
   /** The Edge's Title and whether it is hidden at rest; drawn by the application, not here. */
@@ -122,7 +122,7 @@ export function useRoutedEdgeGeometry(props: EdgeProps<RoutedFlowEdge>): RoutedE
  * The head is the Edge object's `markerEnd` — its Graph's marker, drawn once
  * for the canvas by `GraphHeadMarkers` — which React Flow resolves to a
  * `url('#…')` and this forwards. A marker sits at the end of the line as drawn:
- * the anchor for an Edge that connects, the trimmed end for one that stops
+ * the anchor for an Edge drawn full length, the trimmed end for one that stops
  * short (ADR 0105).
  */
 export function RoutedEdgePath({

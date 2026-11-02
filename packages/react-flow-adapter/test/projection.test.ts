@@ -11,7 +11,7 @@ import {
   ROUTED_EDGE_TYPE,
 } from '../src/index';
 import { imageFile, jsonResourceFile, referenceFile, resourceFile } from './resource-files';
-import { DETACHED_END_TRIM, GRAPH_LANE_SPACING } from '../src/edge-lanes';
+import { GRAPH_LANE_SPACING } from '../src/edge-lanes';
 import { uuid } from './uuid';
 
 function load(
@@ -430,21 +430,21 @@ describe('projectGraphEdges', () => {
     // The Edge data is the Graph id, its lane, how far out its pair's lanes
     // reach, and its end trim, and no geometry
     // (ADR 0086). Both fixture Graphs join the same two Resources, Alt in the other
-    // direction: with nothing active the first keeps the centre and Alt takes
-    // the lane below it. Nothing is active, so both connect. A Map has nowhere
+    // direction, so each direction stacks from half a lane out and each, first
+    // in its direction, runs full length (ADR 0142). A Map has nowhere
     // to store waypoints, so the bezier the Edge draws between the two anchors
     // it attaches to is the only Edge geometry.
     expect(edges.find((e) => e.id === MAIN_EDGE_ID)!.data).toEqual({
       graphId: uuid('00000000-0000-4000-8000-000000000004'),
-      laneOffset: 0,
-      laneReach: GRAPH_LANE_SPACING,
+      laneOffset: -GRAPH_LANE_SPACING / 2,
+      laneReach: GRAPH_LANE_SPACING / 2,
       endTrim: 0,
       headShape: 'arrow',
     });
     expect(edges.find((e) => e.id === ALT_EDGE_ID)!.data).toEqual({
       graphId: uuid('00000000-0000-4000-8000-000000000030'),
-      laneOffset: GRAPH_LANE_SPACING,
-      laneReach: GRAPH_LANE_SPACING,
+      laneOffset: GRAPH_LANE_SPACING / 2,
+      laneReach: GRAPH_LANE_SPACING / 2,
       endTrim: 0,
       headShape: 'arrow',
     });
@@ -515,39 +515,24 @@ describe('projectGraphEdges', () => {
     const dataOf = (edges: ReturnType<typeof projectGraphEdges>, graphId: string) =>
       edges.find((e) => e.id.startsWith(graphId))!.data!;
 
-    it('puts the Active Graph on the centre, connecting, with the others below it', () => {
+    it('carries the lane its Edge is given: the Active Graph centred, the rest beside it and shorter', () => {
       const edges = projectGraphEdges(shared, colors, {
         activeGraphId: uuid(BLUE!),
       });
 
-      expect(dataOf(edges, BLUE!)).toMatchObject({ laneOffset: 0, endTrim: 0 });
+      expect(dataOf(edges, BLUE!)).toMatchObject({
+        laneOffset: 0,
+        laneReach: GRAPH_LANE_SPACING,
+        endTrim: 0,
+      });
       expect(dataOf(edges, RED!)).toMatchObject({
         laneOffset: GRAPH_LANE_SPACING,
-        endTrim: DETACHED_END_TRIM,
+        laneReach: GRAPH_LANE_SPACING,
+        endTrim: 0.1,
       });
-      // Green joins a different pair, so it is alone in its lane — and still
-      // stops short, being another Graph's.
-      expect(dataOf(edges, GREEN!)).toMatchObject({ laneOffset: 0, endTrim: DETACHED_END_TRIM });
-    });
-
-    it('splits the centre between both directions of a pair the Active Graph holds', () => {
-      const edges = projectGraphEdges(
-        [edge(RED!, A!, B!), edge(BLUE!, A!, B!), edge(BLUE!, B!, A!)],
-        colors,
-        { activeGraphId: uuid(BLUE!) },
-      );
-      const byId = (source: string, target: string, graphId: string) =>
-        edges.find((e) => e.id === `${graphId}::${source}::${target}`)!;
-      const forward = byId(A!, B!, BLUE!);
-      const back = byId(B!, A!, BLUE!);
-
-      // A sorts before B, so A → B takes the negative side.
-      expect(forward.data).toMatchObject({ laneOffset: -GRAPH_LANE_SPACING / 2, endTrim: 0 });
-      expect(back.data).toMatchObject({ laneOffset: GRAPH_LANE_SPACING / 2, endTrim: 0 });
-      expect(byId(A!, B!, RED!).data).toMatchObject({
-        laneOffset: (3 * GRAPH_LANE_SPACING) / 2,
-        endTrim: DETACHED_END_TRIM,
-      });
+      // Green is alone on its pair, so it runs anchor to anchor although it is
+      // not the Active Graph.
+      expect(dataOf(edges, GREEN!)).toMatchObject({ laneOffset: 0, laneReach: 0, endTrim: 0 });
     });
 
     it("ends every Edge in its Graph's head shape, the ones that stop short included", () => {
@@ -556,18 +541,12 @@ describe('projectGraphEdges', () => {
         headShapes: { [uuid(BLUE!)]: 'dot', [uuid(RED!)]: 'diamond' },
       });
 
-      // Blue connects; Red stops short beside it and Green stops short alone.
-      // Each still ends in its own Graph's head shape (ADR 0105), and Green,
-      // storing none, ends in an arrow.
+      // Blue runs full length; Red stops short beside it and Green, alone,
+      // runs full length. Each ends in its own Graph's head shape (ADR 0105),
+      // and Green, storing none, ends in an arrow.
       expect(dataOf(edges, BLUE!)).toMatchObject({ endTrim: 0, headShape: 'dot' });
-      expect(dataOf(edges, RED!)).toMatchObject({
-        endTrim: DETACHED_END_TRIM,
-        headShape: 'diamond',
-      });
-      expect(dataOf(edges, GREEN!)).toMatchObject({
-        endTrim: DETACHED_END_TRIM,
-        headShape: 'arrow',
-      });
+      expect(dataOf(edges, RED!)).toMatchObject({ endTrim: 0.1, headShape: 'diamond' });
+      expect(dataOf(edges, GREEN!)).toMatchObject({ endTrim: 0, headShape: 'arrow' });
     });
 
     it("names its Graph's one head marker as the Edge's end marker", () => {
@@ -576,8 +555,7 @@ describe('projectGraphEdges', () => {
         headShapes: { [uuid(BLUE!)]: 'dot' },
       });
 
-      // One marker per Graph, whichever Edge of it this is and whether or not
-      // it connects; Green stores no head shape and still names its own.
+      // One marker per Graph, whichever Edge of it this is and however short; Green stores no head shape and still names its own.
       expect(edges.map((e) => [e.data!.graphId, e.markerEnd])).toEqual([
         [RED, 'graph-head-00000000-0000-4000-8000-000000000201'],
         [GREEN, 'graph-head-00000000-0000-4000-8000-000000000203'],
@@ -595,11 +573,6 @@ describe('projectGraphEdges', () => {
 
       expect(centred(RED!)).toEqual([RED]);
       expect(centred(BLUE!)).toEqual([BLUE]);
-    });
-
-    it('connects every Edge while no Graph is active', () => {
-      const edges = projectGraphEdges(shared, colors, {});
-      expect(edges.map((e) => e.data!.endTrim)).toEqual([0, 0, 0]);
     });
 
     it('draws the Active Graph last, over the lanes it converges with', () => {

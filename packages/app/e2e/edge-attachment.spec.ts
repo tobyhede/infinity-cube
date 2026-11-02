@@ -1,6 +1,7 @@
 import { COLLAPSED_RESOURCE_SIZE } from '@project/core';
 import { expect, test, type Page } from './fixtures';
 import {
+  activateGraph,
   authoringHandle,
   connectHandles,
   dragBy,
@@ -78,13 +79,15 @@ const near = (actual: Point, expected: Point, what: string): void => {
 
 /** The fixture's Long Graph, and the Edge it draws from A to B. An Edge is
  *  identified by its Graph and its two endpoints (`graphRenderEdgeId`). Long is
- *  the fixture's Active Graph, so its Edge takes the centre lane and connects
- *  anchor to anchor (ADR 0100). */
+ *  the fixture's Active Graph, so its Edge takes the centre lane and runs
+ *  anchor to anchor (ADR 0142). */
 const LONG = '00000000-0000-4000-8000-000000000023';
 const MID = '00000000-0000-4000-8000-000000000024';
 const SHORT = '00000000-0000-4000-8000-000000000025';
 const RESOURCE_A = '00000000-0000-4000-8000-000000000002';
 const RESOURCE_B = '00000000-0000-4000-8000-000000000003';
+const RESOURCE_D = '00000000-0000-4000-8000-000000000006';
+const RESOURCE_A_PRIME = '00000000-0000-4000-8000-00000000000c';
 const A_TO_B = `${LONG}::${RESOURCE_A}::${RESOURCE_B}`;
 const A_TO_A = `${LONG}::${RESOURCE_A}::${RESOURCE_A}`;
 
@@ -203,7 +206,7 @@ test('a self-Edge draws a visible loop', async ({ page }) => {
   expect(paths.every((d) => d.length > 0 && !d.includes('NaN'))).toBe(true);
 });
 
-test('several Graphs over one pair of Resources run as parallel lines below the active one', async ({
+test('several Graphs over one pair of Resources run as parallel lines either side of the active one', async ({
   page,
 }) => {
   await page.goto('/');
@@ -212,9 +215,10 @@ test('several Graphs over one pair of Resources run as parallel lines below the 
   await settled(page);
 
   // Long, Mid and Short all carry A → B, and A and B sit level. Long is active,
-  // so it connects on the centre line (asserted against the anchors above); Mid
-  // and Short run below it (ADR 0100) — each a level line of its own, in its own
-  // colour, stopping short of both Resources. Every line ends in its Graph's
+  // so it runs anchor to anchor on the centre line (asserted against the anchors
+  // above); Mid runs one lane below it and Short one lane above (ADR 0142) —
+  // each a level line of its own, in its own colour, stopping short of both
+  // Resources, Short further than Mid. Every line ends in its Graph's
   // head shape (ADR 0105): Long stores none and ends in an arrow, Mid a dot and
   // Short a diamond, so the three tell apart with colour removed.
   const lines = await drawnLines(
@@ -259,17 +263,68 @@ test('several Graphs over one pair of Resources run as parallel lines below the 
   const active = pointsOf(activeLine.d);
   const activeLevel = levelOf(active);
 
-  const others = lines.filter((line) => line.id !== A_TO_B);
-  const levels = new Set<number>();
-  for (const other of others) {
-    const line = pointsOf(other.d);
-    const level = levelOf(line);
-    expect(level, 'runs below the active line').toBeGreaterThan(activeLevel);
-    levels.add(Math.round(level));
-    expect(line[0]!, 'stops short of A').toBeGreaterThan(active[0]!);
-    expect(line[6]!, 'stops short of B').toBeLessThan(active[6]!);
-  }
-  expect(levels.size, 'each in its own lane').toBe(2);
+  const lineOf = (graph: string) =>
+    pointsOf(lines.find((line) => line.id === `${graph}::${RESOURCE_A}::${RESOURCE_B}`)!.d);
+  const [mid, short] = [lineOf(MID), lineOf(SHORT)];
+  expect(levelOf(mid), 'Mid runs one lane below Long').toBeCloseTo(activeLevel + 8, 1);
+  expect(levelOf(short), 'Short runs one lane above Long').toBeCloseTo(activeLevel - 8, 1);
+  expect(mid[0]!, 'Mid stops short of A').toBeGreaterThan(active[0]! + 1);
+  expect(mid[6]!, 'Mid stops short of B').toBeLessThan(active[6]! - 1);
+  expect(short[0]!, 'Short stops shorter of A than Mid').toBeGreaterThan(mid[0]! + 1);
+  expect(short[6]!, 'Short stops shorter of B than Mid').toBeLessThan(mid[6]! - 1);
+});
+
+test('activating a Graph brings its Edge to the centre, anchor to anchor', async ({ page }) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  const a = nodeByTitle(page, 'A').first();
+  await expect(nodeByTitle(page, 'D').first()).toBeVisible();
+  await settled(page);
+
+  const overAB = async () => {
+    const [long, mid, short] = await Promise.all(
+      [LONG, MID, SHORT].map((graph) => endsOf(page, `${graph}::${RESOURCE_A}::${RESOURCE_B}`)),
+    );
+    return { long: long!, mid: mid!, short: short! };
+  };
+  const leavingA = anchorAt(await positionOf(a), 'right');
+  const centre = leavingA.y;
+  const first = await overAB();
+  near(first.long.from, leavingA, 'active Long leaving A');
+
+  // With Mid active, Mid runs on the centre from A's anchor; Long, next in
+  // Graph order, runs a lane below and a step short; Short a lane above and
+  // two steps short.
+  await activateGraph(page, 'Mid');
+  await settled(page);
+  const withMid = await overAB();
+  near(withMid.mid.from, leavingA, 'active Mid leaving A');
+  expect(withMid.long.from.y, 'Long a lane below').toBeCloseTo(centre + 8, 1);
+  expect(withMid.short.from.y, 'Short a lane above').toBeCloseTo(centre - 8, 1);
+  expect(withMid.long.from.x, 'Long a step short of A').toBeGreaterThan(leavingA.x + 1);
+  expect(withMid.short.from.x, 'Short shorter than Long').toBeGreaterThan(withMid.long.from.x + 1);
+
+  // Only Long joins D and A′, so its Edge there runs anchor to anchor on the
+  // centre although Long is not active.
+  const alone = await endsOf(page, `${LONG}::${RESOURCE_D}::${RESOURCE_A_PRIME}`);
+  near(
+    alone.from,
+    anchorAt(await positionOf(nodeByTitle(page, 'D').first()), 'right'),
+    'Long’s D → A′ leaving D',
+  );
+  near(
+    alone.to,
+    anchorAt(await positionOf(nodeByTitle(page, 'A′').first()), 'left'),
+    'Long’s D → A′ entering A′',
+  );
+
+  // With Short active, Short takes the centre and Long and Mid follow it.
+  await activateGraph(page, 'Short');
+  await settled(page);
+  const withShort = await overAB();
+  near(withShort.short.from, leavingA, 'active Short leaving A');
+  expect(withShort.long.from.y, 'Long a lane below').toBeCloseTo(centre + 8, 1);
+  expect(withShort.mid.from.y, 'Mid a lane above').toBeCloseTo(centre - 8, 1);
 });
 
 /** The colour the page paints at a point on screen, as `[r, g, b]`. */

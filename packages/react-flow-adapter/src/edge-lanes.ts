@@ -20,7 +20,7 @@ export interface LaneEdge {
   readonly graphId: GraphId;
 }
 
-/** Where an Edge is drawn beside the others joining its pair, and whether it connects. */
+/** Where an Edge is drawn beside the others joining its pair, and how much of it is drawn. */
 export interface GraphLane {
   /** How far from the centre line the Edge runs, and to which side. Zero for a lone Edge. */
   readonly offset: number;
@@ -32,29 +32,40 @@ export interface GraphLane {
    */
   readonly reach: number;
   /**
-   * Whether the Edge runs anchor to anchor rather than stopping short. The
-   * Active Graph's Edges connect, and while no Graph is active every Edge does;
-   * any other Edge runs beside them and stops short (ADR 0100).
+   * What fraction of its length the Edge leaves undrawn at each end: none for
+   * the first Edge in its direction, `END_TRIM_STEP` more for each Edge ranked
+   * before it there, up to `MAX_END_TRIM`.
    */
-  readonly connects: boolean;
+  readonly endTrim: number;
 }
 
 /**
- * The lane of every Edge, keyed by Edge id.
+ * How much more of its length each further Edge in the same direction between
+ * two Resources leaves undrawn at each end, as a fraction.
+ */
+export const END_TRIM_STEP = 0.1;
+
+/** The most of its length an Edge leaves undrawn at each end, as a fraction. */
+export const MAX_END_TRIM = 0.3;
+
+/**
+ * The lane of every Edge, keyed by Edge id, laid out from the centre out
+ * (ADR 0142).
  *
  * Every Edge joins two Resources, and each attaches from where those Resources are
  * (ADR 0087) rather than from which Graph it belongs to, so every Graph's Edge
  * between the same pair lands on the same two anchors and draws the same curve.
- * Edges sharing a pair — in either direction — are therefore given lanes. The
- * Active Graph's Edges are centred on the anchors: its one Edge takes the
- * centre, and where it holds both directions they sit half a spacing either
- * side of it, the one whose source sorts first on the negative side. Each other
- * Edge runs one spacing further out on the positive side, in the order the
- * Edges are given; where the Active Graph has no Edge in the pair, the first of
- * them keeps the centre.
+ * Edges sharing a pair — in either direction — are therefore given lanes.
  *
- * The offset's sign is the screen's, not the Edge's (see `laneBezier`), so an
- * Edge and its reverse stack the same way.
+ * Each direction of a pair is ranked on its own: the Active Graph's Edge first,
+ * then the rest in the order given, which is the Map's Graph order. The first
+ * runs anchor to anchor and each one after it is a step shorter. Where the pair
+ * runs one way, the first takes the centre and the rest alternate outwards, the
+ * positive side first. Where it runs both ways, each direction stacks from half
+ * a lane out, the direction whose source sorts first on the negative side.
+ * Loops on one Resource nest outwards from it.
+ *
+ * The offset's sign is the screen's, not the Edge's (see `laneBezier`).
  */
 export function graphLanes(
   edges: readonly LaneEdge[],
@@ -69,34 +80,43 @@ export function graphLanes(
   }
 
   const isActive = (edge: LaneEdge) => edge.graphId === activeGraphId;
+  const ranked = (direction: readonly LaneEdge[]) => [
+    ...direction.filter(isActive),
+    ...direction.filter((edge) => !isActive(edge)),
+  ];
+
   const lanes = new Map<string, GraphLane>();
   for (const bundle of bundles.values()) {
-    // A Graph holds one Edge per direction, so the Active Graph has at most two
-    // here, and they share the centre between them.
-    const active = bundle
-      .filter(isActive)
-      .sort((left, right) => (left.source < right.source ? -1 : 1));
-    const centre = (active.length - 1) / 2;
-    const others = bundle.filter((edge) => !isActive(edge));
-    const outermost = active.length === 0 ? -1 : centre;
-    const reach = Math.max(centre, outermost + others.length) * GRAPH_LANE_SPACING;
-    active.forEach((edge, lane) =>
-      lanes.set(edge.id, {
-        offset: (lane - centre) * GRAPH_LANE_SPACING,
-        reach,
-        connects: true,
-      }),
+    const directions = [...new Set(bundle.map((edge) => edge.source))]
+      .sort()
+      .map((source) => ranked(bundle.filter((edge) => edge.source === source)));
+    const placed = directions.flatMap((direction, index) =>
+      direction.map((edge, rank) => ({
+        edge,
+        rank,
+        lane:
+          directions.length === 2
+            ? (index === 0 ? -1 : 1) * (rank + 0.5)
+            : edge.source === edge.target
+              ? rank
+              : alternate(rank),
+      })),
     );
-    others.forEach((edge, lane) =>
+    const reach = Math.max(...placed.map(({ lane }) => Math.abs(lane))) * GRAPH_LANE_SPACING;
+    for (const { edge, rank, lane } of placed) {
       lanes.set(edge.id, {
-        offset: (outermost + 1 + lane) * GRAPH_LANE_SPACING,
+        offset: lane * GRAPH_LANE_SPACING,
         reach,
-        connects: activeGraphId === null,
-      }),
-    );
+        endTrim: Math.min(rank * END_TRIM_STEP, MAX_END_TRIM),
+      });
+    }
   }
   return lanes;
 }
+
+/** The lane, counted in spacings, of the Edge at `rank`: 0, then +1, −1, +2, −2 … */
+const alternate = (rank: number): number =>
+  rank === 0 ? 0 : rank % 2 === 1 ? (rank + 1) / 2 : -rank / 2;
 
 const pairKey = ({ source, target }: LaneEdge): string =>
   source <= target ? `${source}|${target}` : `${target}|${source}`;
@@ -113,13 +133,6 @@ export interface LaneGeometry {
    */
   readonly span: number;
 }
-
-/**
- * How much of its length an Edge that is not the Active Graph's leaves undrawn
- * at each end, as a fraction. The Active Graph's Edge is the one that connects;
- * the others run beside it as a reading of which Graphs also join the pair.
- */
-export const DETACHED_END_TRIM = 0.2;
 
 /**
  * The Edge a lane draws: the lone Edge's own curve, offset along its normal by
