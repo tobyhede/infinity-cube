@@ -4,14 +4,18 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] The lane module ranks each direction of a pair with the Active Graph's Edge first, then Graph order. It places a one-direction pair at 0, +1, −1, +2 … lanes by rank, a two-direction pair at ±(rank + ½) lanes with the direction whose source sorts first negative, and loops at 0, 1, 2 … lanes by rank. Each rank trims one step more, capped as today. It takes the Active Graph, or none, as a required argument.
-- [ ] Reach is the largest offset magnitude in the pair.
-- [ ] Lane module tests cover: a lone Edge; one direction with two to five Graphs; both directions with no two Edges sharing a lane; the Active Graph at each position of Graph order; the Active Graph absent from the pair; no Active Graph; loops; the trim cap; and that activation alone moves lanes.
-- [ ] Projection tests check that each Edge carries its lane and that activation moves the centre. Colour, opacity, stroke, paint order and head-marker tests pass unchanged.
-- [ ] The browser spec, on the fixture's Long, Mid and Short over A → B, checks that the Active Graph runs centred and full length with Long, then Mid, then Short active, and that the rest alternate either side and shorten in Graph order. It also checks that Long's D → A′ runs anchor to anchor with Mid active.
-- [ ] ADR 0142 "Lanes are laid out from the centre out, each direction on its own left" is written with its rejected alternatives and costs. ADR 0100 and ADR 0103 gain `Refined by: 0142`, and the ADR index gains its row.
-- [ ] The canvas rendering guide has a lanes section stating the current rule and citing ADR 0142.
-- [ ] Before-and-after screenshots of A → B with each Graph active.
-- [ ] Targeted local checks pass on Node 26, and `CI passed` is green on #455.
+- [x] The lane module ranks each direction of a pair with the Active Graph's Edge first, then Graph order. It places a one-direction pair at 0, +1, −1, +2 … lanes by rank, a two-direction pair at ±(rank + ½) lanes with the direction whose source sorts first negative, and loops at 0, 1, 2 … lanes by rank. Each rank trims one step more, capped as today. It takes the Active Graph, or none, as a required argument.
+- [x] Reach is the largest offset magnitude in the pair.
+- [x] Lane module tests cover: a lone Edge; one direction with two to five Graphs; both directions with no two Edges sharing a lane; the Active Graph at each position of Graph order; the Active Graph absent from the pair; no Active Graph; loops; the trim cap; and that activation alone moves lanes.
+- [x] Projection tests check that each Edge carries its lane and that activation moves the centre. Colour, opacity, stroke, paint order and head-marker tests pass unchanged.
+- [x] The browser spec, on the fixture's Long, Mid and Short over A → B, checks that the Active Graph runs centred and full length with Long, then Mid, then Short active, and that the rest alternate either side and shorten in Graph order. It also checks that Long's D → A′ runs anchor to anchor with Mid active.
+- [x] ADR 0142 "Lanes are laid out from the centre out, each direction on its own left" is written with its rejected alternatives and costs. ADR 0100 and ADR 0103 gain `Refined by: 0142`, and the ADR index gains its row.
+- [x] The canvas rendering guide has a lanes section stating the current rule and citing ADR 0142.
+- [x] Before-and-after screenshots of A → B with each Graph active.
+- [x] Targeted local checks pass on Node 26, and `CI passed` is green on #455.
+
+## Answer
+
+Built test-first through `graphLanes`, one case per cycle. Red first: a lone inactive Edge stopping short, one-direction alternation with the Active Graph first, the trim cap, a two-way pair split from half a lane out, and loops nesting outwards. The cases for an Active Graph holding both directions, a reverse Edge alone in its direction and no Active Graph passed when written. Disabling the Active-first ranking, or alternation, turned 3 and 2 of the suite red respectively, so they are not vacuous. The projection copies the lane, and `projection.test.ts` holds that and the centre moving on activation. In `edge-attachment.spec.ts`, "…either side of the active one" and "activating a Graph brings its Edge to the centre…" fail on `main`'s lane code and pass on this one. ADR 0142 records the rule, refining ADR 0100 and ADR 0103, and `rendering.md` has a lanes section. Node 26: `vitest run packages/react-flow-adapter packages/app/test test/unit` (3853 passed, 25 skipped), the edge-attachment spec (7 passed), typecheck, typecheck:packages, eslint, prettier and oxlint on the changed files. `CI passed` green on `38bdce0`. Screenshots are in the project thread.
