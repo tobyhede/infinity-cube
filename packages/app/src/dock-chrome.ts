@@ -60,6 +60,7 @@ export interface DockResourcesInput {
   readonly outside: readonly Resource[];
   readonly memberships: DockResourcesList['memberships'];
   readonly spaceTitleById: DockResourcesList['spaceTitleById'];
+  readonly spaceViewNameById: DockResourcesList['spaceViewNameById'];
   readonly disclose: ResourcesDisclosure | null;
   readonly addressedResourceId: ResourceId | null;
   readonly placement: ResourcePlacementCommands;
@@ -432,6 +433,7 @@ export function useDockChrome(
         resources: resources.outside,
         allResources: space.resources,
         spaceTitleById: resources.spaceTitleById,
+        spaceViewNameById: resources.spaceViewNameById,
         spaces: referenceableSpaces,
         onAddSpace: (row) => placement.addSpaceResourceFor(row, centreAnchor()),
         memberships: resources.memberships,

@@ -221,6 +221,6 @@ describe('the Spaces a Resources list offers', () => {
     await waitFor(() =>
       expect(offeredSpaces()).toHaveAccessibleName('Spaces in this Meta Space, 3'),
     );
-    expect(screen.getByRole('button', { name: 'Add Space 1 to Map' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add new view of Space 1 to Map' })).toBeInTheDocument();
   }, 15_000);
 });

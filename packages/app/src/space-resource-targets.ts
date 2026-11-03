@@ -1,6 +1,6 @@
-import { spaceReferences } from '@project/core';
+import { spaceReferences, spaceSelection } from '@project/core';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import type { Resource, UUID } from '@project/core';
+import type { Resource, ResourceId, UUID } from '@project/core';
 import {
   spaceResourceTarget,
   type SpaceResourceAuthoring,
@@ -178,9 +178,35 @@ export const useSpaceResourceTargets = (
 export const spaceTitlesById = (targets: SpaceResourceTargets): ReadonlyMap<UUID, string> =>
   new Map([...targets].map(([id, target]) => [id, target.title]));
 
+/**
+ * The view each Space Resource shows, as its target Map's and Graph's titles,
+ * keyed by the Resource.
+ *
+ * Two Space Resources showing one Space carry the same name wherever the Space
+ * was named after them, so the view is what tells them apart in a list. A
+ * Resource whose target has not been read, or whose selection does not resolve
+ * in it, is absent rather than named with a guess.
+ */
+export const spaceViewNamesById = (
+  targets: SpaceResourceTargets,
+  resources: readonly Resource[],
+): ReadonlyMap<ResourceId, string> => {
+  const names = new Map<ResourceId, string>();
+  for (const resource of resources) {
+    const view = spaceSelection(resource);
+    if (view === undefined) continue;
+    const targetMap = targets.get(view.spaceId)?.maps.find(({ id }) => id === view.map);
+    const graph = targetMap?.graphs.find(({ id }) => id === view.graph);
+    if (targetMap !== undefined && graph !== undefined)
+      names.set(resource.id, `${targetMap.title} · ${graph.title}`);
+  }
+  return names;
+};
+
 export interface SpaceResourceTargetTitles {
   readonly targets: SpaceResourceTargets;
   readonly titleById: ReadonlyMap<UUID, string>;
+  readonly viewNameById: ReadonlyMap<ResourceId, string>;
 }
 
 /**
@@ -197,5 +223,6 @@ export const useSpaceResourceTargetTitles = (
   const read = useCallback((spaceId: UUID) => source.target(spaceId), [source]);
   const targets = useSpaceResourceTargets(resources, read);
   const titleById = useMemo(() => spaceTitlesById(targets), [targets]);
-  return { targets, titleById };
+  const viewNameById = useMemo(() => spaceViewNamesById(targets, resources), [targets, resources]);
+  return { targets, titleById, viewNameById };
 };

@@ -149,6 +149,7 @@ function ResourcesList({
       resources={list.resources}
       allResources={list.allResources}
       spaceTitleById={list.spaceTitleById}
+      spaceViewNameById={list.spaceViewNameById}
       spaces={list.spaces}
       onAddSpace={list.onAddSpace}
       memberships={list.memberships}

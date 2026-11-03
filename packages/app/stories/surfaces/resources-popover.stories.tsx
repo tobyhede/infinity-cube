@@ -9,6 +9,7 @@ import { composeApp } from '#src/compose-app';
 import { resolveMap, resourcesOutsideMap } from '#src/map-resolution';
 import { otherMapMemberships, type MapMemberships } from '#src/map-memberships';
 import type { SpaceDrag } from '#src/resources-drag';
+import { spaceTitlesById, spaceViewNamesById } from '#src/space-resource-targets';
 import { storelessImages } from '../support/image-sources';
 import { sparseAuthoredSnapshot, widelyPlacedSpace } from '../support/spaces';
 import { CANVAS } from '#src/space-authoring';
@@ -60,6 +61,8 @@ function ResourcesPopoverFixture({
   notice,
   spaces,
   memberships,
+  spaceTitleById,
+  spaceViewNameById,
 }: {
   readonly resources?: readonly Resource[];
   readonly allResources?: readonly Resource[];
@@ -67,6 +70,8 @@ function ResourcesPopoverFixture({
   readonly notice?: ReactNode;
   readonly spaces?: readonly { readonly id: UUID; readonly title: string }[];
   readonly memberships?: MapMemberships;
+  readonly spaceTitleById?: ReadonlyMap<UUID, string>;
+  readonly spaceViewNameById?: ReadonlyMap<Resource['id'], string>;
 }) {
   const [open, setOpen] = useState(false);
   const [added, setAdded] = useState<readonly string[]>([]);
@@ -114,6 +119,8 @@ function ResourcesPopoverFixture({
             spaceDrag.current = null;
           }}
           memberships={memberships}
+          spaceTitleById={spaceTitleById}
+          spaceViewNameById={spaceViewNameById}
         />
       </header>
       {notice}
@@ -230,6 +237,84 @@ export const PlacedElsewhere: Story = () => {
   );
 };
 PlacedElsewhere.meta = { iframed: true };
+
+const ROADMAP_ID = id('000000000040');
+const PLAN_MAP = id('000000000041');
+const RISKS_MAP = id('000000000042');
+
+/** The target Space as the target read answers it: its Maps and their Graphs. */
+const ROADMAP_TARGETS = new Map([
+  [
+    ROADMAP_ID,
+    {
+      id: ROADMAP_ID,
+      title: 'Roadmap',
+      maps: [
+        {
+          id: PLAN_MAP,
+          title: 'Plan',
+          graphs: [
+            {
+              id: id('000000000043'),
+              title: 'Milestones',
+              color: '#1f77b4',
+              headShape: 'arrow' as const,
+            },
+          ],
+        },
+        {
+          id: RISKS_MAP,
+          title: 'Risks',
+          graphs: [
+            {
+              id: id('000000000044'),
+              title: 'Security',
+              color: '#d62728',
+              headShape: 'arrow' as const,
+            },
+          ],
+        },
+      ],
+    },
+  ],
+]);
+
+const ROADMAP_RESOURCES: readonly Resource[] = [
+  {
+    id: id('000000000045'),
+    title: 'Roadmap',
+    kind: 'space',
+    content: { spaceId: ROADMAP_ID, map: PLAN_MAP, graph: id('000000000043') },
+  },
+  {
+    id: id('000000000046'),
+    title: 'Roadmap',
+    kind: 'space',
+    content: { spaceId: ROADMAP_ID, map: RISKS_MAP, graph: id('000000000044') },
+  },
+  { id: id('000000000047'), title: 'Release notes', kind: 'markdown', content: { source: '' } },
+];
+
+/**
+ * One Space under three rows that share its name: two Space Resources showing
+ * it differently, one of them also on another Map, and the Space itself. Each
+ * Space Resource row names the Map and Graph it shows, read from the target the
+ * way the application reads it, and the Space row says it makes a new view.
+ */
+export const SpaceViews: Story = () => (
+  <ResourcesPopoverFixture
+    resources={ROADMAP_RESOURCES}
+    spaces={[{ id: ROADMAP_ID, title: 'Roadmap' }]}
+    spaceTitleById={spaceTitlesById(ROADMAP_TARGETS)}
+    spaceViewNameById={spaceViewNamesById(ROADMAP_TARGETS, ROADMAP_RESOURCES)}
+    memberships={
+      new Map([
+        [id('000000000046'), [{ mapId: id('000000000048'), mapTitle: 'Deep dive', graphs: [] }]],
+      ])
+    }
+  />
+);
+SpaceViews.meta = { iframed: true };
 
 export const Empty: Story = () => (
   <ResourcesPopoverFixture resources={[]} allResources={RESOURCES} />

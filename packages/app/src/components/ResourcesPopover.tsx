@@ -194,6 +194,14 @@ export interface ResourcesPlacingProps extends ResourcesPopoverSurfaceProps {
    */
   readonly spaces?: readonly ResourcesPopoverSpace[] | undefined;
   /**
+   * The view each Space Resource row shows, as its target Map's and Graph's
+   * titles. A Space Resource and the Space it shows can carry one name, and two
+   * Space Resources showing one Space usually do, so the view is drawn under the
+   * name and joins the row's description. Absent for a row whose target has not
+   * been read.
+   */
+  readonly spaceViewNameById?: ReadonlyMap<ResourceId, string> | undefined;
+  /**
    * Place a Space by authoring the Space Resource that frames it.
    *
    * Answers a promise where {@link onAdd} answers at once, because this one is
@@ -265,6 +273,9 @@ const FilterToggle = ToggleGroupItem<ResourcesFilter>;
 const NO_SPACE_TITLES: ReadonlyMap<UUID, string> = new Map();
 const NO_SPACES: readonly ResourcesPopoverSpace[] = [];
 const NO_MEMBERSHIPS: MapMemberships = new Map();
+
+/** What a Space row's press makes, drawn under the Space's name. */
+const NEW_VIEW = 'New view';
 
 /** Long enough that scanning down the list does not flash a tooltip per row. */
 const ROW_TOOLTIP_DELAY_MS = 500;
@@ -928,6 +939,19 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
                           beginSpaceDrag(event, row.space, onSpaceDragStart);
                 const placed =
                   row.kind === 'resource' ? membershipsOf(memberships, row.resource.id) : [];
+                // What the row adds, under its name: the view a Space Resource
+                // already shows, or, for a Space row, the new view a press makes.
+                const view =
+                  row.kind === 'resource'
+                    ? placing?.spaceViewNameById?.get(row.resource.id)
+                    : undefined;
+                const detail = row.kind === 'resource' ? view : NEW_VIEW;
+                const describing = [
+                  ...(view === undefined ? [] : [`Shows ${view}`]),
+                  ...(placed.length === 0
+                    ? []
+                    : [`Also in ${placed.map(describeMembership).join('; ')}`]),
+                ].join('. ');
                 const description = `${describedBy}-${key}`;
                 const onDelete = placing?.onDelete;
                 return (
@@ -970,8 +994,12 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
                                 : undefined
                             }
                             className="resources-popover__row min-w-0 flex-1 justify-start"
-                            aria-label={`Add ${name} to Map`}
-                            aria-describedby={placed.length === 0 ? undefined : description}
+                            aria-label={
+                              row.kind === 'resource'
+                                ? `Add ${name} to Map`
+                                : `Add new view of ${name} to Map`
+                            }
+                            aria-describedby={describing === '' ? undefined : description}
                             onDragStart={startDrag}
                             onDragEnd={startDrag === undefined ? undefined : placing?.onDragEnd}
                             onClick={(event) => {
@@ -1032,7 +1060,12 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
                             drawn Resource rather than on every surface that names one. A
                             Space's own title is one line under that ADR, so there the
                             Title and the name are the same string. */}
-                        <span className="resources-popover__row-title">{name}</span>
+                        <span className="resources-popover__row-text">
+                          <span className="resources-popover__row-title">{name}</span>
+                          {detail === undefined ? null : (
+                            <span className="resources-popover__row-detail">{detail}</span>
+                          )}
+                        </span>
                         <MembershipCapsules memberships={placed} />
                       </TooltipTrigger>
                       <TooltipContent side="right" className="flex-col items-start">
@@ -1058,9 +1091,9 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
                       // A Space row keeps the slot empty, so every row ends on one edge.
                       <span aria-hidden="true" className="size-7 shrink-0" />
                     )}
-                    {placed.length === 0 ? null : (
+                    {describing === '' ? null : (
                       <span id={description} className="sr-only">
-                        {`Also in ${placed.map(describeMembership).join('; ')}`}
+                        {describing}
                       </span>
                     )}
                   </li>

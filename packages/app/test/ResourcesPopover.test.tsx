@@ -55,6 +55,7 @@ function Fixture({
   onAdd = vi.fn(),
   onDragStart = vi.fn(),
   spaceTitleById = NO_SPACE_TITLES,
+  spaceViewNameById,
   spaces,
   onAddSpace,
   onSpaceDragStart,
@@ -66,6 +67,7 @@ function Fixture({
   readonly onAdd?: (resource: Resource, activation: 'keyboard' | 'pointer') => string | null;
   readonly onDragStart?: (resourceId: Resource['id'], settle: SettleResource) => void;
   readonly spaceTitleById?: ReadonlyMap<UUID, string>;
+  readonly spaceViewNameById?: ReadonlyMap<Resource['id'], string>;
   readonly spaces?: readonly { readonly id: UUID; readonly title: string }[];
   readonly onAddSpace?: (space: {
     readonly id: UUID;
@@ -87,6 +89,7 @@ function Fixture({
         onAdd={onAdd}
         onDragStart={onDragStart}
         spaceTitleById={spaceTitleById}
+        spaceViewNameById={spaceViewNameById}
         spaces={spaces}
         onAddSpace={onAddSpace}
         onSpaceDragStart={onSpaceDragStart}
@@ -552,7 +555,7 @@ describe('ResourcesPopover', () => {
     const view = render(<ControlledFixture open spaces={[BLUEPRINT]} onAddSpace={onAddSpace} />);
     await screen.findByRole('dialog', { name: 'Resources' });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add Blueprint to Map' }), {
+    fireEvent.click(screen.getByRole('button', { name: 'Add new view of Blueprint to Map' }), {
       detail: 1,
     });
     expect(onAddSpace).toHaveBeenCalledTimes(1);
@@ -666,7 +669,7 @@ describe('ResourcesPopover', () => {
     expect(allSpaces.querySelector('[data-icon="space"]')).not.toBeInTheDocument();
     const spaceResources = screen.getByRole('button', { name: 'Space Resources in this Space, 1' });
     expect(spaceResources.querySelector('[data-icon="space"]')).toBeInTheDocument();
-    const space = screen.getByRole('button', { name: 'Add Blueprint to Map' });
+    const space = screen.getByRole('button', { name: 'Add new view of Blueprint to Map' });
     expect(space.querySelector('[data-icon="space"]')).toBeInTheDocument();
   });
 
@@ -754,11 +757,38 @@ describe('ResourcesPopover', () => {
     expect(resourceButtons().map((button) => button.getAttribute('aria-label'))).toEqual([
       'Add Alpha to Map',
       'Add Alpha to Map',
-      'Add Blueprint to Map',
+      'Add new view of Blueprint to Map',
       'Add Constraints to Map',
-      'Add Yardstick to Map',
+      'Add new view of Yardstick to Map',
       'Add Zulu to Map',
     ]);
+  });
+
+  /**
+   * A Space Resource row and a Space row can carry one name, so each row says
+   * what it adds: the view a Space Resource already shows, or a new view.
+   */
+  it('names the view a Space Resource row shows, and calls a Space row a new view', async () => {
+    render(
+      <Fixture
+        spaceViewNameById={new Map([[id('000000000002'), 'Plan · Security']])}
+        spaces={[{ id: id('000000000020'), title: 'Alpha' }]}
+        onAddSpace={() => Promise.resolve(null)}
+      />,
+    );
+    await openList();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search resources' }), {
+      target: { value: 'alpha' },
+    });
+
+    const spaceResource = screen
+      .getAllByRole('button', { name: 'Add Alpha to Map' })
+      .find((row) => row.querySelector('[data-icon="space"]') !== null);
+    expect(spaceResource).toHaveTextContent('Plan · Security');
+    expect(spaceResource).toHaveAccessibleDescription(/Shows Plan · Security/);
+
+    const space = screen.getByRole('button', { name: 'Add new view of Alpha to Map' });
+    expect(space).toHaveTextContent('New view');
   });
 
   it('takes the Spaces away when their toggle is pressed off, and leaves the Resources', async () => {
@@ -769,11 +799,15 @@ describe('ResourcesPopover', () => {
       />,
     );
     await openList();
-    expect(screen.getByRole('button', { name: 'Add Blueprint to Map' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Add new view of Blueprint to Map' }),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /^Spaces in this Meta Space, \d+$/ }));
 
-    expect(screen.queryByRole('button', { name: 'Add Blueprint to Map' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Add new view of Blueprint to Map' }),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add Zulu to Map' })).toBeInTheDocument();
   });
 
@@ -784,7 +818,7 @@ describe('ResourcesPopover', () => {
     );
     await openList();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add Blueprint to Map' }), {
+    fireEvent.click(screen.getByRole('button', { name: 'Add new view of Blueprint to Map' }), {
       detail: 1,
     });
 
@@ -808,7 +842,7 @@ describe('ResourcesPopover', () => {
     );
     await openList();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add Blueprint to Map' }), {
+    fireEvent.click(screen.getByRole('button', { name: 'Add new view of Blueprint to Map' }), {
       detail: 1,
     });
 
@@ -837,7 +871,7 @@ describe('ResourcesPopover', () => {
     );
     await openList();
 
-    const row = screen.getByRole('button', { name: 'Add Blueprint to Map' });
+    const row = screen.getByRole('button', { name: 'Add new view of Blueprint to Map' });
     act(() => {
       row.focus();
     });
@@ -863,7 +897,7 @@ describe('ResourcesPopover', () => {
     await openList();
 
     const resourceRow = screen.getByRole('button', { name: 'Add Zulu to Map' });
-    const spaceRow = screen.getByRole('button', { name: 'Add Blueprint to Map' });
+    const spaceRow = screen.getByRole('button', { name: 'Add new view of Blueprint to Map' });
 
     for (const row of [resourceRow, spaceRow]) {
       expect(row).toHaveAttribute('draggable', 'true');
@@ -877,7 +911,7 @@ describe('ResourcesPopover', () => {
     await openList();
 
     const setData = vi.fn();
-    fireEvent.dragStart(screen.getByRole('button', { name: 'Add Blueprint to Map' }), {
+    fireEvent.dragStart(screen.getByRole('button', { name: 'Add new view of Blueprint to Map' }), {
       dataTransfer: { setData, effectAllowed: 'none' },
     });
 
@@ -897,7 +931,7 @@ describe('ResourcesPopover', () => {
       />,
     );
     await openList();
-    fireEvent.dragStart(screen.getByRole('button', { name: 'Add Blueprint to Map' }), {
+    fireEvent.dragStart(screen.getByRole('button', { name: 'Add new view of Blueprint to Map' }), {
       dataTransfer: { setData: vi.fn(), effectAllowed: 'none' },
     });
 
@@ -919,7 +953,7 @@ describe('ResourcesPopover', () => {
       />,
     );
     await openList();
-    fireEvent.dragStart(screen.getByRole('button', { name: 'Add Blueprint to Map' }), {
+    fireEvent.dragStart(screen.getByRole('button', { name: 'Add new view of Blueprint to Map' }), {
       dataTransfer: { setData: vi.fn(), effectAllowed: 'none' },
     });
 
@@ -947,7 +981,7 @@ describe('ResourcesPopover', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add Zulu to Map' }));
     expect(screen.getByRole('alert')).toBeInTheDocument();
 
-    fireEvent.dragStart(screen.getByRole('button', { name: 'Add Blueprint to Map' }), {
+    fireEvent.dragStart(screen.getByRole('button', { name: 'Add new view of Blueprint to Map' }), {
       dataTransfer: { setData: vi.fn(), effectAllowed: 'none' },
     });
     await act(async () => {
@@ -972,7 +1006,7 @@ describe('ResourcesPopover', () => {
       <ControlledFixture open spaces={[BLUEPRINT]} onSpaceDragStart={onSpaceDragStart} />,
     );
     await screen.findByRole('dialog', { name: 'Resources' });
-    fireEvent.dragStart(screen.getByRole('button', { name: 'Add Blueprint to Map' }), {
+    fireEvent.dragStart(screen.getByRole('button', { name: 'Add new view of Blueprint to Map' }), {
       dataTransfer: { setData: vi.fn(), effectAllowed: 'none' },
     });
 
@@ -1114,7 +1148,9 @@ describe('ResourcesPopover', () => {
     render(<Fixture spaces={[BLUEPRINT]} onAddSpace={vi.fn()} onDelete={vi.fn()} />);
     await openList();
 
-    expect(screen.getByRole('button', { name: 'Add Blueprint to Map' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Add new view of Blueprint to Map' }),
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Delete Blueprint from Space' }),
     ).not.toBeInTheDocument();
@@ -1519,7 +1555,7 @@ describe('ResourcesPopover row hint', () => {
     );
   };
 
-  it.each(['Add Zulu to Map', 'Add Blueprint to Map'])(
+  it.each(['Add Zulu to Map', 'Add new view of Blueprint to Map'])(
     'says where %s lands, one hint for every row that drags',
     async (name) => {
       render(<Fixture spaces={[BLUEPRINT]} onAddSpace={vi.fn()} onSpaceDragStart={vi.fn()} />);
@@ -1532,7 +1568,7 @@ describe('ResourcesPopover row hint', () => {
 
   it('names no drag on a Space row nothing takes the drag of', async () => {
     render(<ControlledFixture open spaces={[BLUEPRINT]} onAddSpace={vi.fn()} />);
-    expect(await hintOf('Add Blueprint to Map')).toHaveTextContent(
+    expect(await hintOf('Add new view of Blueprint to Map')).toHaveTextContent(
       /^Add to Map: click to centre on canvas$/,
     );
   });

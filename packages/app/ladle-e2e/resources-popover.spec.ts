@@ -45,7 +45,7 @@ test(
     // Interleaved by name rather than sectioned by source: the reader is
     // looking for a name, and the glyph on each row says which it is.
     await expect(page.getByRole('button', { name: /^Add .* to Map$/ })).toHaveCount(7);
-    const spaceRow = page.getByRole('button', { name: 'Add Blueprint to Map' });
+    const spaceRow = page.getByRole('button', { name: 'Add new view of Blueprint to Map' });
     await expect(spaceRow).toHaveAttribute('data-space-id', /.+/);
 
     await expect(spaceRow.locator('[data-icon="space"]')).toBeVisible();
@@ -64,7 +64,9 @@ test(
     await expect(page.getByText('Added: Blueprint')).toBeVisible();
 
     await page.getByRole('button', { name: /^Spaces in this Meta Space, \d+$/ }).click();
-    await expect(page.getByRole('button', { name: 'Add Yardstick to Map' })).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: 'Add new view of Yardstick to Map' }),
+    ).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Add Architecture to Map' })).toBeVisible();
   },
 );
@@ -76,7 +78,7 @@ test(
     await page.goto(story('meta-spaces'));
     await page.getByRole('button', { name: 'Resources' }).click();
 
-    const spaceRow = page.getByRole('button', { name: 'Add Blueprint to Map' });
+    const spaceRow = page.getByRole('button', { name: 'Add new view of Blueprint to Map' });
     await expect(spaceRow).toHaveAttribute('draggable', 'true');
     await expect(spaceRow.locator('.resources-popover__row-grip')).toBeAttached();
     await spaceRow.hover();
@@ -111,7 +113,9 @@ test(
     expect(deleteBox.x).toBeGreaterThanOrEqual(rowBox.x + rowBox.width - 1);
 
     // A Space is not a Resource of this Space, so there is nothing to delete.
-    await expect(page.getByRole('button', { name: 'Add Blueprint to Map' })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Add new view of Blueprint to Map' }),
+    ).toBeVisible();
     await expect(page.getByRole('button', { name: /^Delete Blueprint/ })).toHaveCount(0);
 
     // The press asks for the delete; it does not add the Resource.
@@ -138,6 +142,28 @@ test(
     await expect(page.getByRole('button', { name: 'Markdown Resources, 1' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Reference Resources, 0' })).toBeVisible();
     await expect(page.getByRole('button', { name: /^Add .* to Map$/ })).toHaveCount(1);
+  },
+);
+
+test(
+  'Resources list tells rows sharing a Space’s name apart by the view each adds',
+  { tag: '@parity:resources-popover-names-each-space-view' },
+  async ({ page }) => {
+    await page.goto(story('space-views'));
+    await page.getByRole('button', { name: 'Resources' }).click();
+
+    const plan = page
+      .getByRole('button', { name: 'Add Roadmap to Map' })
+      .filter({ hasText: 'Plan · Milestones' });
+    await expect(plan).toBeVisible();
+    await expect(plan).toHaveAccessibleDescription(/Shows Plan · Milestones/);
+    const risks = page
+      .getByRole('button', { name: 'Add Roadmap to Map' })
+      .filter({ hasText: 'Risks · Security' });
+    await expect(risks).toContainText('Risks · Security');
+    await expect(risks).toHaveAccessibleDescription(/Also in Deep dive/);
+    const space = page.getByRole('button', { name: 'Add new view of Roadmap to Map' });
+    await expect(space).toContainText('New view');
   },
 );
 

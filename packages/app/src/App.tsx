@@ -243,6 +243,7 @@ export const createApp = (
           outside: view.resourcesOutsideMap,
           memberships: view.membershipsOutsideMap,
           spaceTitleById: spaceResourceTargets.titleById,
+          spaceViewNameById: spaceResourceTargets.viewNameById,
           disclose: discloseResources,
           addressedResourceId,
           placement,

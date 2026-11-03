@@ -385,6 +385,8 @@ export interface DockResourcesList {
   readonly allResources: readonly Resource[];
   /** The Title of every Space a Space Resource in the list references. */
   readonly spaceTitleById?: ReadonlyMap<UUID, string> | undefined;
+  /** The view each Space Resource in the list shows, as its target Map's and Graph's titles. */
+  readonly spaceViewNameById?: ReadonlyMap<ResourceId, string> | undefined;
   /**
    * Every Space this Meta Space holds bar the one being authored.
    *
