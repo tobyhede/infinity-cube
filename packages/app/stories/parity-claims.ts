@@ -100,11 +100,11 @@ export const parityClaims: readonly ParityClaim[] = [
       'A Space row carries the drag grip and a tooltip naming both gestures, and dropping it on the canvas places that Space — authoring the Space Resource that frames it at the drop point — while the list that started the drag stays open to take its answer.',
   },
   {
-    id: 'resources-popover-names-each-space-view',
+    id: 'resources-popover-names-each-space-selection',
     storyFile: 'surfaces/resources-popover.stories.tsx',
-    storyExport: 'SpaceViews',
+    storyExport: 'SpaceSelections',
     claim:
-      'Where a Space Resource row and a Space row share a name, each Space Resource row names the Map and Graph of its target that it shows, under its name and in its description, and the Space row reads "New view" and is named as adding a new view of that Space.',
+      'Where a Space Resource row and a Space row share a name, each Space Resource row names the Map and Graph of its target that it shows, under its name and in its description, and the Space row reads "New Space Resource" and is named as adding a new view of that Space.',
   },
   {
     id: 'resources-popover-counts-what-each-filter-contributes',

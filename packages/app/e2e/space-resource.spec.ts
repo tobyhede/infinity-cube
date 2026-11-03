@@ -124,7 +124,7 @@ const addExistingSpace = async (page: Page, title: string): Promise<void> => {
   await page.getByRole('button', { name: 'Resources' }).click();
   const list = page.getByRole('dialog', { name: 'Resources' });
   await expect(list).toBeVisible();
-  await list.getByRole('button', { name: `Add new view of ${title} to Map` }).click();
+  await list.getByRole('button', { name: `Add ${title} as a new Space Resource to Map` }).click();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog', { name: 'Resources' })).toHaveCount(0);
 };
@@ -188,7 +188,7 @@ test(
     // `Space 1`, not `Architecture`: the rename above was the Resource's, and a
     // Resource's Title and the title of the Space it references agree only at
     // creation (`CONTEXT.md`). This row names the Space.
-    const row = list.getByRole('button', { name: 'Add new view of Space 1 to Map' });
+    const row = list.getByRole('button', { name: 'Add Space 1 as a new Space Resource to Map' });
     await expect(row).toHaveCount(1);
     await expect(row).toHaveAttribute('data-space-id', /.+/);
     await expect(row.locator('[data-icon="space"]')).toBeVisible();
@@ -209,9 +209,9 @@ test(
 
     // And pressing its toggle off takes it away, leaving this Space's Resources.
     await page.getByRole('button', { name: /^Spaces in this Meta Space, \d+$/ }).click();
-    await expect(list.getByRole('button', { name: 'Add new view of Space 1 to Map' })).toHaveCount(
-      0,
-    );
+    await expect(
+      list.getByRole('button', { name: 'Add Space 1 as a new Space Resource to Map' }),
+    ).toHaveCount(0);
   },
 );
 
@@ -228,8 +228,8 @@ test(
  * name on two rows, told apart by what each adds.
  */
 test(
-  'the Resources list names the view a Space Resource shows beside the Space row’s new view',
-  { tag: '@parity:resources-popover-names-each-space-view' },
+  'the Resources list names the Map and Graph a Space Resource selects beside the Space row’s new Space Resource',
+  { tag: '@parity:resources-popover-names-each-space-selection' },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
@@ -238,11 +238,13 @@ test(
     await page.getByRole('button', { name: 'Resources' }).click();
     const list = page.getByRole('dialog', { name: 'Resources' });
     const spaceResource = list.getByRole('button', { name: 'Add Deep dive to Map' });
-    // The view is the target's Map and Graph, read from the target Space.
+    // The selections are titled from the target Space.
     await expect(spaceResource).toContainText('Deep dive · Deep dive');
     await expect(spaceResource).toHaveAccessibleDescription(/Shows Deep dive · Deep dive/);
-    const space = list.getByRole('button', { name: 'Add new view of Deep dive to Map' });
-    await expect(space).toContainText('New view');
+    const space = list.getByRole('button', {
+      name: 'Add Deep dive as a new Space Resource to Map',
+    });
+    await expect(space).toContainText('New Space Resource');
   },
 );
 
@@ -258,9 +260,11 @@ test(
 
     await page.getByRole('button', { name: 'Resources' }).click();
     const list = page.getByRole('dialog', { name: 'Resources' });
-    // The Space's row, which offers a new view, not the Space Resource beside
+    // The Space's row, which offers a new Space Resource, not the Space Resource beside
     // it that shares its title.
-    const source = list.getByRole('button', { name: 'Add new view of Deep dive to Map' });
+    const source = list.getByRole('button', {
+      name: 'Add Deep dive as a new Space Resource to Map',
+    });
     await expect(source).toHaveAttribute('data-space-id', /.+/);
     await expect(source).toHaveAttribute('draggable', 'true');
     await source.hover();
@@ -314,9 +318,9 @@ test('stops offering a Space the moment the last Space Resource referencing it i
   };
 
   const offered = await openList();
-  await expect(offered.getByRole('button', { name: 'Add new view of Space 1 to Map' })).toHaveCount(
-    1,
-  );
+  await expect(
+    offered.getByRole('button', { name: 'Add Space 1 as a new Space Resource to Map' }),
+  ).toHaveCount(1);
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog', { name: 'Resources' })).toHaveCount(0);
 
@@ -337,9 +341,9 @@ test('stops offering a Space the moment the last Space Resource referencing it i
   // The fixture already holds ordinary Spaces; deleting Architecture lands
   // back on those, not on an empty Meta Space.
   const after = await openList();
-  await expect(after.getByRole('button', { name: 'Add new view of Space 1 to Map' })).toHaveCount(
-    0,
-  );
+  await expect(
+    after.getByRole('button', { name: 'Add Space 1 as a new Space Resource to Map' }),
+  ).toHaveCount(0);
   await expect(
     page.getByRole('button', {
       name: `Spaces in this Meta Space, ${String(FIXTURE_ORDINARY_SPACE_COUNT)}`,
@@ -583,9 +587,9 @@ test(
     await page.getByRole('button', { name: 'Resources' }).click();
     const list = page.getByRole('dialog', { name: 'Resources' });
     await expect(list).toBeVisible();
-    await expect(list.getByRole('button', { name: 'Add new view of Space 1 to Map' })).toHaveCount(
-      0,
-    );
+    await expect(
+      list.getByRole('button', { name: 'Add Space 1 as a new Space Resource to Map' }),
+    ).toHaveCount(0);
     await expect(
       page.getByRole('button', {
         name: `Spaces in this Meta Space, ${String(FIXTURE_ORDINARY_SPACE_COUNT)}`,
@@ -633,7 +637,9 @@ test('removing a Space Resource from the Map leaves the Resource and its target 
   await expect(list.getByRole('button', { name: 'Add Architecture to Map' })).toBeVisible();
   // And the Space it names still exists: deleting the last reference to a
   // Space takes this row away (the test above), and Remove is not that Edit.
-  await expect(list.getByRole('button', { name: 'Add new view of Space 1 to Map' })).toBeVisible();
+  await expect(
+    list.getByRole('button', { name: 'Add Space 1 as a new Space Resource to Map' }),
+  ).toBeVisible();
 
   // Placing it again is the same Resource, stored context and all, not a fresh
   // Space Resource minted from scratch.

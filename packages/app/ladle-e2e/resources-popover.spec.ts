@@ -45,7 +45,9 @@ test(
     // Interleaved by name rather than sectioned by source: the reader is
     // looking for a name, and the glyph on each row says which it is.
     await expect(page.getByRole('button', { name: /^Add .* to Map$/ })).toHaveCount(7);
-    const spaceRow = page.getByRole('button', { name: 'Add new view of Blueprint to Map' });
+    const spaceRow = page.getByRole('button', {
+      name: 'Add Blueprint as a new Space Resource to Map',
+    });
     await expect(spaceRow).toHaveAttribute('data-space-id', /.+/);
 
     await expect(spaceRow.locator('[data-icon="space"]')).toBeVisible();
@@ -65,7 +67,7 @@ test(
 
     await page.getByRole('button', { name: /^Spaces in this Meta Space, \d+$/ }).click();
     await expect(
-      page.getByRole('button', { name: 'Add new view of Yardstick to Map' }),
+      page.getByRole('button', { name: 'Add Yardstick as a new Space Resource to Map' }),
     ).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Add Architecture to Map' })).toBeVisible();
   },
@@ -78,7 +80,9 @@ test(
     await page.goto(story('meta-spaces'));
     await page.getByRole('button', { name: 'Resources' }).click();
 
-    const spaceRow = page.getByRole('button', { name: 'Add new view of Blueprint to Map' });
+    const spaceRow = page.getByRole('button', {
+      name: 'Add Blueprint as a new Space Resource to Map',
+    });
     await expect(spaceRow).toHaveAttribute('draggable', 'true');
     await expect(spaceRow.locator('.resources-popover__row-grip')).toBeAttached();
     await spaceRow.hover();
@@ -114,7 +118,7 @@ test(
 
     // A Space is not a Resource of this Space, so there is nothing to delete.
     await expect(
-      page.getByRole('button', { name: 'Add new view of Blueprint to Map' }),
+      page.getByRole('button', { name: 'Add Blueprint as a new Space Resource to Map' }),
     ).toBeVisible();
     await expect(page.getByRole('button', { name: /^Delete Blueprint/ })).toHaveCount(0);
 
@@ -146,10 +150,10 @@ test(
 );
 
 test(
-  'Resources list tells rows sharing a Space’s name apart by the view each adds',
-  { tag: '@parity:resources-popover-names-each-space-view' },
+  'Resources list tells rows sharing a Space’s name apart by what each adds',
+  { tag: '@parity:resources-popover-names-each-space-selection' },
   async ({ page }) => {
-    await page.goto(story('space-views'));
+    await page.goto(story('space-selections'));
     await page.getByRole('button', { name: 'Resources' }).click();
 
     const plan = page
@@ -162,8 +166,8 @@ test(
       .filter({ hasText: 'Risks · Security' });
     await expect(risks).toContainText('Risks · Security');
     await expect(risks).toHaveAccessibleDescription(/Also in Deep dive/);
-    const space = page.getByRole('button', { name: 'Add new view of Roadmap to Map' });
-    await expect(space).toContainText('New view');
+    const space = page.getByRole('button', { name: 'Add Roadmap as a new Space Resource to Map' });
+    await expect(space).toContainText('New Space Resource');
   },
 );
 

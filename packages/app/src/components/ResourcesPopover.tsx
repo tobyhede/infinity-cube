@@ -194,13 +194,13 @@ export interface ResourcesPlacingProps extends ResourcesPopoverSurfaceProps {
    */
   readonly spaces?: readonly ResourcesPopoverSpace[] | undefined;
   /**
-   * The view each Space Resource row shows, as its target Map's and Graph's
+   * The Map and Graph each Space Resource row selects, as its target Map's and Graph's
    * titles. A Space Resource and the Space it shows can carry one name, and two
-   * Space Resources showing one Space usually do, so the view is drawn under the
+   * Space Resources showing one Space usually do, so the selections are drawn under the
    * name and joins the row's description. Absent for a row whose target has not
    * been read.
    */
-  readonly spaceViewNameById?: ReadonlyMap<ResourceId, string> | undefined;
+  readonly spaceSelectionNameById?: ReadonlyMap<ResourceId, string> | undefined;
   /**
    * Place a Space by authoring the Space Resource that frames it.
    *
@@ -275,7 +275,7 @@ const NO_SPACES: readonly ResourcesPopoverSpace[] = [];
 const NO_MEMBERSHIPS: MapMemberships = new Map();
 
 /** What a Space row's press makes, drawn under the Space's name. */
-const NEW_VIEW = 'New view';
+const NEW_SPACE_RESOURCE = 'New Space Resource';
 
 /** Long enough that scanning down the list does not flash a tooltip per row. */
 const ROW_TOOLTIP_DELAY_MS = 500;
@@ -939,15 +939,15 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
                           beginSpaceDrag(event, row.space, onSpaceDragStart);
                 const placed =
                   row.kind === 'resource' ? membershipsOf(memberships, row.resource.id) : [];
-                // What the row adds, under its name: the view a Space Resource
-                // already shows, or, for a Space row, the new view a press makes.
-                const view =
+                // What the row adds, under its name: the Map and Graph a Space Resource
+                // selects, or, for a Space row, the new Space Resource a press makes.
+                const selection =
                   row.kind === 'resource'
-                    ? placing?.spaceViewNameById?.get(row.resource.id)
+                    ? placing?.spaceSelectionNameById?.get(row.resource.id)
                     : undefined;
-                const detail = row.kind === 'resource' ? view : NEW_VIEW;
+                const detail = row.kind === 'resource' ? selection : NEW_SPACE_RESOURCE;
                 const describing = [
-                  ...(view === undefined ? [] : [`Shows ${view}`]),
+                  ...(selection === undefined ? [] : [`Shows ${selection}`]),
                   ...(placed.length === 0
                     ? []
                     : [`Also in ${placed.map(describeMembership).join('; ')}`]),
@@ -955,7 +955,7 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
                 const description = `${describedBy}-${key}`;
                 const onDelete = placing?.onDelete;
                 return (
-                  <li key={key} className="flex items-center gap-1">
+                  <li key={key} className="resources-popover__entry">
                     {/* **A row is a button, and the drag is the shortcut.** ADR 0082
                         binds that everything the surface offers is operable from the
                         keyboard alone, and names this case: a drag may be *a* way to
@@ -997,7 +997,7 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
                             aria-label={
                               row.kind === 'resource'
                                 ? `Add ${name} to Map`
-                                : `Add new view of ${name} to Map`
+                                : `Add ${name} as a new Space Resource to Map`
                             }
                             aria-describedby={describing === '' ? undefined : description}
                             onDragStart={startDrag}

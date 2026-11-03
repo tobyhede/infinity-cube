@@ -55,12 +55,47 @@
 
 .resources-popover__row {
   display: flex;
-  align-items: center;
+  /* Marks sit on the name's line, not centred on a row that has a second line
+     under the name. Each mark is 16px against the 20px line, so 2px down. */
+  align-items: flex-start;
   gap: 8px;
   padding: 8px;
   border: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
   border-radius: var(--radius-chrome-md);
   font-size: 13px;
+  line-height: 20px;
+}
+
+.resources-popover__row > :not(.resources-popover__row-text) {
+  margin-block-start: 2px;
+}
+
+/* The grip is 14px. */
+.resources-popover__row > .resources-popover__row-grip {
+  margin-block-start: 3px;
+}
+
+/* A placing row and its Delete share one box, so Delete reads as the row's and
+   not as a control floating beside the list. The box is the entry's; the row
+   inside it keeps its own geometry and gives up only its border. */
+.resources-popover__entry {
+  display: flex;
+  align-items: flex-start;
+  border: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+  border-radius: var(--radius-chrome-md);
+}
+
+.resources-popover__entry > .resources-popover__row,
+.resources-popover__entry > .resources-popover__row:hover,
+.resources-popover__entry > .resources-popover__row:focus-visible {
+  border-color: transparent;
+}
+
+/* Delete on the name's line: the row's 1px border and 8px padding put the
+   line's middle 19px down, and Delete is 28px tall. */
+.resources-popover__entry > .resources-popover__row ~ * {
+  margin-block-start: 5px;
+  margin-inline-end: 4px;
 }
 
 /* Bound to the attribute that decides it rather than to the row, so the cursor
@@ -86,8 +121,9 @@
   text-align: start;
 }
 
-/* What a placing row adds, under its name: a Space Resource's view, or a new
-   view for a Space row. One line, ellipsed like the name above it. */
+/* What a placing row adds, under its name: the Map and Graph a Space Resource
+   selects, or "New Space Resource" for a Space row. One line, ellipsed like
+   the name above it. */
 .resources-popover__row-detail {
   max-width: 100%;
   overflow: hidden;
@@ -124,6 +160,13 @@
    it takes the focus ring, never the hover fill. */
 .resources-popover__row:not([aria-disabled='true']):hover,
 .resources-popover__row:focus-visible {
+  border-color: var(--border);
+  background: var(--accent);
+}
+
+/* Inside an entry the box that answers is the entry's, which holds Delete. */
+.resources-popover__entry:has(> .resources-popover__row:hover),
+.resources-popover__entry:has(> .resources-popover__row:focus-visible) {
   border-color: var(--border);
   background: var(--accent);
 }

@@ -405,7 +405,9 @@ async function openResourcesList(): Promise<HTMLElement> {
 async function addExistingSpace(title: string): Promise<void> {
   await readyToAuthor();
   await openResourcesList();
-  const row = await screen.findByRole('button', { name: `Add new view of ${title} to Map` });
+  const row = await screen.findByRole('button', {
+    name: `Add ${title} as a new Space Resource to Map`,
+  });
   await act(async () => {
     fireEvent.click(row);
     await Promise.resolve();
@@ -840,7 +842,9 @@ describe('referencing an existing Space', () => {
     // Found before the `act` rather than inside it: a query that waits turns the
     // act environment off while it polls, so an update landing meanwhile inside
     // the enclosing `act` is reported as act in an unconfigured environment.
-    const add = await screen.findByRole('button', { name: 'Add new view of Other Space to Map' });
+    const add = await screen.findByRole('button', {
+      name: 'Add Other Space as a new Space Resource to Map',
+    });
     await act(async () => {
       fireEvent.click(add);
       await Promise.resolve();
@@ -1021,7 +1025,7 @@ describe('dropping an existing Space onto the canvas', () => {
     };
 
     fireEvent.dragStart(
-      within(list).getByRole('button', { name: 'Add new view of Other Space to Map' }),
+      within(list).getByRole('button', { name: 'Add Other Space as a new Space Resource to Map' }),
       {
         dataTransfer,
       },

@@ -179,24 +179,24 @@ export const spaceTitlesById = (targets: SpaceResourceTargets): ReadonlyMap<UUID
   new Map([...targets].map(([id, target]) => [id, target.title]));
 
 /**
- * The view each Space Resource shows, as its target Map's and Graph's titles,
+ * The Map and Graph each Space Resource selects, titled from its target,
  * keyed by the Resource.
  *
  * Two Space Resources showing one Space carry the same name wherever the Space
- * was named after them, so the view is what tells them apart in a list. A
+ * was named after them, so the selections are what tell them apart in a list. A
  * Resource whose target has not been read, or whose selection does not resolve
  * in it, is absent rather than named with a guess.
  */
-export const spaceViewNamesById = (
+export const spaceSelectionNamesById = (
   targets: SpaceResourceTargets,
   resources: readonly Resource[],
 ): ReadonlyMap<ResourceId, string> => {
   const names = new Map<ResourceId, string>();
   for (const resource of resources) {
-    const view = spaceSelection(resource);
-    if (view === undefined) continue;
-    const targetMap = targets.get(view.spaceId)?.maps.find(({ id }) => id === view.map);
-    const graph = targetMap?.graphs.find(({ id }) => id === view.graph);
+    const selected = spaceSelection(resource);
+    if (selected === undefined) continue;
+    const targetMap = targets.get(selected.spaceId)?.maps.find(({ id }) => id === selected.map);
+    const graph = targetMap?.graphs.find(({ id }) => id === selected.graph);
     if (targetMap !== undefined && graph !== undefined)
       names.set(resource.id, `${targetMap.title} · ${graph.title}`);
   }
@@ -206,7 +206,7 @@ export const spaceViewNamesById = (
 export interface SpaceResourceTargetTitles {
   readonly targets: SpaceResourceTargets;
   readonly titleById: ReadonlyMap<UUID, string>;
-  readonly viewNameById: ReadonlyMap<ResourceId, string>;
+  readonly selectionNameById: ReadonlyMap<ResourceId, string>;
 }
 
 /**
@@ -223,6 +223,9 @@ export const useSpaceResourceTargetTitles = (
   const read = useCallback((spaceId: UUID) => source.target(spaceId), [source]);
   const targets = useSpaceResourceTargets(resources, read);
   const titleById = useMemo(() => spaceTitlesById(targets), [targets]);
-  const viewNameById = useMemo(() => spaceViewNamesById(targets, resources), [targets, resources]);
-  return { targets, titleById, viewNameById };
+  const selectionNameById = useMemo(
+    () => spaceSelectionNamesById(targets, resources),
+    [targets, resources],
+  );
+  return { targets, titleById, selectionNameById };
 };
