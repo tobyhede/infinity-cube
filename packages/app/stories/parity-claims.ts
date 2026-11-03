@@ -104,7 +104,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'surfaces/resources-popover.stories.tsx',
     storyExport: 'AvailableResources',
     claim:
-      'Each filter switch draws its glyph beside the number of rows it is contributing under the current search — including zero, and including a switch the reader has turned off — and the count moves with the search rather than reporting what the Space holds.',
+      'Each filter switch draws its glyph with the number of rows it is contributing under the current search on its corner — including zero, and including a switch the reader has turned off — and the count moves with the search rather than reporting what the Space holds.',
   },
   {
     id: 'resources-popover-marks-where-else-a-resource-is-placed',
