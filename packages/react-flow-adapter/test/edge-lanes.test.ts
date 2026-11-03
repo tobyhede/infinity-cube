@@ -10,7 +10,8 @@ import {
   graphLanes,
   laneBezier,
   laneSpan,
-  type GraphLane,
+  type LaneEdge,
+  type LaneSide,
 } from '../src/edge-lanes';
 import { uuid } from './uuid';
 
@@ -21,163 +22,357 @@ const FIFTH = 0.2;
 const numbers = (path: string): number[] =>
   (path.match(/-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/gi) ?? []).map(Number);
 
+/**
+ * Every case the approved design canvas draws (PR 455), one row each. Graphs
+ * are listed in the Map's Graph order: Long, Mid, Short, then Back 1 to 3. A
+ * lane is counted in lane spacings: on the screen, below a horizontal pair and
+ * right of a vertical one, where a pair runs one way, and on the Edge's left as
+ * it travels where it runs both ways (ADR 0142).
+ */
 describe('graphLanes', () => {
-  const [RED, BLUE, GREEN, AMBER, VIOLET] = ['1', '2', '3', '4', '5'].map((id) =>
-    uuid(`00000000-0000-4000-8000-00000000020${id}`),
-  );
-  const edge = (graphId: GraphId | undefined, source: string, target: string) => ({
-    id: `${graphId}::${source}::${target}`,
-    graphId: graphId!,
+  const LONG = uuid('00000000-0000-4000-8000-000000000201');
+  const MID = uuid('00000000-0000-4000-8000-000000000202');
+  const SHORT = uuid('00000000-0000-4000-8000-000000000203');
+  const BACK_1 = uuid('00000000-0000-4000-8000-000000000204');
+  const BACK_2 = uuid('00000000-0000-4000-8000-000000000205');
+  const BACK_3 = uuid('00000000-0000-4000-8000-000000000206');
+  const NAMES = new Map<GraphId, string>([
+    [LONG, 'Long'],
+    [MID, 'Mid'],
+    [SHORT, 'Short'],
+    [BACK_1, 'Back 1'],
+    [BACK_2, 'Back 2'],
+    [BACK_3, 'Back 3'],
+  ]);
+  const edge = (graphId: GraphId, source: string, target: string): LaneEdge => ({
+    id: `${NAMES.get(graphId)} ${source}→${target}`,
+    graphId,
     source,
     target,
   });
-  const laneOf = (
-    lanes: ReadonlyMap<string, GraphLane>,
-    graphId: GraphId | undefined,
-    source: string,
-    target: string,
-  ) => lanes.get(`${graphId}::${source}::${target}`);
 
-  it('runs an Edge alone in its pair anchor to anchor on the centre line, whichever Graph is active', () => {
-    const lanes = graphLanes([edge(RED, 'a', 'b')], BLUE!);
+  const LONG_AB = edge(LONG, 'A', 'B');
+  const BACK_1_BA = edge(BACK_1, 'B', 'A');
+  const AB = [LONG_AB, edge(MID, 'A', 'B'), edge(SHORT, 'A', 'B')];
+  const BA = [BACK_1_BA, edge(BACK_2, 'B', 'A'), edge(BACK_3, 'B', 'A')];
+  const LOOPS = [LONG, MID, SHORT].map((graph) => edge(graph, 'A', 'A'));
 
-    expect(laneOf(lanes, RED, 'a', 'b')).toEqual({ offset: 0, reach: 0, endTrim: 0 });
+  /** The lane in spacings, how a positive lane is read, and the trim at each end. */
+  type Expected = readonly [lane: number, side: LaneSide, endTrim: number];
+  const screen = (lane: number, endTrim: number): Expected => [lane, 'screen', endTrim];
+  const travel = (lane: number, endTrim: number): Expected => [lane, 'travel', endTrim];
+
+  const cases: readonly (readonly [
+    name: string,
+    edges: readonly LaneEdge[],
+    active: GraphId | null,
+    expected: Readonly<Record<string, Expected>>,
+  ])[] = [
+    // One direction: the Active Graph on the centre and the
+    // rest stacked on one side in Graph order; lengths ranked in the direction.
+    ['one Edge, its Graph active', AB.slice(0, 1), LONG, { 'Long A→B': screen(0, 0) }],
+    ['one Edge, another Graph active', AB.slice(0, 1), MID, { 'Long A→B': screen(0, 0) }],
+    ['one Edge, no Graph active', AB.slice(0, 1), null, { 'Long A→B': screen(0, 0) }],
+    [
+      'three Graphs, the first active',
+      AB,
+      LONG,
+      { 'Long A→B': screen(0, 0), 'Mid A→B': screen(1, 0.1), 'Short A→B': screen(2, 0.2) },
+    ],
+    [
+      'three Graphs, the second active',
+      AB,
+      MID,
+      { 'Mid A→B': screen(0, 0), 'Long A→B': screen(1, 0.1), 'Short A→B': screen(2, 0.2) },
+    ],
+    [
+      'three Graphs, the third active',
+      AB,
+      SHORT,
+      { 'Short A→B': screen(0, 0), 'Long A→B': screen(1, 0.1), 'Mid A→B': screen(2, 0.2) },
+    ],
+    [
+      'three Graphs, the Active Graph not in the pair',
+      AB,
+      BACK_1,
+      { 'Long A→B': screen(0, 0), 'Mid A→B': screen(1, 0.1), 'Short A→B': screen(2, 0.2) },
+    ],
+    [
+      'three Graphs, no Graph active',
+      AB,
+      null,
+      { 'Long A→B': screen(0, 0), 'Mid A→B': screen(1, 0.1), 'Short A→B': screen(2, 0.2) },
+    ],
+    [
+      'five Graphs, the trim capped at three tenths',
+      [...AB, ...[BACK_1, BACK_2].map((graph) => edge(graph, 'A', 'B'))],
+      LONG,
+      {
+        'Long A→B': screen(0, 0),
+        'Mid A→B': screen(1, 0.1),
+        'Short A→B': screen(2, 0.2),
+        'Back 1 A→B': screen(3, 0.3),
+        'Back 2 A→B': screen(4, 0.3),
+      },
+    ],
+
+    // Both directions, one each way: each on its own left, half a lane out.
+    [
+      'one each way, A→B active',
+      [LONG_AB, BACK_1_BA],
+      LONG,
+      { 'Long A→B': travel(0.5, 0), 'Back 1 B→A': travel(0.5, 0) },
+    ],
+    [
+      'one each way, B→A active',
+      [LONG_AB, BACK_1_BA],
+      BACK_1,
+      { 'Long A→B': travel(0.5, 0), 'Back 1 B→A': travel(0.5, 0) },
+    ],
+    [
+      'one each way, the Active Graph holding both',
+      [edge(LONG, 'A', 'B'), edge(LONG, 'B', 'A')],
+      LONG,
+      { 'Long A→B': travel(0.5, 0), 'Long B→A': travel(0.5, 0) },
+    ],
+    [
+      'one each way, the Active Graph not in the pair',
+      [LONG_AB, BACK_1_BA],
+      MID,
+      { 'Long A→B': travel(0.5, 0), 'Back 1 B→A': travel(0.5, 0) },
+    ],
+    [
+      'one each way, no Graph active',
+      [LONG_AB, BACK_1_BA],
+      null,
+      { 'Long A→B': travel(0.5, 0), 'Back 1 B→A': travel(0.5, 0) },
+    ],
+
+    // Both directions, more than one each way.
+    [
+      'two each way, the first A→B active',
+      [...AB.slice(0, 2), ...BA.slice(0, 2)],
+      LONG,
+      {
+        'Long A→B': travel(0.5, 0),
+        'Mid A→B': travel(1.5, 0.1),
+        'Back 1 B→A': travel(0.5, 0),
+        'Back 2 B→A': travel(1.5, 0.1),
+      },
+    ],
+    [
+      'two each way, the second A→B active',
+      [...AB.slice(0, 2), ...BA.slice(0, 2)],
+      MID,
+      {
+        'Mid A→B': travel(0.5, 0),
+        'Long A→B': travel(1.5, 0.1),
+        'Back 1 B→A': travel(0.5, 0),
+        'Back 2 B→A': travel(1.5, 0.1),
+      },
+    ],
+    [
+      'two each way, the second B→A active',
+      [...AB.slice(0, 2), ...BA.slice(0, 2)],
+      BACK_2,
+      {
+        'Long A→B': travel(0.5, 0),
+        'Mid A→B': travel(1.5, 0.1),
+        'Back 2 B→A': travel(0.5, 0),
+        'Back 1 B→A': travel(1.5, 0.1),
+      },
+    ],
+    [
+      'two each way, the Active Graph holding both',
+      [edge(LONG, 'A', 'B'), edge(MID, 'A', 'B'), edge(MID, 'B', 'A'), edge(BACK_1, 'B', 'A')],
+      MID,
+      {
+        'Mid A→B': travel(0.5, 0),
+        'Long A→B': travel(1.5, 0.1),
+        'Mid B→A': travel(0.5, 0),
+        'Back 1 B→A': travel(1.5, 0.1),
+      },
+    ],
+    [
+      'two each way, the Active Graph not in the pair',
+      [...AB.slice(0, 2), ...BA.slice(0, 2)],
+      SHORT,
+      {
+        'Long A→B': travel(0.5, 0),
+        'Mid A→B': travel(1.5, 0.1),
+        'Back 1 B→A': travel(0.5, 0),
+        'Back 2 B→A': travel(1.5, 0.1),
+      },
+    ],
+    [
+      'two each way, no Graph active',
+      [...AB.slice(0, 2), ...BA.slice(0, 2)],
+      null,
+      {
+        'Long A→B': travel(0.5, 0),
+        'Mid A→B': travel(1.5, 0.1),
+        'Back 1 B→A': travel(0.5, 0),
+        'Back 2 B→A': travel(1.5, 0.1),
+      },
+    ],
+    [
+      'three each way, the second A→B active',
+      [...AB, ...BA],
+      MID,
+      {
+        'Mid A→B': travel(0.5, 0),
+        'Long A→B': travel(1.5, 0.1),
+        'Short A→B': travel(2.5, 0.2),
+        'Back 1 B→A': travel(0.5, 0),
+        'Back 2 B→A': travel(1.5, 0.1),
+        'Back 3 B→A': travel(2.5, 0.2),
+      },
+    ],
+    [
+      'three each way, the third B→A active',
+      [...AB, ...BA],
+      BACK_3,
+      {
+        'Long A→B': travel(0.5, 0),
+        'Mid A→B': travel(1.5, 0.1),
+        'Short A→B': travel(2.5, 0.2),
+        'Back 3 B→A': travel(0.5, 0),
+        'Back 1 B→A': travel(1.5, 0.1),
+        'Back 2 B→A': travel(2.5, 0.2),
+      },
+    ],
+    [
+      'three A→B and one B→A, the third A→B active',
+      [...AB, BACK_1_BA],
+      SHORT,
+      {
+        'Short A→B': travel(0.5, 0),
+        'Long A→B': travel(1.5, 0.1),
+        'Mid A→B': travel(2.5, 0.2),
+        'Back 1 B→A': travel(0.5, 0),
+      },
+    ],
+    [
+      'three A→B and one B→A, B→A active',
+      [...AB, BACK_1_BA],
+      BACK_1,
+      {
+        'Long A→B': travel(0.5, 0),
+        'Mid A→B': travel(1.5, 0.1),
+        'Short A→B': travel(2.5, 0.2),
+        'Back 1 B→A': travel(0.5, 0),
+      },
+    ],
+    [
+      'one A→B and three B→A, the second B→A active',
+      [LONG_AB, ...BA],
+      BACK_2,
+      {
+        'Long A→B': travel(0.5, 0),
+        'Back 2 B→A': travel(0.5, 0),
+        'Back 1 B→A': travel(1.5, 0.1),
+        'Back 3 B→A': travel(2.5, 0.2),
+      },
+    ],
+
+    // Loops: nesting outwards with the Active Graph innermost.
+    [
+      'three loops, the first active',
+      LOOPS,
+      LONG,
+      { 'Long A→A': screen(0, 0), 'Mid A→A': screen(1, 0.1), 'Short A→A': screen(2, 0.2) },
+    ],
+    [
+      'three loops, the second active',
+      LOOPS,
+      MID,
+      { 'Mid A→A': screen(0, 0), 'Long A→A': screen(1, 0.1), 'Short A→A': screen(2, 0.2) },
+    ],
+    [
+      'three loops, no Graph active',
+      LOOPS,
+      null,
+      { 'Long A→A': screen(0, 0), 'Mid A→A': screen(1, 0.1), 'Short A→A': screen(2, 0.2) },
+    ],
+  ];
+
+  it.each(cases)('lays out %s', (_, edges, active, expected) => {
+    const reach = Math.max(...Object.values(expected).map(([lane]) => lane)) * GRAPH_LANE_SPACING;
+    const lanes = graphLanes(edges, active);
+
+    expect(Object.fromEntries(lanes)).toEqual(
+      Object.fromEntries(
+        Object.entries(expected).map(([id, [lane, side, endTrim]]) => [
+          id,
+          { offset: lane * GRAPH_LANE_SPACING, reach, endTrim, side },
+        ]),
+      ),
+    );
   });
 
-  it('centres the Active Graph and alternates the rest outwards in Graph order, one trim increment shorter each', () => {
-    const lanes = graphLanes(
-      [RED, BLUE, GREEN].map((graph) => edge(graph, 'a', 'b')),
-      GREEN!,
-    );
+  it('lays out each pair on its own', () => {
+    const lanes = graphLanes([...AB.slice(0, 2), edge(LONG, 'B', 'C')], MID);
 
-    const reach = GRAPH_LANE_SPACING;
-    expect(laneOf(lanes, GREEN, 'a', 'b')).toEqual({ offset: 0, reach, endTrim: 0 });
-    expect(laneOf(lanes, RED, 'a', 'b')).toEqual({
+    expect(lanes.get('Long B→C')).toEqual({ offset: 0, reach: 0, endTrim: 0, side: 'screen' });
+    expect(lanes.get('Long A→B')).toEqual({
       offset: GRAPH_LANE_SPACING,
-      reach,
-      endTrim: 0.1,
-    });
-    expect(laneOf(lanes, BLUE, 'a', 'b')).toEqual({
-      offset: -GRAPH_LANE_SPACING,
-      reach,
-      endTrim: 0.2,
-    });
-  });
-
-  it('never leaves more than three tenths undrawn at each end', () => {
-    const lanes = graphLanes(
-      [RED, BLUE, GREEN, AMBER, VIOLET].map((graph) => edge(graph, 'a', 'b')),
-      RED!,
-    );
-
-    expect([...lanes.values()]).toEqual([
-      { offset: 0, reach: 2 * GRAPH_LANE_SPACING, endTrim: 0 },
-      { offset: GRAPH_LANE_SPACING, reach: 2 * GRAPH_LANE_SPACING, endTrim: 0.1 },
-      { offset: -GRAPH_LANE_SPACING, reach: 2 * GRAPH_LANE_SPACING, endTrim: 0.2 },
-      { offset: 2 * GRAPH_LANE_SPACING, reach: 2 * GRAPH_LANE_SPACING, endTrim: 0.3 },
-      { offset: -2 * GRAPH_LANE_SPACING, reach: 2 * GRAPH_LANE_SPACING, endTrim: 0.3 },
-    ]);
-  });
-
-  it('stacks each direction on its own left from half a lane out, the Active Graph innermost where it runs', () => {
-    const lanes = graphLanes(
-      [edge(RED, 'b', 'a'), edge(BLUE, 'b', 'a'), edge(GREEN, 'a', 'b')],
-      BLUE!,
-    );
-
-    const reach = 1.5 * GRAPH_LANE_SPACING;
-    expect(laneOf(lanes, BLUE, 'b', 'a')).toEqual({
-      offset: 0.5 * GRAPH_LANE_SPACING,
-      reach,
-      endTrim: 0,
-    });
-    expect(laneOf(lanes, RED, 'b', 'a')).toEqual({
-      offset: 1.5 * GRAPH_LANE_SPACING,
-      reach,
-      endTrim: 0.1,
-    });
-    expect(laneOf(lanes, GREEN, 'a', 'b')).toEqual({
-      offset: 0.5 * GRAPH_LANE_SPACING,
-      reach,
-      endTrim: 0,
-    });
-  });
-
-  it('puts both Edges of an Active Graph holding both directions innermost, each on its own left', () => {
-    const lanes = graphLanes(
-      [edge(RED, 'a', 'b'), edge(BLUE, 'b', 'a'), edge(BLUE, 'a', 'b')],
-      BLUE!,
-    );
-
-    const reach = 1.5 * GRAPH_LANE_SPACING;
-    expect(laneOf(lanes, BLUE, 'a', 'b')).toEqual({
-      offset: 0.5 * GRAPH_LANE_SPACING,
-      reach,
-      endTrim: 0,
-    });
-    expect(laneOf(lanes, BLUE, 'b', 'a')).toEqual({
-      offset: 0.5 * GRAPH_LANE_SPACING,
-      reach,
-      endTrim: 0,
-    });
-    expect(laneOf(lanes, RED, 'a', 'b')).toEqual({
-      offset: 1.5 * GRAPH_LANE_SPACING,
-      reach,
-      endTrim: 0.1,
-    });
-  });
-
-  it('ranks each direction on its own, so a reverse Edge alone in its direction runs full length', () => {
-    const lanes = graphLanes(
-      [edge(RED, 'a', 'b'), edge(BLUE, 'a', 'b'), edge(GREEN, 'a', 'b'), edge(AMBER, 'b', 'a')],
-      RED!,
-    );
-
-    expect(laneOf(lanes, AMBER, 'b', 'a')).toEqual({
-      offset: 0.5 * GRAPH_LANE_SPACING,
-      reach: 2.5 * GRAPH_LANE_SPACING,
-      endTrim: 0,
-    });
-    expect(laneOf(lanes, GREEN, 'a', 'b')).toEqual({
-      offset: 2.5 * GRAPH_LANE_SPACING,
-      reach: 2.5 * GRAPH_LANE_SPACING,
-      endTrim: 0.2,
-    });
-  });
-
-  it('nests loops on one Resource outwards with the Active Graph innermost', () => {
-    const lanes = graphLanes(
-      [RED, BLUE, GREEN].map((graph) => edge(graph, 'a', 'a')),
-      BLUE!,
-    );
-
-    const reach = 2 * GRAPH_LANE_SPACING;
-    expect(laneOf(lanes, BLUE, 'a', 'a')).toEqual({ offset: 0, reach, endTrim: 0 });
-    expect(laneOf(lanes, RED, 'a', 'a')).toEqual({
-      offset: GRAPH_LANE_SPACING,
-      reach,
-      endTrim: 0.1,
-    });
-    expect(laneOf(lanes, GREEN, 'a', 'a')).toEqual({
-      offset: 2 * GRAPH_LANE_SPACING,
-      reach,
-      endTrim: 0.2,
-    });
-  });
-
-  it('counts the first Edge in Graph order first while no Graph is active', () => {
-    const lanes = graphLanes([edge(RED, 'a', 'b'), edge(BLUE, 'a', 'b')], null);
-
-    expect(laneOf(lanes, RED, 'a', 'b')).toEqual({
-      offset: 0,
       reach: GRAPH_LANE_SPACING,
-      endTrim: 0,
-    });
-    expect(laneOf(lanes, BLUE, 'a', 'b')).toEqual({
-      offset: GRAPH_LANE_SPACING,
-      reach: GRAPH_LANE_SPACING,
       endTrim: 0.1,
+      side: 'screen',
     });
+  });
+
+  /** Any Edges over three Resources, at most one per Graph per direction. */
+  const bundleArb = fc
+    .uniqueArray(
+      fc.record({
+        graphId: fc.constantFrom(LONG, MID, SHORT, BACK_1, BACK_2, BACK_3),
+        source: fc.constantFrom('A', 'B', 'C'),
+        target: fc.constantFrom('A', 'B', 'C'),
+      }),
+      { selector: ({ graphId, source, target }) => `${graphId} ${source}→${target}` },
+    )
+    .map((edges) =>
+      [...edges]
+        .sort(
+          (left, right) =>
+            [...NAMES.keys()].indexOf(left.graphId) - [...NAMES.keys()].indexOf(right.graphId),
+        )
+        .map(({ graphId, source, target }) => edge(graphId, source, target)),
+    );
+  const activeArb = fc.constantFrom<GraphId | null>(LONG, MID, SHORT, BACK_1, null);
+
+  it('runs exactly one Edge full length in each direction: the Active Graph’s, or the first in Graph order', () => {
+    fc.assert(
+      fc.property(bundleArb, activeArb, (edges, active) => {
+        const lanes = graphLanes(edges, active);
+        const directions = new Map<string, LaneEdge[]>();
+        for (const each of edges) {
+          const key = `${each.source}→${each.target}`;
+          directions.set(key, [...(directions.get(key) ?? []), each]);
+        }
+        for (const direction of directions.values()) {
+          const full = direction.filter((each) => lanes.get(each.id)?.endTrim === 0);
+          const first = direction.find((each) => each.graphId === active) ?? direction[0];
+          expect(full).toEqual([first]);
+        }
+      }),
+    );
+  });
+
+  it('never puts two Edges of one direction on the same lane', () => {
+    fc.assert(
+      fc.property(bundleArb, activeArb, (edges, active) => {
+        const lanes = graphLanes(edges, active);
+        const taken = new Set<string>();
+        for (const each of edges) {
+          const lane = lanes.get(each.id);
+          const key = `${each.source}→${each.target} ${lane?.offset}`;
+          expect(taken.has(key), `${each.id} shares a lane`).toBe(false);
+          taken.add(key);
+        }
+      }),
+    );
   });
 });
 
@@ -229,9 +424,9 @@ describe('laneBezier', () => {
    * bend with it, which the properties below hold.
    */
   it.each([
-    ['level', level, [0, -8]],
+    ['level', level, [0, 8]],
     ['reversed', reversed, [0, 8]],
-  ] as const)('moves a %s Edge whole, on its left', (_, attachment, [dx, dy]) => {
+  ] as const)('moves a %s Edge whole, below it', (_, attachment, [dx, dy]) => {
     const lone = numbers(laneBezier(attachment, 0).path);
     const laned = numbers(laneBezier(attachment, 8).path);
 
@@ -243,7 +438,7 @@ describe('laneBezier', () => {
 
   it('keeps a level Edge’s lanes straight', () => {
     const ys = numbers(laneBezier(level, 8).path).filter((_, index) => index % 2 === 1);
-    expect(new Set(ys)).toEqual(new Set([42]));
+    expect(new Set(ys)).toEqual(new Set([58]));
   });
 
   /** The cubics a path draws, joined end to end: how long they are, and how near a point is. */
@@ -287,38 +482,12 @@ describe('laneBezier', () => {
     return [...n.slice(0, 2), ...n.slice(-2)];
   };
 
-  const rising: EdgeAttachment = {
-    sourceX: 140,
-    sourceY: 200,
-    sourcePosition: Position.Top,
-    targetX: 100,
-    targetY: 0,
-    targetPosition: Position.Bottom,
-  };
-
-  /**
-   * Keep-left (ADR 0142): a positive offset is the Edge's left as it travels,
-   * so a rightward lane runs above, a leftward one below, a downward one to the
-   * screen's right and an upward one to the screen's left.
-   */
-  it.each([
-    ['rightward', level, [0, 50 - GRAPH_LANE_SPACING], [300, 50 - GRAPH_LANE_SPACING]],
-    ['leftward', reversed, [300, 50 + GRAPH_LANE_SPACING], [0, 50 + GRAPH_LANE_SPACING]],
-    ['downward', stacked, [100 + GRAPH_LANE_SPACING, 0], [140 + GRAPH_LANE_SPACING, 200]],
-    ['upward', rising, [140 - GRAPH_LANE_SPACING, 200], [100 - GRAPH_LANE_SPACING, 0]],
-  ] as const)(
-    'draws a positive offset on the left of a %s Edge’s travel',
-    (_, attachment, start, end) => {
-      expect(ends(laneBezier(attachment, GRAPH_LANE_SPACING).path)).toEqual([...start, ...end]);
-    },
-  );
-
   it('leaves a fifth of a level Edge undrawn at each end and keeps it level', () => {
     const [x1, y1, , , , , x2, y2] = numbers(laneBezier(level, 8, FIFTH).path);
 
     expect(x1).toBeCloseTo(60, 1);
     expect(x2).toBeCloseTo(240, 1);
-    expect([y1, y2]).toEqual([42, 42]);
+    expect([y1, y2]).toEqual([58, 58]);
   });
 
   it.each([
@@ -364,6 +533,54 @@ describe('laneBezier', () => {
     expect(x1).toBeGreaterThan(close.sourceX);
     expect(x2).toBeLessThan(close.targetX);
     expect(x1).toBeLessThan(x2!);
+  });
+
+  const rising: EdgeAttachment = {
+    sourceX: 140,
+    sourceY: 200,
+    sourcePosition: Position.Top,
+    targetX: 100,
+    targetY: 0,
+    targetPosition: Position.Bottom,
+  };
+  const S = GRAPH_LANE_SPACING;
+
+  /**
+   * Where a pair runs one way, a positive offset is a side of the screen:
+   * below a horizontal Edge and right of a vertical one, whichever way it
+   * travels.
+   */
+  it.each([
+    ['rightward', level, [0, 50 + S], [300, 50 + S]],
+    ['leftward', reversed, [300, 50 + S], [0, 50 + S]],
+    ['downward', stacked, [100 + S, 0], [140 + S, 200]],
+    ['upward', rising, [140 + S, 200], [100 + S, 0]],
+  ] as const)(
+    'draws a positive screen offset below or right of a %s Edge',
+    (_, attachment, start, end) => {
+      expect(ends(laneBezier(attachment, S, 0, S, 'screen').path)).toEqual([...start, ...end]);
+    },
+  );
+
+  /**
+   * Where a pair runs both ways, a positive offset is the Edge's left as it
+   * travels (ADR 0142): above a rightward Edge, below a leftward one, right of
+   * a downward one and left of an upward one.
+   */
+  it.each([
+    ['rightward', level, [0, 50 - S], [300, 50 - S]],
+    ['leftward', reversed, [300, 50 + S], [0, 50 + S]],
+    ['downward', stacked, [100 + S, 0], [140 + S, 200]],
+    ['upward', rising, [140 - S, 200], [100 - S, 0]],
+  ] as const)(
+    'draws a positive travel offset on the left of a %s Edge’s travel',
+    (_, attachment, start, end) => {
+      expect(ends(laneBezier(attachment, S, 0, S, 'travel').path)).toEqual([...start, ...end]);
+    },
+  );
+
+  it('reads an offset as a side of the screen unless told otherwise', () => {
+    expect(laneBezier(level, S)).toEqual(laneBezier(level, S, 0, S, 'screen'));
   });
 });
 
@@ -561,10 +778,7 @@ describe('laneBezier keeps its distance', () => {
         const horizontal =
           attachment.sourcePosition === Position.Left ||
           attachment.sourcePosition === Position.Right;
-        // The left of travel: above a rightward Edge, below a leftward one,
-        // right of a downward one and left of an upward one.
-        const left = { right: -1, left: 1, bottom: 1, top: -1 }[attachment.sourcePosition];
-        const [dx, dy] = horizontal ? [0, offset * left] : [offset * left, 0];
+        const [dx, dy] = horizontal ? [0, offset] : [offset, 0];
 
         expect(x1).toBeCloseTo(attachment.sourceX + dx, 6);
         expect(y1).toBeCloseTo(attachment.sourceY + dy, 6);
@@ -762,14 +976,14 @@ describe('laneBezier keeps its distance', () => {
     [
       'Right to Left',
       right(300, 120),
-      -16,
+      16,
       24,
       'M100,116 C117.83868036953166,116 132.4916524186643,117.67462537704372 146.30735473606433,120.76934269614134 C159.95198503670454,123.82573988348474 171.13282802151275,127.89150096886955 182.13880291864365,133.17436891949237 C203.93045612111973,143.6343624566809 221.25487923912922,157.49390095108848 240.00487923912922,172.49390095108848 C258.7548792391292,187.49390095108848 278.9304561211197,203.63436245668086 304.01380291864365,215.67436891949237 C316.4453280215128,221.64150096886954 331.0457350367046,226.95073988348477 346.6979797360643,230.45684269614134 C362.17915241866416,233.9246253770437 380.3386803695318,236 400,236',
     ],
     [
       'Top to Bottom',
       attachmentOf({ horizontal: false, forwards: false, ahead: 200, across: -60 }),
-      8,
+      -8,
       16,
       'M92,100 C92,75.79215610874226 88.52179395553513,58.401125886417894 83.09790070505018,43.33475574618193 C77.73775613869043,28.445465284071496 70.64005659429965,16.61596604342021 63.140056594299644,4.1159660434202126 C55.640056594299644,-8.384033956579788 47.73775613869045,-21.554534715928444 41.847900705050186,-37.91524425381807 C36.02179395553512,-54.09887411358215 32,-74.20784389125774 32,-100',
     ],
@@ -792,7 +1006,7 @@ describe('laneBezier keeps its distance', () => {
 
     expect(laned).toHaveLength(lone.length);
     laned.forEach((value, index) => {
-      expect(value - lone[index]!).toBeCloseTo(index % 2 === 0 ? 0 : -GRAPH_LANE_SPACING);
+      expect(value - lone[index]!).toBeCloseTo(index % 2 === 0 ? 0 : GRAPH_LANE_SPACING);
     });
   });
 

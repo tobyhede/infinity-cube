@@ -427,8 +427,8 @@ describe('projectGraphEdges', () => {
   it('carries the Graph it belongs to and no geometry of its own', () => {
     const edges = projectGraphEdges(graphRenderEdges, colors);
 
-    // The Edge data is the Graph id, its lane, how far out its pair's lanes
-    // reach, and its end trim, and no geometry
+    // The Edge data is the Graph id, its lane and how that lane is read, how
+    // far out its pair's lanes reach, and its end trim, and no geometry
     // (ADR 0086). Both fixture Graphs join the same two Resources, Alt in the other
     // direction, so each stacks on its own left from half a lane out and each, first
     // in its direction, runs full length (ADR 0142). A Map has nowhere
@@ -437,6 +437,7 @@ describe('projectGraphEdges', () => {
     expect(edges.find((e) => e.id === MAIN_EDGE_ID)!.data).toEqual({
       graphId: uuid('00000000-0000-4000-8000-000000000004'),
       laneOffset: GRAPH_LANE_SPACING / 2,
+      laneSide: 'travel',
       laneReach: GRAPH_LANE_SPACING / 2,
       endTrim: 0,
       headShape: 'arrow',
@@ -444,6 +445,7 @@ describe('projectGraphEdges', () => {
     expect(edges.find((e) => e.id === ALT_EDGE_ID)!.data).toEqual({
       graphId: uuid('00000000-0000-4000-8000-000000000030'),
       laneOffset: GRAPH_LANE_SPACING / 2,
+      laneSide: 'travel',
       laneReach: GRAPH_LANE_SPACING / 2,
       endTrim: 0,
       headShape: 'arrow',
@@ -522,11 +524,13 @@ describe('projectGraphEdges', () => {
 
       expect(dataOf(edges, BLUE!)).toMatchObject({
         laneOffset: 0,
+        laneSide: 'screen',
         laneReach: GRAPH_LANE_SPACING,
         endTrim: 0,
       });
       expect(dataOf(edges, RED!)).toMatchObject({
         laneOffset: GRAPH_LANE_SPACING,
+        laneSide: 'screen',
         laneReach: GRAPH_LANE_SPACING,
         endTrim: 0.1,
       });

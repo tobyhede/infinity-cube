@@ -15,7 +15,7 @@ import {
   type AnchorRect,
   type EdgeAttachment,
 } from './edge-attachment';
-import { laneBezier } from './edge-lanes';
+import { laneBezier, type LaneSide } from './edge-lanes';
 
 /**
  * React Flow custom edge that draws a bezier between the two handles.
@@ -28,12 +28,17 @@ import { laneBezier } from './edge-lanes';
 export type RoutedEdgeData = {
   graphId: GraphId;
   /**
-   * How far below (or right of) where its two anchors put it this Edge is
-   * drawn — above (or left) when negative — so the Edges of several
-   * Graphs joining the same two Resources run as parallel lines rather than over
-   * each other. Zero for a lone Edge.
+   * How far beside where its two anchors put it this Edge is drawn, read by
+   * `laneSide`, so the Edges of several Graphs joining the same two Resources
+   * run as parallel lines rather than over each other. Zero for a lone Edge.
    */
   laneOffset: number;
+  /**
+   * How `laneOffset` is read: a side of the screen, or the Edge's left as it
+   * travels, which `laneBezier` turns into a side of the screen as it draws,
+   * so it holds while a Resource is dragged (`graphLanes`).
+   */
+  laneSide: LaneSide;
   /**
    * How far from the centre line the outermost lane of this Edge's pair runs.
    * Every lane of the pair is drawn the same way at that distance, so they
@@ -90,9 +95,14 @@ export interface RoutedEdgeGeometry {
  */
 function routedEdgeGeometry(
   attachment: EdgeAttachment,
-  { laneOffset, laneReach, endTrim }: Pick<RoutedEdgeData, 'laneOffset' | 'laneReach' | 'endTrim'>,
+  {
+    laneOffset,
+    laneSide,
+    laneReach,
+    endTrim,
+  }: Pick<RoutedEdgeData, 'laneOffset' | 'laneSide' | 'laneReach' | 'endTrim'>,
 ): RoutedEdgeGeometry {
-  return laneBezier(attachment, laneOffset, endTrim, laneReach);
+  return laneBezier(attachment, laneOffset, endTrim, laneReach, laneSide);
 }
 
 /**
@@ -107,7 +117,7 @@ function routedEdgeGeometry(
 export function useRoutedEdgeGeometry(props: EdgeProps<RoutedFlowEdge>): RoutedEdgeGeometry {
   return routedEdgeGeometry(
     useEdgeAttachment(props),
-    props.data ?? { laneOffset: 0, laneReach: 0, endTrim: 0 },
+    props.data ?? { laneOffset: 0, laneSide: 'screen', laneReach: 0, endTrim: 0 },
   );
 }
 

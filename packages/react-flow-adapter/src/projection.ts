@@ -404,11 +404,12 @@ export function projectGraphEdges(
     const color = colors[edge.graphId] ?? FALLBACK_COLOR;
     const isActiveGraph = edge.graphId === activeGraphId;
     const emphasized = isActiveGraph || activeGraphId === null;
-    const lane = lanes.get(edge.id) ?? { offset: 0, reach: 0, endTrim: 0 };
+    const lane = lanes.get(edge.id) ?? { offset: 0, side: 'screen', reach: 0, endTrim: 0 };
 
     const data: RoutedEdgeData = {
       graphId: edge.graphId,
       laneOffset: lane.offset,
+      laneSide: lane.side,
       laneReach: lane.reach,
       endTrim: lane.endTrim,
       headShape: options.headShapes?.[edge.graphId] ?? DEFAULT_GRAPH_HEAD_SHAPE,

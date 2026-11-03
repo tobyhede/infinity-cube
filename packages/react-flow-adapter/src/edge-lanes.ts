@@ -20,13 +20,23 @@ export interface LaneEdge {
   readonly graphId: GraphId;
 }
 
+/**
+ * How a lane's offset is read. `screen`: positive is below an Edge between left
+ * and right anchors and right of one between top and bottom anchors, whichever
+ * way it travels. `travel`: positive is the Edge's left as it travels from
+ * source to target, so an Edge and its reverse run on opposite sides.
+ */
+export type LaneSide = 'screen' | 'travel';
+
 /** Where an Edge is drawn beside the others joining its pair, and how much of it is drawn. */
 export interface GraphLane {
-  /**
-   * How far from the centre line the Edge runs: positive on its left as it
-   * travels, negative on its right. Zero for a lone Edge.
-   */
+  /** How far from the centre line the Edge runs, read by `side`. Zero for a lone Edge. */
   readonly offset: number;
+  /**
+   * How `offset` is read: on the screen where every Edge of the pair runs one
+   * way, and by the Edge's travel where the pair runs both ways.
+   */
+  readonly side: LaneSide;
   /**
    * How far from the centre line the outermost lane of this Edge's pair runs,
    * to either side. Every lane of a pair is drawn the same way — offset along
@@ -62,15 +72,14 @@ export const MAX_END_TRIM = 0.3;
  *
  * Each direction of a pair is ranked on its own: the Active Graph's Edge first,
  * then the rest in the order given, which is the Map's Graph order. The first
- * runs anchor to anchor and each one after it is one trim increment shorter. Where the pair
- * runs one way, the first takes the centre and the rest alternate outwards,
- * the keep-left side first. Where it runs both ways, each direction stacks on
- * its own left from half a lane out. Loops on one Resource nest outwards from
- * it.
+ * runs anchor to anchor and each one after it is one trim increment shorter.
  *
- * A positive offset is the Edge's left as it travels from source to target;
- * `laneBezier` turns it into a side of the screen as it draws, so the side
- * holds while a Resource is dragged.
+ * Where the pair runs one way, the first takes the centre and the rest stack
+ * one lane further out each on the screen's positive side. Loops on one
+ * Resource are laid out the same way, nesting outwards from it. Where the pair
+ * runs both ways, each direction stacks on its own left of travel from half a
+ * lane out; `laneBezier` turns that into a side of the screen as it draws, so
+ * the side holds while a Resource is dragged.
  */
 export function graphLanes(
   edges: readonly LaneEdge[],
@@ -95,22 +104,16 @@ export function graphLanes(
     const directions = [...new Set(bundle.map((edge) => edge.source))].map((source) =>
       ranked(bundle.filter((edge) => edge.source === source)),
     );
+    const bothWays = directions.length === 2;
+    const side: LaneSide = bothWays ? 'travel' : 'screen';
     const placed = directions.flatMap((direction) =>
-      direction.map((edge, rank) => ({
-        edge,
-        rank,
-        lane:
-          directions.length === 2
-            ? rank + 0.5
-            : edge.source === edge.target
-              ? rank
-              : alternate(rank),
-      })),
+      direction.map((edge, rank) => ({ edge, rank, lane: bothWays ? rank + 0.5 : rank })),
     );
-    const reach = Math.max(...placed.map(({ lane }) => Math.abs(lane))) * GRAPH_LANE_SPACING;
+    const reach = Math.max(...placed.map(({ lane }) => lane)) * GRAPH_LANE_SPACING;
     for (const { edge, rank, lane } of placed) {
       lanes.set(edge.id, {
         offset: lane * GRAPH_LANE_SPACING,
+        side,
         reach,
         endTrim: Math.min(rank * END_TRIM_INCREMENT, MAX_END_TRIM),
       });
@@ -118,10 +121,6 @@ export function graphLanes(
   }
   return lanes;
 }
-
-/** The lane, counted in spacings, of the Edge at `rank`: 0, then +1, −1, +2, −2 … */
-const alternate = (rank: number): number =>
-  rank === 0 ? 0 : rank % 2 === 1 ? (rank + 1) / 2 : -rank / 2;
 
 const pairKey = ({ source, target }: LaneEdge): string =>
   source <= target ? `${source}|${target}` : `${target}|${source}`;
@@ -178,10 +177,12 @@ export interface LaneGeometry {
  * lane sits beside its anchor, moved along the side the anchor sits on. The
  * heads move with their lanes rather than meeting on one point.
  *
- * A positive offset runs below an Edge whose sides are left and right, and to
- * the right of one whose sides are top and bottom — along the side the anchors
- * sit on, whichever way the Edge travels; a negative one runs above or left. A
- * self-Edge's two sides are on different axes, so its lane is not an offset:
+ * With `side` left at `screen`, a positive offset runs below an Edge whose
+ * sides are left and right, and to the right of one whose sides are top and
+ * bottom — along the side the anchors sit on, whichever way the Edge travels;
+ * a negative one runs above or left. With `side` at `travel`, a positive
+ * offset runs on the Edge's left as it travels, read from the side it leaves
+ * as it is drawn (ADR 0142). A self-Edge's two sides are on different axes, so its lane is not an offset:
  * each anchor moves along its own side, away from the corner the loop goes
  * round, so a connecting Edge's head still lands on its Resource, and the curve between
  * them is `getBezierPath` over the moved anchors. The lane is then a loop of
@@ -197,8 +198,9 @@ export function laneBezier(
   offset: number,
   endTrim = 0,
   reach = Math.abs(offset),
+  side: LaneSide = 'screen',
 ): LaneGeometry {
-  const lane = laneCurve(attachment, offset, reach);
+  const lane = laneCurve(attachment, offset, reach, side);
   if (lane === undefined) {
     const [path, labelX, labelY] = getBezierPath(attachment);
     const span = Math.hypot(
@@ -251,14 +253,15 @@ interface LaneCurve {
  */
 function laneCurve(
   attachment: EdgeAttachment,
-  leftward: number,
+  given: number,
   reach: number,
+  readAs: LaneSide,
 ): LaneCurve | undefined {
   const { sourcePosition, targetPosition } = attachment;
   if (HORIZONTAL.has(sourcePosition) !== HORIZONTAL.has(targetPosition)) {
-    return movedCurve(attachment, selfEdgeMoves(sourcePosition, targetPosition, leftward));
+    return movedCurve(attachment, selfEdgeMoves(sourcePosition, targetPosition, given));
   }
-  const offset = leftward * screenSideOfLeft(sourcePosition);
+  const offset = readAs === 'travel' ? given * screenSideOfLeft(sourcePosition) : given;
 
   const [path, labelX, labelY] = getBezierPath(attachment);
   const centre = cubicOf(path);

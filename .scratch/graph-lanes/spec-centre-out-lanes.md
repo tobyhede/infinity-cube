@@ -8,7 +8,6 @@ Where several Graphs join the same pair of Resources, each Graph's Edge is drawn
 
 - **Inactive Edges looked disconnected.** Every Edge outside the Active Graph stopped short, including where it was alone in its pair, so a Resource the Active Graph does not reach looked unconnected to the Graph it is actually in.
 - **The Active Graph's Edge left the centre.** One attempt at fixing that put the lanes in Graph order whichever Graph was active. With Mid or Short active, the full-length line sat 8 or 16 flow units off the anchors, and its arrowhead, Title and toolbar went with it. This reintroduced the defect `issues/02` had fixed.
-- **Bundles were lopsided.** Every lane after the first stacked on one side of the centre line, so a bundle the Active Graph is not in sat off to one side of the line between its anchors.
 - **Direction was arbitrary.** An Edge and its reverse shared one stack, and which side each took came from Resource ids rather than from the way it travels.
 
 ## Solution
@@ -16,12 +15,12 @@ Where several Graphs join the same pair of Resources, each Graph's Edge is drawn
 Lanes are laid out from the centre out, and length is ranked in each direction separately.
 
 - **Rank.** In each direction between two Resources, the Active Graph's Edge counts first, then the other Graphs' Edges in the Map's Graph order. The first runs anchor to anchor. Each one after it leaves one more tenth of its length undrawn at each end, up to three tenths. Both values are new: today every Edge outside the Active Graph leaves a flat fifth undrawn at each end (ADR 0100).
-- **One direction only.** Where every Edge in the pair runs the same way, the first takes the exact centre. The rest alternate outwards one lane apart, starting on the keep-left side.
+- **One direction only.** Where every Edge in the pair runs the same way, the layout is as it was: the first takes the exact centre, and the rest stack one lane further out each on one side, below a horizontal Edge and right of a vertical one, whichever way they travel. Only the lengths change.
 - **Both directions.** Where the pair has Edges both ways, each direction stacks on its own left of travel. The first in each direction runs half a lane from the centre, and each further one runs a lane further out. A rightward Edge sits above its reverse, and a downward Edge sits on the screen's right of its reverse. Where the Active Graph holds both directions, both its Edges are the innermost pair.
-- **Loops.** Several Graphs' self-Edges on one Resource nest outwards from the Resource. The Active Graph's loop is innermost and full length, and the rest follow in Graph order, one trim increment shorter each.
+- **Loops.** Several Graphs' self-Edges on one Resource nest outwards from the Resource, as they did. The Active Graph's loop is innermost and full length, and the rest follow in Graph order, one trim increment shorter each.
 - **Activation moves lanes.** Changing the Active Graph brings its Edges to the centre. Colour, opacity, stroke width, paint order and head shapes do not change.
 
-This is recorded as ADR 0142, which refines ADR 0100 (lane order and which Edges shorten) and ADR 0103 (the side of an offset follows the direction of travel).
+This is recorded as ADR 0142, which refines ADR 0100 (which Edges shorten, and the two-way layout) and ADR 0103 (in a two-way pair the side of an offset follows the direction of travel).
 
 ## User Stories
 
@@ -30,7 +29,7 @@ This is recorded as ADR 0142, which refines ADR 0100 (lane order and which Edges
 3. As an author, I want the Active Graph's Edge to sit on the centre line between its anchors where its pair runs one way, so that the line I am working on reads as the connection itself.
 4. As an author, I want the Active Graph's arrowhead to land on the middle of the target's anchor, so that its head reads as reaching that Resource.
 5. As an author, I want the Active Graph's Edge Title and toolbar to sit on the centre line, so that its controls are where its connection is.
-6. As an author, I want the other Graphs on a pair to fan out evenly on both sides of the centre, so that the bundle stays centred between its two Resources.
+6. As an author, I want a pair whose Edges all run one way to keep the layout I already know, so that only its lengths change.
 7. As an author, I want each further Graph on a pair to be one trim increment shorter than the one before it in that direction, so that I can tell the bundle's Edges apart by length as well as colour.
 8. As an author, I want the shortening to stop at three tenths at each end, so that even a large bundle's shortest Edge still visibly spans its pair.
 9. As an author, I want the Graphs after the Active one to take their places in the Map's Graph order, so that the bundle follows the order I authored.
@@ -55,18 +54,19 @@ This is recorded as ADR 0142, which refines ADR 0100 (lane order and which Edges
 ## Implementation Decisions
 
 - **The lane module decides rank, lane and length.** `graphLanes` takes the drawn Edges, each with its Graph, and the Active Graph, and answers each Edge's lane offset, its pair's reach and its end trim. Inside each pair it groups Edges by direction, orders each direction with the Active Graph's Edge first and then Graph order, and assigns:
-  - **one direction:** rank 0 at offset 0, then ranks 1, 2, 3 … at +1, −1, +2, −2 … lanes. Positive is the keep-left side, so rank 1 sits on the keep-left side.
-  - **both directions:** rank r at +(r + ½) lanes in each direction. The opposite direction lands on the opposite side because the sign is relative to travel.
-  - **loops (source equals target):** rank r at r lanes, nesting outwards, as loops do today.
+  - **one direction:** rank r at r lanes, read on the screen (`side: 'screen'`), as before.
+  - **both directions:** rank r at +(r + ½) lanes in each direction, read by travel (`side: 'travel'`). The opposite direction lands on the opposite side because the sign is relative to travel.
+  - **loops (source equals target):** rank r at r lanes, read on the screen, nesting outwards, as before.
   - **trim:** rank × the trim increment of a tenth, capped at three tenths. Both values are new, and they replace the flat fifth (`DETACHED_END_TRIM`) every Edge outside the Active Graph leaves today.
   - **reach:** the largest magnitude of any offset in the pair, so every lane of a pair is offset over the same stretch of curve (ADR 0103).
-- **An offset is relative to the direction of travel.** A positive offset is the Edge's left as it travels from source to target. The lane geometry turns that into a screen side from the sides and positions it resolves while drawing. A rightward or upward Edge runs on the opposite screen side from its leftward or downward reverse. Today the sign is fixed to the screen whichever way the Edge travels, so that conversion is the one geometric change. Bridges, spans and the translate fallback (ADR 0103) take the converted offset exactly as they take one today. Loops keep their own geometry.
+- **A two-way pair's offset is relative to the direction of travel.** Each lane says how its offset is read. In a two-way pair a positive offset is the Edge's left as it travels from source to target, and the lane geometry turns that into a screen side from the sides and positions it resolves while drawing, so a rightward or upward Edge runs on the opposite screen side from its leftward or downward reverse. A one-way pair and a loop keep the screen-fixed sign, so that conversion is the one geometric change. Bridges, spans and the translate fallback (ADR 0103) take the converted offset exactly as they take one today. Loops keep their own geometry.
 - **The projection copies the lane.** `projectGraphEdges` hands each Edge its offset, reach and trim, and keeps colour, opacity, stroke width, paint order and head marker as they are. Graph order reaches the lane module as the order the Map's Graphs give their Edges, which it already does.
 - **The Active Graph argument is required.** The lane module takes the Active Graph, or none, explicitly, with no default.
 - **Records.** ADR 0142, "Lanes are laid out from the centre out, each direction on its own left", refines ADR 0100 and ADR 0103. Their status lines gain `Refined by: 0142`, and the ADR index gains its row. It records the rejected alternatives and their costs:
   - every inactive Edge stopping short (ADR 0100), which made reached Resources look disconnected
   - lanes in Graph order whichever Graph is active, which keeps lanes still but takes the Active Graph off the centre
-  - every further lane stacking on one side, which gives lopsided bundles
+  - alternating a one-way pair's lanes either side of the centre, which changes a layout that was not wrong
+  - reading every offset by travel, which flips a one-way bundle when its Resources swap places
   - splitting the centre by Resource id (`issues/02`), which picks a side without meaning
   - shortening at the tail only, which was rejected as a reading of the sketch rather than a requirement
 
@@ -84,8 +84,9 @@ This is recorded as ADR 0142, which refines ADR 0100 (lane order and which Edges
 - **The lane geometry** is the side's seam. A positive offset draws on the left of travel in all four directions, rightward, leftward, downward and upward. The existing ADR 0103 distance properties keep passing with offsets of both signs. Prior art: the existing `laneBezier` tests and properties.
 - **The projection** gets one test that each Edge carries its lane, and one that changing the Active Graph moves the centre. Prior art: the existing `projectGraphEdges` lane tests.
 - **The browser** suite is the end-to-end check. Cover:
-  - the fixture's Long, Mid and Short over A → B: the Active Graph centred and full length, the rest alternating and shortening, and the centre moving when Mid and then Short is activated
-  - a B → A Edge that the test draws itself, to show the two directions stacking on opposite sides from half a lane out
+  - the fixture's Long, Mid and Short over A → B: the Active Graph centred and full length, the rest stacked below and shortening, and the centre moving when Mid and then Short is activated; the same stacked vertically; a lone Edge and a pair the Active Graph is not in
+  - B → A Edges that the test draws itself, one and then two, to show the two directions stacking on opposite sides from half a lane out with each Graph active, stacked vertically and mid-drag
+  - three loops on one Resource, nesting outwards with the Active Graph innermost
 
   The tracked fixture does not change. Prior art: the existing Edge attachment browser spec.
 
@@ -100,3 +101,4 @@ This is recorded as ADR 0142, which refines ADR 0100 (lane order and which Edges
 
 - This replaces `issues/02`'s centring rule. That ticket stays resolved as history.
 - All of this ships on PR #455, which is reset to `main` and rebuilt from this spec.
+- `issues/06` and `issues/07` first changed the one-way layout too, alternating it either side of the centre and reading its side by travel. That was never in scope. `issues/08` restores it and records the approved design canvas.
