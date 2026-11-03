@@ -1,0 +1,244 @@
+# Navigation
+
+**Purpose:** what changes what is shown without writing the Space: choosing a Map, selection, traversal, product URLs and browser history, Open Spaces, and presenting.
+
+Open conflicts are listed in [conflicts/navigation.md](conflicts/navigation.md). Sources are traced in [trace/navigation.md](trace/navigation.md).
+
+| Not here | See |
+|---|---|
+| What a Map and Graph store; every Edit that writes `defaultMap` or `activeGraph`, switching Graphs included (MG-45) | [maps-and-graphs.md](maps-and-graphs.md) |
+| Space Resources, their stored selection and framing, occurrences, drawn-Map policy | [space-and-resources.md](space-and-resources.md) |
+| The Edit lifecycle, persistence states, Retry and Accept stored, image-replacement exclusivity | [editing.md](editing.md) |
+| Host status codes, the Meta Space's repository lifecycle, reading a mounted aggregate | [storage.md](storage.md) |
+| Drawing the canvas, the camera, Graph emphasis | [rendering.md](rendering.md) |
+| Controls, menus and keys outside presenting, command wording, focus outside presenting | [ui.md](ui.md) |
+
+**Terms** (definitions are in `CONTEXT.md`):
+- **Navigation**: the per-Space state that says what is shown: the selected Map, the Active Graph and, while presenting, the Traversal history (for Graph navigation see `conflicts/navigation.md` C2).
+- **Address**: Navigation's position as one value: the selected Map, the Active Graph and the presented Resource (none outside presenting). It is derived from Navigation's state, never stored.
+- **Location**: the browser's current URL. A **product URL** is a location under `/spaces`. "Address" always means Navigation's value, never a URL.
+- **Active Resource**: the Resource reached while presenting, the last entry of the Traversal history (for Graph navigation see `conflicts/navigation.md` C2).
+- **Presentation**: one talk, from a start (NV-57) to the next start or the end of presenting. It has an identity and a start time, which a Notes window follows.
+- **Open Space**: a Space listed in Open Spaces. Its **Opener** is the Space it was Entered from, or none.
+- **Composed Space**: a Space whose session is live because something holds it (its listing, or a drawing of one of its Maps; see space-and-resources.md).
+
+**Status:** **built** means code and a named test match the rule. **built (untested)** means code matches and no test covers it. **not built** means the rule is decided and no code implements it. **bug: code differs** means the code does what the note says instead. **undecided (`conflicts/navigation.md` Cn)** means the rule waits on conflict Cn in [conflicts/navigation.md](conflicts/navigation.md), not on a DECISIONS ruling of the same name; the note says what the code does meanwhile. A test is named as `file` › "test name". Paths that start with `test/` are at the repo root; all others are under `packages/`.
+
+## State: shown, never saved
+
+| State | Held by | Starts as | Reset when | In the URL |
+|---|---|---|---|---|
+| Selected Map | Navigation, per open Space | the Space's `defaultMap`, or the Map the address names | the Space is exited, or a stored Space is accepted | yes |
+| Active Graph shown | Navigation, per open Space | the Map's saved Active Graph, or the Graph the address names | as above | yes |
+| Traversal history, selected move | Navigation, while presenting | the start Resource, or the addressed Resource | presenting ends or restarts | only its last Resource |
+| Canvas selection | the canvas, per occurrence | nothing | a stored Space is accepted; see also NV-10, NV-12 | no |
+| Camera | the canvas | the opening fit (rendering.md) | — | no |
+| Open Spaces, Openers | the session | the Space the first product URL opens | reload | no |
+| Rehearsal notes shown | the presenting window | hidden | each presentation start | no |
+| Interaction drafts | their surface (editing.md) | — | — | no |
+
+## Operations index
+
+| Operation | Effect | Writes | History | Rules |
+|---|---|---|---|---|
+| Choose Map | shows the Map on its saved Active Graph; ends presenting | nothing | one entry | NV-5, NV-6 |
+| Switch Graph | shows the Graph; ends presenting | MG-45 | one entry | NV-8 |
+| Select | sets the one selected subject | nothing | none | NV-9–NV-12 |
+| Graph navigation | moves the selection along the Active Graph | nothing | none | NV-13 |
+| Follow a product URL | opens what it names | nothing (but MG-74) | none | NV-20–NV-27 |
+| Back, Forward | reopens what the location names | nothing | none | NV-33–NV-35 |
+| Copy link | copies one product URL | nothing | none | NV-28 |
+| Enter | opens the target Space on the Space Resource's selection | nothing | by NV-29 | NV-40 |
+| Open in New Tab | opens the target's product URL in a browser tab | nothing | — | NV-41 |
+| Switch Space | shows another open Space | nothing | by NV-29 | NV-42, NV-47 |
+| Exit | closes one open Space | nothing | by NV-29 | NV-44, NV-48, NV-49, NV-81, NV-82, NV-84–NV-87 |
+| Present, Present from Here | starts a presentation | nothing | one entry | NV-51–NV-53 |
+| Advance, Back, choose a move | traverses the Active Graph | nothing | one entry per new Resource | NV-14–NV-18, NV-65 |
+| Overview | leaves presenting | nothing | one entry | NV-55 |
+| Toggle rehearsal notes | shows notes under the Stage | nothing | none | NV-71 |
+| Open Notes window | opens `/spaces/:s/notes` in a new window | nothing | — | NV-72–NV-77 |
+
+## Writing nothing
+
+- **NV-1** Choosing a Map, showing a Graph, following a product URL, Back and Forward, selecting, panning, zooming, Graph navigation and presenting write nothing to the Space. The exceptions are switching Graphs, which is an Edit (MG-45), and the first working read of a Space with no Map (MG-74). *Why:* reading a Space must not change it. **built**: `app/e2e/http-persistence.spec.ts` › "graph activation and presenting do not write or protect navigation" (cited for presenting; it also asserts that switching Graphs writes nothing, which is the MG-45 bug); `app/test/navigation.test.ts` › "selects a Map and its active Graph without changing the Space". Pan and zoom are untested.
+- **NV-2** Navigation holds no copy of the Space. It reads the working Space each time, so an Edit is visible to it at once. *Why:* two copies would disagree. **built**: `app/test/navigation.test.ts` › "traverses an Edge from the changing working Space without installing a copy".
+- **NV-3** Navigation is per Space. Each open Space has its own selected Map, Active Graph and Traversal history, and nothing navigates across Spaces at once. *Why:* Maps and Graphs belong to one Space. **built**: `app/test/open-spaces.test.tsx` › "retains a Space selection while switching and reopening it".
+- **NV-4** Accepting the stored Space after a conflict opens Navigation afresh, at the accepted Space's `defaultMap` and that Map's saved Active Graph, with no Traversal history and no canvas selection. *Why:* the old position may name things the stored Space lacks. **built**: `app/test/navigation.test.ts` › "opens a replacement Space as new navigation, retaining no reading state". Clearing the selection is untested (`App.tsx` remounts the canvas on `replacementEpoch`).
+
+## Choosing a Map
+
+- **NV-5** A Space shown on the canvas always has exactly one selected Map, never none. *Why:* the canvas draws one Map (MG-6). **built**: `app/test/navigation.test.ts` › "refuses a Map the current Space does not hold, leaving navigation untouched".
+- **NV-6** Choosing a Map shows it on its saved Active Graph and ends any presentation. It writes nothing, `defaultMap` included. *Why:* looking at a Map is not working in it. **built**: `app/test/navigation.test.ts` › "answers the selected Map’s own Active Graph after selectMap"; `app/e2e/space-routing.spec.ts` › "choosing a Map pushes history and Back, Forward and reload restore it without authoring".
+- **NV-7** An Edit that continues in another Map (Add Map, Delete Map) moves Navigation to that Map and the Graph the Edit wrote as its Active Graph. *Why:* the author continues where the Edit left them. **built**: `app/test/navigation.test.ts` › "takes the adopted Map’s own Active Graph over the one that was emphasised".
+- **NV-8** Switching Graphs shows the chosen Graph and ends any presentation. What it writes is MG-45. *Why:* a new Graph is a different talk. **built**: `app/test/navigation.test.ts` › "activating a Graph ends the current Traversal history without changing the Space" (its "without changing the Space" assertion is the MG-45 bug).
+
+## Selection
+
+- **NV-9** The canvas has one selected subject: nothing, one Resource or one Edge. Selecting one clears the other. Selecting writes nothing. *Why:* every authoring gesture has one target. **built**: `app/test/render-adapter.test.ts` › "clears the Resource React Flow still holds selected when an Edge takes the selection", "keeps a newly selected Resource when the Edge deselection arrives after it".
+- **NV-10** A selected Edge must be in the Active Graph. When the Active Graph changes away from it, the selection is dropped. *Why:* only the Active Graph's Edges are authorable. **built**: `app/test/edge-authoring.test.ts` › "drops a selected Edge the Active Graph has left behind", "keeps a selected Edge whose Graph is still the Active one".
+- **NV-11** There is one canvas selection across every drawn Map, and it names the occurrence it was made in (occurrences are in space-and-resources.md). *Why:* one Map drawn twice must not share a selected Resource. **built**: `app/test/map-surface.test.ts` › "keeps one selection and continuation across two drawings of the same Map".
+- **NV-12** A Resource named by the location is selected and revealed on the canvas, and the selection clears when the location stops naming it. The selection is never written back to the location. *Why:* a link names a Resource; selection is surface state. **built**: `app/test/app-hooks.test.tsx` › "selects and reveals the addressed Resource, and clears once the address leaves it".
+
+## Traversal
+
+- **NV-13** Graph navigation on the canvas moves the selection from the selected Resource to a Resource joined to it by an Active Graph Edge, and writes nothing. The keys are in ui.md. *Why:* an author moves through the Graph they are working in. **undecided (`conflicts/navigation.md` C2)**: the code moves along Edges in either direction, to the neighbour whose centre is within 45° of the pressed axis, nearest the axis, then nearest; with none that way nothing moves; it keeps no Traversal history: `app/test/graph-navigation.test.ts` › "prefers the candidate nearest the axis over a nearer one off it"; `app/e2e/keyboard-shortcuts.spec.ts` › "the arrow keys follow the Active Graph, and Shift and an arrow move the Resource".
+- **NV-14** Presenting starts at the Graph's start Resource: the first Resource, in Edge order, that an Edge leaves and none reaches. When every Resource is reached (a cycle), it is the first Edge's source. *Why:* the start follows the Graph's shape, not drawing order. **built**: `graph/test/traversal.test.ts` › "prefers an entry to the first edge’s source when a Graph has both", "picks the first edge’s source for a cycle no resource enters".
+- **NV-15** The moves from the Active Resource are its outgoing Edges in the Graph's Edge order. One is selected, the first by default. Choosing among them moves the selection without moving the presentation, and advancing follows the selected one. A line is a one-move choice: nothing tests whether a Graph is linear. *Why:* one mechanism for lines and forks. **built**: `app/test/navigation.test.ts` › "traverses a fork, retreats along Traversal history, and reselects the Edge taken"; `graph/test/traversal.test.ts` › "gives a resource on a line exactly one — the degenerate fork".
+- **NV-16** Advancing appends the reached Resource to the Traversal history, so a revisit through a cycle or a self-Edge is a new entry. Nothing advances on its own. *Why:* the history records the path walked. **built**: `app/test/navigation.test.ts` › "reads the last Resource when Traversal history returns to one it has already visited", "presents a fully cyclic Graph, which has no entry Resource".
+- **NV-17** Retreating removes the last Resource and reselects the Edge that was taken. The first Resource cannot be retreated past. *Why:* a merge has several ways in, and only the history says which was used. **built**: `app/test/navigation.test.ts` › "traverses a fork, retreats along Traversal history, and reselects the Edge taken"; `app/test/PresentingChrome.test.tsx` › "offers Back only where Traversal history can retreat".
+- **NV-18** A Resource with no outgoing Edge ends the Graph: there is no move, and Back still works. *Why:* a sink is a legitimate end. **built**: `app/test/PresentingChrome.test.tsx` › "names a sink as the end of the active Graph".
+- **NV-19** The Traversal history is never stored and never inferred from incoming Edges. It ends when presenting ends. *Why:* it is the viewer's path, not the Space's. **built**: `app/test/navigation.test.ts` › "leaves no Traversal history behind when presenting ends".
+
+## Addresses
+
+- **NV-20** Every Space, Resource, Map and Graph has a product URL built from its id, spelled as an unpadded 22-character base64url value. Titles take no part. The domain, files and HTTP resources keep the canonical UUID spelling. *Why:* a title is mutable and not unique. **built**: `core/test/compact-uuid.property.test.ts` › "round-trips every UUID through one 22-character base64url spelling"; `http/test/product-destination.test.ts` › "formats canonical Space and explicit Map destinations".
+- **NV-21** The product URL shapes are exactly these, with no version segment:
+
+  | Shape | Opens |
+  |---|---|
+  | `/spaces/:s` | the Space at its `defaultMap` |
+  | `/spaces/:s/maps/:m` | that Map |
+  | `/spaces/:s/resources/:r` | the `defaultMap`, revealing the Resource (NV-23) |
+  | `/spaces/:s/maps/:m/resources/:r` | that Map, revealing the Resource; not found if the Map omits it |
+  | `/spaces/:s/graphs/:g` | the Graph in the Map that owns it |
+  | `/spaces/:s/maps/:m/graphs/:g` | that Map and Graph; not found if the Map does not own the Graph |
+  | `/spaces/:s/maps/:m/graphs/:g/present/:r` | a presentation at that Resource (NV-53) |
+  | `/spaces/:s/notes` | a Notes window (NV-72), not a place in the Space |
+
+  Any other path under `/spaces`, `/spaces` itself included, is malformed. *Why:* one table, one meaning per URL. **built**: `http/test/product-destination.test.ts` › "formats and resolves canonical and contextual Resource destinations", "formats and resolves canonical and contextual Graph destinations", "formats and resolves an exact contextual presentation destination", "formats and resolves a Notes window over a Space, and only over a Space it holds", "classifies the claimed product address %s as malformed".
+- **NV-22** Following a product URL is navigation. It opens the Map, Graph or presentation the URL names for that navigation, and writes nothing: no Open/Closed, membership, `defaultMap` or saved Active Graph. The exception is the first working read of a Space with no Map (MG-74). *Why:* a link must not edit what it shows. **built**: `app/e2e/space-routing.spec.ts` › "canonical and contextual Graph links restore navigation context without authoring", "canonical and contextual Resource links reveal a Closed Resource without authoring".
+- **NV-23** A canonical Resource URL whose Resource the `defaultMap` omits reveals it in the Resources collection, with no position invented for it. *Why:* a position is authored. **built**: `app/e2e/space-routing.spec.ts` › "a canonical Resource omitted by the default Map is revealed only in the Resources collection".
+- **NV-24** A product URL that does not resolve shows the application's not-found surface. Resolution never substitutes another entity. *Why:* a wrong guess is worse than a clear miss. **built**: `app/e2e/space-routing.spec.ts` › "Back or Forward to an unresolved destination shows the destination surface". The host's statuses are in storage.md.
+- **NV-25** When a Meta Space exists, `/` opens its canonical URL. Otherwise the host's status is in storage.md. *Why:* Meta is where navigation starts. **built**: `app/e2e/space-routing.spec.ts` › "root redirects to and opens the canonical Meta Space URL".
+- **NV-26** Resolution reads the path only. The query and hash never select a destination, and a presentation URL carries no presentation state in its query. *Why:* the path is the address. **built**: `app/test/browser-location.test.ts` › "survives a browser traversal, which resolves the path alone".
+- **NV-27** Camera, selection, Open Spaces, drafts, Open/Closed and the Traversal history are not in the URL. A presentation URL names only the current Resource. *Why:* a cyclic talk would grow its URL without bound. **built**: `app/e2e/space-routing.spec.ts` › "an exact presentation link starts fresh at its Resource and moves through browser history".
+- **NV-28** Each Copy link command copies one product URL: a Space's, a Resource's canonical or in-Map URL, a Map and Graph, the exact presentation point, or, for a Reference Resource, its Target's canonical Resource URL (Copy link to Target, never an in-Map form). Wording is in ui.md. *Why:* a link names one destination. **built**: `app/e2e/space-routing.spec.ts` › "copy commands distinguish canonical Resource identity from its current Map", "copies the exact current presentation point"; `app/test/entity-actions.test.ts` › "offers a Reference Resource a Copy link to Target alongside its own addresses", "offers Copy link to Target only once, never a within-Map form".
+
+## Browser history
+
+- **NV-29** When the address changes, the location gets one new history entry. One operation makes at most one entry, however many parts of the address it changes. *Why:* Back follows positions the reader actually saw. **built**: `app/test/navigation.test.ts` › "opens a Graph destination in its named Map with one navigation publication"; `app/e2e/space-routing.spec.ts` › "activating a Graph pushes a contextual destination restored by Back and Forward", "entering, advancing and retreating each append presentation history".
+- **NV-30** When the address is unchanged but the location names something narrower or stale, the entry is replaced, not added. For example, the location still names a Resource inside the Map shown although the address no longer does, or names something that no longer resolves. *Why:* it is the same position. **built**: `app/test/destination-coordination.test.ts` › "replaces, without a history entry, when the location still names a Resource the address has dropped", "replaces a location that no longer resolves once the address has settled elsewhere".
+- **NV-31** When the location already opens the address, nothing is written. So a self-Edge advance, a repeated decision, and Back or Forward each write nothing. *Why:* writing would push over the entry the browser just reached. **built**: `app/test/browser-location.test.ts` › "writes nothing when the same position is decided a second time", "takes one entry for a presentation a self-Edge never moves"; `app/e2e/space-routing.spec.ts` › "a self-Edge presentation move takes no browser entry".
+- **NV-32** A canonical location is never rewritten into a contextual one for the same position, and ending a presentation keeps the Graph location it ends on. *Why:* the reader's link stays as they had it. **built**: `app/test/destination-coordination.test.ts` › "does not rewrite a canonical Resource location into its contextual spelling", "keeps the Graph a location already names when a presentation ends".
+- **NV-33** Back or Forward reopens whatever the location resolves to, in whichever Space it names: an open Space is switched to, and a closed one is reopened, without a history entry. *Why:* history is linear and the browser's. **built**: `app/test/open-spaces.test.tsx` › "restores another open Space on Back and Forward without writing history", "reopens a closed Space from browser history without adding an entry".
+- **NV-34** Back or Forward onto a location that no longer resolves is reported (NV-24), not corrected. The next move away writes one entry and clears the report. A location outside product URLs is left alone until the reader moves. *Why:* correcting would lose the entry the reader chose. **built**: `app/test/browser-location.test.ts` › "reports a Back onto a dead address rather than correcting it", "clears the report and takes one entry when presenting moves off an unresolved location", "leaves a Back onto a location outside product addressing alone".
+- **NV-35** A Back or Forward that Navigation refuses (NV-50) returns the browser to the entry it left and keeps both entries. *Why:* the address must keep matching what is shown. **built**: `app/test/browser-history.test.ts` › "rewinds a held Back to the entry it left, and keeps the entry it skipped"; `app/e2e/held-traversal.spec.ts` › "a held traversal returns to the entry it left when the reader jumps on from each arrival".
+
+## The mounted `source`
+
+- **NV-36** On a mounted page, the `source` query locates the mount. Every product URL the page writes, Copy link and the Notes window's URL included, carries `source` and every other query pair as written and in place, and never the hash. `source` is not presentation state (NV-26). *Why:* a link from a mount must reopen the same mount. **built**: `app/test/browser-location.test.ts` › "survives Present", "survives Enter into another Space", "carries the source into a copied link", "carries the rest of the query beside the source, but not the hash". The Notes window's address carrying `source` is untested here (`app/e2e/mount.spec.ts` › "the Notes window mounts the same commit and follows the presentation" shows it reaches the same commit).
+- **NV-37** A page that is not mounted drops `source` and keeps the rest of the query. *Why:* only a mount reads it. **built**: `app/test/browser-location.test.ts` › "carries the rest of the query on a page that is not mounted, but no source or hash".
+- **NV-38** After a mount resolves, the location's `source` is replaced, without a history entry, by the resolved location (repository, directory, commit), only when it names another. A page mounted from the build's default, with no `source`, writes that default into the location the same way. *Why:* a link must reopen the same commit. **built**: `app/test/browser-location.test.ts` › "replaces a branch location with its commit exactly once", "writes nothing when the address already names the commit", "writes a build-time default into the address as a pinned source". Reading the mount, the build default itself, and asking for a source when there is neither are in storage.md.
+- **NV-39** A mounted page answers every product URL itself: one it cannot resolve shows the not-found surface, not an HTTP 404. *Why:* its static host serves the application for every path. **built**: `app/e2e/mount.spec.ts` › "an unknown product URL shows the \"not found\" destination", "a Presenting URL loads directly and survives a reload"; `app/test/mount.test.tsx` › "draws the not-found report over the Meta Space".
+
+## Open Spaces
+
+- **NV-40** Entering a Space Resource opens its target Space on the canvas with that Space's own command surface. It begins on the Map and Graph the Space Resource selects and writes neither. Entering a Space already open switches to it and keeps its live selection. *Why:* entering is a crossing, not a copy. **built**: `app/test/enter-space-resource.test.tsx` › "adds the target to Open Spaces, shows it, and seeds the Resource’s Map and Graph", "focuses an already-open Space and keeps the live selection". Where the entered camera starts is in rendering.md.
+- **NV-41** Open in New Tab opens the target Space at its own product URL in a new browser tab, carrying no containing state. *Why:* every Space has a product URL. **built**: `app/e2e/space-resource.spec.ts` › "Open in New Tab on a Space Resource opens the target Space at its own address".
+- **NV-42** One entry per Space. Choosing an entry switches to that Space and closes nothing. Each open Space keeps its live selection until it is exited. *Why:* two entries on one Space would show stale state. **built**: `app/test/open-spaces.test.tsx` › "opens and composes one live entry per Space id even when openings race", "retains a Space selection while switching and reopening it".
+- **NV-43** Every open Space records its Opener: the Space it was Entered from, or none when a product URL or Open Spaces opened it. The Opener is recorded once, when the Space joins the set; returning to an open Space keeps it. A Space is never its own Opener. *Why:* the author can return the way they came. **built**: `app/test/open-spaces.test.tsx` › "records the Space a crossing was made from, and records none for an address", "keeps the opener a Space joined the set with when it is entered again".
+- **NV-44** The Opener is history, not containment. Exit closes only the Space exited, and the Spaces Entered from it take its own Opener. *Why:* closing one Space must never close another. **built**: `app/test/open-spaces.test.tsx` › "closes only the Space exited, whatever was entered from it", "re-homes what was entered from an exited Space onto that Space’s own opener".
+- **NV-45** Open Spaces lists Meta first, open or not, then each open Space under its Opener in the order opened. Choosing a closed Meta opens it with no Opener. *Why:* Meta is always reachable. **built**: `app/test/open-spaces.test.tsx` › "lists Meta from startup while it is closed, and from its own session once open", "derives each row’s depth from the crossing that opened it", "opens a closed Meta with no Opener".
+- **NV-46** An entry marks a Space whose last save failed, was rejected or is in conflict (persistence states are in editing.md), and no other settled state; a `refused` save is NV-84. The mark's words are UI's (UI-93). *Why:* an entry is a place, and only a Space that stopped saving needs attention. **built**: `app/test/dock-report.test.ts` › "in the words `openSpaceStatusLabel` decides". That `settled` and `pending` are unmarked is untested (`dock-model.ts` `UNWELL_STATUS`).
+- **NV-47** Switching away from a Space waits for its in-flight commit. *Why:* a Space can only go bad as the result of a write. **built**: `app/test/open-spaces.test.tsx` › "waits for the Space being left to finish its in-flight commit".
+- **NV-48** Exit is the one way to close an open Space; Escape and Back never do. Closing the entry does not end a Space another Map still draws (NV-81). *Why:* closing a Space is too large for the key that cancels an edit. **built**: `app/test/enter-space-resource.test.tsx` › "does not exit on Escape". Back is untested.
+- **NV-85** Exit waits for an in-flight commit. It then refuses when the Space's last save `failed` and can be retried, a size rejection or blocked recovery included (`persistence-recovery-required`, recovery `retry`), or the Space is `conflicted` (recovery `resolve-conflict`). *Why:* a refusal is worth making only when it names a recovery. **built**: `app/test/open-spaces.test.tsx` › "waits for an in-flight commit before exiting", "keeps recoverable persistence state discoverable when exit is refused", "refuses to exit work rejected for size, which Retry can still save".
+- **NV-86** When the Space's work was `rejected`, Exit warns that the work is lost and proceeds once confirmed. *Why:* there is no recovery to point at, and refusing would trap the entry. **built**: `app/test/open-spaces.test.tsx` › "warns before exiting rejected work and permits an explicit exit".
+- **NV-87** Entering a Space again after Exit seeds from the Space Resource, and an exited Space reopened by URL starts with a fresh session and selection. *Why:* Exit destroys the entry. **built**: `app/test/enter-space-resource.test.tsx` › "seeds from the Resource again after Exit, because Exit destroyed the entry"; `app/test/open-spaces.test.tsx` › "reopens a safely exited Space with a fresh session and selection".
+- **NV-84** A `refused` save (editing.md) is marked with the rejected word, and Exit warns on it as on `rejected`. **undecided (`conflicts/navigation.md` C3)**: the code does this: `app/test/dock-report.test.ts` › "in the words `openSpaceStatusLabel` decides"; `app/test/open-spaces.test.tsx` › "warns before exiting refused work and permits an explicit exit".
+- **NV-88** A conflict dialog opens only when its Space is on the canvas; an entry carries the mark meanwhile. *Why:* a decision belongs to the Space on screen. **built (untested)**: `app/src/components/OpenSpacesApplication.tsx` hides every other Space.
+- **NV-49** Meta cannot be exited (`meta-space-permanent`). *Why:* Meta is where navigation starts. **built**: `app/test/open-spaces.test.tsx` › "never exits the permanent Meta Space".
+- **NV-82** What exiting the last open Space does, and whether any Space other than Meta is permanent. **undecided (`conflicts/navigation.md` C1)**: the code allows exiting any other Space, the last open one included, which leaves nothing on the canvas (`open-spaces.ts` `followActiveSpace`; untested).
+- **NV-81** A Space stays composed (its session live) while its listing in Open Spaces or any drawing of one of its Maps holds it. Exit releases only the listing: a Space still drawn elsewhere keeps its session, unlisted and without an Opener, and the last release disposes it. Entering or opening a Space already composed, listed or only drawn, uses its live session. *Why:* being listed and being drawn are separate reasons to keep a Space. **built**: `app/test/open-spaces.test.tsx` › "Exit releases only its listing hold and the last drawing disposes the composition", "holds a drawn target without listing it, and Enter reuses its composition", "holds the target a Reference Resource to a Space Resource draws, and Close releases it".
+
+## While an image is replaced
+
+- **NV-50** While any composed Space is replacing an image, every Space's navigation is held: Map and Graph choices, opening a product URL, Entering, switching and Exit are refused, and Back and Forward are held (NV-35). Pan and zoom stay. Why the replacement is exclusive is in editing.md. *Why:* a navigation would move the address while history is held. **built**: `app/test/browser-location.test.ts` › "holds Maps, Graphs and browser traversal during replacement, then permits navigation"; `app/test/open-spaces.test.tsx` › "refuses opening an address and entering a Space during replacement".
+
+## Presenting
+
+### Starting and ending
+
+- **NV-51** Present traverses the Active Graph from its start Resource (NV-14). Present from Here starts at the selected Resource when the Active Graph holds it, and does nothing otherwise. Both start a fresh Traversal history. *Why:* presenting is walking a Graph. **built**: `app/test/navigation.test.ts` › "presents the Active Graph from one of its Resources with fresh Traversal history", "does not present from a Resource the Active Graph does not hold"; `app/e2e/keyboard-shortcuts.spec.ts` › "P and Present from Here present from the selected Resource".
+- **NV-52** A Graph with no Edges cannot be presented, and Present is offered disabled while the Active Graph has none. *Why:* there is nowhere to begin. **built**: `app/e2e/new-space.spec.ts` › "shows the empty initial Graph and its graph HUD"; `app/test/resource-authoring.test.tsx` › "offers Present on a Map whose Active Graph holds an Edge".
+- **NV-53** A presentation URL opens a presentation at its Resource with a fresh Traversal history. It resolves only when the Map owns the Graph and the Resource is an endpoint of one of its Edges. *Why:* the URL names the current Resource only. **built**: `app/test/navigation.test.ts` › "opens an exact presentation Resource with fresh Traversal history in one publication"; `app/e2e/space-routing.spec.ts` › "malformed and incompatible presentation destinations have real host statuses".
+- **NV-54** Only the canvas's own Space presents, and a presentation never crosses into another Space. *Why:* cross-Space Edges are undecided. **built**: `app/test/map-surface-policy.test.ts` › "offers Edit and presenting only on the canvas’s own authoring Map".
+- **NV-55** Leaving presenting returns to the overview on the same Map and Active Graph, with the canvas exactly as it was left. *Why:* presenting never moved the canvas. **built**: `app/e2e/presenting.spec.ts` › "returning to the overview restores the space and its gestures".
+- **NV-56** If an Edit moves Navigation to a Map while presenting (NV-7): the same Graph keeps the traversal; another Graph that holds the Active Resource goes on from it alone; otherwise presenting ends. *Why:* the old history was walked over another Graph. **built**: `app/test/navigation.test.ts` › "goes on from the presented Resource alone when the adopted Graph is another that holds it", "leaves presenting when the adopted Graph does not hold the presented Resource", "keeps the traversal whole when the adopted Graph is the one presented".
+- **NV-57** A presentation starts when presenting begins, when a reopening or an Edit moves to another Map or Graph, and when Present is pressed while presenting (which restarts from the start). A reopening on the same Map and Graph, Back and Forward included, stays in it. Each start hides the rehearsal notes and resets the talk timer and the identity a Notes window follows. *Why:* a different Graph is a different talk. **built**: `app/test/presenting-window.test.ts` › "keeps the presentation and its rehearsal notes across a reopening of the same Map and Graph", "starts afresh, with the rehearsal notes hidden, when Present restarts the talk", "starts afresh, with the rehearsal notes hidden, when a reopening changes Graph".
+- **NV-58** Present asks for the whole document fullscreen; a refusal is tolerated. A presentation opened from a URL does not ask. Leaving the fullscreen it entered leaves presenting, and leaving presenting leaves that fullscreen. *Why:* presenting fills the screen. **built**: `app/e2e/presenting-fullscreen.spec.ts` › "Present takes the whole document fullscreen", "leaving fullscreen leaves presenting", "leaving presenting any other way exits fullscreen", "a refused request is tolerated and the Stage fills the window regardless", "a presentation opened from a link does not request fullscreen and survives an unrelated one".
+
+### The Stage
+
+- **NV-59** Presenting draws the Active Resource on the Stage, which fills the window. The canvas stays mounted behind it, inert, unfocusable and not shown, and no camera moves. *Why:* an audience surface built from authoring features leaks them. **built**: `app/e2e/presenting.spec.ts` › "traverses the graph on the Stage, with the canvas still mounted behind it", "no authoring control is visible or reachable, and the canvas behind the Stage is not focusable".
+- **NV-60** The Stage and its chrome offer no authoring: no command surface, no connection handles, nothing that changes the Space. An Edge drawn before presenting is a move at once. *Why:* to change a talk, leave presenting. **built**: `app/e2e/editing.spec.ts` › "no connection handle is visible or reachable on the presented Resource or a neighbour", "an authored Edge is immediately available when presenting the Graph"; `app/ladle-e2e/command-dock.spec.ts` › "presenting removes the whole command surface".
+- **NV-83** While presenting, a persistence failure and its Retry stay reachable. *Why:* Retry recovers a save, it does not author. **built**: `app/e2e/http-persistence.spec.ts` › "Retry remains reachable while presenting and persists the failed Edit".
+- **NV-61** The Stage draws a Resource by its kind, through its resolved content:
+  - Markdown: its name and its Markdown, through the sanitised renderer the canvas uses (rendering.md);
+  - Image: its name and its picture, fitted whole, with no Replace;
+  - Reference: its own name over its Target's content;
+  - Space, Ur, or a Reference to one: its name alone;
+  - an unresolved Target: a notice.
+
+  *Why:* the audience sees content, not the Map. **built**: `ui/test/PresentedResource.test.tsx` › "renders the Markdown, parsed", "presents a Reference Resource to an Image Resource as its Target’s image, with no Replace", "presents a Space Resource as its name alone", "presents an Ur Resource as a title slide, itself or through a Reference Resource", "presents an unresolved Target as a notice, not an empty document", "strips event-handler attributes".
+- **NV-62** Position, size, Shape and Open or Closed never reach the Stage: every Resource is framed the same way, as a rectangle. *Why:* those are the Map's. **built**: `app/e2e/presenting.spec.ts` › "a Closed, an Open and a resized Resource are framed identically".
+- **NV-63** The frame is the largest 16:9 box above the chrome, letterboxed. Overflowing content scrolls inside it and the traversal keys still work. *Why:* one frame for every Resource. **built**: `app/e2e/presenting.spec.ts` › "the frame is the largest 16:9 box above the chrome, letterboxed", "overflowing content scrolls inside the frame, and the arrow keys still traverse".
+
+### The chrome and keys
+
+- **NV-64** The chrome lists the moves by each Resource's name (its first Title Line), with the selected one marked, and offers Back where NV-17 allows, Overview, Copy link (NV-28) and the rehearsal notes toggle. At a sink it says the Graph has ended. Each move names the action it performs ("Choose <name>", or "Go to <name>" when selected), never a state. *Why:* the Stage shows no neighbour, and selecting alone is not the action. **built**: `app/test/PresentingChrome.test.tsx` › "names the action each move performs rather than the state it is in", "names a sink as the end of the active Graph"; `app/test/navigation.test.ts` › "names a move by the Resource’s name, not by its whole Title".
+- **NV-89** The moves and the end-of-Graph notice share one polite status region, so a changed set of moves is announced without moving focus. *Why:* a screen-reader presenter must hear what the next Resource offers. **built**: `app/test/PresentingChrome.test.tsx` › "announces the choice set and the end of the Graph in one polite region".
+- **NV-90** The selected move is also written as visually hidden text in that region, so moving the selection with Up or Down is announced. *Why:* a changed label or class alone is not read out, and the presenter would cross a fork in silence. **built**: `app/test/PresentingChrome.test.tsx` › "announces the selected move when the selection changes".
+- **NV-91** Each chrome control that performs a presenting key declares it (`aria-keyshortcuts`): the selected move Right, Back Left, Overview Escape. *Why:* the visible key hints are presentation only. **built**: `app/test/PresentingChrome.test.tsx` › "announces on each control the key that performs it".
+- **NV-65** While presenting, Right and Space advance, Left goes back, Up and Down move the selection among the moves (wrapping), Escape leaves, S opens a Notes window and N toggles the rehearsal notes. A dialog, menu or text field keeps its own keys, and Space on a focused control activates that control once. *Why:* traversal is driven from anywhere on the Stage. **built**: `app/test/presenting-keys.test.tsx` › "binds each Traversal command while a traversal is on", "defers Space to the interactive control that already activates on it", "leaves every key to a modal surface open over the canvas", "opens a Notes window on S, and leaves a modified S to the browser, Shift included", "shows or hides the rehearsal notes on N, and leaves a modified N to the browser, Shift included".
+- **NV-66** The chrome takes focus when presenting begins. After a move made from the chrome, focus goes to the newly selected move, else Back, else Overview. A move made by a global key leaves focus where it was. *Why:* entering presenting removes the control focus was on. **built**: `app/test/PresentingChrome.test.tsx` › "takes focus onto its primary control when presentation begins", "restores focus to the newly selected move after advancing from the chrome", "leaves focus alone when the traversal did not start here".
+
+### Presentation Notes
+
+- **NV-67** A talk's notes are found, never stored, in its Presentation Notes Graph, a Graph on the same Map chosen by its title:
+  - titles are compared as words, after NFKC normalisation and case folding, with every run of characters that are neither letters nor digits (Title Line breaks included) counted as one separator;
+  - a title matches when it reads as `<talk Graph title> <marker>` or `<marker>` alone;
+  - the markers are "Presentation Notes" (or "PresentationNotes"), "Notes", and "Presentation" followed by at least one more word;
+  - a Graph is never its own notes.
+
+  For the talk "Intro Talk", "Intro Talk: Notes" and "Presentation Script" match; "Release Notes" and "Presentation" alone do not. *Why:* notes need no new field or kind. **built**: `graph/test/presentation-notes.test.ts` › "accepts %j", "rejects %j", "case-folds the talk %j to match %j", "never takes the presented Graph as its own notes".
+- **NV-68** When several Graphs match: one naming the talk beats a bare marker; then "Presentation Notes" beats "Notes", which beats "Presentation" and more; then Map Graph order. The others are named as passed over. *Why:* a wrong pick must be visible. **built**: `graph/test/presentation-notes.test.ts` › "prefers a Graph naming the talk to a bare one, wherever each sits", "prefers \"Presentation Notes\" to \"Notes\", and \"Notes\" to \"Presentation\" and more", "breaks a remaining tie by the Map’s Graph order", "names every other matching Graph as passed over, in the order it ranked them".
+- **NV-69** A note is a Resource the Active Resource reaches by an Edge of the Presentation Notes Graph. Several are ordered by their place on the Map, top edge then left edge; a Resource reached twice is one note. *Why:* the author arranges notes on the Map. **built**: `graph/test/presentation-notes.test.ts` › "answers the Resources the presented Resource reaches in the notes Graph", "orders several notes by where they sit on the Map, top to bottom then left to right". At the same point the code keeps Edge order (a stable sort; untested), and the single-note rule is untested (`presentation-notes.ts` `new Set`).
+- **NV-70** Finding the notes stores nothing, and nothing about notes reaches the Stage frame. *Why:* the title is the record. **built (untested)**: `graph/src/presentation-notes.ts` `presentationNotes` is a pure read.
+- **NV-71** N shows the Active Resource's notes in the Stage's strip under the chrome, taking room from the frame. They follow the traversal, start at their top for each Resource, start hidden at each presentation start (NV-57) and are never stored. *Why:* rehearsing on one screen. **built**: `app/e2e/notes-window.spec.ts` › "N shows the notes under the Stage to rehearse on one screen, and they start hidden every time"; `app/ladle-e2e/stage.spec.ts` › "the rehearsal notes start at the top for each Resource presented".
+
+### The Notes window
+
+- **NV-72** `/spaces/:s/notes` opens a Notes window over that Space. It composes no Navigation, no browser location and no authoring. *Why:* the presenting window owns Navigation. **built**: `test/unit/app-http-startup.test.ts` › "opens a Notes window over the addressed Space, and no Space composition"; `http/test/product-destination.test.ts` › "formats and resolves a Notes window over a Space, and only over a Space it holds".
+- **NV-73** The Notes window shows the Active Resource's notes, the moves from it with a preview of each and the selected one marked, the time since the presentation started, the Graph chosen as notes and those passed over, and says when there is no notes Graph or no note. *Why:* the presenter's view of the talk. **built**: `app/test/notes-window.test.ts` › "draws the presented Resource’s notes, top to bottom as they sit on the Map", "draws every move from a fork, with the selected one marked, and moves the Stage", "says the talk has no notes Graph when none reads as one", "carries when the presentation started".
+- **NV-74** A move or key pressed in the Notes window sends the presenting window the same traversal command its own key would. A command that arrives while not presenting, or that names a presentation that has ended, changes nothing. *Why:* one owner of Navigation. **built**: `app/test/presentation-link.test.ts` › "moves the Stage from the Notes window exactly as its keys would", "changes nothing for a command that arrives while not presenting", "ignores a command naming a presentation that has ended".
+- **NV-75** The Notes window follows whichever window presents the Space. With two presenting, it follows and drives one, moving to the other when that one ends. When none presents, or the presenting window closes or vanishes, it says "not presenting" and reattaches when presenting starts. A window opened mid-talk joins at the current position. *Why:* it follows a talk, not a window. **built**: `app/test/presentation-link.test.ts` › "follows one of two presenting windows and drives only that one", "moves on to the other presenting window when the one it follows ends", "shows \"not presenting\" when the presenting window vanishes without a word", "brings a Notes window opened mid-presentation to the current position".
+- **NV-76** The Notes window reloads the Space at each presentation start, so an Edit made since is drawn. *Why:* the notes are Resources the author may have changed. **built**: `app/test/notes-window.test.ts` › "reloads the Space when a presentation starts, so an Edit since the last one is drawn".
+- **NV-77** On a mounted page, a Notes window follows and drives only presentations of its own repository, directory, commit and Space. *Why:* two revisions of one Space can share an origin. **built**: `app/test/presentation-link.test.ts` › "follows and controls only the presentation of its own revision".
+
+## Code seams
+
+- **NV-78** Navigation answers its address and knows no URL: it imports no product-destination or HTTP type and never reads the location. Deciding what URL an address deserves stays in `app`. *Why:* one vocabulary per module. **built (untested)**: `app/src/navigation.ts` imports only `@project/core`, `@project/graph`, `@project/persistence` and `./map-resolution`.
+- **NV-79** One pure function decides push, replace or nothing (NV-29 to NV-31) by comparing the address with what the location resolves to. No call site compares state around an operation to decide history. *Why:* a second decision drifts. **built**: `app/test/destination-coordination.test.ts` › "does nothing when the location already opens the address, however it got there".
+- **NV-80** One module reads and writes the browser's location and history, through one adapter that takes the window it is handed. There is no router library: the destination table is declared once in `@project/http` and the host resolves the same table. *Why:* a second table would disagree with the host. **built**: `app/test/browser-history.test.ts` › "stamps the entry it starts on without moving it, and numbers each push"; `http/test/product-destination.test.ts` › "resolves a browser-history destination against an already loaded snapshot". Outside the adapter, only the startup entries `main.tsx` and `mount-main.tsx` read `window.location`. That no other module touches the browser is untested.
+
+## Cross-cutting effects
+
+**Navigation writes nothing (NV-1).** Exceptions:
+- Switching Graphs is an Edit (MG-45; MG-46, MG-47).
+- Opening a Space with no Map, by product URL, by Entering or by drawing it, runs the first working read (MG-74, MG-75).
+- An Edit that continues in a Map moves Navigation (NV-7, NV-56); the Edit's writes are in maps-and-graphs.md.
+
+**Every change of address adds one history entry (NV-29).** Exceptions:
+- the location already opens the address (NV-31);
+- the location is narrower or stale (NV-30, replace);
+- the mount pins its `source` (NV-38, replace);
+- a refused Back or Forward returns (NV-35).
+
+## Open questions
+
+- **Presenting across Spaces.** If Edges between Spaces are ever decided, a presentation URL would need the Space Resource crossings. NV-54 is the current rule.
+
+## Bugs
+
+None found in this doc. Switching Graphs saving nothing is MG-45.
