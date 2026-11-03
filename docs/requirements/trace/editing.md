@@ -196,7 +196,7 @@ The rule ids in `../editing.md` are append-only from this version on.
 | 0104, 0105, 0121, 0122 (EP tags) the refusal codes and unchanged rules of their Edits | sent → MG (held in MG-50–MG-67, MG-22–MG-32) |
 | 0120, 0128 (EP tags) kind model and Resource file | sent → SR, ST |
 | 0109 (EP mention) every authored id has one source | sent → PROC. Minting during derivation folded → ED-4 |
-| 0010 r4 a Space is never the mutable edit buffer | → ED-1 ("no Space value is ever changed in place"); ST-100 points to it. ST and ED each sent it to the other; ED owns it |
+| 0010 r4 a Space is never the mutable edit buffer | → ED-1 ("no Space value is ever mutated in place; an Edit derives a new one"); storage.md points to it. ST and ED each sent it to the other; ED owns it |
 | 0098 r2 the browser `CommitResult` adds transport failures; r6 transport failure classification stays in the transport | sent → ST (ST-101, ST-102); ED-44 points there |
 | 0107 (proposed, EP tag) SVG stored and served sandboxed | dropped: proposed (DEC 7, drafting rule 3) |
 | 0113 r2 availability may depend on interaction state; structural invariants refuse; both for every kind alike | folded → ED-33. A kind withholding its own Create while its creation is in flight is interaction state, so ED-33 states it as the one kind-specific term |
@@ -260,7 +260,7 @@ The rule ids in `../editing.md` are append-only from this version on.
 
 | Item | Disposition |
 |---|---|
-| 0010 r4 a Space is never the mutable edit buffer | → ED-1; ST-100 points to it. Bounced; ED owns it |
+| 0010 r4 a Space is never the mutable edit buffer | → ED-1; storage.md points to it. Bounced; ED owns it |
 | 0030 r2 automatic persistence, no Save | → ED-7 |
 | 0057 r1–r2, r4–r5, r8 | → ED-15, ED-41, ED-44 |
 | 0098 r2, r6 transport failures and their classification | sent back → ST (ST-101, ST-102); ED-44 points there. Bounced; ST owns them |
