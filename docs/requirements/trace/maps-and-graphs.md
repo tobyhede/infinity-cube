@@ -71,7 +71,7 @@ The rule ids in `../maps-and-graphs.md` are append-only from this version on.
 | R48 Shape changes no rect; Title layout; ring | rect half → MG-32. Drawing sent → RD |
 | R49 drawn at every size; toolbar at every size; presented rectangle | sent → RD (drawing), UI (toolbar), NV (presented) |
 | R50 embedded Map draws Shapes | sent → RD |
-| "Treatment without an ADR" line | presentation gate sent → NV. Closed arrival → MG-16. `defaultMap` on Map deletion → MG-14 (C4) |
+| "Treatment without an ADR" line | presentation gate sent → NV. Closed arrival → MG-16. `defaultMap` on Map deletion → MG-14 (ruling C4.2) |
 | A1 no Arrangement type | folded → MG-70 |
 | A2 prefixed names | sent → GL |
 | A3 automatic strategy at render | folded → MG-68 |
@@ -128,7 +128,7 @@ The rule ids in `../maps-and-graphs.md` are append-only from this version on.
 | 0032 r1 set of directed Edges; cycles, self-Edges | → MG-36 |
 | 0032 r2 never reject for presentation | folded → MG-36 |
 | 0032 r3 presenting owns cycle traversal | sent → NV |
-| 0032 r4 duplicate refused at intake; live draw a no-op | intake → MG-60. Live → MG-61 (C3) |
+| 0032 r4 duplicate refused at intake; live draw a no-op | intake → MG-60. Live draw no-op struck by ruling C3; MG-61 states the refusal |
 | 0032 r5 same pair in two Graphs is two Edges | folded → MG-57 |
 | 0032 r6 a Reference is not needed to return | folded → MG-36 |
 | 0013s r1 positions authored; no seeded optimiser | folded → MG-71 |
@@ -141,7 +141,7 @@ The rule ids in `../maps-and-graphs.md` are append-only from this version on.
 | 0031s r1 choosing a Map is navigation | sent → NV |
 | 0031s r2 `Map N` | → MG-10 |
 | 0030 Map ("Layout") ids unique within the Space document | → MG-2 |
-| 0101, 0109 the app mints `Map N` and `Graph N` (`titles.ts`) | → MG-10, MG-42. The numbering details stay in C6 |
+| 0101, 0109 the app mints `Map N` and `Graph N` (`titles.ts`) | → MG-10, MG-42. Numbering details: code only (drafting rule 5, ruling C6) |
 | 0033 Edge joins the Active Graph; modifier drop makes a Resource and the Edge in one Edit | → MG-62, MG-63 |
 | 0033 side not stored; Edge stores `{from,to}` | folded → MG-57 |
 | 0033 handles, preview, self-drag, target selected, cancel; the Connect list | sent → RD, UI |
@@ -209,8 +209,8 @@ The rule ids in `../maps-and-graphs.md` are append-only from this version on.
 | 0086 elkjs only attached to an Edit; lint ban | folded → MG-71. Lint in §4 |
 | 0086 never seed for a drop point | folded → MG-71 |
 | 0086 handle rules | sent → RD |
-| 0090 duplicate Edge ineligible | → MG-61 (C3) |
-| 0091 relocate on Map/Graph deletion | → MG-15, MG-55. Map successor → MG-14 (C4). "Resulting surviving Graph" → MG-56 (bug, with DEC 2). Atomic commit sent → ED |
+| 0090 duplicate Edge ineligible | → MG-61 (ruling C3) |
+| 0091 relocate on Map/Graph deletion | → MG-15, MG-55. Map successor → MG-14 (ruling C4.2). "Resulting surviving Graph" → MG-56 (bug, with DEC 2). Atomic commit sent → ED |
 | 0093 one axis, x first, touching clear, memoryless | folded → MG-24, MG-25 |
 | 0104 optional one-line Title, never minted, refusals, trim, clear, unchanged | → MG-64 |
 | 0104 identity `(from,to)`; duplicate with another Title; find by endpoints | folded → MG-57, MG-60 |
@@ -219,7 +219,7 @@ The rule ids in `../maps-and-graphs.md` are append-only from this version on.
 | 0104 no reconnect; redrawn Edge untitled and appended | → MG-67 |
 | 0104 Edge schema strict | sent → ST (strictness). The pointer is in the doc under "Data model" |
 | 0104 render id; Edit names; Title not Label; toolbar | sent → RD, code, GL, UI |
-| 0104 line 15 drawing an existing Edge changes nothing | → MG-61 (C3) |
+| 0104 line 15 drawing an existing Edge changes nothing | struck by ruling C3 (MG-61) |
 | 0105 one head shape; set; no none/tail/override | → MG-50. Negatives kept as live fences (0105 leaves them open as future proposals) |
 | 0105 optional, absent `arrow`; creation writes `arrow` | folded → MG-50 |
 | 0105 choosing current unchanged | → MG-51 |
@@ -246,11 +246,21 @@ The rule ids in `../maps-and-graphs.md` are append-only from this version on.
 | 0129 Presentation Notes Graph | sent → NV |
 | 0135 in a Graph = endpoint | → MG-33 |
 | 0135 colour and receding | sent → RD |
-| DEC 1 switching is an Edit | → MG-45 (bug). Scope gaps: C1, C2 |
+| DEC 1 switching is an Edit | → MG-45 (bug) |
+| Checkpoint 2 ruling C1 | → MG-46 (bug) |
+| Checkpoint 2 ruling C2 | → MG-47 (built) |
+| Checkpoint 2 ruling C3 | → MG-61 (built) |
+| Checkpoint 2 ruling C4.1 | → MG-81 (bug) |
+| Checkpoint 2 ruling C4.2 | → MG-14 (bug in the embedded case) |
+| Checkpoint 2 ruling C4.3 | → MG-11 (bug) |
+| Checkpoint 2 ruling C6 | → MG-10, MG-18, MG-42, MG-48 (built, code only); MG-49 (bug) |
+| Checkpoint 2 ruling C7 | → MG-83 (new, bug) |
+| Checkpoint 2 ruling S1 | sent → ST |
+| Checkpoint 2 principle (a canvas Edit records where the author works; nothing else does) | → the opening-writes table under MG-79–MG-83 |
 | DEC 2 Delete Graph survivor | → MG-54 (bug), MG-56 (bug, with 0091) |
 | DEC 6 Auto-arrange, reorder kept; cross-Space Edges open | → MG-71, MG-39; Open questions |
-| Code only (no source) | MG-18, MG-48, MG-49 and the numbering details of MG-10/MG-42 (C6). |
-| `CONTEXT.md` "Completion outcome": a drag returned to its start is unchanged | C7 |
+| **Code only** (drafting rule 5: code plus a test, no contrary source) | MG-10 and MG-42 numbering details, MG-18, MG-48. MG-82's control clamp is code only but untested |
+| `CONTEXT.md` "Completion outcome": a drag returned to its start is unchanged | → MG-83 (ruling C7) |
 
 ## 3. Sent to other docs
 
@@ -305,7 +315,7 @@ The rule ids in `../maps-and-graphs.md` are append-only from this version on.
 - 0033 target selected after a connection.
 
 **navigation.md (NV):**
-- R30, 0015 r2: an empty Graph cannot be presented, and Present is disabled. No source but the code and `CONTEXT.md`, so NV must carry it as undecided. No test covers it.
+- R30, 0015 r2: an empty Graph cannot be presented, and Present is disabled. No source but the code and `CONTEXT.md`, and no test, so drafting rule 5 does not make it a requirement; NV must add a test or raise it.
 - MG-43: the Active Graph also changes by choosing a Map, following a product URL, and presenting.
 - R8 URL.
 - R10, 0031s, 0079 and 0116 "choosing or viewing a Map writes nothing".
@@ -316,6 +326,8 @@ The rule ids in `../maps-and-graphs.md` are append-only from this version on.
 - 0129 Presentation Notes.
 
 **CONTEXT.md (GL):**
+- **Needed change (ruling C3):** "Edge" says an exact Edge drawn again "changes nothing", and "Edit" lists "drawing an Edge the Graph already holds" among attempts that produce no Edit as if it were silent. Both must say that drawing an Edge the Graph already holds is refused (`edge-already-exists`) and produces no Edit.
+- **Needed change (ruling C7):** "Completion outcome" already says a drag returned to where it began is unchanged. Keep it; it now matches MG-83.
 - R1, A2, 0014 r2–3, 0005 r2, 0007 r2, 0041 r1, r8–9, 0104 "Title not Label", 0105 vocabulary.
 
 **PROC:**
