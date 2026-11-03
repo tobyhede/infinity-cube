@@ -104,7 +104,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'surfaces/resources-popover.stories.tsx',
     storyExport: 'SpaceSelections',
     claim:
-      'Where a Space Resource row and a Space row share a name, each Space Resource row names the Map and Graph of its target that it shows, under its name and in its description, and the Space row reads "New Space Resource" and is named as adding a new view of that Space.',
+      'Where a Space Resource row and a Space row share a name, each Space Resource row names the Map and Graph it selects, under its name and in its description, and the Space row reads "New Space Resource" and is named as adding a new Space Resource for that Space.',
   },
   {
     id: 'resources-popover-counts-what-each-filter-contributes',
