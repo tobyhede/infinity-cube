@@ -250,7 +250,7 @@ The rule ids in `../navigation.md` are append-only from this version on.
 | 0069 URL shapes, spelling, context, history | → NV-20–NV-32 |
 | 0130 r3 resolved source recorded in the address | → NV-38 |
 | 0130 r4 presentation messaging scoped by source and Space | → NV-77 |
-| 0130 r5 `source` overrides and rides every URL; build default; else ask | → NV-36, NV-38. Asking for a source with neither: bounced, owned by ST (reading the mount), pointer in NV-38 |
+| 0130 r5 `source` overrides and rides every URL; build default; else ask | → NV-36, NV-38. Asking for a source with neither: bounced, owned by ST (ST-106), pointer in NV-38 |
 | 0130 r11 `/` resolves in the client | → NV-25 |
 | Lifecycle: Map resolution (one module answers the Map) | folded → NV-5, NV-6. The five names `map-resolution.ts` exports are §6 |
 
@@ -279,7 +279,7 @@ The rule ids in `../navigation.md` are append-only from this version on.
 - 0068 r18 persistence statuses; the `refused` status Exit warns on.
 - 0126 authoring withdrawal, exclusivity, upload and measurement timeouts.
 
-**storage.md (ST):** 0069 r11 statuses (400, 404) and r12 redirect status; 503 with no Meta; 0079 obsolete identities; 0130 mount reading, default source at build, asking for a source when there is none, seam, reader, images, CSP.
+**storage.md (ST):** 0069 r11 statuses (400, 404: ST-81) and r12 redirect status and 503 with no Meta (ST-82); 0079 obsolete identities; 0130 mount reading, default source at build, asking for a source when there is none (ST-106), seam, reader, images, CSP.
 
 **rendering.md (RD):** 0068 r19 entered camera; 0112 one camera; rendering.md line 62 emphasis; where an entered Space's camera starts (`cameras.test.tsx`).
 

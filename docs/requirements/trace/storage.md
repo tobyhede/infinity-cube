@@ -14,7 +14,7 @@ Abbreviations:
 - "R" ids are the old contract `docs/agents/maps-and-graphs.md`, received through `trace/maps-and-graphs.md` §3.
 - Docs: SR space-and-resources.md, MG maps-and-graphs.md, ED editing.md, RD rendering.md, UI ui.md, NV navigation.md, GL `CONTEXT.md`, PROC process docs (AGENTS.md, workflow.md, anti-slop.md, build-tooling.md).
 
-The rule ids in `../storage.md` are append-only from this version on. ST-99 was added after ST-11 to keep one behaviour per id. The revision after the CODE and SCOPE audits added ST-100–ST-108 and removed ST-26 (see SR-10), ST-38 (see ST-24) and ST-93 (see NV-39).
+The rule ids in `../storage.md` are append-only from this version on. ST-99 was added after ST-11 to keep one behaviour per id. The revision after the CODE and SCOPE audits added ST-100–ST-108 and removed ST-26 (see SR-10), ST-38 (see ST-24) and ST-93 (see NV-39). The reconciliation pass removed ST-100 (see ED-1).
 
 ## 1. ADRs
 
@@ -23,7 +23,7 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 | 0010 r1 Space is the root; `loadSpace` the only intake | → ST-22. The name is in §5 (two doors share one intake) |
 | 0010 r2 downstream takes a Space | folded → ST-22 |
 | 0010 r3 a schema-only value is not a Space | folded → ST-22 |
-| 0010 r4 a Space is never the edit buffer | → ST-100. "No Edit mutates a Space value" stays in ED-1 |
+| 0010 r4 a Space is never the edit buffer | sent → ED (ED-1). ST-100 removed in the reconciliation pass |
 | 0010 r5 "manifest" retired | sent → GL, PROC (vocabulary guard) |
 | 0010 lapsed "future `Draft`" | dropped: no `Draft` exists and editing uses Interaction drafts (ED) |
 | 0018 r3 an empty repository starts from a new Space named Meta | → ST-10, ST-11 (via MG trace §3) |
@@ -111,7 +111,7 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 | 0096 r4 keep `loadMetaSpaceId`; replacement never initializes | → ST-13, ST-14 |
 | 0096 r5 when to revisit | dropped: process guidance |
 | 0098 r1 `CommitOutcome` declared once for both seams | → ST-17 |
-| 0098 r2 repository and browser results add `rejected` and transport failures | folded → ST-17. Transport failures → ST-101 |
+| 0098 r2 repository and browser results add `rejected` and transport failures | folded → ST-17 (`rejected`) and ST-101 (the browser result adds transport failures) |
 | 0098 r3 one outcome→status table read by both sides | → ST-78 |
 | 0098 r4 the route pairs body and status itself | dropped: Hono typing detail (code comment) |
 | 0098 r5 the identity rule lives in `decideCommit`; the codec decodes shape only | folded → ST-4 |
@@ -281,7 +281,7 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 | 0132 and DEC 4 | → ST-95–ST-98, ST-107 |
 | Export status from acknowledged revisions | → ST-103 |
 | 0098 r6 transport-failure classification (coordinator's placement) | → ST-101 |
-| 0010 r4 (coordinator's placement) | → ST-100; ED-1 keeps "no Space value is mutated" |
+| 0010 r4 | sent → ED (ED-1 owns it; ST-100 removed) |
 
 **From trace/maps-and-graphs.md**
 
@@ -348,6 +348,7 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 **maps-and-graphs.md (MG):** nothing new. MG-37, MG-36, MG-60, MG-61 already hold the guide's Graph bullets.
 
 **editing.md (ED):**
+- 0010 r4 (ED-1).
 - 0030 r2 (automatic persistence, no Save); 0057 r1–r2, r4, r8, and the wording of each code (0057 r5's copy half).
 - 0131 r1 (no mounted availability answer) and r4 (persistence reported as any session).
 - The guide's session, coordination, recovery and lifecycle bullets; the session side of the 1 MiB save.

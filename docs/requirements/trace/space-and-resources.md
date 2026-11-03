@@ -199,7 +199,7 @@ The rule ids in `../space-and-resources.md` are append-only from this version on
 | E&P line 37: initialization after the containing Space's own checks | → SR-61 (coordinator ruling; editing.md sent it back) |
 | E&P line 37: Space Authoring refuses `space-resource-deletion-unsupported`; confirmation says the Space may go | refusal → SR-59; confirmation sent → UI |
 | E&P line 38: selection required; no fallback; dangling codes | folded → SR-44 |
-| E&P line 38: `ordinary-space-unreferenced` forgiven for the initializing Edit | → SR-56 (coordinator ruling; storage.md sent it back) |
+| E&P line 38: `ordinary-space-unreferenced` forgiven for the initializing Edit | sent → ST: ST-104 owns it (reconciliation ruling: the commit decision sits behind the backend); SR-56 points to it |
 | E&P line 38: Enter seeds from the selection | sent → NV |
 | E&P line 38: round trip; fixture advice | sent → ST |
 | ARC `edited-resource` row | folded → SR-13, SR-16, SR-31, SR-45 |
@@ -279,7 +279,7 @@ See §6.
 | Which aggregates are valid (Meta sole root, unreachable Spaces, duplicate Resource ids) | SR-55, SR-56, SR-6 |
 | Deleting Meta is refused at commit | SR-55 |
 | 0070 Target immutability | SR-31 |
-| A Space Resource's durable selection; `ordinary-space-unreferenced` forgiveness | SR-44, SR-56 |
+| A Space Resource's durable selection; `ordinary-space-unreferenced` forgiveness | SR-44; forgiveness is ST-104, pointed to from SR-56 |
 
 ### From trace/ui.md
 
@@ -300,7 +300,7 @@ See §6.
 
 **editing.md (ED):** 0074 and DEC 5 Undo; 0112 Undo per occurrence; 0112 and 0126 navigation and authoring held during image replacement, with its 2-minute upload and 10-second measurement bounds; 0113 availability; E&P line 37 coordination, barrier and recovery refusals; ARC universal guard; 0068 r16–r18 statuses.
 
-**storage.md (ST):** 0020 r1, r2, r5, r6; 0063 Export line endings; 0074 Meta identity; 0106 image store, deletion, Export, fixtures; 0128 file, locator, sidecar, strictness, JSON Schema; E&P line 25 file format; E&P line 38 round trip and fixtures; `newSpace`'s default title `New space` (§7).
+**storage.md (ST):** 0020 r1, r2, r5, r6; 0063 Export line endings; 0074 Meta identity; 0106 image store, deletion, Export, fixtures; 0128 file, locator, sidecar, strictness, JSON Schema; E&P line 25 file format; E&P line 38 forgiveness (ST-104), round trip and fixtures; where an unframed drawn Map is placed and fits (RD-5, undecided under conflicts/rendering.md C1); `newSpace`'s default title `New space` (§7).
 
 **rendering.md (RD):** 0009 signal and 0114 glyph; 0051 r4 drawing; 0068 r19 and compound canvas (one camera); 0070 r6 renderer reuse; 0083 r6, r9, r10 ladder, clamp, no resize; a Space Resource with no framing fits its Map.
 

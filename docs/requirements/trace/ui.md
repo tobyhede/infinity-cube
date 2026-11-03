@@ -344,6 +344,8 @@ Rules no source states, kept under drafting rule 5 (code plus a test, contradict
 
 ## 6. Code notes (not requirements)
 
+- **Undo wording.** The delete question's visible words say nothing about undo, so UI-83 holds after Undo ships. Two code comments still say "V1 has no undo" (`app/src/components/DeleteConfirmation.tsx:23`, `app/src/resource-rail-actions.tsx:172`); they must change when Undo is built (DEC 5).
+
 - **Controls carry their operation** (RD G§b6): a Resource's control reaches `CanvasResource` only with the operation that performs it, so presence of the operation is the whole capability.
 
 - **Primitives.** `@base-ui/react` 1.7.0. Base UI has no Anchor part: a non-trigger anchor is a ref handed to `PopoverContent`'s `anchor`. Positioning props belong to `Positioner`, popup props to `Popup`. A controlled choice ignores the `null` from `onValueChange`. A modal with its own starting field sets `initialFocus={false}` and `finalFocus={false}`.

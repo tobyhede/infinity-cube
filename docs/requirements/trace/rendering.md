@@ -235,7 +235,7 @@ The rule ids in `../rendering.md` are append-only from this version on.
 | G§RF b1 pinned to 12.11.2 | → RD-70 |
 | G§RF b2 React Flow's docs as reference (`llms-full.txt`) | sent → PROC: tooling guidance, not product |
 | G§RF b3 every drawn Map uses `createMapSurface`; holds; root canvas reads its surface | one drawing → RD-59; policy and holds sent → SR, NV; prop set is a code note §5 |
-| G§RF b4 an invariant from a canvas gesture is reported, not thrown | sent → ED |
+| G§RF b4 an invariant from a canvas gesture is reported, not thrown | sent → ED (ED-79, undecided under `conflicts/editing.md` C3) |
 | G§RF b5 React Flow's interaction model is the default; arrow-key deviation | principle → RD-76; arrow keys sent → UI |
 | G§RF b6 head markers once per canvas | → RD-44 |
 | G§Overlay activation is emphasis, not filtering | → RD-29 |
@@ -254,11 +254,11 @@ The rule ids in `../rendering.md` are append-only from this version on.
 
 **space-and-resources.md (SR):** 0018 r1; 0070 Target immutability and Space Resource Target; 0083 Title Lines as data and normalization; 0106 kind, URL, recorded natural size (no reader) and load failure validity; 0112 policy, occurrences and "never contains its own Map"; 0114 content actions; G§b7 content resolution.
 
-**editing.md (ED):** 0035 r2; 0042 r1, r8 (epoch), r11; 0057 r3 (outcome side); G§b2 lifecycle; G§b4 refusals; G§b5 epoch; G§RF b4 invariants reported.
+**editing.md (ED):** 0035 r2; 0042 r1, r8 (epoch), r11; 0057 r3 (outcome side); G§b2 lifecycle; G§b4 refusals; G§b5 epoch; G§RF b4 invariants reported (ED-79, undecided, C3).
 
 **storage.md (ST):** 0018 r3; G§Overlay Space-level `graphs` rejection.
 
-**ui.md (UI):** 0006s Open as one verb; 0033 target selected after a connection, modifier key; 0036 r1, r2, r4; 0047, 0050, 0067; 0048; 0057 r3 wording; 0063 r2–5; 0064 r3–r7 controls and exits; 0065; 0070 no editor control on a Reference; 0073; 0082; 0083 names, search, keys; 0102 toolbar, keyboard reach (not built, DEC 6), `renderToolbar` seam; 0105 Graph menu; 0112 refusal wording; 0114 content actions; 0121 resize control and Shape choice; 0122 resize control; G§b1 Connect to Resource and key commands; G§b3 Edge toolbar, reveal and keyboard; G§b6 controls carry their operation; G§b11 resize floor; G§Camera b3 presenting keys; G§RF b5 arrow keys; RD-64 zoom control.
+**ui.md (UI):** 0006s Open as one verb; 0033 target selected after a connection, modifier key; 0036 r1, r2, r4; 0047, 0050, 0067; 0048; 0057 r3 wording; 0063 r2–5; 0064 r3–r7 controls and exits; 0065; 0070 no editor control on a Reference; 0073; 0082; 0083 names, search, keys; 0102 toolbar, keyboard reach (not built, DEC 6), `renderToolbar` seam; 0105 Graph menu; 0112 refusal wording; 0114 content actions; 0121 resize control and Shape choice; 0122 resize control; G§b1 Connect to Resource and key commands; G§b3 Edge toolbar, reveal and keyboard; G§b6 controls carry their operation; G§b11 resize floor; G§Camera b3 presenting keys; G§RF b5 arrow keys; RD-64 zoom control (UI-96).
 
 **navigation.md (NV):** 0024; 0028 activation as navigation; 0068 r9 Enter and new tab; 0070 Jump to Target (not built); 0082 selecting is navigation; 0121 and R49 presented rectangle; 0123; 0129; 0135 Stage unchanged; G§Camera b3, b4; 0112 holds.
 

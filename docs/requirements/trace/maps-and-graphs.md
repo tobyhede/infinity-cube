@@ -49,7 +49,7 @@ The rule ids in `../maps-and-graphs.md` are append-only from this version on.
 | R27 last Graph; deleting the Active Graph | → MG-53 ("not offered" sent → UI). Survivor clause replaced by DEC 2 → MG-54 |
 | R28 Map may name its opening Graph; fallback a read; intake rejects dangling | → MG-44 |
 | R29 activation is navigation; one concept; emphasis | "One Active Graph, selected = active, never a side effect" → MG-43. "Not an Edit; durable at the next Edit" struck by DEC 1 → MG-45. "Every Graph still drawn" and receding sent → RD |
-| R30 empty Graph cannot present | "An empty Graph is valid and may be active" → MG-40. The presentation gate and the control sent → NV, carrying its open status (no source but the code and `CONTEXT.md`) |
+| R30 empty Graph cannot present | "An empty Graph is valid and may be active" → MG-40. The presentation gate and the control sent → NV (NV-52, built, source 0015 r2) |
 | R31 membership = position keys | → MG-3 |
 | R32 placement per Map | → MG-5 |
 | R33 Add to Map: initial position, Closed, no Edges | → MG-16 |
@@ -226,7 +226,7 @@ The rule ids in `../maps-and-graphs.md` are append-only from this version on.
 | 0105 markers, legend, connection preview, menu, vocabulary | sent → RD, UI, GL |
 | 0108 Graph id unique in Space; ids repeat across Spaces | → MG-35 |
 | 0112 a drawn Map offers every command the canvas Map does | sent → SR |
-| 0112 an Edge joins Resources in one Space; refused across drawings | → MG-59. "Refused with wording" sent → UI: the code completes nothing and no wording was found |
+| 0112 an Edge joins Resources in one Space; refused across drawings | → MG-59. "Refused with wording" sent → UI (UI-77, undecided under `conflicts/ui.md` C1) |
 | 0112 occurrences, policy, composition lifetime, notices, Undo per occurrence | sent → SR, NV, ED |
 | 0116 canvas Edit writes `defaultMap`/`activeGraph` | → MG-79 |
 | 0116 drawn Edit leaves them | → MG-80 |
@@ -259,7 +259,7 @@ The rule ids in `../maps-and-graphs.md` are append-only from this version on.
 | Checkpoint 2 principle (a canvas Edit records where the author works; nothing else does) | → the opening-writes table under MG-79–MG-83 |
 | DEC 2 Delete Graph survivor | → MG-54 (bug), MG-56 (bug, with 0091) |
 | DEC 6 Auto-arrange, reorder kept; cross-Space Edges open | → MG-71, MG-39; Open questions |
-| **Code only** (drafting rule 5: code plus a test, no contrary source) | MG-10 and MG-42 numbering details, MG-18, MG-48. MG-82's control clamp is code only but untested |
+| **Code only** (drafting rule 5: code plus a test, no contrary source) | MG-10 and MG-42 numbering details, MG-18, MG-48. MG-82's control clamp (tested: `canvas-resource-decoration.test.ts`) |
 | `CONTEXT.md` "Completion outcome": a drag returned to its start is unchanged | → MG-83 (ruling C7) |
 
 ## 3. Sent to other docs
@@ -311,11 +311,11 @@ The rule ids in `../maps-and-graphs.md` are append-only from this version on.
 - The connection modifier key (MG-63).
 - 0105 and 0121 menus.
 - 0104 Edge toolbar.
-- 0112 wording for a refused cross-drawing connection (none found in code: check).
+- 0112 wording for a refused cross-drawing connection: received as UI-77, undecided under `conflicts/ui.md` C1. MG-59 points there.
 - 0033 target selected after a connection.
 
 **navigation.md (NV):**
-- R30, 0015 r2: an empty Graph cannot be presented, and Present is disabled. No source but the code and `CONTEXT.md`, and no test, so drafting rule 5 does not make it a requirement; NV must add a test or raise it.
+- R30, 0015 r2: an empty Graph cannot be presented, and Present is offered disabled. Received as NV-52 (built; source 0015 r2; tested).
 - MG-43: the Active Graph also changes by choosing a Map, following a product URL, and presenting.
 - R8 URL.
 - R10, 0031s, 0079 and 0116 "choosing or viewing a Map writes nothing".

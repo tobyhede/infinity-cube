@@ -46,8 +46,8 @@ The rule ids in `../editing.md` are append-only from this version on.
 | EP 37 framing reset on Map deletion, kept on Graph deletion | sent → MG (MG-15, MG-55 hold it) |
 | EP 37 zero-reference cascade; convergence keeps a target alive | sent → SR |
 | EP 37 application surface `createSpaceResourceLifecycle`, `referenceableSpaces`, `target` | sent → SR (what is offered), §7 (composition) |
-| EP 37 selection resolved by the lifecycle; `link` initializes the target; `space-resource-target-unavailable` | sent → SR (SR-41, SR-43) |
-| EP 37 initialization runs only after the containing Space's own checks, so a link the containing Space refuses initializes nothing and mints no id | sent → SR: the effect of a link is SR's (SR-43). ED-60 points there. Both traces sent it to each other; SR owns it by the domain-vs-ED boundary |
+| EP 37 selection resolved by the lifecycle; `link` initializes the target; `space-resource-target-unavailable` | sent → SR (SR-41, SR-43, SR-61) |
+| EP 37 initialization runs only after the containing Space's own checks, so a link the containing Space refuses initializes nothing and mints no id | sent → SR: the effect of a link is SR's (SR-43). ED-60 points there (SR-61). Both traces sent it to each other; SR owns it by the domain-vs-ED boundary |
 | EP 37 `space-resource-deletion-unsupported`; deletion chooses the lifecycle first; confirmation says V1 has no undo | sent → SR (code), UI (confirmation). "No undo" replaced by DEC 5 → ED-74 |
 | EP 38 a Space Resource's selection is durable; intake codes; Enter; round trip; fixture advice | sent → SR, NV (Enter), ST (round trip, fixtures) |
 | EP 39 one persistence outcome and one recovery per coordinated Edit | → ED-55, ED-62, ED-63 |
@@ -55,7 +55,7 @@ The rule ids in `../editing.md` are append-only from this version on.
 | EP 39 acknowledging a coordinated commit clears the session's recovery; a superseded recovery never settles a moved-on session; in flight means `pending` | → ED-76 |
 | EP 39 a recovery never replays over a participant another recovery holds; refused replay recorded as blocked | → ED-66 |
 | EP 39 `canRetry`: `failed`, size rejection, blocked | → ED-45, ED-47, ED-66 |
-| EP 39 oversized save keeps Edits and offers Retry; the whole request counts | → ED-47. The 1 MiB limit sent → ST |
+| EP 39 oversized save keeps Edits and offers Retry; the whole request counts | → ED-47. The 1 MiB limit sent → ST (ST-77) |
 | EP 39 Exit refused while `canRetry` admits it | sent → NV |
 | EP 39 the Dock draws `PersistenceNotice` with Retry and Open | sent → UI |
 | EP 39 `compose` opens a Space with a live session on that session | sent → NV (§7 note) |
@@ -196,8 +196,8 @@ The rule ids in `../editing.md` are append-only from this version on.
 | 0104, 0105, 0121, 0122 (EP tags) the refusal codes and unchanged rules of their Edits | sent → MG (held in MG-50–MG-67, MG-22–MG-32) |
 | 0120, 0128 (EP tags) kind model and Resource file | sent → SR, ST |
 | 0109 (EP mention) every authored id has one source | sent → PROC. Minting during derivation folded → ED-4 |
-| 0010 r4 a Space is never the mutable edit buffer | folded → ED-4 ("no Space value is ever changed in place"). ST and ED each sent it to the other; it describes how an Edit is derived, so ED owns it |
-| 0098 r2 the browser `CommitResult` adds transport failures; r6 transport failure classification stays in the transport | sent → ST: both sit behind `SpaceBackend` (the HTTP transport implements them). ST's trace sends them to ED; the boundary gives them to ST |
+| 0010 r4 a Space is never the mutable edit buffer | → ED-1 ("no Space value is ever changed in place"); ST-100 points to it. ST and ED each sent it to the other; ED owns it |
+| 0098 r2 the browser `CommitResult` adds transport failures; r6 transport failure classification stays in the transport | sent → ST (ST-101, ST-102); ED-44 points there |
 | 0107 (proposed, EP tag) SVG stored and served sandboxed | dropped: proposed (DEC 7, drafting rule 3) |
 | 0113 r2 availability may depend on interaction state; structural invariants refuse; both for every kind alike | folded → ED-33. A kind withholding its own Create while its creation is in flight is interaction state, so ED-33 states it as the one kind-specific term |
 | 0009, 0018, 0032, 0033, 0041 r5–7, 0046 r2, 0063 r1, 0069, 0079, 0080 (EP tags) | none is an Edit-lifecycle rule. Intake, first load, document spelling and host codes sent → ST; the Target field of 0046 r2 is dead under drafting rule 1 (0070); 0063 r1 sent → SR; first-load repair sent → MG |
@@ -252,7 +252,7 @@ The rule ids in `../editing.md` are append-only from this version on.
 | 0112 and 0126 navigation and authoring held during image replacement; 2-minute upload and 10-second measurement bounds | → ED-68, ED-72; navigation → NV-50 |
 | 0113 availability | folded → ED-33 |
 | E&P line 37 coordination, barrier, recovery refusals | → ED-54–ED-61 |
-| E&P line 37 initialization order | sent back → SR (SR-43); ED-60 points there. Bounced; SR owns it |
+| E&P line 37 initialization order | sent back → SR (SR-61); ED-60 points there. Bounced; SR owns it |
 | ARC universal guard | → ED-19, ED-20 |
 | 0068 r16–r18 statuses | → statuses table; switching and Exit stay in NV |
 
@@ -260,10 +260,10 @@ The rule ids in `../editing.md` are append-only from this version on.
 
 | Item | Disposition |
 |---|---|
-| 0010 r4 a Space is never the mutable edit buffer | folded → ED-4. Bounced; ED owns it |
+| 0010 r4 a Space is never the mutable edit buffer | → ED-1; ST-100 points to it. Bounced; ED owns it |
 | 0030 r2 automatic persistence, no Save | → ED-7 |
 | 0057 r1–r2, r4–r5, r8 | → ED-15, ED-41, ED-44 |
-| 0098 r2, r6 transport failures and their classification | sent back → ST: they sit behind `SpaceBackend`. Bounced; ST owns them |
+| 0098 r2, r6 transport failures and their classification | sent back → ST (ST-101, ST-102); ED-44 points there. Bounced; ST owns them |
 | 0131 r1 no mounted availability answer | → ED-40 |
 | 0131 r4 persistence reported as any session | → ED-52 |
 | The guide's session, coordination, recovery and lifecycle bullets | → ED-41–ED-67, ED-76, ED-77 (§1 rows EP 37–EP 41) |
@@ -283,7 +283,7 @@ The rule ids in `../editing.md` are append-only from this version on.
 ## 5. Sent to other docs
 
 **space-and-resources.md (SR):**
-- EP 37 initialization order: a link initializes its target only after the containing Space's own checks pass, so a refused link initializes nothing and mints no id (sent back; add to SR-43).
+- EP 37 initialization order: a link initializes its target only after the containing Space's own checks pass, so a refused link initializes nothing and mints no id (sent back; now SR-61).
 - EP 5, 0070: Reference Target immutable (`reference-target-immutable`).
 - CAS per-action checks and codes for Resource and Space Edits (`edited-resource`, `created-resource`, `created-reference`, `deleted-resource`, `renamed-space`), including `image-url-unsupported`, which has no row.
 - EP 37: zero-reference cascade; convergence; `referenceableSpaces` and `target` reads; selection resolved by the lifecycle; `space-resource-target-unavailable`; `space-resource-deletion-unsupported`.
@@ -297,11 +297,11 @@ The rule ids in `../editing.md` are append-only from this version on.
 - EP 26, EP 28, EP 50.
 
 **storage.md (ST):**
-- 0098 r2, r6: transport failures and their classification (sent back; ST's trace sends them to ED).
+- 0098 r2, r6: transport failures and their classification (now ST-101, ST-102).
 - EP 9–19, 25, 27, 32–36, 38 (round trip, fixtures): file format, intake (with the M2 correction that `loadSpaceSnapshot` also mints a Space), repository, locks, export, reader, mount.
-- 0057 r5 shape, r6, r7; `ProtocolFault`; the 1 MiB request limit (`MAX_COMMIT_BODY_BYTES`).
+- 0057 r5 shape and `ProtocolFault` (ST-102), r6, r7; the 1 MiB request limit (ST-77).
 - 0030 except r2; every EP-only ADR listed in §3; 0131 r2, r3, r5; 0132 and DEC 4.
-- Export status: the session's `changedSinceExport` derives from acknowledged revisions (`persistence/test/session.test.ts` › "derives export status only from acknowledged durable revisions").
+- Export status (ST-103): the session's `changedSinceExport` derives from acknowledged revisions (`persistence/test/session.test.ts` › "derives export status only from acknowledged durable revisions").
 
 **ui.md (UI):**
 - 0048 r1–r4; 0064 r3, r4, r6, r7; 0065 r5; 0083 Title keys.
