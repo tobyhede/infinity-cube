@@ -97,7 +97,7 @@ test(
 );
 
 test(
-  'a Resource row ends in Delete from Space and a Space row keeps the slot empty',
+  'a Resource row ends in Delete from Space, drawn on hover or focus, and a Space row has none',
   { tag: '@parity:resources-popover-offers-delete-from-space-on-a-resource-row' },
   async ({ page }) => {
     await page.goto(story('meta-spaces'));
@@ -105,8 +105,18 @@ test(
 
     const row = page.getByRole('button', { name: 'Add Architecture to Map' });
     const deleteControl = page.getByRole('button', { name: 'Delete Architecture from Space' });
-    await expect(deleteControl).toBeVisible();
-    // On its row's line, after the row, not wrapped beneath it.
+    // Not drawn on a row nobody is pointing at, and still in the tab order.
+    await expect(deleteControl).toHaveCSS('opacity', '0');
+    await row.focus();
+    await page.keyboard.press('Tab');
+    await expect(deleteControl).toBeFocused();
+    await expect(deleteControl).toHaveCSS('opacity', '1');
+    await deleteControl.blur();
+    await expect(deleteControl).toHaveCSS('opacity', '0');
+    await row.hover();
+    await expect(deleteControl).toHaveCSS('opacity', '1');
+
+    // At the end of its row, on the row's line, not wrapped beneath it.
     const rowBox = await row.boundingBox();
     const deleteBox = await deleteControl.boundingBox();
     expect(rowBox, 'the row is drawn').not.toBeNull();
@@ -114,7 +124,8 @@ test(
     if (rowBox === null || deleteBox === null) return;
     expect(deleteBox.y).toBeGreaterThanOrEqual(rowBox.y - 1);
     expect(deleteBox.y + deleteBox.height).toBeLessThanOrEqual(rowBox.y + rowBox.height + 1);
-    expect(deleteBox.x).toBeGreaterThanOrEqual(rowBox.x + rowBox.width - 1);
+    expect(deleteBox.x).toBeGreaterThan(rowBox.x + rowBox.width / 2);
+    expect(deleteBox.x + deleteBox.width).toBeLessThanOrEqual(rowBox.x + rowBox.width + 1);
 
     // A Space is not a Resource of this Space, so there is nothing to delete.
     await expect(

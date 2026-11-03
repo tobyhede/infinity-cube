@@ -2177,15 +2177,21 @@ test(
     await page.getByRole('button', { name: 'Resources' }).click();
     const add = page.getByRole('button', { name: 'Add B to Map' });
     const deleteControl = page.getByRole('button', { name: 'Delete B from Space' });
-    await expect(deleteControl).toBeVisible();
-    // On its row's line, not wrapped beneath it.
+    // Drawn only while its row is pointed at.
+    await expect(deleteControl).toHaveCSS('opacity', '0');
+    await add.hover();
+    await expect(deleteControl).toHaveCSS('opacity', '1');
+    // At the end of its row, on the row's line, not wrapped beneath it.
     const addBox = await boxOf(add, 'the row');
     const deleteControlBox = await boxOf(deleteControl, 'the delete control');
     expect(deleteControlBox.y).toBeGreaterThanOrEqual(addBox.y - 1);
     expect(deleteControlBox.y + deleteControlBox.height).toBeLessThanOrEqual(
       addBox.y + addBox.height + 1,
     );
-    expect(deleteControlBox.x).toBeGreaterThanOrEqual(addBox.x + addBox.width - 1);
+    expect(deleteControlBox.x).toBeGreaterThan(addBox.x + addBox.width / 2);
+    expect(deleteControlBox.x + deleteControlBox.width).toBeLessThanOrEqual(
+      addBox.x + addBox.width + 1,
+    );
 
     await deleteControl.click();
     await page

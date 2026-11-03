@@ -1082,14 +1082,19 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
                       <Button
                         variant="ghost"
                         size="icon"
+                        className="resources-popover__delete"
                         aria-label={`Delete ${name} from Space`}
                         onClick={() => onDelete(row.resource, () => filterField.current)}
                       >
                         <DeleteIcon />
                       </Button>
                     ) : (
-                      // A Space row keeps the slot empty, so every row ends on one edge.
-                      <span aria-hidden="true" className="size-7 shrink-0" />
+                      // Where Delete has its own column, a Space row keeps the slot
+                      // empty, so every row ends on one edge.
+                      <span
+                        aria-hidden="true"
+                        className="resources-popover__delete-slot size-7 shrink-0"
+                      />
                     )}
                     {describing === '' ? null : (
                       <span id={description} className="sr-only">

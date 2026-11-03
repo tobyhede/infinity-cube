@@ -90,7 +90,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'surfaces/resources-popover.stories.tsx',
     storyExport: 'MetaSpaces',
     claim:
-      'Each Resource row ends in a Delete <name> from Space control on the row’s own line, a Space row keeps that slot empty, and pressing the control asks to delete that Resource rather than adding it to the Map.',
+      'Each Resource row ends in a Delete <name> from Space control on the row’s own line, drawn only while the row is hovered or holds keyboard focus; a Space row has none, and pressing the control asks to delete that Resource rather than adding it to the Map.',
   },
   {
     id: 'resources-popover-drags-a-space-onto-the-canvas',
