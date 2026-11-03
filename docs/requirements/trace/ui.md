@@ -63,7 +63,7 @@ The rule ids in `../ui.md` are append-only from this version on.
 | 0042 r4 cancelling the rename keeps the created entity | sent → ED (ED-18); UI-52 points there |
 | 0042 r5 refusal to the initiating surface, which keeps focus and draft | where → UI-90; the refused Markdown save → UI-59. Outcome semantics sent → ED |
 | 0042 r6 nothing steals focus | retryable failure takes no focus → UI-93. Conflict and permanent rejection are focus-taking dialogs (UI-93): 0068 r17 covers the conflict dialog; for the permanent rejection the agreeing source is the old guide (G15: the Space's "existing `Alert`/`AlertDialog` states"), with the code and `app/ladle-e2e/command-dock.spec.ts` › "a permanent rejection explains itself and can be acknowledged". Drafting rule 1 narrows 0042's "none" accordingly; no conflict raised. Locking and coalescing sent → ED |
-| 0042 r8 target-bound surfaces close, canvas focused | → UI-88 (bug: no focus placed). Selection and Traversal history clearing sent → NV. Epoch sent → ED |
+| 0042 r8 target-bound surfaces close, canvas focused | focus → UI-88 (bug: no focus placed); surfaces closing → ED-30. Selection and Traversal history clearing sent → NV. Epoch sent → ED |
 | 0042 r2, r3, r7, r9–r11 | sent → ED (r11 checklist → PROC) |
 | 0047 r1–r3 | → UI-1 |
 | 0047 r4 pin and browser-revalidate focus primitives | sent → PROC (build-tooling.md) |
@@ -183,7 +183,8 @@ The rule ids in `../ui.md` are append-only from this version on.
 | E&P "no surface offers a Target" | → UI-19 (widened to every surface) |
 | 0066 resize control rules | dropped: superseded; carried by 0122 (UI-66–UI-69) |
 | 0037, 0053 | dropped: superseded (0064; 0082 carries 0053's negatives) |
-| 0068 r12–r15, r17 Open Spaces, Escape never closes a Space, conflict dialog only for the active Space | sent → NV. r14's status words → UI-98 (NV-46 points there) |
+| 0068 r12–r15, r17 Open Spaces, Escape never closes a Space, conflict dialog only for the active Space | sent → NV. r14's status words → UI-98 (NV-46 points there); a refused save's word → UI-100, undecided with NV-84 (`conflicts/navigation.md` C3) |
+| DECISIONS ruling C3 drawing an existing Edge is refused with its message | → UI-101 (Connect list row; the drag shows the ineligible mark, RD-53); `conflicts/ui.md` C1 notes the consistency |
 | DEC 6 keyboard access to a Resource's toolbar kept, not built | → UI-18 |
 | DEC 4 mounted edits in browser storage, not built | → UI-43 |
 | DEC 5 Undo | sent → ED |
@@ -263,7 +264,7 @@ The rule ids in `../ui.md` are append-only from this version on.
 | 0083 r2 surfaces, r7, r8, r15 | Effects "Names", UI-99, UI-44, UI-49 |
 | 0089 r1 select and caret, r3 list row and drag, r5 refusal channel, r7 disabled Create Reference | UI-86, UI-41, UI-90, UI-21 |
 | 0112 continuation, notice area, cross-drawing wording | UI-87, UI-94, UI-77 |
-| E&P line 37 `target` read | UI-83 (the cascade sentence reads the target) |
+| E&P line 37 `target` read (a target's Maps and Graphs, live where open) | UI-25 (where the selection menus' choices come from); moved from UI-83 after the cross-doc audit |
 | 0113 Dock creation cluster | UI-40 |
 | E&P "no surface offers a Target" | UI-19 |
 | The short Title question | UI-99, conflict C3 |
@@ -338,6 +339,7 @@ Rules no source states, kept under drafting rule 5 (code plus a test, contradict
 - UI-86: a keyboard Add from the Resources list keeps the caret there.
 - UI-94: the notice area's placement above the Dock and its dismissal (0112 states one notice area only).
 - UI-96: the zoom control (RD sent it; no ADR states it).
+- UI-25: where the selection menus' choices come from (SR sent EP 37; no ADR states it).
 - UI-84: the Delete question opens on Cancel, returns the caret, and withholds its answers while deleting (0074 asks only that it asks).
 - UI-4: the bar on Base UI, cmdk and Lucide outside `@project/ui` (only the editor half is 0067's).
 - UI-10's `C`, arrows, Shift+arrows, `P` and Escape bindings come from the binding table (G12 states the table, not each key).

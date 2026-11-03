@@ -14,6 +14,8 @@ These are conflicts for [../ui.md](../ui.md) that drafting rules 1–5 and [../D
 - **(a) Word it.** On a release over a Resource of another drawing, announce a sentence on the canvas channel ("An Edge joins Resources of one Space", or similar). It needs a new refusal identity or a UI-only sentence, and a hit test at release.
 - **(b) Treat it as any ineligible end.** Another drawing's Resources are not offered as connection ends during the drag and a release on one completes nothing, silently, as for every other ineligible end. The Connect list already offers only the drawing's own Resources. UI-77 becomes a **built (untested)** rule saying so.
 
+**Consistency with ruling C3.** DECISIONS ruling C3 says drawing an existing Edge is refused "with its message". Today that message shows only on the Connect list row (UI-101); a drag onto an already-connected Resource marks it ineligible and shows no sentence. Option (b) must not be read as overruling C3: it keeps C3's message where a surface carries it (the Connect list) and accepts that a drag shows the ineligible mark only. If the maintainer reads C3 as requiring a sentence on the drag path too, that is option (a) for both cases.
+
 **Recommendation: (b).** It is what every other ineligible end does, it needs no new identity, and 0112's own comparison ("like any other connection refusal") is met by it. Add a test that a release on another drawing's Resource completes nothing.
 
 **Evidence.** `docs/adr/0112-a-map-behaves-the-same-wherever-it-is-drawn.md:33`; `app/src/edge-authoring-react.tsx` (`mayOfferConnectionEnd`, `isValidConnection`, the gesture-refusal span); `app/test/edge-authoring-react.test.tsx` › "shows the reason a finished pointer gesture ran into". No test covers a cross-drawing release.

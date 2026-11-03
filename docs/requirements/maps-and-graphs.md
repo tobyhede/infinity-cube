@@ -53,32 +53,36 @@ Records reject unknown keys at intake: see storage.md.
 
 ## Operations index
 
-| Edit | Effect | Unchanged when | Refusal codes | Rules |
-|---|---|---|---|---|
-| Add Map | appends a starting Map, makes it `defaultMap`, selects it | — | — | MG-9–MG-11 |
-| Delete Map | removes the Map and its Graphs, repoints Space Resources | it is the last Map | — | MG-12–MG-15 |
-| Rename Map | writes the title | same trimmed title | `map-title-required`, `map-not-found` | MG-8 |
-| Rename Graph | writes the title | same trimmed title | `graph-title-required`, `graph-not-owned` | MG-8 |
-| Add to Map | writes a position | — | `resource-not-found`, `resource-already-in-map`, `map-not-found` | MG-16–MG-18 |
-| Remove from Map | removes the entry and incident Edges | — | `resource-not-in-map`, `map-not-found` | MG-19 |
-| Delete from Space | Remove from Map in every Map | — | see space-and-resources.md | MG-20 |
-| Move | writes drop points | same positions (MG-83) | — | MG-21, MG-83 |
-| Resize | writes size and displaces | same drawn size | `resource-not-in-map` | MG-23–MG-26, MG-82 |
-| Open | writes `open: true` | already Open | `resource-not-in-map`, `resource-not-found`, `open-requires-content` | MG-27–MG-28 |
-| Close | writes `open: false` | already Closed | `resource-not-in-map` | MG-27 |
-| Choose Shape | writes `shape` | same drawn Shape | `resource-not-in-map`, `resource-not-found`, `shape-not-taken` | MG-30–MG-31 |
-| Add Graph | appends an empty Graph and activates it | — | — | MG-41–MG-42 |
-| Switch Graph | writes `activeGraph` (bug: MG-45) | — | — | MG-45–MG-47 |
-| Recolour | writes `color` | same drawn colour (bug: MG-49) | `graph-not-owned` | MG-49 |
-| Choose head shape | writes `headShape` | same drawn head shape | `graph-not-owned` | MG-51 |
-| Delete Graph | removes the Graph, repoints Space Resources | it is the last Graph | — | MG-52–MG-56 |
-| Draw Edge | appends an Edge | — | `edge-already-exists`, `edge-resource-outside-map`, `map-active-graph-required`, `graph-not-owned` | MG-58–MG-63 |
-| Delete Edge | removes an Edge | — | `edge-not-found` | MG-67 |
-| Title Edge | writes or clears `title` | same trimmed Title | `edge-title-one-line`, `edge-not-found` | MG-64 |
-| Hide or Show Title | writes `titleHidden` | already in that state | `edge-title-required` | MG-65 |
-| Reorder Graphs | moves a Graph in the list | — | — | MG-39 (not built) |
-| Auto-arrange | rewrites a Map's positions | — | — | MG-71 (not built) |
-| First working read | writes a starting Map or `defaultMap` | Space already has both | — | MG-74–MG-77 |
+Every completion first runs the guards in editing.md (ED-19 to ED-21): for example, `map-not-found` when the Map it writes has gone, and `graph-not-owned` for a drawing whose Graph has gone. "Checks, in order" then lists the Edit's own checks. The first failure is the answer, and "⇒ unchanged" marks where an unchanged result is decided. Delete Map and Delete Graph are coordinated Edits and run no guards (ED-23).
+
+| Edit | Effect | Checks, in order | Rules |
+|---|---|---|---|
+| Add Map | appends a starting Map, makes it `defaultMap` and selects it (from an Open Space Resource: MG-11) | none | MG-9–MG-11 |
+| Delete Map | removes the Map and its Graphs, and repoints Space Resources | last Map ⇒ unchanged | MG-12–MG-15 |
+| Rename Map | writes the title | `map-not-found` (the completion names another Map than the one resolved: an action check, not the guard) → `map-title-required` → same trimmed title ⇒ unchanged | MG-8 |
+| Rename Graph | writes the title | `graph-not-owned` → `graph-title-required` → same trimmed title ⇒ unchanged | MG-8 |
+| Add to Map | writes a position | `resource-not-found` → `resource-already-in-map` | MG-16–MG-18 |
+| Remove from Map | removes the entry and incident Edges | `resource-not-in-map` | MG-19 |
+| Delete from Space | Remove from Map in every Map | see space-and-resources.md | MG-20 |
+| Move | writes drop points | no position changes ⇒ unchanged (bug: MG-83) | MG-21, MG-83 |
+| Resize | writes size and displaces | `resource-not-in-map` → same drawn size ⇒ unchanged | MG-23–MG-26, MG-82 |
+| Open | writes `open: true` | `resource-not-in-map` → `resource-not-found` → `open-requires-content` → already Open ⇒ unchanged | MG-27–MG-28 |
+| Close | writes `open: false` | `resource-not-in-map` → already Closed ⇒ unchanged | MG-27 |
+| Choose Shape | writes `shape` | `resource-not-in-map` → `resource-not-found` → `shape-not-taken` → same drawn Shape ⇒ unchanged | MG-30–MG-31 |
+| Add Graph | appends an empty Graph and activates it | none | MG-41–MG-42, MG-85 |
+| Switch Graph | writes `activeGraph` (bug: MG-45) | already the saved Active Graph ⇒ unchanged (MG-84) | MG-45–MG-47, MG-84 |
+| Recolour | writes `color` | `graph-not-owned` → same drawn colour ⇒ unchanged (bug: MG-49) | MG-49 |
+| Choose head shape | writes `headShape` | `graph-not-owned` → same drawn head shape ⇒ unchanged | MG-51 |
+| Delete Graph | removes the Graph, and repoints Space Resources | last Graph ⇒ unchanged | MG-52–MG-56 |
+| Draw Edge | appends an Edge | `graph-not-owned` (a named Graph of another Map) → `edge-resource-outside-map` → `map-active-graph-required` → `edge-already-exists` | MG-58–MG-62 |
+| Draw Edge to a new Resource | creates a Resource, its entry and the Edge | `edge-resource-outside-map` → `map-active-graph-required` | MG-63 |
+| Delete Edge | removes an Edge | `graph-not-owned` → `edge-not-found` | MG-67 |
+| Title Edge | writes or clears `title` | `graph-not-owned` → `edge-not-found` → `edge-title-one-line` (on the raw draft) → trimmed draft equals the stored Title, or is empty on an untitled Edge ⇒ unchanged | MG-64 |
+| Hide Title | writes `titleHidden: true` | `graph-not-owned` → `edge-not-found` → `edge-title-required` → already hidden ⇒ unchanged | MG-65 |
+| Show Title | removes `titleHidden` | `graph-not-owned` → `edge-not-found` → already shown, or no Title ⇒ unchanged | MG-65 |
+| Reorder Graphs | moves a Graph in the list | — | MG-39 (not built) |
+| Auto-arrange | rewrites a Map's positions | — | MG-71 (not built) |
+| First working read | writes a starting Map or `defaultMap` (not an Edit: a commit by the loader) | Space already has both ⇒ nothing written | MG-74–MG-77 |
 
 ## Maps and membership
 
@@ -93,15 +97,15 @@ Records reject unknown keys at intake: see storage.md.
 
 ## Add Map
 
-- **MG-9** Add Map is one Edit on a Space's own canvas. It appends a starting Map, makes it that Space's `defaultMap` and selects it there. A drawn Map cannot make this Edit. *Why:* an empty Map is the way into manual authoring, and creating a Map decides where the canvas continues. **built**: `app/test/space-authoring-operations.test.ts` › "creates and selects an empty Map with one empty Active Graph"; `app/test/edit-target.test.ts` › "takes a Map lifecycle Edit from the canvas alone".
+- **MG-9** Add Map is one Edit on a Space's own canvas. It appends a starting Map, makes it that Space's `defaultMap` and selects it there. From an Open Space Resource it is MG-11. The canvas continues on the new Map (navigation.md NV-7). *Why:* an empty Map is the way into manual authoring, and creating a Map decides where the canvas continues. **built**: `app/test/space-authoring-operations.test.ts` › "creates and selects an empty Map with one empty Active Graph".
 - **MG-10** A new Map is titled `Map N`, where N is one above the highest `Map N` in the Space. *Why:* a neutral name the author can change. **built**: `app/test/titles.test.ts` › "numbers Maps and Graphs on their own titles", "takes one past the highest number already in use".
-- **MG-11** Add Map invoked from an Open Space Resource runs in the target Space and leaves the target's `defaultMap` alone; the Space Resource is then pointed at the new Map (see space-and-resources.md). *Why:* only a canvas Edit records where the author is working. **bug: code differs**: the code runs it on the target Space's canvas, so it sets the target's `defaultMap`: `app/test/map-authoring-commands.test.ts` › "points the embedding Space Resource at the created Map once both Spaces have saved".
+- **MG-11** Add Map invoked from an Open Space Resource is a drawn Edit of the target Space. It asks guard 1 against nothing, because it writes no existing Map (editing.md ED-20). It appends a starting Map in the target and leaves the target's `defaultMap` and canvas alone, and the Space Resource is then repointed at the new Map and its Graph (see space-and-resources.md). *Why:* only a canvas Edit records where the author is working. **bug: code differs**: the code completes it as a canvas Edit in the target Space, so it sets the target's `defaultMap`, and the drawn Edit target cannot carry it at all (`app/test/edit-target.test.ts` › "takes a Map lifecycle Edit from the canvas alone"): `app/test/map-authoring-commands.test.ts` › "points the embedding Space Resource at the created Map once both Spaces have saved".
 
 ## Delete Map
 
 - **MG-12** Delete Map removes the Map and every Graph it owns. The Resources it placed stay in the Space. *Why:* Resources belong to the Space, not to a Map. **built**: `app/test/map-authoring-commands.test.ts` › "deletes the Map, repoints every Space Resource that selected it and continues on the survivor".
 - **MG-13** The last Map cannot be deleted: a deletion of it answers unchanged, with no refusal code. Whether the command is offered is in ui.md. *Why:* MG-7. **built**: `persistence/test/space-resource-lifecycle.test.ts` › "update: deleting the only Map is unchanged before any read or commit".
-- **MG-14** Delete Map leaves `defaultMap` where it is if that Map survives. Otherwise the first surviving Map in list order becomes `defaultMap`. The canvas continues on `defaultMap`. *Why:* the opening Map changes only when it has to, and the same way in every context. **bug: code differs**: on the Space's own canvas the code complies, because the deleted Map is the one shown. From an Open Space Resource, when the deleted Map is `defaultMap`, the code moves `defaultMap` to the Map the target Space's canvas shows, if that survives, instead of the first survivor: `app/test/map-authoring-commands.test.ts` › "continues on the Space’s opening Map, where the Resources that selected the deleted Map go too"; `app/src/map-authoring-commands.ts` `preferredSurvivor`.
+- **MG-14** Delete Map leaves `defaultMap` where it is if that Map survives. Otherwise the first surviving Map in list order becomes `defaultMap`. The canvas continues on `defaultMap` (navigation.md NV-7). *Why:* the opening Map changes only when it has to, and the same way in every context. **bug: code differs**: on the Space's own canvas the code complies, because the deleted Map is the one shown. From an Open Space Resource, when the deleted Map is `defaultMap`, the code moves `defaultMap` to the Map the target Space's canvas shows, if that survives, instead of the first survivor: `app/test/map-authoring-commands.test.ts` › "continues on the Space’s opening Map, where the Resources that selected the deleted Map go too"; `app/src/map-authoring-commands.ts` `preferredSurvivor`.
 - **MG-15** Every Space Resource, in any Space, that selects the deleted Map moves in the same Edit to the surviving Map (MG-14) and that Map's Active Graph, and loses its framing. Selection itself is in space-and-resources.md. *Why:* no selection may dangle. **built**: `persistence/test/space-resource-planning.test.ts` › "moves every Space Resource selecting a deleted Map to the successor, and the default with it"; `core/test/space-kind.test.ts` › "drops the framing when the Map changes, since it was the old Map's".
 
 ## Add to Map, Remove, Delete, Move
@@ -115,7 +119,7 @@ Records reject unknown keys at intake: see storage.md.
 
 ## Size and displacement
 
-- **MG-22** An entry's size is optional, and with none stored the Resource is the Closed Size. No size is below the Closed Size on either axis for any kind, Open or Closed, and intake refuses one that is. No Edit writes a size on a Resource's behalf. *Why:* one floor, and content adapts to its rect (see rendering.md). **built**: `graph/test/space-intake.test.ts` › "loads an entry with neither open nor size stored"; `core/test/schema.test.ts` › "refuses a size below the Closed Size on either axis, Open or Closed".
+- **MG-22** An entry's size is optional, and with none stored the Resource is the Closed Size. No size is below the Closed Size on either axis for any kind, Open or Closed, and intake refuses one that is. No Edit writes a size on a Resource's behalf. *Why:* one floor for every kind. What Open content draws when it does not fit is rendering.md RD-5. **built**: `graph/test/space-intake.test.ts` › "loads an entry with neither open nor size stored"; `core/test/schema.test.ts` › "refuses a size below the Closed Size on either axis, Open or Closed".
 - **MG-23** Resize writes a new size on a Resource of any kind, Open or Closed, and keeps Open/Closed and Shape. Resizing to the size it already draws at is unchanged, so resizing an entry that stores no size to the Closed Size is unchanged. *Why:* a bigger Resource is one gesture, and Closing is never a side effect of a size. **built**: `graph/test/snapshot-edits.property.test.ts` › "resizes Open or Closed, writing the size and keeping open, Shape and every Edge", "answers unchanged for a Resize to the Closed Size of an entry storing none".
 - **MG-24** Let the subject sit at (sx, sy) with size (w, h) before the Resize, and change by (Δw, Δh). For every other Resource at (x, y):
   - if `x ≥ sx + w`, it moves by Δw on `x` only;
@@ -129,7 +133,7 @@ Records reject unknown keys at intake: see storage.md.
   *Why:* one axis is enough to stay clear, and testing `x` first keeps a Resource beside the subject from moving vertically. **built**: `graph/test/placement.test.ts` › "moves each Resource on one axis, x first", "moves a Resource exactly on the bottom edge, and leaves one unit short of it", "never moves the subject, whatever the change".
 - **MG-25** A Resize reads the Map as it is now and records nothing about what it pushed. A grow followed by the shrink back restores every position; a shrink followed by a grow need not. *Why:* per-Resize history goes stale, and two identical Maps would behave differently. **built**: `graph/test/placement.test.ts` › "restores every position on the shrink back", "is not an involution when the shrink comes first".
 - **MG-26** Only Resize changes a size or moves another Resource, and one Resize may move many. *Why:* displacement written by the Edit that causes it keeps every position authored. **built**: `graph/test/snapshot-edits.property.test.ts` › "moves no other Resource when it removes or deletes an Open, resized one".
-- **MG-82** A Resize below the Closed Size never reaches the domain: the resize control stops at the Closed Size on both axes (the control is in ui.md). An Edit that asked for less would fail intake inside authoring and throw as a defect, not refuse. *Why:* MG-22 is a floor, not a request to check. **built**: `app/test/canvas-resource-decoration.test.ts` › "offers resize on every kind, Open or Closed, where the Map may be authored" (asserts the control's minimum width and height are the Closed Size). The throw is untested (`app/src/space-authoring.ts` `assertValidAuthoredSnapshot`).
+- **MG-82** A Resize below the Closed Size never reaches the domain; the control's floor is ui.md UI-68. An Edit that asked for less would fail intake inside authoring and throw as a defect, not refuse. *Why:* MG-22 is a floor, not a request to check. **built**: `app/test/canvas-resource-decoration.test.ts` › "offers resize on every kind, Open or Closed, where the Map may be authored" (the control's minimum is the Closed Size). The throw is untested (`app/src/space-authoring.ts` `assertValidAuthoredSnapshot`).
 
 ## Open and Close
 
@@ -153,7 +157,7 @@ Records reject unknown keys at intake: see storage.md.
 - **MG-38** Graph order is authored. A new Graph is appended, and a deletion keeps the survivors' order. *Why:* the author arranges their narratives. **built**: `app/test/space-authoring-operations.test.ts` › "appends, colours and activates one empty Graph without touching the others". The order kept on deletion is untested (`planContextDeletion`).
 - **MG-39** Reorder Graphs moves one Graph within its Map's list, as one Edit. *Why:* order is authored. **not built**: tracked in `.scratch/graph-reordering/issues/01-reorder-a-maps-graphs.md` (repo root).
 - **MG-40** An empty Graph is valid and may be active. Whether it can be presented is in navigation.md. *Why:* a new narrative starts empty. **built**: `app/test/space-authoring-operations.test.ts` › "creates and selects an empty Map with one empty Active Graph".
-- **MG-41** Add Graph is one Edit. It appends an empty Graph with head shape `arrow` and a colour (MG-48), and makes it the Map's Active Graph, wherever the Map is drawn. *Why:* the author draws the new narrative straight away. **built**: `app/test/space-authoring-operations.test.ts` › "appends, colours and activates one empty Graph without touching the others"; `app/test/edit-target.test.ts` › "continues Navigation on the Graph its Edit made active".
+- **MG-41** Add Graph is one Edit. It appends an empty Graph with head shape `arrow` and a colour (MG-48), and makes it the Map's Active Graph, wherever the Map is drawn (inside an Open Space Resource: MG-85). *Why:* the author draws the new narrative straight away. **built**: `app/test/space-authoring-operations.test.ts` › "appends, colours and activates one empty Graph without touching the others"; `app/test/edit-target.test.ts` › "continues Navigation on the Graph its Edit made active".
 - **MG-42** A Graph from Add Graph is titled `Graph N`, where N is one above the highest `Graph N` over every Graph in the Space. A starting Map's Graph is always `Graph 1`. *Why:* a neutral name the author can change. **built**: `app/test/titles.test.ts` › "numbers Maps and Graphs on their own titles"; `app/test/space-authoring-operations.test.ts` › "creates and selects an empty Map with one empty Active Graph".
 
 ## Active Graph
@@ -162,7 +166,7 @@ Records reject unknown keys at intake: see storage.md.
 - **MG-44** A Map's `activeGraph` names the Graph it opens on. With none stored the first Graph opens, and that fallback is a read that is never written on its own. Intake refuses an `activeGraph` naming no Graph (`map-active-graph-missing`) or another Map's (`map-active-graph-outside-map`). *Why:* a hand-written Space needs none, and the app names it outright. **built**: `graph/test/space-intake.test.ts` › "refuses one no map in the space owns, and says only that", "refuses one a second map owns — ownership, not existence". The "never written on its own" clause is untested.
 - **MG-45** Switching Graphs on the canvas is an Edit that writes the Map's `activeGraph`. *Why:* the Graph the author is working in is durable state of the Map. **bug: code differs**: switching only changes navigation state, and it is saved only when a later canvas Edit writes it (MG-79): `app/test/navigation.test.ts` › "activating a Graph ends the current Traversal history without changing the Space".
 - **MG-46** Switching Graphs on the canvas also records the canvas Map as `defaultMap`. *Why:* a canvas Edit records where the author is working. **bug: code differs**: switching writes nothing (MG-45).
-- **MG-47** Switching Graphs inside an Open Space Resource writes only that Space Resource's selection; the target Map's `activeGraph` and the target's `defaultMap` are left alone. *Why:* only a canvas Edit records where the author is working. **built**: `app/test/space-resource-selection.test.tsx` › "writes a Graph chosen from the Map already selected". That the target is left alone is untested.
+- **MG-47** Switching Graphs inside an Open Space Resource is the Space Resource's selection Edit (space-and-resources.md SR-46). It writes neither the target Map's `activeGraph` nor the target's `defaultMap`. *Why:* only a canvas Edit records where the author is working. **built**: `app/test/space-resource-selection.test.tsx` › "writes a Graph chosen from the Map already selected". That the target is left alone is untested.
 
 ## Colour and head shape
 
@@ -187,10 +191,10 @@ Records reject unknown keys at intake: see storage.md.
 - **MG-58** Both endpoints of an Edge are members of its Graph's Map. Intake refuses an endpoint outside the Map (`graph-edge-resource-outside-map`) or missing from the Space (`graph-edge-missing-resource`). Drawing one is refused (`edge-resource-outside-map`). *Why:* a Graph is closed over its Map. **built**: `graph/test/space-intake.test.ts` › "refuses an endpoint naming a space resource outside its map, and says only that".
 - **MG-59** A connection cannot join Resources of two different drawings: a Resource of another drawn Map is not offered as a connection end, and releasing on one completes nothing. *Why:* an Edge joins Resources in one Space. What the author is told is UI-77, **undecided** under `conflicts/ui.md` C1. **built (untested)**: `app/src/edge-authoring-react.tsx` `isValidConnection`, `mayOfferConnectionEnd` (each drawing resolves only its own Resources).
 - **MG-60** Intake refuses a Graph that holds the same Edge twice, by MG-57's identity (`duplicate-graph-edge`). *Why:* one Edge, one entry. **built**: `graph/test/space-intake.test.ts` › "keys an Edge on its endpoints, so two with different Titles are still a duplicate".
-- **MG-61** Drawing an Edge the Graph already holds is refused (`edge-already-exists`), and nothing is drawn. *Why:* the author learns why the gesture did nothing. The sentence shown is in ui.md. **built**: `app/test/edge-authoring.test.ts` › "answers a refusal to the list that asked, and leaves nothing on the canvas".
+- **MG-61** Drawing an Edge the Graph already holds is refused (`edge-already-exists`), and nothing is drawn. *Why:* the Graph already holds that Edge. The reason shows on the Connect list's row (ui.md UI-72); during a drag the target is only marked ineligible (rendering.md). **built**: `app/test/edge-authoring.test.ts` › "answers a refusal to the list that asked, and leaves nothing on the canvas".
 - **MG-62** Drawing an Edge is one Edit that appends it to the Active Graph, or, in a drawn Map, to the Graph that drawing shows. With no Graph to join, the Edit is refused (`map-active-graph-required`). *Why:* new Edges join the Graph the author is working in. **built**: `app/test/space-authoring-operations.test.ts` › "offers a connection the completion accepts", "writes the Edge into the Graph the Space Resource is showing, not the canvas Active Graph". The refusal is untested.
 - **MG-63** A connection may end in a new Markdown Resource, created with its entry and the Edge in one Edit. Dropped on empty canvas, the Resource is centred on the drop point. With no drop point, it goes beside the source. The gestures are in ui.md. *Why:* drawing onward is one gesture. **built**: `app/test/edge-authoring.test.ts` › "authors a Resource centred on the drop point", "authors a Markdown Resource beside the source and continues at the Edge to it".
-- **MG-64** An Edge Title is optional, one line, trimmed and uncapped, and nothing mints one. A line break is refused (`edge-title-one-line`). An empty draft clears the Title and `titleHidden` with it. Setting the same Title is unchanged. *Why:* a Title is the author's words or nothing. **built**: `app/test/space-authoring-operations.test.ts` › "sets a Title on an untitled Edge", "is unchanged when the trimmed draft is the stored Title".
+- **MG-64** An Edge Title is optional, one line, trimmed and uncapped, and nothing mints one. A line break is refused (`edge-title-one-line`), checked on the raw draft before the trim, so a line break at either end is refused rather than trimmed away. An empty draft clears the Title and `titleHidden` with it. Setting the same Title is unchanged. *Why:* a Title is the author's words or nothing. **built**: `app/test/space-authoring-operations.test.ts` › "sets a Title on an untitled Edge", "is unchanged when the trimmed draft is the stored Title"; `app/test/edge-authoring.test.ts` › "keeps the draft on a refused Title and retains the refusal for its Edge".
 - **MG-65** Whether an Edge's Title shows is stored per Edge, only as `titleHidden: true` and only beside a Title. Hiding the Title of an Edge that has none is refused (`edge-title-required`). *Why:* visibility is authored like the Title. **built**: `app/test/space-authoring-operations.test.ts` › "hides a titled Edge’s Title", "refuses hiding the Title of an Edge that has none".
 - **MG-66** An Edge stores no appearance. Its colour and head are its Graph's. *Why:* a style per Edge would be a second way to say which Graph it is in. **built**: `core/test/schema.test.ts` › "refuses an Edge carrying an undeclared key inside a space file".
 - **MG-67** Delete Edge removes one Edge and leaves its Graph, even when empty. An Edge's end cannot be moved: the author deletes the Edge and draws a new one, which is untitled and goes last (MG-62). *Why:* a moved end is a different Edge. **built**: `app/test/space-authoring-operations.test.ts` › "deletes one Edge and leaves the Graph standing, empty".
@@ -206,7 +210,7 @@ Records reject unknown keys at intake: see storage.md.
 
 - **MG-72** Removed. A new Space's contents are in space-and-resources.md (trace §1).
 - **MG-73** A stored or imported Space may have no Map, and so no Graph. *Why:* the first working read supplies one (MG-74), so a hand-written or imported Space need not author one. **built**: `persistence/test/working-space.test.ts` › "persists an empty default Map before returning a mapless stored Space".
-- **MG-74** The first working read of a Space with no Map persists a starting Map titled `Map 1`, as one Edit, before the Space becomes working. Its Resources are not placed and no strategy places them. *Why:* a Map makes a Space usable, and nothing authored says where its Resources go. **built**: `persistence/test/working-space.test.ts` › "persists an empty default Map before returning a mapless stored Space".
+- **MG-74** The first working read of a Space with no Map persists a starting Map titled `Map 1`, in one commit, before the Space becomes working. Its Resources are not placed and no strategy places them. *Why:* a Map makes a Space usable, and nothing authored says where its Resources go. **built**: `persistence/test/working-space.test.ts` › "persists an empty default Map before returning a mapless stored Space".
 - **MG-75** Which reads run the first working read. *Why:* only a Space about to be worked in needs a Map, so exporting a mapless Space keeps it mapless. Where the loader runs is in storage.md.
   - **Initializes:** opening a Space directly, by its product URL or by Entering it (`app/src/open-spaces.ts` `compose`); drawing an Open Space Resource's target (`compose`, through `hold`); reading a Space Resource's target selection (`persistence/src/session-registry.ts` `workingTargetSelection`); and the single-Space HTTP route (`http/src/index.ts`).
   - **Never initializes:** listing Spaces; reading the whole aggregate (Export, the mount reader, the aggregate HTTP route); import completion; and intake's reference checks.
@@ -222,6 +226,8 @@ Records reject unknown keys at intake: see storage.md.
 - **MG-80** An Edit through a drawn Map writes that Map in its target Space and leaves the target's `defaultMap` and the Map's stored `activeGraph` alone, except as the table below says. *Why:* editing a preview is not working in that Space. **built**: `app/test/edit-target.test.ts` › "keeps the Map’s stored Active Graph when it edits on the Graph it shows".
 - **MG-81** Delete Graph on the canvas records the canvas Map as `defaultMap`, like every canvas Edit. Delete Map's `defaultMap` follows MG-14. *Why:* a canvas Edit records where the author is working. **bug: code differs**: Delete Graph writes no `defaultMap`: `persistence/src/space-resource-planning.ts` `planContextDeletion`.
 - **MG-83** An Edit whose own change is nothing is unchanged and writes nothing, not even `defaultMap` or `activeGraph`. Move to the same positions is such an Edit. *Why:* a gesture that changes nothing must not move where the Space opens. **bug: code differs**: Move has no early unchanged check, so a Move to the same positions completes and writes `defaultMap` and `activeGraph` when they differ from the canvas: `app/src/space-authoring.ts` (the `settled-resource-movement` arm reaches `sameSnapshot` only after `updatePositionedMap`).
+- **MG-84** Switching to the Graph that is already the saved Active Graph is unchanged and writes nothing, `defaultMap` included. Switching to a Graph the canvas shows but the Map has not saved has a change of its own and completes (MG-45, MG-46). *Why:* an Edit whose own change is nothing writes nothing (MG-83). **bug: code differs**: switching is not an Edit yet (MG-45), so no outcome is produced, although nothing is written: `app/src/navigation.ts` `activateGraph`.
+- **MG-85** Add Graph from an Open Space Resource also repoints that Space Resource's selection at the new Graph, after the target has saved the Graph, and moves neither the target's canvas nor the containing one. *Why:* the author sees the Graph they just made. **built**: `app/test/graph-authoring-commands.test.ts` › "persists a new Graph before the Resource refers to it, without moving either canvas". Code only (trace).
 
 The principle: **an Edit on the canvas records where the author is working, and nothing else does.** Each cell gives `defaultMap` / `activeGraph`. ✓ means the field is written with the canvas Map (or, for `activeGraph`, the Graph the canvas shows). ✗ means the field is left alone. — means there is nothing to write, because the Map is gone. A rule id means that rule gives the value. Every cell is decided; the code's departures are listed under Bugs.
 
@@ -229,9 +235,9 @@ The principle: **an Edit on the canvas records where the author is working, and 
 |---|---|---|
 | Any Edit with a change of its own (Move, Resize, Open, Shape, Add to Map, Remove, Delete from Space, Edit Resource, Replace Image, Map and Graph renames, Recolour, head shape, Edges) | ✓ / ✓ | ✗ / ✗ |
 | An Edit whose own change is nothing (MG-83) | ✗ / ✗ | ✗ / ✗ |
-| Add Map | ✓ (the new Map) / ✓ (its Graph) | ✗ / ✗ (MG-11) |
-| Add Graph | ✓ / ✓ (the new Graph) | ✗ / ✓ (the new Graph, because a new Graph is created active: MG-41) |
-| Switch Graph | ✓ / ✓ (MG-45, MG-46) | ✗ / ✗ (it writes the Space Resource's selection: MG-47) |
+| Add Map | ✓ (the new Map) / ✓ (its Graph) | ✗ / ✗ (a drawn Edit; the Space Resource is repointed: MG-11) |
+| Add Graph | ✓ / ✓ (the new Graph) | ✗ / ✓ (the new Graph, because a new Graph is created active: MG-41; the Space Resource is repointed: MG-85) |
+| Switch Graph | ✓ / ✓ (MG-45, MG-46); to the saved Active Graph ✗ / ✗ (MG-84) | ✗ / ✗ (it writes the Space Resource's selection: MG-47) |
 | Delete Map | ✓ (the survivor, MG-14) / — | MG-14 / — |
 | Delete Graph | ✓ (MG-81) / MG-54 | ✗ / MG-54 |
 | Rename Space | ✗ / ✗ | ✗ / ✗ |
@@ -249,10 +255,11 @@ The principle: **an Edit on the canvas records where the author is working, and 
 Each line is a rule the code does not meet, with the change it needs.
 
 - **MG-8**: refuse a line break in Map and Graph titles in authoring and at intake, and make intake require a trimmed, non-blank title.
-- **MG-11**: Add Map from an Open Space Resource must leave the target's `defaultMap` alone.
+- **MG-11**: Add Map from an Open Space Resource must be a drawn Edit of the target that leaves the target's `defaultMap` alone, then repoints the Space Resource.
 - **MG-14**: Delete Map from an Open Space Resource, when it deletes `defaultMap`, must move `defaultMap` to the first surviving Map in list order, not to the Map the target's canvas shows.
 - **MG-45**: Switch Graph on the canvas must be an Edit that writes the Map's `activeGraph`.
 - **MG-46**: that Edit must also record the canvas Map as `defaultMap`.
+- **MG-84**: switching to the saved Active Graph must answer unchanged.
 - **MG-49**: Recolour must answer unchanged for the drawn colour (compare with the fallback when none is stored).
 - **MG-54**: Delete Graph must save the first survivor in list order when the saved Active Graph is deleted (not the Graph the target's canvas shows), and must save it even when the Map stored no `activeGraph`.
 - **MG-56**: Space Resources that selected a deleted Graph must move to the Graph the Map is left on under MG-54.

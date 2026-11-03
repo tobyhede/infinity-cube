@@ -254,12 +254,13 @@ The rule ids in `../maps-and-graphs.md` are append-only from this version on.
 | Checkpoint 2 ruling C4.2 | → MG-14 (bug in the embedded case) |
 | Checkpoint 2 ruling C4.3 | → MG-11 (bug) |
 | Checkpoint 2 ruling C6 | → MG-10, MG-18, MG-42, MG-48 (built, code only); MG-49 (bug) |
-| Checkpoint 2 ruling C7 | → MG-83 (new, bug) |
+| Checkpoint 2 ruling C7 | → MG-83 (bug), MG-84 (switching to the saved Active Graph is unchanged; bug while MG-45 is unbuilt) |
+| Checkpoint 2 ruling C4.3 with the cross-doc audit B1 | MG-11 restated as a drawn Edit of the target that asks guard 1 against nothing, then repoints the Space Resource. MG-9 points to it. ED-20 is to be reworded to match (ED's doc) |
 | Checkpoint 2 ruling S1 | sent → ST |
 | Checkpoint 2 principle (a canvas Edit records where the author works; nothing else does) | → the opening-writes table under MG-79–MG-83 |
 | DEC 2 Delete Graph survivor | → MG-54 (bug), MG-56 (bug, with 0091) |
 | DEC 6 Auto-arrange, reorder kept; cross-Space Edges open | → MG-71, MG-39; Open questions |
-| **Code only** (drafting rule 5: code plus a test, no contrary source) | MG-10 and MG-42 numbering details, MG-18, MG-48. MG-82's control clamp (tested: `canvas-resource-decoration.test.ts`) |
+| **Code only** (drafting rule 5: code plus a test, no contrary source) | MG-10 and MG-42 numbering details, MG-18, MG-48, MG-85 (Add Graph from an Open Space Resource repoints the Space Resource). MG-82's control clamp (tested: `canvas-resource-decoration.test.ts`) |
 | `CONTEXT.md` "Completion outcome": a drag returned to its start is unchanged | → MG-83 (ruling C7) |
 
 ## 3. Sent to other docs
@@ -341,3 +342,20 @@ The rule ids in `../maps-and-graphs.md` are append-only from this version on.
 - **`Placement.drawn` and `Placement.authoredPoint`** must not return (0084). MG-21 states the behaviour.
 - **One point type (0038).** The code has `MapPosition`, while `LayoutStrategyResource` declares its own `x?`/`y?`. Whether that breaks 0038 is a PROC question.
 - **Map `kind`.** Every Map stores `kind: 'positioned'`, the only kind (`core/src/schema.ts` `mapSchema`). This is a format matter for ST.
+
+## 5. Items received from other docs
+
+| From | Item | Landed |
+|---|---|---|
+| ED trace (CAS per-action rows) | check order for Map-entry, connection, Graph and Map Edits | MG operations index, column "Checks, in order" |
+| ED trace | `renamed-map`'s `map-not-found` is an action check, not the guard | operations index, Rename Map row |
+| ED trace | an Edge Title Edit checks for a line break before it trims | MG-64 and the Title Edge row |
+| ED trace (EP 26, 28, 37, 50; CAS deletion rows) | Graphs as the only structure, cycles, framing on deletion, Resize, unchanged when no successor | already held: MG-37, MG-36, MG-61, MG-15, MG-55, MG-22–MG-26, MG-82, MG-13, MG-53 |
+| Cross-doc audit N1 | Switch Graph's unchanged case | MG-84 |
+| Cross-doc audit N2 | Add Graph from an Open Space Resource repoints the selection | MG-85 |
+| Cross-doc audit N3 | the first working read is a commit, not an Edit | MG-74 wording; operations index |
+| Cross-doc audit N8 | MG-22's *Why* asserted "content adapts" | now points to RD-5, which is undecided in rendering.md |
+| Cross-doc audit, duplicates | MG-47 against SR-46; MG-82 against UI-68 | MG-47 now points to SR-46; MG-82 keeps only the domain half and points to UI-68 |
+| Cross-doc audit B4 | MG-61's *Why* named a ui.md sentence that the drag path never shows | narrowed: the reason shows on the Connect list (UI-72); a drag marks the target ineligible |
+| Cross-doc audit N7 | RD rules on "no Active Graph" against MG-34/43/44 | not changed here: every Map has a Graph and resolves one Active Graph; RD owns the fix |
+
