@@ -761,6 +761,79 @@ describe('ResourcesPopover', () => {
     ]);
   });
 
+  /**
+   * Pressing the Space row authors a new Space Resource, so while an unplaced
+   * one framing that Space is listed, the row would offer a second orphan and
+   * the reader would meet one name twice.
+   */
+  describe('a Space framed by a listed Space Resource', () => {
+    const ROADMAP = { id: id('000000000012'), title: 'Roadmap' };
+    const titles = new Map([[ROADMAP.id, ROADMAP.title]]);
+    const search = (value: string) =>
+      fireEvent.change(screen.getByRole('textbox', { name: 'Search resources' }), {
+        target: { value },
+      });
+
+    it('is offered once, as that Space Resource, while it is placed on no Map', async () => {
+      render(
+        <Fixture
+          spaceTitleById={titles}
+          spaces={[ROADMAP, BLUEPRINT]}
+          onAddSpace={() => Promise.resolve(null)}
+        />,
+      );
+      await openList();
+      search('Roadmap');
+
+      expect(resourceButtons().map((button) => button.getAttribute('aria-label'))).toEqual([
+        'Add Alpha to Map',
+      ]);
+      expect(
+        screen.getByRole('button', { name: 'Space Resources in this Space, 1' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Spaces in this Meta Space, 0' }),
+      ).toBeInTheDocument();
+
+      search('');
+      expect(screen.getByRole('button', { name: 'Add Blueprint to Map' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Add Roadmap to Map' })).not.toBeInTheDocument();
+    });
+
+    it('stays offered beside it while it is placed on another Map', async () => {
+      const elsewhere = new Map([
+        [id('000000000002'), [{ mapId: id('000000000030'), mapTitle: 'Overview', graphs: [] }]],
+      ]);
+      render(
+        <ResourcesPopover
+          resources={RESOURCES}
+          allResources={RESOURCES}
+          open
+          onOpenChange={vi.fn()}
+          onAdd={vi.fn()}
+          onDragStart={vi.fn()}
+          spaceTitleById={titles}
+          spaces={[ROADMAP, BLUEPRINT]}
+          onAddSpace={() => Promise.resolve(null)}
+          memberships={elsewhere}
+        />,
+      );
+      await screen.findByRole('dialog', { name: 'Resources' });
+      search('Roadmap');
+
+      expect(resourceButtons().map((button) => button.getAttribute('aria-label'))).toEqual([
+        'Add Alpha to Map',
+        'Add Roadmap to Map',
+      ]);
+      expect(
+        screen.getByRole('button', { name: 'Spaces in this Meta Space, 1' }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Add Alpha to Map' })).toHaveAccessibleDescription(
+        /Overview/,
+      );
+    });
+  });
+
   it('takes the Spaces away when their toggle is pressed off, and leaves the Resources', async () => {
     render(
       <Fixture

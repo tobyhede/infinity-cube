@@ -600,13 +600,17 @@ test('removing a Space Resource from the Map leaves the Resource and its target 
   // The Resource survives, unplaced rather than gone — the opposite of what the
   // test above leaves in this same list.
   await expect(list.getByRole('button', { name: 'Add Architecture to Map' })).toBeVisible();
-  // And the Space it names still exists: deleting the last reference to a
-  // Space takes this row away (the test above), and Remove is not that Edit.
-  await expect(list.getByRole('button', { name: 'Add Space 1 to Map' })).toBeVisible();
+  // While it frames Space 1 from no Map, Space 1 is offered only as this
+  // Resource: a Space row press would author a second, unplaced-in-waiting one.
+  await expect(list.getByRole('button', { name: 'Add Space 1 to Map' })).toHaveCount(0);
 
   // Placing it again is the same Resource, stored context and all, not a fresh
   // Space Resource minted from scratch.
   await list.getByRole('button', { name: 'Add Architecture to Map' }).click();
+  // And the Space it names still exists: deleting the last reference to a
+  // Space takes this row away for good (the test above), and Remove is not
+  // that Edit, so placing the Resource brings the Space row back.
+  await expect(list.getByRole('button', { name: 'Add Space 1 to Map' })).toBeVisible();
   await page.keyboard.press('Escape');
   await settled(page);
   const restored = nodeByTitle(page, 'Architecture');
