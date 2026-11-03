@@ -21,3 +21,18 @@ Rulings made by the maintainer before the requirements docs were written. Eviden
 6. **Kept as not built:** kinds declare media types (0120); Default Content and CLI hard reset (0077); manual Graph reordering; keyboard access to a Resource's toolbar (0102); Auto-arrange. **Moved to open questions:** Edges between Spaces (0068, deferred by 0111).
 7. **SVG images (0107, proposed):** left out.
 8. **ADR 0115 is replaced.** The requirements docs are the binding record; the ADRs are archived as history. A behaviour change updates its doc in the same commit.
+
+## Checkpoint 2 rulings (3 November 2026)
+
+- **Drafting rule 5.** Behaviour the code implements and a test asserts, which no source contradicts, is a requirement. The trace marks it "code only".
+- **C1.** Switching Graphs on the canvas also records the canvas Map as `defaultMap`.
+- **C2.** Switching Graphs inside an Open Space Resource writes only that Space Resource's selection. The target Map's `activeGraph` is left alone.
+- **C3.** Drawing an Edge that already exists is refused (`edge-already-exists`) with its message. `CONTEXT.md` changes to match.
+- **C4.1.** Delete Map and Delete Graph on the canvas record the canvas Map as `defaultMap`, like every canvas Edit.
+- **C4.2.** Delete Map: `defaultMap` stays if it survives; otherwise the first surviving Map in list order becomes `defaultMap`.
+- **C4.3.** Add Map from an Open Space Resource leaves the target Space's `defaultMap` alone.
+- **C6.** Confirmed: `Map N`/`Graph N` numbering details, menu step-off, Graph colour choice and fallback. Recolour's "unchanged" compares with the drawn colour, as head shape, Shape and Resize do.
+- **C7.** An Edit whose own change is nothing is unchanged and writes nothing, Move included.
+- **S1.** Every working read goes through the one initializing loader, wherever it runs.
+
+The principle behind C1, C4 and C7: an Edit on the canvas records where the author is working; nothing else does.
