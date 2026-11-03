@@ -6,7 +6,7 @@
 
 **Blocked by:** 04 (The Spaces source gets its own control, apart from the kind filter)
 
-**Status:** in-review
+**Status:** resolved
 
 - [x] Started with the `shadcn-first-ui` skill; any toggle styling change is built from `@project/ui` or recorded in the design-system inventory
 - [x] Each toggle still shows its count, still names kind and count in its accessible name, and still draws pressed and unpressed distinctly
@@ -22,3 +22,7 @@ Built ahead of ticket 04, as an alternative to PR #454's treatment (popover wide
 - Every toggle is one 32×28 box, because the Spaces glyph is larger and made its toggle 2px taller than the rest. The count is absolutely positioned over the top-right corner and anchored on the right, so a wider count grows inwards.
 - `ladle-e2e/resources-popover.spec.ts`, "every filter toggle sits inside the popover on one line, its count still drawn", asserts `KIND_IDS.length + 1` toggles, one shared top, each toggle and its count inside the 288px popup. It failed before the change: the last toggle ended 2px past the panel with the story's single-digit counts.
 - A ring halo round the badge was dropped: `structural-css-literals.test.ts` refuses a new bare `box-shadow`.
+
+## Answer
+
+Compared in review against PR #454's wider, wrapping row, Toby chose this one-line, corner-badge treatment as the more usable. PR #454's filter change (`w-80` and the grid in `resources-popover.css`) should not land beside it.
