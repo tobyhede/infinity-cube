@@ -1,0 +1,21 @@
+# 06: The Active Graph takes the centre, and lanes alternate outwards from it
+
+**What to build:** Where every Edge between two Resources runs one way, the Active Graph's Edge is drawn on the centre line, anchor to anchor. The other Graphs' Edges alternate outwards from it, one lane apart, starting on the positive side, which until 07 is below an Edge between left and right anchors and to the right of one between top and bottom anchors, each one trim increment shorter than the one before in Graph order. Where a pair has Edges both ways, each direction's first Edge runs half a lane from the centre and the rest run a lane further out each, with the direction whose source sorts first on the negative side, as `issues/02` did. That keeps the bundle drawable until 07 makes the positive side each Edge's own left. Activating another Graph moves its Edge to the centre. An Edge alone in its pair runs anchor to anchor whichever Graph is active. Several Graphs' loops on one Resource nest outwards with the Active Graph's innermost and full length. Colour, opacity, stroke width, paint order and head shapes are unchanged. The whole rule is recorded now, in ADR 0142 and the canvas rendering guide, because every part of it is decided. Spec: `../spec-centre-out-lanes.md`.
+
+**Blocked by:** None (can start immediately).
+
+**Status:** resolved
+
+- [x] The lane module ranks each direction of a pair with the Active Graph's Edge first, then Graph order. It places a one-direction pair at 0, +1, −1, +2 … lanes by rank, a two-direction pair at ±(rank + ½) lanes with the direction whose source sorts first negative, and loops at 0, 1, 2 … lanes by rank. Each rank trims one more trim increment of a tenth, capped at three tenths, both new values that replace the flat fifth. It takes the Active Graph, or none, as a required argument.
+- [x] Reach is the largest offset magnitude in the pair.
+- [x] Lane module tests cover: a lone Edge; one direction with two to five Graphs; both directions with no two Edges sharing a lane; the Active Graph at each position of Graph order; the Active Graph absent from the pair; no Active Graph; loops; the trim cap; and that activation alone moves lanes.
+- [x] Projection tests check that each Edge carries its lane and that activation moves the centre. Colour, opacity, stroke, paint order and head-marker tests pass unchanged.
+- [x] The browser spec, on the fixture's Long, Mid and Short over A → B, checks that the Active Graph runs centred and full length with Long, then Mid, then Short active, and that the rest alternate either side and shorten in Graph order. It also checks that Long's D → A′ runs anchor to anchor with Mid active.
+- [x] ADR 0142 "Lanes are laid out from the centre out, each direction on its own left" is written with its rejected alternatives and costs. ADR 0100 and ADR 0103 gain `Refined by: 0142`, and the ADR index gains its row.
+- [x] The canvas rendering guide has a lanes section stating the current rule and citing ADR 0142.
+- [x] Before-and-after screenshots of A → B with each Graph active.
+- [x] Targeted local checks pass on Node 26, and `CI passed` is green on #455.
+
+## Answer
+
+Built test-first through `graphLanes`, one case per cycle. Red first: a lone inactive Edge stopping short, one-direction alternation with the Active Graph first, the trim cap, a two-way pair split from half a lane out, and loops nesting outwards. The cases for an Active Graph holding both directions, a reverse Edge alone in its direction and no Active Graph passed when written. Disabling the Active-first ranking, or alternation, turned 3 and 2 of the suite red respectively, so they are not vacuous. The projection copies the lane, and `projection.test.ts` holds that and the centre moving on activation. In `edge-attachment.spec.ts`, "…either side of the active one" and "activating a Graph brings its Edge to the centre…" fail on `main`'s lane code and pass on this one. ADR 0142 records the rule, refining ADR 0100 and ADR 0103, and `rendering.md` has a lanes section. Node 26: `vitest run packages/react-flow-adapter packages/app/test test/unit` (3853 passed, 25 skipped), the edge-attachment spec (7 passed), typecheck, typecheck:packages, eslint, prettier and oxlint on the changed files. `CI passed` green on `38bdce0`. Screenshots are in the project thread.

@@ -1,6 +1,7 @@
 import { COLLAPSED_RESOURCE_SIZE } from '@project/core';
 import { expect, test, type Page } from './fixtures';
 import {
+  activateGraph,
   authoringHandle,
   connectHandles,
   dragBy,
@@ -78,13 +79,16 @@ const near = (actual: Point, expected: Point, what: string): void => {
 
 /** The fixture's Long Graph, and the Edge it draws from A to B. An Edge is
  *  identified by its Graph and its two endpoints (`graphRenderEdgeId`). Long is
- *  the fixture's Active Graph, so its Edge takes the centre lane and connects
- *  anchor to anchor (ADR 0100). */
+ *  the fixture's Active Graph, so its Edge takes the centre lane and runs
+ *  anchor to anchor (ADR 0142). */
 const LONG = '00000000-0000-4000-8000-000000000023';
 const MID = '00000000-0000-4000-8000-000000000024';
 const SHORT = '00000000-0000-4000-8000-000000000025';
 const RESOURCE_A = '00000000-0000-4000-8000-000000000002';
 const RESOURCE_B = '00000000-0000-4000-8000-000000000003';
+const RESOURCE_C = '00000000-0000-4000-8000-000000000005';
+const RESOURCE_D = '00000000-0000-4000-8000-000000000006';
+const RESOURCE_A_PRIME = '00000000-0000-4000-8000-00000000000c';
 const A_TO_B = `${LONG}::${RESOURCE_A}::${RESOURCE_B}`;
 const A_TO_A = `${LONG}::${RESOURCE_A}::${RESOURCE_A}`;
 
@@ -203,7 +207,7 @@ test('a self-Edge draws a visible loop', async ({ page }) => {
   expect(paths.every((d) => d.length > 0 && !d.includes('NaN'))).toBe(true);
 });
 
-test('several Graphs over one pair of Resources run as parallel lines below the active one', async ({
+test('several Graphs over one pair of Resources run as parallel lines, each ending in its own head', async ({
   page,
 }) => {
   await page.goto('/');
@@ -211,27 +215,21 @@ test('several Graphs over one pair of Resources run as parallel lines below the 
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
 
-  // Long, Mid and Short all carry A → B, and A and B sit level. Long is active,
-  // so it connects on the centre line (asserted against the anchors above); Mid
-  // and Short run below it (ADR 0100) — each a level line of its own, in its own
-  // colour, stopping short of both Resources. Every line ends in its Graph's
-  // head shape (ADR 0105): Long stores none and ends in an arrow, Mid a dot and
-  // Short a diamond, so the three tell apart with colour removed.
+  // Long, Mid and Short all carry A → B, and A and B sit level: each a level
+  // line of its own, in its own colour. Where each runs and how much of it is
+  // drawn is the next test's. Every line ends in its Graph's head shape
+  // (ADR 0105): Long stores none and ends in an arrow, Mid a dot and Short a
+  // diamond, so the three tell apart with colour removed.
   const lines = await drawnLines(
     page,
     `.react-flow__edge[data-id$="::${RESOURCE_A}::${RESOURCE_B}"]`,
   );
   expect(lines.length, 'three Graphs carry A → B').toBe(3);
   expect(new Set(lines.map((line) => line.stroke)).size, 'each in its own colour').toBe(3);
-
-  const pointsOf = (d: string) => (d.match(/-?\d+(\.\d+)?/g) ?? []).map(Number);
-  const levelOf = (points: number[]) => {
-    const ys = points.filter((_, index) => index % 2 === 1);
-    expect(Math.max(...ys) - Math.min(...ys), 'a level line').toBeLessThan(0.01);
-    return ys[0]!;
-  };
-  const activeLine = lines.find((line) => line.id === A_TO_B)!;
-  expect(activeLine.head, 'Long, storing no head shape, ends in an arrow').toBe('arrow');
+  for (const line of lines) {
+    const ys = (line.d.match(/-?\d+(\.\d+)?/g) ?? []).map(Number).filter((_, i) => i % 2 === 1);
+    expect(Math.max(...ys) - Math.min(...ys), `${line.id} is a level line`).toBeLessThan(0.01);
+  }
   expect(
     Object.fromEntries(lines.map((line) => [line.id.split('::')[0], line.head])),
     'each line ends in its own Graph’s head shape',
@@ -247,7 +245,7 @@ test('several Graphs over one pair of Resources run as parallel lines below the 
   ]);
   for (const edge of every) {
     expect(edge.head, `${edge.id} ends in its Graph’s head shape`).toBe(
-      headOf.get(edge.id.split('::')[0]!),
+      headOf.get(edge.id.split('::')[0] ?? ''),
     );
   }
   // Nine Edges name three markers: each Graph's is drawn once for the canvas,
@@ -255,21 +253,336 @@ test('several Graphs over one pair of Resources run as parallel lines below the 
   await expect(page.locator('.react-flow marker'), 'one head marker per Graph').toHaveCount(3);
   await expect(page.locator('.react-flow defs:has(marker)')).toHaveCount(1);
   await expect(page.locator('.react-flow__edge marker')).toHaveCount(0);
+});
 
-  const active = pointsOf(activeLine.d);
-  const activeLevel = levelOf(active);
+/**
+ * Where a straight Edge runs beside the line between its two anchors and how
+ * much of it is drawn: its lane, in lane spacings, on the screen (positive
+ * below a horizontal Edge, right of a vertical one), and the fraction of its
+ * length left undrawn at each end. `from` and `to` are the anchors it leaves
+ * and enters, unmoved, and `horizontal` whether they sit on left and right
+ * sides. The trim is measured along a straight Edge only.
+ */
+async function laneOf(page: Page, edge: string, from: Point, to: Point, horizontal: boolean) {
+  const d = await page
+    .locator(`.react-flow__edge[data-id="${edge}"] .react-flow__edge-path`)
+    .getAttribute('d');
+  const n = (d?.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
+  expect(n.length, `${edge} draws a path`).toBeGreaterThanOrEqual(8);
+  const [startX = 0, startY = 0] = n;
+  const [endX = 0, endY = 0] = n.slice(-2);
+  const across = horizontal ? [startY - from.y, endY - to.y] : [startX - from.x, endX - to.x];
+  const along = horizontal
+    ? [(startX - from.x) / (to.x - from.x), (to.x - endX) / (to.x - from.x)]
+    : [(startY - from.y) / (to.y - from.y), (to.y - endY) / (to.y - from.y)];
+  const [startAcross = 0, endAcross = 0] = across;
+  const [startTrim = 0, endTrim = 0] = along;
+  // A dragged Resource lands within a unit or two of where it was sent, so a
+  // line meant to be straight may lean by a fraction of a unit.
+  expect(Math.abs(endAcross - startAcross), `${edge} runs parallel to its anchors`).toBeLessThan(
+    0.5,
+  );
+  expect(Math.abs(endTrim - startTrim), `${edge} is cut the same at both ends`).toBeLessThan(0.02);
+  return { lane: startAcross / GRAPH_LANE_SPACING, trim: startTrim };
+}
 
-  const others = lines.filter((line) => line.id !== A_TO_B);
-  const levels = new Set<number>();
-  for (const other of others) {
-    const line = pointsOf(other.d);
-    const level = levelOf(line);
-    expect(level, 'runs below the active line').toBeGreaterThan(activeLevel);
-    levels.add(Math.round(level));
-    expect(line[0]!, 'stops short of A').toBeGreaterThan(active[0]!);
-    expect(line[6]!, 'stops short of B').toBeLessThan(active[6]!);
+/** The fixture's lane spacing, in flow units (`GRAPH_LANE_SPACING`). */
+const GRAPH_LANE_SPACING = 8;
+
+/** The two anchors A → B leaves and enters, and whether they sit on left and right sides. */
+interface Anchors {
+  readonly from: Point;
+  readonly to: Point;
+  readonly horizontal: boolean;
+}
+
+/** A → B's anchors: A's right and B's left where they sit level, A's bottom and B's top where B is below. */
+async function anchorsAB(page: Page, horizontal: boolean): Promise<Anchors> {
+  const [a, b] = [nodeByTitle(page, 'A').first(), nodeByTitle(page, 'B').first()];
+  return {
+    from: anchorAt(await positionOf(a), horizontal ? 'right' : 'bottom'),
+    to: anchorAt(await positionOf(b), horizontal ? 'left' : 'top'),
+    horizontal,
+  };
+}
+
+/** An Edge's id, and the lane and trim it should be drawn at. */
+type ExpectedLane = readonly [edge: string, lane: number, trim: number];
+
+/**
+ * Checks each Edge over one pair of Resources, `from` leaving and `to`
+ * entering, against the lane and trim it should have. An Edge running the
+ * other way leaves `to` and enters `from`.
+ */
+async function expectLanes(
+  page: Page,
+  what: string,
+  { from, to, horizontal }: Anchors,
+  expected: readonly ExpectedLane[],
+) {
+  for (const [edge, lane, trim] of expected) {
+    const forwards = edge.endsWith(`::${RESOURCE_A}::${RESOURCE_B}`);
+    const [leaves, enters] = forwards ? [from, to] : [to, from];
+    const measured = await laneOf(page, edge, leaves, enters, horizontal);
+    expect(measured.lane, `${what}: ${edge} lane`).toBeCloseTo(lane, 1);
+    expect(measured.trim, `${what}: ${edge} trim`).toBeCloseTo(trim, 1);
   }
-  expect(levels.size, 'each in its own lane').toBe(2);
+}
+
+const over = (graph: string, from: string, to: string) => `${graph}::${from}::${to}`;
+const AB = (graph: string) => over(graph, RESOURCE_A, RESOURCE_B);
+const BA = (graph: string) => over(graph, RESOURCE_B, RESOURCE_A);
+
+test('a pair running one way puts the Active Graph on the centre, the rest stacked below and ranked shorter', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  const b = nodeByTitle(page, 'B').first();
+  await expect(nodeByTitle(page, 'D').first()).toBeVisible();
+  await settled(page);
+
+  // Long, Mid and Short all carry A → B. Whichever is active runs on the
+  // centre line, anchor to anchor; the rest stack one lane further below each
+  // in Graph order, and each a tenth shorter at each end than the one inside it.
+  await expectLanes(page, 'Long active', await anchorsAB(page, true), [
+    [AB(LONG), 0, 0],
+    [AB(MID), 1, 0.1],
+    [AB(SHORT), 2, 0.2],
+  ]);
+  await activateGraph(page, 'Mid');
+  await settled(page);
+  await expectLanes(page, 'Mid active', await anchorsAB(page, true), [
+    [AB(MID), 0, 0],
+    [AB(LONG), 1, 0.1],
+    [AB(SHORT), 2, 0.2],
+  ]);
+
+  // Only Long joins D and A′, so its Edge there is first in its direction and
+  // runs anchor to anchor on the centre although Mid is active.
+  const [d, aPrime] = [nodeByTitle(page, 'D').first(), nodeByTitle(page, 'A′').first()];
+  const lone = await laneOf(
+    page,
+    over(LONG, RESOURCE_D, RESOURCE_A_PRIME),
+    anchorAt(await positionOf(d), 'right'),
+    anchorAt(await positionOf(aPrime), 'left'),
+    true,
+  );
+  expect(lone.lane, 'Long’s lone D → A′ on the centre').toBeCloseTo(0, 1);
+  expect(lone.trim, 'Long’s lone D → A′ full length').toBeCloseTo(0, 1);
+
+  await activateGraph(page, 'Short');
+  await settled(page);
+  await expectLanes(page, 'Short active', await anchorsAB(page, true), [
+    [AB(SHORT), 0, 0],
+    [AB(LONG), 1, 0.1],
+    [AB(MID), 2, 0.2],
+  ]);
+
+  // Long and Mid join C and D, and Short does not: with Short active, Long is
+  // first in Graph order there, on the centre and full length, and Mid below it.
+  const c = nodeByTitle(page, 'C').first();
+  const [leavesC, entersD] = [
+    anchorAt(await positionOf(c), 'right'),
+    anchorAt(await positionOf(d), 'left'),
+  ];
+  const longCD = await laneOf(page, over(LONG, RESOURCE_C, RESOURCE_D), leavesC, entersD, true);
+  const midCD = await laneOf(page, over(MID, RESOURCE_C, RESOURCE_D), leavesC, entersD, true);
+  expect(longCD.lane, 'Long C → D on the centre').toBeCloseTo(0, 1);
+  expect(longCD.trim, 'Long C → D full length').toBeCloseTo(0, 1);
+  expect(midCD.lane, 'Mid C → D a lane below').toBeCloseTo(1, 1);
+  expect(midCD.trim, 'Mid C → D a tenth short').toBeCloseTo(0.1, 1);
+
+  // Stacked vertically, the rest run to the screen's right of the active one.
+  await activateGraph(page, 'Mid');
+  await dragBy(page, b, -420, 300);
+  await settled(page);
+  await expectLanes(page, 'B below A, Mid active', await anchorsAB(page, false), [
+    [AB(MID), 0, 0],
+    [AB(LONG), 1, 0.1],
+    [AB(SHORT), 2, 0.2],
+  ]);
+});
+
+test('a pair running both ways stacks each direction on its own left, the first in each direction full length', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  const [a, b] = [nodeByTitle(page, 'A').first(), nodeByTitle(page, 'B').first()];
+  await expect(a).toBeVisible();
+  await settled(page);
+
+  /** Draws B → A into the Active Graph. */
+  const drawBA = async () => {
+    const before = await page.locator('.react-flow__edge').count();
+    await b.hover();
+    await connectHandles(
+      page,
+      authoringHandle(b, 'source', 'left'),
+      authoringHandle(a, 'target', 'right'),
+    );
+    await expect(page.locator('.react-flow__edge')).toHaveCount(before + 1);
+    await settled(page);
+  };
+
+  // A → B travels right, so its left is above; B → A travels left, so its left
+  // is below. Each direction starts half a lane out, its first Edge full length.
+  await drawBA();
+  await expectLanes(page, 'Long active, holding both directions', await anchorsAB(page, true), [
+    [AB(LONG), -0.5, 0],
+    [AB(MID), -1.5, 0.1],
+    [AB(SHORT), -2.5, 0.2],
+    [BA(LONG), 0.5, 0],
+  ]);
+
+  // Mid has no B → A yet, so Long's B → A, alone in its direction, stays full
+  // length though Long is no longer active.
+  await activateGraph(page, 'Mid');
+  await settled(page);
+  await expectLanes(page, 'Mid active, in A → B only', await anchorsAB(page, true), [
+    [AB(MID), -0.5, 0],
+    [AB(LONG), -1.5, 0.1],
+    [AB(SHORT), -2.5, 0.2],
+    [BA(LONG), 0.5, 0],
+  ]);
+
+  // Two Edges B → A, Mid's first while Mid is active.
+  await drawBA();
+  await expectLanes(page, 'Mid active, holding both directions', await anchorsAB(page, true), [
+    [AB(MID), -0.5, 0],
+    [AB(LONG), -1.5, 0.1],
+    [AB(SHORT), -2.5, 0.2],
+    [BA(MID), 0.5, 0],
+    [BA(LONG), 1.5, 0.1],
+  ]);
+
+  await activateGraph(page, 'Short');
+  await settled(page);
+  await expectLanes(page, 'Short active, in A → B only', await anchorsAB(page, true), [
+    [AB(SHORT), -0.5, 0],
+    [AB(LONG), -1.5, 0.1],
+    [AB(MID), -2.5, 0.2],
+    [BA(LONG), 0.5, 0],
+    [BA(MID), 1.5, 0.1],
+  ]);
+
+  await activateGraph(page, 'Long');
+  await settled(page);
+  await expectLanes(page, 'Long active, holding both directions', await anchorsAB(page, true), [
+    [AB(LONG), -0.5, 0],
+    [AB(MID), -1.5, 0.1],
+    [AB(SHORT), -2.5, 0.2],
+    [BA(LONG), 0.5, 0],
+    [BA(MID), 1.5, 0.1],
+  ]);
+
+  // Stacked vertically, A → B travels down, so its left is the screen's right,
+  // and B → A travels up, so its left is the screen's left.
+  const vertical: readonly ExpectedLane[] = [
+    [AB(LONG), 0.5, 0],
+    [AB(MID), 1.5, 0.1],
+    [AB(SHORT), 2.5, 0.2],
+    [BA(LONG), -0.5, 0],
+    [BA(MID), -1.5, 0.1],
+  ];
+
+  await dragBy(page, b, -420, 300);
+  await settled(page);
+  await expectLanes(page, 'B below A, Long active', await anchorsAB(page, false), vertical);
+
+  // Halfway through a drag that takes B on down and to the left, the sides
+  // already hold. The projection does not run during a drag, so the side has
+  // to come from the travel as each lane is drawn. Read at the anchors only:
+  // the lanes curve here, so how much of each is drawn is not a straight
+  // line's trim, and pointer arithmetic lands within a unit or two, so the
+  // side is checked to the nearest half lane.
+  await dragBy(page, b, -420, 300, async () => {
+    const { from, to } = await anchorsAB(page, false);
+    const downward = await laneOf(page, AB(LONG), from, to, false);
+    const upward = await laneOf(page, BA(LONG), to, from, false);
+    expect(downward.lane, 'A → B mid-drag, on the screen’s right').toBeCloseTo(0.5, 0);
+    expect(upward.lane, 'B → A mid-drag, on the screen’s left').toBeCloseTo(-0.5, 0);
+  });
+});
+
+test('loops on one Resource nest outwards, the Active Graph’s innermost and full length', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  const a = nodeByTitle(page, 'A').first();
+  await expect(a).toBeVisible();
+  await settled(page);
+
+  // One loop on A in each of Long, Mid and Short, drawn while each is active.
+  for (const graph of ['Long', 'Mid', 'Short']) {
+    await activateGraph(page, graph);
+    const before = await page.locator('.react-flow__edge').count();
+    await a.hover();
+    await connectHandles(
+      page,
+      authoringHandle(a, 'source', 'right'),
+      authoringHandle(a, 'target', 'top'),
+    );
+    await expect(page.locator('.react-flow__edge')).toHaveCount(before + 1);
+    await settled(page);
+  }
+
+  // Read from the drawn paths: a loop's lane moves both its ends one lane
+  // further from the corner per lane, so its middle runs further out; its trim
+  // cuts the same fraction from each end, so a further-out, more-trimmed loop
+  // starts further from where its untrimmed lane would. The Active Graph's
+  // loop runs anchor to anchor.
+  const loopsOf = async () =>
+    page.locator('.react-flow__edge-path').evaluateAll(
+      (paths, ids) =>
+        ids.map((id) => {
+          const path = paths.find((each) => each.closest(`[data-id="${id}"]`) !== null);
+          if (!(path instanceof SVGPathElement)) throw new Error(`No loop drawn for ${id}.`);
+          const length = path.getTotalLength();
+          const at = (distance: number) => {
+            const point = path.getPointAtLength(distance);
+            return { x: point.x, y: point.y };
+          };
+          return { id, start: at(0), middle: at(length / 2), end: at(length) };
+        }),
+      [LONG, MID, SHORT].map((graph) => over(graph, RESOURCE_A, RESOURCE_A)),
+    );
+  const expectLoops = async (what: string, inOrder: readonly string[]) => {
+    const at = await positionOf(a);
+    const [right, top] = [anchorAt(at, 'right'), anchorAt(at, 'top')];
+    const corner = { x: right.x, y: top.y };
+    const loops = await loopsOf();
+    const ranked = inOrder.map((graph) => {
+      const found = loops.find((each) => each.id === over(graph, RESOURCE_A, RESOURCE_A));
+      if (found === undefined) throw new Error(`${what}: no loop for ${graph}.`);
+      return found;
+    });
+    const [innermost, ...outer] = ranked;
+    if (innermost === undefined) throw new Error(`${what}: no loops.`);
+    near(innermost.start, right, `${what}: the active loop leaving A`);
+    near(innermost.end, top, `${what}: the active loop entering A`);
+    const outwards = ranked.map(({ middle }) =>
+      Math.hypot(middle.x - corner.x, middle.y - corner.y),
+    );
+    const cut = outer.map(({ start }, index) =>
+      Math.hypot(start.x - right.x, start.y - (right.y + (index + 1) * GRAPH_LANE_SPACING)),
+    );
+    for (let index = 1; index < ranked.length; index += 1) {
+      expect(
+        outwards[index],
+        `${what}: ${inOrder[index]} runs outside ${inOrder[index - 1]}`,
+      ).toBeGreaterThan((outwards[index - 1] ?? 0) + GRAPH_LANE_SPACING / 4);
+    }
+    expect(cut[0], `${what}: ${inOrder[1]} stops short`).toBeGreaterThan(4);
+    expect(cut[1], `${what}: ${inOrder[2]} stops shorter`).toBeGreaterThan((cut[0] ?? 0) + 4);
+  };
+
+  await expectLoops('Short active', [SHORT, LONG, MID]);
+  await activateGraph(page, 'Mid');
+  await settled(page);
+  await expectLoops('Mid active', [MID, LONG, SHORT]);
 });
 
 /** The colour the page paints at a point on screen, as `[r, g, b]`. */

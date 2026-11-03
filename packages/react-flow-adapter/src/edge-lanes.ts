@@ -20,10 +20,23 @@ export interface LaneEdge {
   readonly graphId: GraphId;
 }
 
-/** Where an Edge is drawn beside the others joining its pair, and whether it connects. */
+/**
+ * How a lane's offset is read. `screen`: positive is below an Edge between left
+ * and right anchors and right of one between top and bottom anchors, whichever
+ * way it travels. `travel`: positive is the Edge's left as it travels from
+ * source to target, so an Edge and its reverse run on opposite sides.
+ */
+export type LaneSide = 'screen' | 'travel';
+
+/** Where an Edge is drawn beside the others joining its pair, and how much of it is drawn. */
 export interface GraphLane {
-  /** How far from the centre line the Edge runs, and to which side. Zero for a lone Edge. */
+  /** How far from the centre line the Edge runs, read by `side`. Zero for a lone Edge. */
   readonly offset: number;
+  /**
+   * How `offset` is read: on the screen where every Edge of the pair runs one
+   * way, and by the Edge's travel where the pair runs both ways.
+   */
+  readonly side: LaneSide;
   /**
    * How far from the centre line the outermost lane of this Edge's pair runs,
    * to either side. Every lane of a pair is drawn the same way — offset along
@@ -32,29 +45,41 @@ export interface GraphLane {
    */
   readonly reach: number;
   /**
-   * Whether the Edge runs anchor to anchor rather than stopping short. The
-   * Active Graph's Edges connect, and while no Graph is active every Edge does;
-   * any other Edge runs beside them and stops short (ADR 0100).
+   * What fraction of its length the Edge leaves undrawn at each end: none for
+   * the first Edge in its direction, `END_TRIM_INCREMENT` more for each Edge ranked
+   * before it there, up to `MAX_END_TRIM`.
    */
-  readonly connects: boolean;
+  readonly endTrim: number;
 }
 
 /**
- * The lane of every Edge, keyed by Edge id.
+ * How much more of its length each further Edge in the same direction between
+ * two Resources leaves undrawn at each end, as a fraction.
+ */
+export const END_TRIM_INCREMENT = 0.1;
+
+/** The most of its length an Edge leaves undrawn at each end, as a fraction. */
+export const MAX_END_TRIM = 0.3;
+
+/**
+ * The lane of every Edge, keyed by Edge id, laid out from the centre out
+ * (ADR 0142).
  *
  * Every Edge joins two Resources, and each attaches from where those Resources are
  * (ADR 0087) rather than from which Graph it belongs to, so every Graph's Edge
  * between the same pair lands on the same two anchors and draws the same curve.
- * Edges sharing a pair — in either direction — are therefore given lanes. The
- * Active Graph's Edges are centred on the anchors: its one Edge takes the
- * centre, and where it holds both directions they sit half a spacing either
- * side of it, the one whose source sorts first on the negative side. Each other
- * Edge runs one spacing further out on the positive side, in the order the
- * Edges are given; where the Active Graph has no Edge in the pair, the first of
- * them keeps the centre.
+ * Edges sharing a pair — in either direction — are therefore given lanes.
  *
- * The offset's sign is the screen's, not the Edge's (see `laneBezier`), so an
- * Edge and its reverse stack the same way.
+ * Each direction of a pair is ranked on its own: the Active Graph's Edge first,
+ * then the rest in the order given, which is the Map's Graph order. The first
+ * runs anchor to anchor and each one after it is one trim increment shorter.
+ *
+ * Where the pair runs one way, the first takes the centre and the rest stack
+ * one lane further out each on the screen's positive side. Loops on one
+ * Resource are laid out the same way, nesting outwards from it. Where the pair
+ * runs both ways, each direction stacks on its own left of travel from half a
+ * lane out; `laneBezier` turns that into a side of the screen as it draws, so
+ * the side holds while a Resource is dragged.
  */
 export function graphLanes(
   edges: readonly LaneEdge[],
@@ -69,31 +94,30 @@ export function graphLanes(
   }
 
   const isActive = (edge: LaneEdge) => edge.graphId === activeGraphId;
+  const ranked = (direction: readonly LaneEdge[]) => [
+    ...direction.filter(isActive),
+    ...direction.filter((edge) => !isActive(edge)),
+  ];
+
   const lanes = new Map<string, GraphLane>();
   for (const bundle of bundles.values()) {
-    // A Graph holds one Edge per direction, so the Active Graph has at most two
-    // here, and they share the centre between them.
-    const active = bundle
-      .filter(isActive)
-      .sort((left, right) => (left.source < right.source ? -1 : 1));
-    const centre = (active.length - 1) / 2;
-    const others = bundle.filter((edge) => !isActive(edge));
-    const outermost = active.length === 0 ? -1 : centre;
-    const reach = Math.max(centre, outermost + others.length) * GRAPH_LANE_SPACING;
-    active.forEach((edge, lane) =>
-      lanes.set(edge.id, {
-        offset: (lane - centre) * GRAPH_LANE_SPACING,
-        reach,
-        connects: true,
-      }),
+    const directions = [...new Set(bundle.map((edge) => edge.source))].map((source) =>
+      ranked(bundle.filter((edge) => edge.source === source)),
     );
-    others.forEach((edge, lane) =>
-      lanes.set(edge.id, {
-        offset: (outermost + 1 + lane) * GRAPH_LANE_SPACING,
-        reach,
-        connects: activeGraphId === null,
-      }),
+    const bothWays = directions.length === 2;
+    const side: LaneSide = bothWays ? 'travel' : 'screen';
+    const placed = directions.flatMap((direction) =>
+      direction.map((edge, rank) => ({ edge, rank, lane: bothWays ? rank + 0.5 : rank })),
     );
+    const reach = Math.max(...placed.map(({ lane }) => lane)) * GRAPH_LANE_SPACING;
+    for (const { edge, rank, lane } of placed) {
+      lanes.set(edge.id, {
+        offset: lane * GRAPH_LANE_SPACING,
+        side,
+        reach,
+        endTrim: Math.min(rank * END_TRIM_INCREMENT, MAX_END_TRIM),
+      });
+    }
   }
   return lanes;
 }
@@ -113,13 +137,6 @@ export interface LaneGeometry {
    */
   readonly span: number;
 }
-
-/**
- * How much of its length an Edge that is not the Active Graph's leaves undrawn
- * at each end, as a fraction. The Active Graph's Edge is the one that connects;
- * the others run beside it as a reading of which Graphs also join the pair.
- */
-export const DETACHED_END_TRIM = 0.2;
 
 /**
  * The Edge a lane draws: the lone Edge's own curve, offset along its normal by
@@ -160,10 +177,12 @@ export const DETACHED_END_TRIM = 0.2;
  * lane sits beside its anchor, moved along the side the anchor sits on. The
  * heads move with their lanes rather than meeting on one point.
  *
- * A positive offset runs below an Edge whose sides are left and right, and to
- * the right of one whose sides are top and bottom — along the side the anchors
- * sit on, whichever way the Edge travels; a negative one runs above or left. A
- * self-Edge's two sides are on different axes, so its lane is not an offset:
+ * With `side` left at `screen`, a positive offset runs below an Edge whose
+ * sides are left and right, and to the right of one whose sides are top and
+ * bottom — along the side the anchors sit on, whichever way the Edge travels;
+ * a negative one runs above or left. With `side` at `travel`, a positive
+ * offset runs on the Edge's left as it travels, read from the side it leaves
+ * as it is drawn (ADR 0142). A self-Edge's two sides are on different axes, so its lane is not an offset:
  * each anchor moves along its own side, away from the corner the loop goes
  * round, so a connecting Edge's head still lands on its Resource, and the curve between
  * them is `getBezierPath` over the moved anchors. The lane is then a loop of
@@ -179,8 +198,9 @@ export function laneBezier(
   offset: number,
   endTrim = 0,
   reach = Math.abs(offset),
+  side: LaneSide = 'screen',
 ): LaneGeometry {
-  const lane = laneCurve(attachment, offset, reach);
+  const lane = laneCurve(attachment, offset, reach, side);
   if (lane === undefined) {
     const [path, labelX, labelY] = getBezierPath(attachment);
     const span = Math.hypot(
@@ -233,13 +253,15 @@ interface LaneCurve {
  */
 function laneCurve(
   attachment: EdgeAttachment,
-  offset: number,
+  given: number,
   reach: number,
+  readAs: LaneSide,
 ): LaneCurve | undefined {
   const { sourcePosition, targetPosition } = attachment;
   if (HORIZONTAL.has(sourcePosition) !== HORIZONTAL.has(targetPosition)) {
-    return movedCurve(attachment, selfEdgeMoves(sourcePosition, targetPosition, offset));
+    return movedCurve(attachment, selfEdgeMoves(sourcePosition, targetPosition, given));
   }
+  const offset = readAs === 'travel' ? given * screenSideOfLeft(sourcePosition) : given;
 
   const [path, labelX, labelY] = getBezierPath(attachment);
   const centre = cubicOf(path);
@@ -678,6 +700,19 @@ function outward(side: Position, distance: number): [number, number] {
 }
 
 const HORIZONTAL = new Set([Position.Left, Position.Right]);
+
+/**
+ * Which way along the screen axis an anchor's side lies on — +1 below or to the
+ * right, −1 above or to the left — the left of an Edge's travel falls, read
+ * from the side it leaves: the Edge leaves along the direction that side
+ * faces, and its left is that direction turned a quarter anticlockwise on the
+ * screen.
+ */
+function screenSideOfLeft(sourcePosition: Position): 1 | -1 {
+  const [tx, ty] = outward(sourcePosition, 1);
+  const [lx, ly] = [ty, -tx];
+  return (HORIZONTAL.has(sourcePosition) ? ly : lx) > 0 ? 1 : -1;
+}
 
 /** How far, and which way on the screen, a self-Edge's lane moves its source and target. */
 function selfEdgeMoves(
