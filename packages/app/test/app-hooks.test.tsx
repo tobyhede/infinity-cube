@@ -675,6 +675,7 @@ describe('useDockChrome', () => {
           outside: view.resourcesOutsideMap,
           memberships: view.membershipsOutsideMap,
           spaceTitleById: new Map(),
+          spaceSelectionNameById: new Map(),
           disclose: null,
           addressedResourceId: null,
           placement,
