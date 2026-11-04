@@ -316,6 +316,31 @@ export const SpaceSelections: Story = () => (
 );
 SpaceSelections.meta = { iframed: true };
 
+const LONG_NAME = 'A Resource whose name runs far past the width the list can give it';
+const LONG_SPACE_NAME = 'A Space whose name runs far past the width the list can give it';
+const LONG_NAMED: readonly Resource[] = [
+  { id: id('000000000050'), title: LONG_NAME, kind: 'markdown', content: { source: '' } },
+];
+
+/**
+ * A name longer than its row: a Resource placed in another Map, so its row
+ * also carries a capsule and Delete, and a Space. Each name is cut short
+ * with an ellipsis before the marks at the row's end rather than running
+ * under them.
+ */
+export const LongNames: Story = () => (
+  <ResourcesPopoverFixture
+    resources={LONG_NAMED}
+    spaces={[{ id: id('000000000051'), title: LONG_SPACE_NAME }]}
+    memberships={
+      new Map([
+        [id('000000000050'), [{ mapId: id('000000000052'), mapTitle: 'Elsewhere', graphs: [] }]],
+      ])
+    }
+  />
+);
+LongNames.meta = { iframed: true };
+
 export const Empty: Story = () => (
   <ResourcesPopoverFixture resources={[]} allResources={RESOURCES} />
 );

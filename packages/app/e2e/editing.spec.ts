@@ -2246,6 +2246,35 @@ test(
   },
 );
 
+test(
+  'a Resource name longer than its Resources list row is cut short before its capsule',
+  { tag: '@parity:resources-popover-cuts-a-long-name-short' },
+  async ({ page }) => {
+    const long = 'B, renamed to run far past the width the Resources list can give it';
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    await settled(page);
+    const resource = nodeByTitle(page, 'B').first();
+    await resourceControls(page, resource);
+    await resource.getByRole('button', { name: 'Edit Title B' }).click();
+    const title = page.getByRole('textbox', { name: 'Resource title' });
+    await title.fill(long);
+    await title.press('Enter');
+    await expect(nodeByTitle(page, long).first()).toBeVisible();
+
+    // Not placed in Collection 2, so its row there carries Collection 1's capsule.
+    await selectCanvas(page, 'Collection 2');
+    await settled(page);
+    await page.getByRole('button', { name: 'Resources' }).click();
+    const add = page.getByRole('button', { name: `Add ${long} to Map` });
+    const addBox = await boxOf(add, 'the row');
+    const nameBox = await boxOf(add.getByText(long, { exact: true }), 'the name');
+    const capsuleBox = await boxOf(add.locator('[data-map-id]'), 'the capsule');
+    expect(nameBox.x + nameBox.width).toBeLessThanOrEqual(capsuleBox.x);
+    expect(nameBox.x + nameBox.width).toBeLessThanOrEqual(addBox.x + addBox.width);
+  },
+);
+
 test('Delete Resource is withdrawn while presenting', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');

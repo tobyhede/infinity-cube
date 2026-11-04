@@ -188,6 +188,46 @@ test(
 );
 
 test(
+  'a name longer than its row is cut short before the marks at its end',
+  { tag: '@parity:resources-popover-cuts-a-long-name-short' },
+  async ({ page }) => {
+    await page.goto(story('long-names'));
+    await page.getByRole('button', { name: 'Resources' }).click();
+
+    for (const name of [
+      'A Resource whose name runs far past the width the list can give it',
+      'A Space whose name runs far past the width the list can give it',
+    ]) {
+      const row = page.getByRole('button', { name: new RegExp(`^Add ${name}`) });
+      const title = row.getByText(name, { exact: true });
+      const rowBox = await row.boundingBox();
+      const titleBox = await title.boundingBox();
+      expect(rowBox, 'the row is drawn').not.toBeNull();
+      expect(titleBox, 'the name is drawn').not.toBeNull();
+      if (rowBox === null || titleBox === null) return;
+      expect(titleBox.x + titleBox.width).toBeLessThanOrEqual(rowBox.x + rowBox.width);
+    }
+
+    // The Resource's name ends before its capsule, and before Delete over it.
+    const row = page.getByRole('button', { name: /^Add A Resource whose name/ });
+    const titleBox = await row
+      .getByText('A Resource whose name runs far past the width the list can give it')
+      .boundingBox();
+    const capsuleBox = await row.locator('[data-map-id]').boundingBox();
+    await row.hover();
+    const deleteBox = await page
+      .getByRole('button', { name: /^Delete A Resource whose name/ })
+      .boundingBox();
+    expect(titleBox, 'the name is drawn').not.toBeNull();
+    expect(capsuleBox, 'the capsule is drawn').not.toBeNull();
+    expect(deleteBox, 'Delete is drawn').not.toBeNull();
+    if (titleBox === null || capsuleBox === null || deleteBox === null) return;
+    expect(titleBox.x + titleBox.width).toBeLessThanOrEqual(capsuleBox.x);
+    expect(titleBox.x + titleBox.width).toBeLessThanOrEqual(deleteBox.x);
+  },
+);
+
+test(
   'the filter counts what each switch contributes under the current search',
   { tag: '@parity:resources-popover-counts-what-each-filter-contributes' },
   async ({ page }) => {

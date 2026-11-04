@@ -154,7 +154,11 @@
   cursor: grab;
 }
 
+/* Bounded by its column, as the detail under it is: the column aligns its
+   children to the start, so without a bound a long name takes its full width
+   and runs under the marks at the row's end instead of ellipsing. */
 .resources-popover__row-title {
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

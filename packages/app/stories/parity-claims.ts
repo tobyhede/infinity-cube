@@ -93,6 +93,13 @@ export const parityClaims: readonly ParityClaim[] = [
       'Each Resource row ends in a Delete <name> from Space control on the row’s own line, drawn only while the row is hovered or holds keyboard focus and without moving the row; a Space row has none, and pressing the control asks to delete that Resource rather than adding it to the Map.',
   },
   {
+    id: 'resources-popover-cuts-a-long-name-short',
+    storyFile: 'surfaces/resources-popover.stories.tsx',
+    storyExport: 'LongNames',
+    claim:
+      'A Resource or Space name longer than its row is cut short before the marks at the row’s end — its membership capsules and Delete — rather than running under them or past the row.',
+  },
+  {
     id: 'resources-popover-delete-takes-the-place-of-the-capsules',
     storyFile: 'surfaces/resources-popover.stories.tsx',
     storyExport: 'PlacedElsewhere',
