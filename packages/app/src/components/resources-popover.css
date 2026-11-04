@@ -99,19 +99,25 @@
   margin-inline-end: 4px;
 }
 
-/* **Where a pointer can hover, Delete is the row's on hover and nowhere else.**
-   A trash can on every row reads as the list's main business; this list's is
-   adding to the Map. So Delete is laid over the end of its row, on the name's
-   line, and drawn only while the entry is hovered or holds keyboard focus. The
-   control never leaves the tab order: Tab from a row lands on its Delete and
-   `:focus-within` draws it, as a receding canvas Resource comes back on focus
-   (`styles.css`). It is laid over rather than given a column, so an idle row
-   runs to its own edge and a Space row, with nothing to delete, keeps no empty
-   slot. While it is drawn the row gives up its end to it, so the membership
-   capsules move aside rather than being covered.
+/* **Where a pointer can hover, Delete takes the place of the row's capsules,
+   and only while it is wanted.** A trash can on every row reads as the list's
+   main business; this list's is adding to the Map. So Delete is laid over the
+   end of its row, on the name's line, and drawn only while the entry is hovered
+   or holds keyboard focus. While it is drawn the membership capsules under it
+   are hidden, not moved, so nothing in the list shifts under the pointer.
 
-   Without hover — a touch screen — there is no gesture that would reveal it, so
-   it keeps its own column, always drawn. */
+   Keyboard focus is `:focus-visible`, not `:focus-within`: a row a pointer
+   pressed or began a drag from keeps focus, and Delete is then the pointer's to
+   draw. Tab from a row still lands on its Delete and draws it, as a receding
+   canvas Resource comes back on focus (`styles.css`).
+
+   While a drag from the list is under way (`data-dragging`, which
+   `ResourcesPopover` sets) no Delete is drawn and every row shows its capsules:
+   the dragged row is still under the pointer, and a drag is not a request to
+   delete it.
+
+   Without hover — a touch screen — no gesture would reveal it, so it keeps its
+   own column, always drawn, and a Space row keeps the empty slot beside it. */
 @media (hover: hover) {
   .resources-popover__entry {
     position: relative;
@@ -124,19 +130,20 @@
     opacity: 0;
   }
 
-  .resources-popover__entry:hover > .resources-popover__delete,
-  .resources-popover__entry:focus-within > .resources-popover__delete {
+  .resources-popover__delete-slot {
+    display: none;
+  }
+
+  .resources-popover__list:not([data-dragging])
+    > .resources-popover__entry:is(:hover, :has(:focus-visible))
+    > .resources-popover__delete {
     opacity: 1;
   }
 
-  /* Delete's 28px and its 4px inset, and the row's own 8px beside them. */
-  .resources-popover__entry:is(:hover, :focus-within):has(> .resources-popover__delete)
-    > .resources-popover__row {
-    padding-inline-end: 40px;
-  }
-
-  .resources-popover__delete-slot {
-    display: none;
+  .resources-popover__list:not([data-dragging])
+    > .resources-popover__entry:is(:hover, :has(:focus-visible)):has(> .resources-popover__delete)
+    .resources-popover__capsules {
+    visibility: hidden;
   }
 }
 

@@ -90,7 +90,14 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'surfaces/resources-popover.stories.tsx',
     storyExport: 'MetaSpaces',
     claim:
-      'Each Resource row ends in a Delete <name> from Space control on the row’s own line, drawn only while the row is hovered or holds keyboard focus; a Space row has none, and pressing the control asks to delete that Resource rather than adding it to the Map.',
+      'Each Resource row ends in a Delete <name> from Space control on the row’s own line, drawn only while the row is hovered or holds keyboard focus and without moving the row; a Space row has none, and pressing the control asks to delete that Resource rather than adding it to the Map.',
+  },
+  {
+    id: 'resources-popover-delete-takes-the-place-of-the-capsules',
+    storyFile: 'surfaces/resources-popover.stories.tsx',
+    storyExport: 'PlacedElsewhere',
+    claim:
+      'While a Resource row’s Delete is drawn, the membership capsules it is laid over are hidden; during a drag from the list, and on a row a pointer left holding focus, Delete is not drawn and the capsules show.',
   },
   {
     id: 'resources-popover-drags-a-space-onto-the-canvas',

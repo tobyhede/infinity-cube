@@ -2208,6 +2208,44 @@ test(
   },
 );
 
+test(
+  'a Resources list row shows its capsules while dragged and Delete in their place while hovered',
+  { tag: '@parity:resources-popover-delete-takes-the-place-of-the-capsules' },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 2');
+    await settled(page);
+
+    // B is placed in Collection 1 and not here, so its row carries a capsule.
+    await page.getByRole('button', { name: 'Resources' }).click();
+    const add = page.getByRole('button', { name: 'Add B to Map' });
+    const deleteControl = page.getByRole('button', { name: 'Delete B from Space' });
+    const capsule = add.locator('[data-map-id]').first();
+    await expect(capsule).toBeVisible();
+
+    await add.hover();
+    await expect(deleteControl).toHaveCSS('opacity', '1');
+    await expect(capsule).toBeHidden();
+
+    const pane = await boxOf(page.locator('.react-flow__pane'), 'the React Flow pane');
+    await page.mouse.down();
+    await page.mouse.move(pane.x + pane.width * 0.5, pane.y + pane.height * 0.8, { steps: 8 });
+    await expect(deleteControl).toHaveCSS('opacity', '0');
+    await expect(capsule).toBeVisible();
+    await page.mouse.up();
+
+    // The drop placed B, and the list it came from draws Delete again.
+    await expect(nodeByTitle(page, 'B')).toBeVisible();
+    await expect(add).toHaveCount(0);
+    const next = page.getByRole('button', { name: /^Add .* to Map$/ }).first();
+    await next.hover();
+    await expect(page.getByRole('button', { name: /^Delete .* from Space$/ }).first()).toHaveCSS(
+      'opacity',
+      '1',
+    );
+  },
+);
+
 test('Delete Resource is withdrawn while presenting', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');

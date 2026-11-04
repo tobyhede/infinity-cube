@@ -113,8 +113,11 @@ test(
     await expect(deleteControl).toHaveCSS('opacity', '1');
     await deleteControl.blur();
     await expect(deleteControl).toHaveCSS('opacity', '0');
+    // Delete is laid over the row: the row keeps its geometry when Delete is drawn.
+    const restingRow = await row.boundingBox();
     await row.hover();
     await expect(deleteControl).toHaveCSS('opacity', '1');
+    expect(await row.boundingBox()).toEqual(restingRow);
 
     // At the end of its row, on the row's line, not wrapped beneath it.
     const rowBox = await row.boundingBox();
@@ -138,6 +141,49 @@ test(
     await expect(page.getByText('Delete requested: Architecture')).toBeVisible();
     await expect(page.getByText('Added: Architecture')).toHaveCount(0);
     await expect(row).toBeVisible();
+  },
+);
+
+test(
+  'a drawn Delete hides the capsules under it, and a drag or a pointer press draws the capsules instead',
+  { tag: '@parity:resources-popover-delete-takes-the-place-of-the-capsules' },
+  async ({ page }) => {
+    await page.goto(story('placed-elsewhere'));
+    await page.getByRole('button', { name: 'Resources' }).click();
+
+    const row = page.getByRole('button', { name: 'Add Resource 4 to Map' });
+    const deleteControl = page.getByRole('button', { name: 'Delete Resource 4 from Space' });
+    const capsule = row.locator('[data-map-id]').first();
+    await expect(capsule).toBeVisible();
+    await expect(deleteControl).toHaveCSS('opacity', '0');
+
+    await row.hover();
+    await expect(deleteControl).toHaveCSS('opacity', '1');
+    await expect(capsule).toBeHidden();
+
+    // A drag the canvas stand-in does not take: the row stays in the list.
+    await page.mouse.down();
+    const canvas = await page.getByRole('button', { name: 'The canvas behind it' }).boundingBox();
+    expect(canvas, 'the canvas stand-in is drawn').not.toBeNull();
+    if (canvas === null) return;
+    await page.mouse.move(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2, {
+      steps: 8,
+    });
+    await expect(deleteControl).toHaveCSS('opacity', '0');
+    await expect(capsule).toBeVisible();
+    await page.mouse.up();
+
+    // The pressed row keeps focus once the pointer has left it; Delete is the
+    // pointer's to draw, so it stays undrawn.
+    await expect(row).toBeFocused();
+    await expect(deleteControl).toHaveCSS('opacity', '0');
+    await expect(capsule).toBeVisible();
+
+    // From the keyboard it is drawn again.
+    await page.keyboard.press('Tab');
+    await expect(deleteControl).toBeFocused();
+    await expect(deleteControl).toHaveCSS('opacity', '1');
+    await expect(capsule).toBeHidden();
   },
 );
 

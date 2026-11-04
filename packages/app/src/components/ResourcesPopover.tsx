@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useId,
   useMemo,
   useRef,
@@ -314,7 +315,10 @@ function MembershipCapsules({ memberships }: { readonly memberships: readonly Ma
   if (memberships.length === 0) return null;
   const hidden = memberships.length - MAX_MARKS;
   return (
-    <span className="ml-auto flex shrink-0 items-center gap-1" aria-hidden="true">
+    <span
+      className="resources-popover__capsules ml-auto flex shrink-0 items-center gap-1"
+      aria-hidden="true"
+    >
       {memberships.slice(0, MAX_MARKS).map((membership) => (
         <Badge
           key={membership.mapId}
@@ -733,7 +737,30 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
       void answer.then(showSettlement(asked), showBreak(asked));
     };
 
+  /**
+   * Whether a drag this list started is under way, which hides every row's
+   * Delete (`resources-popover.css`).
+   *
+   * **Ended from the window, not from the row.** A drop that places the
+   * Resource takes its row out of the list, and `dragend` fired on a row that
+   * is no longer in the document reaches no listener; the `drop` that placed it
+   * still crosses the window first. A drop nothing takes fires no `drop`, and
+   * then its row is still there for `dragend` to cross the window from.
+   */
+  const [dragging, setDragging] = useState(false);
+  useEffect(() => {
+    if (!dragging) return;
+    const end = () => setDragging(false);
+    window.addEventListener('drop', end, true);
+    window.addEventListener('dragend', end, true);
+    return () => {
+      window.removeEventListener('drop', end, true);
+      window.removeEventListener('dragend', end, true);
+    };
+  }, [dragging]);
+
   const beginDrag = (event: DragEvent<HTMLButtonElement>, resourceId: ResourceId): void => {
+    setDragging(true);
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData(RESOURCE_DRAG_TYPE, resourceId);
     placing?.onDragStart(resourceId, showSettlement(standing.opening));
@@ -744,6 +771,7 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
     space: ResourcesPopoverSpace,
     started: (space: ResourcesPopoverSpace, settle: SettlePlacement) => void,
   ): void => {
+    setDragging(true);
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData(SPACE_DRAG_TYPE, space.id);
     started(space, settlementFor(standing.opening));
@@ -924,7 +952,7 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
               )}
             </ul>
           ) : (
-            <ul className="resources-popover__list">
+            <ul className="resources-popover__list" data-dragging={dragging ? '' : undefined}>
               {visible.map(({ key, name, row }) => {
                 // Whether this row drags is decided once, here: a Resource row
                 // always does, a Space row only when something takes its drag.
