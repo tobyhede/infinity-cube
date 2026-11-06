@@ -1,10 +1,11 @@
 # Trace: Rendering
 
-For audit only. Every source rule that feeds `../rendering.md` appears exactly once in §1 or §2, with one of four dispositions:
+For audit only. Every source rule that feeds `../rendering.md` appears exactly once in §1 or §2, with one of five dispositions:
 - **→ RD-n**: kept.
 - **folded → RD-n**: the source restates or implies a kept rule.
 - **dropped**: with the reason.
 - **sent → DOC**: it belongs to another doc.
+- **→ removed (drafting rule 6)**: presentation, not a requirement.
 
 Where an ADR feeds RD only in part, only the parts the mapping tables send to RD are listed; the rest are traced by the doc named. §3 groups the sends by receiving doc. §3a lists every item other traces send here. §4 lists code-only rules. §5 holds code notes.
 
@@ -37,7 +38,7 @@ The rule ids in `../rendering.md` are append-only from this version on.
 | 0033 four side handles; drag to a Resource | → RD-50 |
 | 0033 Active Graph receives the Edge | sent → MG (MG-62) |
 | 0033 handles coloured as the Active Graph | → RD-51 |
-| 0033 route-less Space uses first palette colour / mints `Route 1` | dropped: every Map has a Graph (MG-34). The first-slot fallback survives as code → RD-27 |
+| 0033 route-less Space uses first palette colour / mints `Route 1` | dropped: every Map has a Graph (MG-34). The first-slot fallback survives as code → RD-51 |
 | 0033 source handles on hovered or selected Resource | → RD-52 |
 | 0033 seeking targets on every Resource for the whole drag | dropped: replaced by 0090 (→ RD-53) |
 | 0033 self-Edges accepted | folded → RD-50, RD-53 |
@@ -121,18 +122,18 @@ The rule ids in `../rendering.md` are append-only from this version on.
 | 0090 self-Edges legal; source eligible when near | folded → RD-53 |
 | 0090 anchors still render on every Resource | folded → RD-33 |
 | 0090 reconnect drag (sources when a `from` end moves) | dropped: there is no reconnection (MG-67, RD-47) |
-| 0100 each Edge sharing a pair in its own lane, 8 apart | → RD-37 |
+| 0100 each Edge sharing a pair in its own lane, 8 apart | → RD-37; the spacing → removed (drafting rule 6) |
 | 0100 Active Graph centred and connects; both directions split the centre | → RD-38 |
 | 0100 other Graphs below (right when stacked), one spacing further each | → RD-39 |
-| 0100 trim a fifth at each end, along the curve, in geometry | → RD-40 |
+| 0100 trim a fifth at each end, along the curve, in geometry | → RD-40; the fraction and its measure → removed (drafting rule 6) |
 | 0100 only the connecting Edge carries an arrowhead | dropped: superseded by 0105 (→ RD-43) |
 | 0100 non-active stops short even alone; with no Active Graph nothing stops short | folded → RD-40 |
 | 0100 lanes parallel, never fanned | folded → RD-37 |
 | 0100 lanes decided in the projection; activation moves lanes; sign is the screen's; drag carries lanes | → RD-39 (siting is a code note §5) |
-| 0100 Active Graph painted last; others recede by opacity, narrower stroke | folded → RD-29 |
+| 0100 Active Graph painted last; others recede by opacity, narrower stroke | folded → RD-29; opacity and stroke width → removed (drafting rule 6) |
 | 0100 lane as a translate of the anchors | dropped: superseded by 0103, except as the fallback (→ RD-41) |
 | 0102 commands in `NodeToolbar`, when drawn, click selects first, right-click menu, keyboard reach (not built, DEC 6) | sent → UI |
-| 0102 kind glyph on the Resource at top-right; Open draws none | → RD-9 |
+| 0102 kind glyph on the Resource at top-right; Open draws none | → RD-9; the corner → removed (drafting rule 6) |
 | 0102 band shrinks to the glyph's room | folded → RD-9 (code note §5) |
 | 0102 without an adapter the toolbar draws in the band | sent → UI |
 | 0102 `@project/ui` names no React Flow type | sent → UI |
@@ -148,9 +149,9 @@ The rule ids in `../rendering.md` are append-only from this version on.
 | 0104 what a long Title does on a short Edge is the canvas's | → RD-46 |
 | 0105 every Edge draws its Graph's head shape at its `to` end | → RD-43 |
 | 0105 no `none`, no tail, no per-Edge override; optional, `arrow` default | sent → MG (MG-50) |
-| 0105 every drawn Edge carries it, stop-short included, at the Edge's opacity | folded → RD-43 |
+| 0105 every drawn Edge carries it, stop-short included, at the Edge's opacity | folded → RD-43; the opacity → removed (drafting rule 6) |
 | 0105 four shapes, distinct at small zoom, drawn from one glyph in `@project/ui` | → RD-45 |
-| 0105 markers once per canvas in hidden `<defs>`, keyed by Graph id, sized in stroke widths | → RD-44 |
+| 0105 markers once per canvas in hidden `<defs>`, keyed by Graph id, sized in stroke widths | → RD-44; the sizing → removed (drafting rule 6) |
 | 0105 Graph menu Shape… | sent → UI |
 | 0105 legend mark beside every Graph title (key, Dock, Open Space Resource) | → RD-49 |
 | 0105 connection preview draws the joined Graph's head shape and colour | → RD-54 |
@@ -172,8 +173,8 @@ The rule ids in `../rendering.md` are append-only from this version on.
 | 0114 kind glyph decided by stored kind | → RD-9 |
 | 0121 set, storage, only Ur, optional, Remove forgets | sent → MG (MG-29–MG-31) |
 | 0121 drawn at the rect; changes no rect; proportional fill; pill half-circles; side midpoints | → RD-16 (rect rule MG-32) |
-| 0121 Title centred in the inscribed rectangle, clamped | → RD-17 |
-| 0121 selection ring follows the outline | → RD-18 |
+| 0121 Title centred in the inscribed rectangle, clamped | → RD-17; the centring → removed (drafting rule 6) |
+| 0121 selection ring follows the outline | → removed (drafting rule 6) |
 | 0121 Ur Resource draws no glyph | folded → RD-9 |
 | 0121 Shape drawn Open and Closed alike | dropped as stated: an Ur Resource is never Open (MG-28). "Drawn at every size" → RD-16 |
 | 0121 resize control at the rect's bottom-right | sent → UI |
@@ -188,11 +189,11 @@ The rule ids in `../rendering.md` are append-only from this version on.
 | 0129 Presentation Notes | sent → NV |
 | 0135 in a Graph = Edge endpoint | sent → MG (MG-33) |
 | 0135 border is the Graph's colour | → RD-23 |
-| 0135 recede: solid face, border half-mixed, Title/rail/content half opacity; interactive | → RD-24 ("rail" written as the kind glyph: the canvas toolbar floats outside the Resource and does not recede) |
+| 0135 recede: solid face, border half-mixed, Title/rail/content half opacity; interactive | → RD-24; the border mix and half opacity → removed (drafting rule 6) |
 | 0135 full strength while hovered, focused, selected, edited, offered as a connection end | → RD-25 |
 | 0135 nothing recedes while the Active Graph has no Edges | → RD-26 |
-| 0135 only border and outline take colour; handles and underline in Active colour | → RD-27 |
-| 0135 change of Active Graph fades on hover timing | conflict C2 → RD-28 (content fades on its own timing) |
+| 0135 only border and outline take colour; handles and underline in Active colour | handles → RD-51; the rest (RD-27) → removed (drafting rule 6) |
+| 0135 change of Active Graph fades on hover timing | RD-28 → removed (drafting rule 6); conflict C2 closed |
 | 0135 every drawn Map by its own Active Graph; Stage unchanged | → RD-81; Stage sent → NV |
 
 ## 2. Guides and the old contract
@@ -214,7 +215,7 @@ The rule ids in `../rendering.md` are append-only from this version on.
 | G§b5 0042 draft invalidation (Map, Active Graph, epoch, subject) | Edge gesture → RD-56; epoch sent → ED |
 | G§b6 controls reach `CanvasResource` only with their operation | sent → UI (code note §5) |
 | G§b7 content resolves once through the kinds; display `closed`/`open`/`editing`; a drawn Resource names nothing outside itself; glyph on every kind but Ur | resolution sent → SR; drawing → RD-11, RD-77; "names nothing outside itself" → RD-78; glyph → RD-9, RD-9 |
-| G§b8–b10 drag lean as a rigid motion; Edges follow; clip turns with it; `nodeLookup`; angle written once | → RD-21 (code only). Mechanics are code notes §5 |
+| G§b8–b10 drag lean as a rigid motion; Edges follow; clip turns with it; `nodeLookup`; angle written once | the lean → removed (drafting rule 6); the rigid motion and Edges following → RD-21 (code only). Mechanics are code notes §5 |
 | G§b11 resizing is one canvas draft; preview only the resizing Resource; no `move` draft; floor; no snap | preview → RD-57; drag → RD-58; floor sent → UI (MG-82); displacement sent → MG |
 | G§Strategy b1–b3 strategy contract in `graph`; `Placement` construction closed; `canvasProjection` pure | sent → MG (MG-68–MG-70); code notes §5 |
 | G§Handle b1 four anchors = handles; no per-Graph family | → RD-33 |
@@ -244,7 +245,7 @@ The rule ids in `../rendering.md` are append-only from this version on.
 | G§Overlay tracked fixture shape | sent → PROC (test data, `packages/app/README.md`) |
 | R29 receding and colour (via MG trace) | → RD-23–RD-26 |
 | R40 "a resize preview shows only the resizing Resource" (via MG trace) | → RD-57 |
-| R48 Shape changes no rect; proportional; midpoints; Title inscribed; no glyph; ring | → RD-16, RD-17, RD-18, RD-9 |
+| R48 Shape changes no rect; proportional; midpoints; Title inscribed; no glyph; ring | → RD-16, RD-17, RD-9; the ring → removed (drafting rule 6) |
 | R49 Shape at every size; resize control; presented is the rectangle | → RD-16; control sent → UI; presented sent → NV |
 | R50 embedded Map draws Shapes | → RD-19 |
 
@@ -275,8 +276,8 @@ Every item another trace sends to rendering, with where it landed.
 | Item | Disposition |
 |---|---|
 | R29, 0028 activation is emphasis; every Graph still drawn | → RD-29 |
-| 0135 colour and receding | → RD-23–RD-28, RD-81 |
-| R48–R50, 0121 drawing (Title layout, no glyph, ring, Shapes at every size, embedded Shapes) | → RD-16–RD-19, RD-9 |
+| 0135 colour and receding | → RD-23–RD-26, RD-81; RD-27 and RD-28 → removed (drafting rule 6) |
+| R48–R50, 0121 drawing (Title layout, no glyph, ring, Shapes at every size, embedded Shapes) | → RD-16–RD-19, RD-9; the ring → removed (drafting rule 6) |
 | 0003 r3 | → RD-32 |
 | 0018 r2 opening fit | → RD-62 |
 | 0084 resize preview | → RD-57 |
@@ -324,9 +325,9 @@ Every item another trace sends to rendering, with where it landed.
 |---|---|
 | 0064 r1, r5 (renderer), r8, r9; G7 no `nowheel`, 16:9 or camera follow | → RD-2, RD-6, RD-67, RD-65 |
 | G29 Markdown is sanitised | → RD-6 |
-| G30 Open-Resource movement and motion token | → RD-79 (and RD-3, RD-22) |
+| G30 Open-Resource movement and motion token | RD-79 → removed (drafting rule 6) (RD-3 and RD-22 keep the rest) |
 | G26 Resource text contrast to WCAG AA | → RD-80 |
-| 0102 kind glyph placement; G18 Shape glyph geometry, no glyph on Ur | → RD-9, RD-17 |
+| 0102 kind glyph placement; G18 Shape glyph geometry, no glyph on Ur | placement → removed (drafting rule 6); → RD-9, RD-17 |
 | 0105 legend mark, markers, connection preview | → RD-43–RD-45, RD-49, RD-54 |
 | 0036 handle reveal on selection; 0033 gesture | → RD-52, RD-50–RD-56 |
 | The Edge-chrome bullet: point to UI for the Edge controls | pointer under "Head shapes, Edge Titles and the Graph key" and in "Not here" (UI-78–UI-82) |
@@ -335,15 +336,15 @@ Every item another trace sends to rendering, with where it landed.
 
 Kept under drafting rule 5 (code plus a test, contradicted by nothing):
 - RD-7 the image skeleton and failed state naming its URL.
-- RD-8 the Close fade and reduced motion.
-- RD-10 the Reference Resource's dotted border at rest. Its solid border while hovered, selected or dragged (`ui/src/kinds/reference-canvas.css`) is untested and cut from the rule (§5).
-- RD-12 the rung weights and same ink.
+- RD-8 the Close fade and reduced motion → removed (drafting rule 6).
+- RD-10 the Reference Resource's distinct border at rest (dotted → removed (drafting rule 6)). Its solid border while hovered, selected or dragged (`ui/src/kinds/reference-canvas.css`) is untested and cut from the rule (§5).
+- RD-12 the rung weights and same ink → removed (drafting rule 6).
 - RD-15 three visual lines of a single-line Title. The per-Shape ceiling numbers are untested and kept as a code note (§5).
 - RD-20 distinct rest, selected and dragging treatments.
-- RD-21 the drag lean.
-- RD-22 no animation while dragged or resized; no animation in from the origin.
-- RD-29 "no Edge animates".
-- RD-46, RD-47 Edge Titles as drawn (only the Active Graph's; fitted at rest; hidden and dimmed).
+- RD-21 the drag lean → removed (drafting rule 6); the drawn Map moving rigidly with it stays.
+- RD-22 no animation while dragged or resized. No animation in from the origin → removed (drafting rule 6).
+- RD-29 "no Edge animates" → removed (drafting rule 6).
+- RD-46, RD-47 Edge Titles as drawn (only the Active Graph's; fitted at rest; hidden and dimmed). The fit constants → removed (drafting rule 6) (code note §5).
 - RD-48 the Graph key.
 - RD-56 the Edge gesture's cancel triggers.
 - RD-60 drawn-Map zoom scales positions, not Resources.
@@ -373,4 +374,4 @@ Kept under drafting rule 5 (code plus a test, contradicted by nothing):
 - A Reference Resource's border turns solid while hovered, selected or dragged (`ui/src/kinds/reference-canvas.css`); untested, so not a rule.
 - Edge Title fit constants in `ui/src/edge-title-room.ts`: `EDGE_TITLE_CEILING` 224, `EDGE_TITLE_CLEARANCE` 28, `EDGE_TITLE_BOX_CHROME` 26, `EDGE_TITLE_LEAST_TEXT` 34.
 - The URL reveal calls `fitView({ nodes: [node], padding: 0.5, duration: 0 })` with no `maxZoom` (`CanvasContinuation.tsx`).
-- Active Graph fade: content opacity transitions over `--resource-placement-duration * 0.4` (C2).
+- Active Graph fade: content opacity transitions over `--resource-placement-duration * 0.4` (presentation; C2 closed by drafting rule 6).

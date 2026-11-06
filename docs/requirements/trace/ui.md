@@ -1,10 +1,11 @@
 # Trace: UI
 
-For audit only. Every source rule appears exactly once in §1 or §2, with one of four dispositions:
+For audit only. Every source rule appears exactly once in §1 or §2, with one of five dispositions:
 - **→ UI-n**: kept.
 - **folded → UI-n**: the source restates or implies a kept rule.
 - **dropped**: with the reason.
 - **sent → DOC**: it belongs to another doc.
+- **→ removed (drafting rule 6)**: presentation, not a requirement.
 
 §3 checks off what maps-and-graphs sent here. §4 groups this doc's sends by receiving doc. §5 lists code-only rules. §6 holds code notes.
 
@@ -25,7 +26,7 @@ The rule ids in `../ui.md` are append-only from this version on.
 | G7 Opening and editing are separate | Closed/Open offers → UI-53; Edit on Closed → UI-54; Save/Cancel/Close → UI-55; blur ends nothing → UI-56; editor swap → UI-55. "Open and Close author only `open`" sent → MG (MG-27). Sanitised renderer, no `nowheel`, no 16:9, no camera follow sent → RD |
 | G8 Open Reference read-only | Offers Close and Title editing, no Edit, Save, Cancel or Target picker → UI-19. Ordinary Open by pointer, Enter, Space folded → UI-53. Draws through the Target kind's surfaces, content resolves once sent → RD. Target immutability, descendants read-only, authored like any Resource sent → SR. Create Reference copies the name and puts the caret in the Title: creation sent → SR, caret folded → UI-86. Unavailable on a Reference → UI-21. Space Resource menu groups → UI-20. `ResourceSearchCombobox` has no consumer: dropped (inventory fact, not behaviour) |
 | G10 shadcn default; hand-roll a deviation | → UI-1. The `inert` dialog example dropped: reasoning, not a rule. "A contract contradicting a primitive default loses" folded → UI-1 |
-| G11 Base UI and Lucide | Base UI only, `base-nova`/`neutral`/CSS variables, no `@radix-ui` → UI-2. Lucide default, custom icon only for a Hyper meaning → UI-3 (the OPEN artwork for Meta and the shared cube are its tested instances). Palette is Hyper's folded → UI-2. Manual QA report not run: dropped (status of a report, history). Version `1.7.0`, cmdk not migrated, no Anchor part, Positioner/Popup props, `null` controlled value, Dialog focus hooks: §6 code notes. `nokey` on portalled popups folded → "Keys pressed in chrome never act on the canvas" (Effects) |
+| G11 Base UI and Lucide | Base UI only, `base-nova`, no `@radix-ui` → UI-2; `neutral`/CSS variables → removed (drafting rule 6). Lucide default, custom icon only for a Hyper meaning → UI-3 (the OPEN artwork for Meta and the shared cube are its tested instances). Palette is Hyper's → removed (drafting rule 6). Manual QA report not run: dropped (status of a report, history). Version `1.7.0`, cmdk not migrated, no Anchor part, Positioner/Popup props, `null` controlled value, Dialog focus hooks: §6 code notes. `nokey` on portalled popups folded → "Keys pressed in chrome never act on the canvas" (Effects) |
 | G12 every shortcut declared once | → UI-7. The guard → UI-9. No Ctrl/Meta/Alt, plain takes no Shift → UI-8. Enter/Space and Delete/Backspace aimed at a Resource → UI-10. "Don't add a listener testing `event.key`" folded → UI-7. `.nokey` not read by the guard; Save/Cancel cannot import the table; plan pointer: §6 code notes |
 | G13 `Kbd`/`KbdGroup` | Shortcut hint and `aria-keyshortcuts` → UI-57. The `keyName="modifier"` registry extension: §6 code note |
 | G14 Escape and commit decided by the surface | Title commits on blur, Escape reverts → UI-48. Body exits → UI-56. No surface pends several fields; creation completes on activation: sent → SR (creation, 0089) |
@@ -76,7 +77,7 @@ The rule ids in `../ui.md` are append-only from this version on.
 | 0048, 0074 "no undo" | sent → ED (DEC 5). UI-83's Why says Undo is not built |
 | 0050 r1 Base UI, `base-nova`, no mixing | → UI-2 |
 | 0050 r2 Lucide default, custom icon with a named meaning | → UI-3 |
-| 0050 r3 Hyper's palette, not a restyle | folded → UI-2 |
+| 0050 r3 Hyper's palette, not a restyle | → removed (drafting rule 6) |
 | 0052 r1–r4 story parity | sent → PROC |
 | 0057 r3 wording, field attribution and recovery owned by the conducting surface | → UI-89, UI-90, UI-91 |
 | 0057 r3 "accepted Edit closes its surface without waiting for persistence" | sent → ED (completed is authoritative) |
@@ -113,7 +114,7 @@ The rule ids in `../ui.md` are append-only from this version on.
 | 0073 kind and shared named groups; empty group draws nothing | → UI-13 |
 | 0073 order: menu, kind, Open/Close last | → UI-13 |
 | 0073 arrows cross group boundaries | → UI-13 |
-| 0073 unavailable stays focusable, `aria-disabled`, styled by the attribute | → UI-29 (the styling clause now stated) |
+| 0073 unavailable stays focusable, `aria-disabled`, styled by the attribute | → UI-29; the styling clause → removed (drafting rule 6) |
 | 0073 tests read the attribute, not `toBeDisabled` | sent → PROC |
 | 0073 keydown stop on the toolbar root | → UI-14 |
 | 0073 Title not in the toolbar | → UI-17 |
@@ -135,7 +136,7 @@ The rule ids in `../ui.md` are append-only from this version on.
 | 0082 do not give it layout space; do not restore the header row | folded → UI-33 |
 | 0082 do not persist its position | → UI-39 |
 | 0082 the shape freedom does not lift story evidence | sent → PROC |
-| 0083 Enter completes, Escape cancels, Shift+Enter inserts a line; field grows, uniform size | → UI-49, UI-48 |
+| 0083 Enter completes, Escape cancels, Shift+Enter inserts a line; field grows, uniform size | → UI-49, UI-48; uniform size → removed (drafting rule 6) |
 | 0083 lists, references and accessible names show the name | controls and rows → Effects "Names". Questions and notices → UI-99, conflict C3 (0083 says name only; the code and `CONTEXT.md` add an ellipsis; rule 1 does not settle it because the agreeing source is the glossary) |
 | 0083 the Title control wraps the heading | → UI-44 |
 | 0083 data, normalization, ladder, clamp | sent → SR (data), RD (ladder) |

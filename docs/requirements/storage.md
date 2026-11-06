@@ -56,7 +56,7 @@ Every object in `hyper.json`, `space.json` and a Resource file's envelope reject
 | Export | writes the Aggregate to a directory in place | a file's bytes already match | the files would not read back; the destination holds a directory Import could not read | ST-51–ST-61 |
 | `hyper init` | writes a new Aggregate to a missing or empty directory | — | the directory holds anything else | ST-70 |
 | `hyper run` | Imports into a memory store, serves it, Exports edits back | — | missing, empty or invalid directory | ST-62–ST-65, ST-67 |
-| Mount | reads an Aggregate from GitHub into a page's store | — | the reader or intake refuses it | ST-85–ST-98, ST-106, ST-107 |
+| Mount | reads an Aggregate from GitHub into a page's store | — | the reader or intake refuses it | ST-85–ST-92, ST-94–ST-98, ST-106, ST-107 |
 | Upload image | stores the bytes under their content id | the store already holds them (200) | `unsupported-media-type`, `image-too-large`, `image-format-unsupported`, `image-svg-unsupported` | ST-75–ST-76 |
 
 ## Repository

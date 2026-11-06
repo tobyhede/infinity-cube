@@ -36,3 +36,8 @@ Rulings made by the maintainer before the requirements docs were written. Eviden
 - **S1.** Every working read goes through the one initializing loader, wherever it runs.
 
 The principle behind C1, C4 and C7: an Edit on the canvas records where the author is working; nothing else does.
+
+## Checkpoint 3 rulings (6 November 2026)
+
+- **Drafting rule 6. Presentation is not a requirement.** A rule that only fixes how something looks or moves, and can be changed in CSS or styling alone without changing what the author can see, reach or do, does not belong in these docs. Examples: durations, easing, colour values, opacity levels, sizes, spacing, fonts, shadows and animation choreography. The code and its tests are the record for these. A rule stays when it is structural: what is drawn and what it means, what is visible or hidden, what can be reached or clicked, what is announced or focused, and what is stored. Removed rules become "XX-n: removed (drafting rule 6)".
+- **Rendering C2 is closed by drafting rule 6.** How fast a Resource fades when the Active Graph changes is presentation. RD-28 is removed.

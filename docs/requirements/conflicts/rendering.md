@@ -1,6 +1,6 @@
 # Conflicts: Rendering
 
-Open conflicts for [../rendering.md](../rendering.md). Conflict ids are never reused. Drafting rule 5 settles every other rendering behaviour the code implements and a test asserts.
+Conflicts for [../rendering.md](../rendering.md). Conflict ids are never reused. Drafting rule 5 settles every other rendering behaviour the code implements and a test asserts.
 
 ## C1. Open content that does not fit its rect
 
@@ -15,11 +15,8 @@ Open conflicts for [../rendering.md](../rendering.md). Conflict ids are never re
   3. Split: clip Markdown, fit the drawn Map (or the reverse).
 - **Evidence:** ADR 0122 ("The Closed Size is the one floor"); ADR 0064 ("Scroll is not contained"); `trace/space-and-resources.md` §5; the files above.
 
-## C2. How fast a Resource's content fades on a change of Active Graph
+## Closed
 
-- **Rules affected:** RD-28.
-- **The disagreement:** ADR 0135 says "Opacity and border colour transition over the Resource's existing hover timing (`--resource-hover-duration`), with no new timing." In the code, the border and outline (`ui/src/canvas-resource.css`, the transitions on `.canvas-resource` and the outline) and the Title and glyph row (`opacity` over `--resource-hover-duration`) follow that timing. The content's `opacity`, which carries the receding strength, transitions over `calc(var(--resource-placement-duration) * 0.4)` with placement easing, the transition the Close fade (RD-8) also uses. So on a change of Active Graph the content fades at a different pace from the border and Title. Nothing tests the timing either way.
-- **Options:**
-  1. **Content strength follows the hover timing (recommended).** A CSS change that gives the content's strength the hover transition while keeping the Close fade's own timing for presence (for example, separate properties for strength and presence). Matches 0135 and makes the Resource fade as one piece. Needs a test of the computed transition.
-  2. **Accept the content's own timing.** Amend RD-28 to say the content fades over its presence timing. No code change.
-- **Evidence:** ADR 0135 ("A change of Active Graph fades"); `ui/src/canvas-resource.css` (`.canvas-resource` transitions, the Title and glyph `opacity` transition, `.canvas-resource__content` transition).
+Closed by drafting rule 6 (DECISIONS, Checkpoint 3 rulings).
+
+- **C2. How fast a Resource's content fades on a change of Active Graph.** Presentation, not a requirement; the rule it held is removed.
