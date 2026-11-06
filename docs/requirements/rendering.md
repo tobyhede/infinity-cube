@@ -28,9 +28,9 @@ The canvas stores nothing. It draws from these fields, owned by other docs, and 
 
 | Drawn | Read from | Rules |
 |---|---|---|
-| Resource rect, Open or Closed, Shape | Map entry `x`, `y`, `size`, `open`, `shape` | RD-1–RD-7, RD-9–RD-22 |
+| Resource rect, Open or Closed, Shape | Map entry `x`, `y`, `size`, `open`, `shape` | RD-1–RD-7, RD-9, RD-11–RD-22 |
 | Title ladder | Resource `title` | RD-12–RD-15 |
-| Content | the Resource's resolved content (single hop) | RD-2–RD-7, RD-9–RD-11, RD-77, RD-78 |
+| Content | the Resource's resolved content (single hop) | RD-2–RD-7, RD-9, RD-11, RD-77, RD-78 |
 | Border colour, receding | the Map's Graphs, their `color` and Edges, the Active Graph | RD-23–RD-26, RD-81 |
 | Edges, lanes, head shapes | Graph `edges`, `color`, `headShape`, the Active Graph | RD-29–RD-49 |
 | A drawn Map's placement | the Space Resource's selection and framing | RD-5, RD-59–RD-61 |
@@ -39,7 +39,7 @@ The canvas stores nothing. It draws from these fields, owned by other docs, and 
 
 | Behaviour | Rules |
 |---|---|
-| Resources Closed and Open, content, glyph, Reference Resources | RD-1–RD-7, RD-9–RD-11, RD-77, RD-78, RD-80 |
+| Resources Closed and Open, content, glyph, Reference Resources | RD-1–RD-7, RD-9, RD-11, RD-77, RD-78, RD-80 |
 | The Title ladder | RD-12–RD-15 |
 | Shapes | RD-16–RD-19 |
 | States, motion, colour and receding | RD-20–RD-26, RD-81 |
@@ -62,12 +62,12 @@ The canvas stores nothing. It draws from these fields, owned by other docs, and 
 - **RD-7** An Open Image Resource draws a skeleton until its picture loads. A picture that does not load draws a failed state that names its URL and keeps the Title (that it is not a refusal is SR-27). *Why:* the author sees which picture is missing. **built**: `ui/test/ResourceImage.test.tsx` › "draws a skeleton in the picture’s place until the picture loads", "replaces the skeleton with the failed-image state when the picture does not load"; `ui/test/CanvasResource.test.tsx` › "names the URL when an Open Image Resource cannot load its image, keeping the Title".
 - **RD-8** removed (drafting rule 6).
 - **RD-9** A Closed Resource draws its kind glyph, chosen by its stored kind, on every kind but the Ur Resource. An Open Resource draws no glyph. *Why:* the glyph tells a Reference Resource from its Target; an Ur Resource's Shape says what it is. **built**: `app/ladle-e2e/resource-open.spec.ts` › "at rest a Resource draws no toolbar; selected, its commands are drawn with Open last, and its kind glyph stays at its top-right corner"; `ui/test/CanvasResource.test.tsx` › "draws no kind glyph on an Ur Resource in a %s, Open or Closed", "presents a Reference Resource by its kind alone". The Open clause is untested (`CanvasResource.tsx` `kindMark`).
-- **RD-10** A Reference Resource draws a border at rest unlike any other kind's. *Why:* it tells the Reference apart from what it points at. **built**: `app/ladle-e2e/resource.spec.ts` › "a Reference Resource's dotted border and a long Markdown title's three-line clamp are the kind's own presentation".
+- **RD-10** removed (drafting rule 6).
 - **RD-11** An Open Reference Resource draws its own Title over its Target's content, read-only, through the Target kind's own renderer. An unresolved Target draws a notice. *Why:* one renderer per kind, and the Reference shows what it points at. **built**: `react-flow-adapter/test/ResourceNode.test.tsx` › "draws an Open Reference Resource's resolved Markdown read-only under the Reference Resource Title"; `ui/test/CanvasResource.test.tsx` › "draws an unresolved Target as a notice, not an empty document".
 
 ## The Title ladder
 
-- **RD-12** A Resource draws its Title as Title Lines: line 1 in the `title` role, line 2 `subtitle`, and line 3 and every later line `caption`. Each line is its own block, and an interior blank line is kept. *Why:* the author's breaks carry meaning; the roles are domain knowledge (space-and-resources.md). **built**: `ui/test/CanvasResource.test.tsx` › "gives each authored line its role, and every line past the third the last one", "keeps an interior blank line as a line of its own".
+- **RD-12** A Resource draws its Title as Title Lines: each line is its own block, and an interior blank line is kept. *Why:* the author's breaks carry meaning. **built**: `ui/test/CanvasResource.test.tsx` › "gives each authored line its role, and every line past the third the last one", "keeps an interior blank line as a line of its own".
 - **RD-13** The ladder draws the same Open and Closed, on every kind. *Why:* a Title that changes shape on Open teaches that Opening edits it. **built**: `ui/test/CanvasResource.test.tsx` › "draws the same ladder Open and Closed, on every Resource kind".
 - **RD-14** A break the box chooses is not a rung. A line wraps within its own role, and clamping counts visual lines per role. *Why:* only authored breaks are load-bearing. **built**: `ui/test/canvas-resource-title-ladder.test.ts` › "clamp visual lines per role"; `app/ladle-e2e/resource.spec.ts` › "a wrapped single-line Title stays one rung while an authored three-line Title draws three".
 - **RD-15** A Title too long for its room is clipped at a fixed ceiling chosen to fit a Closed Resource, the same Open and Closed. A Title never resizes a Resource. *Why:* placement is authored; resizing is how a long Title gets room. **built**: `ui/test/canvas-resource-title-ladder.test.ts` › "fits inside the body of a Closed Resource", "is a clip on the heading, not a size the Resource grows to", "still clamps to three visual lines at the title role". The ceiling per Shape is a code note (trace §5).
@@ -169,7 +169,7 @@ What a drawn Map may author, and its policy, are in space-and-resources.md.
 - **RD-75** React Flow owns pointer attempts, transient node state and visual selection. Only a completed gesture reaches Space Authoring, and React Flow never applies a resize locally. *Why:* the domain sees authored facts, not frames. **built**: `app/test/SpaceCanvas.test.tsx` › "proposes no node change to React Flow while it resizes"; `app/test/render-adapter.test.ts` › "completes nothing for a connection Authoring refuses".
 - **RD-76** React Flow's documented pointer, selection and focus behaviour is the default. A deviation needs a stated product requirement, recorded as a rule in this doc or ui.md. The keyboard deviations are in ui.md. *Why:* shaping the feature to the library is cheaper than reshaping the library. **built (untested)**: `app/src/components/SpaceCanvas.tsx`.
 - **RD-77** Whether a Resource embeds a Map, and whether its content area draws above its Title, follow its resolved content, so a Reference Resource takes both from its Target. *Why:* the content decides its geometry, not the stored kind. **built**: `ui/test/CanvasResource.test.tsx` › "takes a Reference Resource’s content-area layout from its Target, including its Close fade"; `react-flow-adapter/test/ResourceNode.test.tsx` › "draws an Open Reference Resource to an Ur Resource as its Title alone, read-only".
-- **RD-78** A drawn Resource draws no other Resource's or Space's name: neither a Reference Resource's Target nor a Space Resource's target Space is named on it. *Why:* the glyph and border tell them apart (RD-9, RD-10). **built (untested)**: `ui/src/CanvasResource.tsx`.
+- **RD-78** A drawn Resource draws no other Resource's or Space's name: neither a Reference Resource's Target nor a Space Resource's target Space is named on it. *Why:* the glyph tells them apart (RD-9). **built (untested)**: `ui/src/CanvasResource.tsx`.
 
 RD-77 and RD-78 belong with the Resources (RD-11); they are numbered here because ids are append-only.
 

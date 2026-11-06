@@ -337,8 +337,8 @@ Every item another trace sends to rendering, with where it landed.
 Kept under drafting rule 5 (code plus a test, contradicted by nothing):
 - RD-7 the image skeleton and failed state naming its URL.
 - RD-8 the Close fade and reduced motion → removed (drafting rule 6).
-- RD-10 the Reference Resource's distinct border at rest (dotted → removed (drafting rule 6)). Its solid border while hovered, selected or dragged (`ui/src/kinds/reference-canvas.css`) is untested and cut from the rule (§5).
-- RD-12 the rung weights and same ink → removed (drafting rule 6).
+- RD-10 the Reference Resource's distinct border at rest → removed (drafting rule 6); the glyph (RD-9) tells a Reference apart. Its solid border while hovered, selected or dragged (`ui/src/kinds/reference-canvas.css`) is untested and cut from the rule (§5).
+- RD-12 the rung weights, same ink, and the `title`/`subtitle`/`caption` roles → removed (drafting rule 6).
 - RD-15 three visual lines of a single-line Title. The per-Shape ceiling numbers are untested and kept as a code note (§5).
 - RD-20 distinct rest, selected and dragging treatments.
 - RD-21 the drag lean → removed (drafting rule 6); the drawn Map moving rigidly with it stays.
