@@ -176,8 +176,6 @@ export function EmbeddedMapAuthoring({
     continuation: composition.continuation,
     commandOutcomes: entry.app.commandOutcomes,
     deleteConfirmation: entry.app.deleteConfirmation,
-    imageReplacement: entry.app.imageReplacement,
-    pickImages: entry.app.pickImages,
     nodes: canvasRendering.liveProjection?.nodes ?? EMPTY_NODES,
     availability,
     nameOnCreation,

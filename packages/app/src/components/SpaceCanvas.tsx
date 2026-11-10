@@ -117,7 +117,6 @@ import { FullView } from './FullView';
 import { openAndExpandSize, openHeight, visibleCanvasCap } from '../open-and-expand';
 import type { CommandOutcomes } from '../command-outcomes';
 import type { DeleteConfirmation } from '../delete-confirmation';
-import type { ImageReplacements } from '../image-replacement';
 import {
   framingFromFit,
   panFraming,
@@ -203,13 +202,6 @@ export interface SpaceCanvasProps {
   readonly deleteConfirmation: DeleteConfirmation;
   /** The composition's plugin gate and reporter (ADR 0142). */
   readonly plugins?: CanvasPlugins | undefined;
-  /**
-   * The Space's image replacements (ADR 0106), which own the whole attempt.
-   * The one way Replace reaches an Image Resource on this canvas that offers it.
-   */
-  readonly imageReplacement: Pick<ImageReplacements, 'replace'>;
-  /** The Space's image picker, which Replace's Upload opens. */
-  readonly pickImages: () => Promise<readonly File[]>;
   /**
    * The Resource a completed creation asks to be named, or `null`.
    *
@@ -321,8 +313,6 @@ export function SpaceCanvas({
   commandOutcomes,
   deleteConfirmation,
   plugins,
-  imageReplacement,
-  pickImages,
   nameOnCreation,
   spaceSession,
   spaceResourceTargets,
@@ -666,8 +656,6 @@ export function SpaceCanvas({
     spaceSession,
     resourceResize,
     onSelectResource: selectResource,
-    imageReplacement,
-    pickImages,
     spaceResourceTargets,
     resourceEntityActions: resourceActions,
     openToFit,

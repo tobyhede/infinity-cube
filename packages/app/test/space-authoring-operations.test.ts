@@ -897,19 +897,101 @@ describe('Change Map content (ADR 0142)', () => {
     expect(mapOf(after, OTHER_MAP_ID)).toEqual(mapOf(twoMaps, OTHER_MAP_ID));
   });
 
-  it.each([
-    ['Markdown', withA({ title: 'A', kind: 'markdown', content: { source: 'A' } })],
-    [
-      'Image',
+  /** A plugin's content commit is one ordinary Edit of its Resource's content (ADR 0142). */
+  describe('changed content', () => {
+    const OLD_URL = 'https://example.com/old.png';
+    const NEW_URL = '/assets/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU';
+    const imageSnapshot = withA({ title: 'Figure', kind: 'image', content: { url: OLD_URL } });
+
+    it('replaces the content, keeping the Resource’s identity, Title, placement and Edges', () => {
+      const { authoring, session } = open(imageSnapshot);
+      const before = session.getState().working;
+      expect(
+        authoring.complete(CANVAS, {
+          kind: 'changed-content',
+          resourceId: RESOURCE_A,
+          content: { url: NEW_URL, naturalSize: { width: 4, height: 3 } },
+        }),
+      ).toEqual({ kind: 'completed' });
+      const after = session.getState().working;
+      expect(after.resources.find(({ id }) => id === RESOURCE_A)?.document).toEqual({
+        title: 'Figure',
+        kind: 'image',
+        content: { url: NEW_URL, naturalSize: { width: 4, height: 3 } },
+      });
+      expect(after.resources.map(({ id }) => id)).toEqual(before.resources.map(({ id }) => id));
+      expect(after.document.maps?.map(({ positions, graphs }) => ({ positions, graphs }))).toEqual(
+        before.document.maps?.map(({ positions, graphs }) => ({ positions, graphs })),
+      );
+    });
+
+    it('answers unchanged for the content the Resource already holds', () => {
+      const { authoring } = open(imageSnapshot);
+      expect(
+        authoring.complete(CANVAS, {
+          kind: 'changed-content',
+          resourceId: RESOURCE_A,
+          content: { url: OLD_URL },
+        }),
+      ).toEqual({ kind: 'unchanged' });
+    });
+
+    it('refuses content its kind’s schema refuses, and a Resource that is gone', () => {
+      const { authoring, session } = open(imageSnapshot);
+      const before = session.getState().working;
+      expect(
+        authoring.complete(CANVAS, {
+          kind: 'changed-content',
+          resourceId: RESOURCE_A,
+          content: { url: 'data:image/png;base64,AAAA' },
+        }),
+      ).toEqual({ kind: 'refused', refusal: { code: 'resource-content-invalid' } });
+      expect(
+        authoring.complete(CANVAS, {
+          kind: 'changed-content',
+          resourceId: UNKNOWN_RESOURCE,
+          content: { url: NEW_URL },
+        }),
+      ).toEqual({ kind: 'refused', refusal: { code: 'resource-not-found' } });
+      expect(session.getState().working).toBe(before);
+    });
+
+    it('refuses a content commit that would change what the Resource references', () => {
+      const { authoring } = open(
+        withA({ title: 'A', kind: 'reference', content: { target: RESOURCE_B } }),
+      );
+      expect(
+        authoring.complete(CANVAS, {
+          kind: 'changed-content',
+          resourceId: RESOURCE_A,
+          content: { target: RESOURCE_C },
+        }),
+      ).toEqual({ kind: 'refused', refusal: { code: 'reference-target-immutable' } });
+    });
+  });
+
+  /** An Image Resource's plugin keeps nothing per Map, so any Map content is refused by its schema. */
+  it('refuses Map content an Image Resource’s plugin does not keep', () => {
+    const { authoring, session } = open(
       withA({
         title: 'A',
         kind: 'image',
-        content: {
-          url: '/assets/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU',
-          naturalSize: { width: 640, height: 480 },
-        },
+        content: { url: '/assets/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU' },
       }),
-    ],
+    );
+    const before = session.getState().working;
+    expect(
+      authoring.complete(CANVAS, {
+        kind: 'changed-map-content',
+        resourceId: RESOURCE_A,
+        content: { shape: 'diamond' },
+      }),
+    ).toEqual({ kind: 'refused', refusal: { code: 'map-content-invalid' } });
+    expect(session.getState().working).toBe(before);
+  });
+
+  it.each([
+    ['Markdown', withA({ title: 'A', kind: 'markdown', content: { source: 'A' } })],
     [
       'Space',
       withA({

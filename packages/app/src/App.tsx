@@ -40,6 +40,7 @@ import { PlacementPending } from './components/PlacementPending';
 import { PresentingStage } from './components/PresentingStage';
 import { ShortcutSheet } from './components/ShortcutSheet';
 import { createKeyDispatcher, KeyDispatcherContext, useKeyCover } from './key-dispatcher';
+import { useExclusiveRunning } from './plugin-host/plugin-gate-context';
 import {
   CommandNotices,
   DrawnSpaceNotices,
@@ -134,10 +135,8 @@ export const createApp = (
           : entries,
       );
     }, []);
-    const replacingImage = useSyncExternalStore(
-      composition.imageReplacement.subscribe,
-      composition.imageReplacement.getState,
-    );
+    // Exclusive work on any plugin surface holds this Space (ADR 0126, ADR 0142).
+    const replacingImage = useExclusiveRunning(composition.pluginGate);
     const authoringState = useSyncExternalStore(authoring.subscribe, authoring.getState);
     const { session: sessionState, navigation: navigationState, replacementEpoch } = authoringState;
     // The address, the disclosure and the Stage's Copy link read the Map id
@@ -411,8 +410,6 @@ export const createApp = (
                   commandOutcomes={commandOutcomes}
                   deleteConfirmation={deleteConfirmation}
                   plugins={plugins}
-                  imageReplacement={composition.imageReplacement}
-                  pickImages={composition.pickImages}
                   nameOnCreation={nameOnCreation}
                   spaceSession={spaceSession}
                   spaceResourceTargets={spaceResourceTargets.targets}

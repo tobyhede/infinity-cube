@@ -33,6 +33,7 @@
     "@project/graph": "workspace:*",
     "@project/http": "workspace:*",
     "@project/persistence": "workspace:*",
+    "@project/plugin-image": "workspace:*",
     "@project/plugin-ur": "workspace:*",
     "@project/react-flow-adapter": "workspace:*",
     "@project/resource-api": "workspace:*",

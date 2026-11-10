@@ -20,8 +20,8 @@ import {
   COLLAPSED_RESOURCE_SIZE,
   resourceSize,
   EDGE_TITLE_ONE_LINE,
-  IMAGE_URL_UNSUPPORTED,
   isAcceptedImageUrl,
+  resourceDocumentSchema,
   type ImageNaturalSize,
   graphHeadShape,
   isOneLineEdgeTitle,
@@ -101,6 +101,13 @@ const assertValidAuthoredSnapshot = (snapshot: SpaceSnapshot): void => {
     );
   }
 };
+
+/**
+ * The refusal code for an image URL an Image Resource may not hold (ADR 0106);
+ * the Image plugin's content schema is the rule, and this names it for the
+ * Create Image Resources Edit, which checks each URL before intake.
+ */
+export const IMAGE_URL_UNSUPPORTED = 'image-url-unsupported';
 
 /** One picture an Image Resource is created for: its URL, and its size when it loaded. */
 export interface CreatedImage {
@@ -185,16 +192,17 @@ export type AuthoringCompletion =
       readonly document: ResourceDocument;
     }
   /**
-   * Replace image: the Image Resource's URL and the natural size measured when
-   * it was set, absent when the picture did not load (ADR 0106). Identity,
-   * Title, placement, size and Edges are kept, and the URL it
-   * already holds is `unchanged`.
+   * Change content: a Resource's whole `content`, as its plugin commits it
+   * (ADR 0142), as an Image Resource's Replace names its new picture. The
+   * Resource's kind's schema decides what is accepted, and the rest is the
+   * `edited-resource` Edit's: identity, Title, placement, size and Edges are
+   * kept, what it references may not change, and the content it already holds
+   * is `unchanged`.
    */
   | {
-      readonly kind: 'replaced-image';
+      readonly kind: 'changed-content';
       readonly resourceId: ResourceId;
-      readonly url: string;
-      readonly naturalSize?: ImageNaturalSize;
+      readonly content: JsonValue;
     }
   | {
       readonly kind: 'create-and-connect';
@@ -387,6 +395,8 @@ export type AuthoringRefusal =
   | { readonly code: 'map-content-invalid' }
   /** Exclusive work runs, and this Edit is not its own (ADR 0142). */
   | { readonly code: 'exclusive-work-running' }
+  /** Content the Resource's kind's schema refuses (ADR 0142). */
+  | { readonly code: 'resource-content-invalid' }
   /** A queued Edit discarded because a replacement Space was opened before it drained (ADR 0042). */
   | { readonly code: 'space-replaced' }
   /** A queued Edit discarded because the Edit draining the queue failed before reaching it. */
@@ -1246,27 +1256,38 @@ export function createSpaceAuthoring({
       snapshot = outcome.snapshot;
       return { id };
     };
-    if (completion.kind === 'edited-resource') {
+    if (completion.kind === 'edited-resource' || completion.kind === 'changed-content') {
       const resourceIndex = snapshot.resources.findIndex(
         (resource) => resource.id === completion.resourceId,
       );
       const resource = snapshot.resources[resourceIndex];
       if (resource === undefined) return refuse({ code: 'resource-not-found' });
+      let proposed: ResourceDocument;
+      if (completion.kind === 'changed-content') {
+        // Content a plugin committed is parsed by its kind's schema here, so a
+        // value it refuses is answered rather than thrown by intake.
+        const parsed = resourceDocumentSchema.safeParse({
+          ...resource.document,
+          content: completion.content,
+        });
+        if (!parsed.success) return refuse({ code: 'resource-content-invalid' });
+        proposed = parsed.data;
+      } else {
+        proposed = completion.document;
+      }
       // Kind is fixed for a Resource's lifetime, and changing it is out of scope for
       // version 1. Everything else the editor holds — a Markdown Resource's Title
       // and body, or a Reference Resource's Title and Target — is one ordinary Edit of
       // this Resource.
-      if (resource.document.kind !== completion.document.kind) {
+      if (resource.document.kind !== proposed.kind) {
         return refuse({ code: 'resource-kind-immutable' });
       }
       // What a Resource references is fixed for its lifetime too: a Reference
       // Resource's Target (ADR 0070) and a Space Resource's target Space.
-      if (
-        !sameValue(resourceReferences(resource.document), resourceReferences(completion.document))
-      ) {
+      if (!sameValue(resourceReferences(resource.document), resourceReferences(proposed))) {
         return refuse({ code: 'reference-target-immutable' });
       }
-      if (!sameValue(spaceReferences(resource.document), spaceReferences(completion.document))) {
+      if (!sameValue(spaceReferences(resource.document), spaceReferences(proposed))) {
         return refuse({ code: 'space-resource-target-immutable' });
       }
       // Normalized and refused *here* rather than only at the surface that
@@ -1275,28 +1296,10 @@ export function createSpaceAuthoring({
       // by throwing, and an author's mistake may not throw. Every caller of
       // this operation is covered by one rule instead of each remembering it,
       // and that one rule is the schema's own (ADR 0083).
-      const title = namedResourceTitle(completion.document.title);
+      const title = namedResourceTitle(proposed.title);
       if (title === null) return refuse({ code: RESOURCE_TITLE_REQUIRED });
-      const document: ResourceDocument = { ...completion.document, title };
+      const document: ResourceDocument = { ...proposed, title };
       if (sameValue(resource.document, document)) return UNCHANGED;
-      const resources = [...snapshot.resources];
-      resources[resourceIndex] = { id: resource.id, document };
-      snapshot = { ...snapshot, resources };
-    } else if (completion.kind === 'replaced-image') {
-      const resourceIndex = snapshot.resources.findIndex(
-        (resource) => resource.id === completion.resourceId,
-      );
-      const resource = snapshot.resources[resourceIndex];
-      if (resource === undefined) return refuse({ code: 'resource-not-found' });
-      if (resource.document.kind !== imageKind.id)
-        return refuse({ code: 'resource-kind-immutable' });
-      if (completion.url === resource.document.content.url) return UNCHANGED;
-      // A URL the schema will not hold is refused before intake, which answers
-      // it by throwing, and an author's URL may not throw
-      // (`image-replacement.test.ts`, "refuses a URL an Image Resource may not
-      // hold rather than throwing on intake").
-      if (!isAcceptedImageUrl(completion.url)) return refuse({ code: IMAGE_URL_UNSUPPORTED });
-      const document = imageDocument(resource.document.title, completion);
       const resources = [...snapshot.resources];
       resources[resourceIndex] = { id: resource.id, document };
       snapshot = { ...snapshot, resources };

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { useOpenSpaces } from '../open-spaces-context';
 import { createPluginGate, type PluginGate } from './plugin-gate';
 
@@ -10,4 +10,12 @@ import { createPluginGate, type PluginGate } from './plugin-gate';
 export function usePluginGate(): PluginGate {
   const [own] = useState(createPluginGate);
   return useOpenSpaces()?.pluginGate ?? own;
+}
+
+/**
+ * Whether exclusive work runs behind this gate: the hold ADR 0126 sets on
+ * authoring and navigation while it does.
+ */
+export function useExclusiveRunning(gate: PluginGate): boolean {
+  return useSyncExternalStore(gate.subscribe, gate.exclusiveRunning, gate.exclusiveRunning);
 }

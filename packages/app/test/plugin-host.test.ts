@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import fc from 'fast-check';
-import { resourceDocumentSchema, uuidSchema } from '@project/core';
+import { uuidSchema, type ResourceDocument } from '@project/core';
 import type { ObserverErrorReporter } from '@project/persistence';
-import type { Answer } from '@project/resource-api/domain';
+import { isStoredAsset, type Answer, type StoreAnswer } from '@project/resource-api/domain';
 import type { PluginOperations } from '@project/ui';
 import {
   beginExclusive,
@@ -29,6 +29,10 @@ import type { AuthoringResult, Settle } from '../src/space-authoring';
 const RESOURCE = uuidSchema.parse('00000000-0000-4000-8000-0000000000a1');
 const STORED = resourceDocumentSchema.parse({ title: 'Decide', kind: 'ur', content: {} });
 const FACTS = { authorOnCanvas: true, editable: true };
+
+/** Why storing refused, or undefined for a store that answered a reference. */
+const refusalOf = (stored: StoreAnswer | undefined): string | undefined =>
+  stored === undefined || isStoredAsset(stored) ? undefined : stored.refused;
 
 /** Why an answer refused, or undefined for one that did not. */
 const reasonOf = (answer: Answer | undefined): string | undefined =>
@@ -329,24 +333,25 @@ describe('the plugin gate', () => {
 });
 
 describe('a plugin surface’s commits on the canvas', () => {
+  const DOCUMENT: ResourceDocument = {
+    title: 'Figure',
+    kind: 'image',
+    content: { url: 'https://example.com/a.png' },
+  };
+  const STORED = `/assets/${'C'.repeat(43)}` as const;
   const hostWith = (
     complete: PluginHost['complete'],
     epoch: { value: number } = { value: 0 },
     report: ObserverErrorReporter = () => undefined,
-  ): PluginHost => {
-    const gate = createPluginGate();
-    return {
-      gate,
-      // As the canvas reads it: the chain the gate last published.
-      get claims() {
-        return gate.getState();
-      },
-      replacementEpoch: () => epoch.value,
-      document: (resourceId) => (resourceId === RESOURCE ? STORED : undefined),
-      complete,
-      report,
-    };
-  };
+    assets: PluginHost['assets'] = {},
+  ): PluginHost => ({
+    gate: createPluginGate(),
+    replacementEpoch: () => epoch.value,
+    complete,
+    report,
+    document: (resourceId) => (resourceId === RESOURCE ? DOCUMENT : undefined),
+    assets,
+  });
 
   it('answers a settled Edit in the words every refusal is reported in', () => {
     expect(answerOf({ kind: 'completed' })).toBe('completed');
@@ -401,18 +406,77 @@ describe('a plugin surface’s commits on the canvas', () => {
     expect(complete).toHaveBeenCalledTimes(1);
   });
 
-  it('commits the Title and the content as one Edit of the Resource, and refuses either invalid', async () => {
-    const complete = vi.fn<PluginHost['complete']>(() => ({ kind: 'completed' }));
-    const operations = pluginSurfaceOperations('ur', RESOURCE, FACTS, hostWith(complete));
-    await expect(operations.commitTitle?.('Decided')).resolves.toBe('completed');
-    await expect(operations.commitContent?.({})).resolves.toBe('completed');
-    expect(complete.mock.calls.map(([completion]) => completion)).toEqual([
-      { kind: 'edited-resource', resourceId: RESOURCE, document: { ...STORED, title: 'Decided' } },
-      { kind: 'edited-resource', resourceId: RESOURCE, document: STORED },
-    ]);
-    expect(reasonOf(await operations.commitTitle?.('   '))).toMatch(/\S/u);
-    expect(reasonOf(await operations.commitContent?.({ stray: true }))).toMatch(/\S/u);
-    expect(complete).toHaveBeenCalledTimes(2);
+  it('commits a Title as one Edit of the document as it stands, and refuses one whose Resource is gone', async () => {
+    const complete = vi.fn((): AuthoringResult => ({ kind: 'completed' }));
+    const host = hostWith(complete);
+    const operations = pluginSurfaceOperations('image', RESOURCE, FACTS, host);
+    await expect(operations.commitTitle?.('Harbour')).resolves.toBe('completed');
+    expect(complete).toHaveBeenCalledWith(
+      {
+        kind: 'edited-resource',
+        resourceId: RESOURCE,
+        document: { ...DOCUMENT, title: 'Harbour' },
+      },
+      expect.any(Function),
+    );
+    const gone = pluginSurfaceOperations(
+      'image',
+      uuidSchema.parse('00000000-0000-4000-8000-0000000000a3'),
+      FACTS,
+      host,
+    );
+    expect(reasonOf(await gone.commitTitle?.('Harbour'))).toMatch(/\S/u);
+    expect(complete).toHaveBeenCalledTimes(1);
+  });
+
+  it('commits content as one changed-content Edit', async () => {
+    const complete = vi.fn((): AuthoringResult => ({ kind: 'unchanged' }));
+    const operations = pluginSurfaceOperations('image', RESOURCE, FACTS, hostWith(complete));
+    await expect(operations.commitContent?.({ url: 'https://example.com/b.png' })).resolves.toBe(
+      'unchanged',
+    );
+    expect(complete).toHaveBeenCalledWith(
+      {
+        kind: 'changed-content',
+        resourceId: RESOURCE,
+        content: { url: 'https://example.com/b.png' },
+      },
+      expect.any(Function),
+    );
+  });
+
+  it('offers the store and picker only where the canvas offers them', () => {
+    const operations = pluginSurfaceOperations('image', RESOURCE, FACTS, hostWith(vi.fn()));
+    expect(operations.commitStore).toBeUndefined();
+    expect(operations.pick).toBeUndefined();
+  });
+
+  it('stores and picks while no exclusive work runs, and stores only for that work while it does', async () => {
+    const store = vi.fn(() => Promise.resolve(STORED));
+    const pick = vi.fn(() => Promise.resolve([new File(['x'], 'x.png')]));
+    const host = hostWith(vi.fn(), undefined, undefined, { store, pick });
+    const operations = pluginSurfaceOperations('image', RESOURCE, FACTS, host);
+    await expect(operations.commitStore?.(new Blob(['a']))).resolves.toBe(STORED);
+    await expect(operations.pick?.('image/png')).resolves.toHaveLength(1);
+    const held = operations.claim?.();
+    let ownStore: ((bytes: Blob) => Promise<StoreAnswer>) | undefined;
+    let finish: () => void = () => undefined;
+    const work = held?.exclusively(
+      (own) =>
+        new Promise<void>((resolve) => {
+          ownStore = own.store;
+          finish = resolve;
+        }),
+    );
+    expect(refusalOf(await operations.commitStore?.(new Blob(['b'])))).toMatch(/\S/u);
+    await expect(operations.pick?.('image/png')).resolves.toEqual([]);
+    await expect(ownStore?.(new Blob(['c']))).resolves.toBe(STORED);
+    finish();
+    await work;
+    expect(refusalOf(await ownStore?.(new Blob(['d'])))).toMatch(/\S/u);
+    expect(store).toHaveBeenCalledTimes(2);
+    expect(pick).toHaveBeenCalledTimes(1);
+    held?.release();
   });
 
   it('withdraws every plain commit while exclusive work runs, and keeps that work’s own live', async () => {

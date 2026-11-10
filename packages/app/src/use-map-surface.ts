@@ -5,6 +5,7 @@ import { useCanvasRendering, type CanvasRendering } from './canvas-rendering';
 import type { MapSurface } from './map-surface';
 import { useAnySpaceReplacingImage } from './open-spaces-context';
 import { useAuthoringAvailability } from './use-authoring-availability';
+import { useExclusiveRunning, usePluginGate } from './plugin-host/plugin-gate-context';
 import { nextResourceTitle } from './titles';
 
 /**
@@ -30,10 +31,9 @@ export function useMapSurface(
   },
 ) {
   const state = useSyncExternalStore(surface.authoring.subscribe, surface.authoring.getState);
-  const ownReplacement = useSyncExternalStore(
-    app.imageReplacement.subscribe,
-    app.imageReplacement.getState,
-  );
+  // Exclusive work behind this drawing's gate holds it, as it holds every
+  // composed Space through the open set (ADR 0126, ADR 0142).
+  const ownReplacement = useExclusiveRunning(usePluginGate());
   const anyReplacement = useAnySpaceReplacingImage();
   // The Space Authoring state an Edit mints from, rather than the surface's
   // copy, which lags until the surface observes the Space

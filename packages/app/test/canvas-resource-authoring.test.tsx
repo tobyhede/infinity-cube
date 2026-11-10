@@ -13,8 +13,8 @@ import {
   type SpaceResourceTargets,
 } from '../src/space-resource-targets';
 import { fixtureDisplay, fixtureFacts } from './render-adapter-fixtures';
-import type { ImageSources } from '../src/image-creation';
-import { heldImageSources, unusedImageSources } from './image-sources';
+import { PluginAssetsProvider } from '@project/ui';
+import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
 import { canvasAuthoring } from './canvas-authoring';
 
@@ -138,11 +138,10 @@ const mountAuthoring = (
 ) => {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-  const { authoring, adapter, imageReplacement, pickImages, commandOutcomes, continuation } =
-    composeApp({
-      images: unusedImageSources,
-      spaceSession,
-    });
+  const { authoring, adapter, commandOutcomes, continuation } = composeApp({
+    images: unusedImageSources,
+    spaceSession,
+  });
   const initialProps: HookProps = {
     open: false,
     enabled: true,
@@ -154,8 +153,6 @@ const mountAuthoring = (
     ({ open, enabled, presenting, nameOnCreation, resourceId }: HookProps) =>
       useCanvasResourceAuthoring({
         continuation,
-        imageReplacement,
-        pickImages,
         nodes: [node(open, resourceId, projectedKind)],
         // The two facts this hook's rules turn on, stated as facts and turned
         // into answers by the one module that owns them. A live chrome rename is
@@ -190,9 +187,7 @@ const mountAuthoring = (
 /** The content edit a Resource's kind offers, where its kind has one. */
 const beginEditOf = (node: ResourceFlowNode): (() => void) | undefined => {
   const operations = node.data.kindOperations;
-  return operations.kind === 'markdown' || operations.kind === 'image'
-    ? operations.onBeginEdit
-    : undefined;
+  return operations.kind === 'markdown' ? operations.onBeginEdit : undefined;
 };
 
 /** An Ur Resource's Map content commit, where its plugin surface is offered one. */
@@ -626,15 +621,13 @@ describe('canvas Resource authoring Space rail', () => {
   const mountRail = (open: boolean, withTarget: boolean, readOnly = false, enabled = true) => {
     const loaded = { snapshot, revision: 0n, exportedRevision: null };
     const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-    const { authoring, adapter, imageReplacement, pickImages, continuation } = composeApp({
+    const { authoring, adapter, continuation } = composeApp({
       images: unusedImageSources,
       spaceSession,
     });
     return renderHook(() =>
       useCanvasResourceAuthoring({
         continuation,
-        imageReplacement,
-        pickImages,
         nodes: [spaceNode(open, readOnly)],
         availability: authoringAvailability({
           editable: true,
@@ -739,7 +732,7 @@ describe('canvas Resource authoring decoration identity', () => {
   const mountIdentity = () => {
     const loaded = { snapshot, revision: 0n, exportedRevision: null };
     const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-    const { authoring, adapter, imageReplacement, pickImages, continuation } = composeApp({
+    const { authoring, adapter, continuation } = composeApp({
       images: unusedImageSources,
       spaceSession,
     });
@@ -751,8 +744,6 @@ describe('canvas Resource authoring decoration identity', () => {
       ({ spaceResourceTargets, portalEditing }: IdentityProps) =>
         useCanvasResourceAuthoring({
           continuation,
-          imageReplacement,
-          pickImages,
           nodes: projection,
           availability: authoringAvailability({
             editable: true,
@@ -847,9 +838,10 @@ describe('canvas Resource authoring decoration identity', () => {
   });
 });
 
-describe('canvas Resource authoring, replacing an image', () => {
+describe('canvas Resource authoring, an Image Resource’s plugin surface', () => {
   const IMAGE_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000b');
   const OLD_URL = 'https://example.com/old.png';
+  const NEW_URL = 'https://example.com/new.png';
   const withImage = spaceSnapshotSchema.parse({
     id: SPACE_ID,
     document: {
@@ -861,7 +853,7 @@ describe('canvas Resource authoring, replacing an image', () => {
           title: 'Map',
           kind: 'positioned',
           positions: {
-            [IMAGE_ID]: { x: 0, y: 0, open: true, size: { width: 640, height: 480 } },
+            [IMAGE_ID]: { x: 0, y: 0, open: false, size: { width: 640, height: 480 } },
           },
           graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
         },
@@ -885,130 +877,148 @@ describe('canvas Resource authoring, replacing an image', () => {
       readOnly: false,
       ...bareKindData('image'),
       ...fixtureFacts('image'),
-      open: true,
       selectedForAuthoring: false,
-      display: {
-        shown: 'open',
-        content: { kind: 'image', url: OLD_URL, via: 'self' },
-      },
+      display: { shown: 'closed' },
+      ownContent: { url: OLD_URL },
+      mapContent: {},
       activeGraphId: GRAPH_ID,
       activeGraphColor: '#8a94a6',
       borderColor: null,
       receding: false,
     },
   };
-  /** The replacer an Image Resource's running edit carries, absent at rest. */
-  const replacerOf = (drawn: ResourceFlowNode) =>
-    drawn.data.display.shown === 'editing' && drawn.data.display.kind === 'image'
-      ? drawn.data.display.edit
-      : undefined;
-  /**
-   * The hook over a composed Space whose image replacements store and measure
-   * through `images`. What a replacement does is the replacement module's
-   * (`image-replacement.test.ts`); these prove only what the canvas draws and says.
-   */
-  const mountImage = (images: ImageSources = unusedImageSources) => {
+  /** The operations the Image Resource's plugin surface is handed. */
+  const operationsOf = (drawn: ResourceFlowNode) =>
+    drawn.data.kindOperations.kind === 'image' ? drawn.data.kindOperations : undefined;
+
+  const STORED = `/assets/${'B'.repeat(43)}` as const;
+  const store = vi.fn((bytes: Blob) =>
+    Promise.resolve(bytes.size > 0 ? STORED : { refused: 'Empty.' }),
+  );
+  const pick = vi.fn(() => Promise.resolve([]));
+
+  /** The hook over a composed Space holding one Image Resource, with an asset store supplied. */
+  const mountImage = (editable = true) => {
     const loaded = { snapshot: withImage, revision: 0n, exportedRevision: null };
     const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-    const { authoring, adapter, imageReplacement, pickImages, continuation } = composeApp({
-      images,
+    const { authoring, adapter, continuation } = composeApp({
+      images: unusedImageSources,
       spaceSession,
       reportObserverError: vi.fn(),
     });
-    const hook = renderHook(() =>
-      useCanvasResourceAuthoring({
-        continuation,
-        nodes: [imageNode],
-        availability: authoringAvailability({
-          editable: true,
-          replacingImage: false,
-          presenting: false,
-          editingResourceBody: false,
-          editingResourceTitle: false,
-          editingChromeTitle: false,
-          spaceOnCanvas: true,
-          editingEmbeddedMap: false,
+    const hook = renderHook(
+      () =>
+        useCanvasResourceAuthoring({
+          continuation,
+          nodes: [imageNode],
+          availability: authoringAvailability({
+            editable,
+            replacingImage: false,
+            presenting: false,
+            editingResourceBody: false,
+            editingResourceTitle: false,
+            editingChromeTitle: false,
+            spaceOnCanvas: true,
+            editingEmbeddedMap: false,
+          }),
+          nameOnCreation: null,
+          authoring: canvasAuthoring(authoring),
+          spaceSession,
+          resourceResize: adapter.getState().resourceResize,
+          onSelectResource: () => undefined,
         }),
-        nameOnCreation: null,
-        authoring: canvasAuthoring(authoring),
-        spaceSession,
-        resourceResize: adapter.getState().resourceResize,
-        onSelectResource: () => undefined,
-        imageReplacement,
-        pickImages,
-      }),
+      {
+        wrapper: ({ children }) => (
+          <PluginAssetsProvider value={{ url: (ref) => ref, read: vi.fn(), store, pick }}>
+            {children}
+          </PluginAssetsProvider>
+        ),
+      },
     );
     return { ...hook, spaceSession };
   };
 
-  it('installs the upload target when Replace begins on an Open Image Resource', () => {
+  it('hands the plugin its Title and content commits, the asset store, the picker and a Claim', () => {
     const { result } = mountImage();
-
-    expect(replacerOf(onlyNode(result.current.nodes))).toBeUndefined();
-    act(() => beginEditOf(onlyNode(result.current.nodes))?.());
-
-    expect(replacerOf(onlyNode(result.current.nodes))).toBeDefined();
-    expect(result.current.bodyEditing).toBe(true);
+    const operations = operationsOf(onlyNode(result.current.nodes));
+    expect(operations?.commitTitle).toBeDefined();
+    expect(operations?.commitContent).toBeDefined();
+    expect(operations?.commitStore).toBeDefined();
+    expect(operations?.pick).toBeDefined();
+    expect(operations?.claim).toBeDefined();
+    expect(operations?.commitMap).toBeDefined();
   });
 
-  it('says a broken upload in the target and keeps the target open', async () => {
-    const { result, spaceSession } = mountImage();
-    act(() => beginEditOf(onlyNode(result.current.nodes))?.());
-    const before = spaceSession.getState().working;
+  it('hands a canvas that authors nothing no commit, store, picker or Claim', () => {
+    const { result } = mountImage(false);
+    const operations = operationsOf(onlyNode(result.current.nodes));
+    expect(operations?.kind).toBe('image');
+    for (const offered of [
+      'commitTitle',
+      'commitContent',
+      'commitMap',
+      'commitStore',
+      'pick',
+      'claim',
+    ]) {
+      expect(operations).not.toHaveProperty(offered);
+    }
+  });
 
+  it('replaces the picture by one content commit, keeping the Resource’s identity, Title and placement', async () => {
+    const { result, spaceSession } = mountImage();
+    const before = spaceSession.getState().working;
     await act(async () => {
       await expect(
-        replacerOf(onlyNode(result.current.nodes))?.onReplace({
-          kind: 'files',
-          files: [new File(['bytes'], 'figure.png', { type: 'image/png' })],
-        }),
-      ).resolves.toBe('This image was not replaced: No image store is reachable.');
+        operationsOf(onlyNode(result.current.nodes))?.commitContent?.({ url: NEW_URL }),
+      ).resolves.toBe('completed');
+    });
+    const after = spaceSession.getState().working;
+    expect(after.resources).toEqual([
+      { id: IMAGE_ID, document: { title: 'Figure', kind: 'image', content: { url: NEW_URL } } },
+    ]);
+    expect(after.document.maps?.[0]?.positions).toEqual(before.document.maps?.[0]?.positions);
+  });
+
+  it('answers unchanged for the content it already holds', async () => {
+    const { result, spaceSession } = mountImage();
+    const before = spaceSession.getState().working;
+    await act(async () => {
+      await expect(
+        operationsOf(onlyNode(result.current.nodes))?.commitContent?.({ url: OLD_URL }),
+      ).resolves.toBe('unchanged');
     });
     expect(spaceSession.getState().working).toBe(before);
-    expect(result.current.bodyEditing).toBe(true);
   });
 
-  it('says another replacement is still running in the target, keeping it open', async () => {
-    const held = heldImageSources();
-    const { result } = mountImage(held.images);
-    act(() => beginEditOf(onlyNode(result.current.nodes))?.());
-    const replacer = replacerOf(onlyNode(result.current.nodes));
-
-    let first: Promise<string | null> | undefined;
-    await act(async () => {
-      first = replacer?.onReplace({ kind: 'url', url: 'https://example.com/first.png' });
-      await expect(
-        replacer?.onReplace({ kind: 'url', url: 'https://example.com/second.png' }),
-      ).resolves.toBe('Another image is still being replaced.');
-    });
-    expect(result.current.bodyEditing).toBe(true);
-
-    held.release();
-    await act(async () => {
-      await expect(first).resolves.toBeNull();
-    });
-  });
-
-  it('replaces the image from the target in one Edit, and says a refusal in the application’s words', async () => {
+  it('refuses content the Image Resource cannot hold, in the application’s words', async () => {
     const { result, spaceSession } = mountImage();
-    act(() => beginEditOf(onlyNode(result.current.nodes))?.());
-    const replacer = replacerOf(onlyNode(result.current.nodes));
-
-    let refused: string | null | undefined;
-    let replaced: string | null | undefined;
+    const before = spaceSession.getState().working;
+    let answer: unknown;
     await act(async () => {
-      refused = await replacer?.onReplace({ kind: 'url', url: 'data:image/png;base64,AAAA' });
-      replaced = await replacer?.onReplace({ kind: 'url', url: 'https://example.com/new.png' });
+      answer = await operationsOf(onlyNode(result.current.nodes))?.commitContent?.({
+        url: 'data:image/png;base64,AAAA',
+      });
     });
-    expect(refused).toBe('An image URL must start with https: or http:.');
-    expect(replaced).toBeNull();
+    expect(answer).toEqual({ refused: 'This Resource cannot hold that content.' });
+    expect(spaceSession.getState().working).toBe(before);
+  });
 
-    expect(spaceSession.getState().working.resources[0]?.document).toEqual({
-      title: 'Figure',
-      kind: 'image',
-      content: { url: 'https://example.com/new.png' },
+  it('renames by a Title commit', async () => {
+    const { result, spaceSession } = mountImage();
+    await act(async () => {
+      await expect(
+        operationsOf(onlyNode(result.current.nodes))?.commitTitle?.('Harbour'),
+      ).resolves.toBe('completed');
     });
-    act(() => replacer?.onEnd());
-    expect(replacerOf(onlyNode(result.current.nodes))).toBeUndefined();
+    expect(spaceSession.getState().working.resources[0]?.document.title).toBe('Harbour');
+  });
+
+  it('stores through the application’s asset store while no exclusive work runs', async () => {
+    const { result } = mountImage();
+    await expect(
+      operationsOf(onlyNode(result.current.nodes))?.commitStore?.(new Blob(['png'])),
+    ).resolves.toBe(STORED);
+    expect(store).toHaveBeenCalledTimes(1);
   });
 });

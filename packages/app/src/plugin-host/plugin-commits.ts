@@ -1,11 +1,4 @@
-import {
-  RESOURCE_TITLE_REQUIRED,
-  resourceDocumentSchema,
-  type JsonValue,
-  type PluginKind,
-  type ResourceDocument,
-  type ResourceId,
-} from '@project/core';
+import type { PluginKind, ResourceDocument, ResourceId } from '@project/core';
 import type { ObserverErrorReporter } from '@project/persistence';
 import type { Answer } from '@project/resource-api/domain';
 import type { Assets } from '@project/resource-api/view';
@@ -95,17 +88,19 @@ export interface PluginHost {
   readonly report: ObserverErrorReporter;
   /** The asset store and file picker a surface offers where it offers commits; absent, neither. */
   readonly assets?: Pick<Assets, 'store' | 'pick'> | undefined;
+  /** The Resource's stored document as it stands now, which a Title commit edits. */
+  readonly document: (resourceId: ResourceId) => ResourceDocument | undefined;
 }
 
-/** Who holds a Claim on a drawing's Resource, as that drawing reads it. */
-export const claimHolderOf = (chain: ClaimChain, drawing: Drawing): ClaimHolder => {
-  if (holds(chain, drawing.key)) return 'this-drawing';
-  return heldByAnotherDrawing(chain, drawing) ? 'another-drawing' : 'none';
-};
+const NOT_FOUND: Refusal = { refused: 'This Resource is no longer available.' };
 
 /**
  * The commits a surface's Resource may make, each running only while `live()`
- * answers, and each landing through `complete`.
+ * answers: its Title as one ordinary `edited-resource` Edit of the document as
+ * it stands, its content as a `changed-content` Edit, its Map content as a
+ * `changed-map-content` Edit, and the asset store where the canvas offers one.
+ * Exclusive work's own commits are admitted past the gate every Space's
+ * Authoring asks at `complete`; a plain one is not.
  */
 function commitsFor(
   host: PluginHost,
@@ -113,13 +108,21 @@ function commitsFor(
   live: () => Refusal | null,
   complete: PluginHost['complete'],
 ): PluginCommits {
-  const changeMapContent = (content: JsonValue): Promise<Answer> => {
+  const complete = own
+    ? (completion: DrawnCompletion, settle: Settle) =>
+        host.gate.admit(() => host.complete(completion, settle))
+    : host.complete;
+  const run = (completion: () => DrawnCompletion | undefined): Promise<Answer> => {
     const withdrawn = live();
     if (withdrawn !== null) return Promise.resolve(withdrawn);
-    return completeAsAnswer(
-      (settle) => complete({ kind: 'changed-map-content', resourceId, content }, settle),
-      host.report,
-    );
+    const built = completion();
+    if (built === undefined) return Promise.resolve(NOT_FOUND);
+    return completeAsAnswer((settle) => complete(built, settle), host.report);
+  };
+  const retitled = (title: string) => (): DrawnCompletion | undefined => {
+    const document = host.document(resourceId);
+    if (document === undefined) return undefined;
+    return { kind: 'edited-resource', resourceId, document: { ...document, title } };
   };
   /** One Edit of the Resource's document, its kind's schema answering for the next one. */
   const editDocument = (
@@ -151,9 +154,9 @@ function commitsFor(
   // A size hint is ignored: Ur, the one plugin drawn here, commits none, and
   // the canvas applies none yet (`docs/agents/maps-and-graphs.md`, R38, R40).
   return {
-    title: (next) => editDocument({ title: next }),
-    content: (next) => editDocument({ content: next }),
-    map: (next) => changeMapContent(next),
+    title: (next) => run(retitled(next)),
+    content: (next) => run(() => ({ kind: 'changed-content', resourceId, content: next })),
+    map: (next) => run(() => ({ kind: 'changed-map-content', resourceId, content: next })),
     store:
       store === undefined
         ? undefined
