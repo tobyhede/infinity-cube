@@ -133,7 +133,7 @@ describe('the Aggregate directory MCP server', () => {
     const bytes = Uint8Array.from([
       0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff, 0xfe,
     ]);
-    const image = 'images/picture.png';
+    const image = 'assets/picture.png';
 
     const written = await callTool(client, 'write_file', {
       path: image,
@@ -149,11 +149,11 @@ describe('the Aggregate directory MCP server', () => {
 
   it('refuses to read a file that is not UTF-8 as text, naming base64', async () => {
     const directory = await writeTalk();
-    await mkdir(join(directory, 'images'));
-    await writeFile(join(directory, 'images', 'picture.png'), Uint8Array.from([0x89, 0xff, 0x00]));
+    await mkdir(join(directory, 'assets'));
+    await writeFile(join(directory, 'assets', 'picture.png'), Uint8Array.from([0x89, 0xff, 0x00]));
     const client = await connect(directory);
 
-    const answer = await callTool(client, 'read_file', { path: 'images/picture.png' });
+    const answer = await callTool(client, 'read_file', { path: 'assets/picture.png' });
 
     expect(answer.isError).toBe(true);
     expect(answer.text).toContain('base64');

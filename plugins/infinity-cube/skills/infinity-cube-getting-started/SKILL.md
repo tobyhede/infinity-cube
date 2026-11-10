@@ -36,7 +36,7 @@ Work from the root of the InfinityCube clone. With no clone at hand, as when thi
    - Killing InfinityCube outright within that second, or a second Ctrl-C, loses the edits not yet written. A write can also fail, for example on a full disk: InfinityCube prints `Could not write the directory:` and tries again, but if the write on stopping fails it prints `Stopped, but the last edits were not written:`, exits 1, and those edits are lost. Check that stopping ends with `Stopped; <dir> holds every edit.` before treating the directory as complete.
    - InfinityCube writes only its own files, in place, and changes only the ones whose content changed. Anything else in the directory (`.git`, a README at the top, a `notes/` directory) is left alone. A crash in the middle of a write can leave some files new and some old; git restores them.
    - A `*.md` file beside `space.json` is refused by the run, naming it, and removed by the next Export, so notes belong in another directory.
-   - Uploaded pictures are written to `images/` and committed with everything else.
+   - Uploaded pictures are written to `assets/` and committed with everything else.
    - Commit from the content directory: `git -C <dir> add -A && git -C <dir> commit`.
 
    Done when the person has the address and has been told each point above.

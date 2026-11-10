@@ -30,4 +30,6 @@ ADR 0106 kept a stored image outside the aggregate and had Export carry only an 
 
 ADR 0106's exception to ADR 0056 narrows. An external image URL's bytes are still not the repository's. A stored image the aggregate references now travels with it, so Export, a reset and Import restores the pictures as well as the Spaces. A stored image nothing references still does not travel.
 
+ADR 0142 widens this rule from stored images to every stored asset, of any media type: the directory is `assets/`, each file `assets/<hash>.<ext>` and each reference `/assets/<hash>`, found by walking each Resource's `content` without naming a kind. Bytes still travel only while a Resource references them, the host admits any media type rather than refusing a file that is not an image, and Export keeps a file of a referenced asset whose bytes the store does not hold.
+
 The fixture's separate image directory is gone: the tracked picture lives in the fixture's own `images/`, and the fixture importer imports through the normal path.
