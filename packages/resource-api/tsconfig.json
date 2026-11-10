@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["react", "react-dom"],
+    // The Resource API (ADR 0142) is the one door a Resource plugin may reach,
+    // so it reaches none of ours: no `@project/*` resolves here, and `rootDir`
+    // refuses a relative escape. Its `/domain` entry imports no React, which
+    // `eslint.config.js` holds.
+    "rootDir": "src",
+    "paths": {}
+  },
+  "include": ["src"]
+}

@@ -9,7 +9,9 @@
     // works for a package with no dependencies. The relative-escape half of the
     // boundary is an ESLint pattern instead.
     "paths": {
-      "@project/core": ["../core/src/index.ts"]
+      "@project/core": ["../core/src/index.ts"],
+      "@project/plugin-ur/domain": ["../plugin-ur/src/domain.ts"],
+      "@project/resource-api/domain": ["../resource-api/src/domain/index.ts"]
     }
   },
   "include": ["src"]

@@ -7,7 +7,11 @@
     // `graph`, which would put domain logic behind a component; not the render
     // libraries, which belong to the adapter. (No `rootDir` — see `graph`.)
     "paths": {
-      "@project/core": ["../core/src/index.ts"]
+      "@project/core": ["../core/src/index.ts"],
+      "@project/plugin-ur/domain": ["../plugin-ur/src/domain.ts"],
+      "@project/resource-api/domain": ["../resource-api/src/domain/index.ts"],
+      "@project/plugin-ur/view": ["../plugin-ur/src/view.tsx"],
+      "@project/resource-api/view": ["../resource-api/src/view/index.tsx"]
     }
   },
   "include": ["src"]

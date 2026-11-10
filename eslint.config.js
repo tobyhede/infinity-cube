@@ -60,6 +60,22 @@ const REACT_DOM_PATTERN = {
   message: 'Domain logic stays out of React (AGENTS.md).',
 };
 
+/** Any package of ours, refused to the Resource API itself (ADR 0142). */
+const RESOURCE_API_OWN_PATTERN = {
+  group: ['@project/*'],
+  message:
+    'The Resource API reaches no package of ours: it is the one door a plugin may reach (ADR 0142).',
+};
+
+/**
+ * Any package of ours but the Resource API, refused to a Resource plugin (ADR
+ * 0142). A bundled plugin has no private door.
+ */
+const PLUGIN_PATTERN = {
+  regex: '^@project/(?!resource-api/(?:domain|view|view/testing)$)',
+  message: 'A Resource plugin imports no @project/* package but @project/resource-api (ADR 0142).',
+};
+
 const UI_IMPLEMENTATION_MESSAGE =
   'Application and adapter UI must use the public @project/ui surface. Add or compose the capability there rather than importing its implementation dependency directly.';
 
@@ -598,6 +614,62 @@ export default tseslint.config(
         {
           paths: [...RENDER_ONLY, ...REACT],
           patterns: [ESCAPE_PATTERN, RENDER_ONLY_PATTERN, REACT_DOM_PATTERN],
+        },
+      ],
+    },
+  },
+  // The Resource API is the one door a plugin may reach (ADR 0142), so it
+  // reaches none of ours, and its domain half names no view: the server and the
+  // CLI load it.
+  {
+    files: ['packages/resource-api/src/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: RENDER_ONLY,
+          patterns: [ESCAPE_PATTERN, RENDER_ONLY_PATTERN, RESOURCE_API_OWN_PATTERN],
+        },
+      ],
+    },
+  },
+  {
+    files: ['packages/resource-api/src/domain/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [...RENDER_ONLY, ...REACT],
+          patterns: [
+            ESCAPE_PATTERN,
+            RENDER_ONLY_PATTERN,
+            REACT_DOM_PATTERN,
+            RESOURCE_API_OWN_PATTERN,
+            { regex: '(?:^|/)view(?:/|$)', message: 'The domain half names no view (ADR 0142).' },
+          ],
+        },
+      ],
+    },
+  },
+  // A Resource plugin imports no package of ours but the Resource API (ADR
+  // 0142). React and its own third-party dependencies are its business.
+  {
+    files: ['packages/plugin-*/src/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { paths: RENDER_ONLY, patterns: [ESCAPE_PATTERN, RENDER_ONLY_PATTERN, PLUGIN_PATTERN] },
+      ],
+    },
+  },
+  {
+    files: ['packages/plugin-*/src/domain.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [...RENDER_ONLY, ...REACT],
+          patterns: [ESCAPE_PATTERN, RENDER_ONLY_PATTERN, REACT_DOM_PATTERN, PLUGIN_PATTERN],
         },
       ],
     },
