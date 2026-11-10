@@ -1644,8 +1644,9 @@ describe('the Map an Open Space Resource draws', () => {
           ?.content,
       ).toEqual({ open: true }),
     );
+    // The edit begins once the Open has drawn the text, a render after it lands.
     expect(
-      within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Save/ }),
+      await within(controlsOf(embeddedNode(DRAWN_A))).findByRole('button', { name: /Save/ }),
     ).toBeTruthy();
     expect(initial.session.getState().working).toEqual(value);
     expect(spaces.getState().activeSpaceId).toBe(HOME_ID);
