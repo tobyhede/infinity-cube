@@ -1,6 +1,11 @@
 import { useLayoutEffect, useRef, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { isPluginKind, type ResourceId } from '@project/core';
-import { resolveResourceContent, type Space } from '@project/graph';
+import {
+  referencedResources,
+  resolveResourceContent,
+  resourceDrawnByPlugin,
+  type Space,
+} from '@project/graph';
 import { Button, PresentedPluginResource, PresentedResource, Stage } from '@project/ui';
 import { FULL_VIEW_KEYS } from '../key-bindings';
 
@@ -82,12 +87,13 @@ export function FullView({
           </div>
         }
       >
-        {isPluginKind(resource.kind) ? (
+        {isPluginKind(resource.kind) && resourceDrawnByPlugin(space, resource) ? (
           <PresentedPluginResource
             resourceId={resource.id}
             kind={resource.kind}
             title={resource.title}
             content={resource.content}
+            embeddable={referencedResources(space, resource)}
             onFailure={onPluginFailure}
             replacementEpoch={replacementEpoch}
           />

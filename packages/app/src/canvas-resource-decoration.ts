@@ -1,4 +1,4 @@
-import { takesOpen, type KindId, type ResourceId } from '@project/core';
+import type { KindId, ResourceId } from '@project/core';
 import {
   isResourceNodeOf,
   type ResourceFlowNode,
@@ -237,7 +237,7 @@ export function decorateSharedResourceNode(
       'onOpenChange' | 'onBeginTitleEditing' | 'resize' | 'titleEditor' | 'entityActions'
     >
   > = {};
-  if (resourceBelongsToWorkingSpace && context.authorOnCanvas && takesOpen(node.data.kind)) {
+  if (resourceBelongsToWorkingSpace && context.authorOnCanvas && node.data.takesOpen) {
     // A kind that declares no Open offers no Open or Close.
     patch.onOpenChange = (open) =>
       open ? context.openResource(node.id) : context.closeResource(node.data.resourceId);

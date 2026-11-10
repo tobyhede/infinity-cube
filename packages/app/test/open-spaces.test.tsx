@@ -389,6 +389,7 @@ describe('Open Spaces', () => {
         ...bareKindData('reference'),
         authorsContent: authorsContent(content),
         embedsMap: embedsMap(content),
+        takesOpen: true,
         open,
         selectedForAuthoring: false,
         display: open ? { shown: 'open', content } : CLOSED_DISPLAY,

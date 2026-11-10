@@ -36,6 +36,7 @@ const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const OTHER_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const REFERENCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const UR_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+const SPACE_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
@@ -72,9 +73,21 @@ const snapshot = spaceSnapshotSchema.parse({
     },
     {
       id: REFERENCE_ID,
-      document: { title: 'A again', kind: 'reference', content: { target: RESOURCE_ID } },
+      document: { title: 'A again', kind: 'reference', content: { target: SPACE_RESOURCE_ID } },
     },
     { id: UR_ID, document: { title: 'Gateway', kind: 'ur', content: {} } },
+    {
+      id: SPACE_RESOURCE_ID,
+      document: {
+        title: 'Architecture',
+        kind: 'space',
+        content: {
+          spaceId: uuidSchema.parse('00000000-0000-4000-8000-000000000095'),
+          map: uuidSchema.parse('00000000-0000-4000-8000-000000000097'),
+          graph: uuidSchema.parse('00000000-0000-4000-8000-000000000096'),
+        },
+      },
+    },
   ],
 });
 
@@ -98,6 +111,17 @@ const resourceNode = (
       mapContent: { open: false },
     };
   }
+  return node;
+};
+
+/**
+ * The Reference Resource, to a Space Resource: the application still draws it
+ * and keeps its Open on the Map entry until resource-plugins issue 07, where a
+ * Reference to a Resource a plugin draws keeps its Open in Map content.
+ */
+const spaceReferenceNode = (): ResourceFlowNode => {
+  const node = drawnNode('A again', REFERENCE_ID, false, 'reference');
+  node.data = { ...node.data, takesOpen: true };
   return node;
 };
 
@@ -447,9 +471,7 @@ describe.each([
 });
 
 it.each(['Enter'])('opens a focused Reference Resource with %s', async (key) => {
-  const reference = resourceNode('A again', REFERENCE_ID);
-  reference.data.kind = 'reference';
-  const { opened } = await mountGraph([reference]);
+  const { opened } = await mountGraph([spaceReferenceNode()]);
 
   const focusedReference = nodeOf(REFERENCE_ID);
   focusedReference.focus();
@@ -475,10 +497,11 @@ it.each(['Enter', ' '])('leaves %s to a `.nokey` region inside a Resource', asyn
  * Shift+Enter is Open and expand (ADR 0137): one Edit that Opens the Resource
  * at the size its content needs. jsdom lays nothing out, so the visible canvas
  * it is capped at is the Closed Size and the Edit Opens it there. A Reference
- * Resource, whose Open the host keeps; a Markdown Resource's is its plugin's.
+ * Resource to a Space Resource, whose Open the host keeps; a Markdown
+ * Resource's is its plugin's.
  */
 it('opens and expands a focused Resource with Shift+Enter', async () => {
-  const { opened } = await mountGraph([resourceNode('A again', REFERENCE_ID, false, 'reference')]);
+  const { opened } = await mountGraph([spaceReferenceNode()]);
 
   const focused = nodeOf(REFERENCE_ID);
   focused.focus();
@@ -537,27 +560,28 @@ it('draws no Resource while the render adapter holds no projection', async () =>
  * pending").
  * Those Resources stay authorable through that window.
  */
-describe.each([
-  ['Reference Resource', resourceNode('A again', REFERENCE_ID, false, 'reference'), REFERENCE_ID],
-] as const)('a %s held while a replacement placement resolves', (_kind, held, id) => {
-  it.each(['Enter'])('opens with %s', async (key) => {
-    const { opened } = await mountGraph([held], undefined, undefined, 'replacing');
-    const focused = nodeOf(id);
-    focused.focus();
+describe.each([['Reference Resource', spaceReferenceNode(), REFERENCE_ID]] as const)(
+  'a %s held while a replacement placement resolves',
+  (_kind, held, id) => {
+    it.each(['Enter'])('opens with %s', async (key) => {
+      const { opened } = await mountGraph([held], undefined, undefined, 'replacing');
+      const focused = nodeOf(id);
+      focused.focus();
 
-    fireEvent.keyDown(focused, { key });
+      fireEvent.keyDown(focused, { key });
 
-    expect(opened()).toEqual([id]);
-  });
+      expect(opened()).toEqual([id]);
+    });
 
-  it('announces the authoring keyboard commands', async () => {
-    await mountGraph([held], undefined, undefined, 'replacing');
+    it('announces the authoring keyboard commands', async () => {
+      await mountGraph([held], undefined, undefined, 'replacing');
 
-    expect(nodeOf(id)).toHaveAccessibleDescription(
-      'Press enter to open a Resource, shift enter to open and expand it, space to read it in Full View, backspace or delete to remove it from this Map, and escape to cancel a move or unselect it. From a selected Resource, press the arrow keys to go along the Active Graph, or shift and the arrow keys to move it.',
-    );
-  });
-});
+      expect(nodeOf(id)).toHaveAccessibleDescription(
+        'Press enter to open a Resource, shift enter to open and expand it, space to read it in Full View, backspace or delete to remove it from this Map, and escape to cancel a move or unselect it. From a selected Resource, press the arrow keys to go along the Active Graph, or shift and the arrow keys to move it.',
+      );
+    });
+  },
+);
 
 describe('the Resource affordance', () => {
   it('opens the Resource rather than renaming its title on the graph', async () => {
@@ -701,8 +725,7 @@ function dragResizeControlTo(clientX: number, clientY: number): void {
  */
 describe('resize belongs to Resource rather than to a Resource kind', () => {
   it('offers a resize operation to a selected Resource whatever its kind', async () => {
-    const reference = resourceNode('Reference Resource', RESOURCE_ID, false);
-    reference.data.kind = 'reference';
+    const reference = spaceReferenceNode();
     reference.data.open = true;
     reference.data.selectedForAuthoring = true;
     reference.data.display = fixtureDisplay(true, 'reference');

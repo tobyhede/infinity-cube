@@ -1,5 +1,10 @@
 import { isPluginKind, type GraphId, type MapId, type ResourceId } from '@project/core';
-import { resolveResourceContent, type Space } from '@project/graph';
+import {
+  referencedResources,
+  resolveResourceContent,
+  resourceDrawnByPlugin,
+  type Space,
+} from '@project/graph';
 import { PresentedPluginResource, PresentedResource, Stage } from '@project/ui';
 import { presentedNotes } from '../notes-window';
 import { presentedByApplication } from '../kinds/registry';
@@ -62,12 +67,13 @@ export function PresentingStage({
         </>
       }
     >
-      {isPluginKind(resource.kind) ? (
+      {isPluginKind(resource.kind) && resourceDrawnByPlugin(space, resource) ? (
         <PresentedPluginResource
           resourceId={resource.id}
           kind={resource.kind}
           title={resource.title}
           content={resource.content}
+          embeddable={referencedResources(space, resource)}
           onFailure={onPluginFailure}
           replacementEpoch={replacementEpoch}
         />

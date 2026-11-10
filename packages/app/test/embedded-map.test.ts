@@ -56,7 +56,13 @@ async function projection(open = false) {
               [A]: { x: 0, y: 0, open: false },
               [B]: { x: 400, y: 0, open: false },
               [REFERENCE]: open
-                ? { x: 0, y: 300, open: true, size: { width: 560, height: 420 } }
+                ? {
+                    x: 0,
+                    y: 300,
+                    open: false,
+                    size: { width: 560, height: 420 },
+                    content: { open: true },
+                  }
                 : { x: 0, y: 300, open: false },
             },
             graphs: [{ id: GRAPH, title: 'Graph', edges: [{ from: A, to: B }] }],
@@ -399,22 +405,15 @@ describe('an embedded production projection', () => {
     }
   });
 
-  it('uses the target projection for Open Reference Resource content and its authored placement', async () => {
+  it('hands an Open Reference Resource its Map content and its Target to embed, at its authored placement', async () => {
     const { drawn } = await draw(true);
     expect(drawn.nodes.find((node) => node.data.resourceId === REFERENCE)).toMatchObject({
       width: 560,
       height: 420,
       data: {
-        open: true,
         kind: 'reference',
-        display: {
-          shown: 'open',
-          content: {
-            kind: 'markdown',
-            content: { url: textAsset('Target content') },
-            via: 'target',
-          },
-        },
+        mapContent: { open: true },
+        embeddable: [{ id: A, kind: 'markdown', title: 'A' }],
       },
     });
     // B sits at the target Map's authored 400 plus the embedding offset, and

@@ -531,7 +531,7 @@ export function SpaceCanvas({
       const resource = view.space.lookup.resource(resourceId);
       const area = canvasRef.current;
       if (node === undefined || resource === undefined || area === null) return 'retained';
-      if (!takesOpen(resource.kind)) return 'retained';
+      if (!takesOpen(resource, (id) => view.space.lookup.resource(id))) return 'retained';
       const zoom = getZoom();
       const content = resolveResourceContent(view.space, resource);
       const size = openAndExpandSize(
@@ -579,7 +579,7 @@ export function SpaceCanvas({
       return (
         availability.authorOnCanvas &&
         resource !== undefined &&
-        takesOpen(resource.kind) &&
+        takesOpen(resource, (id) => view.space.lookup.resource(id)) &&
         placedResources.some((placed) => placed.id === resourceId)
       );
     },
@@ -1070,7 +1070,7 @@ export function SpaceCanvas({
                   openResource: occurrence.openResource,
                 },
                 nodeId,
-                takesOpen: takesOpen(node.data.kind),
+                takesOpen: node.data.takesOpen,
               };
             }
             return undefined;

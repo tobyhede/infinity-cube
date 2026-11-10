@@ -502,9 +502,9 @@ describe('Edit Resource', () => {
 
 describe('Resource size and Open', () => {
   /**
-   * `positionedSnapshot` with Resource A a Reference Resource to B: a kind the
-   * host keeps Open for. A Markdown Resource's Open is its plugin's Map content
-   * (ADR 0142), which the next test holds.
+   * `positionedSnapshot` with Resource A a Space Resource: a kind the host
+   * keeps Open for. A Markdown or Reference Resource's Open is its plugin's Map
+   * content (ADR 0142), which the next test holds.
    */
   const openPositioned = () =>
     open({
@@ -513,34 +513,65 @@ describe('Resource size and Open', () => {
         resource.id === RESOURCE_A
           ? {
               id: RESOURCE_A,
-              document: { title: 'A', kind: 'reference', content: { target: RESOURCE_B } },
+              document: {
+                title: 'A',
+                kind: 'space',
+                content: {
+                  spaceId: uuidSchema.parse('00000000-0000-4000-8000-000000000095'),
+                  map: UNLOADED_MAP,
+                  graph: UNLOADED_GRAPH,
+                },
+              },
             }
           : resource,
       ),
     });
 
-  it('refuses a host Open on a Markdown Resource, whose plugin keeps its Open in Map content', () => {
-    const { authoring, session } = open();
-    const before = session.getState().working;
+  it.each([
+    ['Markdown', positionedSnapshot],
+    [
+      'Reference',
+      {
+        ...positionedSnapshot,
+        resources: positionedSnapshot.resources.map((resource) =>
+          resource.id === RESOURCE_A
+            ? {
+                id: RESOURCE_A,
+                document: {
+                  title: 'A',
+                  kind: 'reference' as const,
+                  content: { target: RESOURCE_B },
+                },
+              }
+            : resource,
+        ),
+      },
+    ],
+  ])(
+    'refuses a host Open on a %s Resource, whose plugin keeps its Open in Map content',
+    (_kind, snapshot) => {
+      const { authoring, session } = open(snapshot);
+      const before = session.getState().working;
 
-    expect(authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: RESOURCE_A })).toEqual(
-      { kind: 'refused', refusal: { code: 'open-requires-content' } },
-    );
-    expect(session.getState().working).toBe(before);
-    expect(
-      authoring.complete(CANVAS, {
-        kind: 'changed-map-content',
-        resourceId: RESOURCE_A,
+      expect(
+        authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: RESOURCE_A }),
+      ).toEqual({ kind: 'refused', refusal: { code: 'open-requires-content' } });
+      expect(session.getState().working).toBe(before);
+      expect(
+        authoring.complete(CANVAS, {
+          kind: 'changed-map-content',
+          resourceId: RESOURCE_A,
+          content: { open: true },
+        }),
+      ).toEqual({ kind: 'completed' });
+      expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toEqual({
+        x: 10,
+        y: 20,
+        open: false,
         content: { open: true },
-      }),
-    ).toEqual({ kind: 'completed' });
-    expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toEqual({
-      x: 10,
-      y: 20,
-      open: false,
-      content: { open: true },
-    });
-  });
+      });
+    },
+  );
 
   it('Opens and Closes changing nothing but open', () => {
     const { authoring, session } = openPositioned();
@@ -1089,7 +1120,6 @@ describe('Change Map content (ADR 0142)', () => {
         },
       }),
     ],
-    ['Reference', withA({ title: 'A', kind: 'reference', content: { target: RESOURCE_B } })],
   ])(
     'refuses Map content on a %s Resource, which no plugin draws, Open or Closed',
     (_kind, snapshot) => {
