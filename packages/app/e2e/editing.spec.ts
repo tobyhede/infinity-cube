@@ -3763,8 +3763,10 @@ test('Create Reference is drawn unavailable on a Reference Resource, still leadi
   await expectMenuGroups(menu, [
     [/^Create Reference/],
     ['Connect to Resource'],
-    // A Resource created just now is on no Graph, so it has nowhere to present from.
-    ['Open and Expand', 'Read in Full View', /^Present from Here/],
+    // A Resource created just now is on no Graph, so it has nowhere to present
+    // from. A Reference to a Markdown Resource keeps its Open as its plugin's Map
+    // content, so it offers no Open and Expand (ADR 0142).
+    ['Read in Full View', /^Present from Here/],
     ['Copy link to Resource in Map', 'Copy link to Resource', 'Copy link to Target'],
     ['Remove from Map', 'Delete from Space'],
   ]);

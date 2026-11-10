@@ -27,7 +27,14 @@ const FILL: CSSProperties = {
   minHeight: 0,
 };
 
-/** The Reference glyph's place on a Closed face: its top-right corner. */
+/**
+ * The band along the top of the rect the canvas keeps clear of controls, as it
+ * does for every Resource it draws: eight pixels, the kind glyph's row, eight
+ * pixels. A press there selects the Resource rather than beginning a rename.
+ */
+const RAIL_BAND = 30;
+
+/** The Reference glyph's place on a Closed face: in the band, at its right. */
 const GLYPH: CSSProperties = { position: 'absolute', top: 8, right: 8, lineHeight: 0 };
 
 /** Whether a settled commit left nothing to say. */
@@ -46,18 +53,20 @@ function ReferenceView({ surface }: PluginViewProps<ReferenceContent, ReferenceM
     const toggle = (next: ReferenceMapContent) => {
       void commit(next).then((answer) => setRefusal(refusalOf(answer)));
     };
+    // Open and Close are one command whose name swaps, so a keyboard author's
+    // focus stays on it across both.
     return [
       open
         ? {
             kind: 'action',
-            id: 'close',
+            id: 'open-close',
             label: `Close Resource ${name}`,
             icon: <Minimize2 size={14} />,
             run: () => toggle({ open: false }),
           }
         : {
             kind: 'action',
-            id: 'open',
+            id: 'open-close',
             label: `Open Resource ${name}`,
             icon: <Maximize2 size={14} />,
             run: () => toggle({ open: true }),
@@ -66,19 +75,27 @@ function ReferenceView({ surface }: PluginViewProps<ReferenceContent, ReferenceM
   }, [commit, open, name]);
 
   return (
-    <div style={FILL} data-open={open}>
+    <div
+      // Closed, the Title sits at the foot of the rect, as every Closed
+      // Resource's does.
+      style={open ? FILL : { ...FILL, justifyContent: 'flex-end' }}
+      data-open={open}
+    >
       {open ? (
         <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
           <Embed resource={surface.content.value.target} title={surface.title} />
         </div>
       ) : (
-        <div style={{ padding: 12 }}>
+        <div style={{ padding: `${RAIL_BAND}px 12px 8px`, minHeight: 0 }}>
           <Title />
-          {/* What it is, drawn on its face as the canvas draws a kind's glyph. */}
-          <span role="img" aria-label={referencePlugin.name} style={GLYPH}>
-            <Link size={14} aria-hidden />
-          </span>
         </div>
+      )}
+      {!open && (
+        // What it is, in the band along the top, as every Closed Resource draws
+        // its kind glyph; an Open one draws none.
+        <span role="img" aria-label={referencePlugin.name} style={GLYPH}>
+          <Link size={14} aria-hidden />
+        </span>
       )}
       {refusal !== null && (
         <p role="status" style={{ margin: 0, padding: '0 12px', fontSize: 12 }}>

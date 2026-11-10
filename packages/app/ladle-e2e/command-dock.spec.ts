@@ -372,7 +372,9 @@ test('a Reference Resource’s actions menu keeps Create Reference leading, draw
   await expectMenuGroups(menu, [
     [/^Create Reference/],
     ['Connect to Resource'],
-    ['Open and Expand', 'Read in Full View', /^Present from Here/],
+    // Its Target is a Markdown Resource, so its Open is its plugin's Map
+    // content and it offers no Open and Expand (ADR 0142).
+    ['Read in Full View', /^Present from Here/],
     ['Copy link to Resource in Map', 'Copy link to Resource', 'Copy link to Target'],
     ['Remove from Map', 'Delete from Space'],
   ]);

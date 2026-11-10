@@ -103,11 +103,16 @@ const WRAPPING_TITLE = 'Why authored placement beats a layout engine that reshuf
  */
 const CLOSED_KINDS = [
   { kind: 'markdown', label: 'markdown' },
-  { kind: 'reference', label: 'reference' },
+  // A Reference Resource is made from its Target, which its content names.
+  { kind: 'reference', label: 'reference', content: { target: resourceIds.strategies } },
   { kind: 'space', label: 'space' },
   { kind: 'ur', label: 'ur' },
   { kind: 'markdown', label: 'creation ghost' },
-] as const satisfies readonly { kind: KindOperations['kind']; label: string }[];
+] as const satisfies readonly {
+  kind: KindOperations['kind'];
+  label: string;
+  content?: unknown;
+}[];
 
 /**
  * The whole of a Closed Resource, at rest, for every kind the component draws.
@@ -135,14 +140,22 @@ export const Closed: Story = () => (
       <div className="inv-row">
         {CLOSED_KINDS.map((entry) => (
           <Specimen key={entry.label} label={`${entry.label} · one line`}>
-            <CanvasResourceSpecimen kind={entry.kind} title={ONE_LINE_TITLE} />
+            <CanvasResourceSpecimen
+              kind={entry.kind}
+              title={ONE_LINE_TITLE}
+              content={'content' in entry ? entry.content : undefined}
+            />
           </Specimen>
         ))}
       </div>
       <div className="inv-row">
         {CLOSED_KINDS.map((entry) => (
           <Specimen key={entry.label} label={`${entry.label} · three lines`}>
-            <CanvasResourceSpecimen kind={entry.kind} title={THREE_LINE_TITLE} />
+            <CanvasResourceSpecimen
+              kind={entry.kind}
+              title={THREE_LINE_TITLE}
+              content={'content' in entry ? entry.content : undefined}
+            />
           </Specimen>
         ))}
       </div>
@@ -484,14 +497,16 @@ function Instance({
   // Every kind Opens and Closes through the one operation (ADR 0070), so the
   // Reference Resource takes it too.
   const kindOperations: KindOperations = { kind };
+  // `CanvasResource` draws a content area for content it still owns: a
+  // Reference's here is a Target it cannot find, since a Reference to a
+  // Resource a plugin draws is drawn by its plugin (ADR 0142).
   const display: ResourceDisplay = open
     ? {
         shown: 'open',
-        content: {
-          kind: 'markdown',
-          content: { url: storyText('Markdown content') },
-          via: kind === 'reference' ? 'target' : 'self',
-        },
+        content:
+          kind === 'reference'
+            ? { kind: 'unresolved', via: 'target' }
+            : { kind: 'markdown', content: { url: storyText('Markdown content') }, via: 'self' },
       }
     : CLOSED_DISPLAY;
   const state: Exclude<CanvasResourceState, 'editing'> = dragging
