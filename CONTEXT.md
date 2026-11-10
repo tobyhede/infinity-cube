@@ -78,7 +78,7 @@ A Resource plugin's hold on the interaction while an author works in it. Claims 
 _Avoid_: lock, focus (the browser's), edit mode (a mode is the plugin's own).
 
 **Default plugin**:
-The Resource plugin that draws a Resource whose Resource kind names no plugin in this build. It draws the Title and says the kind is not available, and the Resource keeps everything every Resource can do. What the missing plugin kept is carried unread, and nothing that plugin might refer to is deleted while it is missing.
+The Resource plugin that draws a Resource whose Resource kind names no plugin in this build. It draws the Title and says the kind is not available, and the Resource keeps everything every Resource can do. What the missing plugin kept is carried unread, and the assets it references travel with it; a Resource it refers to can still be deleted.
 _Avoid_: default kind (every Resource names its kind; there is none), fallback kind, placeholder as the name of the plugin.
 
 **Content action**:
@@ -205,12 +205,16 @@ _Avoid_: arrangement (applying a strategy produces no separate entity — the Re
 An application-supplied collection of the Space's Resources absent from the selected Map. Its current rendering is a popover anchored to the Command Dock's Resources cluster, but where it renders is not part of the collection's identity (ADR 0082).
 _Avoid_: Space-Resource palette, Resource panel, drawer, popover or Dock as the domain name.
 
+**Asset**:
+Bytes with a media type, named by the SHA-256 of those bytes, that a Resource reaches by a URL in its content. Every file a Resource uses is one, whether it is a picture or Markdown text, and the host treats them alike. It is written to `assets/` in an Aggregate directory.
+_Avoid_: sidecar, attachment; and, as a name for an Image Resource, asset.
+
 **Exporting**:
 Projecting the complete aggregate into the repository-friendly form an author can review, commit and share. The unit is every Space at once, rooted at the Meta Space, rather than one Space chosen from among them. Outside Running, Exporting is not what makes an edit durable; it records each Space outside InfinityCube at the revision it was read at. While Running, it is the only thing that does.
 _Avoid_: saving, publishing, syncing; exporting a single Space.
 
 **Aggregate directory**:
-The on-disk form Exporting projects and Importing replaces: a directory holding `aggregate.json` (naming the Meta Space) and one child directory per Space, each named for that Space's Id in lower case and holding `space.json` plus one Resource file per Resource (`resources/<id>.json`, a Markdown Resource's `<id>.md` beside it), and an `images/` directory holding the bytes of every stored image the aggregate references, named by their content. Anything else in those directories is preserved across a round trip; what Exporting removes is exactly what Importing scans. Reading an Aggregate directory also identifies any omitted nested Ids before the persistence seam sees the Aggregate. A new Aggregate directory is made by establishing a new aggregate, whose Meta Space is a new space, and Exporting it to a missing or empty directory; Running does not make one (ADR 0124).
+The on-disk form Exporting projects and Importing replaces: a directory holding `aggregate.json` (naming the Meta Space) and one child directory per Space, each named for that Space's Id in lower case and holding `space.json` plus one Resource file per Resource (`resources/<id>.json`), and an `assets/` directory holding the bytes of every asset the aggregate references, named by their content. Anything else in those directories is preserved across a round trip; what Exporting removes is exactly what Importing scans. Reading an Aggregate directory also identifies any omitted nested Ids before the persistence seam sees the Aggregate. A new Aggregate directory is made by establishing a new aggregate, whose Meta Space is a new space, and Exporting it to a missing or empty directory; Running does not make one (ADR 0124).
 _Avoid_: catalog, bundle, export root as a second name for the same artifact.
 
 **Importing**:
