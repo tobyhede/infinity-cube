@@ -3698,7 +3698,7 @@ test(
       ['Create Reference'],
       ['Connect to Resource'],
       // A Markdown Resource Opens with its plugin's size hint: no Open and Expand (A29).
-    ['Read in Full View', 'Present from Here'],
+      ['Read in Full View', 'Present from Here'],
       ['Copy link to Resource in Map', 'Copy link to Resource'],
       ['Remove from Map', 'Delete from Space'],
     ];
