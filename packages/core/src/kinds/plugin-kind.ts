@@ -18,7 +18,7 @@ import { defineKind, type KindModule, type KindMapContent, type StartsEmpty } fr
  * plugin's schema's answer.
  */
 
-/** What content a plugin draws in its own rect says about the old frame's content area: nothing. */
+/** What content a plugin draws in its own rect says about a host-drawn content area: nothing. */
 const PLUGIN_CONTENT_FACTS: ContentFacts = {
   authored: false,
   embedsMap: false,
@@ -88,7 +88,7 @@ export interface PluginMapContent {
 /**
  * A plugin that starts empty, read as a kind module: its content schema, the
  * references it declares, and its Map content. A kind it draws is never Open
- * by the application's rule, because Open is now the plugin's Map content.
+ * by the application's rule: Open, where a plugin has it, is its Map content.
  */
 export function kindFromPlugin<const K extends string, C, M>(
   plugin: ResourcePlugin<C, M> & { readonly kind: K; readonly newContent: C },

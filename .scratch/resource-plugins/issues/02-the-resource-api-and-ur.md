@@ -43,17 +43,18 @@ Made while delivering this ticket (PR #463).
 - **Withdrawn surfaces.** The host refuses a commit from a withdrawn surface in three places:
   - **An unmounted surface:** `PluginSurface` refuses with "This Resource is no longer drawn here."
   - **A moved epoch:** a commit built before the `replacementEpoch` moved is refused.
-  - **Exclusive work elsewhere:** while exclusive work runs anywhere, every plain commit answers busy. The work's own commits stay live only while it runs.
+  - **Exclusive work elsewhere:** while exclusive work runs anywhere, every plain commit answers refused. The work's own commits stay live only while it runs, and end when its surface unmounts mid-run, so a second run may start without the first's commits beside it.
   - A non-JSON value is refused before it reaches the host.
 - **The size hint is accepted and ignored** until the Markdown plugin (issue 05) needs it.
 - **Assets and Embed are stubs.**
   - `Surface.assets` has `url` and `read`, plus optional `pick` and `store`, matching issue 03's `AssetClient`. Here it reads nothing.
   - `Embed` is one stable component that draws nothing. A test holds its identity across renders.
 - **The embedded Map's selection declaration is deferred to issue 07.**
-- **Plugin kind facts.** Every flag `kindFromPlugin` derives is false: not Open-able, not a Target, no referenced Spaces. So an Ur Resource no longer offers Open, which it never could.
+- **Plugin kind facts.** `kindFromPlugin` derives every flag false but one: not Open-able and no referenced Spaces, and a Target where the plugin declares `mayBeTarget`. Ur declares it, so a Reference to an Ur Resource is accepted, as it was before. An Ur Resource no longer offers Open, which it never could.
 - **Ur computes its own insets.** It lays out its Title in the rectangle its Shape inscribes. The host gives it the rect and strokes the outline.
 - **Claims.**
-  - **The gate and ADR 0126's hold are separate.** The Claim chain and exclusive gate are one per page (`PluginGateProvider` at startup) and are not yet linked to ADR 0126's hold. That is a note for issue 04.
+  - **The gate and ADR 0126's hold are separate.** The Claim chain and exclusive gate are one per page, held by Open Spaces and handed to every composed Space, and are not yet linked to ADR 0126's hold. That is a note for issue 04.
+  - **A held Claim gives the plugin the whole rect.** The plugin's layer takes `nodrag nopan nowheel` while its surface holds a Claim, so the canvas neither drags nor pans under it.
   - **A surface's Claim path is `[resourceId]`.** Nested surfaces arrive with the Space plugin.
 - **A Reference to an Ur Resource keeps the old frame.** It is not drawn by Ur's plugin, so it is the rectangle. On the Stage, Ur is drawn by its plugin, which centres its Title itself; `ur-stage.css` is gone.
 - **The Stage's nominal size is 1600×900.** The Stage host hands the plugin that size, `withoutMap`'s value, no commit and no Claim.
@@ -65,4 +66,12 @@ Made while delivering this ticket (PR #463).
   - A surface's lifetime (still drawn, Claims to release) is one object held in state rather than refs read during render.
 - **Optional capability members accept `undefined`.** These are `Kept.commit`, `KeptMap.commit`, the `Exclusive` members, `Surface.claim` and the host's `PluginOperations` and `PluginCommits`. Absent and `undefined` mean the same to a plugin, and hosts build a surface as one literal.
 - **A rail drawn in the rect stands over the plugin's pixels** (`.canvas-resource--plugin > .canvas-resource__actions`), since the plugin's layer fills the rect.
-- **`AGENTS.md` was not edited.** Its ADR 0142 entry still says "accepted, not built", which is true for every kind but Ur. `docs/agents/maps-and-graphs.md` records what is built.
+- **Exclusive work withdraws every Edit, at `complete`** (review of #463). Issue 01's Answer withdraws every commit while exclusive work runs, so the check sits at the one door every Edit enters: each composed Space's Authoring asks the page's gate first, before every other check, and refuses `exclusive-work-running` ("Wait for the change in progress to finish."). The work's own commits are admitted through the gate. Host Title rename, Close, Delete, Remove from Map and the Dock are refused there, not per caller.
+- **Withdrawal is offered as well as enforced.** The canvas subscribes to the gate, so while work runs elsewhere a plugin surface re-renders with no commits, no Claim, a read-only host Title and no Actions. Host-drawn controls of other kinds and the Dock are only refused at `complete`; they are not yet redrawn without their commands, and Navigation is not withdrawn.
+- **A commit whose Edit throws answers refused** ("This change could not be made.") and the throw goes to the composition's reporter.
+- **Failure boundaries start again on what they draw.** The Map's is keyed on the Resource, the Replacement epoch and the Map content value; the Stage's on the Resource and the Replacement epoch. Both report to the composition's reporter.
+- **The core's Resource is the API's `Resource<C>`**, instantiated per kind with the registry's content, so the core, the stores, HTTP and plugins take one structure. `Resource<C>`'s content defaults to `unknown`.
+- **`renderPlugin` is the host in miniature.** A granted store records the bytes and answers a reference, a granted pick answers the files given, and exclusive work answers busy beside a run, withdraws every other commit, store and pick, and keeps own commits to the run.
+- **A JSON object with an own `__proto__` key is refused**, at any depth, since a record parse drops the key.
+- **Lint and catalogue.** Every file under a plugin's domain entry takes the domain zone (no React, no view), `/view/testing` is refused in a plugin's source, and the UI catalogue reads every `packages/plugin-*/src` and the Resource API's view half.
+- **`AGENTS.md` records the ten packages and that the Resource API and Ur are built.**
