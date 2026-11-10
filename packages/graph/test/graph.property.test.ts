@@ -359,7 +359,7 @@ describe('resolved content, over generated Spaces of every kind', () => {
         const space = acceptedWithKinds(maps, kinds, targets);
         for (const resource of space.resources) {
           if (resource.kind !== 'reference') continue;
-          const target = space.lookup.resource(resource.content.target);
+          const target = space.lookup.resource(uuid(resource.content.target));
           if (target === undefined) throw new Error('intake accepted a missing Target');
           expect(resolveResourceContent(space, resource)).toStrictEqual({
             ...resolveResourceContent(space, target),

@@ -307,8 +307,8 @@ const withEntry = (
 /**
  * Open a Resource in one Map. Only what is drawn inside its rect changes: its
  * size and every position stay as they are. `unchanged` for a Resource already
- * Open, and `open-requires-content` for a Resource of a plugin kind, whose
- * Open is its plugin's Map content rather than the entry's `open`.
+ * Open, and `open-requires-content` for a Resource the application keeps no
+ * Open for: one a plugin draws, which keeps any Open in its Map content.
  */
 function open(snapshot: SpaceSnapshot, mapId: UUID, resourceId: UUID): SnapshotEditOutcome {
   const placed = placedIn(snapshot, mapId);
@@ -317,7 +317,9 @@ function open(snapshot: SpaceSnapshot, mapId: UUID, resourceId: UUID): SnapshotE
   if (at === undefined) return refused({ code: 'resource-not-in-map' });
   const resource = snapshot.resources.find((candidate) => candidate.id === resourceId);
   if (resource === undefined) return refused({ code: 'resource-not-found' });
-  if (!takesOpen(resource.document.kind)) return refused({ code: 'open-requires-content' });
+  const documentOf = (id: UUID) =>
+    snapshot.resources.find((candidate) => candidate.id === id)?.document;
+  if (!takesOpen(resource.document, documentOf)) return refused({ code: 'open-requires-content' });
   if (resourceOpen(at)) return UNCHANGED;
   return withEntry(snapshot, mapId, placed.placement, resourceId, { ...at, open: true });
 }

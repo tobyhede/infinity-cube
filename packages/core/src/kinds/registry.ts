@@ -54,6 +54,14 @@ type KindModules = {
 
 const KIND_MODULES: KindModules = REGISTERED;
 
+/** Each plugin kind's Map content declaration, which a plugin always makes. */
+const PLUGIN_MAP_CONTENT = {
+  [imageKind.id]: imageKind.mapContent,
+  [markdownKind.id]: markdownKind.mapContent,
+  [referenceKind.id]: referenceKind.mapContent,
+  [urKind.id]: urKind.mapContent,
+} satisfies Record<PluginKind, KindMapContent>;
+
 /** A kinded value whose content is its kind's, correlated so its module accepts it. */
 type Kinded<K extends KindId> = {
   [P in K]: { kind: P; content: ContentByKind[P] };
@@ -190,6 +198,42 @@ const contentTargetOf = <K extends KindId>(resource: Kinded<K>) =>
 /** The Resource whose content this one shows, when its kind shows another's (ADR 0070). */
 export const contentTarget = (resource: KindedResource): UUID | undefined =>
   contentTargetOf(resource);
+
+/**
+ * Whether a plugin in this build draws this Resource (ADR 0142): its kind's
+ * plugin, and, for a Resource that shows a content Target, that Target's
+ * kind's plugin too. A Target no plugin draws, a Space Resource until it is a
+ * plugin (`.scratch/resource-plugins/issues/07`), keeps the Resource showing
+ * it on the application's own drawing. A missing Target is the plugin's to
+ * say, so a Resource showing one is still its plugin's.
+ */
+export const drawnByPlugin = (
+  resource: KindedResource,
+  resourceOf: (id: UUID) => KindedResource | undefined,
+): boolean => {
+  if (!isPluginKind(resource.kind)) return false;
+  const targetId = contentTarget(resource);
+  if (targetId === undefined) return true;
+  const target = resourceOf(targetId);
+  return target === undefined || isPluginKind(target.kind);
+};
+
+/**
+ * Whether a Resource may be Open by the application's rule, a Map entry's
+ * `open` (ADR 0122): one no plugin draws whose content, its own or its
+ * Target's, declares Open, as a Space Resource and a Reference to one do. A
+ * Resource a plugin draws keeps any Open in its Map content (ADR 0142).
+ */
+export const takesOpen = (
+  resource: KindedResource,
+  resourceOf: (id: UUID) => KindedResource | undefined,
+): boolean => {
+  if (drawnByPlugin(resource, resourceOf)) return false;
+  if (kindFlags(resource.kind).canOpen) return true;
+  const targetId = contentTarget(resource);
+  const target = targetId === undefined ? undefined : resourceOf(targetId);
+  return target !== undefined && kindFlags(target.kind).canOpen;
+};
 
 /** Whether a Resource of this kind may be another's Target (ADR 0113). */
 export const mayBeTarget = (kind: KindId): boolean => kindFlags(kind).mayBeTarget;

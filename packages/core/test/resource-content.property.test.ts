@@ -85,10 +85,11 @@ describe('content facts', () => {
       false,
       false,
     ]);
-    // `unresolved` draws its "Target not found" notice in the content area.
+    // A plugin draws inside its own rect, so the old frame draws no content
+    // area for one; `unresolved` draws its "Target not found" notice there.
     expect([...contents('self'), UNRESOLVED].map(drawsContentArea)).toEqual([
-      true,
-      true,
+      false,
+      false,
       false,
       false,
       true,

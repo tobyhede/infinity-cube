@@ -780,7 +780,7 @@ describe.each([
       },
     );
 
-    it.each(everyKind.filter(([kind]) => kind !== 'ur' && kind !== 'image' && kind !== 'markdown'))(
+    it.each(everyKind.filter(([kind]) => kind === 'space'))(
       'refuses Map content on a %s Resource that no plugin keeps',
       (_kind, resources) => {
         for (const content of [{ shape: 'rectangle' }, { shape: 'pill' }, null]) {
@@ -816,12 +816,30 @@ describe.each([
       expect(space.maps[0]?.positions[A]).toEqual({ x: 0, y: 0 });
     });
 
-    it.each(everyKind.filter(([kind]) => kind !== 'ur' && kind !== 'image' && kind !== 'markdown'))(
+    it.each(everyKind.filter(([kind]) => kind === 'space'))(
       'loads a %s Resource Open',
       (_kind, resources) => {
         expect(loaded(openIn(resources, true)).resources).toHaveLength(resources.length);
       },
     );
+
+    it('loads a Reference Resource Open or Closed by its Map content, and refuses the Map storing Open', () => {
+      const recap = [referenceTo(A, B), markdown(B, 'B')];
+      for (const open of [true, false])
+        expect(loaded(placedIn(recap, { open })).maps[0]?.positions[A]?.content).toEqual({ open });
+      expect(refused(placedIn(recap, { shape: 'pill' }))).toEqual([
+        expect.objectContaining({ kind: 'map-content-invalid', ref: A }),
+      ]);
+      expect(refused(openIn(recap, true))).toEqual([
+        expect.objectContaining({ kind: 'open-requires-content', ref: A }),
+      ]);
+    });
+
+    it('loads a Reference to a Space Resource stored Open, as the application keeps it until the Space plugin', () => {
+      expect(
+        loaded(openIn([referenceTo(A, B), spaceResource(B, ABSENT)], true)).resources,
+      ).toHaveLength(2);
+    });
 
     it('refuses an Image Resource stored Open, which its plugin draws with no Open (ADR 0142)', () => {
       const image: Resource = {

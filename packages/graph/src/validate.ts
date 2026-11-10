@@ -197,7 +197,8 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
           message: `Map "${subject.id}" keeps Map content for ${member.kind} resource "${resourceId}" that its plugin refuses: ${mapContentRefusal}`,
         });
       }
-      if (!takesOpen(member.kind) && placement !== undefined && resourceOpen(placement)) {
+      const resourceOf = (id: UUID) => resourceById.get(id);
+      if (placement !== undefined && resourceOpen(placement) && !takesOpen(member, resourceOf)) {
         errors.push({
           kind: 'open-requires-content',
           ref: resourceId,
