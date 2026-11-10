@@ -12,6 +12,7 @@ Status: ready-for-agent
 
 - Authoring a Map in place, choosing a Map and a Graph, Entering, and lifecycle on delete behave as they do today.
 - Replace on an Image inside the embedding withdraws every composed Space, and the outer Claim holds until it ends.
+- While it runs, a commit the Space plugin retained for changing its selected Map or closing it answers refused and changes nothing, and the replacement still lands.
 - A Reference to a Space shows the Map with no authoring.
-- The plugin imports nothing but the Resource API.
+- The plugin imports no `@project/*` package but the Resource API.
 - `CI passed` is green, including the PostgreSQL and SQLite jobs.
