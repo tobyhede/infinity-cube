@@ -854,7 +854,8 @@ describe('the Map an Open Space Resource draws', () => {
     const resource = session
       .getState()
       .working.resources.find((candidate) => candidate.id === SPACE_RESOURCE_ID);
-    if (resource?.document.kind !== 'space') throw new Error('Space Resource missing');
+    if (resource === undefined || !isOfKind(resource.document, 'space'))
+      throw new Error('Space Resource missing');
     expect(resource.document.content.framing?.zoom).toBe(1.1);
   });
 
