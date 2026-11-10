@@ -33,13 +33,13 @@ The rules:
 
 Made while delivering the host half (PR #461).
 
-1. **Image's picture rule moves to the browser until issue 04.** Sniffing PNG, JPEG, WebP or GIF from the bytes and refusing SVG now runs in `packages/app/src/picture-admission.ts` (`admitImage`, `storePicture`) before the bytes are stored. The host admits any media type.
+1. **Image's picture rule moves to the browser until issue 04.** Sniffing PNG, JPEG, WebP or GIF from the bytes and refusing SVG now runs in `packages/app/src/picture-admission.ts` (`admitImage`, `storePicture`) before the bytes are stored. The host admits any media type. Its `asset-too-large` refusal is shown to the author as `image-too-large`.
 2. **A media type is stored as its lower-case essence.** Parameters are dropped, and a missing or invalid type is `application/octet-stream`. Bytes already stored keep the type they were first stored under.
 3. **Export keeps an existing file's name for a hash**, so the extension Import read is written back. In a directory with no file for the hash, the name comes from the extension table, and an unlisted media type gets `.bin`.
-4. **The zero-byte asset** is answered by every store through `withEmptyAsset`, stored or not. Export writes no file for it and keeps any file of its hash.
-5. **Absent bytes.** Export keeps any file whose hash is referenced but whose bytes the store does not hold.
+4. **The zero-byte asset** is always held, as `application/octet-stream`: storing it answers `existing` and writes nothing. Export writes no file for it and keeps any file of its hash.
+5. **Absent bytes.** Export keeps any file whose hash is referenced but whose bytes the store does not hold, and reads it back with the files it writes, so a misnamed or duplicated kept file refuses the Export before anything is written.
 6. **What Import owns in `assets/`**: files named `<hash>` or `<hash>.<anything>`. Any other file is not read and is left alone. Two files of one hash refuse the directory.
-7. **Served assets also carry `Content-Security-Policy: default-src 'none'; sandbox`**, beside `nosniff` and the octet-stream rule.
+7. **Served assets also carry `Content-Security-Policy: default-src 'none'; sandbox`**, beside `nosniff` and the octet-stream rule. That rule is `servedMediaType` in `@project/persistence`, which a mount's object URLs use too.
 8. **The SQL migrations drop `images` and create `assets`** rather than renaming, because no state outlives a reset.
 9. **The walk covers Resource `content` only.** Map content does not exist yet. `assetReferences` (`packages/core/src/assets.ts`) is a pure walk over any JSON value, so issue 02 adds Map content to `referencedAssetHashes` (`src/aggregate-directory/assets.ts`) by passing it in.
 10. **The "plugin other than Image" test uses Markdown Resources** whose `source` holds an asset URL, since no plugin API exists yet (`test/unit/export-aggregate.test.ts`).
@@ -47,3 +47,4 @@ Made while delivering the host half (PR #461).
 12. **Problem codes** `invalid-asset-hash` (400) and `asset-too-large` (413) replace the image codes.
 13. **`AssetRef` and `assetRefSchema` live in `@project/core`** for now. Issue 02 re-exports them from `@project/resource-api/domain`.
 14. **The asset-reference walk is recorded as an anti-slop boundary** in `.oxlintrc.json`: it takes `unknown` and uses `typeof`, because it reads any JSON value whatever kind declared it, and `z.custom` calls `isAssetRef` with raw input.
+15. **The held-replacement e2e specs stand in the host's 413 answer on release**, because the host no longer refuses a small file and the browser refuses a non-picture before sending.
