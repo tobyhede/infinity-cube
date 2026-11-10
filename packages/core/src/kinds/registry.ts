@@ -8,6 +8,8 @@ import type {
   KindModule,
   SpaceFraming,
   SpaceSelection,
+  SpaceSelectionProblem,
+  SpaceSelectionTarget,
   SpaceView,
   SpaceViewChoice,
   StartsEmpty,
@@ -15,7 +17,6 @@ import type {
 import { imageKind } from './image';
 import { markdownKind } from './markdown';
 import { referenceKind } from './reference';
-import type { SpaceSelectionTarget, SpaceSelectionProblem } from './space';
 import { spaceKind } from './space';
 import { urKind } from './ur';
 import { PLUGIN_KINDS, type PluginKind } from './plugins';
@@ -53,6 +54,15 @@ type KindModules = {
 };
 
 const KIND_MODULES: KindModules = REGISTERED;
+
+/** Each plugin kind's Map content declaration, which a plugin always makes. */
+const PLUGIN_MAP_CONTENT = {
+  [imageKind.id]: imageKind.mapContent,
+  [markdownKind.id]: markdownKind.mapContent,
+  [referenceKind.id]: referenceKind.mapContent,
+  [spaceKind.id]: spaceKind.mapContent,
+  [urKind.id]: urKind.mapContent,
+} satisfies Record<PluginKind, KindMapContent>;
 
 /** A kinded value whose content is its kind's, correlated so its module accepts it. */
 type Kinded<K extends KindId> = {

@@ -15,21 +15,18 @@ import {
 } from '@project/core';
 import { Button } from './Button';
 import { graphPaint } from './graph-color';
-import { canvasContent, contentCommand, type KindOperations } from './kinds/registry';
-import { isSpaceOperations } from './kinds/space';
+import { canvasContent, type KindOperations } from './kinds/registry';
 import {
   ResourceRailAction,
   ResourceRailActions,
-  ResourceRailKindActions,
   ResourceRailSharedActions,
 } from './ResourceRailActions';
 import { EntityActions, EntityActionsTrigger, type EntityActionGroup } from './EntityActionsMenu';
 import { ResourceRail, ResourceRailKind } from './ResourceRail';
 import { Card, CardContent, CardTitle } from './components/card';
-import { CloseResourceIcon, CommitEditIcon, EntityActionsIcon, OpenResourceIcon } from './icons';
+import { CloseResourceIcon, EntityActionsIcon, OpenResourceIcon } from './icons';
 import './canvas-resource.css';
 import './kinds/reference-canvas.css';
-import './kinds/space-canvas.css';
 import { usePresence } from './use-presence';
 import { InlineTitleEditor } from './InlineTitleEditor';
 import { UnresolvedContent } from './UnresolvedContent';
@@ -234,11 +231,6 @@ export function CanvasResource(props: CanvasResourceProps) {
   const content = display.shown === 'closed' ? null : display.content;
   const onBeginTitleEdit = readOnly ? undefined : props.onBeginTitleEdit;
   const onOpenChange = readOnly ? undefined : props.onOpenChange;
-  const command = contentCommand(kind);
-  const spaceOperations =
-    !readOnly && content !== null && authorsContent(content) && isSpaceOperations(kindOperations)
-      ? kindOperations
-      : undefined;
   const areaContent = useAreaContent(content);
   const bodyControl = useRef<HTMLDivElement>(null);
   const contentControl = useRef<HTMLDivElement>(null);
@@ -259,20 +251,13 @@ export function CanvasResource(props: CanvasResourceProps) {
    */
   const contentAuthoring =
     contentPresence.mounted && !contentLeaving && authorsContent(contentPresence.value);
-  const editControl = useRef<HTMLButtonElement>(null);
   const actionableEntityActions =
     !readOnly && entityActions?.some((group) => group.length > 0) === true;
   const contextNotice = props.contextNotice ?? null;
-  const spaceRail = spaceOperations?.spaceRail;
-  const portal = spaceOperations?.portal;
-  const portalEditing = portal?.editing === true;
   const showActions =
     state !== 'dragging' &&
     state !== 'editing' &&
-    (spaceRail !== undefined ||
-      portal !== undefined ||
-      onOpenChange !== undefined ||
-      actionableEntityActions);
+    (onOpenChange !== undefined || actionableEntityActions);
   const style: CanvasResourceStyle = {
     '--canvas-resource-graph': graphPaint(graphColor),
     '--canvas-resource-border':
@@ -326,12 +311,7 @@ export function CanvasResource(props: CanvasResourceProps) {
     // `ResourceRailAction`'s; what is left here is which commands this Resource
     // has, and what each one runs.
     //
-    // The two groups are the answer to "whose command is this?". A Space
-    // Resource's portal is its own business and means nothing on another kind;
-    // opening and closing is every Resource's.
-    //
-    // The entity actions lead, then a Space Resource's choices, its portal
-    // command, and Open/Close last.
+    // The entity actions lead, and Open/Close is last.
     <ResourceRailActions
       aria-label={`Resource ${name}`}
       className="canvas-resource__actions"
@@ -345,28 +325,6 @@ export function CanvasResource(props: CanvasResourceProps) {
           render={<ResourceRailAction />}
         />
       )}
-      {spaceRail}
-      <ResourceRailKindActions kind={kind}>
-        {portal !== undefined ? (
-          portalEditing ? (
-            <ResourceRailAction
-              ref={editControl}
-              aria-label={`Done Resource ${name}`}
-              onClick={() => portal.onEditingChange(false)}
-            >
-              <CommitEditIcon data-icon="inline-start" />
-            </ResourceRailAction>
-          ) : command !== undefined ? (
-            <ResourceRailAction
-              ref={editControl}
-              aria-label={command.label(name)}
-              onClick={() => portal.onEditingChange(true)}
-            >
-              <command.Icon data-icon="inline-start" />
-            </ResourceRailAction>
-          ) : null
-        ) : null}
-      </ResourceRailKindActions>
       <ResourceRailSharedActions>
         {onOpenChange !== undefined && (
           <ResourceRailAction
@@ -412,10 +370,6 @@ export function CanvasResource(props: CanvasResourceProps) {
       // Every Resource this frame draws is a rectangle; a plugin's outline is
       // drawn by `PluginResource` (ADR 0142).
       data-resource-shape="rectangle"
-      // A running edit is not a hover, so `canvas-resource.css` draws the active
-      // face off this as well as `:hover` — a Resource being written in reads as
-      // active without the pointer on it.
-      data-content-editing={portalEditing}
       style={style}
     >
       {/* Neutral: the band carries no colour and the commands on it sit on the
@@ -477,12 +431,6 @@ export function CanvasResource(props: CanvasResourceProps) {
               </Button>
             )}
           </CardTitle>
-        )}
-        {/* Withheld while the Resource is read-only for the same reason every other
-            authoring affordance is — a read-only surface draws what the Resource
-            shows, not what could be changed about it. */}
-        {spaceOperations !== undefined && spaceRail === undefined && (
-          <p className="canvas-resource__space-note">Reading the referenced Space…</p>
         )}
         {contextNotice !== null && (
           <p role="status" className="canvas-resource__space-note">

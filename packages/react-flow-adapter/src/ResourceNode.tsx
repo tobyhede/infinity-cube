@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Handle,
   NodeResizeControl,
@@ -15,9 +15,9 @@ import {
   CanvasResource,
   graphPaint,
   isPluginOperations,
-  isSpaceOperations,
   PluginResource,
   type CanvasResourceProps,
+  type MapEmbedRequest,
 } from '@project/ui';
 import type { ResourceFlowNode } from './projection';
 import { AUTHORING_HANDLE_DIAMETER } from './authoring-handle';
@@ -111,6 +111,15 @@ export function ResourceNode({
   const onBodyHeightChange = useCallback(
     (height: number | null) => reportBodyHeight?.(id, height),
     [id, reportBodyHeight],
+  );
+
+  const reportMapEmbed = data.onMapEmbed;
+  const onMapEmbed = useMemo(
+    () =>
+      reportMapEmbed === undefined
+        ? undefined
+        : (request: MapEmbedRequest | null) => reportMapEmbed(id, data.resourceId, request),
+    [id, data.resourceId, reportMapEmbed],
   );
 
   const kindOperations = data.kindOperations;
@@ -339,11 +348,7 @@ export function ResourceNode({
   const otherSelected = useStore((state) =>
     visuallySelected ? state.nodes.some((node) => node.selected && node.id !== id) : false,
   );
-  const toolbarVisible =
-    ((visuallySelected && !otherSelected) ||
-      (isSpaceOperations(kindOperations) && kindOperations.portal?.editing === true)) &&
-    !dragging &&
-    !resizeActive;
+  const toolbarVisible = visuallySelected && !otherSelected && !dragging && !resizeActive;
   /**
    * The Resource's commands float above its top-right corner, outside the Resource
    * and at a constant screen size, as React Flow's `NodeToolbar` draws them. The
@@ -480,6 +485,8 @@ export function ResourceNode({
           entityActions={canvasResourceOptionalProps.entityActions}
           contextNotice={canvasResourceOptionalProps.contextNotice}
           renderToolbar={renderToolbar}
+          onMapEmbed={onMapEmbed}
+          onBodyHeightChange={reportBodyHeight === undefined ? undefined : onBodyHeightChange}
         />
       ) : titleEditor !== undefined ? (
         <CanvasResource

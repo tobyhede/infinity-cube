@@ -116,6 +116,39 @@ export interface MapContentDeclaration<M> {
   readonly withoutMap?: M;
 }
 
+/** The Map-coordinate centre and scale a window onto another Space is framed at. */
+export interface SpaceFraming {
+  readonly centreX: number;
+  readonly centreY: number;
+  readonly zoom: number;
+}
+
+/**
+ * The view of another Space a Resource shows through the Map embedding (ADR
+ * 0068, ADR 0142): the Space, a Map of it, a Graph that Map owns, and how the
+ * window is framed, absent until it has been framed.
+ */
+export interface SpaceView {
+  readonly spaceId: string;
+  readonly map: string;
+  readonly graph: string;
+  readonly framing?: SpaceFraming | undefined;
+}
+
+/**
+ * How a plugin whose content shows a view of another Space reads and changes
+ * that view, so the host checks it against the Space it shows and the Map
+ * embedding writes a choice through the plugin's own commit (ADR 0079). The
+ * core enforces that the Map and Graph resolve there; a plugin says only where
+ * its content keeps them.
+ */
+export interface SelectionDeclaration<C> {
+  /** The view this content shows. */
+  of(content: C): SpaceView;
+  /** The content showing `view` in the same Space; a different Map drops the old framing. */
+  select(content: C, view: SpaceView): C;
+}
+
 /**
  * A Resource plugin's domain half. Methods are declared as methods so a plugin
  * of any content is still a plugin of the list's element type.
@@ -161,6 +194,8 @@ export interface ResourcePlugin<C, M> {
   spaceReferences?(content: C): readonly string[];
   /** Whether a Space this kind references lives by that reference (ADR 0074). */
   readonly ownsReferencedSpaces?: boolean;
+  /** How this content shows a view of another Space, when it shows one. */
+  readonly selection?: SelectionDeclaration<C>;
 }
 
 /** A plugin written for the API this build provides. */

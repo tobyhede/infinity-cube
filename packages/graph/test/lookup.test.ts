@@ -88,7 +88,7 @@ function refusedByIntake(resources: readonly Resource[]): Space {
   return { ...everyKind(), resources, lookup: built.lookup };
 }
 
-const framedView = {
+const framedContent = {
   spaceId: TARGET_SPACE,
   map: TARGET_MAP,
   graph: TARGET_GRAPH,
@@ -118,13 +118,17 @@ describe('resolveResourceContent', () => {
         via: 'self',
       },
     ],
-    ['a framed Space Resource', FRAMED_SPACE, { kind: 'space', view: framedView, via: 'self' }],
+    [
+      'a framed Space Resource',
+      FRAMED_SPACE,
+      { kind: 'space', content: framedContent, via: 'self' },
+    ],
     [
       'an unframed Space Resource',
       UNFRAMED_SPACE,
       {
         kind: 'space',
-        view: { spaceId: TARGET_SPACE, map: TARGET_MAP, graph: TARGET_GRAPH, framing: undefined },
+        content: { spaceId: TARGET_SPACE, map: TARGET_MAP, graph: TARGET_GRAPH },
         via: 'self',
       },
     ],
@@ -146,7 +150,7 @@ describe('resolveResourceContent', () => {
     [
       'a Reference Resource to a Space',
       TO_SPACE,
-      { kind: 'space', view: framedView, via: 'target' },
+      { kind: 'space', content: framedContent, via: 'target' },
     ],
     ['a Reference Resource to an Ur Resource', TO_UR, { kind: 'ur', content: {}, via: 'target' }],
   ])('resolves %s', (_, id, expected) => {

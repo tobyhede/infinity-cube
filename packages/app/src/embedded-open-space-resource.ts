@@ -4,13 +4,15 @@ import {
   type MapPosition,
   type GraphId,
   type ResourceId,
+  type SpaceFraming,
+  uuidSchema,
 } from '@project/core';
 import { authorsEmbeddedMap, type ResourceFlowNode } from '@project/react-flow-adapter';
-import { spaceViewOf } from '@project/ui';
 import { mapSurfacePolicy, type MapSurfacePolicy } from './map-surface-policy';
 
 import { DRAG_TILT_RADIANS, tiltResourcePosition } from './drag-tilt';
 import type { EmbeddedBounds } from './embedded-map';
+import type { MapEmbedEntry } from './map-embeddings';
 
 /**
  * The containing Resource's box in canvas space, which bounds math reads without
@@ -46,6 +48,12 @@ export interface DiscoverEmbeddedOpenSpaceResourcesInput<
   readonly editingResources: ReadonlySet<ResourceId>;
   readonly staleSpaces: ReadonlySet<ResourceId>;
   readonly nodes: readonly ResourceFlowNode[];
+  /**
+   * The Map embeddings drawn, by the placement whose rect each is drawn in: a
+   * plugin's `<Embed map>` publishes one while it is drawn, so a Closed Space
+   * Resource requests nothing (ADR 0142).
+   */
+  readonly embeds: ReadonlyMap<string, MapEmbedEntry>;
   readonly entries: readonly Entry[];
   readonly publications: ReadonlyMap<string, EmbeddedPublicationSnapshot>;
   readonly bodyHeights: ReadonlyMap<string, number>;
@@ -65,6 +73,8 @@ export interface EmbeddedOpenSpaceResourceRequest<Entry extends { readonly id: R
   readonly spaceId: ResourceId;
   readonly mapId: MapId;
   readonly graphId: GraphId;
+  /** The framing the embedding asks for, absent until the view has been framed. */
+  readonly framing: SpaceFraming | undefined;
   readonly entry: Entry | undefined;
   readonly absolute: MapPosition;
   /**
@@ -105,6 +115,20 @@ interface EmbedWindow {
   readonly intersection: EmbeddedBounds;
   readonly bounds: EmbeddedBounds;
 }
+
+/** The ids a Map embedding asks for, as the core's, or `undefined` when one is not a UUID. */
+const embeddedViewIds = (view: {
+  readonly spaceId: string;
+  readonly map: string;
+  readonly graph: string;
+}): { readonly spaceId: ResourceId; readonly map: MapId; readonly graph: GraphId } | undefined => {
+  const spaceId = uuidSchema.safeParse(view.spaceId);
+  const map = uuidSchema.safeParse(view.map);
+  const graph = uuidSchema.safeParse(view.graph);
+  return spaceId.success && map.success && graph.success
+    ? { spaceId: spaceId.data, map: map.data, graph: graph.data }
+    : undefined;
+};
 
 /** Title-footer border, added to a measured footer in place of the reserved inset. */
 const FOOTER_BORDER = 4;
@@ -210,13 +234,16 @@ export function discoverEmbeddedOpenSpaceResources<Entry extends { readonly id: 
   }));
   for (const item of queue) {
     const { parent, origin, containingDrawn, clip, path } = item;
-    if (parent.data.open !== true) continue;
-    const shown = spaceViewOf(parent.data.display);
-    if (shown === undefined) continue;
-    const { view, via } = shown;
+    const embedded = input.embeds.get(parent.id);
+    if (embedded === undefined) continue;
+    const ids = embeddedViewIds(embedded.request.view);
+    if (ids === undefined) continue;
+    const view = { ...ids, framing: embedded.request.view.framing };
     const policy = mapSurfacePolicy({
       inherited: item.policy,
-      throughReference: via !== 'self',
+      // A Map embedded by a Resource that does not show its own Map, as a
+      // Reference to a Space Resource does, is drawn read-only (ADR 0070).
+      throughReference: !authorsEmbeddedMap(parent.data),
       stale:
         input.staleSpaces.has(view.spaceId) ||
         (input.publications.has(parent.id) &&
@@ -256,6 +283,7 @@ export function discoverEmbeddedOpenSpaceResources<Entry extends { readonly id: 
       spaceId: view.spaceId,
       mapId: view.map,
       graphId: view.graph,
+      framing: view.framing,
       entry: input.entries.find((entry) => entry.id === view.spaceId),
       absolute: window.absolute,
       drawnAbsolute,

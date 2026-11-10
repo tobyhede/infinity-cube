@@ -44,8 +44,9 @@ import {
   CANVAS_RESOURCE_DRAG_TILT_DEGREES,
   GraphIcon,
   graphPaint,
-  spaceViewOf,
+  HostMapProvider,
   type EntityActionGroup,
+  type MapEmbedRequest,
 } from '@project/ui';
 import {
   authorsEmbeddedMap,
@@ -83,6 +84,9 @@ import { useEmbeddedOpenSpaceResources } from '../use-embedded-open-space-resour
 import { useOpenSpaces } from '../open-spaces-context';
 import type { OpenSpace } from '../open-spaces';
 import { EmbeddedMapAuthoring } from './EmbeddedMapAuthoring';
+import { drawCanvasMapEmbed } from './map-embed-draws';
+import { createMapEmbeddings, MapEmbeddingsProvider, ownMapEmbed } from '../map-embeddings';
+import { usePluginGate } from '../plugin-host/plugin-gate-context';
 import { CANVAS_KEYS, FULL_VIEW_KEYS, keyBelongsElsewhere, pressesBinding } from '../key-bindings';
 import {
   ADD_RESOURCE,
@@ -292,6 +296,24 @@ const neighbourOnScreen = (
 };
 
 /** The Resource a drawn node shows, by the node's id in one drawing. */
+/**
+ * The Resources a placement is drawn inside, through their Map embeddings,
+ * outermost first, then its own: the surface path its embedded Map's Claims
+ * nest under (ADR 0142).
+ */
+const surfacePathOf = (
+  node: ResourceFlowNode,
+  nodesById: ReadonlyMap<string, ResourceFlowNode>,
+): readonly ResourceId[] => {
+  const path: ResourceId[] = [];
+  let current: ResourceFlowNode | undefined = node;
+  while (current !== undefined) {
+    path.unshift(current.data.resourceId);
+    current = current.parentId === undefined ? undefined : nodesById.get(current.parentId);
+  }
+  return path;
+};
+
 const resourceOfNode = (nodes: readonly ResourceFlowNode[], id: string): ResourceId | undefined =>
   nodes.find((node) => node.id === id)?.data.resourceId;
 
@@ -417,6 +439,15 @@ export function SpaceCanvas({
     () => ({ spaceId: thisSpaceId, mapId, policy: rootPolicy }),
     [thisSpaceId, mapId, rootPolicy],
   );
+  // The Map embeddings drawn on this canvas, nested ones too: a plugin's
+  // `<Embed map>` publishes what it asks for while it is drawn (ADR 0142).
+  const [mapEmbeddings] = useState(createMapEmbeddings);
+  const embeds = useSyncExternalStore(mapEmbeddings.subscribe, mapEmbeddings.getState);
+  const publishMapEmbed = useCallback(
+    (nodeId: string, resourceId: ResourceId, request: MapEmbedRequest | null) =>
+      mapEmbeddings.publish(nodeId, resourceId, request),
+    [mapEmbeddings],
+  );
   const {
     embeddedRequests,
     embeddedPublications,
@@ -425,18 +456,32 @@ export function SpaceCanvas({
     publishEmbedded,
     reportBodyHeight,
     editingPortals,
-    onPortalEditingChange: setPortalEditing,
     portalDraft,
     setPortalDraft,
-  } = useEmbeddedOpenSpaceResources(nodes, spaces, draggingIds, embeddedRoot, hasResourcesOnCanvas);
-
-  const onPortalEditingChange = useCallback(
-    (resourceId: ResourceId, editing: boolean) => {
-      setPortalEditing(resourceId, editing);
-      if (!editing) selectResource(resourceId);
-    },
-    [setPortalEditing, selectResource],
+  } = useEmbeddedOpenSpaceResources(
+    nodes,
+    embeds,
+    spaces,
+    draggingIds,
+    embeddedRoot,
+    hasResourcesOnCanvas,
   );
+  // A Claim passed to a Map embedding is held for that Map's authoring, and
+  // withdraws nothing a plugin's own edit does; when it ends, the Resource
+  // whose Map it authored is selected, as Done always selected it.
+  const pageGate = usePluginGate();
+  const gate = plugins?.gate ?? pageGate;
+  const editedBefore = useRef<ReadonlySet<ResourceId>>(editingPortals);
+  useLayoutEffect(() => {
+    const returns = [...editingPortals].map((resourceId) => gate.lend(resourceId));
+    for (const resourceId of editedBefore.current) {
+      if (!editingPortals.has(resourceId)) selectResource(resourceId);
+    }
+    editedBefore.current = editingPortals;
+    return () => {
+      for (const give of returns) give();
+    };
+  }, [editingPortals, gate, selectResource]);
 
   const drawnSpaces = useMemo(
     () => [
@@ -657,15 +702,22 @@ export function SpaceCanvas({
     spaceResourceTargets,
     resourceEntityActions: resourceActions,
     capSizeHint,
-    portalEditing: editingPortals,
-    onPortalEditingChange,
+    mapEmbeddings,
   });
-  const {
-    bodyEditing,
-    openResource: onOpenResource,
-    beginTitleEditing,
-    completeSpaceResourceFraming,
-  } = resourceAuthoring;
+  const { bodyEditing, openResource: onOpenResource, beginTitleEditing } = resourceAuthoring;
+  /**
+   * The framing an author gave a Map authored in place, written through the
+   * embedding's `select`, the plugin's own commit, so withdrawal covers it.
+   */
+  const completeSpaceResourceFraming = useCallback(
+    (resourceId: ResourceId, framing: SpaceResourceFraming) => {
+      const entry = ownMapEmbed(mapEmbeddings.getState(), resourceId);
+      const commit = entry?.request.select?.commit;
+      if (entry === undefined || commit === undefined) return;
+      void commit({ ...entry.request.view, framing });
+    },
+    [mapEmbeddings],
+  );
 
   const embeddedBodyEditing = embeddedRequests.some(
     (request) =>
@@ -1162,12 +1214,13 @@ export function SpaceCanvas({
   const canvasNodes = useMemo(
     () =>
       [...editableNodes, ...liveEmbeddings.flatMap((value) => value.nodes)].map((node) => {
+        const withEmbed = { ...node, data: { ...node.data, onMapEmbed: publishMapEmbed } };
         const withHeight = reportsBodyHeight(node)
           ? {
-              ...node,
-              data: { ...node.data, onBodyHeightChange: reportBodyHeight },
+              ...withEmbed,
+              data: { ...withEmbed.data, onBodyHeightChange: reportBodyHeight },
             }
-          : node;
+          : withEmbed;
         if (
           !editingPortals.has(withHeight.data.resourceId) ||
           !authorsEmbeddedMap(withHeight.data)
@@ -1188,7 +1241,7 @@ export function SpaceCanvas({
           className: classes.join(' '),
         };
       }),
-    [editableNodes, liveEmbeddings, reportBodyHeight, editingPortals],
+    [editableNodes, liveEmbeddings, reportBodyHeight, editingPortals, publishMapEmbed],
   );
   const portalNodesById = useMemo(() => {
     const byId = new Map<string, ResourceFlowNode>();
@@ -1243,6 +1296,7 @@ export function SpaceCanvas({
   );
   const canvasRef = useRef<HTMLDivElement>(null);
   const portalGestureSnapshot = useRef({
+    embeds,
     editingPortals,
     portalNodesById,
     portalDraft,
@@ -1257,6 +1311,7 @@ export function SpaceCanvas({
   // listener cannot pan or zoom from the previous gesture-session snapshot.
   useLayoutEffect(() => {
     portalGestureSnapshot.current = {
+      embeds,
       editingPortals,
       portalNodesById,
       portalDraft,
@@ -1267,6 +1322,7 @@ export function SpaceCanvas({
       authorOnCanvas: availability.authorOnCanvas,
     };
   }, [
+    embeds,
     editingPortals,
     portalNodesById,
     portalDraft,
@@ -1318,9 +1374,7 @@ export function SpaceCanvas({
       const session = portalGestureSnapshot.current;
       const drafted = session.portalDraft.get(resourceId);
       if (drafted !== undefined) return drafted;
-      const parent = session.portalNodesById.get(parentId);
-      const stored =
-        parent === undefined ? undefined : spaceViewOf(parent.data.display)?.view.framing;
+      const stored = session.embeds.get(parentId)?.request.view.framing;
       if (stored !== undefined) return stored;
       const published = session.embeddedPublications.get(parentId);
       const request = session.embeddedRequests.find(
@@ -1990,10 +2044,8 @@ export function SpaceCanvas({
                 availability.authorInEmbeddedMap &&
                 (!embeddedEditing || editingEmbeddingIds.has(request.parent.id))
               }
-              framing={
-                portalDraft.get(request.parent.data.resourceId) ??
-                spaceViewOf(request.parent.data.display)?.view.framing
-              }
+              framing={portalDraft.get(request.parent.data.resourceId) ?? request.framing}
+              surfacePath={surfacePathOf(request.parent, portalNodesById)}
               bounds={request.bounds}
               absolute={request.absolute}
               drawnAbsolute={request.drawnAbsolute}
@@ -2057,7 +2109,9 @@ export function SpaceCanvas({
   );
   return edgeSurface.provide(
     <GraphConnectionLineHeadShape headShape={preview.headShape}>
-      {canvas}
+      <MapEmbeddingsProvider value={mapEmbeddings}>
+        <HostMapProvider draw={drawCanvasMapEmbed}>{canvas}</HostMapProvider>
+      </MapEmbeddingsProvider>
     </GraphConnectionLineHeadShape>,
   );
 }

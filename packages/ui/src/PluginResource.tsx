@@ -45,8 +45,14 @@ import {
 import { readingAssets, usePluginAssets } from './plugin-assets';
 import { RailChoiceMenu } from './RailChoiceMenu';
 import { MapTitleContext, MapTitleView, type MapTitle } from './MapTitle';
-import { EmbeddingProvider, HostEmbed, type Embedding } from './ResourceEmbedding';
-import { createSurfaceLifetime, type SurfaceLifetime } from './surface-lifetime';
+import {
+  EmbeddingProvider,
+  HostEmbed,
+  MapEmbedSlotProvider,
+  type Embedding,
+  type MapEmbedRequest,
+  type MapEmbedSlot,
+} from './ResourceEmbedding';
 import { ResourceFailureBoundary } from './ResourceFailureBoundary';
 import { HostRenderedMarkdown, HostSourceEditor } from './ResourceTextHost';
 import {
@@ -165,6 +171,13 @@ export interface PluginResourceProps {
   readonly renderToolbar?: ((toolbar: ReactNode, held: boolean) => ReactNode) | undefined;
   /** Told what a plugin threw while drawing. */
   readonly onFailure?: ((error: Error) => void) | undefined;
+  /**
+   * Told what a Map embedding drawn in this rect asks for, and `null` once it
+   * is gone, so the canvas draws the Map over the rect (ADR 0142).
+   */
+  readonly onMapEmbed?: ((request: MapEmbedRequest | null) => void) | undefined;
+  /** Told how far a Map embedding's room stops short of the rect's bottom, which clips the Map. */
+  readonly onBodyHeightChange?: ((height: number | null) => void) | undefined;
 }
 
 /**
@@ -346,10 +359,24 @@ export function PluginSurface(props: PluginResourceProps & PluginSurfaceEntries)
     [embeddable, props.resourceId, host, rail, size, state, onFailure, entryFor],
   );
 
+  const onMapEmbed = props.onMapEmbed;
+  const mapNote = props.operations.mapNote;
+  const reportFooter = props.onBodyHeightChange;
+  const mapSlot = useMemo(
+    (): MapEmbedSlot | null =>
+      onMapEmbed === undefined ? null : { publish: onMapEmbed, note: mapNote, reportFooter },
+    [onMapEmbed, mapNote, reportFooter],
+  );
+
   const entityActions = props.entityActions;
   const actionable = !readOnly && entityActions?.some((group) => group.length > 0) === true;
+  // The Map embedding's own commands are the host's: drawn here beside the
+  // plugin's, while the plugin embeds a Map it may choose for (ADR 0142).
+  const mapRail = props.readOnly ? undefined : props.operations.mapRail;
   const showActions =
-    state !== 'dragging' && state !== 'editing' && (actionable || commands.length > 0);
+    state !== 'dragging' &&
+    state !== 'editing' &&
+    (actionable || commands.length > 0 || mapRail !== undefined);
   const toolbar = showActions ? (
     <ResourceRailActions
       aria-label={`Resource ${name}`}
@@ -364,6 +391,7 @@ export function PluginSurface(props: PluginResourceProps & PluginSurfaceEntries)
           render={<ResourceRailAction />}
         />
       )}
+      {mapRail}
       {commands.length > 0 && (
         <ResourceRailKindActions kind={kind}>
           <PluginRailCommands commands={commands} />
@@ -430,9 +458,11 @@ export function PluginSurface(props: PluginResourceProps & PluginSurfaceEntries)
           onFailure={onFailure}
         >
           <MapTitleContext.Provider value={drawnTitle}>
-            <EmbeddingProvider embedding={embedding}>
-              <ResourceHostProvider host={host}>{plugin}</ResourceHostProvider>
-            </EmbeddingProvider>
+            <MapEmbedSlotProvider slot={mapSlot}>
+              <EmbeddingProvider embedding={embedding}>
+                <ResourceHostProvider host={host}>{plugin}</ResourceHostProvider>
+              </EmbeddingProvider>
+            </MapEmbedSlotProvider>
             {/* A plugin that draws no Title is renamed in the host's editor, drawn over it. */}
             {!props.entry.drawsTitle && title.editor !== undefined && !readOnly && (
               <div className="canvas-resource__title-over">

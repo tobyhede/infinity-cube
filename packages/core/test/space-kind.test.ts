@@ -10,7 +10,8 @@ import {
 } from '../src/kinds/registry';
 import { EMPTY_ASSET_REF } from '../src/assets';
 import { referenceKind } from '../src/kinds/reference';
-import { spaceKind, type SpaceSelectionTarget } from '../src/kinds/space';
+import { spaceKind } from '../src/kinds/space';
+import type { SpaceSelectionTarget } from '../src/kinds/kind-module';
 import { uuidSchema } from '../src/schema';
 
 const uuid = (n: number) =>

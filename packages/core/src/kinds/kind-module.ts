@@ -1,14 +1,8 @@
 /* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import type { z } from 'zod';
 import type { ContentFacts } from '../resource-content';
-import type {
-  SpaceSelectionTarget,
-  SpaceSelectionProblem,
-  spaceResourceContentSchema,
-  spaceResourceFramingSchema,
-} from './space';
 import type { UUID } from '../types';
-import type { Outline } from '@project/resource-api/domain';
+import type { Outline, SpaceFraming as ApiSpaceFraming } from '@project/resource-api/domain';
 import type { JsonValue } from '../json-value';
 
 /**
@@ -40,10 +34,8 @@ export interface KindMapContent {
   readonly outline: (value: JsonValue) => Outline;
 }
 
-type SpaceResourceContent = z.infer<typeof spaceResourceContentSchema>;
-
 /** The Map-coordinate centre and scale one window onto another Space is framed at. */
-export type SpaceFraming = Readonly<z.infer<typeof spaceResourceFramingSchema>>;
+export type SpaceFraming = ApiSpaceFraming;
 
 /**
  * The view of another Space a Resource shows: the Space, a Map of it, a Graph
@@ -53,11 +45,51 @@ export type SpaceFraming = Readonly<z.infer<typeof spaceResourceFramingSchema>>;
  * by a conditional spread.
  */
 export interface SpaceView {
-  readonly spaceId: SpaceResourceContent['spaceId'];
-  readonly map: SpaceResourceContent['map'];
-  readonly graph: SpaceResourceContent['graph'];
+  readonly spaceId: UUID;
+  readonly map: UUID;
+  readonly graph: UUID;
   readonly framing: SpaceFraming | undefined;
 }
+
+/** What a selection is checked against: the Space it shows, as the core reads it. */
+export interface SpaceSelectionTarget {
+  /** The ids of the Graphs a Map of the target owns, or `undefined` when it has no such Map. */
+  readonly mapGraphIds: (mapId: UUID) => readonly UUID[] | undefined;
+  /** Whether the target has a Graph with this id. */
+  readonly hasGraph: (graphId: UUID) => boolean;
+}
+
+/** Why a selection does not resolve in the Space it shows. */
+export type SpaceSelectionProblem =
+  | { readonly kind: 'space-resource-map-missing'; readonly mapId: UUID }
+  | { readonly kind: 'space-resource-graph-missing'; readonly graphId: UUID }
+  | {
+      readonly kind: 'space-resource-graph-outside-map';
+      readonly mapId: UUID;
+      readonly graphId: UUID;
+    };
+
+/**
+ * The core's check of a selection (ADR 0079, ADR 0128): its Map and Graph
+ * resolve in the Space it shows, and the Graph is the Map's. The selection's
+ * own Map, with no fallback to that Space's `defaultMap`: a selection names a
+ * Map from the moment it exists, so one that resolves to nothing is a dangling
+ * reference to a deleted Map rather than an unmade choice.
+ */
+export const selectionProblem = (
+  view: Pick<SpaceView, 'map' | 'graph'>,
+  target: SpaceSelectionTarget,
+): SpaceSelectionProblem | undefined => {
+  const graphIds = target.mapGraphIds(view.map);
+  if (graphIds === undefined) return { kind: 'space-resource-map-missing', mapId: view.map };
+  if (!target.hasGraph(view.graph)) {
+    return { kind: 'space-resource-graph-missing', graphId: view.graph };
+  }
+  if (!graphIds.includes(view.graph)) {
+    return { kind: 'space-resource-graph-outside-map', mapId: view.map, graphId: view.graph };
+  }
+  return undefined;
+};
 
 /** A Map and one of its Graphs, chosen in the Space a selection shows. */
 export type SpaceViewChoice = Pick<SpaceView, 'map' | 'graph'>;

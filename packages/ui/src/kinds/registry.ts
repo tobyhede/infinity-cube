@@ -10,10 +10,10 @@ import {
   type ResourceContent,
 } from '@project/core';
 import { imageView } from './image';
-import type { CanvasArea, ContentCommand, KindView } from './kind-view';
+import type { CanvasArea, KindView } from './kind-view';
 import { markdownView } from './markdown';
 import { referenceView } from './reference';
-import { spaceView, type SpaceOperations } from './space';
+import { spaceView } from './space';
 import type { PluginOperations } from './plugin-views';
 import { urView } from './ur';
 
@@ -23,7 +23,7 @@ export interface KindOperationsByKind {
   [referenceKind.id]: PluginOperations;
   [imageKind.id]: PluginOperations;
   [urKind.id]: PluginOperations;
-  [spaceKind.id]: SpaceOperations;
+  [spaceKind.id]: PluginOperations;
 }
 
 /**
@@ -56,10 +56,6 @@ export type KindNaming = Pick<KindView<unknown>, 'name' | 'listName' | 'referenc
 
 /** What a kind's Resources are called and drawn as, from its view half. */
 export const kindNaming = (kind: KindId): KindNaming => KIND_VIEWS[kind];
-
-/** What the command beginning an edit of a Resource's own content is called and drawn as, for its kind. */
-export const contentCommand = (kind: KindId): ContentCommand | undefined =>
-  KIND_VIEWS[kind].contentCommand;
 
 /** What a Resource of this kind offers before the composition offers anything. */
 export const bareOperations = <K extends KindId>(kind: K): KindOperationsByKind[K] =>

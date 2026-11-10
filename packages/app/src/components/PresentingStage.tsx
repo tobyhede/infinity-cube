@@ -5,9 +5,9 @@ import {
   resourceDrawnByPlugin,
   type Space,
 } from '@project/graph';
-import { PresentedPluginResource, PresentedResource, Stage } from '@project/ui';
+import { HostMapProvider, PresentedPluginResource, PresentedResource, Stage } from '@project/ui';
 import { presentedNotes } from '../notes-window';
-import { presentedByApplication } from '../kinds/registry';
+import { drawPresentedMapEmbed } from './map-embed-draws';
 import { PresentedNotesList } from './PresentedNotesList';
 import { PresentingChrome, type PresentingChromeProps } from './PresentingChrome';
 import './rehearsal-notes.css';
@@ -68,19 +68,19 @@ export function PresentingStage({
       }
     >
       {isPluginKind(resource.kind) && resourceDrawnByPlugin(space, resource) ? (
-        <PresentedPluginResource
-          resourceId={resource.id}
-          kind={resource.kind}
-          title={resource.title}
-          content={resource.content}
-          embeddable={referencedResources(space, resource)}
-          onFailure={onPluginFailure}
-          replacementEpoch={replacementEpoch}
-        />
+        <HostMapProvider draw={drawPresentedMapEmbed}>
+          <PresentedPluginResource
+            resourceId={resource.id}
+            kind={resource.kind}
+            title={resource.title}
+            content={resource.content}
+            embeddable={referencedResources(space, resource)}
+            onFailure={onPluginFailure}
+            replacementEpoch={replacementEpoch}
+          />
+        </HostMapProvider>
       ) : (
-        <PresentedResource title={resource.title} content={content}>
-          {presentedByApplication(content)}
-        </PresentedResource>
+        <PresentedResource title={resource.title} content={content} />
       )}
     </Stage>
   );

@@ -1,8 +1,6 @@
 import type { Continuation } from './continuation';
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
-  frameSpaceView,
-  selectSpaceView,
   spaceSelection,
   type SpaceView,
   RESOURCE_TITLE_REQUIRED,
@@ -11,7 +9,6 @@ import {
   uuidSchema,
   type ResourceDocument,
   type ResourceId,
-  type GraphId,
 } from '@project/core';
 import type { Size } from '@project/resource-api/domain';
 import type { ObserverErrorReporter, SpaceSession } from '@project/persistence';
@@ -21,17 +18,20 @@ import type { AuthoringAvailability } from './authoring-availability';
 import { describeAuthoringRefusal } from './authoring-refusal';
 import type { ResourceResize } from './render-adapter';
 import type { SurfaceAuthoring } from './space-authoring';
-import type { SpaceResourceTargetMap } from './space-resource-lifecycle';
 import { useOpenSpaces } from './open-spaces-context';
 import type { CommandOutcomes } from './command-outcomes';
 import type { DeleteConfirmation } from './delete-confirmation';
 import { NO_SPACE_RESOURCE_TARGETS, type SpaceResourceTargets } from './space-resource-targets';
-import type { SpaceResourceFraming } from './space-resource-framing';
 import { applyResourceDataPatch, decorateSharedResourceNode } from './canvas-resource-decoration';
 import { useKindDecoratedNodes } from './kinds/registry';
 import type { PluginHost } from './plugin-host/plugin-commits';
 import type { PluginGate } from './plugin-host/plugin-gate';
 import { usePluginGate } from './plugin-host/plugin-gate-context';
+import { useMapEmbeddings, type MapEmbedEntry, type MapEmbeddings } from './map-embeddings';
+
+const NO_SUBSCRIPTION = () => () => undefined;
+const NONE_EMBEDDED: ReadonlyMap<string, MapEmbedEntry> = new Map();
+const NO_MAP_EMBEDS = () => NONE_EMBEDDED;
 
 type Caret = { readonly resourceId: string; readonly field: 'title' } | null;
 
@@ -64,36 +64,17 @@ const spaceSelectionsKeyOf = (
     })
     .join();
 
-/**
- * Load a Resource that shows a view of another Space, parse the next document,
- * persist it as `edited-resource`.
- *
- * Selection and framing both write that one Edit; they differ only in how the
- * kind changes its view and the sentence a failed parse returns.
- */
-const completeEditedSpaceView = (
-  authoring: Pick<SurfaceAuthoring, 'complete'>,
-  spaceSession: SpaceSession,
-  resourceId: ResourceId,
-  nextDocument: (document: ResourceDocument) => ResourceDocument | undefined,
-  invalidMessage: string,
-): string | null => {
-  const stored = spaceSession
-    .getState()
-    .working.resources.find((resource) => resource.id === resourceId);
-  const next = stored === undefined ? undefined : nextDocument(stored.document);
-  if (next === undefined) return describeAuthoringRefusal({ code: 'resource-not-found' });
-  const parsed = resourceDocumentSchema.safeParse(next);
-  if (!parsed.success) return invalidMessage;
-  const result = authoring.complete({ kind: 'edited-resource', resourceId, document: parsed.data });
-  return result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
-};
-
 /** What this canvas's plugin surfaces claim on, and where what they throw is reported. */
 export interface CanvasPlugins {
   /** The composition's gate, which its Authoring asks at `complete` (ADR 0142). */
   readonly gate: PluginGate;
   readonly report: ObserverErrorReporter;
+  /**
+   * The Resources whose Map embedding this canvas is drawn inside, outermost
+   * first, so a Claim here nests under one they hold. Absent on a canvas drawn
+   * in no embedding.
+   */
+  readonly path?: readonly ResourceId[] | undefined;
 }
 
 const reportPluginFailureToConsole: ObserverErrorReporter = (error) =>
@@ -148,14 +129,10 @@ export interface CanvasResourceAuthoringInput {
   readonly resourceEntityActions?:
     ((resourceId: ResourceId) => readonly EntityActionGroup[]) | undefined;
   /**
-   * Which Open Space Resources currently have their embedded canvas in Edit.
-   *
-   * Absent leaves every Space Resource in Read: the embedding stays inert and the
-   * dock offers no Edit/Done. The containing canvas owns the set because the
-   * embedding is sibling nodes, not markup inside the Resource.
+   * The Map embeddings drawn on the canvas this composition draws on; absent,
+   * the ones the canvas around it provides.
    */
-  readonly portalEditing?: ReadonlySet<ResourceId>;
-  readonly onPortalEditingChange?: ((resourceId: ResourceId, editing: boolean) => void) | undefined;
+  readonly mapEmbeddings?: MapEmbeddings | undefined;
   /**
    * A plugin's size hint capped at what this canvas shows. Only the canvas's
    * own Map offers it, because it knows its viewport; absent, a hint is
@@ -170,10 +147,6 @@ export interface CanvasResourceAuthoring {
   readonly titleEditing: boolean;
   readonly openResource: (resourceId: string) => 'completed' | 'retained';
   readonly beginTitleEditing: (resourceId: string) => void;
-  readonly completeSpaceResourceFraming: (
-    resourceId: ResourceId,
-    framing: SpaceResourceFraming,
-  ) => string | null;
 }
 
 /**
@@ -196,10 +169,9 @@ export function useCanvasResourceAuthoring({
   onTitleEditingChange,
   spaceResourceTargets = NO_SPACE_RESOURCE_TARGETS,
   resourceEntityActions,
-  portalEditing,
-  onPortalEditingChange,
   plugins,
   capSizeHint,
+  mapEmbeddings: ownMapEmbeddings,
 }: CanvasResourceAuthoringInput): CanvasResourceAuthoring {
   const spaces = useOpenSpaces();
   const [contextEditingIds, setContextEditingIds] = useState<ReadonlySet<ResourceId>>(
@@ -227,7 +199,18 @@ export function useCanvasResourceAuthoring({
   // The application's asset store, which a surface stores and picks through
   // only where it offers commits, and only while they are not withdrawn.
   const pluginAssets = usePluginAssets();
-  const bodyEditing = claimChain.holders.length > 0;
+  // A Claim passed to a Map embedding authors that Map, not the plugin's own
+  // rect, so it withdraws nothing a plugin's edit does.
+  const lent = useSyncExternalStore(pluginGate.subscribe, pluginGate.lent);
+  const bodyEditing = claimChain.holders.some((path) => !lent.has(path.at(-1) ?? ''));
+  // The Map embeddings drawn on this canvas, which a Space Resource's host
+  // chooser writes a choice through (ADR 0142).
+  const providedMapEmbeddings = useMapEmbeddings();
+  const mapEmbeddings = ownMapEmbeddings ?? providedMapEmbeddings;
+  const mapEmbeds = useSyncExternalStore(
+    mapEmbeddings?.subscribe ?? NO_SUBSCRIPTION,
+    mapEmbeddings?.getState ?? NO_MAP_EMBEDS,
+  );
 
   useEffect(() => {
     onBodyEditingChange?.(bodyEditing);
@@ -284,7 +267,6 @@ export function useCanvasResourceAuthoring({
 
   const closeResource = useCallback(
     (resourceId: ResourceId): 'completed' | 'retained' => {
-      onPortalEditingChange?.(resourceId, false);
       setContextNotices((previous) => {
         if (!previous.has(resourceId)) return previous;
         const next = new Map(previous);
@@ -300,7 +282,7 @@ export function useCanvasResourceAuthoring({
       const result = authoring.complete({ kind: 'closed-resource', resourceId });
       return result.kind === 'completed' || result.kind === 'unchanged' ? 'completed' : 'retained';
     },
-    [authoring, onPortalEditingChange],
+    [authoring],
   );
 
   const pluginHost = useMemo(
@@ -314,6 +296,7 @@ export function useCanvasResourceAuthoring({
         spaceSession.getState().working.resources.find(({ id }) => id === resourceId)?.document,
       assets: { store: pluginAssets.store, pick: pluginAssets.pick },
       capSizeHint,
+      path: plugins?.path,
     }),
     [
       authoring,
@@ -323,6 +306,7 @@ export function useCanvasResourceAuthoring({
       spaceSession,
       pluginAssets,
       capSizeHint,
+      plugins?.path,
     ],
   );
 
@@ -357,53 +341,6 @@ export function useCanvasResourceAuthoring({
       });
       return result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
     },
-    [authoring, spaceSession],
-  );
-
-  /**
-   * Authoring a Space Resource's Map or Graph selection.
-   *
-   * One operation for both, because they are not independent: a Graph is owned
-   * by the Map that holds it (ADR 0040), and the aggregate refuses a Resource
-   * naming a Graph its Map does not own. So choosing a Map re-seeds
-   * the Graph from that Map rather than leaving the previous one to be
-   * refused at intake.
-   *
-   * There is no arm for a Map that owns no Graph. A Map owns at least
-   * one — `spaceFileSchema` says so — and a Space Resource stores a Graph as well
-   * as a Map (ADR 0079), so writing the pair half-made is not a state this
-   * surface may reach. `graphId` is required here for that reason, and the
-   * schema parse is what still stands between a resolved pair and a stored one.
-   *
-   * The target Space reference is untouched here and cannot be reached from the
-   * surface at all: it is chosen once, at creation (ADR 0068), and Space
-   * Authoring refuses a changed one on its own account.
-   */
-  const completeSpaceResourceSelection = useCallback(
-    (
-      resourceId: ResourceId,
-      targetMap: Pick<SpaceResourceTargetMap, 'id'>,
-      graphId: GraphId,
-    ): string | null =>
-      completeEditedSpaceView(
-        authoring,
-        spaceSession,
-        resourceId,
-        (document) => selectSpaceView(document, { map: targetMap.id, graph: graphId }),
-        'The selection is invalid.',
-      ),
-    [authoring, spaceSession],
-  );
-
-  const completeSpaceResourceFraming = useCallback(
-    (resourceId: ResourceId, framing: SpaceResourceFraming): string | null =>
-      completeEditedSpaceView(
-        authoring,
-        spaceSession,
-        resourceId,
-        (document) => frameSpaceView(document, framing),
-        'The framing is invalid.',
-      ),
     [authoring, spaceSession],
   );
 
@@ -493,10 +430,7 @@ export function useCanvasResourceAuthoring({
     spaces,
     commandOutcomes,
     deleteConfirmation,
-    completeSpaceResourceSelection,
-    portalEditing,
-    // An Open Space Resource offers its Edit only where one may begin.
-    onPortalEditingChange: availability.embeddedMapEdit ? onPortalEditingChange : undefined,
+    mapEmbeds,
     contextNotices,
     onContextEditingChange,
     onContextReport,
@@ -508,6 +442,5 @@ export function useCanvasResourceAuthoring({
     titleEditing: editingTitleResourceId !== null || contextEditingIds.size > 0,
     openResource,
     beginTitleEditing,
-    completeSpaceResourceFraming,
   };
 }

@@ -1,0 +1,156 @@
+import { useMemo, useState, type CSSProperties } from 'react';
+import { Box, Check, Maximize2, Minimize2, Pencil } from 'lucide-react';
+import { titleName, type Answer, type Kept, type SpaceView } from '@project/resource-api/domain';
+import {
+  definePluginView,
+  Rail,
+  Title,
+  type Claim,
+  type PluginViewProps,
+  type RailCommand,
+} from '@project/resource-api/view';
+import { selectView, spacePlugin, viewOf, type SpaceContent, type SpaceMapContent } from './domain';
+
+/**
+ * The Space plugin's view (ADR 0068, ADR 0142). Closed, it draws its Title and
+ * its glyph and requests nothing. Open, it draws the Map it selects through the
+ * host's Map embedding, with its Title below; the embedding draws the Map and
+ * Graph chooser, the shown Space's own authoring and its links, and writes a
+ * choice through `select`, this plugin's own content commit. Its rail is its
+ * own: Open, Close, and Edit, which takes a Claim and passes it to the
+ * embedding so the Map is authored in place until Done releases it.
+ */
+
+const FILL: CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  display: 'flex',
+  flexDirection: 'column',
+  minHeight: 0,
+};
+
+/** The glyph's place on a Closed face: its top-right corner, as the canvas drew a kind glyph. */
+const GLYPH: CSSProperties = { position: 'absolute', top: 8, right: 8, lineHeight: 0 };
+
+/** Whether a settled commit left nothing to say. */
+const refusalOf = (answer: Answer): string | null =>
+  answer === 'completed' || answer === 'unchanged' ? null : answer.refused;
+
+function SpacePluginView({ surface }: PluginViewProps<SpaceContent, SpaceMapContent>) {
+  const name = titleName(surface.title.value);
+  const open = surface.map.value.open;
+  const commitMap = surface.map.commit;
+  const commitContent = surface.content.commit;
+  const content = surface.content.value;
+  const takeClaim = surface.claim;
+  const { Embed } = surface;
+  const [held, setHeld] = useState<Claim | null>(null);
+  const [refusal, setRefusal] = useState<string | null>(null);
+
+  const { spaceId, map, graph, framing } = viewOf(content);
+  const view = useMemo(
+    (): SpaceView => ({ spaceId, map, graph, framing }),
+    [spaceId, map, graph, framing],
+  );
+  // The embedding writes a choice through this plugin's own content commit, so
+  // what withdraws the commit withdraws the choice (ADR 0142).
+  const select = useMemo(
+    (): Kept<SpaceView> | undefined =>
+      commitContent === undefined
+        ? undefined
+        : { value: view, commit: (next) => commitContent(selectView(content, next)) },
+    [commitContent, content, view],
+  );
+
+  const commands = useMemo((): readonly RailCommand[] => {
+    const editing: RailCommand[] = !open
+      ? []
+      : held !== null
+        ? [
+            {
+              kind: 'action',
+              id: 'done',
+              label: `Done Resource ${name}`,
+              icon: <Check size={14} />,
+              run: () => {
+                if (held.release()) setHeld(null);
+              },
+            },
+          ]
+        : takeClaim === undefined
+          ? []
+          : [
+              {
+                kind: 'action',
+                id: 'edit',
+                label: `Edit Resource ${name}`,
+                icon: <Pencil size={14} />,
+                run: () => {
+                  const claim = takeClaim();
+                  if (claim !== undefined) setHeld(claim);
+                },
+              },
+            ];
+    if (commitMap === undefined) return editing;
+    const toggle = (next: SpaceMapContent) => {
+      void commitMap(next).then((answer) => setRefusal(refusalOf(answer)));
+    };
+    return [
+      ...editing,
+      open
+        ? {
+            kind: 'action',
+            id: 'close',
+            label: `Close Resource ${name}`,
+            icon: <Minimize2 size={14} />,
+            run: () => toggle({ open: false }),
+          }
+        : {
+            kind: 'action',
+            id: 'open',
+            label: `Open Resource ${name}`,
+            icon: <Maximize2 size={14} />,
+            run: () => toggle({ open: true }),
+          },
+    ];
+  }, [commitMap, open, name, held, takeClaim]);
+
+  return (
+    <div style={FILL} data-open={open}>
+      {open ? (
+        <>
+          <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
+            <Embed map={view} select={select} claim={held ?? undefined} />
+          </div>
+          <div style={{ padding: '4px 12px 8px' }}>
+            <Title />
+          </div>
+        </>
+      ) : (
+        <div style={{ padding: 12 }}>
+          <Title />
+          {/* What it is, drawn on its face as the canvas draws a kind's glyph. */}
+          <span role="img" aria-label={spacePlugin.name} style={GLYPH}>
+            <Box size={14} aria-hidden />
+          </span>
+        </div>
+      )}
+      {refusal !== null && (
+        <p role="status" style={{ margin: 0, padding: '0 12px', fontSize: 12 }}>
+          {refusal}
+        </p>
+      )}
+      <Rail commands={commands} />
+    </div>
+  );
+}
+
+/** The Space glyph. */
+function SpaceGlyph({ size = 14 }: { readonly size?: number | undefined }) {
+  return <Box size={size} />;
+}
+
+export const spacePluginView = definePluginView(spacePlugin, {
+  View: SpacePluginView,
+  Glyph: SpaceGlyph,
+});

@@ -1,6 +1,21 @@
-import { useLayoutEffect, useState, type ComponentType, type ReactNode } from 'react';
-import type { Answer, AssetRef, Kept, Resource, ResourceId, ResourcePlugin, Size } from '../domain';
-import { useResourceHost } from './host';
+import {
+  createContext,
+  useContext,
+  useLayoutEffect,
+  useState,
+  type ComponentType,
+  type ReactNode,
+} from 'react';
+import type {
+  Answer,
+  AssetRef,
+  Kept,
+  Resource,
+  ResourceId,
+  ResourcePlugin,
+  Size,
+  SpaceView,
+} from '../domain';
 
 /**
  * The view half of the Resource API (ADR 0142): what a surface gives a
@@ -63,24 +78,20 @@ export interface OwnClaim<C, M> extends Claim {
   exclusively<T>(work: (own: Exclusive<C, M>) => Promise<T>): Promise<T | 'busy'>;
 }
 
-/** The Map of another Space an embedding draws. */
-export interface EmbeddedMap {
-  readonly spaceId: string;
-  readonly map: string;
-  readonly graph: string;
-}
-
 /**
- * What the host-owned embedding draws: another Resource, or a Map. The Map
- * embedding draws the selection chooser and writes a choice through `select`,
- * so withdrawal covers it.
+ * What the host-owned embedding draws: another Resource, or a Map of another
+ * Space. The Map embedding draws the Map and Graph chooser, the shown Space's
+ * Map and Graph authoring and its links, and writes a choice or a framing
+ * through `select`, so withdrawal covers it; absent, it offers none. Passed a
+ * held Claim, it authors the Map in place, as far as the host's depth allows,
+ * until that Claim is released.
  */
 export type EmbedProps =
   | { readonly resource: ResourceId; readonly title: Kept<string> }
   | {
-      readonly map: EmbeddedMap;
-      readonly select?: Kept<EmbeddedMap>;
-      readonly claim?: Claim;
+      readonly map: SpaceView;
+      readonly select?: Kept<SpaceView> | undefined;
+      readonly claim?: Claim | undefined;
     };
 
 /**

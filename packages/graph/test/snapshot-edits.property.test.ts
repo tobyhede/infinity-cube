@@ -47,11 +47,7 @@ const titleArb = fc
   .string({ minLength: 1, maxLength: 12 })
   .filter((s) => s.trim().length > 0 && !s.includes('\n'));
 
-/**
- * The Space Resource every openable Reference Resource targets, held by no
- * Map. A Reference to a Space Resource keeps the application's Open until the
- * Space plugin (`.scratch/resource-plugins/issues/07`).
- */
+/** The Space Resource every Reference Resource here targets, held by no Map. */
 const TARGET_ID = uuid('00000000-0000-4000-8000-0000000000f0');
 const TARGET_SPACE = uuid('00000000-0000-4000-8000-0000000000f1');
 const target = {
@@ -64,9 +60,8 @@ const target = {
 } as const;
 
 /**
- * A document of a kind the Map stores Open for: a Reference Resource to a
- * Space Resource. A Resource a plugin draws keeps any Open in its Map content
- * (ADR 0142).
+ * A Reference Resource to a Space Resource. Every Resource is drawn by a
+ * plugin, which keeps any Open in its Map content (ADR 0142).
  */
 const openableDocument = (title: string): ResourceDocument => ({
   title,
@@ -164,7 +159,11 @@ describe('SnapshotEdit.deleteFromSpace properties', () => {
           const closed = closedPlacement(ids, coords);
           const subjectAt = closed.get(subject);
           if (subjectAt === undefined) return;
-          const placement = Placement.place(closed, subject, { ...subjectAt, open, size });
+          const placement = Placement.place(closed, subject, {
+            ...subjectAt,
+            open: false,
+            size,
+          });
           const snapshot = baseSnapshot(ids, Placement.toPositions(placement));
 
           const deleted = SnapshotEdit.deleteFromSpace(snapshot, subject);
@@ -258,7 +257,7 @@ describe('deletionReach properties', () => {
           const at = { x: generated.coords[r * 2] ?? 0, y: generated.coords[r * 2 + 1] ?? 0 };
           positions[id] =
             generated.open[r] === true
-              ? { ...at, open: true, size: { width: 560, height: 420 } }
+              ? { ...at, open: false, size: { width: 560, height: 420 } }
               : { ...at, open: false };
         });
         const graphs = generated.graphs.map((pairs, g): Graph => {
@@ -682,6 +681,7 @@ describe('SnapshotEdit.open, close and resize properties', () => {
         ur: fc.boolean(),
         x: coordinateArb,
         y: coordinateArb,
+        // Drawn and dropped, which keeps the seeded cases the coverage floors were set on.
         open: fc.boolean(),
         size: fc.option(storedSizeArb, { nil: undefined }),
         shape: fc.option(fc.constantFrom(...RESOURCE_SHAPES), { nil: undefined }),
@@ -690,7 +690,8 @@ describe('SnapshotEdit.open, close and resize properties', () => {
         kind: generated.ur ? 'ur' : 'reference',
         x: generated.x,
         y: generated.y,
-        open: !generated.ur && generated.open,
+        // No kind is Open by the Map's rule: each plugin keeps its own (ADR 0142).
+        open: false,
         size: generated.size,
         shape: generated.ur ? generated.shape : undefined,
       })),
@@ -764,7 +765,7 @@ describe('SnapshotEdit.open, close and resize properties', () => {
    * the subject's rect.
    */
   const createCoverage = () => {
-    const counts = { x: 0, y: 0, both: 0, neither: 0, open: 0, closed: 0 };
+    const counts = { x: 0, y: 0, both: 0, neither: 0 };
     const record = (entries: readonly GeneratedEntry[], subjectIndex: number): void => {
       const subject = entries[subjectIndex];
       if (subject === undefined) return;
@@ -782,8 +783,6 @@ describe('SnapshotEdit.open, close and resize properties', () => {
       for (const relation of ['x', 'y', 'both', 'neither'] as const) {
         if (seen[relation]) counts[relation] += 1;
       }
-      if (subject.open) counts.open += 1;
-      else counts.closed += 1;
     };
     const expectEveryCaseGenerated = (): void => {
       for (const count of Object.values(counts)) {
@@ -793,24 +792,18 @@ describe('SnapshotEdit.open, close and resize properties', () => {
     return { record, expectEveryCaseGenerated };
   };
 
-  it('Opens and Closes changing nothing but the subject’s open', () => {
+  it('refuses to Open a Resource of any kind: every plugin keeps its own Open (ADR 0142)', () => {
     fc.assert(
       fc.property(entriesArb, subjectArb, (generated, subjectIndex) => {
         const subjectId = RESOURCE_IDS[subjectIndex];
         if (subjectId === undefined) return;
         const start = snapshotOf(openableSubject(generated, subjectIndex));
-        const startAt = positionsOf(start)[subjectId];
 
-        const opened = settled(start, SnapshotEdit.open(start, MAP_ID, subjectId));
-        expect(positionsOf(opened)).toEqual({
-          ...positionsOf(start),
-          [subjectId]: { ...startAt, open: true },
+        expect(SnapshotEdit.open(start, MAP_ID, subjectId)).toEqual({
+          kind: 'refused',
+          refusal: { code: 'open-requires-content' },
         });
-        const closed = completed(SnapshotEdit.close(opened, MAP_ID, subjectId));
-        expect(positionsOf(closed)).toEqual({
-          ...positionsOf(start),
-          [subjectId]: { ...startAt, open: false },
-        });
+        expect(SnapshotEdit.close(start, MAP_ID, subjectId)).toEqual({ kind: 'unchanged' });
       }),
       { seed: SEED, numRuns: RUNS },
     );
@@ -853,7 +846,7 @@ describe('SnapshotEdit.open, close and resize properties', () => {
     );
   });
 
-  it('restores every position through a grow and the shrink back, Open or Closed', () => {
+  it('restores every position through a grow and the shrink back', () => {
     const coverage = createCoverage();
     fc.assert(
       fc.property(
@@ -881,51 +874,18 @@ describe('SnapshotEdit.open, close and resize properties', () => {
     coverage.expectEveryCaseGenerated();
   });
 
-  it('Opens and expands as one Edit, the Open then the Resize it stands for', () => {
+  it('refuses to Open and expand a Resource of any kind, resizing nothing', () => {
     fc.assert(
       fc.property(entriesArb, subjectArb, sizeArb, (generated, subjectIndex, size) => {
         const subjectId = RESOURCE_IDS[subjectIndex];
         if (subjectId === undefined) return;
-        const start = snapshotOf(openableSubject(generated, subjectIndex));
-        const outcome = SnapshotEdit.openAndExpand(start, MAP_ID, subjectId, size);
+        const snapshot = snapshotOf(openableSubject(generated, subjectIndex));
 
-        const opened = settled(start, SnapshotEdit.open(start, MAP_ID, subjectId));
-        const stepwise = settled(opened, SnapshotEdit.resize(opened, MAP_ID, subjectId, size));
-        if (stepwise === start) {
-          expect(outcome).toEqual({ kind: 'unchanged' });
-          return;
-        }
-        expect(positionsOf(completed(outcome))).toEqual(positionsOf(stepwise));
+        expect(SnapshotEdit.openAndExpand(snapshot, MAP_ID, subjectId, size)).toEqual({
+          kind: 'refused',
+          refusal: { code: 'open-requires-content' },
+        });
       }),
-      { seed: SEED, numRuns: RUNS },
-    );
-  });
-
-  it('floors an Open and expand at the Closed Size on each axis', () => {
-    fc.assert(
-      fc.property(
-        entriesArb,
-        subjectArb,
-        fc.record({ width: fc.nat({ max: 900 }), height: fc.nat({ max: 900 }) }),
-        (generated, subjectIndex, size) => {
-          const subjectId = RESOURCE_IDS[subjectIndex];
-          if (subjectId === undefined) return;
-          const start = snapshotOf(
-            with_(openableSubject(generated, subjectIndex), subjectIndex, { open: false }),
-          );
-          const grown = completed(SnapshotEdit.openAndExpand(start, MAP_ID, subjectId, size));
-          const at = positionsOf(grown)[subjectId];
-
-          expect(at?.open).toBe(true);
-          expect(resourceSize(at ?? {}).width).toBe(
-            Math.max(size.width, COLLAPSED_RESOURCE_SIZE.width),
-          );
-          expect(resourceSize(at ?? {}).height).toBe(
-            Math.max(size.height, COLLAPSED_RESOURCE_SIZE.height),
-          );
-        },
-      ),
-      { seed: SEED, numRuns: RUNS },
     );
   });
 
@@ -997,7 +957,7 @@ describe('SnapshotEdit.open, close and resize properties', () => {
       Object.entries(positionsOf(snapshot)).map(([resourceId, at]) => [resourceId, at?.content]),
     );
 
-  it('keeps every Map content through any number of Resizes, Open and Close', () => {
+  it('keeps every Map content through any number of Resizes and a Close', () => {
     // Map content changes no rect, so the Edits that move and resize Resources
     // carry every entry's Map content through untouched (ADR 0142).
     fc.assert(
@@ -1014,10 +974,6 @@ describe('SnapshotEdit.open, close and resize properties', () => {
           let current = start;
           for (const size of resizes) {
             current = settled(current, SnapshotEdit.resize(current, MAP_ID, subjectId, size));
-            expect(resourceShapesOf(current)).toEqual(resourceShapes);
-          }
-          if (entries[subjectIndex]?.kind === 'reference') {
-            current = settled(current, SnapshotEdit.open(current, MAP_ID, subjectId));
             expect(resourceShapesOf(current)).toEqual(resourceShapes);
           }
           current = settled(current, SnapshotEdit.close(current, MAP_ID, subjectId));
@@ -1212,7 +1168,7 @@ describe('SnapshotEdit across two Maps: addToMap, removeFromMap and deleteFromSp
           const at = placement.get(id) ?? { x: 0, y: 0, open: false };
           return [
             id,
-            open ? { x: at.x, y: at.y, open: true, size: { width: 560, height: 420 } } : at,
+            open ? { x: at.x, y: at.y, open: false, size: { width: 560, height: 420 } } : at,
           ];
         }),
       ),
@@ -1317,7 +1273,7 @@ describe('SnapshotEdit across two Maps: addToMap, removeFromMap and deleteFromSp
     );
   });
 
-  it('moves no other Resource when it removes or deletes an Open, resized one', () => {
+  it('moves no other Resource when it removes or deletes a resized one', () => {
     // Removal changes no size, so it displaces nobody, in any Map.
     fc.assert(
       fc.property(idsArb, coordsArb, fc.nat({ max: 8 }), (ids, coords, subjectSeed) => {
@@ -1325,12 +1281,7 @@ describe('SnapshotEdit across two Maps: addToMap, removeFromMap and deleteFromSp
         if (subject === undefined) return;
         const closed = twoMaps(ids, coords, false);
         const opened = completed(
-          SnapshotEdit.resize(
-            completed(SnapshotEdit.open(closed, MAP_ID, subject)),
-            OTHER_MAP_ID,
-            subject,
-            { width: 560, height: 420 },
-          ),
+          SnapshotEdit.resize(closed, OTHER_MAP_ID, subject, { width: 560, height: 420 }),
         );
         const removed = completed(SnapshotEdit.removeFromMap(opened, MAP_ID, subject));
         const deleted = completed(SnapshotEdit.deleteFromSpace(opened, subject));

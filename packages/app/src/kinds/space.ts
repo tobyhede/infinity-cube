@@ -1,16 +1,14 @@
 import {
   spaceKind,
-  type GraphId,
   type ResourceId,
   type SpaceKindId,
   type SpaceView,
   type UUID,
 } from '@project/core';
-import { createElement, type ReactNode } from 'react';
+import type { Answer } from '@project/resource-api/domain';
 import type { ResourceFlowNodeOf } from '@project/react-flow-adapter';
-import type { KindOperationsByKind } from '@project/ui';
+import type { PluginOperations } from '@project/ui';
 import { buildSpaceResourceRail } from '../build-space-resource-rail';
-import { PresentedSpaceMap } from '../components/PresentedSpaceMap';
 import type {
   CanvasResourceDecorationContext,
   KindCanvasDecoration,
@@ -21,20 +19,22 @@ import type { CommandOutcomes } from '../command-outcomes';
 import type { Continuation } from '../continuation';
 import type { DeleteConfirmation } from '../delete-confirmation';
 import type { KindCreation } from '../kind-creation';
+import { ownMapEmbed, type MapEmbedEntry } from '../map-embeddings';
 import type { ResourcePlacementCommands } from '../resource-placement';
 import type { OpenSpaces } from '../open-spaces';
+import { pluginSurfaceOperations, type PluginHost } from '../plugin-host/plugin-commits';
 import type { SpaceResourceRailContext } from '../space-resource-context-commands';
-import type { SpaceResourceTargetMap } from '../space-resource-lifecycle';
 import type { SpaceResourceTargets } from '../space-resource-targets';
-
-/** The Space kind's operations and decoration, built by assigning what a gate allows. */
-type SpaceOperations = Mutable<KindOperationsByKind[SpaceKindId]>;
-type SpaceDecoration = Mutable<KindDecoration<SpaceKindId>>;
 
 export type SpaceResourceDecorationContext = Pick<
   CanvasResourceDecorationContext,
   'authorOnCanvas' | 'editableResourceIds'
 > & {
+  /**
+   * Where the plugin's commits go and the gate that withdraws them (ADR 0142).
+   * Absent where this canvas offers a plugin no commit.
+   */
+  readonly pluginHost?: PluginHost | undefined;
   readonly continuation: Continuation;
   readonly containingSpaceId: UUID;
   readonly spaceSelections: ReadonlyMap<ResourceId, SpaceView>;
@@ -42,79 +42,87 @@ export type SpaceResourceDecorationContext = Pick<
   readonly spaces: OpenSpaces | null;
   readonly commandOutcomes: CommandOutcomes | undefined;
   readonly deleteConfirmation: Pick<DeleteConfirmation, 'arm'> | undefined;
-  readonly completeSpaceResourceSelection: (
-    resourceId: ResourceId,
-    targetMap: Pick<SpaceResourceTargetMap, 'id'>,
-    graphId: GraphId,
-  ) => string | null;
-  readonly portalEditing: ReadonlySet<ResourceId> | undefined;
-  readonly onPortalEditingChange: ((resourceId: ResourceId, editing: boolean) => void) | undefined;
+  /** The Map embeddings drawn on this canvas, by placement. */
+  readonly mapEmbeds: ReadonlyMap<string, MapEmbedEntry>;
   readonly contextNotices: ReadonlyMap<ResourceId, string>;
   readonly onContextEditingChange: (resourceId: ResourceId, editing: boolean) => void;
   readonly onContextReport: (resourceId: ResourceId, message: string | null) => void;
 };
 
+/** What the Map embedding says while the Space it shows has not been read. */
+export const READING_SPACE_NOTE = 'Reading the referenced Space…';
+
+/** Whether a settled commit left nothing to say. */
+const refusalOf = (answer: Answer): string | null =>
+  answer === 'completed' || answer === 'unchanged' ? null : answer.refused;
+
+/**
+ * A Space Resource's plugin surface (ADR 0142): its Title, content and Map
+ * content commits and its Claim, where the canvas authors it. While its plugin
+ * embeds the Map it selects, the host-owned embedding's commands join its rail:
+ * the Map and Graph chooser, the shown Space's own Map and Graph authoring and
+ * its links. A choice is written through the request's `select`, the plugin's
+ * own content commit, so whatever withdraws that commit withdraws the choice.
+ */
 export function decorateSpaceResourceNode(
   node: ResourceFlowNodeOf<SpaceKindId>,
   context: SpaceResourceDecorationContext,
 ): KindDecoration<SpaceKindId> {
-  const kindOperations: SpaceOperations = { kind: spaceKind.id };
-  const decoration: SpaceDecoration = { kindOperations };
-  if (!node.data.authorsContent) return decoration;
-  const resourceBelongsToWorkingSpace = context.editableResourceIds.has(node.data.resourceId);
-  const selection = context.spaceSelections.get(node.data.resourceId);
+  const resourceId = node.data.resourceId;
+  const editable = context.editableResourceIds.has(resourceId);
+  const kindOperations: Mutable<PluginOperations> = pluginSurfaceOperations(
+    spaceKind.id,
+    resourceId,
+    { authorOnCanvas: context.authorOnCanvas, editable },
+    context.pluginHost,
+  );
+  const decoration: Mutable<KindDecoration<SpaceKindId>> = { kindOperations };
+  const embed = ownMapEmbed(context.mapEmbeds, resourceId);
+  if (embed === undefined || node.data.readOnly || !node.data.authorsContent) return decoration;
+  const selection = context.spaceSelections.get(resourceId);
   const target =
-    selection !== undefined ? context.spaceResourceTargets.get(selection.spaceId) : undefined;
-  // Closed, read-only, and unread omit the rail. Withdrawn authoring still
-  // draws it, disabled: an absent rail is how the Resource says the target has
-  // not been read yet, so a canvas that had merely withdrawn authoring would
-  // put every Open Space Resource back to reporting a wait that had already ended.
-  if (node.data.open === true && !node.data.readOnly && target !== undefined) {
-    const resourceId = node.data.resourceId;
-    let railContext: SpaceResourceRailContext | undefined;
-    if (
-      context.spaces !== null &&
-      context.commandOutcomes !== undefined &&
-      context.deleteConfirmation !== undefined &&
-      selection !== undefined
-    ) {
-      const entry = context.spaces.entry(selection.spaceId);
-      if (entry !== undefined) {
-        railContext = {
-          entry,
-          continuation: context.continuation,
-          spaces: context.spaces,
-          containingSpaceId: context.containingSpaceId,
-          deleteConfirmation: entry.app.deleteConfirmation,
-        };
-      }
-    }
-    kindOperations.spaceRail = buildSpaceResourceRail({
-      target,
-      selection,
-      disabled: !(resourceBelongsToWorkingSpace && context.authorOnCanvas),
-      complete: (targetMap, graphId) =>
-        context.completeSpaceResourceSelection(resourceId, targetMap, graphId),
-      onEditingChange: (editing) => context.onContextEditingChange(resourceId, editing),
-      onReport: (message) => context.onContextReport(resourceId, message),
-      context: railContext,
-    });
+    selection === undefined ? undefined : context.spaceResourceTargets.get(selection.spaceId);
+  if (selection === undefined || target === undefined) {
+    kindOperations.mapNote = READING_SPACE_NOTE;
+    return decoration;
   }
-  if (kindOperations.spaceRail !== undefined) {
-    const notice = context.contextNotices.get(node.data.resourceId);
-    if (notice !== undefined) decoration.contextNotice = notice;
-  }
-  const onPortalEditingChange = context.onPortalEditingChange;
+  let railContext: SpaceResourceRailContext | undefined;
   if (
-    onPortalEditingChange !== undefined &&
-    node.data.open === true &&
-    kindOperations.spaceRail !== undefined
+    context.spaces !== null &&
+    context.commandOutcomes !== undefined &&
+    context.deleteConfirmation !== undefined
   ) {
-    kindOperations.portal = {
-      editing: context.portalEditing?.has(node.data.resourceId) === true,
-      onEditingChange: (editing) => onPortalEditingChange(node.data.resourceId, editing),
-    };
+    const entry = context.spaces.entry(selection.spaceId);
+    if (entry !== undefined) {
+      railContext = {
+        entry,
+        continuation: context.continuation,
+        spaces: context.spaces,
+        containingSpaceId: context.containingSpaceId,
+        deleteConfirmation: entry.app.deleteConfirmation,
+      };
+    }
   }
+  const { view, select } = embed.request;
+  const commit = select?.commit;
+  kindOperations.mapRail = buildSpaceResourceRail({
+    target,
+    selection,
+    // Withdrawn authoring still draws the chooser, disabled.
+    disabled: commit === undefined || !(editable && context.authorOnCanvas),
+    complete: (targetMap, graphId) => {
+      if (commit === undefined) return null;
+      void commit({ ...view, map: targetMap.id, graph: graphId }).then((answer) =>
+        context.onContextReport(resourceId, refusalOf(answer)),
+      );
+      return null;
+    },
+    onEditingChange: (editing) => context.onContextEditingChange(resourceId, editing),
+    onReport: (message) => context.onContextReport(resourceId, message),
+    context: railContext,
+  });
+  const notice = context.contextNotices.get(resourceId);
+  if (notice !== undefined) decoration.contextNotice = notice;
   return decoration;
 }
 
@@ -124,6 +132,7 @@ export const spaceDecoration: KindCanvasDecoration<SpaceKindId, SpaceResourceDec
   slice: ({
     authorOnCanvas,
     editableResourceIds,
+    pluginHost,
     continuation,
     containingSpaceId,
     spaceSelections,
@@ -131,15 +140,14 @@ export const spaceDecoration: KindCanvasDecoration<SpaceKindId, SpaceResourceDec
     spaces,
     commandOutcomes,
     deleteConfirmation,
-    completeSpaceResourceSelection,
-    portalEditing,
-    onPortalEditingChange,
+    mapEmbeds,
     contextNotices,
     onContextEditingChange,
     onContextReport,
   }) => ({
     authorOnCanvas,
     editableResourceIds,
+    pluginHost,
     continuation,
     containingSpaceId,
     spaceSelections,
@@ -147,9 +155,7 @@ export const spaceDecoration: KindCanvasDecoration<SpaceKindId, SpaceResourceDec
     spaces,
     commandOutcomes,
     deleteConfirmation,
-    completeSpaceResourceSelection,
-    portalEditing,
-    onPortalEditingChange,
+    mapEmbeds,
     contextNotices,
     onContextEditingChange,
     onContextReport,
@@ -171,11 +177,3 @@ export const spaceCreation: KindCreation<SpaceCreationContext> = {
   withheld: ({ creatingSpaceResource }) => creatingSpaceResource,
   create: ({ createSpaceResource }) => createSpaceResource(),
 };
-
-/**
- * What the Stage draws for a Space Resource's content: the Map and Graph it
- * selects, which only the application can draw, because it needs the Space
- * the content points at.
- */
-export const spacePresentation = ({ view }: { readonly view: SpaceView }): ReactNode =>
-  createElement(PresentedSpaceMap, { spaceId: view.spaceId, mapId: view.map, graphId: view.graph });

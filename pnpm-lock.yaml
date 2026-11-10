@@ -191,6 +191,9 @@ importers:
       '@project/plugin-reference':
         specifier: workspace:*
         version: link:../plugin-reference
+      '@project/plugin-space':
+        specifier: workspace:*
+        version: link:../plugin-space
       '@project/plugin-ur':
         specifier: workspace:*
         version: link:../plugin-ur
@@ -243,6 +246,9 @@ importers:
       '@project/plugin-reference':
         specifier: workspace:*
         version: link:../plugin-reference
+      '@project/plugin-space':
+        specifier: workspace:*
+        version: link:../plugin-space
       '@project/plugin-ur':
         specifier: workspace:*
         version: link:../plugin-ur
@@ -324,6 +330,24 @@ importers:
         version: 3.25.76
 
   packages/plugin-reference:
+    dependencies:
+      '@project/resource-api':
+        specifier: workspace:*
+        version: link:../resource-api
+      lucide-react:
+        specifier: ^1.31.0
+        version: 1.31.0(react@18.3.1)
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.3.1
+        version: 18.3.1(react@18.3.1)
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
+
+  packages/plugin-space:
     dependencies:
       '@project/resource-api':
         specifier: workspace:*
@@ -433,6 +457,9 @@ importers:
       '@project/plugin-reference':
         specifier: workspace:*
         version: link:../plugin-reference
+      '@project/plugin-space':
+        specifier: workspace:*
+        version: link:../plugin-space
       '@project/plugin-ur':
         specifier: workspace:*
         version: link:../plugin-ur

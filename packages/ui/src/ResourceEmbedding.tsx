@@ -1,4 +1,11 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 import {
   isPluginKind,
   mapContentWithoutMap,
@@ -7,11 +14,11 @@ import {
   type PluginKind,
   type Resource,
 } from '@project/core';
-import type { Answer, Kept, ResourceId, Size } from '@project/resource-api/domain';
-import type { EmbedProps, TitleProps } from '@project/resource-api/view';
+import type { Answer, Kept, ResourceId, Size, SpaceView } from '@project/resource-api/domain';
 import {
   ResourceHostProvider,
-  type RailOutlet,
+  type Claim,
+  type EmbedProps,
   type ResourceHost,
 } from '@project/resource-api/view/host';
 import type { PluginEntry } from './kinds/plugin-views';
@@ -106,11 +113,83 @@ const EMBEDDED_ROOM = {
   minHeight: 0,
 } as const;
 
+/**
+ * What a plugin asked the Map embedding for (ADR 0142): the view of another
+ * Space it shows, the commit a choice or a framing is written through where
+ * the surface offers one, and the Claim it passed, under which the Map is
+ * authored in place.
+ */
+export interface MapEmbedRequest {
+  readonly view: SpaceView;
+  readonly select: Kept<SpaceView> | undefined;
+  readonly claim: Claim | undefined;
+}
+
+/** What draws a Map embedding where a surface's host provides one. */
+export type MapEmbedDraw = (request: MapEmbedRequest) => ReactNode;
+
+const HostMapContext = createContext<MapEmbedDraw | null>(null);
+
+/**
+ * Provide how the Map embedding is drawn inside it: on the canvas, as Map
+ * Resources drawn over the rect; on the Stage, as the presented Map (ADR
+ * 0140). Without one, a Map embedding draws nothing.
+ */
+export function HostMapProvider({
+  draw,
+  children,
+}: {
+  readonly draw: MapEmbedDraw;
+  readonly children?: ReactNode;
+}) {
+  return <HostMapContext.Provider value={draw}>{children}</HostMapContext.Provider>;
+}
+
+/**
+ * The surface a Map embedding is drawn on, as the canvas's drawing of it reads
+ * it: where it says what it asks for, the note the host has for it, and where
+ * it reports the room its plugin leaves below it.
+ */
+export interface MapEmbedSlot {
+  /** Told what the embedding asks for while it is drawn, and `null` once it is not. */
+  readonly publish: (request: MapEmbedRequest | null) => void;
+  /** What the host has to say in place of the Map, as while the Space it shows is read. */
+  readonly note?: string | undefined;
+  /** Told how far the embedding's room stops short of the rect's bottom, or `null` once gone. */
+  readonly reportFooter?: ((height: number | null) => void) | undefined;
+}
+
+const MapEmbedSlotContext = createContext<MapEmbedSlot | null>(null);
+
+/** Provide the slot a Map embedding drawn inside this surface reads. */
+export function MapEmbedSlotProvider({
+  slot,
+  children,
+}: {
+  readonly slot: MapEmbedSlot | null;
+  readonly children?: ReactNode;
+}) {
+  return <MapEmbedSlotContext.Provider value={slot}>{children}</MapEmbedSlotContext.Provider>;
+}
+
+/** The slot of the surface a Map embedding is drawn on, or `null` off the canvas. */
+export const useMapEmbedSlot = (): MapEmbedSlot | null => useContext(MapEmbedSlotContext);
+
+/** The Map embedding: the host's drawing of what the plugin asked for. */
+function HostMapEmbed({ map, select, claim }: Extract<EmbedProps, { readonly map: SpaceView }>) {
+  const draw = useContext(HostMapContext);
+  const request = useMemo(
+    (): MapEmbedRequest => ({ view: map, select, claim }),
+    [map, select, claim],
+  );
+  return draw === null ? null : draw(request);
+}
+
 /** The embedding a surface hands its plugin. */
 export function HostEmbed(props: EmbedProps) {
   const embedding = useContext(EmbeddingContext);
-  // The Map embedding is the Space plugin's (resource-plugins issue 07).
-  if (embedding === null || !('resource' in props)) return null;
+  if (embedding === null) return null;
+  if (!('resource' in props)) return <HostMapEmbed {...props} />;
   const { resource: id, title } = props;
   if (embedding.drawing.includes(id)) return <EmbeddingNote>{NOTES.recursive}</EmbeddingNote>;
   if (embedding.nested) return <EmbeddingNote>{NOTES.nested}</EmbeddingNote>;

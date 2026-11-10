@@ -14,6 +14,7 @@
       "@project/plugin-ur/domain": ["../plugin-ur/src/domain.ts"],
       "@project/plugin-markdown/domain": ["../plugin-markdown/src/domain.ts"],
       "@project/plugin-reference/domain": ["../plugin-reference/src/domain.ts"],
+      "@project/plugin-space/domain": ["../plugin-space/src/domain.ts"],
       "@project/resource-api/domain": ["../resource-api/src/domain/index.ts"]
     }
   },

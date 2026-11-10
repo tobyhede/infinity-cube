@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ReactFlow, ReactFlowProvider, useReactFlow } from '@xyflow/react';
 import { titleName, type GraphId, type MapId, type UUID } from '@project/core';
 import { edgeTypes, GraphHeadMarkers, nodeTypes } from '@project/react-flow-adapter';
-import { Empty, EmptyHeader, EmptyTitle } from '@project/ui';
+import { Empty, EmptyHeader, EmptyTitle, HostMapProvider } from '@project/ui';
 import { createMapSurface } from '../map-surface';
 import { withSurfacePolicy } from '../map-surface-policy';
 import type { OpenSpace } from '../open-spaces';
@@ -156,31 +156,39 @@ function PresentedMapDrawing({
       aria-label={`Map ${mapTitle}`}
       aria-description={nodes.map((node) => titleName(node.data.title)).join(', ')}
     >
-      <ReactFlow
-        className="presented-map__flow"
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
-        fitView
-        fitViewOptions={STAGE_FIT}
-        minZoom={0.05}
-        maxZoom={STAGE_FIT.maxZoom}
-        nodesDraggable={false}
-        nodesConnectable={false}
-        nodesFocusable={false}
-        edgesFocusable={false}
-        elementsSelectable={false}
-        panOnDrag={false}
-        panOnScroll={false}
-        zoomOnScroll={false}
-        zoomOnPinch={false}
-        zoomOnDoubleClick={false}
-        preventScrolling={false}
-        proOptions={{ hideAttribution: true }}
-      >
-        <GraphHeadMarkers />
-      </ReactFlow>
+      <HostMapProvider draw={noMapEmbed}>
+        <ReactFlow
+          className="presented-map__flow"
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          fitView
+          fitViewOptions={STAGE_FIT}
+          minZoom={0.05}
+          maxZoom={STAGE_FIT.maxZoom}
+          nodesDraggable={false}
+          nodesConnectable={false}
+          nodesFocusable={false}
+          edgesFocusable={false}
+          elementsSelectable={false}
+          panOnDrag={false}
+          panOnScroll={false}
+          zoomOnScroll={false}
+          zoomOnPinch={false}
+          zoomOnDoubleClick={false}
+          preventScrolling={false}
+          proOptions={{ hideAttribution: true }}
+        >
+          <GraphHeadMarkers />
+        </ReactFlow>
+      </HostMapProvider>
     </div>
   );
 }
+
+/**
+ * The Map embedding inside a Map already drawn on the Stage: nothing, so a
+ * presented Map draws one level, as it always has.
+ */
+const noMapEmbed = (): null => null;

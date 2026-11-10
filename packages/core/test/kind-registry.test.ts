@@ -118,11 +118,11 @@ describe('who draws a Resource, and who keeps its Open', () => {
     expect(takesOpen(RECAP, () => undefined)).toBe(false);
   });
 
-  it('is the application, which keeps the Open, for a Space Resource and a Reference to one', () => {
-    expect(drawnByPlugin(INNER, () => undefined)).toBe(false);
-    expect(drawnByPlugin(RECAP, () => INNER)).toBe(false);
-    expect(takesOpen(INNER, () => undefined)).toBe(true);
-    expect(takesOpen(RECAP, () => INNER)).toBe(true);
+  it('is the plugin, which keeps the Open, for a Space Resource and a Reference to one', () => {
+    expect(drawnByPlugin(INNER, () => undefined)).toBe(true);
+    expect(drawnByPlugin(RECAP, () => INNER)).toBe(true);
+    expect(takesOpen(INNER, () => undefined)).toBe(false);
+    expect(takesOpen(RECAP, () => INNER)).toBe(false);
   });
 });
 

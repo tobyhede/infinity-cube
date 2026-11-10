@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import {
   kindFlags,
   referenceKind,
-  spaceKind,
+  spaceSelection,
   titleName,
   type KindId,
   type Map as SpaceMap,
@@ -237,7 +237,7 @@ export function resourceRailGroups(
           },
         ]),
   ];
-  if (resource.kind === spaceKind.id) {
+  if (spaceSelection(resource) !== undefined) {
     // The Title edits in place on the drawn Resource; this menu authors neither
     // the Resource's name nor the target Space's.
     const links = addresses.flat();
@@ -350,6 +350,9 @@ export function useResourceRailActions(
       // A node the projection is still drawing for a Resource the working Space
       // no longer has: no commands rather than commands that name nothing.
       if (resource === undefined) return [];
+      // Entering is the application's: a Resource showing another Space's Map
+      // enters the view it shows (ADR 0068), whichever plugin draws it.
+      const shown = spaceSelection(resource);
       return resourceRailGroups(
         resource,
         entityActions({ kind: 'resource', resource, map: selectedMap }),
@@ -370,7 +373,7 @@ export function useResourceRailActions(
                 resourceDeletion.askToDelete(resource, railFocusFallback(currentSpace, resourceId))
             : null,
           enter:
-            spaces === null || resource.kind !== spaceKind.id
+            spaces === null || shown === undefined
               ? null
               : {
                   available: navigate,
@@ -379,10 +382,10 @@ export function useResourceRailActions(
                       'space-enter',
                       async () =>
                         spaces.enter(
-                          resource.content.spaceId,
-                          resource.content.map,
-                          resource.content.graph,
-                          resource.content.framing,
+                          shown.spaceId,
+                          shown.map,
+                          shown.graph,
+                          shown.framing,
                           space.id,
                         ),
                       { subject: titleName(resource.title) },

@@ -99,6 +99,12 @@ export interface PluginHost {
    * a canvas fact; absent, or answering `undefined`, the hint is ignored.
    */
   readonly capSizeHint?: ((hint: Size) => Size | undefined) | undefined;
+  /**
+   * The Resources whose Map embedding this canvas draws inside, outermost
+   * first: a surface here is embedded in each, so its Claim nests under one
+   * they hold (ADR 0142). Empty, or absent, on a canvas drawn in no embedding.
+   */
+  readonly path?: readonly ResourceId[] | undefined;
 }
 
 /** Who holds a Claim on a drawing's Resource, as that drawing reads it. */
@@ -181,26 +187,39 @@ export function pluginSurfaceOperations(
     onFailure: (error: Error) => host.report(error),
   };
   if (!offersCommits(facts)) return drawn;
-  if (host.claims.exclusive !== null) return { ...drawn, withdrawn: true };
-  // While a Claim is held by drawings that draw some other Resource, this one
-  // offers nothing to compete with it (ADR 0064, ADR 0142): its commands come
-  // back when that Claim ends. Another drawing of a held Resource is withheld
-  // per drawing, by `claimHolder`.
-  if (claimedElsewhere(host.claims, resourceId)) return drawn;
-  const replaced = (): Refusal | null => (host.replacementEpoch() === builtIn ? null : GONE);
+  if (host.gate.exclusiveRunning()) return { ...drawn, withdrawn: true };
+  // While another surface holds a Claim, this one offers nothing to compete
+  // with it (ADR 0064, ADR 0142): its commands come back when that Claim ends.
+  // A Resource drawn twice, as two embeddings of one Map draw it, is held by
+  // one of its surfaces at a time: once one holds it, none offers a second.
+  // A surface inside a Map embedding whose Resource holds the Claim may nest
+  // its own under it, as an Image inside an entered Space may (ADR 0142).
+  const path = [...(host.path ?? []), resourceId];
+  const { holders } = host.gate.getState();
+  const heldHere = holders.some((held) => held.includes(resourceId));
+  const deepest = holders.at(-1);
+  const nests =
+    deepest !== undefined &&
+    deepest.length < path.length &&
+    deepest.every((surface, index) => path[index] === surface);
+  if (holders.length > 0 && !heldHere && !nests) return drawn;
   const plain = commitsFor(
     host,
     resourceId,
     () => replaced() ?? (host.gate.exclusiveRunning() ? BUSY : null),
     host.complete,
   );
-  // Exclusive work's own commits are admitted past the gate every Space's
-  // Authoring asks at `complete`; a plain one is not.
-  const admitted: PluginHost['complete'] = (completion, settle) =>
-    host.gate.admit(() => host.complete(completion, settle));
-  const claim = (drawing: symbol): PluginHostClaim | undefined => {
-    const held = host.gate.claim([{ resource: resourceId, key: drawing }], (running) =>
-      commitsFor(host, resourceId, () => replaced() ?? (running() ? null : BUSY), admitted),
+  const claim = (): PluginHostClaim | undefined => {
+    const held = host.gate.claim(path, (running) =>
+      commitsFor(
+        host,
+        resourceId,
+        () => {
+          if (host.replacementEpoch() !== builtIn) return GONE;
+          return running() ? null : BUSY;
+        },
+        true,
+      ),
     );
     if (held === undefined) return undefined;
     return {
