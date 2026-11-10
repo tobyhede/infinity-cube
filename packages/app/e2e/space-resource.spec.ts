@@ -392,6 +392,11 @@ test('a second Space Resource may reference the Space the first one created', as
   // pair back off a Space that already had it, which is the other half of the
   // rule and the half a created target cannot exercise.
   const again = nodeByTitle(page, 'Space 1');
+  // It lands under the selected first Resource, so it is selected by the
+  // keyboard, as React Flow selects a focused node on Enter.
+  await again.focus();
+  await again.press('Enter');
+  await expect(again).toHaveClass(/\bselected\b/);
   await openFromRail(page, again);
   await expect((await resourceControls(page, again)).getByTestId('space-resource-map')).toHaveText(
     'Map 1',
@@ -1709,9 +1714,7 @@ test(
     await page.keyboard.press('Enter');
     await expect(rail.getByRole('button', { name: 'Done Resource Architecture' })).toBeFocused();
     await page.keyboard.press('Enter');
-    // Done by the keyboard ends the portal Edit. Where the focus lands after it
-    // is open: `.scratch/resource-plugins/issues/07-the-space-plugin.md`, Decisions.
-    await expect(rail.getByRole('button', { name: 'Edit Resource Architecture' })).toBeVisible();
+    await expect(rail.getByRole('button', { name: 'Edit Resource Architecture' })).toBeFocused();
   },
 );
 

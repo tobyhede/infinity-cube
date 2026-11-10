@@ -711,6 +711,33 @@ describe('the Map an Open Space Resource draws', () => {
     expect(Number(embeddedNode(DRAWN_A).style.zIndex)).toBeGreaterThan(OPEN_RESOURCE_Z_INDEX);
   });
 
+  /**
+   * Edit and Done are one rail control, and the release that ends the portal
+   * Edit keeps it drawn, so a keyboard author's focus stays on it (ADR 0064).
+   */
+  it('keeps the focus on the rail control across Edit and Done', async () => {
+    const value = home({
+      title: 'Elsewhere',
+      kind: 'space',
+      content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
+    });
+    await mount(value);
+    await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+    const parent = containingNode(SPACE_RESOURCE_ID);
+    const edit = within(controlsOf(parent)).getByRole('button', { name: /^Edit Resource/ });
+    act(() => edit.focus());
+    fireEvent.click(edit);
+    const done = await waitFor(() =>
+      within(controlsOf(parent)).getByRole('button', { name: /^Done Resource/ }),
+    );
+    expect(document.activeElement).toBe(done);
+    fireEvent.click(done);
+    const again = await waitFor(() =>
+      within(controlsOf(parent)).getByRole('button', { name: /^Edit Resource/ }),
+    );
+    expect(document.activeElement).toBe(again);
+  });
+
   it('keeps the embedded Map inert until Edit, and Done returns it to Read', async () => {
     const value = home({
       title: 'Elsewhere',

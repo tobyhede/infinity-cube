@@ -29,7 +29,14 @@ const FILL: CSSProperties = {
   minHeight: 0,
 };
 
-/** The glyph's place on a Closed face: its top-right corner, as the canvas drew a kind glyph. */
+/**
+ * The band along the top of the rect the canvas keeps clear of controls, as it
+ * does for every Resource it draws: eight pixels, the kind glyph's row, eight
+ * pixels. A press there selects the Resource rather than beginning a rename.
+ */
+const RAIL_BAND = 30;
+
+/** The Space glyph's place on a Closed face: in the band, at its right. */
 const GLYPH: CSSProperties = { position: 'absolute', top: 8, right: 8, lineHeight: 0 };
 
 /** Whether a settled commit left nothing to say. */
@@ -111,19 +118,21 @@ function SpacePluginView({ surface }: PluginViewProps<SpaceContent, SpaceMapCont
     const toggle = (next: SpaceMapContent) => {
       void commitMap(next).then((answer) => setRefusal(refusalOf(answer)));
     };
+    // Open and Close are one command whose name swaps, so a keyboard author's
+    // focus stays on it across both.
     return [
       ...editing,
       open
         ? {
             kind: 'action',
-            id: 'close',
+            id: 'open-close',
             label: `Close Resource ${name}`,
             icon: <Minimize2 size={14} />,
             run: () => toggle({ open: false }),
           }
         : {
             kind: 'action',
-            id: 'open',
+            id: 'open-close',
             label: `Open Resource ${name}`,
             icon: <Maximize2 size={14} />,
             run: () => toggle({ open: true }),
@@ -132,7 +141,12 @@ function SpacePluginView({ surface }: PluginViewProps<SpaceContent, SpaceMapCont
   }, [commitMap, open, name, held, takeClaim]);
 
   return (
-    <div style={FILL} data-open={open}>
+    <div
+      // Closed, the Title sits at the foot of the rect, as every Closed
+      // Resource's does.
+      style={open ? FILL : { ...FILL, justifyContent: 'flex-end' }}
+      data-open={open}
+    >
       {open ? (
         <>
           <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
@@ -143,13 +157,16 @@ function SpacePluginView({ surface }: PluginViewProps<SpaceContent, SpaceMapCont
           </div>
         </>
       ) : (
-        <div style={{ padding: 12 }}>
-          <Title />
-          {/* What it is, drawn on its face as the canvas draws a kind's glyph. */}
+        <>
+          <div style={{ padding: `${RAIL_BAND}px 12px 8px`, minHeight: 0 }}>
+            <Title />
+          </div>
+          {/* What it is, in the band along the top, as every Closed Resource
+              draws its kind glyph; an Open one draws none. */}
           <span role="img" aria-label={spacePlugin.name} style={GLYPH}>
             <Box size={14} aria-hidden />
           </span>
-        </div>
+        </>
       )}
       {refusal !== null && (
         <p role="status" style={{ margin: 0, padding: '0 12px', fontSize: 12 }}>

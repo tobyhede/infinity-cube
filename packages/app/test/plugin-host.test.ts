@@ -642,12 +642,16 @@ describe('a plugin surface’s commits on the canvas', () => {
     const other = pluginSurfaceOperations('markdown', OTHER, FACTS, host);
     expect(other.commitMap).toBeUndefined();
     expect(other.claim).toBeUndefined();
-    const again = pluginSurfaceOperations('markdown', RESOURCE, FACTS, host);
-    expect(again.commitContent).toBeTypeOf('function');
-    expect(again.claimHolder?.(drawing)).toBe('this-drawing');
-    const second = Symbol('second drawing');
-    expect(again.claimHolder?.(second)).toBe('another-drawing');
-    expect(again.claim?.(second)).toBeUndefined();
+    expect(pluginSurfaceOperations('markdown', RESOURCE, FACTS, host).commitContent).toBeTypeOf(
+      'function',
+    );
+    // The surface holding the Claim keeps offering one, so the render its own
+    // release lands in still draws its command; taking it adds no second holder.
+    pluginSurfaceOperations('markdown', RESOURCE, FACTS, host).claim?.();
+    expect(host.gate.getState().holders).toEqual([[RESOURCE]]);
+    // Another drawing of the same Resource, inside a Map embedding, offers none.
+    const elsewhere: PluginHost = { ...host, path: [OTHER] };
+    expect(pluginSurfaceOperations('markdown', RESOURCE, FACTS, elsewhere).claim).toBeUndefined();
     held?.release();
     expect(pluginSurfaceOperations('markdown', OTHER, FACTS, host).commitMap).toBeTypeOf(
       'function',

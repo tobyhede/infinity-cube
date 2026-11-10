@@ -47,10 +47,8 @@ test(
  *
  * The table is the point: one loop over every kind the component declares, so
  * a new kind cannot be added with its own story slice and reviewed on its own.
+ * Every kind's plugin draws its Title in its own root (ADR 0142).
  */
-/** Where a Closed Resource draws its Title: the host's body, or its plugin's own root. */
-const HOST_BODY = '.canvas-resource__body';
-
 const CLOSED_KINDS = [
   // A Markdown Resource's plugin draws its Title in a header of its own (ADR 0142).
   {
@@ -68,7 +66,14 @@ const CLOSED_KINDS = [
     border: 'dotted',
     body: '.canvas-resource__plugin > * > :first-child',
   },
-  { label: 'space', kind: 'space', glyph: 'Space Resource', border: 'solid', body: HOST_BODY },
+  // So does a Space Resource's (ADR 0142).
+  {
+    label: 'space',
+    kind: 'space',
+    glyph: 'Space Resource',
+    border: 'solid',
+    body: '.canvas-resource__plugin > * > :first-child',
+  },
   // An Ur Resource's Shape says what it is, so it draws no kind glyph; its
   // plugin draws its Title inside the outline (ADR 0142).
   { label: 'ur', kind: 'ur', glyph: null, border: 'solid', body: '.canvas-resource__plugin > *' },

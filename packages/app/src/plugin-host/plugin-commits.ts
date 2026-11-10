@@ -162,6 +162,10 @@ function commitsFor(
   };
 }
 
+/** Whether two Claim paths name the same surface. */
+const samePath = (a: readonly string[], b: readonly string[]): boolean =>
+  a.length === b.length && a.every((surface, index) => surface === b[index]);
+
 /**
  * A plugin kind's operations on the canvas: bare where the surface offers no
  * commits, and otherwise its commits and a Claim, both withdrawn by the host.
@@ -243,6 +247,11 @@ export function pluginSurfaceOperations(
     commitMap: plain.map,
     commitStore: plain.store,
     pick,
-    claim,
+    // The surface holding the Claim keeps offering one, so the render in
+    // which its own release lands, before the gate's publication rebuilds
+    // these operations, does not draw it without its Edit for a frame and
+    // drop the focus that was on its Done. Another drawing of the same
+    // Resource offers none while it is held.
+    claim: heldHere && !holders.some((held) => samePath(held, path)) ? undefined : claim,
   };
 }

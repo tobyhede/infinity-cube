@@ -864,15 +864,12 @@ describe.each([
       ]);
     });
 
-    it('refuses Map content on a Reference to a Space Resource, which no plugin draws yet', () => {
-      for (const open of [true, false]) {
-        const errors = refused(placedIn([referenceTo(A, B), spaceResource(B, ABSENT)], { open }));
-        expect(errors).toEqual([expect.objectContaining({ kind: 'map-content-invalid', ref: A })]);
-        // No plugin draws it, so no plugin refused the content.
-        expect(errors[0]?.message).toBe(
-          `Map "${WORKING}" keeps Map content for reference resource "${A}", which no plugin draws here, so it keeps none`,
-        );
-      }
+    it('loads a Reference to a Space Resource Open or Closed by its Map content, as its plugin draws it', () => {
+      for (const open of [true, false])
+        expect(
+          loaded(placedIn([referenceTo(A, B), spaceResource(B, ABSENT)], { open })).maps[0]
+            ?.positions[A]?.content,
+        ).toEqual({ open });
     });
 
     it('refuses an Image Resource stored Open, which its plugin draws with no Open (ADR 0142)', () => {

@@ -1117,20 +1117,20 @@ describe('SnapshotEdit.open, close and resize properties', () => {
     );
   });
 
-  it('refuses Map content its plugin refuses, whichever plugin it is, and any on a Resource no plugin draws', () => {
+  it('keeps the Map content its plugin accepts and refuses what it refuses, whichever plugin it is', () => {
     fc.assert(
       fc.property(entriesArb, subjectArb, (generated, subjectIndex) => {
         const subjectId = RESOURCE_IDS[subjectIndex];
         if (subjectId === undefined) return;
-        // A Reference Resource to a Space Resource is drawn by no plugin yet,
-        // so it keeps no Map content at all, its own `{ open }` included.
+        // A Reference Resource to a Space Resource is drawn by its plugin
+        // (resource-plugins issue 07): it keeps its `{ open }` and nothing else.
         const reference = snapshotOf(openableSubject(generated, subjectIndex));
-        for (const content of [{ open: true }, { shape: 'rectangle' }]) {
-          expect(SnapshotEdit.changeMapContent(reference, MAP_ID, subjectId, content)).toEqual({
-            kind: 'refused',
-            refusal: { code: 'map-content-not-kept' },
-          });
-        }
+        expect(
+          SnapshotEdit.changeMapContent(reference, MAP_ID, subjectId, { open: true }).kind,
+        ).not.toBe('refused');
+        expect(
+          SnapshotEdit.changeMapContent(reference, MAP_ID, subjectId, { shape: 'rectangle' }),
+        ).toEqual({ kind: 'refused', refusal: { code: 'map-content-invalid' } });
         const ur = snapshotOf(with_(generated, subjectIndex, { kind: 'ur', open: false }));
         for (const content of [{ shape: 'hexagon' }, 'pill', null, {}]) {
           expect(SnapshotEdit.changeMapContent(ur, MAP_ID, subjectId, content)).toEqual({

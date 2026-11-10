@@ -396,7 +396,7 @@ test('a Space Resource’s actions menu groups Create Reference, Connect, Full V
   await expectMenuGroups(menu, [
     ['Create Reference'],
     ['Connect to Resource'],
-    ['Open and Expand', 'Read in Full View', /^Present from Here/],
+    ['Read in Full View', /^Present from Here/],
     ['Enter', 'Open in New Tab'],
     ['Copy link to Resource in Map', 'Copy link to Resource', 'Copy link to Space'],
     ['Remove from Map', 'Delete from Space'],
