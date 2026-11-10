@@ -167,14 +167,22 @@ export interface StartsEmpty<Content> {
   readonly newContent: Content;
 }
 
+/** The rules every kind declares, since each is a plugin and the plugin answers them (ADR 0142). */
+type DeclaredRule =
+  | 'id'
+  | 'contentSchema'
+  | 'flags'
+  | 'resolveContent'
+  | 'resourceReferences'
+  | 'contentTarget'
+  | 'spaceReferences';
+
 /** What a kind must declare; the rest takes {@link defineKind}'s answer. */
 type KindDeclaration<K extends string, Content, Resolved extends KindResolvedContent> = Pick<
   KindModule<K, Content, Resolved>,
-  'id' | 'contentSchema' | 'flags' | 'resolveContent'
+  DeclaredRule
 > &
-  Partial<
-    Omit<KindModule<K, Content, Resolved>, 'id' | 'contentSchema' | 'flags' | 'resolveContent'>
-  >;
+  Partial<Omit<KindModule<K, Content, Resolved>, DeclaredRule>>;
 
 /** The content in its schema's key order, or as given when the schema refuses it, so this never throws. */
 const inSchemaOrder =
@@ -186,8 +194,8 @@ const inSchemaOrder =
 
 /**
  * A kind module with every rule it does not declare answered as a kind that
- * references nothing, has no content of its own to author, and puts its
- * content in its schema's key order on Export. A module that declares the
+ * has no content of its own to author and puts its content in its schema's
+ * key order on Export. A module that declares the
  * content a new Resource starts with keeps it in its type.
  */
 export function defineKind<const K extends string, Content, Resolved extends KindResolvedContent>(
@@ -200,9 +208,6 @@ export function defineKind<K extends string, Content, Resolved extends KindResol
   declaration: KindDeclaration<K, Content, Resolved>,
 ): KindModule<K, Content, Resolved> {
   return {
-    resourceReferences: () => [],
-    contentTarget: () => undefined,
-    spaceReferences: () => [],
     canonicalContent: inSchemaOrder(declaration.contentSchema),
     ...declaration,
   };
