@@ -73,12 +73,20 @@ type Exclusive<C, M> = {
   store?: Surface<C, M>['assets']['store']
 }
 
-type Creation<C> = {
-  from: 'dock' | 'data' | 'resource' | 'space'
-  accepts?(input): boolean
-  run(host: { create(items: New<C>[]): Promise<Answer>; assets }, input): void | Promise<void>
+type Creation<C> =                                   // each `from` given its own input
+  | { from: 'dock'; run(host: CreationHost<C>): void | Promise<void> }
+  | { from: 'data'; types: string[]; accepts?(data: CreationData): boolean; run(host, data: CreationData) }
+  | { from: 'resource'; accepts?(resource: Resource): boolean; run(host, resource: Resource) }
+  | { from: 'spaces'; run(host, space: { spaceId: string; title: string }) }   // a Space chosen from a list of Spaces
+interface CreationHost<C> {
+  create(items: New<C>[]): Promise<Answer>
+  assets
+  report(words: string): void                        // a refusal the plugin worded, which the host shows
 }
-type New<C> = { title?: string; content: C | ((s: NewSpace) => C); newSpace?: true }   // at most one item with newSpace per create
+type CreationData = { kind: 'files'; files: File[] } | { kind: 'url'; url: string }   // a URL matches as `text/uri-list`
+type New<C> =
+  | { title?: string; content: C }
+  | { title?: string; contentFor: (s: NewSpace) => C; newSpace?: true }   // the only item of its create; without newSpace, the offered Space
 type NewSpace = { spaceId: string; map: string; graph: string }                      // the new Space and the Map and Graph it opens on
 ```
 
@@ -91,7 +99,7 @@ Invariants:
 - The host finds asset references by walking `content` and Map content for whole string values that `assetRefSchema` accepts, whether or not it can read them. Export carries what it finds. Import admits every asset in the directory. A string that only looks like a reference is treated as one, and absent bytes are not an error: Export keeps the URL, completes (ADR 0118) and removes no file of that name. An external URL, such as an Image Resource's `https:` one (ADR 0106), is not an asset: the walk does not find it and Export carries no bytes for it (ADR 0118).
 - A commit settles once its Edit has been applied, including one `queued` behind another. It answers refused from a replaced working Space and from a withdrawn surface.
 - `run` and rail actions are called in the press, so a picker can open. An `await` before `pick` loses the press. `Exclusive` has no `pick`, so work that needs a file picks first and then calls `exclusively`.
-- `host.create` takes no position; the gesture gave it. A second press while a creation runs is ignored. `run` has no surface, so the host reports a refused `store` or `create` made through `host`.
+- `host.create` takes no position; the gesture gave it. A second Dock press of a kind while that kind's Dock creation runs is ignored. `run` has no surface, so the host reports a refused `store` or `create` made through `host`, a plugin's own refusal handed to `report`, and a `run` that throws. A data `types` entry is exact or a wildcard (`image/*`, or `*` then `/*`): an exact match beats a wildcard, then build order decides.
 - A Claim held by one chain answers `undefined` to another. Unmount releases. A host-ended Claim always unmounts the plugin, keyed by Replacement epoch.
 - `exclusively` is one at a time, and answers `busy` before any work starts.
 - `exclusively` withdraws every commit, `store` and `pick` on every surface, including the calling plugin's own and those of the Claims around it. Those Claims stay held and their plugins mounted, each surface re-renders without what was withdrawn, and a retained callback answers refused. A rail command or in-rect control therefore cannot change the Space around the work, whichever Claim's commands are showing.
@@ -105,7 +113,7 @@ Also behind the seam, as issue 01 found:
 - Withdrawal is offered and enforced. The surface host builds each surface without what is withdrawn. It also refuses a retained commit, when called, if its surface is unmounted, the Replacement epoch has moved, or exclusive work is running. The exclusive gate is application-wide across composed Spaces and lives in the surface host around `complete`. Today's `replacingImage` only withdraws controls.
 - `complete` settles a `queued` completion through a callback held on the queue entry. The drain calls it with the entry's own result, or with refused when the entry's epoch has moved or a throw abandoned it.
 - The Map surface's commit caps a size hint at the visible canvas (`visibleCanvasCap`, a canvas fact). The Edit then applies the floor and displacement. The plugin measures at its own width and the cap applies to each side separately, so a capped width can leave text taller than its hint, drawn with overflow.
-- A creation with a new Space goes through the coordinated Space Resource lifecycle, not `complete`. `planCreate` takes the plugin's content function and calls it with `NewSpace`.
+- A creation with a new Space, or of a listed Space, goes through the coordinated Space Resource lifecycle, not `complete`. `planCreate` and `planLink` take a document builder (`CreateSpaceResourceInput.document`), which the host builds from the plugin's `contentFor` and the lifecycle calls with the Space made or linked, throwing unless the document names that Space alone.
 
 The plugin-level test suite renders each plugin with every capability absent, and the host mounts one probe plugin on each surface.
 
