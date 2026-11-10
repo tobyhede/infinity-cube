@@ -592,6 +592,9 @@ test(
     // that cannot tell the two vertical edges apart would pass on either.
     await expect(dock(page)).toHaveAttribute('data-edge', 'left');
     await expect(surface(page)).toHaveAttribute('data-orientation', 'vertical');
+    // The position menu the story pressed is gone, not just closing: a press on
+    // the Map disclosure while it still runs its exit is lost under load.
+    await expect(page.getByRole('menu')).toHaveCount(0);
     await expect(page.getByTestId('space-title').filter({ visible: true })).toContainText(
       'Rendering',
     );
