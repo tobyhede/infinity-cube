@@ -1,6 +1,6 @@
 # Resource plugins
 
-Delivery for [ADR 0142](../../docs/adr/0142-a-resource-plugin-owns-everything-inside-its-rect.md), which supersedes ADR 0137 and refines ADR 0051, 0064, 0120, 0121, 0123, 0125, 0128, 0135 and 0139. The decision and its rejected options are in the ADR, and the terms in `CONTEXT.md`. This file is the plan, and the treatment an ADR does not bind.
+Delivery for [ADR 0142](../../docs/adr/0142-a-resource-plugin-owns-everything-inside-its-rect.md), which supersedes ADR 0137 and refines ADR 0051, 0064, 0120, 0121, 0123, 0125, 0128, 0135 and 0139. The decision and its rejected options are in the ADR, and the terms in `CONTEXT.md`. This file is the plan, and the signatures and treatment an ADR does not bind. Prior art is in `canvas-shapes-research.md`, `block-editors-research.md`, `host-extensions-research.md` and `compound-documents-research.md` beside this file.
 
 ## Where it starts
 
@@ -10,52 +10,93 @@ Read on 2026-11-10.
 - A kind is three halves: `packages/core/src/kinds/`, `packages/ui/src/kinds/`, `packages/app/src/kinds/`. Those halves import package internals. Logic for a kind also lives outside them, as `completeResourceBody`, `image-replacement.ts`, `embedded-map.ts`; `.scratch/resource-kind-modules/kind-sites.md` lists the sites that name a kind.
 - The Stage already bypasses the frame and calls the kind's `presented`.
 - A Map entry is strict, `{ x, y, open?, size?, shape? }`, with no room for a kind's data. `open` is stored in 5 tracked `space.json` files.
-- Open and expand (ADR 0137) is an application Edit, `SnapshotEdit.openAndExpand`, measured through `CanvasResource`.
+- Open and expand (ADR 0137) is an application Edit, `SnapshotEdit.openAndExpand`, measured through `CanvasResource`. `opensToFit` is a core flag that grows a Markdown Resource on Open.
+- Creation lives in `kind-creation.ts`, each `app/kinds/` module and `resource-placement.ts`.
 - Image bytes are image-specific: `POST /images`, the `images` table, `storeImage`, and `loadReferencedImages` naming the kind in Export.
+- `complete` in `space-authoring.ts` can answer `queued` with no later outcome.
+- No error boundary exists in `packages/app/src`, `packages/ui/src` or `packages/react-flow-adapter/src`.
 
 ## The target
 
-**The Resource API** is one new package, `@project/resource-api`, with a `/domain` entry that imports no React and a `/view` entry. **Each plugin is its own package** with those two halves, imports only `@project/resource-api`, and is listed once in the build-time plugin list. A lint ban holds the import rule. Each plugin declares an `apiVersion`, checked at build.
+`@project/resource-api` has a `/domain` entry that imports no React and a `/view` entry. **Each plugin is its own package** with those two halves, imports only `@project/resource-api`, and is listed once in the build-time plugin list. A lint ban holds the import rule.
 
-The domain half keeps what `KindModule` declares today and adds a Map content schema and `assetReferences(content)`.
+```ts
+// /domain: what KindModule declares today, less the Open and Shape flags, plus
+definePlugin<C, M>({
+  apiVersion, kind, name, listName, referenceName, content, newContent?, file?,
+  mapContent: { schema, default, withoutMap? },     // withoutMap falls back to default
+  assetReferences?(content, mapContent),
+  outline?(mapContent),                             // a rectangle when absent
+  /* the reference, target and selection declarations */
+})
 
-The view half has **one render**, given `{ title, content, mapContent?, size, selected, graphColor, receded, capabilities }`. A capability is present or absent, and the render is not told which surface it is on.
+// /view
+definePluginView<C, M>({ View, Glyph, creates? })
 
-| Capability | Who offers it |
-| --- | --- |
-| `commitContent(next)`, `commitMapContent(next)`, each answering `completed`, `unchanged` or `refused` | A Map, for a Resource that may be authored there. `commitMapContent` needs a Map. |
-| Exclusive interaction claim, one canvas-wide | A Map |
-| Rename | A surface where the Title may be authored |
-| Asset store | A Map |
-| Embed a Map, embed a Resource | Any surface. An embedded Resource gets no commit and no Map content. |
+type Answer = 'completed' | 'unchanged' | { refused: string }
+type Kept<T> = { value: T; commit?: (next: T) => Promise<Answer> }
 
-The API also exports the Title component (Title Lines, the one-activation control, its accessible names), `ResourceFrame` (ADR 0135 and ADR 0139's border, ring and receding on a rectangle) and the wrapper marking a region as the plugin's for the pointer.
+interface Surface<C, M> {
+  title: Kept<string>
+  content: Kept<C>
+  map: Kept<M> & { commit?: (next: M, options?: { sizeHint?: Size }) => Promise<Answer> }
+  size: Size
+  selected: boolean
+  claim?(): Claim | undefined
+  assets: { url(ref): string; pick?(accept): Promise<File[]>; store?(file): Promise<AssetRef | { refused: string }> }
+  Embed: ComponentType<{ resource: ResourceId; title: Kept<string> } | { map: SpaceView; claim?: Claim }>
+}
 
-**The stored `kind` field stays.** A Map entry becomes `{ x, y, size?, content? }`, with `content` parsed by the plugin's Map content schema.
+interface Claim { release(): boolean; exclusively<T>(work: () => Promise<T>): Promise<T | 'busy'> }
+
+type Creation<C> = {
+  from: 'dock' | 'data' | 'resource' | 'space'
+  accepts?(input): boolean
+  run(host: { create(items: New<C>[]): Promise<Answer>; assets }, input): void | Promise<void>
+}
+type New<C> = { title?: string; content: C | ((s: NewSpace) => C); newSpace?: true }
+```
+
+The API also exports `Title`, `Own` (the region that is the plugin's for the pointer), `<Rail commands>`, and `/view/testing`'s `renderPlugin(View, { content, map, grants })`.
+
+Invariants:
+
+- A commit settles once its Edit has been applied, including one `queued` behind another. It answers refused from a replaced working Space and from a withdrawn surface.
+- `run` and rail actions are called in the press, so a picker can open. An `await` before `pick` loses the press.
+- `host.create` takes no position; the gesture gave it. A second press while a creation runs is ignored.
+- A Claim held by one chain answers `undefined` to another. Unmount releases. A host-ended Claim always unmounts the plugin, keyed by Replacement epoch.
+- `exclusively` is one at a time, and answers `busy` before any work starts.
+- The Claim keeps its own chain's capabilities while `exclusively` withdraws everyone else's.
+
+Behind the seam, as pure cores with a thin shell: which fields a surface offers (`mapSurfacePolicy` and availability), the Claim chain, and the creation decision.
+
+The plugin-level test suite renders each plugin with every capability absent, and the host mounts one probe plugin on each surface.
 
 ## Settled treatment
 
 Not bound by the ADR, and free to change with a story and a test.
 
-- Rail: the canvas draws it with `CommandToolbar`. A plugin declares commands as data (label, icon, action or menu), which may change with its state. In-rect controls are allowed too.
-- Title: Ur, Markdown and Reference draw it inline with the Title component. Image draws none, keeping it as its text alternative, and is renamed from the rail.
-- Pointer: the whole rect moves and selects unless a plugin wraps a region, and a claim gives the plugin the whole rect.
-- Selection and Graph colour: Markdown and Reference draw them with `ResourceFrame`, and Ur draws them on its Shape's outline from the same inputs. Image draws a border only when selected or in a Graph. The anchor handles and resize control stay the canvas's.
+- Rail: the canvas draws it with `CommandToolbar`. During nested Claims the deepest Claim's commands show. In-rect controls are allowed too.
+- Title: Ur and Markdown draw it inline with `Title`. Image draws none, keeping it as its text alternative, and is renamed from the rail. An Open Reference passes its own to the Target.
+- Border, ring, receding: the canvas draws them on the outline. Image shows a border only when selected or in a Graph.
+- Pointer and events: the whole rect moves and selects unless a plugin wraps a region in `Own`, and a Claim gives the plugin the whole rect. Inside `Own`, pointer and key events are the plugin's; drop and paste stay the host's unless the plugin takes them; canvas shortcuts never interrupt IME composition. `Own` works on every surface but an inert one.
 - Image: fits the whole picture into the size it is given, without cropping.
-- Markdown editing: an Edit command or a press on the body takes the claim and shows the source editor. Save and Cancel are rail commands, and `Mod-Enter` and `Escape` still work. A click elsewhere still leaves the draft up (ADR 0064).
-- A replaced working Space remounts the plugin, which discards a running draft (Replacement epoch).
+- Markdown: `{ default: { open: false }, withoutMap: { open: true } }`. Open hints at the size of its content. An Edit command or a press on the body takes a Claim and shows the source editor. Save and Cancel are rail commands, and `Mod-Enter` and `Escape` still work. A click elsewhere still leaves the draft up (ADR 0064).
+- Matching data: exact beats wildcard, then build order.
+- A failure boundary and a deleted Target each draw a short note in the Resource's rect.
 
 ## Order
 
 Each step is its own PR, leaves `main` green and rolls fixtures, seeds and tests forward with it (ADR 0054). The old frame hosts any kind not yet moved.
 
-1. `01` — the Resource API and its hosts, with Ur on it. Open and expand is not offered on a moved plugin, and goes altogether in `07`.
-2. `02` — the asset store; `03` — Image, the proof of a Resource with no frame.
-3. `04` — Markdown, the proof of a plugin-owned mode.
-4. `05` — Reference, on the Resource embed.
-5. `06` — Space, on the Map embed, last because it is the riskiest.
-6. `07` — retire the shared frame and the core fields.
+1. `01` — a throwaway proof of the interface on the hard paths.
+2. `02` — the Resource API and its hosts, with Ur on it.
+3. `03` — the asset store; `04` — Image.
+4. `05` — Markdown; `06` — Reference.
+5. `07` — Space, last of the kinds because it is the riskiest.
+6. `08` — creation through the API; `09` — the default plugin.
+7. `10` — retire the shared frame and the core fields.
 
 ## Out of scope
 
-Runtime-loaded plugins, host versioning of content, and renaming "Closed Size" (a rename ships alone). The Notes window draws no Resource yet; when it does, it is one more surface.
+Runtime-loaded plugins, host versioning of content, a stored plugin version, separate keyboard and pointer Claims, Undo across a Claim, Edge attachment for outlines other than Ur's Shapes, and renaming "Closed Size" (a rename ships alone). The Notes window draws no Resource yet; when it does, it is one more surface.
