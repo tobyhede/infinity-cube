@@ -21,7 +21,11 @@ import type { SpaceSelectionTarget, SpaceSelectionProblem } from './space';
 import { spaceKind } from './space';
 import { urKind } from './ur';
 import { PLUGIN_KINDS, type PluginKind } from './plugins';
-import { RECTANGLE, type Outline } from '@project/resource-api/domain';
+import {
+  RECTANGLE,
+  type Outline,
+  type Resource as ApiResource,
+} from '@project/resource-api/domain';
 import type { JsonValue } from '../json-value';
 
 /**
@@ -103,12 +107,14 @@ export const fileContentParser = (kind: KindId): KindedParser<KindedFile<KindId>
   parsersFor(kind).file;
 
 /**
- * A Resource: the core's envelope, `id`, `title` and `kind`, and
- * the content its kind's module parses. Typed from the registry, so a kind is
- * declared in its module and listed in this file, and nowhere else.
+ * A Resource: the Resource API's one structure (ADR 0142), its envelope `id`,
+ * `title` and `kind`, and the content its kind's module parses. Typed from the
+ * registry, so a kind is declared in its module and listed in this file, and
+ * nowhere else; and instantiated from `Resource<C>`, so the core, the stores,
+ * HTTP and a plugin take the same structure.
  */
 export type Resource = {
-  [K in KindId]: { id: UUID; title: string; kind: K; content: ContentByKind[K] };
+  [K in KindId]: ApiResource<ContentByKind[K]> & { readonly id: UUID; readonly kind: K };
 }[KindId];
 
 /** A stored Resource document: a Resource less its id, which is stored beside it. */

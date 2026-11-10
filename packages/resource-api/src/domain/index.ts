@@ -22,7 +22,7 @@ export type ResourceId = string;
  * on the wire and given to a plugin. `content` is what its plugin's content
  * schema parses.
  */
-export interface Resource<C> {
+export interface Resource<C = unknown> {
   readonly id: ResourceId;
   readonly title: string;
   readonly kind: string;
