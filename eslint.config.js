@@ -314,18 +314,10 @@ const KIND_FEATURE_FILES = [
   'packages/core/src/index.ts',
   // The kinds a Reference badge sits on are every kind but Reference; the flag saying so is a runtime boolean, so no type reads it.
   'packages/ui/src/icons.tsx',
-  // The Space Resource lifecycle (ADR 0074): its create.
+  // The Space Resource lifecycle (ADR 0074): the document its create writes when its caller gives none.
   'packages/persistence/src/space-resource-planning.ts',
   // The Space glyph on the Space cluster's own controls.
   'packages/app/src/components/CommandDockSpaces.tsx',
-  // A dropped image URL creates an Image Resource.
-  'packages/app/src/components/SpaceCanvas.tsx',
-  // Create Reference's glyph.
-  'packages/app/src/resource-rail-actions.tsx',
-  // Creating an Image or a Reference Resource.
-  'packages/app/src/space-authoring.ts',
-  // Image Resource creation's picture admission, the Image plugin's rule, until creation moves onto the Resource API.
-  'packages/app/src/picture-admission.ts',
 ];
 
 export default tseslint.config(
