@@ -3,6 +3,7 @@ import { render, type RenderResult } from '@testing-library/react';
 import type { Answer, AssetRef, Size } from '../domain';
 import {
   createRailStore,
+  type Assets,
   ResourceHostProvider,
   type Exclusive,
   type OwnClaim,
@@ -30,11 +31,12 @@ export interface Grants {
   readonly pick?: boolean;
 }
 
-/** What a rendered plugin's commits received, in order. */
+/** What a rendered plugin's commits and asset store received, in order. */
 export interface Commits<C, M> {
   readonly title: string[];
   readonly content: C[];
   readonly map: M[];
+  readonly stored: Blob[];
 }
 
 export interface RenderPluginOptions<C, M> {
@@ -47,9 +49,16 @@ export interface RenderPluginOptions<C, M> {
   readonly selected?: boolean;
   /** What every commit answers; `completed` also applies the value, as a host would. */
   readonly answer?: Answer;
+  /** What a granted pick answers. */
+  readonly files?: readonly File[];
 }
 
 export type RenderedPlugin<C, M> = RenderResult & { readonly commits: Commits<C, M> };
+
+const TEST_ASSETS = {
+  url: (ref: AssetRef) => ref,
+  read: () => Promise.resolve({ refused: 'No asset store in this test.' }),
+};
 
 const DEFAULT_SIZE: Size = { width: 200, height: 120 };
 
@@ -58,10 +67,40 @@ function TestEmbed() {
   return null;
 }
 
-const TEST_ASSETS = {
-  url: (ref: AssetRef) => ref,
-  read: () => Promise.resolve({ refused: 'No asset store in this test.' }),
-};
+const WITHDRAWN = { refused: 'Exclusive work is running.' } as const;
+const ENDED = { refused: 'The exclusive work has ended.' } as const;
+
+/** A stored Blob's reference: its position, padded to an asset reference's 43 characters. */
+const testAssetRef = (position: number): AssetRef =>
+  `/assets/${String(position).padStart(43, 'A')}`;
+
+/** Whether exclusive work runs on the test page, and which run it is. */
+function createTestGate() {
+  let run: symbol | null = null;
+  const listeners = new Set<() => void>();
+  const install = (next: symbol | null) => {
+    run = next;
+    for (const listener of listeners) listener();
+  };
+  return {
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    running: () => run !== null,
+    /** Run `work`, or answer busy where a run is live; `live` answers whether this run still is. */
+    async exclusively<T>(work: (live: () => boolean) => Promise<T>): Promise<T | 'busy'> {
+      if (run !== null) return 'busy';
+      const mine = Symbol('exclusive work');
+      install(mine);
+      try {
+        return await work(() => run === mine);
+      } finally {
+        install(null);
+      }
+    },
+  };
+}
 
 function TestTitle({ title }: { readonly title: string }) {
   return function Title({ className }: TitleProps) {
@@ -127,15 +166,29 @@ export function renderPlugin<C, M>(
   View: ComponentType<PluginViewProps<C, M>>,
   options: RenderPluginOptions<C, M>,
 ): RenderedPlugin<C, M> {
-  const commits: Commits<C, M> = { title: [], content: [], map: [] };
+  const commits: Commits<C, M> = { title: [], content: [], map: [], stored: [] };
   const grants = options.grants ?? {};
   const answer: Answer = options.answer ?? 'completed';
+  const gate = createTestGate();
+  const files = [...(options.files ?? [])];
+  const store = (bytes: Blob): Promise<AssetRef | { readonly refused: string }> => {
+    if (answer !== 'completed' && answer !== 'unchanged') return Promise.resolve(answer);
+    commits.stored.push(bytes);
+    return Promise.resolve(testAssetRef(commits.stored.length));
+  };
+  const pick = () => Promise.resolve(gate.running() ? [] : files);
+  /** A commit answering refused when `live` says it is not, as the host's withdrawn and ended commits do. */
+  const guarded =
+    <T, A>(commit: (next: T) => Promise<A>, live: () => boolean, refusal: { refused: string }) =>
+    (next: T): Promise<A | { readonly refused: string }> =>
+      live() ? commit(next) : Promise.resolve(refusal);
 
   function Harness() {
     const [title, setTitle] = useState(options.title ?? 'Resource');
     const [content, setContent] = useState(options.content);
     const [mapValue, setMapValue] = useState(options.map);
     const rail = useMemo(() => createRailStore(), []);
+    const running = useSyncExternalStore(gate.subscribe, gate.running);
     const host: ResourceHost = useMemo(
       () => ({ Title: TestTitle({ title }), Own: TestOwn, rail }),
       [rail, title],
@@ -154,18 +207,41 @@ export function renderPlugin<C, M>(
       title: grants.title === true ? titleCommit : undefined,
       content: grants.content === true ? contentCommit : undefined,
       map: grants.map === true ? mapCommit : undefined,
+      store: grants.store === true ? store : undefined,
     };
-    const own: Exclusive<C, M> = granted;
-    const claim: OwnClaim<C, M> = { release: () => true, exclusively: (work) => work(own) };
+    const idle = () => !gate.running();
+    const offered = <T,>(commit: T | undefined) => (running ? undefined : commit);
+    const plain = <T, A>(commit: ((next: T) => Promise<A>) | undefined) =>
+      offered(commit === undefined ? undefined : guarded(commit, idle, WITHDRAWN));
+    const claim: OwnClaim<C, M> = {
+      release: () => true,
+      exclusively: (work) =>
+        gate.exclusively((live) => {
+          const ownCommit = <T, A>(commit: ((next: T) => Promise<A>) | undefined) =>
+            commit === undefined ? undefined : guarded(commit, live, ENDED);
+          const own: Exclusive<C, M> = {
+            title: ownCommit(granted.title),
+            content: ownCommit(granted.content),
+            map: ownCommit(granted.map),
+            store: ownCommit(granted.store),
+          };
+          return work(own);
+        }),
+    };
+    const assets: Assets = {
+      ...TEST_ASSETS,
+      store: plain(granted.store),
+      pick: grants.pick === true ? offered(pick) : undefined,
+    };
     const surface: Surface<C, M> = {
       resource: { id: 'resource', title, kind: options.kind ?? 'test', content },
-      title: { value: title, commit: granted.title },
-      content: { value: content, commit: granted.content },
-      map: { value: mapValue, commit: granted.map },
+      title: { value: title, commit: plain(granted.title) },
+      content: { value: content, commit: plain(granted.content) },
+      map: { value: mapValue, commit: plain(granted.map) },
       size: options.size ?? DEFAULT_SIZE,
       selected: options.selected ?? false,
       claim: grants.claim === true ? () => claim : undefined,
-      assets: TEST_ASSETS,
+      assets,
       Embed: TestEmbed,
     };
     return (

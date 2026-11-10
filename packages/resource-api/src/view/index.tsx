@@ -32,9 +32,9 @@ export interface Assets {
   /** An asset's bytes, or why they cannot be read. */
   read(ref: AssetRef): Promise<Blob | { readonly refused: string }>;
   /** Ask the author for files, called in the press. */
-  readonly pick?: (accept: string) => Promise<File[]>;
+  readonly pick?: ((accept: string) => Promise<File[]>) | undefined;
   /** Store bytes, answering their reference. */
-  readonly store?: (bytes: Blob) => Promise<AssetRef | { readonly refused: string }>;
+  readonly store?: ((bytes: Blob) => Promise<AssetRef | { readonly refused: string }>) | undefined;
 }
 
 /** A Claim: who is interacting (ADR 0142). */
