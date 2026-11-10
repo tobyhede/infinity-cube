@@ -214,7 +214,7 @@ describe('a kind module is imported only under kinds/ or by a feature of its kin
   it('lets a listed file import a kind module’s export', async () => {
     const refused = await refusedLines(
       ["import { imageKind } from '@project/core';"],
-      'packages/app/src/image-replacement.ts',
+      'packages/app/src/space-authoring.ts',
     );
     expect([...refused]).toEqual([]);
   });
@@ -232,7 +232,7 @@ describe('a kind module is imported only under kinds/ or by a feature of its kin
 
   it('reads a named import, and an `export *` of a kind module, as importing a refused name', () => {
     expect(importsKindModuleName(RULED_FILE)).toBe(false);
-    expect(importsKindModuleName('packages/app/src/image-replacement.ts')).toBe(true);
+    expect(importsKindModuleName('packages/app/src/space-authoring.ts')).toBe(true);
     expect(importsKindModuleName('packages/core/src/index.ts')).toBe(true);
   });
 });

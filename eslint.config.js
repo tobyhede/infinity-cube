@@ -310,8 +310,6 @@ const KIND_MODULE_IMPORTS = {
 const KIND_FEATURE_FILES = [
   // The core's surface, which re-exports every kind module.
   'packages/core/src/index.ts',
-  // An Image Resource's natural size, as a type.
-  'packages/core/src/types.ts',
   // The UI surface, which re-exports the kind view functions the application's one-kind features call.
   'packages/ui/src/index.ts',
   // The kinds a Reference badge sits on are every kind but Reference; the flag saying so is a runtime boolean, so no type reads it.
@@ -330,11 +328,9 @@ const KIND_FEATURE_FILES = [
   'packages/app/src/components/SpaceCanvas.tsx',
   // A Space Resource's embedded Map.
   'packages/app/src/embedded-open-space-resource.ts',
-  // Replace is an Image Resource's (ADR 0106).
-  'packages/app/src/image-replacement.ts',
   // Create Reference's glyph, and a Space Resource's Enter and menu.
   'packages/app/src/resource-rail-actions.tsx',
-  // Creating an Image or a Reference Resource, and Replace.
+  // Creating an Image or a Reference Resource.
   'packages/app/src/space-authoring.ts',
 ];
 

@@ -63,6 +63,7 @@ Guards above are omitted below.
 | Action | Its own checks, in order |
 | --- | --- |
 | `edited-resource` | `resource-not-found` → `resource-kind-immutable` → `reference-target-immutable` → `space-resource-target-immutable` → `resource-title-required` → (identical to current ⇒ `unchanged`) → `reference-target-missing` → `reference-target-not-targetable` → completed |
+| `changed-content` | `resource-not-found` → `resource-content-invalid` (the kind's content schema refuses it) → then `edited-resource`'s checks from `resource-kind-immutable` on, over the document with that content |
 | `created-resource` | none → completed |
 | `created-reference` | `reference-targets-self` → `reference-target-missing` → `reference-target-not-targetable` → completed |
 | `opened-resource` | `resource-not-in-map` → `resource-not-found` → `open-requires-content` → (already Open ⇒ `unchanged`) → completed |
@@ -74,8 +75,8 @@ Guards above are omitted below.
 | `removed-resource-from-map` | `resource-not-in-map` → completed |
 | `deleted-resource` | `resource-not-found` → `space-resource-deletion-unsupported` → `resource-has-references` → completed |
 
-`open-requires-content` is the code `opened-resource` and `opened-resource-to-fit` raise for an Ur Resource,
-which has no content to show; intake raises the same code for a Map entry storing
+`open-requires-content` is the code `opened-resource` and `opened-resource-to-fit` raise for an Ur or an Image Resource,
+which is never Open (ADR 0142); intake raises the same code for a Map entry storing
 one Open. Every code string here is quoted exactly as `AuthoringRefusal['code']`
 declares it. A refusal code is a stable identity across the seam (ADR 0057), so
 renaming one is a change to the domain surface rather than a wording fix, made in
@@ -139,14 +140,14 @@ Edit that holds no Map say it needed one.
 | --- | --- |
 | `settled-resource-movement` | none → completed |
 
-## The 30 codes
+## The 31 codes
 
-1 contextual (`map-not-found`) plus 29 action-specific —
-none is produced anywhere else. 24 of those 29 are tabulated above, and
+1 contextual (`map-not-found`) plus 30 action-specific —
+none is produced anywhere else. 25 of those 30 are tabulated above, and
 `exclusive-work-running` is the gate's, asked of every action before its row;
 `map-required` is declared and presented but currently raised nowhere, so it
-appears in no row, and `image-url-unsupported`, raised by the Image Resource
-Edits, has no row yet. `space-replaced` and `edit-abandoned` are no action's:
+appears in no row, and `image-url-unsupported`, raised by Image Resource
+creation, has no row yet. `space-replaced` and `edit-abandoned` are no action's:
 they are how a `queued` Edit settles when the drain discards it — a
 replacement Space opened before it drained, or the Edit draining the queue
 failed before reaching it — and reach only the `settle` callback its caller
