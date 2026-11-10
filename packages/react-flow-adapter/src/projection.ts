@@ -45,10 +45,10 @@ const FALLBACK_COLOR = FALLBACK_GRAPH_COLOR;
  * the rest to hairlines with small heads (`RECEDING_STROKE_WIDTH`), which this
  * softens rather than hides.
  */
-export const OTHER_GRAPH_OPACITY = 0.8;
 
-/** The stroke width of an Edge outside the Active Graph, while one is: a hairline. */
-export const RECEDING_STROKE_WIDTH = 1;
+/** The z-index an Open Resource is drawn at, over its Closed neighbours. */
+export const OPEN_RESOURCE_Z_INDEX = 10;
+export const OTHER_GRAPH_OPACITY = 0.35;
 
 /** What ends an inline title edit. Answers a refusal reason, or `null` when the
  *  new title was accepted — the same contract `CanvasResource`'s editor reads, where
@@ -423,7 +423,7 @@ export function projectResourceNodes(
     }
     if (open) {
       node.data.open = true;
-      node.zIndex = 10;
+      node.zIndex = OPEN_RESOURCE_Z_INDEX;
     }
     return node;
   });

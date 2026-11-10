@@ -51,6 +51,7 @@ import {
 import {
   authorsEmbeddedMap,
   nodeTypes,
+  OPEN_RESOURCE_Z_INDEX,
   GraphConnectionLine,
   GraphHeadMarkers,
   GraphConnectionLineHeadShape,
@@ -1228,7 +1229,13 @@ export function SpaceCanvas({
   const canvasNodes = useMemo(
     () =>
       [...editableNodes, ...liveEmbeddings.flatMap((value) => value.nodes)].map((node) => {
-        const withEmbed = { ...node, data: { ...node.data, onMapEmbed: publishMapEmbed } };
+        // A Resource drawing a Map embedding is drawn over its Closed neighbours,
+        // as an Open Resource is, so the Map drawn over its rect is reachable.
+        const raised =
+          node.zIndex === undefined && embeds.has(node.id)
+            ? { ...node, zIndex: OPEN_RESOURCE_Z_INDEX }
+            : node;
+        const withEmbed = { ...raised, data: { ...raised.data, onMapEmbed: publishMapEmbed } };
         const withHeight = reportsBodyHeight(node)
           ? {
               ...withEmbed,
@@ -1255,7 +1262,7 @@ export function SpaceCanvas({
           className: classes.join(' '),
         };
       }),
-    [editableNodes, liveEmbeddings, reportBodyHeight, editingPortals, publishMapEmbed],
+    [editableNodes, liveEmbeddings, reportBodyHeight, editingPortals, publishMapEmbed, embeds],
   );
   const portalNodesById = useMemo(() => {
     const byId = new Map<string, ResourceFlowNode>();

@@ -1,3 +1,4 @@
+import { OPEN_RESOURCE_Z_INDEX } from '@project/react-flow-adapter';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
@@ -696,6 +697,18 @@ describe('the Map an Open Space Resource draws', () => {
     expect(spaces.entry(HOME_ID)?.session.getState().working.resources).toHaveLength(2);
     const editor = await screen.findByRole('textbox', { name: 'Resource title' });
     expect(editor.closest('.react-flow__node')?.getAttribute('data-id')).toMatch(/^embedded:/);
+  });
+
+  it('draws an Open Space Resource over its Closed neighbours, as an Open Resource is drawn', async () => {
+    const value = home({
+      title: 'Elsewhere',
+      kind: 'space',
+      content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
+    });
+    await mount(value);
+    await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+    expect(containingNode(SPACE_RESOURCE_ID).style.zIndex).toBe(String(OPEN_RESOURCE_Z_INDEX));
+    expect(Number(embeddedNode(DRAWN_A).style.zIndex)).toBeGreaterThan(OPEN_RESOURCE_Z_INDEX);
   });
 
   it('keeps the embedded Map inert until Edit, and Done returns it to Read', async () => {

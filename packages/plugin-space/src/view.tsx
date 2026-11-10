@@ -84,7 +84,8 @@ function SpacePluginView({ surface }: PluginViewProps<SpaceContent, SpaceMapCont
         ? [
             {
               kind: 'action',
-              id: 'done',
+              // Edit's own id: one control toggled, so the focus stays on it.
+              id: 'edit',
               label: `Done Resource ${name}`,
               icon: <Check size={14} />,
               run: () => {
@@ -137,7 +138,7 @@ function SpacePluginView({ surface }: PluginViewProps<SpaceContent, SpaceMapCont
           <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
             <Embed map={view} select={select} claim={held ?? undefined} />
           </div>
-          <div style={{ padding: '4px 12px 8px' }}>
+          <div style={{ padding: '4px 12px 8px' }} data-testid="space-resource-footer">
             <Title />
           </div>
         </>
