@@ -2,7 +2,14 @@ import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/pr
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { assetHashOfPath, titleName, uuidSchema, type Resource, type UUID } from '@project/core';
+import {
+  isOfKind,
+  assetHashOfPath,
+  titleName,
+  uuidSchema,
+  type Resource,
+  type UUID,
+} from '@project/core';
 import { loadSpaceAggregate } from '@project/graph';
 import { isAssetHash } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -14,7 +21,7 @@ const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
 
 const spaceResourceTargets = (resources: readonly Resource[]): readonly UUID[] =>
   resources.flatMap((resource) =>
-    resource.kind === 'space' ? [uuidSchema.parse(resource.content.spaceId)] : [],
+    isOfKind(resource, 'space') ? [uuidSchema.parse(resource.content.spaceId)] : [],
   );
 
 /**
@@ -100,7 +107,7 @@ describe('tracked fixture aggregate', () => {
 
     for (const space of ordinary) {
       for (const resource of space.resources) {
-        if (resource.kind !== 'markdown') continue;
+        if (!isOfKind(resource, 'markdown')) continue;
         expect(titleName(resource.title).length).toBeGreaterThan(1);
         // Its text is an asset the fixture carries, and says something (ADR 0142).
         const hash = assetHashOfPath(resource.content.url);
@@ -141,7 +148,7 @@ describe('tracked fixture assets', () => {
 
     const opened = loaded.aggregate.spaces.flatMap(({ snapshot }) =>
       snapshot.resources.flatMap(({ id, document }) =>
-        document.kind === 'image' &&
+        isOfKind(document, 'image') &&
         document.content.url.startsWith(STORED_IMAGE_PREFIX) &&
         (snapshot.document.maps ?? []).some((m) => m.positions[id] !== undefined)
           ? [document.content.url]

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EMPTY_ASSET_REF, KIND_IDS, type Resource } from '@project/core';
+import { EMPTY_ASSET_REF, type Resource } from '@project/core';
 import {
   parseResourceFiles,
   serializeResource,
@@ -171,14 +171,21 @@ describe('parseResourceFiles refuses a file that is not a Resource file', () => 
     }
   });
 
-  it('refuses a well-formed kind id this build does not register, naming it and those it does', () => {
+  it('reads a well-formed kind id no plugin in this build draws, its content whole (ADR 0142)', () => {
     for (const kind of ['video', 'Markdown', 'vnd.acme.widget']) {
-      const files = [json({ id: RESOURCE_A, title: 'A', kind, content: {} })];
-      expect(errorKinds(files)).toEqual(['invalid-resource-file']);
-      expect(messages(files)).toEqual([
-        `resources/${RESOURCE_A}.json: kind: "${kind}" names no kind this build registers (${KIND_IDS.join(', ')})`,
+      const content = { frames: [{ at: 0 }], loop: true };
+      const parsed = parseResourceFiles([json({ id: RESOURCE_A, title: 'A', kind, content })]);
+      expect(parsed.ok).toBe(true);
+      if (!parsed.ok) return;
+      expect(parsed.resources.map(({ resource }) => resource)).toEqual([
+        { id: RESOURCE_A, title: 'A', kind, content },
       ]);
     }
+  });
+
+  it('refuses a Resource file of a missing kind whose envelope has a key it does not declare', () => {
+    const files = [json({ id: RESOURCE_A, title: 'A', kind: 'video', content: {}, extra: 1 })];
+    expect(errorKinds(files)).toEqual(['invalid-resource-file']);
   });
 
   it('refuses a file with no id, minting none', () => {

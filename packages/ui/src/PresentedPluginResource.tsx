@@ -1,5 +1,5 @@
-import { createContext, useContext, useMemo, useState } from 'react';
-import { mapContentWithoutMap, titleName, type PluginKind, type Resource } from '@project/core';
+import { useMemo } from 'react';
+import { mapContentWithoutMap, titleName, type ResourceKind, type Resource } from '@project/core';
 import type { Size } from '@project/resource-api/domain';
 import type { OwnProps, TitleProps } from '@project/resource-api/view';
 import {
@@ -41,7 +41,7 @@ function StageOwn({ children, className }: OwnProps) {
 
 export interface PresentedPluginResourceProps {
   readonly resourceId: string;
-  readonly kind: PluginKind;
+  readonly kind: ResourceKind;
   /** The Resource's Title, whole; the Stage draws its name. */
   readonly title: string;
   /** The Resource's content as stored, which its plugin's schema parses. */
@@ -150,7 +150,7 @@ function NoTitle() {
 }
 
 export interface PresentedPluginContentProps {
-  readonly kind: PluginKind;
+  readonly kind: ResourceKind;
   /** The name drawn above, which the plugin is given as its Title. */
   readonly title: string;
   /** The content, which the plugin's schema parses. */

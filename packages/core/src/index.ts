@@ -25,6 +25,9 @@ export {
   takesOpen,
   isKindId,
   isRegisteredKind,
+  isMissingKind,
+  isOfKind,
+  isMissingKindId,
   kindFlags,
   isPluginKind,
   keepsMapContent,
@@ -44,5 +47,7 @@ export {
   spaceSelection,
   spaceSelectionProblem,
   type KindId,
+  type MissingKind,
+  type ResourceKind,
   type KindedResource,
 } from './kinds/registry';

@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, type RenderResult } from '@testing-
 import { beforeAll, afterAll, describe, expect, it, vi } from 'vitest';
 
 import {
+  isOfKind,
   encodeCompactUuid,
   spaceSnapshotSchema,
   uuidSchema,
@@ -204,7 +205,9 @@ const bodyOf = (session: SpaceSession, resourceId: string): string | undefined =
   const document = session
     .getState()
     .working.resources.find((resource) => resource.id === resourceId)?.document;
-  return document?.kind === 'markdown' ? textAt(document.content.url) : undefined;
+  return document !== undefined && isOfKind(document, 'markdown')
+    ? textAt(document.content.url)
+    : undefined;
 };
 
 /**

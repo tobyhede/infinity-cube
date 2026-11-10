@@ -1,10 +1,4 @@
-import {
-  declaredKind,
-  isKindId,
-  KIND_UNREGISTERED,
-  resourceFileSchema,
-  type Resource,
-} from '@project/core';
+import { declaredKind, isKindId, resourceFileSchema, type Resource } from '@project/core';
 
 /** A file of a Space directory's `resources/`, as read from disk: where it was found, and its text. */
 export interface ResourceFile {
@@ -38,9 +32,9 @@ type FileDecoding =
 
 /**
  * A Resource file's JSON, refused unless its `kind` is declared, with no
- * default kind (ADR 0128), and is a kind id; then the file's schema refuses a kind this build does not
- * register, which this door quotes beside the registered ones the schema
- * names, and holds the envelope and the kind's content each strict.
+ * default kind (ADR 0128), and is a kind id; then the file's schema holds the
+ * envelope strict, and the content strict to its kind's plugin. A kind no
+ * plugin in this build draws is read whole, its content unread (ADR 0142).
  */
 function decodeFile(file: ResourceFile): FileDecoding {
   let json: unknown;
@@ -79,11 +73,7 @@ function decodeFile(file: ResourceFile): FileDecoding {
       parsed.error.issues.map((issue) => ({
         kind: 'invalid-resource-file',
         path: file.path,
-        // A file is read as written, so its door quotes the kind it declares.
-        message:
-          issue.code === 'custom' && issue.params?.['code'] === KIND_UNREGISTERED
-            ? `${file.path}: kind: "${kind}" ${issue.message}`
-            : `${file.path}: ${issue.path.join('.') || '(resource)'}: ${issue.message}`,
+        message: `${file.path}: ${issue.path.join('.') || '(resource)'}: ${issue.message}`,
       })),
     );
   }

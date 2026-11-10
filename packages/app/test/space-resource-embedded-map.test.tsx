@@ -2,6 +2,7 @@ import { OPEN_RESOURCE_Z_INDEX } from '@project/react-flow-adapter';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
+  isOfKind,
   EMPTY_ASSET_REF,
   spaceSnapshotSchema,
   uuidSchema,
@@ -810,7 +811,8 @@ describe('the Map an Open Space Resource draws', () => {
     const resource = session
       .getState()
       .working.resources.find((candidate) => candidate.id === SPACE_RESOURCE_ID);
-    if (resource?.document.kind !== 'space') throw new Error('Space Resource missing');
+    if (resource === undefined || !isOfKind(resource.document, 'space'))
+      throw new Error('Space Resource missing');
     expect(resource.document.content.framing?.zoom).toBe(1.1);
   });
 
@@ -944,7 +946,8 @@ describe('the Map an Open Space Resource draws', () => {
     const resource = session
       .getState()
       .working.resources.find((candidate) => candidate.id === SPACE_RESOURCE_ID);
-    if (resource?.document.kind !== 'space') throw new Error('Space Resource missing');
+    if (resource === undefined || !isOfKind(resource.document, 'space'))
+      throw new Error('Space Resource missing');
     expect(resource.document.content.framing).toBeUndefined();
   });
 
@@ -972,7 +975,8 @@ describe('the Map an Open Space Resource draws', () => {
     const resource = session
       .getState()
       .working.resources.find((candidate) => candidate.id === SPACE_RESOURCE_ID);
-    if (resource?.document.kind !== 'space') throw new Error('Space Resource missing');
+    if (resource === undefined || !isOfKind(resource.document, 'space'))
+      throw new Error('Space Resource missing');
     expect(resource.document.content.framing).toBeUndefined();
   });
 
@@ -1069,7 +1073,8 @@ describe('the Map an Open Space Resource draws', () => {
       const resource = session
         .getState()
         .working.resources.find((candidate) => candidate.id === resourceId);
-      if (resource?.document.kind !== 'space') throw new Error('Space Resource missing');
+      if (resource === undefined || !isOfKind(resource.document, 'space'))
+        throw new Error('Space Resource missing');
       return resource.document.content.framing?.zoom;
     };
     expect(authoredZoom(SPACE_RESOURCE_ID)).toBe(1.1);
@@ -1115,7 +1120,8 @@ describe('the Map an Open Space Resource draws', () => {
     const resource = initial.session
       .getState()
       .working.resources.find((candidate) => candidate.id === SPACE_RESOURCE_ID);
-    if (resource?.document.kind !== 'space') throw new Error('Space Resource missing');
+    if (resource === undefined || !isOfKind(resource.document, 'space'))
+      throw new Error('Space Resource missing');
     expect(resource.document.content.framing?.zoom).toBe(1.1);
   });
 

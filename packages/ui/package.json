@@ -29,6 +29,7 @@
     "@codemirror/view": "^6.43.9",
     "@lezer/highlight": "^1.2.3",
     "@project/core": "workspace:*",
+    "@project/plugin-default": "workspace:*",
     "@project/plugin-image": "workspace:*",
     "@project/plugin-markdown": "workspace:*",
     "@project/plugin-reference": "workspace:*",

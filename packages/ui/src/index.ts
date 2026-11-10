@@ -100,7 +100,7 @@ export type {
 export { ResourceKindIcon, resourceKindName } from './ResourceKindIcon';
 export { BADGED_TARGET_GLYPH } from './kinds/kind-view';
 export { bareOperations, kindNaming } from './kinds/registry';
-export type { KindNaming, KindOperationsByKind } from './kinds/registry';
+export type { KindNaming, KindOperationsByKind, KindOperationsOf } from './kinds/registry';
 export type { ResourceKindIconProps } from './ResourceKindIcon';
 export { ResourceSearchCombobox } from './ResourceSearchCombobox';
 export type { ResourceChoice, ResourceSearchComboboxProps } from './ResourceSearchCombobox';

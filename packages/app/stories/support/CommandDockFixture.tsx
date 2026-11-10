@@ -1,16 +1,6 @@
 import { useEffect, useRef } from 'react';
-import {
-  newUuid,
-  spaceKind,
-  uuidSchema,
-  type ResourceDocument,
-  type SpaceSnapshot,
-} from '@project/core';
-import {
-  MemorySpaceBackendTestControl,
-  type ShownSpace,
-  type SpaceSessionState,
-} from '@project/persistence';
+import { isOfKind, newUuid, uuidSchema, type SpaceSnapshot } from '@project/core';
+import { MemorySpaceBackendTestControl, type SpaceSessionState } from '@project/persistence';
 import { Application } from '#components/Application';
 import { snapshotFromSpace } from '#src/snapshot';
 import { storyOpening, storySpaces } from './application';
@@ -141,7 +131,8 @@ const blockSave = async (
   const resource = rendering.session
     .getState()
     .working.resources.find(({ id }) => id === created.resourceId);
-  if (resource?.document.kind !== 'space') throw new Error('No Space Resource was created.');
+  if (resource === undefined || !isOfKind(resource.document, 'space'))
+    throw new Error('No Space Resource was created.');
   const { entry: target } = await spaces.hold(uuidSchema.parse(resource.document.content.spaceId));
   const stored = target.session.getState().working;
   const targetMap = stored.document.defaultMap;

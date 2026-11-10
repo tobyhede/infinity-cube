@@ -9,6 +9,7 @@ import {
 } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
+  isOfKind,
   EMPTY_ASSET_REF,
   newUuid,
   spaceSnapshotSchema,
@@ -346,7 +347,7 @@ const nodeFor = (id: UUID): HTMLElement | null =>
 /** The Space Resources `Home` holds, in authored order. */
 const spaceResourcesOf = (session: SpaceSession) =>
   resourcesOf(session).flatMap((resource) =>
-    resource.document.kind === 'space' ? [{ id: resource.id, document: resource.document }] : [],
+    isOfKind(resource.document, 'space') ? [{ id: resource.id, document: resource.document }] : [],
   );
 
 /**
@@ -964,7 +965,9 @@ describe('referencing an existing Space', () => {
 
     const stored = await backend.loadSpace(HOME_ID);
     const storedSpaceResources = (stored?.snapshot.resources ?? []).flatMap((resource) =>
-      resource.document.kind === 'space' ? [{ id: resource.id, document: resource.document }] : [],
+      isOfKind(resource.document, 'space')
+        ? [{ id: resource.id, document: resource.document }]
+        : [],
     );
     // The backend answers Resources in ascending id order, which need
     // not match Space Authoring's own authored order, so the two sides are

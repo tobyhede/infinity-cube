@@ -190,7 +190,6 @@ const refused: [string, Json, { instancePath: string; keyword: string }][] = [
     { id, title: 'A', content: {} },
     { instancePath: '', keyword: 'required' },
   ],
-  ['a bare kind no build registers', envelope('video', {}), { instancePath: '', keyword: 'oneOf' }],
   [
     'a media type as a vendor kind',
     envelope('vnd.acme.image/png', {}),
@@ -246,8 +245,8 @@ const refused: [string, Json, { instancePath: string; keyword: string }][] = [
 /**
  * The schema is held to compiling under strict mode, to accepting the example
  * its README publishes for each kind, to refusing what ADR 0128 names at the
- * place it names (a missing or malformed `kind`, a bare kind no build
- * registers, an unknown key at either level, Ur content, and a locator form
+ * place it names (a missing or malformed `kind`, an unknown key at either
+ * level, Ur content, and a locator form
  * the kind does not take), and to accepting what only intake refuses. The
  * next block holds it to intake itself.
  */
@@ -267,6 +266,7 @@ describe('the Resource file JSON Schema', () => {
   it.each([
     ['a vendor kind with any content', envelope('vnd.acme.chart', { series: [1, 2] })],
     ['a vendor kind in upper case', envelope('vnd.Acme.Chart', {})],
+    ['a bare kind no build registers, with any content', envelope('video', { frames: [] })],
   ])('accepts %s', (_name, file) => {
     expect(resourceFileSchema(file), JSON.stringify(resourceFileSchema.errors)).toBe(true);
   });
@@ -361,12 +361,6 @@ describe('the Resource file JSON Schema refuses only what intake refuses', () =>
   const invalid: [string, ResourceFile[], 'both' | 'only intake'][] = [
     ['a Resource with no kind', filesOf({ id, title: 'A', content: {} }), 'both'],
     ['a malformed kind id', filesOf(envelope('a.b', {})), 'both'],
-    ['a bare kind no build registers', filesOf(envelope('video', {})), 'both'],
-    [
-      'a vendor kind this build does not register',
-      filesOf(envelope('vnd.acme.chart', {})),
-      'only intake',
-    ],
     ['an unknown envelope key', filesOf({ ...envelope('ur', {}), body: 'x' }), 'both'],
     [
       'an unknown content key',
@@ -415,5 +409,19 @@ describe('the Resource file JSON Schema refuses only what intake refuses', () =>
 
   it.each(refused)('intake refuses %s too, which the schema refuses', (_name, file) => {
     expect(intakeRefuses(filesOf(file))).toBe(true);
+  });
+
+  it.each([
+    ['a bare kind no plugin draws', envelope('video', { frames: [{ at: 0 }] })],
+    ['a vendor kind no plugin draws', envelope('vnd.acme.chart', { series: [1, 2] })],
+  ])('intake and the schema both accept %s, its content unread (ADR 0142)', (_name, file) => {
+    expect(intakeRefuses(filesOf(file))).toBe(false);
+    expect(resourceFileSchema(file), JSON.stringify(resourceFileSchema.errors)).toBe(true);
+  });
+
+  it('intake and the schema both refuse a kind no plugin draws whose content is not an object', () => {
+    const file = envelope('video', ['frame']);
+    expect(intakeRefuses(filesOf(file))).toBe(true);
+    expect(resourceFileSchema(file)).toBe(false);
   });
 });

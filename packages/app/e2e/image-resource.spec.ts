@@ -1,7 +1,13 @@
 // `test` comes from ./fixtures, not @playwright/test — it carries the auto-use
 // gate that fails a test if React Flow logged a warning while it ran.
 import { readFileSync } from 'node:fs';
-import { COLLAPSED_RESOURCE_SIZE, encodeCompactUuid, uuidSchema, type UUID } from '@project/core';
+import {
+  isOfKind,
+  COLLAPSED_RESOURCE_SIZE,
+  encodeCompactUuid,
+  uuidSchema,
+  type UUID,
+} from '@project/core';
 import { decodeLoadedSpace } from '@project/persistence';
 import { expect, test, type Locator, type Page } from './fixtures';
 import {
@@ -369,7 +375,7 @@ async function storedImages(page: Page, spaceId: UUID) {
   const { snapshot } = decodeLoadedSpace(await response.json());
   const positions = snapshot.document.maps?.find(({ id }) => id === SEEDED_MAP_ID)?.positions;
   return snapshot.resources.flatMap(({ id, document }) =>
-    document.kind === 'image' ? [{ id, document, at: positions?.[id] }] : [],
+    isOfKind(document, 'image') ? [{ id, document, at: positions?.[id] }] : [],
   );
 }
 
@@ -1270,7 +1276,9 @@ test('keeping local work during a Replace in flight re-commits it, and the Repla
     kind: 'image',
     content: { naturalSize: FIRST_PICTURE.size },
   });
-  expect(figure?.kind === 'image' ? figure.content.url : undefined).not.toBe(FIGURE_URL);
+  expect(
+    figure !== undefined && isOfKind(figure, 'image') ? figure.content.url : undefined,
+  ).not.toBe(FIGURE_URL);
 });
 
 test('Reload is withheld while a Replace is in flight and offered again once it answers', async ({
@@ -1610,9 +1618,10 @@ test('drop and paste create in an edited embedded Map and an inert drop or paste
   await settled(page);
   const rootRead = await page.request.get(`/api/spaces/${rootId}`);
   const frame = decodeLoadedSpace(await rootRead.json()).snapshot.resources.find(
-    ({ document }) => document.kind === 'space' && document.title === title,
+    ({ document }) => isOfKind(document, 'space') && document.title === title,
   );
-  if (frame?.document.kind !== 'space') throw new Error('Space Resource was not created');
+  if (frame === undefined || !isOfKind(frame.document, 'space'))
+    throw new Error('Space Resource was not created');
   const targetId = uuidSchema.parse(frame.document.content.spaceId);
   const drawing = page.locator(`.react-flow__node[data-id="${frame.id}"]`);
   await openFromRail(page, drawing);
@@ -1675,9 +1684,11 @@ async function openSpaceResource(
   await settled(page);
   const rootRead = await page.request.get(`/api/spaces/${rootId}`);
   const frame = decodeLoadedSpace(await rootRead.json()).snapshot.resources.find(
-    ({ document }) => document.kind === 'space' && document.title === title,
+    ({ document }) => isOfKind(document, 'space') && document.title === title,
   );
-  if (frame?.document.kind !== 'space') throw new Error('Space Resource was not created');
+  if (frame === undefined || !isOfKind(frame.document, 'space')) {
+    throw new Error('Space Resource was not created');
+  }
   const drawing = page.locator(`.react-flow__node[data-id="${frame.id}"]`);
   await openFromRail(page, drawing);
   await expect(
@@ -1708,7 +1719,7 @@ test('a drop or paste on the Map a Reference Resource draws is refused as read-o
   await settled(page);
   const rootRead = await page.request.get(`/api/spaces/${rootId}`);
   const reference = decodeLoadedSpace(await rootRead.json()).snapshot.resources.find(
-    ({ document }) => document.kind === 'reference' && document.content.target === id,
+    ({ document }) => isOfKind(document, 'reference') && document.content.target === id,
   );
   if (reference === undefined) throw new Error('Reference Resource was not created');
   const referenceNode = page.locator(`.react-flow__node[data-id="${reference.id}"]`);

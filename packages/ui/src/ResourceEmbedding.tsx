@@ -1,10 +1,9 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
-  isPluginKind,
   mapContentWithoutMap,
   mayBeTarget,
   titleName,
-  type PluginKind,
+  type ResourceKind,
   type Resource,
 } from '@project/core';
 import type { Answer, Kept, ResourceId, Size, SpaceView } from '@project/resource-api/domain';
@@ -189,8 +188,7 @@ export function HostEmbed(props: EmbedProps) {
   if (embedding.nested) return <EmbeddingNote>{NOTES.nested}</EmbeddingNote>;
   const target = embedding.resources.find((resource) => resource.id === id);
   if (target === undefined) return <EmbeddingNote>{NOTES.deleted}</EmbeddingNote>;
-  if (!isPluginKind(target.kind) || !mayBeTarget(target.kind))
-    return <EmbeddingNote>{NOTES.untargetable}</EmbeddingNote>;
+  if (!mayBeTarget(target.kind)) return <EmbeddingNote>{NOTES.untargetable}</EmbeddingNote>;
   return (
     <EmbeddedSurface
       key={target.id}
@@ -255,7 +253,7 @@ function EmbeddedSurface({
   embedding,
 }: {
   readonly target: Resource;
-  readonly kind: PluginKind;
+  readonly kind: ResourceKind;
   readonly title: Kept<string>;
   readonly embedding: Embedding;
 }) {

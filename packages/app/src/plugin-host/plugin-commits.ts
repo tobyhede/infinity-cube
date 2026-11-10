@@ -1,4 +1,4 @@
-import type { JsonValue, PluginKind, ResourceDocument, ResourceId } from '@project/core';
+import type { JsonValue, ResourceKind, ResourceDocument, ResourceId } from '@project/core';
 import type { ObserverErrorReporter } from '@project/persistence';
 import type { Answer, Size } from '@project/resource-api/domain';
 import type { Assets } from '@project/resource-api/view';
@@ -173,7 +173,7 @@ function commitsFor(
  * a press; the decoration is rebuilt whenever the gate publishes.
  */
 export function pluginSurfaceOperations(
-  kind: PluginKind,
+  kind: ResourceKind,
   resourceId: ResourceId,
   facts: PluginSurfaceFacts,
   host: PluginHost | undefined,

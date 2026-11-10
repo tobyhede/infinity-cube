@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { titleName, uuidSchema } from '@project/core';
+import { isOfKind, titleName, uuidSchema } from '@project/core';
 import { loadSpace, type ResourceFile } from '@project/graph';
 import fixtureJson from '../fixture/00000000-0000-4000-8000-000000000040/space.json';
 import presentationJson from '../fixture/00000000-0000-4000-8000-000000000060/space.json';
@@ -172,7 +172,7 @@ describe.each([
     expect(result.space.resources).toHaveLength(expected.resources);
     // Every Markdown Resource names a text its aggregate holds, and none is empty.
     for (const resource of result.space.resources) {
-      if (resource.kind !== 'markdown') continue;
+      if (!isOfKind(resource, 'markdown')) continue;
       expect(textOf(name, resource.content.url)?.trim().length ?? 0).toBeGreaterThan(0);
     }
   });

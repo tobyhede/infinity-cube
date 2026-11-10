@@ -3,7 +3,7 @@ import { Position } from '@xyflow/react';
 import { CLOSED_DISPLAY, FALLBACK_GRAPH_COLOR, bareOperations, graphPaint } from '@project/ui';
 import type {
   EntityActionGroup,
-  KindOperationsByKind,
+  KindOperationsOf,
   MapEmbedRequest,
   ResourceDisplay,
 } from '@project/ui';
@@ -68,7 +68,7 @@ export type ResourceTitleEditor = {
  * its `display`.
  */
 type KindDataOf<K extends Resource['kind']> = {
-  [P in K]: { kind: P; kindOperations: KindOperationsByKind[P] };
+  [P in K]: { kind: P; kindOperations: KindOperationsOf<P> };
 }[K];
 type ResourceKindData = KindDataOf<Resource['kind']>;
 

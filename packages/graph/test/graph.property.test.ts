@@ -1,6 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { EMPTY_ASSET_REF, type Resource, type UUID } from '@project/core';
+import { isOfKind, EMPTY_ASSET_REF, type KindId, type Resource, type UUID } from '@project/core';
 import { loadSpace, resolveResourceContent, serializeResource, type Space } from '../src/index';
 import { resourceFile, uuid } from './resource-files';
 import { textRef } from './text-asset';
@@ -256,7 +256,7 @@ describe('what intake refuses, over generated documents', () => {
   });
 });
 
-type ContentKind = Resource['kind'];
+type ContentKind = KindId;
 
 /** A Resource of the chosen kind that owns its content. */
 function contentOwner(id: UUID, index: number, kind: Exclude<ContentKind, 'reference'>): Resource {
@@ -358,7 +358,7 @@ describe('resolved content, over generated Spaces of every kind', () => {
       fc.property(mapsArb, kindsArb, targetsArb, (maps, kinds, targets) => {
         const space = acceptedWithKinds(maps, kinds, targets);
         for (const resource of space.resources) {
-          if (resource.kind !== 'reference') continue;
+          if (!isOfKind(resource, 'reference')) continue;
           const target = space.lookup.resource(uuid(resource.content.target));
           if (target === undefined) throw new Error('intake accepted a missing Target');
           expect(resolveResourceContent(space, resource)).toStrictEqual({

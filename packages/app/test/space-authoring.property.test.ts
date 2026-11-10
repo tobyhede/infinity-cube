@@ -2,6 +2,7 @@ import fc from 'fast-check';
 import { expect, it } from 'vitest';
 
 import {
+  isOfKind,
   EMPTY_ASSET_REF,
   GRAPH_HEAD_SHAPES,
   normalizeTitle,
@@ -328,17 +329,16 @@ function resolve(
       return {
         kind: 'edited-resource',
         resourceId: resource.id,
-        document:
-          document.kind === 'reference'
-            ? {
-                ...document,
-                title: generated.title,
-                content: {
-                  ...document.content,
-                  target: uuidSchema.parse(proposedTarget?.id ?? document.content.target),
-                },
-              }
-            : { ...document, title: generated.title },
+        document: isOfKind(document, 'reference')
+          ? {
+              ...document,
+              title: generated.title,
+              content: {
+                ...document.content,
+                target: uuidSchema.parse(proposedTarget?.id ?? document.content.target),
+              },
+            }
+          : { ...document, title: generated.title },
       };
     }
     case 'created-resource':

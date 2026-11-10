@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EMPTY_ASSET_REF, newUuid, spaceFileSchema, uuidSchema } from '@project/core';
+import { isOfKind, EMPTY_ASSET_REF, newUuid, spaceFileSchema, uuidSchema } from '@project/core';
 import { initializeSpace, loadSpace, newSpace, nextGraphColor } from '../src/index';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -31,7 +31,7 @@ describe('newSpace', () => {
     const resource = result.space.resources[0]!;
     expect(resource.kind).toBe('markdown');
     expect(resource.title).toBe('Resource 1');
-    expect(resource.kind === 'markdown' && resource.content.url).toBe(EMPTY_ASSET_REF);
+    expect(isOfKind(resource, 'markdown') && resource.content.url).toBe(EMPTY_ASSET_REF);
   });
 
   it('starts complete with its first Resource at the canonical centred position', () => {

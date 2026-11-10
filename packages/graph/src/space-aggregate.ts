@@ -1,4 +1,4 @@
-import { spaceReferences, spaceSelectionProblem, type UUID } from '@project/core';
+import { isMissingKind, spaceReferences, spaceSelectionProblem, type UUID } from '@project/core';
 import {
   declaredSpaceReferences,
   missingSpaceReferences,
@@ -159,7 +159,13 @@ export function loadSpaceAggregate({
   errors.push(...spaceReferenceCycles(declared).map(located('space-reference-cycle')));
   if (errors.length > 0) return { ok: false, errors };
 
-  for (const spaceId of unrootedSpaces(declared, metaSpaceId)) {
+  // While any plugin is missing, a Space nothing else refers to is held rather
+  // than refused (ADR 0142): the Resource with no plugin may be what refers to
+  // it, and nothing can read its content to say.
+  const pluginMissing = spaces.some((space) =>
+    space.resources.some((resource) => isMissingKind(resource.kind)),
+  );
+  for (const spaceId of pluginMissing ? [] : unrootedSpaces(declared, metaSpaceId)) {
     errors.push({ kind: 'ordinary-space-unreferenced', spaceId });
   }
   if (errors.length > 0) return { ok: false, errors };

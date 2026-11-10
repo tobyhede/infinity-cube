@@ -12,6 +12,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@project/plugin-default": "workspace:*",
     "@project/plugin-image": "workspace:*",
     "@project/plugin-markdown": "workspace:*",
     "@project/plugin-reference": "workspace:*",

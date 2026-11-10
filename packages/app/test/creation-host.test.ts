@@ -1,8 +1,6 @@
 import { act } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type JsonValue } from '@project/core';
-import { MemorySpaceBackend } from '@project/persistence';
-import { isStoredAsset } from '@project/resource-api/domain';
+import { isOfKind, uuidSchema, type JsonValue } from '@project/core';
 import type { CreationData } from '@project/resource-api/view';
 import {
   NotCreatableContent,
@@ -465,7 +463,8 @@ describe('a creation from a list of Spaces', () => {
     const first = opened.session
       .getState()
       .working.resources.find(({ document }) => document.kind === 'space');
-    if (first?.document.kind !== 'space') throw new Error('No Space was made.');
+    if (first === undefined || !isOfKind(first.document, 'space'))
+      throw new Error('No Space was made.');
     const space = { spaceId: first.document.content.spaceId, title: 'Space 1' };
     const settle = vi.fn();
 
@@ -496,7 +495,8 @@ describe('a creation the host keeps its word on', () => {
     const [first] = opened.session
       .getState()
       .working.resources.filter(({ document }) => document.kind === 'space');
-    if (first?.document.kind !== 'space') throw new Error('No Space was made.');
+    if (first === undefined || !isOfKind(first.document, 'space'))
+      throw new Error('No Space was made.');
     const space = { spaceId: first.document.content.spaceId, title: 'Space 1' };
     const settle = vi.fn();
 

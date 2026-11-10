@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
-import { spaceFileSchema, spaceSnapshotSchema } from '@project/core';
+import { isOfKind, spaceFileSchema, spaceSnapshotSchema } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
 import { readSingleSpace } from '../../src/aggregate-directory';
 import {
@@ -707,7 +707,8 @@ describe('release scope', () => {
     const parallel = imported.resources.find(
       ({ document }) => document.title === 'parallel/01 — Reference Resource',
     );
-    if (parallel?.document.kind !== 'markdown') throw new Error('Expected a Markdown Resource.');
+    if (parallel === undefined || !isOfKind(parallel.document, 'markdown'))
+      throw new Error('Expected a Markdown Resource.');
     const hash = parallel.document.content.url.slice('/assets/'.length);
     const text = readFileSync(join(destination, 'assets', `${hash}.md`), 'utf8');
     expect(text).toContain('- **Tags:** `release/v1`');

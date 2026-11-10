@@ -4,6 +4,7 @@ import {
   imageKind,
   isPluginKind,
   PLUGIN_KINDS,
+  isRegisteredKind,
   jsonValueSchema,
   markdownKind,
   referenceKind,
@@ -11,6 +12,7 @@ import {
   urKind,
   type JsonValue,
   type PluginKind,
+  type ResourceKind,
 } from '@project/core';
 import type {
   Answer,
@@ -34,6 +36,8 @@ import type {
   PluginView,
   Surface,
 } from '@project/resource-api/view';
+import { defaultPlugin } from '@project/plugin-default/domain';
+import { defaultPluginView } from '@project/plugin-default/view';
 import { imagePlugin } from '@project/plugin-image/domain';
 import { imagePluginView } from '@project/plugin-image/view';
 import { markdownPlugin } from '@project/plugin-markdown/domain';
@@ -88,7 +92,8 @@ export type ClaimHolder = 'this-drawing' | 'another-drawing' | 'none';
  * Flat, so a kind offering nothing carries its kind alone.
  */
 export interface PluginOperations {
-  readonly kind: PluginKind;
+  /** The Resource's kind: a plugin's, or one no plugin in this build draws, which the default plugin does. */
+  readonly kind: ResourceKind;
   readonly commitTitle?: PluginCommits['title'];
   readonly commitContent?: PluginCommits['content'];
   readonly commitMap?: PluginCommits['map'];
@@ -130,15 +135,20 @@ export interface PluginOperations {
   readonly mapNote?: string | undefined;
 }
 
-/** Whether a kind's operations are a plugin kind's, which `PluginResource` draws. */
+/**
+ * Whether a kind's operations are drawn by `PluginResource`: a plugin kind's,
+ * or a kind no plugin in this build draws, which the default plugin does.
+ */
 export const isPluginOperations = (operations: {
   readonly kind: string;
-}): operations is PluginOperations => isPluginKind(operations.kind);
+}): operations is PluginOperations =>
+  isPluginKind(operations.kind) || !isRegisteredKind(operations.kind);
 
 /** What a host mounts a plugin's view with. */
 export interface PluginSurfaceInput {
   readonly resourceId: string;
-  readonly kind: PluginKind;
+  /** The Resource's stored kind, which its plugin is given as it is stored. */
+  readonly kind: ResourceKind;
   readonly title: string;
   /** The Resource's content as it is stored, which the plugin's schema parses here. */
   readonly content: unknown;
@@ -377,12 +387,12 @@ export function pluginEntry<C, M>(
     );
     const content = plugin.content.safeParse(input.content);
     if (!content.success) {
-      throw new Error(`Resource ${input.resourceId}'s content is not the ${plugin.kind} plugin's.`);
+      throw new Error(`Resource ${input.resourceId}'s content is not the ${input.kind} plugin's.`);
     }
     const mapContent = plugin.mapContent.schema.safeParse(input.mapContent);
     if (!mapContent.success) {
       throw new Error(
-        `Resource ${input.resourceId}'s Map content is not the ${plugin.kind} plugin's.`,
+        `Resource ${input.resourceId}'s Map content is not the ${input.kind} plugin's.`,
       );
     }
     // The outline the canvas strokes was asked for outside any boundary, where
@@ -393,7 +403,7 @@ export function pluginEntry<C, M>(
       resource: {
         id: input.resourceId,
         title: input.title,
-        kind: plugin.kind,
+        kind: input.kind,
         content: content.data,
       },
       title: { value: input.title, commit: commitTitle },
@@ -436,11 +446,28 @@ const PLUGIN_ENTRIES = {
   [urKind.id]: pluginEntry(urPlugin, urPluginView),
 } satisfies Record<PluginKind, PluginEntry>;
 
-/** The entry of the plugin that draws this kind. */
-export const pluginEntryFor = (kind: PluginKind): PluginEntry => PLUGIN_ENTRIES[kind];
+/** What one Resource of each plugin's kind is called. */
+const PLUGIN_NAMES = {
+  [imageKind.id]: imagePlugin.name,
+  [markdownKind.id]: markdownPlugin.name,
+  [referenceKind.id]: referencePlugin.name,
+  [spaceKind.id]: spacePlugin.name,
+  [urKind.id]: urPlugin.name,
+} satisfies Record<PluginKind, string>;
 
-/** A plugin kind's glyph. */
-export const pluginGlyph = (kind: PluginKind): PluginEntry['Glyph'] => PLUGIN_ENTRIES[kind].Glyph;
+/**
+ * The default plugin's entry (ADR 0142): what draws a Resource whose kind
+ * names no plugin in this build. It is in no list, so no kind selects it; the
+ * host takes it when nothing else matches.
+ */
+const DEFAULT_ENTRY = pluginEntry(defaultPlugin, defaultPluginView);
+
+/** The entry of the plugin that draws this kind: its own, or the default plugin where it has none. */
+export const pluginEntryFor = (kind: ResourceKind): PluginEntry =>
+  isPluginKind(kind) ? PLUGIN_ENTRIES[kind] : DEFAULT_ENTRY;
+
+/** The glyph of the plugin that draws this kind. */
+export const pluginGlyph = (kind: ResourceKind): PluginEntry['Glyph'] => pluginEntryFor(kind).Glyph;
 
 /**
  * Every plugin's creations, in build order (the plugin list's), each with the

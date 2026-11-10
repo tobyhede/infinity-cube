@@ -3,7 +3,7 @@ import {
   mayBeTarget,
   resourceReferences,
   spaceReferences,
-  type KindId,
+  type ResourceKind,
   type KindedResource,
   type UUID,
 } from '@project/core';
@@ -30,7 +30,7 @@ export type ResourceReferenceProblem =
 export const resourceReferenceProblems = (
   resourceId: UUID,
   resource: KindedResource,
-  kindOf: (id: UUID) => KindId | undefined,
+  kindOf: (id: UUID) => ResourceKind | undefined,
 ): ResourceReferenceProblem[] =>
   resourceReferences(resource).flatMap((targetId): ResourceReferenceProblem[] => {
     if (targetId === resourceId) return [{ code: 'reference-targets-self', targetId }];

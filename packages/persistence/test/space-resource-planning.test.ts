@@ -1,6 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { isOfKind, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import type { LoadedSpace } from '../src/backend';
 import {
   cascadeDeletion,
@@ -423,7 +423,7 @@ const lifecycleAggregates = fc.integer({ min: 2, max: 7 }).chain((count) =>
 
 const spaceResourceTargets = (snapshot: SpaceSnapshot): UUID[] =>
   snapshot.resources.flatMap(({ document }) =>
-    document.kind === 'space' ? [uuidSchema.parse(document.content.spaceId)] : [],
+    isOfKind(document, 'space') ? [uuidSchema.parse(document.content.spaceId)] : [],
   );
 
 describe('planDelete over any lifecycle-built aggregate', () => {
