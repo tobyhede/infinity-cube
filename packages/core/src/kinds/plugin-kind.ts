@@ -205,7 +205,7 @@ export function kindFromPlugin<const K extends string, C, M>(
   plugin: ResourcePlugin<C, M> & { readonly kind: K },
 ): KindModule<K, C, PluginContent<K, C>> & PluginMapContent {
   const kind = plugin.kind;
-  const module = defineKind({
+  const declaration = {
     id: kind,
     contentSchema: contentSchemaOf(plugin),
     flags: {
@@ -214,16 +214,20 @@ export function kindFromPlugin<const K extends string, C, M>(
       ownsReferencedSpaces: plugin.ownsReferencedSpaces === true,
     },
     facts: plugin.selection === undefined ? PLUGIN_CONTENT_FACTS : SELECTING_CONTENT_FACTS,
-    resolveContent: (content): PluginContent<K, C> => ({ kind, content }),
-    resourceReferences: (content) => uuids(plugin.resourceReferences?.(content) ?? []),
-    contentTarget: (content) => {
+    resolveContent: (content: C): PluginContent<K, C> => ({ kind, content }),
+    resourceReferences: (content: C) => uuids(plugin.resourceReferences?.(content) ?? []),
+    contentTarget: (content: C) => {
       const target = plugin.contentTarget?.(content);
       return target === undefined ? undefined : uuids([target])[0];
     },
-    spaceReferences: (content) => uuids(plugin.spaceReferences?.(content) ?? []),
-    ...(plugin.selection === undefined ? {} : { selection: selectionOf(plugin.selection) }),
-  });
-  const mapContent = mapContentOf(plugin, plugin.mapContent);
+    spaceReferences: (content: C) => uuids(plugin.spaceReferences?.(content) ?? []),
+  };
+  // A plugin that declares its selection has the core check it (ADR 0079).
+  const module =
+    plugin.selection === undefined
+      ? defineKind(declaration)
+      : defineKind({ ...declaration, selection: selectionOf(plugin.selection) });
+  const mapContent = mapContentOf(kind, plugin.mapContent, plugin.outline?.bind(plugin));
   return plugin.newContent === undefined
     ? { ...module, mapContent }
     : { ...module, newContent: plugin.newContent, mapContent };
