@@ -27,6 +27,7 @@ import {
   stageFrame,
 } from './graph';
 import { expectPictureLoaded, HARBOUR_SIZE } from './image';
+import { openFromRail } from './space-resource-frame';
 import { SEEDED_MAP_ID, seedPositionedMap } from './seed';
 
 const IMAGE_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000a1');
@@ -545,8 +546,7 @@ test('a picture dropped on a Resource, or on the Map an Open Space Resource draw
   const spaceResource = page
     .locator('.react-flow__node:visible:not([data-id^="embedded:"])')
     .filter({ has: page.getByRole('heading', { name: spaceTitle }) });
-  await spaceResource.focus();
-  await spaceResource.press('Enter');
+  await openFromRail(page, spaceResource);
   const embedded = page.locator('.react-flow__node:visible[data-id^="embedded:"]');
   await expect(embedded).toHaveCount(1);
   await settled(page);
@@ -1615,8 +1615,7 @@ test('drop and paste create in an edited embedded Map and an inert drop or paste
   if (frame?.document.kind !== 'space') throw new Error('Space Resource was not created');
   const targetId = uuidSchema.parse(frame.document.content.spaceId);
   const drawing = page.locator(`.react-flow__node[data-id="${frame.id}"]`);
-  await drawing.focus();
-  await drawing.press('Enter');
+  await openFromRail(page, drawing);
   const child = page.locator(`.react-flow__node[data-id^="embedded:${frame.id}:"]`).first();
   await expect(child).toBeVisible();
   await pasteOver(page, drawing, child, FIGURE_URL);
@@ -1680,8 +1679,7 @@ async function openSpaceResource(
   );
   if (frame?.document.kind !== 'space') throw new Error('Space Resource was not created');
   const drawing = page.locator(`.react-flow__node[data-id="${frame.id}"]`);
-  await drawing.focus();
-  await drawing.press('Enter');
+  await openFromRail(page, drawing);
   await expect(
     page.locator(`.react-flow__node[data-id^="embedded:${frame.id}:"]`).first(),
   ).toBeVisible();
@@ -1714,8 +1712,7 @@ test('a drop or paste on the Map a Reference Resource draws is refused as read-o
   );
   if (reference === undefined) throw new Error('Reference Resource was not created');
   const referenceNode = page.locator(`.react-flow__node[data-id="${reference.id}"]`);
-  await referenceNode.focus();
-  await referenceNode.press('Enter');
+  await openFromRail(page, referenceNode);
   const child = page.locator(`.react-flow__node[data-id^="embedded:${reference.id}:"]`).first();
   await expect(child).toBeVisible();
 

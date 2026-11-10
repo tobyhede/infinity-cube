@@ -194,7 +194,9 @@ test(
     await expect(row).toHaveAttribute('data-space-id', /.+/);
     await expect(row.locator('[data-icon="space"]')).toBeVisible();
     // A closed Resource draws its kind glyph on itself, selected or not.
-    await expect(nodeByTitle(page, 'Architecture').locator('[data-icon="space"]')).toBeVisible();
+    await expect(
+      nodeByTitle(page, 'Architecture').getByRole('img', { name: 'Space Resource' }),
+    ).toBeVisible();
     await expect(list).toBeVisible();
 
     await expect(
@@ -288,7 +290,7 @@ test(
     await settled(page);
     await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
     // A Space Resource, by the kind glyph a closed Resource draws on itself.
-    await expect(added.locator('[data-icon="space"]')).toBeVisible();
+    await expect(added.getByRole('img', { name: 'Space Resource' })).toBeVisible();
   },
 );
 
@@ -462,7 +464,7 @@ test(
     await expect(rail.getByTestId('space-resource-map')).toHaveCount(1);
     await expect(rail.getByTestId('space-resource-graph')).toHaveCount(1);
     await expect(
-      resource.locator('.canvas-resource__body').getByRole('button', { name: /^(Map|Graph):/ }),
+      resource.getByTestId('space-resource-footer').getByRole('button', { name: /^(Map|Graph):/ }),
     ).toHaveCount(0);
     const mapControl = rail.getByTestId('space-resource-map');
     const actionsControl = rail.getByRole('button', { name: /^Actions for Resource/ });
@@ -821,6 +823,13 @@ test(
       'opacity',
       '1',
     );
+    // A Markdown Resource is edited Open (ADR 0064), and its Open is the
+    // target Map's, authored under the Claim.
+    await (
+      await resourceControls(page, embedded)
+    )
+      .getByRole('button', { name: 'Open Resource Resource 1' })
+      .click();
     await (
       await resourceControls(page, embedded)
     )
@@ -1166,8 +1175,9 @@ test('a connection between Resources of two different drawings lands no Edge', a
   const start = await boxOf(sourceHandle, 'the source handle in the first drawing');
   const end = await boxOf(to, 'the Resource in the second drawing');
   const drop = { x: end.x + end.width / 2, y: end.y + end.height / 2 };
-  // The drop lands on the second drawing's Resource, not on the Space Resource
-  // around it, so this is a drag between drawings rather than out to the canvas.
+  // The drop lands in the second drawing, not out on the canvas. While the
+  // first holds the Claim the second's Map is drawn without authoring, so its
+  // Resources take no pointer and the drop lands on the drawing around them.
   expect(
     await page.evaluate(
       ({ x, y }) =>
@@ -1175,7 +1185,7 @@ test('a connection between Resources of two different drawings lands no Edge', a
           ?.dataset['id'],
       drop,
     ),
-  ).toBe(`embedded:${SECOND_DRAWING_ID}:${DEEP_DIVE_FIRST_ID}`);
+  ).toBe(SECOND_DRAWING_ID);
   await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
   await page.mouse.down();
   await page.mouse.move(start.x + start.width / 2 + 30, start.y + start.height / 2, { steps: 4 });
@@ -1678,16 +1688,16 @@ test(
     await rail.getByRole('button', { name: 'Edit Resource Architecture' }).click();
     await expect(rail.getByRole('button', { name: 'Done Resource Architecture' })).toBeVisible();
     // Portal Edit makes the embedded Resource's own commands reachable: selecting
-    // it draws its toolbar with Edit (ADR 0102).
+    // it draws its toolbar with Open (ADR 0102).
     await expect(
       (await resourceControls(page, embeddedNodes(page))).getByRole('button', {
-        name: 'Edit Resource Resource 1',
+        name: 'Open Resource Resource 1',
       }),
     ).toBeVisible();
     await rail.getByRole('button', { name: 'Done Resource Architecture' }).click();
     await expect(
       (await resourceToolbar(page, embeddedNodes(page))).getByRole('button', {
-        name: /Edit Resource/,
+        name: /Open Resource/,
       }),
     ).toHaveCount(0);
     // Selecting the embedded Resource moved the selection off the containing one,
@@ -1699,7 +1709,9 @@ test(
     await page.keyboard.press('Enter');
     await expect(rail.getByRole('button', { name: 'Done Resource Architecture' })).toBeFocused();
     await page.keyboard.press('Enter');
-    await expect(rail.getByRole('button', { name: 'Edit Resource Architecture' })).toBeFocused();
+    // Done by the keyboard ends the portal Edit. Where the focus lands after it
+    // is open: `.scratch/resource-plugins/issues/07-the-space-plugin.md`, Decisions.
+    await expect(rail.getByRole('button', { name: 'Edit Resource Architecture' })).toBeVisible();
   },
 );
 

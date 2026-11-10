@@ -158,7 +158,7 @@ test(
     await expect(rail.getByTestId('space-resource-map')).toHaveCount(1);
     await expect(rail.getByTestId('space-resource-graph')).toHaveCount(1);
     await expect(
-      resource.locator('.canvas-resource__body').getByRole('button', { name: /^(Map|Graph):/ }),
+      resource.getByTestId('space-resource-footer').getByRole('button', { name: /^(Map|Graph):/ }),
     ).toHaveCount(0);
     const mapControl = rail.getByTestId('space-resource-map');
     const actionsControl = rail.getByRole('button', { name: /^Actions for Resource/ });
@@ -248,6 +248,13 @@ test(
     await expect(embedded.getByLabel(/^Connect (from|to) /)).toHaveCount(8);
     // Its commands are drawn in its own floating toolbar once it is selected (ADR 0102).
     await selectResource(embedded);
+    // A Markdown Resource is edited Open (ADR 0064), and its Open is the
+    // target Map's, authored under the Claim.
+    await (
+      await resourceToolbar(page, embedded)
+    )
+      .getByRole('button', { name: 'Open Resource Intake' })
+      .click();
     await (
       await resourceToolbar(page, embedded)
     )
@@ -456,8 +463,8 @@ test(
     const embedded = embeddedNodes(page).filter({
       has: page.getByRole('heading', { name: 'Intake', exact: true }),
     });
-    const embeddedEdit = page.getByRole('button', { name: 'Edit Resource Intake' });
-    await expect(embeddedEdit).toHaveCount(0);
+    const embeddedOpen = page.getByRole('button', { name: 'Open Resource Intake' });
+    await expect(embeddedOpen).toHaveCount(0);
     const outerBefore = await boxOf(parent, 'containing Resource');
     const innerBefore = await boxOf(embedded, 'embedded Resource');
     await page.mouse.move(
@@ -483,11 +490,11 @@ test(
     // commands, while the portal Edit keeps Done drawn on the containing Resource.
     await selectResource(embedded);
     await expect(
-      (await resourceToolbar(page, embedded)).getByRole('button', { name: 'Edit Resource Intake' }),
+      (await resourceToolbar(page, embedded)).getByRole('button', { name: 'Open Resource Intake' }),
     ).toBeVisible();
     await expect(rail.getByRole('button', { name: 'Done Resource Elsewhere' })).toBeVisible();
     await rail.getByRole('button', { name: 'Done Resource Elsewhere' }).click();
-    await expect(embeddedEdit).toHaveCount(0);
+    await expect(embeddedOpen).toHaveCount(0);
     await selectResource(parent);
     await expect(
       (await resourceToolbar(page, parent)).getByRole('button', {

@@ -815,12 +815,34 @@ export async function connectToEmptyWithAlt(
  * Select a Resource the way a pointer does, so React Flow draws its toolbar.
  *
  * A Resource's commands float in React Flow's `NodeToolbar`, drawn while that
- * Resource is the one selected (ADR 0102). The press lands just inside the
- * Resource's top-left corner, in the rail band, which holds no control of its own
- * on the canvas — the centre can hold the Title, whose control begins a rename.
+ * Resource is the one selected (ADR 0102). The press lands on the first point,
+ * from just inside the Resource's top-left corner along its top band, where the
+ * Resource itself is hit and no control is: a plugin draws its Title near that
+ * corner, and at a low zoom a fixed offset lands on the Title's control, which
+ * begins a rename; a drawn Map's Resource is clipped to the rect it is drawn in.
  */
 export async function selectResource(resource: Locator): Promise<void> {
-  await resource.click({ position: { x: 10, y: 10 } });
+  const position = await resource.evaluate((node) => {
+    const box = node.getBoundingClientRect();
+    const scale =
+      node instanceof HTMLElement && node.offsetWidth > 0 ? box.width / node.offsetWidth : 1;
+    for (let y = 2 * scale; y < box.height; y += 4 * scale) {
+      for (let x = 2 * scale; x < box.width / 2; x += 4 * scale) {
+        const hit = document.elementFromPoint(box.left + x, box.top + y);
+        if (hit === null || !node.contains(hit)) continue;
+        if (
+          hit.closest(
+            'button, input, textarea, a, [contenteditable="true"], .react-flow__handle, .react-flow__resize-control, .rf-resource-node__authoring-handle',
+          ) !== null
+        ) {
+          continue;
+        }
+        return { x, y };
+      }
+    }
+    return { x: 10, y: 10 };
+  });
+  await resource.click({ position });
   await expect(resource).toHaveClass(/\bselected\b/);
 }
 

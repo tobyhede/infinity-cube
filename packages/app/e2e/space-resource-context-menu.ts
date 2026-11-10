@@ -247,7 +247,7 @@ export async function exerciseSpaceResourceEntityMenu(
   await expectMenuGroups(page.getByRole('menu'), [
     ['Create Reference'],
     ['Connect to Resource'],
-    ['Open and Expand', 'Read in Full View', /^Present from Here/],
+    ['Read in Full View', /^Present from Here/],
     ['Enter', 'Open in New Tab'],
     ['Copy link to Resource in Map', 'Copy link to Resource', 'Copy link to Space'],
     ['Remove from Map', 'Delete from Space'],
@@ -276,7 +276,7 @@ export async function exerciseSpaceResourceEntityMenu(
   await expect(embedded.first()).toBeVisible();
   expect(
     await reference
-      .locator('.canvas-resource__body')
+      .getByTestId('space-resource-footer')
       .evaluate((body) => (body instanceof HTMLElement ? body.offsetHeight : 0)),
   ).toBeLessThan(50);
   await expect(embedded.getByTestId('canvas-resource-actions')).toHaveCount(0);
