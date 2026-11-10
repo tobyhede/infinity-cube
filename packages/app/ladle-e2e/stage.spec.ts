@@ -92,7 +92,8 @@ test(
 
     await expect(body(page)).toBeFocused();
     await page.keyboard.press('ArrowRight');
-    await expect(presentedName(page)).toHaveText('Picture');
+    // An Image Resource draws no Title on the Stage: its Title names its picture (ADR 0142).
+    await expect(frame(page).getByRole('img', { name: 'Picture' })).toBeVisible();
     await expect.poll(scrollTop).toBe(0);
   },
 );
