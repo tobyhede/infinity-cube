@@ -4,10 +4,9 @@ import {
   ASSET_TOO_LARGE,
   assetPath,
   COMMIT_OUTCOME_WIRE,
-  INLINE_MEDIA_TYPES,
   isAssetHash,
   MAX_ASSET_BYTES,
-  OCTET_STREAM,
+  servedMediaType,
   decodeCommitRequest,
   encodeCommitConflict,
   encodeCommitRefusal,
@@ -79,8 +78,6 @@ const STORED_ASSET_HEADERS = {
  * The media type an asset is served as: one of the four picture types inline,
  * and everything else as `application/octet-stream`, whatever it was stored as.
  */
-const servedMediaType = (mediaType: string): string =>
-  INLINE_MEDIA_TYPES.includes(mediaType) ? mediaType : OCTET_STREAM;
 
 export interface SpaceHttpAppOptions {
   logError?: (message: string, error: unknown) => void;

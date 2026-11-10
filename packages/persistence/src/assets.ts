@@ -179,9 +179,19 @@ export const extensionForMediaType = (mediaType: string): string =>
  * picture types a browser draws without running anything. Every other asset is
  * served as `application/octet-stream`.
  */
-export const INLINE_MEDIA_TYPES: readonly string[] = [
+const INLINE_MEDIA_TYPES: readonly string[] = [
   'image/png',
   'image/jpeg',
   'image/webp',
   'image/gif',
 ];
+
+/**
+ * The media type a stored asset is handed to the page under, wherever the page
+ * reads it from: the host's `GET /assets/:hash` and a mount's object URLs
+ * alike. A picture keeps its type; every other asset is inert bytes, so a
+ * stored HTML or SVG file never runs as active content of the application's
+ * origin.
+ */
+export const servedMediaType = (mediaType: string): string =>
+  INLINE_MEDIA_TYPES.includes(mediaType) ? mediaType : OCTET_STREAM;

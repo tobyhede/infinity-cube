@@ -3,6 +3,7 @@ import { loadSpaceAggregate } from '@project/graph';
 import {
   AggregateInvariantError,
   ascendingById,
+  EMPTY_ASSET,
   withEmptyAsset,
   decideCommit,
   readInIdOrder as read,
@@ -177,8 +178,11 @@ export class MemorySpaceRepository implements SpaceRepository {
     return Promise.resolve();
   }
 
+  /** The asset of zero bytes is held already, so storing it writes nothing. */
   storeAsset(asset: StoredAsset): Promise<'stored' | 'existing'> {
-    if (this.#assets.has(asset.hash)) return Promise.resolve('existing');
+    if (asset.hash === EMPTY_ASSET.hash || this.#assets.has(asset.hash)) {
+      return Promise.resolve('existing');
+    }
     this.#assets.set(asset.hash, { ...asset, bytes: asset.bytes.slice() });
     return Promise.resolve('stored');
   }

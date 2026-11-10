@@ -627,6 +627,47 @@ describe('stored asset bytes', () => {
     expect(await readdir(join(destination, 'assets'))).toEqual([`${missing.hash}.png`]);
   });
 
+  /*
+   * A file Export keeps is one the next Import reads, so it is read back with
+   * the files Export writes: a directory Import would refuse is refused here,
+   * before anything is written, rather than reported as exported.
+   */
+  it.each([
+    [
+      'is not named for its content',
+      (hash: string) => [[`${hash}.png`, pngBytes(5)]] as const,
+      'must be named for its content',
+    ],
+    [
+      'shares its hash with another file',
+      (hash: string) =>
+        [
+          [`${hash}.png`, pngBytes(3)],
+          [`${hash}.jpg`, pngBytes(3)],
+        ] as const,
+      'two files of one hash',
+    ],
+  ])(
+    'refuses, writing nothing, when a kept file of an absent asset %s',
+    async (_, kept, refusal) => {
+      const destination = join(await makeTemporaryDirectory(), 'exported');
+      const missing = await admitted(pngBytes(3));
+      await mkdir(join(destination, 'assets'), { recursive: true });
+      for (const [name, bytes] of kept(missing.hash)) {
+        await writeFile(join(destination, 'assets', name), bytes);
+      }
+
+      await expect(
+        exportAggregate(
+          await holding(withImages({ id: PICTURE_ID, document: showing(missing) }), []),
+          destination,
+        ),
+      ).rejects.toThrow(refusal);
+
+      expect(await readdir(destination)).toEqual(['assets']);
+    },
+  );
+
   it('writes no file for the asset of zero bytes, which needs none', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
 

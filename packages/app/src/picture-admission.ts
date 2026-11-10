@@ -6,7 +6,7 @@
  */
 
 import { isAssetRef } from '@project/core';
-import { MAX_ASSET_BYTES, type AssetClient } from '@project/persistence';
+import { ASSET_TOO_LARGE, MAX_ASSET_BYTES, type AssetClient } from '@project/persistence';
 
 /** The largest image the host stores, in bytes: 10 MiB. */
 export const MAX_IMAGE_BYTES = MAX_ASSET_BYTES;
@@ -146,8 +146,9 @@ export const admitImage = (bytes: Uint8Array): ImageAdmission => {
 /**
  * Store a picture through the asset store: its bytes are admitted as a picture
  * first, and stored under the media type they are, whatever the file declared.
- * Throws when the host cannot answer, or answers a refusal a picture that
- * passed this rule cannot be given.
+ * The host's size refusal is the picture's, since the host's cap is the one
+ * that stands. Throws when the host cannot answer, or answers a refusal a
+ * picture that passed this rule cannot be given.
  */
 export const storePicture = async (assets: AssetClient, image: Blob): Promise<ImageStoring> => {
   if (image.size > MAX_IMAGE_BYTES) return { kind: 'refused', code: 'image-too-large' };
@@ -156,6 +157,7 @@ export const storePicture = async (assets: AssetClient, image: Blob): Promise<Im
   if (admission.kind === 'refused') return admission;
   const stored = await assets.store(new Blob([bytes], { type: admission.mediaType }));
   if (!isAssetRef(stored)) {
+    if (stored.refused === ASSET_TOO_LARGE) return { kind: 'refused', code: 'image-too-large' };
     throw new Error(`The asset store refused a picture: ${stored.refused}`);
   }
   return { kind: 'stored', url: stored };

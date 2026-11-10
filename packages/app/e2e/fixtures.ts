@@ -88,4 +88,4 @@ export const test = base.extend<E2eFixtures>({
 });
 
 export { expect } from '@playwright/test';
-export type { Locator, Page } from '@playwright/test';
+export type { Locator, Page, Route } from '@playwright/test';

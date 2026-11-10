@@ -2260,13 +2260,13 @@ export const spaceRepositoryContract = (
     });
   });
 
-  it(`${name} answers the asset of zero bytes though nothing stored it`, async () => {
+  it(`${name} holds the asset of zero bytes already, under the type it always has`, async () => {
     await withHarness(async (repository) => {
       await expect(repository.loadAsset(EMPTY_ASSET.hash)).resolves.toEqual(EMPTY_ASSET);
       const stored = await storedAsset(new Uint8Array(0), 'text/plain');
       expect(stored.hash).toBe(EMPTY_ASSET.hash);
-      await expect(repository.storeAsset(stored)).resolves.toBe('stored');
-      await expect(repository.loadAsset(EMPTY_ASSET.hash)).resolves.toEqual(stored);
+      await expect(repository.storeAsset(stored)).resolves.toBe('existing');
+      await expect(repository.loadAsset(EMPTY_ASSET.hash)).resolves.toEqual(EMPTY_ASSET);
     });
   });
 

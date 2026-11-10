@@ -1,4 +1,5 @@
-import { resolve } from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 import { type SpaceSnapshot, type UUID } from '@project/core';
 import { loadSpaceAggregate, type SpaceAggregateError } from '@project/graph';
 import type { LoadedAggregate } from '@project/persistence';
@@ -166,8 +167,8 @@ const markAggregateExported = async (
  * whose bytes the store does not hold is not an error: the URL stays, the
  * Export completes, and a file of that name in the directory is kept.
  *
- * The files are checked to read back before any is written, and a refusal
- * writes nothing. Then each file whose bytes differ is replaced, and each file
+ * The files are checked to read back before any is written, with the asset
+ * files kept for absent bytes, and a refusal writes nothing. Then each file whose bytes differ is replaced, and each file
  * Import would read that the aggregate no longer serialises to is removed. The
  * destination and its Space directories are never renamed or recreated, and
  * nothing Import does not read is touched. A failure part-way leaves some files
@@ -190,10 +191,32 @@ export const exportAggregate = async (
   await assertExportableDestination(destination);
   // An asset already in the directory keeps its name there, so the files are
   // named once the directory is known to scan.
-  const files = aggregateFiles(aggregate, assets.carried, await scannedAggregateFiles(destination));
+  const scanned = await scannedAggregateFiles(destination);
+  const files = aggregateFiles(aggregate, assets.carried, scanned);
   await rejectSymbolicLinks(destination, files.keys());
 
-  const checked = await checkReadsBack(destination, files, aggregate.metaSpaceId);
+  // A file of a referenced asset the store holds no bytes for is kept rather
+  // than written, and the next Import reads it as it reads the rest, so it is
+  // read back with them: a kept file Import would refuse refuses the Export.
+  const kept = new Set<string>(assets.kept);
+  const isKept = (path: string): boolean => {
+    if (!path.startsWith(`${ASSETS_DIRECTORY_NAME}/`)) return false;
+    const hash = assetFileHash(path.slice(ASSETS_DIRECTORY_NAME.length + 1));
+    return hash !== undefined && kept.has(hash);
+  };
+  const keptFiles = await Promise.all(
+    scanned
+      .filter(isKept)
+      .map(
+        async (path) => [path, new Uint8Array(await readFile(join(destination, path)))] as const,
+      ),
+  );
+
+  const checked = await checkReadsBack(
+    destination,
+    new Map([...files, ...keptFiles]),
+    aggregate.metaSpaceId,
+  );
   if (!checked.ok) {
     return {
       kind: 'would-not-read-back',
@@ -202,15 +225,10 @@ export const exportAggregate = async (
       errors: checked.errors,
     };
   }
-  const kept = new Set<string>(assets.kept);
   await writeInPlace(
     destination,
     files,
-    (await scannedAggregateFiles(destination)).filter((path) => {
-      if (!path.startsWith(`${ASSETS_DIRECTORY_NAME}/`)) return true;
-      const hash = assetFileHash(path.slice(ASSETS_DIRECTORY_NAME.length + 1));
-      return hash === undefined || !kept.has(hash);
-    }),
+    scanned.filter((path) => !isKept(path)),
   );
   const unrecorded = await markAggregateExported(repository, aggregate);
   return { kind: 'exported', aggregate, unrecorded };

@@ -9,6 +9,7 @@ import {
   MAX_ASSET_BYTES,
   mediaTypeForExtension,
   normalizeMediaType,
+  servedMediaType,
   withEmptyAsset,
 } from '../src/assets';
 
@@ -97,6 +98,20 @@ describe('the host table of extensions and media types', () => {
     ['application/x-made-up', 'bin'],
   ])('writes %s with .%s', (type, extension) => {
     expect(extensionForMediaType(type)).toBe(extension);
+  });
+});
+
+describe('the media type an asset is served under', () => {
+  it.each([
+    ['image/png', 'image/png'],
+    ['image/jpeg', 'image/jpeg'],
+    ['image/webp', 'image/webp'],
+    ['image/gif', 'image/gif'],
+    ['image/svg+xml', 'application/octet-stream'],
+    ['text/html', 'application/octet-stream'],
+    ['text/markdown', 'application/octet-stream'],
+  ])('serves %s as %s', (stored, served) => {
+    expect(servedMediaType(stored)).toBe(served);
   });
 });
 

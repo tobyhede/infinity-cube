@@ -15,6 +15,7 @@ import {
   decideCommit,
   decodeStoredRevision,
   encodeStoredRevision,
+  EMPTY_ASSET,
   withEmptyAsset,
   RevisionCodecError,
   type AggregateLoadResult,
@@ -407,7 +408,9 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
    * and the first stored media type stands. Outside any transaction, so a
    * losing insert aborts nothing else.
    */
+  /** The asset of zero bytes is held already, so storing it writes no row. */
   storeAsset(asset: StoredAsset): Promise<'stored' | 'existing'> {
+    if (asset.hash === EMPTY_ASSET.hash) return Promise.resolve('existing');
     return this.#naming(() =>
       this.#store.serialise(async () => {
         try {

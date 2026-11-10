@@ -63,9 +63,7 @@ async function holdReplacement(page: Page): Promise<void> {
   );
   const chooser = page.waitForEvent('filechooser');
   await target.getByRole('button', { name: 'Upload' }).click();
-  await (
-    await chooser
-  ).setFiles({ name: 'fake.png', mimeType: 'image/png', buffer: Buffer.from('not a picture') });
+  await (await chooser).setFiles({ name: 'harbour.png', mimeType: 'image/png', buffer: HARBOUR });
   await expect(target).toHaveAttribute('aria-busy', 'true');
 }
 

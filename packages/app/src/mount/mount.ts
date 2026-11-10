@@ -10,7 +10,7 @@ import {
 } from '@project/aggregate';
 import { assetHashOfPath, type UUID } from '@project/core';
 import { httpAssetClient, HttpSpaceBackend } from '@project/http';
-import { isAssetHash, type AssetClient } from '@project/persistence';
+import { isAssetHash, servedMediaType, type AssetClient } from '@project/persistence';
 import type { ImageDisplay } from '@project/ui';
 
 /**
@@ -108,8 +108,9 @@ const inPageFetch =
 
 /**
  * Where each stored asset the in-page store holds is drawn from: an object URL
- * over the store's own bytes, made the first time it is drawn and kept for the
- * page's life, as a stored asset is (ADR 0106). Any other URL is drawn as
+ * over the store's own bytes, typed as the host serves them (`servedMediaType`),
+ * made the first time it is drawn and kept for the page's life, as a stored
+ * asset is (ADR 0106). Any other URL is drawn as
  * authored, so an asset the store holds no bytes for draws as a picture that
  * will not load.
  */
@@ -124,7 +125,9 @@ const objectUrlDisplay = (
     if (asset === undefined) return url;
     let objectUrl = made.get(url);
     if (objectUrl === undefined) {
-      objectUrl = createObjectUrl(new Blob([asset.bytes], { type: asset.mediaType }));
+      objectUrl = createObjectUrl(
+        new Blob([asset.bytes], { type: servedMediaType(asset.mediaType) }),
+      );
       made.set(url, objectUrl);
     }
     return objectUrl;

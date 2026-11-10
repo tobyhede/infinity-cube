@@ -141,10 +141,19 @@ describe('storing a picture as an asset', () => {
     expect(store).not.toHaveBeenCalled();
   });
 
-  it('throws when the asset store refuses a picture that passed', async () => {
+  it("answers the host's size refusal as the picture's, so the author reads why", async () => {
     const { assets } = recordingAssets({ refused: 'asset-too-large' });
 
-    await expect(storePicture(assets, new Blob([png]))).rejects.toThrow('asset-too-large');
+    await expect(storePicture(assets, new Blob([png]))).resolves.toEqual({
+      kind: 'refused',
+      code: 'image-too-large',
+    });
+  });
+
+  it('throws when the asset store answers a refusal a picture cannot be given', async () => {
+    const { assets } = recordingAssets({ refused: 'asset-absent' });
+
+    await expect(storePicture(assets, new Blob([png]))).rejects.toThrow('asset-absent');
   });
 });
 

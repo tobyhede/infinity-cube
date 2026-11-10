@@ -1,4 +1,5 @@
 import { Blob as NodeBlob } from 'node:buffer';
+import { createHash } from 'node:crypto';
 import { act, waitFor, within } from '@testing-library/react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -261,6 +262,29 @@ describe('mounting an aggregate in the page', () => {
     expect(picture?.type).toBe('image/png');
     expect(await bytesOf(picture ?? new Blob())).toEqual(uploaded);
   });
+
+  it.each([
+    ['an SVG', 'svg', '<svg xmlns="http://www.w3.org/2000/svg"><script>1</script></svg>'],
+    ['an HTML page', 'html', '<!doctype html><script>1</script>'],
+  ])(
+    'draws %s an Image references as inert bytes, never as active content of the page',
+    async (_, extension, text) => {
+      const bytes = new TextEncoder().encode(text);
+      const hash = createHash('sha256').update(bytes).digest('base64url');
+      const files = fixtureFiles();
+      files.set(`assets/${hash}.${extension}`, bytes);
+      const objectUrls = recordingObjectUrls();
+      const mounted = await mountAggregate({
+        source: mapSource('fixture', files),
+        newId: mintsNothing,
+        createObjectUrl: objectUrls.createObjectUrl,
+      });
+      if (!mounted.ok) throw new Error('The fixture mounts.');
+
+      expect(mounted.mounted.displayImage(`/assets/${hash}`)).toBe('blob:https://mounted.test/1');
+      expect(objectUrls.made.map((made) => made.type)).toEqual(['application/octet-stream']);
+    },
+  );
 
   it('reads a mounted asset from the in-page store, never through an object URL', async () => {
     const files = fixtureFiles();

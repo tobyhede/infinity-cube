@@ -2,8 +2,8 @@
 // gate that fails a test if React Flow logged a warning while it ran.
 import { readFileSync } from 'node:fs';
 import { COLLAPSED_RESOURCE_SIZE, encodeCompactUuid, uuidSchema, type UUID } from '@project/core';
-import { decodeLoadedSpace } from '@project/persistence';
-import { expect, test, type Locator, type Page } from './fixtures';
+import { decodeLoadedSpace, encodeProblemDetails } from '@project/persistence';
+import { expect, test, type Locator, type Page, type Route } from './fixtures';
 import {
   boxOf,
   createResource,
@@ -1124,22 +1124,40 @@ test('the same URL retries a failed picture without an Edit', async ({ page }) =
 });
 
 /**
+ * A picture the browser admits, so it is sent to the host, whose answer the
+ * held upload replaces with the host's size refusal: the one refusal the asset
+ * store gives, which no picture small enough to send would otherwise earn.
+ */
+const REFUSED_PICTURE = { name: 'refused.png', mimeType: 'image/png', buffer: HARBOUR };
+
+/** The sentence the target shows for `REFUSED_PICTURE`. */
+const REFUSED_SENTENCE = 'refused.png is larger than 10 MB, the largest image that can be stored.';
+
+/** Answer a held upload as the host answers bytes over its cap. */
+const answerTooLarge = (route: Route): Promise<void> =>
+  route.fulfill({
+    status: 413,
+    contentType: 'application/problem+json',
+    body: JSON.stringify(encodeProblemDetails('asset-too-large', 'The asset is too large')),
+  });
+
+/**
  * Send a file from the upload target and hold the host's answer until the
- * returned release is called, so the replacement stays in flight.
+ * returned release is called, so the replacement stays in flight. The default
+ * file is refused on release; any other is stored.
  */
 async function uploadHeld(
   page: Page,
   target: Locator,
-  // Declared a PNG, so it is sent, and refused by the host from its bytes.
-  file = { name: 'fake.png', mimeType: 'image/png', buffer: Buffer.from('not a picture') },
+  file: typeof REFUSED_PICTURE = REFUSED_PICTURE,
 ): Promise<() => void> {
   const held = Promise.withResolvers<undefined>();
-  // The host's image collection, which a chosen file is sent to.
+  // The host's asset collection, which a chosen file is sent to.
   await page.route(
     (url) => url.pathname === '/assets',
     async (route) => {
       await held.promise;
-      await route.continue();
+      await (file === REFUSED_PICTURE ? answerTooLarge(route) : route.continue());
     },
   );
   const chooser = page.waitForEvent('filechooser');
@@ -1219,9 +1237,7 @@ test(
     await expect(target).toBeVisible();
 
     release();
-    await expect(target.getByRole('alert')).toHaveText(
-      'fake.png is not a PNG, JPEG, WebP or GIF image.',
-    );
+    await expect(target.getByRole('alert')).toHaveText(REFUSED_SENTENCE);
     await expect(cancel).toBeEnabled();
     await expectAvailable(menuButtons);
     await page.goBack();
@@ -1530,7 +1546,7 @@ async function conflictDuringReplacement(
     (url) => url.pathname === '/assets',
     async (route) => {
       await uploadHeld;
-      await route.continue();
+      await (file === REFUSED_PICTURE ? answerTooLarge(route) : route.continue());
     },
   );
 
@@ -1592,12 +1608,7 @@ test('Reload is withheld while a replacement is held and offered again once it a
   const { behindDialog, conflict, revision, releaseUpload } = await conflictDuringReplacement(
     page,
     spaceId,
-    {
-      // Declared a PNG, so it is sent, and refused by the host from its bytes.
-      name: 'fake.png',
-      mimeType: 'image/png',
-      buffer: Buffer.from('not a picture'),
-    },
+    REFUSED_PICTURE,
   );
   const reload = conflict.getByRole('button', { name: 'Reload' });
   await expect(reload).toHaveAttribute('aria-disabled', 'true');
@@ -1610,9 +1621,7 @@ test('Reload is withheld while a replacement is held and offered again once it a
   await expect(behindDialog.locator('[aria-busy="true"]')).toHaveCount(1);
 
   releaseUpload();
-  await expect(
-    behindDialog.getByText('fake.png is not a PNG, JPEG, WebP or GIF image.'),
-  ).toBeVisible();
+  await expect(behindDialog.getByText(REFUSED_SENTENCE)).toBeVisible();
   await expect(behindDialog.locator('[aria-busy="true"]')).toHaveCount(0);
   await expect(reload).not.toHaveAttribute('aria-disabled', 'true');
   await reload.click();
