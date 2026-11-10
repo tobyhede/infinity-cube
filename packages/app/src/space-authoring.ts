@@ -488,8 +488,8 @@ export interface SpaceAuthoring {
    * authors its Map without moving this Space's canvas.
    */
   readonly complete: {
-    (target: DrawnEditTarget, completion: DrawnCompletion): AuthoringResult;
-    (target: CanvasEditTarget, completion: AuthoringCompletion): AuthoringResult;
+    (target: DrawnEditTarget, completion: DrawnCompletion, settle?: SettleQueued): AuthoringResult;
+    (target: CanvasEditTarget, completion: AuthoringCompletion, settle?: SettleQueued): AuthoringResult;
   };
   readonly retryPersistence: () => void;
   /**
@@ -584,6 +584,13 @@ interface ReportedCompletion {
  */
 export type ImagesCompletion = Extract<AuthoringCompletion, { kind: 'created-images' }>;
 
+/** PROOF (issue 01): the later outcome of a completion that answered `queued`. */
+export type QueuedSettlement =
+  | Exclude<AuthoringResult, { readonly kind: 'queued' }>
+  | { readonly kind: 'discarded-replaced' }
+  | { readonly kind: 'discarded-failure' };
+export type SettleQueued = (settled: QueuedSettlement) => void;
+
 /** A `ReportedCompletion` waiting behind the Edit that was installing when it arrived. */
 interface QueuedCompletion extends ReportedCompletion {
   /**
@@ -591,6 +598,7 @@ interface QueuedCompletion extends ReportedCompletion {
    * current in — read by the drain, and the only reason it is recorded.
    */
   readonly replacementEpoch: number;
+  readonly settle?: SettleQueued;
 }
 
 interface SpaceAuthoringDependencies {
@@ -1628,13 +1636,17 @@ export function createSpaceAuthoring({
 
   let completing = false;
   const queued: QueuedCompletion[] = [];
-  const complete = (target: EditTarget, completion: AuthoringCompletion): AuthoringResult => {
+  const complete = (
+    target: EditTarget,
+    completion: AuthoringCompletion,
+    settle?: SettleQueued,
+  ): AuthoringResult => {
     if (target.kind === 'drawn' && currentSpace().lookup.map(target.mapId) === undefined) {
       return { kind: 'refused', refusal: { code: 'map-not-found' } };
     }
     const reported: ReportedCompletion = { target, completion };
     if (completing) {
-      queued.push({ ...reported, replacementEpoch });
+      queued.push(settle === undefined ? { ...reported, replacementEpoch } : { ...reported, replacementEpoch, settle });
       return { kind: 'queued' };
     }
     completing = true;
@@ -1660,12 +1672,14 @@ export function createSpaceAuthoring({
         // install-gate rule.
         if (next.replacementEpoch !== replacementEpoch) {
           discardedAsReplaced += 1;
+          next.settle?.({ kind: 'discarded-replaced' });
           continue;
         }
         try {
-          performCompletion(next);
+          next.settle?.(performCompletion(next));
         } catch (error) {
           safelyReport(error);
+          next.settle?.({ kind: 'discarded-failure' });
           break;
         }
       }
@@ -1687,6 +1701,7 @@ export function createSpaceAuthoring({
       // partway through the drain: those Edits are gone, and saying so is the
       // difference between a readable failure and a silent one.
       const discarded = queued.length;
+      for (const left of queued) left.settle?.({ kind: 'discarded-failure' });
       queued.length = 0;
       if (discarded > 0) {
         safelyReport(
