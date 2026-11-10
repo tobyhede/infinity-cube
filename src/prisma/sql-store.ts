@@ -1,7 +1,7 @@
 import type { SqlTables } from '../persistence/sql-store';
 import {
   asOrderable,
-  buildImageTable,
+  buildAssetTable,
   buildRepositoryStateTable,
   buildSpaceTable,
   buildResourceTable,
@@ -223,7 +223,7 @@ export const postgresSqlStore = (database: PostgresDatabase) => {
         Resource: buildResourceTable(orm.Resource, (spaceId: string, keepIds: readonly string[]) =>
           deleteResourcesExcept(orm, spaceId, keepIds),
         ),
-        Image: buildImageTable(orm.Image),
+        Asset: buildAssetTable(orm.Asset),
         RepositoryState: buildRepositoryStateTable(orm.RepositoryState),
       };
     },

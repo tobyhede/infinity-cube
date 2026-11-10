@@ -1,7 +1,8 @@
 import {
-  isAcceptedImageUrl,
+  isAssetRef,
   spaceSnapshotSchema,
   uuidSchema,
+  type AssetRef,
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
@@ -37,25 +38,15 @@ export const problemCatalogue = {
     title: 'Payload too large',
     status: 413,
   },
-  'invalid-image-id': {
-    type: 'urn:infinity-cube:problem:invalid-image-id',
-    title: 'Invalid image id',
+  'invalid-asset-hash': {
+    type: 'urn:infinity-cube:problem:invalid-asset-hash',
+    title: 'Invalid asset hash',
     status: 400,
   },
-  'image-too-large': {
-    type: 'urn:infinity-cube:problem:image-too-large',
-    title: 'Image too large',
+  'asset-too-large': {
+    type: 'urn:infinity-cube:problem:asset-too-large',
+    title: 'Asset too large',
     status: 413,
-  },
-  'image-format-unsupported': {
-    type: 'urn:infinity-cube:problem:image-format-unsupported',
-    title: 'Image format unsupported',
-    status: 415,
-  },
-  'image-svg-unsupported': {
-    type: 'urn:infinity-cube:problem:image-svg-unsupported',
-    title: 'SVG image unsupported',
-    status: 415,
   },
   'not-found': { type: 'urn:infinity-cube:problem:not-found', title: 'Not found', status: 404 },
   'method-not-allowed': {
@@ -751,15 +742,13 @@ export const commitOutcomeDecoder = (
   Object.values(COMMIT_OUTCOME_WIRE).find((entry) => entry.status === status)?.decode;
 
 /**
- * The URL the host answered for an image it stored: the one member of its
- * `{ url }` body, held to what an Image Resource may record.
+ * The URL the host answered for an asset it stored: the one member of its
+ * `{ url }` body, held to be an asset reference.
  */
-export const decodeStoredImageUrl = (value: unknown): string => {
-  const record = exactRecord(value, ['url'], 'stored image');
+export const decodeStoredAssetUrl = (value: unknown): AssetRef => {
+  const record = exactRecord(value, ['url'], 'stored asset');
   const url = record['url'];
-  if (typeof url !== 'string' || !isAcceptedImageUrl(url)) {
-    throw new Error('stored image url must be one an Image Resource may hold');
-  }
+  if (!isAssetRef(url)) throw new Error('stored asset url must be an asset reference');
   return url;
 };
 

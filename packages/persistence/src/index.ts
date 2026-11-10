@@ -16,7 +16,7 @@ export {
   decodeLoadedSpace,
   decodeLoadedAggregate,
   decodeSpaceSummaries,
-  decodeStoredImageUrl,
+  decodeStoredAssetUrl,
   encodeCommitRequest,
   encodeCommitConflict,
   encodeCommitRefusal,
@@ -55,27 +55,30 @@ export {
   decodeStoredRevision,
   encodeStoredRevision,
 } from './revision-codec';
-/* The images the host stores beside Spaces and outside the aggregate
- * (ADR 0106): the admission rule the storing route and fixture seeding share,
- * and the store every repository under `src/` implements. */
+/* The one asset store the host keeps beside Spaces and outside the aggregate
+ * (ADR 0142, ADR 0106): the admission rule the storing route and the directory
+ * reader share, the extension table, and the store every repository implements. */
 export {
-  admitImage,
-  IMAGE_COLLECTION_PATH,
-  IMAGE_MEDIA_TYPES,
-  imagePath,
-  isImageId,
-  isImageMediaType,
-  isImageRefusal,
-  MAX_IMAGE_BYTES,
-  refusalForDeclaredType,
-  type ImageAdmission,
-  type ImageId,
-  type ImageMediaType,
-  type ImageRefusal,
-  type ImageStore,
-  type ImageStoring,
-  type StoredImage,
-} from './images';
+  admitAsset,
+  ASSET_ABSENT,
+  ASSET_TOO_LARGE,
+  assetHashOf,
+  assetPath,
+  EMPTY_ASSET,
+  extensionForMediaType,
+  INLINE_MEDIA_TYPES,
+  isAssetHash,
+  MAX_ASSET_BYTES,
+  mediaTypeForExtension,
+  normalizeMediaType,
+  OCTET_STREAM,
+  withEmptyAsset,
+  type AssetAdmission,
+  type AssetClient,
+  type AssetHash,
+  type AssetStore,
+  type StoredAsset,
+} from './assets';
 /* Two test-facing helpers, two doors, and the difference is what they are.
  * `MemorySpaceBackendTestControl` is named by `MemorySpaceBackend`'s public
  * constructor, so a caller that cannot import it cannot construct the adapter

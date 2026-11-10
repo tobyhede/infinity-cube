@@ -72,8 +72,8 @@ export interface SqlLoadedSpaceRow {
   readonly resources: readonly SqlResourceRow[];
 }
 
-/** A stored image's columns, as both databases' Bytes codecs hand them over. */
-export interface SqlImageRow {
+/** A stored asset's columns, as both databases' Bytes codecs hand them over. */
+export interface SqlAssetRow {
   readonly mediaType: string;
   readonly bytes: Uint8Array;
 }
@@ -238,13 +238,13 @@ export interface SqlTables<Order> {
     readonly deleteAllForSpace: (spaceId: string) => Promise<void>;
   };
   /**
-   * The images stored beside Spaces (ADR 0106). No lifecycle door reads or
-   * writes this table: a stored image is outside the aggregate.
+   * The assets stored beside Spaces (ADR 0142). No lifecycle door reads or
+   * writes this table: a stored asset is outside the aggregate.
    */
-  readonly Image: {
-    /** Insert one image; a losing insert raises the database's duplicate-key error. */
-    readonly create: (input: SqlImageRow & { readonly id: string }) => Promise<void>;
-    readonly find: (id: string) => Promise<SqlImageRow | null>;
+  readonly Asset: {
+    /** Insert one asset; a losing insert raises the database's duplicate-key error. */
+    readonly create: (input: SqlAssetRow & { readonly hash: string }) => Promise<void>;
+    readonly find: (hash: string) => Promise<SqlAssetRow | null>;
   };
   readonly RepositoryState: {
     readonly read: () => Promise<{ readonly metaSpaceId: string } | null>;
@@ -402,17 +402,17 @@ interface ResourceDeletableForSpace {
   };
 }
 
-interface ImageCollection {
+interface AssetCollection {
   readonly create: (input: {
-    readonly id: string;
+    readonly hash: string;
     readonly mediaType: string;
     readonly bytes: Uint8Array;
   }) => Promise<unknown>;
-  readonly where: (filter: { readonly id: string }) => {
+  readonly where: (filter: { readonly hash: string }) => {
     readonly select: (
       fieldA: 'mediaType',
       fieldB: 'bytes',
-    ) => { readonly first: () => Promise<SqlImageRow | null> };
+    ) => { readonly first: () => Promise<SqlAssetRow | null> };
   };
 }
 
@@ -610,13 +610,13 @@ export const buildResourceTable = (
   deleteAllForSpace: (spaceId) => deleteResourcesForSpace(resource, spaceId),
 });
 
-/** `SqlTables<Order>['Image']`, the same on both databases. */
-export const buildImageTable = (image: ImageCollection): SqlTables<unknown>['Image'] => ({
-  create: async ({ id, mediaType, bytes }) => {
-    await image.create({ id, mediaType, bytes });
+/** `SqlTables<Order>['Asset']`, the same on both databases. */
+export const buildAssetTable = (asset: AssetCollection): SqlTables<unknown>['Asset'] => ({
+  create: async ({ hash, mediaType, bytes }) => {
+    await asset.create({ hash, mediaType, bytes });
   },
-  find: async (id) => {
-    const row = await image.where({ id }).select('mediaType', 'bytes').first();
+  find: async (hash) => {
+    const row = await asset.where({ hash }).select('mediaType', 'bytes').first();
     return row === null ? null : { mediaType: row.mediaType, bytes: row.bytes };
   },
 });

@@ -1,11 +1,13 @@
-import { uuidSchema, type UUID } from '@project/core';
+import { ASSET_COLLECTION_PATH, uuidSchema, type UUID } from '@project/core';
 import {
-  admitImage,
+  admitAsset,
+  ASSET_TOO_LARGE,
+  assetPath,
   COMMIT_OUTCOME_WIRE,
-  IMAGE_COLLECTION_PATH,
-  imagePath,
-  isImageId,
-  MAX_IMAGE_BYTES,
+  INLINE_MEDIA_TYPES,
+  isAssetHash,
+  MAX_ASSET_BYTES,
+  OCTET_STREAM,
   decodeCommitRequest,
   encodeCommitConflict,
   encodeCommitRefusal,
@@ -17,8 +19,7 @@ import {
   classifyStoredFailure,
   problemCatalogue,
   type InfinityCubeProblemCode,
-  type ImageRefusal,
-  type ImageStore,
+  type AssetStore,
   type ProblemError,
   type CommitRequestJson,
   type StoredSpaceRepository,
@@ -43,7 +44,7 @@ export {
   type ProductResponse,
 } from './product-destination';
 
-export { HttpSpaceBackend } from './backend';
+export { HttpSpaceBackend, httpAssetClient } from './backend';
 export type { HttpSpaceBackendOptions } from './backend';
 
 export const MAX_COMMIT_BODY_BYTES = 1_048_576;
@@ -57,26 +58,29 @@ const SPACE_AGGREGATE_PATH = '/api/aggregate';
 // finished routing by then, so its own pattern is no longer available to ask,
 // and this must keep matching what `SPACE_RESOURCE_PATH` registers.
 const SPACE_RESOURCE_PATTERN = /^\/api\/spaces\/([^/]+)$/;
-const IMAGE_RESOURCE_PATH = `${IMAGE_COLLECTION_PATH}/:id`;
-// The image path as a matcher, for the same reason as `SPACE_RESOURCE_PATTERN`.
-const IMAGE_RESOURCE_PATTERN = new RegExp(`^${IMAGE_COLLECTION_PATH}/([^/]+)$`);
+const ASSET_RESOURCE_PATH = `${ASSET_COLLECTION_PATH}/:hash`;
+// The asset path as a matcher, for the same reason as `SPACE_RESOURCE_PATTERN`.
+const ASSET_RESOURCE_PATTERN = new RegExp(`^${ASSET_COLLECTION_PATH}/([^/]+)$`);
 
 /**
- * How a stored image is served. Its id is the digest of its bytes, so the
+ * How a stored asset is served. Its hash is the digest of its bytes, so the
  * representation at one URL never changes and any cache may keep it for as
- * long as it likes. `nosniff` holds a browser to the media type the bytes were
- * admitted as.
+ * long as it likes. `nosniff` holds a browser to the media type it is served
+ * as, and the sandbox policy runs nothing in a document a browser opens from
+ * it, so no stored asset is active content on the application's origin.
  */
-const STORED_IMAGE_HEADERS = {
+const STORED_ASSET_HEADERS = {
   'Cache-Control': 'public, max-age=31536000, immutable',
   'X-Content-Type-Options': 'nosniff',
+  'Content-Security-Policy': "default-src 'none'; sandbox",
 } as const;
 
-const IMAGE_REFUSAL_DETAIL = {
-  'image-too-large': `Send an image no larger than ${MAX_IMAGE_BYTES} bytes.`,
-  'image-format-unsupported': 'Send a PNG, JPEG, WebP or GIF image.',
-  'image-svg-unsupported': 'Send the image as PNG, JPEG, WebP or GIF; an SVG is not stored.',
-} as const satisfies Readonly<Record<ImageRefusal, string>>;
+/**
+ * The media type an asset is served as: one of the four picture types inline,
+ * and everything else as `application/octet-stream`, whatever it was stored as.
+ */
+const servedMediaType = (mediaType: string): string =>
+  INLINE_MEDIA_TYPES.includes(mediaType) ? mediaType : OCTET_STREAM;
 
 export interface SpaceHttpAppOptions {
   logError?: (message: string, error: unknown) => void;
@@ -350,13 +354,13 @@ const validateSpaceId = validator('param', (value, context) => {
     : problem(context, 'invalid-space-id', 'Use a UUID for the Space id.');
 });
 
-const INVALID_IMAGE_ID_DETAIL = 'Use the unpadded base64url SHA-256 of the image for its id.';
+const INVALID_ASSET_HASH_DETAIL = 'Use the unpadded base64url SHA-256 of the asset for its hash.';
 
-const validateImageId = validator('param', (value, context) => {
-  const id = value['id'];
-  return id !== undefined && isImageId(id)
-    ? { id }
-    : problem(context, 'invalid-image-id', INVALID_IMAGE_ID_DETAIL);
+const validateAssetHash = validator('param', (value, context) => {
+  const hash = value['hash'];
+  return hash !== undefined && isAssetHash(hash)
+    ? { hash }
+    : problem(context, 'invalid-asset-hash', INVALID_ASSET_HASH_DETAIL);
 });
 
 /**
@@ -382,20 +386,20 @@ const unservedContractPath = (context: Context): Response | undefined => {
     context.header('Allow', 'GET');
     return problem(context, 'method-not-allowed', 'Use GET for the aggregate resource.');
   }
-  if (context.req.path === IMAGE_COLLECTION_PATH) {
+  if (context.req.path === ASSET_COLLECTION_PATH) {
     context.header('Allow', 'POST');
-    return problem(context, 'method-not-allowed', 'Use POST to store an image.');
+    return problem(context, 'method-not-allowed', 'Use POST to store an asset.');
   }
-  const image = IMAGE_RESOURCE_PATTERN.exec(context.req.path);
-  if (image !== null) {
-    if (!isImageId(image[1] ?? '')) {
-      return problem(context, 'invalid-image-id', INVALID_IMAGE_ID_DETAIL);
+  const asset = ASSET_RESOURCE_PATTERN.exec(context.req.path);
+  if (asset !== null) {
+    if (!isAssetHash(asset[1] ?? '')) {
+      return problem(context, 'invalid-asset-hash', INVALID_ASSET_HASH_DETAIL);
     }
-    // A stored image is a real representation, so HEAD is served — by Hono,
+    // A stored asset is a real representation, so HEAD is served — by Hono,
     // from the GET handler — rather than refused.
     if (context.req.method === 'HEAD') return undefined;
     context.header('Allow', 'GET, HEAD');
-    return problem(context, 'method-not-allowed', 'Use GET or HEAD for a stored image.');
+    return problem(context, 'method-not-allowed', 'Use GET or HEAD for a stored asset.');
   }
   const resource = SPACE_RESOURCE_PATTERN.exec(context.req.path);
   if (resource === null) {
@@ -447,7 +451,7 @@ const applyTransportPolicy = createMiddleware(async (context, next) => {
 });
 
 export const createSpaceHttpApp = (
-  repository: StoredSpaceRepository & ImageStore,
+  repository: StoredSpaceRepository & AssetStore,
   options: SpaceHttpAppOptions,
 ) => {
   const logError = options.logError ?? defaultLogError;
@@ -560,47 +564,54 @@ export const createSpaceHttpApp = (
         return storedFailureProblem(context, error);
       }
     })
-    // The body is the image, and the bytes decide what it is: neither its
-    // declared type nor a filename is read (ADR 0106).
-    .post(IMAGE_COLLECTION_PATH, async (context) => {
+    // The body is the asset and its declared `Content-Type` is its media
+    // type: any type is admitted, and so are zero bytes (ADR 0142).
+    .post(ASSET_COLLECTION_PATH, async (context) => {
       if (!hasIdentityEncoding(context)) {
         return problem(
           context,
           'unsupported-media-type',
-          'Send the image without content encoding.',
+          'Send the asset without content encoding.',
         );
       }
-      const read = await readBoundedBody(context.req.raw.body, MAX_IMAGE_BYTES);
+      const read = await readBoundedBody(context.req.raw.body, MAX_ASSET_BYTES);
       const admission =
         read.kind === 'oversized'
-          ? ({ kind: 'refused', code: 'image-too-large' } as const)
-          : await admitImage(concatenate(read.chunks, read.size));
+          ? ({ kind: 'refused', code: ASSET_TOO_LARGE } as const)
+          : await admitAsset(
+              concatenate(read.chunks, read.size),
+              context.req.header('Content-Type') ?? '',
+            );
       if (admission.kind === 'refused') {
-        return problem(context, admission.code, IMAGE_REFUSAL_DETAIL[admission.code]);
+        return problem(
+          context,
+          admission.code,
+          `Send an asset no larger than ${MAX_ASSET_BYTES} bytes.`,
+        );
       }
-      const url = imagePath(admission.image.id);
+      const url = assetPath(admission.asset.hash);
       try {
-        const outcome = await repository.storeImage(admission.image);
+        const outcome = await repository.storeAsset(admission.asset);
         context.header('Location', url);
         return outcome === 'stored' ? context.json({ url }, 201) : context.json({ url }, 200);
       } catch (error) {
-        invokeLogError(logError, 'Failed to store an image', error);
+        invokeLogError(logError, 'Failed to store an asset', error);
         return storedFailureProblem(context, error);
       }
     })
-    .get(IMAGE_RESOURCE_PATH, validateImageId, async (context) => {
-      const { id } = context.req.valid('param');
+    .get(ASSET_RESOURCE_PATH, validateAssetHash, async (context) => {
+      const { hash } = context.req.valid('param');
       try {
-        const image = await repository.loadImage(id);
-        if (image === undefined) {
-          return problem(context, 'not-found', `Choose an image that is stored; ${id} is not.`);
+        const asset = await repository.loadAsset(hash);
+        if (asset === undefined) {
+          return problem(context, 'not-found', `Choose an asset that is stored; ${hash} is not.`);
         }
-        return context.body(image.bytes, 200, {
-          ...STORED_IMAGE_HEADERS,
-          'Content-Type': image.mediaType,
+        return context.body(asset.bytes, 200, {
+          ...STORED_ASSET_HEADERS,
+          'Content-Type': servedMediaType(asset.mediaType),
         });
       } catch (error) {
-        invokeLogError(logError, `Failed to load image ${id}`, error);
+        invokeLogError(logError, `Failed to load asset ${hash}`, error);
         return storedFailureProblem(context, error);
       }
     });

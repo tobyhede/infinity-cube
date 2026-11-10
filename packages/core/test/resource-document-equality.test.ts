@@ -147,7 +147,7 @@ describe("each kind's content is parsed by its module at every door", () => {
 
   it.each([
     ['https://example.com/a.png', true],
-    ['/images/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU', true],
+    ['/assets/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU', true],
     ['data:image/png;base64,AA==', false],
     ['a.png', false],
   ])('answers the image URL %j the same way at every door', (url, accepted) => {

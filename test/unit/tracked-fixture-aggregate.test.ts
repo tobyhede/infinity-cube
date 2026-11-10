@@ -106,7 +106,7 @@ describe('tracked fixture aggregate', () => {
   });
 });
 
-const STORED_IMAGE_PREFIX = '/images/';
+const STORED_IMAGE_PREFIX = '/assets/';
 const trackedFixture = fileURLToPath(new URL('../../packages/app/fixture', import.meta.url));
 const temporaryDirectories: string[] = [];
 

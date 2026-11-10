@@ -320,7 +320,7 @@ describe('Create Ur Resource', () => {
 });
 
 describe('Create Image Resources', () => {
-  const STORED = '/images/LXEWQrcmsEQBYnyp-6wy9chTD7GQPMTbAiWHF5IaSIE';
+  const STORED = '/assets/LXEWQrcmsEQBYnyp-6wy9chTD7GQPMTbAiWHF5IaSIE';
   const THIRD_MINTED = uuidSchema.parse('00000000-0000-4000-8000-000000000033');
 
   it('creates one Image Resource titled Resource N, recording its URL and natural size', () => {
@@ -905,7 +905,7 @@ describe('Change Map content (ADR 0142)', () => {
         title: 'A',
         kind: 'image',
         content: {
-          url: '/images/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU',
+          url: '/assets/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU',
           naturalSize: { width: 640, height: 480 },
         },
       }),

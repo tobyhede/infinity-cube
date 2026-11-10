@@ -1,12 +1,13 @@
-import { HttpSpaceBackend, productAddress } from '@project/http';
+import { httpAssetClient, HttpSpaceBackend, productAddress } from '@project/http';
 import { loadSpaceSnapshot, type Space } from '@project/graph';
 import { newUuid, type ImageNaturalSize, type UUID } from '@project/core';
-import type { SpaceBackend } from '@project/persistence';
+import type { AssetClient, SpaceBackend } from '@project/persistence';
 import { displayImageAsAuthored, type ImageDisplay } from '@project/ui';
 import type { HistoryApi } from './browser-location';
 import { createBrowserHistory } from './browser-history';
 import { pickImagesInBrowser } from './browser-file-picker';
 import type { ImageSources } from './image-creation';
+import { storePicture } from './picture-admission';
 import type { Fullscreen } from './presenting-fullscreen';
 import type { PresentationLinks } from './presentation-link';
 import type { ApplicationStartupResult } from './startup';
@@ -55,15 +56,16 @@ const measureInBrowser = (url: string): Promise<ImageNaturalSize | undefined> =>
   });
 
 /**
- * The host's image store over HTTP, and the browser measuring what it loads and
- * choosing files. A picture is measured where `displayImage` draws it from, so
- * a measurement loads what the Resource will show.
+ * The host's asset store, and the browser measuring what it loads and choosing
+ * files. A picture is admitted as one before it is stored as an asset. It is
+ * measured where `displayImage` draws it from, so a measurement loads what the
+ * Resource will show.
  */
 export const browserImageSources = (
-  host: HttpSpaceBackend = new HttpSpaceBackend(),
+  assets: AssetClient = httpAssetClient(new HttpSpaceBackend()),
   displayImage: ImageDisplay = displayImageAsAuthored,
 ): ImageSources => ({
-  store: (image) => host.storeImage(image),
+  store: (image) => storePicture(assets, image),
   measure: (url) => measureInBrowser(displayImage(url)),
   pick: pickImagesInBrowser,
 });

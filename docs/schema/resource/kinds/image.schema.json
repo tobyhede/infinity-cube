@@ -16,7 +16,7 @@
         },
         {
           "description": "A stored image's content id: the SHA-256 of its bytes as unpadded base64url, 43 characters in canonical spelling (ADR 0106).",
-          "pattern": "^/images/[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$"
+          "pattern": "^/assets/[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$"
         }
       ]
     },

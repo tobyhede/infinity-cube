@@ -14,7 +14,7 @@ import { postgresTestDatabase } from '../support/postgres-database';
 import { clearInfinityCubeContent } from '../support/clear-infinity-cube-content';
 import { runInfinityCubeScript } from '../support/infinity-cube-command';
 import { markdownResourceFiles } from '../support/aggregate-directory';
-import { admitted, pngBytes, showing } from '../support/stored-images';
+import { admitted, pngBytes, showing } from '../support/stored-assets';
 
 const IMPORTED_SPACE_ID = uuidSchema.parse('d1111111-1111-4111-8111-111111111111');
 const MALFORMED_SPACE_ID = uuidSchema.parse('d2222222-2222-4222-8222-222222222222');

@@ -54,7 +54,7 @@ const BASE64URL = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz012345678
 
 /**
  * The URLs an Image Resource may hold (ADR 0106): a web URL, or the
- * `/images/<id>` of a stored image, whose last character carries two zero bits.
+ * `/assets/<id>` of a stored image, whose last character carries two zero bits.
  */
 const imageUrlArb = fc.oneof(
   fc.webUrl({ validSchemes: ['https', 'http'], withQueryParameters: true, withFragments: true }),
@@ -63,7 +63,7 @@ const imageUrlArb = fc.oneof(
       fc.string({ unit: fc.constantFrom(...Array.from(BASE64URL)), minLength: 42, maxLength: 42 }),
       fc.constantFrom(...Array.from('AEIMQUYcgkosw048')),
     )
-    .map(([head, last]) => `/images/${head}${last}`),
+    .map(([head, last]) => `/assets/${head}${last}`),
 );
 
 const dimensionArb = fc.double({ min: 1e-6, max: 1e6, noNaN: true });

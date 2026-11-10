@@ -1009,7 +1009,7 @@ export const spaceRepositoryContract = (
             document: {
               title: 'Figure',
               kind: 'image',
-              content: { url: '/images/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU' },
+              content: { url: '/assets/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU' },
             },
           },
         ],

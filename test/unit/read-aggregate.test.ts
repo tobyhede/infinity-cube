@@ -21,7 +21,7 @@ import { readGitHubLocation } from '../../packages/app/src/mount/github-source';
 import { COMMIT, fakeGitHub, OWNER, REPO } from '../../packages/app/test/fake-github';
 import { markdownResourceFiles, resourceFiles } from '../support/aggregate-directory';
 import { captureError } from '../support/capture-error';
-import { admitted, pngBytes } from '../support/stored-images';
+import { admitted, pngBytes } from '../support/stored-assets';
 
 const META_SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const OTHER_SPACE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
@@ -703,7 +703,7 @@ describe('a file that could not be read', () => {
 
   it('names an image that could not be read as a discovery failure', async () => {
     const image = await admitted(pngBytes(7));
-    const path = `images/${image.id}.png`;
+    const path = `assets/${image.id}.png`;
     const thrown = await captureError(() =>
       readAggregateFrom(
         withUnreadable(
@@ -885,7 +885,7 @@ describe('reading from a source', () => {
           encode(text),
         ],
       ),
-      [`images/${image.id}.png`, image.bytes],
+      [`assets/${image.id}.png`, image.bytes],
       ['README.md', encode('# Notes\n')],
     ]);
     const { source, reads } = recordingReads(mapSource('/talk', files));
@@ -897,7 +897,7 @@ describe('reading from a source', () => {
       `${META_SPACE_ID}/space.json`,
       `${META_SPACE_ID}/resources/${RESOURCE_ID}.json`,
       `${META_SPACE_ID}/resources/${RESOURCE_ID}.md`,
-      `images/${image.id}.png`,
+      `assets/${image.id}.png`,
     ]);
     expect(reads).toEqual((await scanAggregateFrom(mapSource('/talk', files))).files);
   });

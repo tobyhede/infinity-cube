@@ -1,6 +1,6 @@
 import type { SpaceSnapshot, UUID } from '@project/core';
 import type { SpaceAggregateError } from '@project/graph';
-import type { LoadedSpace, StoredImage } from '@project/persistence';
+import type { LoadedSpace, StoredAsset } from '@project/persistence';
 import {
   type AggregateInput,
   type SpaceRepository,
@@ -46,16 +46,16 @@ export interface AggregateImportOptions {
 }
 
 /**
- * Store each image the directory carries, one at a time and in the order read.
- * A stored image is outside the aggregate and is never deleted (ADR 0106), so
- * an image stored by an import whose aggregate is then refused is one more
- * picture nothing shows, like any upload whose Edit never landed.
+ * Store each asset the directory carries, one at a time and in the order read.
+ * A stored asset is outside the aggregate and is never deleted (ADR 0106), so
+ * an asset stored by an import whose aggregate is then refused is one more
+ * asset nothing references, like any upload whose Edit never landed.
  */
-const storeImages = async (
+const storeAssets = async (
   repository: SpaceRepository,
-  images: readonly StoredImage[],
+  assets: readonly StoredAsset[],
 ): Promise<void> => {
-  for (const image of images) await repository.storeImage(image);
+  for (const asset of assets) await repository.storeAsset(asset);
 };
 
 const initialize = async (
@@ -127,10 +127,10 @@ export const importAggregate = async (
  * Import what `readAggregate` read, for a caller that has to look at the
  * contents before anything is stored.
  *
- * The images are admitted first, so every stored image the aggregate shows is
- * there to load the moment the aggregate is (ADR 0118). A stored-image URL the
- * directory carries no bytes for is not refused: it draws as a picture that
- * will not load, which ADR 0106 already allows.
+ * The assets are admitted first, so every stored asset the aggregate
+ * references is there to load the moment the aggregate is (ADR 0118). An
+ * asset URL the directory carries no bytes for is not refused: its bytes are
+ * absent, which is not an error (ADR 0142).
  */
 export const importAggregateContents = async (
   contents: AggregateDirectoryContents,
@@ -138,7 +138,7 @@ export const importAggregateContents = async (
   { replace }: Pick<AggregateImportOptions, 'replace'>,
 ): Promise<AggregateImportResult> => {
   const input: AggregateInput = { metaSpaceId: contents.metaSpaceId, spaces: contents.spaces };
-  await storeImages(repository, contents.images);
+  await storeAssets(repository, contents.assets);
 
   if (!replace) return initialize(repository, input);
 

@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { exportAggregate } from '../../src/export/export-aggregate';
 import { captureError } from '../support/capture-error';
 import { MemorySpaceRepository } from '@project/aggregate';
-import { admitted, directoryTree, pngBytes, showing } from '../support/stored-images';
+import { admitted, directoryTree, pngBytes, showing } from '../support/stored-assets';
 
 const SPACE_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000001');
 const RESOURCE_A = uuidSchema.parse('a0000000-0000-4000-8000-000000000010');
@@ -558,7 +558,7 @@ describe('stored image bytes', () => {
     expect(await readdir(destination)).not.toContain('images');
     await expect(
       readFile(join(destination, SPACE_ID, 'resources', `${PICTURE_ID}.json`), 'utf8'),
-    ).resolves.toContain(`"url": "/images/${missing.id}"`);
+    ).resolves.toContain(`"url": "/assets/${missing.id}"`);
   });
 
   /*

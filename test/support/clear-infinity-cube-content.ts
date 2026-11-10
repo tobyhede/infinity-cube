@@ -16,8 +16,8 @@ export const clearInfinityCubeContent = async (): Promise<void> => {
       db.orm.public.Space.where({ id: spaceId })
         .deleteCount()
         .then(() => undefined),
-    deleteImages: async () =>
-      db.orm.public.Image.where((image) => image.id.isNotNull())
+    deleteAssets: async () =>
+      db.orm.public.Asset.where((asset) => asset.hash.isNotNull())
         .deleteCount()
         .then(() => undefined),
   });

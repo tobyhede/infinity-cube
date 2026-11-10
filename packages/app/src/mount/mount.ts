@@ -1,4 +1,3 @@
-import type { UUID } from '@project/core';
 import {
   AggregateDirectoryError,
   createSpaceHost,
@@ -9,8 +8,9 @@ import {
   type AggregateSource,
   type SpaceHostApplication,
 } from '@project/aggregate';
-import { HttpSpaceBackend } from '@project/http';
-import { IMAGE_COLLECTION_PATH, isImageId } from '@project/persistence';
+import { assetHashOfPath, type UUID } from '@project/core';
+import { httpAssetClient, HttpSpaceBackend } from '@project/http';
+import { isAssetHash, type AssetClient } from '@project/persistence';
 import type { ImageDisplay } from '@project/ui';
 
 /**
@@ -45,8 +45,14 @@ export interface MountedAggregate {
   readonly metaSpaceId: UUID;
   /** The ordinary HTTP backend, whose requests the in-page application answers. */
   readonly backend: HttpSpaceBackend;
-  /** Draws each image the in-page store holds from an object URL over its bytes. */
+  /** Draws each asset the in-page store holds from an object URL over its bytes. */
   readonly displayImage: ImageDisplay;
+  /**
+   * The in-page asset store as a surface reaches it: `url` is `displayImage`,
+   * and `read` and `store` go through `backend`, so reading answers the
+   * store's bytes and never fetches an object URL.
+   */
+  readonly assets: AssetClient;
 }
 
 /**
@@ -101,25 +107,24 @@ const inPageFetch =
   };
 
 /**
- * Where each stored image the in-page store holds is drawn from: an object URL
+ * Where each stored asset the in-page store holds is drawn from: an object URL
  * over the store's own bytes, made the first time it is drawn and kept for the
- * page's life, as a stored image is (ADR 0106). Any other URL is drawn as
- * authored, so a stored image the store holds no bytes for draws as a picture
- * that will not load.
+ * page's life, as a stored asset is (ADR 0106). Any other URL is drawn as
+ * authored, so an asset the store holds no bytes for draws as a picture that
+ * will not load.
  */
 const objectUrlDisplay = (
   repository: MemorySpaceRepository,
   createObjectUrl: (image: Blob) => string,
 ): ImageDisplay => {
-  const prefix = `${IMAGE_COLLECTION_PATH}/`;
   const made = new Map<string, string>();
   return (url) => {
-    const id = url.startsWith(prefix) ? url.slice(prefix.length) : '';
-    const image = isImageId(id) ? repository.heldImage(id) : undefined;
-    if (image === undefined) return url;
+    const hash = assetHashOfPath(url) ?? '';
+    const asset = isAssetHash(hash) ? repository.heldAsset(hash) : undefined;
+    if (asset === undefined) return url;
     let objectUrl = made.get(url);
     if (objectUrl === undefined) {
-      objectUrl = createObjectUrl(new Blob([image.bytes], { type: image.mediaType }));
+      objectUrl = createObjectUrl(new Blob([asset.bytes], { type: asset.mediaType }));
       made.set(url, objectUrl);
     }
     return objectUrl;
@@ -131,8 +136,8 @@ const objectUrlDisplay = (
  * store from it through the aggregate lifecycle, answering what browser
  * startup takes, or why the directory did not mount.
  *
- * Images first, as Import stores them (ADR 0118), so every stored image the
- * aggregate shows is there the moment the aggregate is.
+ * Assets first, as Import stores them (ADR 0118), so every stored asset the
+ * aggregate references is there the moment the aggregate is.
  */
 export const mountAggregate = async ({
   source,
@@ -148,7 +153,7 @@ export const mountAggregate = async ({
   }
 
   const repository = new MemorySpaceRepository();
-  for (const image of contents.images) await repository.storeImage(image);
+  for (const asset of contents.assets) await repository.storeAsset(asset);
   const initialized = await repository.initializeAggregate({
     metaSpaceId: contents.metaSpaceId,
     spaces: contents.spaces,
@@ -167,12 +172,15 @@ export const mountAggregate = async ({
   }
 
   const host = createSpaceHost(repository, newId);
+  const backend = new HttpSpaceBackend(IN_PAGE_ORIGIN, { fetch: inPageFetch(host) });
+  const displayImage = objectUrlDisplay(repository, createObjectUrl);
   return {
     ok: true,
     mounted: {
       metaSpaceId: contents.metaSpaceId,
-      backend: new HttpSpaceBackend(IN_PAGE_ORIGIN, { fetch: inPageFetch(host) }),
-      displayImage: objectUrlDisplay(repository, createObjectUrl),
+      backend,
+      displayImage,
+      assets: httpAssetClient(backend, displayImage),
     },
   };
 };

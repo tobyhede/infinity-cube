@@ -1,14 +1,14 @@
 /**
- * The images the host stores beside Spaces and outside the aggregate
- * (ADR 0106): what one is, which bytes are admitted as one, and what a store of
- * them owes its callers. Browser-safe, because the route that stores them is
- * `@project/http`'s, and each repository under `src/` implements the store.
+ * Which bytes an Image Resource's picture may be (ADR 0106): the Image kind's
+ * rule, applied in the browser before the bytes are stored as an asset. The
+ * asset store admits any media type (ADR 0142), so this is where a picture is
+ * told from anything else, from its bytes alone.
  */
 
-import { isStoredImageId, STORED_IMAGE_COLLECTION_PATH } from '@project/core';
+import { MAX_ASSET_BYTES, type AssetClient } from '@project/persistence';
 
 /** The largest image the host stores, in bytes: 10 MiB. */
-export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+export const MAX_IMAGE_BYTES = MAX_ASSET_BYTES;
 
 /** The formats the host stores, each identified from the bytes. */
 export const IMAGE_MEDIA_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'] as const;
@@ -17,27 +17,6 @@ export type ImageMediaType = (typeof IMAGE_MEDIA_TYPES)[number];
 /** Whether a stored media type is one the host stores images as. */
 export const isImageMediaType = (value: string): value is ImageMediaType =>
   IMAGE_MEDIA_TYPES.some((type) => type === value);
-
-/**
- * The SHA-256 of an image's bytes, spelled as unpadded base64url. The spelling
- * is `@project/core`'s `isStoredImageId`, the rule an Image Resource's stored
- * image URL is held to as well; this narrows a string that passes it.
- */
-export type ImageId = string & { readonly imageId: unique symbol };
-
-export const isImageId = (value: string): value is ImageId => isStoredImageId(value);
-
-/** The collection stored images are addressed under. */
-export const IMAGE_COLLECTION_PATH = STORED_IMAGE_COLLECTION_PATH;
-
-/** An image's root-relative URL: the address an Image Resource records for a stored image. */
-export const imagePath = (id: ImageId): string => `${IMAGE_COLLECTION_PATH}/${id}`;
-
-export interface StoredImage {
-  readonly id: ImageId;
-  readonly mediaType: ImageMediaType;
-  readonly bytes: Uint8Array<ArrayBuffer>;
-}
 
 /**
  * Why bytes are not stored, each a named code the application puts into words.
@@ -51,7 +30,7 @@ const IMAGE_REFUSALS = [
 ] as const;
 export type ImageRefusal = (typeof IMAGE_REFUSALS)[number];
 
-/** What storing an image answered the browser: the URL it is stored at, or why not. */
+/** What storing a picture answered: the asset URL it is stored at, or why not. */
 export type ImageStoring =
   | { readonly kind: 'stored'; readonly url: string }
   | { readonly kind: 'refused'; readonly code: ImageRefusal };
@@ -66,7 +45,7 @@ export const isImageRefusal = (code: string): code is ImageRefusal =>
  *
  * A declared type comes from the file's name or the platform, not its bytes,
  * so this only refuses a type it knows is not stored: a declared image type
- * or no type at all is sent, and `admitImage` decides from the bytes.
+ * or no type at all is read, and `admitImage` decides from the bytes.
  */
 export const refusalForDeclaredType = (type: string): ImageRefusal | undefined => {
   if (type === '' || isImageMediaType(type)) return undefined;
@@ -74,19 +53,8 @@ export const refusalForDeclaredType = (type: string): ImageRefusal | undefined =
 };
 
 export type ImageAdmission =
-  | { readonly kind: 'admitted'; readonly image: StoredImage }
+  | { readonly kind: 'admitted'; readonly mediaType: ImageMediaType }
   | { readonly kind: 'refused'; readonly code: ImageRefusal };
-
-/**
- * Images, by content. Storing bytes already stored stores nothing and answers
- * `existing`; nothing is ever deleted, because a URL can be copied anywhere and
- * nothing can know an image is unused. A reset clears the store with everything
- * else, and neither aggregate lifecycle door touches it.
- */
-export interface ImageStore {
-  storeImage(image: StoredImage): Promise<'stored' | 'existing'>;
-  loadImage(id: ImageId): Promise<StoredImage | undefined>;
-}
 
 const startsWith = (bytes: Uint8Array, prefix: readonly number[], offset = 0): boolean =>
   prefix.every((value, index) => bytes[offset + index] === value);
@@ -161,25 +129,33 @@ const mediaTypeOf = (bytes: Uint8Array): ImageMediaType | 'svg' | undefined => {
   return undefined;
 };
 
-/** The id content-addressing gives these bytes. */
-export const imageIdOf = async (bytes: Uint8Array<ArrayBuffer>): Promise<ImageId> => {
-  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
-  const id = digest.toBase64({ alphabet: 'base64url', omitPadding: true });
-  if (!isImageId(id)) throw new Error('A SHA-256 digest did not spell an image id');
-  return id;
+/**
+ * Decide whether bytes are a picture, from the bytes alone: a declared type is
+ * never consulted, so a PNG sent as `text/plain` is a PNG and an SVG sent as
+ * `image/png` is an SVG.
+ */
+export const admitImage = (bytes: Uint8Array): ImageAdmission => {
+  if (bytes.byteLength > MAX_IMAGE_BYTES) return { kind: 'refused', code: 'image-too-large' };
+  const mediaType = mediaTypeOf(bytes);
+  if (mediaType === 'svg') return { kind: 'refused', code: 'image-svg-unsupported' };
+  if (mediaType === undefined) return { kind: 'refused', code: 'image-format-unsupported' };
+  return { kind: 'admitted', mediaType };
 };
 
 /**
- * Decide whether bytes are stored as an image, from the bytes alone: a declared
- * type is never consulted, so a PNG sent as `text/plain` is a PNG and an SVG
- * sent as `image/png` is an SVG. An admitted image owns a copy of the bytes, so
- * its id stays their SHA-256 whatever the caller does with its own array.
+ * Store a picture through the asset store: its bytes are admitted as a picture
+ * first, and stored under the media type they are, whatever the file declared.
+ * Throws when the host cannot answer, or answers a refusal a picture that
+ * passed this rule cannot be given.
  */
-export const admitImage = async (bytes: Uint8Array<ArrayBuffer>): Promise<ImageAdmission> => {
-  if (bytes.byteLength > MAX_IMAGE_BYTES) return { kind: 'refused', code: 'image-too-large' };
-  const owned = bytes.slice();
-  const mediaType = mediaTypeOf(owned);
-  if (mediaType === 'svg') return { kind: 'refused', code: 'image-svg-unsupported' };
-  if (mediaType === undefined) return { kind: 'refused', code: 'image-format-unsupported' };
-  return { kind: 'admitted', image: { id: await imageIdOf(owned), mediaType, bytes: owned } };
+export const storePicture = async (assets: AssetClient, image: Blob): Promise<ImageStoring> => {
+  if (image.size > MAX_IMAGE_BYTES) return { kind: 'refused', code: 'image-too-large' };
+  const bytes = new Uint8Array(await image.arrayBuffer());
+  const admission = admitImage(bytes);
+  if (admission.kind === 'refused') return admission;
+  const stored = await assets.store(new Blob([bytes], { type: admission.mediaType }));
+  if (typeof stored !== 'string') {
+    throw new Error(`The asset store refused a picture: ${stored.refused}`);
+  }
+  return { kind: 'stored', url: stored };
 };

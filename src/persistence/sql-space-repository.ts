@@ -15,17 +15,17 @@ import {
   decideCommit,
   decodeStoredRevision,
   encodeStoredRevision,
-  isImageMediaType,
+  withEmptyAsset,
   RevisionCodecError,
   type AggregateLoadResult,
-  type ImageId,
+  type AssetHash,
   type LoadedAggregate,
   type LoadedSpace,
   type RepositoryCommitResult,
   type SpaceChange,
   type SpaceCommit,
   type SpaceSummary,
-  type StoredImage,
+  type StoredAsset,
 } from '@project/persistence';
 import { isDeepStrictEqual } from 'node:util';
 import { classifyInitializedAggregate } from '@project/aggregate';
@@ -402,18 +402,19 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
   }
 
   /**
-   * Insert the image, and answer a losing insert as the image already being
-   * there: its id is its content, so a row under that id holds these bytes.
-   * Outside any transaction, so a losing insert aborts nothing else.
+   * Insert the asset, and answer a losing insert as the asset already being
+   * there: its hash is its content, so a row under that hash holds these bytes,
+   * and the first stored media type stands. Outside any transaction, so a
+   * losing insert aborts nothing else.
    */
-  storeImage(image: StoredImage): Promise<'stored' | 'existing'> {
+  storeAsset(asset: StoredAsset): Promise<'stored' | 'existing'> {
     return this.#naming(() =>
       this.#store.serialise(async () => {
         try {
-          await this.#store.tables(this.#store.orm).Image.create(image);
+          await this.#store.tables(this.#store.orm).Asset.create(asset);
           return 'stored';
         } catch (error) {
-          if (this.#store.isDuplicateKey(error, 'images')) return 'existing';
+          if (this.#store.isDuplicateKey(error, 'assets')) return 'existing';
           throw error;
         }
       }),
@@ -421,19 +422,20 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
   }
 
   /**
-   * One stored image, its bytes copied into a view this repository owns: a
-   * driver may hand back a `Buffer` over its own pooled memory.
+   * One stored asset, its bytes copied into a view this repository owns: a
+   * driver may hand back a `Buffer` over its own pooled memory. The asset of
+   * zero bytes is answered whether or not a row holds it.
    */
-  loadImage(id: ImageId): Promise<StoredImage | undefined> {
+  loadAsset(hash: AssetHash): Promise<StoredAsset | undefined> {
     return this.#naming(() =>
       this.#store.serialise(async () => {
-        const row = await this.#store.tables(this.#store.orm).Image.find(id);
-        if (row === null) return undefined;
-        const { mediaType } = row;
-        if (!isImageMediaType(mediaType)) {
-          throw new AggregateInvariantError(`Stored image ${id} has media type ${mediaType}`);
-        }
-        return { id, mediaType, bytes: new Uint8Array(row.bytes) };
+        const row = await this.#store.tables(this.#store.orm).Asset.find(hash);
+        return withEmptyAsset(
+          hash,
+          row === null
+            ? undefined
+            : { hash, mediaType: row.mediaType, bytes: new Uint8Array(row.bytes) },
+        );
       }),
     );
   }

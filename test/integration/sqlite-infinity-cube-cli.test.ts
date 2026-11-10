@@ -12,7 +12,7 @@ import { createSqliteDatabase } from '../../src/sqlite/db';
 import { sqliteSqlStore } from '../../src/sqlite/sql-store';
 import { runInfinityCubeScript } from '../support/infinity-cube-command';
 import { migrateSqliteFile } from '../support/sqlite-harness';
-import { admitted, pngBytes, showing } from '../support/stored-images';
+import { admitted, pngBytes, showing } from '../support/stored-assets';
 
 const META_SPACE_ID = uuidSchema.parse('e1111111-1111-4111-8111-111111111111');
 const TARGET_SPACE_ID = uuidSchema.parse('e2222222-2222-4222-8222-222222222222');

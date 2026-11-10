@@ -19,11 +19,11 @@ const FIXTURE_SPACES = [
 /** The tracked fixture image, and the URL its SHA-256 gives it (ADR 0106). */
 const HARBOUR = readFileSync(
   new URL(
-    '../../packages/app/fixture/images/fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs.png',
+    '../../packages/app/fixture/assets/fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs.png',
     import.meta.url,
   ),
 );
-const HARBOUR_URL = '/images/fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs';
+const HARBOUR_URL = '/assets/fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs';
 const startRuntime = async (options: E2eHttpRuntimeOptions) => {
   const app = await createApp(options);
   return new HttpSpaceBackend('http://infinity-cube.test', {

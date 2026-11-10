@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { HttpSpaceBackend } from '@project/http';
 
 const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x01]);
-const STORED_URL = '/images/KJx3oXmDEwnD1FBZUrDl_2u5HAtMb2ip2ose1tOMXmQ';
+const STORED_URL = '/assets/KJx3oXmDEwnD1FBZUrDl_2u5HAtMb2ip2ose1tOMXmQ';
 
 /** A Fetch that answers a stored URL `delayMs` after it is called, unless aborted first. */
 const answersAfter =

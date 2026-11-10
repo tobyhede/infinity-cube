@@ -5,13 +5,19 @@ import type { LoadedAggregate } from '@project/persistence';
 import {
   aggregateFiles,
   assertExportableDestination,
-  loadReferencedImages,
+  loadReferencedAssets,
   rejectSymbolicLinks,
   scannedAggregateFiles,
   writeInPlace,
   type DirectoryFiles,
 } from '../aggregate-directory';
-import { mapSource, readAggregateFrom, type SpaceRepository } from '@project/aggregate';
+import {
+  assetFileHash,
+  ASSETS_DIRECTORY_NAME,
+  mapSource,
+  readAggregateFrom,
+  type SpaceRepository,
+} from '@project/aggregate';
 
 /** One Space whose bytes landed but whose projected revision was not recorded. */
 export interface UnrecordedExport {
@@ -151,10 +157,14 @@ const markAggregateExported = async (
  *
  * One `loadAggregate()` read is the whole of what gets exported, so every Space
  * in the directory comes from one consistent view rather than from a series of
- * reads a concurrent commit could fall between. The bytes of every stored image
- * the aggregate shows are written to `images/` (ADR 0118); images are read after
- * the aggregate and outside its revision, and an image's id is its content, so
- * no commit can change one between the two reads.
+ * reads a concurrent commit could fall between. The bytes of every stored asset
+ * the aggregate references are written to `assets/` (ADR 0142, ADR 0118), found
+ * by walking each Resource's `content` without naming a kind; assets are read
+ * after the aggregate and outside its revision, and an asset's hash is its
+ * content, so no commit can change one between the two reads. An asset no
+ * Resource references is left out, and its file removed. A referenced asset
+ * whose bytes the store does not hold is not an error: the URL stays, the
+ * Export completes, and a file of that name in the directory is kept.
  *
  * The files are checked to read back before any is written, and a refusal
  * writes nothing. Then each file whose bytes differ is replaced, and each file
@@ -170,13 +180,14 @@ export const exportAggregate = async (
   const loaded = await repository.loadAggregate();
   if (loaded.kind === 'uninitialized') return { kind: 'uninitialized' };
   const aggregate = loaded.aggregate;
-  const images = await loadReferencedImages(
+  const assets = await loadReferencedAssets(
     repository,
     aggregate.spaces.map(({ snapshot }) => snapshot),
   );
 
   const destination = resolve(destinationPath);
-  const files = aggregateFiles(aggregate, images);
+  const scanned = await scannedAggregateFiles(destination);
+  const files = aggregateFiles(aggregate, assets.carried, scanned);
   await rejectSymbolicLinks(destination, files.keys());
   await assertExportableDestination(destination);
 
@@ -189,7 +200,16 @@ export const exportAggregate = async (
       errors: checked.errors,
     };
   }
-  await writeInPlace(destination, files, await scannedAggregateFiles(destination));
+  const kept = new Set<string>(assets.kept);
+  await writeInPlace(
+    destination,
+    files,
+    (await scannedAggregateFiles(destination)).filter((path) => {
+      if (!path.startsWith(`${ASSETS_DIRECTORY_NAME}/`)) return true;
+      const hash = assetFileHash(path.slice(ASSETS_DIRECTORY_NAME.length + 1));
+      return hash === undefined || !kept.has(hash);
+    }),
+  );
   const unrecorded = await markAggregateExported(repository, aggregate);
   return { kind: 'exported', aggregate, unrecorded };
 };

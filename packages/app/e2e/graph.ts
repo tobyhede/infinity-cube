@@ -38,7 +38,7 @@ const fixtureDir = `${fixtureRoot}/${fixtureMetaId}`;
  * Ordinary Spaces the fixture aggregate already holds, excluding Meta.
  *
  * A child directory is a Space when it holds a `space.json`, as Import
- * discovers them; `images/` and any other directory are not.
+ * discovers them; `assets/` and any other directory are not.
  *
  * `space-resource.spec.ts` (`stops offering a Space…`, `deleting the last Space
  * Resource…`) lands back on this count after destroying a Space it just created.

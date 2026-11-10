@@ -25,7 +25,7 @@ const MISSING = uuidSchema.parse('00000000-0000-4000-8000-000000000032');
 
 const OLD_URL = 'https://example.com/old.png';
 const NEW_URL = 'https://example.com/new.png';
-const STORED = '/images/LXEWQrcmsEQBYnyp-6wy9chTD7GQPMTbAiWHF5IaSIE';
+const STORED = '/assets/LXEWQrcmsEQBYnyp-6wy9chTD7GQPMTbAiWHF5IaSIE';
 
 /** An Open Image Resource with a remembered Open Size and an Edge to a Markdown Resource. */
 const snapshot: SpaceSnapshot = {

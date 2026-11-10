@@ -26,7 +26,7 @@ import {
   type RunEvent,
   type RunStart,
 } from '../../src/run/run';
-import { admitted, pngBytes } from '../support/stored-images';
+import { admitted, pngBytes } from '../support/stored-assets';
 
 const FIXTURE = fileURLToPath(new URL('../../packages/app/fixture', import.meta.url));
 const META_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
@@ -325,7 +325,7 @@ describe('Running an Aggregate directory', () => {
     const id = (await admitted(bytes)).id;
 
     const stored = await backend.storeImage(new Blob([bytes], { type: 'image/png' }));
-    expect(stored).toEqual({ kind: 'stored', url: `/images/${id}` });
+    expect(stored).toEqual({ kind: 'stored', url: `/assets/${id}` });
     if (stored.kind !== 'stored') return;
     const loaded = await backend.loadSpace(META_SPACE_ID);
     if (loaded === undefined) throw new Error('Expected the Meta Space');
@@ -358,7 +358,7 @@ describe('Running an Aggregate directory', () => {
     expect(new Uint8Array(await readFile(join(directory, 'images', `${id}.png`)))).toEqual(bytes);
     await expect(
       readFile(join(directory, META_SPACE_ID, 'resources', `${resourceId}.json`), 'utf8'),
-    ).resolves.toContain(`"url": "/images/${id}"`);
+    ).resolves.toContain(`"url": "/assets/${id}"`);
     await run.stop();
   });
 

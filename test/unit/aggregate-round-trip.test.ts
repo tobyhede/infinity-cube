@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { exportAggregate } from '../../src/export/export-aggregate';
 import { importAggregate } from '../../src/import/import-aggregate';
 import { MemorySpaceRepository, AGGREGATE_FILE_NAME } from '@project/aggregate';
-import { admitted, directoryTree, jpegBytes, pngBytes, showing } from '../support/stored-images';
+import { admitted, directoryTree, jpegBytes, pngBytes, showing } from '../support/stored-assets';
 
 const META_SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const TARGET_SPACE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
@@ -415,7 +415,7 @@ describe('exporting and importing one complete aggregate', () => {
         document: {
           title: 'Stored',
           kind: 'image' as const,
-          content: { url: '/images/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU' },
+          content: { url: '/assets/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU' },
         },
       },
     ];
@@ -435,7 +435,7 @@ describe('exporting and importing one complete aggregate', () => {
   "title": "Stored",
   "kind": "image",
   "content": {
-    "url": "/images/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+    "url": "/assets/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
   }
 }
 `);

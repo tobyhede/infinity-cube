@@ -17,8 +17,8 @@ const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const FIRST = uuidSchema.parse('00000000-0000-4000-8000-000000000031');
 const SECOND = uuidSchema.parse('00000000-0000-4000-8000-000000000032');
 
-const STORED_A = '/images/LXEWQrcmsEQBYnyp-6wy9chTD7GQPMTbAiWHF5IaSIE';
-const STORED_B = '/images/KJx3oXmDEwnD1FBZUrDl_2u5HAtMb2ip2ose1tOMXmQ';
+const STORED_A = '/assets/LXEWQrcmsEQBYnyp-6wy9chTD7GQPMTbAiWHF5IaSIE';
+const STORED_B = '/assets/KJx3oXmDEwnD1FBZUrDl_2u5HAtMb2ip2ose1tOMXmQ';
 
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,

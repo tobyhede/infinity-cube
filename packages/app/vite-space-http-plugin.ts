@@ -9,6 +9,9 @@ import type { Plugin } from 'vite';
 // this host writes is the one the runtime composes, rather than a second copy
 // of it here, which is what the two had already become.
 import type { ProductRequestResolver, ProductResponse } from '../http/src/index';
+// Relative for the same reason, and a runtime import: the module imports
+// nothing, so bundling it brings nothing else of the package with it.
+import { ASSET_COLLECTION_PATH, assetHashOfPath } from '../core/src/asset-hash';
 
 export interface FetchApplication extends ProductRequestResolver {
   fetch(request: Request, env?: unknown): Response | Promise<Response>;
@@ -55,11 +58,19 @@ const defaultPreviewLoader = async (modulePath: string): Promise<unknown> =>
 type Next = (error?: unknown) => void;
 
 /**
- * The collections the Fetch application serves whole: the API, and the stored
- * images (ADR 0106), which live outside `/api` because an image's URL is
- * recorded on a Resource and read by the browser directly.
+ * The collection the Fetch application serves whole: the API.
  */
-const APPLICATION_COLLECTIONS = ['/api', '/images'] as const;
+const APPLICATION_COLLECTIONS = ['/api'] as const;
+
+/**
+ * Whether `pathname` is the stored asset collection or one stored asset
+ * (ADR 0142), which live outside `/api` because an asset's URL is recorded in
+ * `content` and read by the browser directly. Only a valid hash is the
+ * application's: the built application's own scripts are served under the
+ * same `/assets/`, and those belong to Vite.
+ */
+const isAssetPath = (pathname: string): boolean =>
+  pathname === ASSET_COLLECTION_PATH || assetHashOfPath(pathname) !== undefined;
 
 /**
  * Node's parser is more permissive than the URL parser: it accepts request
@@ -73,8 +84,11 @@ const APPLICATION_COLLECTIONS = ['/api', '/images'] as const;
 const isApplicationRequest = (request: IncomingMessage): boolean => {
   const pathname = URL.parse(request.url ?? '/', 'http://infinity-cube.invalid')?.pathname;
   if (pathname === undefined) return false;
-  return APPLICATION_COLLECTIONS.some(
-    (collection) => pathname === collection || pathname.startsWith(`${collection}/`),
+  return (
+    isAssetPath(pathname) ||
+    APPLICATION_COLLECTIONS.some(
+      (collection) => pathname === collection || pathname.startsWith(`${collection}/`),
+    )
   );
 };
 

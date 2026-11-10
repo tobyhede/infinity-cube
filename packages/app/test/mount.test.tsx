@@ -284,7 +284,7 @@ describe('mounting an aggregate in the page', () => {
     // Read inside `act`: the canvas keeps settling while the FileReader runs,
     // and an update in that gap would land outside any test boundary.
     const bytes = await act(() => bytesOf(picture ?? new Blob()));
-    expect(bytes).toEqual(files.get(`images/${IMAGE_ID}.png`));
+    expect(bytes).toEqual(files.get(`assets/${IMAGE_ID}.png`));
   });
 
   it('pins the commit a branch resolves to in the address, keeping the path', async () => {

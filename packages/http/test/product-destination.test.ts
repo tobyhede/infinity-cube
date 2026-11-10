@@ -412,10 +412,10 @@ describe('product destinations', () => {
   });
 });
 
-describe('a stored image address', () => {
-  // Stored images are served by the application, not opened as a destination
-  // in it (ADR 0106), so an image URL is not the product's to resolve.
-  it.each(['/images', `/images/${'A'.repeat(43)}`, '/images/not-an-id'])(
+describe('a stored asset address', () => {
+  // Stored assets are served by the application, not opened as a destination
+  // in it (ADR 0142), so an asset URL is not the product's to resolve.
+  it.each(['/assets', `/assets/${'A'.repeat(43)}`, '/assets/not-an-id'])(
     'classifies %s as outside product addressing',
     (path) => {
       expect(productAddress(path)).toEqual({ kind: 'outside' });

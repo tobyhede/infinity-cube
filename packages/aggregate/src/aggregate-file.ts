@@ -5,10 +5,10 @@ import {
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
-import type { StoredImage } from '@project/persistence';
+import type { StoredAsset } from '@project/persistence';
 import type { AggregateSource, DirectoryListing, SourceRead } from './aggregate-source';
 import { describeSchemaFailure, identifySpace, SpaceIdentityError } from './identify-space';
-import { admitImageFile, IMAGES_DIRECTORY_NAME, isImageFileName } from './images';
+import { admitAssetFile, assetFileHash, ASSETS_DIRECTORY_NAME } from './assets';
 import { compareOrdinal } from './ordinal';
 import type { AggregateInput } from './space-repository';
 import { AggregateDirectoryError, parseSingleSpace, refuseSpaceDocument } from './space-directory';
@@ -71,7 +71,7 @@ interface ScannedSpace {
 interface ScannedBelowRoot {
   readonly spaces: readonly ScannedSpace[];
   /** By path relative to the Aggregate directory, in ordinal order. */
-  readonly images: readonly string[];
+  readonly assets: readonly string[];
 }
 
 /**
@@ -131,11 +131,11 @@ const refuseLinks = (source: AggregateSource, paths: readonly string[]): void =>
   throw new AggregateDirectoryError('discovery', linkDiagnostics(source, paths));
 };
 
-/** Whether a file named `name` in `images/` is one Importing reads. */
-const isVisibleImage = (name: string): boolean => name !== '' && !name.startsWith('.');
+/** Whether a file named `name` in `assets/` is one Importing owns and reads. */
+const isAssetFile = (name: string): boolean => assetFileHash(name) !== undefined;
 
 /**
- * The root's listing, refused when `aggregate.json`, `images/` or a directory
+ * The root's listing, refused when `aggregate.json`, `assets/` or a directory
  * named for a Space is a symbolic link: Export writes into each of those.
  */
 const listRoot = async (source: AggregateSource): Promise<DirectoryListing> => {
@@ -147,7 +147,7 @@ const listRoot = async (source: AggregateSource): Promise<DirectoryListing> => {
       root,
       (name) =>
         name === AGGREGATE_FILE_NAME ||
-        name === IMAGES_DIRECTORY_NAME ||
+        name === ASSETS_DIRECTORY_NAME ||
         spaceDirectoryId(name) !== undefined,
     ),
   );
@@ -205,19 +205,20 @@ const scanSpaceDirectory = async (
 
 /**
  * List what Importing reads beneath the root, given the root's listing: each
- * child directory but `images/`, the `resources/` of each one holding a
- * `space.json`, and `images/`.
+ * child directory but `assets/`, the `resources/` of each one holding a
+ * `space.json`, and `assets/`.
  *
  * A child directory is a Space directory because it holds a `space.json`,
- * except `images/`, which is the image directory whatever it holds: a visible
- * file directly in it is read once, as an image. `images/` is listed whether
- * or not the root's listing names it, and a missing one lists empty; a linked
- * one was refused with the root. Nothing deeper is listed, so a sibling
+ * except `assets/`, which is the asset directory whatever it holds: a file
+ * directly in it named by a valid hash, with any extension, is read once, as
+ * an asset, and any other is left alone. `assets/` is listed whether or not
+ * the root's listing names it, and a missing one lists empty; a linked one was
+ * refused with the root. Nothing deeper is listed, so a sibling
  * aggregate or a nested `aggregate.json` is never searched for.
  *
  * Every directory is listed before a failure is raised, so each one that
  * could not be listed, or holds a link at a path InfinityCube owns, is reported
- * together, in ordinal order with `images/` last, as every file that could
+ * together, in ordinal order with `assets/` last, as every file that could
  * not be read is.
  */
 const scanBelowRoot = async (
@@ -225,46 +226,46 @@ const scanBelowRoot = async (
   root: DirectoryListing,
 ): Promise<ScannedBelowRoot> => {
   const names = root.directories
-    .filter((name) => name !== IMAGES_DIRECTORY_NAME)
+    .filter((name) => name !== ASSETS_DIRECTORY_NAME)
     .sort(compareOrdinal);
-  const [spaceResults, imagesResult] = await Promise.all([
+  const [spaceResults, assetsResult] = await Promise.all([
     Promise.all(names.map((name) => settledListing(scanSpaceDirectory(source, name)))),
     settledListing(
-      listOrRefuse(source, IMAGES_DIRECTORY_NAME).then((images) => {
-        refuseLinks(source, ownedLinks(IMAGES_DIRECTORY_NAME, images, isImageFileName));
-        return images;
+      listOrRefuse(source, ASSETS_DIRECTORY_NAME).then((assets) => {
+        refuseLinks(source, ownedLinks(ASSETS_DIRECTORY_NAME, assets, isAssetFile));
+        return assets;
       }),
     ),
   ]);
-  const refusals = [...spaceResults, imagesResult].flatMap((result) =>
+  const refusals = [...spaceResults, assetsResult].flatMap((result) =>
     result.ok ? [] : [result.refusal],
   );
-  if (refusals.length > 0 || !imagesResult.ok) {
+  if (refusals.length > 0 || !assetsResult.ok) {
     throw new AggregateDirectoryError(
       'discovery',
       refusals.flatMap(({ diagnostics }) => diagnostics),
     );
   }
   const spaces = spaceResults.flatMap((result) => (result.ok ? [result.value] : []));
-  const images = imagesResult.value;
+  const assets = assetsResult.value;
   return {
     spaces: spaces
       .filter((space): space is ScannedSpace => space !== undefined)
       .sort((left, right) => compareOrdinal(left.name, right.name)),
-    images: images.files
-      .filter(isVisibleImage)
+    assets: assets.files
+      .filter(isAssetFile)
       .sort(compareOrdinal)
-      .map((name) => `${IMAGES_DIRECTORY_NAME}/${name}`),
+      .map((name) => `${ASSETS_DIRECTORY_NAME}/${name}`),
   };
 };
 
 /** The paths beneath the root that Importing reads, in the order it reads them. */
-const scannedPaths = ({ spaces, images }: ScannedBelowRoot): readonly string[] => [
+const scannedPaths = ({ spaces, assets }: ScannedBelowRoot): readonly string[] => [
   ...spaces.flatMap(({ name, resources }) => [
     `${name}/space.json`,
     ...resources.map((inside) => `${name}/${inside}`),
   ]),
-  ...images,
+  ...assets,
 ];
 
 /** The files Importing reads in an Aggregate directory, and the Space directories among them. */
@@ -280,12 +281,12 @@ export interface AggregateScan {
  * them, found by listing alone: `aggregate.json`; then, for each child directory
  * holding a `space.json`, in ordinal name order, that `space.json` followed by
  * the `*.md` beside it and the `resources/*.json` and `resources/*.md`, in
- * ordinal order of their path inside the Space directory; then the visible
- * files directly in `images/`, in ordinal order.
+ * ordinal order of their path inside the Space directory; then the files
+ * directly in `assets/` named by a valid hash, in ordinal order.
  *
  * This is the one discovery rule: `readAggregateFrom` reads what it finds, and
  * Export owns what it finds. A child directory without a `space.json` is not a
- * Space directory, and `images/` is never one. A sibling aggregate, notes and
+ * Space directory, and `assets/` is never one. A sibling aggregate, notes and
  * any other file are left out. A directory with no `aggregate.json` still answers
  * the rest, which Export owns there as well.
  */
@@ -383,6 +384,30 @@ const agreeingSpaceDirectory = (
   return { directory, id, input };
 };
 
+/**
+ * A refusal for each hash two or more files in `assets/` are named by, naming
+ * every one of them: one asset exists per hash, so which file holds it would
+ * be a guess.
+ */
+const duplicateAssetFailures = (
+  directory: string,
+  paths: readonly string[],
+): readonly AggregateDirectoryError[] => {
+  const byHash = new Map<string, string[]>();
+  for (const path of paths) {
+    const hash = assetFileHash(path.slice(ASSETS_DIRECTORY_NAME.length + 1));
+    if (hash === undefined) continue;
+    byHash.set(hash, [...(byHash.get(hash) ?? []), path]);
+  }
+  const diagnostics = [...byHash.values()]
+    .filter((named) => named.length > 1)
+    .map(
+      (named) =>
+        `${named.map((path) => joinPath(directory, path)).join(', ')}: two files of one hash; keep one`,
+    );
+  return diagnostics.length > 0 ? [new AggregateDirectoryError('parsing', diagnostics)] : [];
+};
+
 /** The Spaces minting completed, beside the failures it gathered on the way. */
 interface IdentifiedSpaces {
   readonly spaces: readonly SpaceSnapshot[];
@@ -425,12 +450,12 @@ const identifyReadSpaces = (
 
 /**
  * What an Aggregate directory holds: the complete Meta-rooted input the
- * persistence lifecycle takes, and the stored images its `images/` carries.
- * The images are outside the aggregate (ADR 0106), so they travel beside it
- * rather than inside the input either lifecycle door reads.
+ * persistence lifecycle takes, and the stored assets its `assets/` carries.
+ * The assets are outside the aggregate (ADR 0106, ADR 0142), so they travel
+ * beside it rather than inside the input either lifecycle door reads.
  */
 export interface AggregateDirectoryContents extends AggregateInput {
-  readonly images: readonly StoredImage[];
+  readonly assets: readonly StoredAsset[];
 }
 
 /**
@@ -440,14 +465,14 @@ const aggregateContents = (
   metaSpaceId: UUID,
   reads: readonly SpaceDirectoryRead[],
   readFailures: readonly unknown[],
-  images: { readonly images: readonly StoredImage[]; readonly failures: readonly unknown[] },
+  assets: { readonly assets: readonly StoredAsset[]; readonly failures: readonly unknown[] },
   newId: () => UUID,
 ): AggregateDirectoryContents => {
   // Minting runs over whatever read cleanly even when a neighbour did not, so a
   // fault it raises is weighed against the read failures rather than hidden
   // behind them.
   const identified = identifyReadSpaces(reads, newId);
-  const failures = [...readFailures, ...identified.failures, ...images.failures];
+  const failures = [...readFailures, ...identified.failures, ...assets.failures];
 
   if (failures.length > 0) {
     // A failure this reader does not model — a programming fault, the identity
@@ -467,13 +492,14 @@ const aggregateContents = (
     );
   }
 
-  return { metaSpaceId, spaces: identified.spaces, images: images.images };
+  return { metaSpaceId, spaces: identified.spaces, assets: assets.assets };
 };
 
 /**
  * Read a canonical aggregate from a source into the complete Meta-rooted input
- * the persistence lifecycle takes, beside every image `images/` carries, each
- * admitted by the rule storing an uploaded picture uses (ADR 0133, ADR 0118).
+ * the persistence lifecycle takes, beside every asset `assets/` carries, each
+ * admitted by the rule storing an asset uses, typed by its extension and named
+ * for its content, one file to a hash (ADR 0133, ADR 0142).
  *
  * The reader decides everything the read involves, and the source only reaches
  * the files. It lists the root, and refuses a root with no `aggregate.json`. It
@@ -568,31 +594,35 @@ export const readAggregateFrom = async (
     }
   }
 
-  const unreadableImages = scanned.images.flatMap(unreadableDiagnostic);
-  const imageResults = await Promise.allSettled(
-    scanned.images
+  const unreadableAssets = scanned.assets.flatMap(unreadableDiagnostic);
+  const assetResults = await Promise.allSettled(
+    scanned.assets
       .filter((path) => !isUnreadable(path))
       .map((path) => {
-        const name = path.slice(IMAGES_DIRECTORY_NAME.length + 1);
-        return admitImageFile(
-          joinPath(directory, IMAGES_DIRECTORY_NAME, name),
+        const name = path.slice(ASSETS_DIRECTORY_NAME.length + 1);
+        return admitAssetFile(
+          joinPath(directory, ASSETS_DIRECTORY_NAME, name),
           name,
           new Uint8Array(bytesOf(path)),
         );
       }),
   );
-  const images = {
-    images: imageResults.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : [])),
+  const admitted = assetResults.flatMap((result) =>
+    result.status === 'fulfilled' ? [result.value] : [],
+  );
+  const assets = {
+    assets: admitted,
     // SAFETY: PromiseRejectedResult.reason is typed `any` by lib.es; asserting
     // `unknown` stops that `any` from propagating into `failures`.
     failures: [
-      ...imageResults.flatMap((result) =>
+      ...assetResults.flatMap((result) =>
         result.status === 'rejected' ? [result.reason as unknown] : [],
       ),
-      ...(unreadableImages.length > 0
-        ? [new AggregateDirectoryError('discovery', unreadableImages)]
+      ...duplicateAssetFailures(directory, scanned.assets),
+      ...(unreadableAssets.length > 0
+        ? [new AggregateDirectoryError('discovery', unreadableAssets)]
         : []),
     ],
   };
-  return aggregateContents(metaSpaceId, reads, readFailures, images, newId);
+  return aggregateContents(metaSpaceId, reads, readFailures, assets, newId);
 };

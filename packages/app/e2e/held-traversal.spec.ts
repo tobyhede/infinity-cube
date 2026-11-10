@@ -10,7 +10,7 @@ import { seedPositionedMap } from './seed';
 const IMAGE_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000a1');
 const FIGURE_URL = 'https://example.com/figure.png';
 const HARBOUR = readFileSync(
-  new URL('../fixture/images/fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs.png', import.meta.url),
+  new URL('../fixture/assets/fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs.png', import.meta.url),
 );
 
 /** Open a Space holding a Closed Image Resource on the Map `Pictures`, and a second Map `Elsewhere`. */
@@ -55,7 +55,7 @@ async function holdReplacement(page: Page): Promise<void> {
   await settled(page);
   const never = Promise.withResolvers<undefined>();
   await page.route(
-    (url) => url.pathname === '/images',
+    (url) => url.pathname === '/assets',
     async (route) => {
       await never.promise;
       await route.continue();

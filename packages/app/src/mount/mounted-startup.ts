@@ -80,14 +80,14 @@ export const createMountedStartup = (options: MountedStartupOptions): SpaceStart
         createObjectUrl: options.createObjectUrl,
       });
       if (!result.ok) throw new Error(describeAggregateReadRefusal(result.refusal, pinned));
-      const { backend, displayImage, metaSpaceId } = result.mounted;
+      const { backend, assets, displayImage, metaSpaceId } = result.mounted;
       const startup = createSpaceStartup(
         options.fullscreen,
         options.presentations(pinned),
         backend,
         options.newId,
         history,
-        browserImageSources(backend, displayImage),
+        browserImageSources(assets, displayImage),
         displayImage,
         { mounted: true },
       );

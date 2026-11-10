@@ -40,7 +40,7 @@ const OVERSIZED = { width: 4000, height: 3000 } as const;
  * nothing reaches the network.
  */
 const HARBOUR = readFileSync(
-  new URL('../fixture/images/fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs.png', import.meta.url),
+  new URL('../fixture/assets/fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs.png', import.meta.url),
 );
 
 interface Pictures {
@@ -480,7 +480,7 @@ test('choosing a file from the Dock creates an Image Resource titled Resource N 
   expect(created?.document).toMatchObject({
     kind: 'image',
     content: {
-      url: expect.stringMatching(/^\/images\/[A-Za-z0-9_-]{43}$/u),
+      url: expect.stringMatching(/^\/assets\/[A-Za-z0-9_-]{43}$/u),
       naturalSize: FIRST_PICTURE.size,
     },
   });
@@ -600,7 +600,7 @@ test('a picture dropped on a Resource, or on the Map an Open Space Resource draw
   const spaceId = await openForCreation(page);
   const uploads: string[] = [];
   page.on('request', (request) => {
-    if (request.method() === 'POST' && new URL(request.url()).pathname.endsWith('/images')) {
+    if (request.method() === 'POST' && new URL(request.url()).pathname.endsWith('/assets')) {
       uploads.push(request.url());
     }
   });
@@ -911,7 +911,7 @@ test(
 
     await expect(target).toHaveCount(0);
     const picture = resource.getByRole('img', { name: 'Figure' });
-    await expect(picture).toHaveAttribute('src', /^\/images\/[A-Za-z0-9_-]{43}$/u);
+    await expect(picture).toHaveAttribute('src', /^\/assets\/[A-Za-z0-9_-]{43}$/u);
     await expectPictureLoaded(picture, FIRST_PICTURE.size.width);
     await settled(page);
     const after = await storedFigure(page, spaceId);
@@ -919,7 +919,7 @@ test(
       title: 'Figure',
       kind: 'image',
       content: {
-        url: expect.stringMatching(/^\/images\/[A-Za-z0-9_-]{43}$/u),
+        url: expect.stringMatching(/^\/assets\/[A-Za-z0-9_-]{43}$/u),
         naturalSize: FIRST_PICTURE.size,
       },
     });
@@ -1062,7 +1062,7 @@ for (const failure of ['HTTP 500', 'network', 'timeout']) {
     const { resource, target } = await beginReplacing(page);
     const before = await storedFigure(page, spaceId);
     if (failure === 'timeout') await page.clock.install();
-    await page.route('**/images', async (route) => {
+    await page.route('**/assets', async (route) => {
       if (failure === 'network') await route.abort('failed');
       else if (failure === 'timeout') return;
       else await route.fulfill({ status: 500, body: 'Unavailable' });
@@ -1087,7 +1087,7 @@ for (const failure of ['HTTP 500', 'network', 'timeout']) {
     await expectAvailable(dockNavigation(page));
     expect((await storedFigure(page, spaceId)).revision).toBe(before.revision);
     expect(errors).toEqual([]);
-    await page.unroute('**/images');
+    await page.unroute('**/assets');
     await upload();
     await expect(target).toHaveCount(0);
     await expectPictureLoaded(
@@ -1136,7 +1136,7 @@ async function uploadHeld(
   const held = Promise.withResolvers<undefined>();
   // The host's image collection, which a chosen file is sent to.
   await page.route(
-    (url) => url.pathname === '/images',
+    (url) => url.pathname === '/assets',
     async (route) => {
       await held.promise;
       await route.continue();
@@ -1255,7 +1255,7 @@ test('a failed save is retried while a replacement is held, and the replacement 
     release = resolve;
   });
   await page.route(
-    (url) => url.pathname === '/images',
+    (url) => url.pathname === '/assets',
     async (route) => {
       await held;
       await route.continue();
@@ -1527,7 +1527,7 @@ async function conflictDuringReplacement(
     releaseUpload = resolve;
   });
   await page.route(
-    (url) => url.pathname === '/images',
+    (url) => url.pathname === '/assets',
     async (route) => {
       await uploadHeld;
       await route.continue();
@@ -1655,7 +1655,7 @@ test('the tracked fixture draws its Open Image Resource with no network', async 
     .getByRole('article', { name: 'Harbour' });
   await expect(resource).toHaveAttribute('data-open', 'true');
   const picture = resource.getByRole('img', { name: 'Harbour' });
-  await expect(picture).toHaveAttribute('src', /^\/images\/[A-Za-z0-9_-]{43}$/u);
+  await expect(picture).toHaveAttribute('src', /^\/assets\/[A-Za-z0-9_-]{43}$/u);
   await expectPictureLoaded(picture, HARBOUR_SIZE.width);
   expect(escaped).toEqual([]);
 });

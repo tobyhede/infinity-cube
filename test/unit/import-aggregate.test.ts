@@ -28,7 +28,7 @@ import {
 } from '../support/aggregate-directory';
 import { MemorySpaceRepository } from '@project/aggregate';
 import { captureError } from '../support/capture-error';
-import { admitted, jpegBytes, pngBytes } from '../support/stored-images';
+import { admitted, jpegBytes, pngBytes } from '../support/stored-assets';
 
 const META_SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const OTHER_META_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
@@ -494,7 +494,7 @@ describe('importing the images an Aggregate directory carries', () => {
   it('admits every image in images/ before the aggregate is stored', async () => {
     const shown = await admitted(pngBytes(1));
     const unshown = await admitted(jpegBytes(2));
-    const root = await writePicturedAggregate(`/images/${shown.id}`, {
+    const root = await writePicturedAggregate(`/assets/${shown.id}`, {
       [`${shown.id}.png`]: pngBytes(1),
       [`${unshown.id}.jpg`]: jpegBytes(2),
     });
@@ -511,7 +511,7 @@ describe('importing the images an Aggregate directory carries', () => {
     const image = await admitted(pngBytes(1));
     const stored = new MemorySpaceRepository();
     await importFrom(await writeMetaOnlyAggregate(OTHER_META_ID, 'Before'), stored);
-    const root = await writePicturedAggregate(`/images/${image.id}`, {
+    const root = await writePicturedAggregate(`/assets/${image.id}`, {
       [`${image.id}.png`]: pngBytes(1),
     });
     const repository = new RecordingRepository(stored);
@@ -529,7 +529,7 @@ describe('importing the images an Aggregate directory carries', () => {
    */
   it('does not refuse a stored-image URL whose bytes the directory does not carry', async () => {
     const absent = await admitted(pngBytes(9));
-    const root = await writePicturedAggregate(`/images/${absent.id}`, {});
+    const root = await writePicturedAggregate(`/assets/${absent.id}`, {});
     const repository = new RecordingRepository();
 
     await expect(importFrom(root, repository)).resolves.toMatchObject({ kind: 'imported' });
@@ -538,7 +538,7 @@ describe('importing the images an Aggregate directory carries', () => {
 
   it('ignores the dotfiles and directories inside images/', async () => {
     const image = await admitted(pngBytes(1));
-    const root = await writePicturedAggregate(`/images/${image.id}`, {
+    const root = await writePicturedAggregate(`/assets/${image.id}`, {
       '.DS_Store': 'Bud1 not an image',
     });
     await mkdir(join(root, 'images', 'drafts'));
@@ -551,7 +551,7 @@ describe('importing the images an Aggregate directory carries', () => {
 
   it('refuses a file in images/ that is not an image the host stores, before storing anything', async () => {
     const image = await admitted(pngBytes(1));
-    const root = await writePicturedAggregate(`/images/${image.id}`, {
+    const root = await writePicturedAggregate(`/assets/${image.id}`, {
       [`${image.id}.png`]: pngBytes(1),
       'notes.txt': 'not an image',
     });
@@ -574,7 +574,7 @@ describe('importing the images an Aggregate directory carries', () => {
    */
   it('refuses an image file not named for its content', async () => {
     const image = await admitted(pngBytes(1));
-    const root = await writePicturedAggregate(`/images/${image.id}`, {
+    const root = await writePicturedAggregate(`/assets/${image.id}`, {
       'harbour.png': pngBytes(1),
     });
     const repository = new RecordingRepository();

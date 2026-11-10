@@ -96,7 +96,7 @@ describe('storing an image', () => {
 
       const stored = await post(app, bytes, 'application/octet-stream');
 
-      const url = `/images/${idOf(bytes)}`;
+      const url = `/assets/${idOf(bytes)}`;
       expect(stored.status).toBe(201);
       expect(stored.headers.get('location')).toBe(url);
       expect(stored.headers.get('content-type')).toBe('application/json; charset=utf-8');
@@ -121,8 +121,8 @@ describe('storing an image', () => {
 
     expect(first.status).toBe(201);
     expect(second.status).toBe(200);
-    expect(second.headers.get('location')).toBe(`/images/${idOf(png)}`);
-    await expect(second.json()).resolves.toEqual({ url: `/images/${idOf(png)}` });
+    expect(second.headers.get('location')).toBe(`/assets/${idOf(png)}`);
+    await expect(second.json()).resolves.toEqual({ url: `/assets/${idOf(png)}` });
     expect(images.size).toBe(1);
   });
 
@@ -132,7 +132,7 @@ describe('storing an image', () => {
 
     const stored = await post(app, png, 'image/svg+xml');
     expect(stored.status).toBe(201);
-    expect((await app.request(`/images/${idOf(png)}`)).headers.get('content-type')).toBe(
+    expect((await app.request(`/assets/${idOf(png)}`)).headers.get('content-type')).toBe(
       'image/png',
     );
     await expectProblem(await post(app, svg, 'image/png'), 'image-svg-unsupported');
@@ -211,7 +211,7 @@ describe('reading an image', () => {
     expect(isImageId(UNKNOWN_ID)).toBe(true);
 
     await expectProblem(
-      await createSpaceHttpApp(store, { newId: mintsNothing }).request(`/images/${UNKNOWN_ID}`),
+      await createSpaceHttpApp(store, { newId: mintsNothing }).request(`/assets/${UNKNOWN_ID}`),
       'not-found',
     );
     expect(readsSpace).not.toHaveBeenCalled();
@@ -228,7 +228,7 @@ describe('reading an image', () => {
 
     await expectProblem(
       await createSpaceHttpApp(store, { newId: mintsNothing }).request(
-        `/images/${encodeURIComponent(id)}`,
+        `/assets/${encodeURIComponent(id)}`,
       ),
       'invalid-image-id',
     );
@@ -241,7 +241,7 @@ describe('reading an image', () => {
     const app = createSpaceHttpApp(store, { newId: mintsNothing });
     await post(app, png);
 
-    const response = await app.request(`/images/${idOf(png)}`, { method: 'HEAD' });
+    const response = await app.request(`/assets/${idOf(png)}`, { method: 'HEAD' });
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toBe('image/png');
     expect(response.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
@@ -249,8 +249,8 @@ describe('reading an image', () => {
 
   it.each([
     ['the collection', '/images', 'GET', 'POST'],
-    ['an image', `/images/${UNKNOWN_ID}`, 'DELETE', 'GET, HEAD'],
-    ['an image', `/images/${UNKNOWN_ID}`, 'PUT', 'GET, HEAD'],
+    ['an image', `/assets/${UNKNOWN_ID}`, 'DELETE', 'GET, HEAD'],
+    ['an image', `/assets/${UNKNOWN_ID}`, 'PUT', 'GET, HEAD'],
   ])('answers 405 for %s under %s, naming what is allowed', async (_, path, method, allow) => {
     const { store } = repository();
     const response = await createSpaceHttpApp(store, { newId: mintsNothing }).request(path, {
@@ -264,7 +264,7 @@ describe('reading an image', () => {
   it('answers 400 for a malformed id whatever the method', async () => {
     const { store } = repository();
     await expectProblem(
-      await createSpaceHttpApp(store, { newId: mintsNothing }).request('/images/nope', {
+      await createSpaceHttpApp(store, { newId: mintsNothing }).request('/assets/nope', {
         method: 'DELETE',
       }),
       'invalid-image-id',

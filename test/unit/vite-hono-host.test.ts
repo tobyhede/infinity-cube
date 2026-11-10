@@ -241,7 +241,7 @@ describe('Vite Hono host', () => {
       const stored = await fetch(`${host.url}/images`, { method: 'POST', body: png });
       expect(stored.status).toBe(201);
       const url = stored.headers.get('location');
-      expect(url).toMatch(/^\/images\/[\w-]{43}$/u);
+      expect(url).toMatch(/^\/assets\/[\w-]{43}$/u);
       const served = await fetch(`${host.url}${url ?? ''}`);
 
       expect(served.status).toBe(200);

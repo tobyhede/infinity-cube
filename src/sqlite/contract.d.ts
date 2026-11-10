@@ -16,7 +16,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:4e4bea125e21acc61505c207378f4b10ce265a4f0c63e176b71f3ddf9986b572'>;
+  StorageHashBase<'sha256:e3e41488ce89fd9074faca318df912f7ec4fe64d7b30cf3e2e18e310d0c6ee3f'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:5282b6091e26ba5dfb56feeb9a788d9f937328a35816f953b05008ddddb77b7c'>;
 export type ProfileHash =
@@ -31,8 +31,8 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
 
 export type FieldOutputTypes = {
   readonly __unbound__: {
-    readonly Image: {
-      readonly id: CodecTypes['sqlite/text@1']['output'];
+    readonly Asset: {
+      readonly hash: CodecTypes['sqlite/text@1']['output'];
       readonly mediaType: CodecTypes['sqlite/text@1']['output'];
       readonly bytes: CodecTypes['sqlite/blob@1']['output'];
       readonly createdAt: CodecTypes['sqlite/datetime@1']['output'];
@@ -60,8 +60,8 @@ export type FieldOutputTypes = {
 };
 export type FieldInputTypes = {
   readonly __unbound__: {
-    readonly Image: {
-      readonly id: CodecTypes['sqlite/text@1']['input'];
+    readonly Asset: {
+      readonly hash: CodecTypes['sqlite/text@1']['input'];
       readonly mediaType: CodecTypes['sqlite/text@1']['input'];
       readonly bytes: CodecTypes['sqlite/blob@1']['input'];
       readonly createdAt: CodecTypes['sqlite/datetime@1']['input'];
@@ -89,10 +89,10 @@ export type FieldInputTypes = {
 };
 export type StorageColumnTypes = {
   readonly __unbound__: {
-    readonly images: {
+    readonly assets: {
       readonly bytes: CodecTypes['sqlite/blob@1']['output'];
       readonly created_at: CodecTypes['sqlite/datetime@1']['output'];
-      readonly id: CodecTypes['sqlite/text@1']['output'];
+      readonly hash: CodecTypes['sqlite/text@1']['output'];
       readonly media_type: CodecTypes['sqlite/text@1']['output'];
     };
     readonly repository_state: {
@@ -118,10 +118,10 @@ export type StorageColumnTypes = {
 };
 export type StorageColumnInputTypes = {
   readonly __unbound__: {
-    readonly images: {
+    readonly assets: {
       readonly bytes: CodecTypes['sqlite/blob@1']['input'];
       readonly created_at: CodecTypes['sqlite/datetime@1']['input'];
-      readonly id: CodecTypes['sqlite/text@1']['input'];
+      readonly hash: CodecTypes['sqlite/text@1']['input'];
       readonly media_type: CodecTypes['sqlite/text@1']['input'];
     };
     readonly repository_state: {
@@ -162,9 +162,9 @@ type ContractBase = Omit<
         readonly kind: 'sqlite-namespace';
         readonly entries: {
           readonly table: {
-            readonly images: {
+            readonly assets: {
               columns: {
-                readonly id: {
+                readonly hash: {
                   readonly nativeType: 'text';
                   readonly codecId: 'sqlite/text@1';
                   readonly nullable: false;
@@ -186,7 +186,7 @@ type ContractBase = Omit<
                   readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
                 };
               };
-              primaryKey: { readonly columns: readonly ['id'] };
+              primaryKey: { readonly columns: readonly ['hash'] };
               uniques: readonly [];
               indexes: readonly [];
               foreignKeys: readonly [];
@@ -341,15 +341,15 @@ type ContractBase = Omit<
       readonly namespace: '__unbound__' & NamespaceId;
       readonly model: 'Resource';
     };
-    readonly images: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Image' };
+    readonly assets: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Asset' };
   };
   readonly domain: {
     readonly namespaces: {
       readonly __unbound__: {
         readonly models: {
-          readonly Image: {
+          readonly Asset: {
             readonly fields: {
-              readonly id: {
+              readonly hash: {
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'sqlite/text@1' };
               };
@@ -368,10 +368,10 @@ type ContractBase = Omit<
             };
             readonly relations: Record<string, never>;
             readonly storage: {
-              readonly table: 'images';
+              readonly table: 'assets';
               readonly namespaceId: '__unbound__';
               readonly fields: {
-                readonly id: { readonly column: 'id' };
+                readonly hash: { readonly column: 'hash' };
                 readonly mediaType: { readonly column: 'media_type' };
                 readonly bytes: { readonly column: 'bytes' };
                 readonly createdAt: { readonly column: 'created_at' };

@@ -17,7 +17,7 @@ const mintsNothing = (): UUID => {
 
 const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x01]);
 /** `png`'s SHA-256 as unpadded base64url, computed independently with Node's `crypto`. */
-const PNG_URL = '/images/KJx3oXmDEwnD1FBZUrDl_2u5HAtMb2ip2ose1tOMXmQ';
+const PNG_URL = '/assets/KJx3oXmDEwnD1FBZUrDl_2u5HAtMb2ip2ose1tOMXmQ';
 
 /** The real Fetch application over an in-memory store, reached as the browser reaches it. */
 const backendOverHost = (): HttpSpaceBackend => {

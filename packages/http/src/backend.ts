@@ -1,4 +1,4 @@
-import type { UUID } from '@project/core';
+import { assetRefHash, type AssetRef, type UUID } from '@project/core';
 import {
   CANONICAL_DECIMAL,
   commitOutcomeDecoder,
@@ -6,12 +6,13 @@ import {
   decodeProblemDetails,
   decodeSpaceSummaries,
   decodeLoadedSpace,
-  decodeStoredImageUrl,
+  decodeStoredAssetUrl,
   encodeCommitRequest,
-  isImageRefusal,
-  MAX_IMAGE_BYTES,
+  ASSET_ABSENT,
+  ASSET_TOO_LARGE,
+  MAX_ASSET_BYTES,
   problemCodeForType,
-  type ImageStoring,
+  type AssetClient,
   type CommitResult,
   type LoadedSpace,
   type ProblemDetails,
@@ -42,7 +43,7 @@ const hasProblemDetailsMediaType = (response: Response): boolean => {
 export interface HttpSpaceBackendOptions {
   fetch?: typeof globalThis.fetch;
   timeoutMs?: number;
-  /** The budget for sending an image, which may be up to `MAX_IMAGE_BYTES` over the author's uplink. */
+  /** The budget for sending an asset, which may be up to `MAX_ASSET_BYTES` over the author's uplink. */
   uploadTimeoutMs?: number;
 }
 
@@ -56,7 +57,7 @@ export class HttpSpaceBackend implements SpaceBackend {
     this.#baseUrl = baseUrl;
     this.#fetch = options.fetch ?? globalThis.fetch.bind(globalThis);
     this.#timeoutMs = options.timeoutMs ?? 10_000;
-    // Two minutes carries a full-size image over an uplink of about 0.7 Mbps.
+    // Two minutes carries a full-size asset over an uplink of about 0.7 Mbps.
     this.#uploadTimeoutMs = options.uploadTimeoutMs ?? 120_000;
   }
 
@@ -114,26 +115,42 @@ export class HttpSpaceBackend implements SpaceBackend {
   }
 
   /**
-   * Send an image to the host's store (ADR 0106), answering the URL it is
-   * stored at or the refusal the host named. The host decides from the bytes;
-   * an image over the size limit is answered here without sending it, because
-   * the host could only refuse it after reading all of it. Throws when the
-   * host cannot be reached or answers anything else.
+   * Send bytes to the host's asset store (ADR 0142) under the Blob's media
+   * type, answering the asset reference they are stored at or the refusal the
+   * host named. Any media type and zero bytes are admitted; bytes over the
+   * size limit are answered here without sending them, because the host could
+   * only refuse them after reading all of them. Throws when the host cannot be
+   * reached or answers anything else.
    */
-  storeImage(image: Blob): Promise<ImageStoring> {
-    if (image.size > MAX_IMAGE_BYTES) {
-      return Promise.resolve({ kind: 'refused', code: 'image-too-large' });
-    }
+  storeAsset(bytes: Blob): Promise<AssetRef | { readonly refused: string }> {
+    if (bytes.size > MAX_ASSET_BYTES) return Promise.resolve({ refused: ASSET_TOO_LARGE });
+    const headers: Record<string, string> = bytes.type === '' ? {} : { 'Content-Type': bytes.type };
     return this.#timedRequest(
-      (client) => client.images.$post(undefined, { init: { body: image } }),
-      async (response): Promise<ImageStoring> => {
-        if (response.ok)
-          return { kind: 'stored', url: decodeStoredImageUrl(await response.json()) };
+      (client) => client.assets.$post(undefined, { init: { body: bytes, headers } }),
+      async (response): Promise<AssetRef | { readonly refused: string }> => {
+        if (response.ok) return decodeStoredAssetUrl(await response.json());
         if (hasProblemDetailsMediaType(response)) {
           const code = problemCodeForType(decodeProblemDetails(await response.json()).type);
-          if (isImageRefusal(code)) return { kind: 'refused', code };
+          if (code === ASSET_TOO_LARGE) return { refused: code };
         }
-        throw new Error(`Unable to store an image: HTTP ${response.status}`);
+        throw new Error(`Unable to store an asset: HTTP ${response.status}`);
+      },
+      this.#uploadTimeoutMs,
+    );
+  }
+
+  /**
+   * Read a stored asset's bytes, answering `asset-absent` when the host holds
+   * none under its hash. Throws when the host cannot be reached or answers
+   * anything else.
+   */
+  readAsset(ref: AssetRef): Promise<Blob | { readonly refused: string }> {
+    return this.#timedRequest(
+      (client) => client.assets[':hash'].$get({ param: { hash: assetRefHash(ref) } }),
+      async (response): Promise<Blob | { readonly refused: string }> => {
+        if (response.status === 404) return { refused: ASSET_ABSENT };
+        if (!response.ok) throw new Error(`Unable to read an asset: HTTP ${response.status}`);
+        return await response.blob();
       },
       this.#uploadTimeoutMs,
     );
@@ -183,6 +200,23 @@ export class HttpSpaceBackend implements SpaceBackend {
   }
 }
 
+/**
+ * The asset store over HTTP, as a surface reaches it (ADR 0142): reads and
+ * stores go through `backend`, and `url` says where an asset is drawn from —
+ * as authored by default, because a host serves its own assets; a mount draws
+ * from object URLs over its in-page store's bytes. Reading never fetches the
+ * URL `url` answers, so a mount reads bytes from its store, not from an object
+ * URL.
+ */
+export const httpAssetClient = (
+  backend: Pick<HttpSpaceBackend, 'readAsset' | 'storeAsset'>,
+  url: (ref: AssetRef) => string = (ref) => ref,
+): AssetClient => ({
+  url,
+  read: (ref) => backend.readAsset(ref),
+  store: (bytes) => backend.storeAsset(bytes),
+});
+
 class HttpTimeoutError extends Error {
   constructor() {
     super('Request timed out');
@@ -229,10 +263,8 @@ const commitFailureForProblem = (problem: ProblemDetails, response: Response): C
     case 'invalid-space-id':
     case 'unsupported-media-type':
     case 'method-not-allowed':
-    case 'invalid-image-id':
-    case 'image-too-large':
-    case 'image-format-unsupported':
-    case 'image-svg-unsupported':
+    case 'invalid-asset-hash':
+    case 'asset-too-large':
       return protocolFailure({ kind: 'unexpected-problem', problemCode: code });
   }
 };

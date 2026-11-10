@@ -1,12 +1,5 @@
 import type { SpaceAggregateError, SpaceError } from '@project/graph';
-import {
-  IMAGE_MEDIA_TYPES,
-  MAX_IMAGE_BYTES,
-  type ImageMediaType,
-  type ImageRefusal,
-  type SaveBlock,
-  type SpaceSessionState,
-} from '@project/persistence';
+import type { SaveBlock, SpaceSessionState } from '@project/persistence';
 import type { ConnectionResult } from './connection-completion';
 import type { AuthoringRefusal, StoredSpaceRefusal } from './space-authoring';
 import type {
@@ -14,6 +7,12 @@ import type {
   SpaceResourceTargetUnavailableReason,
 } from './space-resource-lifecycle';
 import { failureMessage } from './failure-message';
+import {
+  IMAGE_MEDIA_TYPES,
+  MAX_IMAGE_BYTES,
+  type ImageMediaType,
+  type ImageRefusal,
+} from './picture-admission';
 
 /**
  * Why a coordinated Space Resource lifecycle operation refused (ADR 0076).
