@@ -128,7 +128,15 @@ function SpacePluginView({ surface }: PluginViewProps<SpaceContent, SpaceMapCont
             id: 'open-close',
             label: `Close Resource ${name}`,
             icon: <Minimize2 size={14} />,
-            run: () => toggle({ open: false }),
+            run: () => {
+              // A Closed face draws no Done, so Close ends the Edit first; a
+              // Claim held inside this one keeps both until it is released.
+              if (held !== null) {
+                if (!held.release()) return;
+                setHeld(null);
+              }
+              toggle({ open: false });
+            },
           }
         : {
             kind: 'action',

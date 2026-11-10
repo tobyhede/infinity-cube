@@ -296,25 +296,25 @@ const neighbourOnScreen = (
   return neighbourToward(centreOf(origin), candidates, direction);
 };
 
-/** The Resource a drawn node shows, by the node's id in one drawing. */
 /**
  * The Resources a placement is drawn inside, through their Map embeddings,
- * outermost first, then its own: the surface path its embedded Map's Claims
- * nest under (ADR 0142).
+ * outermost first, then its own: the chain its embedded Map's Claims nest
+ * under (ADR 0142).
  */
-const surfacePathOf = (
+const embeddingChainOf = (
   node: ResourceFlowNode,
   nodesById: ReadonlyMap<string, ResourceFlowNode>,
 ): readonly ResourceId[] => {
-  const path: ResourceId[] = [];
+  const chain: ResourceId[] = [];
   let current: ResourceFlowNode | undefined = node;
   while (current !== undefined) {
-    path.unshift(current.data.resourceId);
+    chain.unshift(current.data.resourceId);
     current = current.parentId === undefined ? undefined : nodesById.get(current.parentId);
   }
-  return path;
+  return chain;
 };
 
+/** The Resource a drawn node shows, by the node's id in one drawing. */
 const resourceOfNode = (nodes: readonly ResourceFlowNode[], id: string): ResourceId | undefined =>
   nodes.find((node) => node.id === id)?.data.resourceId;
 
@@ -469,16 +469,13 @@ export function SpaceCanvas({
   );
   // A Claim passed to a Map embedding is held for that Map's authoring, and
   // withdraws nothing a plugin's own edit does; when it ends, the Resource
-  // whose Map it authored is selected, as Done always selected it.
+  // whose Map it authored is selected.
   const pageGate = usePluginGate();
   const gate = plugins?.gate ?? pageGate;
   const editedBefore = useRef<ReadonlySet<ResourceId>>(editingPortals);
   /** Lands a framing still pending for a Resource whose Map is no longer authored in place. */
   const flushPortalFraming = useRef<(resourceId: ResourceId) => void>(() => undefined);
   const lastEmbeds = useRef(embeds);
-  useLayoutEffect(() => {
-    lastEmbeds.current = embeds;
-  }, [embeds]);
   useLayoutEffect(() => {
     const returns = [...editingPortals].map((resourceId) => gate.lend(resourceId));
     for (const resourceId of editedBefore.current) {
@@ -493,6 +490,11 @@ export function SpaceCanvas({
       for (const give of returns) give();
     };
   }, [editingPortals, gate, selectResource]);
+  // After the flush above, so a flush in the commit that drops an embedding
+  // still finds the request the embedding last made.
+  useLayoutEffect(() => {
+    lastEmbeds.current = embeds;
+  }, [embeds]);
 
   const drawnSpaces = useMemo(
     () => [
@@ -2068,7 +2070,7 @@ export function SpaceCanvas({
                 (!embeddedEditing || editingEmbeddingIds.has(request.parent.id))
               }
               framing={portalDraft.get(request.parent.data.resourceId) ?? request.framing}
-              surfacePath={surfacePathOf(request.parent, portalNodesById)}
+              embeddedIn={embeddingChainOf(request.parent, portalNodesById)}
               bounds={request.bounds}
               absolute={request.absolute}
               drawnAbsolute={request.drawnAbsolute}

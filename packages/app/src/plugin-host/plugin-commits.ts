@@ -104,7 +104,7 @@ export interface PluginHost {
    * first: a surface here is embedded in each, so its Claim nests under one
    * they hold (ADR 0142). Empty, or absent, on a canvas drawn in no embedding.
    */
-  readonly path?: readonly ResourceId[] | undefined;
+  readonly embeddedIn?: readonly ResourceId[] | undefined;
 }
 
 /** Who holds a Claim on a drawing's Resource, as that drawing reads it. */
@@ -162,8 +162,8 @@ function commitsFor(
   };
 }
 
-/** Whether two Claim paths name the same surface. */
-const samePath = (a: readonly string[], b: readonly string[]): boolean =>
+/** Whether two Claim chains name the same surface. */
+const sameChain = (a: readonly string[], b: readonly string[]): boolean =>
   a.length === b.length && a.every((surface, index) => surface === b[index]);
 
 /**
@@ -198,14 +198,14 @@ export function pluginSurfaceOperations(
   // one of its surfaces at a time: once one holds it, none offers a second.
   // A surface inside a Map embedding whose Resource holds the Claim may nest
   // its own under it, as an Image inside an entered Space may (ADR 0142).
-  const path = [...(host.path ?? []), resourceId];
+  const chain = [...(host.embeddedIn ?? []), resourceId];
   const { holders } = host.gate.getState();
   const heldHere = holders.some((held) => held.includes(resourceId));
   const deepest = holders.at(-1);
   const nests =
     deepest !== undefined &&
-    deepest.length < path.length &&
-    deepest.every((surface, index) => path[index] === surface);
+    deepest.length < chain.length &&
+    deepest.every((surface, index) => chain[index] === surface);
   if (holders.length > 0 && !heldHere && !nests) return drawn;
   const plain = commitsFor(
     host,
@@ -214,7 +214,7 @@ export function pluginSurfaceOperations(
     host.complete,
   );
   const claim = (): PluginHostClaim | undefined => {
-    const held = host.gate.claim(path, (running) =>
+    const held = host.gate.claim(chain, (running) =>
       commitsFor(
         host,
         resourceId,
@@ -252,6 +252,6 @@ export function pluginSurfaceOperations(
     // these operations, does not draw it without its Edit for a frame and
     // drop the focus that was on its Done. Another drawing of the same
     // Resource offers none while it is held.
-    claim: heldHere && !holders.some((held) => samePath(held, path)) ? undefined : claim,
+    claim: heldHere && !holders.some((held) => sameChain(held, chain)) ? undefined : claim,
   };
 }

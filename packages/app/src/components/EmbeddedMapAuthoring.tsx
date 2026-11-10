@@ -51,7 +51,7 @@ export function EmbeddedMapAuthoring({
   drawnAbsolute: { x: drawnX, y: drawnY },
   tiltCenter,
   publish,
-  surfacePath,
+  embeddedIn,
 }: {
   readonly parent: ResourceFlowNode;
   readonly entry: OpenSpace;
@@ -85,7 +85,7 @@ export function EmbeddedMapAuthoring({
    * one embedding it, so a Claim taken on a Resource drawn here nests under
    * the Claim that Resource holds (ADR 0142).
    */
-  readonly surfacePath: readonly ResourceId[];
+  readonly embeddedIn: readonly ResourceId[];
 }) {
   const parentId = parent.id;
   const chromeRoot = useRef<HTMLElement>(null);
@@ -174,12 +174,16 @@ export function EmbeddedMapAuthoring({
   const readTarget = useCallback((id: ResourceId) => entry.spaceResources.target(id), [entry]);
   const targets = useSpaceResourceTargets(space.resources, readTarget);
   const nameOnCreation = useNameOnCreation(composition.continuation);
-  const pathKey = surfacePath.join();
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- the path's ids, not its identity
-  const path = useMemo(() => surfacePath, [pathKey]);
+  const embeddedInKey = embeddedIn.join();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- the ids, not the array's identity
+  const embeddedInIds = useMemo(() => embeddedIn, [embeddedInKey]);
   const plugins = useMemo(
-    () => ({ gate: entry.app.pluginGate, report: entry.app.reportObserverError, path }),
-    [entry.app, path],
+    () => ({
+      gate: entry.app.pluginGate,
+      report: entry.app.reportObserverError,
+      embeddedIn: embeddedInIds,
+    }),
+    [entry.app, embeddedInIds],
   );
   const authoring = useCanvasResourceAuthoring({
     plugins,

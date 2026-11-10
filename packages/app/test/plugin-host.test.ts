@@ -650,7 +650,7 @@ describe('a plugin surface’s commits on the canvas', () => {
     pluginSurfaceOperations('markdown', RESOURCE, FACTS, host).claim?.();
     expect(host.gate.getState().holders).toEqual([[RESOURCE]]);
     // Another drawing of the same Resource, inside a Map embedding, offers none.
-    const elsewhere: PluginHost = { ...host, path: [OTHER] };
+    const elsewhere: PluginHost = { ...host, embeddedIn: [OTHER] };
     expect(pluginSurfaceOperations('markdown', RESOURCE, FACTS, elsewhere).claim).toBeUndefined();
     held?.release();
     expect(pluginSurfaceOperations('markdown', OTHER, FACTS, host).commitMap).toBeTypeOf(
@@ -660,8 +660,7 @@ describe('a plugin surface’s commits on the canvas', () => {
 
   /**
    * The Space plugin passes its Claim to the Map embedding, and a Resource
-   * drawn inside it nests its own under that one (ADR 0142, resource-plugins
-   * issue 07): an Image's Replace there runs as exclusive work under the inner
+   * drawn inside it nests its own under that one (ADR 0142): an Image's Replace there runs as exclusive work under the inner
    * Claim, so every composed Space is withdrawn while it runs, a commit the
    * Space Resource kept from before answers refused and changes nothing, the
    * replacement lands, and the outer Claim holds until the inner one ends.
@@ -678,8 +677,8 @@ describe('a plugin surface’s commits on the canvas', () => {
     const outer = space.claim?.();
     expect(outer).toBeDefined();
 
-    // The Image inside the embedding is drawn on a host whose path names the Space Resource.
-    const inside: PluginHost = { ...host, path: [SPACE_RESOURCE] };
+    // The Image inside the embedding is drawn on a host embedded in the Space Resource.
+    const inside: PluginHost = { ...host, embeddedIn: [SPACE_RESOURCE] };
     const image = pluginSurfaceOperations('image', RESOURCE, FACTS, inside);
     expect(image.claim).toBeTypeOf('function');
     const inner = image.claim?.();

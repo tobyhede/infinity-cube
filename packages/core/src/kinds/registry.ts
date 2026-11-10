@@ -213,10 +213,10 @@ const targetIn = (
 /**
  * Whether a plugin in this build draws this Resource (ADR 0142): its kind's
  * plugin, and, for a Resource that shows a content Target, that Target's
- * kind's plugin too. A Target no plugin draws, a Space Resource until it is a
- * plugin (`.scratch/resource-plugins/issues/07`), keeps the Resource showing
- * it on the application's own drawing. A missing Target is the plugin's to
- * say, so a Resource showing one is still its plugin's.
+ * kind's plugin too. A Target no plugin draws keeps the Resource showing it on
+ * the application's own drawing; every kind in this build is a plugin's, so
+ * none does. A missing Target is the plugin's to say, so a Resource showing
+ * one is still its plugin's.
  */
 export const drawnByPlugin = (
   resource: KindedResource,
@@ -231,8 +231,8 @@ export const drawnByPlugin = (
 /**
  * Whether a Resource may be Open by the application's rule, a Map entry's
  * `open` (ADR 0122): one no plugin draws whose content, its own or its
- * Target's, declares Open, as a Space Resource and a Reference to one do. A
- * Resource a plugin draws keeps any Open in its Map content (ADR 0142).
+ * Target's, declares Open. A Resource a plugin draws keeps any Open in its
+ * Map content (ADR 0142), so in this build no Resource takes one.
  */
 export const takesOpen = (
   resource: KindedResource,

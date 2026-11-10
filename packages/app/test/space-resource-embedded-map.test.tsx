@@ -818,6 +818,48 @@ describe('the Map an Open Space Resource draws', () => {
     expect(resource.document.content.framing?.zoom).toBe(1.1);
   });
 
+  it('lands a framing still pending when the Space Resource leaves the Map in portal Edit', async () => {
+    const value = home({
+      title: 'Elsewhere',
+      kind: 'space',
+      content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
+    });
+    const session = await mount(value);
+    await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+    beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
+    await waitFor(() =>
+      expect(
+        within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Open Resource/ }),
+      ).toBeTruthy(),
+    );
+    fireEvent.wheel(containingNode(SPACE_RESOURCE_ID), { deltaY: -120, bubbles: true });
+    // Inside the debounce, the Map stops placing it, so its embedding unmounts
+    // with the framing still pending.
+    const working = session.getState().working;
+    act(() =>
+      session.submit({
+        ...working,
+        document: {
+          ...working.document,
+          maps: (working.document.maps ?? []).map((authored) => ({
+            ...authored,
+            positions: Object.fromEntries(
+              Object.entries(authored.positions).filter(([id]) => id !== SPACE_RESOURCE_ID),
+            ),
+          })),
+        },
+      }),
+    );
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 180));
+    });
+    const resource = session
+      .getState()
+      .working.resources.find((candidate) => candidate.id === SPACE_RESOURCE_ID);
+    if (resource?.document.kind !== 'space') throw new Error('Space Resource missing');
+    expect(resource.document.content.framing?.zoom).toBe(1.1);
+  });
+
   /**
    * Portal Edit keeps `editingPortals` populated after Present or a chrome
    * rename withdraws canvas authoring. Wheel must not keep writing framing.

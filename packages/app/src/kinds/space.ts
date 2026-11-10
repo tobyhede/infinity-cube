@@ -31,6 +31,12 @@ export type SpaceResourceDecorationContext = Pick<
   'authorOnCanvas' | 'editableResourceIds'
 > & {
   /**
+   * Whether this drawing may offer a Space Resource its Edit: the Map surface
+   * policy's answer, which withholds it on every drawing but the canvas's own
+   * Map, so authoring stops at the depth `mapSurfacePolicy` allows.
+   */
+  readonly embeddedMapEdit: boolean;
+  /**
    * Where the plugin's commits go and the gate that withdraws them (ADR 0142).
    * Absent where this canvas offers a plugin no commit.
    */
@@ -76,6 +82,7 @@ export function decorateSpaceResourceNode(
     { authorOnCanvas: context.authorOnCanvas, editable },
     context.pluginHost,
   );
+  if (!context.embeddedMapEdit) delete kindOperations.claim;
   const decoration: Mutable<KindDecoration<SpaceKindId>> = { kindOperations };
   const embed = ownMapEmbed(context.mapEmbeds, resourceId);
   if (embed === undefined || node.data.readOnly || !node.data.authorsContent) return decoration;
@@ -131,6 +138,7 @@ export const spaceDecoration: KindCanvasDecoration<SpaceKindId, SpaceResourceDec
   kind: spaceKind.id,
   slice: ({
     authorOnCanvas,
+    embeddedMapEdit,
     editableResourceIds,
     pluginHost,
     continuation,
@@ -146,6 +154,7 @@ export const spaceDecoration: KindCanvasDecoration<SpaceKindId, SpaceResourceDec
     onContextReport,
   }) => ({
     authorOnCanvas,
+    embeddedMapEdit,
     editableResourceIds,
     pluginHost,
     continuation,

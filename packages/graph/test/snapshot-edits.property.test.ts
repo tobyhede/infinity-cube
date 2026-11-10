@@ -1122,8 +1122,8 @@ describe('SnapshotEdit.open, close and resize properties', () => {
       fc.property(entriesArb, subjectArb, (generated, subjectIndex) => {
         const subjectId = RESOURCE_IDS[subjectIndex];
         if (subjectId === undefined) return;
-        // A Reference Resource to a Space Resource is drawn by its plugin
-        // (resource-plugins issue 07): it keeps its `{ open }` and nothing else.
+        // A Reference Resource to a Space Resource is drawn by its plugin: it
+        // keeps its `{ open }` and nothing else.
         const reference = snapshotOf(openableSubject(generated, subjectIndex));
         expect(
           SnapshotEdit.changeMapContent(reference, MAP_ID, subjectId, { open: true }).kind,

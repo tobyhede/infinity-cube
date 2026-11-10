@@ -132,6 +132,24 @@ describe('the Space plugin’s view', () => {
     expect(rendered.commits.claims).toEqual({ taken: 1, released: 1 });
   });
 
+  it('releases its Claim when Closed during Edit, so nothing stays held behind a Closed face', async () => {
+    const rendered = renderPlugin(spacePluginView.View, {
+      content,
+      map: open,
+      title: 'Elsewhere',
+      grants: { claim: true, map: true },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Elsewhere' }));
+    expect(await screen.findByTestId('embedded-map')).toHaveAttribute('data-claimed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Close Resource Elsewhere' }));
+    await screen.findByRole('img', { name: 'Space Resource' });
+    expect(rendered.commits.claims).toEqual({ taken: 1, released: 1 });
+    expect(rendered.commits.map).toEqual([closed]);
+    // Opened again, it is out of Edit: the Claim went with the Close.
+    fireEvent.click(screen.getByRole('button', { name: 'Open Resource Elsewhere' }));
+    expect(await screen.findByRole('button', { name: 'Edit Resource Elsewhere' })).toBeVisible();
+  });
+
   it('offers no Edit while Closed, and stays out of editing where the Claim is refused', () => {
     renderPlugin(spacePluginView.View, {
       content,

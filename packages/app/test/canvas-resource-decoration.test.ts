@@ -135,6 +135,7 @@ type DecorationContext = CanvasResourceDecorationContext & KindDecorationContext
 
 const context = (overrides: Partial<DecorationContext> = {}): DecorationContext => ({
   authorOnCanvas: true,
+  embeddedMapEdit: true,
   bodyEditing: false,
   editableResourceIds: new Set([RESOURCE_ID, REFERENCE_ID, SPACE_RESOURCE_ID, UR_ID]),
   openResource: () => 'completed',
@@ -565,6 +566,16 @@ describe('decorateSpaceResourceNode', () => {
         context({ pluginHost, editableResourceIds: new Set() }),
       ).kindOperations,
     ).not.toHaveProperty('commitContent');
+  });
+
+  it('offers no Claim where the Map surface policy withholds a Space Resource its Edit, keeping its commits', () => {
+    // As inside an embedded Map: authoring stops at the canvas's own Map.
+    const operations = decorateSpaceResourceNode(
+      openSpaceNode(),
+      context({ pluginHost: testPluginHost(vi.fn()), embeddedMapEdit: false }),
+    ).kindOperations;
+    expect(operations.commitMap).toBeTypeOf('function');
+    expect(operations).not.toHaveProperty('claim');
   });
 });
 

@@ -496,8 +496,8 @@ it.each(['Enter', ' '])('leaves %s to a `.nokey` region inside a Resource', asyn
 });
 
 /**
- * Shift+Enter is Open and expand (ADR 0137), an Edit of the host's Open, which
- * no kind keeps now that each kind's Open is its plugin's (ADR 0142).
+ * Shift+Enter is Open and expand (ADR 0137), an Edit of the host's Open; each
+ * kind's Open is its plugin's Map content (ADR 0142), so no kind takes it.
  */
 it('leaves Shift+Enter to the plugin on a focused Reference Resource', async () => {
   const { opened } = await mountGraph([spaceReferenceNode()]);

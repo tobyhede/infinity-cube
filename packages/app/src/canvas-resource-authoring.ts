@@ -74,7 +74,7 @@ export interface CanvasPlugins {
    * first, so a Claim here nests under one they hold. Absent on a canvas drawn
    * in no embedding.
    */
-  readonly path?: readonly ResourceId[] | undefined;
+  readonly embeddedIn?: readonly ResourceId[] | undefined;
 }
 
 const reportPluginFailureToConsole: ObserverErrorReporter = (error) =>
@@ -202,7 +202,7 @@ export function useCanvasResourceAuthoring({
   // A Claim passed to a Map embedding authors that Map, not the plugin's own
   // rect, so it withdraws nothing a plugin's edit does.
   const lent = useSyncExternalStore(pluginGate.subscribe, pluginGate.lent);
-  const bodyEditing = claimChain.holders.some((path) => !lent.has(path.at(-1) ?? ''));
+  const bodyEditing = claimChain.holders.some((held) => !lent.has(held.at(-1) ?? ''));
   // The Map embeddings drawn on this canvas, which a Space Resource's host
   // chooser writes a choice through (ADR 0142).
   const providedMapEmbeddings = useMapEmbeddings();
@@ -296,7 +296,7 @@ export function useCanvasResourceAuthoring({
         spaceSession.getState().working.resources.find(({ id }) => id === resourceId)?.document,
       assets: { store: pluginAssets.store, pick: pluginAssets.pick },
       capSizeHint,
-      path: plugins?.path,
+      embeddedIn: plugins?.embeddedIn,
     }),
     [
       authoring,
@@ -306,7 +306,7 @@ export function useCanvasResourceAuthoring({
       spaceSession,
       pluginAssets,
       capSizeHint,
-      plugins?.path,
+      plugins?.embeddedIn,
     ],
   );
 
@@ -421,6 +421,7 @@ export function useCanvasResourceAuthoring({
   );
   const decoratedNodes = useKindDecoratedNodes(withShared, {
     authorOnCanvas: availability.authorOnCanvas,
+    embeddedMapEdit: availability.embeddedMapEdit,
     editableResourceIds,
     pluginHost,
     continuation,

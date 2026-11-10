@@ -189,6 +189,6 @@ function PresentedMapDrawing({
 
 /**
  * The Map embedding inside a Map already drawn on the Stage: nothing, so a
- * presented Map draws one level, as it always has.
+ * presented Map draws one level.
  */
 const noMapEmbed = (): null => null;
