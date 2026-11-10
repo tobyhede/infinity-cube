@@ -25,6 +25,30 @@ export async function beginPortalEdit(page: Page, resource: Locator): Promise<vo
   ).toBeVisible();
 }
 
+/**
+ * Open a Resource from its rail: a Space Resource's Open is its plugin's Map
+ * content, committed by its rail command, and no canvas key Opens it (ADR 0142).
+ */
+export async function openFromRail(page: Page, resource: Locator): Promise<void> {
+  await (
+    await resourceControls(page, resource)
+  )
+    .getByRole('button', { name: /^Open Resource/ })
+    .click({ delay: 120 });
+}
+
+/** End portal Edit, releasing the Space Resource's Claim so another may take one (ADR 0142). */
+export async function endPortalEdit(page: Page, resource: Locator): Promise<void> {
+  await (
+    await resourceToolbar(page, resource)
+  )
+    .getByRole('button', { name: /^Done Resource/ })
+    .click({ delay: 120 });
+  await expect(
+    (await resourceToolbar(page, resource)).getByRole('button', { name: /^Done Resource/ }),
+  ).toHaveCount(0);
+}
+
 /** Wheel the portal camera from the containing Resource's left inset. */
 export async function zoomPortal(
   page: Page,

@@ -70,7 +70,7 @@ function fixtureContent(
     case 'space':
       return {
         kind: 'space',
-        view: { ...space, graph: FIXTURE_TARGET_GRAPH, framing: undefined },
+        content: { ...space, graph: FIXTURE_TARGET_GRAPH },
         via: 'self',
       };
     case 'image':

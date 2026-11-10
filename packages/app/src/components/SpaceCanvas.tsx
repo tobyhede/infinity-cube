@@ -472,10 +472,20 @@ export function SpaceCanvas({
   const pageGate = usePluginGate();
   const gate = plugins?.gate ?? pageGate;
   const editedBefore = useRef<ReadonlySet<ResourceId>>(editingPortals);
+  /** Lands a framing still pending for a Resource whose Map is no longer authored in place. */
+  const flushPortalFraming = useRef<(resourceId: ResourceId) => void>(() => undefined);
+  const lastEmbeds = useRef(embeds);
+  useLayoutEffect(() => {
+    lastEmbeds.current = embeds;
+  }, [embeds]);
   useLayoutEffect(() => {
     const returns = [...editingPortals].map((resourceId) => gate.lend(resourceId));
     for (const resourceId of editedBefore.current) {
-      if (!editingPortals.has(resourceId)) selectResource(resourceId);
+      if (editingPortals.has(resourceId)) continue;
+      // Done lands what the author framed before the commit is withdrawn by
+      // another Claim (ADR 0142).
+      flushPortalFraming.current(resourceId);
+      selectResource(resourceId);
     }
     editedBefore.current = editingPortals;
     return () => {
@@ -711,7 +721,11 @@ export function SpaceCanvas({
    */
   const completeSpaceResourceFraming = useCallback(
     (resourceId: ResourceId, framing: SpaceResourceFraming) => {
-      const entry = ownMapEmbed(mapEmbeddings.getState(), resourceId);
+      // Unmounting, the embedding is gone before the canvas flushes what was
+      // pending: the last one drawn still names the commit.
+      const entry =
+        ownMapEmbed(mapEmbeddings.getState(), resourceId) ??
+        ownMapEmbed(lastEmbeds.current, resourceId);
       const commit = entry?.request.select?.commit;
       if (entry === undefined || commit === undefined) return;
       void commit({ ...entry.request.view, framing });
@@ -1498,7 +1512,9 @@ export function SpaceCanvas({
     root.addEventListener('pointerup', onPointerUp);
     root.addEventListener('pointercancel', onPointerUp);
     root.addEventListener('wheel', onWheel, { capture: true, passive: false });
+    flushPortalFraming.current = (resourceId) => flushPendingZoom(resourceId);
     return () => {
+      flushPortalFraming.current = () => undefined;
       root.removeEventListener('pointerdown', onPointerDown);
       root.removeEventListener('pointermove', onPointerMove);
       root.removeEventListener('pointerup', onPointerUp);

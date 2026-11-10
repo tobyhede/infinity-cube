@@ -30,9 +30,45 @@ export interface MapEmbeddings {
 
 const NONE: ReadonlyMap<string, MapEmbedEntry> = new Map();
 
+/** Whether two requests ask for the same view, a choice where the other offers one, and the same Claim. */
+const sameAsk = (a: MapEmbedRequest, b: MapEmbedRequest): boolean =>
+  a.view.spaceId === b.view.spaceId &&
+  a.view.map === b.view.map &&
+  a.view.graph === b.view.graph &&
+  a.view.framing?.centreX === b.view.framing?.centreX &&
+  a.view.framing?.centreY === b.view.framing?.centreY &&
+  a.view.framing?.zoom === b.view.framing?.zoom &&
+  (a.select?.commit === undefined) === (b.select?.commit === undefined) &&
+  a.claim === b.claim;
+
 export function createMapEmbeddings(): MapEmbeddings {
   let state = NONE;
+  /** The request each placement last published, whose `select` the stored one forwards to. */
+  const latest = new Map<string, MapEmbedRequest>();
   const listeners = new Set<() => void>();
+  /**
+   * The request as it is stored: its choice forwards to the latest one
+   * published. A host mints a plugin's commits afresh as it redraws, and the
+   * plugin's request with them, so a request asking for the same thing is
+   * kept rather than republished: a choice still reaches the commit offered
+   * now, and the canvas is not redrawn for it.
+   */
+  const stored = (nodeId: string, request: MapEmbedRequest): MapEmbedRequest => {
+    const select = request.select;
+    if (select?.commit === undefined) return request;
+    return {
+      ...request,
+      select: {
+        value: select.value,
+        commit: (next) => {
+          const commit = latest.get(nodeId)?.select?.commit;
+          return commit === undefined
+            ? Promise.resolve({ refused: 'This choice is no longer offered.' })
+            : commit(next);
+        },
+      },
+    };
+  };
   return {
     getState: () => state,
     subscribe: (listener) => {
@@ -43,10 +79,17 @@ export function createMapEmbeddings(): MapEmbeddings {
     },
     publish: (nodeId, resourceId, request) => {
       const current = state.get(nodeId);
-      if (request === null ? current === undefined : current?.request === request) return;
+      // A withdrawn request keeps its latest commit reachable, so a framing
+      // pending when its embedding is taken down still lands.
+      if (request === null) {
+        if (current === undefined) return;
+      } else {
+        latest.set(nodeId, request);
+        if (current?.resourceId === resourceId && sameAsk(current.request, request)) return;
+      }
       const next = new Map(state);
       if (request === null) next.delete(nodeId);
-      else next.set(nodeId, { resourceId, request });
+      else next.set(nodeId, { resourceId, request: stored(nodeId, request) });
       state = next;
       for (const listener of [...listeners]) listener();
     },

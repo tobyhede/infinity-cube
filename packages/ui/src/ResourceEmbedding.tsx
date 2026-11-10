@@ -1,11 +1,4 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   isPluginKind,
   mapContentWithoutMap,
@@ -176,12 +169,13 @@ export function MapEmbedSlotProvider({
 export const useMapEmbedSlot = (): MapEmbedSlot | null => useContext(MapEmbedSlotContext);
 
 /** The Map embedding: the host's drawing of what the plugin asked for. */
-function HostMapEmbed({ map, select, claim }: Extract<EmbedProps, { readonly map: SpaceView }>) {
+function HostMapEmbed({
+  map: view,
+  select,
+  claim,
+}: Extract<EmbedProps, { readonly map: SpaceView }>) {
   const draw = useContext(HostMapContext);
-  const request = useMemo(
-    (): MapEmbedRequest => ({ view: map, select, claim }),
-    [map, select, claim],
-  );
+  const request = useMemo((): MapEmbedRequest => ({ view, select, claim }), [view, select, claim]);
   return draw === null ? null : draw(request);
 }
 

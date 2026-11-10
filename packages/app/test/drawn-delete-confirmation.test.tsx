@@ -88,7 +88,7 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
           [SPACE_RESOURCE_ID]: {
             x: 0,
             y: 0,
-            open: true,
+            content: { open: true },
             size: { width: 700, height: 500 },
           },
         },

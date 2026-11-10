@@ -22,20 +22,20 @@ export function CanvasMapEmbed({ request }: { readonly request: MapEmbedRequest 
   useLayoutEffect(() => () => publish?.(null), [publish]);
   useLayoutEffect(() => {
     const element = room.current;
-    const card = element?.closest<HTMLElement>('.canvas-resource') ?? null;
-    if (element === null || card === null || reportFooter === undefined) return;
+    const resource = element?.closest<HTMLElement>('.canvas-resource') ?? null;
+    if (element === null || resource === null || reportFooter === undefined) return;
     const report = () => {
-      const cardBox = card.getBoundingClientRect();
+      const resourceBox = resource.getBoundingClientRect();
       const box = element.getBoundingClientRect();
       // The canvas is drawn scaled: measure in the Resource's own units.
-      const scale = card.offsetHeight > 0 ? cardBox.height / card.offsetHeight : 1;
+      const scale = resource.offsetHeight > 0 ? resourceBox.height / resource.offsetHeight : 1;
       if (scale <= 0) return;
-      reportFooter((cardBox.bottom - box.bottom) / scale - FOOTER_BORDER);
+      reportFooter((resourceBox.bottom - box.bottom) / scale - FOOTER_BORDER);
     };
     report();
     const observer = new ResizeObserver(report);
     observer.observe(element);
-    observer.observe(card);
+    observer.observe(resource);
     return () => {
       observer.disconnect();
       reportFooter(null);

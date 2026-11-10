@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { ESLint } from 'eslint';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
@@ -32,6 +33,8 @@ const PLUGIN_FILES = [
   'packages/plugin-ur/src/view.tsx',
   'packages/plugin-markdown/src/domain.ts',
   'packages/plugin-markdown/src/view.tsx',
+  'packages/plugin-space/src/domain.ts',
+  'packages/plugin-space/src/view.tsx',
 ];
 
 describe('Resource plugin import restrictions', () => {
@@ -121,6 +124,36 @@ describe('Resource plugin import restrictions', () => {
       ),
     ).toEqual([]);
   });
+});
+
+/** Every module specifier a source file imports or re-exports. */
+const specifiersOf = (source: string): readonly string[] =>
+  [...source.matchAll(/\b(?:from|import)\s+'([^']+)'/gu)].flatMap(([, specifier]) =>
+    specifier === undefined ? [] : [specifier],
+  );
+
+describe('the Space plugin’s imports', () => {
+  /**
+   * The Space Resource reaches the Map embedding, the selection commit and its
+   * Claim through the Resource API alone (ADR 0142): its sources name no
+   * package of ours but that, whatever the lint zone would admit.
+   */
+  it.each(['packages/plugin-space/src/domain.ts', 'packages/plugin-space/src/view.tsx'])(
+    'imports only the Resource API and its own third-party dependencies in %s',
+    async (file) => {
+      const outside = specifiersOf(await readFile(file, 'utf8')).filter(
+        (specifier) =>
+          ![
+            '@project/resource-api/domain',
+            '@project/resource-api/view',
+            'react',
+            'lucide-react',
+            'zod',
+          ].includes(specifier) && !specifier.startsWith('./'),
+      );
+      expect(outside).toEqual([]);
+    },
+  );
 });
 
 describe('Resource API import restrictions', () => {

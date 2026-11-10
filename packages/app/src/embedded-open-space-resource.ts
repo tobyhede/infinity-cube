@@ -123,10 +123,10 @@ const embeddedViewIds = (view: {
   readonly graph: string;
 }): { readonly spaceId: ResourceId; readonly map: MapId; readonly graph: GraphId } | undefined => {
   const spaceId = uuidSchema.safeParse(view.spaceId);
-  const map = uuidSchema.safeParse(view.map);
-  const graph = uuidSchema.safeParse(view.graph);
-  return spaceId.success && map.success && graph.success
-    ? { spaceId: spaceId.data, map: map.data, graph: graph.data }
+  const mapId = uuidSchema.safeParse(view.map);
+  const graphId = uuidSchema.safeParse(view.graph);
+  return spaceId.success && mapId.success && graphId.success
+    ? { spaceId: spaceId.data, map: mapId.data, graph: graphId.data }
     : undefined;
 };
 

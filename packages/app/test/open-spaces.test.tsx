@@ -32,6 +32,7 @@ import { CANVAS } from '../src/space-authoring';
 import { refusingFullscreen } from './fullscreen';
 import { unlinkedPresentations } from './presentations';
 import { stubResizeObserver } from './resize-observer';
+import { publishedEmbeds } from './published-embeds';
 
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const OTHER_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -372,7 +373,7 @@ describe('Open Spaces', () => {
     // `Meta`'s Space Resource: the Target's Space view, reached by reference.
     const content: ResourceContent = {
       kind: 'space',
-      view: { spaceId: OTHER_ID, map: MAP_ID, graph: GRAPH_ONE, framing: undefined },
+      content: { spaceId: OTHER_ID, map: MAP_ID, graph: GRAPH_ONE },
       via: 'target',
     };
     const reference = (open: boolean): ResourceFlowNode => ({
@@ -401,7 +402,7 @@ describe('Open Spaces', () => {
     });
     const { result, rerender, unmount } = renderHook(
       ({ nodes }) =>
-        useEmbeddedOpenSpaceResources(nodes, openSpaces, new Set(), {
+        useEmbeddedOpenSpaceResources(nodes, publishedEmbeds(nodes), openSpaces, new Set(), {
           spaceId: META_ID,
           mapId: META_MAP_ID,
           policy: 'authoring',

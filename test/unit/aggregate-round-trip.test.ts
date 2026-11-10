@@ -105,7 +105,12 @@ const metaSpace = (): SpaceSnapshot => ({
         positions: {
           [MARKDOWN_RESOURCE_ID]: { x: 0, y: 0, open: false },
           [FIRST_LINK_ID]: { x: 340, y: 0, open: false },
-          [SECOND_LINK_ID]: { x: 680, y: 0, open: true, size: { width: 480, height: 270 } },
+          [SECOND_LINK_ID]: {
+            x: 680,
+            y: 0,
+            content: { open: true },
+            size: { width: 480, height: 270 },
+          },
           [CONVERGING_LINK_ID]: { x: 1020, y: 0, open: false },
         },
         graphs: [

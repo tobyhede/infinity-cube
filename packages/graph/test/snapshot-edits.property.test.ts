@@ -144,7 +144,7 @@ describe('SnapshotEdit.deleteFromSpace properties', () => {
     );
   });
 
-  it('moves no other Resource when it deletes one, Open or resized', () => {
+  it('moves no other Resource when it deletes one, resized', () => {
     // Removal changes no size, so it displaces nobody.
     fc.assert(
       fc.property(
@@ -152,8 +152,7 @@ describe('SnapshotEdit.deleteFromSpace properties', () => {
         coordsArb,
         fc.nat({ max: 8 }),
         sizeArb,
-        fc.boolean(),
-        (ids, coords, subjectSeed, size, open) => {
+        (ids, coords, subjectSeed, size) => {
           const subject = ids[subjectSeed % ids.length];
           if (subject === undefined) return;
           const closed = closedPlacement(ids, coords);

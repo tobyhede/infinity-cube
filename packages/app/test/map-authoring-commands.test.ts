@@ -209,7 +209,7 @@ const contexts: readonly {
         control,
         authored,
         outcomes: source.app.commandOutcomes,
-        mapId: document.content.map,
+        mapId: SECOND_MAP,
         claim: { completionMovesMap: false },
         commands: embeddedMapAuthoringCommands({
           target: authored,

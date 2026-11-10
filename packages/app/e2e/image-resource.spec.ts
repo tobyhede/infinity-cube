@@ -1389,7 +1389,7 @@ test('a Replace in an only-drawn Space holds Back and Forward and edits that Spa
   const harbourBefore = loaded.snapshot.resources.find(({ id }) => id === HARBOUR_ID)?.document;
   const drawingId = uuidSchema.parse('00000000-0000-4000-8000-000000000011');
   const root = await seedPositionedMap(page, 'Embedded pictures', () => ({
-    [drawingId]: { x: 0, y: 0, open: true, size: { width: 900, height: 700 } },
+    [drawingId]: { x: 0, y: 0, content: { open: true }, size: { width: 900, height: 700 } },
   }));
   const rootBefore = root.snapshot.resources;
   await page.goto(`/spaces/${encodeCompactUuid(root.snapshot.id)}`);
@@ -1613,7 +1613,7 @@ test('drop and paste create in an edited embedded Map and an inert drop or paste
     ({ document }) => document.kind === 'space' && document.title === title,
   );
   if (frame?.document.kind !== 'space') throw new Error('Space Resource was not created');
-  const targetId = frame.document.content.spaceId;
+  const targetId = uuidSchema.parse(frame.document.content.spaceId);
   const drawing = page.locator(`.react-flow__node[data-id="${frame.id}"]`);
   await drawing.focus();
   await drawing.press('Enter');
@@ -1685,7 +1685,12 @@ async function openSpaceResource(
   await expect(
     page.locator(`.react-flow__node[data-id^="embedded:${frame.id}:"]`).first(),
   ).toBeVisible();
-  return { drawing, id: frame.id, title, targetId: frame.document.content.spaceId };
+  return {
+    drawing,
+    id: frame.id,
+    title,
+    targetId: uuidSchema.parse(frame.document.content.spaceId),
+  };
 }
 
 test('a drop or paste on the Map a Reference Resource draws is refused as read-only', async ({

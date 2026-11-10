@@ -79,7 +79,7 @@ const targetOf = (containing: OpenSpace, resourceId: UUID): UUID => {
     .getState()
     .working.resources.find(({ id }) => id === resourceId);
   if (resource?.document.kind !== 'space') throw new Error('No Space Resource was created');
-  return resource.document.content.spaceId;
+  return uuidSchema.parse(resource.document.content.spaceId);
 };
 
 const liveSession = (openSpaces: OpenSpaces, spaceId: UUID): OpenSpace['session'] => {

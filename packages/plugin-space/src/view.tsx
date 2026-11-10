@@ -41,16 +41,31 @@ function SpacePluginView({ surface }: PluginViewProps<SpaceContent, SpaceMapCont
   const open = surface.map.value.open;
   const commitMap = surface.map.commit;
   const commitContent = surface.content.commit;
-  const content = surface.content.value;
   const takeClaim = surface.claim;
   const { Embed } = surface;
   const [held, setHeld] = useState<Claim | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
 
-  const { spaceId, map, graph, framing } = viewOf(content);
+  // Keyed by the values, not by the parsed content's identity, which the host
+  // may mint afresh each render: what the embedding is asked for changes only
+  // when the selection does.
+  const selected = viewOf(surface.content.value);
+  const { spaceId, graph, framing } = selected;
+  const mapId = selected.map;
+  const centreX = framing?.centreX;
+  const centreY = framing?.centreY;
+  const zoom = framing?.zoom;
   const view = useMemo(
-    (): SpaceView => ({ spaceId, map, graph, framing }),
-    [spaceId, map, graph, framing],
+    (): SpaceView => ({
+      spaceId,
+      map: mapId,
+      graph,
+      framing:
+        centreX === undefined || centreY === undefined || zoom === undefined
+          ? undefined
+          : { centreX, centreY, zoom },
+    }),
+    [spaceId, mapId, graph, centreX, centreY, zoom],
   );
   // The embedding writes a choice through this plugin's own content commit, so
   // what withdraws the commit withdraws the choice (ADR 0142).
@@ -58,8 +73,8 @@ function SpacePluginView({ surface }: PluginViewProps<SpaceContent, SpaceMapCont
     (): Kept<SpaceView> | undefined =>
       commitContent === undefined
         ? undefined
-        : { value: view, commit: (next) => commitContent(selectView(content, next)) },
-    [commitContent, content, view],
+        : { value: view, commit: (next) => commitContent(selectView(view, next)) },
+    [commitContent, view],
   );
 
   const commands = useMemo((): readonly RailCommand[] => {

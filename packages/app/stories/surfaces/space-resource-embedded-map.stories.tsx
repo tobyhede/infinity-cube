@@ -128,7 +128,7 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
           [SPACE_RESOURCE_ID]: {
             x: 340,
             y: 0,
-            open: true,
+            content: { open: true },
             size: { width: 640, height: 420 },
           },
         },
@@ -296,13 +296,13 @@ const pairHome: SpaceSnapshot = spaceSnapshotSchema.parse({
           [PAIR_OVERVIEW_RESOURCE_ID]: {
             x: 0,
             y: 0,
-            open: true,
+            content: { open: true },
             size: { width: 460, height: 320 },
           },
           [PAIR_DETAIL_RESOURCE_ID]: {
             x: 500,
             y: 0,
-            open: true,
+            content: { open: true },
             size: { width: 460, height: 320 },
           },
         },

@@ -119,11 +119,8 @@ const resourceNode = (
  * and keeps its Open on the Map entry until resource-plugins issue 07, where a
  * Reference to a Resource a plugin draws keeps its Open in Map content.
  */
-const spaceReferenceNode = (): ResourceFlowNode => {
-  const node = drawnNode('A again', REFERENCE_ID, false, 'reference');
-  node.data = { ...node.data, takesOpen: true };
-  return node;
-};
+const spaceReferenceNode = (): ResourceFlowNode =>
+  drawnNode('A again', REFERENCE_ID, false, 'reference');
 
 /** A Resource node as the projection draws it, before any plugin's own data. */
 const drawnNode = (
@@ -470,14 +467,19 @@ describe.each([
   });
 });
 
-it.each(['Enter'])('opens a focused Reference Resource with %s', async (key) => {
+/**
+ * Every kind's Open is its plugin's Map content (ADR 0142), a Reference
+ * Resource's to a Space Resource included, so the canvas's Open key opens
+ * none of them through the host.
+ */
+it.each(['Enter'])('leaves %s to the plugin on a focused Reference Resource', async (key) => {
   const { opened } = await mountGraph([spaceReferenceNode()]);
 
   const focusedReference = nodeOf(REFERENCE_ID);
   focusedReference.focus();
   fireEvent.keyDown(focusedReference, { key });
 
-  expect(opened()).toEqual([REFERENCE_ID]);
+  expect(opened()).toEqual([]);
 });
 
 it.each(['Enter', ' '])('leaves %s to a `.nokey` region inside a Resource', async (key) => {
@@ -494,20 +496,17 @@ it.each(['Enter', ' '])('leaves %s to a `.nokey` region inside a Resource', asyn
 });
 
 /**
- * Shift+Enter is Open and expand (ADR 0137): one Edit that Opens the Resource
- * at the size its content needs. jsdom lays nothing out, so the visible canvas
- * it is capped at is the Closed Size and the Edit Opens it there. A Reference
- * Resource to a Space Resource, whose Open the host keeps; a Markdown
- * Resource's is its plugin's.
+ * Shift+Enter is Open and expand (ADR 0137), an Edit of the host's Open, which
+ * no kind keeps now that each kind's Open is its plugin's (ADR 0142).
  */
-it('opens and expands a focused Resource with Shift+Enter', async () => {
+it('leaves Shift+Enter to the plugin on a focused Reference Resource', async () => {
   const { opened } = await mountGraph([spaceReferenceNode()]);
 
   const focused = nodeOf(REFERENCE_ID);
   focused.focus();
   fireEvent.keyDown(focused, { key: 'Enter', shiftKey: true });
 
-  expect(opened()).toEqual([REFERENCE_ID]);
+  expect(opened()).toEqual([]);
 });
 
 /**
@@ -563,14 +562,14 @@ it('draws no Resource while the render adapter holds no projection', async () =>
 describe.each([['Reference Resource', spaceReferenceNode(), REFERENCE_ID]] as const)(
   'a %s held while a replacement placement resolves',
   (_kind, held, id) => {
-    it.each(['Enter'])('opens with %s', async (key) => {
+    it.each(['Enter'])('leaves %s to its plugin', async (key) => {
       const { opened } = await mountGraph([held], undefined, undefined, 'replacing');
       const focused = nodeOf(id);
       focused.focus();
 
       fireEvent.keyDown(focused, { key });
 
-      expect(opened()).toEqual([id]);
+      expect(opened()).toEqual([]);
     });
 
     it('announces the authoring keyboard commands', async () => {

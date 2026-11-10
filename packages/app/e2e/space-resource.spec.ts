@@ -7,6 +7,7 @@ import {
 } from './graph';
 import {
   beginPortalEdit,
+  openFromRail,
   embeddedGraphEdgeCount,
   exercisePortalEditHostCanvas,
   exerciseSpaceResourcePadding,
@@ -389,8 +390,7 @@ test('a second Space Resource may reference the Space the first one created', as
   // pair back off a Space that already had it, which is the other half of the
   // rule and the half a created target cannot exercise.
   const again = nodeByTitle(page, 'Space 1');
-  await again.focus();
-  await again.press('Enter');
+  await openFromRail(page, again);
   await expect((await resourceControls(page, again)).getByTestId('space-resource-map')).toHaveText(
     'Map 1',
   );
@@ -436,8 +436,7 @@ test(
     // an exact collision), which leaves the rail under another node's box. Enter
     // on the focused node is the same `opened-resource` completion the control runs.
     const resource = nodeByTitle(page, 'Architecture');
-    await resource.focus();
-    await resource.press('Enter');
+    await openFromRail(page, resource);
 
     // Enabled rather than merely present: a selector over a target with nothing
     // to choose is disabled, so this is what says the created Space arrived
@@ -648,8 +647,7 @@ test('removing a Space Resource from the Map leaves the Resource and its target 
   await settled(page);
   const restored = nodeByTitle(page, 'Architecture');
   await expect(restored).toHaveCount(1);
-  await restored.focus();
-  await restored.press('Enter');
+  await openFromRail(page, restored);
   await expect(
     (await resourceControls(page, restored)).getByTestId('space-resource-map'),
   ).toHaveText('Map 1');
@@ -696,8 +694,7 @@ async function openSpaceResourceOnItsMap(page: Page): Promise<Locator> {
   await settled(page);
 
   const resource = nodeByTitle(page, 'Architecture');
-  await resource.focus();
-  await resource.press('Enter');
+  await openFromRail(page, resource);
 
   await expect(
     (await resourceControls(page, resource)).getByTestId('space-resource-map'),
@@ -943,8 +940,7 @@ test('a Shape chosen inside an Open Space Resource is the target Map’s, drawn 
   await expect(title).toHaveCount(0);
   await settled(page);
   const reference = nodeByTitle(page, 'Architecture, again');
-  await reference.focus();
-  await reference.press('Enter');
+  await openFromRail(page, reference);
   const referenceId = await reference.getAttribute('data-id');
   if (referenceId === null) throw new Error('The Reference Resource has no id.');
   const throughReference = page
@@ -1069,13 +1065,11 @@ const SECOND_DRAWING_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000d1
 
 /**
  * Two Space Resources drawing the same Map are two drawings (ADR 0112), so a
- * drag from a Resource in one to a Resource in the other is refused with the
- * same wording as a drag out to the canvas, and authors nothing in the Space
- * both of them draw.
+ * drag from a Resource in one to a Resource in the other authors nothing in
+ * the Space both of them draw; while one holds its Claim the other is drawn
+ * without authoring (ADR 0142).
  */
-test('a connection between Resources of two different drawings is refused with wording', async ({
-  page,
-}) => {
+test('a connection between Resources of two different drawings lands no Edge', async ({ page }) => {
   // The drawn Space keeps two Resources side by side and no Edges, so each
   // drawing frames both and any authored Edge is a new one.
   const response = await page.request.get(`/api/spaces/${DEEP_DIVE_SPACE_ID}`);
@@ -1120,8 +1114,18 @@ test('a connection between Resources of two different drawings is refused with w
     page,
     'Two drawings',
     () => ({
-      [DEEP_DIVE_RESOURCE_ID]: { x: 0, y: 0, open: true, size: { width: 640, height: 420 } },
-      [SECOND_DRAWING_ID]: { x: 720, y: 0, open: true, size: { width: 640, height: 420 } },
+      [DEEP_DIVE_RESOURCE_ID]: {
+        x: 0,
+        y: 0,
+        content: { open: true },
+        size: { width: 640, height: 420 },
+      },
+      [SECOND_DRAWING_ID]: {
+        x: 720,
+        y: 0,
+        content: { open: true },
+        size: { width: 640, height: 420 },
+      },
     }),
     [
       {
@@ -1150,8 +1154,9 @@ test('a connection between Resources of two different drawings is refused with w
   await expect(from).toBeVisible();
   await expect(to).toBeVisible();
   await settled(page);
+  // One Claim at a time (ADR 0142): the first drawing is authored, and the
+  // second, its sibling, is drawn without authoring while that Claim holds.
   await beginPortalEdit(page, first);
-  await beginPortalEdit(page, second);
   const firstBefore = await embeddedGraphEdgeCount(page, first);
   const secondBefore = await embeddedGraphEdgeCount(page, second);
 
@@ -1177,9 +1182,6 @@ test('a connection between Resources of two different drawings is refused with w
   await page.mouse.move(drop.x, drop.y, { steps: 8 });
   await page.mouse.up();
 
-  await expect(page.getByTestId('canvas-command-refusal')).toHaveText(
-    'An Edge can connect Resources only within the same drawn Map.',
-  );
   await settled(page);
   expect(await embeddedGraphEdgeCount(page, first)).toBe(firstBefore);
   expect(await embeddedGraphEdgeCount(page, second)).toBe(secondBefore);
@@ -1240,13 +1242,7 @@ test('an embedded Resource can move, open with the keyboard and resize in its ta
   await page.mouse.up();
   const moved = await boxOf(embedded, 'moved embedded Resource');
   expect(moved.x).toBeGreaterThan(before.x + 30);
-  // A Markdown Resource Opens from its rail (issue 05): Enter on the
-  // Resource itself Opens nothing, so the keyboard reaches the rail's Open.
-  await (
-    await resourceControls(page, embedded)
-  )
-    .getByRole('button', { name: 'Open Resource Resource 1' })
-    .press('Enter');
+  await openFromRail(page, embedded);
   await expect(
     (await resourceControls(page, embedded)).getByRole('button', {
       name: 'Close Resource Resource 1',
@@ -1399,8 +1395,7 @@ test(
 
     const resource = nodeByTitle(page, 'Architecture');
     // Open first, then Enter. Enter is offered Open or Closed; the press is the claim.
-    await resource.focus();
-    await resource.press('Enter');
+    await openFromRail(page, resource);
     await (
       await resourceControls(page, resource)
     )
@@ -1523,8 +1518,7 @@ test('a Space Resource keeps the size it is resized to through Close and reopeni
     .poll(async () => (await boxOf(parent, 'Closed Space Resource')).width)
     .toBeCloseTo(resized.width, 0);
 
-  await parent.focus();
-  await parent.press('Enter');
+  await openFromRail(page, parent);
   await expect(
     (await resourceControls(page, parent)).getByRole('button', {
       name: 'Close Resource Architecture',
@@ -1553,11 +1547,7 @@ test(
       return route.continue();
     });
     const resource = nodeByTitle(page, 'Resource 1');
-    await (
-      await resourceControls(page, resource)
-    )
-      .getByRole('button', { name: 'Open Resource Resource 1' })
-      .click();
+    await openFromRail(page, resource);
     await expect(page.getByTestId('persistence-failure')).toBeVisible();
     await page.getByRole('button', { name: 'Go to Map fixture', exact: true }).click();
     const trigger = page.getByRole('button', { name: 'Spaces. 2 open, 1 needs attention.' });
@@ -1746,8 +1736,7 @@ test(
       .getByRole('button', { name: 'Close Resource Architecture' })
       .click();
     await settled(page);
-    await parent.focus();
-    await parent.press('Enter');
+    await openFromRail(page, parent);
     await settled(page);
     expect((await inset('framed after reopen')).x).toBeCloseTo(framedInset.x, 0);
     expect((await inset('framed after reopen')).y).toBeCloseTo(framedInset.y, 0);

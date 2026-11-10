@@ -10,6 +10,7 @@ import {
 } from '../e2e/graph';
 import {
   beginPortalEdit,
+  endPortalEdit,
   embeddedGraphEdgeCount,
   exercisePortalEditHostCanvas,
   exerciseSpaceResourcePadding,
@@ -533,6 +534,8 @@ test(
     const intakeAfter = await boxOf(intake, 'framed Intake');
     expect(intakeAfter.x).not.toBeCloseTo(intakeBefore.x, 0);
     const indexBefore = await boxOf(index, 'Index');
+    // One Claim at a time (ADR 0142): Done hands portal Edit to the other.
+    await endPortalEdit(page, overview);
     await beginPortalEdit(page, detail);
     expect((await boxOf(index, 'Index while the other portal pans')).x).toBeCloseTo(
       indexBefore.x,

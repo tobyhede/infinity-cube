@@ -261,11 +261,10 @@ function ownContent(kind: ResourceNodeData['kind'], source: string, url: string)
     case 'space':
       return {
         kind: 'space',
-        view: {
+        content: {
           spaceId: uuid('00000000-0000-4000-8000-0000000000aa'),
           map: uuid('00000000-0000-4000-8000-0000000000ab'),
           graph: uuid('00000000-0000-4000-8000-0000000000ac'),
-          framing: undefined,
         },
         via: 'self',
       };
@@ -310,22 +309,24 @@ function props({
             ? { url: textAsset(source) }
             : kind === 'reference' && target !== undefined
               ? { target: target.id }
-              : undefined,
+              : kind === 'space' && resolved.kind === 'space'
+                ? resolved.content
+                : undefined,
     mapContent:
       kind === 'ur'
         ? { shape: resourceShape }
         : kind === 'image'
           ? {}
-          : kind === 'markdown' || (kind === 'reference' && target !== undefined)
-            ? { open: open === true }
-            : undefined,
+          : kind === 'reference' && target === undefined
+            ? undefined
+            : { open: open === true },
     embeddable: target === undefined ? undefined : [target],
     resourceId,
     title,
     ...bareKindData(kind),
     authorsContent: authorsContent(resolved),
     embedsMap: embedsMap(resolved),
-    takesOpen: kind === 'space' || (kind === 'reference' && target === undefined),
+    takesOpen: kind === 'reference' && target === undefined,
     selectedForAuthoring,
     display: open === true ? { shown: 'open', content: resolved } : { shown: 'closed' },
     activeGraphId: graphId,
@@ -452,10 +453,12 @@ describe('ResourceNode canvas Resource state adapter', () => {
 
   /**
    * Node data carries a kind's operations whole, and `ResourceNode` hands them to
-   * `CanvasResource` as they are: nothing here re-derives them from other fields.
+   * `PluginResource` as they are: nothing here re-derives them from other fields.
+   * The Map embedding's commands are the host's and drawn on the rail beside
+   * the plugin's own Close (ADR 0142).
    */
   it("passes a Space Resource's kind operations through whole", () => {
-    const onEditingChange = vi.fn();
+    const commitMap = vi.fn(() => Promise.resolve<'completed'>('completed'));
     const node = props({ kind: 'space', title: 'Elsewhere', open: true, selected: true });
     render(
       <ResourceNode
@@ -465,16 +468,16 @@ describe('ResourceNode canvas Resource state adapter', () => {
           kind: 'space',
           kindOperations: {
             kind: 'space',
-            spaceRail: <button type="button">Map: Overview</button>,
-            portal: { editing: false, onEditingChange },
+            commitMap,
+            mapRail: <button type="button">Map: Overview</button>,
           },
         }}
       />,
     );
 
     expect(screen.getByRole('button', { name: 'Map: Overview' })).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Elsewhere' }));
-    expect(onEditingChange).toHaveBeenCalledWith(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Close Resource Elsewhere' }));
+    expect(commitMap).toHaveBeenCalledWith({ open: false }, undefined);
   });
 
   it('draws an Ur Resource through its plugin host, its Shape choice committing Map content', () => {
@@ -590,21 +593,13 @@ describe('ResourceNode canvas Resource state adapter', () => {
     expect(pick).not.toHaveBeenCalled();
   });
 
-  it('renders a Space Resource through explicit non-Markdown kind operations', () => {
-    const onOpenChange = vi.fn();
-    render(
-      <ResourceNode
-        {...props({
-          kind: 'space',
-          open: true,
-          onOpenChange,
-        })}
-      />,
-    );
+  it('draws a Space Resource through its plugin host, offering nothing with no commits', () => {
+    render(<ResourceNode {...props({ kind: 'space', open: true })} />);
 
-    expect(screen.getByRole('article', { name: 'A' })).toHaveAttribute('data-kind', 'space');
-    expect(screen.queryByRole('img', { name: 'Space Resource' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Open Resource A' })).toBeNull();
+    const resource = screen.getByRole('article', { name: 'A' });
+    expect(resource).toHaveAttribute('data-kind', 'space');
+    expect(resource).toHaveClass('canvas-resource--plugin');
+    expect(screen.queryByRole('button', { name: 'Close Resource A' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Edit Resource A' })).toBeNull();
   });
 });

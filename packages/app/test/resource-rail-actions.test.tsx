@@ -841,7 +841,7 @@ describe('a Resource’s commands on the canvas rail', () => {
     expectMenuGroups(menu, [
       ['Create Reference'],
       ['Connect to Resource'],
-      ['Open and Expand', 'Read in Full View', 'Present from Here'],
+      ['Read in Full View', 'Present from Here'],
       ['Open in New Tab'],
       ['Copy link to Resource in Map', 'Copy link to Resource', 'Copy link to Space'],
       ['Remove from Map', 'Delete from Space'],

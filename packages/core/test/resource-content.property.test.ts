@@ -16,7 +16,7 @@ const id = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const contents = (via: ContentVia): ResourceContent[] => [
   { kind: 'markdown', content: { url: EMPTY_ASSET_REF }, via },
   { kind: 'image', content: { url: 'https://example.com/image.png' }, via },
-  { kind: 'space', view: { spaceId: id, map: id, graph: id, framing: undefined }, via },
+  { kind: 'space', content: { spaceId: id, map: id, graph: id }, via },
   { kind: 'ur', content: {}, via },
 ];
 const UNRESOLVED: ResourceContent = { kind: 'unresolved', via: 'target' };
@@ -35,7 +35,7 @@ const contentArbitrary: fc.Arbitrary<ResourceContent> = fc.oneof(
   }),
   fc.record({
     kind: fc.constant('space' as const),
-    view: fc.constant({ spaceId: id, map: id, graph: id, framing: undefined }),
+    content: fc.constant({ spaceId: id, map: id, graph: id }),
     via: viaArbitrary,
   }),
   fc.record({ kind: fc.constant('ur' as const), content: fc.constant({}), via: viaArbitrary }),

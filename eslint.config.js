@@ -312,23 +312,15 @@ const KIND_MODULE_IMPORTS = {
 const KIND_FEATURE_FILES = [
   // The core's surface, which re-exports every kind module.
   'packages/core/src/index.ts',
-  // The UI surface, which re-exports the kind view functions the application's one-kind features call.
-  'packages/ui/src/index.ts',
   // The kinds a Reference badge sits on are every kind but Reference; the flag saying so is a runtime boolean, so no type reads it.
   'packages/ui/src/icons.tsx',
-  // A Space Resource's portal.
-  'packages/ui/src/CanvasResource.tsx',
-  // A Space Resource's portal editing keeps its toolbar drawn.
-  'packages/react-flow-adapter/src/ResourceNode.tsx',
   // The Space Resource lifecycle (ADR 0074): its create.
   'packages/persistence/src/space-resource-planning.ts',
   // The Space glyph on the Space cluster's own controls.
   'packages/app/src/components/CommandDockSpaces.tsx',
-  // A Space Resource's framing of its embedded Map; a dropped image URL creates an Image Resource.
+  // A dropped image URL creates an Image Resource.
   'packages/app/src/components/SpaceCanvas.tsx',
-  // A Space Resource's embedded Map.
-  'packages/app/src/embedded-open-space-resource.ts',
-  // Create Reference's glyph, and a Space Resource's Enter and menu.
+  // Create Reference's glyph.
   'packages/app/src/resource-rail-actions.tsx',
   // Creating an Image or a Reference Resource.
   'packages/app/src/space-authoring.ts',

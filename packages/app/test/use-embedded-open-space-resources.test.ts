@@ -11,6 +11,7 @@ import {
   type EmbeddedTargetReader,
 } from '../src/use-embedded-open-space-resources';
 import { fixtureDisplay, fixtureFacts } from './render-adapter-fixtures';
+import { publishedEmbeds } from './published-embeds';
 
 /** No gesture in flight: the lean is a drag's, and these tests run none. */
 const NO_DRAG: ReadonlySet<string> = new Set();
@@ -67,7 +68,7 @@ describe('useEmbeddedOpenSpaceResources', () => {
     });
     const { rerender } = renderHook(
       ({ nodes }) =>
-        useEmbeddedOpenSpaceResources(nodes, spaces, NO_DRAG, {
+        useEmbeddedOpenSpaceResources(nodes, publishedEmbeds(nodes), spaces, NO_DRAG, {
           spaceId: HOST,
           mapId: OTHER_MAP,
           policy: 'authoring',
@@ -107,7 +108,7 @@ describe('useEmbeddedOpenSpaceResources', () => {
     };
     const { rerender } = renderHook(
       ({ nodes }) =>
-        useEmbeddedOpenSpaceResources(nodes, spaces, NO_DRAG, {
+        useEmbeddedOpenSpaceResources(nodes, publishedEmbeds(nodes), spaces, NO_DRAG, {
           spaceId: HOST,
           mapId: OTHER_MAP,
           policy: 'authoring',
@@ -129,11 +130,17 @@ describe('useEmbeddedOpenSpaceResources', () => {
       return Promise.resolve(undefined);
     });
     const { result } = renderHook(() =>
-      useEmbeddedOpenSpaceResources([spaceResource(HOST, MAP)], spaces, NO_DRAG, {
-        spaceId: HOST,
-        mapId: OTHER_MAP,
-        policy: 'authoring',
-      }),
+      useEmbeddedOpenSpaceResources(
+        [spaceResource(HOST, MAP)],
+        publishedEmbeds([spaceResource(HOST, MAP)]),
+        spaces,
+        NO_DRAG,
+        {
+          spaceId: HOST,
+          mapId: OTHER_MAP,
+          policy: 'authoring',
+        },
+      ),
     );
     await waitFor(() => expect(result.current.embeddedFailures.get(TARGET)).toBe('Target missing'));
     fail = false;
@@ -147,7 +154,7 @@ describe('useEmbeddedOpenSpaceResources', () => {
     const spaces = reader(() => Promise.reject(new Error('Target missing')));
     const { result, rerender } = renderHook(
       ({ nodes }) =>
-        useEmbeddedOpenSpaceResources(nodes, spaces, NO_DRAG, {
+        useEmbeddedOpenSpaceResources(nodes, publishedEmbeds(nodes), spaces, NO_DRAG, {
           spaceId: HOST,
           mapId: OTHER_MAP,
           policy: 'authoring',
@@ -162,11 +169,17 @@ describe('useEmbeddedOpenSpaceResources', () => {
   it('measures the title footer into embed bounds', async () => {
     const spaces = reader(() => Promise.resolve(undefined));
     const { result } = renderHook(() =>
-      useEmbeddedOpenSpaceResources([spaceResource(HOST, MAP)], spaces, NO_DRAG, {
-        spaceId: HOST,
-        mapId: OTHER_MAP,
-        policy: 'authoring',
-      }),
+      useEmbeddedOpenSpaceResources(
+        [spaceResource(HOST, MAP)],
+        publishedEmbeds([spaceResource(HOST, MAP)]),
+        spaces,
+        NO_DRAG,
+        {
+          spaceId: HOST,
+          mapId: OTHER_MAP,
+          policy: 'authoring',
+        },
+      ),
     );
     await waitFor(() => expect(result.current.embeddedRequests).toHaveLength(1));
     expect(result.current.embeddedRequests[0]?.bounds.bottom).toBe(396);
@@ -176,10 +189,31 @@ describe('useEmbeddedOpenSpaceResources', () => {
     expect(result.current.embeddedRequests[0]?.bounds.bottom).toBe(456);
   });
 
-  it('owns portal Edit membership and the in-flight framing draft', async () => {
+  it('counts a Resource as editing its portal while its plugin passes a Claim to the embedding', async () => {
     const spaces = reader(() => Promise.resolve(undefined));
+    const nodes = [spaceResource(HOST, MAP)];
+    const { result, rerender } = renderHook(
+      ({ claimed }) =>
+        useEmbeddedOpenSpaceResources(nodes, publishedEmbeds(nodes, claimed), spaces, NO_DRAG, {
+          spaceId: HOST,
+          mapId: OTHER_MAP,
+          policy: 'authoring',
+        }),
+      { initialProps: { claimed: new Set<string>() } },
+    );
+    await waitFor(() => expect(result.current.embeddedRequests).toHaveLength(1));
+    expect(result.current.editingPortals.has(HOST)).toBe(false);
+    rerender({ claimed: new Set([HOST]) });
+    expect(result.current.editingPortals.has(HOST)).toBe(true);
+    rerender({ claimed: new Set() });
+    expect(result.current.editingPortals.has(HOST)).toBe(false);
+  });
+
+  it('owns the in-flight framing draft', async () => {
+    const spaces = reader(() => Promise.resolve(undefined));
+    const nodes = [spaceResource(HOST, MAP)];
     const { result } = renderHook(() =>
-      useEmbeddedOpenSpaceResources([spaceResource(HOST, MAP)], spaces, NO_DRAG, {
+      useEmbeddedOpenSpaceResources(nodes, publishedEmbeds(nodes), spaces, NO_DRAG, {
         spaceId: HOST,
         mapId: OTHER_MAP,
         policy: 'authoring',
@@ -188,14 +222,8 @@ describe('useEmbeddedOpenSpaceResources', () => {
     await waitFor(() => expect(result.current.embeddedRequests).toHaveLength(1));
     const framing: SpaceResourceFraming = { centreX: 200, centreY: 100, zoom: 2 };
     act(() => {
-      result.current.onPortalEditingChange(HOST, true);
       result.current.setPortalDraft(new Map([[HOST, framing]]));
     });
-    expect(result.current.editingPortals.has(HOST)).toBe(true);
     expect(result.current.portalDraft.get(HOST)).toEqual(framing);
-    act(() => {
-      result.current.onPortalEditingChange(HOST, false);
-    });
-    expect(result.current.editingPortals.has(HOST)).toBe(false);
   });
 });

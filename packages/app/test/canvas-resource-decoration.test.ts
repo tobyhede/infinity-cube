@@ -39,6 +39,7 @@ import { RESOURCE_SIZE } from '../src/resource';
 import { NO_SPACE_RESOURCE_TARGETS } from '../src/space-resource-targets';
 import type { SpaceResourceTarget } from '../src/space-resource-lifecycle';
 import type { Continuation } from '../src/continuation';
+import type { MapEmbedEntry } from '../src/map-embeddings';
 import { fixtureDisplay, fixtureFacts } from './render-adapter-fixtures';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -161,9 +162,7 @@ const context = (overrides: Partial<DecorationContext> = {}): DecorationContext 
   spaces: null,
   commandOutcomes: undefined,
   deleteConfirmation: undefined,
-  completeSpaceResourceSelection: () => null,
-  portalEditing: undefined,
-  onPortalEditingChange: undefined,
+  mapEmbeds: new Map(),
   contextNotices: new Map(),
   onContextEditingChange: () => undefined,
   onContextReport: () => undefined,
@@ -465,66 +464,107 @@ describe('the Image kind’s decoration', () => {
   });
 });
 
+/** The Map embedding a drawn Space Resource's plugin publishes, choosing through `select` when given. */
+const embedding = (
+  select: MapEmbedEntry['request']['select'] = {
+    value: { spaceId: TARGET_SPACE_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
+    commit: () => Promise.resolve('completed'),
+  },
+): ReadonlyMap<string, MapEmbedEntry> =>
+  new Map([
+    [
+      SPACE_RESOURCE_ID,
+      {
+        resourceId: SPACE_RESOURCE_ID,
+        request: {
+          view: { spaceId: TARGET_SPACE_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
+          select,
+          claim: undefined,
+        },
+      },
+    ],
+  ]);
+
 describe('decorateSpaceResourceNode', () => {
-  it('omits the rail while closed, unread, or read-only', () => {
+  const openSpaceNode = (readOnly = false) =>
+    ofKind(projectionNode(SPACE_RESOURCE_ID, 'space', true, readOnly), 'space');
+
+  it('draws no Map embedding commands while its plugin embeds no Map, as while Closed', () => {
+    const operations = decorateSpaceResourceNode(
+      ofKind(projectionNode(SPACE_RESOURCE_ID, 'space'), 'space'),
+      context(),
+    ).kindOperations;
+    expect(operations.mapRail).toBeUndefined();
+    expect(operations.mapNote).toBeUndefined();
+  });
+
+  it('says the Space is being read in place of the chooser while its target is unread', () => {
+    const operations = decorateSpaceResourceNode(
+      openSpaceNode(),
+      context({ mapEmbeds: embedding(), spaceResourceTargets: NO_SPACE_RESOURCE_TARGETS }),
+    ).kindOperations;
+    expect(operations.mapRail).toBeUndefined();
+    expect(operations.mapNote).toBe('Reading the referenced Space…');
+  });
+
+  it('draws no Map embedding commands on a read-only Resource', () => {
+    expect(
+      decorateSpaceResourceNode(openSpaceNode(true), context({ mapEmbeds: embedding() }))
+        .kindOperations.mapRail,
+    ).toBeUndefined();
+  });
+
+  it('builds the chooser for an embedded Map whose target is read, and still when authoring is withdrawn', () => {
+    expect(
+      decorateSpaceResourceNode(openSpaceNode(), context({ mapEmbeds: embedding() })).kindOperations
+        .mapRail,
+    ).toBeDefined();
+    expect(
+      decorateSpaceResourceNode(
+        openSpaceNode(),
+        context({ mapEmbeds: embedding(), authorOnCanvas: false }),
+      ).kindOperations.mapRail,
+    ).toBeDefined();
+    // With no `select`, as while the plugin's content commit is withdrawn, the
+    // chooser is drawn and disabled rather than taken away.
+    expect(
+      decorateSpaceResourceNode(openSpaceNode(), context({ mapEmbeds: embedding(undefined) }))
+        .kindOperations.mapRail,
+    ).toBeDefined();
+  });
+
+  it('withholds a context notice while the chooser is absent, and carries it once present', () => {
+    const notices = new Map([[SPACE_RESOURCE_ID, 'Link copied.']]);
     expect(
       decorateSpaceResourceNode(
         ofKind(projectionNode(SPACE_RESOURCE_ID, 'space'), 'space'),
-        context(),
-      ).kindOperations.spaceRail,
+        context({ contextNotices: notices }),
+      ).contextNotice,
     ).toBeUndefined();
     expect(
       decorateSpaceResourceNode(
-        ofKind(projectionNode(SPACE_RESOURCE_ID, 'space', true), 'space'),
-        context({ spaceResourceTargets: NO_SPACE_RESOURCE_TARGETS }),
-      ).kindOperations.spaceRail,
-    ).toBeUndefined();
-    expect(
-      decorateSpaceResourceNode(
-        ofKind(projectionNode(SPACE_RESOURCE_ID, 'space', true, true), 'space'),
-        context(),
-      ).kindOperations.spaceRail,
-    ).toBeUndefined();
+        openSpaceNode(),
+        context({ contextNotices: notices, mapEmbeds: embedding() }),
+      ).contextNotice,
+    ).toBe('Link copied.');
   });
 
-  it('builds the rail for an Open Space Resource whose target is read, and still when authoring is withdrawn', () => {
+  it("offers the plugin's commits and Claim where the canvas authors it", () => {
+    const pluginHost = testPluginHost(vi.fn());
+    const operations = decorateSpaceResourceNode(
+      openSpaceNode(),
+      context({ pluginHost }),
+    ).kindOperations;
+    expect(operations.kind).toBe('space');
+    expect(operations.commitContent).toBeTypeOf('function');
+    expect(operations.commitMap).toBeTypeOf('function');
+    expect(operations.claim).toBeTypeOf('function');
     expect(
       decorateSpaceResourceNode(
-        ofKind(projectionNode(SPACE_RESOURCE_ID, 'space', true), 'space'),
-        context(),
-      ).kindOperations.spaceRail,
-    ).toBeDefined();
-    expect(
-      decorateSpaceResourceNode(
-        ofKind(projectionNode(SPACE_RESOURCE_ID, 'space', true), 'space'),
-        context({ authorOnCanvas: false }),
-      ).kindOperations.spaceRail,
-    ).toBeDefined();
-  });
-
-  it('withholds context notice when the rail is absent', () => {
-    const patch = decorateSpaceResourceNode(
-      ofKind(projectionNode(SPACE_RESOURCE_ID, 'space'), 'space'),
-      context({ contextNotices: new Map([[SPACE_RESOURCE_ID, 'Link copied.']]) }),
-    );
-    expect(patch.contextNotice).toBeUndefined();
-  });
-
-  it('carries a context notice and portal Edit once the rail is present', () => {
-    const onPortalEditingChange = vi.fn();
-    const patch = decorateSpaceResourceNode(
-      ofKind(projectionNode(SPACE_RESOURCE_ID, 'space', true), 'space'),
-      context({
-        contextNotices: new Map([[SPACE_RESOURCE_ID, 'Link copied.']]),
-        onPortalEditingChange,
-        portalEditing: new Set([SPACE_RESOURCE_ID]),
-      }),
-    );
-    expect(patch.contextNotice).toBe('Link copied.');
-    expect(patch.kindOperations.portal?.editing).toBe(true);
-    expect(patch.kindOperations.portal?.onEditingChange).toBeTypeOf('function');
-    patch.kindOperations.portal?.onEditingChange(false);
-    expect(onPortalEditingChange).toHaveBeenCalledWith(SPACE_RESOURCE_ID, false);
+        openSpaceNode(),
+        context({ pluginHost, editableResourceIds: new Set() }),
+      ).kindOperations,
+    ).not.toHaveProperty('commitContent');
   });
 });
 

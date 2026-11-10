@@ -113,7 +113,7 @@ const metaWithOpenSpaceResource: SpaceSnapshot = {
     ...meta.document,
     maps: meta.document.maps?.map((m) => ({
       ...m,
-      positions: { ...m.positions, [SPACE_RESOURCE_ID]: { x: 0, y: 40, open: true } },
+      positions: { ...m.positions, [SPACE_RESOURCE_ID]: { x: 0, y: 40, content: { open: true } } },
     })),
   },
 };
@@ -256,19 +256,16 @@ describe('the canvas of a mounted session', () => {
     await waitFor(() => expect(initial.session.getState().working.resources).toHaveLength(3));
   });
 
-  // A Space Resource, whose Open the host keeps: a Markdown Resource's is its plugin's (ADR 0142).
-  it.each(BOTH)('mounted %s: Enter on a Resource opens it', async (mounted) => {
+  // A Space Resource's Open is its plugin's Map content, Opened from its rail (ADR 0142).
+  it.each(BOTH)('mounted %s: Open on a Resource opens it', async (mounted) => {
     const initial = await openMeta(mounted);
-    const node = nodeOf('Other');
+    await selectResource('Other');
 
-    act(() => {
-      node.focus();
-      fireEvent.keyDown(node, { key: 'Enter' });
-    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Resource Other' }));
 
     await waitFor(() => {
       const { maps } = initial.session.getState().working.document;
-      expect(maps?.[0]?.positions[SPACE_RESOURCE_ID]?.open).toBe(true);
+      expect(maps?.[0]?.positions[SPACE_RESOURCE_ID]?.content).toEqual({ open: true });
     });
   });
 

@@ -1,8 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type ResourceContent } from '@project/core';
-import { CanvasResource, CLOSED_DISPLAY } from '../src';
+import { PluginResource, type PluginHostClaim } from '../src';
 
 /**
  * The Resource rail's keyboard contract (ADR 0073).
@@ -11,38 +10,48 @@ import { CanvasResource, CLOSED_DISPLAY } from '../src';
  * buttons could not: one tab stop for a rail however many commands it carries,
  * and arrow traversal inside it.
  *
- * They also assert the rail's two groups, which are what stops "whose command
- * is this?" being answered by where a control happens to have been typed.
+ * They also assert the rail's groups, which are what stops "whose command is
+ * this?" being answered by where a control happens to have been typed: a
+ * plugin's own commands are its kind's group, and the Map embedding's commands
+ * the host draws beside it are not (ADR 0142).
  *
- * They draw a Space Resource, the kind `CanvasResource` draws that has a
- * command of its own: its portal's Edit and Done. Markdown and Image
- * Resources are plugins', drawn by `PluginResource` (ADR 0142).
+ * They draw a Space Resource, whose plugin has commands of its own: Edit and
+ * Done, and Open and Close.
  */
 
-const SPACE_CONTENT: ResourceContent = {
-  kind: 'space',
-  view: {
-    spaceId: uuidSchema.parse('00000000-0000-4000-8000-0000000000aa'),
-    map: uuidSchema.parse('00000000-0000-4000-8000-0000000000ab'),
-    graph: uuidSchema.parse('00000000-0000-4000-8000-0000000000ac'),
-    framing: undefined,
-  },
-  via: 'self',
+const SPACE_CONTENT = {
+  spaceId: '00000000-0000-4000-8000-0000000000aa',
+  map: '00000000-0000-4000-8000-0000000000ab',
+  graph: '00000000-0000-4000-8000-0000000000ac',
 };
-const openSpace = { shown: 'open', content: SPACE_CONTENT } as const;
 
 const railActions = () => screen.getByTestId('canvas-resource-actions');
 const railButtons = () => Array.from(railActions().querySelectorAll('button'));
 const tabStops = () => railButtons().filter((button) => button.tabIndex === 0);
 
-const spaceResource = (editing = false) => (
-  <CanvasResource
-    kindOperations={{ kind: 'space', portal: { editing, onEditingChange: vi.fn() } }}
-    onOpenChange={vi.fn()}
-    display={openSpace}
+/** A host Claim that is always granted and always released. */
+const grantedClaim = (): PluginHostClaim => ({
+  release: () => true,
+  exclusively: (work) => work({}),
+  unmount: () => undefined,
+});
+
+const spaceResource = (open = true) => (
+  <PluginResource
+    resourceId="a"
+    kind="space"
+    title={{ title: 'A', readOnly: false, onReturnFocus: () => undefined }}
+    content={SPACE_CONTENT}
+    mapContent={{ open }}
+    outline="rectangle"
     state="rest"
-    title="A"
     graphColor="#ffc53d"
+    readOnly={false}
+    operations={{
+      kind: 'space',
+      commitMap: () => Promise.resolve('completed'),
+      claim: grantedClaim,
+    }}
   />
 );
 
@@ -55,8 +64,8 @@ describe('the Resource rail is one toolbar', () => {
     expect(toolbar).toHaveAttribute('aria-orientation', 'horizontal');
   });
 
-  it('costs one tab stop however many commands it carries', () => {
-    const { rerender } = render(spaceResource());
+  it('costs one tab stop however many commands it carries', async () => {
+    render(spaceResource());
 
     expect(railButtons()).toHaveLength(2);
     expect(tabStops()).toHaveLength(1);
@@ -64,7 +73,8 @@ describe('the Resource rail is one toolbar', () => {
     // The same rail while its Map is edited: Done and Close, still one tab
     // stop — which is the whole argument, because a canvas draws many
     // Resources and each one has a rail.
-    rerender(spaceResource(true));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Resource A' }));
+    await screen.findByRole('button', { name: 'Done Resource A' });
 
     expect(railButtons()).toHaveLength(2);
     expect(railButtons()[0]).toHaveAccessibleName('Done Resource A');
@@ -104,59 +114,57 @@ describe('the Resource rail is one toolbar', () => {
   });
 });
 
-const kindGroup = (name: string) => within(railActions()).getByRole('group', { name });
-const sharedGroup = () => within(railActions()).getByRole('group', { name: 'Resource commands' });
+const kindGroup = () =>
+  within(railActions()).getByRole('group', { name: 'Space Resource commands' });
 
 describe('the rail says whose command each one is', () => {
-  it("puts a kind's own command in that kind's group", () => {
+  it("puts the plugin's own commands in its kind's group, Open and Close among them", () => {
     render(spaceResource());
 
-    const edit = screen.getByRole('button', { name: 'Edit Resource A' });
-    expect(kindGroup('Space Resource commands')).toContainElement(edit);
-    expect(sharedGroup()).not.toContainElement(edit);
-  });
-
-  it('puts Open and Close in the shared group, because every Resource has them', () => {
-    render(spaceResource());
-
-    const close = screen.getByRole('button', { name: 'Close Resource A' });
-    expect(sharedGroup()).toContainElement(close);
-    // Open and Close trail the rail, so Close is in the same place whatever
-    // kind of Resource it is drawn on.
+    expect(kindGroup()).toContainElement(screen.getByRole('button', { name: 'Edit Resource A' }));
+    expect(kindGroup()).toContainElement(screen.getByRole('button', { name: 'Close Resource A' }));
     const groups = within(railActions()).getAllByRole('group');
     expect(groups.map((group) => group.getAttribute('aria-label'))).toEqual([
       'Space Resource commands',
-      'Resource commands',
     ]);
   });
 
-  it("keeps the shared group while an edit replaces the kind's own command", () => {
-    render(spaceResource(true));
-
-    // Done ends the edit and belongs with Edit, which it replaces while the
-    // Map is edited. Close is still the Resource's.
-    const space = kindGroup('Space Resource commands');
-    expect(within(space).getByRole('button', { name: 'Done Resource A' })).toBeInTheDocument();
-    expect(sharedGroup()).toContainElement(
-      screen.getByRole('button', { name: 'Close Resource A' }),
-    );
-  });
-
-  it('draws Reference Resource Open in the shared Resource command group', () => {
+  it("draws the Map embedding's commands outside the plugin's group, before it", () => {
     render(
-      <CanvasResource
-        kindOperations={{ kind: 'reference' }}
-        onOpenChange={() => 'completed'}
-        display={CLOSED_DISPLAY}
-        state="rest"
-        title="A"
-        graphColor="#ffc53d"
+      <PluginResource
+        {...spaceResource().props}
+        operations={{
+          kind: 'space',
+          commitMap: () => Promise.resolve('completed'),
+          mapRail: <button type="button">Choose Map</button>,
+        }}
       />,
     );
 
-    const groups = within(railActions()).getAllByRole('group');
-    expect(groups.map((group) => group.getAttribute('aria-label'))).toEqual(['Resource commands']);
-    expect(groups[0]).toContainElement(screen.getByRole('button', { name: 'Open Resource A' }));
+    const choose = screen.getByRole('button', { name: 'Choose Map' });
+    expect(railActions()).toContainElement(choose);
+    expect(kindGroup()).not.toContainElement(choose);
+    expect(railButtons()[0]).toBe(choose);
+  });
+
+  it('draws no Map embedding commands on a read-only Resource', () => {
+    render(
+      <PluginResource
+        {...spaceResource().props}
+        readOnly
+        operations={{ kind: 'space', mapRail: <button type="button">Choose Map</button> }}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Choose Map' })).toBeNull();
+  });
+
+  it('draws Open alone on a Closed Space Resource, with no Edit', () => {
+    render(spaceResource(false));
+
+    expect(railButtons().map((button) => button.getAttribute('aria-label'))).toEqual([
+      'Open Resource A',
+    ]);
   });
 
   it('groups the commands without dividing the keyboard', async () => {
@@ -164,11 +172,6 @@ describe('the rail says whose command each one is', () => {
 
     const edit = screen.getByRole('button', { name: 'Edit Resource A' });
     const close = screen.getByRole('button', { name: 'Close Resource A' });
-    expect(kindGroup('Space Resource commands')).toContainElement(edit);
-    expect(sharedGroup()).toContainElement(close);
-
-    // One arrow crosses the group boundary, because the roving tabindex is the
-    // toolbar root's and a group is semantics rather than a second composite.
     edit.focus();
     fireEvent.keyDown(edit, { key: 'ArrowRight' });
     await waitFor(() => expect(close).toHaveFocus());
