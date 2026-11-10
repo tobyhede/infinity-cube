@@ -521,7 +521,7 @@ test('Opening an unresized Markdown Resource grows it to its content, and Closin
   expect(openedId).not.toBeNull();
 
   await openResource(resource, 'A');
-  await expect(resource.locator('.canvas-resource[data-open="true"]')).toHaveCount(1);
+  await expect(resource.locator('.canvas-resource__plugin [data-open="true"]')).toHaveCount(1);
   await settled(page);
   const opened = await allPositions(page);
   const openWidth = await restingWidth();
@@ -539,13 +539,13 @@ test('Opening an unresized Markdown Resource grows it to its content, and Closin
   expect(await allPositions(page)).toEqual(opened);
 
   await (await controls(resource)).getByRole('button', { name: 'Close Resource A' }).click();
-  await expect(resource.locator('.canvas-resource[data-open="true"]')).toHaveCount(0);
+  await expect(resource.locator('.canvas-resource__plugin [data-open="true"]')).toHaveCount(0);
   expect(await allPositions(page)).toEqual(opened);
   expect(await restingWidth()).toBeCloseTo(openWidth, 0);
 
   // Sized now, so Opening again changes what it draws and no rect.
   await openResource(resource, 'A');
-  await expect(resource.locator('.canvas-resource[data-open="true"]')).toHaveCount(1);
+  await expect(resource.locator('.canvas-resource__plugin [data-open="true"]')).toHaveCount(1);
   expect(await allPositions(page)).toEqual(opened);
 
   await page.reload();
@@ -3673,7 +3673,8 @@ test('the Resource menu groups Create Reference, Connect, Full View and Present 
   await expectMenuGroups(menu, [
     ['Create Reference'],
     ['Connect to Resource'],
-    ['Open and Expand', 'Read in Full View', 'Present from Here'],
+    // A Markdown Resource Opens with its plugin's size hint: no Open and Expand (A29).
+    ['Read in Full View', 'Present from Here'],
     ['Copy link to Resource in Map', 'Copy link to Resource'],
     ['Remove from Map', 'Delete from Space'],
   ]);
@@ -3696,7 +3697,8 @@ test(
     const groups = [
       ['Create Reference'],
       ['Connect to Resource'],
-      ['Open and Expand', 'Read in Full View', 'Present from Here'],
+      // A Markdown Resource Opens with its plugin's size hint: no Open and Expand (A29).
+    ['Read in Full View', 'Present from Here'],
       ['Copy link to Resource in Map', 'Copy link to Resource'],
       ['Remove from Map', 'Delete from Space'],
     ];

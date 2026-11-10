@@ -1,5 +1,6 @@
-import { Suspense, useCallback, useEffect, useRef } from 'react';
+import { Suspense, useCallback, useEffect, useRef, type KeyboardEvent } from 'react';
 import type { RenderedMarkdownProps, SourceEditorProps } from '@project/resource-api/view';
+import { Button } from './Button';
 import { Kbd, KbdGroup } from './components/kbd';
 import { RenderedMarkdown } from './RenderedMarkdown';
 import { MarkdownSourceEditor } from './markdown-source-editor-lazy';
@@ -15,14 +16,38 @@ import './markdown-resource-body.css';
  * reads the same on the Map and on the Stage.
  */
 
-/** Markdown as a Resource surface renders it. */
-export function HostRenderedMarkdown({ markdown, drawnName, className }: RenderedMarkdownProps) {
+/**
+ * Markdown as a Resource surface renders it, with the press that begins an
+ * edit where the plugin offers one: a ghost `Button` over the whole text, out
+ * of the tab order since the rail's Edit is the keyboard's way in. It lies
+ * outside the plugin's own region, so the wheel over it stays the canvas's.
+ */
+export function HostRenderedMarkdown({
+  markdown,
+  drawnName,
+  className,
+  edit,
+}: RenderedMarkdownProps) {
   return (
-    <RenderedMarkdown
-      markdown={markdown}
-      drawnName={drawnName}
-      className={cn('markdown-resource-body__rendered resource__body', className)}
-    />
+    <>
+      <RenderedMarkdown
+        markdown={markdown}
+        drawnName={drawnName}
+        className={cn('markdown-resource-body__rendered resource__body', className)}
+      />
+      {edit !== undefined && (
+        <Button
+          variant="ghost"
+          className="markdown-resource-body__edit-target"
+          aria-label={edit.label}
+          tabIndex={-1}
+          onClick={(event) => {
+            event.stopPropagation();
+            edit.begin();
+          }}
+        />
+      )}
+    </>
   );
 }
 
@@ -41,6 +66,8 @@ export function HostSourceEditor({
   onValueChange,
   ariaLabel,
   autoFocus = false,
+  onSave,
+  onCancel,
   className,
 }: SourceEditorProps) {
   const handle = useRef<MarkdownSourceEditorHandle | null>(null);
@@ -62,12 +89,25 @@ export function HostSourceEditor({
     if (handle.current === null) wantsCaret.current = true;
     else handle.current.focus();
   }, [autoFocus]);
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+    const exit =
+      event.key === 'Escape'
+        ? onCancel
+        : event.key === 'Enter' && (event.metaKey || event.ctrlKey)
+          ? onSave
+          : undefined;
+    if (exit === undefined) return;
+    event.preventDefault();
+    event.stopPropagation();
+    exit();
+  };
   return (
     <div
       className={cn(
         'markdown-resource-body markdown-resource-body--editing nodrag nopan',
         className,
       )}
+      onKeyDown={onKeyDown}
     >
       <Suspense fallback={<div className="markdown-resource-body__pending" aria-hidden="true" />}>
         <MarkdownSourceEditor

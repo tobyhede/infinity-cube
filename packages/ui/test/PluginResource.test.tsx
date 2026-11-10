@@ -47,6 +47,7 @@ const probePlugin = definePlugin({
 type ProbeSurface = Surface<z.output<typeof probeContent>, z.output<typeof probeMap>>;
 const surfaces: ProbeSurface[] = [];
 let claimOnMount = false;
+let probeMounts = 0;
 function ProbeView({ surface }: { readonly surface: ProbeSurface }) {
   surfaces.push(surface);
   if (surface.content.value.fails) throw new Error('The probe was told to fail.');
@@ -55,6 +56,9 @@ function ProbeView({ surface }: { readonly surface: ProbeSurface }) {
   useEffect(() => {
     if (claimOnMount) claim?.();
   }, [claim]);
+  useEffect(() => {
+    probeMounts += 1;
+  }, []);
   return (
     <div data-testid="probe">
       <Title />
@@ -452,53 +456,50 @@ describe('the Map host a plugin draws inside (ADR 0142)', () => {
     expect(claim).toHaveBeenCalledTimes(1);
   });
 
-  it('tells the host once that it is gone, however many Claims it took and released', () => {
-    surfaces.length = 0;
-    const unmountClaim = vi.fn();
-    const claim = vi.fn((): PluginHostClaim => ({
-      release: () => undefined,
-      exclusively: () => Promise.resolve('busy'),
-      unmount: unmountClaim,
-    }));
-    const { unmount } = render(
-      <PluginSurface {...probeProps({ operations: { kind: 'ur', claim } })} entry={probeEntry} />,
-    );
-    const take = surfaces.at(-1)?.claim;
-    for (let taken = 0; taken < 3; taken += 1) take?.()?.release();
-    expect(claim).toHaveBeenCalledTimes(3);
-    unmount();
-    expect(unmountClaim).toHaveBeenCalledTimes(1);
-  });
-
-  it('hands the host a release the plugin asks for during its exclusive work, which needs no retry', async () => {
-    surfaces.length = 0;
-    const release = vi.fn();
-    let finish: () => void = () => undefined;
-    const held: PluginHostClaim = {
-      release,
-      exclusively: (work) => work({}),
-      unmount: () => undefined,
-    };
-    render(
-      <PluginSurface
-        {...probeProps({ operations: { kind: 'ur', claim: () => held } })}
-        entry={probeEntry}
-      />,
-    );
-    const own = surfaces.at(-1)?.claim?.();
-    const work = own?.exclusively(
-      () =>
-        new Promise<void>((resolve) => {
-          finish = resolve;
-        }),
-    );
-    // Asked once, mid-work: the host completes it when the work ends
-    // (`packages/app/test/plugin-host.test.ts`), so the plugin asks no more.
-    expect(own?.release()).toBeUndefined();
-    finish();
-    await work;
-    expect(release).toHaveBeenCalledTimes(1);
-  });
+  it.each([
+    ['a modal or presenting withdraws authoring', { withdrawn: true }],
+    ['the Resource becomes read-only', { readOnly: true }],
+  ] as const)(
+    'keeps a plugin drawn and its Claim held while %s, and offers its commits again after',
+    (_, withdrawal) => {
+      surfaces.length = 0;
+      probeMounts = 0;
+      claimOnMount = true;
+      const release = vi.fn(() => true);
+      const unmountClaim = vi.fn();
+      const held: PluginHostClaim = {
+        release,
+        exclusively: () => Promise.resolve('busy'),
+        unmount: unmountClaim,
+      };
+      const authoring = {
+        kind: 'ur',
+        claim: () => held,
+        commitContent: () => Promise.resolve('completed' as const),
+      } satisfies PluginResourceProps['operations'];
+      const { rerender } = render(
+        <PluginSurface {...probeProps({ operations: authoring })} entry={probeEntry} />,
+      );
+      claimOnMount = false;
+      expect(surfaces.at(-1)?.content.commit).toBeDefined();
+      rerender(
+        <PluginSurface
+          {...probeProps({
+            readOnly: 'readOnly' in withdrawal,
+            operations: { ...authoring, withdrawn: 'withdrawn' in withdrawal },
+          })}
+          entry={probeEntry}
+        />,
+      );
+      expect(surfaces.at(-1)?.content.commit).toBeUndefined();
+      rerender(<PluginSurface {...probeProps({ operations: authoring })} entry={probeEntry} />);
+      expect(surfaces.at(-1)?.content.commit).toBeDefined();
+      // One mount throughout, and the Claim neither released nor dropped.
+      expect(probeMounts).toBe(1);
+      expect(release).not.toHaveBeenCalled();
+      expect(unmountClaim).not.toHaveBeenCalled();
+    },
+  );
 
   it('loses only its own Resource when its plugin throws', () => {
     const onFailure = vi.fn();
@@ -635,6 +636,14 @@ describe('the Map host a plugin draws inside (ADR 0142)', () => {
     expect(screen.getByTestId('probe')).toBeInTheDocument();
   });
 
+  it('keeps a drawing plugin mounted when its Map content changes, so what it holds survives an Open', () => {
+    probeMounts = 0;
+    const { rerender } = render(<PluginSurface {...probeProps()} entry={probeEntry} />);
+    rerender(<PluginSurface {...probeProps({ mapContent: { n: 2 } })} entry={probeEntry} />);
+    expect(screen.getByTestId('probe')).toBeInTheDocument();
+    expect(probeMounts).toBe(1);
+  });
+
   it('offers no authoring while exclusive work runs elsewhere, its own Title and Actions included', () => {
     render(
       <PluginResource
@@ -650,25 +659,15 @@ describe('the Map host a plugin draws inside (ADR 0142)', () => {
     expect(screen.queryByRole('button', { name: 'Actions for Resource Decide' })).toBeNull();
   });
 
-  it('gives the plugin the whole rect while this drawing holds a Claim, and not another', () => {
+  it('gives the plugin the whole rect to drag in while it holds a Claim, leaving the wheel the canvas’s', () => {
     const { rerender } = render(<PluginResource {...props('pill')} />);
     const layer = () =>
       screen.getByRole('article', { name: 'Decide' }).querySelector('.canvas-resource__plugin');
     expect(layer()).not.toHaveClass('nodrag');
-    rerender(
-      <PluginResource
-        {...props('pill')}
-        operations={{ kind: 'ur', claimHolder: () => 'another-drawing' }}
-      />,
-    );
-    expect(layer()).not.toHaveClass('nodrag');
-    rerender(
-      <PluginResource
-        {...props('pill')}
-        operations={{ kind: 'ur', claimHolder: () => 'this-drawing' }}
-      />,
-    );
-    expect(layer()).toHaveClass('nodrag', 'nopan', 'nowheel');
+    rerender(<PluginResource {...props('pill')} operations={{ kind: 'ur', claimed: true }} />);
+    expect(layer()).toHaveClass('nodrag', 'nopan');
+    // The canvas still zooms over a claimed Resource (ADR 0064): no `nowheel`.
+    expect(layer()).not.toHaveClass('nowheel');
   });
 
   it('keeps a drawn plugin, its state and its Claim through a change of its Map content', () => {

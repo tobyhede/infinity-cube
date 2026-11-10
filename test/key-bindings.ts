@@ -1,5 +1,5 @@
 export interface KeyBinding {
-  readonly module: `packages/${'app' | 'ui' | 'plugin-markdown'}/src/${string}`;
+  readonly module: `packages/${'app' | 'ui' | `plugin-${string}`}/src/${string}`;
   readonly sourceKey: string;
   readonly occurrence: number;
   readonly key: string;
@@ -139,20 +139,36 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     behaviour: 'withhold the Resource surface commit chord from CodeMirror',
   },
   {
-    module: 'packages/plugin-markdown/src/view.tsx',
+    module: 'packages/plugin-image/src/view.tsx',
     sourceKey: 'Escape',
     occurrence: 1,
     key: 'Escape',
-    surface: 'Markdown Resource body',
-    behaviour: 'cancel Markdown editing',
+    surface: 'Image Resource title editor',
+    behaviour: 'abandon renaming an Image Resource',
   },
   {
-    module: 'packages/plugin-markdown/src/view.tsx',
+    module: 'packages/plugin-image/src/view.tsx',
+    sourceKey: 'Enter',
+    occurrence: 1,
+    key: 'Enter',
+    surface: 'Image Resource title editor',
+    behaviour: 'commit renaming an Image Resource; Shift-Enter breaks a line',
+  },
+  {
+    module: 'packages/ui/src/ResourceTextHost.tsx',
+    sourceKey: 'Escape',
+    occurrence: 1,
+    key: 'Escape',
+    surface: 'source editor a host gives a plugin',
+    behaviour: "run the plugin's Cancel, as the Markdown plugin's edit does",
+  },
+  {
+    module: 'packages/ui/src/ResourceTextHost.tsx',
     sourceKey: 'Enter',
     occurrence: 1,
     key: 'Mod-Enter',
-    surface: 'Markdown Resource body',
-    behaviour: 'commit Markdown editing',
+    surface: 'source editor a host gives a plugin',
+    behaviour: "run the plugin's Save, as the Markdown plugin's edit does",
   },
   {
     module: 'packages/ui/src/InlineTitleEditor.tsx',

@@ -13,7 +13,10 @@
      control variant.
    - Custom behavior being introduced: none; MarkdownSourceEditor retains
      activation, keyboard and focus behavior. The two ends of a running edit
-     are the Markdown plugin's rail commands, drawn by the plugin host's rail.
+     are the Markdown plugin's rail commands, drawn by the plugin host's rail,
+     and the source editor's Escape and Mod-Enter, which the host's editor
+     hands to them. A press on the rendered text begins an edit through a
+     ghost Button drawn over it.
    - Tests proving the deviation: packages/plugin-markdown/test/markdown-plugin.test.tsx
      and packages/app/ladle-e2e/resource-open.spec.ts.
 
@@ -110,6 +113,22 @@
   padding: 0.75em;
   overflow: hidden;
   background: color-mix(in srgb, currentcolor 8%, transparent);
+}
+
+/* Pointer activation for the rendered body, with no second visible affordance.
+   Keyboard authors use the rail's Edit; this only keeps the click-to-edit
+   gesture without drawing another pencil or button. */
+.markdown-resource-body__edit-target {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--canvas-resource-radius);
+  background: transparent;
+  opacity: 0;
+  cursor: text;
 }
 
 .markdown-resource-body--editing {

@@ -1,12 +1,5 @@
-import {
-  createContext,
-  useContext,
-  useMemo,
-  useState,
-  useSyncExternalStore,
-  type ComponentType,
-} from 'react';
-import { render, type RenderResult } from '@testing-library/react';
+import { useMemo, useState, useSyncExternalStore, type ComponentType } from 'react';
+import { act, render, type RenderResult } from '@testing-library/react';
 import type { Answer, AssetRef, Size } from '../domain';
 import {
   createRailStore,
@@ -82,7 +75,15 @@ export interface RenderPluginOptions<C, M> {
   readonly assets?: Partial<Assets>;
 }
 
-export type RenderedPlugin<C, M> = RenderResult & { readonly commits: Commits<C, M> };
+export type RenderedPlugin<C, M> = RenderResult & {
+  readonly commits: Commits<C, M>;
+  /**
+   * Withdraw every commit, store, pick and Claim from the surface, or offer
+   * them again, as a host does while a modal is up, while presenting or where
+   * the Resource becomes read-only; a Claim already taken stays held.
+   */
+  readonly withdraw: (withdrawn: boolean) => void;
+};
 
 /** Where a test surface draws an asset from: a URL that names the reference, so a test can see it. */
 export const testAssetUrl = (ref: AssetRef): string => `blob:test${ref}`;
@@ -135,16 +136,26 @@ function createTestGate() {
 }
 
 /** Markdown drawn as its text, so a plugin's test reads what it was given. */
-function TestRenderedMarkdown({ markdown, className }: RenderedMarkdownProps) {
+function TestRenderedMarkdown({ markdown, className, edit }: RenderedMarkdownProps) {
   return (
-    <div className={className} data-testid="rendered-markdown">
-      {markdown}
-    </div>
+    <>
+      <div className={className} data-testid="rendered-markdown">
+        {markdown}
+      </div>
+      {edit !== undefined && <button type="button" aria-label={edit.label} onClick={edit.begin} />}
+    </>
   );
 }
 
 /** A source editor drawn as a text area. */
-function TestSourceEditor({ value, onValueChange, ariaLabel, autoFocus }: SourceEditorProps) {
+function TestSourceEditor({
+  value,
+  onValueChange,
+  ariaLabel,
+  autoFocus,
+  onSave,
+  onCancel,
+}: SourceEditorProps) {
   return (
     <textarea
       aria-label={ariaLabel}
@@ -153,6 +164,10 @@ function TestSourceEditor({ value, onValueChange, ariaLabel, autoFocus }: Source
         if (autoFocus === true) element?.focus();
       }}
       onChange={(event) => onValueChange(event.target.value)}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') onCancel?.();
+        else if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) onSave?.();
+      }}
     />
   );
 }
@@ -256,6 +271,13 @@ export function renderPlugin<C, M>(
   const grants = options.grants ?? {};
   const answer: Answer = options.answer ?? 'completed';
   const gate = createTestGate();
+  let authoringWithdrawn = false;
+  const authoringListeners = new Set<() => void>();
+  const subscribeAuthoring = (listener: () => void) => {
+    authoringListeners.add(listener);
+    return () => authoringListeners.delete(listener);
+  };
+  const withdrawn = () => authoringWithdrawn;
   const files = [...(options.files ?? [])];
   const store = (bytes: Blob): Promise<AssetRef | { readonly refused: string }> => {
     if (options.storing !== undefined) return options.storing(bytes);
@@ -284,7 +306,9 @@ export function renderPlugin<C, M>(
     const [content, setContent] = useState(options.content);
     const [mapValue, setMapValue] = useState(options.map);
     const rail = useMemo(() => createRailStore(), []);
-    const running = useSyncExternalStore(gate.subscribe, gate.running);
+    const exclusiveRunning = useSyncExternalStore(gate.subscribe, gate.running);
+    const authoringOff = useSyncExternalStore(subscribeAuthoring, withdrawn);
+    const running = exclusiveRunning || authoringOff;
     const host: ResourceHost = useMemo(
       () => ({
         Title: TestTitle({ title }),
@@ -350,7 +374,7 @@ export function renderPlugin<C, M>(
       size: options.size ?? DEFAULT_SIZE,
       selected: options.selected ?? false,
       claim:
-        grants.claim === true
+        grants.claim === true && !running
           ? () => {
               if (options.claimRefused === true) return undefined;
               commits.claims.taken += 1;
@@ -377,5 +401,11 @@ export function renderPlugin<C, M>(
   }
 
   const rendered = render(<Harness />);
-  return Object.assign(rendered, { commits });
+  const withdraw = (next: boolean): void => {
+    act(() => {
+      authoringWithdrawn = next;
+      for (const listener of authoringListeners) listener();
+    });
+  };
+  return Object.assign(rendered, { commits, withdraw });
 }

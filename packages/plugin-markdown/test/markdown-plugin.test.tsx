@@ -225,4 +225,150 @@ describe('the Markdown plugin’s view', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Markdown source of Notes' }));
     expect(screen.getByRole('textbox')).toHaveValue('Old');
   });
+  it('keeps the draft up and Save available again when the store rejects', async () => {
+    let stores = 0;
+    const rendered = renderPlugin(markdownPluginView.View, {
+      content,
+      map: open,
+      title: 'Notes',
+      grants: editable,
+      assets: {
+        ...reading({ [TEXT_REF]: 'Old' }),
+        store: () => {
+          stores += 1;
+          return stores === 1 ? Promise.reject(new Error('502')) : Promise.resolve(SAVED_REF);
+        },
+      },
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Draft' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Resource Notes' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('The text could not be saved.');
+    expect(screen.getByRole('textbox')).toHaveValue('Draft');
+    expect(screen.getByRole('button', { name: 'Save Resource Notes' })).toBeEnabled();
+    expect(rendered.commits.content).toEqual([]);
+    fireEvent.click(screen.getByRole('button', { name: 'Save Resource Notes' }));
+    await screen.findByRole('button', { name: 'Edit Resource Notes' });
+    expect(rendered.commits.content).toEqual([{ url: SAVED_REF }]);
+  });
+
+  it('draws a note, and still Opens, when reading its text rejects', async () => {
+    const rendered = renderPlugin(markdownPluginView.View, {
+      content,
+      map: closed,
+      title: 'Notes',
+      grants: { map: true },
+      assets: { read: () => Promise.reject(new Error('timeout')) },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Open Resource Notes' }));
+    expect(await screen.findByRole('note')).toHaveTextContent('This text cannot be read.');
+    expect(rendered.commits.map).toEqual([open]);
+  });
+
+  it('keeps editing what was typed while a Save was under way', async () => {
+    let finish: (ref: AssetRef) => void = () => undefined;
+    const rendered = renderPlugin(markdownPluginView.View, {
+      content,
+      map: open,
+      title: 'Notes',
+      grants: editable,
+      assets: {
+        ...reading({ [TEXT_REF]: 'Old' }),
+        store: () =>
+          new Promise<AssetRef>((resolve) => {
+            finish = resolve;
+          }),
+      },
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'First' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Resource Notes' }));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'First and more' } });
+    finish(SAVED_REF);
+    await waitFor(() => expect(rendered.commits.content).toEqual([{ url: SAVED_REF }]));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Save Resource Notes' })).toBeEnabled(),
+    );
+    expect(screen.getByRole('textbox')).toHaveValue('First and more');
+    expect(rendered.commits.claims.released).toBe(0);
+  });
+
+  it('ignores Escape while a Save is under way, so a refused Save keeps its draft', async () => {
+    let finish: (answer: { readonly refused: string }) => void = () => undefined;
+    renderPlugin(markdownPluginView.View, {
+      content,
+      map: open,
+      title: 'Notes',
+      grants: editable,
+      assets: {
+        ...reading({ [TEXT_REF]: 'Old' }),
+        store: () =>
+          new Promise<{ readonly refused: string }>((resolve) => {
+            finish = resolve;
+          }),
+      },
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Draft' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Resource Notes' }));
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Escape' });
+    expect(screen.getByRole('textbox')).toHaveValue('Draft');
+    finish({ refused: 'Not stored.' });
+    expect(await screen.findByRole('status')).toHaveTextContent('Not stored.');
+    expect(screen.getByRole('textbox')).toHaveValue('Draft');
+  });
+
+  it('offers Edit when Closed, which Opens it and then begins editing', async () => {
+    const rendered = renderPlugin(markdownPluginView.View, {
+      content,
+      map: closed,
+      title: 'Notes',
+      grants: editable,
+      assets: { ...reading({ [TEXT_REF]: 'Old' }), store: () => Promise.resolve(SAVED_REF) },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
+    expect(await screen.findByRole('textbox', { name: 'Markdown source of Notes' })).toHaveValue(
+      'Old',
+    );
+    expect(rendered.commits.map).toEqual([open]);
+    expect(rendered.commits.hints).toHaveLength(1);
+    expect(rendered.commits.claims.taken).toBe(1);
+  });
+
+  it('Opens but begins no edit from Closed when its text cannot be read', async () => {
+    const rendered = renderPlugin(markdownPluginView.View, {
+      content,
+      map: closed,
+      title: 'Notes',
+      grants: editable,
+      assets: reading({}),
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
+    expect(await screen.findByRole('note')).toBeInTheDocument();
+    expect(rendered.commits.map).toEqual([open]);
+    expect(rendered.commits.claims.taken).toBe(0);
+    expect(screen.queryByRole('textbox')).toBeNull();
+  });
+  it('keeps its draft and Claim while authoring is withdrawn, and Saves once it returns', async () => {
+    const rendered = renderPlugin(markdownPluginView.View, {
+      content,
+      map: open,
+      title: 'Notes',
+      grants: editable,
+      assets: { ...reading({ [TEXT_REF]: 'Old' }), store: () => Promise.resolve(SAVED_REF) },
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Draft' } });
+    rendered.withdraw(true);
+    expect(screen.getByRole('textbox')).toHaveValue('Draft');
+    expect(screen.queryByRole('button', { name: 'Save Resource Notes' })).toBeNull();
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter', ctrlKey: true });
+    expect(screen.getByRole('textbox')).toHaveValue('Draft');
+    expect(rendered.commits.claims.released).toBe(0);
+    rendered.withdraw(false);
+    fireEvent.click(screen.getByRole('button', { name: 'Save Resource Notes' }));
+    await screen.findByRole('button', { name: 'Edit Resource Notes' });
+    expect(rendered.commits.content).toEqual([{ url: SAVED_REF }]);
+    expect(rendered.commits.claims).toEqual({ taken: 1, released: 1 });
+  });
 });

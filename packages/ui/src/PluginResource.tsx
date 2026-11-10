@@ -477,20 +477,20 @@ export function PluginSurface(props: PluginResourceProps & { readonly entry: Plu
       {props.renderToolbar === undefined ? toolbar : props.renderToolbar(toolbar, held > 0)}
       <div
         className={
-          // A Claim gives the plugin the whole rect: the canvas neither drags,
-          // pans nor zooms from inside it while one is held.
-          holder === 'this-drawing'
-            ? 'canvas-resource__plugin nodrag nopan nowheel'
+          // A Claim gives the plugin the whole rect to point in: the canvas
+          // neither drags nor pans from inside it while one is held. The wheel
+          // stays the canvas's, so it still zooms over the Resource (ADR 0064).
+          props.operations.claimed === true
+            ? 'canvas-resource__plugin nodrag nopan'
             : 'canvas-resource__plugin'
         }
       >
         <ResourceFailureBoundary
-          // A throw is this drawing's: the boundary mounts afresh for another
-          // Resource or after a replacement, and a failed drawing is tried
-          // again on another Map content value, which leaves a drawn plugin,
-          // its state and its Claims as they are.
+          // A throw is this drawing's: the plugin mounts afresh for another
+          // Resource or after a replacement, and a failed one is drawn again
+          // for another Map content value, which leaves a drawing one mounted.
           key={`${props.resourceId}:${String(props.operations.epoch ?? 0)}`}
-          retryOn={props.mapContent}
+          retryKey={JSON.stringify(props.mapContent)}
           onFailure={props.onFailure ?? props.operations.onFailure}
         >
           <MapTitleContext.Provider value={drawnTitle}>

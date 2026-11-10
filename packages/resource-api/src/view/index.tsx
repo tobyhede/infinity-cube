@@ -174,6 +174,12 @@ export interface RenderedMarkdownProps {
   /** A name already drawn above the text: a first heading that only repeats it is left out. */
   readonly drawnName?: string | undefined;
   readonly className?: string;
+  /**
+   * A press anywhere on the text begins an edit: the host draws the target,
+   * named `label` for a screen reader, over the text with nothing visible, so
+   * the rail's Edit stays the one keyboard way in.
+   */
+  readonly edit?: { readonly label: string; readonly begin: () => void } | undefined;
 }
 
 /** What the host draws a source editor with. */
@@ -184,6 +190,10 @@ export interface SourceEditorProps {
   readonly ariaLabel: string;
   /** Whether the caret is put in it when it is drawn. */
   readonly autoFocus?: boolean;
+  /** What `Mod-Enter` in the editor does: the edit's Save. */
+  readonly onSave?: () => void;
+  /** What `Escape` in the editor does: the edit's Cancel. */
+  readonly onCancel?: () => void;
   readonly className?: string;
 }
 

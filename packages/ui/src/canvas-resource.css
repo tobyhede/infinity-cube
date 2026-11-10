@@ -552,10 +552,13 @@
 
 /* A Resource a plugin draws (ADR 0142): the plugin's region fills the rect, and
    everything inside it is the plugin's. The canvas keeps the border, the ring
-   and the rail, which are drawn outside the region. */
+   and the rail, which are drawn outside the region. The region is its own
+   stacking context, so nothing a plugin raises inside it covers the canvas's
+   resize control or Edge handles. */
 .canvas-resource__plugin {
   position: absolute;
   inset: 0;
+  isolation: isolate;
   color: var(--canvas-resource-title);
   opacity: var(--canvas-resource-strength, 1);
 }

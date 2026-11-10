@@ -247,6 +247,59 @@ describe('the Aggregate directory MCP server', () => {
     expect(refused.text).toContain(`resources/${added}.json`);
   });
 
+  it('checks a Resource file naming text not yet written by naming the file to write, which write_asset then writes', async () => {
+    const directory = await writeTalk();
+    const client = await connect(directory);
+    const added = uuidSchema.parse('77777777-7777-4777-8777-777777777777');
+    const text = '# Added\n\nBy tools.\n';
+    const url = textAssetRef(text);
+    const hash = url.slice('/assets/'.length);
+
+    await callTool(client, 'write_file', {
+      path: `${SPACE_ID}/resources/${added}.json`,
+      content: JSON.stringify({ id: added, title: 'Added', kind: 'markdown', content: { url } }),
+    });
+    const absent = await callTool(client, 'check');
+    expect(absent.isError).toBe(false);
+    expect(absent.text).toContain(`${url} has no file: write its bytes to assets/${hash}.`);
+    expect(absent.text).toContain(`assets/${hash}.md`);
+
+    expect((await callTool(client, 'write_asset', { content: text })).text).toContain(url);
+    expect(await callTool(client, 'check')).toEqual({
+      text: `${directory} is a valid aggregate.\n`,
+      isError: false,
+    });
+  });
+
+  it('writes Markdown text with `\\n` line endings, naming it by those bytes', async () => {
+    const directory = await writeTalk();
+    const client = await connect(directory);
+    const url = textAssetRef('# Lines\nOne\nTwo\n');
+
+    const stored = await callTool(client, 'write_asset', { content: '# Lines\r\nOne\rTwo\r\n' });
+
+    expect(stored.text).toContain(url);
+    await expect(
+      readFile(join(directory, 'assets', `${url.slice('/assets/'.length)}.md`), 'utf8'),
+    ).resolves.toBe('# Lines\nOne\nTwo\n');
+  });
+
+  it('refuses to write an asset whose bytes a file of another extension already holds', async () => {
+    const directory = await writeTalk();
+    const client = await connect(directory);
+    const hash = textAssetRef('Plain.\n').slice('/assets/'.length);
+    await callTool(client, 'write_asset', { content: 'Plain.\n', extension: 'txt' });
+
+    const refused = await callTool(client, 'write_asset', { content: 'Plain.\n' });
+
+    expect(refused.isError).toBe(true);
+    expect(refused.text).toContain(`assets/${hash}.txt`);
+    expect(await callTool(client, 'check')).toEqual({
+      text: `${directory} is a valid aggregate.\n`,
+      isError: false,
+    });
+  });
+
   it('checks an empty directory by saying what to write, naming no command', async () => {
     const directory = await makeTemporaryDirectory();
     const client = await connect(directory);

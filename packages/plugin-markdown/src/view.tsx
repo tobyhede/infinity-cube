@@ -1,12 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-  type KeyboardEvent,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { z } from 'zod';
 import { Check, Maximize2, Minimize2, Pencil, StickyNote, X } from 'lucide-react';
 import {
@@ -52,6 +44,13 @@ export const READING_WIDTH = 640;
 /** The inset the text is drawn at inside the rect. */
 const INSET = 12;
 
+/**
+ * The band along the top of the rect the canvas keeps clear of controls, as it
+ * does for every Resource it draws: eight pixels, the kind glyph's row, eight
+ * pixels. A press there selects the Resource rather than beginning a rename.
+ */
+const RAIL_BAND = 30;
+
 /** The text of the asset at a URL, as far as it has been read. */
 type Text =
   | { readonly state: 'reading' }
@@ -59,6 +58,12 @@ type Text =
   | { readonly state: 'refused'; readonly refused: string };
 
 const READING: Text = { state: 'reading' };
+
+/** What a note says where reading the text failed rather than being refused. */
+const UNREAD = 'Reading it failed.';
+
+/** What the status says where a Save failed rather than being refused. */
+const UNSAVED = 'The text could not be saved. Your draft is kept; Save again to retry.';
 
 /**
  * Read the text an asset holds, once per URL, starting from text this view
@@ -75,16 +80,22 @@ function useText(url: AssetRef, assets: Assets, known: Map<string, string>, want
     if (!wanted || known.has(url)) return undefined;
     let live = true;
     const stillLive = (): boolean => live;
-    void readAsset(url).then(async (answer) => {
-      if (!stillLive()) return;
-      if (answer instanceof Blob) {
-        const text = await textOf(answer);
-        known.set(url, text);
-        if (stillLive()) setRead({ url, text: { state: 'read', text } });
-      } else {
-        setRead({ url, text: { state: 'refused', refused: answer.refused } });
-      }
-    });
+    void readAsset(url)
+      .then(async (answer) => {
+        if (!stillLive()) return;
+        if (answer instanceof Blob) {
+          const text = await textOf(answer);
+          known.set(url, text);
+          if (stillLive()) setRead({ url, text: { state: 'read', text } });
+        } else {
+          setRead({ url, text: { state: 'refused', refused: answer.refused } });
+        }
+      })
+      // A read that fails outright, as a network failure or a timeout does,
+      // is refused like any other: the text is drawn as a note, never awaited.
+      .catch(() => {
+        if (stillLive()) setRead({ url, text: { state: 'refused', refused: UNREAD } });
+      });
     return () => {
       live = false;
     };
@@ -161,12 +172,12 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
   useEffect(() => release, [release]);
 
   const readable = text.state === 'read' ? text.text : null;
-  const mayEdit =
-    open &&
-    readable !== null &&
-    contentCommit !== undefined &&
-    store !== undefined &&
-    takeClaim !== undefined;
+  const mayAuthor = contentCommit !== undefined && store !== undefined && takeClaim !== undefined;
+  const mayEdit = open && readable !== null && mayAuthor;
+  // Edit on a Closed Resource Opens it and then begins editing (ADR 0064):
+  // what it Opens to is read only once it is Open, so the text decides then.
+  const mayEditClosed = !open && mayAuthor && mapCommit !== undefined;
+  const editWhenOpen = useRef(false);
 
   const beginEdit = useCallback(() => {
     if (!mayEdit || editing !== null) return;
@@ -182,6 +193,15 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
   // A Resource Closed elsewhere while its draft was up has nowhere to draw it.
   if (editing !== null && !open) setEditing(null);
 
+  // An Edit asked for while Closed begins once the Open it caused has landed
+  // and the text is read, and is dropped where the text cannot be read.
+  useEffect(() => {
+    if (text.state === 'refused') editWhenOpen.current = false;
+    if (!editWhenOpen.current || !open || text.state !== 'read') return;
+    editWhenOpen.current = false;
+    beginEdit();
+  }, [open, text.state, beginEdit]);
+
   const save = useCallback(() => {
     if (editing === null || editing.saving || readable === null) return;
     if (contentCommit === undefined || store === undefined) return;
@@ -190,20 +210,30 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
       end();
       return;
     }
-    setEditing({ draft: editing.draft, saving: true });
-    const stored = store(new Blob([next], { type: MARKDOWN_MEDIA_TYPE }));
-    void stored
+    const saved = editing.draft;
+    setEditing({ draft: saved, saving: true });
+    // The editor stays live while a Save runs: text typed meanwhile is a new
+    // draft, which a Save that lands leaves up rather than discarding.
+    const settle = (refused: string | null): void => {
+      setRefusal(refused);
+      setEditing((now) =>
+        now === null || (refused === null && now.draft === saved)
+          ? null
+          : { draft: now.draft, saving: false },
+      );
+    };
+    void store(new Blob([next], { type: MARKDOWN_MEDIA_TYPE }))
       .then((answer) => {
         if (!isStoredAsset(answer)) return answer;
         known.set(answer, next);
         return contentCommit({ url: answer });
       })
-      .then((answer) => {
-        const refused = refusalOf(answer);
-        setRefusal(refused);
-        if (refused === null) end();
-        else setEditing((now) => (now === null ? now : { draft: now.draft, saving: false }));
-      });
+      .then(
+        (answer) => settle(refusalOf(answer)),
+        // A store or commit that fails outright, as a network failure, a
+        // server error or a timeout does, keeps the draft and Save, to retry.
+        () => settle(UNSAVED),
+      );
   }, [editing, readable, contentCommit, store, known, end]);
 
   const cancel = useCallback(() => {
@@ -215,7 +245,16 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
     (next: MarkdownMapContent, sizeHint?: Size) => {
       if (mapCommit === undefined) return;
       const committed = sizeHint === undefined ? mapCommit(next) : mapCommit(next, { sizeHint });
-      void committed.then((answer) => setRefusal(refusalOf(answer)));
+      void committed.then(
+        (answer) => {
+          const refused = refusalOf(answer);
+          setRefusal(refused);
+          if (refused !== null) editWhenOpen.current = false;
+        },
+        () => {
+          editWhenOpen.current = false;
+        },
+      );
     },
     [mapCommit],
   );
@@ -277,17 +316,23 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
             ]),
       ];
     }
-    const edit: RailCommand[] = mayEdit
-      ? [
-          {
-            kind: 'action',
-            id: 'edit',
-            label: `Edit Resource ${name}`,
-            icon: <Pencil size={14} />,
-            run: beginEdit,
-          },
-        ]
-      : [];
+    const edit: RailCommand[] =
+      mayEdit || mayEditClosed
+        ? [
+            {
+              kind: 'action',
+              id: 'edit',
+              label: `Edit Resource ${name}`,
+              icon: <Pencil size={14} />,
+              run: mayEdit
+                ? beginEdit
+                : () => {
+                    editWhenOpen.current = true;
+                    setMeasuring(true);
+                  },
+            },
+          ]
+        : [];
     if (mapCommit === undefined) return edit;
     return [
       ...edit,
@@ -316,69 +361,61 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
     cancel,
     mapCommit,
     mayEdit,
+    mayEditClosed,
     beginEdit,
     open,
     commitMap,
   ]);
 
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      event.stopPropagation();
-      cancel();
-    } else if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-      event.preventDefault();
-      event.stopPropagation();
-      save();
-    }
+  // Like the disabled Cancel, Escape waits for a Save under way: a Save that
+  // is refused leaves its draft up.
+  const escape = (): void => {
+    if (editing?.saving !== true) cancel();
   };
 
   return (
-    <div style={fill} data-open={open} data-editing={editing !== null}>
-      <div ref={header} style={{ padding: `${INSET}px ${INSET}px 0` }}>
+    <div
+      // Closed, the Title sits at the foot of the rect, as every Closed
+      // Resource's does.
+      style={open ? fill : { ...fill, justifyContent: 'flex-end' }}
+      data-open={open}
+      data-editing={editing !== null}
+    >
+      <div
+        ref={header}
+        style={{ padding: `${RAIL_BAND}px ${INSET}px ${open ? 0 : 8}px`, minHeight: 0 }}
+      >
         <Title />
       </div>
       {open && (
         <div style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'auto' }}>
           {editing !== null ? (
             <Own>
-              <div onKeyDown={onKeyDown} style={{ height: '100%' }}>
-                <SourceEditor
-                  value={editing.draft}
-                  onValueChange={(draft) =>
-                    setEditing((now) => (now === null ? now : { draft, saving: now.saving }))
-                  }
-                  ariaLabel={`Markdown source of ${name}`}
-                  autoFocus
-                />
-              </div>
+              <SourceEditor
+                value={editing.draft}
+                onValueChange={(draft) =>
+                  setEditing((now) => (now === null ? now : { draft, saving: now.saving }))
+                }
+                ariaLabel={`Markdown source of ${name}`}
+                autoFocus
+                onSave={save}
+                onCancel={escape}
+              />
             </Own>
           ) : text.state === 'refused' ? (
             <p role="note" style={{ margin: 0, padding: INSET, fontSize: 12 }}>
               {`This text cannot be read. ${text.refused}`}
             </p>
           ) : text.state === 'read' ? (
-            <>
-              <RenderedMarkdown markdown={text.text} drawnName={name} />
-              {mayEdit && surface.selected && (
-                <Own>
-                  <button
-                    type="button"
-                    aria-label={`Edit Markdown source of ${name}`}
-                    tabIndex={-1}
-                    onClick={beginEdit}
-                    style={{
-                      position: 'absolute',
-                      inset: 0,
-                      opacity: 0,
-                      border: 0,
-                      background: 'transparent',
-                      cursor: 'text',
-                    }}
-                  />
-                </Own>
-              )}
-            </>
+            <RenderedMarkdown
+              markdown={text.text}
+              drawnName={name}
+              edit={
+                mayEdit && surface.selected
+                  ? { label: `Edit Markdown source of ${name}`, begin: beginEdit }
+                  : undefined
+              }
+            />
           ) : null}
         </div>
       )}

@@ -4,6 +4,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { AGGREGATE_FILE_NAME } from '@project/aggregate';
 import { assetHashOf } from '@project/persistence';
+import { lineFeedText } from '@project/resource-api/domain';
 import type { UUID } from '@project/core';
 import { z } from 'zod';
 import { rejectSymbolicLinks, replaceFile } from '../aggregate-directory/write-in-place';
@@ -164,13 +165,29 @@ export const createAggregateMcpServer = (given: string, newId: () => UUID): McpS
     },
     ({ content, encoding: carried, extension = 'md' }) =>
       attempt(async () => {
-        const bytes = new Uint8Array(
+        const given = new Uint8Array(
           carried === 'base64' ? Buffer.from(content, 'base64') : new TextEncoder().encode(content),
         );
+        // Markdown text is stored with `\n` line endings, as the Markdown
+        // plugin stores what it saves, so the same text is one asset.
+        const bytes =
+          extension.toLowerCase() === 'md'
+            ? new TextEncoder().encode(lineFeedText(new TextDecoder().decode(given)))
+            : given;
         const hash = await assetHashOf(bytes);
         const file = `assets/${hash}.${extension}`;
         const target = await fileInside(directory, file);
         await mkdir(dirname(target), { recursive: true });
+        // One hash names one file: a file of another extension holding these
+        // bytes is the asset already, and a second would be refused by Import.
+        const held = (await readdir(dirname(target))).find(
+          (name) => name.startsWith(`${hash}.`) && name !== `${hash}.${extension}`,
+        );
+        if (held !== undefined) {
+          throw new PathRefusal(
+            `assets/${held} already holds these bytes; name them as /assets/${hash}, or delete assets/${held} first.`,
+          );
+        }
         await replaceFile(target, bytes);
         return answer(`Wrote ${file}. Name it as /assets/${hash}.`);
       }),
