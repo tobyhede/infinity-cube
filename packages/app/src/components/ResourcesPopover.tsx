@@ -11,11 +11,16 @@ import {
 } from 'react';
 import {
   contentTarget,
+  DEFAULT_KIND,
+  isMissingKind,
   KIND_IDS,
   spaceReferences,
   titleName,
+  type KindId,
+  type MissingKind,
   type Resource,
   type ResourceId,
+  type ResourceKind,
   type UUID,
 } from '@project/core';
 import { describeSpaceResourceBreak, type SpaceResourceBreak } from '../authoring-refusal';
@@ -78,18 +83,32 @@ type Activation = 'keyboard' | 'pointer';
  * OPEN mark for the collection; Space Resources and individual Space rows keep
  * their cube glyph.
  */
-export type ResourcesFilter = Resource['kind'] | 'spaces';
+export type ResourcesFilter = KindId | 'unavailable' | 'spaces';
+
+/**
+ * The filter a Resource is listed under: its kind's, or, for every kind no
+ * plugin in this build draws, the one `unavailable` filter (issue 09).
+ */
+const filterOfKind = (kind: ResourceKind): KindId | 'unavailable' =>
+  isMissingKind(kind) ? 'unavailable' : kind;
+
+/** The first kind among `resources` that no plugin in this build draws. */
+const firstMissingKind = (resources: readonly Resource[]): MissingKind | undefined => {
+  for (const { kind } of resources) if (isMissingKind(kind)) return kind;
+  return undefined;
+};
 
 /**
  * Every filter exactly once, in the order they are drawn: each kind's, in the
  * order the kinds are registered, then `spaces`. The ui registry types a view
  * half for every kind, so a kind added to `Resource` has a filter, a name and a
- * glyph here before the application compiles.
+ * glyph here before the application compiles. Every kind no plugin in this
+ * build draws shares the one `unavailable` filter.
  */
-const FILTERS: readonly ResourcesFilter[] = [...KIND_IDS, 'spaces'];
+const FILTERS: readonly ResourcesFilter[] = [...KIND_IDS, 'unavailable', 'spaces'];
 
 /** The Connect list's filters: an Edge never ends at an unplaced Space. */
-const RESOURCE_FILTERS = KIND_IDS;
+const RESOURCE_FILTERS: readonly ResourcesFilter[] = [...KIND_IDS, 'unavailable'];
 
 /**
  * Everything on, because the list's job is to show what is *not* on the canvas
@@ -101,16 +120,27 @@ const ALL_FILTERS: readonly ResourcesFilter[] = FILTERS;
 
 /** What a filter's toggle is called: its kind's Resources, or the Meta Space's Spaces. */
 const filterName = (filter: ResourcesFilter): string =>
-  filter === 'spaces' ? 'Spaces in this Meta Space' : kindNaming(filter).listName;
+  filter === 'spaces'
+    ? 'Spaces in this Meta Space'
+    : filter === 'unavailable'
+      ? 'Resources of a kind not in this build'
+      : kindNaming(filter).listName;
 
 /**
  * A filter's glyph: its kind's own, or, for a kind that draws its Target's
  * with a badge, the badge over the default base; the Meta Space's Spaces draw
  * the Opener mark.
  */
-const FilterGlyph = ({ filter }: { readonly filter: ResourcesFilter }) => {
+const FilterGlyph = ({
+  filter,
+  unavailable,
+}: {
+  readonly filter: ResourcesFilter;
+  /** A kind the `unavailable` filter stands for, whose glyph is the default plugin's. */
+  readonly unavailable: MissingKind | undefined;
+}) => {
   if (filter === 'spaces') return <ParentIcon />;
-  const { Glyph } = kindNaming(filter);
+  const { Glyph } = kindNaming(filter === 'unavailable' ? (unavailable ?? DEFAULT_KIND) : filter);
   return Glyph === BADGED_TARGET_GLYPH ? <ReferenceIcon /> : <Glyph />;
 };
 
@@ -557,7 +587,15 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
   const connecting = props.purpose === 'connect' ? props : null;
   const placing = props.purpose === 'connect' ? null : props;
   const spaces = placing?.spaces ?? NO_SPACES;
-  const filters: readonly ResourcesFilter[] = connecting === null ? FILTERS : RESOURCE_FILTERS;
+  /**
+   * The `unavailable` toggle is drawn only while the Space holds a Resource of
+   * a kind no plugin in this build draws: in every other build it would be a
+   * permanent zero for something that cannot be made (issue 09).
+   */
+  const unavailable = firstMissingKind([...resources, ...allResources]);
+  const filters = (connecting === null ? FILTERS : RESOURCE_FILTERS).filter(
+    (filter) => filter !== 'unavailable' || unavailable !== undefined,
+  );
   const surfaceName = connecting === null ? 'Resources' : `Connect ${connecting.from}`;
   /**
    * Whether the Connect list's close owes its anchor no caret: a drawn Edge
@@ -658,7 +696,8 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
         ? spaces.filter((space) => matched(space.title)).length
         : resources.filter(
             (resource) =>
-              resource.kind === filter && matched(searchableText(resource, titleById, spaceTitles)),
+              filterOfKind(resource.kind) === filter &&
+              matched(searchableText(resource, titleById, spaceTitles)),
           ).length;
   }, [resources, spaces, titleById, spaceTitles, needle]);
 
@@ -677,7 +716,7 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
       .map((resource, index) => ({ resource, index }))
       .filter(
         ({ resource }) =>
-          shown.includes(resource.kind) &&
+          shown.includes(filterOfKind(resource.kind)) &&
           matched(searchableText(resource, titleById, spaceTitles)),
       )
       .map(({ resource, index }) => ({
@@ -915,7 +954,7 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
                   title={filterName(filter)}
                   className="resources-popover__toggle"
                 >
-                  <FilterGlyph filter={filter} />
+                  <FilterGlyph filter={filter} unavailable={unavailable} />
                   <span className="resources-popover__count" aria-hidden="true">
                     {countOf(filter)}
                   </span>

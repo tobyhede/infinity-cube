@@ -11,17 +11,17 @@ describe('the default plugin’s domain half', () => {
     }
   });
 
-  it('declares no reference, no Create and no outline, and may be a Target', () => {
+  it('declares no reference, no Create, no outline and no Target', () => {
     for (const declaration of [
       'resourceReferences',
       'spaceReferences',
       'contentTarget',
       'newContent',
       'outline',
+      'mayBeTarget',
     ] as const) {
       expect(defaultPlugin).not.toHaveProperty(declaration);
     }
-    expect(defaultPlugin.mayBeTarget).toBe(true);
   });
 });
 

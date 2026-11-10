@@ -9,7 +9,10 @@ import {
   type Map,
   type UUID,
 } from '@project/core';
-import { resourceReferenceProblems, type ResourceReferenceProblem } from './declared-references';
+import {
+  storedResourceReferenceProblems,
+  type ResourceReferenceProblem,
+} from './declared-references';
 import { repeatedGraphEdges } from './graph-edges';
 
 /**
@@ -299,9 +302,11 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
   }
 
   // Every Resource reference a kind declares resolves, to a kind that may be a
-  // Target, so referencing stays a single hop (ADR 0113).
+  // Target, so referencing stays a single hop (ADR 0113). One that names a
+  // Resource whose plugin is missing is carried (issue 09).
+  const kindOf = (id: UUID) => resourceById.get(id)?.kind;
   for (const resource of space.resources) {
-    for (const problem of resourceReferenceProblems(resource.id, resource, kindOf)) {
+    for (const problem of storedResourceReferenceProblems(resource.id, resource, kindOf)) {
       errors.push(describeReferenceProblem(resource.id, problem));
     }
   }

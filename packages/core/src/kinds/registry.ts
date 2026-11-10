@@ -25,7 +25,7 @@ import {
   type Outline,
   type Resource as ApiResource,
 } from '@project/resource-api/domain';
-import type { JsonObject, JsonValue } from '../json-value';
+import { canonicalJsonObject, type JsonObject, type JsonValue } from '../json-value';
 
 /**
  * The kinds, every one a module, registered with every build: the one place each
@@ -399,12 +399,15 @@ const canonicalContentOf = <K extends KindId>(resource: Kinded<K>) =>
 
 /**
  * A Resource with its content as Export writes it, so a file's bytes do not
- * depend on how it was built. A Resource with no plugin is written as it was
- * read: nothing here can say what its content's canonical form is.
+ * depend on how it was built or which store answered it. A Resource with no
+ * plugin has its content's keys sorted at every depth, the one canonical form
+ * of a value nothing here reads (`canonicalJsonValue`).
  */
 export const canonicalResource = <R extends KindedResource>(resource: R): R => {
   const kinded: KindedResource = resource;
-  return isPlugged(kinded) ? { ...resource, content: canonicalContentOf(kinded) } : resource;
+  return isPlugged(kinded)
+    ? { ...resource, content: canonicalContentOf(kinded) }
+    : { ...resource, content: canonicalJsonObject(kinded.content) };
 };
 
 /** The kind a Resource is created as when its author chooses none: a new Space's first, the canvas's Add. */

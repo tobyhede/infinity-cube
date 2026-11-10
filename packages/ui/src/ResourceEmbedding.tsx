@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   mapContentWithoutMap,
+  isMissingKind,
   mayBeTarget,
   titleName,
   type ResourceKind,
@@ -188,7 +189,10 @@ export function HostEmbed(props: EmbedProps) {
   if (embedding.nested) return <EmbeddingNote>{NOTES.nested}</EmbeddingNote>;
   const target = embedding.resources.find((resource) => resource.id === id);
   if (target === undefined) return <EmbeddingNote>{NOTES.deleted}</EmbeddingNote>;
-  if (!mayBeTarget(target.kind)) return <EmbeddingNote>{NOTES.untargetable}</EmbeddingNote>;
+  // A Reference already naming a Resource whose plugin is missing is carried
+  // (issue 09) and embeds the default plugin's surface.
+  if (!mayBeTarget(target.kind) && !isMissingKind(target.kind))
+    return <EmbeddingNote>{NOTES.untargetable}</EmbeddingNote>;
   return (
     <EmbeddedSurface
       key={target.id}

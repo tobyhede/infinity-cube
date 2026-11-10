@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import {
+  isMissingKind,
   kindFlags,
   spaceSelection,
   titleName,
@@ -41,7 +42,9 @@ import { shortcutOf } from './shortcut-sheet';
 
 /** The sentence the unavailable Create Reference row of a Resource that may not be a Target carries. */
 export const referenceTerminal = (kind: ResourceKind): string =>
-  `${kindNaming(kind).listName} cannot be referenced.`;
+  isMissingKind(kind)
+    ? `“${kind}” is not available in this build, so it cannot be referenced.`
+    : `${kindNaming(kind).listName} cannot be referenced.`;
 
 /** A creation a Resource's rail offers on it, as a plugin declares one from a Resource (ADR 0142). */
 export interface RailCreation {

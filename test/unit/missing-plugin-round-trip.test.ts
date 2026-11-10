@@ -43,6 +43,7 @@ const missing = (kind: string): MissingKind => {
 const KIND = missing('vnd.example.diagram');
 /** Map content its plugin would read, which no host here does. */
 const MAP_CONTENT = { zoom: 2, layers: ['ink', { id: 7, hidden: true }] };
+const MAP_CONTENT_REVERSED = { layers: ['ink', { hidden: true, id: 7 }], zoom: 2 };
 
 /** Bytes that are not valid UTF-8, so a text decode anywhere on the way would change them. */
 const binary = Uint8Array.from([0xff, 0xfe, 0x00, 0xc3, 0x28, 0xa0, 0xa1]);
@@ -73,6 +74,8 @@ const assets = async (): Promise<Assets> => ({
 const meta = (
   { own, shared }: Assets,
   extra: readonly SpaceSnapshot['resources'][number][] = [],
+  /** Every unread object's keys reversed, as a store that keeps no key order (`jsonb`) may answer. */
+  reversed = false,
 ): SpaceSnapshot =>
   ({
     id: META,
@@ -86,7 +89,12 @@ const meta = (
           kind: 'positioned',
           positions: {
             [NOTE]: { x: 0, y: 0 },
-            [UNPLUGGED]: { x: 400, y: 0, content: MAP_CONTENT, size: { width: 320, height: 200 } },
+            [UNPLUGGED]: {
+              x: 400,
+              y: 0,
+              content: reversed ? MAP_CONTENT_REVERSED : MAP_CONTENT,
+              size: { width: 320, height: 200 },
+            },
             [SHARING]: { x: 800, y: 0 },
           },
           graphs: [{ id: GRAPH, title: 'Graph 1', edges: [{ from: NOTE, to: UNPLUGGED }] }],
@@ -104,11 +112,17 @@ const meta = (
         document: {
           title: 'Diagram',
           kind: KIND,
-          content: {
-            source: assetPath(own.hash),
-            legend: assetPath(shared.hash),
-            options: { direction: 'TD', nodes: [1, 2, 3] },
-          },
+          content: reversed
+            ? {
+                options: { nodes: [1, 2, 3], direction: 'TD' },
+                legend: assetPath(shared.hash),
+                source: assetPath(own.hash),
+              }
+            : {
+                source: assetPath(own.hash),
+                legend: assetPath(shared.hash),
+                options: { direction: 'TD', nodes: [1, 2, 3] },
+              },
         },
       },
       {
@@ -185,10 +199,10 @@ const deleted = (id: UUID) => (snapshot: SpaceSnapshot) => ({
   ...snapshot,
   document: {
     ...snapshot.document,
-    maps: (snapshot.document.maps ?? []).map((map) => ({
-      ...map,
-      positions: Object.fromEntries(Object.entries(map.positions).filter(([key]) => key !== id)),
-      graphs: map.graphs.map((graph) => ({
+    maps: (snapshot.document.maps ?? []).map((m) => ({
+      ...m,
+      positions: Object.fromEntries(Object.entries(m.positions).filter(([key]) => key !== id)),
+      graphs: m.graphs.map((graph) => ({
         ...graph,
         edges: graph.edges.filter(({ from, to }) => from !== id && to !== id),
       })),
@@ -203,6 +217,8 @@ const assetFiles = async (directory: string): Promise<readonly string[]> =>
 const resourceFile = (directory: string, id: UUID) =>
   readFile(join(directory, META, 'resources', `${id}.json`));
 
+const spaceFile = (directory: string) => readFile(join(directory, META, 'space.json'), 'utf8');
+
 describe('a Resource whose plugin is missing', () => {
   it('imports, and its file, assets and Map content come back as they were written', async () => {
     const stored = await assets();
@@ -215,6 +231,25 @@ describe('a Resource whose plugin is missing', () => {
     const own = await imported.loadAsset(stored.own.hash);
     expect(own?.mediaType).toBe('application/pdf');
     expect(own?.bytes).toEqual(stored.own.bytes);
+  });
+
+  it('writes its content and Map content in one key order, whatever order the store answers', async () => {
+    const stored = await assets();
+    const asWritten = await makeDirectory();
+    const asReordered = await makeDirectory();
+    await exportTo(await holding([meta(stored)], stored), asWritten);
+    await exportTo(await holding([meta(stored, [], true)], stored), asReordered);
+
+    expect(await resourceFile(asReordered, UNPLUGGED)).toEqual(
+      await resourceFile(asWritten, UNPLUGGED),
+    );
+    expect(await spaceFile(asReordered)).toEqual(await spaceFile(asWritten));
+    const text = (await resourceFile(asWritten, UNPLUGGED)).toString('utf8');
+    const at = (key: string) => text.indexOf(`"${key}"`);
+    expect(at('direction')).toBeLessThan(at('nodes'));
+    expect([at('legend'), at('options'), at('source')]).toEqual(
+      [at('legend'), at('options'), at('source')].toSorted((left, right) => left - right),
+    );
   });
 
   it('keeps its Resource file and assets byte-identical while another Resource is edited', async () => {

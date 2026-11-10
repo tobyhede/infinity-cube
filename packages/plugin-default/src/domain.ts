@@ -11,8 +11,11 @@ import { definePlugin } from '@project/resource-api/domain';
  * It reads nothing. Its content and Map content schemas accept any value, so
  * the host carries a Resource with no plugin whole, and the plugin that
  * returns reads that Resource as it stands. It declares no reference, so a
- * Resource it draws holds no other Resource and no Space; it may be a Target,
- * because a Resource with no plugin is referenced as any other is.
+ * Resource it draws holds no other Resource and no Space. It may not become a
+ * Target: nothing here can say whether the missing plugin lets its Resources be
+ * one, and a Reference created now would leave the aggregate refused once a
+ * plugin that says no returns. A Reference that already names one is carried
+ * (`storedResourceReferenceProblems` in `@project/graph`).
  */
 
 /** Whatever the Resource's content is: read by its own plugin, never by this one. */
@@ -26,5 +29,4 @@ export const defaultPlugin = definePlugin({
   referenceName: 'Reference to a Resource',
   content: unreadSchema,
   mapContent: { schema: unreadSchema, default: {} },
-  mayBeTarget: true,
 });

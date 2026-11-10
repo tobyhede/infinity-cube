@@ -77,5 +77,24 @@ export function sameJsonValue(left: JsonValue, right: JsonValue): boolean {
   });
 }
 
+/**
+ * `value` with every object's keys in code-unit order, at every depth: the one
+ * canonical form of a JSON value nothing here reads (issue 09). A store need
+ * not keep key order — PostgreSQL's `jsonb` does not — so a value Export writes
+ * unread would otherwise come back in whatever order its store answered.
+ */
+export function canonicalJsonValue(value: JsonValue): JsonValue {
+  if (Array.isArray(value)) return value.map(canonicalJsonValue);
+  return isJsonObject(value) ? canonicalJsonObject(value) : value;
+}
+
+/** A JSON object in {@link canonicalJsonValue}'s form. */
+export const canonicalJsonObject = (value: JsonObject): JsonObject =>
+  Object.fromEntries(
+    Object.entries(value)
+      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+      .map(([key, entry]) => [key, canonicalJsonValue(entry)]),
+  );
+
 const isJsonObject = (value: JsonValue): value is JsonObject =>
   value !== null && typeof value === 'object' && !Array.isArray(value);

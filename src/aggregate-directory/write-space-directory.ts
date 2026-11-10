@@ -2,6 +2,7 @@ import { stat } from 'node:fs/promises';
 import { relative } from 'node:path';
 import {
   SPACE_FILE_VERSION,
+  canonicalJsonValue,
   canonicalResource,
   type GraphEdge,
   type JsonObject,
@@ -94,13 +95,16 @@ const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
       // `Placement.fromMap` rebuilds every entry key by key — state and size
       // included — so a stored `{"y":…,"x":…}` exports in the canonical order
       // rather than the one `jsonb` handed back; the sort fixes the entries'
-      // order. Map content keeps its place in the entry, its keys put in order.
+      // order. Map content is no plugin's here, so it is written in the one
+      // canonical form of a value nothing reads, its keys sorted at every depth.
       positions: Object.fromEntries(
         [...Placement.fromMap(m)]
           .sort(([left], [right]) => compareOrdinal(left, right))
-          .map(([resourceId, at]) => [
-            resourceId,
-            at.content === undefined ? at : { ...at, content: canonicalJson(at.content) },
+          .map(([id, entry]) => [
+            id,
+            entry.content === undefined
+              ? entry
+              : { ...entry, content: canonicalJsonValue(entry.content) },
           ]),
       ),
       graphs: canonicalGraphs(m.graphs),

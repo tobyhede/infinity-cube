@@ -69,9 +69,9 @@ async function openWithMissingPlugin(page: Page): Promise<{ spaceId: UUID; markd
             ...seeded.snapshot,
             document: {
               ...seeded.snapshot.document,
-              maps: (seeded.snapshot.document.maps ?? []).map((map) => ({
-                ...map,
-                graphs: map.graphs.map((graph) => ({
+              maps: (seeded.snapshot.document.maps ?? []).map((m) => ({
+                ...m,
+                graphs: m.graphs.map((graph) => ({
                   ...graph,
                   edges: [{ from: UNPLUGGED_ID, to: markdown.id }],
                 })),
@@ -99,11 +99,11 @@ async function storedSpace(page: Page, spaceId: UUID) {
 
 const storedUnplugged = async (page: Page, spaceId: UUID) => {
   const { snapshot } = await storedSpace(page, spaceId);
-  const map = snapshot.document.maps?.find(({ id }) => id === SEEDED_MAP_ID);
+  const seededMap = snapshot.document.maps?.find(({ id }) => id === SEEDED_MAP_ID);
   return {
     document: snapshot.resources.find(({ id }) => id === UNPLUGGED_ID)?.document,
-    placement: map?.positions[UNPLUGGED_ID],
-    edges: map?.graphs.flatMap(({ edges }) => edges) ?? [],
+    placement: seededMap?.positions[UNPLUGGED_ID],
+    edges: seededMap?.graphs.flatMap(({ edges }) => edges) ?? [],
   };
 };
 

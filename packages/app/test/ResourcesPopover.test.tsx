@@ -1,7 +1,14 @@
 import { useState } from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { EMPTY_ASSET_REF, KIND_IDS, uuidSchema, type Resource, type UUID } from '@project/core';
+import {
+  EMPTY_ASSET_REF,
+  KIND_IDS,
+  isMissingKindId,
+  uuidSchema,
+  type Resource,
+  type UUID,
+} from '@project/core';
 import {
   ResourcesPopover,
   RESOURCE_DRAG_TYPE,
@@ -216,6 +223,15 @@ const openList = async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Resources' }));
   return await screen.findByRole('dialog', { name: 'Resources' });
 };
+
+/** A Resource whose kind names no plugin in this build (issue 09). */
+const unplugged = (): Resource => {
+  const kind = 'vnd.example.chart';
+  if (!isMissingKindId(kind)) throw new Error('A plugin in this build draws the kind');
+  return { id: id('000000000006'), title: 'Flow', kind, content: { nodes: 3 } };
+};
+
+const UNAVAILABLE = 'Resources of a kind not in this build';
 
 const resourceButtons = () => screen.getAllByRole('button', { name: /^Add .* to Map$/ });
 
@@ -740,6 +756,28 @@ describe('ResourcesPopover', () => {
 
     expect(screen.queryByRole('button', { name: 'Add Gateway to Map' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add Zulu to Map' })).toBeInTheDocument();
+  });
+
+  it('lists, counts and filters a Resource whose plugin is missing under its own toggle', async () => {
+    const resources = [...RESOURCES, unplugged()];
+    render(<Fixture resources={resources} allResources={resources} />);
+    await openList();
+
+    const toggle = screen.getByRole('button', { name: `${UNAVAILABLE}, 1` });
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Add Flow to Map' })).toBeInTheDocument();
+
+    fireEvent.click(toggle);
+
+    expect(screen.queryByRole('button', { name: 'Add Flow to Map' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add Zulu to Map' })).toBeInTheDocument();
+  });
+
+  it('draws no toggle for missing kinds while the Space holds none', async () => {
+    render(<Fixture />);
+    await openList();
+
+    expect(screen.queryByRole('button', { name: new RegExp(UNAVAILABLE) })).toBeNull();
   });
 
   /**
@@ -1278,6 +1316,14 @@ describe('ResourcesPopover as a Connect list', () => {
       .map((toggle) => toggle.getAttribute('title'));
     expect(toggles).toHaveLength(KIND_IDS.length);
     expect(toggles).not.toContain('Spaces in this Meta Space');
+  });
+
+  it('offers a Resource whose plugin is missing as an Edge end', async () => {
+    render(<ConnectFixture resources={[...RESOURCES, unplugged()]} />);
+    await openConnectList();
+
+    expect(screen.getByRole('button', { name: 'Connect to Flow' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: `${UNAVAILABLE}, 1` })).toBeInTheDocument();
   });
 
   it('offers no delete on a Connect row, where choosing a Resource is all the list does', async () => {

@@ -1,6 +1,10 @@
+import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   EMPTY_ASSET_REF,
   isMissingKindId,
+  newUuid,
   uuidSchema,
   type GraphEdge,
   type GraphHeadShape,
@@ -11,6 +15,7 @@ import {
 import { loadSpaceAggregate, parseResourceFiles, serializeResource } from '@project/graph';
 import {
   admitAsset,
+  assetPath,
   AggregateInvariantError,
   createWorkingSpaceLoader,
   EMPTY_ASSET,
@@ -18,8 +23,10 @@ import {
   type StoredAsset,
 } from '@project/persistence';
 import { expect, it } from 'vitest';
-import type { SpaceRepository } from '@project/aggregate';
+import { MemorySpaceRepository, type SpaceRepository } from '@project/aggregate';
 import type { SqlStore } from '../../src/persistence/sql-store';
+import { exportAggregate } from '../../src/export/export-aggregate';
+import { importAggregate } from '../../src/import/import-aggregate';
 
 /**
  * The behaviour every `SpaceRepository` owes its callers, run against each
@@ -1116,6 +1123,104 @@ export const spaceRepositoryContract = (
         kind: 'loaded',
         aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(renamed, 1n, null)] },
       });
+    });
+  });
+
+  /**
+   * Issue 09's round trip through this store: Import an Aggregate directory
+   * holding a Resource whose plugin is missing, discard the directory, Export
+   * into an empty one and Import that. The Resource file, `space.json` and an
+   * asset that is not valid UTF-8 come back byte-identical, although a store
+   * may answer the unread content and Map content in its own key order
+   * (PostgreSQL's `jsonb` does), and the re-read Resource is the one written.
+   */
+  it(`${name} carries a Resource whose plugin is missing through Import and Export byte-identical`, async () => {
+    await withHarness(async (repository) => {
+      const kind = 'vnd.example.chart';
+      if (!isMissingKindId(kind)) throw new Error('A plugin in this build draws the kind');
+      const asset = await admitAsset(
+        Uint8Array.from([0xff, 0xfe, 0x00, 0xc3, 0x28, 0xa0, 0xa1]),
+        'application/pdf',
+      );
+      if (asset.kind !== 'admitted') throw new Error(`Not an asset: ${asset.code}`);
+      // Keys jsonb would reorder: it sorts by length, then by bytes.
+      const content = {
+        source: assetPath(asset.asset.hash),
+        legend: 'a longer value',
+        options: { direction: 'TD', at: [1, 2.5, null, { nested: true }] },
+      };
+      const snapshot: SpaceSnapshot = {
+        id: SPACE_ID,
+        document: {
+          version: 1,
+          title: 'Chart',
+          defaultMap: MAP_ID,
+          maps: [
+            {
+              id: MAP_ID,
+              title: 'Map',
+              kind: 'positioned',
+              positions: {
+                [SECOND_RESOURCE_ID]: {
+                  x: 10,
+                  y: 20,
+                  content: { zoom: 2, at: ['ink', { id: 7 }] },
+                },
+              },
+              graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
+            },
+          ],
+        },
+        resources: [
+          resource(RESOURCE_ID, 'Note'),
+          { id: SECOND_RESOURCE_ID, document: { title: 'Flow', kind, content } },
+        ],
+      };
+      const scratch = await mkdtemp(join(tmpdir(), 'infinity-cube-contract-missing-plugin-'));
+      try {
+        const source = join(scratch, 'source');
+        const writer = new MemorySpaceRepository(
+          [{ snapshot, revision: 0n, exportedRevision: null }],
+          SPACE_ID,
+        );
+        await writer.storeAsset(asset.asset);
+        expect((await exportAggregate(writer, source)).kind).toBe('exported');
+        const files = ['space.json', join('resources', `${SECOND_RESOURCE_ID}.json`)];
+        const written = await Promise.all(
+          files.map((file) => readFile(join(source, SPACE_ID, file))),
+        );
+        const assetNames = await readdir(join(source, 'assets'));
+        const assetBytes = await Promise.all(
+          assetNames.map((file) => readFile(join(source, 'assets', file))),
+        );
+
+        await expect(
+          importAggregate(source, repository, { replace: false, newId: newUuid }),
+        ).resolves.toMatchObject({ kind: 'imported' });
+        await rm(source, { recursive: true });
+        const exported = join(scratch, 'exported');
+        expect((await exportAggregate(repository, exported)).kind).toBe('exported');
+
+        expect(
+          await Promise.all(files.map((file) => readFile(join(exported, SPACE_ID, file)))),
+        ).toEqual(written);
+        expect(await readdir(join(exported, 'assets'))).toEqual(assetNames);
+        expect(
+          await Promise.all(assetNames.map((file) => readFile(join(exported, 'assets', file)))),
+        ).toEqual(assetBytes);
+
+        const reread = new MemorySpaceRepository();
+        await expect(
+          importAggregate(exported, reread, { replace: false, newId: newUuid }),
+        ).resolves.toMatchObject({ kind: 'imported' });
+        const space = await reread.loadSpace(SPACE_ID);
+        expect(space?.snapshot).toEqual(snapshot);
+        const loaded = await reread.loadAsset(asset.asset.hash);
+        expect(loaded?.mediaType).toBe('application/pdf');
+        expect(loaded?.bytes).toEqual(asset.asset.bytes);
+      } finally {
+        await rm(scratch, { recursive: true, force: true });
+      }
     });
   });
 
