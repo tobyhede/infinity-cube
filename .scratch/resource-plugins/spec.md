@@ -52,12 +52,9 @@ interface Surface<C, M> {
   selected: boolean
   claim?(): OwnClaim<C, M> | undefined
   assets: { url(ref): string; read(ref): Promise<Blob | { refused: string }>; pick?(accept): Promise<File[]>; store?(bytes: Blob): Promise<AssetRef | { refused: string }> }
-  // One Embed: a Resource, drawn by its own plugin, or a Space, drawn as one of its Maps.
-  // No `select`: the Space's defaultMap. `select` with a commit: the host's chooser and framing, writing only through it.
-  // Choosing another Map commits a view with no framing; reframing commits the same Map and Graph with the new framing.
-  // Enter, which navigates into the shown Space, is an embedding command too, offered where navigation is.
-  // `claim`: the shown Space's authoring, its Maps and Graphs included. Commands come from these, never from a kind.
-  Embed: ComponentType<{ resource: ResourceId; title: Kept<string> } | { space: SpaceId; select?: Kept<SpaceView>; claim?: Claim }>
+  // One component for the surface's lifetime: unmounting releases, so a new type per render would release every Claim inside it.
+  // The Map embedding draws the selection chooser and the target Space's Map and Graph authoring and links, and writes a choice through `select`.
+  Embed: ComponentType<{ resource: ResourceId; title: Kept<string> } | { map: SpaceView; select?: Kept<SpaceView>; claim?: Claim }>
 }
 
 interface Claim { release(): boolean }
@@ -77,7 +74,8 @@ type Creation<C> = {
   accepts?(input): boolean
   run(host: { create(items: New<C>[]): Promise<Answer>; assets }, input): void | Promise<void>
 }
-type New<C> = { title?: string; content: C | ((s: NewSpace) => C); newSpace?: true }
+type New<C> = { title?: string; content: C | ((s: NewSpace) => C); newSpace?: true }   // at most one item with newSpace per create
+type NewSpace = { spaceId: string; map: string; graph: string }                      // the new Space and the Map and Graph it opens on
 ```
 
 The API also exports `Title`, `Own` (the region that is the plugin's for the pointer), `<Rail commands>` (which draws nothing: it publishes the plugin's commands as data to its surface, and the canvas draws them on the rail), and `/view/testing`'s `renderPlugin(View, { content, map, grants })`.
@@ -88,7 +86,7 @@ Invariants:
 - A plugin saves bytes by `store`, which answers their `AssetRef`, then a content commit naming it. A plugin creating a Resource stores first, or names the asset of zero bytes, which always exists, so it needs no id and `newContent` stays a plain value.
 - The host finds asset references by walking `content` and Map content for whole string values that `assetRefSchema` accepts, whether or not it can read them. Export carries what it finds. Import admits every asset in the directory. A string that only looks like a reference is treated as one, and absent bytes are not an error: Export keeps the URL, completes (ADR 0118) and removes no file of that name. An external URL, such as an Image Resource's `https:` one (ADR 0106), is not an asset: the walk does not find it and Export carries no bytes for it (ADR 0118).
 - A commit settles once its Edit has been applied, including one `queued` behind another. It answers refused from a replaced working Space and from a withdrawn surface.
-- `run` and rail actions are called in the press, so a picker can open. An `await` before `pick` loses the press.
+- `run` and rail actions are called in the press, so a picker can open. An `await` before `pick` loses the press. `Exclusive` has no `pick`, so work that needs a file picks first and then calls `exclusively`.
 - `host.create` takes no position; the gesture gave it. A second press while a creation runs is ignored. `run` has no surface, so the host reports a refused `store` or `create` made through `host`.
 - A Claim held by one chain answers `undefined` to another. Unmount releases. A host-ended Claim always unmounts the plugin, keyed by Replacement epoch.
 - `exclusively` is one at a time, and answers `busy` before any work starts.
@@ -98,6 +96,13 @@ Invariants:
 
 Behind the seam, as pure cores with a thin shell: which fields a surface offers (`mapSurfacePolicy` and availability), the Claim chain, and the creation decision.
 
+Also behind the seam, as issue 01 found:
+
+- Withdrawal is offered and enforced. The surface host builds each surface without what is withdrawn. It also refuses a retained commit, when called, if its surface is unmounted, the Replacement epoch has moved, or exclusive work is running. The exclusive gate is application-wide across composed Spaces and lives in the surface host around `complete`. Today's `replacingImage` only withdraws controls.
+- `complete` settles a `queued` completion through a callback held on the queue entry. The drain calls it with the entry's own result, or with refused when the entry's epoch has moved or a throw abandoned it.
+- The Map surface's commit caps a size hint at the visible canvas (`visibleCanvasCap`, a canvas fact). The Edit then applies the floor and displacement. The plugin measures at its own width and the cap applies to each side separately, so a capped width can leave text taller than its hint, drawn with overflow.
+- A creation with a new Space goes through the coordinated Space Resource lifecycle, not `complete`. `planCreate` takes the plugin's content function and calls it with `NewSpace`.
+
 The plugin-level test suite renders each plugin with every capability absent, and the host mounts one probe plugin on each surface.
 
 ## Settled treatment
@@ -105,6 +110,8 @@ The plugin-level test suite renders each plugin with every capability absent, an
 Not bound by the ADR, and free to change with a story and a test.
 
 - Rail: the canvas draws it with `CommandToolbar`. During nested Claims the deepest Claim's commands show. In-rect controls are allowed too.
+- Space: the plugin's rail has Open, Close, Enter and the Title. The host-owned Map embedding draws the Map and Graph chooser, the target Space's Map and Graph authoring and its links. It writes a choice through the plugin's selection commit (`select`), so withdrawal covers it. Issue 01 found that a plugin cannot read the target Space's structure, and that these commands write a Space other than the plugin's own Resource.
+- Claims: there is one chain at a time, so an entered Space or an open Markdown draft stops every other Resource from claiming until it is released, as availability does today.
 - Title: Ur and Markdown draw it inline with `Title`. Image draws none, keeping it as its text alternative, and is renamed from the rail. An Open Reference passes its own to the Target.
 - Border, ring, receding: the canvas draws them on the outline. Image shows a border only when selected or in a Graph.
 - Pointer and events: the whole rect moves and selects unless a plugin wraps a region in `Own`, and a Claim gives the plugin the whole rect. Inside `Own`, pointer and key events are the plugin's; drop and paste stay the host's unless the plugin takes them; canvas shortcuts never interrupt IME composition. `Own` works on every surface but an inert one.

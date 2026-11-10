@@ -71,10 +71,18 @@ export interface EmbeddedMap {
   readonly graph: string;
 }
 
-/** What the host-owned embedding draws: another Resource, or a Map. */
+/**
+ * What the host-owned embedding draws: another Resource, or a Map. The Map
+ * embedding draws the selection chooser and writes a choice through `select`,
+ * so withdrawal covers it.
+ */
 export type EmbedProps =
   | { readonly resource: ResourceId; readonly title: Kept<string> }
-  | { readonly map: EmbeddedMap; readonly claim?: Claim };
+  | {
+      readonly map: EmbeddedMap;
+      readonly select?: Kept<EmbeddedMap>;
+      readonly claim?: Claim;
+    };
 
 /**
  * What a surface hosts a plugin's view with: the Resource, its Title, content
@@ -90,6 +98,7 @@ export interface Surface<C, M> {
   readonly selected: boolean;
   readonly claim?: () => OwnClaim<C, M> | undefined;
   readonly assets: Assets;
+  /** One component for the surface's lifetime: unmounting releases, so a new type per render would release every Claim inside it. */
   readonly Embed: ComponentType<EmbedProps>;
 }
 
