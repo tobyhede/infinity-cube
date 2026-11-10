@@ -55,23 +55,31 @@ A Resource kind is not its content's media type. A kind is what a Resource's con
 _Avoid_: Card (retired by ADR 0085), Thing (ADR 0085's name for it, retired by ADR 0101), node, slide, page, tile, subgraph. For the content: prose (it may be a table, a drawing or code, not only writing), body (works for markdown, but a Space Resource's content is a graph). For the kind: MIME type, content type, file type or format, which name a media type; and a bare "kind" where another sort of kind could be meant.
 
 **Resource plugin**:
-The module that makes a Resource kind what it is: what its content is and how it is kept, what it draws into the dimensions it is given, and every way its content is authored, including any mode it has. A Resource names its kind and the kind selects its plugin. A bundled plugin and one written outside this repository are the same thing, use the same **Resource API**, and are compiled into the application.
+The module that makes a Resource kind what it is: what its content is and how it is kept, what it draws into the dimensions it is given, every way its content is authored, including any mode it has, and, when it is not a rectangle, the outline it is drawn in. A Resource names its kind and the kind selects its plugin. A bundled plugin and one written outside this repository are the same thing, use the same **Resource API**, and are compiled into the application.
 _Avoid_: kind for the module (the kind is the name it goes by), extension, add-on, and plugin for code loaded at runtime (there is none).
 
 **Resource API**:
-Everything the application offers a Resource plugin, and all a plugin may reach: committing its content and getting back whether that completed, claiming exclusive interaction, storing assets, and drawing a Map or another Resource. Every plugin uses the same one; there is no private door for a bundled plugin.
+Everything the application offers a Resource plugin, and all a plugin may reach: committing what it keeps and hearing whether that completed, taking a **Claim**, storing assets, creating Resources, and drawing a Map or another Resource. Every plugin uses the same one; there is no private door for a bundled plugin.
 _Avoid_: SDK, hooks (as the name of the whole).
 
 **Resource content**:
 What a Resource plugin keeps for a Resource everywhere it appears, the same on every Map. It is the Resource's content; "Resource content" is the name to use where **Map content** is also in play.
 
 **Map content**:
-What a Resource plugin keeps for one Resource on one Map, beside the position and size the canvas owns: an Ur Resource's Shape, a Markdown Resource's Open or Closed state. It goes with the Map entry, so removing the Resource from the Map forgets it, and a Resource surface with no Map has none.
+What a Resource plugin keeps for one Resource on one Map, beside the position and size the canvas owns: an Ur Resource's Shape, a Markdown Resource's Open or Closed state. It goes with the Map entry, so removing the Resource from the Map forgets it. A plugin always has a value for it: what the Map entry stores, the plugin's default where it stores nothing, and the plugin's own answer on a Resource surface with no Map.
 _Avoid_: view state (it is authored and kept), placement (the mapping that holds it).
 
 **Resource surface**:
-What hosts a Resource plugin's drawing: a Map, the **Stage**, or another Resource embedding it. A Resource surface gives the plugin dimensions, the capabilities it offers, and whether the Resource is selected and in which Graph's colour, which the plugin draws. A capability is simply present or absent, and the plugin is not told which surface it is on.
+What hosts a Resource plugin's drawing: a Map, the **Stage**, or another Resource embedding it. A Resource surface gives the plugin dimensions, the capabilities it offers, and whether the Resource is selected. A capability is simply present or absent, and the plugin is not told which surface it is on.
 _Avoid_: read-only as a mode of a plugin (a surface that offers no authoring offers no commit), Resource canvas (the canvas is a Map's).
+
+**Claim**:
+A Resource plugin's hold on the interaction while an author works in it. Claims nest through what a plugin embeds, and the deepest holds the keyboard and shows its commands. An outer Claim is not released while an inner one runs. A Claim may run work **exclusively**, withdrawing authoring and navigation from every composed Space until that work settles.
+_Avoid_: lock, focus (the browser's), edit mode (a mode is the plugin's own).
+
+**Default plugin**:
+The Resource plugin that draws a Resource whose Resource kind names no plugin in this build. It draws the Title and says the kind is not available, and the Resource keeps everything every Resource can do. What the missing plugin kept is carried unread, and nothing that plugin might refer to is deleted while it is missing.
+_Avoid_: default kind (every Resource names its kind; there is none), fallback kind, placeholder as the name of the plugin.
 
 **Content action**:
 What a Resource plugin lets an author do to its Resource's content: Edit for a Markdown Resource's body, Replace for an Image Resource's image, and for a Space Resource, choosing the Map and Graph it shows and authoring that Map in place. Whether one is a mode, an interaction or nothing at all is the plugin's. An Ur Resource offers none, having no content, and a Reference Resource offers none because the content it shows is its Target's, read-only.
@@ -220,7 +228,7 @@ _Avoid_: publishing, deploying, hosting, loading (as names for the operation); m
 **Opening**:
 Bringing a single Resource's content up **on the Resource itself**, inside the rect it already has. A Markdown Resource opens on its Title and rendered Markdown; putting a caret in its source is a separate Edit. A Reference Resource opens on its own Title and its immutable Target's content read-only, while the Target Resource must be opened explicitly to author that content. A Space Resource opens on the Map it selects. Opening is not presenting — the canvas it happens on is still what is being worked in — and Open Markdown content reads through the same renderer used while presenting.
 
-A Resource plugin may give its Resources an **Open** and a **Closed** state. A Markdown, Space or Reference Resource has one; an Image Resource is always its image, and an Ur Resource has nothing to open. The state is the plugin's and kept in its **Map content**, so it may differ from Map to Map, it is not the viewer's, it survives a reload, and any number of a Map's Resources may be Open at once. Opening and Closing change what is drawn inside the Resource and never its size: an Open Resource is the size it was, and its content adapts to that rect. Resizing is the canvas's; a plugin renders into the size it is given.
+A Resource plugin may give its Resources an **Open** and a **Closed** state. A Markdown, Space or Reference Resource has one; an Image Resource is always its image, and an Ur Resource has nothing to open. The state is the plugin's and kept in its **Map content**, so it may differ from Map to Map, it is not the viewer's, it survives a reload, and any number of a Map's Resources may be Open at once. Opening and Closing change what is drawn inside the Resource and never its size: an Open Resource is the size it was, and its content adapts to that rect. Resizing is the canvas's; a plugin renders into the size it is given, and may hint at another on an author's gesture, which the canvas is free to ignore.
 
 Putting a caret in one of an Open Resource's fields is a separate gesture from Opening. The surface may keep transient caret and content-edit state locally while that interaction is live; only the authored Space must not persist which field is being typed into, exactly as it does not persist which title field is currently being renamed on the graph.
 _Avoid_: Expanded and expansion as state beside Open and Opening, Open Size (retired: a Resource has one size, whether Open or not), preview, popup, modal, dialog, drill-down, view mode for content Opening (which has one surface, the Resource).
