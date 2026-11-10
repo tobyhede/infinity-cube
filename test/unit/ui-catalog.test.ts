@@ -570,7 +570,7 @@ describe('production component coverage', () => {
     ]);
   });
 
-  it.each(['packages/plugin-thing/src/view.tsx', 'packages/resource-api/src/view/Part.tsx'])(
+  it.each(['packages/plugin-probe/src/view.tsx', 'packages/resource-api/src/view/Part.tsx'])(
     'holds %s, a plugin’s or the Resource API’s view, to a story (ADR 0142)',
     (module) => {
       const root = fixture();
