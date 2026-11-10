@@ -149,7 +149,7 @@ test(
     expect(room.y).toBeGreaterThanOrEqual(box.y - 0.5);
     expect(room.x + room.width).toBeLessThanOrEqual(box.x + box.width + 0.5);
     expect(room.y + room.height).toBeLessThanOrEqual(box.y + box.height + 0.5);
-    await expect(picture).toHaveCSS('object-fit', 'scale-down');
+    await expect(picture).toHaveCSS('object-fit', 'contain');
     expect(
       await body(page).evaluate((element) => element.scrollHeight <= element.clientHeight),
     ).toBe(true);

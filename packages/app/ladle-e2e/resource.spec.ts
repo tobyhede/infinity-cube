@@ -67,7 +67,6 @@ const CLOSED_KINDS = [
     body: HOST_BODY,
   },
   { label: 'space', kind: 'space', glyph: 'Space Resource', border: 'solid', body: HOST_BODY },
-  { label: 'image', kind: 'image', glyph: 'Image Resource', border: 'solid', body: HOST_BODY },
   // An Ur Resource's Shape says what it is, so it draws no kind glyph; its
   // plugin draws its Title inside the outline (ADR 0142).
   { label: 'ur', kind: 'ur', glyph: null, border: 'solid', body: '.canvas-resource__plugin > *' },
@@ -161,31 +160,6 @@ test(
     const rungs = await sizesOf(ladder.locator('.canvas-resource__title-line'));
     expect(rungs[0]! > rungs[1]!).toBe(true);
     expect(rungs[1]! > rungs[2]!).toBe(true);
-  },
-);
-
-/**
- * A Closed Image Resource looks like any Resource (ADR 0106): its Title and its
- * kind glyph at the one Closed size, and no picture — a Closed Resource draws no
- * thumbnail, so no `img` element is mounted on it at all.
- */
-test(
-  'a Closed Image Resource draws its Title and kind at the Closed size, and no picture',
-  { tag: '@parity:closed-image-resource-draws-title-and-kind' },
-  async ({ page }) => {
-    await page.goto('/?story=components--resource--closed&mode=preview');
-
-    const image = specimen(page, 'image · one line').getByRole('article');
-    await expect(image).toHaveAttribute('data-kind', 'image');
-    await expect(image.getByRole('heading', { name: 'Strategies' })).toBeVisible();
-    await expect(image.getByRole('img', { name: 'Image Resource' })).toBeVisible();
-    await expect(image.locator('img')).toHaveCount(0);
-
-    const markdown = specimen(page, 'markdown · one line').getByRole('article');
-    const pictured = await image.boundingBox();
-    const closed = await markdown.boundingBox();
-    expect(pictured?.width).toBeCloseTo(closed?.width ?? 0, 0);
-    expect(pictured?.height).toBeCloseTo(closed?.height ?? 0, 0);
   },
 );
 

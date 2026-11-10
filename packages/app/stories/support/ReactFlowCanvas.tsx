@@ -429,16 +429,13 @@ interface CanvasResourceNodeSpecimenBaseProps {
 }
 
 /**
- * The fixture Resource keeps its own kind, or is drawn as an Image Resource,
- * whose Open content is then its own image.
+ * The fixture Resource keeps its own kind, or is drawn as an Image Resource by
+ * its plugin, showing the picture at `picture` (ADR 0142).
  */
 export type CanvasResourceNodeSpecimenProps = CanvasResourceNodeSpecimenBaseProps &
   (
-    | { readonly kind?: undefined }
-    | {
-        readonly kind: 'image';
-        readonly content: Extract<ResourceContent, { readonly kind: 'image' }>;
-      }
+    | { readonly kind?: undefined; readonly picture?: undefined }
+    | { readonly kind: 'image'; readonly picture: string }
   );
 
 /**
@@ -459,6 +456,7 @@ export function CanvasResourceNodeSpecimen({
   zoom,
   title,
   kind,
+  picture,
   content,
   readOnly = false,
   resourceShape,
@@ -497,7 +495,10 @@ export function CanvasResourceNodeSpecimen({
   if (openOperationEnabled) data.onOpenChange = onOpenChange ?? (() => 'completed');
   if (open !== undefined) data.open = open;
   if (title !== undefined) data.title = title;
-  if (kind === 'image') data.kind = kind;
+  if (kind === 'image') {
+    // An Image Resource, drawn by its plugin from its own content (ADR 0142).
+    Object.assign(data, bareKindData('image'), { ownContent: { url: picture }, mapContent: {} });
+  }
   if (resourceShape !== undefined) {
     // An Ur Resource, drawn by its plugin from its Map content (ADR 0142).
     Object.assign(data, bareKindData('ur'), {

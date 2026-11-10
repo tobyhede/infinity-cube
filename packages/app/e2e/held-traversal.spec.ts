@@ -43,16 +43,11 @@ async function openPicturesAndElsewhere(page: Page): Promise<void> {
 }
 
 /**
- * Begin replacing the Image Resource's picture with a file, and hold the host's
- * answer so the replacement stays in flight and refuses every traversal.
+ * Replace the Image Resource's picture with a file from its rail (ADR 0142), and
+ * hold the host's answer so the Replace stays in flight and refuses every
+ * traversal.
  */
 async function holdReplacement(page: Page): Promise<void> {
-  const node = page.locator(`.react-flow__node[data-id="${IMAGE_ID}"]`);
-  const controls = await resourceControls(page, node);
-  await controls.getByRole('button', { name: 'Replace image of Resource Figure' }).click();
-  const target = node.getByRole('group', { name: 'Replace image of Figure' });
-  await expect(target).toBeVisible();
-  await settled(page);
   const never = Promise.withResolvers<undefined>();
   await page.route(
     (url) => url.pathname === '/assets',
@@ -61,10 +56,12 @@ async function holdReplacement(page: Page): Promise<void> {
       await route.continue();
     },
   );
+  const node = page.locator(`.react-flow__node[data-id="${IMAGE_ID}"]`);
+  const controls = await resourceControls(page, node);
   const chooser = page.waitForEvent('filechooser');
-  await target.getByRole('button', { name: 'Upload' }).click();
+  await controls.getByRole('button', { name: 'Replace image of Resource Figure' }).click();
   await (await chooser).setFiles({ name: 'harbour.png', mimeType: 'image/png', buffer: HARBOUR });
-  await expect(target).toHaveAttribute('aria-busy', 'true');
+  await expect(node.getByTestId('image-notice')).toHaveText('Replacing image…');
 }
 
 /**
