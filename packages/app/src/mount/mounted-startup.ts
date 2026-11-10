@@ -89,7 +89,7 @@ export const createMountedStartup = (options: MountedStartupOptions): SpaceStart
         history,
         browserImageSources(assets, displayImage),
         displayImage,
-        { mounted: true },
+        { mounted: true, assets },
       );
       return { startup, backend, metaSpaceId, pinned, resolved: read.aggregate.location };
     })();

@@ -32,13 +32,13 @@ import { graphPaint } from './graph-color';
 import { EntityActionsIcon } from './icons';
 import { InlineTitleEditor } from './InlineTitleEditor';
 import {
-  NO_ASSETS,
   NoEmbed,
   pluginEntryFor,
   type PluginEntry,
   type PluginHostClaim,
   type PluginOperations,
 } from './kinds/plugin-views';
+import { readingAssets, usePluginAssets } from './plugin-assets';
 import { RailChoiceMenu } from './RailChoiceMenu';
 import { ResourceFailureBoundary } from './ResourceFailureBoundary';
 import {
@@ -314,6 +314,11 @@ export function PluginSurface(props: PluginResourceProps & { readonly entry: Plu
     () => guarded(props.operations, lifetime, readOnly),
     [props.operations, lifetime, readOnly],
   );
+  const supplied = usePluginAssets();
+  const assets = useMemo(
+    () => (readOnly ? readingAssets(supplied) : supplied),
+    [readOnly, supplied],
+  );
   const plugin = props.entry.render({
     resourceId: props.resourceId,
     kind,
@@ -323,8 +328,7 @@ export function PluginSurface(props: PluginResourceProps & { readonly entry: Plu
     size,
     selected: state === 'selected' || state === 'editing',
     operations,
-    drawing: lifetime.drawing,
-    assets: NO_ASSETS,
+    assets,
     Embed: NoEmbed,
     onClaim: lifetime.hold,
   });

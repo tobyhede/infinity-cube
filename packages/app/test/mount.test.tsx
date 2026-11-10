@@ -307,6 +307,22 @@ describe('mounting an aggregate in the page', () => {
     expect(objectUrls.made).toEqual([]);
   });
 
+  it("hands a plugin's surface the in-page asset store, drawn from object URLs", async () => {
+    const files = fixtureFiles();
+    const objectUrls = recordingObjectUrls();
+    const startup = mountedStartup(files, { objectUrls });
+
+    const result = await startup.resolve('/');
+
+    const assets = result.assets;
+    expect(assets?.url(`/assets/${IMAGE_ID}`)).toBe('blob:https://mounted.test/1');
+    const read = await assets?.read(`/assets/${IMAGE_ID}`);
+    if (read === undefined || 'refused' in read) throw new Error('The asset was not read.');
+    expect(await bytesOf(read)).toEqual(files.get(`assets/${IMAGE_ID}.png`));
+    expect(assets?.store).toBeTypeOf('function');
+    expect(assets?.pick).toBeTypeOf('function');
+  });
+
   it('draws a stored image from an object URL over the mounted bytes', async () => {
     const files = fixtureFiles();
     const objectUrls = recordingObjectUrls();

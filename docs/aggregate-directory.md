@@ -153,7 +153,7 @@ The bytes of every stored asset the aggregate's Resources reference ([ADR 0142](
   ```
 
 - Importing reads every file directly in `assets/` named by a hash, alone or followed by a dot and any extension, and admits it whatever its type, up to 10 MiB. A file over that, one **not named for its own content**, or two files named by the same hash refuse the whole directory. A file whose name is not a hash is not read, and is left alone.
-- An asset reference is a whole string value of exactly `/assets/<hash>`, anywhere in a Resource's `content`. A reference whose file is not in `assets/` is allowed: the reference stays, and a picture draws as one that will not load.
+- An asset reference is a whole string value of exactly `/assets/<hash>`, anywhere in a Resource's `content` or a Map entry's `content`. A reference whose file is not in `assets/` is allowed: the reference stays, and a picture draws as one that will not load.
 - The asset of zero bytes always exists, so no file is needed for it.
 - An `https:` or `http:` URL stays a URL. InfinityCube does not download it, and nothing is written to `assets/` for it.
 - Exporting owns the hash-named files in `assets/`: an asset no Resource references any more is removed, and an `assets/` left empty is removed. A file of a referenced asset whose bytes the store does not hold is kept. Other files, dotfiles, subdirectories and links inside `assets/` are left alone.

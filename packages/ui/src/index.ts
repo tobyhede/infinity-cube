@@ -36,6 +36,7 @@ export type { RailChoiceMenuProps } from './RailChoiceMenu';
 export { PluginResource } from './PluginResource';
 export type { MapTitle, PluginResourceProps } from './PluginResource';
 export { PresentedPluginResource } from './PresentedPluginResource';
+export { NO_ASSETS, PluginAssetsProvider, usePluginAssets } from './plugin-assets';
 export type { PresentedPluginResourceProps } from './PresentedPluginResource';
 export { ResourceFailureBoundary } from './ResourceFailureBoundary';
 export type { ResourceFailureBoundaryProps } from './ResourceFailureBoundary';

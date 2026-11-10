@@ -4,9 +4,10 @@ import { useEffect, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { type JsonValue, type ResourceShape } from '@project/core';
-import { definePlugin, type Answer, type Outline } from '@project/resource-api/domain';
-import { definePluginView, Title, type Surface } from '@project/resource-api/view';
+import { definePlugin, type Answer } from '@project/resource-api/domain';
+import { definePluginView, Title, type Assets, type Surface } from '@project/resource-api/view';
 import {
+  PluginAssetsProvider,
   PluginResource,
   PresentedPluginResource,
   type PluginHostClaim,
@@ -14,6 +15,17 @@ import {
 } from '../src';
 import { pluginEntry } from '../src/kinds/plugin-views';
 import { PluginSurface } from '../src/PluginResource';
+import { PresentedPluginSurface } from '../src/PresentedPluginResource';
+
+const REF = `/assets/${'A'.repeat(43)}` as const;
+
+/** The application's asset store as a surface reaches it, every part distinguishable. */
+const APPLICATION_ASSETS: Assets = {
+  url: (ref) => `blob:${ref}`,
+  read: () => Promise.resolve({ refused: 'asset-absent' }),
+  pick: () => Promise.resolve([]),
+  store: () => Promise.resolve({ refused: 'asset-too-large' }),
+};
 
 /**
  * A plugin of the test's own, drawn through the same host: it keeps every
@@ -272,6 +284,33 @@ describe('the Map host a plugin draws inside (ADR 0142)', () => {
     expect(surface?.map.commit).toBeUndefined();
     expect(surface?.content.commit).toBeUndefined();
     expect(surface?.claim).toBeUndefined();
+  });
+
+  it("hands the plugin the application's assets, storing and picking while it is editable", async () => {
+    surfaces.length = 0;
+    render(
+      <PluginAssetsProvider value={APPLICATION_ASSETS}>
+        <PluginSurface {...probeProps()} entry={probeEntry} />
+      </PluginAssetsProvider>,
+    );
+    const assets = surfaces.at(-1)?.assets;
+    expect(assets?.url(`/assets/${'A'.repeat(43)}`)).toBe(`blob:/assets/${'A'.repeat(43)}`);
+    await expect(assets?.read(REF)).resolves.toEqual({ refused: 'asset-absent' });
+    expect(assets?.store).toBe(APPLICATION_ASSETS.store);
+    expect(assets?.pick).toBe(APPLICATION_ASSETS.pick);
+  });
+
+  it('hands a read-only surface the assets to read, and nothing to store or pick', async () => {
+    surfaces.length = 0;
+    render(
+      <PluginAssetsProvider value={APPLICATION_ASSETS}>
+        <PluginSurface {...probeProps({ readOnly: true })} entry={probeEntry} />
+      </PluginAssetsProvider>,
+    );
+    const assets = surfaces.at(-1)?.assets;
+    await expect(assets?.read(REF)).resolves.toEqual({ refused: 'asset-absent' });
+    expect(assets?.store).toBeUndefined();
+    expect(assets?.pick).toBeUndefined();
   });
 
   it('releases every Claim taken through it when it unmounts, and grants none after', () => {
@@ -626,6 +665,42 @@ describe('the Stage host a plugin draws inside (ADR 0142)', () => {
     expect(presented.querySelector('[data-outline="rectangle"]')).not.toBeNull();
     expect(screen.getByRole('heading', { name: 'Decide' })).toBeVisible();
     expect(screen.queryByRole('button', { name: /^Shape/u })).toBeNull();
+  });
+
+  it('hands the plugin the assets to read, and nothing to store or pick', async () => {
+    // The Stage gives the value its kind's `withoutMap` gives, so this probe
+    // takes any Map content.
+    const stageProbe = definePlugin({
+      ...probePlugin,
+      mapContent: { schema: z.object({}).passthrough(), default: {} },
+    });
+    const stageProbeEntry = pluginEntry(
+      stageProbe,
+      definePluginView(stageProbe, {
+        View: ({ surface }) => {
+          stageSurfaces.push(surface);
+          return null;
+        },
+        Glyph: () => null,
+      }),
+    );
+    const stageSurfaces: Surface<z.output<typeof probeContent>, object>[] = [];
+    render(
+      <PluginAssetsProvider value={APPLICATION_ASSETS}>
+        <PresentedPluginSurface
+          resourceId="probe"
+          kind="ur"
+          title="Probe"
+          content={{ fails: false }}
+          entry={stageProbeEntry}
+        />
+      </PluginAssetsProvider>,
+    );
+    const assets = stageSurfaces.at(-1)?.assets;
+    expect(assets?.url(`/assets/${'A'.repeat(43)}`)).toBe(`blob:/assets/${'A'.repeat(43)}`);
+    await expect(assets?.read(REF)).resolves.toEqual({ refused: 'asset-absent' });
+    expect(assets?.store).toBeUndefined();
+    expect(assets?.pick).toBeUndefined();
   });
 
   it('draws a short note in place of a plugin that throws', async () => {

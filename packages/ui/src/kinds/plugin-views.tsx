@@ -115,12 +115,6 @@ export interface PluginEntry {
   readonly render: (input: PluginSurfaceInput) => ReactElement;
 }
 
-/** No asset store yet: issue 03 fills this. A reference is drawn from its own URL. */
-export const NO_ASSETS: Assets = {
-  url: (ref) => ref,
-  read: () => Promise.resolve({ refused: 'Assets are not available here yet.' }),
-};
-
 /** The embedding, before any plugin embeds: one component for every surface's lifetime. */
 export function NoEmbed(_props: EmbedProps) {
   return null;

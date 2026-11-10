@@ -1,5 +1,5 @@
 import { compareOrdinal } from '@project/aggregate';
-import { assetReferences, assetRefHash, type SpaceSnapshot } from '@project/core';
+import { assetReferences, assetRefHash, type AssetRef, type SpaceSnapshot } from '@project/core';
 import {
   EMPTY_ASSET,
   isAssetHash,
@@ -10,20 +10,24 @@ import {
 
 /**
  * Every asset hash the aggregate references, once each, in ordinal order: each
- * whole string value in a Resource's `content` that is an asset reference,
- * whatever its kind and whether or not any plugin reads it (ADR 0142). No kind
- * is named, so a Resource whose plugin is missing has its assets found as
- * readily as any other.
+ * whole string value that is an asset reference in a Resource's `content` or
+ * in the Map content of any Map entry, whatever its kind and whether or not
+ * any plugin reads it (ADR 0142). No kind is named, so a Resource whose plugin
+ * is missing has its assets found as readily as any other.
  */
 export const referencedAssetHashes = (spaces: readonly SpaceSnapshot[]): readonly AssetHash[] => {
   const hashes = new Set<AssetHash>();
-  for (const { resources } of spaces) {
-    for (const { document } of resources) {
-      for (const ref of assetReferences(document.content)) {
-        const hash = assetRefHash(ref);
-        if (isAssetHash(hash)) hashes.add(hash);
-      }
+  const collect = (refs: readonly AssetRef[]): void => {
+    for (const ref of refs) {
+      const hash = assetRefHash(ref);
+      if (isAssetHash(hash)) hashes.add(hash);
     }
+  };
+  for (const { document, resources } of spaces) {
+    for (const placed of document.maps ?? []) {
+      for (const entry of Object.values(placed.positions)) collect(assetReferences(entry?.content));
+    }
+    for (const resource of resources) collect(assetReferences(resource.document.content));
   }
   return [...hashes].sort(compareOrdinal);
 };
