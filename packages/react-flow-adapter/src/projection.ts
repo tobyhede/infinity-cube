@@ -8,6 +8,7 @@ import {
   authorsContent,
   embedsMap,
   resolvedMapContent,
+  takesOpen,
   type JsonValue,
   type Resource,
   type ResourceId,
@@ -15,7 +16,7 @@ import {
   type GraphHeadShape,
   type GraphId,
 } from '@project/core';
-import { resolveResourceContent } from '@project/graph';
+import { referencedResources, resolveResourceContent, resourceDrawnByPlugin } from '@project/graph';
 import type {
   GraphRenderEdge,
   LayoutStrategyResource,
@@ -188,9 +189,22 @@ type ResourceNodeCommonData = {
   ownContent?: Resource['content'] | undefined;
   /**
    * The Map content the plugin drawing this Resource is given on this Map: its
-   * entry's, else the plugin's default. `undefined` for a kind no plugin draws.
+   * entry's, else the plugin's default. `undefined` for a Resource no plugin
+   * draws (`drawnByPlugin`), which the application's own drawing draws.
    */
   mapContent?: JsonValue | undefined;
+  /**
+   * The Resources this one's content references, as they stand, which the
+   * plugin drawing it may draw inside its rect through the host's embedding
+   * (ADR 0142): an Open Reference Resource's Target.
+   */
+  embeddable?: readonly Resource[] | undefined;
+  /**
+   * Whether the application keeps this Resource's Open, a Map entry's `open`
+   * (`takesOpen`): a Space Resource or a Reference to one, never a Resource a
+   * plugin draws, which keeps any Open in its Map content.
+   */
+  takesOpen: boolean;
   /** Ordinary renderer selection, kept outside the authored Space. */
   selectedForAuthoring: boolean;
   /** The graph being emphasised, if any. Drives handle dimming. */
@@ -335,6 +349,7 @@ export function projectResourceNodes(
   const laidOut = new Map((options.strategyGraph?.resources ?? []).map((r) => [r.id, r]));
 
   const source = visible ? space.resources.filter((r) => visible.has(r.id)) : space.resources;
+  const resourceOf = (id: ResourceId) => space.lookup.resource(id);
 
   return source.map((resource) => {
     const placedResource = laidOut.get(resource.id);
@@ -344,6 +359,7 @@ export function projectResourceNodes(
     const content = resolveResourceContent(space, resource);
     const display: ResourceDisplay = open ? { shown: 'open', content } : CLOSED_DISPLAY;
     const emphasis = options.resourceEmphasis?.(resource.id) ?? UNEMPHASISED;
+    const byPlugin = resourceDrawnByPlugin(space, resource);
     const node: ResourceFlowNode = {
       id: resource.id,
       type: 'resource',
@@ -359,7 +375,11 @@ export function projectResourceNodes(
         display,
         shape: options.resourceShape?.(resource.id) ?? DEFAULT_RESOURCE_SHAPE,
         ownContent: resource.content,
-        mapContent: resolvedMapContent(resource.kind, options.mapContent?.(resource.id)),
+        mapContent: byPlugin
+          ? resolvedMapContent(resource.kind, options.mapContent?.(resource.id))
+          : undefined,
+        embeddable: byPlugin ? referencedResources(space, resource) : undefined,
+        takesOpen: takesOpen(resource, resourceOf),
         activeGraphId,
         activeGraphColor: options.activeGraphColor ?? FALLBACK_COLOR,
         borderColor: emphasis.borderColor,

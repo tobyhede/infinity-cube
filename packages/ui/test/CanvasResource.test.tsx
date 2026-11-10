@@ -9,9 +9,7 @@ import {
   type KindOperations,
   type ResourceDisplay,
 } from '../src';
-import { textAsset, WithTexts } from './markdown-texts';
-
-const FIGURE_URL = 'https://example.com/figure.png';
+import { WithTexts } from './markdown-texts';
 
 const SPACE_CONTENT: ResourceContent = {
   kind: 'space',
@@ -27,7 +25,7 @@ const SPACE_CONTENT: ResourceContent = {
 /** An Open display drawing `content`. */
 const opened = (content: ResourceContent): ResourceDisplay => ({ shown: 'open', content });
 
-it('takes a Reference Resource’s content-area layout from its Target, including its Close fade', async () => {
+it('takes a Reference Resource’s content-area layout from what it shows, including its Close fade', async () => {
   const props = {
     kindOperations: { kind: 'reference' as const },
     state: 'rest' as const,
@@ -40,21 +38,12 @@ it('takes a Reference Resource’s content-area layout from its Target, includin
   );
   const resource = screen.getByRole('article', { name: 'A' });
   expect(resource).not.toHaveAttribute('data-content-area');
-  rerender(
-    <CanvasResource
-      {...props}
-      display={opened({
-        kind: 'markdown',
-        content: { url: textAsset('Target body') },
-        via: 'target',
-      })}
-    />,
-  );
+  rerender(<CanvasResource {...props} display={opened({ kind: 'unresolved', via: 'target' })} />);
   expect(resource).toHaveAttribute('data-content-area', 'true');
-  expect(await screen.findByText('Target body')).toBeVisible();
+  expect(await screen.findByText('Target not found')).toBeVisible();
   rerender(<CanvasResource {...props} display={CLOSED_DISPLAY} />);
   expect(resource).toHaveAttribute('data-content-area', 'true');
-  expect(resource).toHaveTextContent('Target body');
+  expect(resource).toHaveTextContent('Target not found');
 });
 
 /**
@@ -162,35 +151,6 @@ describe('CanvasResource kind and interaction state', () => {
     expect(screen.queryByRole('button', { name: 'Close Resource Return' })).not.toBeInTheDocument();
   });
 
-  it('draws an Open Reference Resource to an Image Resource as its Target’s image, with no Replace', () => {
-    render(
-      <CanvasResource
-        kindOperations={{ kind: 'reference' }}
-        onOpenChange={() => 'completed'}
-        display={opened({
-          kind: 'image',
-          content: { url: FIGURE_URL },
-          via: 'target',
-        })}
-        state="selected"
-        title="Figure, again"
-        graphColor="#ffc53d"
-      />,
-    );
-
-    const resource = screen.getByRole('article', { name: 'Figure, again' });
-    expect(resource).toHaveAttribute('data-content-kind', 'image');
-    const picture = screen.getByRole('img', { name: 'Figure, again' });
-    expect(picture).toHaveAttribute('src', FIGURE_URL);
-    expect(screen.getByRole('button', { name: 'Close Resource Figure, again' })).toBeVisible();
-    expect(screen.queryByRole('button', { name: /^Replace image/u })).toBeNull();
-
-    fireEvent.error(picture);
-
-    expect(screen.getByText('Image did not load')).toBeVisible();
-    expect(screen.queryByRole('button', { name: 'Replace image' })).toBeNull();
-  });
-
   it('draws an unresolved Target as a notice, not an empty document', () => {
     render(
       <CanvasResource
@@ -247,31 +207,6 @@ describe('CanvasResource Open and Close operation', () => {
     expect(screen.queryByRole('button', { name: /Resource A$/ })).not.toBeInTheDocument();
     fireEvent.contextMenu(screen.getByRole('article', { name: 'A' }));
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
-  });
-
-  it('draws the rendered body of an Open Reference to a Markdown Resource', async () => {
-    const onOpenChange = vi.fn(() => 'completed' as const);
-    render(
-      <CanvasResource
-        kindOperations={{ kind: 'reference' }}
-        onOpenChange={onOpenChange}
-        display={{
-          shown: 'open',
-          content: {
-            kind: 'markdown',
-            content: { url: textAsset('## Authored placement') },
-            via: 'target',
-          },
-        }}
-        state="rest"
-        title="A"
-        graphColor="#ffc53d"
-      />,
-      { wrapper: WithTexts },
-    );
-    expect(await screen.findByRole('heading', { name: 'Authored placement' })).toBeVisible();
-    screen.getByRole('button', { name: 'Close Resource A' }).click();
-    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
   it('offers no action when neither operation is supplied', () => {
@@ -817,14 +752,14 @@ describe('CanvasResource title editor', () => {
   });
 });
 
-describe('CanvasResource Open Reference to a Markdown Resource', () => {
+describe('CanvasResource Open Reference Resource', () => {
   it('repeats transition durations cyclically when timing the opacity exit', async () => {
     const { rerender } = render(
       <CanvasResource
         kindOperations={{ kind: 'reference' }}
         display={{
           shown: 'open',
-          content: { kind: 'markdown', content: { url: textAsset('Leaving body') }, via: 'target' },
+          content: { kind: 'unresolved', via: 'target' },
         }}
         state="rest"
         title="Strategies"
@@ -833,7 +768,7 @@ describe('CanvasResource Open Reference to a Markdown Resource', () => {
       { wrapper: WithTexts },
     );
     // The text is read before the clock is faked, so the read is not held by it.
-    expect(await screen.findByText('Leaving body')).toBeInTheDocument();
+    expect(await screen.findByText('Target not found')).toBeInTheDocument();
     vi.useFakeTimers();
     const computed = document.createElement('div').style;
     computed.transitionProperty = 'color, transform, width, opacity';
@@ -850,9 +785,9 @@ describe('CanvasResource Open Reference to a Markdown Resource', () => {
       />,
     );
     await act(() => vi.advanceTimersByTime(99));
-    expect(screen.getByText('Leaving body')).toBeInTheDocument();
+    expect(screen.getByText('Target not found')).toBeInTheDocument();
     await act(() => vi.advanceTimersByTime(1));
-    expect(screen.queryByText('Leaving body')).not.toBeInTheDocument();
+    expect(screen.queryByText('Target not found')).not.toBeInTheDocument();
 
     style.mockRestore();
     vi.useRealTimers();
@@ -875,31 +810,6 @@ describe('CanvasResource Open Reference to a Markdown Resource', () => {
     );
   });
 
-  it('draws its Target’s Markdown below the Title and reports itself open', async () => {
-    render(
-      <CanvasResource
-        kindOperations={{ kind: 'reference' }}
-        display={{
-          shown: 'open',
-          content: {
-            kind: 'markdown',
-            content: { url: textAsset('the Resource’s own source') },
-            via: 'target',
-          },
-        }}
-        state="rest"
-        title="Strategies"
-        graphColor="#ffc53d"
-      />,
-      { wrapper: WithTexts },
-    );
-    expect(await screen.findByText('the Resource’s own source')).toBeVisible();
-
-    const resource = screen.getByRole('article', { name: 'Strategies' });
-    expect(resource).toHaveAttribute('data-open', 'true');
-    expect(screen.getByText('the Resource’s own source')).toBeVisible();
-  });
-
   it('draws no body on a closed Reference Resource', () => {
     render(
       <CanvasResource
@@ -917,17 +827,13 @@ describe('CanvasResource Open Reference to a Markdown Resource', () => {
     );
   });
 
-  it('holds the Markdown body open while the Title is being renamed', async () => {
+  it('holds its content area open while the Title is being renamed', async () => {
     render(
       <CanvasResource
         kindOperations={{ kind: 'reference' }}
         display={{
           shown: 'open',
-          content: {
-            kind: 'markdown',
-            content: { url: textAsset('the Resource’s own source') },
-            via: 'target',
-          },
+          content: { kind: 'unresolved', via: 'target' },
         }}
         state="editing"
         title="Strategies"
@@ -938,12 +844,12 @@ describe('CanvasResource Open Reference to a Markdown Resource', () => {
       />,
       { wrapper: WithTexts },
     );
-    expect(await screen.findByText('the Resource’s own source')).toBeVisible();
+    expect(await screen.findByText('Target not found')).toBeVisible();
 
     // Open is what the Map authored and the caret is a gesture, so the
     // two are independent rather than exclusive (ADR 0064).
     expect(screen.getByRole('textbox', { name: 'Resource title' })).toBeVisible();
-    expect(screen.getByText('the Resource’s own source')).toBeVisible();
+    expect(screen.getByText('Target not found')).toBeVisible();
   });
 });
 
@@ -1156,11 +1062,7 @@ describe('how far an Open Resource overflows', () => {
     const { container } = render(
       <CanvasResource
         kindOperations={{ kind: 'reference' }}
-        display={opened({
-          kind: 'markdown',
-          content: { url: textAsset('Long body') },
-          via: 'target',
-        })}
+        display={opened({ kind: 'unresolved', via: 'target' })}
         state="rest"
         title="Strategies"
         graphColor="#ffc53d"
@@ -1168,7 +1070,7 @@ describe('how far an Open Resource overflows', () => {
       { wrapper: WithTexts },
     );
 
-    const text = await screen.findByText('Long body');
+    const text = await screen.findByText('Target not found');
     Object.defineProperty(text, 'scrollHeight', { value: 420 });
     Object.defineProperty(text, 'clientHeight', { value: 100 });
 
@@ -1186,13 +1088,13 @@ describe('CanvasResource Close fade', () => {
     return content;
   }
 
-  it('keeps the Markdown it last drew while the content fades out', async () => {
+  it('keeps what it last drew while the content fades out', async () => {
     const { rerender } = render(
       <CanvasResource
         kindOperations={{ kind: 'reference' }}
         display={{
           shown: 'open',
-          content: { kind: 'markdown', content: { url: textAsset('## Hello') }, via: 'target' },
+          content: { kind: 'unresolved', via: 'target' },
         }}
         state="rest"
         title="A"
@@ -1200,7 +1102,7 @@ describe('CanvasResource Close fade', () => {
       />,
       { wrapper: WithTexts },
     );
-    expect(await screen.findByText('Hello')).toBeVisible();
+    expect(await screen.findByText('Target not found')).toBeVisible();
     rerender(
       <CanvasResource
         kindOperations={{ kind: 'reference' }}
@@ -1211,34 +1113,7 @@ describe('CanvasResource Close fade', () => {
       />,
     );
 
-    expect(leavingContent()).toHaveTextContent('Hello');
-  });
-
-  it('keeps the Target’s picture a Reference Resource last drew while the content fades out', () => {
-    const { rerender } = render(
-      <CanvasResource
-        kindOperations={{ kind: 'reference' }}
-        display={opened({
-          kind: 'image',
-          content: { url: FIGURE_URL },
-          via: 'target',
-        })}
-        state="rest"
-        title="A"
-        graphColor="#ffc53d"
-      />,
-    );
-    rerender(
-      <CanvasResource
-        kindOperations={{ kind: 'reference' }}
-        display={CLOSED_DISPLAY}
-        state="rest"
-        title="A"
-        graphColor="#ffc53d"
-      />,
-    );
-
-    expect(leavingContent().querySelector('img')).toHaveAttribute('src', FIGURE_URL);
+    expect(leavingContent()).toHaveTextContent('Target not found');
   });
 });
 

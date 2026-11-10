@@ -1682,7 +1682,7 @@ const FOREIGN_RESOURCE_FILES: readonly string[] = [
   'packages/ui/src/components/card.tsx',
   'packages/ui/src/index.ts',
   'packages/ui/src/CanvasResource.tsx',
-  'packages/ui/src/PluginResource.tsx',
+  'packages/ui/src/MapTitle.tsx',
   'packages/ui/src/ResourceRail.tsx',
   'packages/ui/test/design-system-baseline.test.tsx',
 ];

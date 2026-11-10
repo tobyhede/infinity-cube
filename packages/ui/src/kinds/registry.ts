@@ -12,7 +12,7 @@ import {
 import { imageView } from './image';
 import type { CanvasArea, ContentCommand, KindView } from './kind-view';
 import { markdownView } from './markdown';
-import { referenceView, type ReferenceOperations } from './reference';
+import { referenceView } from './reference';
 import { spaceView, type SpaceOperations } from './space';
 import type { PluginOperations } from './plugin-views';
 import { urView } from './ur';
@@ -20,7 +20,7 @@ import { urView } from './ur';
 /** What each kind offers beyond its shared Title, by its id. */
 export interface KindOperationsByKind {
   [markdownKind.id]: PluginOperations;
-  [referenceKind.id]: ReferenceOperations;
+  [referenceKind.id]: PluginOperations;
   [imageKind.id]: PluginOperations;
   [urKind.id]: PluginOperations;
   [spaceKind.id]: SpaceOperations;

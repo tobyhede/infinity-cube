@@ -65,16 +65,6 @@
   line-height: 1.2;
 }
 
-/* A plugin embedded below the name, as a Reference to an Image Resource draws
-   its picture, makes its Resource exactly the frame's height rather than at
-   least it: the name stacks over the plugin, which takes the room left below. */
-.stage__body .resource--full:has(> .resource-embedded-plugin) {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-}
-
 /* What the application draws in place of a kind's content — a Space Resource's
    Map — fills the room below the name, as a picture does. */
 .stage__body .resource--drawn {

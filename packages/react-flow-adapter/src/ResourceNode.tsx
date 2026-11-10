@@ -461,6 +461,7 @@ export function ResourceNode({
           }}
           content={data.ownContent}
           mapContent={data.mapContent}
+          embeddable={data.embeddable}
           outline={data.shape}
           size={canvasResourceOptionalProps.size}
           state={
