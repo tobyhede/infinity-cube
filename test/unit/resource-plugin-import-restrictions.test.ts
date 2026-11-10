@@ -35,6 +35,8 @@ const PLUGIN_FILES = [
   'packages/plugin-markdown/src/view.tsx',
   'packages/plugin-space/src/domain.ts',
   'packages/plugin-space/src/view.tsx',
+  'packages/plugin-default/src/domain.ts',
+  'packages/plugin-default/src/view.tsx',
 ];
 
 describe('Resource plugin import restrictions', () => {

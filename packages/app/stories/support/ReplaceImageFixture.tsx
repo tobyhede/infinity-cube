@@ -1,4 +1,4 @@
-import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { isOfKind, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import type { SpaceSession } from '@project/persistence';
 import { useCallback, useState, useSyncExternalStore } from 'react';
 import { Application } from '#components/Application';
@@ -126,7 +126,7 @@ function RevisionEvidence({ session }: { readonly session: SpaceSession }) {
       hidden
       data-testid="replacement-revision"
       data-persistence={state.persistence.kind}
-      data-url={figure?.kind === 'image' ? figure.content.url : undefined}
+      data-url={figure !== undefined && isOfKind(figure, 'image') ? figure.content.url : undefined}
     >
       {state.acknowledgedRevision.toString()}
     </output>

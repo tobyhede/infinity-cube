@@ -1,5 +1,6 @@
 import {
   EMPTY_ASSET_REF,
+  isMissingKindId,
   spaceSnapshotSchema,
   uuidSchema,
   type SpaceSnapshot,
@@ -234,6 +235,79 @@ describe('loadSpaceAggregate', () => {
     );
 
     expect(errors).toEqual([{ kind: 'ordinary-space-unreferenced', spaceId: CHILD }]);
+  });
+
+  /**
+   * A Resource whose plugin is missing may be what refers to a Space, and
+   * nothing can read its content to say, so while one is in the aggregate an
+   * unrooted Space is held (ADR 0142). Once none is, the rooting rule refuses
+   * that Space again, as it does when the plugin returns.
+   */
+  describe('while a plugin is missing', () => {
+    const PORTAL = 'vnd.example.portal';
+    if (!isMissingKindId(PORTAL)) throw new Error('A plugin draws the portal kind');
+    const portal = (id: UUID): StoredResource => ({
+      id,
+      document: { title: 'Portal', kind: PORTAL, content: { to: CHILD } },
+    });
+
+    it('holds an ordinary Space with no inbound Space Resource', () => {
+      const result = loadSpaceAggregate({
+        metaSpaceId: META,
+        snapshots: [
+          snapshot(META, [portal(META_RESOURCE)]),
+          snapshot(CHILD, [markdown(CHILD_RESOURCE)]),
+        ],
+      });
+
+      expect(result.ok).toBe(true);
+    });
+
+    it('holds it while any Resource of a missing kind stays, wherever it is', () => {
+      const result = loadSpaceAggregate({
+        metaSpaceId: META,
+        snapshots: [snapshot(META, []), snapshot(CHILD, [portal(CHILD_RESOURCE)])],
+      });
+
+      expect(result.ok).toBe(true);
+    });
+
+    it('refuses that Space, naming it, once no Resource of a missing kind is left', () => {
+      const errors = errorsOf(
+        loadSpaceAggregate({
+          metaSpaceId: META,
+          snapshots: [
+            snapshot(META, [markdown(SECOND_META_RESOURCE)]),
+            snapshot(CHILD, [markdown(CHILD_RESOURCE)]),
+          ],
+        }),
+      );
+
+      expect(errors).toEqual([{ kind: 'ordinary-space-unreferenced', spaceId: CHILD }]);
+    });
+
+    it('still refuses a Space Resource whose target is missing', () => {
+      const errors = errorsOf(
+        loadSpaceAggregate({
+          metaSpaceId: META,
+          snapshots: [
+            snapshot(META, [
+              portal(META_RESOURCE),
+              spaceResource(SECOND_META_RESOURCE, OTHER, SELECTS_FIRST),
+            ]),
+          ],
+        }),
+      );
+
+      expect(errors).toEqual([
+        {
+          kind: 'space-reference-missing',
+          spaceId: META,
+          resourceId: SECOND_META_RESOURCE,
+          targetSpaceId: OTHER,
+        },
+      ]);
+    });
   });
 
   it('locates an explicit Map that the target does not supply', () => {

@@ -1,5 +1,6 @@
 import {
   EMPTY_ASSET_REF,
+  isMissingKindId,
   uuidSchema,
   type GraphEdge,
   type GraphHeadShape,
@@ -1058,6 +1059,63 @@ export const spaceRepositoryContract = (
         kind: 'committed',
       });
       await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(renamed, 1n, null));
+    });
+  });
+
+  /**
+   * A Resource whose kind names no plugin in this build is the same Resource
+   * as any other (ADR 0142): the store holds its content and its Map content
+   * as JSON it never reads, renames it as an ordinary Edit, and hands it back
+   * whole to a fresh host, which is where a build that gains the plugin reads
+   * it through that plugin.
+   */
+  it(`${name} stores, renames and reloads a Resource whose plugin is missing unchanged`, async (context) => {
+    await withReopenHarness(context, async (repository, reopen) => {
+      const kind = 'vnd.example.diagram';
+      if (!isMissingKindId(kind)) throw new Error('A plugin in this build draws the kind');
+      const content = {
+        source: EMPTY_ASSET_REF,
+        options: { direction: 'TD', nodes: [1, 2.5, null, { nested: true }] },
+      };
+      const mapContent = { zoom: 2, layers: ['ink', { id: 7 }] };
+      const first: SpaceSnapshot = {
+        id: SPACE_ID,
+        document: {
+          version: 1,
+          title: 'Diagram',
+          defaultMap: MAP_ID,
+          maps: [
+            {
+              id: MAP_ID,
+              title: 'Map',
+              kind: 'positioned',
+              positions: { [SECOND_RESOURCE_ID]: { x: 10, y: 20, content: mapContent } },
+              graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
+            },
+          ],
+        },
+        resources: [
+          resource(RESOURCE_ID, 'Note'),
+          { id: SECOND_RESOURCE_ID, document: { title: 'Flow', kind, content } },
+        ],
+      };
+      await seed(repository, first);
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(first, 0n, null));
+
+      const renamed: SpaceSnapshot = {
+        ...first,
+        resources: [
+          resource(RESOURCE_ID, 'Note'),
+          { id: SECOND_RESOURCE_ID, document: { title: 'Renamed flow', kind, content } },
+        ],
+      };
+      await expect(commitUpdate(repository, renamed, 0n)).resolves.toMatchObject({
+        kind: 'committed',
+      });
+      await expect((await reopen()).loadAggregate()).resolves.toEqual({
+        kind: 'loaded',
+        aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(renamed, 1n, null)] },
+      });
     });
   });
 
