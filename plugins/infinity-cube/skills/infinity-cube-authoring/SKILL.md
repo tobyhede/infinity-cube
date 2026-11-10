@@ -5,12 +5,12 @@ description: Write or change an InfinityCube Aggregate directory's files — a t
 
 # Authoring an Aggregate directory
 
-An **Aggregate directory** is InfinityCube's on-disk form: `aggregate.json` naming the Meta Space, one directory per Space named for its Id, each holding `space.json` and a `resources/` directory of JSON Resource files (with a Markdown Resource's source in its `<id>.md` sidecar), and `assets/` holding the stored files Resources reference, such as pictures. The reference is [`docs/aggregate-directory.md`](https://github.com/tobyhede/infinity-cube/blob/main/docs/aggregate-directory.md): the authority on every key and rule. Read it before writing: the copy in your InfinityCube clone when you have one, since the format moves with the code and `main` may be ahead of that clone, otherwise the link. This skill is the order to work in and the traps.
+An **Aggregate directory** is InfinityCube's on-disk form: `aggregate.json` naming the Meta Space, one directory per Space named for its Id, each holding `space.json` and a `resources/` directory of JSON Resource files, and `assets/` holding the stored files Resources reference: a Markdown Resource's text and pictures. The reference is [`docs/aggregate-directory.md`](https://github.com/tobyhede/infinity-cube/blob/main/docs/aggregate-directory.md): the authority on every key and rule. Read it before writing: the copy in your InfinityCube clone when you have one, since the format moves with the code and `main` may be ahead of that clone, otherwise the link. This skill is the order to work in and the traps.
 
 You reach the directory one of three ways, and each step says what differs:
 
 - **Shell:** you run commands, from an InfinityCube clone, with `<dir>` absolute. With no clone, make one where the person agrees: `git clone https://github.com/tobyhede/infinity-cube`, then `pnpm install` in it, with Node at or above the version in the clone's `.node-version` (26.8.1 at the time of writing) and pnpm 9.
-- **MCP:** you have only the tools of a `pnpm cube mcp` server (`list_files`, `read_file`, `write_file`, `delete_file`, `check`), scoped to the directory, with paths relative to it. `read_file` and `write_file` take `encoding: "base64"` for a binary file.
+- **MCP:** you have only the tools of a `pnpm cube mcp` server (`list_files`, `read_file`, `write_file`, `write_asset`, `delete_file`, `check`), scoped to the directory, with paths relative to it. `read_file` and `write_file` take `encoding: "base64"` for a binary file; `write_asset` writes an asset under its hash and answers its URL.
 - **Neither:** you can write files but run nothing. Work as for MCP, and the directory ends unchecked.
 
 ## Steps
@@ -27,13 +27,14 @@ You reach the directory one of three ways, and each step says what differs:
    - A Space's directory name **is** its Id, and every new Id is a lower-case UUID. Shell: mint with `node -e 'console.log(crypto.randomUUID())'`. Otherwise: write a random version-4 UUID in lower case.
    - Resource Ids are unique across the whole aggregate, and Graph Ids across the whole Space.
    - Give every Map and Graph you write an `id`; an Id Import mints cannot be referred to.
-   - A Resource is `resources/<id>.json`: `{ "id", "title", "kind", "content" }`, all four required. A Markdown Resource's `content` is `{ "path": "<id>.md", "mediaType": "text/markdown" }`, and its source is the plain `resources/<id>.md` beside it, with no frontmatter. Each kind's `content` is in the reference's table, and [`docs/schema/resource/examples/`](https://github.com/tobyhede/infinity-cube/tree/main/docs/schema/resource/examples) has one known-good file per kind to copy.
+   - A Resource is `resources/<id>.json`: `{ "id", "title", "kind", "content" }`, all four required. A Markdown Resource's `content` is `{ "url": "/assets/<hash>" }`, and its text is the asset `assets/<hash>.md`: plain Markdown with `\n` line endings and no frontmatter, named by the SHA-256 of its bytes as for a picture below. MCP: `write_asset` with the text writes the file and answers the URL. A new, empty one names `/assets/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU`, which needs no file. Nothing goes beside a Resource file. Each kind's `content` is in the reference's table, and [`docs/schema/resource/examples/`](https://github.com/tobyhede/infinity-cube/tree/main/docs/schema/resource/examples) has one known-good file per kind to copy.
    - A Resource appears on a Map only when that Map's `positions` holds it, and is presented only when an Edge of a Graph reaches it. `check` accepts a Resource on no Map, so place each new one and usually connect it.
    - An Edge joins only Resources its Map positions, and every Map owns at least one Graph.
    - Every ordinary Space is reached by a Space Resource elsewhere in the aggregate (`"kind": "space"`, `content` holding `spaceId`, `map` and `graph`, and an optional `framing` of `centreX`, `centreY` and `zoom` that Export writes for a framed one; keep it when you rewrite the file), so it needs a Map and a Graph for that Resource to name. Only the Meta Space may have no Maps.
    - Every object, `content` included, is strict: spell keys exactly as the reference does.
    - A stored picture is an asset, `assets/<hash>.<ext>`: the hash is the SHA-256 of its bytes as unpadded base64url, not hex, and the extension gives its media type (`png`, `jpg`, `webp`, `gif` for a picture); the reference shows the command. The Resource's `content.url` is `/assets/<hash>`. Without a shell, write a picture only when the person gives its bytes and hash (MCP: `write_file` with `encoding: "base64"`); otherwise use an `https:` URL.
-   - Keep notes outside Space directories: a `*.md` there that is not a Markdown Resource's sidecar is refused.
+   - A Markdown Resource is Closed on every Map unless that Map's placement says `"content": { "open": true }`; an `"open": true` key on its placement is refused.
+   - `check` accepts a URL whose asset is missing from `assets/`, and says which file it needs: write that file, or the Resource draws a note in place of its text.
 
    Done when every file you meant to add or change is written.
 

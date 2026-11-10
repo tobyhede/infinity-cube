@@ -4,7 +4,7 @@ import { lazy } from 'react';
  * The split point that keeps CodeMirror's stack out of the initial bundle
  * (ADR 0063), owned by the package the editor lives in.
  *
- * `MarkdownResourceBody` consumes the editor from inside this package, so a
+ * `HostSourceEditor` consumes the editor from inside this package, so a
  * static import from it would put the whole stack into the barrel — and from
  * the barrel into every consumer of `@project/ui`, including the adapter. Do
  * not move the split point to `app`: nothing there would catch that import.

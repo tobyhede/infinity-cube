@@ -1,7 +1,13 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { AGGREGATE_FILE_VERSION, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import {
+  EMPTY_ASSET_REF,
+  AGGREGATE_FILE_VERSION,
+  uuidSchema,
+  type SpaceSnapshot,
+  type UUID,
+} from '@project/core';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AGGREGATE_FILE_NAME } from '@project/aggregate';
 import {
@@ -13,7 +19,7 @@ import { postgresSqlStore } from '../../src/prisma/sql-store';
 import { postgresTestDatabase } from '../support/postgres-database';
 import { clearInfinityCubeContent } from '../support/clear-infinity-cube-content';
 import { runInfinityCubeScript } from '../support/infinity-cube-command';
-import { markdownResourceFiles } from '../support/aggregate-directory';
+import { markdownResourceFiles, textAssetRef } from '../support/aggregate-directory';
 import { admitted, pngBytes, showing } from '../support/stored-assets';
 
 const IMPORTED_SPACE_ID = uuidSchema.parse('d1111111-1111-4111-8111-111111111111');
@@ -175,7 +181,7 @@ describe('infinity-cube CLI', () => {
       },
     ]);
     // Written by hand rather than through `serializeResource`, so the command
-    // reads a Resource file and sidecar the codec under test did not produce.
+    // reads a Resource file the codec under test did not produce.
     for (const [name, text] of Object.entries(
       markdownResourceFiles(OPENING_ID, 'Opening', 'Durable CLI body.\n'),
     )) {
@@ -199,7 +205,7 @@ describe('infinity-cube CLI', () => {
     expect(stored?.snapshot.resources[0]?.document).toEqual({
       title: 'Opening',
       kind: 'markdown',
-      content: { source: 'Durable CLI body.\n' },
+      content: { url: textAssetRef('Durable CLI body.\n') },
     });
 
     // The aggregate file named Meta and the repository stored what it named. Nothing
@@ -292,7 +298,7 @@ describe('infinity-cube CLI', () => {
           document: {
             title: 'Exported resource',
             kind: 'markdown',
-            content: { source: 'Canonical export.\n' },
+            content: { url: EMPTY_ASSET_REF },
           },
         },
       ],

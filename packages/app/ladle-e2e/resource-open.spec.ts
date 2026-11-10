@@ -5,6 +5,12 @@ import { expectPictureAtOwnSize, expectPictureLoaded, HARBOUR_SIZE } from '../e2
 
 const openCloseStory = '/?story=components--resource--open-and-close&mode=preview';
 const markdownStory = '/?story=components--resource--editing--markdown&mode=preview';
+
+/**
+ * Where an ended edit returns focus: the Resource the plugin is drawn in, which
+ * the host is told to focus when the plugin's last Claim goes (ADR 0064, ADR 0142).
+ */
+const returnedTo = (page: Page) => page.getByRole('group', { name: 'Strategies on the canvas' });
 const resizeControlStory = '/?story=components--resource--resize-control&mode=preview';
 const HARBOUR = readFileSync(
   new URL('../fixture/assets/fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs.png', import.meta.url),
@@ -407,7 +413,7 @@ test('a selected Open Resource offers only Edit and Close, and its body begins t
     .getByRole('button')
     .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label')));
   expect(labels).toEqual(['Edit Resource Strategies', 'Close Resource Strategies']);
-  const bodyTarget = resource.getByTestId('markdown-resource-body-edit-target');
+  const bodyTarget = resource.getByRole('button', { name: 'Edit Markdown source of Strategies' });
   await expect(bodyTarget).toHaveCSS('opacity', '0');
   await expect(bodyTarget.locator('svg')).toHaveCount(0);
   await bodyTarget.click();
@@ -418,7 +424,7 @@ test('the rail replaces its Edit action with the two ends of a running edit', as
   await open(page, markdownStory);
   const resource = page.getByRole('article', { name: 'Strategies' });
   const actions = resource.getByTestId('canvas-resource-actions');
-  await page.getByRole('button', { name: 'Focused edit', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit Resource Strategies' }).click();
   await expect(page.getByRole('textbox', { name: 'Markdown source of Strategies' })).toBeFocused();
 
   expect(
@@ -479,7 +485,7 @@ test('the rail is one toolbar: one tab stop, and its commands under the arrows',
 test('an unavailable rail command keeps its place under the arrows', async ({ page }) => {
   await open(page, markdownStory);
   const resource = page.getByRole('article', { name: 'Strategies' });
-  await page.getByRole('button', { name: 'Focused edit', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit Resource Strategies' }).click();
   await expect(page.getByRole('textbox', { name: 'Markdown source of Strategies' })).toBeFocused();
 
   const save = resource.getByRole('button', { name: 'Save Resource Strategies' });
@@ -520,7 +526,7 @@ test('an unavailable rail command keeps its place under the arrows', async ({ pa
 
 /**
  * An Open Resource hides its redundant kind glyph while its commands stay live
- * during an Edit. This story mounts `CanvasResource` without React Flow, so its
+ * during an Edit. This story mounts `PluginResource` without React Flow, so its
  * toolbar is drawn inline in the rail band rather than in a `NodeToolbar`, and is
  * drawn whether or not the pointer is on the Resource.
  */
@@ -535,7 +541,7 @@ test('an Open Resource running an edit keeps its commands drawn, however it is l
   await expect(resource.locator('.resource-rail__kind')).toHaveCount(0);
   await expect(commands).toBeVisible();
 
-  await page.getByRole('button', { name: 'Focused edit', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit Resource Strategies' }).click();
   await expect(page.getByRole('textbox', { name: 'Markdown source of Strategies' })).toBeFocused();
   // Nothing is hovering the Resource and the caret is in its body, so the Edit
   // itself must keep Save, Cancel and Close visible.
@@ -550,7 +556,7 @@ test('an Open Resource running an edit keeps its commands drawn, however it is l
 
   await resource.getByRole('button', { name: 'Cancel editing Resource Strategies' }).click();
   await page.mouse.move(0, 0);
-  await expect(resource.getByRole('button', { name: 'Edit Resource Strategies' })).toBeFocused();
+  await expect(returnedTo(page)).toBeFocused();
   await expect(commands).toBeVisible();
 });
 
@@ -564,7 +570,7 @@ test(
     const resource = page.getByRole('article', { name: 'Strategies' });
     const editor = page.getByRole('textbox', { name: 'Markdown source of Strategies' });
 
-    await page.getByRole('button', { name: 'Focused edit', exact: true }).click();
+    await page.getByRole('button', { name: 'Edit Resource Strategies' }).click();
     await editor.pressSequentially('Abandoned. ');
     // Clicking away is not an exit: the draft is still there and the editor is
     // still up. Four exits and no more — two keys and the two controls.
@@ -575,28 +581,28 @@ test(
     await resource.getByRole('button', { name: 'Cancel editing Resource Strategies' }).click();
     await expect(editor).toHaveCount(0);
     await expect(resource).not.toContainText('Abandoned.');
-    await expect(resource.getByRole('button', { name: 'Edit Resource Strategies' })).toBeFocused();
+    await expect(returnedTo(page)).toBeFocused();
 
     await resource.getByRole('button', { name: 'Edit Resource Strategies' }).click();
     await editor.pressSequentially('Kept. ');
     await resource.getByRole('button', { name: 'Save Resource Strategies' }).click();
     await expect(editor).toHaveCount(0);
     await expect(resource).toContainText('Kept.');
-    await expect(resource.getByRole('button', { name: 'Edit Resource Strategies' })).toBeFocused();
+    await expect(returnedTo(page)).toBeFocused();
 
     await resource.getByRole('button', { name: 'Edit Resource Strategies' }).click();
     await editor.press('Escape');
-    await expect(resource.getByRole('button', { name: 'Edit Resource Strategies' })).toBeFocused();
+    await expect(returnedTo(page)).toBeFocused();
 
     await resource.getByRole('button', { name: 'Edit Resource Strategies' }).click();
     await editor.press(process.platform === 'darwin' ? 'Meta+Enter' : 'Control+Enter');
-    await expect(resource.getByRole('button', { name: 'Edit Resource Strategies' })).toBeFocused();
+    await expect(returnedTo(page)).toBeFocused();
   },
 );
 
 test('the body editor shows its shortcut hint only with actual focus', async ({ page }) => {
   await open(page, markdownStory);
-  await page.getByRole('button', { name: 'Focused edit', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit Resource Strategies' }).click();
   const editor = page.getByRole('textbox', { name: 'Markdown source of Strategies' });
   // Located by its own element, not its copy: the keys are drawn by the shared
   // `Kbd` primitive, so the hint is several nodes and the text between them is
@@ -645,12 +651,12 @@ test('the body editor shows its shortcut hint only with actual focus', async ({ 
   });
   expect(Number.parseFloat(gaps.betweenPairs)).toBeGreaterThan(Number.parseFloat(gaps.withinPair));
 
-  await editor.press('Escape');
-  await expect(page.getByRole('heading', { name: 'Placement is authored' })).toBeVisible();
-  const unfocused = page.getByRole('button', { name: 'Unfocused edit' });
-  await unfocused.click();
-  await expect(unfocused).toBeFocused();
+  // The edit is still running with the caret elsewhere: the hint goes.
+  const cancel = page.getByRole('button', { name: 'Cancel editing Resource Strategies' });
+  await cancel.focus();
   await expect(hint).toHaveCSS('opacity', '0');
+  await cancel.click();
+  await expect(page.getByRole('heading', { name: 'Placement is authored' })).toBeVisible();
 });
 
 test('rendered and source modes keep one content column', async ({ page }) => {
@@ -658,7 +664,7 @@ test('rendered and source modes keep one content column', async ({ page }) => {
   const renderedBox = await page
     .getByRole('heading', { name: 'Placement is authored' })
     .boundingBox();
-  await page.getByRole('button', { name: 'Focused edit', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit Resource Strategies' }).click();
   const firstLine = page.locator('.cm-line').first();
   await expect(firstLine).toBeVisible();
   const sourceBox = await firstLine.boundingBox();

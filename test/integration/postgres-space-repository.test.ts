@@ -1,4 +1,4 @@
-import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { toJsonValue } from '../../src/persistence/sql-store';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
@@ -133,7 +133,7 @@ const snapshot: SpaceSnapshot = {
       document: {
         title: 'Stored resource',
         kind: 'markdown',
-        content: { source: 'Stored through the repository.' },
+        content: { url: EMPTY_ASSET_REF },
       },
     },
     {
@@ -141,7 +141,7 @@ const snapshot: SpaceSnapshot = {
       document: {
         title: 'Resource to remove',
         kind: 'markdown',
-        content: { source: 'Runtime commits are authoritative.' },
+        content: { url: EMPTY_ASSET_REF },
       },
     },
   ],
@@ -178,7 +178,7 @@ const otherSnapshot: SpaceSnapshot = {
       document: {
         title: 'Other resource',
         kind: 'markdown',
-        content: { source: 'Owned by the other space.' },
+        content: { url: EMPTY_ASSET_REF },
       },
     },
   ],
@@ -196,7 +196,7 @@ const concurrentSnapshot: SpaceSnapshot = {
       document: {
         title: 'Concurrent resource',
         kind: 'markdown',
-        content: { source: 'Owned by the concurrent space.' },
+        content: { url: EMPTY_ASSET_REF },
       },
     },
   ],
@@ -384,7 +384,7 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
       await orm.public.Resource.create({
         id: RESOURCE_ID,
         spaceId: SPACE_ID,
-        document: { title: 'Shared', kind: 'markdown', content: { source: 'Winner' } },
+        document: { title: 'Shared', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       });
       await orm.public.RepositoryState.create({ singletonId: 1, metaSpaceId: SPACE_ID });
       winnerReady.resolve(undefined);
@@ -398,7 +398,7 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
       resources: [
         {
           id: RESOURCE_ID,
-          document: { title: 'Shared', kind: 'markdown', content: { source: 'Loser' } },
+          document: { title: 'Shared', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
       ],
     };

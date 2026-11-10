@@ -19,6 +19,7 @@ import { CLOSED_DISPLAY } from '@project/ui';
 import { stubResizeObserver } from './resize-observer';
 import { canvasReading, IDLE_PLACEMENT } from './map-surfaces';
 import { createPluginGate } from '../src/plugin-host/plugin-gate';
+import { textAsset } from './markdown-texts';
 
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -46,7 +47,10 @@ const snapshot = spaceSnapshotSchema.parse({
     defaultMap: MAP_ID,
   },
   resources: [
-    { id: RESOURCE_ID, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
+    {
+      id: RESOURCE_ID,
+      document: { title: 'A', kind: 'markdown', content: { url: textAsset('A') } },
+    },
   ],
 });
 

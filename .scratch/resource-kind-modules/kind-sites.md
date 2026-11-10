@@ -10,7 +10,6 @@ Categories: **one-kind** = a feature that exists for that kind alone; **registry
 
 | file:line | what it names | kind | category | G19 exemption |
 |---|---|---|---|---|
-| packages/app/src/canvas-resource-authoring.ts:309 | `markdownKind.id`: body completion guard | markdown | C | canvas-resource-authoring.ts |
 | packages/app/src/components/CommandDockSpaces.tsx:459 | `spaceKind.id`: Space glyph | space | display | CommandDockSpaces.tsx |
 | packages/app/src/components/CommandDockSpaces.tsx:564 | `spaceKind.id`: Space glyph | space | display | CommandDockSpaces.tsx |
 | packages/app/src/resource-rail-actions.tsx:93 | `referenceKind.id`: Create Reference glyph | reference | E (display of a creation) | resource-rail-actions.tsx |
@@ -19,6 +18,8 @@ Categories: **one-kind** = a feature that exists for that kind alone; **registry
 | packages/app/src/space-authoring.ts:116 | `imageKind.id`: new Image Resource document | image | E | space-authoring.ts |
 | packages/app/src/space-authoring.ts:1364 | `referenceKind.id`: new Reference Resource | reference | E | space-authoring.ts |
 | packages/persistence/src/space-resource-planning.ts:328 | `spaceKind.id`: new Space Resource document | space | E (lifecycle) | space-resource-planning.ts |
+
+`packages/app/src/canvas-resource-authoring.ts` no longer reaches a module id: a Markdown Resource's body is its plugin's (ADR 0142, resource-plugins issue 05), so the canvas keeps no Markdown completion.
 
 `packages/app/src/resource-deletion.ts` no longer reaches a module id: Delete routes by `kindFlags(kind).ownsReferencedSpaces` (G02).
 

@@ -1,4 +1,4 @@
-import { encodeCompactUuid, spaceSnapshotSchema, uuidSchema } from '@project/core';
+import { EMPTY_ASSET_REF, encodeCompactUuid, spaceSnapshotSchema, uuidSchema } from '@project/core';
 import type { LoadedSpace, SpaceBackend } from '@project/persistence';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -34,11 +34,11 @@ const loaded: LoadedSpace = {
     resources: [
       {
         id: RESOURCE_ID,
-        document: { title: 'Resource', kind: 'markdown', content: { source: '' } },
+        document: { title: 'Resource', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       },
       {
         id: OTHER_RESOURCE_ID,
-        document: { title: 'Other', kind: 'markdown', content: { source: '' } },
+        document: { title: 'Other', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       },
     ],
   }),
@@ -222,7 +222,11 @@ describe('product destinations', () => {
                 ...loaded.snapshot.resources,
                 {
                   id: resourceId,
-                  document: { title: 'Outside', kind: 'markdown', content: { source: '' } },
+                  document: {
+                    title: 'Outside',
+                    kind: 'markdown',
+                    content: { url: EMPTY_ASSET_REF },
+                  },
                 },
               ]
             : loaded.snapshot.resources,
@@ -292,7 +296,7 @@ describe('product destinations', () => {
           ...loaded.snapshot.resources,
           {
             id: omitted,
-            document: { title: 'Omitted', kind: 'markdown', content: { source: '' } },
+            document: { title: 'Omitted', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
           },
         ],
       },

@@ -1,4 +1,4 @@
-import { newUuid, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { EMPTY_ASSET_REF, newUuid, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import { createSpaceHttpApp, HttpSpaceBackend, productDestinationPath } from '@project/http';
 import { MemorySpaceBackend, type SpaceBackend } from '@project/persistence';
 import { describe, expect, it } from 'vitest';
@@ -69,7 +69,7 @@ const snapshot = (
   resources: [
     {
       id: resourceId,
-      document: { title: 'Start here', kind: 'markdown', content: { source: 'Stored body' } },
+      document: { title: 'Start here', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
   ],
 });
@@ -340,7 +340,11 @@ describe('HTTP space startup composition', () => {
           ...snapshot().resources,
           {
             id: OTHER_RESOURCE_ID,
-            document: { title: 'Next', kind: 'markdown' as const, content: { source: '' } },
+            document: {
+              title: 'Next',
+              kind: 'markdown' as const,
+              content: { url: EMPTY_ASSET_REF },
+            },
           },
         ],
         document: {
@@ -462,7 +466,11 @@ describe('HTTP space startup composition', () => {
           ...snapshot().resources,
           {
             id: omittedId,
-            document: { title: 'Omitted', kind: 'markdown' as const, content: { source: '' } },
+            document: {
+              title: 'Omitted',
+              kind: 'markdown' as const,
+              content: { url: EMPTY_ASSET_REF },
+            },
           },
         ],
       },

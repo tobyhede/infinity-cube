@@ -8,6 +8,7 @@ import { composeApp } from '../src/compose-app';
 import { openTestSpace } from './opened-space';
 import { unusedImageSources } from './image-sources';
 import { stubResizeObserver } from './resize-observer';
+import { textAsset } from './markdown-texts';
 
 /**
  * React Flow positions the whole graph with one viewport transform, and derives
@@ -51,7 +52,11 @@ const snapshot = (title: string, resourceTitle: string, x: number, y: number): S
     resources: [
       {
         id: RESOURCE_ID,
-        document: { title: resourceTitle, kind: 'markdown', content: { source: resourceTitle } },
+        document: {
+          title: resourceTitle,
+          kind: 'markdown',
+          content: { url: textAsset(resourceTitle) },
+        },
       },
     ],
   });

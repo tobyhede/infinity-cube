@@ -23,9 +23,9 @@ export interface KeptMap<M> {
 /** What a surface offers for reaching assets (ADR 0142). */
 export interface Assets {
   /** The URL an asset is drawn from. */
-  url(ref: AssetRef): string;
+  readonly url: (ref: AssetRef) => string;
   /** An asset's bytes, or why they cannot be read. */
-  read(ref: AssetRef): Promise<Blob | { readonly refused: string }>;
+  readonly read: (ref: AssetRef) => Promise<Blob | { readonly refused: string }>;
   /** Ask the author for files, called in the press. */
   readonly pick?: ((accept: string) => Promise<File[]>) | undefined;
   /** Store bytes, answering their reference. */
@@ -140,6 +140,12 @@ export type RailCommand =
       readonly icon: ReactNode;
       readonly run: () => void;
       readonly disabled?: boolean;
+      /**
+       * The keys that run it too, as `aria-keyshortcuts` names them. A command
+       * that names keys belongs to work running inside the plugin's rect, so
+       * pressing it keeps the focus where that work has it.
+       */
+      readonly keyshortcuts?: string;
     }
   | {
       readonly kind: 'choice';
@@ -162,6 +168,67 @@ export interface OwnProps {
   readonly className?: string;
 }
 
+/** What the host renders Markdown text with. */
+export interface RenderedMarkdownProps {
+  readonly markdown: string;
+  /** A name already drawn above the text: a first heading that only repeats it is left out. */
+  readonly drawnName?: string | undefined;
+  readonly className?: string;
+}
+
+/** What the host draws a source editor with. */
+export interface SourceEditorProps {
+  readonly value: string;
+  readonly onValueChange: (value: string) => void;
+  /** Names the writing surface for a screen reader. */
+  readonly ariaLabel: string;
+  /** Whether the caret is put in it when it is drawn. */
+  readonly autoFocus?: boolean;
+  readonly className?: string;
+}
+
+/** Where a plugin's rail commands go, so the host can draw them wherever its rail is. */
+export interface RailOutlet {
+  readonly publish: (source: symbol, commands: readonly RailCommand[]) => void;
+  readonly withdraw: (source: symbol) => void;
+}
+
+/** What a host provides the API's components with. */
+export interface ResourceHost {
+  readonly Title: ComponentType<TitleProps>;
+  readonly Own: ComponentType<OwnProps>;
+  readonly rail: RailOutlet;
+  /**
+   * Markdown rendered as every surface renders it: one parser and sanitiser,
+   * so the same text never reads differently on the Map and on the Stage.
+   */
+  readonly RenderedMarkdown: ComponentType<RenderedMarkdownProps>;
+  /**
+   * The host's source editor. `Escape` and `Mod-Enter` are left to the plugin:
+   * they reach an element wrapped around it.
+   */
+  readonly SourceEditor: ComponentType<SourceEditorProps>;
+}
+
+const ResourceHostContext = createContext<ResourceHost | null>(null);
+
+/** Provide a host for the plugin view rendered inside it. */
+export function ResourceHostProvider({
+  host,
+  children,
+}: {
+  readonly host: ResourceHost;
+  readonly children?: ReactNode;
+}) {
+  return <ResourceHostContext.Provider value={host}>{children}</ResourceHostContext.Provider>;
+}
+
+const useResourceHost = (component: string): ResourceHost => {
+  const host = useContext(ResourceHostContext);
+  if (host === null) throw new Error(`<${component}> is drawn only inside a Resource surface.`);
+  return host;
+};
+
 /** The Resource's Title, drawn as the surface draws a Title, with the rename it offers. */
 export function Title(props: TitleProps) {
   const { Title: HostTitle } = useResourceHost('Title');
@@ -175,6 +242,56 @@ export function Title(props: TitleProps) {
 export function Own(props: OwnProps) {
   const { Own: HostOwn } = useResourceHost('Own');
   return <HostOwn {...props} />;
+}
+
+/**
+ * Markdown text rendered by the host's one parser and sanitiser. Text a plugin
+ * reads is untrusted, and is never inserted otherwise.
+ */
+export function RenderedMarkdown(props: RenderedMarkdownProps) {
+  const { RenderedMarkdown: HostRenderedMarkdown } = useResourceHost('RenderedMarkdown');
+  return <HostRenderedMarkdown {...props} />;
+}
+
+/** The host's source editor, for a plugin whose content is text it edits. */
+export function SourceEditor(props: SourceEditorProps) {
+  const { SourceEditor: HostSourceEditor } = useResourceHost('SourceEditor');
+  return <HostSourceEditor {...props} />;
+}
+
+/** A rail outlet a host reads back: the commands published, in the order their sources first published. */
+export interface RailStore extends RailOutlet {
+  readonly commands: () => readonly RailCommand[];
+  readonly subscribe: (listener: () => void) => () => void;
+}
+
+/** A rail outlet that keeps what is published, for a host to draw. */
+export function createRailStore(): RailStore {
+  const published = new Map<symbol, readonly RailCommand[]>();
+  const listeners = new Set<() => void>();
+  let snapshot: readonly RailCommand[] = [];
+  const changed = () => {
+    snapshot = [...published.values()].flat();
+    for (const listener of [...listeners]) listener();
+  };
+  return {
+    publish: (source, commands) => {
+      if (published.get(source) === commands) return;
+      published.set(source, commands);
+      changed();
+    },
+    withdraw: (source) => {
+      if (!published.delete(source)) return;
+      changed();
+    },
+    commands: () => snapshot,
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  };
 }
 
 /** Emit commands for the canvas to draw on this Resource's rail. Draws nothing in place. */

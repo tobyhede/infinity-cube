@@ -6,7 +6,7 @@ import { loadSpace } from '@project/graph';
 import { afterEach, describe, expect, it } from 'vitest';
 import { AggregateDirectoryError } from '@project/aggregate';
 import { readSingleSpace } from '../../src/aggregate-directory';
-import { markdownResourceFiles, resourceFiles } from '../support/aggregate-directory';
+import { markdownResourceFiles, resourceFiles, textAssetRef } from '../support/aggregate-directory';
 import { captureError } from '../support/capture-error';
 
 const SPACE_ID = '00000000-0000-4000-8000-000000000001';
@@ -89,11 +89,19 @@ describe('readSingleSpace', () => {
       resources: [
         {
           id: ROOT_RESOURCE_ID,
-          document: { title: 'Root', kind: 'markdown', content: { source: 'Root body\n' } },
+          document: {
+            title: 'Root',
+            kind: 'markdown',
+            content: { url: textAssetRef('Root body\n') },
+          },
         },
         {
           id: DETAIL_RESOURCE_ID,
-          document: { title: 'Detail', kind: 'markdown', content: { source: 'Detail body\n' } },
+          document: {
+            title: 'Detail',
+            kind: 'markdown',
+            content: { url: textAssetRef('Detail body\n') },
+          },
         },
         { id: UR_RESOURCE_ID, document: { title: 'Node', kind: 'ur', content: {} } },
       ],
@@ -104,12 +112,12 @@ describe('readSingleSpace', () => {
   });
 
   /*
-   * A `.md` beside `space.json` or in `resources/` that no Resource file names
-   * is read so that it can be refused, naming it: a Resource left in an older
-   * format, or a sidecar whose Resource file is gone, is never silently
-   * dropped (ADR 0128).
+   * A Markdown Resource's text is an asset (ADR 0142), so a Space directory
+   * holds no sidecar: a `.md` beside `space.json` or in `resources/` is not read,
+   * and a Resource whose text is not stored here is read all the same, as
+   * Import reads it (ADR 0118).
    */
-  it('refuses a .md no Resource file names, beside space.json or in resources/', async () => {
+  it('reads no .md beside space.json or in resources/, and a Resource whose text is not here', async () => {
     const temporaryDirectory = await makeTemporaryDirectory();
     const talkDirectory = join(temporaryDirectory, 'talk');
     const resourcesDirectory = join(talkDirectory, 'resources');
@@ -118,43 +126,28 @@ describe('readSingleSpace', () => {
       join(talkDirectory, 'space.json'),
       JSON.stringify({ version: 1, id: SPACE_ID, title: 'Talk' }),
     );
-    const besideSpaceFile = join(talkDirectory, 'README.md');
-    const orphaned = join(resourcesDirectory, `${DETAIL_RESOURCE_ID}.md`);
-    await writeFile(besideSpaceFile, '# Notes\n');
-    await writeFile(orphaned, 'Detail body\n');
+    await writeFile(join(talkDirectory, 'README.md'), '# Notes\n');
+    await writeFile(join(resourcesDirectory, `${DETAIL_RESOURCE_ID}.md`), 'Detail body\n');
+    for (const [name, text] of Object.entries(
+      markdownResourceFiles(ROOT_RESOURCE_ID, 'Root', 'Root body\n'),
+    )) {
+      await writeFile(join(resourcesDirectory, name), text);
+    }
 
-    const thrown = await captureError(() => readSingleSpace(talkDirectory));
-
-    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
-    if (!(thrown instanceof AggregateDirectoryError)) return;
-    expect(thrown.kind).toBe('parsing');
-    expect(thrown.diagnostics).toEqual([
-      expect.stringContaining(besideSpaceFile),
-      expect.stringContaining(orphaned),
-    ]);
-    expect(thrown.diagnostics.every((line) => line.includes('no Resource file names'))).toBe(true);
-  });
-
-  it('refuses a Markdown Resource file whose sidecar is missing, naming the Resource file', async () => {
-    const temporaryDirectory = await makeTemporaryDirectory();
-    const talkDirectory = join(temporaryDirectory, 'talk');
-    const resourcesDirectory = join(talkDirectory, 'resources');
-    await mkdir(resourcesDirectory, { recursive: true });
-    await writeFile(
-      join(talkDirectory, 'space.json'),
-      JSON.stringify({ version: 1, id: SPACE_ID, title: 'Talk' }),
-    );
-    const resourceFile = join(resourcesDirectory, `${ROOT_RESOURCE_ID}.json`);
-    const files = markdownResourceFiles(ROOT_RESOURCE_ID, 'Root', 'Root body\n');
-    await writeFile(resourceFile, files[`${ROOT_RESOURCE_ID}.json`] ?? '');
-
-    const thrown = await captureError(() => readSingleSpace(talkDirectory));
-
-    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
-    if (!(thrown instanceof AggregateDirectoryError)) return;
-    expect(thrown.kind).toBe('parsing');
-    expect(thrown.diagnostics).toEqual([expect.stringContaining(resourceFile)]);
-    expect(thrown.diagnostics[0]).toContain(`${ROOT_RESOURCE_ID}.md`);
+    await expect(readSingleSpace(talkDirectory)).resolves.toEqual({
+      id: SPACE_ID,
+      document: { version: 1, title: 'Talk' },
+      resources: [
+        {
+          id: ROOT_RESOURCE_ID,
+          document: {
+            title: 'Root',
+            kind: 'markdown',
+            content: { url: textAssetRef('Root body\n') },
+          },
+        },
+      ],
+    });
   });
 
   // Unreadable-mode is the only way to fail a *discovered* resource file's read:
@@ -171,13 +164,16 @@ describe('readSingleSpace', () => {
       const resourcesDirectory = join(talkDirectory, 'resources');
       await mkdir(resourcesDirectory, { recursive: true });
 
-      const rootResource = join(talkDirectory, 'a.md');
+      const rootResource = join(resourcesDirectory, `${ROOT_RESOURCE_ID}.json`);
       const nestedResource = join(resourcesDirectory, `${UR_RESOURCE_ID}.json`);
       await writeFile(
         join(talkDirectory, 'space.json'),
         JSON.stringify({ version: 1, title: 'Talk' }),
       );
-      await writeFile(rootResource, 'A body\n');
+      await writeFile(
+        rootResource,
+        markdownResourceFiles(ROOT_RESOURCE_ID, 'A', 'A body\n')[`${ROOT_RESOURCE_ID}.json`] ?? '',
+      );
       await writeFile(
         nestedResource,
         resourceFiles({ id: UR_RESOURCE_ID, title: 'Z', kind: 'ur', content: {} })[

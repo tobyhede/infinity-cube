@@ -3,13 +3,13 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type ResourceContent } from '@project/core';
 import {
-  beginEditing,
   CanvasResource,
   canvasResourceContentOverflow,
   CLOSED_DISPLAY,
   type KindOperations,
   type ResourceDisplay,
 } from '../src';
+import { textAsset, WithTexts } from './markdown-texts';
 
 const FIGURE_URL = 'https://example.com/figure.png';
 
@@ -27,7 +27,7 @@ const SPACE_CONTENT: ResourceContent = {
 /** An Open display drawing `content`. */
 const opened = (content: ResourceContent): ResourceDisplay => ({ shown: 'open', content });
 
-it('takes a Reference Resource’s content-area layout from its Target, including its Close fade', () => {
+it('takes a Reference Resource’s content-area layout from its Target, including its Close fade', async () => {
   const props = {
     kindOperations: { kind: 'reference' as const },
     state: 'rest' as const,
@@ -36,16 +36,22 @@ it('takes a Reference Resource’s content-area layout from its Target, includin
   };
   const { rerender } = render(
     <CanvasResource {...props} display={opened({ kind: 'ur', content: {}, via: 'target' })} />,
+    { wrapper: WithTexts },
   );
   const resource = screen.getByRole('article', { name: 'A' });
   expect(resource).not.toHaveAttribute('data-content-area');
   rerender(
     <CanvasResource
       {...props}
-      display={opened({ kind: 'markdown', source: 'Target body', via: 'target' })}
+      display={opened({
+        kind: 'markdown',
+        content: { url: textAsset('Target body') },
+        via: 'target',
+      })}
     />,
   );
   expect(resource).toHaveAttribute('data-content-area', 'true');
+  expect(await screen.findByText('Target body')).toBeVisible();
   rerender(<CanvasResource {...props} display={CLOSED_DISPLAY} />);
   expect(resource).toHaveAttribute('data-content-area', 'true');
   expect(resource).toHaveTextContent('Target body');
@@ -118,26 +124,6 @@ describe('CanvasResource kind and interaction state', () => {
     );
     expect(screen.getByRole('img', { name: 'Markdown Resource' })).toBeVisible();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
-  });
-
-  it('presents a Markdown Resource and its resting state', () => {
-    render(
-      <CanvasResource
-        kindOperations={{ kind: 'markdown' }}
-        display={{ shown: 'open', content: { kind: 'markdown', source: 'Markdown', via: 'self' } }}
-        state="rest"
-        title="Strategies"
-        graphColor="#ffc53d"
-      />,
-    );
-
-    const resource = screen.getByRole('article', { name: 'Strategies' });
-    expect(resource).toHaveAttribute('data-kind', 'markdown');
-    expect(resource).toHaveAttribute('data-state', 'rest');
-    // Every kind draws its glyph, Markdown included — ResourceKindIcon has no
-    // silent-nothing case, and the rail is not the centred, icon-optional
-    // map the pre-design-system Resource used.
-    expect(screen.queryByRole('img', { name: 'Markdown Resource' })).toBeNull();
   });
 
   it('presents a Reference Resource by its kind alone', () => {
@@ -227,8 +213,8 @@ describe('CanvasResource kind and interaction state', () => {
   it('reflects dragging as its own external state, distinct from selected', () => {
     render(
       <CanvasResource
-        kindOperations={{ kind: 'markdown' }}
-        display={{ shown: 'open', content: { kind: 'markdown', source: 'Markdown', via: 'self' } }}
+        kindOperations={{ kind: 'reference' }}
+        display={opened({ kind: 'ur', content: {}, via: 'target' })}
         state="dragging"
         title="Closing"
         graphColor="#ffc53d"
@@ -242,33 +228,12 @@ describe('CanvasResource kind and interaction state', () => {
   });
 });
 
-describe('CanvasResource content command', () => {
-  it('draws a rail for a content begin only with the command that runs it', () => {
-    // A begin is offered only through the command its kind names, so a rail
-    // drawn for the begin always holds a control that runs it.
-    const operations = { kind: 'space' as const, onBeginEdit: vi.fn() };
-    render(
-      <CanvasResource
-        kindOperations={operations}
-        display={opened(SPACE_CONTENT)}
-        state="selected"
-        title="Overview"
-        graphColor="#ffc53d"
-      />,
-    );
-    const controls = screen
-      .queryByTestId('canvas-resource-actions')
-      ?.querySelectorAll('button').length;
-    expect(controls, 'a rail is drawn only with a control in it').not.toBe(0);
-  });
-});
-
 describe('CanvasResource Open and Close operation', () => {
   it('owns its read-only state and withholds supplied authoring operations', () => {
     render(
       <CanvasResource
         readOnly
-        kindOperations={{ kind: 'markdown', onBeginEdit: vi.fn() }}
+        kindOperations={{ kind: 'reference' }}
         onOpenChange={vi.fn(() => 'completed' as const)}
         display={CLOSED_DISPLAY}
         state="selected"
@@ -284,87 +249,27 @@ describe('CanvasResource Open and Close operation', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
-  it('withdraws an active body editor when the Resource becomes read-only', () => {
-    const kindOperations: KindOperations = { kind: 'markdown' };
-    const display = beginEditing(
-      opened({ kind: 'markdown', source: 'Draft', via: 'self' }),
-      {
-        onComplete: vi.fn(),
-        onEnd: vi.fn(),
-      },
-      true,
-    );
-    const { rerender } = render(
-      <CanvasResource
-        kindOperations={kindOperations}
-        display={display}
-        state="rest"
-        title="A"
-        graphColor="#ffc53d"
-      />,
-    );
-    expect(screen.getByRole('button', { name: 'Save Resource A' })).toBeVisible();
-
-    rerender(
-      <CanvasResource
-        readOnly
-        kindOperations={kindOperations}
-        display={display}
-        state="rest"
-        title="A"
-        graphColor="#ffc53d"
-      />,
-    );
-
-    expect(screen.queryByRole('button', { name: 'Save Resource A' })).not.toBeInTheDocument();
-    expect(screen.getByRole('article', { name: 'A' })).toHaveAttribute(
-      'data-content-editing',
-      'false',
-    );
-  });
-
-  it('draws rendered Markdown with no editor for a read-only Resource given an editing display', () => {
-    const { container } = render(
-      <CanvasResource
-        readOnly
-        kindOperations={{ kind: 'markdown' }}
-        display={beginEditing(
-          opened({ kind: 'markdown', source: '## Authored placement', via: 'self' }),
-          { onComplete: vi.fn(), onEnd: vi.fn() },
-          true,
-        )}
-        state="selected"
-        title="A"
-        graphColor="#ffc53d"
-      />,
-    );
-
-    expect(screen.getByRole('heading', { name: 'Authored placement' })).toBeVisible();
-    expect(container.querySelector('.markdown-resource-body--editing')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Save Resource A' })).not.toBeInTheDocument();
-    expect(screen.getByRole('article', { name: 'A' })).toHaveAttribute(
-      'data-content-editing',
-      'false',
-    );
-  });
-
-  it('owns the rendered body of an Open Markdown Resource', () => {
+  it('draws the rendered body of an Open Reference to a Markdown Resource', async () => {
     const onOpenChange = vi.fn(() => 'completed' as const);
     render(
       <CanvasResource
-        kindOperations={{ kind: 'markdown' }}
+        kindOperations={{ kind: 'reference' }}
         onOpenChange={onOpenChange}
         display={{
           shown: 'open',
-          content: { kind: 'markdown', source: '## Authored placement', via: 'self' },
+          content: {
+            kind: 'markdown',
+            content: { url: textAsset('## Authored placement') },
+            via: 'target',
+          },
         }}
         state="rest"
         title="A"
         graphColor="#ffc53d"
       />,
+      { wrapper: WithTexts },
     );
-
-    expect(screen.getByRole('heading', { name: 'Authored placement' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Authored placement' })).toBeVisible();
     screen.getByRole('button', { name: 'Close Resource A' }).click();
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
@@ -403,9 +308,9 @@ describe('CanvasResource Open and Close operation', () => {
 
     rerender(
       <CanvasResource
-        kindOperations={{ kind: 'markdown' }}
+        kindOperations={{ kind: 'reference' }}
         onOpenChange={onOpenChange}
-        display={{ shown: 'open', content: { kind: 'markdown', source: 'Markdown', via: 'self' } }}
+        display={opened({ kind: 'ur', content: {}, via: 'target' })}
         state="selected"
         title="A"
         graphColor="#ffc53d"
@@ -415,204 +320,6 @@ describe('CanvasResource Open and Close operation', () => {
     expect(close.querySelector('svg')).toHaveClass('lucide-minimize-2');
     close.click();
     expect(onOpenChange).toHaveBeenLastCalledWith(false);
-  });
-
-  it('offers Edit before Close whether or not the Resource is open', () => {
-    const onBeginContentEdit = vi.fn();
-    const onOpenChange = vi.fn(() => 'completed' as const);
-    const { rerender } = render(
-      <CanvasResource
-        kindOperations={{ kind: 'markdown', onBeginEdit: onBeginContentEdit }}
-        onOpenChange={onOpenChange}
-        display={CLOSED_DISPLAY}
-        state="selected"
-        title="A"
-        graphColor="#ffc53d"
-      />,
-    );
-
-    const labels = () =>
-      // The commands, which are the labelled buttons; the kind glyph trails them.
-      Array.from(
-        screen.getByTestId('canvas-resource-actions').querySelectorAll('button[aria-label]'),
-      ).map((button) => button.getAttribute('aria-label'));
-    expect(labels()).toEqual(['Edit Resource A', 'Open Resource A']);
-
-    // Collapsed, Edit is the two gestures an author would otherwise make in
-    // order, and both are the Resource's own operations — opening is the same call
-    // the Open control makes, so nothing about it has a second implementation.
-    screen.getByRole('button', { name: 'Edit Resource A' }).click();
-    expect(onOpenChange).toHaveBeenCalledOnce();
-    expect(onOpenChange).toHaveBeenCalledWith(true);
-    expect(onBeginContentEdit).toHaveBeenCalledOnce();
-
-    rerender(
-      <CanvasResource
-        kindOperations={{ kind: 'markdown', onBeginEdit: onBeginContentEdit }}
-        onOpenChange={onOpenChange}
-        display={{ shown: 'open', content: { kind: 'markdown', source: 'Markdown', via: 'self' } }}
-        state="selected"
-        title="A"
-        graphColor="#ffc53d"
-      />,
-    );
-
-    expect(labels()).toEqual(['Edit Resource A', 'Close Resource A']);
-    // Open, it is only the caret: the Resource is already the size it needs to be.
-    screen.getByRole('button', { name: 'Edit Resource A' }).click();
-    expect(onOpenChange).toHaveBeenCalledOnce();
-    expect(onBeginContentEdit).toHaveBeenCalledTimes(2);
-  });
-
-  it('withholds Edit from a collapsed Resource that cannot be opened', () => {
-    render(
-      <CanvasResource
-        kindOperations={{ kind: 'markdown', onBeginEdit: vi.fn() }}
-        display={CLOSED_DISPLAY}
-        state="selected"
-        title="A"
-        graphColor="#ffc53d"
-      />,
-    );
-
-    // The first half of the pair is missing, so the caret would have nowhere to
-    // land — a control that ran half of what it names is worse than none.
-    expect(screen.queryByRole('button', { name: 'Edit Resource A' })).not.toBeInTheDocument();
-  });
-
-  it('does not place the content caret when opening a collapsed Resource is retained', () => {
-    const onBeginContentEdit = vi.fn();
-    render(
-      <CanvasResource
-        kindOperations={{ kind: 'markdown', onBeginEdit: onBeginContentEdit }}
-        onOpenChange={() => 'retained'}
-        display={CLOSED_DISPLAY}
-        state="selected"
-        title="A"
-        graphColor="#ffc53d"
-      />,
-    );
-
-    screen.getByRole('button', { name: 'Edit Resource A' }).click();
-
-    expect(onBeginContentEdit).not.toHaveBeenCalled();
-  });
-
-  it('replaces Edit with the two ends of the edit its content is running, keeping Close', () => {
-    const onComplete = vi.fn();
-    const onEnd = vi.fn();
-    const onBeginContentEdit = vi.fn();
-    render(
-      <CanvasResource
-        kindOperations={{ kind: 'markdown', onBeginEdit: onBeginContentEdit }}
-        onOpenChange={vi.fn()}
-        display={beginEditing(
-          opened({ kind: 'markdown', source: 'Markdown', via: 'self' }),
-          {
-            onComplete,
-            onEnd,
-          },
-          true,
-        )}
-        state="rest"
-        title="A"
-        graphColor="#ffc53d"
-        onBeginTitleEdit={vi.fn()}
-      />,
-    );
-
-    const actions = screen.getByTestId('canvas-resource-actions');
-    // Close belongs to the Resource rather than to the edit, so it keeps its slot
-    // and says it is unavailable instead of vanishing — closing mid-edit would
-    // drop the Resource's box out from under a live caret holding a draft.
-    expect(
-      Array.from(actions.querySelectorAll('button')).map((button) =>
-        button.getAttribute('aria-label'),
-      ),
-    ).toEqual(['Save Resource A', 'Cancel editing Resource A', 'Close Resource A']);
-    // Unavailable through `aria-disabled` rather than the native property, so
-    // the control keeps its place in the rail's arrow order (ADR 0073) rather
-    // than being drawn and unreachable.
-    const close = screen.getByRole('button', { name: 'Close Resource A' });
-    expect(close).toHaveAttribute('aria-disabled', 'true');
-    expect(close).not.toBeDisabled();
-    expect(screen.queryByRole('button', { name: 'Edit Title A' })).not.toBeInTheDocument();
-    // The one fact the stylesheet reads to keep the rail up while the caret is
-    // in the body, where no hover or focus of the rail's own is true.
-    expect(screen.getByRole('article', { name: 'A' })).toHaveAttribute(
-      'data-content-editing',
-      'true',
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Save Resource A' }));
-    expect(onComplete).toHaveBeenCalledOnce();
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel editing Resource A' }));
-    expect(onEnd).toHaveBeenCalledTimes(2);
-    expect(onBeginContentEdit).not.toHaveBeenCalled();
-  });
-
-  it('draws those two ends as the rail actions beside them, not as a second kind', () => {
-    render(
-      <CanvasResource
-        kindOperations={{ kind: 'markdown' }}
-        onOpenChange={vi.fn()}
-        display={beginEditing(
-          opened({ kind: 'markdown', source: 'Markdown', via: 'self' }),
-          {
-            onComplete: vi.fn(),
-            onEnd: vi.fn(),
-          },
-          true,
-        )}
-        state="rest"
-        title="A"
-        graphColor="#ffc53d"
-      />,
-    );
-
-    const actions = screen.getByTestId('canvas-resource-actions');
-    const buttons = Array.from(actions.querySelectorAll('button'));
-    // One rail, one control treatment. A commit control that carried its own box
-    // or its own type would read as a different kind of control to the Close
-    // button it sits beside.
-    for (const button of buttons) {
-      expect(button).toHaveClass('resource__rail-action');
-      expect(button.textContent).toBe('');
-      expect(button.querySelector('svg')).toHaveAttribute('data-icon');
-    }
-    // The key each performs is still stated, which is how a control that
-    // performs a shortcut announces it (`docs/agents/ui.md`). These two are the
-    // repo's worked example of that convention.
-    expect(buttons[0]).toHaveAttribute('aria-keyshortcuts', 'Meta+Enter Control+Enter');
-    expect(buttons[1]).toHaveAttribute('aria-keyshortcuts', 'Escape');
-  });
-
-  it('keeps the caret in the content when one of those two ends is pressed', () => {
-    render(
-      <CanvasResource
-        kindOperations={{ kind: 'markdown' }}
-        onOpenChange={vi.fn()}
-        display={beginEditing(
-          opened({ kind: 'markdown', source: 'Markdown', via: 'self' }),
-          {
-            onComplete: vi.fn(),
-            onEnd: vi.fn(),
-          },
-          true,
-        )}
-        state="rest"
-        title="A"
-        graphColor="#ffc53d"
-      />,
-    );
-
-    // The rail is outside the writing surface, so a press on it would otherwise
-    // pull the caret and the selection out of the document the author is still
-    // in. `fireEvent` answers `false` for an event whose default was prevented,
-    // which is what stops the browser moving focus to the button.
-    for (const name of ['Save Resource A', 'Cancel editing Resource A']) {
-      expect(fireEvent.mouseDown(screen.getByRole('button', { name }))).toBe(false);
-    }
   });
 
   it('hides both actions while the title is being edited', () => {
@@ -806,10 +513,8 @@ describe('CanvasResource Title ladder', () => {
   it('draws the same ladder Open and Closed, on every Resource kind', () => {
     const title = 'Strategies\nNo strategy is privileged\nADR 0014';
     const cases: readonly (readonly [KindOperations, ResourceDisplay])[] = [
-      [{ kind: 'markdown' }, CLOSED_DISPLAY],
-      [{ kind: 'markdown' }, opened({ kind: 'markdown', source: '', via: 'self' })],
       [{ kind: 'reference' }, CLOSED_DISPLAY],
-      [{ kind: 'reference' }, opened({ kind: 'markdown', source: '', via: 'target' })],
+      [{ kind: 'reference' }, opened({ kind: 'ur', content: {}, via: 'target' })],
       [{ kind: 'space' }, CLOSED_DISPLAY],
       [{ kind: 'space' }, opened(SPACE_CONTENT)],
       [{ kind: 'ur' }, CLOSED_DISPLAY],
@@ -882,14 +587,12 @@ describe('CanvasResource Title ladder', () => {
     const title = 'Strategies\nNo strategy is privileged\nADR 0014';
     const resource = (open: boolean) => (
       <CanvasResource
-        kindOperations={{ kind: 'markdown', onBeginEdit: () => undefined }}
+        kindOperations={{
+          kind: 'space',
+          portal: { editing: false, onEditingChange: () => undefined },
+        }}
         onOpenChange={() => 'completed' as const}
-        display={
-          open
-            ? { shown: 'open', content: { kind: 'markdown', source: 'Markdown', via: 'self' } }
-            : CLOSED_DISPLAY
-        }
-        // Selected, so the Open body offers its edit target to be named.
+        display={open ? opened(SPACE_CONTENT) : CLOSED_DISPLAY}
         state="selected"
         title={title}
         graphColor="#ffc53d"
@@ -901,7 +604,6 @@ describe('CanvasResource Title ladder', () => {
     const { unmount } = render(resource(false));
     for (const name of [
       'Resource Strategies',
-      'Edit Resource Strategies',
       'Open Resource Strategies',
       'Actions for Resource Strategies',
       'Edit Title Strategies',
@@ -921,10 +623,10 @@ describe('CanvasResource Title ladder', () => {
     expect(screen.queryByLabelText(/No strategy is privileged/u)).toBeNull();
     unmount();
 
-    // Opening reveals two more names and changes a third; none of them grows a
-    // Title Line either.
+    // Opening changes Open to Close and offers the portal's Edit, neither of
+    // which grows a Title Line.
     render(resource(true));
-    for (const name of ['Close Resource Strategies', 'Edit Markdown source of Strategies']) {
+    for (const name of ['Close Resource Strategies', 'Edit Resource Strategies']) {
       expect(screen.getAllByLabelText(name), name).not.toHaveLength(0);
     }
   });
@@ -1115,29 +817,32 @@ describe('CanvasResource title editor', () => {
   });
 });
 
-describe('CanvasResource Open Markdown Resource', () => {
+describe('CanvasResource Open Reference to a Markdown Resource', () => {
   it('repeats transition durations cyclically when timing the opacity exit', async () => {
-    vi.useFakeTimers();
-    const computed = document.createElement('div').style;
-    computed.transitionProperty = 'color, transform, width, opacity';
-    computed.transitionDuration = '10ms, 100ms';
-    const style = vi.spyOn(window, 'getComputedStyle').mockReturnValue(computed);
     const { rerender } = render(
       <CanvasResource
-        kindOperations={{ kind: 'markdown' }}
+        kindOperations={{ kind: 'reference' }}
         display={{
           shown: 'open',
-          content: { kind: 'markdown', source: 'Leaving body', via: 'self' },
+          content: { kind: 'markdown', content: { url: textAsset('Leaving body') }, via: 'target' },
         }}
         state="rest"
         title="Strategies"
         graphColor="#ffc53d"
       />,
+      { wrapper: WithTexts },
     );
+    // The text is read before the clock is faked, so the read is not held by it.
+    expect(await screen.findByText('Leaving body')).toBeInTheDocument();
+    vi.useFakeTimers();
+    const computed = document.createElement('div').style;
+    computed.transitionProperty = 'color, transform, width, opacity';
+    computed.transitionDuration = '10ms, 100ms';
+    const style = vi.spyOn(window, 'getComputedStyle').mockReturnValue(computed);
 
     rerender(
       <CanvasResource
-        kindOperations={{ kind: 'markdown' }}
+        kindOperations={{ kind: 'reference' }}
         display={CLOSED_DISPLAY}
         state="rest"
         title="Strategies"
@@ -1170,19 +875,25 @@ describe('CanvasResource Open Markdown Resource', () => {
     );
   });
 
-  it('draws its Markdown below the Title and reports itself open', () => {
+  it('draws its Target’s Markdown below the Title and reports itself open', async () => {
     render(
       <CanvasResource
-        kindOperations={{ kind: 'markdown' }}
+        kindOperations={{ kind: 'reference' }}
         display={{
           shown: 'open',
-          content: { kind: 'markdown', source: 'the Resource’s own source', via: 'self' },
+          content: {
+            kind: 'markdown',
+            content: { url: textAsset('the Resource’s own source') },
+            via: 'target',
+          },
         }}
         state="rest"
         title="Strategies"
         graphColor="#ffc53d"
       />,
+      { wrapper: WithTexts },
     );
+    expect(await screen.findByText('the Resource’s own source')).toBeVisible();
 
     const resource = screen.getByRole('article', { name: 'Strategies' });
     expect(resource).toHaveAttribute('data-open', 'true');
@@ -1206,13 +917,17 @@ describe('CanvasResource Open Markdown Resource', () => {
     );
   });
 
-  it('holds the Markdown body open while the Title is being renamed', () => {
+  it('holds the Markdown body open while the Title is being renamed', async () => {
     render(
       <CanvasResource
-        kindOperations={{ kind: 'markdown' }}
+        kindOperations={{ kind: 'reference' }}
         display={{
           shown: 'open',
-          content: { kind: 'markdown', source: 'the Resource’s own source', via: 'self' },
+          content: {
+            kind: 'markdown',
+            content: { url: textAsset('the Resource’s own source') },
+            via: 'target',
+          },
         }}
         state="editing"
         title="Strategies"
@@ -1221,7 +936,9 @@ describe('CanvasResource Open Markdown Resource', () => {
         onCancelTitleEdit={vi.fn()}
         onReturnFocus={vi.fn()}
       />,
+      { wrapper: WithTexts },
     );
+    expect(await screen.findByText('the Resource’s own source')).toBeVisible();
 
     // Open is what the Map authored and the caret is a gesture, so the
     // two are independent rather than exclusive (ADR 0064).
@@ -1435,53 +1152,28 @@ describe('CanvasResource Space Resource', () => {
 });
 
 describe('how far an Open Resource overflows', () => {
-  it('answers the most any element of its content would scroll, and nothing outside one', () => {
+  it('answers the most any element of its content would scroll, and nothing outside one', async () => {
     const { container } = render(
       <CanvasResource
-        kindOperations={{ kind: 'markdown' }}
-        display={opened({ kind: 'markdown', source: 'Long body', via: 'self' })}
+        kindOperations={{ kind: 'reference' }}
+        display={opened({
+          kind: 'markdown',
+          content: { url: textAsset('Long body') },
+          via: 'target',
+        })}
         state="rest"
         title="Strategies"
         graphColor="#ffc53d"
       />,
+      { wrapper: WithTexts },
     );
-    const text = screen.getByText('Long body');
+
+    const text = await screen.findByText('Long body');
     Object.defineProperty(text, 'scrollHeight', { value: 420 });
     Object.defineProperty(text, 'clientHeight', { value: 100 });
 
     expect(canvasResourceContentOverflow(container)).toBe(320);
     expect(canvasResourceContentOverflow(document.createElement('div'))).toBe(0);
-  });
-});
-
-describe('CanvasResource Open Markdown body', () => {
-  /**
-   * A click on an unselected Resource selects it, as a click on any React Flow
-   * node does; editing its Markdown is the next click, or the Edit command
-   * (ADR 0102). So the body offers its edit target only once the Resource is
-   * selected, and before that the click reaches the node beneath.
-   */
-  const openMarkdown = (state: 'rest' | 'selected', onBeginEdit: () => void) => (
-    <CanvasResource
-      kindOperations={{ kind: 'markdown', onBeginEdit }}
-      onOpenChange={() => 'completed' as const}
-      display={{ shown: 'open', content: { kind: 'markdown', source: 'Body', via: 'self' } }}
-      state={state}
-      title="A"
-      graphColor="#ffc53d"
-    />
-  );
-
-  it('offers no edit target on a Resource that is not selected', () => {
-    render(openMarkdown('rest', vi.fn()));
-    expect(screen.queryByTestId('markdown-resource-body-edit-target')).toBeNull();
-  });
-
-  it('begins the edit from the body of a selected Resource', () => {
-    const onBeginEdit = vi.fn();
-    render(openMarkdown('selected', onBeginEdit));
-    fireEvent.click(screen.getByTestId('markdown-resource-body-edit-target'));
-    expect(onBeginEdit).toHaveBeenCalledOnce();
   });
 });
 
@@ -1494,19 +1186,24 @@ describe('CanvasResource Close fade', () => {
     return content;
   }
 
-  it('keeps the Markdown it last drew while the content fades out', () => {
+  it('keeps the Markdown it last drew while the content fades out', async () => {
     const { rerender } = render(
       <CanvasResource
-        kindOperations={{ kind: 'markdown' }}
-        display={{ shown: 'open', content: { kind: 'markdown', source: '## Hello', via: 'self' } }}
+        kindOperations={{ kind: 'reference' }}
+        display={{
+          shown: 'open',
+          content: { kind: 'markdown', content: { url: textAsset('## Hello') }, via: 'target' },
+        }}
         state="rest"
         title="A"
         graphColor="#ffc53d"
       />,
+      { wrapper: WithTexts },
     );
+    expect(await screen.findByText('Hello')).toBeVisible();
     rerender(
       <CanvasResource
-        kindOperations={{ kind: 'markdown' }}
+        kindOperations={{ kind: 'reference' }}
         display={CLOSED_DISPLAY}
         state="rest"
         title="A"
@@ -1515,78 +1212,6 @@ describe('CanvasResource Close fade', () => {
     );
 
     expect(leavingContent()).toHaveTextContent('Hello');
-  });
-
-  it('draws the new content when re-opened while leaving', () => {
-    const { rerender } = render(
-      <CanvasResource
-        kindOperations={{ kind: 'markdown' }}
-        display={{ shown: 'open', content: { kind: 'markdown', source: 'Before', via: 'self' } }}
-        state="rest"
-        title="A"
-        graphColor="#ffc53d"
-      />,
-    );
-    rerender(
-      <CanvasResource
-        kindOperations={{ kind: 'markdown' }}
-        display={CLOSED_DISPLAY}
-        state="rest"
-        title="A"
-        graphColor="#ffc53d"
-      />,
-    );
-    rerender(
-      <CanvasResource
-        kindOperations={{ kind: 'markdown' }}
-        display={{ shown: 'open', content: { kind: 'markdown', source: 'After', via: 'self' } }}
-        state="rest"
-        title="A"
-        graphColor="#ffc53d"
-      />,
-    );
-
-    const content = screen
-      .getByRole('article', { name: 'A' })
-      .querySelector('.canvas-resource__content');
-    expect(content).toHaveAttribute('data-presence', 'entering');
-    expect(content).toHaveTextContent('After');
-    expect(content).not.toHaveTextContent('Before');
-  });
-
-  it('fades out rendered Markdown, not the editor, when closed while its body is edited', () => {
-    const { rerender } = render(
-      <CanvasResource
-        kindOperations={{ kind: 'markdown' }}
-        display={beginEditing(
-          opened({ kind: 'markdown', source: 'Hello', via: 'self' }),
-          {
-            onComplete: vi.fn(),
-            onEnd: vi.fn(),
-          },
-          true,
-        )}
-        state="selected"
-        title="A"
-        graphColor="#ffc53d"
-      />,
-    );
-    expect(screen.getByRole('button', { name: 'Save Resource A' })).toBeVisible();
-
-    rerender(
-      <CanvasResource
-        kindOperations={{ kind: 'markdown' }}
-        display={CLOSED_DISPLAY}
-        state="selected"
-        title="A"
-        graphColor="#ffc53d"
-      />,
-    );
-
-    const content = leavingContent();
-    expect(content).toHaveTextContent('Hello');
-    expect(content.querySelector('.markdown-resource-body--editing')).toBeNull();
-    expect(content.querySelector('.markdown-resource-body__rendered')).not.toBeNull();
   });
 
   it('keeps the Target’s picture a Reference Resource last drew while the content fades out', () => {

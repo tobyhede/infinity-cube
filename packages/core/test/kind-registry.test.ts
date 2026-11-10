@@ -13,6 +13,7 @@ import {
   type ResourceDocument,
 } from '../src/kinds/registry';
 import { uuidSchema } from '../src/schema';
+import { EMPTY_ASSET_REF } from '../src/assets';
 import { imageKind } from '../src/kinds/image';
 import { markdownKind } from '../src/kinds/markdown';
 import { referenceKind } from '../src/kinds/reference';
@@ -63,7 +64,7 @@ describe("a kind's content Target", () => {
 
 describe('where resolved content came from', () => {
   const OWN = REPRESENTATIVE.filter((doc) => contentTarget(doc) === undefined);
-  const NOTES = { kind: markdownKind.id, content: { source: 'Notes' } } as const;
+  const NOTES = { kind: markdownKind.id, content: { url: EMPTY_ASSET_REF } } as const;
   const RECAP = { kind: referenceKind.id, content: { target: TARGET } } as const;
 
   it.each(OWN)('is the Resource itself when its kind names no Target: $kind $title', (doc) => {
@@ -73,7 +74,7 @@ describe('where resolved content came from', () => {
   it('is the Target when its kind names one', () => {
     expect(resolveContent(RECAP, () => NOTES)).toEqual({
       kind: markdownKind.id,
-      source: 'Notes',
+      content: NOTES.content,
       via: 'target',
     });
   });

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import {
   createSpaceSessionRegistry,
   MemorySpaceBackend,
@@ -91,11 +91,11 @@ const targetSnapshot: SpaceSnapshot = {
   resources: [
     {
       id: TARGET_RESOURCE_ID,
-      document: { title: 'Architecture', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Architecture', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
     {
       id: TARGET_RESOURCE_TWO,
-      document: { title: 'Second', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Second', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
   ],
 };
@@ -123,7 +123,7 @@ const metaSnapshot: SpaceSnapshot = {
   resources: [
     {
       id: META_RESOURCE_ID,
-      document: { title: 'Meta', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Meta', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
     {
       id: SPACE_RESOURCE_ID,

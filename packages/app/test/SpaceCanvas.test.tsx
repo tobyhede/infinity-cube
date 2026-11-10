@@ -3,9 +3,12 @@ import {
   createEvent,
   fireEvent,
   screen,
+  waitFor,
   within,
   type RenderResult,
 } from '@testing-library/react';
+import { useSyncExternalStore, type ReactElement } from 'react';
+import { z } from 'zod';
 import { ReactFlowProvider } from '@xyflow/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { resourceOpen, spaceSnapshotSchema, uuidSchema, type ResourceId } from '@project/core';
@@ -27,6 +30,7 @@ import { unusedImageSources } from './image-sources';
 import { stubResizeObserver } from './resize-observer';
 import { canvasReading, holdCanvasPolicy, IDLE_PLACEMENT } from './map-surfaces';
 import type { MapSurfacePolicy } from '../src/map-surface-policy';
+import { textAsset } from './markdown-texts';
 
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const OTHER_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
@@ -58,8 +62,14 @@ const snapshot = spaceSnapshotSchema.parse({
     defaultMap: MAP_ID,
   },
   resources: [
-    { id: RESOURCE_ID, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
-    { id: OTHER_RESOURCE_ID, document: { title: 'B', kind: 'markdown', content: { source: 'B' } } },
+    {
+      id: RESOURCE_ID,
+      document: { title: 'A', kind: 'markdown', content: { url: textAsset('A') } },
+    },
+    {
+      id: OTHER_RESOURCE_ID,
+      document: { title: 'B', kind: 'markdown', content: { url: textAsset('B') } },
+    },
     {
       id: REFERENCE_ID,
       document: { title: 'A again', kind: 'reference', content: { target: RESOURCE_ID } },
@@ -78,6 +88,25 @@ const resourceNode = (
   id: typeof RESOURCE_ID = RESOURCE_ID,
   selected = false,
   kind: ResourceNodeData['kind'] = 'markdown',
+): ResourceFlowNode => {
+  const node = drawnNode(title, id, selected, kind);
+  // A Markdown Resource is drawn by its plugin, from its content and Map content (ADR 0142).
+  if (kind === 'markdown') {
+    node.data = {
+      ...node.data,
+      ownContent: { url: textAsset(title) },
+      mapContent: { open: false },
+    };
+  }
+  return node;
+};
+
+/** A Resource node as the projection draws it, before any plugin's own data. */
+const drawnNode = (
+  title: string,
+  id: typeof RESOURCE_ID,
+  selected: boolean,
+  kind: ResourceNodeData['kind'],
 ): ResourceFlowNode => ({
   id,
   type: 'resource',
@@ -100,6 +129,9 @@ const resourceNode = (
     receding: false,
   },
 });
+
+/** Markdown's Map content while it is Open. */
+const OPEN_MAP_CONTENT = z.object({ open: z.literal(true) });
 
 interface Harness {
   readonly view: RenderResult;
@@ -150,12 +182,26 @@ async function mountGraph(
     canPresentFrom: (resourceId: typeof RESOURCE_ID) => resourceId === RESOURCE_ID,
     run: presentFrom,
   };
+  // Full View is the composition's state, so the canvas reads it as it reads
+  // any store, and an effect that ends it renders nothing from inside itself.
   let fullViewOf: ResourceId | null = null;
-  let rerenderGraph = (): void => undefined;
+  const fullViewListeners = new Set<() => void>();
   const show = (resourceId: ResourceId | null): void => {
     fullViewOf = resourceId;
-    rerenderGraph();
+    for (const listener of [...fullViewListeners]) listener();
   };
+  const subscribeFullView = (listener: () => void): (() => void) => {
+    fullViewListeners.add(listener);
+    return () => {
+      fullViewListeners.delete(listener);
+    };
+  };
+  const readFullView = (): ResourceId | null => fullViewOf;
+  const FullViewOf = ({
+    children,
+  }: {
+    readonly children: (resourceId: ResourceId | null) => ReactElement;
+  }): ReactElement => children(useSyncExternalStore(subscribeFullView, readFullView, readFullView));
   let nodes = initialNodes;
   let titleEditing = true;
   const stored = { snapshot, revision: 0n, exportedRevision: null };
@@ -172,42 +218,49 @@ async function mountGraph(
   };
   const graph = () => (
     <ReactFlowProvider>
-      <SpaceCanvas
-        surface={surface}
-        reading={canvasReading(surface, {
-          // What the render adapter holds, and whether the Map's placement has
-          // resolved into a projection: `replacing` holds the drawn Resources
-          // while a replacement placement resolves, and `nothing` holds none.
-          projection: held === 'nothing' ? null : { nodes, edges: [] },
-          projected: held === 'placed' ? { nodes, edges: [] } : null,
-          // `titleEditing` is the chrome rename `App` reports — the fact that
-          // withdraws canvas authoring.
-          facts: { editingChromeTitle: !titleEditing },
-          changeNodes: nodesChanged,
-          selectResource: onSelectResource,
-          resourceResize,
-          setEditingResourceTitle: titleEditingChanged,
-        })}
-        placement={placement}
-        commandOutcomes={commandOutcomes}
-        deleteConfirmation={deleteConfirmation}
-        nameOnCreation={null}
-        spaceSession={spaceSession}
-        presentFrom={presentable}
-        fullView={{ resourceId: fullViewOf, show }}
-      />
+      <FullViewOf>
+        {(fullViewResourceId) => (
+          <SpaceCanvas
+            surface={surface}
+            reading={canvasReading(surface, {
+              // What the render adapter holds, and whether the Map's placement has
+              // resolved into a projection: `replacing` holds the drawn Resources
+              // while a replacement placement resolves, and `nothing` holds none.
+              projection: held === 'nothing' ? null : { nodes, edges: [] },
+              projected: held === 'placed' ? { nodes, edges: [] } : null,
+              // `titleEditing` is the chrome rename `App` reports — the fact that
+              // withdraws canvas authoring.
+              facts: { editingChromeTitle: !titleEditing },
+              changeNodes: nodesChanged,
+              selectResource: onSelectResource,
+              resourceResize,
+              setEditingResourceTitle: titleEditingChanged,
+            })}
+            placement={placement}
+            commandOutcomes={commandOutcomes}
+            deleteConfirmation={deleteConfirmation}
+            nameOnCreation={null}
+            spaceSession={spaceSession}
+            presentFrom={presentable}
+            fullView={{ resourceId: fullViewResourceId, show }}
+          />
+        )}
+      </FullViewOf>
     </ReactFlowProvider>
   );
   const view = await mountSettled(graph());
-  // Inside whatever event or render asked for it, which is already a test boundary.
-  rerenderGraph = () => view.rerender(graph());
   return {
     view,
     opened: () => {
       const { maps = [] } = spaceSession.getState().working.document;
       const positions = maps.find(({ id }) => id === MAP_ID)?.positions ?? {};
+      // Open by the host, or by a plugin's Map content, as Markdown's is (ADR 0142).
       return Object.entries(positions)
-        .filter(([, entry]) => entry !== undefined && resourceOpen(entry))
+        .filter(
+          ([, entry]) =>
+            entry !== undefined &&
+            (resourceOpen(entry) || OPEN_MAP_CONTENT.safeParse(entry.content).success),
+        )
         .map(([resourceId]) => resourceId);
     },
     addResource,
@@ -290,7 +343,8 @@ describe('a title Edit the graph refused', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Resource B' }));
 
-    expect(opened()).toEqual([OTHER_RESOURCE_ID]);
+    // The plugin reads its text to measure, then commits its Map content.
+    await waitFor(() => expect(opened()).toEqual([OTHER_RESOURCE_ID]));
   });
 });
 
@@ -316,7 +370,7 @@ describe('opening a Resource', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Resource A' }));
 
-    expect(opened()).toEqual([RESOURCE_ID]);
+    await waitFor(() => expect(opened()).toEqual([RESOURCE_ID]));
   });
 
   it('leaves the Title control free to rename without Opening the Resource', async () => {
@@ -388,7 +442,7 @@ describe.each([
       fireEvent.click(button);
     }
 
-    expect(opened()).toEqual([RESOURCE_ID]);
+    await waitFor(() => expect(opened()).toEqual([RESOURCE_ID]));
   });
 });
 
@@ -420,16 +474,34 @@ it.each(['Enter', ' '])('leaves %s to a `.nokey` region inside a Resource', asyn
 /**
  * Shift+Enter is Open and expand (ADR 0137): one Edit that Opens the Resource
  * at the size its content needs. jsdom lays nothing out, so the visible canvas
- * it is capped at is the Closed Size and the Edit Opens it there.
+ * it is capped at is the Closed Size and the Edit Opens it there. A Reference
+ * Resource, whose Open the host keeps; a Markdown Resource's is its plugin's.
  */
 it('opens and expands a focused Resource with Shift+Enter', async () => {
+  const { opened } = await mountGraph([resourceNode('A again', REFERENCE_ID, false, 'reference')]);
+
+  const focused = nodeOf(REFERENCE_ID);
+  focused.focus();
+  fireEvent.keyDown(focused, { key: 'Enter', shiftKey: true });
+
+  expect(opened()).toEqual([REFERENCE_ID]);
+});
+
+/**
+ * The application keeps no Open for a Markdown Resource (ADR 0142): its Open
+ * is its plugin's rail command, so the canvas's Open keys leave it alone.
+ */
+it.each([
+  ['Enter', false],
+  ['Enter', true],
+] as const)('leaves %s (shift %s) alone on a Markdown Resource', async (key, shiftKey) => {
   const { opened } = await mountGraph([resourceNode('A')]);
 
   const focused = nodeOf(RESOURCE_ID);
   focused.focus();
-  fireEvent.keyDown(focused, { key: 'Enter', shiftKey: true });
+  fireEvent.keyDown(focused, { key, shiftKey });
 
-  expect(opened()).toEqual([RESOURCE_ID]);
+  expect(opened()).toEqual([]);
 });
 
 it('leaves Shift+Enter alone on a Resource it cannot open and expand', async () => {
@@ -466,7 +538,6 @@ it('draws no Resource while the render adapter holds no projection', async () =>
  * Those Resources stay authorable through that window.
  */
 describe.each([
-  ['Resource', resourceNode('A'), RESOURCE_ID],
   ['Reference Resource', resourceNode('A again', REFERENCE_ID, false, 'reference'), REFERENCE_ID],
 ] as const)('a %s held while a replacement placement resolves', (_kind, held, id) => {
   it.each(['Enter'])('opens with %s', async (key) => {
@@ -494,7 +565,7 @@ describe('the Resource affordance', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Resource A' }));
 
-    expect(opened()).toEqual([RESOURCE_ID]);
+    await waitFor(() => expect(opened()).toEqual([RESOURCE_ID]));
     expect(screen.queryByRole('textbox', { name: 'Resource title' })).not.toBeInTheDocument();
   });
 });
@@ -502,11 +573,13 @@ describe('the Resource affordance', () => {
 describe('withdrawing canvas authoring from an Open Resource', () => {
   it('withdraws body editing and resize through the same complete gate', async () => {
     const opened = resourceNode('A', RESOURCE_ID, true);
-    opened.data.open = true;
-    opened.data.display = fixtureDisplay(true, 'markdown', '# A');
+    opened.data.mapContent = { open: true };
     const { view, setTitleEditing } = await mountGraph([opened]);
 
-    expect(screen.getByRole('button', { name: 'Edit Markdown source of A' })).toBeVisible();
+    // Drawn transparent over the body, so present rather than visible.
+    expect(
+      await screen.findByRole('button', { name: 'Edit Markdown source of A' }),
+    ).toBeInTheDocument();
     expect(view.container.querySelector('.react-flow__resize-control')).toBeInTheDocument();
 
     setTitleEditing(false);
@@ -519,10 +592,9 @@ describe('withdrawing canvas authoring from an Open Resource', () => {
     'does not Open a Resource with %s while its body is being edited',
     async (key) => {
       const drawn = resourceNode('A', RESOURCE_ID, true);
-      drawn.data.open = true;
-      drawn.data.display = fixtureDisplay(true, 'markdown', '# A');
+      drawn.data.mapContent = { open: true };
       const { opened } = await mountGraph([drawn]);
-      fireEvent.click(screen.getByRole('button', { name: 'Edit Markdown source of A' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit Markdown source of A' }));
 
       const editor = await screen.findByRole('textbox', { name: 'Markdown source of A' });
       editor.focus();
@@ -961,7 +1033,8 @@ describe('Full View', () => {
     expect(opened()).toEqual([]);
   });
 
-  it('leaves on Enter and Opens the Resource on the canvas', async () => {
+  // The host keeps no Open for a Markdown Resource (ADR 0142), so Enter only leaves.
+  it('leaves on Enter, Opening nothing for a Markdown Resource', async () => {
     const { opened, fullViewOf } = await enterFullView();
 
     // Flushes the updates the press schedules, which land after it returns.
@@ -971,7 +1044,7 @@ describe('Full View', () => {
     });
 
     expect(fullViewOf()).toBeNull();
-    expect(opened()).toEqual([RESOURCE_ID]);
+    expect(opened()).toEqual([]);
   });
 
   it('keeps a canvas command from running on the Map it covers', async () => {
@@ -999,6 +1072,7 @@ describe('Full View', () => {
   it('ends when the canvas surface is held', async () => {
     const { fullViewOf, holdPolicy } = await enterFullView();
 
+    // The plugin's surface settles its withdrawn commits after the hold lands.
     holdPolicy('inert');
 
     expect(fullViewOf()).toBeNull();

@@ -323,7 +323,7 @@ test(
     await settled(page);
     await openResource(resourceA, 'A');
     await resourceA.hover();
-    const bodyTarget = resourceA.getByTestId('markdown-resource-body-edit-target');
+    const bodyTarget = resourceA.getByRole('button', { name: 'Edit Markdown source of A' });
     await expect(bodyTarget).toHaveCSS('opacity', '0');
     await expect(bodyTarget.locator('svg')).toHaveCount(0);
     expect(

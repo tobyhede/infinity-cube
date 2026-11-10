@@ -14,12 +14,17 @@ import { checkAggregate } from '../../src/run/run';
 import {
   filesUnder,
   markdownResourceFiles,
+  textAssetFiles,
+  textAssetRef,
   writeAggregateInto,
 } from '../support/aggregate-directory';
 import { callTool } from '../support/mcp-tool-answer';
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const OPENING_ID = uuidSchema.parse('66666666-6666-4666-8666-666666666666');
+const OPENING_TEXT = 'Hello.\n';
+/** The Opening Resource's text, as its asset file under `assets/` (ADR 0142). */
+const OPENING_ASSET = `assets/${textAssetRef(OPENING_TEXT).slice('/assets/'.length)}.md`;
 
 const temporaryDirectories: string[] = [];
 const clients: Client[] = [];
@@ -38,13 +43,18 @@ const makeTemporaryDirectory = async (): Promise<string> => {
 };
 
 const writeTalk = async (root?: string): Promise<string> =>
-  writeAggregateInto(root ?? (await makeTemporaryDirectory()), SPACE_ID, [
-    {
-      name: SPACE_ID,
-      spaceFile: JSON.stringify({ version: 1, id: SPACE_ID, title: 'Talk' }),
-      resources: markdownResourceFiles(OPENING_ID, 'Opening', 'Hello.\n'),
-    },
-  ]);
+  writeAggregateInto(
+    root ?? (await makeTemporaryDirectory()),
+    SPACE_ID,
+    [
+      {
+        name: SPACE_ID,
+        spaceFile: JSON.stringify({ version: 1, id: SPACE_ID, title: 'Talk' }),
+        resources: markdownResourceFiles(OPENING_ID, 'Opening', OPENING_TEXT),
+      },
+    ],
+    textAssetFiles(OPENING_TEXT),
+  );
 
 /** A client connected in memory to the server for `directory`, as a local MCP client connects. */
 const connect = async (directory: string): Promise<Client> => {
@@ -57,7 +67,7 @@ const connect = async (directory: string): Promise<Client> => {
 };
 
 describe('the Aggregate directory MCP server', () => {
-  it('offers exactly the file tools and check', async () => {
+  it('offers exactly the file tools, the asset writer and check', async () => {
     const client = await connect(await writeTalk());
 
     const { tools } = await client.listTools();
@@ -67,6 +77,7 @@ describe('the Aggregate directory MCP server', () => {
       'delete_file',
       'list_files',
       'read_file',
+      'write_asset',
       'write_file',
     ]);
   });
@@ -83,46 +94,45 @@ describe('the Aggregate directory MCP server', () => {
     expect(answer.isError).toBe(false);
     expect(answer.text.split('\n')).toEqual([
       `${SPACE_ID}/resources/${OPENING_ID}.json`,
-      `${SPACE_ID}/resources/${OPENING_ID}.md`,
       `${SPACE_ID}/space.json`,
       AGGREGATE_FILE_NAME,
+      OPENING_ASSET,
     ]);
   });
 
   it("reads a file's text", async () => {
     const client = await connect(await writeTalk());
 
-    const answer = await callTool(client, 'read_file', {
-      path: `${SPACE_ID}/resources/${OPENING_ID}.md`,
-    });
+    const answer = await callTool(client, 'read_file', { path: OPENING_ASSET });
 
-    expect(answer).toEqual({ text: 'Hello.\n', isError: false });
+    expect(answer).toEqual({ text: OPENING_TEXT, isError: false });
   });
 
   it('writes a new file, creating its parent directories, and replaces an existing one', async () => {
     const directory = await writeTalk();
     const client = await connect(directory);
-    const sidecar = `${SPACE_ID}/resources/${OPENING_ID}.md`;
+    const spaceFile = `${SPACE_ID}/space.json`;
+    const retitled = JSON.stringify({ version: 1, id: SPACE_ID, title: 'Retitled' });
 
     const created = await callTool(client, 'write_file', {
       path: 'notes/draft/outline.md',
       content: '# Outline\n',
     });
-    const replaced = await callTool(client, 'write_file', { path: sidecar, content: 'Goodbye.\n' });
+    const replaced = await callTool(client, 'write_file', { path: spaceFile, content: retitled });
 
     expect(created.isError).toBe(false);
     expect(replaced.isError).toBe(false);
     await expect(readFile(join(directory, 'notes/draft/outline.md'), 'utf8')).resolves.toBe(
       '# Outline\n',
     );
-    await expect(readFile(join(directory, sidecar), 'utf8')).resolves.toBe('Goodbye.\n');
+    await expect(readFile(join(directory, spaceFile), 'utf8')).resolves.toBe(retitled);
     expect(Object.keys(await filesUnder(directory)).sort()).toEqual(
       [
         AGGREGATE_FILE_NAME,
         'notes/draft/outline.md',
         `${SPACE_ID}/resources/${OPENING_ID}.json`,
-        sidecar,
-        `${SPACE_ID}/space.json`,
+        OPENING_ASSET,
+        spaceFile,
       ].sort(),
     );
   });
@@ -149,7 +159,7 @@ describe('the Aggregate directory MCP server', () => {
 
   it('refuses to read a file that is not UTF-8 as text, naming base64', async () => {
     const directory = await writeTalk();
-    await mkdir(join(directory, 'assets'));
+    await mkdir(join(directory, 'assets'), { recursive: true });
     await writeFile(join(directory, 'assets', 'picture.png'), Uint8Array.from([0x89, 0xff, 0x00]));
     const client = await connect(directory);
 
@@ -163,14 +173,10 @@ describe('the Aggregate directory MCP server', () => {
     const directory = await writeTalk();
     const client = await connect(directory);
 
-    const answer = await callTool(client, 'delete_file', {
-      path: `${SPACE_ID}/resources/${OPENING_ID}.md`,
-    });
+    const answer = await callTool(client, 'delete_file', { path: OPENING_ASSET });
 
     expect(answer.isError).toBe(false);
-    expect(Object.keys(await filesUnder(directory))).not.toContain(
-      `${SPACE_ID}/resources/${OPENING_ID}.md`,
-    );
+    expect(Object.keys(await filesUnder(directory))).not.toContain(OPENING_ASSET);
   });
 
   it('checks an accepted directory as cube check does', async () => {
@@ -184,15 +190,61 @@ describe('the Aggregate directory MCP server', () => {
 
   it('checks a refused directory with the problems cube check prints', async () => {
     const directory = await writeTalk();
-    await rm(join(directory, SPACE_ID, 'resources', `${OPENING_ID}.md`));
+    await writeFile(
+      join(directory, SPACE_ID, 'resources', `${OPENING_ID}.json`),
+      JSON.stringify({
+        id: OPENING_ID,
+        title: 'Opening',
+        kind: 'markdown',
+        content: { path: `${OPENING_ID}.md`, mediaType: 'text/markdown' },
+      }),
+    );
     const refused = await checkAggregate(directory, newUuid);
-    if (refused.kind === 'valid') throw new Error('Import accepted a missing sidecar');
+    if (refused.kind === 'valid') throw new Error('Import accepted Markdown content by path');
     const client = await connect(directory);
 
     const answer = await callTool(client, 'check');
 
     expect(answer).toEqual({ text: describeRunRefusal(refused, directory), isError: true });
     expect(answer.text).toContain(OPENING_ID);
+  });
+
+  /** The whole of adding a Markdown Resource, as an MCP client does it, with no other tool (ADR 0142). */
+  it('adds a Markdown Resource with its tools alone, and check names a Resource file it refuses', async () => {
+    const directory = await writeTalk();
+    const client = await connect(directory);
+    const added = uuidSchema.parse('77777777-7777-4777-8777-777777777777');
+
+    const stored = await callTool(client, 'write_asset', { content: '# Added\n\nBy tools.\n' });
+    expect(stored.isError).toBe(false);
+    const url = textAssetRef('# Added\n\nBy tools.\n');
+    expect(stored.text).toContain(url);
+    const resourceFile = `${SPACE_ID}/resources/${added}.json`;
+    const written = await callTool(client, 'write_file', {
+      path: resourceFile,
+      content: JSON.stringify({ id: added, title: 'Added', kind: 'markdown', content: { url } }),
+    });
+    expect(written.isError).toBe(false);
+    expect(await callTool(client, 'check')).toEqual({
+      text: `${directory} is a valid aggregate.\n`,
+      isError: false,
+    });
+    await expect(
+      readFile(join(directory, 'assets', `${url.slice('/assets/'.length)}.md`), 'utf8'),
+    ).resolves.toBe('# Added\n\nBy tools.\n');
+
+    await callTool(client, 'write_file', {
+      path: resourceFile,
+      content: JSON.stringify({
+        id: added,
+        title: 'Added',
+        kind: 'markdown',
+        content: { url: 'https://example.com/added.md' },
+      }),
+    });
+    const refused = await callTool(client, 'check');
+    expect(refused.isError).toBe(true);
+    expect(refused.text).toContain(`resources/${added}.json`);
   });
 
   it('checks an empty directory by saying what to write, naming no command', async () => {

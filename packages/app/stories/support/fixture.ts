@@ -14,6 +14,7 @@ import {
   type ResourceFile,
   type Space,
 } from '@project/graph';
+import { storyText } from './story-assets';
 
 /**
  * The inventory's fixture: a small, believable Space, shaped to exercise the
@@ -55,7 +56,7 @@ export const resources: readonly Resource[] = [
     id: resourceIds.opening,
     kind: 'markdown',
     title: 'Opening',
-    content: { source: '# Opening\n\nWhere the traversal begins.' },
+    content: { url: storyText('# Opening\n\nWhere the traversal begins.') },
   },
   {
     id: resourceIds.problem,
@@ -64,20 +65,22 @@ export const resources: readonly Resource[] = [
     title: 'Why authored placement beats a layout engine that reshuffles on every edit',
     kind: 'markdown',
     content: {
-      source: '# Placement\n\nThree spike increments each reshuffled the existing resources.',
+      url: storyText(
+        '# Placement\n\nThree spike increments each reshuffled the existing resources.',
+      ),
     },
   },
   {
     id: resourceIds.strategies,
     title: 'Strategies',
     kind: 'markdown',
-    content: { source: '# Strategies\n\nNo strategy is privileged.' },
+    content: { url: storyText('# Strategies\n\nNo strategy is privileged.') },
   },
   {
     id: resourceIds.traversal,
     title: 'Traversal',
     kind: 'markdown',
-    content: { source: '# Traversal\n\nPresenting draws on its own Stage.' },
+    content: { url: storyText('# Traversal\n\nPresenting draws on its own Stage.') },
   },
   {
     id: resourceIds.openingReference,
@@ -89,7 +92,7 @@ export const resources: readonly Resource[] = [
     id: resourceIds.closing,
     title: 'Closing',
     kind: 'markdown',
-    content: { source: '# Closing\n' },
+    content: { url: storyText('# Closing\n') },
   },
 ];
 

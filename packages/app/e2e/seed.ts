@@ -1,4 +1,5 @@
-import { uuidSchema } from '@project/core';
+import { z } from 'zod';
+import { assetRefSchema, uuidSchema } from '@project/core';
 import type { GraphEdge, ResourcePlacement, SpaceSnapshot } from '@project/core';
 import { expect, type Page } from './fixtures';
 
@@ -98,4 +99,18 @@ export async function seedPositionedMap(
   // SAFETY: same as `loaded` above — this app's own wire response, not
   // third-party JSON.
   return (await seededResponse.json()) as HttpLoadedSpace;
+}
+
+/**
+ * Store `text` as a Markdown asset through the host's asset collection, and
+ * answer the URL a Markdown Resource's content names it by (ADR 0142).
+ */
+export async function storeText(page: Page, text: string): Promise<`/assets/${string}`> {
+  const stored = await page.request.post('/assets', {
+    headers: { 'Content-Type': 'text/markdown' },
+    data: Buffer.from(text, 'utf8'),
+  });
+  expect(stored.ok()).toBe(true);
+  const { url } = z.object({ url: assetRefSchema }).parse(await stored.json());
+  return url;
 }

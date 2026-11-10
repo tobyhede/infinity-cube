@@ -76,7 +76,8 @@ Guards above are omitted below.
 | `deleted-resource` | `resource-not-found` → `space-resource-deletion-unsupported` → `resource-has-references` → completed |
 
 `open-requires-content` is the code `opened-resource` and `opened-resource-to-fit` raise for an Ur or an Image Resource,
-which is never Open (ADR 0142); intake raises the same code for a Map entry storing
+which is never Open, and for a Markdown Resource, whose plugin keeps its Open
+as Map content (ADR 0142); intake raises the same code for a Map entry storing
 one Open. Every code string here is quoted exactly as `AuthoringRefusal['code']`
 declares it. A refusal code is a stable identity across the seam (ADR 0057), so
 renaming one is a change to the domain surface rather than a wording fix, made in

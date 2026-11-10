@@ -3,13 +3,14 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { AGGREGATE_FILE_NAME } from '@project/aggregate';
+import { assetHashOf } from '@project/persistence';
 import type { UUID } from '@project/core';
 import { z } from 'zod';
 import { rejectSymbolicLinks, replaceFile } from '../aggregate-directory/write-in-place';
 import { describeCheckFailure, describeError } from '../cli/describe-error';
 import { describeCheck } from '../cli/run-refusal';
 
-const INSTRUCTIONS = `This server edits one InfinityCube Aggregate directory: a talk's Spaces, Maps, Graphs and Resources as JSON and Markdown files, by paths relative to the directory. The format is https://github.com/tobyhede/infinity-cube/blob/main/docs/aggregate-directory.md. Edit only a directory no pnpm cube run is serving, since a run overwrites what you write. Call list_files first; read ${AGGREGATE_FILE_NAME} and each space.json it lists before writing, and if it lists none the directory is empty and check says what to write. Call check after writing: it Imports the directory as a run does and answers what it refuses. Dot-entries and symbolic links are refused.`;
+const INSTRUCTIONS = `This server edits one InfinityCube Aggregate directory: a talk's Spaces, Maps, Graphs and Resources as JSON files, and the assets they name, such as a Markdown Resource's text, by paths relative to the directory. Write an asset with write_asset, which names it by its SHA-256 and answers the URL a Resource's content names it by. The format is https://github.com/tobyhede/infinity-cube/blob/main/docs/aggregate-directory.md. Edit only a directory no pnpm cube run is serving, since a run overwrites what you write. Call list_files first; read ${AGGREGATE_FILE_NAME} and each space.json it lists before writing, and if it lists none the directory is empty and check says what to write. Call check after writing: it Imports the directory as a run does and answers what it refuses. Dot-entries and symbolic links are refused.`;
 
 const EMPTY = `The directory holds no aggregate yet. Write ${AGGREGATE_FILE_NAME} and its Meta Space's directory as the format reference describes, then check again.`;
 
@@ -140,6 +141,38 @@ export const createAggregateMcpServer = (given: string, newId: () => UUID): McpS
           carried === 'base64' ? Buffer.from(content, 'base64') : new TextEncoder().encode(content),
         );
         return answer(`Wrote ${file}.`);
+      }),
+  );
+
+  server.registerTool(
+    'write_asset',
+    {
+      description:
+        'Write bytes as an asset, assets/<hash>.<extension>, named by their SHA-256, answering the URL a Resource\'s content names it by, such as a Markdown Resource\'s { "url": "/assets/<hash>" }',
+      inputSchema: {
+        content: z.string().describe("The asset's text, or its bytes as base64"),
+        encoding,
+        extension: z
+          .string()
+          .regex(/^[A-Za-z0-9]+$/u)
+          .optional()
+          .describe(
+            'The file extension, which names its media type: md, the default, for Markdown',
+          ),
+      },
+      annotations: { destructiveHint: false, idempotentHint: true },
+    },
+    ({ content, encoding: carried, extension = 'md' }) =>
+      attempt(async () => {
+        const bytes = new Uint8Array(
+          carried === 'base64' ? Buffer.from(content, 'base64') : new TextEncoder().encode(content),
+        );
+        const hash = await assetHashOf(bytes);
+        const file = `assets/${hash}.${extension}`;
+        const target = await fileInside(directory, file);
+        await mkdir(dirname(target), { recursive: true });
+        await replaceFile(target, bytes);
+        return answer(`Wrote ${file}. Name it as /assets/${hash}.`);
       }),
   );
 

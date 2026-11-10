@@ -658,11 +658,13 @@ describe('a file that could not be read', () => {
                 encode(JSON.stringify({ version: 1, metaSpaceId: META_SPACE_ID })),
               ],
               [`${META_SPACE_ID}/space.json`, encode(refusedDocument)],
-              [`${META_SPACE_ID}/a.md`, encode('A body\n')],
+              [`${META_SPACE_ID}/resources/${RESOURCE_ID}.json`, encode('{}')],
               [`${OTHER_SPACE_ID}/space.json`, encode('{ invalid other')],
             ]),
           ),
-          new Map([[`${META_SPACE_ID}/a.md`, 'EACCES: permission denied']]),
+          new Map([
+            [`${META_SPACE_ID}/resources/${RESOURCE_ID}.json`, 'EACCES: permission denied'],
+          ]),
         ),
         countingIds(),
       ),
@@ -691,10 +693,12 @@ describe('a file that could not be read', () => {
                 `${META_SPACE_ID}/space.json`,
                 encode(JSON.stringify({ version: 1, title: 'Meta' })),
               ],
-              [`${META_SPACE_ID}/a.md`, encode('A body\n')],
+              [`${META_SPACE_ID}/resources/${RESOURCE_ID}.json`, encode('{}')],
             ]),
           ),
-          new Map([[`${META_SPACE_ID}/a.md`, 'EACCES: permission denied']]),
+          new Map([
+            [`${META_SPACE_ID}/resources/${RESOURCE_ID}.json`, 'EACCES: permission denied'],
+          ]),
         ),
         countingIds(),
       ),
@@ -703,7 +707,9 @@ describe('a file that could not be read', () => {
     expect(thrown).toBeInstanceOf(AggregateDirectoryError);
     if (!(thrown instanceof AggregateDirectoryError)) return;
     expect(thrown.kind).toBe('discovery');
-    expect(thrown.diagnostics).toEqual([`/talk/${META_SPACE_ID}/a.md: EACCES: permission denied`]);
+    expect(thrown.diagnostics).toEqual([
+      `/talk/${META_SPACE_ID}/resources/${RESOURCE_ID}.json: EACCES: permission denied`,
+    ]);
   });
 
   it('names an asset that could not be read as a discovery failure', async () => {
@@ -797,9 +803,7 @@ describe('scanAggregateFrom', () => {
       files: [
         AGGREGATE_FILE_NAME,
         `${META_SPACE_ID}/space.json`,
-        `${META_SPACE_ID}/notes.md`,
         `${META_SPACE_ID}/resources/${RESOURCE_ID}.json`,
-        `${META_SPACE_ID}/resources/${RESOURCE_ID}.md`,
         `${OTHER_SPACE_ID}/space.json`,
         `assets/${OWNED_HASH}.png`,
       ],
@@ -903,7 +907,6 @@ describe('reading from a source', () => {
       AGGREGATE_FILE_NAME,
       `${META_SPACE_ID}/space.json`,
       `${META_SPACE_ID}/resources/${RESOURCE_ID}.json`,
-      `${META_SPACE_ID}/resources/${RESOURCE_ID}.md`,
       `assets/${image.hash}.png`,
     ]);
     expect(reads).toEqual((await scanAggregateFrom(mapSource('/talk', files))).files);
@@ -1141,7 +1144,6 @@ describe('a symbolic link, on disk', () => {
     )) {
       await linkTo(root, `${META_SPACE_ID}/resources/${name}`, text);
     }
-    await linkTo(root, `${META_SPACE_ID}/notes.md`, 'beside space.json\n');
     const image = await admitted(pngBytes(7));
     await mkdir(join(root, 'assets'));
     const picture = join(await makeTemporaryDirectory(), 'picture.png');
@@ -1149,9 +1151,7 @@ describe('a symbolic link, on disk', () => {
     await symlink(picture, join(root, 'assets', `${image.hash}.png`));
 
     expect(await discoveryDiagnostics(() => readAggregate(root, countingIds()))).toEqual([
-      `${root}/${META_SPACE_ID}/notes.md: ${LINK_REASON}`,
       `${root}/${META_SPACE_ID}/resources/${RESOURCE_ID}.json: ${LINK_REASON}`,
-      `${root}/${META_SPACE_ID}/resources/${RESOURCE_ID}.md: ${LINK_REASON}`,
       `${root}/assets/${image.hash}.png: ${LINK_REASON}`,
     ]);
   });
@@ -1225,18 +1225,18 @@ describe('a symbolic link, on disk', () => {
   it("reports a Space directory's links beside a resources/ that could not be listed", async () => {
     const root = await makeTemporaryDirectory();
     await writeAggregateFile(root, META_SPACE_ID);
-    const meta = await writeSpace(
+    const meta = join(root, META_SPACE_ID);
+    await linkTo(
       root,
-      META_SPACE_ID,
+      `${META_SPACE_ID}/space.json`,
       JSON.stringify({ version: 1, title: 'Meta' }),
     );
-    await linkTo(root, `${META_SPACE_ID}/notes.md`, 'beside space.json\n');
     await writeFile(join(meta, 'resources'), 'a file, not a directory\n');
 
     const diagnostics = await discoveryDiagnostics(() => readAggregate(root, countingIds()));
 
     expect(diagnostics).toHaveLength(2);
-    expect(diagnostics[0]).toBe(`${meta}/notes.md: ${LINK_REASON}`);
+    expect(diagnostics[0]).toBe(`${meta}/space.json: ${LINK_REASON}`);
     expect(diagnostics[1]).toMatch(new RegExp(`^${meta}/resources: .*ENOTDIR`));
   });
 

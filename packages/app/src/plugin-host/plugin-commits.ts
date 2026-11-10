@@ -1,6 +1,6 @@
-import type { PluginKind, ResourceDocument, ResourceId } from '@project/core';
+import type { JsonValue, PluginKind, ResourceDocument, ResourceId } from '@project/core';
 import type { ObserverErrorReporter } from '@project/persistence';
-import type { Answer } from '@project/resource-api/domain';
+import type { Answer, Size } from '@project/resource-api/domain';
 import type { Assets } from '@project/resource-api/view';
 import type { ClaimHolder, PluginCommits, PluginHostClaim, PluginOperations } from '@project/ui';
 import { describeAuthoringRefusal } from '../authoring-refusal';
@@ -35,6 +35,7 @@ type Refusal = { readonly refused: string };
 const GONE: Refusal = { refused: 'This Resource has changed since it was drawn. Try again.' };
 const BUSY: Refusal = { refused: 'Another change is still being made. Try again when it ends.' };
 const BROKE: Answer = { refused: 'This change could not be made.' };
+const NOT_FOUND: Refusal = { refused: 'This Resource is no longer available.' };
 
 /** A settled Edit as a plugin reads it, its refusal in the words every refusal is reported in. */
 export const answerOf = (result: SettledResult): Answer => {
@@ -85,17 +86,14 @@ export interface PluginHost {
   readonly report: ObserverErrorReporter;
   /** The asset store and file picker a surface offers where it offers commits; absent, neither. */
   readonly assets?: Pick<Assets, 'store' | 'pick'> | undefined;
-  /** The Resource's stored document as it stands now, which a Title commit edits. */
+  /** A Resource's stored document now, which a Title commit rewrites the Title of. */
   readonly document: (resourceId: ResourceId) => ResourceDocument | undefined;
+  /**
+   * A plugin's size hint capped at what this canvas shows (`visibleCanvasCap`),
+   * a canvas fact; absent, or answering `undefined`, the hint is ignored.
+   */
+  readonly capSizeHint?: ((hint: Size) => Size | undefined) | undefined;
 }
-
-const NOT_FOUND: Refusal = { refused: 'This Resource is no longer available.' };
-
-/** Who holds a Claim on a drawing's Resource, as that drawing reads it. */
-export const claimHolderOf = (chain: ClaimChain, drawing: Drawing): ClaimHolder => {
-  if (holds(chain, drawing.key)) return 'this-drawing';
-  return heldByAnotherDrawing(chain, drawing) ? 'another-drawing' : 'none';
-};
 
 /**
  * The commits a surface's Resource may make, each running only while `live()`
@@ -110,6 +108,11 @@ function commitsFor(
   live: () => Refusal | null,
   complete: PluginHost['complete'],
 ): PluginCommits {
+  const complete = own
+    ? (completion: DrawnCompletion, settle: Settle) =>
+        host.gate.admit(() => host.complete(completion, settle))
+    : host.complete;
+  /** Run the Edit `completion` builds, unless withdrawn or its Resource is gone. */
   const run = (completion: () => DrawnCompletion | undefined): Promise<Answer> => {
     const withdrawn = live();
     if (withdrawn !== null) return Promise.resolve(withdrawn);
@@ -122,13 +125,20 @@ function commitsFor(
     if (document === undefined) return undefined;
     return { kind: 'edited-resource', resourceId, document: { ...document, title } };
   };
+  const changeMapContent = (
+    content: JsonValue,
+    options?: { readonly sizeHint?: Size },
+  ): Promise<Answer> =>
+    run(() => {
+      const hint = options?.sizeHint;
+      const size = hint === undefined ? undefined : host.capSizeHint?.(hint);
+      return { kind: 'changed-map-content', resourceId, content, size };
+    });
   const store = host.assets?.store;
   return {
     title: (next) => run(retitled(next)),
     content: (next) => run(() => ({ kind: 'changed-content', resourceId, content: next })),
-    // A size hint is ignored: the canvas applies none yet
-    // (`docs/agents/maps-and-graphs.md`, R38, R40).
-    map: (next) => run(() => ({ kind: 'changed-map-content', resourceId, content: next })),
+    map: changeMapContent,
     store:
       store === undefined
         ? undefined
@@ -164,8 +174,14 @@ export function pluginSurfaceOperations(
     onFailure: (error: Error) => host.report(error),
   };
   if (!offersCommits(facts)) return drawn;
-  if (host.claims.exclusive !== null) return { ...drawn, withdrawn: true };
-  const replaced = (): Refusal | null => (host.replacementEpoch() === builtIn ? null : GONE);
+  if (host.gate.exclusiveRunning()) return { ...drawn, withdrawn: true };
+  // While another surface holds a Claim, this one offers nothing to compete
+  // with it (ADR 0064, ADR 0142): its commands come back when that Claim ends.
+  // A Resource drawn twice, as two embeddings of one Map draw it, is held by
+  // one of its surfaces at a time: once one holds it, none offers a second.
+  const { holders } = host.gate.getState();
+  const heldHere = holders.some((path) => path.includes(resourceId));
+  if (holders.length > 0 && !heldHere) return drawn;
   const plain = commitsFor(
     host,
     resourceId,
@@ -202,6 +218,6 @@ export function pluginSurfaceOperations(
     commitMap: plain.map,
     commitStore: plain.store,
     pick,
-    claim,
+    claim: heldHere ? undefined : claim,
   };
 }

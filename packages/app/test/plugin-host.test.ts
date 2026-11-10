@@ -362,21 +362,16 @@ describe('a plugin surface’s commits on the canvas', () => {
     epoch: { value: number } = { value: 0 },
     report: ObserverErrorReporter = () => undefined,
     assets: PluginHost['assets'] = {},
-  ): PluginHost => {
-    const gate = createPluginGate();
-    return {
-      gate,
-      // As the canvas reads it: the chain the gate last published.
-      get claims() {
-        return gate.getState();
-      },
-      replacementEpoch: () => epoch.value,
-      complete,
-      report,
-      document: (resourceId) => (resourceId === RESOURCE ? DOCUMENT : undefined),
-      assets,
-    };
-  };
+    capSizeHint?: PluginHost['capSizeHint'],
+  ): PluginHost => ({
+    gate: createPluginGate(),
+    replacementEpoch: () => epoch.value,
+    complete,
+    report,
+    document: (resourceId) => (resourceId === RESOURCE ? DOCUMENT : undefined),
+    assets,
+    capSizeHint,
+  });
 
   it('answers a settled Edit in the words every refusal is reported in', () => {
     expect(answerOf({ kind: 'completed' })).toBe('completed');
@@ -504,6 +499,35 @@ describe('a plugin surface’s commits on the canvas', () => {
     held?.release();
   });
 
+  it('carries a size hint capped at what the canvas shows, and drops one it cannot cap', async () => {
+    const complete = vi.fn((): AuthoringResult => ({ kind: 'completed' }));
+    const capped = pluginSurfaceOperations(
+      'markdown',
+      RESOURCE,
+      FACTS,
+      hostWith(complete, { value: 0 }, undefined, undefined, (hint) => ({
+        width: Math.min(hint.width, 800),
+        height: Math.min(hint.height, 600),
+      })),
+    );
+    await capped.commitMap?.({ open: true }, { sizeHint: { width: 640, height: 2000 } });
+    expect(complete).toHaveBeenLastCalledWith(
+      {
+        kind: 'changed-map-content',
+        resourceId: RESOURCE,
+        content: { open: true },
+        size: { width: 640, height: 600 },
+      },
+      expect.any(Function),
+    );
+    const uncapped = pluginSurfaceOperations('markdown', RESOURCE, FACTS, hostWith(complete));
+    await uncapped.commitMap?.({ open: true }, { sizeHint: { width: 640, height: 2000 } });
+    expect(complete).toHaveBeenLastCalledWith(
+      { kind: 'changed-map-content', resourceId: RESOURCE, content: { open: true } },
+      expect.any(Function),
+    );
+  });
+
   it('withdraws every plain commit while exclusive work runs, and keeps that work’s own live', async () => {
     const complete = vi.fn((): AuthoringResult => ({ kind: 'completed' }));
     const host = hostWith(complete);
@@ -600,6 +624,23 @@ describe('a plugin surface’s commits on the canvas', () => {
     expect(other.commitMap).toBeUndefined();
     expect(other.claim).toBeUndefined();
     expect(other.withdrawn).toBe(true);
+  });
+
+  it('offers another surface nothing while one holds a Claim, and no second Claim on the Resource held', () => {
+    const host = hostWith(() => ({ kind: 'completed' }));
+    const held = pluginSurfaceOperations('markdown', RESOURCE, FACTS, host).claim?.();
+    const OTHER = uuidSchema.parse('00000000-0000-4000-8000-0000000000a3');
+    const other = pluginSurfaceOperations('markdown', OTHER, FACTS, host);
+    expect(other.commitMap).toBeUndefined();
+    expect(other.claim).toBeUndefined();
+    expect(pluginSurfaceOperations('markdown', RESOURCE, FACTS, host).commitContent).toBeTypeOf(
+      'function',
+    );
+    expect(pluginSurfaceOperations('markdown', RESOURCE, FACTS, host).claim).toBeUndefined();
+    held?.release();
+    expect(pluginSurfaceOperations('markdown', OTHER, FACTS, host).commitMap).toBeTypeOf(
+      'function',
+    );
   });
 
   /** An asset store recording what it stored, and a picker answering one file. */

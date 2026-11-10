@@ -1,4 +1,4 @@
-import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import {
   AggregateInvariantError,
   classifyStoredFailure,
@@ -89,7 +89,7 @@ const LINK_RESOURCE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000013'
 
 const resource = (id: UUID, title: string) => ({
   id,
-  document: { title, kind: 'markdown' as const, content: { source: title } },
+  document: { title, kind: 'markdown' as const, content: { url: EMPTY_ASSET_REF } },
 });
 
 const space = (id: UUID, title: string, resourceIds: readonly UUID[]): SpaceSnapshot => ({

@@ -300,7 +300,7 @@ describe('resource file schema', () => {
     id: A,
     title: 'A',
     kind: 'markdown',
-    content: { path: `${A}.md`, mediaType: 'text/markdown' },
+    content: { url: '/assets/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU' },
   };
 
   /** The messages a refused file prints, in order. */
@@ -327,23 +327,17 @@ describe('resource file schema', () => {
     expect(resourceFileSchema.safeParse({ ...MARKDOWN_FILE, kind: 'chart' }).success).toBe(false);
   });
 
-  it('reads a Markdown Resource file as the locator of its sidecar', () => {
+  it('reads a Markdown Resource file as the URL of the asset holding its text (ADR 0142)', () => {
     expect(resourceFileSchema.parse(MARKDOWN_FILE)).toEqual(MARKDOWN_FILE);
   });
 
-  it('compares the Markdown media type case-insensitively, and refuses any other', () => {
-    const withMediaType = (mediaType: string) => ({
-      ...MARKDOWN_FILE,
-      content: { ...MARKDOWN_FILE.content, mediaType },
-    });
-    expect(resourceFileSchema.safeParse(withMediaType('Text/Markdown')).success).toBe(true);
-    expect(resourceFileSchema.safeParse(withMediaType('text/plain')).success).toBe(false);
-  });
-
-  it('refuses a Markdown Resource file that carries its source rather than locating it', () => {
-    expect(
-      resourceFileSchema.safeParse({ ...MARKDOWN_FILE, content: { source: '# A' } }).success,
-    ).toBe(false);
+  it('refuses a Markdown Resource file that carries its source, a sidecar or an outside URL', () => {
+    for (const content of [
+      { source: '# A' },
+      { path: `${A}.md`, mediaType: 'text/markdown' },
+      { url: 'https://example.com/a.md' },
+    ])
+      expect(resourceFileSchema.safeParse({ ...MARKDOWN_FILE, content }).success).toBe(false);
   });
 
   it('refuses a key the envelope does not declare, naming it', () => {
@@ -471,7 +465,7 @@ describe('resource file schema', () => {
       id: A,
       title: 'A',
       kind: 'markdown',
-      content: { source: '' },
+      content: { url: '/assets/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU' },
       description: 'What A is',
     });
     expect('description' in resource).toBe(false);
@@ -480,7 +474,10 @@ describe('resource file schema', () => {
         id: A,
         title: 'A',
         kind: 'markdown',
-        content: { source: '', description: 'What A is' },
+        content: {
+          url: '/assets/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU',
+          description: 'What A is',
+        },
       }).success,
     ).toBe(false);
   });

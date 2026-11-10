@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { Story } from '@ladle/react';
-import { uuidSchema, type Resource, type UUID } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type Resource, type UUID } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { ResourcesPopover, SPACE_DRAG_TYPE } from '#components/ResourcesPopover';
 import { PersistenceNotice } from '#components/PersistenceControl';
@@ -19,13 +19,23 @@ export default { title: 'Surfaces/Resources Popover' };
 const id = (suffix: string) => uuidSchema.parse(`00000000-0000-4000-8000-${suffix}`);
 
 const RESOURCES: readonly Resource[] = [
-  { id: id('000000000001'), title: 'API boundaries', kind: 'markdown', content: { source: '' } },
-  { id: id('000000000002'), title: 'Architecture', kind: 'markdown', content: { source: '' } },
+  {
+    id: id('000000000001'),
+    title: 'API boundaries',
+    kind: 'markdown',
+    content: { url: EMPTY_ASSET_REF },
+  },
+  {
+    id: id('000000000002'),
+    title: 'Architecture',
+    kind: 'markdown',
+    content: { url: EMPTY_ASSET_REF },
+  },
   {
     id: id('000000000003'),
     title: 'Design constraints',
     kind: 'markdown',
-    content: { source: '' },
+    content: { url: EMPTY_ASSET_REF },
   },
   {
     id: id('000000000004'),
@@ -45,7 +55,7 @@ const LONG_RESOURCES: readonly Resource[] = Array.from({ length: 18 }, (_, index
   id: id(String(index + 100).padStart(12, '0')),
   title: `Reference ${String(index + 1).padStart(2, '0')}`,
   kind: 'markdown' as const,
-  content: { source: '' },
+  content: { url: EMPTY_ASSET_REF },
 }));
 
 /** Spaces of the Meta Space, which are not Resources and are in no Map. */

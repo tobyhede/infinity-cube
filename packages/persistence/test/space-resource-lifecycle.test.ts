@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import { nextGraphColor } from '@project/graph';
 import { MemorySpaceBackend, MemorySpaceBackendTestControl } from '../src/memory';
 import { canRetry, type SpaceSessionState } from '../src/session';
@@ -57,7 +57,7 @@ const metaSnapshot: SpaceSnapshot = {
   resources: [
     {
       id: META_RESOURCE_ID,
-      document: { title: 'Meta', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Meta', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
   ],
 };
@@ -103,7 +103,7 @@ const targetSnapshot: SpaceSnapshot = {
   resources: [
     {
       id: TARGET_RESOURCE_ID,
-      document: { title: 'Architecture', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Architecture', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
   ],
 };
@@ -325,7 +325,7 @@ describe('Space Resource lifecycle', () => {
       resources: [
         {
           id: CHILD_RESOURCE_ID,
-          document: { title: 'Child', kind: 'markdown', content: { source: '' } },
+          document: { title: 'Child', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
       ],
     };
@@ -1202,7 +1202,7 @@ describe('Space Resource lifecycle', () => {
               id: TARGET_MAP_ID,
               title: 'Map 1',
               kind: 'positioned',
-              positions: { [TARGET_RESOURCE_ID]: { x: 0, y: 0, open: false } },
+              positions: { [TARGET_RESOURCE_ID]: { x: 0, y: 0 } },
               graphs: [
                 {
                   id: TARGET_GRAPH_ID,
@@ -1222,7 +1222,7 @@ describe('Space Resource lifecycle', () => {
             // neutral `Resource 1` every new Space's first Resource takes, because the
             // two are independent from the moment they exist (ADR 0068).
             id: TARGET_RESOURCE_ID,
-            document: { title: 'Resource 1', kind: 'markdown', content: { source: '' } },
+            document: { title: 'Resource 1', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
           },
         ],
       },
@@ -1288,7 +1288,7 @@ describe('Space Resource lifecycle', () => {
       resources: [
         {
           id: CHILD_RESOURCE_ID,
-          document: { title: 'Child', kind: 'markdown', content: { source: '' } },
+          document: { title: 'Child', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
       ],
     };
@@ -1377,7 +1377,7 @@ describe('Space Resource lifecycle', () => {
       resources: [
         {
           id: TARGET_RESOURCE_ID,
-          document: { title: 'Architecture', kind: 'markdown', content: { source: '' } },
+          document: { title: 'Architecture', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
       ],
     };
@@ -1513,7 +1513,7 @@ describe('Space Resource lifecycle', () => {
       resources: [
         {
           id: TARGET_RESOURCE_ID,
-          document: { title: 'Architecture', kind: 'markdown', content: { source: '' } },
+          document: { title: 'Architecture', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
       ],
     };
@@ -1735,7 +1735,7 @@ describe('Space Resource lifecycle', () => {
       resources: [
         {
           id: TARGET_RESOURCE_ID,
-          document: { title: 'Architecture', kind: 'markdown', content: { source: '' } },
+          document: { title: 'Architecture', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
       ],
     };
@@ -1829,7 +1829,7 @@ describe('Space Resource lifecycle', () => {
       resources: [
         {
           id: CHILD_RESOURCE_ID,
-          document: { title: 'Sibling', kind: 'markdown', content: { source: '' } },
+          document: { title: 'Sibling', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
       ],
     };
@@ -2122,7 +2122,7 @@ describe('Space Resource lifecycle', () => {
       resources: [
         {
           id: CHILD_RESOURCE_ID,
-          document: { title: 'Sibling', kind: 'markdown', content: { source: '' } },
+          document: { title: 'Sibling', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
         {
           id: CHILD_LINK_ID,
@@ -2213,7 +2213,7 @@ describe('Space Resource lifecycle', () => {
       resources: [
         {
           id: CHILD_RESOURCE_ID,
-          document: { title: 'Unrelated', kind: 'markdown', content: { source: '' } },
+          document: { title: 'Unrelated', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
       ],
     };
@@ -2270,7 +2270,7 @@ describe('Space Resource lifecycle', () => {
       resources: [
         {
           id: CHILD_RESOURCE_ID,
-          document: { title: 'Orphan', kind: 'markdown', content: { source: '' } },
+          document: { title: 'Orphan', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
       ],
     };
@@ -3320,17 +3320,21 @@ describe('Space Resource recovery another coordination holds', () => {
  * brings it under.
  */
 describe('A coordinated save over the request size limit', () => {
+  // The Title carries the bulk, because a Markdown Resource's text is an asset (ADR 0142).
   const metaWithBody = (space: SpaceSnapshot, body: string): SpaceSnapshot => ({
     ...space,
     resources: space.resources.map((resource) =>
       resource.id === META_RESOURCE_ID
-        ? { ...resource, document: { title: 'Meta', kind: 'markdown', content: { source: body } } }
+        ? {
+            ...resource,
+            document: { title: `Meta${body}`, kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+          }
         : resource,
     ),
   });
   const metaBody = (space: SpaceSnapshot): string | undefined => {
     const document = space.resources.find(({ id }) => id === META_RESOURCE_ID)?.document;
-    return document?.kind === 'markdown' ? document.content.source : undefined;
+    return document?.title.slice('Meta'.length);
   };
 
   it('refuses the total request, keeps every Edit, and saves once a reduction fits', async () => {

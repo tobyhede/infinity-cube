@@ -1,4 +1,4 @@
-import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import { describe, expect, it } from 'vitest';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import type { SqlStore } from '../../src/persistence/sql-store';
@@ -120,7 +120,7 @@ const B_FIRST = idAt(60);
 
 const markdown = (id: UUID, title: string) => ({
   id,
-  document: { title, kind: 'markdown' as const, content: { source: title } },
+  document: { title, kind: 'markdown' as const, content: { url: EMPTY_ASSET_REF } },
 });
 
 const link = (id: UUID, spaceId: UUID, mapId: UUID, graph: UUID) => ({

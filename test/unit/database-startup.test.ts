@@ -1,4 +1,4 @@
-import { uuidSchema, type UUID } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type UUID } from '@project/core';
 import { nextGraphColor } from '@project/graph';
 import postgres from '@prisma-next/postgres/runtime';
 import {
@@ -57,7 +57,11 @@ const storedSpace = (
     resources: [
       {
         id: resourceId,
-        document: { title: 'Existing resource', kind: 'markdown', content: { source: '' } },
+        document: {
+          title: 'Existing resource',
+          kind: 'markdown',
+          content: { url: EMPTY_ASSET_REF },
+        },
       },
     ],
   },
@@ -83,7 +87,7 @@ describe('defaultContentAggregate', () => {
                 id: MAP_ID,
                 title: 'Map 1',
                 kind: 'positioned',
-                positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
+                positions: { [RESOURCE_ID]: { x: 0, y: 0 } },
                 graphs: [
                   {
                     id: GRAPH_ID,
@@ -100,7 +104,11 @@ describe('defaultContentAggregate', () => {
           resources: [
             {
               id: RESOURCE_ID,
-              document: { title: 'Resource 1', kind: 'markdown', content: { source: '' } },
+              document: {
+                title: 'Resource 1',
+                kind: 'markdown',
+                content: { url: EMPTY_ASSET_REF },
+              },
             },
           ],
         },

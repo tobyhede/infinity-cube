@@ -159,11 +159,6 @@ const namings = (kind: string): readonly string[] =>
  * `.scratch/resource-kind-modules/`.
  */
 const ONE_KIND_FEATURES = new Map<string, readonly string[]>([
-  // A Markdown body's completion.
-  [
-    'packages/app/src/canvas-resource-authoring.ts',
-    ["if (stored?.document.kind !== markdownKind.id) return 'retained';"],
-  ],
   // The Space glyph on the Space cluster's own controls.
   [
     'packages/app/src/components/CommandDockSpaces.tsx',

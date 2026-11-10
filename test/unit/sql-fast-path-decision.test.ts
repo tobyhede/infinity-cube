@@ -1,5 +1,6 @@
 import fc from 'fast-check';
 import {
+  EMPTY_ASSET_REF,
   COLLAPSED_RESOURCE_SIZE,
   RESOURCE_SHAPES,
   uuidSchema,
@@ -51,7 +52,7 @@ const closed = (x: number, y: number) => ({ x, y, open: false as const });
 
 const markdown = (id: UUID, title: string) => ({
   id,
-  document: { title, kind: 'markdown' as const, content: { source: `# ${title}` } },
+  document: { title, kind: 'markdown' as const, content: { url: EMPTY_ASSET_REF } },
 });
 
 const ur = (id: UUID, title: string) => ({

@@ -1,7 +1,7 @@
 import { StrictMode, useEffect, useLayoutEffect, type ReactNode } from 'react';
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type SpaceSnapshot } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
 import { createMapSurface } from '../src/map-surface';
@@ -36,7 +36,7 @@ function composition() {
     resources: [
       {
         id: RESOURCE,
-        document: { title: 'Resource 1', kind: 'markdown', content: { source: '' } },
+        document: { title: 'Resource 1', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       },
     ],
   };

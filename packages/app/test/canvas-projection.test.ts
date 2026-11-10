@@ -235,7 +235,14 @@ describe('canvasProjection', () => {
     const authoredMap = {
       ...mapOwning(DRAWN),
       positions: {
-        [RESOURCE_A]: { x: 0, y: 0, open: true, size: { width: 560, height: 420 } },
+        // A Markdown Resource is Open by its Map content (ADR 0142).
+        [RESOURCE_A]: {
+          x: 0,
+          y: 0,
+          open: false,
+          content: { open: true },
+          size: { width: 560, height: 420 },
+        },
         [RESOURCE_B]: { x: 700, y: 0, open: false, size: { width: 400, height: 300 } },
       },
     };
@@ -253,7 +260,7 @@ describe('canvasProjection', () => {
     expect(nodes.find(({ id }) => id === RESOURCE_A)).toMatchObject({
       width: 560,
       height: 420,
-      data: { open: true },
+      data: { mapContent: { open: true } },
     });
     expect(nodes.find(({ id }) => id === RESOURCE_B)).toMatchObject({
       width: 400,
@@ -292,7 +299,7 @@ describe('canvasProjection', () => {
     ]);
   });
 
-  it('gives a plugin its default where the entry stores no Map content, and other kinds none', async () => {
+  it('gives each plugin its own default where the entry stores no Map content', async () => {
     const rectangleMap = {
       ...mapOwning(DRAWN),
       positions: {
@@ -309,7 +316,7 @@ describe('canvasProjection', () => {
 
     expect(nodes.map(({ id, data }) => [id, data.shape, data.mapContent])).toEqual([
       [RESOURCE_A, 'rectangle', { shape: 'rectangle' }],
-      [RESOURCE_B, 'rectangle', undefined],
+      [RESOURCE_B, 'rectangle', { open: false }],
     ]);
   });
 });

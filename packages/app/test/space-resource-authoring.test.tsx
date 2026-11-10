@@ -9,6 +9,7 @@ import {
 } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
+  EMPTY_ASSET_REF,
   newUuid,
   spaceSnapshotSchema,
   uuidSchema,
@@ -119,7 +120,7 @@ const meta = (target: SpaceSnapshot): SpaceSnapshot => {
   const resources = [
     {
       id: META_RESOURCE_ID,
-      document: { title: 'Meta', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Meta', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
     {
       id: META_TO_HOME_ID,
@@ -187,11 +188,11 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
   resources: [
     {
       id: HOME_RESOURCE_ID,
-      document: { title: 'Start here', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Start here', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
     {
       id: HOME_NEXT_RESOURCE_ID,
-      document: { title: 'And then', kind: 'markdown', content: { source: '' } },
+      document: { title: 'And then', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
   ],
 });
@@ -230,7 +231,7 @@ const other: SpaceSnapshot = spaceSnapshotSchema.parse({
   resources: [
     {
       id: OTHER_RESOURCE_ID,
-      document: { title: 'Resource 1', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Resource 1', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
   ],
 });
@@ -245,7 +246,7 @@ const maplessOther: SpaceSnapshot = spaceSnapshotSchema.parse({
   resources: [
     {
       id: OTHER_RESOURCE_ID,
-      document: { title: 'Resource 1', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Resource 1', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
   ],
 });
@@ -466,7 +467,7 @@ describe('Create Space Resource', () => {
     const target = await backend.loadSpace(targetId);
     expect(target?.snapshot.document.title).toBe('Space 1');
     expect(target?.snapshot.resources.map((resource) => resource.document)).toEqual([
-      { title: 'Resource 1', kind: 'markdown', content: { source: '' } },
+      { title: 'Resource 1', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     ]);
     await settled(session);
   });

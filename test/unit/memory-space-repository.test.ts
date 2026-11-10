@@ -1,4 +1,4 @@
-import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import { describe, expect, it } from 'vitest';
 import { MemorySpaceRepository } from '@project/aggregate';
 import { spaceRepositoryContract } from '../support/repository-contract';
@@ -22,7 +22,7 @@ const space = (id: UUID, resourceId: UUID, title: string): SpaceSnapshot => ({
   resources: [
     {
       id: resourceId,
-      document: { title: `${title} resource`, kind: 'markdown', content: { source: '' } },
+      document: { title: `${title} resource`, kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
   ],
 });
@@ -96,7 +96,7 @@ describe('MemorySpaceRepository', () => {
           document: {
             title: 'Claimed resource',
             kind: 'markdown' as const,
-            content: { source: '' },
+            content: { url: EMPTY_ASSET_REF },
           },
         },
       ],

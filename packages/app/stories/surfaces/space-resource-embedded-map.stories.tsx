@@ -1,5 +1,11 @@
 import type { Story } from '@ladle/react';
-import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import {
+  EMPTY_ASSET_REF,
+  spaceSnapshotSchema,
+  uuidSchema,
+  type SpaceSnapshot,
+  type UUID,
+} from '@project/core';
 import { Application } from '#components/Application';
 import { storyOpening, storySpaces } from '../support/application';
 
@@ -81,9 +87,18 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
     defaultMap: TARGET_MAP_ID,
   },
   resources: [
-    { id: INTAKE_ID, document: { title: 'Intake', kind: 'markdown', content: { source: '' } } },
-    { id: STORAGE_ID, document: { title: 'Storage', kind: 'markdown', content: { source: '' } } },
-    { id: REVIEW_ID, document: { title: 'Review', kind: 'markdown', content: { source: '' } } },
+    {
+      id: INTAKE_ID,
+      document: { title: 'Intake', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+    },
+    {
+      id: STORAGE_ID,
+      document: { title: 'Storage', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+    },
+    {
+      id: REVIEW_ID,
+      document: { title: 'Review', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+    },
   ],
 });
 
@@ -131,7 +146,7 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
   resources: [
     {
       id: HOME_RESOURCE_ID,
-      document: { title: 'Start here', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Start here', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
     {
       id: SPACE_RESOURCE_ID,
@@ -240,13 +255,16 @@ const pairTarget: SpaceSnapshot = spaceSnapshotSchema.parse({
   resources: [
     {
       id: PAIR_INTAKE_ID,
-      document: { title: 'Intake', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Intake', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
     {
       id: PAIR_STORAGE_ID,
-      document: { title: 'Storage', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Storage', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
-    { id: PAIR_INDEX_ID, document: { title: 'Index', kind: 'markdown', content: { source: '' } } },
+    {
+      id: PAIR_INDEX_ID,
+      document: { title: 'Index', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+    },
   ],
 });
 

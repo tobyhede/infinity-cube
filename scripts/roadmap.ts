@@ -11,7 +11,7 @@ import {
 } from 'node:fs';
 import { basename, join, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { resourceSchema, type Resource } from '@project/core';
+import { resourceSchema } from '@project/core';
 import { serializeResource } from '@project/graph';
 
 /**
@@ -690,16 +690,17 @@ const stableRoadmapUuid = (name: string): string => {
 };
 
 /**
- * One planned issue as a Markdown Resource. Its source links the issue by a
- * path relative to `resources/`, where its sidecar is written.
+ * One planned issue as a Markdown Resource and its text, which is an asset
+ * named by its SHA-256 (ADR 0142). The text links the issue by a path relative
+ * to `assets/`, where it is written.
  */
 const markdownResource = (
   id: string,
   planned: PlannedReleaseIssue,
-  resourcesDirectory: string,
+  assetsDirectory: string,
   scratchRoot: string,
-): Resource => {
-  const issuePath = relative(resourcesDirectory, join(scratchRoot, planned.issue.path)).replaceAll(
+) => {
+  const issuePath = relative(assetsDirectory, join(scratchRoot, planned.issue.path)).replaceAll(
     sep,
     '/',
   );
@@ -707,7 +708,7 @@ const markdownResource = (
     planned.issue.unmetBlockers.length === 0
       ? 'None'
       : planned.issue.unmetBlockers.map((blocker) => `\`${blocker}\``).join(', ');
-  const source = [
+  const text = [
     `# ${planned.issue.title}`,
     '',
     `- **Reference:** \`${planned.reference}\``,
@@ -718,12 +719,14 @@ const markdownResource = (
     `[Open issue](${issuePath})`,
     '',
   ].join('\n');
-  return resourceSchema.parse({
+  const hash = createHash('sha256').update(text).digest('base64url');
+  const resource = resourceSchema.parse({
     id,
     title: `${planned.reference} — ${planned.issue.title}`,
     kind: 'markdown',
-    content: { source },
+    content: { url: `/assets/${hash}` },
   });
+  return { resource, text, hash };
 };
 
 /** Generate one ordinary Space that dogfoods the open release dependency graph. */
@@ -753,20 +756,25 @@ export const writeReleaseSpace = (
   };
 
   const resourcesDirectory = join(destination, 'resources');
-  rmSync(resourcesDirectory, { recursive: true, force: true });
-  mkdirSync(resourcesDirectory, { recursive: true });
-  // Each issue as its Resource file and Markdown sidecar, at the paths
-  // `serializeResource` gives them relative to the Space directory (ADR 0128).
+  const assetsDirectory = join(destination, 'assets');
+  for (const directory of [resourcesDirectory, assetsDirectory]) {
+    rmSync(directory, { recursive: true, force: true });
+    mkdirSync(directory, { recursive: true });
+  }
+  // Each issue as its Resource file, at the path `serializeResource` gives it
+  // relative to the Space directory (ADR 0128), and its text as an asset in
+  // `assets/` beside it (ADR 0142).
   for (const planned of issues) {
-    const resource = markdownResource(
+    const { resource, text, hash } = markdownResource(
       resourceId(planned.reference),
       planned,
-      resourcesDirectory,
+      assetsDirectory,
       scratchRoot,
     );
     for (const file of serializeResource(resource)) {
       writeFileSync(join(destination, file.path), file.text);
     }
+    writeFileSync(join(assetsDirectory, `${hash}.md`), text);
   }
 
   const criticalReferences = new Set(plan.criticalSubgraph.map(({ reference }) => reference));
@@ -790,17 +798,11 @@ export const writeReleaseSpace = (
       if (criticalReferences.has(planned.reference)) {
         const slot = criticalSlotByDepth.get(planned.depth) ?? 0;
         criticalSlotByDepth.set(planned.depth, slot + 1);
-        return [
-          resourceId(planned.reference),
-          { x: slot * 420, y: planned.depth * 300, open: false },
-        ];
+        return [resourceId(planned.reference), { x: slot * 420, y: planned.depth * 300 }];
       }
       const slot = parallelSlotByDepth.get(planned.depth) ?? 0;
       parallelSlotByDepth.set(planned.depth, slot + 1);
-      return [
-        resourceId(planned.reference),
-        { x: 460 + slot * 420, y: planned.depth * 300, open: false },
-      ];
+      return [resourceId(planned.reference), { x: 460 + slot * 420, y: planned.depth * 300 }];
     }),
   );
 

@@ -341,7 +341,6 @@ export function ResourceNode({
   );
   const toolbarVisible =
     ((visuallySelected && !otherSelected) ||
-      display.shown === 'editing' ||
       (isSpaceOperations(kindOperations) && kindOperations.portal?.editing === true)) &&
     !dragging &&
     !resizeActive;
@@ -350,12 +349,13 @@ export function ResourceNode({
    * and at a constant screen size, as React Flow's `NodeToolbar` draws them. The
    * offset is screen pixels and the top anchor reaches half its diameter above
    * the Resource in canvas units, so the offset scales with it to keep the
-   * toolbar clear of the anchor at every zoom.
+   * toolbar clear of the anchor at every zoom. A plugin holding a Claim keeps
+   * them up, as a running edit does, because they carry the edit's ends.
    */
-  const renderToolbar = (toolbar: ReactNode) =>
+  const renderToolbar = (toolbar: ReactNode, held = false) =>
     toolbar === null ? null : (
       <NodeToolbar
-        isVisible={toolbarVisible}
+        isVisible={toolbarVisible || (held && !dragging && !resizeActive)}
         position={Position.Top}
         align="end"
         offset={(AUTHORING_HANDLE_DIAMETER / 2) * zoom + 6}

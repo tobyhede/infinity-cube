@@ -18,6 +18,7 @@ import type { ImageSources } from '../src/image-creation';
 import { holdExclusive, type HeldExclusive } from './held-exclusive';
 import { unusedImageSources } from './image-sources';
 import { createPluginGate } from '../src/plugin-host/plugin-gate';
+import { textAsset } from './markdown-texts';
 
 /**
  * The rules that decide a browser history entry, proved without a DOM.
@@ -71,8 +72,14 @@ const snapshot: SpaceSnapshot = {
     defaultMap: MAP_ID,
   },
   resources: [
-    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
-    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', content: { source: 'B' } } },
+    {
+      id: RESOURCE_A,
+      document: { title: 'A', kind: 'markdown', content: { url: textAsset('A') } },
+    },
+    {
+      id: RESOURCE_B,
+      document: { title: 'B', kind: 'markdown', content: { url: textAsset('B') } },
+    },
   ],
 };
 
@@ -94,7 +101,10 @@ const selfEdge: SpaceSnapshot = {
     defaultMap: MAP_ID,
   },
   resources: [
-    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
+    {
+      id: RESOURCE_A,
+      document: { title: 'A', kind: 'markdown', content: { url: textAsset('A') } },
+    },
   ],
 };
 

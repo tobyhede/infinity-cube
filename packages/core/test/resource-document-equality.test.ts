@@ -1,14 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
-  imageKind,
-  markdownFileContentSchema,
-  markdownKind,
-  referenceKind,
+  EMPTY_ASSET_REF,
   resourceDocumentSchema,
   resourceFileSchema,
   resourceSchema,
-  spaceKind,
-  urKind,
 } from '../src/index';
 
 /**
@@ -16,7 +11,7 @@ import {
  * its stored document and its Resource file each parse `content` through the
  * registered kind's schema, so the three doors answer one rule. What differs
  * is the envelope: the document has no id, and the file is strict and holds
- * the kind's file content, which for Markdown is a locator.
+ * the content as the Resource does: Markdown names its text by asset URL.
  */
 const RESOURCE_ID = '00000000-0000-4000-8000-000000000001';
 const TARGET_ID = '00000000-0000-4000-8000-000000000002';
@@ -45,7 +40,7 @@ const asWritten = [
   { title: 'Box', kind: 'ur', content: {} },
 ] as const;
 
-const markdown = { title: 'Prose', kind: 'markdown', content: { source: '# Prose' } } as const;
+const markdown = { title: 'Prose', kind: 'markdown', content: { url: EMPTY_ASSET_REF } } as const;
 
 /** A document as it arrives at a door, before one has read it. */
 interface Draft {
@@ -168,22 +163,16 @@ describe("each kind's content is parsed by its module at every door", () => {
   });
 });
 
-describe("a Resource file holds the kind's file content", () => {
-  it("parses a kind whose file holds its content as it is with that kind's own schema", () => {
-    for (const kind of [imageKind, referenceKind, spaceKind, urKind]) {
-      expect(kind.file.contentSchema, kind.id).toBe(kind.contentSchema);
-    }
-  });
-
-  it("holds a Markdown Resource's sidecar locator in place of its source", () => {
-    expect(markdownKind.file.contentSchema).toBe(markdownFileContentSchema);
+describe('a Resource file holds the content as the Resource does', () => {
+  it("holds a Markdown Resource's text by URL alone, refusing a sidecar locator or a source", () => {
     const locator = { path: `${RESOURCE_ID}.md`, mediaType: 'text/markdown' };
+    expect(resourceFileSchema.safeParse({ ...markdown, id: RESOURCE_ID }).success).toBe(true);
     expect(
       resourceFileSchema.safeParse({ ...markdown, id: RESOURCE_ID, content: locator }).success,
-    ).toBe(true);
-    expect(resourceFileSchema.safeParse({ ...markdown, id: RESOURCE_ID }).success).toBe(false);
+    ).toBe(false);
     expect(
-      resourceSchema.safeParse({ ...markdown, id: RESOURCE_ID, content: locator }).success,
+      resourceFileSchema.safeParse({ ...markdown, id: RESOURCE_ID, content: { source: '# Prose' } })
+        .success,
     ).toBe(false);
   });
 

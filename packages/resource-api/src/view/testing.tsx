@@ -8,15 +8,19 @@ import {
 } from 'react';
 import { render, type RenderResult } from '@testing-library/react';
 import type { Answer, AssetRef, Size } from '../domain';
-import { createRailStore, ResourceHostProvider, type ResourceHost } from './host';
-import type {
-  Assets,
-  Exclusive,
-  OwnClaim,
-  OwnProps,
-  PluginViewProps,
-  Surface,
-  TitleProps,
+import {
+  createRailStore,
+  ResourceHostProvider,
+  type Assets,
+  type Exclusive,
+  type OwnClaim,
+  type OwnProps,
+  type PluginViewProps,
+  type RenderedMarkdownProps,
+  type ResourceHost,
+  type SourceEditorProps,
+  type Surface,
+  type TitleProps,
 } from './index';
 
 /**
@@ -46,6 +50,10 @@ export interface Commits<C, M> {
   readonly exclusive: number;
   /** How many times the picker was opened. */
   readonly picked: number;
+  /** The size hint each Map content commit carried, in order, `undefined` where it carried none. */
+  readonly hints: (Size | undefined)[];
+  /** How many Claims were taken and released. */
+  readonly claims: { taken: number; released: number };
 }
 
 export interface RenderPluginOptions<C, M> {
@@ -68,10 +76,10 @@ export interface RenderPluginOptions<C, M> {
   /** Whether a granted `claim()` is refused, as the chain refuses one. */
   readonly claimRefused?: boolean;
   /**
-   * What a granted store answers in place of storing the bytes: a store whose
-   * host cannot be reached rejects.
+   * The asset store the surface reaches, over one that reads nothing. `store`
+   * and `pick` are offered only where granted.
    */
-  readonly storing?: (bytes: Blob) => Promise<AssetRef | { readonly refused: string }>;
+  readonly assets?: Partial<Assets>;
 }
 
 export type RenderedPlugin<C, M> = RenderResult & { readonly commits: Commits<C, M> };
@@ -126,21 +134,36 @@ function createTestGate() {
   };
 }
 
-/**
- * One Claim per surface, as a host's chain holds one per drawing: taking it
- * again answers the same Claim, and one release ends it, so exclusive work
- * asked for after that answers busy.
- */
-function createClaimHold() {
-  let held = false;
-  return {
-    held: () => held,
-    take: () => {
-      held = true;
-    },
-    release: () => {
-      held = false;
-    },
+/** Markdown drawn as its text, so a plugin's test reads what it was given. */
+function TestRenderedMarkdown({ markdown, className }: RenderedMarkdownProps) {
+  return (
+    <div className={className} data-testid="rendered-markdown">
+      {markdown}
+    </div>
+  );
+}
+
+/** A source editor drawn as a text area. */
+function TestSourceEditor({ value, onValueChange, ariaLabel, autoFocus }: SourceEditorProps) {
+  return (
+    <textarea
+      aria-label={ariaLabel}
+      value={value}
+      ref={(element) => {
+        if (autoFocus === true) element?.focus();
+      }}
+      onChange={(event) => onValueChange(event.target.value)}
+    />
+  );
+}
+
+function TestTitle({ title }: { readonly title: string }) {
+  return function Title({ className }: TitleProps) {
+    return (
+      <h2 className={className} data-testid="plugin-title">
+        {title}
+      </h2>
+    );
   };
 }
 
@@ -178,6 +201,7 @@ function TestRail({ host }: { readonly host: ReturnType<typeof createRailStore> 
             key={command.id}
             type="button"
             aria-label={command.label}
+            aria-keyshortcuts={command.keyshortcuts}
             disabled={command.disabled === true}
             onClick={command.run}
           >
@@ -226,6 +250,8 @@ export function renderPlugin<C, M>(
     get picked() {
       return pickerOpenings;
     },
+    hints: [],
+    claims: { taken: 0, released: 0 },
   };
   const grants = options.grants ?? {};
   const answer: Answer = options.answer ?? 'completed';
@@ -245,9 +271,13 @@ export function renderPlugin<C, M>(
   const hold = createClaimHold();
   /** A commit answering refused when `live` says it is not, as the host's withdrawn and ended commits do. */
   const guarded =
-    <T, A>(commit: (next: T) => Promise<A>, live: () => boolean, refusal: { refused: string }) =>
-    (next: T): Promise<A | { readonly refused: string }> =>
-      live() ? commit(next) : Promise.resolve(refusal);
+    <T, O, A>(
+      commit: (next: T, options?: O) => Promise<A>,
+      live: () => boolean,
+      refusal: { refused: string },
+    ) =>
+    (next: T, options?: O): Promise<A | { readonly refused: string }> =>
+      live() ? commit(next, options) : Promise.resolve(refusal);
 
   function Harness() {
     const [title, setTitle] = useState(options.title ?? 'Resource');
@@ -255,65 +285,63 @@ export function renderPlugin<C, M>(
     const [mapValue, setMapValue] = useState(options.map);
     const rail = useMemo(() => createRailStore(), []);
     const running = useSyncExternalStore(gate.subscribe, gate.running);
-    const host: ResourceHost = useMemo(() => ({ Title: TestTitle, Own: TestOwn, rail }), [rail]);
-    // One set of commits while what is offered stays the same, as a host keeps
-    // its own, so a plugin keying work on a commit sees what a host gives it.
-    const offeredNow = useMemo(() => {
-      const settle =
-        <T,>(record: T[], apply: (next: T) => void) =>
-        (next: T) => {
-          record.push(next);
-          if (answer === 'completed') apply(next);
-          return Promise.resolve(answer);
-        };
-      const granted = {
-        title: grants.title === true ? settle(commits.title, setTitle) : undefined,
-        content: grants.content === true ? settle(commits.content, setContent) : undefined,
-        map: grants.map === true ? settle(commits.map, setMapValue) : undefined,
-        store: grants.store === true ? store : undefined,
+    const host: ResourceHost = useMemo(
+      () => ({
+        Title: TestTitle({ title }),
+        Own: TestOwn,
+        rail,
+        RenderedMarkdown: TestRenderedMarkdown,
+        SourceEditor: TestSourceEditor,
+      }),
+      [rail, title],
+    );
+    const settle =
+      <T,>(record: T[], apply: (next: T) => void) =>
+      (next: T) => {
+        record.push(next);
+        if (answer === 'completed') apply(next);
+        return Promise.resolve(answer);
       };
-      const idle = () => !gate.running();
-      const offered = <T,>(commit: T | undefined) => (running ? undefined : commit);
-      const plain = <T, A>(commit: ((next: T) => Promise<A>) | undefined) =>
-        offered(commit === undefined ? undefined : guarded(commit, idle, WITHDRAWN));
-      const claim: OwnClaim<C, M> = {
-        release: () => hold.release(),
-        exclusively: (work) => {
-          if (!hold.held()) return Promise.resolve('busy' as const);
-          return gate.exclusively((live) => {
-            exclusiveRuns += 1;
-            const ownCommit = <T, A>(commit: ((next: T) => Promise<A>) | undefined) =>
-              commit === undefined ? undefined : guarded(commit, live, ENDED);
-            const own: Exclusive<C, M> = {
-              title: ownCommit(granted.title),
-              content: ownCommit(granted.content),
-              map: ownCommit(granted.map),
-              store: ownCommit(granted.store),
-            };
-            return work(own);
-          });
-        },
-      };
-      const assets: Assets = {
-        ...TEST_ASSETS,
-        store: plain(granted.store),
-        pick: grants.pick === true ? offered(pick) : undefined,
-      };
-      return {
-        title: plain(granted.title),
-        content: plain(granted.content),
-        map: plain(granted.map),
-        claim:
-          grants.claim === true
-            ? () => {
-                if (options.claimRefused === true) return undefined;
-                hold.take();
-                return claim;
-              }
-            : undefined,
-        assets,
-      };
-    }, [running]);
+    const titleCommit = settle(commits.title, setTitle);
+    const contentCommit = settle(commits.content, setContent);
+    const mapSettle = settle(commits.map, setMapValue);
+    const mapCommit = (next: M, hint?: { readonly sizeHint?: Size }) => {
+      commits.hints.push(hint?.sizeHint);
+      return mapSettle(next);
+    };
+    const granted = {
+      title: grants.title === true ? titleCommit : undefined,
+      content: grants.content === true ? contentCommit : undefined,
+      map: grants.map === true ? mapCommit : undefined,
+      store: grants.store === true ? (options.assets?.store ?? store) : undefined,
+    };
+    const idle = () => !gate.running();
+    const offered = <T,>(commit: T | undefined) => (running ? undefined : commit);
+    const plain = <T, O, A>(commit: ((next: T, options?: O) => Promise<A>) | undefined) =>
+      offered(commit === undefined ? undefined : guarded(commit, idle, WITHDRAWN));
+    const claim: OwnClaim<C, M> = {
+      release: () => true,
+      exclusively: (work) =>
+        gate.exclusively((live) => {
+          exclusiveRuns += 1;
+          const ownCommit = <T, O, A>(
+            commit: ((next: T, options?: O) => Promise<A>) | undefined,
+          ) => (commit === undefined ? undefined : guarded(commit, live, ENDED));
+          const own: Exclusive<C, M> = {
+            title: ownCommit(granted.title),
+            content: ownCommit(granted.content),
+            map: ownCommit(granted.map),
+            store: ownCommit(granted.store),
+          };
+          return work(own);
+        }),
+    };
+    const assets: Assets = {
+      url: options.assets?.url ?? TEST_ASSETS.url,
+      read: options.assets?.read ?? TEST_ASSETS.read,
+      store: plain(granted.store),
+      pick: grants.pick === true ? offered(pick) : undefined,
+    };
     const surface: Surface<C, M> = {
       resource: { id: 'resource', title, kind: options.kind ?? 'test', content },
       title: { value: title, commit: offeredNow.title },
@@ -321,8 +349,21 @@ export function renderPlugin<C, M>(
       map: { value: mapValue, commit: offeredNow.map },
       size: options.size ?? DEFAULT_SIZE,
       selected: options.selected ?? false,
-      claim: offeredNow.claim,
-      assets: offeredNow.assets,
+      claim:
+        grants.claim === true
+          ? () => {
+              if (options.claimRefused === true) return undefined;
+              commits.claims.taken += 1;
+              return {
+                ...claim,
+                release: () => {
+                  commits.claims.released += 1;
+                  return claim.release();
+                },
+              };
+            }
+          : undefined,
+      assets,
       Embed: TestEmbed,
     };
     return (

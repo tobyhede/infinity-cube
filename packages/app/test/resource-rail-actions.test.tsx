@@ -25,6 +25,7 @@ import { mountSpace } from './space-mounting';
 import { RESOURCE_HEIGHT, RESOURCE_WIDTH } from '../src/resource';
 import { unusedImageSources } from './image-sources';
 import { stubResizeObserver } from './resize-observer';
+import { textAsset } from './markdown-texts';
 
 /**
  * A Resource's own commands belong to the Resource (ADR 0073, ADR 0082).
@@ -78,11 +79,11 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
   resources: [
     {
       id: RESOURCE_ID,
-      document: { title: 'A', kind: 'markdown', content: { source: 'A source' } },
+      document: { title: 'A', kind: 'markdown', content: { url: textAsset('A source') } },
     },
     {
       id: OTHER_RESOURCE_ID,
-      document: { title: 'B', kind: 'markdown', content: { source: 'B source' } },
+      document: { title: 'B', kind: 'markdown', content: { url: textAsset('B source') } },
     },
   ],
 });
@@ -216,7 +217,8 @@ const openedA = () =>
             [RESOURCE_ID]: {
               x: 0,
               y: 0,
-              open: true,
+              open: false,
+              content: { open: true },
               size: { width: RESOURCE_WIDTH, height: RESOURCE_HEIGHT },
             },
           },
@@ -344,7 +346,8 @@ describe('a Resource’s commands on the canvas rail', () => {
     expectMenuGroups(menu, [
       ['Create Reference'],
       ['Connect to Resource'],
-      ['Open and Expand', 'Read in Full View', 'Present from Here'],
+      // No Open and Expand: a Markdown Resource's Open is its plugin's (ADR 0142).
+      ['Read in Full View', 'Present from Here'],
       ['Copy link to Resource in Map', 'Copy link to Resource'],
       ['Remove from Map', 'Delete from Space'],
     ]);
@@ -557,21 +560,21 @@ describe('a Resource’s commands on the canvas rail', () => {
    * A body edit holds Shift+Enter and Space, not the commands they run: the
    * rail still offers Open and Expand and Read in Full View while one is open.
    */
-  it('keeps Open and Expand and Read in Full View while the Resource’s body is edited', async () => {
+  it('keeps Read in Full View while the Resource’s body is edited, offering no Open and Expand for a Markdown Resource', async () => {
     const session = mount(undefined, undefined, openedA());
 
     await selectResource('A');
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
     expect(await screen.findByRole('menuitem', { name: 'Read in Full View' })).toBeVisible();
-    expect(screen.getByRole('menuitem', { name: 'Open and Expand' })).toBeVisible();
+    // A Markdown Resource's Open is its plugin's, so the host offers no Open of its own (ADR 0142).
+    expect(screen.queryByRole('menuitem', { name: 'Open and Expand' })).toBeNull();
     fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
 
-    fireEvent.click(await screen.findByRole('button', { name: /^Edit .* of A$/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Markdown source of A' }));
     await screen.findByRole('textbox', { name: /of A$/ });
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
 
     expect(await screen.findByRole('menuitem', { name: 'Read in Full View' })).toBeVisible();
-    expect(screen.getByRole('menuitem', { name: 'Open and Expand' })).toBeVisible();
     await settled(session);
   });
 
@@ -685,7 +688,13 @@ describe('a Resource’s commands on the canvas rail', () => {
             ...snapshot.document.maps?.[0],
             positions: {
               ...snapshot.document.maps?.[0]?.positions,
-              [RESOURCE_ID]: { x: 0, y: 0, open: true, size: { width, height } },
+              [RESOURCE_ID]: {
+                x: 0,
+                y: 0,
+                open: false,
+                content: { open: true },
+                size: { width, height },
+              },
             },
           },
         ],
@@ -1193,7 +1202,7 @@ describe('Connect to Resource in a Resource’s Actions menu', () => {
       ...snapshot.resources,
       {
         id: REFERENCE_ID,
-        document: { title: 'C', kind: 'markdown', content: { source: 'C source' } },
+        document: { title: 'C', kind: 'markdown', content: { url: textAsset('C source') } },
       },
     ],
   });

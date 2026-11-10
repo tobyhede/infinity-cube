@@ -149,9 +149,6 @@ const context = (overrides: Partial<DecorationContext> = {}): DecorationContext 
   editingTitleResourceId: null,
   completeResourceTitle: () => null,
   clearCaret: () => undefined,
-  beginBodyEditing: () => undefined,
-  bodyEditorResourceId: null,
-  completeResourceBody: () => 'completed',
   continuation,
   containingSpaceId: SPACE_ID,
   spaceSelections: new Map([
@@ -176,7 +173,7 @@ const context = (overrides: Partial<DecorationContext> = {}): DecorationContext 
 describe('decorateSharedResourceNode', () => {
   it('offers Open, title editing and entity actions on a Resource of the working Space', () => {
     const patch = decorateSharedResourceNode(
-      projectionNode(RESOURCE_ID, 'markdown'),
+      projectionNode(RESOURCE_ID, 'reference'),
       context({ resourceEntityActions: () => [] }),
     );
     expect(patch.onOpenChange).toBeTypeOf('function');
@@ -213,43 +210,11 @@ describe('decorateSharedResourceNode', () => {
 
   it('withholds competing title controls while a body caret is live', () => {
     const patch = decorateSharedResourceNode(
-      projectionNode(RESOURCE_ID, 'markdown', true),
+      projectionNode(RESOURCE_ID, 'reference', true),
       context({ bodyEditing: true }),
     );
     expect(patch.onBeginTitleEditing).toBeUndefined();
     expect(patch.onOpenChange).toBeTypeOf('function');
-  });
-
-  it('keeps the live content editor’s Close drawn, and inert, while authoring is withdrawn', () => {
-    const openResource = vi.fn(() => 'completed' as const);
-    const closeResource = vi.fn(() => 'completed' as const);
-    const withdrawn = context({
-      authorOnCanvas: false,
-      bodyEditing: true,
-      bodyEditorResourceId: RESOURCE_ID,
-      openResource,
-      closeResource,
-      resourceEntityActions: () => [[]],
-    });
-
-    const patch = decorateSharedResourceNode(
-      projectionNode(RESOURCE_ID, 'markdown', true),
-      withdrawn,
-    );
-    expect(patch.onOpenChange).toBeTypeOf('function');
-    expect(patch.onOpenChange?.(false)).toBe('retained');
-    expect(patch.onOpenChange?.(true)).toBe('retained');
-    expect(closeResource).not.toHaveBeenCalled();
-    expect(openResource).not.toHaveBeenCalled();
-    expect(patch.onBeginTitleEditing).toBeUndefined();
-    expect(patch.resize).toBeUndefined();
-    expect(patch.titleEditor).toBeUndefined();
-    expect(patch.entityActions).toEqual([]);
-
-    expect(
-      decorateSharedResourceNode(projectionNode(REFERENCE_ID, 'markdown', true), withdrawn)
-        .onOpenChange,
-    ).toBeUndefined();
   });
 
   it('withholds every authoring control from a projected Resource absent from the working Space', () => {
@@ -379,44 +344,75 @@ describe('an Ur Resource’s decoration', () => {
 });
 
 describe('decorateMarkdownResourceNode', () => {
-  it('offers body editing where the canvas is authored', () => {
-    const beginBodyEditing = vi.fn();
-    const markdown = ofKind(projectionNode(RESOURCE_ID, 'markdown', true), 'markdown');
-    const { kindOperations } = decorateMarkdownResourceNode(
-      markdown,
-      context({ beginBodyEditing }),
-    );
-    expect(kindOperations.onBeginEdit).toBeTypeOf('function');
-    kindOperations.onBeginEdit?.();
-    expect(beginBodyEditing).toHaveBeenCalledWith(markdown);
-    expect(
-      decorateMarkdownResourceNode(markdown, context({ authorOnCanvas: false })).kindOperations
-        .onBeginEdit,
-    ).toBeUndefined();
+  const EMPTY_TEXT = '/assets/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU';
+  const NEXT_TEXT = '/assets/BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBA';
+  const markdown = () => ofKind(projectionNode(RESOURCE_ID, 'markdown', true), 'markdown');
+  const hostWith = (complete: PluginHost['complete']): PluginHost => ({
+    gate: createPluginGate(),
+    replacementEpoch: () => 0,
+    complete,
+    report: () => undefined,
+    document: (resourceId) =>
+      resourceId === RESOURCE_ID
+        ? { title: 'Notes', kind: 'markdown', content: { url: EMPTY_TEXT } }
+        : undefined,
   });
 
-  it('enters the editing display, focused, on an Open Resource whose caret is live', () => {
-    const markdown = ofKind(projectionNode(RESOURCE_ID, 'markdown', true), 'markdown');
-    const patch = decorateMarkdownResourceNode(
-      markdown,
-      context({ bodyEditorResourceId: RESOURCE_ID }),
-    );
-    expect(patch.display).toMatchObject({
-      shown: 'editing',
-      kind: 'markdown',
-      content: { kind: 'markdown', via: 'self' },
-      edit: { autoFocus: true },
-    });
-    expect(decorateMarkdownResourceNode(markdown, context()).display).toBeUndefined();
+  /**
+   * The canvas holds no editing state for a Markdown Resource (ADR 0142): its
+   * decoration is the plugin's commits and Claim, and never a display.
+   */
+  it('offers the plugin its commits and a Claim where the canvas is authored, and no display', () => {
+    const pluginHost = hostWith(vi.fn((): AuthoringResult => ({ kind: 'completed' })));
+    const patch = decorateMarkdownResourceNode(markdown(), context({ pluginHost }));
+    expect(patch).not.toHaveProperty('display');
+    expect(patch.kindOperations.commitContent).toBeTypeOf('function');
+    expect(patch.kindOperations.commitTitle).toBeTypeOf('function');
+    expect(patch.kindOperations.commitMap).toBeTypeOf('function');
+    expect(patch.kindOperations.claim).toBeTypeOf('function');
+    for (const withheld of [
+      context({ pluginHost, authorOnCanvas: false }),
+      context({ pluginHost, editableResourceIds: new Set() }),
+      context(),
+    ]) {
+      const withheldOperations = decorateMarkdownResourceNode(markdown(), withheld).kindOperations;
+      expect(withheldOperations.commitContent).toBeUndefined();
+      expect(withheldOperations.commitTitle).toBeUndefined();
+      expect(withheldOperations.commitMap).toBeUndefined();
+      expect(withheldOperations.claim).toBeUndefined();
+    }
   });
 
-  it('leaves a Closed Resource’s display alone although its caret is live', () => {
-    expect(
-      decorateMarkdownResourceNode(
-        ofKind(projectionNode(RESOURCE_ID, 'markdown'), 'markdown'),
-        context({ bodyEditorResourceId: RESOURCE_ID }),
-      ).display,
-    ).toBeUndefined();
+  it('commits content as one changed-content Edit carrying its URL', async () => {
+    const complete = vi.fn((): AuthoringResult => ({ kind: 'completed' }));
+    const { commitContent } = decorateMarkdownResourceNode(
+      markdown(),
+      context({ pluginHost: hostWith(complete) }),
+    ).kindOperations;
+    await expect(commitContent?.({ url: NEXT_TEXT })).resolves.toBe('completed');
+    expect(complete).toHaveBeenCalledOnce();
+    expect(complete).toHaveBeenCalledWith(
+      { kind: 'changed-content', resourceId: RESOURCE_ID, content: { url: NEXT_TEXT } },
+      expect.any(Function),
+    );
+  });
+
+  it('commits a Title as an Edit of the stored document', async () => {
+    const complete = vi.fn((): AuthoringResult => ({ kind: 'completed' }));
+    const { commitTitle } = decorateMarkdownResourceNode(
+      markdown(),
+      context({ pluginHost: hostWith(complete) }),
+    ).kindOperations;
+    await expect(commitTitle?.('Renamed')).resolves.toBe('completed');
+    expect(complete).toHaveBeenCalledWith(
+      {
+        kind: 'edited-resource',
+        resourceId: RESOURCE_ID,
+        document: { title: 'Renamed', kind: 'markdown', content: { url: EMPTY_TEXT } },
+      },
+      expect.any(Function),
+    );
+    expect(complete).toHaveBeenCalledOnce();
   });
 });
 

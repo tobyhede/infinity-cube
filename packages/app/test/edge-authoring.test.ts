@@ -19,6 +19,7 @@ import { mintingIds } from './minting';
 import { node } from './render-adapter-fixtures';
 import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
+import { textAsset } from './markdown-texts';
 
 /**
  * Edge Authoring through its own interface: the one draft, what cancels it, what
@@ -56,9 +57,18 @@ const automaticSnapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: { version: 1, title: 'Space' },
   resources: [
-    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
-    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', content: { source: 'B' } } },
-    { id: RESOURCE_C, document: { title: 'C', kind: 'markdown', content: { source: 'C' } } },
+    {
+      id: RESOURCE_A,
+      document: { title: 'A', kind: 'markdown', content: { url: textAsset('A') } },
+    },
+    {
+      id: RESOURCE_B,
+      document: { title: 'B', kind: 'markdown', content: { url: textAsset('B') } },
+    },
+    {
+      id: RESOURCE_C,
+      document: { title: 'C', kind: 'markdown', content: { url: textAsset('C') } },
+    },
   ],
 };
 
@@ -824,7 +834,13 @@ describe('connecting from the Connect list', () => {
                 ...m,
                 positions: {
                   ...m.positions,
-                  [RESOURCE_A]: { x: 10, y: 20, open: true, size: { width: 560, height: 420 } },
+                  [RESOURCE_A]: {
+                    x: 10,
+                    y: 20,
+                    open: false,
+                    content: { open: true },
+                    size: { width: 560, height: 420 },
+                  },
                 },
               }
             : m,

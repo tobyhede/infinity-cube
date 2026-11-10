@@ -8,7 +8,7 @@ import {
   spaceSelectionProblem,
   type ResourceDocument,
 } from '../src/kinds/registry';
-import { EMPTY_MARKDOWN } from '../src/kinds/markdown';
+import { EMPTY_ASSET_REF } from '../src/assets';
 import { referenceKind } from '../src/kinds/reference';
 import { spaceKind, type SpaceSelectionTarget } from '../src/kinds/space';
 import { uuidSchema } from '../src/schema';
@@ -41,7 +41,11 @@ const SPACE_RESOURCE: ResourceDocument = {
   kind: spaceKind.id,
   content: selecting(MAP, GRAPH),
 };
-const MARKDOWN: ResourceDocument = { title: 'Notes', kind: 'markdown', content: EMPTY_MARKDOWN };
+const MARKDOWN: ResourceDocument = {
+  title: 'Notes',
+  kind: 'markdown',
+  content: { url: EMPTY_ASSET_REF },
+};
 const REFERENCE: ResourceDocument = {
   title: 'Recap',
   kind: referenceKind.id,

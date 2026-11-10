@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import { isPluginKind, type ResourceShape } from '@project/core';
+import { isPluginKind, PLUGINS, type ResourceShape } from '@project/core';
 import {
   CanvasResource,
   CLOSED_DISPLAY,
@@ -50,13 +50,20 @@ export function CanvasResourceSpecimen({
 }: CanvasResourceSpecimenProps) {
   const kindOperations: KindOperations = { kind };
   if (isPluginKind(kind)) {
+    // A fresh Resource of the kind, in the Shape asked for where its Map content takes one.
+    const plugin = PLUGINS.find((entry) => entry.kind === kind);
+    const askedMapContent = plugin?.mapContent.schema.safeParse({ shape: resourceShape });
     const drawn = (
       <PluginResource
         resourceId={`specimen-${kind}`}
         kind={kind}
         title={{ title, readOnly: true, onReturnFocus: () => undefined }}
-        content={{}}
-        mapContent={{ shape: resourceShape }}
+        content={plugin?.newContent ?? {}}
+        mapContent={
+          askedMapContent?.success === true
+            ? askedMapContent.data
+            : (plugin?.mapContent.default ?? {})
+        }
         outline={resourceShape}
         size={size}
         state={state}

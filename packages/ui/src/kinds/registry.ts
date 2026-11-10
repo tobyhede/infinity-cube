@@ -11,7 +11,7 @@ import {
 } from '@project/core';
 import { imageView } from './image';
 import type { CanvasArea, ContentCommand, KindView } from './kind-view';
-import { markdownView, type MarkdownEdit, type MarkdownOperations } from './markdown';
+import { markdownView } from './markdown';
 import { referenceView, type ReferenceOperations } from './reference';
 import { spaceView, type SpaceOperations } from './space';
 import type { PluginOperations } from './plugin-views';
@@ -19,20 +19,11 @@ import { urView } from './ur';
 
 /** What each kind offers beyond its shared Title, by its id. */
 export interface KindOperationsByKind {
-  [markdownKind.id]: MarkdownOperations;
+  [markdownKind.id]: PluginOperations;
   [referenceKind.id]: ReferenceOperations;
   [imageKind.id]: PluginOperations;
   [urKind.id]: PluginOperations;
   [spaceKind.id]: SpaceOperations;
-}
-
-/**
- * What an edit running in a Resource's content area holds, by the id of each
- * kind whose own content is edited there; the display carries it while the
- * edit runs.
- */
-export interface KindEditByKind {
-  [markdownKind.id]: MarkdownEdit;
 }
 
 /**

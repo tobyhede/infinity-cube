@@ -1,4 +1,10 @@
-import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import {
+  EMPTY_ASSET_REF,
+  spaceSnapshotSchema,
+  uuidSchema,
+  type SpaceSnapshot,
+  type UUID,
+} from '@project/core';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { loadSpaceAggregate, type SpaceAggregateError } from '../src/index';
 
@@ -18,7 +24,7 @@ type StoredResource = SpaceSnapshot['resources'][number];
 
 const markdown = (id: UUID, title = id): StoredResource => ({
   id,
-  document: { title, kind: 'markdown', content: { source: '' } },
+  document: { title, kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
 });
 
 /**

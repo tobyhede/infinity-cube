@@ -163,12 +163,15 @@ export type AuthoringCompletion =
    * Change Map content: what one Resource's plugin keeps for it on the Map the
    * Edit is written into (ADR 0142), as an Ur Resource keeps its Shape (ADR
    * 0121). Its plugin's schema decides what is accepted; the value the plugin is
-   * already given there is `unchanged`.
+   * already given there is `unchanged`. `size` is a plugin's size hint as the
+   * canvas capped it, applied in the same Edit on an entry with no stored size,
+   * floored and displacing as a Resize does.
    */
   | {
       readonly kind: 'changed-map-content';
       readonly resourceId: ResourceId;
       readonly content: JsonValue;
+      readonly size?: { readonly width: number; readonly height: number } | undefined;
     }
   | {
       readonly kind: 'connected-resources';
@@ -1324,6 +1327,7 @@ export function createSpaceAuthoring({
         mapId,
         completion.resourceId,
         completion.content,
+        completion.size,
       );
       if (outcome.kind !== 'completed') return notCompleted(outcome);
       snapshot = outcome.snapshot;

@@ -1,4 +1,5 @@
 import {
+  EMPTY_ASSET_REF,
   uuidSchema,
   type GraphEdge,
   type GraphHeadShape,
@@ -75,7 +76,7 @@ const FOURTH_GRAPH_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000025')
 
 const resource = (id: UUID, title: string) => ({
   id,
-  document: { title, kind: 'markdown' as const, content: { source: title } },
+  document: { title, kind: 'markdown' as const, content: { url: EMPTY_ASSET_REF } },
 });
 
 /**
@@ -673,7 +674,7 @@ export const spaceRepositoryContract = (
         resources: [
           {
             id: RESOURCE_ID,
-            document: { title: 'Resource', kind: 'markdown', content: { source: 'Body' } },
+            document: { title: 'Resource', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
           },
         ],
       };
@@ -683,7 +684,7 @@ export const spaceRepositoryContract = (
         resources: [
           {
             id: RESOURCE_ID,
-            document: { content: { source: 'Body' }, kind: 'markdown', title: 'Resource' },
+            document: { content: { url: EMPTY_ASSET_REF }, kind: 'markdown', title: 'Resource' },
           },
         ],
       };
@@ -1010,7 +1011,7 @@ export const spaceRepositoryContract = (
             document: {
               title: 'Figure',
               kind: 'image',
-              content: { url: '/assets/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU' },
+              content: { url: EMPTY_ASSET_REF },
             },
           },
         ],

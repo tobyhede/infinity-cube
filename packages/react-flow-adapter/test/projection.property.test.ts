@@ -1,7 +1,7 @@
 import fc from 'fast-check';
 import { Position } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
-import { uuidSchema, type Resource, type UUID } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type Resource, type UUID } from '@project/core';
 import {
   buildGraphRenderEdges,
   loadSpace,
@@ -241,7 +241,7 @@ function withKinds(
                 }
               : chosen === 'ur'
                 ? { id, title, kind: 'ur', content: {} }
-                : { id, title, kind: 'markdown', content: { source: `Body ${index}\n` } };
+                : { id, title, kind: 'markdown', content: { url: EMPTY_ASSET_REF } };
       if (resource.kind !== 'reference') owners.push(id);
       return serializeResource(resource);
     });

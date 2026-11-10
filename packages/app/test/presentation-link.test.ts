@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { uuidSchema, type ResourceId, type SpaceSnapshot, type UUID } from '@project/core';
+import {
+  EMPTY_ASSET_REF,
+  uuidSchema,
+  type ResourceId,
+  type SpaceSnapshot,
+  type UUID,
+} from '@project/core';
 import {
   MemorySpaceBackend,
   openSpaceSession,
@@ -72,7 +78,7 @@ const snapshot: SpaceSnapshot = {
   },
   resources: [OPENING, LEFT, RIGHT, CLOSING].map((id, index) => ({
     id,
-    document: { title: `Slide ${index}`, kind: 'markdown', content: { source: '' } },
+    document: { title: `Slide ${index}`, kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
   })),
 };
 

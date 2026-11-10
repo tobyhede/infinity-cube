@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { uuidSchema } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema } from '@project/core';
 import type { UUID } from '@project/core';
 import type { LoadedSpace, SpaceBackend } from '../src/index';
 
@@ -30,7 +30,7 @@ export const contractLoaded: LoadedSpace = {
     resources: [
       {
         id: RESOURCE_ID,
-        document: { title: 'A', kind: 'markdown', content: { source: 'Original' } },
+        document: { title: 'A', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       },
     ],
   },

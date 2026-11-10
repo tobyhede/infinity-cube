@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { newUuid, uuidSchema, type ImageNaturalSize, type SpaceSnapshot } from '@project/core';
+import {
+  EMPTY_ASSET_REF,
+  newUuid,
+  uuidSchema,
+  type ImageNaturalSize,
+  type SpaceSnapshot,
+} from '@project/core';
 import { productDestinationPath } from '@project/http';
 import { MemorySpaceBackend } from '@project/persistence';
 import { createSpaceStartup } from '../src/space';
@@ -15,7 +21,10 @@ const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: { version: 1, title: 'Measurement' },
   resources: [
-    { id: RESOURCE_ID, document: { kind: 'markdown', title: 'Notes', content: { source: '' } } },
+    {
+      id: RESOURCE_ID,
+      document: { kind: 'markdown', title: 'Notes', content: { url: EMPTY_ASSET_REF } },
+    },
   ],
 };
 

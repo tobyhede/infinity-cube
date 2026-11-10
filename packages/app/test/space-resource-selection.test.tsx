@@ -9,6 +9,7 @@ import {
 } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
+  EMPTY_ASSET_REF,
   spaceSnapshotSchema,
   uuidSchema,
   type SpaceResourceDocument,
@@ -116,7 +117,7 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
   resources: [
     {
       id: TARGET_RESOURCE_ID,
-      document: { title: 'Resource 1', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Resource 1', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
   ],
 });
@@ -152,7 +153,7 @@ const home = (spaceResource: SpaceResourceDocument): SpaceSnapshot =>
     resources: [
       {
         id: HOME_RESOURCE_ID,
-        document: { title: 'Start here', kind: 'markdown', content: { source: '' } },
+        document: { title: 'Start here', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       },
       { id: SPACE_RESOURCE_ID, document: spaceResource },
     ],
@@ -200,7 +201,7 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
   resources: [
     {
       id: META_RESOURCE_ID,
-      document: { title: 'Meta', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Meta', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
     {
       id: META_TO_HOME_ID,

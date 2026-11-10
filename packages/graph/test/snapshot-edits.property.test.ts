@@ -1,6 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
+  EMPTY_ASSET_REF,
   COLLAPSED_RESOURCE_SIZE,
   RESOURCE_SHAPES,
   resourceSize,
@@ -46,10 +47,19 @@ const titleArb = fc
   .string({ minLength: 1, maxLength: 12 })
   .filter((s) => s.trim().length > 0 && !s.includes('\n'));
 
-const markdownDocument = (title: string): ResourceDocument => ({
+/** The Ur Resource every openable Reference Resource targets, held by no Map. */
+const TARGET_ID = uuid('00000000-0000-4000-8000-0000000000f0');
+const target = { id: TARGET_ID, document: { title: 'Target', kind: 'ur', content: {} } } as const;
+
+/**
+ * A document of a kind the Map stores Open for: a Reference Resource. A
+ * Markdown Resource keeps Open in its plugin's Map content, and an Image or Ur
+ * Resource is never Open (ADR 0142).
+ */
+const openableDocument = (title: string): ResourceDocument => ({
   title,
-  kind: 'markdown',
-  content: { source: '' },
+  kind: 'reference',
+  content: { target: TARGET_ID },
 });
 
 /** A chain Edge through every consecutive pair, so an interior Resource carries incident Edges on both sides. */
@@ -64,6 +74,13 @@ const chainEdges = (ids: readonly UUID[]): GraphEdge[] => {
 };
 
 /** One Map owning one Graph over every generated Resource, at the given positions. */
+/** A Markdown Resource's document, whose Open is its plugin's Map content (ADR 0142). */
+const markdownDocument = (title: string): ResourceDocument => ({
+  title,
+  kind: 'markdown',
+  content: { url: EMPTY_ASSET_REF },
+});
+
 /** An Ur Resource's document, the one kind a Map may draw in any Shape (ADR 0121). */
 const urDocument = (title: string): ResourceDocument => ({ title, kind: 'ur', content: {} });
 
@@ -71,7 +88,7 @@ const baseSnapshot = (
   ids: readonly UUID[],
   positions: Record<UUID, ResourcePlacement>,
   edges: readonly GraphEdge[] = [],
-  documentOf: (title: string) => ResourceDocument = markdownDocument,
+  documentOf: (title: string) => ResourceDocument = openableDocument,
 ): SpaceSnapshot => ({
   id: SPACE_ID,
   document: {
@@ -88,7 +105,10 @@ const baseSnapshot = (
       },
     ],
   },
-  resources: ids.map((id, index) => ({ id, document: documentOf(`Resource ${index}`) })),
+  resources: [
+    ...ids.map((id, index) => ({ id, document: documentOf(`Resource ${index}`) })),
+    target,
+  ],
 });
 
 const closedPlacement = (ids: readonly UUID[], coords: readonly number[]): Placement =>
@@ -258,10 +278,13 @@ describe('deletionReach properties', () => {
           defaultMap: documentMaps[0]?.id ?? MAP_ID,
           maps: documentMaps,
         },
-        resources: resourceIds.map((id, index) => ({
-          id,
-          document: markdownDocument(`Resource ${index}`),
-        })),
+        resources: [
+          ...resourceIds.map((id, index) => ({
+            id,
+            document: openableDocument(`Resource ${index}`),
+          })),
+          target,
+        ],
       };
       const subject = resourceIds[subjectSeed % resourceIds.length] ?? resourceIds[0];
       return { snapshot, subject };
@@ -362,11 +385,11 @@ describe('SnapshotEdit.createInMap properties', () => {
     );
   });
 
-  /** The document a Target of `kind` replaces the base Markdown Resource with, if any. */
+  /** The document a Target of `kind` replaces the base Resource with. */
   const contentOwningTarget = (kind: 'markdown' | 'space' | 'ur'): ResourceDocument | undefined => {
     switch (kind) {
       case 'markdown':
-        return undefined;
+        return { title: 'Prose', kind: 'markdown', content: { url: EMPTY_ASSET_REF } };
       case 'space':
         return {
           title: 'Nested',
@@ -475,7 +498,7 @@ describe('SnapshotEdit.createInMap properties', () => {
             baseSnapshot(ids, positions),
             MAP_ID,
             newResourceId,
-            markdownDocument('New'),
+            openableDocument('New'),
             anchor,
             'exact',
           );
@@ -513,7 +536,7 @@ describe('SnapshotEdit.createInMap properties', () => {
             snapshot,
             missingMapId,
             newResourceId,
-            markdownDocument('New'),
+            openableDocument('New'),
             { x: 0, y: 0 },
             'avoidingOverlap',
           );
@@ -539,7 +562,7 @@ describe('SnapshotEdit.createInMap properties', () => {
           snapshot,
           MAP_ID,
           newResourceId,
-          markdownDocument('New'),
+          openableDocument('New'),
           anchor,
           'avoidingOverlap',
         );
@@ -597,7 +620,7 @@ describe('SnapshotEdit.open, close and resize properties', () => {
    * either with the wrong kind.
    */
   type GeneratedEntry = {
-    readonly kind: 'ur' | 'markdown';
+    readonly kind: 'ur' | 'reference' | 'markdown';
     readonly x: number;
     readonly y: number;
     readonly open: boolean;
@@ -652,7 +675,7 @@ describe('SnapshotEdit.open, close and resize properties', () => {
         shape: fc.option(fc.constantFrom(...RESOURCE_SHAPES), { nil: undefined }),
       })
       .map((generated): GeneratedEntry => ({
-        kind: generated.ur ? 'ur' : 'markdown',
+        kind: generated.ur ? 'ur' : 'reference',
         x: generated.x,
         y: generated.y,
         open: !generated.ur && generated.open,
@@ -678,9 +701,9 @@ describe('SnapshotEdit.open, close and resize properties', () => {
   ): readonly GeneratedEntry[] =>
     entries.map((entry, index) => (index === at ? { ...entry, ...change } : entry));
 
-  /** The entries with the subject a Markdown Resource, which may be Open. */
-  const markdownSubject = (entries: readonly GeneratedEntry[], at: number) =>
-    with_(entries, at, { kind: 'markdown', shape: undefined });
+  /** The entries with the subject a Reference Resource, which may be Open. */
+  const openableSubject = (entries: readonly GeneratedEntry[], at: number) =>
+    with_(entries, at, { kind: 'reference', shape: undefined });
 
   const snapshotOf = (entries: readonly GeneratedEntry[]): SpaceSnapshot => {
     const positions: Record<UUID, ResourcePlacement> = {};
@@ -694,7 +717,9 @@ describe('SnapshotEdit.open, close and resize properties', () => {
       resources: base.resources.map((resource, index) =>
         entries[index]?.kind === 'ur'
           ? { id: resource.id, document: urDocument(resource.document.title) }
-          : resource,
+          : entries[index]?.kind === 'markdown'
+            ? { id: resource.id, document: markdownDocument(resource.document.title) }
+            : resource,
       ),
     };
   };
@@ -761,7 +786,7 @@ describe('SnapshotEdit.open, close and resize properties', () => {
       fc.property(entriesArb, subjectArb, (generated, subjectIndex) => {
         const subjectId = RESOURCE_IDS[subjectIndex];
         if (subjectId === undefined) return;
-        const start = snapshotOf(markdownSubject(generated, subjectIndex));
+        const start = snapshotOf(openableSubject(generated, subjectIndex));
         const startAt = positionsOf(start)[subjectId];
 
         const opened = settled(start, SnapshotEdit.open(start, MAP_ID, subjectId));
@@ -849,7 +874,7 @@ describe('SnapshotEdit.open, close and resize properties', () => {
       fc.property(entriesArb, subjectArb, sizeArb, (generated, subjectIndex, size) => {
         const subjectId = RESOURCE_IDS[subjectIndex];
         if (subjectId === undefined) return;
-        const start = snapshotOf(markdownSubject(generated, subjectIndex));
+        const start = snapshotOf(openableSubject(generated, subjectIndex));
         const outcome = SnapshotEdit.openAndExpand(start, MAP_ID, subjectId, size);
 
         const opened = settled(start, SnapshotEdit.open(start, MAP_ID, subjectId));
@@ -874,7 +899,7 @@ describe('SnapshotEdit.open, close and resize properties', () => {
           const subjectId = RESOURCE_IDS[subjectIndex];
           if (subjectId === undefined) return;
           const start = snapshotOf(
-            with_(markdownSubject(generated, subjectIndex), subjectIndex, { open: false }),
+            with_(openableSubject(generated, subjectIndex), subjectIndex, { open: false }),
           );
           const grown = completed(SnapshotEdit.openAndExpand(start, MAP_ID, subjectId, size));
           const at = positionsOf(grown)[subjectId];
@@ -979,7 +1004,7 @@ describe('SnapshotEdit.open, close and resize properties', () => {
             current = settled(current, SnapshotEdit.resize(current, MAP_ID, subjectId, size));
             expect(resourceShapesOf(current)).toEqual(resourceShapes);
           }
-          if (entries[subjectIndex]?.kind === 'markdown') {
+          if (entries[subjectIndex]?.kind === 'reference') {
             current = settled(current, SnapshotEdit.open(current, MAP_ID, subjectId));
             expect(resourceShapesOf(current)).toEqual(resourceShapes);
           }
@@ -1059,14 +1084,80 @@ describe('SnapshotEdit.open, close and resize properties', () => {
     );
   });
 
+  /** The entries with the subject a Closed Markdown Resource storing no size. */
+  const markdownSubject = (entries: readonly GeneratedEntry[], at: number) =>
+    with_(entries, at, { kind: 'markdown', open: false, size: undefined, shape: undefined });
+
+  /** A size hint as a plugin might ask: any size, some below the Closed Size, some fractional. */
+  const hintArb = fc.record({
+    width: fc.double({ min: 0, max: 1200, noNaN: true }),
+    height: fc.double({ min: 0, max: 1200, noNaN: true }),
+  });
+
+  /** The Resize's answer, read as the completed Open it follows when it changed nothing. */
+  const settledOutcome = (
+    snapshot: SpaceSnapshot,
+    outcome: SnapshotEditOutcome,
+  ): SnapshotEditOutcome =>
+    outcome.kind === 'unchanged' ? { kind: 'completed', snapshot } : outcome;
+
+  it('applies a Map content Edit’s size hint as a Resize does, floored at the Closed Size', () => {
+    fc.assert(
+      fc.property(entriesArb, subjectArb, hintArb, (generated, subjectIndex, hint) => {
+        const subjectId = RESOURCE_IDS[subjectIndex];
+        if (subjectId === undefined) return;
+        const start = snapshotOf(markdownSubject(generated, subjectIndex));
+        const opened = completed(
+          SnapshotEdit.changeMapContent(start, MAP_ID, subjectId, { open: true }),
+        );
+        const floored = {
+          width: Math.max(Math.round(hint.width), COLLAPSED_RESOURCE_SIZE.width),
+          height: Math.max(Math.round(hint.height), COLLAPSED_RESOURCE_SIZE.height),
+        };
+        // One Edit: the content, then the size it hints at with the displacement
+        // that size causes, exactly as the Resize it stands for.
+        expect(
+          SnapshotEdit.changeMapContent(start, MAP_ID, subjectId, { open: true }, hint),
+        ).toEqual(settledOutcome(opened, SnapshotEdit.resize(opened, MAP_ID, subjectId, floored)));
+      }),
+      { seed: SEED, numRuns: RUNS },
+    );
+  });
+
+  it('ignores a size hint on an entry that already stores a size, and on content that is unchanged', () => {
+    fc.assert(
+      fc.property(
+        entriesArb,
+        subjectArb,
+        sizeArb,
+        hintArb,
+        (generated, subjectIndex, stored, hint) => {
+          const subjectId = RESOURCE_IDS[subjectIndex];
+          if (subjectId === undefined) return;
+          const sized = snapshotOf(
+            with_(markdownSubject(generated, subjectIndex), subjectIndex, { size: stored }),
+          );
+          expect(
+            SnapshotEdit.changeMapContent(sized, MAP_ID, subjectId, { open: true }, hint),
+          ).toEqual(SnapshotEdit.changeMapContent(sized, MAP_ID, subjectId, { open: true }));
+          const closed = snapshotOf(markdownSubject(generated, subjectIndex));
+          expect(
+            SnapshotEdit.changeMapContent(closed, MAP_ID, subjectId, { open: false }, hint),
+          ).toEqual({ kind: 'unchanged' });
+        },
+      ),
+      { seed: SEED, numRuns: RUNS },
+    );
+  });
+
   it('refuses Map content for a kind no plugin draws, and content its plugin refuses', () => {
     fc.assert(
       fc.property(entriesArb, subjectArb, (generated, subjectIndex) => {
         const subjectId = RESOURCE_IDS[subjectIndex];
         if (subjectId === undefined) return;
-        const markdown = snapshotOf(markdownSubject(generated, subjectIndex));
+        const image = snapshotOf(openableSubject(generated, subjectIndex));
         expect(
-          SnapshotEdit.changeMapContent(markdown, MAP_ID, subjectId, { shape: 'rectangle' }),
+          SnapshotEdit.changeMapContent(image, MAP_ID, subjectId, { shape: 'rectangle' }),
         ).toEqual({ kind: 'refused', refusal: { code: 'map-content-not-kept' } });
         const ur = snapshotOf(with_(generated, subjectIndex, { kind: 'ur', open: false }));
         for (const content of [{ shape: 'hexagon' }, 'pill', null, {}]) {

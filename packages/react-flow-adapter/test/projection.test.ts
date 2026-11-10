@@ -14,6 +14,7 @@ import {
 import { imageFile, jsonResourceFile, referenceFile, resourceFile } from './resource-files';
 import { ACTIVE_LANE_SPACING, GRAPH_LANE_SPACING } from '../src/edge-lanes';
 import { uuid } from './uuid';
+import { textAsset } from './markdown-texts';
 
 function load(
   input: unknown,
@@ -132,13 +133,32 @@ describe('projectResourceNodes', () => {
           expect(nodes.find((node) => node.id === referenceId)?.data.display).toEqual({
             shown: 'closed',
           });
+        // A Markdown Resource's plugin edits its own content (ADR 0142).
         expect(nodes.find((node) => node.id === targetId)?.data).toMatchObject({
-          authorsContent: true,
+          authorsContent: kind === 'space',
           embedsMap: kind === 'space',
         });
       }
     },
   );
+
+  /**
+   * Open is the Markdown plugin's Map content (ADR 0142): an entry that stores
+   * none is drawn with the plugin's default, Closed, whoever draws the Map and
+   * whether or not it may be authored, and one Map's Open is not another's.
+   */
+  it('draws a fresh Markdown Resource Closed, and each Map with its own Open', () => {
+    const a = uuid('00000000-0000-4000-8000-000000000002');
+    const nodes = projectResourceNodes(space);
+    expect(nodes.find((n) => n.id === a)?.data.mapContent).toEqual({ open: false });
+    const opened = projectResourceNodes(space, {
+      mapContent: (id) => (id === a ? { open: true } : undefined),
+    });
+    expect(opened.find((n) => n.id === a)?.data.mapContent).toEqual({ open: true });
+    expect(opened.filter((n) => n.id !== a).map((n) => n.data.mapContent)).not.toContainEqual({
+      open: true,
+    });
+  });
 
   it('maps resources to resource nodes carrying the title, not the content', () => {
     const nodes = projectResourceNodes(space);
@@ -315,7 +335,11 @@ describe('projectResourceNodes', () => {
       open: true,
       display: {
         shown: 'open',
-        content: { kind: 'markdown', source: '## Authored once', via: 'target' },
+        content: {
+          kind: 'markdown',
+          content: { url: textAsset('## Authored once') },
+          via: 'target',
+        },
       },
     });
   });
@@ -383,7 +407,7 @@ describe('projectResourceNodes display', () => {
     const openResourceIds = new Set([markdownId, imageId, referenceId]);
     expect(display(markdownId, { openResourceIds })).toStrictEqual({
       shown: 'open',
-      content: { kind: 'markdown', source: '## Authored once', via: 'self' },
+      content: { kind: 'markdown', content: { url: textAsset('## Authored once') }, via: 'self' },
     });
     expect(display(imageId, { openResourceIds })).toStrictEqual({
       shown: 'open',

@@ -17,18 +17,12 @@ export {
   CANVAS_RESOURCE_DRAG_TILT_DEGREES,
   canvasResourceContentOverflow,
 } from './CanvasResource';
-export { atRest, CLOSED_DISPLAY } from './resource-display';
-export { beginEditing } from './kinds/markdown';
+export { CLOSED_DISPLAY } from './resource-display';
 export { isSpaceOperations, spaceViewOf } from './kinds/space';
-export type { OwnContent, ResourceDisplay } from './resource-display';
+export type { ResourceDisplay } from './resource-display';
 export { InlineTitleEditor } from './InlineTitleEditor';
 export type { InlineTitleEditorProps, InlineTitleEditorVariant } from './InlineTitleEditor';
-export type {
-  CanvasResourceBodyEditor,
-  KindOperations,
-  CanvasResourceProps,
-  CanvasResourceState,
-} from './CanvasResource';
+export type { KindOperations, CanvasResourceProps, CanvasResourceState } from './CanvasResource';
 export { SpaceResourceSelectors } from './SpaceResourceSelectors';
 export { RailChoiceMenu } from './RailChoiceMenu';
 export type { RailChoiceMenuProps } from './RailChoiceMenu';

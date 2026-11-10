@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { importSpaceFileSchema, importSpaceSchema, spaceSnapshotSchema } from '../src/index';
+import { EMPTY_ASSET_REF } from '../src/assets';
 
 const SPACE_ID = '00000000-0000-4000-8000-000000000001';
 const RESOURCE_A = '00000000-0000-4000-8000-000000000002';
@@ -29,11 +30,11 @@ const identified = {
   resources: [
     {
       id: RESOURCE_A,
-      document: { title: 'A', kind: 'markdown' as const, content: { source: 'A' } },
+      document: { title: 'A', kind: 'markdown' as const, content: { url: EMPTY_ASSET_REF } },
     },
     {
       id: RESOURCE_B,
-      document: { title: 'B', kind: 'markdown' as const, content: { source: 'B' } },
+      document: { title: 'B', kind: 'markdown' as const, content: { url: EMPTY_ASSET_REF } },
     },
   ],
 };

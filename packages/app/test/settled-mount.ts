@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react';
-import { act, render, type RenderResult } from '@testing-library/react';
+import { act, queries, render, type RenderResult } from '@testing-library/react';
+import { TestAssets } from './markdown-texts';
 
 /**
  * Render, and let the mount finish before answering.
@@ -13,11 +14,13 @@ import { act, render, type RenderResult } from '@testing-library/react';
  * mount's queued work has run. The unowned-update guard `vitest.setup.ts`
  * installs is what holds this: a canvas test that mounts with a bare `render`
  * fails on the slider's report.
+ *
+ * It draws inside the test asset store, so a Markdown Resource reads its text.
  */
 export const mountSettled = async (ui: ReactElement): Promise<RenderResult> => {
   let view: RenderResult | undefined;
   await act(async () => {
-    view = render(ui);
+    view = render(ui, { wrapper: TestAssets, queries });
     await Promise.resolve();
   });
   if (view === undefined) throw new Error('render answered nothing');

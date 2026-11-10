@@ -79,6 +79,13 @@ export const isStoredAsset = (answer: StoreAnswer): answer is AssetRef =>
 export const assetRefSchema = z.string().refine(isAssetRef, 'An asset reference.');
 
 /**
+ * The asset of zero bytes, which always exists (ADR 0142): a Resource whose
+ * bytes are empty names it, so creating one stores nothing and stays
+ * synchronous. It is the SHA-256 of nothing.
+ */
+export const EMPTY_ASSET: AssetRef = '/assets/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU';
+
+/**
  * The outlines the canvas strokes a Resource's border and ring on (ADR 0135,
  * ADR 0139). Each touches the midpoint of every side of the rect, where Edges
  * attach.

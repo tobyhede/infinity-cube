@@ -10,6 +10,7 @@ import {
 import { NoEmbed, pluginEntryFor, type PluginEntry } from './kinds/plugin-views';
 import { readingAssets, usePluginAssets } from './plugin-assets';
 import { ResourceFailureBoundary } from './ResourceFailureBoundary';
+import { HostRenderedMarkdown, HostSourceEditor } from './ResourceTextHost';
 
 /**
  * The Stage's host for a Resource a plugin draws (ADR 0142): the frame is the
@@ -66,12 +67,18 @@ export function PresentedPluginSurface(
   const supplied = usePluginAssets();
   const assets = useMemo(() => readingAssets(supplied), [supplied]);
   const name = titleName(title);
-  const [host] = useState((): ResourceHost => ({
-    Title: StageTitle,
-    Own: StageOwn,
-    rail: createRailStore(),
-  }));
-  const [drawing] = useState(() => Symbol('drawing'));
+  const host: ResourceHost = useMemo(() => {
+    function StageTitle({ className }: TitleProps) {
+      return <h2 className={['resource__title', className].filter(Boolean).join(' ')}>{name}</h2>;
+    }
+    return {
+      Title: StageTitle,
+      Own: StageOwn,
+      rail: createRailStore(),
+      RenderedMarkdown: HostRenderedMarkdown,
+      SourceEditor: HostSourceEditor,
+    };
+  }, [name]);
   const plugin = props.entry.render({
     resourceId: props.resourceId,
     kind,
@@ -118,29 +125,36 @@ const EMBEDDED_ROOM = {
 
 export interface EmbeddedPluginContentProps {
   readonly kind: PluginKind;
-  /** The Title the embedding passes, which the plugin draws as it draws any. */
+  /** The Title the embedding passes, which the plugin is given as its name; the frame draws it. */
   readonly title: string;
   /** The embedded Resource's content, which its plugin's schema parses. */
   readonly content: unknown;
 }
 
+/** The embedded plugin's Title: the frame around it draws the Reference's own, so at most one draws. */
+function NoTitle() {
+  return null;
+}
+
 /**
- * Another Resource's plugin drawn inside a Resource's content area, as an Open
- * Reference Resource draws its Target (ADR 0070, ADR 0142): on a surface
- * offering no authoring of the Target, with the Reference's own Title, and
- * filling the room it is given.
+ * Another Resource's plugin drawn inside the old frame's content area, as an
+ * Open Reference Resource draws its Target (ADR 0070, ADR 0142): on a surface
+ * offering no authoring of the Target, given the Reference's own Title as its
+ * name, drawing no Title of its own, and filling the room it is given.
  */
 export function EmbeddedPluginContent({ kind, title, content }: EmbeddedPluginContentProps) {
   const supplied = usePluginAssets();
   const assets = useMemo(() => readingAssets(supplied), [supplied]);
-  const [drawing] = useState(() => Symbol('drawing'));
-  const name = titleName(title);
-  const host: ResourceHost = useMemo(() => {
-    function EmbeddedTitle({ className }: TitleProps) {
-      return <h2 className={className}>{name}</h2>;
-    }
-    return { Title: EmbeddedTitle, Own: StageOwn, rail: createRailStore() };
-  }, [name]);
+  const host: ResourceHost = useMemo(
+    () => ({
+      Title: NoTitle,
+      Own: StageOwn,
+      rail: createRailStore(),
+      RenderedMarkdown: HostRenderedMarkdown,
+      SourceEditor: HostSourceEditor,
+    }),
+    [],
+  );
   const plugin = pluginEntryFor(kind).render({
     resourceId: '',
     drawing,

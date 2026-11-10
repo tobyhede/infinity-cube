@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { COLLAPSED_RESOURCE_SIZE } from './resource-geometry';
 import {
   contentParser,
-  fileContentParser,
   isRegisteredKind,
   KIND_IDS,
   kindFlags,
@@ -133,24 +132,17 @@ export const resourceSchema: z.ZodType<Resource, z.ZodTypeDef, unknown> = envelo
  * `docs/schema/resource/` specifies it: the envelope is strict, and so is
  * every kind's content schema, so a key no kind declares is refused, naming
  * it, and no authored key is dropped on intake (ADR 0127). `kind` is
- * required, and the content is the kind's file content, which its file codec
- * maps to the document's.
+ * required, and the content is the Resource's content as its kind's schema
+ * parses it, the same value a store holds (ADR 0142).
  */
 export const resourceFileSchema: z.ZodType<ResourceFileDocument, z.ZodTypeDef, unknown> = enveloped(
   z
     .object({ id: idSchema, title: resourceTitleSchema, kind: z.string(), content: z.unknown() })
     .strict(),
-  fileContentParser,
+  contentParser,
 );
 
 const declaredKindSchema = z.object({ kind: z.string() });
-const declaredIdSchema = z.object({ id: z.string() });
-
-/** The `id` a Resource file's JSON declares, when it is an object declaring a string one. */
-export const declaredId = (json: unknown): string | undefined => {
-  const parsed = declaredIdSchema.safeParse(json);
-  return parsed.success ? parsed.data.id : undefined;
-};
 
 /** The `kind` a Resource file's JSON declares, when it is an object declaring a string one. */
 export const declaredKind = (json: unknown): string | undefined => {
@@ -273,9 +265,6 @@ export const resourceShapeSchema = z.enum(RESOURCE_SHAPES);
 
 /** Whether a Resource of this kind may be Open, as its kind declares (ADR 0122). */
 export const takesOpen = (kind: KindId): boolean => kindFlags(kind).canOpen;
-
-/** Whether Opening a never-resized Resource of this kind grows it to its content, as its kind declares. */
-export const opensToFit = (kind: KindId): boolean => kindFlags(kind).opensToFit;
 
 /**
  * What a Map stores for one Resource: its origin, and optionally whether it is

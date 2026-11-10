@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   resourceSize,
   spaceSnapshotSchema,
@@ -23,7 +24,11 @@ export interface Workload {
   readonly editedResources: number;
   readonly unrelatedSpaces: number;
   readonly unrelatedResources: number;
-  /** Characters in each Markdown Resource body. */
+  /**
+   * Characters in each Markdown Resource's text. The text is an asset its
+   * content names by URL (ADR 0142), so it changes which URL is stored and not
+   * the size of the stored document.
+   */
   readonly bodyLength: number;
 }
 
@@ -47,6 +52,10 @@ const body = (title: string, length: number): string => {
   const text = PARAGRAPH.repeat(Math.ceil(length / PARAGRAPH.length) + 1);
   return `${heading}${text}`.slice(0, Math.max(length, heading.length));
 };
+
+/** The URL of the asset a text is, named by its SHA-256 as the asset store names it. */
+const textUrl = (text: string): `/assets/${string}` =>
+  `/assets/${createHash('sha256').update(text).digest('base64url')}`;
 
 const COLUMNS = 10;
 
@@ -95,7 +104,7 @@ const ordinarySpace = (
       document: {
         title: `Resource ${index + 1}`,
         kind: 'markdown',
-        content: { source: body(`Resource ${index + 1}`, bodyLength) },
+        content: { url: textUrl(body(`Resource ${index + 1}`, bodyLength)) },
       },
     })),
   });
@@ -264,7 +273,7 @@ export const applyEdit = (
                 ...resource,
                 document: {
                   ...resource.document,
-                  content: { source: `${resource.document.content.source}\n\nEdit ${sample}.` },
+                  content: { url: textUrl(`${resource.document.content.url}\n\nEdit ${sample}.`) },
                 },
               };
         }),
@@ -337,7 +346,7 @@ export const applyEdit = (
             document: {
               title: `Added ${sample}`,
               kind: 'markdown',
-              content: { source: `# Added ${sample}` },
+              content: { url: textUrl(`# Added ${sample}`) },
             },
           },
         ],

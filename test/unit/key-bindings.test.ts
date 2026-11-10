@@ -6,14 +6,11 @@ import { describe, expect, it } from 'vitest';
 import { KEY_BINDINGS } from '../key-bindings';
 
 const repoRoot = join(import.meta.dirname, '../..');
-/** The app and UI packages, and every Resource plugin package, whose views read keys too. */
-const sourceRoots: readonly string[] = [
+const sourceRoots = [
   'packages/app/src',
   'packages/ui/src',
-  ...readdirSync(join(repoRoot, 'packages'))
-    .filter((name) => name.startsWith('plugin-'))
-    .map((name) => `packages/${name}/src`),
-];
+  'packages/plugin-markdown/src',
+] as const;
 
 interface DiscoveredBinding {
   readonly module: string;
@@ -274,8 +271,8 @@ describe('discoverBindings', () => {
 describe('the authored keyboard-binding inventory', () => {
   /**
    * A binding is a repository-authored key comparison, a keymap entry, or a
-   * React Flow `*KeyCode` prop value in `packages/app/src`, `packages/ui/src` or
-   * a Resource plugin package's `src`.
+   * React Flow `*KeyCode` prop value in `packages/app/src`, `packages/ui/src`
+   * or a plugin's view, as `packages/plugin-markdown/src`.
    * Primitive-internal handling is outside these trees and therefore out of
    * scope. Comments, documentation, `aria-keyshortcuts` and handlers that only
    * propagate an event do not bind a key and are not scanned.

@@ -16,12 +16,12 @@ const NOTES_MAP = uuidSchema.parse('00000000-0000-4000-8000-000000000081');
  * The Spaces on disk, loaded exactly as authored.
  *
  * A space is a directory, not a file (ADR 0020): the space file holds
- * structure, and every Resource is a Resource file under `resources/`, a
- * Markdown Resource's source the sidecar beside it. So this reads
- * every Resource file and every `.md` in the directory, as intake would be
- * handed them, and is the regression test that the Resource files are still
- * authored correctly: a malformed Resource file, a missing sidecar or a `.md`
- * no Resource file names fails here.
+ * structure, and every Resource is a Resource file under `resources/`. A
+ * Markdown Resource's text is an asset its content names (ADR 0142), held in
+ * the aggregate's `assets/`. So this reads every Resource file, as intake
+ * would be handed them, and is the regression test that the Resource files are
+ * still authored correctly: a malformed Resource file, or a Markdown Resource
+ * whose text has no file, fails here.
  *
  * The tracked fixture is a complete aggregate: Meta is the Map fixture, and
  * the ordinary Spaces hang off it. `example/` is dormant and nothing else would
@@ -29,14 +29,20 @@ const NOTES_MAP = uuidSchema.parse('00000000-0000-4000-8000-000000000081');
  */
 
 const spaceDirs = import.meta.glob<string>(
-  [
-    '../fixture/**/*.md',
-    '../fixture/*/resources/*.json',
-    '../example/**/*.md',
-    '../example/resources/*.json',
-  ],
+  ['../fixture/*/resources/*.json', '../example/resources/*.json'],
   { query: '?raw', import: 'default', eager: true },
 );
+
+/** Every Markdown text the two aggregates hold, keyed by path. */
+const texts = import.meta.glob<string>(['../fixture/assets/*.md', '../example/assets/*.md'], {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+});
+
+/** The text an asset reference names in the aggregate `dir` belongs to. */
+const textOf = (dir: string, url: string): string | undefined =>
+  texts[`../${dir.split('/')[0]}/assets/${url.slice('/assets/'.length)}.md`];
 
 /** The resource files of one space directory, keyed the way the plugin serves them. */
 function resourceFiles(dir: string): ResourceFile[] {
@@ -164,11 +170,10 @@ describe.each([
     const result = loadSpace(json, resourceFiles(name));
     if (!result.ok) throw new Error(result.errors.map((e) => e.message).join('\n'));
     expect(result.space.resources).toHaveLength(expected.resources);
-    // A reference resource shows its target's content, so it has no body of its own (ADR
-    // 0009); every markdown resource carries one, read from its sidecar.
+    // Every Markdown Resource names a text its aggregate holds, and none is empty.
     for (const resource of result.space.resources) {
-      if (resource.kind !== 'markdown') expect('body' in resource).toBe(false);
-      else expect(resource.content.source.trim().length).toBeGreaterThan(0);
+      if (resource.kind !== 'markdown') continue;
+      expect(textOf(name, resource.content.url)?.trim().length ?? 0).toBeGreaterThan(0);
     }
   });
 });

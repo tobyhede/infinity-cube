@@ -1,12 +1,12 @@
-import { uuidSchema, type Resource, type UUID } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type Resource, type UUID } from '@project/core';
 import type { ResourceFile } from '../src/index';
 
 /**
  * A Resource's files as an author writes them: its Resource file
- * `resources/<id>.json`, and for a Markdown Resource the `<id>.md` sidecar its
- * locator names. Tests build these rather than resource objects, because that
- * is what `loadSpace` takes. Each helper returns every file of one Resource, so
- * a list of Resources is spread into one list of files.
+ * `resources/<id>.json`, a Markdown Resource's naming the asset that holds its
+ * text (ADR 0142). Tests build these rather than resource objects, because
+ * that is what `loadSpace` takes. Each helper returns every file of one
+ * Resource, so a list of Resources is spread into one list of files.
  *
  * The JSON is written here with `JSON.stringify` rather than through
  * `serializeResource`, so the tests exercise intake against files the codec
@@ -27,12 +27,9 @@ function file(id: string, title: string, kind: string, content: Json): ResourceF
 export function resourceFile(
   id: string,
   title = defaultTitle(id),
-  body = '',
+  url: string = EMPTY_ASSET_REF,
 ): readonly ResourceFile[] {
-  return [
-    file(id, title, 'markdown', { path: `${id}.md`, mediaType: 'text/markdown' }),
-    { path: `resources/${id}.md`, text: body },
-  ];
+  return [file(id, title, 'markdown', { url })];
 }
 
 /** Any kind's Resource file, its content written as given. */
@@ -59,8 +56,8 @@ export function imageFile(id: string, title: string, url: string): readonly Reso
  * ever reached it.
  */
 
-export function resource(id: string, title = defaultTitle(id), body = ''): Resource {
-  return { id: uuid(id), title, kind: 'markdown', content: { source: body } };
+export function resource(id: string, title = defaultTitle(id)): Resource {
+  return { id: uuid(id), title, kind: 'markdown', content: { url: EMPTY_ASSET_REF } };
 }
 
 export const uuid = (value: string): UUID => uuidSchema.parse(value);

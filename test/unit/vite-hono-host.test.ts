@@ -7,6 +7,7 @@ import {
 } from 'node:http';
 import { connect } from 'node:net';
 import {
+  EMPTY_ASSET_REF,
   encodeCompactUuid,
   newUuid,
   uuidSchema,
@@ -47,7 +48,10 @@ const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: { version: 1, title: 'One' },
   resources: [
-    { id: RESOURCE_ID, document: { title: 'A', kind: 'markdown', content: { source: '' } } },
+    {
+      id: RESOURCE_ID,
+      document: { title: 'A', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+    },
   ],
 };
 const updateCommit = {

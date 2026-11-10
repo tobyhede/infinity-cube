@@ -1,3 +1,5 @@
+import { readdir, readFile } from 'node:fs/promises';
+import { extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { newUuid, type SpaceSnapshot } from '@project/core';
 import {
@@ -7,7 +9,13 @@ import {
 } from '../../src/aggregate-directory';
 import { importAggregateContents } from '../../src/import/import-aggregate';
 import { type SpaceRepository, identifySpace } from '@project/aggregate';
-import { EMPTY_ASSET, type AssetHash, type LoadedSpace } from '@project/persistence';
+import {
+  admitAsset,
+  EMPTY_ASSET,
+  mediaTypeForExtension,
+  type AssetHash,
+  type LoadedSpace,
+} from '@project/persistence';
 
 const fixtureDirectory = fileURLToPath(new URL('../../packages/app/fixture', import.meta.url));
 
@@ -50,6 +58,7 @@ export const importSpaceDirectory = async (
   repository: SpaceRepository,
   directory: string,
 ): Promise<LoadedSpace> => {
+  await storeSpaceDirectoryAssets(repository, directory);
   const input = await readSingleSpace(directory);
   const snapshot = identifySpace(input, newUuid);
   const initialized = await repository.initializeAggregate({
@@ -57,6 +66,24 @@ export const importSpaceDirectory = async (
     spaces: [snapshot],
   });
   return seededSpace(initialized, directory, snapshot.id);
+};
+
+/**
+ * Store every file in a single Space directory's own `assets/`, as Import
+ * stores an aggregate's (ADR 0142), so a generated Space directory's Markdown
+ * text is there to read. A missing `assets/` stores nothing.
+ */
+const storeSpaceDirectoryAssets = async (
+  repository: SpaceRepository,
+  directory: string,
+): Promise<void> => {
+  const assets = join(directory, 'assets');
+  const names = await readdir(assets).catch(() => []);
+  for (const name of names.sort()) {
+    const bytes = new Uint8Array(await readFile(join(assets, name)));
+    const admitted = await admitAsset(bytes, mediaTypeForExtension(extname(name).slice(1)));
+    if (admitted.kind === 'admitted') await repository.storeAsset(admitted.asset);
+  }
 };
 
 /**

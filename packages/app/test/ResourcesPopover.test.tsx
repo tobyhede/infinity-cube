@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { KIND_IDS, uuidSchema, type Resource, type UUID } from '@project/core';
+import { EMPTY_ASSET_REF, KIND_IDS, uuidSchema, type Resource, type UUID } from '@project/core';
 import {
   ResourcesPopover,
   RESOURCE_DRAG_TYPE,
@@ -15,14 +15,14 @@ import { resourceDeletionWords } from '../src/resource-deletion';
 const id = (suffix: string) => uuidSchema.parse(`00000000-0000-4000-8000-${suffix}`);
 
 const RESOURCES: readonly Resource[] = [
-  { id: id('000000000001'), title: 'Zulu', kind: 'markdown', content: { source: '' } },
+  { id: id('000000000001'), title: 'Zulu', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
   {
     id: id('000000000002'),
     title: 'Alpha',
     kind: 'space',
     content: { spaceId: id('000000000012'), map: id('000000000013'), graph: id('000000000014') },
   },
-  { id: id('000000000003'), title: 'Alpha', kind: 'markdown', content: { source: '' } },
+  { id: id('000000000003'), title: 'Alpha', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
   {
     id: id('000000000004'),
     title: 'Constraints',
@@ -326,7 +326,7 @@ describe('ResourcesPopover', () => {
         id: id('000000000005'),
         title: 'Auth\nHow a session begins',
         kind: 'markdown',
-        content: { source: '' },
+        content: { url: EMPTY_ASSET_REF },
       },
       ...RESOURCES,
     ];
@@ -600,7 +600,7 @@ describe('ResourcesPopover', () => {
         id: id('000000000003'),
         title: 'Alpha\nHow a session begins',
         kind: 'markdown',
-        content: { source: '' },
+        content: { url: EMPTY_ASSET_REF },
       },
       {
         id: id('000000000004'),

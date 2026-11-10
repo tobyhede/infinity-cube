@@ -9,7 +9,13 @@ import {
 } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { newUuid, spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
+import {
+  EMPTY_ASSET_REF,
+  newUuid,
+  spaceSnapshotSchema,
+  uuidSchema,
+  type SpaceSnapshot,
+} from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
 import { productDestinationPath } from '@project/http';
 import {
@@ -48,6 +54,7 @@ import type { MapView } from '../src/map-view';
 import { refusingFullscreen } from './fullscreen';
 import { unlinkedPresentations } from './presentations';
 import { stubResizeObserver } from './resize-observer';
+import { TestAssets } from './markdown-texts';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -81,7 +88,7 @@ const snapshot = (title: string, resourceTitle: string, x: number, y: number): S
     resources: [
       {
         id: RESOURCE_ID,
-        document: { title: resourceTitle, kind: 'markdown', content: { source: resourceTitle } },
+        document: { title: resourceTitle, kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       },
     ],
   });
@@ -258,7 +265,7 @@ const openPresentable = async (
   });
   const initial = await spaces.open(SPACE_ID);
   await act(async () => {
-    render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
+    render(<OpenSpacesApplication spaces={spaces} initial={initial} />, { wrapper: TestAssets });
     await Promise.resolve();
   });
   act(() => initial.app.adapter.getState().selectResource(RESOURCE_ID));
@@ -1627,7 +1634,11 @@ describe('Space app Resources list', () => {
         ...base.resources,
         {
           id: OUTSIDE_RESOURCE_ID,
-          document: { title: 'Outside resource', kind: 'markdown', content: { source: '' } },
+          document: {
+            title: 'Outside resource',
+            kind: 'markdown',
+            content: { url: EMPTY_ASSET_REF },
+          },
         },
       ],
     };
@@ -1846,7 +1857,11 @@ describe('Space app Resources list drop', () => {
         ...base.resources,
         {
           id: OUTSIDE_RESOURCE_ID,
-          document: { title: 'Outside resource', kind: 'markdown', content: { source: '' } },
+          document: {
+            title: 'Outside resource',
+            kind: 'markdown',
+            content: { url: EMPTY_ASSET_REF },
+          },
         },
       ],
     };
@@ -1923,11 +1938,19 @@ describe('Space app Map reading', () => {
         ...base.resources,
         {
           id: OUTSIDE_RESOURCE_ID,
-          document: { title: 'Outside resource', kind: 'markdown', content: { source: '' } },
+          document: {
+            title: 'Outside resource',
+            kind: 'markdown',
+            content: { url: EMPTY_ASSET_REF },
+          },
         },
         {
           id: UNPLACED_RESOURCE_ID,
-          document: { title: 'Unplaced resource', kind: 'markdown', content: { source: '' } },
+          document: {
+            title: 'Unplaced resource',
+            kind: 'markdown',
+            content: { url: EMPTY_ASSET_REF },
+          },
         },
       ],
       document: {

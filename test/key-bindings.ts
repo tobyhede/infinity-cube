@@ -1,5 +1,5 @@
 export interface KeyBinding {
-  readonly module: `packages/${'app' | 'ui' | `plugin-${string}`}/src/${string}`;
+  readonly module: `packages/${'app' | 'ui' | 'plugin-markdown'}/src/${string}`;
   readonly sourceKey: string;
   readonly occurrence: number;
   readonly key: string;
@@ -139,7 +139,7 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     behaviour: 'withhold the Resource surface commit chord from CodeMirror',
   },
   {
-    module: 'packages/ui/src/MarkdownResourceBody.tsx',
+    module: 'packages/plugin-markdown/src/view.tsx',
     sourceKey: 'Escape',
     occurrence: 1,
     key: 'Escape',
@@ -147,7 +147,7 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     behaviour: 'cancel Markdown editing',
   },
   {
-    module: 'packages/ui/src/MarkdownResourceBody.tsx',
+    module: 'packages/plugin-markdown/src/view.tsx',
     sourceKey: 'Enter',
     occurrence: 1,
     key: 'Mod-Enter',

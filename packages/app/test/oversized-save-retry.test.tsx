@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import { MAX_COMMIT_BODY_BYTES } from '@project/http';
 import {
   encodeCommitRequest,
@@ -49,14 +49,21 @@ const withNotes = (body: string): SpaceSnapshot => ({
     ],
   },
   resources: [
-    { id: RESOURCE_ID, document: { title: 'Notes', kind: 'markdown', content: { source: body } } },
+    {
+      id: RESOURCE_ID,
+      document: { title: `Notes${body}`, kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+    },
   ],
 });
 
 const requestBytes = (request: SpaceCommit): number =>
   new TextEncoder().encode(JSON.stringify(encodeCommitRequest(request))).byteLength;
 
-/** A Notes body that makes Meta's own update request exactly `bytes` long. */
+/**
+ * A Title for Notes that makes Meta's own update request exactly `bytes` long.
+ * The Title carries the bulk because a Markdown Resource's text is an asset
+ * (ADR 0142).
+ */
 const notesForRequestOf = (bytes: number): string =>
   'x'.repeat(
     bytes -
@@ -94,23 +101,23 @@ const notesBody = (space: OpenSpace): string | undefined => {
   const document = space.session
     .getState()
     .working.resources.find(({ id }) => id === RESOURCE_ID)?.document;
-  return document?.kind === 'markdown' ? document.content.source : undefined;
+  return document?.title.slice('Notes'.length);
 };
 
 const storedNotes = async (backend: MemorySpaceBackend): Promise<string | undefined> => {
   const document = (await backend.loadSpace(META_ID))?.snapshot.resources.find(
     ({ id }) => id === RESOURCE_ID,
   )?.document;
-  return document?.kind === 'markdown' ? document.content.source : undefined;
+  return document?.title.slice('Notes'.length);
 };
 
-/** Complete the Edit an author makes by writing `body` into Notes. */
+/** Complete the Edit an author makes by writing `body` as the Title of Notes. */
 const writeNotes = (space: OpenSpace, body: string): void => {
   act(() => {
     const result = space.app.authoring.complete(CANVAS, {
       kind: 'edited-resource',
       resourceId: RESOURCE_ID,
-      document: { title: 'Notes', kind: 'markdown', content: { source: body } },
+      document: { title: `Notes${body}`, kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     });
     if (result.kind !== 'completed') throw new Error('The Notes Edit did not complete');
   });

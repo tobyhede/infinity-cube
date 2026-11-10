@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { loadSpace } from '../src/index';
 import { jsonResourceFile, resourceFile, uuid } from './resource-files';
+import { textRef } from './text-asset';
 
 /**
  * `loadSpace`'s own half of intake: the space file's shape, the resource files
@@ -49,8 +50,8 @@ const noStructure = { ...validInput, maps: [] };
 const { version: _version, ...versionless } = noStructure;
 
 const validResources = [
-  ...resourceFile(uuid('00000000-0000-4000-8000-000000000002'), 'A', 'Body of A.\n'),
-  ...resourceFile(uuid('00000000-0000-4000-8000-000000000003'), 'B', 'Body of B.\n'),
+  ...resourceFile(uuid('00000000-0000-4000-8000-000000000002'), 'A', textRef('Body of A.\n')),
+  ...resourceFile(uuid('00000000-0000-4000-8000-000000000003'), 'B', textRef('Body of B.\n')),
 ];
 
 describe('loadSpace', () => {
@@ -65,20 +66,20 @@ describe('loadSpace', () => {
     expect(result.space.maps).toHaveLength(1);
   });
 
-  it('builds each resource from its file, body included', () => {
+  it('builds each resource from its file, the URL of its text included', () => {
     const result = loadSpace(validInput, validResources);
     if (!result.ok) throw new Error('expected a valid space');
     expect(result.space.lookup.resource(uuid('00000000-0000-4000-8000-000000000002'))).toEqual({
       id: uuid('00000000-0000-4000-8000-000000000002'),
       title: 'A',
       kind: 'markdown',
-      content: { source: 'Body of A.\n' },
+      content: { url: textRef('Body of A.\n') },
     });
   });
 
   it('rejects a reference resource file carrying a body, because its content comes from its target', () => {
     const result = loadSpace(noStructure, [
-      ...resourceFile(uuid('00000000-0000-4000-8000-000000000002'), 'A', 'The source.\n'),
+      ...resourceFile(uuid('00000000-0000-4000-8000-000000000002'), 'A'),
       ...jsonResourceFile('00000000-0000-4000-8000-000000000007', 'A again', 'reference', {
         target: '00000000-0000-4000-8000-000000000002',
         source: 'This would be discarded.\n',
@@ -139,20 +140,6 @@ describe('loadSpace', () => {
     if (result.ok) return;
     expect(result.errors).toEqual([
       expect.objectContaining({ kind: 'invalid-json', path: 'resources/a.json' }),
-    ]);
-  });
-
-  it('refuses a .md beside space.json, naming it, rather than dropping it', () => {
-    const result = loadSpace(noStructure, [
-      {
-        path: 'intro.md',
-        text: '---\nid: 00000000-0000-4000-8000-000000000002\ntitle: A\nkind: markdown\n---\n',
-      },
-    ]);
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.errors).toEqual([
-      expect.objectContaining({ kind: 'unclaimed-sidecar', path: 'intro.md' }),
     ]);
   });
 

@@ -322,8 +322,6 @@ const KIND_FEATURE_FILES = [
   'packages/react-flow-adapter/src/ResourceNode.tsx',
   // The Space Resource lifecycle (ADR 0074): its create.
   'packages/persistence/src/space-resource-planning.ts',
-  // A Markdown body's completion.
-  'packages/app/src/canvas-resource-authoring.ts',
   // The Space glyph on the Space cluster's own controls.
   'packages/app/src/components/CommandDockSpaces.tsx',
   // A Space Resource's framing of its embedded Map; a dropped image URL creates an Image Resource.

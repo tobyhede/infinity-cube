@@ -354,9 +354,11 @@ describe('the Map host a plugin draws inside (ADR 0142)', () => {
       />,
     );
     claimOnMount = false;
-    const claim = surfaces.at(-1)?.claim?.();
-    const answer = await claim?.exclusively(
-      (own) => own.store?.(new Blob(['own'])) ?? Promise.resolve(undefined),
+    const answer = await act(async () =>
+      surfaces
+        .at(-1)
+        ?.claim?.()
+        ?.exclusively((own) => own.store?.(new Blob(['own'])) ?? Promise.resolve(undefined)),
     );
     expect(answer).toBe(REF);
     expect(ownStored).toHaveLength(1);

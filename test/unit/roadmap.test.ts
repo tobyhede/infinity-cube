@@ -633,12 +633,11 @@ describe('release scope', () => {
     if (release === null) throw new Error('Expected a release.');
     const destination = writeReleaseSpace(root, buildRoadmap(root), release);
     if (destination === null) throw new Error('Expected a generated Space.');
-    // One Resource: its Resource file and its Markdown sidecar.
-    expect(
-      readdirSync(join(destination, 'resources'))
-        .map((name) => name.slice(name.lastIndexOf('.')))
-        .sort(),
-    ).toEqual(['.json', '.md']);
+    // One Resource: its Resource file, and its text as an asset (ADR 0142).
+    expect(readdirSync(join(destination, 'resources'))).toHaveLength(1);
+    expect(readdirSync(join(destination, 'resources'))[0]).toMatch(/\.json$/u);
+    expect(readdirSync(join(destination, 'assets'))).toHaveLength(1);
+    expect(readdirSync(join(destination, 'assets'))[0]).toMatch(/\.md$/u);
 
     // And once the work that outlived the gate settles too, the release is over
     // and there is nothing left to draw. Generating a Space is still the normal
@@ -692,10 +691,11 @@ describe('release scope', () => {
     const destination = writeReleaseSpace(root, roadmap, release);
     if (destination === null) throw new Error('Expected a generated Space.');
 
-    // A Resource file and a Markdown sidecar for each of the three issues.
+    // A Resource file for each of the three issues, and its text as an asset.
     const files = readdirSync(join(destination, 'resources'));
     expect(files.filter((name) => name.endsWith('.json'))).toHaveLength(3);
-    expect(files.filter((name) => name.endsWith('.md'))).toHaveLength(3);
+    expect(files.filter((name) => name.endsWith('.md'))).toHaveLength(0);
+    expect(readdirSync(join(destination, 'assets'))).toHaveLength(3);
     const written: unknown = JSON.parse(readFileSync(join(destination, 'space.json'), 'utf8'));
     const file = spaceFileSchema.parse(written);
     expect(file.maps?.[0]?.graphs.map(({ edges }) => edges)).toEqual([
@@ -707,10 +707,11 @@ describe('release scope', () => {
     const parallel = imported.resources.find(
       ({ document }) => document.title === 'parallel/01 — Reference Resource',
     );
-    expect(parallel?.document.kind).toBe('markdown');
-    expect(
-      readFileSync(join(destination, 'resources', `${String(parallel?.id)}.md`), 'utf8'),
-    ).toContain('- **Tags:** `release/v1`');
+    if (parallel?.document.kind !== 'markdown') throw new Error('Expected a Markdown Resource.');
+    const hash = parallel.document.content.url.slice('/assets/'.length);
+    expect(readFileSync(join(destination, 'assets', `${hash}.md`), 'utf8')).toContain(
+      '- **Tags:** `release/v1`',
+    );
     const intake = loadSpaceSnapshot(
       spaceSnapshotSchema.parse({
         id: imported.id,

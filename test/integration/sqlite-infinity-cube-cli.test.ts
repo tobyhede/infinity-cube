@@ -1,7 +1,13 @@
 import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { AGGREGATE_FILE_VERSION, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import {
+  EMPTY_ASSET_REF,
+  AGGREGATE_FILE_VERSION,
+  uuidSchema,
+  type SpaceSnapshot,
+  type UUID,
+} from '@project/core';
 import { afterEach, describe, expect, it } from 'vitest';
 import { writeSpaceDirectory as writeLoadedSpaceDirectory } from '../../src/aggregate-directory';
 import { runInfinityCube } from '../../src/cli/run';
@@ -52,7 +58,7 @@ const metaSpace: SpaceSnapshot = {
       document: {
         title: 'Opening',
         kind: 'markdown',
-        content: { source: 'Durable SQLite body.\n' },
+        content: { url: EMPTY_ASSET_REF },
       },
     },
     {

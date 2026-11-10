@@ -19,5 +19,20 @@ export const describeCheck = (
   directory: string,
 ): { readonly accepted: boolean; readonly text: string } =>
   result.kind === 'valid'
-    ? { accepted: true, text: `${directory} is a valid aggregate.\n` }
+    ? {
+        accepted: true,
+        text: `${directory} is a valid aggregate.\n${describeAbsent(result.absentAssets)}`,
+      }
     : { accepted: false, text: describeRunRefusal(result, directory) };
+
+/**
+ * The files a valid aggregate names and does not carry, one line each: what a
+ * Resource reads from them is absent until each is written.
+ */
+const describeAbsent = (hashes: readonly string[]): string =>
+  hashes
+    .map(
+      (hash) =>
+        `/assets/${hash} has no file: write its bytes to assets/${hash}.<extension>, such as assets/${hash}.md for Markdown text.\n`,
+    )
+    .join('');

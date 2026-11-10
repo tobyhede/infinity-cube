@@ -1,8 +1,9 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import type { Resource, UUID } from '@project/core';
+import { EMPTY_ASSET_REF, type Resource, type UUID } from '@project/core';
 import { loadSpace, resolveResourceContent, serializeResource, type Space } from '../src/index';
 import { resourceFile, uuid } from './resource-files';
+import { textRef } from './text-asset';
 
 /**
  * The aggregate properties of intake, stated over generated documents and
@@ -262,7 +263,12 @@ function contentOwner(id: UUID, index: number, kind: Exclude<ContentKind, 'refer
   const title = `Resource ${index}`;
   switch (kind) {
     case 'markdown':
-      return { id, title, kind, content: { source: index % 3 === 0 ? '' : `Body ${index}\n` } };
+      return {
+        id,
+        title,
+        kind,
+        content: { url: index % 3 === 0 ? EMPTY_ASSET_REF : textRef(`Body ${index}\n`) },
+      };
     case 'image':
       return { id, title, kind, content: { url: `https://example.com/${index}.png` } };
     case 'space': {

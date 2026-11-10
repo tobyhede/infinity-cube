@@ -1,109 +1,23 @@
-/* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
-import { z } from 'zod';
-import { defineKind, type KindFileCodec } from './kind-module';
-
-/** A Markdown Resource's content: the source its author wrote, which its file holds as the body. */
-export const markdownResourceContentSchema = z.object({ source: z.string() }).strict();
-type MarkdownResourceContent = z.infer<typeof markdownResourceContentSchema>;
-
-/** The Markdown kind's id, declared before its module because the content it resolves to names it. */
-const MARKDOWN_KIND_ID = 'markdown';
-
-/** What a Markdown Resource's content resolves to: the source it shows. */
-export interface MarkdownContent {
-  readonly kind: typeof MARKDOWN_KIND_ID;
-  readonly source: string;
-}
-
-/** The media type of a Markdown Resource's sidecar. */
-export const MARKDOWN_MEDIA_TYPE = 'text/markdown';
+import { markdownPlugin } from '@project/plugin-markdown/domain';
+import { kindFromPlugin, type PluginContent } from './plugin-kind';
 
 /**
- * Media types compare case-insensitively in ASCII only, so only `A`-`Z` are
- * lowered: `toLowerCase` would also fold the Kelvin sign (U+212A) to `k`,
- * which the JSON Schema refuses.
+ * The Markdown kind (ADR 0020), drawn by the Markdown plugin (ADR 0142): a
+ * Resource whose text is an asset its content names by URL, and which is Open
+ * or Closed on each Map as its plugin's Map content says. This module reads
+ * that plugin's domain half as a kind module; everything it says is the
+ * plugin's.
  */
-const isMarkdownMediaType = (mediaType: string): boolean =>
-  mediaType.replace(/[A-Z]/g, (letter) => letter.toLowerCase()) === MARKDOWN_MEDIA_TYPE;
-
-/** The sidecar a Markdown Resource's file names: its own `<id>.md`, beside its Resource file. */
-export const markdownSidecarPath = (id: string): string => `${id}.md`;
-
-/**
- * A Markdown Resource's content as its Resource file holds it: a
- * locator naming its sidecar, in place of the source the sidecar holds. The
- * media type compares case-insensitively; that the path is the Resource's own
- * `<id>.md` is the codec's to check, since the schema does not see the id.
- */
-export const markdownFileContentSchema = z
-  .object({
-    path: z.string(),
-    mediaType: z.string().refine(isMarkdownMediaType, {
-      message: `A Markdown Resource's sidecar is ${MARKDOWN_MEDIA_TYPE}`,
-    }),
-  })
-  .strict();
-
-/** A Markdown Resource's file holds a locator, and its source is the plain `<id>.md` beside it. */
-const markdownFile: KindFileCodec<
-  MarkdownResourceContent,
-  z.infer<typeof markdownFileContentSchema>
-> = {
-  contentSchema: markdownFileContentSchema,
-  sidecarNames: (id) => [markdownSidecarPath(id)],
-  encode: (id, content) => {
-    const path = markdownSidecarPath(id);
-    return {
-      content: { path, mediaType: MARKDOWN_MEDIA_TYPE },
-      sidecars: [{ name: path, text: content.source }],
-    };
-  },
-  decode: (id, content, sidecar) => {
-    const own = markdownSidecarPath(id);
-    if (content.path !== own) {
-      return {
-        ok: false,
-        kind: 'invalid-resource-file',
-        message: `content.path: a Markdown Resource's sidecar is its own "${own}", not "${content.path}"`,
-      };
-    }
-    const source = sidecar(own);
-    return source === undefined
-      ? {
-          ok: false,
-          kind: 'missing-sidecar',
-          message: `content.path: the sidecar "${own}" it names does not exist`,
-        }
-      : { ok: true, content: { source } };
-  },
+export const markdownKind = {
+  ...kindFromPlugin(markdownPlugin),
+  // An Open Reference Resource still draws its Target in the old frame's
+  // content area, where the Markdown plugin draws its text read-only, until
+  // the Reference plugin embeds it (`.scratch/resource-plugins/issues/06`).
+  facts: { authored: false, embedsMap: false, drawsContentArea: true },
 };
-
-/** A Markdown Resource's content before its author writes any: a genuinely empty body. */
-export const EMPTY_MARKDOWN: MarkdownResourceContent = { source: '' };
-
-/**
- * The Markdown kind (ADR 0020): a content kind whose content is Markdown
- * source. Its content action is Edit, and Export writes its source with `\n`
- * line endings.
- */
-export const markdownKind = defineKind({
-  id: MARKDOWN_KIND_ID,
-  contentSchema: markdownResourceContentSchema,
-  flags: {
-    canOpen: true,
-    opensToFit: true,
-    mayBeTarget: true,
-    ownsReferencedSpaces: false,
-  },
-  facts: { authored: true, embedsMap: false, drawsContentArea: true },
-  resolveContent: (content): MarkdownContent => ({
-    kind: MARKDOWN_KIND_ID,
-    source: content.source,
-  }),
-  canonicalContent: (content) => ({ source: content.source.replace(/\r\n?/g, '\n') }),
-  file: markdownFile,
-  newContent: EMPTY_MARKDOWN,
-});
 
 /** The Markdown kind's id. */
 export type MarkdownKindId = typeof markdownKind.id;
+
+/** What a Markdown Resource's content resolves to: its kind and the asset its text is. */
+export type MarkdownContent = PluginContent<MarkdownKindId, typeof markdownKind.newContent>;

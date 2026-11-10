@@ -2,19 +2,15 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/tobyhede/infinity-cube/main/docs/schema/resource/kinds/markdown.schema.json",
   "title": "Markdown content",
-  "description": "A Markdown Resource's content is a sidecar: a plain Markdown file with no frontmatter, beside its Resource file, owned by the Resource and written and removed with it (ADR 0128). Its path is <id>.md, named for the Resource's own id; the schema holds the shape and intake checks that the id is the Resource's, which gives every sidecar exactly one owner.",
+  "description": "A Markdown Resource's text is an asset (ADR 0142): its content is the URL form of the locator, /assets/<hash>, naming the text by the SHA-256 of its bytes. Export writes the text to the Aggregate directory's assets/<hash>.md while a Resource references it; a Resource keeps no text of its own, no path and no media type.",
   "type": "object",
   "$ref": "../locator.schema.json",
-  "required": ["path", "mediaType"],
+  "required": ["url"],
   "properties": {
-    "path": {
+    "url": {
+      "description": "A stored text's content id: the SHA-256 of its bytes as unpadded base64url, 43 characters in canonical spelling.",
       "type": "string",
-      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.md$"
-    },
-    "mediaType": {
-      "description": "text/markdown, in any case, since media types compare case-insensitively.",
-      "type": "string",
-      "pattern": "^[tT][eE][xX][tT]/[mM][aA][rR][kK][dD][oO][wW][nN]$"
+      "pattern": "^/assets/[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$"
     }
   },
   "unevaluatedProperties": false
