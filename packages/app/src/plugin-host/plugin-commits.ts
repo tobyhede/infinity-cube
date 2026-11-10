@@ -8,7 +8,8 @@ import {
 } from '@project/core';
 import type { ObserverErrorReporter } from '@project/persistence';
 import type { Answer } from '@project/resource-api/domain';
-import type { ClaimHolder, PluginCommits, PluginHostClaim, PluginOperations } from '@project/ui';
+import type { Assets } from '@project/resource-api/view';
+import type { PluginCommits, PluginHostClaim, PluginOperations } from '@project/ui';
 import { describeAuthoringRefusal } from '../authoring-refusal';
 import type { AuthoringResult, DrawnCompletion, Settle, SettledResult } from '../space-authoring';
 import { heldByAnotherDrawing, holds, type ClaimChain, type Drawing } from './claim-chain';
@@ -35,8 +36,11 @@ export interface PluginSurfaceFacts {
 export const offersCommits = (facts: PluginSurfaceFacts): boolean =>
   facts.authorOnCanvas && facts.editable;
 
-const GONE: Answer = { refused: 'This Resource has changed since it was drawn. Try again.' };
-const BUSY: Answer = { refused: 'Another change is still being made. Try again when it ends.' };
+/** An answer that refuses, which a commit and a store each answer alike. */
+type Refusal = { readonly refused: string };
+
+const GONE: Refusal = { refused: 'This Resource has changed since it was drawn. Try again.' };
+const BUSY: Refusal = { refused: 'Another change is still being made. Try again when it ends.' };
 const BROKE: Answer = { refused: 'This change could not be made.' };
 const INVALID: Answer = { refused: 'This change cannot be kept.' };
 
@@ -89,6 +93,8 @@ export interface PluginHost {
   readonly complete: (completion: DrawnCompletion, settle: Settle) => AuthoringResult;
   /** Where an Edit that threw, or a plugin that threw while drawing, is reported. */
   readonly report: ObserverErrorReporter;
+  /** The asset store and file picker a surface offers where it offers commits; absent, neither. */
+  readonly assets?: Pick<Assets, 'store' | 'pick'> | undefined;
 }
 
 /** Who holds a Claim on a drawing's Resource, as that drawing reads it. */
@@ -104,8 +110,8 @@ export const claimHolderOf = (chain: ClaimChain, drawing: Drawing): ClaimHolder 
 function commitsFor(
   host: PluginHost,
   resourceId: ResourceId,
-  live: () => Answer | null,
-  complete: PluginHost['complete'],
+  live: () => Refusal | null,
+  own: boolean,
 ): PluginCommits {
   const changeMapContent = (content: JsonValue): Promise<Answer> => {
     const withdrawn = live();
@@ -115,38 +121,16 @@ function commitsFor(
       host.report,
     );
   };
-  /** One Edit of the Resource's document, its kind's schema answering for the next one. */
-  const editDocument = (
-    change: { readonly title: string } | { readonly content: JsonValue },
-  ): Promise<Answer> => {
-    const withdrawn = live();
-    if (withdrawn !== null) return Promise.resolve(withdrawn);
-    const stored = host.document(resourceId);
-    if (stored === undefined) {
-      return Promise.resolve({ refused: describeAuthoringRefusal({ code: 'resource-not-found' }) });
-    }
-    const parsed = resourceDocumentSchema.safeParse({ ...stored, ...change });
-    if (!parsed.success) {
-      const titleRequired = parsed.error.issues.some(
-        (issue) => issue.code === 'custom' && issue.params?.['code'] === RESOURCE_TITLE_REQUIRED,
-      );
-      return Promise.resolve(
-        titleRequired
-          ? { refused: describeAuthoringRefusal({ code: RESOURCE_TITLE_REQUIRED }) }
-          : INVALID,
-      );
-    }
-    return completeAsAnswer(
-      (settle) => complete({ kind: 'edited-resource', resourceId, document: parsed.data }, settle),
-      host.report,
-    );
-  };
-  // A size hint is ignored: Ur, the one plugin drawn here, commits none, and
-  // the canvas applies none yet (`docs/agents/maps-and-graphs.md`, R38, R40).
+  const store = host.assets?.store;
   return {
-    title: (next) => editDocument({ title: next }),
-    content: (next) => editDocument({ content: next }),
     map: (next) => changeMapContent(next),
+    store:
+      store === undefined
+        ? undefined
+        : (bytes) => {
+            const withdrawn = live();
+            return withdrawn === null ? store(bytes) : Promise.resolve(withdrawn);
+          },
   };
 }
 
@@ -198,11 +182,13 @@ export function pluginSurfaceOperations(
       unmount: () => host.gate.unmount(drawing),
     };
   };
-  return {
-    ...drawn,
-    commitTitle: plain.title,
-    commitContent: plain.content,
-    commitMap: plain.map,
-    claim,
-  };
+  const pickFiles = host.assets?.pick;
+  const pick =
+    pickFiles === undefined
+      ? undefined
+      : (accept: string): Promise<File[]> =>
+          host.gate.exclusiveRunning() || host.replacementEpoch() !== builtIn
+            ? Promise.resolve([])
+            : pickFiles(accept);
+  return { ...drawn, commitMap: plain.map, commitStore: plain.store, pick, claim };
 }

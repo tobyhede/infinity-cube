@@ -7,7 +7,7 @@ import {
   type JsonValue,
   type PluginKind,
 } from '@project/core';
-import type { Answer, ResourcePlugin, Size } from '@project/resource-api/domain';
+import type { Answer, AssetRef, ResourcePlugin, Size } from '@project/resource-api/domain';
 import type {
   Assets,
   EmbedProps,
@@ -29,12 +29,16 @@ import { ResourceFailureBoundary } from '../ResourceFailureBoundary';
  * before the host takes it, so a plugin's types are its own end to end.
  */
 
-/** A commit as the host takes it: JSON in, an answer out. */
+/** Store bytes as an asset, answering their reference or why not. */
+export type PluginStore = (bytes: Blob) => Promise<AssetRef | { readonly refused: string }>;
+
+/** A commit as the host takes it: JSON in, an answer out; and the asset store, withdrawn as they are. */
 export interface PluginCommits {
   readonly title?: ((next: string) => Promise<Answer>) | undefined;
   readonly content?: ((next: JsonValue) => Promise<Answer>) | undefined;
   readonly map?:
     ((next: JsonValue, options?: { readonly sizeHint?: Size }) => Promise<Answer>) | undefined;
+  readonly store?: PluginStore | undefined;
 }
 
 /** A Claim as the host hands it out, before the plugin's types are put on it. */
@@ -63,16 +67,13 @@ export interface PluginOperations {
   readonly commitContent?: PluginCommits['content'];
   readonly commitMap?: PluginCommits['map'];
   /**
-   * A Claim for the drawing keyed `drawing`: a key the surface mints for its
-   * own lifetime, so two drawings of one Resource never share a Claim.
+   * The asset store and the author's file picker, offered where commits are
+   * and withdrawn as they are: a kept store answers refused, and a kept pick
+   * answers no files, while exclusive work runs (ADR 0142).
    */
-  readonly claim?: ((drawing: symbol) => PluginHostClaim | undefined) | undefined;
-  /**
-   * Who holds a Claim on this Resource, as the drawing keyed `drawing` reads it
-   * when asked. A drawing whose Resource another drawing holds is offered no
-   * commit, and a commit it kept answers refused.
-   */
-  readonly claimHolder?: ((drawing: symbol) => ClaimHolder) | undefined;
+  readonly commitStore?: PluginStore | undefined;
+  readonly pick?: ((accept: string) => Promise<File[]>) | undefined;
+  readonly claim?: (() => PluginHostClaim | undefined) | undefined;
   /**
    * Exclusive work runs elsewhere: the surface offers no authoring, its
    * host-drawn Title and Actions included, until it ends (ADR 0142).
@@ -135,9 +136,10 @@ export function pluginEntry<C, M>(
       return parsed.success ? commit(parsed.data) : Promise.resolve(NOT_JSON);
     };
   const exclusiveOf = (own: PluginCommits): Exclusive<C, M> => {
-    const { title, content, map: ownMap } = own;
+    const { title, content, map: ownMap, store } = own;
     return {
       title,
+      store,
       content: content === undefined ? undefined : asJson(content),
       map:
         ownMap === undefined

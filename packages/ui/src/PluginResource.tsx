@@ -22,6 +22,9 @@ import type { OwnProps, RailCommand, TitleProps } from '@project/resource-api/vi
 import {
   createRailStore,
   ResourceHostProvider,
+  type Assets,
+  type OwnProps,
+  type RailCommand,
   type ResourceHost,
 } from '@project/resource-api/view/host';
 import { Button } from './Button';
@@ -66,10 +69,9 @@ import './canvas-resource.css';
  * earlier render answers refused once this surface has unmounted.
  */
 
-const SURFACE_GONE: Answer = { refused: 'This Resource is no longer drawn here.' };
-const HELD_ELSEWHERE: Answer = {
-  refused: 'This Resource is being changed where it is drawn elsewhere. Try again when that ends.',
-};
+const SURFACE_GONE = {
+  refused: 'This Resource is no longer drawn here.',
+} as const satisfies Answer;
 
 /** Stop the canvas reading a press or key meant for the plugin's own region. */
 const stop = (event: PointerEvent | KeyboardEvent): void => {
@@ -262,20 +264,23 @@ function guarded(
   };
   const whileMounted =
     <A extends readonly unknown[]>(commit: (...args: A) => Promise<Answer>) =>
-    (...args: A): Promise<Answer> => {
-      const refusal = withheld();
-      return refusal === null ? commit(...args) : Promise.resolve(refusal);
-    };
-  const { commitTitle, commitContent, commitMap, claim } = operations;
+    (...args: A): Promise<Answer> =>
+      lifetime.drawn() ? commit(...args) : Promise.resolve(SURFACE_GONE);
+  const { commitTitle, commitContent, commitMap, commitStore, pick, claim } = operations;
   return {
     kind: operations.kind,
     commitTitle: commitTitle === undefined ? undefined : whileMounted(commitTitle),
     commitContent: commitContent === undefined ? undefined : whileMounted(commitContent),
     commitMap: commitMap === undefined ? undefined : whileMounted(commitMap),
-    claim:
-      claim === undefined
+    commitStore:
+      commitStore === undefined
         ? undefined
-        : (drawing) => (lifetime.drawn() ? claim(drawing) : undefined),
+        : (bytes) => (lifetime.drawn() ? commitStore(bytes) : Promise.resolve(SURFACE_GONE)),
+    pick:
+      pick === undefined
+        ? undefined
+        : (accept) => (lifetime.drawn() ? pick(accept) : Promise.resolve([])),
+    claim: claim === undefined ? undefined : () => (lifetime.drawn() ? claim() : undefined),
   };
 }
 
@@ -314,10 +319,16 @@ export function PluginSurface(props: PluginResourceProps & { readonly entry: Plu
     () => guarded(props.operations, lifetime, readOnly),
     [props.operations, lifetime, readOnly],
   );
+  // Assets are drawn and read from the application's store; storing and
+  // picking are what the host offers with its commits, withdrawn as they are.
   const supplied = usePluginAssets();
   const assets = useMemo(
-    () => (readOnly ? readingAssets(supplied) : supplied),
-    [readOnly, supplied],
+    (): Assets => ({
+      ...readingAssets(supplied),
+      store: operations.commitStore,
+      pick: operations.pick,
+    }),
+    [supplied, operations],
   );
   const plugin = props.entry.render({
     resourceId: props.resourceId,

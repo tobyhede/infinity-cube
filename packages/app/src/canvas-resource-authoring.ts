@@ -16,7 +16,7 @@ import {
 } from '@project/core';
 import type { ObserverErrorReporter, SpaceSession } from '@project/persistence';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
-import type { EntityActionGroup, ImageReplacement } from '@project/ui';
+import { usePluginAssets, type EntityActionGroup, type ImageReplacement } from '@project/ui';
 import { describeImageReplacement, type ImageReplacements } from './image-replacement';
 import type { AuthoringAvailability } from './authoring-availability';
 import { describeAuthoringRefusal } from './authoring-refusal';
@@ -360,6 +360,9 @@ export function useCanvasResourceAuthoring({
   // Read so every plugin surface is decorated again when a Claim is taken or
   // exclusive work begins or ends, and offers only what is not withdrawn.
   const claimChain = useSyncExternalStore(pluginGate.subscribe, pluginGate.getState);
+  // The application's asset store, which a surface stores and picks through
+  // only where it offers commits, and only while they are not withdrawn.
+  const pluginAssets = usePluginAssets();
   const pluginHost = useMemo(
     (): PluginHost => ({
       gate: pluginGate,
@@ -370,8 +373,11 @@ export function useCanvasResourceAuthoring({
           ?.document,
       complete: (completion, settle) => authoring.complete(completion, settle),
       report: reportPluginFailure,
+      assets: { store: pluginAssets.store, pick: pluginAssets.pick },
     }),
-    [authoring, spaceSession, pluginGate, reportPluginFailure, claimChain],
+    // `claimChain` is read by the operations built from this host, not here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [authoring, pluginGate, reportPluginFailure, claimChain, pluginAssets],
   );
 
   const replaceResourceImage = useMemo(() => {
