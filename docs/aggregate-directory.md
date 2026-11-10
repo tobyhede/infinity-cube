@@ -40,7 +40,7 @@ A child directory without a `space.json` is not a Space and is left alone.
 
 ### The rules that make Spaces an aggregate
 
-- The Meta Space is the root. Every **ordinary** Space must be reached by some Space Resource in another Space; one that nothing reaches is refused: `Space <id> is not the Meta Space and no Space Resource points at it`.
+- The Meta Space is the root. Every **ordinary** Space must be reached by some Space Resource in another Space; one that nothing reaches is refused: `Space <id> is not the Meta Space and no Space Resource points at it`. While any Resource's kind is one this version of InfinityCube has no plugin for, a Space nothing reaches is held instead ([ADR 0142](adr/0142-a-resource-plugin-owns-everything-inside-its-rect.md)): that Resource may be what reaches it, and nothing can read it to say. Deleting the last such Resource while a Space is held only this way is refused, naming the Space.
 - A Space Resource's `map` and `graph` must name a Map of its target Space and a Graph that Map owns.
 - Space Resources may converge on one Space but may not form a cycle, and a Space Resource may not target its own Space.
 - Resource Ids are unique across the whole aggregate, not just within a Space.
@@ -123,7 +123,7 @@ A Markdown Resource's text is an **asset** ([ADR 0142](adr/0142-a-resource-plugi
 
 A Resource's identity is its `id`, never its file name. Exporting writes every Resource as `resources/<id>.json`, whatever it was called before.
 
-Every Resource has `id`, `title`, `kind` and `content`, and none may be left out. The Title must have at least one non-blank line, and may run to several. `kind` is a kind's id; one this version of InfinityCube does not know is refused. A Resource file is strict, as `space.json` is: a key the envelope or the kind's `content` does not declare, at any depth, is refused, naming the key and the file, so a misspelt key fails loudly. `content` depends on the kind:
+Every Resource has `id`, `title`, `kind` and `content`, and none may be left out. The Title must have at least one non-blank line, and may run to several. `kind` is a kind id: a bare id, or `vnd.<owner>.<name>`, each part ASCII letters, digits and hyphens. A Resource file is strict, as `space.json` is: a key the envelope or a known kind's `content` does not declare, at any depth, is refused, naming the key and the file, so a misspelt key fails loudly. `content` depends on the kind:
 
 | `kind` | `content` |
 | --- | --- |
@@ -132,6 +132,8 @@ Every Resource has `id`, `title`, `kind` and `content`, and none may be left out
 | `image` | `url`: `https:` or `http:`, or `/assets/<hash>` for a picture in `assets/`. Optional `naturalSize: { width, height }` in pixels. The Title is the image's text alternative. An Image Resource is never Open: a placement storing `"open": true` for one is refused. |
 | `reference` | `target`: the Id of another Resource **in the same Space**, not itself and not another Reference Resource. It shows its Target's content, read-only. |
 | `space` | `spaceId`, `map`, `graph`: the target Space and the Map and Graph it shows. Optional `framing: { centreX, centreY, zoom }`. |
+
+A `kind` this version of InfinityCube has no plugin for is not refused ([ADR 0142](adr/0142-a-resource-plugin-owns-everything-inside-its-rect.md)): its `content` may be any JSON object, which is carried as written and never read, and the Resource is drawn as its Title and a note that its kind is not available. It can be placed, resized, connected, renamed, referenced, presented and deleted as any Resource, its Map entries' `content` is kept as written, and the assets its `content` names travel with it. A version that has the plugin reads it as it stands. A misspelt kind is such a kind, so check the `kind` of a Resource drawn this way.
 
 Only `resources/*.json` is read: a `.md` in `resources/` or beside `space.json` is not a Resource and is left alone.
 
