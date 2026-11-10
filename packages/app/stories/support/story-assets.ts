@@ -36,6 +36,10 @@ export function storyText(text: string): AssetRef {
   return ref;
 }
 
+/** Store bytes as the catalogue does: as text, named by {@link storyText}. */
+export const storeStoryText = async (bytes: Blob): Promise<AssetRef> =>
+  storyText(await bytes.text());
+
 /**
  * Reads each text {@link storyText} named, and the empty asset; any other
  * reference is refused. A story that authors stores its Save's text here,
@@ -43,7 +47,7 @@ export function storyText(text: string): AssetRef {
  */
 export const STORY_ASSETS: Assets = {
   url: (ref) => ref,
-  store: async (bytes) => storyText(await bytes.text()),
+  store: storeStoryText,
   read: (ref) => {
     const text = TEXTS.get(ref);
     return Promise.resolve(

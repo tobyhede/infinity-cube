@@ -104,10 +104,14 @@ test(
     await expect(title).toHaveAttribute('class', closedClass ?? '');
     expect(await title.evaluate(titleStyle)).toEqual(closedStyle);
     expect(await titleLeftInset()).toBeCloseTo(closedInset, 0);
-    const openContent = resource.locator('.canvas-resource__content');
-    await expect(openContent).toHaveAttribute('data-presence', 'present');
-    await expect(openContent).toHaveCSS('opacity', '1');
-    const openBottomInset = await titleBottomInset();
+    // Its plugin draws the text as soon as its Map content says Open, and none
+    // of it once Closed, with the Title where it was Closed (ADR 0142).
+    await expect(resource.locator('.canvas-resource__plugin [data-open="true"]')).toHaveCount(1);
+    await toolbar.getByRole('button', { name: 'Close Resource Strategies' }).click();
+    await expect(resource.getByRole('heading', { name: 'Placement is authored' })).toHaveCount(0);
+    await expect(resource.locator('.canvas-resource__plugin [data-open="false"]')).toHaveCount(1);
+    expect(await titleLeftInset()).toBeCloseTo(closedInset, 0);
+    expect(await titleBottomInset()).toBeCloseTo(closedBottomInset, 0);
 
     const transitionDuration = (element: Element, property: string) => {
       const style = getComputedStyle(element);
@@ -120,79 +124,6 @@ test(
         ? Number.parseFloat(duration)
         : Number.parseFloat(duration) * 1000;
     };
-    const closingSnapshot = await toolbar
-      .getByRole('button', { name: 'Close Resource Strategies' })
-      .evaluate((button, duration) => {
-        const startedAt = performance.now();
-        // The toolbar floats outside the Resource (ADR 0102), so the Resource is
-        // found from the placement the toolbar names rather than as an ancestor.
-        const placement = button
-          .closest<HTMLElement>('[data-resource-rail-for]')
-          ?.getAttribute('data-resource-rail-for');
-        const element =
-          placement === null || placement === undefined
-            ? null
-            : document.querySelector<HTMLElement>(
-                `.react-flow__node[data-id="${placement}"] .canvas-resource`,
-              );
-        button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-        if (element === null) throw new Error('Closing Resource is unavailable');
-        const content = element.querySelector<HTMLElement>('.canvas-resource__content');
-        const titleElement = element.querySelector<HTMLElement>('.canvas-resource__title');
-        if (content === null || titleElement === null)
-          throw new Error('Closing Resource content or Title is unavailable');
-        return new Promise<{
-          contentDuration: number | string | CSSNumericValue | null;
-          contentInert: boolean;
-          contentPresence: string | undefined;
-          contentTransitionRunning: boolean;
-          open: string | undefined;
-          titleBottomInsets: number[];
-        }>((resolve) => {
-          const titleBottomInsets: number[] = [];
-          let firstFrame:
-            | {
-                contentDuration: number | string | CSSNumericValue | null;
-                contentInert: boolean;
-                contentPresence: string | undefined;
-                contentTransitionRunning: boolean;
-                open: string | undefined;
-              }
-            | undefined;
-          const sample = (now: number) => {
-            const resourceBox = element.getBoundingClientRect();
-            const titleBox = titleElement.getBoundingClientRect();
-            titleBottomInsets.push(resourceBox.bottom - titleBox.bottom);
-            if (firstFrame === undefined) {
-              const opacityTransition = content.getAnimations().find((animation) => {
-                if (!(animation.effect instanceof KeyframeEffect)) return false;
-                return animation.effect
-                  .getKeyframes()
-                  .some((frame) => frame['opacity'] !== undefined);
-              });
-              firstFrame = {
-                contentDuration: opacityTransition?.effect?.getTiming().duration ?? null,
-                contentInert: content.hasAttribute('inert'),
-                contentPresence: content.dataset['presence'],
-                contentTransitionRunning: opacityTransition?.playState === 'running',
-                open: element.dataset['open'],
-              };
-            }
-            if (now - startedAt < duration) requestAnimationFrame(sample);
-            else resolve({ ...firstFrame, titleBottomInsets });
-          };
-          requestAnimationFrame(sample);
-        });
-      }, 220);
-    expect(closingSnapshot.contentDuration).toBeCloseTo(80, 5);
-    expect(closingSnapshot.contentInert).toBe(true);
-    expect(closingSnapshot.contentPresence).toBe('leaving');
-    expect(closingSnapshot.contentTransitionRunning).toBe(true);
-    expect(closingSnapshot.open).toBe('false');
-    for (const inset of closingSnapshot.titleBottomInsets) {
-      expect(inset).toBeGreaterThan(0);
-      expect(inset).toBeLessThanOrEqual(Math.max(openBottomInset, closedBottomInset) + 1);
-    }
 
     // Deselected, the Resource's Edge handles quiet once the pointer leaves it.
     await specimen.locator('.react-flow__pane').click({ position: { x: 2, y: 2 } });

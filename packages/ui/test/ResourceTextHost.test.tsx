@@ -5,7 +5,11 @@ import { HostRenderedMarkdown, HostSourceEditor } from '../src/ResourceTextHost'
 describe('the text components a host gives a plugin (ADR 0142)', () => {
   it('draws a press target over rendered text only where the plugin offers an edit', () => {
     const begin = vi.fn();
-    const { rerender } = render(<HostRenderedMarkdown markdown="Body" />);
+    const { rerender, container } = render(<HostRenderedMarkdown markdown="Body" />);
+    // Inside the surface whose values the rendered text's rules read.
+    expect(
+      container.querySelector('.markdown-resource-body > .markdown-resource-body__rendered'),
+    ).not.toBeNull();
     expect(screen.queryByRole('button')).toBeNull();
     rerender(<HostRenderedMarkdown markdown="Body" edit={{ label: 'Edit Notes', begin }} />);
     const target = screen.getByRole('button', { name: 'Edit Notes' });

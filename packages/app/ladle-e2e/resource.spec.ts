@@ -52,12 +52,13 @@ test(
 const HOST_BODY = '.canvas-resource__body';
 
 const CLOSED_KINDS = [
+  // A Markdown Resource's plugin draws its Title in a header of its own (ADR 0142).
   {
     label: 'markdown',
     kind: 'markdown',
     glyph: 'Markdown Resource',
     border: 'solid',
-    body: HOST_BODY,
+    body: '.canvas-resource__plugin > * > :first-child',
   },
   {
     label: 'reference',
@@ -77,7 +78,7 @@ const CLOSED_KINDS = [
     kind: 'markdown',
     glyph: 'Markdown Resource',
     border: 'solid',
-    body: HOST_BODY,
+    body: '.canvas-resource__plugin > * > :first-child',
   },
 ] as const;
 
@@ -291,11 +292,12 @@ test(
         return resolved;
       }, label);
 
-      // The band behind the commands paints nothing at all.
-      await expect(item.locator('.canvas-resource__rail')).toHaveCSS(
-        'background-color',
-        'rgba(0, 0, 0, 0)',
-      );
+      // The band behind the commands paints nothing at all; a plugin's
+      // Resource draws no band of its own (ADR 0142).
+      const rail = item.locator('.canvas-resource__rail');
+      if ((await rail.count()) > 0) {
+        await expect(rail).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      }
       const commands = item.getByTestId('canvas-resource-actions');
       await expect(commands).toHaveCSS('opacity', '1');
       const surface = await commands.evaluate((el) => getComputedStyle(el).backgroundColor);
@@ -471,11 +473,11 @@ test(
 
 test('reduced motion removes Resource content transitions', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('/?story=components--resource--open-and-close&mode=preview');
+  // An Open Reference Resource, whose content `CanvasResource` draws and
+  // transitions; a plugin's Resource draws its content with no transition.
+  await page.goto('/?story=components--resource--open-reference-resource&mode=preview');
 
-  const resource = page
-    .getByRole('region', { name: 'Long Markdown Resource' })
-    .getByRole('article');
+  const resource = page.getByRole('article', { name: 'Strategy overview' });
   const content = resource.locator('.canvas-resource__content');
 
   await expect(content).toHaveCSS('transition-duration', '0s');

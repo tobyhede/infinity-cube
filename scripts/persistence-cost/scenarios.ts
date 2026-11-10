@@ -289,7 +289,8 @@ export const applyEdit = (
       return withPositions(snapshot, (positions) => {
         const placement = positions[subject.id];
         if (placement === undefined) throw new Error(`Resource ${subject.id} is not placed`);
-        positions[subject.id] = { ...placement, open: true };
+        // A Markdown Resource keeps Open in its plugin's Map content (ADR 0142).
+        positions[subject.id] = { ...placement, content: { open: true } };
         return positions;
       });
     case 'resize':

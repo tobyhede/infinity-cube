@@ -6,6 +6,7 @@ import { createOpenSpaces, type OpenSpace, type OpenSpaces } from '#src/open-spa
 import { storelessImages } from './image-sources';
 import { refusingFullscreen } from './fullscreen';
 import { unlinkedPresentations } from './presentations';
+import { STORY_ASSETS } from './story-assets';
 
 /**
  * Fixture data, an isolated history adapter and a host that refuses fullscreen;
@@ -50,8 +51,13 @@ export function storySpaces(
   });
 }
 
+/**
+ * The opening a catalogue application starts from, with the catalogue's asset
+ * store: startup supplies the plugin asset store itself, over the catalogue's.
+ */
 export const storyOpening = (spaces: OpenSpaces, opened: OpenSpace) => ({
   kind: 'opened' as const,
   spaces,
   opened,
+  assets: STORY_ASSETS,
 });

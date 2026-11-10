@@ -371,4 +371,33 @@ describe('the Markdown plugin’s view', () => {
     expect(rendered.commits.content).toEqual([{ url: SAVED_REF }]);
     expect(rendered.commits.claims).toEqual({ taken: 1, released: 1 });
   });
+  it('keeps focus on its Open command as it becomes Close, and back', async () => {
+    renderPlugin(markdownPluginView.View, {
+      content,
+      map: closed,
+      title: 'Notes',
+      grants: { map: true },
+      assets: reading({ [TEXT_REF]: 'Text' }),
+    });
+    const open = screen.getByRole('button', { name: 'Open Resource Notes' });
+    open.focus();
+    fireEvent.click(open);
+    const close = await screen.findByRole('button', { name: 'Close Resource Notes' });
+    expect(close).toBe(open);
+    expect(close).toHaveFocus();
+  });
+
+  it('draws its kind glyph, named for a screen reader, only while Closed', async () => {
+    renderPlugin(markdownPluginView.View, {
+      content,
+      map: closed,
+      title: 'Notes',
+      grants: { map: true },
+      assets: reading({ [TEXT_REF]: 'Text' }),
+    });
+    expect(screen.getByRole('img', { name: 'Markdown Resource' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Open Resource Notes' }));
+    await screen.findByRole('button', { name: 'Close Resource Notes' });
+    expect(screen.queryByRole('img', { name: 'Markdown Resource' })).toBeNull();
+  });
 });

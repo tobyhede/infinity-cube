@@ -132,12 +132,17 @@ interface Editing {
   readonly saving: boolean;
 }
 
+/**
+ * The view fills its rect at least, in flow, so text longer than the rect
+ * grows past it: the canvas clips it to the Resource, and the Stage clips or
+ * scrolls it by its own rule. A running edit keeps to the rect, where the
+ * source editor scrolls.
+ */
 const fill: CSSProperties = {
-  position: 'absolute',
-  inset: 0,
+  position: 'relative',
   display: 'flex',
   flexDirection: 'column',
-  minHeight: 0,
+  minHeight: '100%',
 };
 
 /**
@@ -305,7 +310,7 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
           : [
               {
                 kind: 'action' as const,
-                id: 'close',
+                id: 'open-close',
                 label: `Close Resource ${name}`,
                 icon: <Minimize2 size={14} />,
                 run: () => undefined,
@@ -334,19 +339,21 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
           ]
         : [];
     if (mapCommit === undefined) return edit;
+    // Open and Close are one command whose name swaps, so a keyboard author's
+    // focus stays on it across both.
     return [
       ...edit,
       open
         ? {
             kind: 'action',
-            id: 'close',
+            id: 'open-close',
             label: `Close Resource ${name}`,
             icon: <Minimize2 size={14} />,
             run: () => commitMap({ open: false }),
           }
         : {
             kind: 'action',
-            id: 'open',
+            id: 'open-close',
             label: `Open Resource ${name}`,
             icon: <Maximize2 size={14} />,
             run: () => setMeasuring(true),
@@ -377,7 +384,13 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
     <div
       // Closed, the Title sits at the foot of the rect, as every Closed
       // Resource's does.
-      style={open ? fill : { ...fill, justifyContent: 'flex-end' }}
+      style={
+        !open
+          ? { ...fill, height: '100%', justifyContent: 'flex-end' }
+          : editing !== null
+            ? { ...fill, height: '100%' }
+            : fill
+      }
       data-open={open}
       data-editing={editing !== null}
     >
@@ -387,8 +400,26 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
       >
         <Title />
       </div>
+      {!open && (
+        // The kind glyph sits in the band along the top, at its right, as
+        // every Closed Resource's does; an Open one draws none.
+        <span
+          role="img"
+          aria-label={markdownPlugin.name}
+          style={{ position: 'absolute', top: 8, right: 8, display: 'flex' }}
+        >
+          <MarkdownGlyph />
+        </span>
+      )}
       {open && (
-        <div style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'auto' }}>
+        <div
+          style={{
+            position: 'relative',
+            flex: 1,
+            minHeight: editing === null ? undefined : 0,
+            overflow: editing === null ? undefined : 'hidden',
+          }}
+        >
           {editing !== null ? (
             <Own>
               <SourceEditor

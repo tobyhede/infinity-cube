@@ -28,8 +28,10 @@ export function HostRenderedMarkdown({
   className,
   edit,
 }: RenderedMarkdownProps) {
+  // `markdown-resource-body` carries the values the rendered text's own rules
+  // read: its gutter, its inset and its headings' weight.
   return (
-    <>
+    <div className="markdown-resource-body">
       <RenderedMarkdown
         markdown={markdown}
         drawnName={drawnName}
@@ -47,7 +49,7 @@ export function HostRenderedMarkdown({
           }}
         />
       )}
-    </>
+    </div>
   );
 }
 

@@ -13,7 +13,7 @@ import {
 } from '@project/ui';
 import { resourceSizeVars } from '#src/resource';
 import type { ResourceFrameStyle } from '../support/CanvasResourceSpecimen';
-import { storyText } from '../support/story-assets';
+import { storeStoryText, storyText } from '../support/story-assets';
 
 export default { title: 'Components/Resource/Editing' };
 
@@ -162,6 +162,9 @@ function useStoryHost(initialText: string) {
     kind: 'markdown',
     commitContent: commits.content,
     commitMap: commits.map,
+    // The host offers a store only where it says so: Save stores its text in
+    // the catalogue's asset store.
+    commitStore: storeStoryText,
     claim,
   };
   return { content, mapContent, operations };

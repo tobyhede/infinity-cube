@@ -343,10 +343,12 @@ test('a Markdown Resource’s actions menu groups Create Reference, Connect, Ful
   await page.goto(story('default'));
 
   const menu = await resourceActions(page, 'Opening');
+  // A Markdown Resource is drawn by its plugin, which offers no Open and
+  // Expand (issue 05): Opening is its rail's.
   await expectMenuGroups(menu, [
     ['Create Reference'],
     ['Connect to Resource'],
-    ['Open and Expand', 'Read in Full View', /^Present from Here/],
+    ['Read in Full View', /^Present from Here/],
     ['Copy link to Resource in Map', 'Copy link to Resource'],
     ['Remove from Map', 'Delete from Space'],
   ]);

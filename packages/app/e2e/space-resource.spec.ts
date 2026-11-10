@@ -1240,8 +1240,13 @@ test('an embedded Resource can move, open with the keyboard and resize in its ta
   await page.mouse.up();
   const moved = await boxOf(embedded, 'moved embedded Resource');
   expect(moved.x).toBeGreaterThan(before.x + 30);
-  await embedded.focus();
-  await embedded.press('Enter');
+  // A Markdown Resource Opens from its rail (issue 05): Enter on the
+  // Resource itself Opens nothing, so the keyboard reaches the rail's Open.
+  await (
+    await resourceControls(page, embedded)
+  )
+    .getByRole('button', { name: 'Open Resource Resource 1' })
+    .press('Enter');
   await expect(
     (await resourceControls(page, embedded)).getByRole('button', {
       name: 'Close Resource Resource 1',
@@ -1548,8 +1553,11 @@ test(
       return route.continue();
     });
     const resource = nodeByTitle(page, 'Resource 1');
-    await resource.focus();
-    await resource.press('Enter');
+    await (
+      await resourceControls(page, resource)
+    )
+      .getByRole('button', { name: 'Open Resource Resource 1' })
+      .click();
     await expect(page.getByTestId('persistence-failure')).toBeVisible();
     await page.getByRole('button', { name: 'Go to Map fixture', exact: true }).click();
     const trigger = page.getByRole('button', { name: 'Spaces. 2 open, 1 needs attention.' });
