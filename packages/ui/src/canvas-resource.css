@@ -560,6 +560,12 @@
   opacity: var(--canvas-resource-strength, 1);
 }
 
+/* A rail drawn in the rect stands over the plugin's pixels, which fill it. */
+.canvas-resource--plugin > .canvas-resource__actions {
+  position: relative;
+  z-index: 1;
+}
+
 /* What a Resource whose plugin threw draws in its rect instead (ADR 0142). */
 .resource-failure {
   margin: 0;
