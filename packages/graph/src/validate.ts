@@ -201,7 +201,7 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
         errors.push({
           kind: 'open-requires-content',
           ref: resourceId,
-          message: `Map "${subject.id}" stores ${member.kind} resource "${resourceId}" Open; a Resource with no content is always Closed`,
+          message: `Map "${subject.id}" stores ${member.kind} resource "${resourceId}" Open; a Resource whose kind is never Open is always Closed`,
         });
       }
     }

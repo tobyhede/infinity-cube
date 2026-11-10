@@ -109,7 +109,7 @@ describe('resolveResourceContent', () => {
       IMAGE,
       {
         kind: 'image',
-        url: 'https://example.com/harbour.png',
+        content: { url: 'https://example.com/harbour.png' },
         via: 'self',
       },
     ],
@@ -123,7 +123,7 @@ describe('resolveResourceContent', () => {
         via: 'self',
       },
     ],
-    ['an Ur Resource', UR, { kind: 'ur', via: 'self' }],
+    ['an Ur Resource', UR, { kind: 'ur', content: {}, via: 'self' }],
     [
       'a Reference Resource to Markdown',
       TO_MARKDOWN,
@@ -134,7 +134,7 @@ describe('resolveResourceContent', () => {
       TO_IMAGE,
       {
         kind: 'image',
-        url: 'https://example.com/harbour.png',
+        content: { url: 'https://example.com/harbour.png' },
         via: 'target',
       },
     ],
@@ -143,7 +143,7 @@ describe('resolveResourceContent', () => {
       TO_SPACE,
       { kind: 'space', view: framedView, via: 'target' },
     ],
-    ['a Reference Resource to an Ur Resource', TO_UR, { kind: 'ur', via: 'target' }],
+    ['a Reference Resource to an Ur Resource', TO_UR, { kind: 'ur', content: {}, via: 'target' }],
   ])('resolves %s', (_, id, expected) => {
     expect(resolveResourceContent(space, of(id))).toStrictEqual(expected);
   });

@@ -775,7 +775,7 @@ describe.each([
       },
     );
 
-    it.each(everyKind.filter(([kind]) => kind !== 'ur'))(
+    it.each(everyKind.filter(([kind]) => kind !== 'ur' && kind !== 'image'))(
       'refuses Map content on a %s Resource, which no plugin draws',
       (_kind, resources) => {
         for (const content of [{ shape: 'rectangle' }, { shape: 'pill' }, null]) {
@@ -811,12 +811,25 @@ describe.each([
       expect(space.maps[0]?.positions[A]).toEqual({ x: 0, y: 0 });
     });
 
-    it.each(everyKind.filter(([kind]) => kind !== 'ur'))(
+    it.each(everyKind.filter(([kind]) => kind !== 'ur' && kind !== 'image'))(
       'loads a %s Resource Open',
       (_kind, resources) => {
         expect(loaded(openIn(resources, true)).resources).toHaveLength(resources.length);
       },
     );
+
+    it('refuses an Image Resource stored Open, which its plugin draws with no Open (ADR 0142)', () => {
+      const image: Resource = {
+        id: A,
+        title: 'Figure',
+        kind: 'image',
+        content: { url: 'https://example.com/figure.png' },
+      };
+      expect(refused(openIn([image], true))).toEqual([
+        expect.objectContaining({ kind: 'open-requires-content', ref: A }),
+      ]);
+      expect(loaded(openIn([image], false)).resources).toHaveLength(1);
+    });
 
     it('refuses an Ur Resource stored Open, which has no content to show', () => {
       expect(refused(openIn([{ id: A, title: 'Node', kind: 'ur', content: {} }], true))).toEqual([

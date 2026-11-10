@@ -14,9 +14,9 @@ import {
 const id = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const contents = (via: ContentVia): ResourceContent[] => [
   { kind: 'markdown', source: 'Body', via },
-  { kind: 'image', url: 'https://example.com/image.png', via },
+  { kind: 'image', content: { url: 'https://example.com/image.png' }, via },
   { kind: 'space', view: { spaceId: id, map: id, graph: id, framing: undefined }, via },
-  { kind: 'ur', via },
+  { kind: 'ur', content: {}, via },
 ];
 const UNRESOLVED: ResourceContent = { kind: 'unresolved', via: 'target' };
 
@@ -25,7 +25,7 @@ const contentArbitrary: fc.Arbitrary<ResourceContent> = fc.oneof(
   fc.record({ kind: fc.constant('markdown' as const), source: fc.string(), via: viaArbitrary }),
   fc.record({
     kind: fc.constant('image' as const),
-    url: fc.webUrl(),
+    content: fc.record({ url: fc.webUrl() }),
     via: viaArbitrary,
   }),
   fc.record({
@@ -33,7 +33,7 @@ const contentArbitrary: fc.Arbitrary<ResourceContent> = fc.oneof(
     view: fc.constant({ spaceId: id, map: id, graph: id, framing: undefined }),
     via: viaArbitrary,
   }),
-  fc.record({ kind: fc.constant('ur' as const), via: viaArbitrary }),
+  fc.record({ kind: fc.constant('ur' as const), content: fc.constant({}), via: viaArbitrary }),
   fc.constant(UNRESOLVED),
 );
 const asSelf = (content: ResourceContent): ResourceContent =>
@@ -45,7 +45,9 @@ describe('content facts', () => {
       fc.property(contentArbitrary, (content) => {
         const offered = authorsContent(content);
         // `unresolved` is always `via: 'target'`, so `via` alone excludes it.
-        expect(offered).toBe(content.via === 'self' && content.kind !== 'ur');
+        expect(offered).toBe(
+          content.via === 'self' && content.kind !== 'ur' && content.kind !== 'image',
+        );
       }),
     );
   });
@@ -70,7 +72,7 @@ describe('content facts', () => {
   });
 
   it('answers each kind’s own authoring and content facts', () => {
-    expect(contents('self').map(authorsContent)).toEqual([true, true, true, false]);
+    expect(contents('self').map(authorsContent)).toEqual([true, false, true, false]);
     expect(authorsContent(UNRESOLVED)).toBe(false);
     expect([...contents('self'), UNRESOLVED].map(embedsMap)).toEqual([
       false,

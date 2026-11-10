@@ -16,7 +16,6 @@ import type {
   aggregateFileSchema,
   uuidSchema,
 } from './schema';
-import type { imageNaturalSizeSchema } from './kinds/image';
 
 /** Domain types are derived from the Zod schemas so they can never drift apart. */
 
@@ -42,8 +41,6 @@ export type GraphEdge = z.infer<typeof graphEdgeSchema>;
 export type Graph = z.infer<typeof graphSchema>;
 /** One of the four shapes a Graph's Edges draw at their heads (ADR 0105). */
 export type GraphHeadShape = z.infer<typeof graphHeadShapeSchema>;
-/** An image's size in pixels, as measured when an Image Resource's URL was set (ADR 0106). */
-export type ImageNaturalSize = z.infer<typeof imageNaturalSizeSchema>;
 export type MapPosition = z.infer<typeof mapPositionSchema>;
 export type ResourcePlacement = z.infer<typeof resourcePlacementSchema>;
 /** One of the four outlines an Ur Resource is drawn in on a Map, Open or Closed. */

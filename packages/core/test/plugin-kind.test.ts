@@ -16,8 +16,10 @@ import {
 
 describe('a Resource plugin read as a kind (ADR 0142)', () => {
   it('lists every plugin this build draws, and only those keep Map content', () => {
-    expect(PLUGIN_KINDS).toEqual(['ur']);
+    expect(PLUGIN_KINDS).toEqual(['image', 'ur']);
     expect(isPluginKind('ur')).toBe(true);
+    expect(isPluginKind('image')).toBe(true);
+    expect(keepsMapContent('image')).toBe(true);
     expect(isPluginKind('markdown')).toBe(false);
     expect(keepsMapContent('ur')).toBe(true);
     expect(keepsMapContent('markdown')).toBe(false);
