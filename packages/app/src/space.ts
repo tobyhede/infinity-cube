@@ -1,11 +1,12 @@
 import { httpAssetClient, HttpSpaceBackend, productAddress } from '@project/http';
 import { loadSpaceSnapshot, type Space } from '@project/graph';
-import { newUuid, type ImageNaturalSize, type UUID } from '@project/core';
+import { newUuid, type AssetRef, type ImageNaturalSize, type UUID } from '@project/core';
 import type { AssetClient, SpaceBackend } from '@project/persistence';
 import type { Assets } from '@project/resource-api/view';
 import { displayImageAsAuthored, type ImageDisplay } from '@project/ui';
 import type { HistoryApi } from './browser-location';
 import { createBrowserHistory } from './browser-history';
+import { describeAssetRefusal } from './authoring-refusal';
 import { pickFilesInBrowser, pickImagesInBrowser } from './browser-file-picker';
 import type { ImageSources } from './image-creation';
 import { storePicture } from './picture-admission';
@@ -71,15 +72,29 @@ export const browserImageSources = (
   pick: pickImagesInBrowser,
 });
 
+/** What the asset store answers a read or a store: the bytes, their reference, or a refusal. */
+type AssetAnswer = Blob | AssetRef | AssetRefusal;
+interface AssetRefusal {
+  readonly refused: string;
+}
+
+const isRefusal = (answer: AssetAnswer): answer is AssetRefusal =>
+  typeof answer === 'object' && 'refused' in answer;
+
+/** A store's answer with its refusal worded, as every refusal a plugin reads is (ADR 0057). */
+const worded = <T extends AssetAnswer>(answer: T | AssetRefusal): T | AssetRefusal =>
+  isRefusal(answer) ? { refused: describeAssetRefusal(answer.refused) } : answer;
+
 /**
  * The asset store as a Resource plugin's surface reaches it (ADR 0142): the
- * client's `url`, `read` and `store`, and the browser's own file picker. A host
+ * client's `url`, `read` and `store`, each refusal worded by
+ * `describeAssetRefusal`, and the browser's own file picker. A host
  * hands on only `url` and `read` where its Resource is not authored.
  */
 export const browserPluginAssets = (assets: AssetClient): Assets => ({
   url: (ref) => assets.url(ref),
-  read: (ref) => assets.read(ref),
-  store: (bytes) => assets.store(bytes),
+  read: async (ref) => worded(await assets.read(ref)),
+  store: async (bytes) => worded(await assets.store(bytes)),
   pick: async (accept) => [...(await pickFilesInBrowser(document, accept))],
 });
 

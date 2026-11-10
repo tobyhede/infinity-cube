@@ -1,5 +1,11 @@
 import type { SpaceAggregateError, SpaceError } from '@project/graph';
-import type { SaveBlock, SpaceSessionState } from '@project/persistence';
+import {
+  ASSET_ABSENT,
+  ASSET_TOO_LARGE,
+  MAX_ASSET_BYTES,
+  type SaveBlock,
+  type SpaceSessionState,
+} from '@project/persistence';
 import type { ConnectionResult } from './connection-completion';
 import type { AuthoringRefusal, StoredSpaceRefusal } from './space-authoring';
 import type {
@@ -504,3 +510,19 @@ export const describeImageReplacementBreak: ImageReplacementBreak = (failure) =>
 /** A replacement begun while another still holds the Space, said beside its upload target. */
 export const describeImageReplacementPending = (): string =>
   'Another image is still being replaced.';
+
+/**
+ * Application-owned copy for an asset store's refusal (ADR 0057, ADR 0142),
+ * from its stable code: what a Resource plugin reads in `{ refused }`, never
+ * the code itself. A code this build has no sentence for gets the general one.
+ */
+export const describeAssetRefusal = (code: string): string => {
+  switch (code) {
+    case ASSET_TOO_LARGE:
+      return `This file is larger than ${MAX_ASSET_BYTES / (1024 * 1024)} MB, the largest that can be stored.`;
+    case ASSET_ABSENT:
+      return 'This file is not stored here.';
+    default:
+      return 'This file could not be stored or read.';
+  }
+};

@@ -23,4 +23,7 @@ export const PluginAssetsProvider = PluginAssetsContext.Provider;
 export const usePluginAssets = (): Assets => useContext(PluginAssetsContext);
 
 /** The part of an asset store a surface that authors nothing is handed. */
-export const readingAssets = ({ url, read }: Assets): Assets => ({ url, read });
+export const readingAssets = (assets: Assets): Assets => ({
+  url: (ref) => assets.url(ref),
+  read: (ref) => assets.read(ref),
+});
