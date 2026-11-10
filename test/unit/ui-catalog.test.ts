@@ -50,6 +50,7 @@ const fixture = (): string => {
   // one, so the fixture has to supply them even where a case does not use them.
   write(root, 'packages/app/src/styles.css', '');
   mkdirSync(join(root, 'packages/react-flow-adapter/src'), { recursive: true });
+  mkdirSync(join(root, 'packages/resource-api/src/view'), { recursive: true });
   mkdirSync(join(root, 'packages/app/stories/support'), { recursive: true });
   return root;
 };
@@ -569,6 +570,16 @@ describe('production component coverage', () => {
     ]);
   });
 
+  it.each(['packages/plugin-thing/src/view.tsx', 'packages/resource-api/src/view/Part.tsx'])(
+    'holds %s, a plugin’s or the Resource API’s view, to a story (ADR 0142)',
+    (module) => {
+      const root = fixture();
+      write(root, module, 'export const Part = () => null;');
+
+      expect(() => buildUiCatalog(root)).toThrowError(`${module} is rendered by no stable story`);
+    },
+  );
+
   it('takes a recorded reason in place of a story, and reports it', () => {
     const root = fixture();
     write(
@@ -803,6 +814,7 @@ describe('hand-rolled application styles', () => {
   it.each([
     ['packages/app/src/styles.css', /packages\/app\/src\/styles\.css is missing/],
     ['packages/react-flow-adapter/src', /packages\/react-flow-adapter\/src is missing/],
+    ['packages/resource-api/src/view', /packages\/resource-api\/src\/view is missing/],
   ])('refuses to pass quietly when %s has gone', (path, expected) => {
     const root = fixture();
     rmSync(join(root, path), { recursive: true, force: true });

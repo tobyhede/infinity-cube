@@ -1,5 +1,6 @@
 import { ESLint } from 'eslint';
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 
 /**
  * ADR 0142: a Resource plugin imports no package of ours but the Resource API,
@@ -16,6 +17,8 @@ const lintImport = async (specifier: string, filePath: string): Promise<readonly
     .filter(({ ruleId }) => ruleId === 'no-restricted-imports')
     .map(({ message }) => message);
 };
+
+const lintConfigSchema = z.object({ rules: z.record(z.unknown()) });
 
 const PLUGIN_FILES = ['packages/plugin-ur/src/domain.ts', 'packages/plugin-ur/src/view.tsx'];
 
@@ -50,8 +53,35 @@ describe('Resource plugin import restrictions', () => {
     },
   );
 
-  it('keeps React out of a plugin’s domain half', async () => {
-    expect(await lintImport('react', 'packages/plugin-ur/src/domain.ts')).toHaveLength(1);
+  it.each(['react', 'react-dom', '@project/resource-api/view', './view', '../view'])(
+    'keeps %s out of a plugin’s domain half',
+    async (specifier) => {
+      expect(await lintImport(specifier, 'packages/plugin-ur/src/domain.ts')).not.toHaveLength(0);
+    },
+  );
+
+  it('zones every file under a plugin’s domain entry as the entry itself', async () => {
+    // A file that does not exist cannot be linted under the project service, so its zone is compared.
+    const zone = async (file: string) =>
+      lintConfigSchema.parse(await eslint.calculateConfigForFile(file)).rules[
+        'no-restricted-imports'
+      ];
+    expect(await zone('packages/plugin-ur/src/domain/rules.ts')).toEqual(
+      await zone('packages/plugin-ur/src/domain.ts'),
+    );
+  });
+
+  it.each(PLUGIN_FILES)('keeps the test host out of %s', async (file) => {
+    expect(await lintImport('@project/resource-api/view/testing', file)).not.toHaveLength(0);
+  });
+
+  it('permits the test host in a plugin’s tests', async () => {
+    expect(
+      await lintImport(
+        '@project/resource-api/view/testing',
+        'packages/plugin-ur/test/ur-plugin.test.tsx',
+      ),
+    ).toEqual([]);
   });
 });
 

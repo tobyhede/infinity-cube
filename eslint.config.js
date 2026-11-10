@@ -68,12 +68,20 @@ const RESOURCE_API_OWN_PATTERN = {
 };
 
 /**
- * Any package of ours but the Resource API, refused to a Resource plugin (ADR
- * 0142). A bundled plugin has no private door.
+ * Any package of ours but the Resource API's two halves, refused to a Resource
+ * plugin's source (ADR 0142). A bundled plugin has no private door, and the
+ * test host is for its tests.
  */
 const PLUGIN_PATTERN = {
-  regex: '^@project/(?!resource-api/(?:domain|view|view/testing)$)',
-  message: 'A Resource plugin imports no @project/* package but @project/resource-api (ADR 0142).',
+  regex: '^@project/(?!resource-api/(?:domain|view)$)',
+  message:
+    'A Resource plugin imports no @project/* package but @project/resource-api/domain and /view; /view/testing is for its tests (ADR 0142).',
+};
+
+/** A view, refused to a domain half, which the server and the CLI load (ADR 0142). */
+const DOMAIN_NAMES_NO_VIEW_PATTERN = {
+  regex: '(?:^|/)view(?:/|$)',
+  message: 'The domain half names no view (ADR 0142).',
 };
 
 const UI_IMPLEMENTATION_MESSAGE =
@@ -654,7 +662,7 @@ export default tseslint.config(
             RENDER_ONLY_PATTERN,
             REACT_DOM_PATTERN,
             RESOURCE_API_OWN_PATTERN,
-            { regex: '(?:^|/)view(?:/|$)', message: 'The domain half names no view (ADR 0142).' },
+            DOMAIN_NAMES_NO_VIEW_PATTERN,
           ],
         },
       ],
@@ -672,13 +680,19 @@ export default tseslint.config(
     },
   },
   {
-    files: ['packages/plugin-*/src/domain.ts'],
+    files: ['packages/plugin-*/src/domain.ts', 'packages/plugin-*/src/domain/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': [
         'error',
         {
           paths: [...RENDER_ONLY, ...REACT],
-          patterns: [ESCAPE_PATTERN, RENDER_ONLY_PATTERN, REACT_DOM_PATTERN, PLUGIN_PATTERN],
+          patterns: [
+            ESCAPE_PATTERN,
+            RENDER_ONLY_PATTERN,
+            REACT_DOM_PATTERN,
+            PLUGIN_PATTERN,
+            DOMAIN_NAMES_NO_VIEW_PATTERN,
+          ],
         },
       ],
     },
