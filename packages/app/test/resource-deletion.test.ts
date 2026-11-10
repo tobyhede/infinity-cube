@@ -3,7 +3,6 @@ import { kindFlags, uuidSchema, type SpaceSnapshot, type Resource } from '@proje
 import { MemorySpaceBackend } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
 import { openTestSpace } from './opened-space';
-import { unusedImageSources } from './image-sources';
 import { textAsset } from './markdown-texts';
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -62,7 +61,6 @@ function open(stored: SpaceSnapshot = snapshot) {
   const { spaceSession: session, spaceResources } = openTestSpace(backend, loaded);
   const reported: unknown[] = [];
   const composed = composeApp({
-    images: unusedImageSources,
     spaceSession: session,
     selection: MAP_ID,
     spaceResources,

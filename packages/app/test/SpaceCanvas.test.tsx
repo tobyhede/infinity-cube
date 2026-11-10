@@ -26,7 +26,6 @@ import type { ResourceResize } from '../src/render-adapter';
 import { mountSettled } from './settled-mount';
 import { CLOSED_DISPLAY } from '@project/ui';
 import { fixtureDisplay, fixtureFacts } from './render-adapter-fixtures';
-import { unusedImageSources } from './image-sources';
 import { stubResizeObserver } from './resize-observer';
 import { canvasReading, holdCanvasPolicy, IDLE_PLACEMENT } from './map-surfaces';
 import type { MapSurfacePolicy } from '../src/map-surface-policy';
@@ -228,12 +227,11 @@ async function mountGraph(
   const stored = { snapshot, revision: 0n, exportedRevision: null };
   const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(stored), stored);
   const { surface, commandOutcomes, deleteConfirmation } = composeApp({
-    images: unusedImageSources,
     spaceSession,
   });
   const placement = {
     ...IDLE_PLACEMENT,
-    createResource: addResource,
+    createFromDock: addResource,
     dropExistingResource: addExistingResource,
     dropSpace: placeSpace,
   };

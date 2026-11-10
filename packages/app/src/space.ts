@@ -7,9 +7,7 @@ import { displayImageAsAuthored, type ImageDisplay } from '@project/ui';
 import type { HistoryApi } from './browser-location';
 import { createBrowserHistory } from './browser-history';
 import { describeAssetRefusal } from './authoring-refusal';
-import { pickFilesInBrowser, pickImagesInBrowser } from './browser-file-picker';
-import type { ImageSize, ImageSources } from './image-creation';
-import { storePicture } from './picture-admission';
+import { pickFilesInBrowser } from './browser-file-picker';
 import type { Fullscreen } from './presenting-fullscreen';
 import type { PresentationLinks } from './presentation-link';
 import type { ApplicationStartupResult } from './startup';
@@ -31,49 +29,9 @@ export interface SpaceStartup {
  */
 const browserHistory = (): HistoryApi => createBrowserHistory(window);
 
-/** How long a picture may take to load before it is taken as one that did not. */
-const MEASURE_TIMEOUT_MS = 10_000;
-
-/**
- * The browser loading a picture to learn its natural size (ADR 0106): the one
- * place the application builds an `Image`. A picture that errors, never
- * answers, or has no intrinsic size answers `undefined`.
- */
-const measureInBrowser = (url: string): Promise<ImageSize | undefined> =>
-  new Promise((resolve) => {
-    const picture = new Image();
-    const settle = (size: ImageSize | undefined): void => {
-      clearTimeout(timer);
-      picture.onload = null;
-      picture.onerror = null;
-      resolve(size);
-    };
-    const timer = setTimeout(() => settle(undefined), MEASURE_TIMEOUT_MS);
-    picture.onload = () => {
-      const { naturalWidth: width, naturalHeight: height } = picture;
-      settle(width > 0 && height > 0 ? { width, height } : undefined);
-    };
-    picture.onerror = () => settle(undefined);
-    picture.src = url;
-  });
-
-/**
- * The host's asset store, and the browser measuring what it loads and choosing
- * files. A picture is admitted as one before it is stored as an asset. It is
- * measured where `displayImage` draws it from, so a measurement loads what the
- * Resource will show.
- */
-export const browserImageSources = (
-  assets: AssetClient = httpAssetClient(new HttpSpaceBackend()),
-  displayImage: ImageDisplay = displayImageAsAuthored,
-): ImageSources => ({
-  store: (image) => storePicture(assets, image),
-  measure: (url) => measureInBrowser(displayImage(url)),
-  pick: pickImagesInBrowser,
-});
-
-/** A refusal as a plugin reads it: the store's code put into words. */
-interface WordedRefusal {
+/** What the asset store answers a read or a store: the bytes, their reference, or a refusal. */
+type AssetAnswer = Blob | AssetRef | AssetRefusal;
+interface AssetRefusal {
   readonly refused: string;
 }
 
@@ -106,7 +64,7 @@ export const browserPluginAssets = (assets: AssetClient): Assets => ({
  *
  * The other four seams default together and for one reason: this is the composition
  * root, and it is where the ambient browser, the ambient generator and the real
- * transport — for Spaces and for images — are named. Everything below takes each of them required.
+ * transport — for Spaces and for assets — are named. Everything below takes each of them required.
  *
  * `session.mounted` says the session is Mounting an aggregate (ADR 0130), so
  * every Space it opens marks its Edits as lost on reload (ADR 0131). It is
@@ -120,7 +78,7 @@ export const createSpaceStartup = (
   backend: SpaceBackend = new HttpSpaceBackend(),
   newId: () => UUID = newUuid,
   history: HistoryApi = browserHistory(),
-  images: ImageSources = browserImageSources(),
+  displayImage: ImageDisplay = displayImageAsAuthored,
   {
     mounted = false,
     assets = httpAssetClient(new HttpSpaceBackend()),
@@ -142,7 +100,6 @@ export const createSpaceStartup = (
         metaSpaceTitle: meta.snapshot.document.title,
         newId,
         history,
-        images,
         fullscreen,
         presentations,
         mounted,

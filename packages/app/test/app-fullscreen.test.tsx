@@ -8,7 +8,6 @@ import { createOpenSpaces } from '../src/open-spaces';
 import type { Fullscreen } from '../src/presenting-fullscreen';
 import { unlinkedPresentations } from './presentations';
 import { recordingHistory } from './browser-history';
-import { unusedImageSources } from './image-sources';
 import { stubResizeObserver } from './resize-observer';
 import { textAsset } from './markdown-texts';
 
@@ -72,7 +71,6 @@ it('asks the fullscreen Open Spaces was composed with when the Dock presents', a
     subscribe: () => () => undefined,
   };
   const spaces = createOpenSpaces({
-    images: unusedImageSources,
     backend: MemorySpaceBackend.asMeta({ snapshot, revision: 0n, exportedRevision: null }),
     metaSpaceId: SPACE_ID,
     metaSpaceTitle: snapshot.document.title,

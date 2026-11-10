@@ -4,7 +4,6 @@ import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
 import { createMapSurface } from '../src/map-surface';
 import { mintingIds } from './minting';
-import { unusedImageSources } from './image-sources';
 
 const id = (tail: string) => uuidSchema.parse(`00000000-0000-4000-8000-${tail.padStart(12, '0')}`);
 const SPACE = id('1');
@@ -54,7 +53,7 @@ function composition(newId?: () => ReturnType<typeof id>) {
   };
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-  const app = composeApp({ spaceSession, images: unusedImageSources, newId });
+  const app = composeApp({ spaceSession, newId });
   return { app, spaceSession };
 }
 

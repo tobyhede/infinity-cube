@@ -17,7 +17,6 @@ import { composeApp } from '../src/compose-app';
 import { openTestSpace } from './opened-space';
 import { beginRename } from './command-dock';
 import { selectResource } from './resource-selection';
-import { unusedImageSources } from './image-sources';
 import { stubResizeObserver } from './resize-observer';
 import { textAsset } from './markdown-texts';
 
@@ -152,7 +151,7 @@ async function mountedSpaceApp(local: SpaceSnapshot = LOCAL): Promise<SpaceSessi
     {
       id: runtime(local).id,
       session,
-      app: composeApp({ images: unusedImageSources, spaceSession: session, spaceResources }),
+      app: composeApp({ spaceSession: session, spaceResources }),
       spaceResources,
     },
     (app) => {

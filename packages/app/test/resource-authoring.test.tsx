@@ -27,7 +27,6 @@ import {
   unavailable,
 } from './command-dock';
 import { selectResource } from './resource-selection';
-import { unusedImageSources } from './image-sources';
 import { stubResizeObserver } from './resize-observer';
 import { textAsset, textAt } from './markdown-texts';
 
@@ -184,7 +183,7 @@ function mount(value: SpaceSnapshot = snapshot, history?: HistoryApi): SpaceSess
     {
       id: runtime(value).id,
       session,
-      app: composeApp({ images: unusedImageSources, spaceSession: session }),
+      app: composeApp({ spaceSession: session }),
       spaceResources,
     },
     (app) => {

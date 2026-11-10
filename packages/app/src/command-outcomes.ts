@@ -1,29 +1,20 @@
-import type { MapId } from '@project/core';
+import type { MapId, ResourceId } from '@project/core';
 import {
   createNonThrowingReporter,
   createObservableState,
   type ObservableState,
   type ObserverErrorReporter,
 } from '@project/persistence';
-import {
-  describeAuthoringRefusal,
-  describeImageRefusals,
-  describeSpaceResourceCreationBreak,
-  describeSpaceResourceRefusal,
-} from './authoring-refusal';
+import { describeAuthoringRefusal, describeSpaceResourceRefusal } from './authoring-refusal';
 import type { Continuation, PendingContinuation } from './continuation';
 import { failureMessage } from './failure-message';
 import { TitledBreak, type CompletedContextEdit, type EditOutcome } from './authoring-commands';
 import { GRAPH_REPORT_TITLES } from './graph-authoring-commands';
 import { MAP_REPORT_TITLES } from './map-authoring-commands';
-import type { ImageEditResult } from './image-creation';
 import type { Navigation } from './navigation';
 import type { ExitSpaceResult, OpenSpace, SelectSpaceResult } from './open-spaces';
 import type { AuthoringResult, SpaceAuthoring } from './space-authoring';
-import type {
-  SpaceResourceCreationResult,
-  SpaceResourceDeletionResult,
-} from './space-resource-lifecycle';
+import type { SpaceResourceDeletionResult } from './space-resource-lifecycle';
 
 /**
  * What the author is told after a chrome command, as one module.
@@ -131,26 +122,15 @@ const CHANNELS = {
     words: 'described',
     title: 'Resource not removed',
   },
-  // It names what died. A Space Resource's placement is optimistic (ADR
-  // 0089), so the author may be typing into the Resource when the lifecycle
-  // answers, and this title makes a Resource vanishing from under the caret
-  // legible.
-  'space-resource-create': {
+  // A creation through the Resource API (ADR 0142): its refusal names the
+  // kind that was not created, which only the creation knows, so the report
+  // is the result's. Storing a picture or coordinating a new Space outlasts
+  // the press, so the Map may change before the answer arrives; the answer is
+  // still about the author's gesture.
+  'resource-create': {
     resetsOnMapChange: false,
-    words: 'described',
-    title: 'Space not created',
-  },
-  'reference-create': {
-    resetsOnMapChange: false,
-    words: 'described',
-    title: 'Reference Resource not created',
-  },
-  // Storing and measuring a picture outlast the press, so the Map may change
-  // before the answer arrives; the answer is still about the author's gesture.
-  'image-create': {
-    resetsOnMapChange: false,
-    words: 'described',
-    title: 'Image not created',
+    words: 'reported',
+    title: 'Resource not created',
   },
   // Enter, Exit and Open reach *another* Space's session, and each can fail
   // for a reason that is not a refusal — a Space that cannot be re-composed, a
@@ -180,9 +160,7 @@ export const COMMAND_CHANNELS = [
   'map-create',
   'map-manage',
   'map-delete',
-  'space-resource-create',
-  'reference-create',
-  'image-create',
+  'resource-create',
   'space-command',
   'graph-create',
   'graph-edit',
@@ -228,6 +206,15 @@ export interface CommandContinuation<Completed> {
 }
 
 type Completed<Result> = Extract<Result, { readonly kind: 'completed' }>;
+
+/**
+ * How a creation through the Resource API settled, as the host words it: the
+ * Resource it continues at, or the whole notice of its refusal, titled by the
+ * kind that was not created.
+ */
+export type CreationOutcome =
+  | { readonly kind: 'completed'; readonly createdResourceId?: ResourceId | undefined }
+  | { readonly kind: 'refused'; readonly report: CommandNotice };
 
 /**
  * Where the author continues after a completed Map creation.
@@ -286,17 +273,9 @@ interface CommandSignatures {
     readonly options: [];
   };
   readonly 'resource-remove': { readonly result: AuthoringResult; readonly options: [] };
-  readonly 'space-resource-create': {
-    readonly result: SpaceResourceCreationResult;
-    readonly options: [options?: CommandContinuation<Completed<SpaceResourceCreationResult>>];
-  };
-  readonly 'reference-create': {
-    readonly result: AuthoringResult;
-    readonly options: [options?: CommandContinuation<Completed<AuthoringResult>>];
-  };
-  readonly 'image-create': {
-    readonly result: ImageEditResult;
-    readonly options: [options?: CommandContinuation<Completed<ImageEditResult>>];
+  readonly 'resource-create': {
+    readonly result: CreationOutcome;
+    readonly options: [options?: CommandContinuation<Completed<CreationOutcome>>];
   };
   readonly 'space-enter': {
     readonly result: OpenSpace;
@@ -406,45 +385,13 @@ const COMMANDS: CommandDefinitions = {
     broke: brokeOn('resource-delete'),
   },
   'resource-remove': authoringCommand('resource-remove'),
-  'space-resource-create': {
-    channel: 'space-resource-create',
-    settle: (result, options) => {
-      if (result.kind === 'refused') {
-        return notice(
-          described('space-resource-create')(describeSpaceResourceRefusal(result.refusal)),
-        );
-      }
-      // `unchanged` made no Resource, so there is nothing to continue at.
-      if (result.kind === 'unchanged') return CLEAR;
-      return { kind: 'clear', continuation: options?.continueAt?.(result) ?? null };
-    },
-    broke: (failure) =>
-      described('space-resource-create')(describeSpaceResourceCreationBreak(failure)),
-  },
-  'reference-create': {
-    channel: 'reference-create',
-    settle: (result, options) => {
-      if (result.kind === 'refused') {
-        return notice(described('reference-create')(describeAuthoringRefusal(result.refusal)));
-      }
-      if (result.kind !== 'completed') return CLEAR;
-      return { kind: 'clear', continuation: options?.continueAt?.(result) ?? null };
-    },
-    broke: brokeOn('reference-create'),
-  },
-  'image-create': {
-    channel: 'image-create',
-    settle: (result, options) => {
-      if (result.kind === 'refused') {
-        return notice(described('image-create')(describeAuthoringRefusal(result.refusal)));
-      }
-      if (result.kind === 'not-stored') {
-        return notice(described('image-create')(describeImageRefusals(result.refusals)));
-      }
-      if (result.kind !== 'completed') return CLEAR;
-      return { kind: 'clear', continuation: options?.continueAt?.(result) ?? null };
-    },
-    broke: brokeOn('image-create'),
+  'resource-create': {
+    channel: 'resource-create',
+    settle: (result, options) =>
+      result.kind === 'refused'
+        ? notice(result.report)
+        : { kind: 'clear', continuation: options?.continueAt?.(result) ?? null },
+    broke: brokeOn('resource-create'),
   },
   'space-enter': {
     channel: 'space-command',

@@ -111,11 +111,111 @@ export interface PluginViewProps<C, M> {
   readonly surface: Surface<C, M>;
 }
 
+/**
+ * The Space a new Resource names in its content: the Space, and the Map and
+ * Graph it opens on (ADR 0074, ADR 0079).
+ */
+export interface NewSpace {
+  readonly spaceId: string;
+  readonly map: string;
+  readonly graph: string;
+}
+
+/**
+ * One Resource a creation asks the host for: its content as a value, or, as
+ * `contentFor`, a function of the Space it names. That Space is the new one the
+ * host makes for an item with `newSpace`, at most one per create, or else the
+ * Space a creation `from` a Space was offered, as the host reads it when the
+ * Resource is made. A plugin never makes or deletes a Space itself; the host
+ * owns its lifetime (ADR 0074).
+ */
+export type New<C> =
+  | {
+      /** Its Title; absent, the host names it as it names every new Resource. */
+      readonly title?: string | undefined;
+      readonly content: C;
+    }
+  | {
+      readonly title?: string | undefined;
+      readonly contentFor: (space: NewSpace) => C;
+      readonly newSpace?: true | undefined;
+    };
+
+/**
+ * What a creation's `run` is given: the host's `create`, which places what it
+ * is asked for where the gesture was made, in one atomic Edit, and continues
+ * into the first one's Title; the asset store and picker; and `report`, since
+ * `run` has no surface to say a refusal of its own on.
+ */
+export interface CreationHost<C> {
+  /**
+   * Create these Resources, or refuse: when creation is no longer available,
+   * when another creation runs, or when the Edit refuses. The host reports a
+   * refusal itself, so a plugin need not.
+   */
+  create(items: readonly New<C>[]): Promise<Answer>;
+  readonly assets: Assets;
+  /** Say why nothing was created, in words the plugin worded; the host shows them. */
+  report(words: string): void;
+}
+
+/** Data arriving on a surface: files dropped, or a URL pasted. */
+export type CreationData =
+  | { readonly kind: 'files'; readonly files: readonly File[] }
+  | { readonly kind: 'url'; readonly url: string };
+
+/** The media type a pasted URL is matched as. */
+export const URL_MEDIA_TYPE = 'text/uri-list';
+
+/** A Space offered to a creation from a list of Spaces. */
+export interface OfferedSpace {
+  readonly spaceId: string;
+  readonly title: string;
+}
+
+/**
+ * How a plugin's Resources are created (ADR 0142): where the creation is
+ * offered, and what it runs when pressed, in the press, so a picker opened
+ * from it keeps the gesture. An `await` before `pick` loses the press.
+ */
+export type Creation<C> =
+  | {
+      /** A press on the Command Dock. */
+      readonly from: 'dock';
+      readonly run: (host: CreationHost<C>) => void | Promise<void>;
+    }
+  | {
+      /**
+       * Data arriving on the canvas. `types` are media types, each exact or a
+       * wildcard (`image/*`, or `*` then `/*` for any type): among plugins
+       * accepting the same data, an exact match beats a wildcard, then build
+       * order decides. A pasted URL arrives as {@link URL_MEDIA_TYPE}.
+       */
+      readonly from: 'data';
+      readonly types: readonly string[];
+      /** Whether this data is the plugin's at all, beyond its media type. */
+      readonly accepts?: ((data: CreationData) => boolean) | undefined;
+      readonly run: (host: CreationHost<C>, data: CreationData) => void | Promise<void>;
+    }
+  | {
+      /** A command on another Resource, given that Resource. */
+      readonly from: 'resource';
+      readonly accepts?: ((resource: Resource) => boolean) | undefined;
+      readonly run: (host: CreationHost<C>, resource: Resource) => void | Promise<void>;
+    }
+  | {
+      /** A Space chosen from a list of Spaces, given that Space. */
+      readonly from: 'spaces';
+      readonly run: (host: CreationHost<C>, space: OfferedSpace) => void | Promise<void>;
+    };
+
 /** A plugin's view half. */
 export interface PluginView<C, M> {
   readonly kind: string;
   readonly View: ComponentType<PluginViewProps<C, M>>;
   readonly Glyph: ComponentType<{ readonly size?: number | undefined }>;
+  /** How its Resources are created, each where it is offered; none, none are. */
+  readonly creates?: readonly Creation<C>[] | undefined;
 }
 
 /** Declare a plugin's view half for its domain half. */
@@ -123,7 +223,7 @@ export function definePluginView<const K extends string, C, M>(
   plugin: ResourcePlugin<C, M> & { readonly kind: K },
   view: Omit<PluginView<C, M>, 'kind'>,
 ): PluginView<C, M> & { readonly kind: K } {
-  return { kind: plugin.kind, View: view.View, Glyph: view.Glyph };
+  return { kind: plugin.kind, View: view.View, Glyph: view.Glyph, creates: view.creates };
 }
 
 /** One choice in a choice command. */

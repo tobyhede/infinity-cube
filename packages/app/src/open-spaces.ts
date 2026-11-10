@@ -22,7 +22,6 @@ import { composeApp, type ComposedApp } from './compose-app';
 import { createPluginGate, type PluginGate } from './plugin-host/plugin-gate';
 import { createMountedEdits, type MountedEdits } from './mounted-edits';
 import { destinationOpening, type DestinationOpening } from './destination-opening';
-import type { ImageSources } from './image-creation';
 import type { Fullscreen } from './presenting-fullscreen';
 import type { PresentationLinks } from './presentation-link';
 import {
@@ -251,12 +250,6 @@ export interface OpenSpacesOptions {
    */
   readonly history: HistoryApi;
   /**
-   * Where an Image Resource's picture is stored and measured, required with no
-   * default for the reason `history` is: `createSpaceStartup` names the host
-   * and the browser, and a test supplies answers of its own.
-   */
-  readonly images: ImageSources;
-  /**
    * What Present asks to put fullscreen, required with no default for the
    * reason `history` is: `main.tsx` supplies the one adapter over `document`,
    * and a test or a story supplies one of its own. A default would let a mount
@@ -396,7 +389,6 @@ export function createOpenSpaces({
   metaSpaceTitle,
   newId,
   history,
-  images,
   fullscreen,
   presentations,
   reportObserverError,
@@ -612,7 +604,6 @@ export function createOpenSpaces({
       app: composeApp({
         spaceSession: session,
         selection,
-        images,
         newId,
         reportObserverError: report,
         spaceResources,

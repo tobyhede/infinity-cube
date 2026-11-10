@@ -6,7 +6,6 @@ import { MemorySpaceBackend } from '@project/persistence';
 import { mountSpace } from './space-mounting';
 import { composeApp } from '../src/compose-app';
 import { openTestSpace } from './opened-space';
-import { unusedImageSources } from './image-sources';
 import { stubResizeObserver } from './resize-observer';
 import { textAsset } from './markdown-texts';
 
@@ -107,7 +106,7 @@ describe('graph viewport', () => {
       {
         id: runtime(local).id,
         session,
-        app: composeApp({ images: unusedImageSources, spaceSession: session }),
+        app: composeApp({ spaceSession: session }),
         spaceResources,
       },
       (app) => {

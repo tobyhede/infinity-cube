@@ -19,6 +19,7 @@ import {
   useRailBand,
   type Assets,
   type Claim,
+  type Creation,
   type PluginViewProps,
   type RailCommand,
 } from '@project/resource-api/view';
@@ -556,7 +557,20 @@ function MarkdownGlyph({ size = 14 }: { readonly size?: number | undefined }) {
   return <StickyNote size={size} />;
 }
 
+/**
+ * Create Markdown Resource: one press on the Command Dock, the empty text,
+ * which names the asset of zero bytes and so stores nothing; the host places it
+ * and continues into its Title.
+ */
+const createFromDock: Creation<MarkdownContent> = {
+  from: 'dock',
+  run: async (host) => {
+    await host.create([{ content: markdownPlugin.newContent }]);
+  },
+};
+
 export const markdownPluginView = definePluginView(markdownPlugin, {
   View: MarkdownView,
   Glyph: MarkdownGlyph,
+  creates: [createFromDock],
 });

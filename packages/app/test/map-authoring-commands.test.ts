@@ -21,7 +21,6 @@ import {
 } from '../src/map-authoring-commands';
 import { createOpenSpaces, type OpenSpace } from '../src/open-spaces';
 import { recordingHistory } from './browser-history';
-import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
 import { refusingFullscreen } from './fullscreen';
 import { unlinkedPresentations } from './presentations';
@@ -100,7 +99,6 @@ const openSpaces = (control?: MemorySpaceBackendTestControl) =>
   createOpenSpaces({
     fullscreen: refusingFullscreen,
     presentations: unlinkedPresentations,
-    images: unusedImageSources,
     backend: new MemorySpaceBackend(
       META,
       [meta, target].map((snapshot) => ({ snapshot, revision: 0n, exportedRevision: null })),

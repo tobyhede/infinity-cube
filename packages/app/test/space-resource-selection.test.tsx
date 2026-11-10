@@ -21,7 +21,6 @@ import { mountSpace } from './space-mounting';
 import { composeApp } from '../src/compose-app';
 import { openTestSpace } from './opened-space';
 import { selectResource } from './resource-selection';
-import { unusedImageSources } from './image-sources';
 import { stubResizeObserver } from './resize-observer';
 
 /**
@@ -242,7 +241,7 @@ function mount(value: SpaceSnapshot = created): SpaceSession {
     {
       id: runtime(value).id,
       session,
-      app: composeApp({ images: unusedImageSources, spaceSession: session }),
+      app: composeApp({ spaceSession: session }),
       spaceResources,
     },
     (app) => {

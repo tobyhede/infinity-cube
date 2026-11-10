@@ -1,9 +1,7 @@
 import { newUuid, type SpaceSnapshot, type UUID } from '@project/core';
 import { MemorySpaceBackend, type MemorySpaceBackendTestControl } from '@project/persistence';
 import { productDestinationPath } from '@project/http';
-import type { ImageSources } from '#src/image-creation';
 import { createOpenSpaces, type OpenSpace, type OpenSpaces } from '#src/open-spaces';
-import { storelessImages } from './image-sources';
 import { refusingFullscreen } from './fullscreen';
 import { unlinkedPresentations } from './presentations';
 import { STORY_ASSETS } from './story-assets';
@@ -17,7 +15,6 @@ export function storySpaces(
   metaSpaceId: UUID,
   snapshots: readonly SpaceSnapshot[],
   control?: MemorySpaceBackendTestControl,
-  images: ImageSources = storelessImages,
   mounted = false,
 ): OpenSpaces {
   const backend = new MemorySpaceBackend(
@@ -33,7 +30,6 @@ export function storySpaces(
     metaSpaceId,
     metaSpaceTitle: meta.document.title,
     newId: newUuid,
-    images,
     fullscreen: refusingFullscreen,
     presentations: unlinkedPresentations,
     mounted,

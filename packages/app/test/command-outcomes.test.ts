@@ -6,17 +6,14 @@ import {
   COMMAND_DISCARDED,
   type CommandChannel,
   type CommandNotice,
+  type CreationOutcome,
 } from '../src/command-outcomes';
 import type { PendingContinuation } from '../src/continuation';
 import { composeApp } from '../src/compose-app';
 import type { CompletedContextEdit, EditOutcome } from '../src/authoring-commands';
 import { CANVAS, type AuthoringResult } from '../src/space-authoring';
-import type {
-  SpaceResourceCreationResult,
-  SpaceResourceDeletionResult,
-} from '../src/space-resource-lifecycle';
+import type { SpaceResourceDeletionResult } from '../src/space-resource-lifecycle';
 import { openTestSpace } from './opened-space';
-import { unusedImageSources } from './image-sources';
 import { textAsset } from './markdown-texts';
 
 /**
@@ -85,7 +82,6 @@ function open(storedRevision = 0n) {
   const { spaceSession: session } = openTestSpace(backend, loaded);
   const reported: unknown[] = [];
   const composed = composeApp({
-    images: unusedImageSources,
     spaceSession: session,
     selection: MAP_A,
     reportObserverError: (error) => reported.push(error),
@@ -114,11 +110,19 @@ const refusedDeletion: SpaceResourceDeletionResult = {
   kind: 'refused',
   refusal: { code: 'space-resource-not-found', resourceId: RESOURCE_A },
 };
-const refusedCreation: SpaceResourceCreationResult = {
-  kind: 'refused',
-  refusal: { code: 'map-not-found', mapId: MAP_A },
-};
 const MAP_GONE = 'This Map is no longer part of the Space.';
+const creationReport: CommandNotice = { title: 'Space Resource not created', message: MAP_GONE };
+const refusedCreation: CreationOutcome = { kind: 'refused', report: creationReport };
+const createdResource: CreationOutcome = { kind: 'completed', createdResourceId: CREATED };
+/** The creation host's continuation: into the created Resource's Title. */
+const inTheTitle = ({ createdResourceId }: { readonly createdResourceId?: string | undefined }) =>
+  createdResourceId === undefined
+    ? null
+    : ({
+        target: { kind: 'resource', resourceId: uuidSchema.parse(createdResourceId) },
+        select: true,
+        then: 'rename',
+      } as const);
 const mapReport: CommandNotice = { title: 'Map not created', message: 'Try a different name.' };
 const refusedMap = { kind: 'refused', report: mapReport } as const;
 const createdMap = { kind: 'completed', mapId: MAP_B, graphId: GRAPH_B } as const;
@@ -156,8 +160,7 @@ async function refuseOnEveryChannel(outcomes: ReturnType<typeof open>['outcomes'
   outcomes.run('graph-delete', () => refusedGraphDelete);
   outcomes.run('resource-delete', () => refusedAuthoring);
   outcomes.run('resource-remove', () => refusedAuthoring);
-  outcomes.run('reference-create', () => refusedAuthoring);
-  await outcomes.run('space-resource-create', () => Promise.resolve(refusedCreation));
+  await outcomes.run('resource-create', () => Promise.resolve(refusedCreation));
   await outcomes.run(
     'space-open',
     () => Promise.resolve({ kind: 'refused', code: 'space-not-open' } as const),
@@ -213,78 +216,22 @@ describe('titles and sentences', () => {
     expect(notice(outcomes, 'graph-edit')).toBeNull();
   });
 
-  it('publishes a refused Reference Resource creation under its own title', () => {
+  it('publishes a refused creation’s complete report, titled by the plugin that asked', () => {
     const { outcomes } = open();
 
-    outcomes.run('reference-create', () => refusedAuthoring);
+    outcomes.run('resource-create', () => refusedCreation);
 
-    expect(notice(outcomes, 'reference-create')).toEqual({
-      title: 'Reference Resource not created',
-      message: MAP_GONE,
-    });
+    expect(notice(outcomes, 'resource-create')).toBe(creationReport);
   });
 
-  it.each([
-    ['image-too-large', 'huge.png is larger than 10 MB, the largest image that can be stored.'],
-    ['image-format-unsupported', 'notes.txt is not a PNG, JPEG, WebP or GIF image.'],
-    [
-      'image-svg-unsupported',
-      'figure.svg is an SVG image, which cannot be stored. Use PNG, JPEG, WebP or GIF.',
-    ],
-  ] as const)(
-    'says a stored image refused as %s in the application’s words, naming the file',
-    async (code, message) => {
-      const { outcomes } = open();
-      const name = message.split(' ')[0] ?? '';
-
-      await outcomes.run('image-create', () =>
-        Promise.resolve({ kind: 'not-stored' as const, refusals: [{ code, name }] }),
-      );
-
-      expect(notice(outcomes, 'image-create')).toEqual({ title: 'Image not created', message });
-    },
-  );
-
-  it('says every file a drop had refused, not only the first', async () => {
-    const { outcomes } = open();
-
-    await outcomes.run('image-create', () =>
-      Promise.resolve({
-        kind: 'not-stored' as const,
-        refusals: [
-          { code: 'image-format-unsupported' as const, name: 'notes.txt' },
-          { code: 'image-too-large' as const, name: 'huge.png' },
-        ],
-      }),
-    );
-
-    expect(notice(outcomes, 'image-create')).toEqual({
-      title: 'Image not created',
-      message:
-        'notes.txt is not a PNG, JPEG, WebP or GIF image. ' +
-        'huge.png is larger than 10 MB, the largest image that can be stored.',
-    });
-  });
-
-  it('continues a created Image Resource at the first Resource the Edit made', async () => {
+  it('continues a created Resource at the first Resource the Edit made', async () => {
     const { outcomes, continuation } = open();
 
-    await outcomes.run(
-      'image-create',
-      () => Promise.resolve({ kind: 'completed' as const, createdResourceId: CREATED }),
-      {
-        continueAt: ({ createdResourceId }) =>
-          createdResourceId === undefined
-            ? null
-            : {
-                target: { kind: 'resource', resourceId: createdResourceId },
-                select: true,
-                then: 'rename',
-              },
-      },
-    );
+    await outcomes.run('resource-create', () => Promise.resolve(createdResource), {
+      continueAt: inTheTitle,
+    });
 
-    expect(notice(outcomes, 'image-create')).toBeNull();
+    expect(notice(outcomes, 'resource-create')).toBeNull();
     expect(continuation.getState().pending).toEqual({
       target: { kind: 'resource', resourceId: CREATED },
       select: true,
@@ -305,11 +252,9 @@ describe('titles and sentences', () => {
 
   it('answers the caller the result its operation produced', async () => {
     const { outcomes } = open();
-    const completed = { kind: 'completed', resourceId: CREATED } as const;
-
     await expect(
-      outcomes.run('space-resource-create', () => Promise.resolve(completed)),
-    ).resolves.toBe(completed);
+      outcomes.run('resource-create', () => Promise.resolve(createdResource)),
+    ).resolves.toBe(createdResource);
   });
 
   it('clears the channel at the press and leaves it clear on completion', () => {
@@ -337,14 +282,13 @@ describe('the Map-change reset', () => {
   it('clears exactly the channels a Map change resets', async () => {
     const { outcomes, navigation } = open();
     await refuseOnEveryChannel(outcomes);
-    expect(outcomes.getState().notices.size).toBe(11);
+    expect(outcomes.getState().notices.size).toBe(10);
 
     navigation.selectMap(MAP_B);
 
     expect([...outcomes.getState().notices.keys()].sort()).toEqual([
-      'reference-create',
+      'resource-create',
       'space-command',
-      'space-resource-create',
     ]);
   });
 
@@ -360,40 +304,11 @@ describe('the Map-change reset', () => {
 });
 
 describe('continueAt', () => {
-  it('requests the continuation at the id the operation minted', async () => {
+  it('requests the continuation at the id the creation minted', async () => {
     const { outcomes, continuation } = open();
 
-    await outcomes.run(
-      'space-resource-create',
-      () => Promise.resolve({ kind: 'completed', resourceId: CREATED } as const),
-      {
-        continueAt: ({ resourceId }) => ({
-          target: { kind: 'resource', resourceId },
-          select: true,
-          then: 'rename',
-        }),
-      },
-    );
-
-    expect(continuation.getState().pending).toEqual({
-      target: { kind: 'resource', resourceId: CREATED },
-      select: true,
-      then: 'rename',
-    });
-  });
-
-  it('continues a created Reference Resource at the id Space Authoring minted', () => {
-    const { outcomes, continuation } = open();
-
-    outcomes.run('reference-create', () => ({ kind: 'completed', createdResourceId: CREATED }), {
-      continueAt: ({ createdResourceId }) =>
-        createdResourceId === undefined
-          ? null
-          : {
-              target: { kind: 'resource', resourceId: createdResourceId },
-              select: true,
-              then: 'rename',
-            },
+    await outcomes.run('resource-create', () => Promise.resolve(createdResource), {
+      continueAt: inTheTitle,
     });
 
     expect(continuation.getState().pending).toEqual({
@@ -406,40 +321,12 @@ describe('continueAt', () => {
   it('requests nothing where the completion names nothing to continue at', () => {
     const { outcomes, continuation } = open();
 
-    outcomes.run('reference-create', () => completedAuthoring, { continueAt: () => null });
+    outcomes.run('resource-create', () => ({ kind: 'completed' }) as const, {
+      continueAt: inTheTitle,
+    });
 
     expect(continuation.getState().pending).toBeNull();
-  });
-
-  it('requests nothing for a Reference Resource creation that did not complete', () => {
-    const { outcomes, continuation } = open();
-    const continueAt = vi.fn(
-      () => ({ target: { kind: 'canvas' }, select: false, then: 'focus' }) as const,
-    );
-
-    outcomes.run('reference-create', () => refusedAuthoring, { continueAt });
-    outcomes.run('reference-create', () => queuedAuthoring, { continueAt });
-    outcomes.run('reference-create', () => unchangedAuthoring, { continueAt });
-
-    expect(continueAt).not.toHaveBeenCalled();
-    expect(continuation.getState().pending).toBeNull();
-  });
-
-  it('requests nothing for a Space Resource creation that changed nothing', async () => {
-    const { outcomes, continuation } = open();
-    const continueAt = vi.fn(
-      () => ({ target: { kind: 'canvas' }, select: false, then: 'focus' }) as const,
-    );
-
-    await outcomes.run(
-      'space-resource-create',
-      () => Promise.resolve({ kind: 'unchanged' } as const),
-      { continueAt },
-    );
-
-    expect(continueAt).not.toHaveBeenCalled();
-    expect(continuation.getState().pending).toBeNull();
-    expect(notice(outcomes, 'space-resource-create')).toBeNull();
+    expect(notice(outcomes, 'resource-create')).toBeNull();
   });
 
   it('requests nothing on a refusal', async () => {
@@ -448,16 +335,13 @@ describe('continueAt', () => {
       () => ({ target: { kind: 'canvas' }, select: false, then: 'focus' }) as const,
     );
 
-    await outcomes.run('space-resource-create', () => Promise.resolve(refusedCreation), {
+    await outcomes.run('resource-create', () => Promise.resolve(refusedCreation), {
       continueAt,
     });
 
     expect(continueAt).not.toHaveBeenCalled();
     expect(continuation.getState().pending).toBeNull();
-    expect(notice(outcomes, 'space-resource-create')).toEqual({
-      title: 'Space not created',
-      message: MAP_GONE,
-    });
+    expect(notice(outcomes, 'resource-create')).toBe(creationReport);
   });
 });
 
@@ -482,47 +366,14 @@ describe('a thrown operation', () => {
     const { outcomes, reported } = open();
     const failure = new Error('coordination broke');
 
-    await expect(
-      outcomes.run('space-resource-create', () => Promise.reject(failure)),
-    ).resolves.toBe(COMMAND_BROKE);
-
-    expect(reported).toEqual([failure]);
-    expect(notice(outcomes, 'space-resource-create')).toEqual({
-      title: 'Space not created',
-      message: 'This Resource was not created: coordination broke',
-    });
-  });
-
-  it('says a Space Resource creation that broke before its await as a break, not a refusal', async () => {
-    const { outcomes, reported, continuation } = open();
-    const failure = new Error('map resolution broke');
-    const continueAt = vi.fn(
-      () => ({ target: { kind: 'canvas' }, select: false, then: 'focus' }) as const,
+    await expect(outcomes.run('resource-create', () => Promise.reject(failure))).resolves.toBe(
+      COMMAND_BROKE,
     );
 
-    const resolveMap = (): never => {
-      throw failure;
-    };
-
-    // An `async` thunk, as `App`'s creation is: title minting and `resolveMap`
-    // run before it hands back the lifecycle's promise, and their throw must
-    // arrive as a rejection rather than escape `run` synchronously.
-    const answered = await outcomes.run(
-      'space-resource-create',
-      async () => {
-        resolveMap();
-        return Promise.resolve(refusedCreation);
-      },
-      { continueAt },
-    );
-
-    expect(answered).toBe(COMMAND_BROKE);
     expect(reported).toEqual([failure]);
-    expect(continueAt).not.toHaveBeenCalled();
-    expect(continuation.getState().pending).toBeNull();
-    expect(notice(outcomes, 'space-resource-create')).toEqual({
-      title: 'Space not created',
-      message: 'This Resource was not created: map resolution broke',
+    expect(notice(outcomes, 'resource-create')).toEqual({
+      title: 'Resource not created',
+      message: 'coordination broke',
     });
   });
 
@@ -546,21 +397,6 @@ describe('a thrown operation', () => {
     ).resolves.toBe(COMMAND_BROKE);
     expect(notice(outcomes, 'graph-edit')).toEqual(said);
     expect(reported).toEqual([failure, failure]);
-  });
-
-  it('says a thrown Reference Resource creation in the words the failure carries', () => {
-    const { outcomes, reported } = open();
-    const referenceFailure = new Error('reference broke');
-
-    outcomes.run('reference-create', () => {
-      throw referenceFailure;
-    });
-
-    expect(reported).toEqual([referenceFailure]);
-    expect(notice(outcomes, 'reference-create')).toEqual({
-      title: 'Reference Resource not created',
-      message: 'reference broke',
-    });
   });
 
   it('reports a Map command throw and says it in the words the failure carries', () => {
@@ -825,14 +661,14 @@ describe('staleness', () => {
 
   it('keeps a run on a channel the Map change does not reset', async () => {
     const { outcomes, navigation } = open();
-    const pending = deferred<SpaceResourceCreationResult>();
-    const running = outcomes.run('space-resource-create', () => pending.promise);
+    const pending = deferred<CreationOutcome>();
+    const running = outcomes.run('resource-create', () => pending.promise);
 
     navigation.selectMap(MAP_B);
     pending.resolve(refusedCreation);
     await running;
 
-    expect(notice(outcomes, 'space-resource-create')?.message).toBe(MAP_GONE);
+    expect(notice(outcomes, 'resource-create')?.message).toBe(MAP_GONE);
   });
 
   it('leaves the newer outcome standing when two runs settle out of order', async () => {
@@ -869,14 +705,14 @@ describe('staleness', () => {
     authoring.complete(CANVAS, { kind: 'deleted-edge', graphId: GRAPH_A, edge: EDGE });
     await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));
     outcomes.run('resource-delete', () => refusedAuthoring);
-    await outcomes.run('space-resource-create', () => Promise.resolve(refusedCreation));
+    await outcomes.run('resource-create', () => Promise.resolve(refusedCreation));
     expect(notice(outcomes, 'resource-delete')).not.toBeNull();
-    expect(notice(outcomes, 'space-resource-create')).not.toBeNull();
+    expect(notice(outcomes, 'resource-create')).not.toBeNull();
 
     expect(authoring.acceptStoredSpace()).toBeNull();
 
     expect(notice(outcomes, 'resource-delete')).toBeNull();
-    expect(notice(outcomes, 'space-resource-create')).toBeNull();
+    expect(notice(outcomes, 'resource-create')).toBeNull();
   });
 
   it('still reports a discarded settlement that threw, and answers it discarded', async () => {

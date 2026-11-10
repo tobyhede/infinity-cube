@@ -214,7 +214,7 @@ export const createApp = (
       entityActions,
       availability,
       editingResourceBody,
-      createReferenceFrom: placement.createReferenceFrom,
+      createFromResource: placement.createFromResource,
       spaces,
     });
     useUnsettledLeaveGuard(sessionState.persistence.kind, replacingImage);

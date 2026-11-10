@@ -1,6 +1,10 @@
 import { act, renderHook } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { describe, expect, it } from 'vitest';
 import { uuidSchema, type MapId } from '@project/core';
+import type { AssetRef } from '@project/resource-api/domain';
+import type { Assets } from '@project/resource-api/view';
+import { PluginAssetsProvider } from '@project/ui';
 import type { OpenSpace } from '../src/open-spaces';
 import { useResourcePlacement } from '../src/resource-placement';
 import {
@@ -9,17 +13,47 @@ import {
   derivationSpace,
   openDerivationSpace,
 } from './app-derivation-fixtures';
-import { heldImageSources } from './image-sources';
 import { mintingIds } from './minting';
 
 /**
- * The Image Resource gestures `useResourcePlacement` offers, driven while the
- * picture they bring is still being measured.
+ * The Image plugin's creation from dropped files, as `useResourcePlacement`
+ * runs it, driven while the picture it brings is still being stored.
  */
 
 const CREATED = uuidSchema.parse('00000000-0000-4000-8000-0000000000e1');
-const URL = 'https://example.com/a.png';
+const STORED: AssetRef = '/assets/LCa0a2j_xo_5m0U8HTBBNBNCLXBkg7-g-YpeiGJm564';
 const AT = { x: 30, y: 40 };
+
+const GIF_BYTES = Uint8Array.from([...new TextEncoder().encode('GIF89a'), 5, 0, 1, 0]);
+
+/** A file whose bytes can be read, which jsdom's `File` cannot do. */
+class ReadableFile extends File {
+  override arrayBuffer(): Promise<ArrayBuffer> {
+    return Promise.resolve(GIF_BYTES.slice().buffer);
+  }
+}
+
+/** A GIF whose header gives its size, so it is sized without being loaded. */
+const gif = (): File => new ReadableFile([GIF_BYTES], 'a.gif', { type: 'image/gif' });
+
+/** An asset store whose every store waits for `release`. */
+const heldStore = () => {
+  const waiting: (() => void)[] = [];
+  const assets: Assets = {
+    url: (ref) => ref,
+    read: () => Promise.resolve({ refused: 'Nothing is read here.' }),
+    store: () =>
+      new Promise((resolve) => {
+        waiting.push(() => resolve(STORED));
+      }),
+  };
+  return {
+    assets,
+    release: () => {
+      for (const resolve of waiting.splice(0)) resolve();
+    },
+  };
+};
 
 const drawnMap = () => {
   const resolved = derivationSpace().lookup.map(MAP_ID);
@@ -27,14 +61,20 @@ const drawnMap = () => {
   return resolved.map;
 };
 
-const place = (opened: OpenSpace) =>
-  renderHook(() =>
-    useResourcePlacement(opened, {
-      map: drawnMap(),
-      presenting: false,
-      replacementEpoch: 0,
-      reportBreak: () => undefined,
-    }),
+const place = (opened: OpenSpace, assets: Assets) =>
+  renderHook(
+    () =>
+      useResourcePlacement(opened, {
+        map: drawnMap(),
+        presenting: false,
+        replacementEpoch: 0,
+        reportBreak: () => undefined,
+      }),
+    {
+      wrapper: ({ children }: { readonly children: ReactNode }) => (
+        <PluginAssetsProvider value={assets}>{children}</PluginAssetsProvider>
+      ),
+    },
   );
 
 const placedIn = (opened: OpenSpace, mapId: MapId): readonly string[] =>
@@ -46,16 +86,16 @@ const placedIn = (opened: OpenSpace, mapId: MapId): readonly string[] =>
 /** Settle every promise the gesture chained on the answer. */
 const settled = () => act(() => new Promise((resolve) => setTimeout(resolve, 0)));
 
-describe('an Image Resource gesture the author moves away from', () => {
+describe('an Image Resource drop the author moves away from', () => {
   it('places the Resource on the Map it was made on, and owes no Title on the Map drawn now', async () => {
-    const measuring = heldImageSources();
-    const opened = openDerivationSpace(mintingIds(CREATED), measuring.images);
-    const { result } = place(opened);
+    const storing = heldStore();
+    const opened = openDerivationSpace(mintingIds(CREATED));
+    const { result } = place(opened, storing.assets);
 
-    act(() => result.current.pasteImageUrl(URL, AT));
+    act(() => result.current.createFromData({ kind: 'files', files: [gif()] }, AT));
     await settled();
     act(() => opened.app.navigation.selectMap(OTHER_MAP_ID));
-    measuring.release();
+    storing.release();
     await settled();
 
     expect(placedIn(opened, MAP_ID)).toContain(CREATED);
@@ -65,12 +105,13 @@ describe('an Image Resource gesture the author moves away from', () => {
   });
 
   it('continues in the Title while the Map it was made on is still drawn', async () => {
-    const measuring = heldImageSources();
-    const opened = openDerivationSpace(mintingIds(CREATED), measuring.images);
-    const { result } = place(opened);
+    const storing = heldStore();
+    const opened = openDerivationSpace(mintingIds(CREATED));
+    const { result } = place(opened, storing.assets);
 
-    act(() => result.current.pasteImageUrl(URL, AT));
-    measuring.release();
+    act(() => result.current.createFromData({ kind: 'files', files: [gif()] }, AT));
+    await settled();
+    storing.release();
     await settled();
 
     expect(placedIn(opened, MAP_ID)).toContain(CREATED);
@@ -82,16 +123,16 @@ describe('an Image Resource gesture the author moves away from', () => {
   });
 });
 
-describe('an Image Resource gesture that brought no files', () => {
+describe('an Image Resource drop that brought no files', () => {
   it('leaves a gesture still in flight to settle', async () => {
-    const measuring = heldImageSources();
-    const opened = openDerivationSpace(mintingIds(CREATED), measuring.images);
-    const { result } = place(opened);
+    const storing = heldStore();
+    const opened = openDerivationSpace(mintingIds(CREATED));
+    const { result } = place(opened, storing.assets);
 
-    act(() => result.current.pasteImageUrl(URL, AT));
-    act(() => result.current.createImagesFromFiles([]));
-    act(() => result.current.dropImages([], AT));
-    measuring.release();
+    act(() => result.current.createFromData({ kind: 'files', files: [gif()] }, AT));
+    act(() => result.current.createFromData({ kind: 'files', files: [] }, AT));
+    await settled();
+    storing.release();
     await settled();
 
     expect(opened.app.continuation.getState().pending).toEqual({

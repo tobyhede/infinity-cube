@@ -18,7 +18,6 @@ import type {
 } from '../src/space-authoring';
 
 import { completeDrag, fixtureDisplay, moving, node, settled } from './render-adapter-fixtures';
-import { unusedImageSources } from './image-sources';
 import { textAsset } from './markdown-texts';
 
 const RESOURCE_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -116,7 +115,6 @@ function sessionBackedAdapter(
   );
   const session = openSpaceSession(backend, loaded);
   const { authoring, surface } = composeApp({
-    images: unusedImageSources,
     spaceSession: session,
     selection: mapId,
     newId,

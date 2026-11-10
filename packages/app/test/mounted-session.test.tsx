@@ -6,7 +6,6 @@ import { createOpenSpaces, type OpenSpace } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { unavailable } from './command-dock';
 import { recordingHistory } from './browser-history';
-import { heldImageSources } from './image-sources';
 import { refusingFullscreen } from './fullscreen';
 import { unlinkedPresentations } from './presentations';
 import { selectResource } from './resource-selection';
@@ -127,7 +126,6 @@ async function openMeta(mounted: boolean, root: SpaceSnapshot = meta): Promise<O
   const spaces = createOpenSpaces({
     fullscreen: refusingFullscreen,
     presentations: unlinkedPresentations,
-    images: heldImageSources().images,
     backend,
     metaSpaceId: META_ID,
     metaSpaceTitle: 'Meta',

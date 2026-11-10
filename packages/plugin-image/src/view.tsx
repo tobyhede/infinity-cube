@@ -30,6 +30,7 @@ import {
   type ImageContent,
   type ImageMapContent,
 } from './domain';
+import { IMAGE_CREATIONS } from './creation';
 
 /**
  * The Image plugin's view (ADR 0106, ADR 0142): the picture, fitted whole into
@@ -392,4 +393,5 @@ function ImageResourceGlyph({ size = 14 }: { readonly size?: number | undefined 
 export const imagePluginView = definePluginView(imagePlugin, {
   View: ImageView,
   Glyph: ImageResourceGlyph,
+  creates: IMAGE_CREATIONS,
 });

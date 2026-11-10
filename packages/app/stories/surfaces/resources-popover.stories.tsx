@@ -9,8 +9,6 @@ import { composeApp } from '#src/compose-app';
 import { resolveMap, resourcesOutsideMap } from '#src/map-resolution';
 import { otherMapMemberships, type MapMemberships } from '#src/map-memberships';
 import type { SpaceDrag } from '#src/resources-drag';
-import { spaceTitlesById, spaceSelectionNamesById } from '#src/space-resource-targets';
-import { storelessImages } from '../support/image-sources';
 import { sparseAuthoredSnapshot, widelyPlacedSpace } from '../support/spaces';
 import { CANVAS } from '#src/space-authoring';
 
@@ -163,10 +161,7 @@ function RefusedAdd() {
     const stored = { snapshot: sparseAuthoredSnapshot, revision: 0n, exportedRevision: null };
     return openSpaceSession(MemorySpaceBackend.asMeta(stored), stored);
   }, []);
-  const composed = useMemo(
-    () => composeApp({ spaceSession: session, images: storelessImages }),
-    [session],
-  );
+  const composed = useMemo(() => composeApp({ spaceSession: session }), [session]);
   useSyncExternalStore(session.subscribe, session.getState);
   const space = composed.currentSpace();
   const selectedMap = space.lookup.map(composed.navigation.getState().selectedMapId)?.map;

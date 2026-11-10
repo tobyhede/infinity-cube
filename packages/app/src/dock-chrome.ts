@@ -1,6 +1,7 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   graphHeadShape,
+  KIND_IDS,
   type Graph,
   type GraphHeadShape,
   type GraphId,
@@ -18,6 +19,7 @@ import type { BrowserLocation } from './browser-location';
 import type { PendingCanvasProjection } from './canvas-projection';
 import type {
   DockChrome,
+  DockCreate,
   DockResourcesList,
   SpaceExitReport,
 } from './components/command-dock-chrome';
@@ -26,12 +28,18 @@ import { offered, renameDraftAnswer } from './authoring-commands';
 import { graphDeletionWords, topLevelGraphAuthoringCommands } from './graph-authoring-commands';
 import { mapDeletionWords, topLevelMapAuthoringCommands } from './map-authoring-commands';
 import type { OpenSpace, OpenSpaces, RejectedExitConfirmation } from './open-spaces';
-import type { ResourcePlacementCommands } from './resource-placement';
+import { DOCK_CREATIONS, type ResourcePlacementCommands } from './resource-placement';
 import { CANVAS } from './space-authoring';
 import type { ResourcesDisclosure } from './resources-disclosure';
 import { useReferenceableSpaces } from './referenceable-spaces';
-import { dockCreates, type CreateConditions } from './kind-creation';
-import { KIND_CREATIONS, type KindCreationContext } from './kinds/registry';
+
+/**
+ * The Dock's Creates in registry order, the order the cluster has always drawn
+ * its kinds in, whatever order the plugins are built in.
+ */
+const ORDERED_DOCK_CREATIONS = [...DOCK_CREATIONS].sort(
+  (a, b) => KIND_IDS.indexOf(a.kind) - KIND_IDS.indexOf(b.kind),
+);
 
 /**
  * The Graph the Dock's Graph cluster names: the Active Graph, or nothing.
@@ -90,20 +98,45 @@ export interface DockChromeInput {
 }
 
 /**
- * The Create conditions as last committed, for a Create that continues after
- * its press (a picker answering), and `null` once the Dock that drew it has
- * gone. Not a ref: it is read by the presses `dockCreates` builds during render.
+ * Whether Add Resource is offered as last committed, for a Create that asks
+ * the host for its Resources after its press (a picker answering), and `false`
+ * once the Dock that drew it has gone. Not a ref: it is read by the presses
+ * the Dock builds during render.
  */
-class CommittedCreateConditions {
-  #conditions: CreateConditions<KindCreationContext> | null = null;
-  readonly current = (): CreateConditions<KindCreationContext> | null => this.#conditions;
-  /** Commit these conditions, answering how to withdraw them when the Dock goes. */
-  commit(conditions: CreateConditions<KindCreationContext>): () => void {
-    this.#conditions = conditions;
+class CommittedAddResource {
+  #available = false;
+  readonly current = (): boolean => this.#available;
+  /** Commit this answer, answering how to withdraw it when the Dock goes. */
+  commit(available: boolean): () => void {
+    this.#available = available;
     return () => {
-      this.#conditions = null;
+      this.#available = false;
     };
   }
+}
+
+/**
+ * The Creates the Dock draws, one per plugin creation it offers. Whether each
+ * may run is answered once for the render, and both the control and its press
+ * read that one answer, so they cannot disagree; a creation that asks for its
+ * Resources after its press is asked again then. Every Create is withheld while
+ * Add Resource is, and each while a creation of its own kind runs.
+ */
+export function dockCreates(
+  placement: Pick<ResourcePlacementCommands, 'createFromDock' | 'creating'>,
+  addResource: boolean,
+  current: () => boolean,
+): readonly DockCreate[] {
+  return ORDERED_DOCK_CREATIONS.map(({ kind }) => {
+    const available = addResource && !placement.creating.has(kind);
+    return {
+      kind,
+      disabled: !available,
+      create: () => {
+        if (available) placement.createFromDock(kind, current);
+      },
+    };
+  });
 }
 
 export interface DockChromeState {
@@ -261,19 +294,8 @@ export function useDockChrome(
     [spaces, space.title, exiting, commandOutcomes],
   );
 
-  /** What each kind's Create is drawn with this render. */
-  const createConditions: CreateConditions<KindCreationContext> = {
-    context: {
-      createResource: resources.placement.createResource,
-      createSpaceResource: resources.placement.createSpaceResource,
-      creatingSpaceResource: resources.placement.creatingSpaceResource,
-      createImagesFromFiles: resources.placement.createImagesFromFiles,
-      pickImages: app.pickImages,
-    },
-    addResource: availability.addResource,
-  };
-  const [committedCreate] = useState(() => new CommittedCreateConditions());
-  useLayoutEffect(() => committedCreate.commit(createConditions));
+  const [committedCreate] = useState(() => new CommittedAddResource());
+  useLayoutEffect(() => committedCreate.commit(availability.addResource));
 
   const activeGraph = activeGraphOf(projection.visibleGraphs, activeGraphId);
   if (activeGraph === null) return { chrome: null, onChromeContinuationLand };
@@ -451,11 +473,8 @@ export function useDockChrome(
         onSpaceDragStart: placement.startSpaceDrag,
         onDragEnd: placement.endDrag,
       },
-      // Each kind's app half says what its press does and when it is withheld.
-      create: dockCreates(KIND_CREATIONS, createConditions, {
-        current: committedCreate.current,
-        reportBreak,
-      }),
+      // Each plugin's creation says what its press does (ADR 0142).
+      create: dockCreates(placement, availability.addResource, committedCreate.current),
     },
     persistence: {
       state: persistence,

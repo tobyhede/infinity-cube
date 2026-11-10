@@ -297,12 +297,15 @@ describe('useResourcePlacement', () => {
       { initialProps: { presenting: false } },
     );
 
-  it('adds a Resource at the visible centre and continues in its Title', () => {
+  it('adds a Resource at the visible centre and continues in its Title', async () => {
     const opened = openDerivationSpace(mintingIds(CREATED));
     const { result } = place(opened);
     act(() => result.current.reportVisibleCentre(() => ({ x: 70, y: 80 })));
 
-    act(() => result.current.createResource('markdown'));
+    await act(async () => {
+      result.current.createFromDock('markdown');
+      await Promise.resolve();
+    });
 
     expect(placedIds(opened)).toContain(CREATED);
     expect(opened.app.continuation.getState().pending).toEqual({
@@ -312,12 +315,15 @@ describe('useResourcePlacement', () => {
     });
   });
 
-  it('creates an Ur Resource at the visible centre and continues in its Title', () => {
+  it('creates an Ur Resource at the visible centre and continues in its Title', async () => {
     const opened = openDerivationSpace(mintingIds(CREATED));
     const { result } = place(opened);
     act(() => result.current.reportVisibleCentre(() => ({ x: 70, y: 80 })));
 
-    act(() => result.current.createResource('ur'));
+    await act(async () => {
+      result.current.createFromDock('ur');
+      await Promise.resolve();
+    });
 
     expect(opened.app.currentSpace().lookup.resource(CREATED)?.kind).toBe('ur');
     expect(placedIds(opened)).toContain(CREATED);
@@ -517,7 +523,7 @@ describe('useResourceRailActions', () => {
           navigate: available,
         },
         editingResourceBody: false,
-        createReferenceFrom: () => 'done',
+        createFromResource: () => 'done',
         spaces: null,
       }),
     );
@@ -711,10 +717,13 @@ describe('useDockChrome', () => {
     expect(opened.session.getState().working.document.title).toBe('Renamed');
   });
 
-  it("creates a markdown Resource on the drawing Map from the Create cluster's press", () => {
+  it("creates a markdown Resource on the drawing Map from the Create cluster's press", async () => {
     const opened = openDerivationSpace(mintingIds(CREATED));
     const chrome = chromeFor(opened, GRAPH_ID).result.current.chrome;
-    act(() => chrome?.resources.create.find(({ kind }) => kind === 'markdown')?.create());
+    await act(async () => {
+      chrome?.resources.create.find(({ kind }) => kind === 'markdown')?.create();
+      await Promise.resolve();
+    });
     expect(placedIds(opened)).toContain(CREATED);
   });
 

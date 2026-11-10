@@ -3,6 +3,7 @@ import {
   declaredOutline,
   imageKind,
   isPluginKind,
+  PLUGIN_KINDS,
   jsonValueSchema,
   markdownKind,
   referenceKind,
@@ -11,11 +12,23 @@ import {
   type JsonValue,
   type PluginKind,
 } from '@project/core';
-import type { Answer, AssetRef, ResourcePlugin, Size } from '@project/resource-api/domain';
+import type {
+  Answer,
+  AssetRef,
+  Resource as ApiResource,
+  ResourcePlugin,
+  Size,
+} from '@project/resource-api/domain';
 import type {
   Assets,
+  Creation,
+  CreationData,
+  CreationHost,
   EmbedProps,
   Exclusive,
+  New,
+  NewSpace,
+  OfferedSpace,
   OwnClaim,
   PluginView,
   Surface,
@@ -141,8 +154,56 @@ export interface PluginSurfaceInput {
   readonly onClaim: (claim: PluginHostClaim) => void;
 }
 
+/**
+ * A Resource a creation asks the host for, as the host takes it: its content
+ * JSON its plugin's schema accepted, or a function of the Space it names that
+ * answers such JSON and throws on anything else.
+ */
+export type HostNew =
+  | { readonly title?: string | undefined; readonly content: JsonValue }
+  | {
+      readonly title?: string | undefined;
+      readonly contentFor: (space: NewSpace) => JsonValue;
+      readonly newSpace?: true | undefined;
+    };
+
+/** What the host gives a creation's `run`, before the plugin's types are put on it. */
+export interface HostCreationHost {
+  create(items: readonly HostNew[]): Promise<Answer>;
+  readonly assets: Assets;
+  report(words: string): void;
+}
+
+/** A plugin's creation as the host runs it (ADR 0142), each `from` with the input it is given. */
+export type HostCreation =
+  | { readonly from: 'dock'; readonly run: (host: HostCreationHost) => void | Promise<void> }
+  | {
+      readonly from: 'data';
+      readonly types: readonly string[];
+      readonly accepts?: ((data: CreationData) => boolean) | undefined;
+      readonly run: (host: HostCreationHost, data: CreationData) => void | Promise<void>;
+    }
+  | {
+      readonly from: 'resource';
+      readonly accepts?: ((resource: ApiResource) => boolean) | undefined;
+      readonly run: (host: HostCreationHost, resource: ApiResource) => void | Promise<void>;
+    }
+  | {
+      readonly from: 'spaces';
+      readonly run: (host: HostCreationHost, space: OfferedSpace) => void | Promise<void>;
+    };
+
+/** One plugin's creation, with the kind it creates and what one of its Resources is called. */
+export interface PluginCreationEntry {
+  readonly kind: PluginKind;
+  readonly name: string;
+  readonly creation: HostCreation;
+}
+
 /** One plugin, both halves, behind a door that takes the host's values. */
 export interface PluginEntry {
+  /** How its Resources are created, in the order it declares them. */
+  readonly creations: readonly HostCreation[];
   readonly Glyph: ComponentType<{ readonly size?: number | undefined }>;
   /** Whether the canvas strokes no border while the Resource is in no Graph and not selected. */
   readonly bareAtRest: boolean;
@@ -160,6 +221,73 @@ export interface PluginSurfaceEntries {
 
 /** Why a commit was refused before it reached the host: the value was not JSON. */
 const NOT_JSON: Answer = { refused: 'This change cannot be kept.' };
+
+/** Why a creation was refused before it reached the host: its content was not its plugin's. */
+const NOT_CREATABLE: Answer = { refused: 'This Resource cannot be created.' };
+
+/** Content a plugin created, as the host takes it: its schema's, and JSON; or `undefined`. */
+const creatableJson = <C,>(plugin: ResourcePlugin<C, unknown>, value: C): JsonValue | undefined => {
+  const parsed = plugin.content.safeParse(value);
+  if (!parsed.success) return undefined;
+  const json = jsonValueSchema.safeParse(parsed.data);
+  return json.success ? json.data : undefined;
+};
+
+/**
+ * A plugin's creation with its types erased: each item's content is parsed by
+ * the plugin's own schema and checked to be JSON before the host takes it, so
+ * an item the plugin got wrong refuses the whole create, and a content
+ * function answering such a value throws inside the host.
+ */
+function hostCreation<C>(plugin: ResourcePlugin<C, unknown>, creation: Creation<C>): HostCreation {
+  const typed = (host: HostCreationHost): CreationHost<C> => ({
+    assets: host.assets,
+    report: (words) => host.report(words),
+    create: (items: readonly New<C>[]) => {
+      const erased: HostNew[] = [];
+      for (const item of items) {
+        if ('contentFor' in item) {
+          const { contentFor } = item;
+          erased.push({
+            title: item.title,
+            newSpace: item.newSpace,
+            contentFor: (space) => {
+              const json = creatableJson(plugin, contentFor(space));
+              if (json === undefined) {
+                throw new Error(`The ${plugin.kind} plugin created content its schema refuses.`);
+              }
+              return json;
+            },
+          });
+        } else {
+          const json = creatableJson(plugin, item.content);
+          if (json === undefined) return Promise.resolve(NOT_CREATABLE);
+          erased.push({ title: item.title, content: json });
+        }
+      }
+      return host.create(erased);
+    },
+  });
+  switch (creation.from) {
+    case 'dock':
+      return { from: 'dock', run: (host) => creation.run(typed(host)) };
+    case 'data':
+      return {
+        from: 'data',
+        types: creation.types,
+        accepts: creation.accepts,
+        run: (host, data) => creation.run(typed(host), data),
+      };
+    case 'resource':
+      return {
+        from: 'resource',
+        accepts: creation.accepts,
+        run: (host, resource) => creation.run(typed(host), resource),
+      };
+    case 'spaces':
+      return { from: 'spaces', run: (host, space) => creation.run(typed(host), space) };
+  }
+}
 
 /** A plugin's entry: what a host draws it through, whichever plugin it is. */
 export function pluginEntry<C, M>(
@@ -264,7 +392,8 @@ export function pluginEntry<C, M>(
     );
   }
   return {
-    Glyph,
+    creations: (view.creates ?? []).map((creation) => hostCreation(plugin, creation)),
+    Glyph: view.Glyph,
     bareAtRest: plugin.bareAtRest === true,
     drawsTitle: plugin.drawsTitle !== false,
     render,
@@ -280,8 +409,30 @@ const PLUGIN_ENTRIES = {
   [urKind.id]: pluginEntry(urPlugin, urPluginView),
 } satisfies Record<PluginKind, PluginEntry>;
 
+/** What one Resource of each plugin's kind is called. */
+const PLUGIN_NAMES = {
+  [imageKind.id]: imagePlugin.name,
+  [markdownKind.id]: markdownPlugin.name,
+  [referenceKind.id]: referencePlugin.name,
+  [spaceKind.id]: spacePlugin.name,
+  [urKind.id]: urPlugin.name,
+} satisfies Record<PluginKind, string>;
+
 /** The entry of the plugin that draws this kind. */
 export const pluginEntryFor = (kind: PluginKind): PluginEntry => PLUGIN_ENTRIES[kind];
 
 /** A plugin kind's glyph. */
 export const pluginGlyph = (kind: PluginKind): PluginEntry['Glyph'] => PLUGIN_ENTRIES[kind].Glyph;
+
+/**
+ * Every plugin's creations, in build order (the plugin list's), each with the
+ * kind it creates: where the host finds what a gesture may create.
+ */
+export const pluginCreations = (): readonly PluginCreationEntry[] =>
+  PLUGIN_KINDS.flatMap((kind) =>
+    PLUGIN_ENTRIES[kind].creations.map((creation) => ({
+      kind,
+      name: PLUGIN_NAMES[kind],
+      creation,
+    })),
+  );

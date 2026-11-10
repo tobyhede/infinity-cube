@@ -19,7 +19,6 @@ import {
 import { NavigationUnavailableError } from '../src/browser-location';
 import { useEmbeddedOpenSpaceResources } from '../src/use-embedded-open-space-resources';
 import { createOpenSpaces } from '../src/open-spaces';
-import type { ImageSources } from '../src/image-creation';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { unavailable } from './command-dock';
 import { recordingHistory } from './browser-history';
@@ -27,12 +26,12 @@ import { productDestinationPath } from '@project/http';
 import { mintingIds } from './minting';
 import { NO_CLAIMS } from '../src/plugin-host/claim-chain';
 import { holdExclusive } from './held-exclusive';
-import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
 import { refusingFullscreen } from './fullscreen';
 import { unlinkedPresentations } from './presentations';
 import { stubResizeObserver } from './resize-observer';
 import { publishedEmbeds } from './published-embeds';
+import { createdEmpty } from './created-resources';
 
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const OTHER_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -178,7 +177,6 @@ const setup = (
     [META_ID, 'Meta'],
     [OTHER_ID, 'Other'],
   ],
-  images: ImageSources = unusedImageSources,
 ) => {
   const history = recordingHistory();
   const backend = new MemorySpaceBackend(
@@ -192,7 +190,6 @@ const setup = (
     openSpaces: createOpenSpaces({
       fullscreen: refusingFullscreen,
       presentations: unlinkedPresentations,
-      images,
       backend,
       metaSpaceId: META_ID,
       metaSpaceTitle: spaces.find(([id]) => id === META_ID)?.[1] ?? 'Meta',
@@ -772,11 +769,7 @@ describe('Open Spaces', () => {
     const other = await openSpaces.open(OTHER_ID);
 
     expect(
-      other.app.authoring.complete(CANVAS, {
-        kind: 'created-resource',
-        resourceKind: 'markdown',
-        anchor: { x: 100, y: 100 },
-      }),
+      other.app.authoring.complete(CANVAS, createdEmpty('markdown', { x: 100, y: 100 })),
     ).toEqual({ kind: 'completed', createdResourceId: MINTED_RESOURCE_ID });
 
     expect(other.session.getState().working.resources.map(({ id }) => id)).toContain(
@@ -1471,7 +1464,6 @@ describe('Open Spaces', () => {
       const spaces = createOpenSpaces({
         fullscreen: refusingFullscreen,
         presentations: unlinkedPresentations,
-        images: unusedImageSources,
         backend,
         metaSpaceId: META_ID,
         metaSpaceTitle: 'Meta',

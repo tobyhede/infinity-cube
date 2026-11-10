@@ -29,7 +29,6 @@ import { mintingIds } from './minting';
 import { openTestSpace } from './opened-space';
 import type { SpaceResourceAuthoring } from '../src/space-resource-lifecycle';
 import { createResource, createResourceControl, unavailable } from './command-dock';
-import { unusedImageSources } from './image-sources';
 import { stubResizeObserver } from './resize-observer';
 
 /**
@@ -327,7 +326,6 @@ function mount(
   );
   const spaceResources: SpaceResourceAuthoring = { ...authoring, ...broken };
   const app = composeApp({
-    images: unusedImageSources,
     spaceSession: session,
     reportObserverError,
   });
@@ -605,7 +603,7 @@ describe('Create Space Resource', () => {
 
     await createSpaceResource();
 
-    expect(await screen.findByText('Space not created')).toBeVisible();
+    expect(await screen.findByText('Space Resource not created')).toBeVisible();
     expect(spaceResourcesOf(session)).toEqual([]);
     expect(resourcesOf(session)).toEqual(home.resources);
     expect(screen.queryByRole('textbox', { name: 'Resource title' })).toBeNull();
@@ -625,10 +623,10 @@ describe('Create Space Resource', () => {
         .mockResolvedValue({ kind: 'unchanged' });
       const { session } = mount(other, { create }, vi.fn());
       await createSpaceResource();
-      expect(await screen.findByText('Space not created')).toBeVisible();
+      expect(await screen.findByText('Space Resource not created')).toBeVisible();
       await createSpaceResource();
       expect(create).toHaveBeenCalledTimes(2);
-      expect(screen.queryByText('Space not created')).toBeNull();
+      expect(screen.queryByText('Space Resource not created')).toBeNull();
       await settled(session);
     },
   );
@@ -651,7 +649,7 @@ describe('Create Space Resource', () => {
 
     expect(create).toHaveBeenCalledTimes(1);
     expect(spaceResourcesOf(session)).toHaveLength(0);
-    expect(screen.queryByText('Space not created')).toBeNull();
+    expect(screen.queryByText('Space Resource not created')).toBeNull();
     expect(screen.queryByRole('textbox', { name: 'Resource title' })).toBeNull();
     await settled(session);
   });

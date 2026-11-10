@@ -4,7 +4,6 @@ import { MemorySpaceBackendTestControl, type SpaceSessionState } from '@project/
 import { Application } from '#components/Application';
 import { snapshotFromSpace } from '#src/snapshot';
 import { storyOpening, storySpaces } from './application';
-import { heldImageSources } from './image-sources';
 import type { OpenSpace, OpenSpaces } from '#src/open-spaces';
 import { CANVAS } from '#src/space-authoring';
 import {
@@ -218,10 +217,7 @@ export async function openDockStory(scenario: DockScenario) {
     ]);
     return storyOpening(spaces, await spaces.open(snapshot.id));
   }
-  const spaces =
-    scenario === 'replacing'
-      ? storySpaces(metaSnapshot.id, snapshots, control, heldImageSources().images)
-      : storySpaces(metaSnapshot.id, snapshots, control, undefined, scenario === 'mounted');
+  const spaces = storySpaces(metaSnapshot.id, snapshots, control, scenario === 'mounted');
   await spaces.open(metaSnapshot.id);
   await spaces.enter(platformSnapshot.id);
   await spaces.enter(designSystemSnapshot.id);

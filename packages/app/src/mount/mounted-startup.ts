@@ -10,7 +10,7 @@ import type { HistoryApi } from '../browser-location';
 import type { PresentationLinks } from '../presentation-link';
 import type { Fullscreen } from '../presenting-fullscreen';
 import { carriedAddress } from '../source-parameter';
-import { browserImageSources, createSpaceStartup, type SpaceStartup } from '../space';
+import { createSpaceStartup, type SpaceStartup } from '../space';
 import {
   formatGitHubLocation,
   type GitHubLocation,
@@ -87,7 +87,7 @@ export const createMountedStartup = (options: MountedStartupOptions): SpaceStart
         backend,
         options.newId,
         history,
-        browserImageSources(assets, displayImage),
+        displayImage,
         { mounted: true, assets },
       );
       return { startup, backend, metaSpaceId, pinned, resolved: read.aggregate.location };

@@ -1,11 +1,8 @@
 import {
   kindFlags,
   newDefaultResourceDocument,
-  newResourceDocument,
-  referenceKind,
   resourceReferences,
   spaceReferences,
-  type EmptyCreatableKindId,
   type ResourceDocument,
   type ResourceId,
   type Graph,
@@ -20,18 +17,13 @@ import {
   COLLAPSED_RESOURCE_SIZE,
   resourceSize,
   EDGE_TITLE_ONE_LINE,
-  IMAGE_URL_UNSUPPORTED,
-  isAcceptedImageUrl,
   resourceDocumentSchema,
-  type ImageNaturalSize,
   graphHeadShape,
   isOneLineEdgeTitle,
   RESOURCE_TITLE_REQUIRED,
   normalizeTitle,
   type SpaceSnapshot,
   type UUID,
-  imageKind,
-  type ImageKindId,
 } from '@project/core';
 import {
   graphColorsByGraphId,
@@ -103,21 +95,18 @@ const assertValidAuthoredSnapshot = (snapshot: SpaceSnapshot): void => {
   }
 };
 
-/** One picture an Image Resource is created for: its URL, and its size when it loaded. */
-export interface CreatedImage {
-  readonly url: string;
-  readonly naturalSize?: ImageNaturalSize;
+/**
+ * One Resource a creation asks for (ADR 0142): its kind, its Title or none,
+ * and its content, which the kind's schema decides.
+ */
+export interface NewResource {
+  readonly kind: string;
+  readonly title?: string | undefined;
+  readonly content: JsonValue;
 }
 
-/** An Image Resource's document: its Title, its URL, and its natural size when the picture loaded. */
-const imageDocument = (title: string, { url, naturalSize }: CreatedImage): ResourceDocument => {
-  const content: Extract<ResourceDocument, { kind: ImageKindId }>['content'] = { url };
-  if (naturalSize !== undefined) content.naturalSize = naturalSize;
-  return { title, kind: imageKind.id, content };
-};
-
-/** The gap between Image Resources a single gesture creates side by side. */
-const IMAGE_ROW_GAP = 40;
+/** The gap between Resources a single creation places side by side. */
+const CREATED_ROW_GAP = 40;
 
 /**
  * One completed authored fact, as the interaction that finished knows it.
@@ -208,35 +197,17 @@ export type AuthoringCompletion =
       readonly position: MapPosition | 'beside-source';
     }
   /**
-   * Create Resource: a detached Resource of a kind that starts empty, at the
-   * visible centre, neutrally titled, with the content its kind's module
-   * declares it starts with.
+   * Create Resources (ADR 0142): what a plugin's creation asked the host for,
+   * in one Edit, placed in a row from the anchor the gesture gave. Each is
+   * titled as given, normalized as a rename is, or `Resource N` in order when
+   * it is given none or an empty one, and its content is parsed by its kind's
+   * schema here, so content it refuses is answered rather than thrown by
+   * intake. A Resource naming a Space is the coordinated lifecycle's, never
+   * this Edit's (ADR 0074).
    */
   | {
-      readonly kind: 'created-resource';
-      readonly resourceKind: EmptyCreatableKindId;
-      readonly anchor: MapPosition;
-    }
-  /**
-   * Create Reference: created with its Target, because a Reference Resource without
-   * one is not a valid Resource. The caller supplies the Target's Title; an empty
-   * title mints `Resource N` like any other Resource.
-   */
-  | {
-      readonly kind: 'created-reference';
-      readonly target: ResourceId;
-      readonly title?: string;
-      readonly anchor: MapPosition;
-    }
-  /**
-   * Create Image Resources: one per image, in one Edit, each titled
-   * `Resource N` in order and placed in a row from the anchor (ADR 0106). The
-   * caller has already stored or measured each picture; this Edit only
-   * records what it was told.
-   */
-  | {
-      readonly kind: 'created-images';
-      readonly images: readonly CreatedImage[];
+      readonly kind: 'created-resources';
+      readonly items: readonly NewResource[];
       readonly anchor: MapPosition;
       /**
        * `exact` for a drop or a paste, which aimed at their point; a press has
@@ -372,8 +343,8 @@ export type AuthoringRefusal =
   // raises it from the Resource schema, so both ends spell it from one constant.
   | { readonly code: typeof RESOURCE_TITLE_REQUIRED }
   | { readonly code: 'map-title-required' }
-  // Spelt from `@project/core`'s constant, which the Image Resource schema raises too.
-  | { readonly code: typeof IMAGE_URL_UNSUPPORTED }
+  /** A created Resource naming a Space, which only the coordinated lifecycle makes (ADR 0074). */
+  | { readonly code: 'space-reference-creation-unsupported' }
   /**
    * Rename Space with nothing left after the trim. `spaceFileSchema` declares
    * the title as `z.string().min(1)`, which counts characters, so blank is the
@@ -593,13 +564,6 @@ interface ReportedCompletion {
   readonly target: EditTarget;
   readonly completion: AuthoringCompletion;
 }
-
-/**
- * Create Image Resources, addressed to the Map the gesture was made on: storing
- * and measuring outlast the gesture, so the canvas may be drawing another Map
- * by the time this Edit lands (`image-creation.ts`).
- */
-export type ImagesCompletion = Extract<AuthoringCompletion, { kind: 'created-images' }>;
 
 /** A `ReportedCompletion` waiting behind the Edit that was installing when it arrived. */
 interface QueuedCompletion extends ReportedCompletion {
@@ -1331,53 +1295,32 @@ export function createSpaceAuthoring({
       );
       if (outcome.kind !== 'completed') return notCompleted(outcome);
       snapshot = outcome.snapshot;
-    } else if (completion.kind === 'created-resource') {
-      const title = nextResourceTitle(snapshot);
-      const document = newResourceDocument(completion.resourceKind, title);
-      const created = createResource(document, completion.anchor, 'avoidingOverlap');
-      if ('kind' in created) return created;
-      createdResourceId = created.id;
-    } else if (completion.kind === 'created-images') {
-      // A URL the schema will not hold is refused before intake, which answers
-      // it by throwing, and an author's paste may not throw
-      // (`space-authoring-operations.test.ts`, "refuses a URL an Image Resource
-      // may not hold rather than throwing on intake").
-      if (completion.images.length === 0) return UNCHANGED;
-      if (completion.images.some(({ url }) => !isAcceptedImageUrl(url))) {
-        return refuse({ code: IMAGE_URL_UNSUPPORTED });
-      }
-      const step = COLLAPSED_RESOURCE_SIZE.width + IMAGE_ROW_GAP;
-      for (const [index, image] of completion.images.entries()) {
-        // Titled after the Resources created before it in this same Edit, so a
-        // row of three takes three successive numbers.
-        const document = imageDocument(nextResourceTitle(snapshot), image);
+    } else if (completion.kind === 'created-resources') {
+      if (completion.items.length === 0) return UNCHANGED;
+      const step = COLLAPSED_RESOURCE_SIZE.width + CREATED_ROW_GAP;
+      for (const [index, item] of completion.items.entries()) {
+        // An empty title mints the same neutral `Resource N` every other
+        // created Resource gets, titled after the Resources created before it
+        // in this same Edit, so a row of three takes three successive numbers.
+        // Text the caller gave is never overwritten, and is normalized the way
+        // a rename is: creation and renaming write one field, so the same
+        // typed bytes reach the same stored document whichever wrote them
+        // (ADR 0083).
+        const title = namedResourceTitle(item.title ?? '') ?? nextResourceTitle(snapshot);
+        const parsed = resourceDocumentSchema.safeParse({
+          title,
+          kind: item.kind,
+          content: item.content,
+        });
+        if (!parsed.success) return refuse({ code: 'resource-content-invalid' });
+        if (spaceReferences(parsed.data).length > 0) {
+          return refuse({ code: 'space-reference-creation-unsupported' });
+        }
         const at = { ...completion.anchor, x: completion.anchor.x + index * step };
-        const created = createResource(document, at, completion.placement);
+        const created = createResource(parsed.data, at, completion.placement);
         if ('kind' in created) return created;
         createdResourceId ??= created.id;
       }
-    } else if (completion.kind === 'created-reference') {
-      // An empty title mints the same neutral `Resource N` every other created Resource
-      // gets; text the author already entered is never overwritten. `??` cannot
-      // express this — the empty string is a value a caller really sends, and
-      // the whole point is that it does not count as one.
-      //
-      // The caller names the Reference Resource after its Target, and it is
-      // renamed in place afterwards; two Resources sharing a name is not a
-      // collision because a title is not an identifier (ADR 0089). What stays
-      // this module's is the default and the normalization, not the choice.
-      // Normalized the way a rename is, and for the same reason: creation and
-      // renaming write one field, so the same typed bytes have to reach the
-      // same stored document whichever path wrote them (ADR 0083).
-      const entered = namedResourceTitle(completion.title ?? '');
-      const document: ResourceDocument = {
-        title: entered ?? nextResourceTitle(snapshot),
-        kind: referenceKind.id,
-        content: { target: completion.target },
-      };
-      const created = createResource(document, completion.anchor, 'avoidingOverlap');
-      if ('kind' in created) return created;
-      createdResourceId = created.id;
     } else if (completion.kind === 'added-resource-to-map') {
       const outcome = SnapshotEdit.addToMap(
         snapshot,

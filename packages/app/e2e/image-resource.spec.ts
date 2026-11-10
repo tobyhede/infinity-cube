@@ -663,7 +663,7 @@ for (const refused of [
     await createResource(page, 'Image Resource');
     await (await chooser).setFiles(refused.file);
 
-    const notice = page.getByRole('alert').filter({ hasText: 'Image not created' });
+    const notice = page.getByRole('alert').filter({ hasText: 'Image Resource not created' });
     await expect(notice).toContainText(refused.sentence);
     await expect(page.getByRole('textbox', { name: 'Resource title' })).toHaveCount(0);
     expect(await storedImages(page, spaceId)).toEqual([]);

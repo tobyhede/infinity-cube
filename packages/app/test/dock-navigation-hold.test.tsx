@@ -7,7 +7,6 @@ import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { createResourceControl, unavailable } from './command-dock';
 import { recordingHistory } from './browser-history';
 import { holdExclusive, type HeldExclusive } from './held-exclusive';
-import { unusedImageSources } from './image-sources';
 import { refusingFullscreen } from './fullscreen';
 import { unlinkedPresentations } from './presentations';
 import { mintingIds } from './minting';
@@ -114,7 +113,6 @@ it('withdraws the canvas Space’s navigation and authoring while an only-drawn 
   const spaces = createOpenSpaces({
     fullscreen: refusingFullscreen,
     presentations: unlinkedPresentations,
-    images: unusedImageSources,
     backend,
     metaSpaceId: META_ID,
     metaSpaceTitle: 'Meta',

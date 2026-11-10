@@ -8,7 +8,6 @@ import { MemorySpaceBackend } from '@project/persistence';
 import { createOpenSpaces } from '../src/open-spaces';
 import { recordingHistory } from './browser-history';
 import { startApplication } from '../src/startup';
-import { unusedImageSources } from './image-sources';
 import { refusingFullscreen } from './fullscreen';
 import { unlinkedPresentations } from './presentations';
 import { stubResizeObserver } from './resize-observer';
@@ -47,7 +46,6 @@ it('opens once under StrictMode and mounts without interpreting the browser path
   const spaces = createOpenSpaces({
     fullscreen: refusingFullscreen,
     presentations: unlinkedPresentations,
-    images: unusedImageSources,
     backend,
     metaSpaceId: SPACE_ID,
     metaSpaceTitle: snapshot.document.title,
@@ -97,7 +95,6 @@ it('draws the starting view until the opening settles, then the opened Space', a
   const spaces = createOpenSpaces({
     fullscreen: refusingFullscreen,
     presentations: unlinkedPresentations,
-    images: unusedImageSources,
     backend,
     metaSpaceId: SPACE_ID,
     metaSpaceTitle: snapshot.document.title,
