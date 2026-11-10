@@ -21,7 +21,14 @@ import { trackedFiles } from '../support/structural-scan';
 const RULE = '@typescript-eslint/no-restricted-imports';
 
 /** The modules under a `kinds/` directory that name no kind: the interface and the registry. */
-const KIND_NEUTRAL_MODULES = new Set(['registry', 'kind-module', 'kind-view']);
+const KIND_NEUTRAL_MODULES = new Set([
+  'registry',
+  'kind-module',
+  'kind-view',
+  'plugins',
+  'plugin-kind',
+  'plugin-views',
+]);
 
 const moduleNameOf = (file: string): string =>
   file.slice(file.lastIndexOf('/') + 1).replace(/\.tsx?$/u, '');

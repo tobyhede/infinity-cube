@@ -195,11 +195,9 @@ const beginEditOf = (node: ResourceFlowNode): (() => void) | undefined => {
     : undefined;
 };
 
-/** An Ur Resource's Shape choice, where it is offered. */
-const resourceShapeChangeOf = (node: ResourceFlowNode) =>
-  node.data.kindOperations.kind === 'ur'
-    ? node.data.kindOperations.onResourceShapeChange
-    : undefined;
+/** An Ur Resource's Map content commit, where its plugin surface is offered one. */
+const mapCommitOf = (node: ResourceFlowNode) =>
+  node.data.kindOperations.kind === 'ur' ? node.data.kindOperations.commitMap : undefined;
 
 /** A Space Resource's own operations, or nothing for another kind. */
 const spaceOperationsOf = (data: ResourceFlowNode['data']) =>
@@ -296,12 +294,12 @@ describe('canvas Resource authoring', () => {
   });
 
   /**
-   * An Ur Resource's Shape is chosen on its rail (ADR 0121): one Edit on the
-   * Map, offered only where a refusal can be reported.
+   * An Ur Resource's plugin commits its Map content (ADR 0142): one Edit on the
+   * Map, answering how it settled, and withdrawn while presenting.
    */
-  it('changes an Ur Resource’s Shape on its Map, and offers no choice without command outcomes', () => {
-    const resourceShapeOf = (spaceSession: ReturnType<typeof mountAuthoring>['spaceSession']) =>
-      spaceSession.getState().working.document.maps?.[0]?.positions[UR_ID]?.shape;
+  it('commits an Ur Resource’s Map content on its Map, answering how it settled', async () => {
+    const mapContentOf = (spaceSession: ReturnType<typeof mountAuthoring>['spaceSession']) =>
+      spaceSession.getState().working.document.maps?.[0]?.positions[UR_ID]?.content;
     const props = {
       open: false,
       enabled: true,
@@ -310,19 +308,27 @@ describe('canvas Resource authoring', () => {
       resourceId: UR_ID,
     };
 
-    const silent = mountAuthoring(undefined, 'ur');
-    silent.rerender(props);
-    expect(resourceShapeChangeOf(onlyNode(silent.result.current.nodes))).toBeUndefined();
-    silent.unmount();
-
-    const { result, rerender, spaceSession } = mountAuthoring(undefined, 'ur', true);
+    const { result, rerender, spaceSession } = mountAuthoring(undefined, 'ur');
     rerender(props);
-    act(() => resourceShapeChangeOf(onlyNode(result.current.nodes))?.('diamond'));
-    expect(resourceShapeOf(spaceSession)).toBe('diamond');
+    const commit = mapCommitOf(onlyNode(result.current.nodes));
+    expect(commit).toBeDefined();
+    await act(async () => {
+      await expect(commit?.({ shape: 'diamond' })).resolves.toBe('completed');
+    });
+    expect(mapContentOf(spaceSession)).toEqual({ shape: 'diamond' });
+    await act(async () => {
+      await expect(commit?.({ shape: 'diamond' })).resolves.toBe('unchanged');
+    });
+    await act(async () => {
+      const answer = await commit?.({ shape: 'hexagon' });
+      expect(answer === 'completed' || answer === 'unchanged' ? '' : answer?.refused).toMatch(
+        /\S/u,
+      );
+    });
+    expect(mapContentOf(spaceSession)).toEqual({ shape: 'diamond' });
 
-    rerender({ ...props, open: true });
-    act(() => resourceShapeChangeOf(onlyNode(result.current.nodes))?.('ellipse'));
-    expect(resourceShapeOf(spaceSession)).toBe('ellipse');
+    rerender({ ...props, presenting: true });
+    expect(mapCommitOf(onlyNode(result.current.nodes))).toBeUndefined();
   });
 
   /**

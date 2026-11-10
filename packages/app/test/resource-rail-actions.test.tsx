@@ -989,7 +989,7 @@ describe('a Resource’s commands on the canvas rail', () => {
             ...withUr.document.maps?.[0],
             positions: {
               ...withUr.document.maps?.[0]?.positions,
-              [UR_ID]: { x: 0, y: 400, open: false, shape: 'diamond' },
+              [UR_ID]: { x: 0, y: 400, open: false, content: { shape: 'diamond' } },
             },
           },
         ],
@@ -1001,9 +1001,9 @@ describe('a Resource’s commands on the canvas rail', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Shape: Diamond' }));
     fireEvent.click(await screen.findByRole('menuitemradio', { name: 'Ellipse' }));
     await waitFor(() =>
-      expect(session.getState().working.document.maps?.[0]?.positions[UR_ID]?.shape).toBe(
-        'ellipse',
-      ),
+      expect(session.getState().working.document.maps?.[0]?.positions[UR_ID]?.content).toEqual({
+        shape: 'ellipse',
+      }),
     );
     expect(await screen.findByRole('button', { name: 'Shape: Ellipse' })).toBeVisible();
     await settled(session);

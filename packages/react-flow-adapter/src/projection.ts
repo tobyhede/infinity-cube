@@ -185,12 +185,12 @@ type ResourceNodeCommonData = {
    */
   shape: ResourceShape;
   /** The Resource's content as stored, which a plugin drawing it parses itself (ADR 0142). */
-  ownContent: Resource['content'];
+  ownContent?: Resource['content'] | undefined;
   /**
    * The Map content the plugin drawing this Resource is given on this Map: its
    * entry's, else the plugin's default. `undefined` for a kind no plugin draws.
    */
-  mapContent: JsonValue | undefined;
+  mapContent?: JsonValue | undefined;
   /** Ordinary renderer selection, kept outside the authored Space. */
   selectedForAuthoring: boolean;
   /** The graph being emphasised, if any. Drives handle dimming. */

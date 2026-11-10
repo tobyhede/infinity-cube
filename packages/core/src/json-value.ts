@@ -14,7 +14,7 @@ export type JsonValue = string | number | boolean | null | JsonArray | JsonObjec
  * inferred contract still names the snapshot type itself
  * (`packages/http/test/space-http-app-types.test.ts`).
  */
-// oxlint-disable-next-line typescript/no-empty-interface -- recursive by name, see above
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- recursive by name, see above
 export interface JsonArray extends Array<JsonValue> {}
 
 /** A JSON object, mutable for the same reason. */
@@ -58,7 +58,9 @@ export function sameJsonValue(left: JsonValue, right: JsonValue): boolean {
   return keys.every((key) => {
     const leftValue = left[key];
     const rightValue = right[key];
-    return leftValue !== undefined && rightValue !== undefined && sameJsonValue(leftValue, rightValue);
+    return (
+      leftValue !== undefined && rightValue !== undefined && sameJsonValue(leftValue, rightValue)
+    );
   });
 }
 

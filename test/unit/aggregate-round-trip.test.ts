@@ -333,12 +333,13 @@ describe('exporting and importing one complete aggregate', () => {
     }
   });
 
-  it("preserves every Resource's Shape, size and Open/Closed state on its Map, and their absence", async () => {
+  it("preserves every Resource's Map content, size and Open/Closed state on its Map, and their absence", async () => {
     const destination = join(await makeTemporaryDirectory(), 'aggregate');
     const [meta, ...targets] = completeAggregate();
     if (meta === undefined) throw new Error('The aggregate names no Meta Space');
-    // Only an Ur Resource takes a Shape (ADR 0121): one in a diamond storing
-    // neither `open` nor `size`, and one resized in an ellipse.
+    // Only a kind a plugin draws keeps Map content (ADR 0142): an Ur Resource
+    // in a diamond storing neither `open` nor `size`, and one resized in an
+    // ellipse.
     const withResourceShapes: SpaceSnapshot = {
       ...meta,
       document: {
@@ -347,15 +348,14 @@ describe('exporting and importing one complete aggregate', () => {
           ...m,
           positions: {
             ...m.positions,
-            // A stored rectangle is legal on any kind, and kept as stored.
-            [FIRST_LINK_ID]: { x: 340, y: 0, open: false, shape: 'rectangle' },
-            [CLOSED_UR_ID]: { x: 0, y: 400, shape: 'diamond' },
+            [FIRST_LINK_ID]: { x: 340, y: 0, open: false },
+            [CLOSED_UR_ID]: { x: 0, y: 400, content: { shape: 'diamond' } },
             [RESIZED_UR_ID]: {
               x: 340,
               y: 400,
               open: false,
               size: { width: 480, height: 270 },
-              shape: 'ellipse',
+              content: { shape: 'ellipse' },
             },
           },
         })),
@@ -370,21 +370,21 @@ describe('exporting and importing one complete aggregate', () => {
     await exportTo(repositoryHolding([withResourceShapes, ...targets]), destination);
     const written = await readFile(join(destination, META_SPACE_ID, 'space.json'), 'utf8');
     // Written last on the entry, after its size.
-    expect(written).toMatch(/"size": \{[^}]*\},\s*"shape": "ellipse"/);
+    expect(written).toMatch(/"size": \{[^}]*\},\s*"content": \{\s*"shape": "ellipse"\s*\}/);
     const reimported = await importFrom(destination);
 
     const positions = (await storedSnapshots(reimported)).find(({ id }) => id === META_SPACE_ID)
       ?.document.maps?.[0]?.positions;
-    expect(positions?.[CLOSED_UR_ID]).toEqual({ x: 0, y: 400, shape: 'diamond' });
+    expect(positions?.[CLOSED_UR_ID]).toEqual({ x: 0, y: 400, content: { shape: 'diamond' } });
     expect(positions?.[RESIZED_UR_ID]).toEqual({
       x: 340,
       y: 400,
       open: false,
       size: { width: 480, height: 270 },
-      shape: 'ellipse',
+      content: { shape: 'ellipse' },
     });
-    expect(positions?.[FIRST_LINK_ID]).toEqual({ x: 340, y: 0, open: false, shape: 'rectangle' });
-    // An entry with no Shape or size stored is written and read back without one.
+    expect(positions?.[FIRST_LINK_ID]).toEqual({ x: 340, y: 0, open: false });
+    // An entry with no Map content or size stored is written and read back without one.
     expect(positions?.[MARKDOWN_RESOURCE_ID]).toEqual({ x: 0, y: 0, open: false });
   });
 

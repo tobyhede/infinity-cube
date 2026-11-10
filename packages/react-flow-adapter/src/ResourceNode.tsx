@@ -446,7 +446,9 @@ export function ResourceNode({
         the rect, border, ring and rail and hands the plugin everything inside
         its outline; every other kind is still drawn by `CanvasResource`.
       */}
-      {isPluginOperations(kindOperations) && data.mapContent !== undefined ? (
+      {isPluginOperations(kindOperations) &&
+      data.mapContent !== undefined &&
+      data.ownContent !== undefined ? (
         <PluginResource
           resourceId={data.resourceId}
           kind={kindOperations.kind}

@@ -3,7 +3,7 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
+  useState,
   useSyncExternalStore,
   type CSSProperties,
   type KeyboardEvent,
@@ -36,7 +36,8 @@ import { InlineTitleEditor } from './InlineTitleEditor';
 import {
   NO_ASSETS,
   NoEmbed,
-  renderPluginView,
+  pluginEntryFor,
+  type PluginEntry,
   type PluginCommits,
   type PluginHostClaim,
   type PluginOperations,
@@ -67,8 +68,6 @@ import './canvas-resource.css';
  * Withdrawal is enforced as well as offered: a commit the plugin kept from an
  * earlier render answers refused once this surface has unmounted.
  */
-
-
 
 const SURFACE_GONE: Answer = { refused: 'This Resource is no longer drawn here.' };
 
@@ -211,49 +210,84 @@ export interface PluginResourceProps {
   readonly onFailure?: ((error: Error) => void) | undefined;
 }
 
+/**
+ * One mounted surface's lifetime: whether it is still drawn, and the Claims
+ * it was granted, which go with it when it unmounts.
+ */
+interface SurfaceLifetime {
+  readonly drawn: () => boolean;
+  readonly hold: (claim: PluginHostClaim) => void;
+  readonly begin: () => void;
+  readonly end: () => void;
+}
+
+function createSurfaceLifetime(): SurfaceLifetime {
+  let drawn = true;
+  const held: PluginHostClaim[] = [];
+  return {
+    drawn: () => drawn,
+    hold: (claim) => {
+      held.push(claim);
+    },
+    begin: () => {
+      drawn = true;
+    },
+    end: () => {
+      drawn = false;
+      for (const claim of held.splice(0)) claim.unmount();
+    },
+  };
+}
+
 /** What the surface offers, less what has gone with an unmounted surface. */
 function guarded(
   operations: PluginOperations,
-  mounted: { readonly current: boolean },
+  lifetime: SurfaceLifetime,
   readOnly: boolean,
 ): PluginOperations {
   if (readOnly) return { kind: operations.kind };
   const whileMounted =
     <A extends readonly unknown[]>(commit: (...args: A) => Promise<Answer>) =>
     (...args: A): Promise<Answer> =>
-      mounted.current ? commit(...args) : Promise.resolve(SURFACE_GONE);
-  const offered: {
-    -readonly [K in keyof PluginOperations]: PluginOperations[K];
-  } = { kind: operations.kind };
-  if (operations.commitTitle !== undefined) offered.commitTitle = whileMounted(operations.commitTitle);
-  if (operations.commitContent !== undefined) {
-    offered.commitContent = whileMounted(operations.commitContent);
-  }
-  if (operations.commitMap !== undefined) offered.commitMap = whileMounted(operations.commitMap);
-  const claim = operations.claim;
-  if (claim !== undefined) offered.claim = () => (mounted.current ? claim() : undefined);
-  return offered;
+      lifetime.drawn() ? commit(...args) : Promise.resolve(SURFACE_GONE);
+  const { commitTitle, commitContent, commitMap, claim } = operations;
+  return {
+    kind: operations.kind,
+    commitTitle: commitTitle === undefined ? undefined : whileMounted(commitTitle),
+    commitContent: commitContent === undefined ? undefined : whileMounted(commitContent),
+    commitMap: commitMap === undefined ? undefined : whileMounted(commitMap),
+    claim: claim === undefined ? undefined : () => (lifetime.drawn() ? claim() : undefined),
+  };
 }
 
+/** A Resource a plugin in this build draws, on the Map. */
 export function PluginResource(props: PluginResourceProps) {
+  return <PluginSurface {...props} entry={pluginEntryFor(props.kind)} />;
+}
+
+/**
+ * The Map host around one plugin's entry, whichever plugin it is: what
+ * `PluginResource` draws, and what a test draws a plugin of its own through.
+ */
+export function PluginSurface(props: PluginResourceProps & { readonly entry: PluginEntry }) {
   const { kind, title, readOnly, state } = props;
   const name = titleName(title.title);
   const size = props.size ?? COLLAPSED_RESOURCE_SIZE;
   const rail = useMemo(() => createRailStore(), []);
   const commands = useSyncExternalStore(rail.subscribe, rail.commands, rail.commands);
-  const mounted = useRef(true);
-  const claims = useRef<PluginHostClaim[]>([]);
+  const [lifetime] = useState(createSurfaceLifetime);
   useEffect(() => {
-    mounted.current = true;
-    const held = claims.current;
-    return () => {
-      mounted.current = false;
-      for (const claim of held.splice(0)) claim.unmount();
-    };
-  }, []);
+    lifetime.begin();
+    return lifetime.end;
+  }, [lifetime]);
   const host: ResourceHost = useMemo(() => ({ Title: MapTitleView, Own: MapOwn, rail }), [rail]);
-  const operations = guarded(props.operations, mounted, readOnly);
-  const plugin = renderPluginView({
+  // One set of commits while the operations the surface is handed stay the
+  // same, so the plugin's own render, and the rail it publishes, settle.
+  const operations = useMemo(
+    () => guarded(props.operations, lifetime, readOnly),
+    [props.operations, lifetime, readOnly],
+  );
+  const plugin = props.entry.render({
     resourceId: props.resourceId,
     kind,
     title: title.title,
@@ -264,7 +298,7 @@ export function PluginResource(props: PluginResourceProps) {
     operations,
     assets: NO_ASSETS,
     Embed: NoEmbed,
-    onClaim: (claim) => claims.current.push(claim),
+    onClaim: lifetime.hold,
   });
 
   const entityActions = props.entityActions;
@@ -277,7 +311,7 @@ export function PluginResource(props: PluginResourceProps) {
       className="canvas-resource__actions"
       data-testid="canvas-resource-actions"
     >
-      {actionable && entityActions !== undefined && (
+      {actionable && (
         <EntityActionsTrigger
           groups={entityActions}
           label={`Actions for Resource ${name}`}

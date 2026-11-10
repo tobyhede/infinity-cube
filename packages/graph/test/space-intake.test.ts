@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { type Resource, type ResourcePlacement } from '@project/core';
+import { type JsonValue, type Resource, type ResourcePlacement } from '@project/core';
 import { loadSpace, loadSpaceSnapshot, type LoadSpaceResult } from '../src/index';
 import type { SpaceReferenceError } from '../src/validate';
 import { jsonResourceFile, resourceFile, uuid } from './resource-files';
@@ -708,7 +708,7 @@ describe.each([
     });
   });
 
-  describe('Shapes (ADR 0121) and Open on each entry', () => {
+  describe('Map content (ADR 0142) and Open on each entry', () => {
     const IMAGE: Resource = {
       id: A,
       title: 'Figure',
@@ -725,21 +725,17 @@ describe.each([
       ['reference', [referenceTo(A, B), markdown(B, 'B')]],
       ['ur', [{ id: A, title: 'Node', kind: 'ur', content: {} }]],
     ];
-    const placedIn = (resources: readonly Resource[], resourceShape: ResourcePlacement['shape']) =>
+    const placedIn = (resources: readonly Resource[], content: JsonValue) =>
       load({
         resources,
         maps: [
-          positionedMap(WORKING, { [A]: { x: 0, y: 0, open: false, shape: resourceShape } }, [
+          positionedMap(WORKING, { [A]: { x: 0, y: 0, open: false, content } }, [
             graph(MAIN, 'Main'),
           ]),
         ],
       });
 
-    it.each(everyKind)('loads a %s Resource in the rectangle', (_kind, resources) => {
-      expect(loaded(placedIn(resources, 'rectangle')).resources).toHaveLength(resources.length);
-    });
-
-    it.each(everyKind)('loads a %s Resource with no Shape stored', (_kind, resources) => {
+    it.each(everyKind)('loads a %s Resource with no Map content stored', (_kind, resources) => {
       const space = loaded(
         load({
           resources,
@@ -762,12 +758,12 @@ describe.each([
               positionedMap(
                 WORKING,
                 {
-                  [A]: { x: 0, y: 0, open: false, shape: resourceShape },
+                  [A]: { x: 0, y: 0, open: false, content: { shape: resourceShape } },
                   [B]: {
                     x: 320,
                     y: 0,
                     size: { width: 400, height: 300 },
-                    shape: resourceShape,
+                    content: { shape: resourceShape },
                   },
                 },
                 [graph(MAIN, 'Main')],
@@ -780,15 +776,24 @@ describe.each([
     );
 
     it.each(everyKind.filter(([kind]) => kind !== 'ur'))(
-      'refuses a %s Resource in any Shape but the rectangle',
+      'refuses Map content on a %s Resource, which no plugin draws',
       (_kind, resources) => {
-        for (const resourceShape of ['pill', 'ellipse', 'diamond'] as const) {
-          expect(refused(placedIn(resources, resourceShape))).toEqual([
-            expect.objectContaining({ kind: 'shape-not-taken', ref: A }),
+        for (const content of [{ shape: 'rectangle' }, { shape: 'pill' }, null]) {
+          expect(refused(placedIn(resources, content))).toEqual([
+            expect.objectContaining({ kind: 'map-content-invalid', ref: A }),
           ]);
         }
       },
     );
+
+    it('refuses Ur Map content its plugin refuses, naming the entry', () => {
+      const ur: Resource = { id: A, title: 'Node', kind: 'ur', content: {} };
+      for (const content of [{ shape: 'hexagon' }, {}, 'pill', { shape: 'pill', open: true }]) {
+        expect(refused(placedIn([ur], content)), JSON.stringify(content)).toEqual([
+          expect.objectContaining({ kind: 'map-content-invalid', ref: A }),
+        ]);
+      }
+    });
 
     const openIn = (resources: readonly Resource[], open: boolean) =>
       load({

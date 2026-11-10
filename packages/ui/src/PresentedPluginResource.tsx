@@ -8,7 +8,7 @@ import {
   type ResourceHost,
   type TitleProps,
 } from '@project/resource-api/view';
-import { NO_ASSETS, NoEmbed, renderPluginView } from './kinds/plugin-views';
+import { NO_ASSETS, NoEmbed, pluginEntryFor } from './kinds/plugin-views';
 import { ResourceFailureBoundary } from './ResourceFailureBoundary';
 
 /**
@@ -21,8 +21,6 @@ import { ResourceFailureBoundary } from './ResourceFailureBoundary';
 
 /** The frame's nominal size: the Stage's 16:9 frame, which the plugin's rect fills. */
 const STAGE_SIZE: Size = { width: 1600, height: 900 };
-
-
 
 function StageOwn({ children, className }: OwnProps) {
   return <div className={className}>{children}</div>;
@@ -44,13 +42,11 @@ export function PresentedPluginResource(props: PresentedPluginResourceProps) {
   const name = titleName(title);
   const host: ResourceHost = useMemo(() => {
     function StageTitle({ className }: TitleProps) {
-      return (
-        <h2 className={['resource__title', className].filter(Boolean).join(' ')}>{name}</h2>
-      );
+      return <h2 className={['resource__title', className].filter(Boolean).join(' ')}>{name}</h2>;
     }
     return { Title: StageTitle, Own: StageOwn, rail: createRailStore() };
   }, [name]);
-  const plugin = renderPluginView({
+  const plugin = pluginEntryFor(kind).render({
     resourceId: props.resourceId,
     kind,
     title,

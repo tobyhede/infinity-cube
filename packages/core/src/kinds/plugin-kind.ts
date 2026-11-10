@@ -41,7 +41,8 @@ function mapContentOf<M>(
 ): KindMapContent {
   const asJson = (value: M, which: string): JsonValue => {
     const parsed = jsonValueSchema.safeParse(value);
-    if (!parsed.success) throw new Error(`The "${kind}" plugin's ${which} Map content is not JSON.`);
+    if (!parsed.success)
+      throw new Error(`The "${kind}" plugin's ${which} Map content is not JSON.`);
     return parsed.data;
   };
   const defaultValue = asJson(declaration.default, 'default');

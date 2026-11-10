@@ -64,7 +64,7 @@ export function createPluginGate(): PluginGate {
         install(released);
         return true;
       },
-      exclusively: async <T,>(work: (own: Own) => Promise<T>): Promise<T | 'busy'> => {
+      exclusively: async <T>(work: (own: Own) => Promise<T>): Promise<T | 'busy'> => {
         const begun = beginExclusive(chain, surface);
         if (begun === 'busy' || begun === 'not-held') return 'busy';
         install(begun);

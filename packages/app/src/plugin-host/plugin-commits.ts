@@ -94,9 +94,7 @@ export function pluginSurfaceOperations(
     if (host.gate.exclusiveRunning()) return BUSY;
     return null;
   });
-  const operations: { -readonly [K in keyof PluginOperations]: PluginOperations[K] } = { kind };
-  if (plain.map !== undefined) operations.commitMap = plain.map;
-  operations.claim = (): PluginHostClaim | undefined => {
+  const claim = (): PluginHostClaim | undefined => {
     const held = host.gate.claim([resourceId], (running) =>
       commitsFor(host, resourceId, () => {
         if (host.replacementEpoch() !== builtIn) return GONE;
@@ -110,5 +108,5 @@ export function pluginSurfaceOperations(
       unmount: () => host.gate.unmount(resourceId),
     };
   };
-  return operations;
+  return { kind, commitMap: plain.map, claim };
 }

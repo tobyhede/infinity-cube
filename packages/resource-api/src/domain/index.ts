@@ -48,7 +48,7 @@ export type Answer = 'completed' | 'unchanged' | { readonly refused: string };
  */
 export interface Kept<T> {
   readonly value: T;
-  readonly commit?: (next: T) => Promise<Answer>;
+  readonly commit?: ((next: T) => Promise<Answer>) | undefined;
 }
 
 /**

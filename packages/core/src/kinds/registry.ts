@@ -55,9 +55,9 @@ type KindModules = {
 const KIND_MODULES: KindModules = REGISTERED;
 
 /** Each plugin kind's Map content declaration, which a plugin always makes. */
-const PLUGIN_MAP_CONTENT: { readonly [K in PluginKind]: KindMapContent } = {
+const PLUGIN_MAP_CONTENT = {
   [urKind.id]: urKind.mapContent,
-};
+} satisfies Record<PluginKind, KindMapContent>;
 
 /** A kinded value whose content is its kind's, correlated so its module accepts it. */
 type Kinded<K extends KindId> = {

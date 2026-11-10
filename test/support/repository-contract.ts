@@ -1143,7 +1143,7 @@ export const spaceRepositoryContract = (
         const base = graphedSpace(SPACE_ID, 'Shaped', [RESOURCE_ID, SECOND_RESOURCE_ID]);
         return {
           ...base,
-          // Only an Ur Resource takes a Shape (ADR 0121).
+          // Only a kind a plugin draws keeps Map content (ADR 0142).
           resources: base.resources.map(({ id, document }) => ({
             id,
             document: { title: document.title, kind: 'ur', content: {} },
@@ -1174,7 +1174,7 @@ export const spaceRepositoryContract = (
     });
   });
 
-  it(`${name} keeps every Resource's Shape through initialization, commit and load`, async () => {
+  it(`${name} keeps every Resource's Map content through initialization, commit and load`, async () => {
     await withHarness(async (repository) => {
       const withResourceShapes = (
         first: ResourceShape,
@@ -1184,7 +1184,7 @@ export const spaceRepositoryContract = (
         const base = graphedSpace(SPACE_ID, 'Shaped', [RESOURCE_ID, SECOND_RESOURCE_ID]);
         return {
           ...base,
-          // Only an Ur Resource takes a Shape (ADR 0121).
+          // Only a kind a plugin draws keeps Map content (ADR 0142).
           resources: base.resources.map(({ id, document }) => ({
             id,
             document: { title: document.title, kind: 'ur', content: {} },
@@ -1194,16 +1194,16 @@ export const spaceRepositoryContract = (
             maps: (base.document.maps ?? []).map((m) => ({
               ...m,
               positions: {
-                [RESOURCE_ID]: { x: 0, y: 0, open: false, shape: first },
+                [RESOURCE_ID]: { x: 0, y: 0, open: false, content: { shape: first } },
                 [SECOND_RESOURCE_ID]: secondResized
                   ? {
                       x: 300,
                       y: 0,
                       open: false,
                       size: { width: 560, height: 420 },
-                      shape: second,
+                      content: { shape: second },
                     }
-                  : { x: 300, y: 0, open: false, shape: second },
+                  : { x: 300, y: 0, open: false, content: { shape: second } },
               },
             })),
           },

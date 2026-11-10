@@ -1,4 +1,4 @@
-import type { ComponentType, ReactElement } from 'react';
+import { useMemo, type ComponentType, type ReactElement } from 'react';
 import {
   isPluginKind,
   jsonValueSchema,
@@ -11,7 +11,6 @@ import type {
   Assets,
   EmbedProps,
   Exclusive,
-  KeptMap,
   OwnClaim,
   PluginView,
   Surface,
@@ -30,9 +29,10 @@ import { urPluginView } from '@project/plugin-ur/view';
 
 /** A commit as the host takes it: JSON in, an answer out. */
 export interface PluginCommits {
-  readonly title?: (next: string) => Promise<Answer>;
-  readonly content?: (next: JsonValue) => Promise<Answer>;
-  readonly map?: (next: JsonValue, options?: { readonly sizeHint?: Size }) => Promise<Answer>;
+  readonly title?: ((next: string) => Promise<Answer>) | undefined;
+  readonly content?: ((next: JsonValue) => Promise<Answer>) | undefined;
+  readonly map?:
+    ((next: JsonValue, options?: { readonly sizeHint?: Size }) => Promise<Answer>) | undefined;
 }
 
 /** A Claim as the host hands it out, before the plugin's types are put on it. */
@@ -53,7 +53,7 @@ export interface PluginOperations {
   readonly commitTitle?: PluginCommits['title'];
   readonly commitContent?: PluginCommits['content'];
   readonly commitMap?: PluginCommits['map'];
-  readonly claim?: () => PluginHostClaim | undefined;
+  readonly claim?: (() => PluginHostClaim | undefined) | undefined;
 }
 
 /** Whether a kind's operations are a plugin kind's, which `PluginResource` draws. */
@@ -80,7 +80,7 @@ export interface PluginSurfaceInput {
 }
 
 /** One plugin, both halves, behind a door that takes the host's values. */
-interface PluginEntry {
+export interface PluginEntry {
   readonly Glyph: ComponentType<{ readonly size?: number | undefined }>;
   readonly render: (input: PluginSurfaceInput) => ReactElement;
 }
@@ -99,82 +99,104 @@ export function NoEmbed(_props: EmbedProps) {
 /** Why a commit was refused before it reached the host: the value was not JSON. */
 const NOT_JSON: Answer = { refused: 'This change cannot be kept.' };
 
-function entryOf<C, M>(plugin: ResourcePlugin<C, M>, view: PluginView<C, M>): PluginEntry {
+/** A plugin's entry: what a host draws it through, whichever plugin it is. */
+export function pluginEntry<C, M>(
+  plugin: ResourcePlugin<C, M>,
+  view: PluginView<C, M>,
+): PluginEntry {
   const asJson =
-    <T,>(commit: (next: JsonValue) => Promise<Answer>) =>
-    (next: T): Promise<Answer> => {
+    (commit: (next: JsonValue) => Promise<Answer>) =>
+    (next: C | M): Promise<Answer> => {
       const parsed = jsonValueSchema.safeParse(next);
       return parsed.success ? commit(parsed.data) : Promise.resolve(NOT_JSON);
     };
   const exclusiveOf = (own: PluginCommits): Exclusive<C, M> => {
-    const exclusive: {
-      -readonly [K in keyof Exclusive<C, M>]: Exclusive<C, M>[K];
-    } = {};
-    if (own.title !== undefined) exclusive.title = own.title;
-    const content = own.content;
-    if (content !== undefined) exclusive.content = asJson<C>(content);
-    const map = own.map;
-    if (map !== undefined) exclusive.map = (next, options) => asJson<M>((value) => map(value, options))(next);
-    return exclusive;
+    const { title, content, map: ownMap } = own;
+    return {
+      title,
+      content: content === undefined ? undefined : asJson(content),
+      map:
+        ownMap === undefined
+          ? undefined
+          : (next, options) => asJson((value) => ownMap(value, options))(next),
+    };
   };
-  const render = (input: PluginSurfaceInput): ReactElement => {
+  /**
+   * The plugin mounted with the host's values. A component rather than a
+   * call, so a value its schemas refuse throws inside the failure boundary the
+   * host draws it in; and each commit keeps its identity while the host's
+   * does, so a plugin that keys work on one does not run it again on every
+   * render of the host.
+   */
+  function Mounted({ input }: { readonly input: PluginSurfaceInput }) {
+    const { operations, onClaim } = input;
+    const { commitTitle, commitContent, commitMap, claim: hostClaim } = operations;
+    const mapCommit = useMemo(
+      () =>
+        commitMap === undefined
+          ? undefined
+          : (next: M, options?: { readonly sizeHint?: Size }) =>
+              asJson((value) => commitMap(value, options))(next),
+      [commitMap],
+    );
+    const contentCommit = useMemo(
+      () => (commitContent === undefined ? undefined : asJson(commitContent)),
+      [commitContent],
+    );
+    const claim = useMemo(
+      () =>
+        hostClaim === undefined
+          ? undefined
+          : (): OwnClaim<C, M> | undefined => {
+              const held = hostClaim();
+              if (held === undefined) return undefined;
+              onClaim(held);
+              return {
+                release: () => held.release(),
+                exclusively: (work) => held.exclusively((own) => work(exclusiveOf(own))),
+              };
+            },
+      [hostClaim, onClaim],
+    );
     const content = plugin.content.safeParse(input.content);
     if (!content.success) {
       throw new Error(`Resource ${input.resourceId}'s content is not the ${plugin.kind} plugin's.`);
     }
     const mapContent = plugin.mapContent.schema.safeParse(input.mapContent);
     if (!mapContent.success) {
-      throw new Error(`Resource ${input.resourceId}'s Map content is not the ${plugin.kind} plugin's.`);
+      throw new Error(
+        `Resource ${input.resourceId}'s Map content is not the ${plugin.kind} plugin's.`,
+      );
     }
-    const { operations } = input;
-    const map: { -readonly [K in keyof KeptMap<M>]: KeptMap<M>[K] } = { value: mapContent.data };
-    const commitMap = operations.commitMap;
-    if (commitMap !== undefined) {
-      map.commit = (next, options) => asJson<M>((value) => commitMap(value, options))(next);
-    }
-    const kept: { value: C; commit?: (next: C) => Promise<Answer> } = { value: content.data };
-    if (operations.commitContent !== undefined) kept.commit = asJson<C>(operations.commitContent);
-    const title: { value: string; commit?: (next: string) => Promise<Answer> } = {
-      value: input.title,
-    };
-    if (operations.commitTitle !== undefined) title.commit = operations.commitTitle;
-    const surface: {
-      -readonly [K in keyof Surface<C, M>]: Surface<C, M>[K];
-    } = {
-      resource: { id: input.resourceId, title: input.title, kind: plugin.kind, content: content.data },
-      title,
-      content: kept,
-      map,
+    const surface: Surface<C, M> = {
+      resource: {
+        id: input.resourceId,
+        title: input.title,
+        kind: plugin.kind,
+        content: content.data,
+      },
+      title: { value: input.title, commit: commitTitle },
+      content: { value: content.data, commit: contentCommit },
+      map: { value: mapContent.data, commit: mapCommit },
       size: input.size,
       selected: input.selected,
+      claim,
       assets: input.assets,
       Embed: input.Embed,
     };
-    const hostClaim = operations.claim;
-    if (hostClaim !== undefined) {
-      surface.claim = (): OwnClaim<C, M> | undefined => {
-        const held = hostClaim();
-        if (held === undefined) return undefined;
-        input.onClaim(held);
-        return {
-          release: () => held.release(),
-          exclusively: (work) => held.exclusively((own) => work(exclusiveOf(own))),
-        };
-      };
-    }
     return <view.View surface={surface} />;
-  };
+  }
+  const render = (input: PluginSurfaceInput): ReactElement => <Mounted input={input} />;
   return { Glyph: view.Glyph, render };
 }
 
 /** Every plugin's entry, typed so a plugin the list names and this file omits fails to compile. */
-const PLUGIN_ENTRIES: { readonly [K in PluginKind]: PluginEntry } = {
-  [urKind.id]: entryOf(urPlugin, urPluginView),
-};
+const PLUGIN_ENTRIES = {
+  [urKind.id]: pluginEntry(urPlugin, urPluginView),
+} satisfies Record<PluginKind, PluginEntry>;
 
-/** A plugin's view mounted with the host's values. */
-export const renderPluginView = (input: PluginSurfaceInput): ReactElement =>
-  PLUGIN_ENTRIES[input.kind].render(input);
+/** The entry of the plugin that draws this kind. */
+export const pluginEntryFor = (kind: PluginKind): PluginEntry => PLUGIN_ENTRIES[kind];
 
 /** A plugin kind's glyph. */
 export const pluginGlyph = (kind: PluginKind): PluginEntry['Glyph'] => PLUGIN_ENTRIES[kind].Glyph;

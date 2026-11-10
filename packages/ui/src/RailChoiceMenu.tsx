@@ -44,9 +44,7 @@ export function RailChoiceMenu({ command }: RailChoiceMenuProps) {
           onClick={(event) => event.stopPropagation()}
           onPointerDown={(event) => event.stopPropagation()}
           className="nokey nodrag nopan gap-1 px-1.5"
-          aria-label={
-            chosen === undefined ? command.label : `${command.label}: ${chosen.label}`
-          }
+          aria-label={chosen === undefined ? command.label : `${command.label}: ${chosen.label}`}
           icon={chosen?.icon}
         />
       }

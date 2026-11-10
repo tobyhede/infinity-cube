@@ -1,0 +1,344 @@
+import '@testing-library/jest-dom/vitest';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { useEffect } from 'react';
+import { describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
+import { type JsonValue, type ResourceShape } from '@project/core';
+import { definePlugin, type Answer } from '@project/resource-api/domain';
+import { definePluginView, Title, type Surface } from '@project/resource-api/view';
+import {
+  PluginResource,
+  PresentedPluginResource,
+  type PluginHostClaim,
+  type PluginResourceProps,
+} from '../src';
+import { pluginEntry } from '../src/kinds/plugin-views';
+import { PluginSurface } from '../src/PluginResource';
+
+/**
+ * A plugin of the test's own, drawn through the same host: it keeps every
+ * surface it is handed, takes a Claim when told to, and throws when its
+ * content says so, so what the host offers and withdraws can be read.
+ */
+const probeContent = z.object({ fails: z.boolean() }).strict();
+const probeMap = z.object({ n: z.number() }).strict();
+const probePlugin = definePlugin({
+  apiVersion: 1,
+  kind: 'probe',
+  name: 'Probe',
+  listName: 'Probes',
+  referenceName: null,
+  content: probeContent,
+  newContent: { fails: false },
+  mapContent: { schema: probeMap, default: { n: 0 } },
+});
+type ProbeSurface = Surface<z.output<typeof probeContent>, z.output<typeof probeMap>>;
+const surfaces: ProbeSurface[] = [];
+let claimOnMount = false;
+function ProbeView({ surface }: { readonly surface: ProbeSurface }) {
+  surfaces.push(surface);
+  if (surface.content.value.fails) throw new Error('The probe was told to fail.');
+  const claim = surface.claim;
+  useEffect(() => {
+    if (claimOnMount) claim?.();
+  }, [claim]);
+  return (
+    <div data-testid="probe">
+      <Title />
+    </div>
+  );
+}
+const probeEntry = pluginEntry(
+  probePlugin,
+  definePluginView(probePlugin, { View: ProbeView, Glyph: () => null }),
+);
+const probeProps = (overrides: Partial<PluginResourceProps> = {}): PluginResourceProps => ({
+  resourceId: 'probe',
+  kind: 'ur',
+  title: { title: 'Probe', readOnly: false, onReturnFocus: () => undefined },
+  content: { fails: false },
+  mapContent: { n: 1 },
+  outline: 'rectangle',
+  state: 'rest',
+  graphColor: '#ffc53d',
+  readOnly: false,
+  operations: { kind: 'ur' },
+  ...overrides,
+});
+
+const title = { title: 'Decide', readOnly: false, onReturnFocus: () => undefined };
+
+const props = (
+  resourceShape: ResourceShape,
+  overrides: Partial<PluginResourceProps> = {},
+): PluginResourceProps => ({
+  resourceId: 'decide',
+  kind: 'ur',
+  title,
+  content: {},
+  mapContent: { shape: resourceShape },
+  outline: resourceShape,
+  state: 'rest',
+  graphColor: '#ffc53d',
+  readOnly: false,
+  operations: { kind: 'ur' },
+  ...overrides,
+});
+
+const outline = (resource: HTMLElement) => resource.querySelector('.canvas-resource__outline');
+
+describe('the Map host a plugin draws inside (ADR 0142)', () => {
+  it.each([
+    ['pill', 'rect'],
+    ['ellipse', 'rect'],
+    ['diamond', 'polygon'],
+  ] as const)('strokes the border and ring on a declared %s', (resourceShape, element) => {
+    render(
+      <PluginResource
+        {...props(resourceShape)}
+        state="selected"
+        size={{ width: 480, height: 300 }}
+      />,
+    );
+    const resource = screen.getByRole('article', { name: 'Decide' });
+    expect(resource).toHaveAttribute('data-resource-shape', resourceShape);
+    const drawn = outline(resource);
+    const ring = drawn?.querySelector('.canvas-resource__outline-ring');
+    const edge = drawn?.querySelector('.canvas-resource__outline-edge');
+    expect(edge?.tagName).toBe(element);
+    expect(ring?.tagName).toBe(element);
+    expect(drawn?.getAttribute('viewBox')).toBe('0 0 480 300');
+  });
+
+  it('draws no outline for a rectangle, whose border is the rect', () => {
+    render(<PluginResource {...props('rectangle')} />);
+    const resource = screen.getByRole('article', { name: 'Decide' });
+    expect(resource).toHaveAttribute('data-resource-shape', 'rectangle');
+    expect(outline(resource)).toBeNull();
+  });
+
+  it("draws the plugin's view, with the Title the host owns", () => {
+    render(
+      <PluginResource {...props('diamond')} title={{ ...title, title: 'Decide\nwhich way' }} />,
+    );
+    const resource = screen.getByRole('article', { name: 'Decide' });
+    expect(resource.querySelector('[data-outline="diamond"]')).not.toBeNull();
+    expect(resource).toHaveTextContent(/Decide/u);
+    expect(resource).toHaveTextContent(/which way/u);
+  });
+
+  it('offers the rename the Title carries, and writes it in place', () => {
+    const begin = vi.fn();
+    const { rerender } = render(
+      <PluginResource {...props('pill')} title={{ ...title, onBeginTitleEdit: begin }} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Title Decide' }));
+    expect(begin).toHaveBeenCalledTimes(1);
+    rerender(
+      <PluginResource
+        {...props('pill')}
+        state="editing"
+        title={{ ...title, editor: { onComplete: () => null, onCancel: () => undefined } }}
+      />,
+    );
+    const box = screen.getByRole('textbox', { name: 'Resource title' });
+    fireEvent.change(box, { target: { value: 'Decide now' } });
+    // A render of the host does not remount the Title, so the draft survives it.
+    rerender(
+      <PluginResource
+        {...props('pill')}
+        state="editing"
+        graphColor="#00ff00"
+        title={{ ...title, editor: { onComplete: () => null, onCancel: () => undefined } }}
+      />,
+    );
+    expect(screen.getByRole('textbox', { name: 'Resource title' })).toBe(box);
+  });
+
+  it("draws the plugin's rail commands on the Resource's rail, and runs them", async () => {
+    const commitMap = vi.fn((next: JsonValue): Promise<Answer> => {
+      expect(next).toEqual({ shape: 'pill' });
+      return Promise.resolve('completed');
+    });
+    render(
+      <PluginResource
+        {...props('ellipse')}
+        state="selected"
+        operations={{ kind: 'ur', commitMap }}
+      />,
+    );
+    const face = screen.getByRole('button', { name: 'Shape: Ellipse' });
+    expect(face.querySelector('svg[data-resource-shape="ellipse"]')).not.toBeNull();
+    fireEvent.click(face);
+    const items = await screen.findAllByRole('menuitemradio');
+    expect(items.map((item) => item.textContent)).toEqual([
+      'Rectangle',
+      'Pill',
+      'Ellipse',
+      'Diamond',
+    ]);
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Pill' }));
+    expect(commitMap).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers a plugin no commit on a read-only surface, so it draws no Shape choice', () => {
+    render(
+      <PluginResource
+        {...props('ellipse')}
+        readOnly
+        state="selected"
+        operations={{ kind: 'ur', commitMap: () => Promise.resolve('completed') }}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /^Shape/u })).toBeNull();
+  });
+
+  it('answers a commit the plugin kept refused once the surface has gone', async () => {
+    surfaces.length = 0;
+    const commitMap = vi.fn(() => Promise.resolve<Answer>('completed'));
+    const { unmount } = render(
+      <PluginSurface
+        {...probeProps({ operations: { kind: 'ur', commitMap } })}
+        entry={probeEntry}
+      />,
+    );
+    const kept = surfaces.at(-1)?.map.commit;
+    expect(kept).toBeDefined();
+    await expect(kept?.({ n: 2 })).resolves.toBe('completed');
+    expect(commitMap).toHaveBeenLastCalledWith({ n: 2 }, undefined);
+    unmount();
+    await expect(kept?.({ n: 3 })).resolves.toEqual({
+      refused: 'This Resource is no longer drawn here.',
+    });
+    expect(commitMap).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses a committed value that is not JSON before the host sees it', async () => {
+    surfaces.length = 0;
+    const commitMap = vi.fn(() => Promise.resolve<Answer>('completed'));
+    render(
+      <PluginSurface
+        {...probeProps({ operations: { kind: 'ur', commitMap } })}
+        entry={probeEntry}
+      />,
+    );
+    await expect(surfaces.at(-1)?.map.commit?.({ n: Number.NaN })).resolves.toEqual({
+      refused: 'This change cannot be kept.',
+    });
+    expect(commitMap).not.toHaveBeenCalled();
+  });
+
+  it('hands the plugin one Embed and one Title for the surface’s lifetime', () => {
+    surfaces.length = 0;
+    const { rerender } = render(<PluginSurface {...probeProps()} entry={probeEntry} />);
+    rerender(
+      <PluginSurface
+        {...probeProps({ state: 'selected', mapContent: { n: 9 } })}
+        entry={probeEntry}
+      />,
+    );
+    rerender(<PluginSurface {...probeProps({ graphColor: '#000000' })} entry={probeEntry} />);
+    expect(surfaces.length).toBeGreaterThanOrEqual(3);
+    expect(new Set(surfaces.map((surface) => surface.Embed)).size).toBe(1);
+    expect(surfaces.map((surface) => surface.map.value)).toContainEqual({ n: 9 });
+  });
+
+  it('offers no commit and no Claim on a read-only surface', () => {
+    surfaces.length = 0;
+    render(
+      <PluginSurface
+        {...probeProps({
+          readOnly: true,
+          operations: {
+            kind: 'ur',
+            commitMap: () => Promise.resolve('completed'),
+            claim: () => undefined,
+          },
+        })}
+        entry={probeEntry}
+      />,
+    );
+    const surface = surfaces.at(-1);
+    expect(surface?.map.commit).toBeUndefined();
+    expect(surface?.content.commit).toBeUndefined();
+    expect(surface?.claim).toBeUndefined();
+  });
+
+  it('releases every Claim taken through it when it unmounts, and grants none after', () => {
+    surfaces.length = 0;
+    claimOnMount = true;
+    const unmountClaim = vi.fn();
+    const held: PluginHostClaim = {
+      release: () => true,
+      exclusively: () => Promise.resolve('busy'),
+      unmount: unmountClaim,
+    };
+    const claim = vi.fn(() => held);
+    const { unmount } = render(
+      <PluginSurface {...probeProps({ operations: { kind: 'ur', claim } })} entry={probeEntry} />,
+    );
+    claimOnMount = false;
+    expect(claim).toHaveBeenCalledTimes(1);
+    expect(unmountClaim).not.toHaveBeenCalled();
+    const kept = surfaces.at(-1)?.claim;
+    unmount();
+    expect(unmountClaim).toHaveBeenCalledTimes(1);
+    expect(kept?.()).toBeUndefined();
+    expect(claim).toHaveBeenCalledTimes(1);
+  });
+
+  it('loses only its own Resource when its plugin throws', () => {
+    const onFailure = vi.fn();
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    render(
+      <div>
+        <PluginSurface
+          {...probeProps({ content: { fails: true }, title: { ...title, title: 'Decide' } })}
+          entry={probeEntry}
+          onFailure={onFailure}
+        />
+        <PluginResource
+          {...props('pill')}
+          resourceId="other"
+          title={{ ...title, title: 'Other' }}
+        />
+      </div>,
+    );
+    error.mockRestore();
+    expect(screen.getByRole('article', { name: 'Decide' })).toContainElement(
+      screen.getByTestId('resource-failure'),
+    );
+    expect(screen.getByRole('article', { name: 'Other' })).toHaveTextContent('Other');
+    expect(onFailure).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('the Stage host a plugin draws inside (ADR 0142)', () => {
+  it('gives the plugin the value withoutMap gives, and no commit', () => {
+    render(
+      <PresentedPluginResource
+        resourceId="decide"
+        kind="ur"
+        title={'Decide\nwhich way'}
+        content={{}}
+      />,
+    );
+    const presented = screen.getByTestId('resource-content');
+    expect(presented).toHaveAttribute('data-content-kind', 'ur');
+    expect(presented.querySelector('[data-outline="rectangle"]')).not.toBeNull();
+    expect(screen.getByRole('heading', { name: 'Decide' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /^Shape/u })).toBeNull();
+  });
+
+  it('draws a short note in place of a plugin that throws', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    await act(async () => {
+      render(<PresentedPluginResource resourceId="x" kind="ur" title="X" content="not Ur's" />);
+      await Promise.resolve();
+    });
+    error.mockRestore();
+    expect(screen.getByTestId('resource-failure')).toHaveTextContent(
+      'This Resource could not be drawn.',
+    );
+  });
+});

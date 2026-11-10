@@ -83,7 +83,9 @@ const NOT_THE_KIND = new Map<string, ReadonlyMap<string, readonly string[]>>([
 const isScannedSource = (file: string): boolean =>
   /^(?:packages\/[^/]+\/src|src)\/.*\.(?:tsx?|css)$/u.test(file);
 
-const isKindModule = (file: string): boolean => file.includes('/kinds/');
+/** A `kinds/` module, or a Resource plugin's own package, which declares its kind (ADR 0142). */
+const isKindModule = (file: string): boolean =>
+  file.includes('/kinds/') || /^packages\/plugin-[^/]+\//u.test(file);
 
 const sourceOf = (file: string): string =>
   file.endsWith('.css') ? maskedCssSource(file) : maskedTsSource(file);
@@ -254,6 +256,7 @@ describe('a kind is named only by its module', () => {
 
   it('reads source in the kinds/ directories as module source', () => {
     expect(isKindModule('packages/core/src/kinds/ur.ts')).toBe(true);
+    expect(isKindModule('packages/plugin-ur/src/domain.ts')).toBe(true);
     expect(isKindModule('packages/core/src/schema.ts')).toBe(false);
   });
 });

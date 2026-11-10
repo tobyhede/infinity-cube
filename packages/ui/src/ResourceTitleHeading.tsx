@@ -59,4 +59,3 @@ export function TitleHeading({ title }: TitleLadderProps) {
     </span>
   );
 }
-

@@ -22,7 +22,7 @@ export type MapCommit<M> = (next: M, options?: { readonly sizeHint?: Size }) => 
 /** A Map content value and its commit, when the surface offers one. */
 export interface KeptMap<M> {
   readonly value: M;
-  readonly commit?: MapCommit<M>;
+  readonly commit?: MapCommit<M> | undefined;
 }
 
 /** What a surface offers for reaching assets (ADR 0142). */
@@ -48,10 +48,10 @@ export interface Claim {
  * runs. Each writes only the calling plugin's Resource.
  */
 export interface Exclusive<C, M> {
-  readonly title?: (next: string) => Promise<Answer>;
-  readonly content?: (next: C) => Promise<Answer>;
-  readonly map?: MapCommit<M>;
-  readonly store?: (bytes: Blob) => Promise<AssetRef | { readonly refused: string }>;
+  readonly title?: ((next: string) => Promise<Answer>) | undefined;
+  readonly content?: ((next: C) => Promise<Answer>) | undefined;
+  readonly map?: MapCommit<M> | undefined;
+  readonly store?: ((bytes: Blob) => Promise<AssetRef | { readonly refused: string }>) | undefined;
 }
 
 /** A Claim the plugin holds on its own surface, through which exclusivity is reached. */
@@ -96,7 +96,7 @@ export interface Surface<C, M> {
   readonly map: KeptMap<M>;
   readonly size: Size;
   readonly selected: boolean;
-  readonly claim?: () => OwnClaim<C, M> | undefined;
+  readonly claim?: (() => OwnClaim<C, M> | undefined) | undefined;
   readonly assets: Assets;
   /** One component for the surface's lifetime: unmounting releases, so a new type per render would release every Claim inside it. */
   readonly Embed: ComponentType<EmbedProps>;

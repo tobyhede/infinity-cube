@@ -198,10 +198,19 @@ const packageInternalsPattern = (exemptApp) => ({
 
 /**
  * The kind-neutral modules under a `kinds/` directory: the interface every kind
- * implements and the registry each choice among kinds goes through. Every other
- * module there is one kind's, and what it exports names that kind.
+ * implements, the registry each choice among kinds goes through, and the
+ * plugin list and its adapters, which read every Resource plugin alike (ADR
+ * 0142). Every other module there is one kind's, and what it exports names
+ * that kind.
  */
-const KIND_NEUTRAL_MODULES = new Set(['registry', 'kind-module', 'kind-view']);
+const KIND_NEUTRAL_MODULES = new Set([
+  'registry',
+  'kind-module',
+  'kind-view',
+  'plugins',
+  'plugin-kind',
+  'plugin-views',
+]);
 
 /** Each name a module's source exports, by declaration or by an `export { … }` list. */
 const exportedNames = (source) => [
@@ -280,7 +289,7 @@ const KIND_FEATURE_FILES = [
   'packages/ui/src/index.ts',
   // The kinds a Reference badge sits on are every kind but Reference; the flag saying so is a runtime boolean, so no type reads it.
   'packages/ui/src/icons.tsx',
-  // A Space Resource's portal and an Ur Resource's Shape menu.
+  // A Space Resource's portal.
   'packages/ui/src/CanvasResource.tsx',
   // A Space Resource's portal editing keeps its toolbar drawn.
   'packages/react-flow-adapter/src/ResourceNode.tsx',

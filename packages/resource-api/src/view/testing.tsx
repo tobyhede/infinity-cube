@@ -53,6 +53,11 @@ export type RenderedPlugin<C, M> = RenderResult & { readonly commits: Commits<C,
 
 const DEFAULT_SIZE: Size = { width: 200, height: 120 };
 
+/** The embedding a test surface hands its plugin: one component for every render, as a host must. */
+function TestEmbed() {
+  return null;
+}
+
 const TEST_ASSETS = {
   url: (ref: AssetRef) => ref,
   read: () => Promise.resolve({ refused: 'No asset store in this test.' }),
@@ -129,7 +134,7 @@ export function renderPlugin<C, M>(
   function Harness() {
     const [title, setTitle] = useState(options.title ?? 'Resource');
     const [content, setContent] = useState(options.content);
-    const [map, setMap] = useState(options.map);
+    const [mapValue, setMapValue] = useState(options.map);
     const rail = useMemo(() => createRailStore(), []);
     const host: ResourceHost = useMemo(
       () => ({ Title: TestTitle({ title }), Own: TestOwn, rail }),
@@ -144,29 +149,25 @@ export function renderPlugin<C, M>(
       };
     const titleCommit = settle(commits.title, setTitle);
     const contentCommit = settle(commits.content, setContent);
-    const mapCommit = settle(commits.map, setMap);
+    const mapCommit = settle(commits.map, setMapValue);
+    const granted = {
+      title: grants.title === true ? titleCommit : undefined,
+      content: grants.content === true ? contentCommit : undefined,
+      map: grants.map === true ? mapCommit : undefined,
+    };
+    const own: Exclusive<C, M> = granted;
+    const claim: OwnClaim<C, M> = { release: () => true, exclusively: (work) => work(own) };
     const surface: Surface<C, M> = {
       resource: { id: 'resource', title, kind: options.kind ?? 'test', content },
-      title: grants.title === true ? { value: title, commit: titleCommit } : { value: title },
-      content:
-        grants.content === true ? { value: content, commit: contentCommit } : { value: content },
-      map: grants.map === true ? { value: map, commit: mapCommit } : { value: map },
+      title: { value: title, commit: granted.title },
+      content: { value: content, commit: granted.content },
+      map: { value: mapValue, commit: granted.map },
       size: options.size ?? DEFAULT_SIZE,
       selected: options.selected ?? false,
+      claim: grants.claim === true ? () => claim : undefined,
       assets: TEST_ASSETS,
-      Embed: () => null,
+      Embed: TestEmbed,
     };
-    if (grants.claim === true) {
-      const own: Exclusive<C, M> = {};
-      if (grants.title === true) Object.assign(own, { title: titleCommit });
-      if (grants.content === true) Object.assign(own, { content: contentCommit });
-      if (grants.map === true) Object.assign(own, { map: mapCommit });
-      const claim: OwnClaim<C, M> = {
-        release: () => true,
-        exclusively: (work) => work(own),
-      };
-      Object.assign(surface, { claim: () => claim });
-    }
     return (
       <ResourceHostProvider host={host}>
         <View surface={surface} />

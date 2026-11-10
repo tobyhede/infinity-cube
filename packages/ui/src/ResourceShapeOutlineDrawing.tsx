@@ -1,8 +1,4 @@
-import type {
-  OutlinePoint,
-  OutlineSize,
-  ResourceShapeOutline,
-} from './resource-shape-outline';
+import type { OutlinePoint, OutlineSize, ResourceShapeOutline } from './resource-shape-outline';
 
 /**
  * A Shape's paper and edge, drawn in place of the Resource's own border
@@ -61,4 +57,3 @@ const OUTLINE_LAYERS = [
 /** An outline polygon's vertices, as its `points` attribute spells them. */
 const points = (vertices: readonly OutlinePoint[]): string =>
   vertices.map(({ x, y }) => `${x},${y}`).join(' ');
-
