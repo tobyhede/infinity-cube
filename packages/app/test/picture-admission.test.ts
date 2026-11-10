@@ -1,13 +1,12 @@
-import { createHash } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
+import type { AssetRef } from '@project/core';
+import type { AssetClient } from '@project/persistence';
+import { describe, expect, it, vi } from 'vitest';
 import {
   admitImage,
-  imageIdOf,
-  imagePath,
-  isImageId,
   MAX_IMAGE_BYTES,
   refusalForDeclaredType,
-} from '../src/images';
+  storePicture,
+} from '../src/picture-admission';
 
 const bytes = (...values: readonly number[]): Uint8Array<ArrayBuffer> => Uint8Array.from(values);
 const ascii = (text: string): Uint8Array<ArrayBuffer> => new TextEncoder().encode(text);
@@ -27,36 +26,14 @@ const jpeg = bytes(0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10);
 const gif = ascii('GIF89a\u0001\u0000');
 const webp = joined(ascii('RIFF'), bytes(0x24, 0, 0, 0), ascii('WEBPVP8 '));
 
-/** SHA-256 spelled as unpadded base64url, computed by Node's own hash rather than the module's. */
-const expectedId = (content: Uint8Array): string =>
-  createHash('sha256').update(content).digest('base64url');
-
 describe('admitting an image', () => {
   it.each([
     ['PNG', png, 'image/png'],
     ['JPEG', jpeg, 'image/jpeg'],
     ['GIF', gif, 'image/gif'],
     ['WebP', webp, 'image/webp'],
-  ] as const)('admits %s by its bytes, naming it by their SHA-256', async (_, content, type) => {
-    await expect(admitImage(content)).resolves.toEqual({
-      kind: 'admitted',
-      image: { id: expectedId(content), mediaType: type, bytes: content },
-    });
-  });
-
-  it('keeps an admitted image named by its bytes when the caller later changes theirs', async () => {
-    const content = png.slice();
-    const admission = await admitImage(content);
-    content.fill(0);
-    if (admission.kind !== 'admitted') throw new Error('expected the PNG to be admitted');
-    expect(admission.image.id).toBe(expectedId(admission.image.bytes));
-    expect(admission.image.bytes).toEqual(png);
-  });
-
-  it('names bytes by the digest every SHA-256 implementation gives them', async () => {
-    await expect(imageIdOf(new Uint8Array())).resolves.toBe(
-      '47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU',
-    );
+  ] as const)('admits %s by its bytes', (_, content, type) => {
+    expect(admitImage(content)).toEqual({ kind: 'admitted', mediaType: type });
   });
 
   it.each([
@@ -66,8 +43,8 @@ describe('admitting an image', () => {
     ['a RIFF container that is not WebP', joined(ascii('RIFF'), bytes(0, 0, 0, 0), ascii('WAVE'))],
     ['a PDF', ascii('%PDF-1.7')],
     ['markup whose root element is not svg', ascii('<html><svg/></html>')],
-  ])('refuses %s as an unsupported format', async (_, content) => {
-    await expect(admitImage(content)).resolves.toEqual({
+  ])('refuses %s as an unsupported format', (_, content) => {
+    expect(admitImage(content)).toEqual({
       kind: 'refused',
       code: 'image-format-unsupported',
     });
@@ -91,21 +68,21 @@ describe('admitting an image', () => {
     ['an SVG after an entity value holding a bracket', '<!DOCTYPE svg [<!ENTITY e "]>">]><svg/>'],
     ['an SVG after a subset comment holding a quote', "<!DOCTYPE svg [<!-- it's ] -->]><svg/>"],
     ['an SVG after a subset instruction holding a bracket', '<!DOCTYPE svg [<?pi ]?>]><svg/>'],
-  ])('refuses %s with its own code', async (_, text) => {
-    await expect(admitImage(ascii(text))).resolves.toEqual({
+  ])('refuses %s with its own code', (_, text) => {
+    expect(admitImage(ascii(text))).toEqual({
       kind: 'refused',
       code: 'image-svg-unsupported',
     });
   });
 
-  it('admits an image of exactly the size limit and refuses one byte more', async () => {
+  it('admits an image of exactly the size limit and refuses one byte more', () => {
     const atLimit = new Uint8Array(MAX_IMAGE_BYTES);
     atLimit.set(png);
     const overLimit = new Uint8Array(MAX_IMAGE_BYTES + 1);
     overLimit.set(png);
 
-    await expect(admitImage(atLimit)).resolves.toMatchObject({ kind: 'admitted' });
-    await expect(admitImage(overLimit)).resolves.toEqual({
+    expect(admitImage(atLimit)).toMatchObject({ kind: 'admitted' });
+    expect(admitImage(overLimit)).toEqual({
       kind: 'refused',
       code: 'image-too-large',
     });
@@ -116,20 +93,58 @@ describe('admitting an image', () => {
   });
 });
 
-describe('an image id', () => {
-  it('is the canonical 43-character unpadded base64url spelling of a digest', () => {
-    const id = expectedId(png);
-    expect(isImageId(id)).toBe(true);
-    expect(isImageId(`${id}=`)).toBe(false);
-    expect(isImageId(id.slice(1))).toBe(false);
-    expect(isImageId(id.replace(/^./u, '+'))).toBe(false);
-    // A final digit carrying set bits past the digest's 256 spells no digest.
-    expect(isImageId(`${'A'.repeat(42)}B`)).toBe(false);
-    expect(isImageId(`${'A'.repeat(42)}E`)).toBe(true);
+describe('storing a picture as an asset', () => {
+  const STORED: AssetRef = `/assets/${'A'.repeat(43)}`;
+
+  const recordingAssets = (answer: AssetRef | { readonly refused: string } = STORED) => {
+    const store = vi.fn((_bytes: Blob) => Promise.resolve(answer));
+    const assets: AssetClient = {
+      url: (ref) => ref,
+      read: () => Promise.resolve({ refused: 'asset-absent' }),
+      store,
+    };
+    return { assets, store };
+  };
+
+  it('stores a picture under the type its bytes are, whatever the file declared', async () => {
+    const { assets, store } = recordingAssets();
+
+    await expect(storePicture(assets, new Blob([png], { type: 'text/plain' }))).resolves.toEqual({
+      kind: 'stored',
+      url: STORED,
+    });
+    const [sent] = store.mock.calls[0] ?? [];
+    expect(sent?.type).toBe('image/png');
+    expect(new Uint8Array(await (sent ?? new Blob()).arrayBuffer())).toEqual(png);
   });
 
-  it('is addressed under /images', async () => {
-    expect(imagePath(await imageIdOf(png))).toBe(`/images/${expectedId(png)}`);
+  it('refuses what is not a picture without storing it', async () => {
+    const { assets, store } = recordingAssets();
+
+    await expect(storePicture(assets, new Blob([ascii('<svg/>')]))).resolves.toEqual({
+      kind: 'refused',
+      code: 'image-svg-unsupported',
+    });
+    await expect(storePicture(assets, new Blob([ascii('hello')]))).resolves.toEqual({
+      kind: 'refused',
+      code: 'image-format-unsupported',
+    });
+    expect(store).not.toHaveBeenCalled();
+  });
+
+  it('refuses a picture over the limit without reading or storing it', async () => {
+    const { assets, store } = recordingAssets();
+
+    await expect(
+      storePicture(assets, new Blob([new Uint8Array(MAX_IMAGE_BYTES + 1)])),
+    ).resolves.toEqual({ kind: 'refused', code: 'image-too-large' });
+    expect(store).not.toHaveBeenCalled();
+  });
+
+  it('throws when the asset store refuses a picture that passed', async () => {
+    const { assets } = recordingAssets({ refused: 'asset-too-large' });
+
+    await expect(storePicture(assets, new Blob([png]))).rejects.toThrow('asset-too-large');
   });
 });
 

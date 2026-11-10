@@ -3,7 +3,7 @@ import { act, waitFor, within } from '@testing-library/react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { mapSource } from '@project/aggregate';
-import { uuidSchema, type UUID } from '@project/core';
+import { isAssetRef, uuidSchema, type UUID } from '@project/core';
 import { productDestinationPath } from '@project/http';
 import { parseGitHubLocation, type GitHubLocation } from '../src/mount/github-location';
 import { mountAggregate } from '../src/mount/mount';
@@ -232,7 +232,7 @@ describe('mounting an aggregate in the page', () => {
     expect(fresh?.snapshot.document.title).toBe('Map fixture');
   });
 
-  it('stores an uploaded image in the page and draws it from an object URL over its bytes', async () => {
+  it('stores an uploaded asset in the page and draws it from an object URL over its bytes', async () => {
     const objectUrls = recordingObjectUrls();
     const mounted = await mountAggregate({
       source: mapSource('fixture', fixtureFiles()),
@@ -240,9 +240,8 @@ describe('mounting an aggregate in the page', () => {
       createObjectUrl: objectUrls.createObjectUrl,
     });
     if (!mounted.ok) throw new Error('The fixture mounts.');
-    const { backend, displayImage } = mounted.mounted;
-    // A PNG signature and a tail no fixture image has: storing reads the
-    // signature and nothing else.
+    const { assets, displayImage } = mounted.mounted;
+    // A PNG signature and a tail no fixture image has.
     const uploaded = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x7f]);
 
     // Uploaded as Node's own Blob, as a page uploads its own: the in-page
@@ -252,16 +251,36 @@ describe('mounting an aggregate in the page', () => {
     vi.stubGlobal('Blob', NodeBlob);
     const upload = new Blob([uploaded], { type: 'image/png' });
     vi.stubGlobal('Blob', pageBlob);
-    const stored = await backend.storeImage(upload);
-    if (stored.kind !== 'stored')
-      throw new Error(`The image was not stored: ${JSON.stringify(stored)}`);
+    const stored = await assets.store(upload);
+    if (!isAssetRef(stored)) throw new Error(`The asset was not stored: ${JSON.stringify(stored)}`);
 
-    expect(displayImage(stored.url)).toBe('blob:https://mounted.test/1');
-    expect(displayImage(stored.url)).toBe('blob:https://mounted.test/1');
+    expect(assets.url(stored)).toBe('blob:https://mounted.test/1');
+    expect(displayImage(stored)).toBe('blob:https://mounted.test/1');
     const [picture] = objectUrls.made;
     expect(objectUrls.made).toHaveLength(1);
     expect(picture?.type).toBe('image/png');
     expect(await bytesOf(picture ?? new Blob())).toEqual(uploaded);
+  });
+
+  it('reads a mounted asset from the in-page store, never through an object URL', async () => {
+    const files = fixtureFiles();
+    const objectUrls = recordingObjectUrls();
+    const mounted = await mountAggregate({
+      source: mapSource('fixture', files),
+      newId: mintsNothing,
+      createObjectUrl: objectUrls.createObjectUrl,
+    });
+    if (!mounted.ok) throw new Error('The fixture mounts.');
+    const { assets } = mounted.mounted;
+
+    const read = await assets.read(`/assets/${IMAGE_ID}`);
+
+    if ('refused' in read) throw new Error(`The asset was not read: ${read.refused}`);
+    expect(await bytesOf(read)).toEqual(files.get(`assets/${IMAGE_ID}.png`));
+    await expect(assets.read(`/assets/${'A'.repeat(43)}`)).resolves.toEqual({
+      refused: 'asset-absent',
+    });
+    expect(objectUrls.made).toEqual([]);
   });
 
   it('draws a stored image from an object URL over the mounted bytes', async () => {

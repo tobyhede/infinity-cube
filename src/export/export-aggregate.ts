@@ -186,10 +186,12 @@ export const exportAggregate = async (
   );
 
   const destination = resolve(destinationPath);
-  const scanned = await scannedAggregateFiles(destination);
-  const files = aggregateFiles(aggregate, assets.carried, scanned);
-  await rejectSymbolicLinks(destination, files.keys());
+  await rejectSymbolicLinks(destination, aggregateFiles(aggregate, assets.carried).keys());
   await assertExportableDestination(destination);
+  // An asset already in the directory keeps its name there, so the files are
+  // named once the directory is known to scan.
+  const files = aggregateFiles(aggregate, assets.carried, await scannedAggregateFiles(destination));
+  await rejectSymbolicLinks(destination, files.keys());
 
   const checked = await checkReadsBack(destination, files, aggregate.metaSpaceId);
   if (!checked.ok) {

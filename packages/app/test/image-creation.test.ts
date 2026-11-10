@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { uuidSchema, type ImageNaturalSize, type SpaceSnapshot } from '@project/core';
-import { MemorySpaceBackend, openSpaceSession, type ImageStoring } from '@project/persistence';
+import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
+import type { ImageStoring } from '../src/picture-admission';
 import { composeApp } from '../src/compose-app';
 import { createImageResources, type ImageSources } from '../src/image-creation';
 import { createOpenSpaces } from '../src/open-spaces';

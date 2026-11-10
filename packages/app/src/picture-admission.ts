@@ -5,6 +5,7 @@
  * told from anything else, from its bytes alone.
  */
 
+import { isAssetRef } from '@project/core';
 import { MAX_ASSET_BYTES, type AssetClient } from '@project/persistence';
 
 /** The largest image the host stores, in bytes: 10 MiB. */
@@ -154,7 +155,7 @@ export const storePicture = async (assets: AssetClient, image: Blob): Promise<Im
   const admission = admitImage(bytes);
   if (admission.kind === 'refused') return admission;
   const stored = await assets.store(new Blob([bytes], { type: admission.mediaType }));
-  if (typeof stored !== 'string') {
+  if (!isAssetRef(stored)) {
     throw new Error(`The asset store refused a picture: ${stored.refused}`);
   }
   return { kind: 'stored', url: stored };

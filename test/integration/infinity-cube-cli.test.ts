@@ -391,26 +391,26 @@ describe('infinity-cube CLI', () => {
    * picture an Aggregate directory carries is stored by Import and written
    * back by Export.
    */
-  it('stores the images an imported directory carries, and exports them again', async () => {
+  it('stores the assets an imported directory carries, and exports them again', async () => {
     const image = await admitted(pngBytes(1));
     const pictured: SpaceSnapshot = {
       ...metaSpaceSnapshot,
       resources: [...metaSpaceSnapshot.resources, { id: PICTURE_ID, document: showing(image) }],
     };
     const source = await makeAggregateDirectory(META_SPACE_ID, [targetSpaceSnapshot, pictured]);
-    await mkdir(join(source, 'images'));
-    await writeFile(join(source, 'images', `${image.id}.png`), pngBytes(1));
+    await mkdir(join(source, 'assets'));
+    await writeFile(join(source, 'assets', `${image.hash}.png`), pngBytes(1));
 
     expect((await runInfinityCubeCommand(['import', source])).status).toBe(0);
-    await expect(repository.loadImage(image.id)).resolves.toEqual(image);
+    await expect(repository.loadAsset(image.hash)).resolves.toEqual(image);
 
     const destination = await temporaryDirectory('infinity-cube-cli-images-');
     expect(
       (await runInfinityCubeCommand(['export', destination, '--store', 'postgres'])).status,
     ).toBe(0);
-    expect(new Uint8Array(await readFile(join(destination, 'images', `${image.id}.png`)))).toEqual(
-      pngBytes(1),
-    );
+    expect(
+      new Uint8Array(await readFile(join(destination, 'assets', `${image.hash}.png`))),
+    ).toEqual(pngBytes(1));
   });
 
   it('reports a malformed resource path and stores no partial space', async () => {

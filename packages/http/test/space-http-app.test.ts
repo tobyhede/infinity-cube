@@ -7,7 +7,7 @@ import {
   problemCatalogue,
   type InfinityCubeProblemCode,
   type SpaceCommit,
-  type ImageStore,
+  type AssetStore,
   type StoredSpaceRepository,
 } from '@project/persistence';
 import { describe, expect, it, vi } from 'vitest';
@@ -47,10 +47,10 @@ const updateCommit = (next = snapshot): SpaceCommit => ({
 });
 
 const repository = (
-  overrides: Partial<StoredSpaceRepository & ImageStore> = {},
-): StoredSpaceRepository & ImageStore => ({
-  storeImage: () => Promise.reject(new Error('This repository stores no images')),
-  loadImage: () => Promise.resolve(undefined),
+  overrides: Partial<StoredSpaceRepository & AssetStore> = {},
+): StoredSpaceRepository & AssetStore => ({
+  storeAsset: () => Promise.reject(new Error('This repository stores no assets')),
+  loadAsset: () => Promise.resolve(undefined),
   listSpaces: () => Promise.resolve([{ id: SPACE_ID, title: 'One' }]),
   loadSpace: () => Promise.resolve(loaded),
   loadAggregate: () =>

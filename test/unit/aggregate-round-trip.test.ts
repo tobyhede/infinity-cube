@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { newUuid, spaceFileSchema, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
@@ -442,7 +442,7 @@ describe('exporting and importing one complete aggregate', () => {
     expect(await readdir(join(destination, META_SPACE_ID, 'resources'))).not.toContain(
       `${STORED_ID}.md`,
     );
-    await expect(readdir(destination)).resolves.not.toContain('images');
+    await expect(readdir(destination)).resolves.not.toContain('assets');
   });
 
   /*
@@ -499,7 +499,7 @@ describe('exporting and importing one complete aggregate', () => {
   });
 });
 
-describe('stored image bytes', () => {
+describe('stored asset bytes', () => {
   const PICTURE_ID = uuidSchema.parse('16161616-1616-4616-8616-161616161616');
   const PHOTO_ID = uuidSchema.parse('17171717-1717-4717-8717-171717171717');
 
@@ -522,7 +522,7 @@ describe('stored image bytes', () => {
       ],
     };
     const repository = repositoryHolding([pictured, ...targets]);
-    for (const image of stored) await repository.storeImage(image);
+    for (const image of stored) await repository.storeAsset(image);
     return repository;
   };
 
@@ -537,15 +537,15 @@ describe('stored image bytes', () => {
 
     await exportTo(source, destination);
 
-    expect((await readdir(join(destination, 'images'))).sort()).toEqual(
-      [`${png.id}.png`, `${jpeg.id}.jpg`].sort(),
+    expect((await readdir(join(destination, 'assets'))).sort()).toEqual(
+      [`${png.hash}.png`, `${jpeg.hash}.jpg`].sort(),
     );
-    expect(new Uint8Array(await readFile(join(destination, 'images', `${png.id}.png`)))).toEqual(
+    expect(new Uint8Array(await readFile(join(destination, 'assets', `${png.hash}.png`)))).toEqual(
       pngBytes(1),
     );
     const reimported = await importFrom(destination);
-    await expect(reimported.loadImage(png.id)).resolves.toEqual(png);
-    await expect(reimported.loadImage(jpeg.id)).resolves.toEqual(jpeg);
+    await expect(reimported.loadAsset(png.hash)).resolves.toEqual(png);
+    await expect(reimported.loadAsset(jpeg.hash)).resolves.toEqual(jpeg);
     expect(await storedSnapshots(reimported)).toEqual(await storedSnapshots(source));
   });
 
@@ -553,7 +553,7 @@ describe('stored image bytes', () => {
    * What an author commits is what InfinityCube reads back and writes again, so a run
    * that changes nothing changes no byte of the directory, pictures included.
    */
-  it('round-trips a directory with images byte-for-byte through Import then Export', async () => {
+  it('round-trips a directory with assets byte-for-byte through Import then Export', async () => {
     const root = await makeTemporaryDirectory();
     const first = join(root, 'first');
     const second = join(root, 'second');
@@ -570,6 +570,59 @@ describe('stored image bytes', () => {
     expect(await directoryTree(second)).toEqual(await directoryTree(first));
   });
 
+  /*
+   * Import types a file by its extension through the host table and Export
+   * writes back the name it read, so an asset's file name and media type
+   * survive a round trip, an extension the table does not list included.
+   */
+  it('keeps each asset file name and media type through Import then Export', async () => {
+    const root = await makeTemporaryDirectory();
+    const directory = join(root, 'aggregate');
+    await exportTo(await picturing({ id: PICTURE_ID, bytes: pngBytes(1) }), directory);
+    const files = [
+      { bytes: jpegBytes(3), extension: 'jpeg', mediaType: 'image/jpeg' },
+      { bytes: new TextEncoder().encode('# Notes\n'), extension: 'md', mediaType: 'text/markdown' },
+      {
+        bytes: new TextEncoder().encode('graph TD; A-->B\n'),
+        extension: 'mermaid',
+        mediaType: 'application/octet-stream',
+      },
+    ];
+    const assets = await Promise.all(
+      files.map(({ bytes, mediaType }) => admitted(bytes, mediaType)),
+    );
+    await mkdir(join(directory, 'assets'), { recursive: true });
+    const names: string[] = [];
+    for (const [index, { bytes, extension }] of files.entries()) {
+      const asset = assets[index];
+      if (asset === undefined) throw new Error('An asset was not admitted');
+      names.push(`${asset.hash}.${extension}`);
+      await writeFile(join(directory, 'assets', `${asset.hash}.${extension}`), bytes);
+    }
+    const resourcesDirectory = join(directory, META_SPACE_ID, 'resources');
+    for (const [index, asset] of assets.entries()) {
+      const id = `18181818-1818-4818-8818-${String(index).padStart(12, '0')}`;
+      await writeFile(
+        join(resourcesDirectory, `${id}.json`),
+        `${JSON.stringify({ id, title: `Asset ${index}`, kind: 'image', content: { url: `/assets/${asset.hash}` } }, null, 2)}\n`,
+      );
+    }
+    const before = await readdir(join(directory, 'assets'));
+
+    const reimported = await importFrom(directory);
+    for (const [index, asset] of assets.entries()) {
+      await expect(reimported.loadAsset(asset.hash)).resolves.toEqual({
+        hash: asset.hash,
+        mediaType: files[index]?.mediaType,
+        bytes: files[index]?.bytes,
+      });
+    }
+    await exportTo(reimported, directory);
+
+    expect((await readdir(join(directory, 'assets'))).sort()).toEqual(before.sort());
+    expect(before).toEqual(expect.arrayContaining(names));
+  });
+
   it('stores one file for two Resources showing the same picture', async () => {
     const destination = join(await makeTemporaryDirectory(), 'aggregate');
     const png = await admitted(pngBytes(1));
@@ -579,7 +632,7 @@ describe('stored image bytes', () => {
       destination,
     );
 
-    await expect(readdir(join(destination, 'images'))).resolves.toEqual([`${png.id}.png`]);
+    await expect(readdir(join(destination, 'assets'))).resolves.toEqual([`${png.hash}.png`]);
   });
 });
 

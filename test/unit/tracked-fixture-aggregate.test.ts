@@ -4,7 +4,7 @@ import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { titleName, uuidSchema, type Resource, type UUID } from '@project/core';
 import { loadSpaceAggregate } from '@project/graph';
-import { isImageId } from '@project/persistence';
+import { isAssetHash } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { importFixture } from '../support/import-fixture';
 import { exportAggregate } from '../../src/export/export-aggregate';
@@ -126,7 +126,7 @@ const copyOf = async (tracked: string): Promise<string> => {
 };
 const copyOfTrackedFixture = (): Promise<string> => copyOf(trackedFixture);
 
-describe('tracked fixture images', () => {
+describe('tracked fixture assets', () => {
   it('seeds an Open Image Resource whose stored image loads from the repository', async () => {
     const repository = new MemorySpaceRepository();
     await importFixture(repository);
@@ -146,8 +146,8 @@ describe('tracked fixture images', () => {
 
     for (const url of opened) {
       const id = url.slice(STORED_IMAGE_PREFIX.length);
-      if (!isImageId(id)) throw new Error(`${url} does not name a stored image`);
-      const image = await repository.loadImage(id);
+      if (!isAssetHash(id)) throw new Error(`${url} does not name a stored asset`);
+      const image = await repository.loadAsset(id);
       expect(image?.mediaType).toBe('image/png');
     }
   });
@@ -166,22 +166,23 @@ describe('tracked fixture images', () => {
     await expect(repository.listSpaces()).resolves.toEqual([]);
   });
 
-  it('ignores the dotfiles and subdirectories a checkout can leave among the tracked images', async () => {
+  it('ignores the dotfiles and subdirectories a checkout can leave among the tracked assets', async () => {
     const copy = await copyOfTrackedFixture();
-    await writeFile(join(copy, 'images', '.DS_Store'), 'Bud1 not an image');
-    await mkdir(join(copy, 'images', 'nested'));
+    await writeFile(join(copy, 'assets', '.DS_Store'), 'Bud1 not an asset');
+    await mkdir(join(copy, 'assets', 'nested'));
 
     const repository = new MemorySpaceRepository();
     await importFixture(repository, { directory: copy });
     await expect(repository.listSpaces()).resolves.not.toEqual([]);
   });
 
-  it('refuses to seed when a tracked image file is not an image', async () => {
+  it('refuses to seed when a tracked asset file is not named for its bytes', async () => {
     const copy = await copyOfTrackedFixture();
-    await writeFile(join(copy, 'images', 'notes.txt'), 'not an image');
+    const misnamed = `${'A'.repeat(43)}.txt`;
+    await writeFile(join(copy, 'assets', misnamed), 'not these bytes');
 
     const repository = new MemorySpaceRepository();
-    await expect(importFixture(repository, { directory: copy })).rejects.toThrow('notes.txt');
+    await expect(importFixture(repository, { directory: copy })).rejects.toThrow(misnamed);
     await expect(repository.listSpaces()).resolves.toEqual([]);
   });
 });

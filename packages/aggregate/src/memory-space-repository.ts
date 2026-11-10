@@ -194,7 +194,10 @@ export class MemorySpaceRepository implements SpaceRepository {
   loadAsset(hash: AssetHash): Promise<StoredAsset | undefined> {
     const asset = this.#assets.get(hash);
     return Promise.resolve(
-      withEmptyAsset(hash, asset === undefined ? undefined : { ...asset, bytes: asset.bytes.slice() }),
+      withEmptyAsset(
+        hash,
+        asset === undefined ? undefined : { ...asset, bytes: asset.bytes.slice() },
+      ),
     );
   }
 

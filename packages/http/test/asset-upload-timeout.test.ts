@@ -36,17 +36,14 @@ const stallsBody: typeof globalThis.fetch = (_input, init) => {
   );
 };
 
-describe('the time an image upload is given', () => {
+describe('the time an asset upload is given', () => {
   it('is not the read timeout, so an upload slower than a read still stores', async () => {
     const backend = new HttpSpaceBackend('http://example.test', {
       timeoutMs: 5,
       fetch: answersAfter(50),
     });
 
-    await expect(backend.storeImage(new Blob([png]))).resolves.toEqual({
-      kind: 'stored',
-      url: STORED_URL,
-    });
+    await expect(backend.storeAsset(new Blob([png]))).resolves.toBe(STORED_URL);
   });
 
   it('still ends an upload the host never answers', async () => {
@@ -55,7 +52,7 @@ describe('the time an image upload is given', () => {
       fetch: answersAfter(60_000),
     });
 
-    await expect(backend.storeImage(new Blob([png]))).rejects.toThrow('Request timed out');
+    await expect(backend.storeAsset(new Blob([png]))).rejects.toThrow('Request timed out');
   }, 1000);
 
   it('still ends an upload whose answer never finishes arriving', async () => {
@@ -64,6 +61,6 @@ describe('the time an image upload is given', () => {
       fetch: stallsBody,
     });
 
-    await expect(backend.storeImage(new Blob([png]))).rejects.toThrow('Request timed out');
+    await expect(backend.storeAsset(new Blob([png]))).rejects.toThrow('Request timed out');
   }, 1000);
 });

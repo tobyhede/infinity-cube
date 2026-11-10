@@ -208,6 +208,19 @@
       }
     },
     {
+      // The asset-reference walk (ADR 0142) reads every whole string value in a
+      // Resource's `content`, whatever kind declared it and whether or not its
+      // plugin is installed, so it takes an arbitrary JSON value: `unknown` in
+      // and `typeof` to tell a string or an object is the walk itself, the
+      // generic recursive JSON case `space-authoring.ts`'s `sameValue` is.
+      // `isAssetRef` takes `unknown` because `z.custom` calls it with raw input.
+      "files": ["packages/core/src/assets.ts"],
+      "rules": {
+        "anti-slop/no-runtime-typeof": "off",
+        "anti-slop/no-unknown-parameters": "off"
+      }
+    },
+    {
       // `defaultMarkdownKind`/`defaultPositionedKind` are Zod `z.preprocess`
       // transformers: they run on raw, unvalidated input *before* the schema
       // parses it, so `unknown` in and out is the honest contract, not a

@@ -4,12 +4,12 @@ import {
   MemorySpaceBackend,
   MemorySpaceBackendTestControl,
   openSpaceSession,
-  type ImageStoring,
   type ObserverErrorReporter,
 } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
 import type { ImageSources } from '../src/image-creation';
 import * as imageReplacementModule from '../src/image-replacement';
+import type { ImageStoring } from '../src/picture-admission';
 import { describeImageReplacement } from '../src/image-replacement';
 import { unusedImageSources } from './image-sources';
 import { mintingIds } from './minting';

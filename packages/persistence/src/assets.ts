@@ -77,7 +77,8 @@ export const assetHashOf = async (bytes: Uint8Array<ArrayBuffer>): Promise<Asset
 export const assetPath = (hash: AssetHash): AssetRef => assetRef(hash);
 
 const emptyAssetHash = (): AssetHash => {
-  if (!isAssetHash(EMPTY_ASSET_HASH)) throw new Error('The hash of zero bytes is not an asset hash');
+  if (!isAssetHash(EMPTY_ASSET_HASH))
+    throw new Error('The hash of zero bytes is not an asset hash');
   return EMPTY_ASSET_HASH;
 };
 
@@ -129,7 +130,11 @@ export const admitAsset = async (
   const owned = bytes.slice();
   return {
     kind: 'admitted',
-    asset: { hash: await assetHashOf(owned), mediaType: normalizeMediaType(declaredType), bytes: owned },
+    asset: {
+      hash: await assetHashOf(owned),
+      mediaType: normalizeMediaType(declaredType),
+      bytes: owned,
+    },
   };
 };
 

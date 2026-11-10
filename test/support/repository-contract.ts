@@ -8,11 +8,12 @@ import {
 } from '@project/core';
 import { loadSpaceAggregate } from '@project/graph';
 import {
-  admitImage,
+  admitAsset,
   AggregateInvariantError,
   createWorkingSpaceLoader,
+  EMPTY_ASSET,
   REVISION_CEILING,
-  type StoredImage,
+  type StoredAsset,
 } from '@project/persistence';
 import { expect, it } from 'vitest';
 import type { SpaceRepository } from '@project/aggregate';
@@ -2193,63 +2194,87 @@ export const spaceRepositoryContract = (
   }
 
   /*
-   * The store of images beside Spaces (ADR 0106). It holds content by its
+   * The one asset store beside Spaces (ADR 0142). It holds content by its
    * digest, so what is asserted is that the bytes and media type come back
-   * exactly, that the same bytes are stored once, and that neither aggregate
-   * lifecycle door reaches it.
+   * exactly, whatever the type, that the same bytes are stored once under the
+   * first type, that the asset of zero bytes always exists, and that neither
+   * aggregate lifecycle door reaches it.
    */
-  const storedImage = async (bytes: Uint8Array<ArrayBuffer>): Promise<StoredImage> => {
-    const admission = await admitImage(bytes);
-    if (admission.kind !== 'admitted') throw new Error(`Not an image: ${admission.code}`);
-    return admission.image;
+  const storedAsset = async (
+    bytes: Uint8Array<ArrayBuffer>,
+    mediaType: string,
+  ): Promise<StoredAsset> => {
+    const admission = await admitAsset(bytes, mediaType);
+    if (admission.kind !== 'admitted') throw new Error(`Not an asset: ${admission.code}`);
+    return admission.asset;
   };
   const pngBytes = () =>
     Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff, 0x7f, 0x80]);
-  const gifBytes = () => new TextEncoder().encode('GIF89a\u0001\u0000\u0000');
+  const textBytes = () => new TextEncoder().encode('# Notes\n');
+  const binaryBytes = () => Uint8Array.from([0x00, 0xff, 0x10, 0x80]);
 
-  it(`${name} stores an image and loads its bytes and media type unchanged`, async () => {
+  it(`${name} stores an asset of any type and loads its bytes and media type unchanged`, async () => {
     await withHarness(async (repository) => {
-      const png = await storedImage(pngBytes());
-      const gif = await storedImage(gifBytes());
+      const png = await storedAsset(pngBytes(), 'image/png');
+      const text = await storedAsset(textBytes(), 'text/markdown');
+      const binary = await storedAsset(binaryBytes(), 'application/x-made-up');
 
-      await expect(repository.storeImage(png)).resolves.toBe('stored');
-      await expect(repository.storeImage(gif)).resolves.toBe('stored');
+      for (const asset of [png, text, binary]) {
+        await expect(repository.storeAsset(asset)).resolves.toBe('stored');
+      }
 
-      await expect(repository.loadImage(png.id)).resolves.toEqual({
-        id: png.id,
+      await expect(repository.loadAsset(png.hash)).resolves.toEqual({
+        hash: png.hash,
         mediaType: 'image/png',
         bytes: pngBytes(),
       });
-      await expect(repository.loadImage(gif.id)).resolves.toEqual({
-        id: gif.id,
-        mediaType: 'image/gif',
-        bytes: gifBytes(),
+      await expect(repository.loadAsset(text.hash)).resolves.toEqual({
+        hash: text.hash,
+        mediaType: 'text/markdown',
+        bytes: textBytes(),
+      });
+      await expect(repository.loadAsset(binary.hash)).resolves.toEqual({
+        hash: binary.hash,
+        mediaType: 'application/x-made-up',
+        bytes: binaryBytes(),
       });
     });
   });
 
-  it(`${name} stores the same bytes once, answering the second store as existing`, async () => {
+  it(`${name} stores the same bytes once, keeping the first media type`, async () => {
     await withHarness(async (repository) => {
-      const image = await storedImage(pngBytes());
+      const asset = await storedAsset(pngBytes(), 'image/png');
 
-      await expect(repository.storeImage(image)).resolves.toBe('stored');
-      await expect(repository.storeImage(await storedImage(pngBytes()))).resolves.toBe('existing');
-      await expect(repository.loadImage(image.id)).resolves.toEqual(image);
+      await expect(repository.storeAsset(asset)).resolves.toBe('stored');
+      await expect(
+        repository.storeAsset(await storedAsset(pngBytes(), 'text/plain')),
+      ).resolves.toBe('existing');
+      await expect(repository.loadAsset(asset.hash)).resolves.toEqual(asset);
     });
   });
 
-  it(`${name} answers an image it does not store as absent`, async () => {
+  it(`${name} answers an asset it does not store as absent`, async () => {
     await withHarness(async (repository) => {
-      const image = await storedImage(pngBytes());
-      await expect(repository.loadImage(image.id)).resolves.toBeUndefined();
+      const asset = await storedAsset(pngBytes(), 'image/png');
+      await expect(repository.loadAsset(asset.hash)).resolves.toBeUndefined();
     });
   });
 
-  it(`${name} keeps stored images outside the aggregate its lifecycle doors replace`, async () => {
+  it(`${name} answers the asset of zero bytes though nothing stored it`, async () => {
     await withHarness(async (repository) => {
-      const image = await storedImage(pngBytes());
+      await expect(repository.loadAsset(EMPTY_ASSET.hash)).resolves.toEqual(EMPTY_ASSET);
+      const stored = await storedAsset(new Uint8Array(0), 'text/plain');
+      expect(stored.hash).toBe(EMPTY_ASSET.hash);
+      await expect(repository.storeAsset(stored)).resolves.toBe('stored');
+      await expect(repository.loadAsset(EMPTY_ASSET.hash)).resolves.toEqual(stored);
+    });
+  });
+
+  it(`${name} keeps stored assets outside the aggregate its lifecycle doors replace`, async () => {
+    await withHarness(async (repository) => {
+      const asset = await storedAsset(pngBytes(), 'image/png');
       await seed(repository, space(SPACE_ID, 'Before', [RESOURCE_ID]));
-      await repository.storeImage(image);
+      await repository.storeAsset(asset);
 
       await expect(
         repository.replaceAggregate(
@@ -2257,16 +2282,16 @@ export const spaceRepositoryContract = (
           SPACE_ID,
         ),
       ).resolves.toMatchObject({ kind: 'replaced' });
-      await expect(repository.loadImage(image.id)).resolves.toEqual(image);
+      await expect(repository.loadAsset(asset.hash)).resolves.toEqual(asset);
     });
   });
 
-  it(`${name} keeps a stored image across a fresh repository host`, async (context) => {
+  it(`${name} keeps a stored asset across a fresh repository host`, async (context) => {
     await withReopenHarness(context, async (repository, reopen) => {
-      const image = await storedImage(pngBytes());
-      await repository.storeImage(image);
+      const asset = await storedAsset(textBytes(), 'text/markdown');
+      await repository.storeAsset(asset);
 
-      await expect((await reopen()).loadImage(image.id)).resolves.toEqual(image);
+      await expect((await reopen()).loadAsset(asset.hash)).resolves.toEqual(asset);
     });
   });
 };

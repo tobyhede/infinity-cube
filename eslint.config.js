@@ -320,14 +320,8 @@ const KIND_FEATURE_FILES = [
   'packages/ui/src/CanvasResource.tsx',
   // A Space Resource's portal editing keeps its toolbar drawn.
   'packages/react-flow-adapter/src/ResourceNode.tsx',
-  // A stored image's URL is held to what an Image Resource may record.
-  'packages/persistence/src/http-protocol.ts',
-  // A stored image's id and collection path are an Image Resource's (ADR 0106).
-  'packages/persistence/src/images.ts',
   // The Space Resource lifecycle (ADR 0074): its create.
   'packages/persistence/src/space-resource-planning.ts',
-  // A stored image's bytes travel with the Image Resource that references it (ADR 0118).
-  'src/aggregate-directory/images.ts',
   // A Markdown body's completion.
   'packages/app/src/canvas-resource-authoring.ts',
   // The Space glyph on the Space cluster's own controls.
