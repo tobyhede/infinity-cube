@@ -389,7 +389,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'OpenImageReference',
     claim:
-      "An Open Reference Resource whose Target is an Image Resource keeps its own Title and draws the Target's picture read-only, as its own content would be, offering Close and no Replace, and naming the URL with no Replace when the picture does not load (ADR 0070, ADR 0106).",
+      "An Open Reference Resource whose Target is an Image Resource draws the Target's picture read-only, named by its own Title and renamed from its rail without touching the Target's, offering Close and no Replace, and naming the URL with no Replace when the picture does not load (ADR 0070, ADR 0106, ADR 0142).",
   },
   /*
    * **No claim covers a saving lifecycle.** The Command Dock mounts

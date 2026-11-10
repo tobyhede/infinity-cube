@@ -3,10 +3,13 @@ import type { Story } from '@ladle/react';
 import {
   RESOURCE_SHAPES,
   uuidSchema,
+  type JsonValue,
   type Map,
   type Resource,
   type ResourceShape,
 } from '@project/core';
+import { referenceMapContentSchema } from '@project/plugin-reference/domain';
+import type { Answer } from '@project/resource-api/domain';
 import { urMapContentSchema } from '@project/plugin-ur/domain';
 import { productDestinationPath, type ProductDestination } from '@project/http';
 import {
@@ -605,23 +608,24 @@ export const OpenAndClose: Story = () => {
 };
 OpenAndClose.meta = { iframed: true };
 
+/**
+ * An Open Reference Resource is drawn by its plugin (ADR 0070, ADR 0142): it
+ * embeds its Target, Strategies, through the host's embedding, under its own
+ * Title, and its Open and Close are its Map content, changed from its rail.
+ */
 export const OpenReference: Story = () => {
   const [open, setOpen] = useState(true);
-  const changeOpen = (next: boolean) => {
-    setOpen(next);
-    return 'completed' as const;
+  const commitMap = (next: JsonValue): Promise<Answer> => {
+    setOpen(referenceMapContentSchema.parse(next).open);
+    return Promise.resolve('completed');
   };
   return (
     <div className="p-8">
       <CanvasResourceNodeSpecimen
         resourceId={resourceIds.openingReference}
-        open={open}
-        onOpenChange={changeOpen}
-        content={{
-          kind: 'markdown',
-          content: { url: storyText('## Strategies\n\nNo strategy is privileged.') },
-          via: 'target',
-        }}
+        openOperationEnabled={false}
+        mapContent={{ open }}
+        commitMap={commitMap}
         nodeSize={open ? openFrame : closedFrame}
         stageClassName="inv-resource-node-stage--large"
       />
@@ -726,20 +730,25 @@ const imageReferenceMap: DrawnMap = {
 };
 
 /**
- * A Reference Resource whose Target is an Image Resource draws the Target's
- * picture read-only, as its own content would be (ADR 0070, ADR 0106): its own
- * Title, Close, and no Replace, even where the picture does not load. Both
- * Resources are in a Space that holds their Image Resource Targets, so what
- * each draws is resolved from its Target rather than handed to it. Each is
- * sized to hold the Target's 400×300 picture plus the Resource's chrome.
+ * A Reference Resource whose Target is an Image Resource is that picture,
+ * read-only (ADR 0070, ADR 0106, ADR 0142): named by its own Title, which its
+ * rail renames, with Close and no Replace, even where the picture does not
+ * load. Both Resources are in a Space that holds their Image Resource Targets,
+ * so what each draws is its Target, embedded by the host. Each is sized to the
+ * Target's 400×300 picture.
  */
 export const OpenImageReference: Story = () => {
   const [open, setOpen] = useState(true);
-  const changeOpen = (next: boolean) => {
-    setOpen(next);
-    return 'completed' as const;
+  const commitMap = (next: JsonValue): Promise<Answer> => {
+    setOpen(referenceMapContentSchema.parse(next).open);
+    return Promise.resolve('completed');
   };
-  const sizedToPicture = { width: 408, height: 359 };
+  const [title, setTitle] = useState('Harbour, again');
+  const commitTitle = (next: string): Promise<Answer> => {
+    setTitle(next);
+    return Promise.resolve('completed');
+  };
+  const sizedToPicture = { width: 400, height: 300 };
   return (
     <div className="flex flex-wrap items-start gap-8 p-8">
       <section aria-label="Image Target" className="flex flex-col gap-2">
@@ -747,8 +756,11 @@ export const OpenImageReference: Story = () => {
         <CanvasResourceNodeSpecimen
           drawn={imageReferenceMap}
           resourceId={imageReferenceIds.harbourReference}
-          open={open}
-          onOpenChange={changeOpen}
+          openOperationEnabled={false}
+          mapContent={{ open }}
+          commitMap={commitMap}
+          title={title}
+          commitTitle={commitTitle}
           nodeSize={open ? sizedToPicture : closedFrame}
           zoom={1}
           stageClassName="inv-resource-node-stage--large"
@@ -759,7 +771,8 @@ export const OpenImageReference: Story = () => {
         <CanvasResourceNodeSpecimen
           drawn={imageReferenceMap}
           resourceId={imageReferenceIds.missingReference}
-          open
+          openOperationEnabled={false}
+          mapContent={{ open: true }}
           nodeSize={sizedToPicture}
           zoom={1}
           stageClassName="inv-resource-node-stage--large"

@@ -648,7 +648,7 @@ test('resources are drawn at exactly the size the strategy placed them at', asyn
 });
 
 test(
-  'a Reference Resource Opens on its Target Markdown read-only with click, Enter and Space',
+  'a Reference Resource Opens on its Target Markdown read-only from its rail, under its own Title',
   { tag: '@parity:open-reference-shows-target-markdown-read-only' },
   async ({ page }) => {
     await page.goto('/');
@@ -660,19 +660,19 @@ test(
     await openResource(recap, 'A′');
     const controls = await resourceControls(page, recap);
     await expect(recap.getByText('entry point')).toBeVisible();
-    await expect(recap.getByRole('heading', { name: 'A′', exact: true })).toBeVisible();
+    // Its own Title draws once, in place of the Target's.
+    await expect(recap.getByRole('heading', { name: 'A′', exact: true })).toHaveCount(1);
     await expect(recap.getByRole('textbox')).toHaveCount(0);
     await expect(controls.getByRole('button', { name: /Edit Resource/ })).toHaveCount(0);
     await expect(page.getByRole('combobox', { name: 'Target' })).toHaveCount(0);
     await controls.getByRole('button', { name: 'Close Resource A′' }).click();
 
+    // Its Open is its plugin's Map content (ADR 0142), so the canvas's Enter
+    // leaves it alone and its rail Opens it.
     await recap.focus();
     await page.keyboard.press('Enter');
-    await expect(controls.getByRole('button', { name: 'Close Resource A′' })).toBeVisible();
-    await controls.getByRole('button', { name: 'Close Resource A′' }).click();
-
-    await recap.focus();
-    await page.keyboard.press('Enter');
+    await expect(controls.getByRole('button', { name: 'Open Resource A′' })).toBeVisible();
+    await openResource(recap, 'A′');
     await expect(recap.getByText('entry point')).toBeVisible();
     await recap.click({ position: { x: 8, y: 8 } });
     const resizeControl = recap.locator('.react-flow__resize-control.handle.bottom.right');
