@@ -2,6 +2,7 @@ import {
   spaceReferences,
   mapContentProblem,
   resourceOpen,
+  drawnByPlugin,
   takesOpen,
   uuidSchema,
   type Resource,
@@ -185,11 +186,16 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
         continue;
       }
       // The kind is read from the Resource, because the entry does not carry it.
-      // Which Map content a Resource keeps is its plugin's schema's answer.
+      // Which Map content a Resource keeps is its plugin's schema's answer, and a
+      // Resource no plugin draws here, as a Reference to a Space Resource, keeps none.
+      const resourceOf = (id: UUID) => resourceById.get(id);
       const mapContentRefusal =
         placement?.content === undefined
           ? undefined
-          : mapContentProblem(member.kind, placement.content);
+          : (mapContentProblem(member.kind, placement.content) ??
+            (drawnByPlugin(member, resourceOf)
+              ? undefined
+              : 'no plugin draws it here, so it keeps no Map content'));
       if (mapContentRefusal !== undefined) {
         errors.push({
           kind: 'map-content-invalid',
@@ -197,7 +203,6 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
           message: `Map "${subject.id}" keeps Map content for ${member.kind} resource "${resourceId}" that its plugin refuses: ${mapContentRefusal}`,
         });
       }
-      const resourceOf = (id: UUID) => resourceById.get(id);
       if (placement !== undefined && resourceOpen(placement) && !takesOpen(member, resourceOf)) {
         errors.push({
           kind: 'open-requires-content',

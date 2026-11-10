@@ -7,6 +7,7 @@ import {
   resourceOpen,
   resourceSize,
   sameJsonValue,
+  drawnByPlugin,
   takesOpen,
   type Graph,
   type JsonValue,
@@ -419,6 +420,12 @@ function changeMapContent(
   if (resource === undefined) return refused({ code: 'resource-not-found' });
   const kind = resource.document.kind;
   if (!keepsMapContent(kind)) return refused({ code: 'map-content-not-kept' });
+  // A Resource no plugin draws here, as a Reference to a Space Resource, keeps none.
+  const documentOf = (id: UUID) =>
+    snapshot.resources.find((candidate) => candidate.id === id)?.document;
+  if (!drawnByPlugin(resource.document, documentOf)) {
+    return refused({ code: 'map-content-not-kept' });
+  }
   if (mapContentProblem(kind, content) !== undefined) {
     return refused({ code: 'map-content-invalid' });
   }

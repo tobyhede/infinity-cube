@@ -841,6 +841,13 @@ describe.each([
       ).toHaveLength(2);
     });
 
+    it('refuses Map content on a Reference to a Space Resource, which no plugin draws yet', () => {
+      for (const open of [true, false])
+        expect(refused(placedIn([referenceTo(A, B), spaceResource(B, ABSENT)], { open }))).toEqual([
+          expect.objectContaining({ kind: 'map-content-invalid', ref: A }),
+        ]);
+    });
+
     it('refuses an Image Resource stored Open, which its plugin draws with no Open (ADR 0142)', () => {
       const image: Resource = {
         id: A,
