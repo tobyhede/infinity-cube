@@ -22,16 +22,29 @@ export interface JsonObject {
   [key: string]: JsonValue;
 }
 
-/** The parser of a JSON value, finite numbers only, so it encodes back as read. */
-export const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
-  z.union([
-    z.string(),
-    z.number().finite(),
-    z.boolean(),
-    z.null(),
-    z.array(jsonValueSchema),
-    z.record(jsonValueSchema),
-  ]),
+/**
+ * The parser of a JSON value, finite numbers only, so it encodes back as read.
+ * An object with an own `__proto__` key is refused rather than parsed, since a
+ * record parse would drop that key and the value would not encode back as read.
+ */
+export const jsonValueSchema: z.ZodType<JsonValue, z.ZodTypeDef, unknown> = z.lazy(() =>
+  z
+    .unknown()
+    .superRefine((value, context) => {
+      if (value instanceof Object && Object.hasOwn(value, '__proto__')) {
+        context.addIssue({ code: 'custom', message: 'A JSON object with no __proto__ key.' });
+      }
+    })
+    .pipe(
+      z.union([
+        z.string(),
+        z.number().finite(),
+        z.boolean(),
+        z.null(),
+        z.array(jsonValueSchema),
+        z.record(jsonValueSchema),
+      ]),
+    ),
 );
 
 /**

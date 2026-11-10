@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   isPluginKind,
+  jsonValueSchema,
   keepsMapContent,
   mapContentProblem,
   mapContentWithoutMap,
@@ -48,5 +49,17 @@ describe('sameJsonValue', () => {
     expect(sameJsonValue([1], { 0: 1 })).toBe(false);
     expect(sameJsonValue(null, {})).toBe(false);
     expect(sameJsonValue('a', 'a')).toBe(true);
+  });
+});
+
+describe('jsonValueSchema', () => {
+  it('refuses an object carrying a __proto__ key, at any depth, rather than dropping it', () => {
+    expect(jsonValueSchema.safeParse(JSON.parse('{"shape":"pill","__proto__":{}}')).success).toBe(
+      false,
+    );
+    expect(jsonValueSchema.safeParse(JSON.parse('[{"a":{"__proto__":1}}]')).success).toBe(false);
+    expect(jsonValueSchema.parse(JSON.parse('{"proto":{"a":[1,"b",null,true]}}'))).toEqual({
+      proto: { a: [1, 'b', null, true] },
+    });
   });
 });
