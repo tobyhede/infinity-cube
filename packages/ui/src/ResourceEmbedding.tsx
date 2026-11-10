@@ -37,8 +37,10 @@ import { ResourceFailureBoundary } from './ResourceFailureBoundary';
  * kind may not be a Target (ADR 0113), which keeps referencing to one hop.
  *
  * `HostEmbed` is one component for every surface's lifetime, reading what it
- * draws from context, so no render of the surface around it remounts what it
- * embeds (resource-plugins issue 01).
+ * draws from context. Do not make `Embed` a new component per render: React
+ * would remount the embedded plugin on each render of the surface around it,
+ * dropping its state. `PluginResource.test.tsx` holds that every surface a
+ * plugin is handed carries the one `Embed`.
  */
 
 /** What an embedding drawn inside one surface reads. */
