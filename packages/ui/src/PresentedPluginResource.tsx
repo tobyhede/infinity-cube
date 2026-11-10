@@ -35,6 +35,8 @@ export interface PresentedPluginResourceProps {
   readonly content: unknown;
   /** Told what a plugin threw while drawing. */
   readonly onFailure?: ((error: Error) => void) | undefined;
+  /** The Replacement epoch, which the drawing starts again on, as it does for another Resource. */
+  readonly replacementEpoch?: number | undefined;
 }
 
 export function PresentedPluginResource(props: PresentedPluginResourceProps) {
@@ -65,7 +67,12 @@ export function PresentedPluginResource(props: PresentedPluginResourceProps) {
       data-testid="resource-content"
       data-content-kind={kind}
     >
-      <ResourceFailureBoundary onFailure={props.onFailure}>
+      <ResourceFailureBoundary
+        // Keyed so traversing to another Resource of the same plugin, or a
+        // replacement, draws afresh: no failure and no plugin state carry over.
+        key={`${props.resourceId}:${String(props.replacementEpoch ?? 0)}`}
+        onFailure={props.onFailure}
+      >
         <ResourceHostProvider host={host}>{plugin}</ResourceHostProvider>
       </ResourceFailureBoundary>
     </article>

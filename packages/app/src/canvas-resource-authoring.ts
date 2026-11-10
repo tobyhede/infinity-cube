@@ -14,7 +14,7 @@ import {
   type ResourceId,
   type GraphId,
 } from '@project/core';
-import type { SpaceSession } from '@project/persistence';
+import type { ObserverErrorReporter, SpaceSession } from '@project/persistence';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import type { EntityActionGroup, ImageReplacement } from '@project/ui';
 import { describeImageReplacement, type ImageReplacements } from './image-replacement';
@@ -31,6 +31,7 @@ import type { SpaceResourceFraming } from './space-resource-framing';
 import { applyResourceDataPatch, decorateSharedResourceNode } from './canvas-resource-decoration';
 import { useKindDecoratedNodes } from './kinds/registry';
 import type { PluginHost } from './plugin-host/plugin-commits';
+import type { PluginGate } from './plugin-host/plugin-gate';
 import { usePluginGate } from './plugin-host/plugin-gate-context';
 
 type Caret =
@@ -92,8 +93,23 @@ const completeEditedSpaceView = (
   return result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
 };
 
+/** What this canvas's plugin surfaces claim on, and where what they throw is reported. */
+export interface CanvasPlugins {
+  /** The composition's gate, which its Authoring asks at `complete` (ADR 0142). */
+  readonly gate: PluginGate;
+  readonly report: ObserverErrorReporter;
+}
+
+const reportPluginFailureToConsole: ObserverErrorReporter = (error) =>
+  console.error('A Resource plugin failed', error);
+
 export interface CanvasResourceAuthoringInput {
   readonly continuation: Continuation;
+  /**
+   * The composition's gate and reporter. Absent, the page's gate (or one of
+   * this canvas's own, as in a story) and the console.
+   */
+  readonly plugins?: CanvasPlugins | undefined;
   /** This canvas Space's outcomes; target rails resolve their target's composition. */
   readonly commandOutcomes?: CommandOutcomes | undefined;
   /** This canvas Space's confirmation; target rails use the target's confirmation. */
@@ -196,6 +212,7 @@ export function useCanvasResourceAuthoring({
   portalEditing,
   onPortalEditingChange,
   openToFit,
+  plugins,
 }: CanvasResourceAuthoringInput): CanvasResourceAuthoring {
   const spaces = useOpenSpaces();
   const [contextEditingIds, setContextEditingIds] = useState<ReadonlySet<ResourceId>>(
@@ -337,14 +354,22 @@ export function useCanvasResourceAuthoring({
    * answering how it settled, withdrawn by the application's one gate and by
    * the Space being replaced.
    */
-  const pluginGate = usePluginGate();
+  const pageGate = usePluginGate();
+  const pluginGate = plugins?.gate ?? pageGate;
+  const reportPluginFailure = plugins?.report ?? reportPluginFailureToConsole;
+  // Read so every plugin surface is decorated again when a Claim is taken or
+  // exclusive work begins or ends, and offers only what is not withdrawn.
+  const claimChain = useSyncExternalStore(pluginGate.subscribe, pluginGate.getState);
   const pluginHost = useMemo(
     (): PluginHost => ({
       gate: pluginGate,
       replacementEpoch: () => authoring.getState().replacementEpoch,
       complete: (completion, settle) => authoring.complete(completion, settle),
+      report: reportPluginFailure,
     }),
-    [authoring, pluginGate],
+    // `claimChain` is read by the operations built from this host, not here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [authoring, pluginGate, reportPluginFailure, claimChain],
   );
 
   const replaceResourceImage = useMemo(() => {

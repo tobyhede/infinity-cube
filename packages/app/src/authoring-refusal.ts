@@ -138,6 +138,8 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
       return 'This Resource keeps nothing of its own on a Map.';
     case 'map-content-invalid':
       return 'This Resource cannot be drawn that way on a Map.';
+    case 'exclusive-work-running':
+      return 'Wait for the change in progress to finish.';
     case 'space-replaced':
       return 'The Space was replaced before this change could be made.';
     case 'edit-abandoned':

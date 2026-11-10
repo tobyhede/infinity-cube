@@ -54,6 +54,17 @@ export interface PluginOperations {
   readonly commitContent?: PluginCommits['content'];
   readonly commitMap?: PluginCommits['map'];
   readonly claim?: (() => PluginHostClaim | undefined) | undefined;
+  /**
+   * Exclusive work runs elsewhere: the surface offers no authoring, its
+   * host-drawn Title and Actions included, until it ends (ADR 0142).
+   */
+  readonly withdrawn?: boolean | undefined;
+  /** The surface holds a Claim, which gives the plugin the whole rect. */
+  readonly claimed?: boolean | undefined;
+  /** The Replacement epoch the surface was offered in, which its failure boundary is keyed on. */
+  readonly epoch?: number | undefined;
+  /** Told what the plugin threw while drawing. */
+  readonly onFailure?: ((error: Error) => void) | undefined;
 }
 
 /** Whether a kind's operations are a plugin kind's, which `PluginResource` draws. */

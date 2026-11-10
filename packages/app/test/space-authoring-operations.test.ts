@@ -15,6 +15,7 @@ import { GRAPH_PALETTE, nextGraphColor } from '@project/graph';
 import { composeApp } from '../src/compose-app';
 
 import { CANVAS, type AuthoringResult, type Settle } from '../src/space-authoring';
+import { createPluginGate, type PluginGate } from '../src/plugin-host/plugin-gate';
 import { mintingIds } from './minting';
 import { unusedImageSources } from './image-sources';
 
@@ -588,6 +589,52 @@ describe('Resource size and Open', () => {
       }),
     ).toEqual({ kind: 'unchanged' });
     expect(session.getState().working).toBe(before);
+  });
+});
+
+describe('Exclusive work withdraws every Edit (ADR 0142)', () => {
+  /** A Space composed over the shared gate, as Open Spaces composes each one. */
+  const openOn = (pluginGate: PluginGate) => {
+    const loaded = { snapshot: positionedSnapshot, revision: 0n, exportedRevision: null };
+    const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
+    return composeApp({
+      images: unusedImageSources,
+      spaceSession: session,
+      selection: MAP_ID,
+      newId: mintingIds(MINTED),
+      pluginGate,
+    });
+  };
+  const rename = (title: string) => ({ kind: 'renamed-map' as const, mapId: MAP_ID, title });
+
+  it('refuses every Edit in every composed Space while exclusive work runs, and admits the work’s own', async () => {
+    const pluginGate = createPluginGate();
+    const one = openOn(pluginGate);
+    const other = openOn(pluginGate);
+    let finish: () => void = () => undefined;
+    const work = pluginGate
+      .claim(['surface'], () => null)
+      ?.exclusively(
+        () =>
+          new Promise<void>((resolve) => {
+            finish = resolve;
+          }),
+      );
+
+    expect(one.authoring.complete(CANVAS, rename('Renamed'))).toEqual({
+      kind: 'refused',
+      refusal: { code: 'exclusive-work-running' },
+    });
+    expect(other.authoring.complete(CANVAS, rename('Renamed'))).toEqual({
+      kind: 'refused',
+      refusal: { code: 'exclusive-work-running' },
+    });
+    const ownResult = pluginGate.admit(() => one.authoring.complete(CANVAS, rename('By the work')));
+    expect(ownResult).toEqual({ kind: 'completed' });
+
+    finish();
+    await work;
+    expect(other.authoring.complete(CANVAS, rename('After'))).toEqual({ kind: 'completed' });
   });
 });
 

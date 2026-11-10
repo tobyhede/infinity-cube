@@ -5,7 +5,6 @@ import { OpenSpacesApplication } from './components/OpenSpacesApplication';
 import type { DestinationOpening } from './destination-opening';
 import { StartupFailure } from './components/StartupFailure';
 import { NotesWindowApplication } from './components/NotesWindowApplication';
-import { PluginGateProvider } from './plugin-host/PluginGateProvider';
 import type { NotesWindow } from './notes-window';
 
 export interface ApplicationRoot {
@@ -65,13 +64,11 @@ export const startApplication = async (
           {startup.kind === 'notes' ? (
             <NotesWindowApplication notes={startup.notes} now={startup.now} />
           ) : (
-            <PluginGateProvider>
-              <OpenSpacesApplication
-                spaces={startup.spaces}
-                initial={startup.opened}
-                opening={startup.opening}
-              />
-            </PluginGateProvider>
+            <OpenSpacesApplication
+              spaces={startup.spaces}
+              initial={startup.opened}
+              opening={startup.opening}
+            />
           )}
         </ImageDisplayProvider>
       </StrictMode>,

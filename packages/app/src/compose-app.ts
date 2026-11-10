@@ -6,6 +6,7 @@ import type { ConnectionCompletion } from './connection-completion';
 import type { Continuation } from './continuation';
 import type { EdgeAuthoring } from './edge-authoring';
 import { createMapSurface, type MapSurface } from './map-surface';
+import { createPluginGate, type PluginGate } from './plugin-host/plugin-gate';
 import { createDeleteConfirmation, type DeleteConfirmation } from './delete-confirmation';
 import { createResourceDeletion, type ResourceDeletion } from './resource-deletion';
 import type { SpaceResourceAuthoring } from './space-resource-lifecycle';
@@ -129,6 +130,12 @@ export interface ComposeAppDependencies extends ComposeCoreDependencies {
    */
   readonly mounted?: boolean | undefined;
   /**
+   * The application's one Claim chain and exclusive gate (ADR 0142), shared by
+   * every composed Space so exclusive work in one withdraws every Edit in all.
+   * Absent, this composition has a gate of its own, as a lone Space does.
+   */
+  readonly pluginGate?: PluginGate | undefined;
+  /**
    * The address a destination opened in a new browsing context is given: the
    * browser location's `href`, which carries the query and a mounted page's
    * `source` (ADR 0130), so a Notes window mounts the revision its presenting
@@ -189,6 +196,8 @@ export interface ComposedApp extends AppCore {
    */
   readonly imageReplacement: ImageReplacements;
   readonly authoring: SpaceAuthoring;
+  /** The gate this Space's Authoring asks at `complete`, which its plugin surfaces claim on. */
+  readonly pluginGate: PluginGate;
   readonly adapter: RenderAdapter;
   readonly surface: MapSurface;
   /**
@@ -260,6 +269,7 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     fullscreen = NO_FULLSCREEN,
     mounted = false,
     addressOf = productDestinationPath,
+    pluginGate = createPluginGate(),
   } = dependencies;
   const core = composeCore(dependencies);
   const { currentSpace, navigation } = core;
@@ -274,6 +284,7 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     currentSpace,
     newId,
     reportObserverError,
+    exclusiveWork: pluginGate,
   });
   const deleteConfirmation = createDeleteConfirmation({ authoring, reportObserverError });
   const surface = createMapSurface(
@@ -337,6 +348,7 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
       reportObserverError: compositionReporter,
     }),
     authoring,
+    pluginGate,
     adapter,
     surface,
     continuation,

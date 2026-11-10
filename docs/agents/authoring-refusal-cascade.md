@@ -26,6 +26,15 @@ truth for it — update it in the same commit as any change to
 `deriveCompletedEdit`'s cascade, or delete the stale row rather than leave it
 disagreeing with the function.
 
+## Exclusive work
+
+Before anything else, every `complete` — every action, `created-map` and
+`renamed-space` included, and whichever Space it is made in — asks the
+application's exclusive gate (ADR 0142): while a plugin's exclusive work runs,
+an Edit that is not that work's own is refused `exclusive-work-running`. The
+work's own commits are admitted (`PluginGate.admit`), and an Edit queued from
+inside an admitted one is admitted with it.
+
 ## Universal guard
 
 Every action but the two below asks this guard before its own checks:
@@ -130,10 +139,11 @@ Edit that holds no Map say it needed one.
 | --- | --- |
 | `settled-resource-movement` | none → completed |
 
-## The 29 codes
+## The 30 codes
 
-1 contextual (`map-not-found`) plus 28 action-specific —
-none is produced anywhere else. 24 of those 28 are tabulated above;
+1 contextual (`map-not-found`) plus 29 action-specific —
+none is produced anywhere else. 24 of those 29 are tabulated above, and
+`exclusive-work-running` is the gate's, asked of every action before its row;
 `map-required` is declared and presented but currently raised nowhere, so it
 appears in no row, and `image-url-unsupported`, raised by the Image Resource
 Edits, has no row yet. `space-replaced` and `edit-abandoned` are no action's:

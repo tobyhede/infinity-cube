@@ -385,6 +385,8 @@ export type AuthoringRefusal =
   | { readonly code: 'map-content-not-kept' }
   /** Map content the Resource's plugin's schema refuses. */
   | { readonly code: 'map-content-invalid' }
+  /** Exclusive work runs, and this Edit is not its own (ADR 0142). */
+  | { readonly code: 'exclusive-work-running' }
   /** A queued Edit discarded because a replacement Space was opened before it drained (ADR 0042). */
   | { readonly code: 'space-replaced' }
   /** A queued Edit discarded because the Edit draining the queue failed before reaching it. */
@@ -645,6 +647,12 @@ interface SpaceAuthoringDependencies {
    * second source of minted identity behind the one the composition names.
    */
   readonly newId: () => UUID;
+  /**
+   * The application's exclusive gate (ADR 0142): while a plugin's exclusive
+   * work runs, every Edit that is not that work's own is refused here, at the
+   * one door every Edit enters by, whichever control or Space made it.
+   */
+  readonly exclusiveWork?: { readonly withdraws: () => boolean } | undefined;
 }
 
 /**
@@ -793,6 +801,7 @@ export function createSpaceAuthoring({
   currentSpace,
   reportObserverError = (error) => console.error('SpaceAuthoring observer failed', error),
   newId,
+  exclusiveWork,
 }: SpaceAuthoringDependencies): SpaceAuthoring {
   let replacementEpoch = 0;
   let installing = 0;
@@ -1662,6 +1671,9 @@ export function createSpaceAuthoring({
     completion: AuthoringCompletion,
     settle?: Settle,
   ): AuthoringResult => {
+    if (exclusiveWork?.withdraws() === true) {
+      return { kind: 'refused', refusal: { code: 'exclusive-work-running' } };
+    }
     if (target.kind === 'drawn' && currentSpace().lookup.map(target.mapId) === undefined) {
       return { kind: 'refused', refusal: { code: 'map-not-found' } };
     }

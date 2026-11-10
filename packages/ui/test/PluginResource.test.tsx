@@ -311,6 +311,87 @@ describe('the Map host a plugin draws inside (ADR 0142)', () => {
     expect(screen.getByRole('article', { name: 'Other' })).toHaveTextContent('Other');
     expect(onFailure).toHaveBeenCalledTimes(1);
   });
+
+  it('reports a throw to the reporter the surface was offered', () => {
+    const onFailure = vi.fn();
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    render(
+      <PluginSurface
+        {...probeProps({ content: { fails: true }, operations: { kind: 'ur', onFailure } })}
+        entry={probeEntry}
+      />,
+    );
+    error.mockRestore();
+    expect(onFailure).toHaveBeenCalledTimes(1);
+  });
+
+  it('draws the plugin again once the Space is replaced or its Map content changes', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { rerender } = render(
+      <PluginSurface
+        {...probeProps({ content: { fails: true }, operations: { kind: 'ur', epoch: 1 } })}
+        entry={probeEntry}
+      />,
+    );
+    expect(screen.getByTestId('resource-failure')).toBeInTheDocument();
+    // The same content, as drawn: still failed.
+    rerender(
+      <PluginSurface
+        {...probeProps({ content: { fails: false }, operations: { kind: 'ur', epoch: 1 } })}
+        entry={probeEntry}
+      />,
+    );
+    expect(screen.getByTestId('resource-failure')).toBeInTheDocument();
+    rerender(
+      <PluginSurface
+        {...probeProps({ content: { fails: false }, operations: { kind: 'ur', epoch: 2 } })}
+        entry={probeEntry}
+      />,
+    );
+    expect(screen.getByTestId('probe')).toBeInTheDocument();
+    rerender(
+      <PluginSurface
+        {...probeProps({ content: { fails: true }, operations: { kind: 'ur', epoch: 2 } })}
+        entry={probeEntry}
+      />,
+    );
+    rerender(
+      <PluginSurface
+        {...probeProps({
+          content: { fails: false },
+          mapContent: { n: 2 },
+          operations: { kind: 'ur', epoch: 2 },
+        })}
+        entry={probeEntry}
+      />,
+    );
+    error.mockRestore();
+    expect(screen.getByTestId('probe')).toBeInTheDocument();
+  });
+
+  it('offers no authoring while exclusive work runs elsewhere, its own Title and Actions included', () => {
+    render(
+      <PluginResource
+        {...props('pill')}
+        state="selected"
+        title={{ ...title, onBeginTitleEdit: () => undefined }}
+        entityActions={[[{ id: 'delete', label: 'Delete', onSelect: () => 'done' as const }]]}
+        operations={{ kind: 'ur', withdrawn: true, commitMap: () => Promise.resolve('completed') }}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: 'Edit Title Decide' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Shape/u })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Actions for Resource Decide' })).toBeNull();
+  });
+
+  it('gives the plugin the whole rect while it holds a Claim', () => {
+    const { rerender } = render(<PluginResource {...props('pill')} />);
+    const layer = () =>
+      screen.getByRole('article', { name: 'Decide' }).querySelector('.canvas-resource__plugin');
+    expect(layer()).not.toHaveClass('nodrag');
+    rerender(<PluginResource {...props('pill')} operations={{ kind: 'ur', claimed: true }} />);
+    expect(layer()).toHaveClass('nodrag', 'nopan', 'nowheel');
+  });
 });
 
 describe('the Stage host a plugin draws inside (ADR 0142)', () => {
@@ -340,5 +421,41 @@ describe('the Stage host a plugin draws inside (ADR 0142)', () => {
     expect(screen.getByTestId('resource-failure')).toHaveTextContent(
       'This Resource could not be drawn.',
     );
+  });
+
+  it('draws the next Resource afresh after one that threw, and after a replacement', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const onFailure = vi.fn();
+    let rendered: ReturnType<typeof render> | undefined;
+    await act(async () => {
+      rendered = render(
+        <PresentedPluginResource
+          resourceId="x"
+          kind="ur"
+          title="X"
+          content="not Ur's"
+          onFailure={onFailure}
+        />,
+      );
+      await Promise.resolve();
+    });
+    expect(onFailure).toHaveBeenCalledTimes(1);
+    const rerender = (ui: Parameters<ReturnType<typeof render>['rerender']>[0]) =>
+      rendered?.rerender(ui);
+    rerender(<PresentedPluginResource resourceId="y" kind="ur" title="Y" content={{}} />);
+    expect(screen.queryByTestId('resource-failure')).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Y' })).toBeVisible();
+    rerender(<PresentedPluginResource resourceId="y" kind="ur" title="Y" content="not Ur's" />);
+    rerender(
+      <PresentedPluginResource
+        resourceId="y"
+        kind="ur"
+        title="Y"
+        content={{}}
+        replacementEpoch={1}
+      />,
+    );
+    error.mockRestore();
+    expect(screen.queryByTestId('resource-failure')).toBeNull();
   });
 });

@@ -16,6 +16,10 @@ export interface PresentingStageProps extends PresentingChromeProps {
   readonly graphId: GraphId;
   /** The Resource Navigation is presenting. */
   readonly resourceId: ResourceId;
+  /** Told what a Resource plugin threw while drawing (ADR 0142). */
+  readonly onPluginFailure?: ((error: Error) => void) | undefined;
+  /** The Replacement epoch, on which a plugin's drawing starts again. */
+  readonly replacementEpoch?: number | undefined;
 }
 
 /**
@@ -34,6 +38,8 @@ export function PresentingStage({
   mapId,
   graphId,
   resourceId,
+  onPluginFailure,
+  replacementEpoch,
   ...chrome
 }: PresentingStageProps) {
   const resource = space.lookup.resource(resourceId);
@@ -62,6 +68,8 @@ export function PresentingStage({
           kind={resource.kind}
           title={resource.title}
           content={resource.content}
+          onFailure={onPluginFailure}
+          replacementEpoch={replacementEpoch}
         />
       ) : (
         <PresentedResource title={resource.title} content={content}>

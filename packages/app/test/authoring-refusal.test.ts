@@ -36,6 +36,7 @@ const EVERY_REFUSAL = {
   'open-requires-content': { code: 'open-requires-content' },
   'map-content-not-kept': { code: 'map-content-not-kept' },
   'map-content-invalid': { code: 'map-content-invalid' },
+  'exclusive-work-running': { code: 'exclusive-work-running' },
   'space-replaced': { code: 'space-replaced' },
   'edit-abandoned': { code: 'edit-abandoned' },
   'resource-has-references': { code: 'resource-has-references', referenceTitles: ['Recap'] },

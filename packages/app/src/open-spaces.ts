@@ -19,6 +19,7 @@ import {
   type HistoryApi,
 } from './browser-location';
 import { composeApp, type ComposedApp } from './compose-app';
+import { createPluginGate, type PluginGate } from './plugin-host/plugin-gate';
 import { createMountedEdits, type MountedEdits } from './mounted-edits';
 import { destinationOpening, type DestinationOpening } from './destination-opening';
 import type { ImageSources } from './image-creation';
@@ -154,6 +155,12 @@ export type SelectSpaceResult =
 
 export interface OpenSpaces {
   readonly metaSpaceId: UUID;
+  /**
+   * The page's one Claim chain and exclusive gate (ADR 0142): every Space
+   * composed here shares it, so exclusive work in one withdraws every Edit in
+   * all of them, and every plugin surface claims on it.
+   */
+  readonly pluginGate: PluginGate;
   /**
    * Every row the Open Spaces menu draws, Meta first whether or not it is open,
    * then the tree the rest of the open set makes below it.
@@ -398,6 +405,7 @@ export function createOpenSpaces({
   const report: ObserverErrorReporter =
     reportObserverError ?? console.error.bind(console, 'Open Spaces observer failed');
   const registry = createSpaceSessionRegistry(backend, { reportObserverError: report });
+  const pluginGate = createPluginGate();
   // Opening a Space is a working load, so it initializes a stored mapless
   // Space before anything composes against it (ADR 0079).
   const loadWorkingSpace = createWorkingSpaceLoader(backend, newId);
@@ -603,6 +611,7 @@ export function createOpenSpaces({
         presentations,
         fullscreen,
         mounted,
+        pluginGate,
         // The Notes window's address carries the query as every other address
         // the location writes does, `source` included only when Mounting.
         addressOf: browserLocation.href,
@@ -1029,6 +1038,7 @@ export function createOpenSpaces({
 
   return {
     metaSpaceId,
+    pluginGate,
     listing,
     opener,
     select,

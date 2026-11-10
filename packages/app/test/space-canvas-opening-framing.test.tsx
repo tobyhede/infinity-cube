@@ -18,6 +18,7 @@ import { unusedImageSources } from './image-sources';
 import { CLOSED_DISPLAY } from '@project/ui';
 import { stubResizeObserver } from './resize-observer';
 import { canvasReading, IDLE_PLACEMENT } from './map-surfaces';
+import { createPluginGate } from '../src/plugin-host/plugin-gate';
 
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -129,6 +130,7 @@ describe('opening framing on a mounted canvas', () => {
     };
     const spaces: OpenSpaces = {
       metaSpaceId: HOST_ID,
+      pluginGate: createPluginGate(),
       mountedEdits: createMountedEdits(() => undefined),
       listing: unused,
       opener: unused,
@@ -245,6 +247,7 @@ describe('opening framing on a mounted canvas', () => {
     };
     const spaces: OpenSpaces = {
       metaSpaceId: TARGET_ID,
+      pluginGate: createPluginGate(),
       mountedEdits: createMountedEdits(() => undefined),
       listing: unused,
       opener: unused,

@@ -270,7 +270,11 @@ export function PluginResource(props: PluginResourceProps) {
  * `PluginResource` draws, and what a test draws a plugin of its own through.
  */
 export function PluginSurface(props: PluginResourceProps & { readonly entry: PluginEntry }) {
-  const { kind, title, readOnly, state } = props;
+  const { kind, title, state } = props;
+  // Exclusive work elsewhere withdraws every authoring control the surface
+  // draws, not only the plugin's commits (ADR 0142).
+  const readOnly = props.readOnly || props.operations.withdrawn === true;
+  const drawnTitle = props.operations.withdrawn === true ? { ...title, readOnly: true } : title;
   const name = titleName(title.title);
   const size = props.size ?? COLLAPSED_RESOURCE_SIZE;
   const rail = useMemo(() => createRailStore(), []);
@@ -356,9 +360,22 @@ export function PluginSurface(props: PluginResourceProps & { readonly entry: Plu
         <ResourceShapeOutlineDrawing outline={resourceShapeOutline(outline, size)} size={size} />
       )}
       {props.renderToolbar === undefined ? toolbar : props.renderToolbar(toolbar)}
-      <div className="canvas-resource__plugin">
-        <ResourceFailureBoundary onFailure={props.onFailure}>
-          <MapTitleContext.Provider value={title}>
+      <div
+        className={
+          // A Claim gives the plugin the whole rect: the canvas neither drags,
+          // pans nor zooms from inside it while one is held.
+          props.operations.claimed === true
+            ? 'canvas-resource__plugin nodrag nopan nowheel'
+            : 'canvas-resource__plugin'
+        }
+      >
+        <ResourceFailureBoundary
+          // A throw is this drawing's: the boundary starts again for another
+          // Resource, after a replacement, or for another Map content value.
+          key={`${props.resourceId}:${String(props.operations.epoch ?? 0)}:${JSON.stringify(props.mapContent)}`}
+          onFailure={props.onFailure ?? props.operations.onFailure}
+        >
+          <MapTitleContext.Provider value={drawnTitle}>
             <ResourceHostProvider host={host}>{plugin}</ResourceHostProvider>
           </MapTitleContext.Provider>
         </ResourceFailureBoundary>

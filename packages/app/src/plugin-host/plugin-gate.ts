@@ -29,6 +29,14 @@ export interface PluginGate {
   /** Whether exclusive work runs anywhere, which withdraws every surface's commits. */
   readonly exclusiveRunning: () => boolean;
   /**
+   * Whether an Edit made now is withdrawn: exclusive work runs, and the Edit
+   * is not that work's own (`admit`). Every composed Space's Authoring asks
+   * it at `complete`, so nothing changes the Space around the work.
+   */
+  readonly withdraws: () => boolean;
+  /** Run `edit`, synchronously, as the running exclusive work's own. */
+  readonly admit: <T>(edit: () => T) => T;
+  /**
    * Claim for the surface at `path`, or `undefined` when the chain refuses.
    * `own` builds the commits exclusive work may use, live while `live()` is.
    */
@@ -42,10 +50,19 @@ export interface PluginGate {
 
 export function createPluginGate(): PluginGate {
   let chain: ClaimChain = NO_CLAIMS;
+  /**
+   * The one exclusive run whose commits are live. It ends whichever way the
+   * chain's exclusive work ends — the work settling, or its surface unmounting
+   * — so a run whose surface has gone never commits again, even after that
+   * surface claims and runs anew.
+   */
+  let liveRun: object | null = null;
+  let admitting = 0;
   const listeners = new Set<() => void>();
   const install = (next: ClaimChain): void => {
     if (next === chain) return;
     chain = next;
+    if (chain.exclusive === null) liveRun = null;
     for (const listener of [...listeners]) listener();
   };
 
@@ -67,13 +84,13 @@ export function createPluginGate(): PluginGate {
       exclusively: async <T>(work: (own: Own) => Promise<T>): Promise<T | 'busy'> => {
         const begun = beginExclusive(chain, surface);
         if (begun === 'busy' || begun === 'not-held') return 'busy';
+        const run = {};
+        liveRun = run;
         install(begun);
-        let live = true;
         try {
-          return await work(own(() => live));
+          return await work(own(() => liveRun === run));
         } finally {
-          live = false;
-          install(endExclusive(chain, surface));
+          if (liveRun === run) install(endExclusive(chain, surface));
         }
       },
     };
@@ -88,6 +105,15 @@ export function createPluginGate(): PluginGate {
       };
     },
     exclusiveRunning: () => chain.exclusive !== null,
+    withdraws: () => chain.exclusive !== null && admitting === 0,
+    admit: (edit) => {
+      admitting += 1;
+      try {
+        return edit();
+      } finally {
+        admitting -= 1;
+      }
+    },
     claim,
     unmount: (surface) => install(unmountIn(chain, surface)),
   };

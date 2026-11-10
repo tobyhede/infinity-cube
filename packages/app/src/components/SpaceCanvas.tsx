@@ -62,7 +62,7 @@ import {
 import { connectionAppearance } from '../colors';
 import { describeCanvasGestureRefusal, type CanvasGestureRefusal } from '../authoring-refusal';
 import { CANVAS_OCCURRENCE, observeMapSurfaces, type MapSurface } from '../map-surface';
-import { useCanvasResourceAuthoring } from '../canvas-resource-authoring';
+import { useCanvasResourceAuthoring, type CanvasPlugins } from '../canvas-resource-authoring';
 import type { SpaceResourceTargets } from '../space-resource-targets';
 import type { ResourcePlacementCommands } from '../resource-placement';
 import type { MapSurfaceReading } from '../use-map-surface';
@@ -201,6 +201,8 @@ export interface SpaceCanvasProps {
   readonly commandOutcomes: CommandOutcomes;
   /** Where a Space Resource rail's Delete Map and Delete Graph ask first. */
   readonly deleteConfirmation: DeleteConfirmation;
+  /** The composition's plugin gate and reporter (ADR 0142). */
+  readonly plugins?: CanvasPlugins | undefined;
   /**
    * The Space's image replacements (ADR 0106), which own the whole attempt.
    * The one way Replace reaches an Image Resource on this canvas that offers it.
@@ -318,6 +320,7 @@ export function SpaceCanvas({
   onDrawnSpacesChange,
   commandOutcomes,
   deleteConfirmation,
+  plugins,
   imageReplacement,
   pickImages,
   nameOnCreation,
@@ -655,6 +658,7 @@ export function SpaceCanvas({
     continuation: surface.continuation,
     commandOutcomes,
     deleteConfirmation,
+    plugins,
     nodes,
     availability,
     nameOnCreation,
@@ -2060,6 +2064,7 @@ export function SpaceCanvas({
           onLeave={() => leaveFullView(false)}
           onOpen={availability.authorOnCanvas ? () => leaveFullView(true) : null}
           onKeyDown={fullViewKeyDown}
+          onPluginFailure={plugins?.report}
         />
       ) : null}
     </>

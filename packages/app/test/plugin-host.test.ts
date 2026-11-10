@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import fc from 'fast-check';
 import { uuidSchema } from '@project/core';
+import type { ObserverErrorReporter } from '@project/persistence';
 import type { Answer } from '@project/resource-api/domain';
+import type { PluginOperations } from '@project/ui';
 import {
   beginExclusive,
   claim,
@@ -132,13 +134,98 @@ describe('the plugin gate', () => {
     expect(gate.claim(['b'], () => null)).toBeDefined();
     expect(listener).toHaveBeenCalledTimes(3);
   });
+
+  it('ends exclusive work’s commits when its surface unmounts, so only one run is ever live', async () => {
+    const gate = createPluginGate();
+    let firstLive: () => boolean = () => true;
+    let finishFirst: () => void = () => undefined;
+    const first = gate
+      .claim(['a'], (live) => ({ live }))
+      ?.exclusively(
+        (own) =>
+          new Promise<void>((resolve) => {
+            firstLive = own.live;
+            finishFirst = resolve;
+          }),
+      );
+    expect(firstLive()).toBe(true);
+
+    gate.unmount('a');
+    expect(firstLive()).toBe(false);
+    expect(gate.exclusiveRunning()).toBe(false);
+
+    // A second surface may now run, and the first run's commits stay ended.
+    let secondLive: () => boolean = () => false;
+    let finishSecond: () => void = () => undefined;
+    const second = gate
+      .claim(['b'], (live) => ({ live }))
+      ?.exclusively(
+        (own) =>
+          new Promise<void>((resolve) => {
+            secondLive = own.live;
+            finishSecond = resolve;
+          }),
+      );
+    expect(secondLive()).toBe(true);
+    expect(firstLive()).toBe(false);
+
+    // The first run settling late does not end the second.
+    finishFirst();
+    await first;
+    expect(gate.exclusiveRunning()).toBe(true);
+    expect(secondLive()).toBe(true);
+    finishSecond();
+    await second;
+    expect(gate.exclusiveRunning()).toBe(false);
+  });
+
+  it('keeps an unmounted surface’s run ended when the same surface claims and runs again', async () => {
+    const gate = createPluginGate();
+    let firstLive: () => boolean = () => true;
+    let finishFirst: () => void = () => undefined;
+    const first = gate
+      .claim(['a'], (live) => ({ live }))
+      ?.exclusively(
+        (own) =>
+          new Promise<void>((resolve) => {
+            firstLive = own.live;
+            finishFirst = resolve;
+          }),
+      );
+    gate.unmount('a');
+    let againLive: () => boolean = () => false;
+    let finishAgain: () => void = () => undefined;
+    const again = gate
+      .claim(['a'], (live) => ({ live }))
+      ?.exclusively(
+        (own) =>
+          new Promise<void>((resolve) => {
+            againLive = own.live;
+            finishAgain = resolve;
+          }),
+      );
+    expect(againLive()).toBe(true);
+    expect(firstLive()).toBe(false);
+    finishFirst();
+    await first;
+    expect(againLive()).toBe(true);
+    expect(gate.exclusiveRunning()).toBe(true);
+    finishAgain();
+    await again;
+  });
 });
 
 describe('a plugin surface’s commits on the canvas', () => {
   const hostWith = (
     complete: PluginHost['complete'],
     epoch: { value: number } = { value: 0 },
-  ): PluginHost => ({ gate: createPluginGate(), replacementEpoch: () => epoch.value, complete });
+    report: ObserverErrorReporter = () => undefined,
+  ): PluginHost => ({
+    gate: createPluginGate(),
+    replacementEpoch: () => epoch.value,
+    complete,
+    report,
+  });
 
   it('answers a settled Edit in the words every refusal is reported in', () => {
     expect(answerOf({ kind: 'completed' })).toBe('completed');
@@ -150,23 +237,32 @@ describe('a plugin surface’s commits on the canvas', () => {
 
   it('answers a queued Edit when it settles, and any other at once', async () => {
     let settle: Settle = () => undefined;
-    const queued = completeAsAnswer((told) => {
-      settle = told;
-      return { kind: 'queued' };
-    });
+    const queued = completeAsAnswer(
+      (told) => {
+        settle = told;
+        return { kind: 'queued' };
+      },
+      () => undefined,
+    );
     settle({ kind: 'refused', refusal: { code: 'space-replaced' } });
     expect(reasonOf(await queued)).toMatch(/\S/u);
-    await expect(completeAsAnswer(() => ({ kind: 'unchanged' }))).resolves.toBe('unchanged');
+    await expect(
+      completeAsAnswer(
+        () => ({ kind: 'unchanged' }),
+        () => undefined,
+      ),
+    ).resolves.toBe('unchanged');
   });
 
   it('offers nothing where the canvas may not author the Resource', () => {
     const host = hostWith(() => ({ kind: 'completed' }));
+    const offered = (operations: PluginOperations) => [operations.commitMap, operations.claim];
     expect(
-      pluginSurfaceOperations('ur', RESOURCE, { ...FACTS, authorOnCanvas: false }, host),
-    ).toEqual({ kind: 'ur' });
-    expect(pluginSurfaceOperations('ur', RESOURCE, { ...FACTS, editable: false }, host)).toEqual({
-      kind: 'ur',
-    });
+      offered(pluginSurfaceOperations('ur', RESOURCE, { ...FACTS, authorOnCanvas: false }, host)),
+    ).toEqual([undefined, undefined]);
+    expect(
+      offered(pluginSurfaceOperations('ur', RESOURCE, { ...FACTS, editable: false }, host)),
+    ).toEqual([undefined, undefined]);
     expect(pluginSurfaceOperations('ur', RESOURCE, FACTS, undefined)).toEqual({ kind: 'ur' });
   });
 
@@ -213,5 +309,70 @@ describe('a plugin surface’s commits on the canvas', () => {
     expect(complete).toHaveBeenCalledTimes(1);
     held?.unmount();
     expect(host.gate.getState()).toEqual(NO_CLAIMS);
+  });
+
+  it('answers refused, and reports, when the Edit throws', async () => {
+    const report = vi.fn();
+    const broke = new Error('derivation broke');
+    const answer = await completeAsAnswer(() => {
+      throw broke;
+    }, report);
+    expect(reasonOf(answer)).toMatch(/\S/u);
+    expect(report).toHaveBeenCalledWith(broke);
+  });
+
+  it('commits the exclusive work’s own Edits through the gate’s admission, and no plain one', async () => {
+    const admitted: boolean[] = [];
+    const host = hostWith((): AuthoringResult => {
+      admitted.push(!host.gate.withdraws());
+      return { kind: 'completed' };
+    });
+    const operations = pluginSurfaceOperations('ur', RESOURCE, FACTS, host);
+    let ownMap: ((next: { shape: string }) => Promise<Answer>) | undefined;
+    let finish: () => void = () => undefined;
+    const work = operations.claim?.()?.exclusively(
+      (own) =>
+        new Promise<void>((resolve) => {
+          ownMap = own.map;
+          finish = resolve;
+        }),
+    );
+    await expect(ownMap?.({ shape: 'pill' })).resolves.toBe('completed');
+    expect(admitted).toEqual([true]);
+    finish();
+    await work;
+  });
+
+  it('offers no commit and no Claim while exclusive work runs, and says the surface is withdrawn', () => {
+    const host = hostWith(() => ({ kind: 'completed' }));
+    const running = pluginSurfaceOperations('ur', RESOURCE, FACTS, host);
+    void running.claim?.()?.exclusively(() => new Promise<void>(() => undefined));
+    const other = pluginSurfaceOperations(
+      'ur',
+      uuidSchema.parse('00000000-0000-4000-8000-0000000000a2'),
+      FACTS,
+      host,
+    );
+    expect(other.commitMap).toBeUndefined();
+    expect(other.claim).toBeUndefined();
+    expect(other.withdrawn).toBe(true);
+    expect(pluginSurfaceOperations('ur', RESOURCE, FACTS, host).claimed).toBe(true);
+  });
+
+  it('says whether the surface holds a Claim, and reports what its plugin throws while drawing', () => {
+    const report = vi.fn();
+    const host = hostWith(() => ({ kind: 'completed' }), { value: 2 }, report);
+    expect(pluginSurfaceOperations('ur', RESOURCE, FACTS, host).claimed).toBe(false);
+    pluginSurfaceOperations('ur', RESOURCE, FACTS, host).claim?.();
+    const held = pluginSurfaceOperations('ur', RESOURCE, FACTS, host);
+    expect(held.claimed).toBe(true);
+    expect(held.epoch).toBe(2);
+    const thrown = new Error('drawing broke');
+    held.onFailure?.(thrown);
+    expect(report).toHaveBeenCalledWith(thrown);
+    // A surface that may not be authored still reports what it throws.
+    const bare = pluginSurfaceOperations('ur', RESOURCE, { ...FACTS, editable: false }, host);
+    bare.onFailure?.(thrown);
+    expect(report).toHaveBeenCalledTimes(2);
   });
 });

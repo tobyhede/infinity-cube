@@ -73,6 +73,9 @@ export const createApp = (
    * guard is here rather than on `ComposedApp`.
    */
   const reportBreak = createNonThrowingReporter(reportObserverError);
+  // What this Space's plugin surfaces claim on, and where a plugin that throws
+  // is reported (ADR 0142).
+  const plugins = { gate: composition.pluginGate, report: reportBreak };
   const currentSpaceId = () => currentSpace().id;
   const openingGraphId = opening?.graphId ?? null;
   const openingPresentationResourceId = opening?.presentationResourceId ?? null;
@@ -407,6 +410,7 @@ export const createApp = (
                   onDrawnSpacesChange={reportDrawnSpaces}
                   commandOutcomes={commandOutcomes}
                   deleteConfirmation={deleteConfirmation}
+                  plugins={plugins}
                   imageReplacement={composition.imageReplacement}
                   pickImages={composition.pickImages}
                   nameOnCreation={nameOnCreation}
@@ -426,6 +430,8 @@ export const createApp = (
               mapId={selectedMapId}
               graphId={presentedGraphId}
               resourceId={activeResourceId}
+              onPluginFailure={plugins.report}
+              replacementEpoch={replacementEpoch}
               moves={moves}
               canRetreat={canRetreat(navigationState)}
               onSelectBranch={presentingWindow.commands.selectBranch}

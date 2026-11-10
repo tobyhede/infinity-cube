@@ -354,6 +354,7 @@ describe('an Ur Resource’s decoration', () => {
       gate: createPluginGate(),
       replacementEpoch: () => 0,
       complete,
+      report: () => undefined,
     };
     const ur = () => ofKind(projectionNode(UR_ID, 'ur'), 'ur');
     const commit = decorateUrResourceNode(ur(), context({ pluginHost })).kindOperations.commitMap;
@@ -585,6 +586,7 @@ describe('decorating each kind from its own part of the context', () => {
       gate: createPluginGate(),
       replacementEpoch: () => 0,
       complete,
+      report: () => undefined,
     });
     const first = vi.fn((): AuthoringResult => ({ kind: 'completed' }));
     const second = vi.fn((): AuthoringResult => ({ kind: 'completed' }));

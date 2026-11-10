@@ -19,6 +19,10 @@ export interface FullViewProps {
    * than on one of the view's own controls.
    */
   readonly onKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>, fromContent: boolean) => void;
+  /** Told what a Resource plugin threw while drawing (ADR 0142). */
+  readonly onPluginFailure?: ((error: Error) => void) | undefined;
+  /** The Replacement epoch, on which a plugin's drawing starts again. */
+  readonly replacementEpoch?: number | undefined;
 }
 
 /**
@@ -31,7 +35,15 @@ export interface FullViewProps {
  * audience sees. The Stage's body takes focus when the view appears and each
  * time it moves to another Resource, so the keys reach the view at once.
  */
-export function FullView({ space, resourceId, onLeave, onOpen, onKeyDown }: FullViewProps) {
+export function FullView({
+  space,
+  resourceId,
+  onLeave,
+  onOpen,
+  onKeyDown,
+  onPluginFailure,
+  replacementEpoch,
+}: FullViewProps) {
   const body = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
@@ -76,6 +88,8 @@ export function FullView({ space, resourceId, onLeave, onOpen, onKeyDown }: Full
             kind={resource.kind}
             title={resource.title}
             content={resource.content}
+            onFailure={onPluginFailure}
+            replacementEpoch={replacementEpoch}
           />
         ) : (
           <PresentedResource

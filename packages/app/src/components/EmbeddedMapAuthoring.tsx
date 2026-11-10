@@ -167,7 +167,12 @@ export function EmbeddedMapAuthoring({
   const readTarget = useCallback((id: ResourceId) => entry.spaceResources.target(id), [entry]);
   const targets = useSpaceResourceTargets(space.resources, readTarget);
   const nameOnCreation = useNameOnCreation(composition.continuation);
+  const plugins = useMemo(
+    () => ({ gate: entry.app.pluginGate, report: entry.app.reportObserverError }),
+    [entry.app],
+  );
   const authoring = useCanvasResourceAuthoring({
+    plugins,
     continuation: composition.continuation,
     commandOutcomes: entry.app.commandOutcomes,
     deleteConfirmation: entry.app.deleteConfirmation,
