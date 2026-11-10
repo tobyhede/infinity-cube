@@ -2,6 +2,7 @@
 
 Status: accepted
 Refines: 0051
+Refined by: 0142
 Related: 0064, 0070, 0122
 
 A Resource on a Map is drawn **Closed**, as its Title, or **Open**, as its content, at the size its Map entry authors. "Front" is not a word for either, and it is not a word for anything else. The Resource is what is drawn; Closed and Open say how.

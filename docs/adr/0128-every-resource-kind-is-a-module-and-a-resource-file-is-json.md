@@ -2,6 +2,7 @@
 
 Status: accepted
 Refines: 0020, 0120, 0127
+Refined by: 0142
 Related: 0010, 0054, 0056, 0070, 0074, 0106, 0109, 0113, 0117, 0118, 0121, 0122
 
 ADR 0120 made the content kinds, Markdown and Image, modules registered at composition, and kept Ur, Reference and Space as the domain's. **Every kind is now a module, those three included, and the domain names no kind.** The core of a Resource is its id, its Title and the id of its kind; everything else is the kind's. Not every kind is a content kind: Ur, Reference and Space are still not content kinds (ADR 0120), they are modules that are not.
