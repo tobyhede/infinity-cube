@@ -223,6 +223,46 @@ describe('planCreate', () => {
     });
   });
 
+  it('writes the document its caller builds from the Space it made', () => {
+    const target = initializeTarget('New', ids([spaceOf(5), uuid(0x501), mapOf(5), graphOf(5)]));
+    const shownTo: unknown[] = [];
+    const outcome = planCreate(
+      view([space(0, [])]),
+      {
+        ...input,
+        document: (shown) => {
+          shownTo.push(shown);
+          return { title: 'Shown', kind: 'space', content: { ...shown } };
+        },
+      },
+      { ...target, resourceId: linkOf(0, 5) },
+    );
+
+    expect(shownTo).toEqual([{ spaceId: spaceOf(5), map: mapOf(5), graph: graphOf(5) }]);
+    if (outcome.kind !== 'changes') throw new Error('expected changes');
+    expect(outcome.changes[0]).toMatchObject({
+      snapshot: { resources: [{ id: linkOf(0, 5), document: { title: 'Shown' } }] },
+    });
+  });
+
+  it('throws on a document naming any Space but the one it made', () => {
+    const target = initializeTarget('New', ids([spaceOf(5), uuid(0x501), mapOf(5), graphOf(5)]));
+    expect(() =>
+      planCreate(
+        view([space(0, [])]),
+        {
+          ...input,
+          document: (shown) => ({
+            title: 'Elsewhere',
+            kind: 'space',
+            content: { ...shown, spaceId: spaceOf(6) },
+          }),
+        },
+        { ...target, resourceId: linkOf(0, 5) },
+      ),
+    ).toThrow(/must name it alone/u);
+  });
+
   it('refuses when the containing Map is gone from what the plan reads', () => {
     const target = initializeTarget('New', ids([spaceOf(5), uuid(0x501), mapOf(5), graphOf(5)]));
     expect(

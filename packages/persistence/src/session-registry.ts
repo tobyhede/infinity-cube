@@ -54,6 +54,8 @@ export type {
   DeleteReferencedMapInput,
   DeleteSpaceResourceInput,
   LinkSpaceResourceInput,
+  ShownSpace,
+  SpaceResourceDocument,
   SpaceResourceRefusal,
   SpaceResourceTargetUnavailableReason,
 } from './space-resource-planning';
