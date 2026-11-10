@@ -1,7 +1,8 @@
 import {
   resourceOpen,
-  resourceShape,
+  resourceOutline,
   resourceSize,
+  type JsonValue,
   type ResourceId,
   type ResourceShape,
   type Graph,
@@ -95,14 +96,25 @@ export function canvasProjection(space: Space, resolved: ResolvedMap): PendingCa
     [...authored].filter(([, at]) => resourceOpen(at)).map(([resourceId]) => resourceId),
   );
   // Every Resource drawn is one of `resourceIds`, the Map's own members, so
-  // each has an entry; one with no Shape stored draws as the rectangle.
-  const drawnResourceShape = (resourceId: ResourceId): ResourceShape => {
+  // each has an entry.
+  const entry = (resourceId: ResourceId) => {
     const at = authored.get(resourceId);
     if (at === undefined) {
       throw new Error(`Resource ${resourceId} is drawn on Map ${resolved.map.id} without an entry`);
     }
-    return resourceShape(at);
+    return at;
   };
+  const kinds = new Map(space.resources.map((resource) => [resource.id, resource.kind]));
+  // The outline the canvas strokes, from the Map content the entry stores, as
+  // the plugin drawing the Resource declares it (ADR 0142); a rectangle for a
+  // kind no plugin draws.
+  const drawnResourceShape = (resourceId: ResourceId): ResourceShape => {
+    const kind = kinds.get(resourceId);
+    const at = entry(resourceId);
+    return kind === undefined ? 'rectangle' : resourceOutline(kind, at.content);
+  };
+  const storedMapContent = (resourceId: ResourceId): JsonValue | undefined =>
+    entry(resourceId).content;
   const strategyGraph = buildLayoutStrategyGraph(resourceIds, edges, (resourceId) => {
     const at = authored.get(resourceId);
     return at === undefined ? RESOURCE_SIZE : resourceSize(at);
@@ -126,6 +138,7 @@ export function canvasProjection(space: Space, resolved: ResolvedMap): PendingCa
           resourceIds,
           openResourceIds,
           resourceShape: drawnResourceShape,
+          mapContent: storedMapContent,
           resourceEmphasis: emphasisUnder(activeGraphId),
         }),
         edges: projectGraphEdges(edges, colors, { activeGraphId, headShapes }),

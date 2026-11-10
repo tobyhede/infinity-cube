@@ -25,7 +25,6 @@ export const referenceKind = defineKind({
   id: REFERENCE_KIND_ID,
   contentSchema: referenceResourceContentSchema,
   flags: {
-    takesResourceShape: false,
     canOpen: true,
     opensToFit: false,
     mayBeTarget: false,

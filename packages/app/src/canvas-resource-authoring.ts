@@ -12,7 +12,6 @@ import {
   uuidSchema,
   type ResourceDocument,
   type ResourceId,
-  type ResourceShape,
   type GraphId,
 } from '@project/core';
 import type { SpaceSession } from '@project/persistence';
@@ -31,6 +30,8 @@ import { NO_SPACE_RESOURCE_TARGETS, type SpaceResourceTargets } from './space-re
 import type { SpaceResourceFraming } from './space-resource-framing';
 import { applyResourceDataPatch, decorateSharedResourceNode } from './canvas-resource-decoration';
 import { useKindDecoratedNodes } from './kinds/registry';
+import type { PluginHost } from './plugin-host/plugin-commits';
+import { usePluginGate } from './plugin-host/plugin-gate-context';
 
 type Caret =
   | { readonly resourceId: string; readonly field: 'title' }
@@ -332,24 +333,18 @@ export function useCanvasResourceAuthoring({
   );
 
   /**
-   * One Edit per choice, its refusal reported as the Actions menu's commands
-   * are. Without command outcomes there is nowhere to say a refusal, so the
-   * choice is not offered.
+   * Where a plugin surface's commits go (ADR 0142): this canvas's Edits, each
+   * answering how it settled, withdrawn by the application's one gate and by
+   * the Space being replaced.
    */
-  const changeResourceShape = useMemo(
-    () =>
-      commandOutcomes === undefined
-        ? undefined
-        : (resourceId: ResourceId, resourceShape: ResourceShape): void => {
-            commandOutcomes.run('resource-shape', () =>
-              authoring.complete({
-                kind: 'changed-resource-shape',
-                resourceId,
-                shape: resourceShape,
-              }),
-            );
-          },
-    [authoring, commandOutcomes],
+  const pluginGate = usePluginGate();
+  const pluginHost = useMemo(
+    (): PluginHost => ({
+      gate: pluginGate,
+      replacementEpoch: () => authoring.getState().replacementEpoch,
+      complete: (completion, settle) => authoring.complete(completion, settle),
+    }),
+    [authoring, pluginGate],
   );
 
   const replaceResourceImage = useMemo(() => {
@@ -532,7 +527,7 @@ export function useCanvasResourceAuthoring({
     clearCaret,
     replaceResourceImage,
     pickImageFiles: pickImages,
-    changeResourceShape,
+    pluginHost,
     continuation,
     containingSpaceId: working.id,
     spaceSelections,

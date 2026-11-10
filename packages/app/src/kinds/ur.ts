@@ -1,55 +1,50 @@
-import { urKind, type ResourceId, type ResourceShape, type UrKindId } from '@project/core';
+import { urKind, type UrKindId } from '@project/core';
 import type { ResourceFlowNodeOf } from '@project/react-flow-adapter';
-import type { KindOperationsByKind } from '@project/ui';
 import type {
   CanvasResourceDecorationContext,
   KindCanvasDecoration,
   KindDecoration,
-  Mutable,
 } from '../canvas-resource-decoration';
 import type { KindCreation } from '../kind-creation';
+import { pluginSurfaceOperations, type PluginHost } from '../plugin-host/plugin-commits';
 import type { ResourcePlacementCommands } from '../resource-placement';
-
-/** The Ur kind's operations, built by assigning what a gate allows. */
-type UrOperations = Mutable<KindOperationsByKind[UrKindId]>;
 
 export type UrResourceDecorationContext = Pick<
   CanvasResourceDecorationContext,
   'authorOnCanvas' | 'editableResourceIds'
 > & {
   /**
-   * Draw an Ur Resource in another Shape on this Map, reporting a refusal.
-   * Absent where this canvas has no command outcomes to report one through.
+   * Where the plugin's commits go and the gate that withdraws them (ADR 0142).
+   * Absent where this canvas offers a plugin no commit.
    */
-  readonly changeResourceShape?:
-    ((resourceId: ResourceId, resourceShape: ResourceShape) => void) | undefined;
+  readonly pluginHost?: PluginHost | undefined;
 };
 
-/** An Ur Resource's Shape choice, offered Open and Closed alike (ADR 0121). */
+/** An Ur Resource's plugin surface: its Map content commit and a Claim, where the canvas authors it. */
 export function decorateUrResourceNode(
   node: ResourceFlowNodeOf<UrKindId>,
   context: UrResourceDecorationContext,
 ): KindDecoration<UrKindId> {
-  const kindOperations: UrOperations = { kind: urKind.id };
-  const changeResourceShape = context.changeResourceShape;
-  if (
-    context.editableResourceIds.has(node.data.resourceId) &&
-    context.authorOnCanvas &&
-    changeResourceShape !== undefined
-  ) {
-    kindOperations.onResourceShapeChange = (resourceShape) =>
-      changeResourceShape(node.data.resourceId, resourceShape);
-  }
-  return { kindOperations };
+  return {
+    kindOperations: pluginSurfaceOperations(
+      urKind.id,
+      node.data.resourceId,
+      {
+        authorOnCanvas: context.authorOnCanvas,
+        editable: context.editableResourceIds.has(node.data.resourceId),
+      },
+      context.pluginHost,
+    ),
+  };
 }
 
 /** The Ur kind's canvas decoration, from its own part of the context. */
 export const urDecoration: KindCanvasDecoration<UrKindId, UrResourceDecorationContext> = {
   kind: urKind.id,
-  slice: ({ authorOnCanvas, editableResourceIds, changeResourceShape }) => ({
+  slice: ({ authorOnCanvas, editableResourceIds, pluginHost }) => ({
     authorOnCanvas,
     editableResourceIds,
-    changeResourceShape,
+    pluginHost,
   }),
   decorate: decorateUrResourceNode,
 };

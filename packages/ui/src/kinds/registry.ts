@@ -14,14 +14,15 @@ import type { CanvasArea, ContentCommand, KindView } from './kind-view';
 import { markdownView, type MarkdownEdit, type MarkdownOperations } from './markdown';
 import { referenceView, type ReferenceOperations } from './reference';
 import { spaceView, type SpaceOperations } from './space';
-import { urView, type UrOperations } from './ur';
+import type { PluginOperations } from './plugin-views';
+import { urView } from './ur';
 
 /** What each kind offers beyond its shared Title, by its id. */
 export interface KindOperationsByKind {
   [markdownKind.id]: MarkdownOperations;
   [referenceKind.id]: ReferenceOperations;
   [imageKind.id]: ImageOperations;
-  [urKind.id]: UrOperations;
+  [urKind.id]: PluginOperations;
   [spaceKind.id]: SpaceOperations;
 }
 

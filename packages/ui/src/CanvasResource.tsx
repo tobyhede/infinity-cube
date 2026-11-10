@@ -7,22 +7,16 @@ import {
   type ReactNode,
 } from 'react';
 import {
-  COLLAPSED_RESOURCE_SIZE,
-  DEFAULT_RESOURCE_SHAPE,
   authorsContent,
   drawsContentArea,
-  takesResourceShape,
-  titleLines,
   titleName,
   UNRESOLVED_CONTENT,
   type ResourceContent,
-  type ResourceShape,
 } from '@project/core';
 import { Button } from './Button';
 import { graphPaint } from './graph-color';
 import { canvasContent, contentCommand, type KindOperations } from './kinds/registry';
 import { isSpaceOperations } from './kinds/space';
-import { isUrOperations } from './kinds/ur';
 import {
   ResourceRailAction,
   ResourceRailActions,
@@ -32,7 +26,6 @@ import {
 import type { ResourceContentEdit } from './resource-content-edit';
 import { EntityActions, EntityActionsTrigger, type EntityActionGroup } from './EntityActionsMenu';
 import { ResourceRail, ResourceRailKind } from './ResourceRail';
-import { ResourceShapeMenu } from './ResourceShapeMenu';
 import { Card, CardContent, CardTitle } from './components/card';
 import {
   AbandonEditIcon,
@@ -45,17 +38,12 @@ import type { MarkdownResourceBodyEditor } from './MarkdownResourceBody';
 import './canvas-resource.css';
 import './kinds/reference-canvas.css';
 import './kinds/space-canvas.css';
-import './kinds/ur-canvas.css';
 import { usePresence } from './use-presence';
 import { InlineTitleEditor } from './InlineTitleEditor';
 import { UnresolvedContent } from './UnresolvedContent';
 import { atRest, type ResourceDisplay } from './resource-display';
-import {
-  resourceShapeOutline,
-  type OutlinePoint,
-  type OutlineSize,
-  type ResourceShapeOutline,
-} from './resource-shape-outline';
+import type { OutlineSize } from './resource-shape-outline';
+import { TitleHeading } from './ResourceTitleHeading';
 
 export type { KindOperations } from './kinds/registry';
 
@@ -78,16 +66,9 @@ interface CanvasResourceCommonProps {
    */
   readonly display: ResourceDisplay;
   /**
-   * The Shape the Map draws this Resource in (ADR 0121), whatever the display.
-   * Absent, as on a Resource no Map places — a creation ghost, a specimen — the
-   * Resource is drawn as the rectangle.
-   */
-  readonly shape?: ResourceShape;
-  /**
-   * The rect the Resource is drawn at, in canvas units, which its Shape's
-   * outline and inscribed rectangle are answered for. A canvas adapter supplies
-   * the size it gives the Resource; absent, the Resource is drawn at the Closed
-   * Size.
+   * The rect the Resource is drawn at, in canvas units. A canvas adapter
+   * supplies the size it gives the Resource; absent, the Resource is drawn at
+   * the Closed Size.
    */
   readonly size?: OutlineSize;
   /**
@@ -187,8 +168,6 @@ type CanvasResourceStyle = CSSProperties & {
   readonly '--canvas-resource-graph': string;
   readonly '--canvas-resource-border': string;
   readonly '--canvas-resource-drag-tilt': string;
-  readonly '--canvas-resource-shape-inset-inline': string;
-  readonly '--canvas-resource-shape-inset-block': string;
 };
 
 /**
@@ -292,10 +271,6 @@ export function CanvasResource(props: CanvasResourceProps) {
    */
   const display = readOnly ? atRest(props.display) : props.display;
   const open = display.shown !== 'closed';
-  // Every Shape but the rectangle is drawn as an outline, and its inscribed
-  // rectangle has room for the short Title and not the ladder.
-  const drawnResourceShape = props.shape ?? DEFAULT_RESOURCE_SHAPE;
-  const drawsOutline = drawnResourceShape !== 'rectangle';
   const content = display.shown === 'closed' ? null : display.content;
   const onBeginTitleEdit = readOnly ? undefined : props.onBeginTitleEdit;
   const onOpenChange = readOnly ? undefined : props.onOpenChange;
@@ -346,8 +321,6 @@ export function CanvasResource(props: CanvasResourceProps) {
     command === undefined ? undefined : contentEditAction(open, onOpenChange, onBeginContentEdit);
   const actionableEntityActions =
     !readOnly && entityActions?.some((group) => group.length > 0) === true;
-  const onResourceShapeChange =
-    !readOnly && isUrOperations(kindOperations) ? kindOperations.onResourceShapeChange : undefined;
   const contextNotice = props.contextNotice ?? null;
   const spaceRail = spaceOperations?.spaceRail;
   const portal = spaceOperations?.portal;
@@ -359,11 +332,8 @@ export function CanvasResource(props: CanvasResourceProps) {
       portal !== undefined ||
       visibleContentEdit !== null ||
       onOpenChange !== undefined ||
-      onResourceShapeChange !== undefined ||
       actionableEntityActions ||
       beginContentEdit !== undefined);
-  const size = props.size ?? COLLAPSED_RESOURCE_SIZE;
-  const outline = resourceShapeOutline(drawnResourceShape, size);
   const style: CanvasResourceStyle = {
     '--canvas-resource-graph': graphPaint(graphColor),
     '--canvas-resource-border':
@@ -371,10 +341,6 @@ export function CanvasResource(props: CanvasResourceProps) {
         ? 'var(--canvas-resource-ink-color)'
         : graphPaint(props.borderColor),
     '--canvas-resource-drag-tilt': `${CANVAS_RESOURCE_DRAG_TILT_DEGREES}deg`,
-    // The Shape's inscribed rectangle, as a share of the rect it is drawn at,
-    // which `canvas-resource.css` lays the Title and kind glyph out in.
-    '--canvas-resource-shape-inset-inline': `${(outline.inscribed.inline / size.width) * 100}%`,
-    '--canvas-resource-shape-inset-block': `${(outline.inscribed.block / size.height) * 100}%`,
   };
   /** The content area: unresolved content, or what its kind's view half draws. */
   const drawAreaContent = (value: ResourceContent): ReactNode =>
@@ -420,9 +386,8 @@ export function CanvasResource(props: CanvasResourceProps) {
     };
   }, [onBodyHeightChange]);
 
-  // An Open Resource's content already says what it is, and an Ur Resource's
-  // Shape does (ADR 0121), so neither draws its kind.
-  const kindMark = open || takesResourceShape(kind) ? null : <ResourceRailKind kind={kind} />;
+  // An Open Resource's content already says what it is, so it draws no kind.
+  const kindMark = open ? null : <ResourceRailKind kind={kind} />;
   const toolbar = showActions ? (
     // ADR 0073. One tab stop for the whole rail, arrows between its
     // controls: a canvas carries many Resources and a Resource's rail carries
@@ -454,9 +419,6 @@ export function CanvasResource(props: CanvasResourceProps) {
       )}
       {spaceRail}
       <ResourceRailKindActions kind={kind}>
-        {onResourceShapeChange !== undefined && (
-          <ResourceShapeMenu shape={drawnResourceShape} onChoose={onResourceShapeChange} />
-        )}
         {visibleContentEdit !== null ? (
           <ContentEditActions name={name} edit={visibleContentEdit} />
         ) : beginContentEdit !== undefined && command !== undefined ? (
@@ -540,9 +502,9 @@ export function CanvasResource(props: CanvasResourceProps) {
       // layout remains invariant; no wall-clock presentation state is allowed
       // to become a second Open fact and move the Title mid-close.
       data-open={open}
-      // The Shape the Resource is drawn in, which `canvas-resource.css` reads to
-      // draw the outline below and inset the Title and glyph within it.
-      data-resource-shape={drawnResourceShape}
+      // Every Resource this frame draws is a rectangle; a plugin's outline is
+      // drawn by `PluginResource` (ADR 0142).
+      data-resource-shape="rectangle"
       // A running edit is not a hover, so `canvas-resource.css` draws the active
       // face off this as well as `:hover` — a Resource being written in reads as
       // active without the pointer on it.
@@ -553,7 +515,6 @@ export function CanvasResource(props: CanvasResourceProps) {
           shared command surface. The Graph's colour is on this Resource — `--canvas-resource-graph` below draws the
           Title's own hover and caret treatment — and on the handles and
           Edges the adapter draws around it. */}
-      {drawsOutline && <ResourceShapeOutlineDrawing outline={outline} size={size} />}
       {rail}
       {props.renderToolbar?.(toolbar)}
       <CardContent ref={bodyControl} className="canvas-resource__body">
@@ -641,124 +602,6 @@ export function CanvasResource(props: CanvasResourceProps) {
     <EntityActions groups={readOnly ? [] : entityActions} render={resource} />
   ) : (
     resource
-  );
-}
-
-/**
- * A Shape's paper and edge, drawn in place of the Resource's own border
- * and fill, which `canvas-resource.css` withdraws for it.
- *
- * Drawn in the units of the rect the Resource is drawn at, so the drawing is
- * not stretched and the outline touches the midpoint of each of the rect's
- * sides, where the adapter's handles sit and Edges attach (ADR 0110, ADR
- * 0121). The stroke keeps the border's width however the drawing is scaled,
- * because `canvas-resource.css` gives it `vector-effect: non-scaling-stroke`.
- *
- * The geometry is drawn twice: first the selection ring, a wider stroke that
- * `canvas-resource.css` shows only while the Resource is selected or its Title
- * is being written, then the edge, whose fill covers the ring's inner half. So
- * the ring follows the outline.
- */
-function ResourceShapeOutlineDrawing({
-  outline,
-  size: { width, height },
-}: {
-  readonly outline: ResourceShapeOutline;
-  readonly size: OutlineSize;
-}) {
-  return (
-    <svg
-      className="canvas-resource__outline"
-      viewBox={`0 0 ${width} ${height}`}
-      preserveAspectRatio="none"
-      aria-hidden="true"
-      focusable="false"
-    >
-      {OUTLINE_LAYERS.map(({ className }) =>
-        outline.kind === 'polygon' ? (
-          <polygon key={className} className={className} points={points(outline.points)} />
-        ) : (
-          <rect
-            key={className}
-            className={className}
-            width={width}
-            height={height}
-            rx={outline.rx}
-            ry={outline.ry}
-          />
-        ),
-      )}
-    </svg>
-  );
-}
-
-/** The outline's two layers, ring beneath edge, each drawn from the same geometry. */
-const OUTLINE_LAYERS = [
-  { className: 'canvas-resource__outline-ring' },
-  { className: 'canvas-resource__outline-edge' },
-] as const;
-
-/** An outline polygon's vertices, as its `points` attribute spells them. */
-const points = (vertices: readonly OutlinePoint[]): string =>
-  vertices.map(({ x, y }) => `${x},${y}`).join(' ');
-
-interface TitleLadderProps {
-  readonly title: string;
-}
-
-/**
- * A Resource's Title drawn as its Title Lines (ADR 0083).
- *
- * The drawn Resource is the only surface that draws the ladder — everywhere else
- * shows the name, which is the first line — and it draws it identically whether
- * the Resource is Open or Closed and whatever kind the Resource is. A Title that
- * changed shape on Opening would teach an author that Opening edits it.
- *
- * Each line is **its own block element carrying its role**, and that is the
- * whole of the structure: the roles come from `titleLines`, which is where the
- * domain settles what an author's second line means, and the type ladder,
- * clamping and colour come from `canvas-resource.css`. Nothing here reads a
- * newline, because a `split('\n')` at a call site is exactly what ADR 0083
- * bought the named operation to prevent.
- *
- * The distinction the block-per-line is here for: a break the **author typed**
- * starts a rung and a break the **box chose** does not. Each element wraps
- * freely within its own role, so a subtitle that runs to two visual lines is
- * one subtitle rather than a subtitle and a caption, and a long single-line
- * Title draws entirely at the `title` role.
- *
- * Keyed by position because position *is* the identity here — it is what gives
- * a line its role — and two lines of a Title may legitimately read the same.
- */
-function TitleLadder({ title }: TitleLadderProps) {
-  return (
-    <>
-      {titleLines(title).map((line, index) => (
-        <span key={index} className="canvas-resource__title-line" data-role={line.role}>
-          {line.text}
-        </span>
-      ))}
-    </>
-  );
-}
-
-/**
- * The Resource's Title Lines, as the one heading the drawn Resource draws.
- *
- * A `span` and not a `div` or an `h2`: a `button`'s content model is phrasing
- * content, and this element sits inside ADR 0065's activation control whenever
- * the Title is editable. `role="heading"` with `aria-level` is the ARIA
- * spelling of what a native `h2` would say, taken because the native element
- * cannot legally go where this one has to.
- *
- * It carries no `aria-label`. Its name is the Title Lines it draws, which is
- * the whole reason the control wraps it rather than the other way round.
- */
-function TitleHeading({ title }: TitleLadderProps) {
-  return (
-    <span className="canvas-resource__title-heading" role="heading" aria-level={2}>
-      <TitleLadder title={title} />
-    </span>
   );
 }
 

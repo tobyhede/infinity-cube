@@ -14,7 +14,9 @@ import {
 import {
   CanvasResource,
   graphPaint,
+  isPluginOperations,
   isSpaceOperations,
+  PluginResource,
   type CanvasResourceProps,
 } from '@project/ui';
 import type { ResourceFlowNode } from './projection';
@@ -439,12 +441,48 @@ export function ResourceNode({
           />
         </>
       )}
-      {titleEditor !== undefined ? (
+      {/*
+        A Resource a plugin draws is drawn by its host (ADR 0142), which keeps
+        the rect, border, ring and rail and hands the plugin everything inside
+        its outline; every other kind is still drawn by `CanvasResource`.
+      */}
+      {isPluginOperations(kindOperations) && data.mapContent !== undefined ? (
+        <PluginResource
+          resourceId={data.resourceId}
+          kind={kindOperations.kind}
+          title={{
+            title: data.title,
+            readOnly: data.readOnly,
+            onBeginTitleEdit: data.onBeginTitleEditing,
+            editor: titleEditor,
+            onReturnFocus,
+          }}
+          content={data.ownContent}
+          mapContent={data.mapContent}
+          outline={data.shape}
+          size={canvasResourceOptionalProps.size}
+          state={
+            titleEditor !== undefined
+              ? 'editing'
+              : dragging
+                ? 'dragging'
+                : visuallySelected
+                  ? 'selected'
+                  : 'rest'
+          }
+          graphColor={data.activeGraphColor}
+          borderColor={canvasResourceOptionalProps.borderColor}
+          readOnly={data.readOnly}
+          operations={kindOperations}
+          entityActions={canvasResourceOptionalProps.entityActions}
+          contextNotice={canvasResourceOptionalProps.contextNotice}
+          renderToolbar={renderToolbar}
+        />
+      ) : titleEditor !== undefined ? (
         <CanvasResource
           readOnly={data.readOnly}
           kindOperations={kindOperations}
           display={display}
-          shape={data.shape}
           renderToolbar={renderToolbar}
           title={data.title}
           graphColor={data.activeGraphColor}
@@ -459,7 +497,6 @@ export function ResourceNode({
           readOnly={data.readOnly}
           kindOperations={kindOperations}
           display={display}
-          shape={data.shape}
           renderToolbar={renderToolbar}
           title={data.title}
           graphColor={data.activeGraphColor}

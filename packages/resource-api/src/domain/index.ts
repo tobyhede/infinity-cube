@@ -134,8 +134,16 @@ export type CurrentPlugin<C, M> = ResourcePlugin<C, M> & {
  * them.
  */
 export function definePlugin<const V extends number, const K extends string, C, M>(
+  plugin: ResourcePlugin<C, M> & {
+    readonly apiVersion: V;
+    readonly kind: K;
+    readonly newContent: C;
+  },
+): ResourcePlugin<C, M> & { readonly apiVersion: V; readonly kind: K; readonly newContent: C };
+export function definePlugin<const V extends number, const K extends string, C, M>(
   plugin: ResourcePlugin<C, M> & { readonly apiVersion: V; readonly kind: K },
-): ResourcePlugin<C, M> & { readonly apiVersion: V; readonly kind: K } {
+): ResourcePlugin<C, M> & { readonly apiVersion: V; readonly kind: K };
+export function definePlugin<C, M>(plugin: ResourcePlugin<C, M>): ResourcePlugin<C, M> {
   return plugin;
 }
 

@@ -14,6 +14,8 @@ import {
 } from './kinds/registry';
 import { RESOURCE_TITLE_REQUIRED, normalizeTitle } from './title';
 import { uuidSchema } from './uuid';
+import { jsonValueSchema } from './json-value';
+import { OUTLINES } from '@project/resource-api/domain';
 
 export { newUuid, uuidSchema } from './uuid';
 
@@ -260,19 +262,14 @@ const resourceSizeSchema = z
   .strict();
 
 /**
- * The outline a Resource whose kind takes a Shape is drawn in on a Map (ADR 0121), Open or Closed.
- * Every member touches the midpoint of each side of the Resource's rect, where
- * Edges attach.
+ * The outlines the canvas strokes a Resource's border and ring on (ADR 0142):
+ * the Resource API's, which a plugin's declared outline names, as an Ur
+ * Resource's Shape does (ADR 0121). Every member touches the midpoint of each
+ * side of the Resource's rect, where Edges attach.
  */
-export const RESOURCE_SHAPES = ['rectangle', 'pill', 'ellipse', 'diamond'] as const;
+export const RESOURCE_SHAPES = OUTLINES;
 
 export const resourceShapeSchema = z.enum(RESOURCE_SHAPES);
-
-/**
- * Whether a Resource of this kind takes a Shape other than the rectangle (ADR
- * 0121), as its kind declares.
- */
-export const takesResourceShape = (kind: KindId): boolean => kindFlags(kind).takesResourceShape;
 
 /** Whether a Resource of this kind may be Open, as its kind declares (ADR 0122). */
 export const takesOpen = (kind: KindId): boolean => kindFlags(kind).canOpen;
@@ -282,11 +279,14 @@ export const opensToFit = (kind: KindId): boolean => kindFlags(kind).opensToFit;
 
 /**
  * What a Map stores for one Resource: its origin, and optionally whether it is
- * Open, its size and its Shape. Each optional field has an application
- * default, as a Graph's `headShape` does: an entry with no `open` is Closed
- * (`resourceOpen`), one with no `size` is the Closed Size (`resourceSize`), and
- * one with no `shape` is the rectangle (`resourceShape`). Size and Open/Closed
- * are independent: Open changes what is drawn inside the rect, never the rect.
+ * Open, its size and its plugin's Map content (ADR 0142). An entry with no
+ * `open` is Closed (`resourceOpen`), one with no `size` is the Closed Size
+ * (`resourceSize`), and one with no `content` gives its plugin the plugin's
+ * declared default (`resolvedMapContent`). Size and Open/Closed are
+ * independent: Open changes what is drawn inside the rect, never the rect.
+ *
+ * `content` is any JSON value here: which values a Resource may keep is its
+ * plugin's schema's answer, which intake asks with the Resource's kind in view.
  *
  * **Strict**, as the Map is: a stripped key is a question answered silently.
  */
@@ -294,7 +294,7 @@ export const resourcePlacementSchema = mapPositionSchema
   .extend({
     open: z.boolean().optional(),
     size: resourceSizeSchema.optional(),
-    shape: resourceShapeSchema.optional(),
+    content: jsonValueSchema.optional(),
   })
   .strict();
 

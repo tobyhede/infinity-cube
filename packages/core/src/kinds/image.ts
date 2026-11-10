@@ -86,7 +86,6 @@ export const imageKind = defineKind({
   id: IMAGE_KIND_ID,
   contentSchema: imageResourceContentSchema,
   flags: {
-    takesResourceShape: false,
     canOpen: true,
     opensToFit: false,
     mayBeTarget: true,

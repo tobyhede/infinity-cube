@@ -16,7 +16,7 @@ import {
   type MapId,
   type MapPosition,
   type ResourcePlacement,
-  type ResourceShape,
+  type JsonValue,
   COLLAPSED_RESOURCE_SIZE,
   resourceSize,
   EDGE_TITLE_ONE_LINE,
@@ -159,14 +159,15 @@ export type AuthoringCompletion =
       readonly size: { readonly width: number; readonly height: number };
     }
   /**
-   * Change Shape: the outline one Resource is drawn in on the Map the Edit is
-   * written into (ADR 0121). Open or Closed alike; the Shape it already draws as
-   * is `unchanged`.
+   * Change Map content: what one Resource's plugin keeps for it on the Map the
+   * Edit is written into (ADR 0142), as an Ur Resource keeps its Shape (ADR
+   * 0121). Its plugin's schema decides what is accepted; the value the plugin is
+   * already given there is `unchanged`.
    */
   | {
-      readonly kind: 'changed-resource-shape';
+      readonly kind: 'changed-map-content';
       readonly resourceId: ResourceId;
-      readonly shape: ResourceShape;
+      readonly content: JsonValue;
     }
   | {
       readonly kind: 'connected-resources';
@@ -326,7 +327,7 @@ type MapRequiredOperation = Extract<
   | { readonly kind: 'closed-resource' }
   | { readonly kind: 'resized-resource' }
   | { readonly kind: 'opened-resource-to-fit' }
-  | { readonly kind: 'changed-resource-shape' }
+  | { readonly kind: 'changed-map-content' }
   | { readonly kind: 'renamed-map' }
   | { readonly kind: 'renamed-graph' }
   | { readonly kind: 'recolored-graph' }
@@ -380,7 +381,14 @@ export type AuthoringRefusal =
   | { readonly code: 'resource-already-in-map' }
   | { readonly code: 'resource-not-in-map' }
   | { readonly code: 'open-requires-content' }
-  | { readonly code: 'shape-not-taken' }
+  /** Map content for a Resource whose kind no plugin draws (ADR 0142). */
+  | { readonly code: 'map-content-not-kept' }
+  /** Map content the Resource's plugin's schema refuses. */
+  | { readonly code: 'map-content-invalid' }
+  /** A queued Edit discarded because a replacement Space was opened before it drained (ADR 0042). */
+  | { readonly code: 'space-replaced' }
+  /** A queued Edit discarded because the Edit draining the queue failed before reaching it. */
+  | { readonly code: 'edit-abandoned' }
   | {
       readonly code: 'resource-has-references';
       /** The Reference Resources by **name**, which is what a sentence listing Resources says (ADR 0083). */
@@ -460,7 +468,7 @@ export interface SurfaceAuthoring {
   /** The drawn Map's own placement, derived fresh from the working snapshot. */
   readonly mapPlacement: () => Placement;
   readonly edgeEligibility: (proposal: EdgeProposal) => EdgeEligibility;
-  readonly complete: (completion: DrawnCompletion) => AuthoringResult;
+  readonly complete: (completion: DrawnCompletion, settle?: Settle) => AuthoringResult;
 }
 
 export interface SpaceAuthoring {
@@ -488,8 +496,8 @@ export interface SpaceAuthoring {
    * authors its Map without moving this Space's canvas.
    */
   readonly complete: {
-    (target: DrawnEditTarget, completion: DrawnCompletion): AuthoringResult;
-    (target: CanvasEditTarget, completion: AuthoringCompletion): AuthoringResult;
+    (target: DrawnEditTarget, completion: DrawnCompletion, settle?: Settle): AuthoringResult;
+    (target: CanvasEditTarget, completion: AuthoringCompletion, settle?: Settle): AuthoringResult;
   };
   readonly retryPersistence: () => void;
   /**
@@ -591,7 +599,20 @@ interface QueuedCompletion extends ReportedCompletion {
    * current in — read by the drain, and the only reason it is recorded.
    */
   readonly replacementEpoch: number;
+  /** Told how the queued Edit settled, when its caller asked. */
+  readonly settle?: Settle;
 }
+
+/** How an Edit settled: every answer but `queued`, which is not an outcome. */
+export type SettledResult = Exclude<AuthoringResult, { readonly kind: 'queued' }>;
+
+/**
+ * Told once how a `queued` Edit settled (ADR 0142): its own result when the
+ * drain reaches it, or refused when the Space was replaced before then or a
+ * throw abandoned the queue. Never called for an Edit that did not queue,
+ * whose answer `complete` already returned.
+ */
+export type Settle = (result: SettledResult) => void;
 
 interface SpaceAuthoringDependencies {
   readonly session: SpaceSession;
@@ -1284,12 +1305,12 @@ export function createSpaceAuthoring({
       );
       if (outcome.kind !== 'completed') return notCompleted(outcome);
       snapshot = outcome.snapshot;
-    } else if (completion.kind === 'changed-resource-shape') {
-      const outcome = SnapshotEdit.changeResourceShape(
+    } else if (completion.kind === 'changed-map-content') {
+      const outcome = SnapshotEdit.changeMapContent(
         snapshot,
         mapId,
         completion.resourceId,
-        completion.shape,
+        completion.content,
       );
       if (outcome.kind !== 'completed') return notCompleted(outcome);
       snapshot = outcome.snapshot;
@@ -1613,7 +1634,7 @@ export function createSpaceAuthoring({
     });
   };
 
-  const performCompletion = (reported: ReportedCompletion): AuthoringResult => {
+  const performCompletion = (reported: ReportedCompletion): SettledResult => {
     const derived = deriveCompletedEdit(reported);
     // `unchanged` and `refused` are already the answer — the core and the
     // interface share one vocabulary rather than translating between two.
@@ -1628,13 +1649,29 @@ export function createSpaceAuthoring({
 
   let completing = false;
   const queued: QueuedCompletion[] = [];
-  const complete = (target: EditTarget, completion: AuthoringCompletion): AuthoringResult => {
+  const settleSafely = (settle: Settle | undefined, result: SettledResult): void => {
+    if (settle === undefined) return;
+    try {
+      settle(result);
+    } catch (error) {
+      safelyReport(error);
+    }
+  };
+  const complete = (
+    target: EditTarget,
+    completion: AuthoringCompletion,
+    settle?: Settle,
+  ): AuthoringResult => {
     if (target.kind === 'drawn' && currentSpace().lookup.map(target.mapId) === undefined) {
       return { kind: 'refused', refusal: { code: 'map-not-found' } };
     }
     const reported: ReportedCompletion = { target, completion };
     if (completing) {
-      queued.push({ ...reported, replacementEpoch });
+      const entry: QueuedCompletion =
+        settle === undefined
+          ? { ...reported, replacementEpoch }
+          : { ...reported, replacementEpoch, settle };
+      queued.push(entry);
       return { kind: 'queued' };
     }
     completing = true;
@@ -1660,12 +1697,14 @@ export function createSpaceAuthoring({
         // install-gate rule.
         if (next.replacementEpoch !== replacementEpoch) {
           discardedAsReplaced += 1;
+          settleSafely(next.settle, { kind: 'refused', refusal: { code: 'space-replaced' } });
           continue;
         }
         try {
-          performCompletion(next);
+          settleSafely(next.settle, performCompletion(next));
         } catch (error) {
           safelyReport(error);
+          settleSafely(next.settle, { kind: 'refused', refusal: { code: 'edit-abandoned' } });
           break;
         }
       }
@@ -1687,7 +1726,10 @@ export function createSpaceAuthoring({
       // partway through the drain: those Edits are gone, and saying so is the
       // difference between a readable failure and a silent one.
       const discarded = queued.length;
-      queued.length = 0;
+      const abandoned = queued.splice(0);
+      for (const entry of abandoned) {
+        settleSafely(entry.settle, { kind: 'refused', refusal: { code: 'edit-abandoned' } });
+      }
       if (discarded > 0) {
         safelyReport(
           new Error(`SpaceAuthoring discarded ${discarded} queued completion(s) after a failure.`),

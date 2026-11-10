@@ -8,14 +8,14 @@ import type {
   spaceResourceFramingSchema,
 } from './space';
 import type { UUID } from '../types';
+import type { Outline } from '@project/resource-api/domain';
+import type { JsonValue } from '../json-value';
 
 /**
  * What a kind says about the rules every Resource meets, so that no rule names
  * a kind (ADR 0128). The core reads these; a module sets them.
  */
 export interface KindFlags {
-  /** Whether a Resource of this kind takes a Shape other than the rectangle (ADR 0121). */
-  readonly takesResourceShape: boolean;
   /** Whether a Resource of this kind may be Open (ADR 0122). */
   readonly canOpen: boolean;
   /**
@@ -28,6 +28,22 @@ export interface KindFlags {
   readonly mayBeTarget: boolean;
   /** Whether a Space this kind references lives by that reference, and is deleted with its last (ADR 0074). */
   readonly ownsReferencedSpaces: boolean;
+}
+
+/**
+ * What a plugin keeps for its Resource on one Map (ADR 0142), as the core holds
+ * it: JSON values it stores, compares and carries without reading, and the
+ * plugin's own answers about one.
+ */
+export interface KindMapContent {
+  /** The value where a Map entry stores none. */
+  readonly default: JsonValue;
+  /** The value on a surface with no Map. */
+  readonly withoutMap: JsonValue;
+  /** Why the plugin's schema refuses this value, or `undefined` when it accepts it. */
+  readonly problem: (value: JsonValue) => string | undefined;
+  /** The outline the canvas strokes for this value (ADR 0135, ADR 0139). */
+  readonly outline: (value: JsonValue) => Outline;
 }
 
 /** A file a kind writes beside a Resource file, named relative to it. */
@@ -147,6 +163,8 @@ export interface KindModule<
   readonly facts?: ContentFacts;
   /** The content a new Resource of this kind starts with, when it may be created empty. */
   readonly newContent?: Content;
+  /** What a Resource of this kind keeps on each Map, when a plugin draws the kind (ADR 0142). */
+  readonly mapContent?: KindMapContent;
 }
 
 /**

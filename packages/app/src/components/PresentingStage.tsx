@@ -1,6 +1,6 @@
-import type { GraphId, MapId, ResourceId } from '@project/core';
+import { isPluginKind, type GraphId, type MapId, type ResourceId } from '@project/core';
 import { resolveResourceContent, type Space } from '@project/graph';
-import { PresentedResource, Stage } from '@project/ui';
+import { PresentedPluginResource, PresentedResource, Stage } from '@project/ui';
 import { presentedNotes } from '../notes-window';
 import { presentedByApplication } from '../kinds/registry';
 import { PresentedNotesList } from './PresentedNotesList';
@@ -24,8 +24,9 @@ export interface PresentingStageProps extends PresentingChromeProps {
  * Resource's notes while the presenter rehearses with them (ADR 0129).
  *
  * The Resource is drawn by its kind, through the content
- * `resolveResourceContent` answers, and never by its position, size, Shape or
- * Open state on any Map — so nothing about how it sits on the canvas reaches
+ * `resolveResourceContent` answers, or by its plugin with the Map content its
+ * plugin gives where there is no Map (ADR 0142), and never by its position,
+ * size, Shape or Open state on any Map — so nothing about how it sits on the canvas reaches
  * the audience. Nothing here authors the Space.
  */
 export function PresentingStage({
@@ -55,9 +56,18 @@ export function PresentingStage({
         </>
       }
     >
-      <PresentedResource title={resource.title} content={content}>
-        {presentedByApplication(content)}
-      </PresentedResource>
+      {isPluginKind(resource.kind) ? (
+        <PresentedPluginResource
+          resourceId={resource.id}
+          kind={resource.kind}
+          title={resource.title}
+          content={resource.content}
+        />
+      ) : (
+        <PresentedResource title={resource.title} content={content}>
+          {presentedByApplication(content)}
+        </PresentedResource>
+      )}
     </Stage>
   );
 }

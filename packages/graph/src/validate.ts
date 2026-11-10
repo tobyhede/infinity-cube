@@ -1,10 +1,8 @@
 import {
   spaceReferences,
-  DEFAULT_RESOURCE_SHAPE,
+  mapContentProblem,
   resourceOpen,
-  resourceShape,
   takesOpen,
-  takesResourceShape,
   uuidSchema,
   type Resource,
   type Map,
@@ -65,8 +63,8 @@ export type SpaceReferenceErrorKind =
   | 'reference-target-not-targetable'
   /** A Space reference a kind declares names the Space holding it. */
   | 'space-reference-cycle'
-  /** A Map gives a Resource whose kind takes no Shape a Shape other than the rectangle. */
-  | 'shape-not-taken'
+  /** A Map gives a Resource Map content its plugin's schema refuses, or Map content a kind no plugin draws (ADR 0142). */
+  | 'map-content-invalid'
   /** A Map stores a Resource with no content to show Open. */
   | 'open-requires-content';
 
@@ -187,15 +185,16 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
         continue;
       }
       // The kind is read from the Resource, because the entry does not carry it.
-      if (
-        !takesResourceShape(member.kind) &&
-        placement !== undefined &&
-        resourceShape(placement) !== DEFAULT_RESOURCE_SHAPE
-      ) {
+      // Which Map content a Resource keeps is its plugin's schema's answer.
+      const mapContentRefusal =
+        placement?.content === undefined
+          ? undefined
+          : mapContentProblem(member.kind, placement.content);
+      if (mapContentRefusal !== undefined) {
         errors.push({
-          kind: 'shape-not-taken',
+          kind: 'map-content-invalid',
           ref: resourceId,
-          message: `Map "${subject.id}" draws ${member.kind} resource "${resourceId}" as a ${resourceShape(placement)}; its kind takes no Shape other than the rectangle`,
+          message: `Map "${subject.id}" keeps Map content for ${member.kind} resource "${resourceId}" that its plugin refuses: ${mapContentRefusal}`,
         });
       }
       if (!takesOpen(member.kind) && placement !== undefined && resourceOpen(placement)) {

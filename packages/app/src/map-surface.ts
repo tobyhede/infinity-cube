@@ -154,11 +154,11 @@ export function createMapSurface(
   const authoring: SurfaceAuthoring = {
     getState: observable.getState,
     subscribe: observable.subscribe,
-    complete: (completion) => {
+    complete: (completion, settle) => {
       const lands = target();
       return lands.kind === 'canvas'
-        ? app.authoring.complete(lands, completion)
-        : app.authoring.complete(lands, completion);
+        ? app.authoring.complete(lands, completion, settle)
+        : app.authoring.complete(lands, completion, settle);
     },
     edgeEligibility: (proposal) => app.authoring.edgeEligibility(target(), proposal),
     mapPlacement: () => {
