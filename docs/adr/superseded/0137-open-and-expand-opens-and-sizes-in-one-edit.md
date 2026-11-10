@@ -1,6 +1,7 @@
 # Open and expand Opens a Resource and sizes it to its content in one Edit
 
-Status: accepted
+Status: superseded
+Superseded by: 0142
 Refines: 0122, 0084, 0093
 
 ADR 0122 made a Resource's size independent of Open: Open changes only what is drawn inside the rect, and only Resize changes a size. So a long document Opens into the Closed Size's 260×146 and scrolls there, and reading it on the canvas takes an Open and then a resize drag that has to guess the size its text needs. **Open and expand** is the one gesture for "show me this on the Map": `Shift+Enter` on a Resource, or Open and Expand in its Actions menu.
