@@ -7,10 +7,13 @@ import { expect, test, type Locator, type Page } from './fixtures';
 import {
   boxOf,
   createResource,
+  createResourceControl,
+  dock,
   dockNavigation,
   expectArrowOrder,
   expectAvailable,
   expectWithheld,
+  nodeByTitle,
   openResource,
   presentControl,
   presentedResource,
@@ -853,6 +856,13 @@ test(
     const node = await replaceFromRail(page, FIRST_FILE);
     await expect(node.getByTestId('image-notice')).toHaveText('Replacing image…');
 
+    // Authoring is withdrawn with navigation: creating a Resource, and the
+    // Image's own Rename, wait for the Replace.
+    const create = createResourceControl(page);
+    await expect(create).toBeDisabled();
+    const rename = page.getByRole('button', { name: 'Rename Resource Figure' });
+    await expect(rename).toHaveCount(0);
+
     const menuButtons = dockNavigation(page);
     await expectWithheld(menuButtons);
     await expectArrowOrder(page, menuButtons);
@@ -888,11 +898,504 @@ test(
     );
     await expect(node.getByTestId('image-notice')).toHaveCount(0);
     await expectAvailable(menuButtons);
+    await expect(create).toBeEnabled();
+    await (
+      await imageControls(page)
+    ).controls
+      .getByRole('button', { name: 'Rename Resource Figure' })
+      .focus();
     await page.goBack();
     await expect(page).toHaveURL(previousUrl);
     await expect(selectedCanvas(page)).toHaveText('Elsewhere');
   },
 );
+
+/**
+ * Hold every upload to the host's asset collection until the answer is
+ * released, so a Replace stays in flight between its store and its commit.
+ */
+async function holdUploads(page: Page): Promise<() => void> {
+  const held = Promise.withResolvers<undefined>();
+  await page.route(
+    (url) => url.pathname === '/assets',
+    async (route) => {
+      await held.promise;
+      await route.continue();
+    },
+  );
+  return () => held.resolve(undefined);
+}
+
+/**
+ * Press `node`'s rail Replace, choose `file`, and wait until the plugin says
+ * the Replace is running.
+ */
+async function replaceHeld(
+  page: Page,
+  node: Locator,
+  title: string,
+  file: { name: string; mimeType: string; buffer: Buffer } = FIRST_FILE,
+): Promise<void> {
+  const controls = await resourceControls(page, node);
+  const replace = controls.getByRole('button', { name: `Replace image of Resource ${title}` });
+  const chooser = page.waitForEvent('filechooser');
+  // Pressed from the keyboard, as the rail may sit under the Dock.
+  await replace.focus();
+  await replace.press('Enter');
+  await (await chooser).setFiles(file);
+  await expect(node.getByTestId('image-notice')).toHaveText('Replacing image…');
+}
+
+/** Rename the seeded Image Resource from its rail, committing on Enter. */
+async function renameFigure(page: Page, title: string): Promise<void> {
+  const { controls } = await imageControls(page);
+  await controls.getByRole('button', { name: 'Rename Resource Figure' }).click();
+  const field = page.getByRole('textbox', { name: 'Resource title' });
+  await field.fill(title);
+  await field.press('Enter');
+}
+
+const PRESENTATION_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000060');
+const OVERVIEW_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000061');
+
+/**
+ * Add the Image Resource to the fixture's Presentation Space on the Overview
+ * Map that Meta's Space Resource enters it on, through the same HTTP commit the
+ * browser makes.
+ */
+async function seedPresentationFigure(page: Page): Promise<void> {
+  const response = await page.request.get(`/api/spaces/${PRESENTATION_ID}`);
+  expect(response.ok()).toBe(true);
+  const { snapshot, revision } = decodeLoadedSpace(await response.json());
+  const maps = (snapshot.document.maps ?? []).map((authored) =>
+    authored.id === OVERVIEW_MAP_ID
+      ? {
+          ...authored,
+          positions: {
+            ...authored.positions,
+            [IMAGE_ID]: { x: 1272, y: 12, open: false, size: SIZED_TO_PICTURE },
+          },
+        }
+      : authored,
+  );
+  const commit = await page.request.post('/api/spaces', {
+    data: {
+      changes: [
+        {
+          kind: 'update',
+          spaceId: PRESENTATION_ID,
+          snapshot: {
+            ...snapshot,
+            resources: [
+              ...snapshot.resources,
+              {
+                id: IMAGE_ID,
+                document: {
+                  title: 'Figure',
+                  kind: 'image',
+                  content: { url: FIGURE_URL, naturalSize: HARBOUR_SIZE },
+                },
+              },
+            ],
+            document: { ...snapshot.document, maps },
+          },
+          expectedRevision: revision.toString(),
+        },
+      ],
+    },
+  });
+  expect(commit.ok()).toBe(true);
+}
+
+/**
+ * In an entered Space the opener's crumb is navigation too: a Replace run from
+ * the Image plugin's rail withholds it with the rest, in the same arrow order,
+ * and when the Replace lands every navigation command is available again,
+ * Exit included.
+ */
+test("a Replace in an entered Space withholds the opener's crumb, and its answer makes every navigation command available", async ({
+  page,
+}) => {
+  await serveFigure(page);
+  await seedPresentationFigure(page);
+  await page.goto('/');
+  await selectCanvas(page, 'Linked Spaces');
+  const presentation = nodeByTitle(page, 'Presentation');
+  await expect(presentation).toBeVisible();
+  await settled(page);
+  await (
+    await resourceControls(page, presentation)
+  )
+    .getByRole('button', { name: 'Actions for Resource Presentation' })
+    .click();
+  await page.getByRole('menuitem', { name: 'Enter', exact: true }).click();
+  // Meta stays open behind the entered Space, so its Dock is in the page too.
+  const bar = dock(page).filter({ visible: true });
+  const shownSpace = bar.getByTestId('space-title');
+  await expect(shownSpace).toContainText('Presentation');
+  await expect(bar.getByTestId('selected-canvas')).toContainText('Overview');
+  await settled(page);
+
+  const release = await holdUploads(page);
+  const { node } = await imageControls(page);
+  await replaceHeld(page, node, 'Figure');
+
+  const goTo = page.getByRole('button', { name: 'Go to Map fixture' });
+  const navigation = [goTo, ...dockNavigation(page)];
+  await expectWithheld(navigation);
+  await expectArrowOrder(page, navigation);
+  await goTo.click({ force: true });
+  await expect(shownSpace).toContainText('Presentation');
+  await expect(page.getByRole('alert')).toHaveCount(0);
+
+  release();
+  await expect(node.getByTestId('image-notice')).toHaveCount(0);
+  await expectPictureLoaded(node.getByRole('img', { name: 'Figure' }), FIRST_PICTURE.size.width);
+  await expectAvailable(navigation);
+  await shownSpace.click({ delay: 120 });
+  const exit = page.getByRole('menu').getByRole('menuitem', { name: 'Exit Space' });
+  await expect(exit).toBeEnabled();
+  await exit.click();
+  await expect(shownSpace).toContainText('Map fixture');
+});
+
+/**
+ * Follow a fragment of the current location, answering whether the browser
+ * fired `popstate` for it; the spec fires `popstate` before `hashchange`.
+ */
+const followFragment = (page: Page, fragment: string) =>
+  page.evaluate(
+    (hash) =>
+      new Promise<boolean>((resolve) => {
+        let popped = false;
+        const heard = () => {
+          popped = true;
+        };
+        window.addEventListener('popstate', heard);
+        window.addEventListener(
+          'hashchange',
+          () => {
+            window.removeEventListener('popstate', heard);
+            resolve(popped);
+          },
+          { once: true },
+        );
+        window.location.hash = hash;
+      }),
+    fragment,
+  );
+
+/**
+ * Traverse by `delta`, answering a read of how many `popstate`s have arrived
+ * since and where the browser is. Each call counts on its own.
+ */
+async function traverseCounting(page: Page, delta: number) {
+  await page.evaluate((by) => {
+    const { dataset } = document.documentElement;
+    const token = String(Number(dataset['popToken'] ?? 0) + 1);
+    dataset['popToken'] = token;
+    dataset['pops'] = '0';
+    window.addEventListener('popstate', () => {
+      if (dataset['popToken'] === token) dataset['pops'] = String(Number(dataset['pops']) + 1);
+    });
+    window.history.go(by);
+  }, delta);
+  return () =>
+    page.evaluate(() => ({
+      pops: Number(document.documentElement.dataset['pops']),
+      url: window.location.href,
+    }));
+}
+
+test('a Replace in flight holds a Back and a Forward across a fragment link', async ({ page }) => {
+  await serveFigure(page);
+  await openPictures(page);
+  await newMap(page);
+  const mapName = page.getByRole('textbox', { name: 'Map name' });
+  await mapName.fill('Elsewhere');
+  await mapName.press('Enter');
+  await selectCanvas(page, 'Pictures');
+  await selectCanvas(page, 'Elsewhere');
+  await selectCanvas(page, 'Pictures');
+  const heldUrl = page.url();
+  const fragmentUrl = `${heldUrl}#figure`;
+  // A same-document entry the application did not write, arriving by `popstate`.
+  expect(await followFragment(page, 'figure')).toBe(true);
+  await expect(page).toHaveURL(fragmentUrl);
+  const { node } = await imageControls(page);
+  const release = await holdUploads(page);
+  await replaceHeld(page, node, 'Figure');
+
+  // Back across the fragment's entry, to the Elsewhere entry, returns to the fragment's.
+  const afterBack = await traverseCounting(page, -2);
+  await expect.poll(afterBack).toEqual({ pops: 2, url: fragmentUrl });
+  await expect(selectedCanvas(page)).toHaveText('Pictures');
+
+  release();
+  await expect(node.getByTestId('image-notice')).toHaveCount(0);
+  await page.unrouteAll({ behavior: 'wait' });
+  await serveFigure(page);
+  await page.goBack();
+  await expect(page).toHaveURL(heldUrl);
+  const releaseAgain = await holdUploads(page);
+  await replaceHeld(page, node, 'Figure', { ...FIRST_FILE, name: 'again.png' });
+
+  // Forward onto the fragment's entry returns to the entry it left.
+  const afterForward = await traverseCounting(page, 1);
+  await expect.poll(afterForward).toEqual({ pops: 2, url: heldUrl });
+  releaseAgain();
+  await expect(node.getByTestId('image-notice')).toHaveCount(0);
+});
+
+/**
+ * Stand a revision conflict up under a Replace in flight: another writer
+ * commits first, the browser's rename of the Image Resource is parked until a
+ * Replace has started and its upload is held, and the parked save then meets
+ * the newer stored revision.
+ */
+async function conflictDuringReplace(page: Page, spaceId: UUID) {
+  const stored = await page.request.get(`/api/spaces/${spaceId}`);
+  expect(stored.ok()).toBe(true);
+  const loaded = decodeLoadedSpace(await stored.json());
+  const remoteCommit = await page.request.post('/api/spaces', {
+    data: {
+      changes: [
+        {
+          kind: 'update',
+          spaceId,
+          snapshot: {
+            ...loaded.snapshot,
+            document: { ...loaded.snapshot.document, title: 'Renamed elsewhere' },
+          },
+          expectedRevision: loaded.revision.toString(),
+        },
+      ],
+    },
+  });
+  expect(remoteCommit.ok()).toBe(true);
+
+  const saveHeld = Promise.withResolvers<undefined>();
+  let parked = false;
+  await page.route('**/api/spaces', async (route) => {
+    if (!parked && route.request().method() === 'POST') {
+      parked = true;
+      await saveHeld.promise;
+    }
+    await route.continue();
+  });
+  await renameFigure(page, 'Harbour');
+  const { node } = await imageControls(page);
+  const releaseUpload = await holdUploads(page);
+  await replaceHeld(page, node, 'Harbour');
+  saveHeld.resolve(undefined);
+  const conflict = page.getByRole('alertdialog', { name: 'Changes conflict' });
+  await expect(conflict).toBeVisible();
+  return {
+    // The modal dialog hides the canvas from the accessibility tree, so what
+    // stands behind it is read from the node itself.
+    behind: node,
+    conflict,
+    revision: loaded.revision + 1n,
+    releaseUpload,
+  };
+}
+
+test('keeping local work during a Replace in flight re-commits it, and the Replace lands', async ({
+  page,
+}) => {
+  await serveFigure(page);
+  const spaceId = await openPictures(page);
+  const { behind, conflict, revision, releaseUpload } = await conflictDuringReplace(page, spaceId);
+  const status = page.getByTestId('persistence-status');
+  const keepLocal = conflict.getByRole('button', { name: 'Keep local and retry' });
+  await expect(keepLocal).not.toHaveAttribute('aria-disabled', 'true');
+  await keepLocal.click();
+  await expect(conflict).toBeHidden();
+  await expect(status).toHaveText('Persisted');
+  await expect(status).toHaveAttribute('data-revision', (revision + 1n).toString());
+  // It re-committed the working Space, renamed, and the Replace still runs.
+  await expect(behind.getByTestId('image-notice')).toHaveText('Replacing image…');
+
+  releaseUpload();
+  await expect(behind.getByTestId('image-notice')).toHaveCount(0);
+  await expect(status).toHaveAttribute('data-revision', (revision + 2n).toString());
+  const { figure } = await storedFigure(page, spaceId);
+  expect(figure).toMatchObject({
+    title: 'Harbour',
+    kind: 'image',
+    content: { naturalSize: FIRST_PICTURE.size },
+  });
+  expect(figure?.kind === 'image' ? figure.content.url : undefined).not.toBe(FIGURE_URL);
+});
+
+test('Reload is withheld while a Replace is in flight and offered again once it answers', async ({
+  page,
+}) => {
+  await serveFigure(page);
+  const spaceId = await openPictures(page);
+  const { behind, conflict, revision, releaseUpload } = await conflictDuringReplace(page, spaceId);
+  const reload = conflict.getByRole('button', { name: 'Reload' });
+  await expect(reload).toHaveAttribute('aria-disabled', 'true');
+  await expect(reload).not.toHaveAttribute('disabled');
+  await reload.focus();
+  await expect(reload).toBeFocused();
+  await reload.click({ force: true });
+  await reload.press('Enter');
+  await expect(conflict).toBeVisible();
+  await expect(behind.getByTestId('image-notice')).toHaveText('Replacing image…');
+
+  releaseUpload();
+  await expect(behind.getByText('Replacing image…')).toHaveCount(0);
+  await expect(reload).not.toHaveAttribute('aria-disabled', 'true');
+  await reload.click();
+  await expect(conflict).toBeHidden();
+  await expect(page.getByTestId('space-title').filter({ visible: true })).toHaveText(
+    'Renamed elsewhere',
+  );
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute(
+    'data-revision',
+    revision.toString(),
+  );
+});
+
+test('a failed save is retried while a Replace is in flight, and the Replace lands', async ({
+  page,
+}) => {
+  await serveFigure(page);
+  const spaceId = await openPictures(page);
+  const status = page.getByTestId('persistence-status');
+  const before = BigInt((await status.getAttribute('data-revision')) ?? '');
+  let failing = true;
+  await page.route('**/api/spaces', async (route) => {
+    if (failing && route.request().method() === 'POST') return route.abort('failed');
+    return route.continue();
+  });
+  // Renaming the Image Resource is the Edit whose save fails.
+  await renameFigure(page, 'Harbour');
+  const failure = page.getByTestId('persistence-failure');
+  await expect(failure).toBeVisible();
+
+  const { node } = await imageControls(page);
+  const release = await holdUploads(page);
+  await replaceHeld(page, node, 'Harbour');
+
+  const retry = failure.getByRole('button', { name: 'Retry', exact: true });
+  await expect(retry).toBeEnabled();
+  failing = false;
+  await retry.click();
+  await expect(failure).toBeHidden();
+  await expect(status).toHaveText('Persisted');
+  await expect(status).toHaveAttribute('data-revision', (before + 1n).toString());
+  // Retry re-committed the working Space, and the Replace still holds the page.
+  await expect(node.getByTestId('image-notice')).toHaveText('Replacing image…');
+  await expectWithheld(dockNavigation(page));
+
+  release();
+  await expect(node.getByTestId('image-notice')).toHaveCount(0);
+  await expectAvailable(dockNavigation(page));
+  await expect(status).toHaveAttribute('data-revision', (before + 2n).toString());
+  expect((await storedFigure(page, spaceId)).figure).toMatchObject({
+    title: 'Harbour',
+    content: { naturalSize: FIRST_PICTURE.size },
+  });
+});
+
+/**
+ * A Replace run from the plugin on a Map an Open Space Resource draws is that
+ * drawn Space's Edit: Back and Forward are held while it runs, the picture is
+ * replaced in place, and the drawn Space, not the canvas's, records it.
+ */
+test('a Replace in an only-drawn Space holds Back and Forward and edits that Space', async ({
+  page,
+}) => {
+  await serveFigure(page);
+  const response = await page.request.get(`/api/spaces/${DEEP_DIVE_ID}`);
+  expect(response.ok()).toBe(true);
+  const loaded = decodeLoadedSpace(await response.json());
+  const targetMap = loaded.snapshot.document.maps?.[0];
+  if (targetMap === undefined) throw new Error('Deep dive must have a Map');
+  const committed = await page.request.post('/api/spaces', {
+    data: {
+      changes: [
+        {
+          kind: 'update',
+          spaceId: DEEP_DIVE_ID,
+          snapshot: {
+            ...loaded.snapshot,
+            document: {
+              ...loaded.snapshot.document,
+              maps: [
+                {
+                  ...targetMap,
+                  positions: {
+                    [HARBOUR_ID]: { x: 0, y: 0, open: false, size: SIZED_TO_PICTURE },
+                  },
+                  graphs: targetMap.graphs.map((graph) => ({ ...graph, edges: [] })),
+                },
+              ],
+            },
+          },
+          expectedRevision: loaded.revision.toString(),
+        },
+      ],
+    },
+  });
+  expect(committed.ok()).toBe(true);
+  const harbourBefore = loaded.snapshot.resources.find(({ id }) => id === HARBOUR_ID)?.document;
+  const drawingId = uuidSchema.parse('00000000-0000-4000-8000-000000000011');
+  const root = await seedPositionedMap(page, 'Embedded pictures', () => ({
+    [drawingId]: { x: 0, y: 0, open: true, size: { width: 900, height: 700 } },
+  }));
+  const rootBefore = root.snapshot.resources;
+  await page.goto(`/spaces/${encodeCompactUuid(root.snapshot.id)}`);
+  await expect(selectedCanvas(page)).toHaveText('Embedded pictures');
+  const drawing = page.locator(`.react-flow__node[data-id="${drawingId}"]`);
+  const picture = page.locator(`.react-flow__node[data-id="embedded:${drawingId}:${HARBOUR_ID}"]`);
+  await expect(picture).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Spaces. 1 open.' })).toBeVisible();
+  const edit = (await resourceControls(page, drawing)).getByRole('button', {
+    name: 'Edit Resource Deep dive',
+  });
+  await edit.focus();
+  await edit.press('Enter');
+  const heldUrl = page.url();
+  expect(await followFragment(page, 'embedded-image')).toBe(true);
+  const fragmentUrl = page.url();
+
+  const release = await holdUploads(page);
+  await replaceHeld(page, picture, 'Harbour');
+  const afterBack = await traverseCounting(page, -1);
+  await expect.poll(afterBack).toEqual({ pops: 2, url: fragmentUrl });
+  await expect(picture.getByTestId('image-notice')).toHaveText('Replacing image…');
+
+  release();
+  await expect(picture.getByTestId('image-notice')).toHaveCount(0);
+  await expect(picture.getByRole('img', { name: 'Harbour' })).toHaveAttribute(
+    'src',
+    /^\/assets\/[A-Za-z0-9_-]{43}$/u,
+  );
+  await expect
+    .poll(async () => {
+      const result = await page.request.get(`/api/spaces/${DEEP_DIVE_ID}`);
+      return decodeLoadedSpace(await result.json()).snapshot.resources.find(
+        ({ id }) => id === HARBOUR_ID,
+      )?.document;
+    })
+    .toMatchObject({ kind: 'image', content: { naturalSize: FIRST_PICTURE.size } });
+  const harbourAfter = decodeLoadedSpace(
+    await (await page.request.get(`/api/spaces/${DEEP_DIVE_ID}`)).json(),
+  ).snapshot.resources.find(({ id }) => id === HARBOUR_ID)?.document;
+  expect(harbourAfter).not.toEqual(harbourBefore);
+  // The canvas's own Space recorded nothing of it.
+  const rootAfter = decodeLoadedSpace(
+    await (await page.request.get(`/api/spaces/${root.snapshot.id}`)).json(),
+  ).snapshot.resources;
+  expect(rootAfter).toEqual(rootBefore);
+
+  await page.goBack();
+  await expect(page).toHaveURL(heldUrl);
+  await expect(page.getByRole('button', { name: 'Spaces. 1 open.' })).toBeVisible();
+});
 
 /** Presenting draws the picture fitted on the Stage, and offers no Replace there. */
 test('a presented Image Resource offers no Replace', async ({ page }) => {

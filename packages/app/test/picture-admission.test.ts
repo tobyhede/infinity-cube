@@ -31,6 +31,32 @@ describe('storing a picture as an asset', () => {
     expect(new Uint8Array(await (sent ?? new Blob()).arrayBuffer())).toEqual(png);
   });
 
+  it('answers the size its header gives, read as Replace reads it', async () => {
+    const { assets } = recordingAssets();
+    const sized = Uint8Array.from([
+      ...png.subarray(0, 8),
+      0,
+      0,
+      0,
+      13,
+      ...ascii('IHDR'),
+      0,
+      0,
+      1,
+      144,
+      0,
+      0,
+      1,
+      44,
+    ]);
+
+    await expect(storePicture(assets, new Blob([sized]))).resolves.toEqual({
+      kind: 'stored',
+      url: STORED,
+      naturalSize: { width: 400, height: 300 },
+    });
+  });
+
   it('refuses what is not a picture without storing it', async () => {
     const { assets, store } = recordingAssets();
 

@@ -40,6 +40,7 @@ describe('the Ur plugin’s view', () => {
       map: [],
       stored: [],
       exclusive: 0,
+      picked: 0,
     });
   });
 

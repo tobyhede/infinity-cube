@@ -47,9 +47,45 @@ const isStartOfFrame = (marker: number): boolean =>
 const standsAlone = (marker: number): boolean =>
   marker === 0x01 || (marker >= 0xd0 && marker <= 0xd9);
 
-/** JPEG: walk the segments to the first start of frame, which gives height then width. */
+const littleEndian32 = (bytes: Uint8Array, at: number): number =>
+  littleEndian16(bytes, at) + littleEndian16(bytes, at + 2) * 0x10000;
+
+/** The Exif orientation tag, which says how a JPEG's frame is turned to be shown. */
+const ORIENTATION_TAG = 0x0112;
+
+/**
+ * The orientation an APP1 Exif segment's first IFD records, or `undefined`
+ * where it records none. `at` is where the segment's body begins.
+ */
+const exifOrientation = (bytes: Uint8Array, at: number, end: number): number | undefined => {
+  if (ascii(bytes, at, 6) !== 'Exif\0\0') return undefined;
+  const tiff = at + 6;
+  const order = ascii(bytes, tiff, 2);
+  if (order !== 'II' && order !== 'MM') return undefined;
+  const u16 = order === 'II' ? littleEndian16 : bigEndian16;
+  const u32 = order === 'II' ? littleEndian32 : bigEndian32;
+  const ifd = tiff + u32(bytes, tiff + 4);
+  const entries = u16(bytes, ifd);
+  for (let entry = 0; entry < entries; entry += 1) {
+    const field = ifd + 2 + entry * 12;
+    if (field + 12 > end) return undefined;
+    if (u16(bytes, field) === ORIENTATION_TAG) return u16(bytes, field + 8);
+  }
+  return undefined;
+};
+
+/** Orientations 5 to 8 turn the frame a quarter, so it is shown with its sides swapped. */
+const turnsAQuarter = (orientation: number | undefined): boolean =>
+  orientation !== undefined && orientation >= 5 && orientation <= 8;
+
+/**
+ * JPEG: walk the segments to the first start of frame, which gives height then
+ * width, turned as an Exif orientation before it says, so the size is the one
+ * a browser draws (`image-orientation: from-image`, its default).
+ */
 const jpegSize = (bytes: Uint8Array): PictureSize | undefined => {
   let at = 2;
+  let orientation: number | undefined;
   while (at + 3 < bytes.byteLength) {
     if (bytes[at] !== 0xff) return undefined;
     const marker = bytes[at + 1] ?? 0;
@@ -58,9 +94,15 @@ const jpegSize = (bytes: Uint8Array): PictureSize | undefined => {
     } else if (standsAlone(marker)) {
       at += 2;
     } else if (isStartOfFrame(marker)) {
-      return sized(bigEndian16(bytes, at + 7), bigEndian16(bytes, at + 5));
+      const width = bigEndian16(bytes, at + 7);
+      const height = bigEndian16(bytes, at + 5);
+      return turnsAQuarter(orientation) ? sized(height, width) : sized(width, height);
     } else {
-      at += 2 + bigEndian16(bytes, at + 2);
+      const length = bigEndian16(bytes, at + 2);
+      if (marker === 0xe1 && orientation === undefined) {
+        orientation = exifOrientation(bytes, at + 4, at + 2 + length);
+      }
+      at += 2 + length;
     }
   }
   return undefined;

@@ -104,6 +104,8 @@ const KIND_MODULE_NAMES = new Set(['core', 'ui', 'app'].flatMap(kindModuleFiles)
 
 /** Whether a specifier reaches a kind module by relative path. */
 const reachesKindModule = (specifier: string): boolean => {
+  // A plugin package is a kind module (ADR 0142).
+  if (specifier.startsWith('@project/plugin-')) return true;
   const name = /(?:^|\/)kinds\/([^/]+)$/u.exec(specifier)?.[1];
   return name !== undefined && KIND_MODULE_NAMES.has(name);
 };
@@ -198,6 +200,15 @@ describe('a kind module is imported only under kinds/ or by a feature of its kin
           refused: false,
         })),
         { line: "import './kinds/space-canvas.css';", refused: false },
+      ]),
+    ).toEqual([]);
+  });
+
+  it('refuses a plugin package, which is a kind module (ADR 0142)', async () => {
+    expect(
+      await misjudged([
+        { line: "import { admitImage } from '@project/plugin-image/domain';", refused: true },
+        { line: "import { urPluginView } from '@project/plugin-ur/view';", refused: true },
       ]),
     ).toEqual([]);
   });

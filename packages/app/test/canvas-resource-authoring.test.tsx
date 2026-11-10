@@ -17,6 +17,7 @@ import { PluginAssetsProvider } from '@project/ui';
 import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
 import { canvasAuthoring } from './canvas-authoring';
+import { holdExclusive } from './held-exclusive';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -138,7 +139,7 @@ const mountAuthoring = (
 ) => {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-  const { authoring, adapter, commandOutcomes, continuation } = composeApp({
+  const { authoring, adapter, commandOutcomes, continuation, pluginGate } = composeApp({
     images: unusedImageSources,
     spaceSession,
   });
@@ -181,7 +182,7 @@ const mountAuthoring = (
       initialProps,
     },
   );
-  return { ...hook, spaceSession, authoring, adapter, commandOutcomes };
+  return { ...hook, spaceSession, authoring, adapter, commandOutcomes, pluginGate };
 };
 
 /** The content edit a Resource's kind offers, where its kind has one. */
@@ -228,6 +229,36 @@ describe('canvas Resource authoring', () => {
       resourceId: RESOURCE_ID,
     });
     expect(result.current.nodes[0]?.data.display.shown).toBe('editing');
+  });
+
+  it('refuses a Markdown body save while a plugin’s exclusive work runs, keeping the draft', async () => {
+    const { result, rerender, spaceSession, pluginGate } = mountAuthoring();
+    act(() => {
+      onlyNode(result.current.nodes).data.onOpenChange?.(true);
+      beginEditOf(onlyNode(result.current.nodes))?.();
+    });
+    rerender({
+      open: true,
+      enabled: true,
+      presenting: false,
+      nameOnCreation: null,
+      resourceId: RESOURCE_ID,
+    });
+    const display = onlyNode(result.current.nodes).data.display;
+    const editor = display.shown === 'editing' ? display.edit.editor : undefined;
+    expect(editor).toBeDefined();
+    const before = spaceSession.getState().working;
+
+    // A Replace on an Image Resource elsewhere holds the gate every Edit asks.
+    const held = holdExclusive(pluginGate, 'an Image Resource');
+    expect(held).toBeDefined();
+    act(() => expect(editor?.onComplete('Written during a Replace')).toBe('retained'));
+    expect(spaceSession.getState().working).toBe(before);
+
+    held?.release();
+    await held?.running;
+    act(() => expect(editor?.onComplete('Written during a Replace')).toBe('completed'));
+    expect(spaceSession.getState().working).not.toBe(before);
   });
 
   it('authors Open for a Reference Resource through the same Resource operation', () => {

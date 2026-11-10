@@ -1,14 +1,14 @@
 import { httpAssetClient, HttpSpaceBackend, productAddress } from '@project/http';
 import { loadSpaceSnapshot, type Space } from '@project/graph';
-import { newUuid, type AssetRef, type ImageNaturalSize, type UUID } from '@project/core';
-import type { AssetClient, AssetRefusal, SpaceBackend } from '@project/persistence';
+import { newUuid, type AssetRef, type UUID } from '@project/core';
+import type { AssetClient, SpaceBackend } from '@project/persistence';
 import type { Assets } from '@project/resource-api/view';
 import { displayImageAsAuthored, type ImageDisplay } from '@project/ui';
 import type { HistoryApi } from './browser-location';
 import { createBrowserHistory } from './browser-history';
 import { describeAssetRefusal } from './authoring-refusal';
 import { pickFilesInBrowser, pickImagesInBrowser } from './browser-file-picker';
-import type { ImageSources } from './image-creation';
+import type { ImageSize, ImageSources } from './image-creation';
 import { storePicture } from './picture-admission';
 import type { Fullscreen } from './presenting-fullscreen';
 import type { PresentationLinks } from './presentation-link';
@@ -39,10 +39,10 @@ const MEASURE_TIMEOUT_MS = 10_000;
  * place the application builds an `Image`. A picture that errors, never
  * answers, or has no intrinsic size answers `undefined`.
  */
-const measureInBrowser = (url: string): Promise<ImageNaturalSize | undefined> =>
+const measureInBrowser = (url: string): Promise<ImageSize | undefined> =>
   new Promise((resolve) => {
     const picture = new Image();
-    const settle = (size: ImageNaturalSize | undefined): void => {
+    const settle = (size: ImageSize | undefined): void => {
       clearTimeout(timer);
       picture.onload = null;
       picture.onerror = null;

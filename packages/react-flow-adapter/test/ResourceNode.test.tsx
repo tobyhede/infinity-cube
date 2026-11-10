@@ -513,12 +513,43 @@ describe('ResourceNode canvas Resource state adapter', () => {
 
   it('offers an Image Resource Replace on the rail where the host offers its content, Claim and picker', () => {
     const url = 'https://example.com/harbour.png';
-    const pick = vi.fn(() => Promise.resolve([]));
+    const pressed: string[] = [];
+    const pick = vi.fn(() => {
+      pressed.push('pick');
+      return Promise.resolve([]);
+    });
+    const held = { release: () => true, exclusively: vi.fn(), unmount: () => undefined };
+    const claim = vi.fn(() => {
+      pressed.push('claim');
+      return held;
+    });
     render(
       <ResourceNode
         {...props({
           kind: 'image',
           url,
+          selected: true,
+          imageOperations: {
+            commitContent: () => Promise.resolve('completed'),
+            claim,
+            pick,
+          },
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Replace image of Resource A' }));
+    // The Claim is taken in the press, then the picker opens in it.
+    expect(pressed).toEqual(['claim', 'pick']);
+  });
+
+  it('opens no picker where the host refuses the Claim', () => {
+    const pick = vi.fn(() => Promise.resolve([]));
+    render(
+      <ResourceNode
+        {...props({
+          kind: 'image',
+          url: 'https://example.com/harbour.png',
           selected: true,
           imageOperations: {
             commitContent: () => Promise.resolve('completed'),
@@ -530,7 +561,7 @@ describe('ResourceNode canvas Resource state adapter', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Replace image of Resource A' }));
-    expect(pick).toHaveBeenCalledTimes(1);
+    expect(pick).not.toHaveBeenCalled();
   });
 
   it('renders a Space Resource through explicit non-Markdown kind operations', () => {

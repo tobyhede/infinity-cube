@@ -135,6 +135,33 @@ describe('creating Image Resources from files', () => {
     ]);
   });
 
+  it('records the size storing read from the bytes, and measures only a picture it could not size', async () => {
+    const { session, authoring } = open(FIRST, SECOND);
+    const images = sources(
+      {
+        'diagram.png': { kind: 'stored', url: STORED_A, naturalSize: { width: 300, height: 400 } },
+        'photo.png': { kind: 'stored', url: STORED_B },
+      },
+      { [STORED_A]: { width: 640, height: 480 }, [STORED_B]: { width: 20, height: 10 } },
+    );
+
+    await createImageResources(
+      { images, authoring },
+      { kind: 'files', files: [file('diagram.png'), file('photo.png')] },
+      { mapId: MAP_ID, drawing: 'canvas', anchor: AT, placement: 'exact' },
+    );
+
+    expect(
+      session
+        .getState()
+        .working.resources.slice(1)
+        .map(({ document }) => document.content),
+    ).toEqual([
+      { url: STORED_A, naturalSize: { width: 300, height: 400 } },
+      { url: STORED_B, naturalSize: { width: 20, height: 10 } },
+    ]);
+  });
+
   it('creates nothing when any file is refused, and names the file and the code', async () => {
     const { session, authoring } = open(FIRST);
     const before = session.getState().working;

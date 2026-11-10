@@ -56,10 +56,14 @@ export interface Kept<T> {
 /**
  * A reference to a stored asset: `/assets/` then the SHA-256 of its bytes as 43
  * characters of unpadded base64url (ADR 0106), always a whole string value.
+ * Only the canonical spelling: the last character carries four bits of the
+ * digest and two zero bits, so it is one of the sixteen whose low two bits are
+ * clear, as the host's asset hash requires (`packages/core/test/assets.test.ts`
+ * holds the two to one rule).
  */
 export type AssetRef = `/assets/${string}`;
 
-const ASSET_REF = /^\/assets\/[A-Za-z0-9_-]{43}$/u;
+const ASSET_REF = /^\/assets\/[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$/u;
 
 /** Whether a string is an asset reference. */
 export const isAssetRef = (value: string): value is AssetRef => ASSET_REF.test(value);

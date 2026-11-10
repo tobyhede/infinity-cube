@@ -97,6 +97,24 @@ describe('the Image plugin’s view', () => {
     expect(screen.queryByRole('textbox')).toBeNull();
   });
 
+  it('keeps a refused rename open with its draft, and says why', async () => {
+    const rendered = renderPlugin(imagePluginView.View, {
+      content: FIGURE,
+      map: {},
+      title: 'Figure',
+      grants: { title: true },
+      answer: { refused: 'A Resource needs a title.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Rename Resource Figure' }));
+    const field = screen.getByRole('textbox', { name: 'Resource title' });
+    fireEvent.change(field, { target: { value: '   ' } });
+    fireEvent.keyDown(field, { key: 'Enter' });
+    expect(rendered.commits.title).toEqual(['   ']);
+    expect(await screen.findByText('A Resource needs a title.')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Resource title' })).toHaveValue('   ');
+    expect(screen.getByRole('img', { name: 'Figure' })).toBeInTheDocument();
+  });
+
   it('abandons a rename on Escape, committing nothing', () => {
     const rendered = renderPlugin(imagePluginView.View, {
       content: FIGURE,
@@ -191,7 +209,7 @@ describe('the Image plugin’s view', () => {
     expect(rendered.commits.exclusive).toBe(0);
   });
 
-  it('starts nothing when the Claim is refused', async () => {
+  it('opens no picker and starts nothing when the Claim is refused', async () => {
     const rendered = renderPlugin(imagePluginView.View, {
       content: FIGURE,
       map: {},
@@ -202,6 +220,8 @@ describe('the Image plugin’s view', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Replace image of Resource Figure' }));
     expect(await screen.findByTestId('image-notice')).not.toBeEmptyDOMElement();
+    // The Claim is taken in the press, so a refused one opens no picker.
+    expect(rendered.commits.picked).toBe(0);
     expect(rendered.commits.exclusive).toBe(0);
     expect(rendered.commits.stored).toEqual([]);
   });

@@ -180,6 +180,21 @@ export const interactiveDeviations = [
       '`packages/plugin-image/test/image-plugin.test.tsx` (a dropped picture replaces it; the drop does not reach the canvas; more than one file is refused) and `packages/app/e2e/image-resource.spec.ts` (a picture dropped on an Image Resource replaces it, creating nothing).',
   },
   {
+    subject: 'packages/plugin-image/src/view.tsx — renaming from the rail',
+    existingInfinityCubeComponentConsidered:
+      "The host's Title editor, which the host draws over a plugin that draws no Title while it is renamed from outside it (`drawsTitle: false`); the Resource API gives a plugin no way to open it from its own rail command, and no `@project/ui` component is reachable from a plugin (ADR 0142).",
+    shadcnOrBaseUiConsidered:
+      "shadcn's Textarea is a styled `<textarea>`, which the plugin cannot import; Base UI has no inline editor.",
+    productRequirement:
+      "Issue 04 of `.scratch/resource-plugins/`: Rename is on the Image plugin's rail, and the Title is the picture's text alternative, which no drawn Title shows.",
+    whyCompositionIsInsufficient:
+      'The plugin draws inside its own rect with `@project/resource-api` alone, so composition offers it no text field.',
+    customBehaviour:
+      "A `<textarea>` inside the plugin's Own region takes the caret; Enter or leaving it commits the Title, Shift-Enter breaks a line, Escape abandons it, and a composition in progress is left alone. A refused Title keeps the editor open with the draft and shows the refusal's words (ADR 0057); only a settled one closes it.",
+    tests:
+      '`packages/plugin-image/test/image-plugin.test.tsx` (renames from the rail; Escape abandons; a refused rename keeps its draft) and `packages/app/e2e/image-resource.spec.ts`.',
+  },
+  {
     subject: 'packages/app/src/browser-file-picker.ts — the browser file picker',
     existingInfinityCubeComponentConsidered:
       '`@project/ui`\'s `Input` with `type="file"`, which `ImageFilePicker` was. A component is mounted by a surface, so Create Image Resource and Replace image each mounted one and the app had two pickers.',

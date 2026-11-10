@@ -7,7 +7,13 @@
  */
 
 import { isAssetRef } from '@project/core';
-import { admitImage, MAX_IMAGE_BYTES, type ImageRefusal } from '@project/plugin-image/domain';
+import {
+  admitImage,
+  MAX_IMAGE_BYTES,
+  pictureSize,
+  type ImageRefusal,
+  type PictureSize,
+} from '@project/plugin-image/domain';
 import { ASSET_TOO_LARGE, type AssetClient } from '@project/persistence';
 
 export {
@@ -22,14 +28,18 @@ export {
   type ImageRefusal,
 } from '@project/plugin-image/domain';
 
-/** What storing a picture answered: the asset URL it is stored at, or why not. */
+/**
+ * What storing a picture answered: the asset URL it is stored at, and the size
+ * its header gives where it gives one, or why not.
+ */
 export type ImageStoring =
-  | { readonly kind: 'stored'; readonly url: string }
+  | { readonly kind: 'stored'; readonly url: string; readonly naturalSize?: PictureSize }
   | { readonly kind: 'refused'; readonly code: ImageRefusal };
 
 /**
  * Store a picture through the asset store: its bytes are admitted as a picture
- * first, and stored under the media type they are, whatever the file declared.
+ * first, and stored under the media type they are, whatever the file declared,
+ * and sized from its header by the plugin's `pictureSize`.
  * The host's size refusal is the picture's, since the host's cap is the one
  * that stands. Throws when the host cannot answer, or answers a refusal a
  * picture that passed this rule cannot be given.
@@ -44,5 +54,10 @@ export const storePicture = async (assets: AssetClient, image: Blob): Promise<Im
     if (stored.refused === ASSET_TOO_LARGE) return { kind: 'refused', code: 'image-too-large' };
     throw new Error(`The asset store refused a picture: ${stored.refused}`);
   }
-  return { kind: 'stored', url: stored };
+  // Sized from its bytes, as Replace sizes it, so a picture records one size
+  // whichever way it arrived.
+  const naturalSize = pictureSize(bytes, admission.mediaType);
+  return naturalSize === undefined
+    ? { kind: 'stored', url: stored }
+    : { kind: 'stored', url: stored, naturalSize };
 };

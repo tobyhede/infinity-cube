@@ -638,7 +638,7 @@ OpenReference.meta = { iframed: true };
 /** The stored picture the Image Resource story draws, which its asset store resolves to the tracked file. */
 const HARBOUR_REF = '/assets/fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs';
 /** A stored picture the story's asset store resolves to a URL that does not load. */
-const MISSING_REF = '/assets/MISSINGpictureMISSINGpictureMISSINGpicture1';
+const MISSING_REF = '/assets/MISSINGpictureMISSINGpictureMISSINGpicture0';
 
 /** The catalogue's asset store: Harbour from the tracked file, and nothing else. */
 const imageStoryAssets = {

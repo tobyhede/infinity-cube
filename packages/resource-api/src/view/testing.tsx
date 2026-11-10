@@ -44,6 +44,8 @@ export interface Commits<C, M> {
   readonly stored: Blob[];
   /** How many times exclusive work ran. */
   readonly exclusive: number;
+  /** How many times the picker was opened. */
+  readonly picked: number;
 }
 
 export interface RenderPluginOptions<C, M> {
@@ -82,9 +84,9 @@ function TestEmbed() {
 const WITHDRAWN = { refused: 'Exclusive work is running.' } as const;
 const ENDED = { refused: 'The exclusive work has ended.' } as const;
 
-/** A stored Blob's reference: its position, padded to an asset reference's 43 characters. */
+/** A stored Blob's reference: its position, padded to a canonical asset reference's 43 characters. */
 export const testAssetRef = (position: number): AssetRef =>
-  `/assets/${String(position).padStart(43, 'A')}`;
+  `/assets/${String(position).padStart(42, 'A')}A`;
 
 /** Whether exclusive work runs on the test page, and which run it is. */
 function createTestGate() {
@@ -184,6 +186,7 @@ export function renderPlugin<C, M>(
   options: RenderPluginOptions<C, M>,
 ): RenderedPlugin<C, M> {
   let exclusiveRuns = 0;
+  let pickerOpenings = 0;
   const commits: Commits<C, M> = {
     title: [],
     content: [],
@@ -191,6 +194,9 @@ export function renderPlugin<C, M>(
     stored: [],
     get exclusive() {
       return exclusiveRuns;
+    },
+    get picked() {
+      return pickerOpenings;
     },
   };
   const grants = options.grants ?? {};
@@ -202,7 +208,10 @@ export function renderPlugin<C, M>(
     commits.stored.push(bytes);
     return Promise.resolve(testAssetRef(commits.stored.length));
   };
-  const pick = () => Promise.resolve(gate.running() ? [] : files);
+  const pick = () => {
+    pickerOpenings += 1;
+    return Promise.resolve(gate.running() ? [] : files);
+  };
   /** A commit answering refused when `live` says it is not, as the host's withdrawn and ended commits do. */
   const guarded =
     <T, A>(commit: (next: T) => Promise<A>, live: () => boolean, refusal: { refused: string }) =>

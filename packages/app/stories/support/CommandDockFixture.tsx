@@ -234,7 +234,7 @@ export async function openDockStory(scenario: DockScenario) {
   // Exclusive work on the Rendering Space's Image Resource, as its Replace
   // runs, held for as long as the story is mounted (ADR 0126, ADR 0142).
   if (scenario === 'replacing') {
-    const held = spaces.pluginGate?.claim([HELD_IMAGE], () => ({}));
+    const held = spaces.pluginGate.claim([HELD_IMAGE], () => ({}));
     void held?.exclusively(() => new Promise<never>(() => undefined));
   }
   if (scenario === 'save-blocked') {

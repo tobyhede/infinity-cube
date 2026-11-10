@@ -35,18 +35,20 @@
  */
 export interface AuthoringInProgress {
   /**
-   * Some composed Space, listed or only drawn, is replacing an image.
+   * Some composed Space, listed or only drawn, is running a plugin's
+   * exclusive work, as an Image Resource's Replace does (ADR 0126, ADR 0142).
    *
-   * A replacement is the application's exclusive operation until its Edit is
-   * applied (`.scratch/image-resource/issues/05-an-author-replaces-the-image.md`,
-   * "Other actions while a replacement runs"; ADR 0112), wherever it began:
-   * every answer is withdrawn except `editResourceBody`, which is what keeps
-   * the replacement's own target mounted to show its answer, and
+   * Exclusive work is the application's one operation until it settles,
+   * wherever it began: every answer is withdrawn except `editResourceBody`,
+   * which keeps an open Markdown body editor mounted with its draft — its Save
+   * is refused at `complete` by the plugin gate every Space's Authoring asks
+   * (`packages/app/test/canvas-resource-authoring.test.tsx`, `refuses a
+   * Markdown body save while a plugin’s exclusive work runs`) — and
    * `embeddedMapEdit`, a control left drawn over an embedding that is itself
-   * withdrawn. Several Edits
-   * move the address as well as authoring — New Map and New Graph continue in
-   * what they create, and deleting the selected Map reselects — so authoring
-   * and navigation are withdrawn together rather than one at a time.
+   * withdrawn. Several Edits move the address as well as authoring — New Map
+   * and New Graph continue in what they create, and deleting the selected Map
+   * reselects — so authoring and navigation are withdrawn together rather than
+   * one at a time.
    *
    * The open set answers it for every composed Space, as
    * `OpenSpacesState.replacingImage`, and refuses navigation on the same answer

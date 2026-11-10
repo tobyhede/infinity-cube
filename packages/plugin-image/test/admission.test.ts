@@ -124,6 +124,37 @@ describe('reading a picture’s size from its header', () => {
     });
   });
 
+  it('turns a JPEG’s frame as its Exif orientation says, as a browser draws it', () => {
+    const frame = joined(bytes(0xff, 0xc0, 0x00, 0x11, 0x08), bytes(0x01, 0x2c), bytes(0x01, 0x90));
+    const u16 = (value: number, little: boolean) =>
+      little ? u16le(value) : bytes(value >>> 8, value & 255);
+    const u32of = (value: number, little: boolean) =>
+      little ? joined(u16le(value & 0xffff), u16le(value >>> 16)) : u32(value);
+    const exif = (orientation: number, little: boolean) => {
+      const tiff = joined(
+        ascii(little ? 'II' : 'MM'),
+        u16(0x2a, little),
+        u32of(8, little),
+        u16(1, little),
+        u16(0x0112, little),
+        u16(3, little),
+        u32of(1, little),
+        u16(orientation, little),
+        bytes(0, 0),
+        u32of(0, little),
+      );
+      const body = joined(ascii('Exif'), bytes(0, 0), tiff);
+      return joined(bytes(0xff, 0xe1), u16(body.byteLength + 2, false), body);
+    };
+    const jpegWith = (orientation: number, little: boolean) =>
+      pictureSize(joined(bytes(0xff, 0xd8), exif(orientation, little), frame), 'image/jpeg');
+    expect(jpegWith(6, false)).toEqual({ width: 300, height: 400 });
+    expect(jpegWith(8, true)).toEqual({ width: 300, height: 400 });
+    expect(jpegWith(5, true)).toEqual({ width: 300, height: 400 });
+    expect(jpegWith(3, false)).toEqual({ width: 400, height: 300 });
+    expect(jpegWith(1, true)).toEqual({ width: 400, height: 300 });
+  });
+
   it('reads each WebP form', () => {
     const riff = (chunk: string, body: Uint8Array) =>
       joined(ascii('RIFF'), bytes(0, 0, 0, 0), ascii('WEBP'), ascii(chunk), body);

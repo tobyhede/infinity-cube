@@ -296,7 +296,9 @@ const KIND_MODULE_IMPORTS = {
     {
       regex: `(?:^|/)kinds/(?!(?:${[...KIND_NEUTRAL_MODULES].join('|')})$)[^/.]+$`,
       message: KIND_MODULE_MESSAGE,
-    },
+    }, // A plugin package is a kind module (ADR 0142): only kinds/ and a listed
+    // one-kind feature read it.
+    { regex: '^@project/plugin-', message: KIND_MODULE_MESSAGE },
   ],
 };
 
@@ -332,6 +334,8 @@ const KIND_FEATURE_FILES = [
   'packages/app/src/resource-rail-actions.tsx',
   // Creating an Image or a Reference Resource.
   'packages/app/src/space-authoring.ts',
+  // Image Resource creation's picture admission, the Image plugin's rule, until creation moves onto the Resource API.
+  'packages/app/src/picture-admission.ts',
 ];
 
 export default tseslint.config(

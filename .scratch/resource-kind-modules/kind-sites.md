@@ -37,6 +37,7 @@ Categories: **one-kind** = a feature that exists for that kind alone; **registry
 | packages/app/src/space-authoring.ts:113 | `Extract<ResourceDocument, { kind: ImageKindId }>` | image | E | space-authoring.ts |
 | packages/app/src/space-authoring.ts | refusal `IMAGE_URL_UNSUPPORTED`, now declared there | image | E (image-URL rule) | space-authoring.ts |
 | packages/app/src/space-authoring.ts | `isAcceptedImageUrl` on Create | image | E (image-URL rule) | space-authoring.ts |
+| packages/app/src/picture-admission.ts | `admitImage` and its refusals from `@project/plugin-image/domain`: creation admits a picture by the plugin's rule | image | one-kind (Image creation, until issue 08) | picture-admission.ts |
 
 ## Sites now off the list
 

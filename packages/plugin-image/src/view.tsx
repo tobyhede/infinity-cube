@@ -1,6 +1,7 @@
 import {
   useCallback,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type DragEvent,
@@ -33,8 +34,8 @@ import {
  * the size it is given and never cropped, and nothing else. It draws no Title;
  * the Title is the picture's text alternative and is renamed from the rail.
  *
- * Replace is a rail command and a drop on the picture. The picker opens in the
- * press, then the plugin takes a Claim and runs the replacement exclusively, so
+ * Replace is a rail command and a drop on the picture. The plugin takes a Claim
+ * in the press, opens the picker in it, then runs the replacement exclusively, so
  * every other commit on every surface is withdrawn until it settles (ADR 0126):
  * the bytes are admitted as a picture, stored, and named in one content commit.
  */
@@ -200,17 +201,20 @@ function ImageView({ surface }: PluginViewProps<ImageContent, ImageMapContent>) 
 
   const replaceable = commitContent !== undefined && claimOf !== undefined;
 
+  /** Take the Claim a replacement runs under, or say why none was given. */
+  const claimForReplace = useCallback((): OwnClaim<ImageContent, ImageMapContent> | undefined => {
+    const claim = claimOf?.();
+    if (claim === undefined) setNotice(BUSY);
+    return claim;
+  }, [claimOf]);
+
+  /** Replace the picture with the one file given, under `claim`, which is released once it settles. */
   const replaceWith = useCallback(
-    (files: readonly File[]) => {
+    (claim: OwnClaim<ImageContent, ImageMapContent>, files: readonly File[]) => {
       const [file, ...rest] = files;
-      if (file === undefined) return;
-      if (rest.length > 0) {
-        setNotice(ONE_AT_A_TIME);
-        return;
-      }
-      const claim: OwnClaim<ImageContent, ImageMapContent> | undefined = claimOf?.();
-      if (claim === undefined) {
-        setNotice(BUSY);
+      if (file === undefined || rest.length > 0) {
+        claim.release();
+        if (file !== undefined) setNotice(ONE_AT_A_TIME);
         return;
       }
       setNotice(null);
@@ -224,7 +228,7 @@ function ImageView({ surface }: PluginViewProps<ImageContent, ImageMapContent>) 
           setWorking(false);
         });
     },
-    [claimOf],
+    [],
   );
 
   const commands = useMemo((): readonly RailCommand[] => {
@@ -249,17 +253,37 @@ function ImageView({ surface }: PluginViewProps<ImageContent, ImageMapContent>) 
         label: `Replace image of Resource ${name}`,
         icon: <ImageUp size={14} aria-hidden />,
         disabled: working,
-        // The picker opens in the press, before anything is awaited.
-        run: () => void pick(ACCEPT).then(replaceWith),
+        // The Claim is taken in the press, then the picker opens in it too,
+        // before anything is awaited: a browser opens one only in a press.
+        run: () => {
+          const claim = claimForReplace();
+          if (claim === undefined) return;
+          void pick(ACCEPT).then(
+            (files) => replaceWith(claim, files),
+            () => claim.release(),
+          );
+        },
       });
     }
     return offered;
-  }, [commitTitle, name, working, replaceable, pick, replaceWith]);
+  }, [commitTitle, name, working, replaceable, pick, claimForReplace, replaceWith]);
 
+  // A refused Title keeps the editor open with the draft and says why (ADR
+  // 0057); only a settled one closes it. One commit is in flight at a time.
+  const renameInFlight = useRef(false);
   const rename = (next: string) => {
-    setRenaming(false);
-    if (commitTitle === undefined || next === title) return;
-    void commitTitle(next).then((answer) => setNotice(refusalOf(answer)));
+    if (commitTitle === undefined || next === title) {
+      setRenaming(false);
+      return;
+    }
+    if (renameInFlight.current) return;
+    renameInFlight.current = true;
+    void commitTitle(next).then((answer) => {
+      renameInFlight.current = false;
+      const refusal = refusalOf(answer);
+      setNotice(refusal);
+      if (refusal === null) setRenaming(false);
+    });
   };
 
   const drop = replaceable
@@ -275,7 +299,14 @@ function ImageView({ surface }: PluginViewProps<ImageContent, ImageMapContent>) 
           if (!carriesFiles(event)) return;
           event.preventDefault();
           event.stopPropagation();
-          if (!working) replaceWith([...event.dataTransfer.files]);
+          if (working) return;
+          const files = [...event.dataTransfer.files];
+          if (files.length > 1) {
+            setNotice(ONE_AT_A_TIME);
+            return;
+          }
+          const claim = claimForReplace();
+          if (claim !== undefined) replaceWith(claim, files);
         },
       }
     : {};

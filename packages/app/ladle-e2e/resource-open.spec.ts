@@ -804,7 +804,7 @@ test(
       .getByRole('article', { name: 'Missing' });
     await expect(resource.getByText('Image did not load')).toBeVisible();
     await expect(
-      resource.getByText('/assets/MISSINGpictureMISSINGpictureMISSINGpicture1'),
+      resource.getByText('/assets/MISSINGpictureMISSINGpictureMISSINGpicture0'),
     ).toBeVisible();
     await expect(resource.getByRole('img', { name: 'Missing' })).toHaveCount(0);
   },
