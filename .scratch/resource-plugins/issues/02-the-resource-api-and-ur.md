@@ -21,3 +21,48 @@ Ur moves first because it is the smallest. Its package holds both halves, it dec
 - A Claim held by one chain answers `undefined` to another, an inner release returns to the outer, and an outer Claim is not released while an inner one runs.
 - `exclusively` is one at a time and answers `busy` before any work starts; while it runs, every retained commit, the surrounding Claims' included, answers refused, and only the work's own commits land.
 - `CI passed` is green, including the PostgreSQL and SQLite jobs.
+
+## Decisions
+
+Made while delivering this ticket (PR #463).
+
+- **Where the plugin list lives.** It is `packages/core/src/kinds/plugins.ts` (`PLUGINS = pluginList([urPlugin])`), so core, graph and intake read plugins with no React. Each plugin's view half is keyed to that list in `packages/ui/src/kinds/plugin-views.tsx`, with `satisfies Record<PluginKind, PluginEntry>`, so a plugin the list names and ui omits fails to compile.
+- **How `apiVersion` is checked.** `pluginList` takes only elements whose `apiVersion` is the API's literal, which is the build failure. It also refuses on load (`PluginListError`), for a plugin that slips past the types. Both are held by `packages/resource-api/test/domain.test.ts`.
+- **Core lost `rootDir`.** Core now imports `@project/resource-api` and `@project/plugin-ur`, whose files resolve outside core's own directory.
+- **`definePluginView` takes the domain half.** The view knows its own kind and names without restating them.
+- **Outlines are a fixed vocabulary.** `OUTLINES` is rectangle, pill, ellipse and diamond. The host strokes only those, and a plugin declares one. It cannot draw an arbitrary path.
+- **Map content type and storage.**
+  - Map content is held as `JsonValue` and compared whole, key order aside (`sameJsonValue`).
+  - `JsonArray` and `JsonObject` are *mutable* interfaces. Only that form is its own image under Hono's `JSONParsed`; readonly or alias forms made `space-http-app-types.test.ts` recurse too deeply.
+  - PostgreSQL `jsonb` may reorder the keys of multi-key Map content on Export. Ur's Map content has one key, so nothing changes yet.
+- **Unchanged is computed against the resolved value.** An Edit that writes the plugin's default to an entry that stores none answers `unchanged`.
+- **Refusal codes.**
+  - `changed-map-content` refuses `map-content-not-kept` (no plugin draws the kind) and `map-content-invalid` (the plugin's schema refuses the value). `shape-not-taken` is gone.
+  - Intake raises `map-content-invalid` too.
+  - A `queued` Edit discarded by the drain settles `space-replaced` or `edit-abandoned`, through the optional `settle` callback `complete` now takes.
+- **Withdrawn surfaces.** The host refuses a commit from a withdrawn surface in three places:
+  - **An unmounted surface:** `PluginSurface` refuses with "This Resource is no longer drawn here."
+  - **A moved epoch:** a commit built before the `replacementEpoch` moved is refused.
+  - **Exclusive work elsewhere:** while exclusive work runs anywhere, every plain commit answers busy. The work's own commits stay live only while it runs.
+  - A non-JSON value is refused before it reaches the host.
+- **The size hint is accepted and ignored** until the Markdown plugin (issue 05) needs it.
+- **Assets and Embed are stubs.**
+  - `Surface.assets` has `url` and `read`, plus optional `pick` and `store`, matching issue 03's `AssetClient`. Here it reads nothing.
+  - `Embed` is one stable component that draws nothing. A test holds its identity across renders.
+- **The embedded Map's selection declaration is deferred to issue 07.**
+- **Plugin kind facts.** Every flag `kindFromPlugin` derives is false: not Open-able, not a Target, no referenced Spaces. So an Ur Resource no longer offers Open, which it never could.
+- **Ur computes its own insets.** It lays out its Title in the rectangle its Shape inscribes. The host gives it the rect and strokes the outline.
+- **Claims.**
+  - **The gate and ADR 0126's hold are separate.** The Claim chain and exclusive gate are one per page (`PluginGateProvider` at startup) and are not yet linked to ADR 0126's hold. That is a note for issue 04.
+  - **A surface's Claim path is `[resourceId]`.** Nested surfaces arrive with the Space plugin.
+- **A Reference to an Ur Resource keeps the old frame.** It is not drawn by Ur's plugin, so it is the rectangle. On the Stage, Ur is drawn by its plugin, which centres its Title itself; `ur-stage.css` is gone.
+- **The Stage's nominal size is 1600×900.** The Stage host hands the plugin that size, `withoutMap`'s value, no commit and no Claim.
+- **Kind-neutral modules.** `plugins`, `plugin-kind` and `plugin-views` joined `KIND_NEUTRAL_MODULES` in `eslint.config.js`, because they read every plugin alike. A `packages/plugin-*` package counts as a kind module in `kind-ids-in-modules.test.ts`.
+- **A test seam for the host.** `PluginSurface` takes the plugin's entry, so `packages/ui/test/PluginResource.test.tsx` draws a probe plugin through the real Map host.
+- **Commit identities are stable.**
+  - The host memoises its guarded operations, and the plugin entry memoises its JSON-checking wrappers.
+  - Otherwise a plugin that publishes rail commands keyed on a commit re-renders the host forever.
+  - A surface's lifetime (still drawn, Claims to release) is one object held in state rather than refs read during render.
+- **Optional capability members accept `undefined`.** These are `Kept.commit`, `KeptMap.commit`, the `Exclusive` members, `Surface.claim` and the host's `PluginOperations` and `PluginCommits`. Absent and `undefined` mean the same to a plugin, and hosts build a surface as one literal.
+- **A rail drawn in the rect stands over the plugin's pixels** (`.canvas-resource--plugin > .canvas-resource__actions`), since the plugin's layer fills the rect.
+- **`AGENTS.md` was not edited.** Its ADR 0142 entry still says "accepted, not built", which is true for every kind but Ur. `docs/agents/maps-and-graphs.md` records what is built.

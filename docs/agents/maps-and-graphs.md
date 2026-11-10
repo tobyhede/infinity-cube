@@ -150,7 +150,7 @@ Older ADRs use retired names. Read Layout or Diagram as Map, Card or Thing as Re
 Every rule above is built except these:
 
 - **Auto-arrange** (R6), with any returning automatic strategy (R7). Delivery: [`.scratch/auto-arrange/issues/01-auto-arrange-a-map.md`](../../.scratch/auto-arrange/issues/01-auto-arrange-a-map.md), which also holds the two open questions: whether the Edit records which strategy produced the positions, and whether it asks for confirmation before rewriting a whole Map while undo does not exist.
-- **Resource plugins and Map content** (R37–R40, R45–R47). The code still stores `open` and `shape` as Map entry fields, with `canOpen` and `takesResourceShape` as core flags and the `open-requires-content` and `shape-not-taken` refusals, and still offers Open and expand (A29) and `opensToFit`; no plugin's Open carries a size hint (R38, R40). Delivery: [`.scratch/resource-plugins/spec.md`](../../.scratch/resource-plugins/spec.md).
+- **Resource plugins and Map content** (R37–R39, R45–R47). A Map entry's optional `content` is built: its plugin's schema parses it, the `changed-map-content` Edit writes it, and an Ur Resource's Shape is its Map content. The code still stores `open` as a Map entry field, with `canOpen` as a core flag and the `open-requires-content` refusal, and still offers Open and expand (A29) and `opensToFit`; every kind but Ur is still drawn by `CanvasResource`. Delivery: [`.scratch/resource-plugins/spec.md`](../../.scratch/resource-plugins/spec.md).
 - **Manual Graph reordering** (R25). Delivery: [`.scratch/graph-reordering/issues/01-reorder-a-maps-graphs.md`](../../.scratch/graph-reordering/issues/01-reorder-a-maps-graphs.md).
 
 Remove an entry here in the change that verifies its implementation.

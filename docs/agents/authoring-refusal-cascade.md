@@ -60,7 +60,7 @@ Guards above are omitted below.
 | `closed-resource` | `resource-not-in-map` → (already Closed ⇒ `unchanged`) → completed |
 | `resized-resource` | `resource-not-in-map` → (same size as `resourceSize` resolves it ⇒ `unchanged`) → completed |
 | `opened-resource-to-fit` | `resource-not-in-map` → `resource-not-found` → `open-requires-content` → (already Open at the floored size ⇒ `unchanged`) → completed |
-| `changed-resource-shape` | `resource-not-in-map` → `resource-not-found` → `shape-not-taken` → (same Shape as `resourceShape` resolves it ⇒ `unchanged`) → completed |
+| `changed-map-content` | `resource-not-in-map` → `resource-not-found` → `map-content-not-kept` → `map-content-invalid` → (the same value as the entry's content resolves to, its plugin's default where it stores none ⇒ `unchanged`) → completed |
 | `added-resource-to-map` | `resource-not-found` → `resource-already-in-map` → completed |
 | `removed-resource-from-map` | `resource-not-in-map` → completed |
 | `deleted-resource` | `resource-not-found` → `space-resource-deletion-unsupported` → `resource-has-references` → completed |
@@ -130,13 +130,17 @@ Edit that holds no Map say it needed one.
 | --- | --- |
 | `settled-resource-movement` | none → completed |
 
-## The 26 codes
+## The 29 codes
 
-1 contextual (`map-not-found`) plus 25 action-specific —
-none is produced anywhere else. 23 of those 25 are tabulated above;
+1 contextual (`map-not-found`) plus 28 action-specific —
+none is produced anywhere else. 24 of those 28 are tabulated above;
 `map-required` is declared and presented but currently raised nowhere, so it
 appears in no row, and `image-url-unsupported`, raised by the Image Resource
-Edits, has no row yet.
+Edits, has no row yet. `space-replaced` and `edit-abandoned` are no action's:
+they are how a `queued` Edit settles when the drain discards it — a
+replacement Space opened before it drained, or the Edit draining the queue
+failed before reaching it — and reach only the `settle` callback its caller
+passed to `complete` (ADR 0142). An Edit that is not queued never calls it.
 Count the codes, not the cells: several serve more than one action —
 `resource-not-found`, `resource-not-in-map`, `graph-not-owned`, `edge-not-found`,
 `edge-resource-outside-map` and two of the `reference-target-*` codes each appear in more than

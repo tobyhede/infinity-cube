@@ -6,7 +6,7 @@ import { urPlugin } from '@project/plugin-ur/domain';
  * build draws with, listed once. A plugin written for another Resource API
  * version fails the typecheck here, and refuses to load if it slips past it.
  * Each plugin's view half is keyed to this list by its kind in
- * `packages/ui/src/kinds/plugin-views.ts`, whose type requires one per entry.
+ * `packages/ui/src/kinds/plugin-views.tsx`, whose type requires one per entry.
  */
 export const PLUGINS = pluginList([urPlugin]);
 
