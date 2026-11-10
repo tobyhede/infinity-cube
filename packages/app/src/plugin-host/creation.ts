@@ -25,6 +25,7 @@ import {
   describeSpaceResourceRefusal,
 } from '../authoring-refusal';
 import type { CreationOutcome } from '../command-outcomes';
+import { failureMessage } from '../failure-message';
 import type { ComposedApp } from '../compose-app';
 import { resolveMap } from '../map-resolution';
 import type { NewResource, SettledResult } from '../space-authoring';
@@ -50,6 +51,8 @@ import type { PluginGate } from './plugin-gate';
 /** A plugin's creation offered from one place, with what it creates. */
 export interface OfferedCreation<Run> {
   readonly kind: PluginCreationEntry['kind'];
+  /** Where it is offered from: only a Dock press is single flight. */
+  readonly from: HostCreation['from'];
   readonly name: string;
   readonly run: Run;
 }
@@ -61,7 +64,7 @@ export const dockCreations = (
   entries: readonly PluginCreationEntry[],
 ): readonly OfferedCreation<RunOf<'dock'>>[] =>
   entries.flatMap(({ kind, name, creation }) =>
-    creation.from === 'dock' ? [{ kind, name, run: creation.run }] : [],
+    creation.from === 'dock' ? [{ kind, from: creation.from, name, run: creation.run }] : [],
   );
 
 /** Every creation offered on a Resource, given that Resource, in the order given. */
@@ -72,7 +75,7 @@ export const resourceCreations = (
 })[] =>
   entries.flatMap(({ kind, name, creation }) =>
     creation.from === 'resource'
-      ? [{ kind, name, run: creation.run, accepts: creation.accepts }]
+      ? [{ kind, from: creation.from, name, run: creation.run, accepts: creation.accepts }]
       : [],
   );
 
@@ -81,7 +84,7 @@ export const spaceCreation = (
   entries: readonly PluginCreationEntry[],
 ): OfferedCreation<RunOf<'spaces'>> | undefined =>
   entries.flatMap(({ kind, name, creation }) =>
-    creation.from === 'spaces' ? [{ kind, name, run: creation.run }] : [],
+    creation.from === 'spaces' ? [{ kind, from: creation.from, name, run: creation.run }] : [],
   )[0];
 
 /** How well one declared media type matches one arriving type: exactly, as a wildcard, or not. */
@@ -119,12 +122,12 @@ export function dataCreation(
       ),
     );
     if (score > 0 && (best === null || score > best.score)) {
-      best = { score, offered: { kind, name, run: creation.run } };
+      best = { score, offered: { kind, from: creation.from, name, run: creation.run } };
     }
   }
   if (best === null) return undefined;
-  const { kind, name, run } = best.offered;
-  return { kind, name, run: (host) => run(host, data) };
+  const { kind, from, name, run } = best.offered;
+  return { kind, from, name, run: (host) => run(host, data) };
 }
 
 /** Why the host refused a `create` before trying it. */
@@ -231,6 +234,44 @@ const REPORTED = {
 export interface CreationPlace {
   readonly anchor: MapPosition;
   readonly placement: PlacementMode;
+  /**
+   * The Map `anchor` is a point on; absent, the host's own. A Dock press names
+   * the Map drawn when its Resources are asked for, as a picker may answer
+   * after the author has moved to another.
+   */
+  readonly mapId?: MapId | undefined;
+}
+
+/**
+ * The Dock creations in flight, by kind, kept by whatever outlives one Map's
+ * host, so moving to another Map keeps a creation's single flight.
+ */
+export interface CreationFlights {
+  readonly has: (kind: string) => boolean;
+  readonly start: (kind: string) => void;
+  readonly end: (kind: string) => void;
+  readonly kinds: () => ReadonlySet<string>;
+}
+
+/** Flights that tell `onChange` the kinds in flight whenever that set changes. */
+export function createCreationFlights(
+  onChange: (kinds: ReadonlySet<string>) => void,
+): CreationFlights {
+  const running = new Map<string, number>();
+  const kinds = (): ReadonlySet<string> => new Set(running.keys());
+  const move = (kind: string, by: 1 | -1): void => {
+    const count = (running.get(kind) ?? 0) + by;
+    const changed = count === 0 || !running.has(kind);
+    if (count <= 0) running.delete(kind);
+    else running.set(kind, count);
+    if (changed) onChange(kinds());
+  };
+  return {
+    has: (kind) => running.has(kind),
+    start: (kind) => move(kind, 1),
+    end: (kind) => move(kind, -1),
+    kinds,
+  };
 }
 
 /** One gesture that runs a creation. */
@@ -246,6 +287,12 @@ export interface CreationGesture {
    * notice.
    */
   readonly settle?: ((refusal: string | null) => void) | undefined;
+  /**
+   * Whether a completed creation continues into the new Resource's Title;
+   * absent, it does. The Resources list keeps the reader in the list, so a
+   * Space Resource placed from it does not.
+   */
+  readonly continues?: boolean | undefined;
 }
 
 export interface CreationHostDependencies {
@@ -257,8 +304,8 @@ export interface CreationHostDependencies {
   /** The Map the gestures are made on. */
   readonly mapId: MapId;
   readonly reportBreak: ObserverErrorReporter;
-  /** Told the kinds being created whenever one starts or ends, so a surface can draw those Creates withheld. */
-  readonly onCreatingChange: (creating: ReadonlySet<string>) => void;
+  /** The Dock creations in flight, shared with every host the surface builds. */
+  readonly flights: CreationFlights;
 }
 
 export interface CreationHostShell {
@@ -270,8 +317,6 @@ export interface CreationHostShell {
     offered: OfferedCreation<(host: HostCreationHost) => void | Promise<void>>,
     gesture: CreationGesture,
   ) => Promise<void>;
-  /** The kinds whose creation runs now. */
-  readonly creating: () => ReadonlySet<string>;
 }
 
 /** What a performed create answered, and the Resource it continues at. */
@@ -303,28 +348,23 @@ const documentFor = (
 ): ResourceDocument => resourceDocumentSchema.parse({ title, kind, content: contentFor(shown) });
 
 /**
- * The host behind every creation gesture on one Map surface. It is single
- * flight for each kind: while one `create` of a kind runs, another of that kind
- * is refused unreported, which is how a second press is ignored. A creation of
- * another kind still runs, as a Markdown Resource may land while a Space
- * Resource's coordination is open.
+ * The host behind every creation gesture on one Map surface. A Dock press is
+ * single flight for its kind: while one `create` of a kind from the Dock runs,
+ * another is refused unreported, which is how a second press is ignored. A
+ * creation of another kind, or from anywhere else, still runs, as a Markdown
+ * Resource may land, or a listed Space be shown, while a new Space's
+ * coordination is open.
  */
 export function createCreationHost(deps: CreationHostDependencies): CreationHostShell {
-  const { app, session, spaceResources, gate, assets, mapId, reportBreak } = deps;
+  const { app, session, spaceResources, gate, assets, reportBreak, flights } = deps;
   const { commandOutcomes, currentSpace, surface } = app;
-  const running = new Map<string, number>();
-  const kinds = (): ReadonlySet<string> => new Set(running.keys());
-  const setRunning = (kind: string, by: 1 | -1): void => {
-    const count = (running.get(kind) ?? 0) + by;
-    const changed = count === 0 || !running.has(kind);
-    if (count === 0) running.delete(kind);
-    else running.set(kind, count);
-    if (changed) deps.onCreatingChange(kinds());
-  };
+  const mapOf = (place: CreationPlace): MapId => place.mapId ?? deps.mapId;
 
   /** An Edit of ordinary Resources, on the Map the gesture was made on, wherever the canvas is now. */
-  const edit = (items: readonly NewResource[], { anchor, placement }: CreationPlace) =>
+  const edit = (items: readonly NewResource[], place: CreationPlace) =>
     new Promise<Performed>((resolve) => {
+      const { anchor, placement } = place;
+      const mapId = mapOf(place);
       const completion = { kind: 'created-resources', items, anchor, placement } as const;
       const settle = (result: SettledResult): void => resolve(performedEdit(result));
       // Addressed to the Map the gesture was made on, because the anchor is a
@@ -342,12 +382,12 @@ export function createCreationHost(deps: CreationHostDependencies): CreationHost
   const lifecycle = async (
     plan: Extract<CreatePlan, { kind: 'new-space' | 'link' }>,
     kind: string,
-    { anchor }: CreationPlace,
+    place: CreationPlace,
   ): Promise<Performed> => {
     try {
       const containingSpaceId: UUID = currentSpace().id;
-      const resolved = resolveMap(currentSpace(), mapId);
-      const position = anchor;
+      const resolved = resolveMap(currentSpace(), mapOf(place));
+      const position = place.anchor;
       let result: SpaceResourceCreationResult;
       if (plan.kind === 'new-space') {
         // One title, minted from this Space's own Resource titles, names both
@@ -392,7 +432,7 @@ export function createCreationHost(deps: CreationHostDependencies): CreationHost
   };
 
   /** Continue into the created Resource's Title, owed only while the gesture's Map is still drawn. */
-  const continueAt = (createdResourceId: ResourceId | undefined) =>
+  const continueAt = (createdResourceId: ResourceId | undefined, mapId: MapId) =>
     createdResourceId === undefined || surface.context().mapId !== mapId
       ? null
       : ({
@@ -402,7 +442,12 @@ export function createCreationHost(deps: CreationHostDependencies): CreationHost
         } as const);
 
   /** Tell the author how a creation settled: on the surface that asked, or as the standing notice. */
-  const tell = (name: string, gesture: CreationGesture, performed: Performed): void => {
+  const tell = (
+    name: string,
+    gesture: CreationGesture,
+    performed: Performed,
+    mapId: MapId = deps.mapId,
+  ): void => {
     const { answer } = performed;
     const refused = answer === 'completed' || answer === 'unchanged' ? null : answer.refused;
     if (gesture.settle !== undefined) {
@@ -417,8 +462,8 @@ export function createCreationHost(deps: CreationHostDependencies): CreationHost
     // Requested on this surface's own continuation rather than through command
     // outcomes, which continue on the application's canvas: a Map drawn inside
     // a Space Resource continues in its own drawing.
-    if (refused !== null) return;
-    const pending = continueAt(performed.createdResourceId);
+    if (refused !== null || gesture.continues === false) return;
+    const pending = continueAt(performed.createdResourceId, mapId);
     if (pending !== null) surface.continuation.request(pending);
   };
 
@@ -430,7 +475,7 @@ export function createCreationHost(deps: CreationHostDependencies): CreationHost
     const plan = decideCreate(items, {
       kind: offered.kind,
       available: gesture.available?.() ?? true,
-      creating: running.has(offered.kind),
+      creating: offered.from === 'dock' && flights.has(offered.kind),
       exclusive: gate.withdraws(),
       offered: gesture.offered,
     });
@@ -440,17 +485,23 @@ export function createCreationHost(deps: CreationHostDependencies): CreationHost
       if (REPORTED[plan.refusal]) tell(offered.name, gesture, { answer });
       return answer;
     }
-    setRunning(offered.kind, 1);
+    const flies = offered.from === 'dock';
+    if (flies) flights.start(offered.kind);
     try {
       const place = gesture.place();
       const performed =
         plan.kind === 'edit'
           ? await edit(plan.items, place)
           : await lifecycle(plan, offered.kind, place);
-      tell(offered.name, gesture, performed.answer === 'unchanged' ? COMPLETED : performed);
+      tell(
+        offered.name,
+        gesture,
+        performed.answer === 'unchanged' ? COMPLETED : performed,
+        mapOf(place),
+      );
       return performed.answer;
     } finally {
-      setRunning(offered.kind, -1);
+      if (flies) flights.end(offered.kind);
     }
   };
 
@@ -460,14 +511,21 @@ export function createCreationHost(deps: CreationHostDependencies): CreationHost
       create: (items) => create(offered, gesture, items),
       report: (words) => tell(offered.name, gesture, { answer: { refused: words } }),
     };
+    // A creation that breaks is told as the channel tells every break: the
+    // author hears the failure's words, and the diagnostic still reaches the
+    // operational channel.
+    const broke: ObserverErrorReporter = (failure) => {
+      reportBreak(failure);
+      tell(offered.name, gesture, { answer: { refused: failureMessage(failure) } });
+    };
     try {
       const ran = offered.run(host);
-      return ran instanceof Promise ? ran.catch(reportBreak) : Promise.resolve();
+      return ran instanceof Promise ? ran.catch(broke) : Promise.resolve();
     } catch (failure) {
-      reportBreak(failure);
+      broke(failure);
       return Promise.resolve();
     }
   };
 
-  return { run, creating: kinds };
+  return { run };
 }

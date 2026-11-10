@@ -15,6 +15,7 @@ import { pluginCreations, usePluginAssets, type EntityActionOutcome } from '@pro
 import { describeAuthoringRefusal } from './authoring-refusal';
 import type { OpenSpace } from './open-spaces';
 import {
+  createCreationFlights,
   createCreationHost,
   dataCreation,
   dockCreations,
@@ -153,6 +154,15 @@ export function useResourcePlacement(
   const gate = usePluginGate();
   const assets = usePluginAssets();
   const [creating, setCreating] = useState<ReadonlySet<string>>(NOTHING_CREATING);
+  // Kept across the host each Map builds, so a Dock creation stays single
+  // flight while the author moves to another Map.
+  const [flights] = useState(() => createCreationFlights(setCreating));
+  // The Map drawn now, which a Dock press reads when its Resources are asked
+  // for, after a picker that may outlast the Map it was pressed on.
+  const drawnMapId = useRef(mapId);
+  useEffect(() => {
+    drawnMapId.current = mapId;
+  }, [mapId]);
 
   const host = useMemo(
     () =>
@@ -164,15 +174,16 @@ export function useResourcePlacement(
         assets,
         mapId,
         reportBreak,
-        onCreatingChange: setCreating,
+        flights,
       }),
-    [app, session, spaceResources, gate, assets, mapId, reportBreak],
+    [app, session, spaceResources, gate, assets, mapId, reportBreak, flights],
   );
 
   /**
-   * A Dock creation: one press, placed at the visible centre when its
-   * Resources are asked for, which is after a picker answers for one that
-   * opens one. The toolbar stays available for an empty authored Map: it is
+   * A Dock creation: one press, placed at the visible centre of the Map drawn
+   * when its Resources are asked for, which is after a picker answers for one
+   * that opens one, so a picture picked after moving to another Map lands
+   * there. The toolbar stays available for an empty authored Map: it is
    * the zero-Resource Space's way to create the first Resource.
    */
   const createFromDock = useCallback(
@@ -180,7 +191,11 @@ export function useResourcePlacement(
       const offered = DOCK_CREATIONS.find((creation) => creation.kind === kind);
       if (offered === undefined) return;
       void host.run(offered, {
-        place: () => ({ anchor: centreAnchor(), placement: 'avoidingOverlap' }),
+        place: () => ({
+          anchor: centreAnchor(),
+          placement: 'avoidingOverlap',
+          mapId: drawnMapId.current,
+        }),
         available,
       });
     },
@@ -241,6 +256,8 @@ export function useResourcePlacement(
               place: () => ({ anchor, placement: 'avoidingOverlap' }),
               offered: offeredSpace,
               settle: resolve,
+              // The list keeps the reader, as it does after adding a Resource.
+              continues: false,
             },
           )
           // A creation that asked for nothing has nothing to say.

@@ -1,13 +1,16 @@
+import { act } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type JsonValue } from '@project/core';
 import type { CreationData } from '@project/resource-api/view';
 import type { HostCreationHost, HostNew, PluginCreationEntry } from '@project/ui';
 import type { OpenSpace } from '../src/open-spaces';
 import {
+  createCreationFlights,
   createCreationHost,
   dataCreation,
   decideCreate,
   type CreateFacts,
+  type CreationFlights,
   type CreationGesture,
   type OfferedCreation,
 } from '../src/plugin-host/creation';
@@ -157,8 +160,13 @@ describe('what one create becomes', () => {
 
 type Run = (host: HostCreationHost) => void | Promise<void>;
 
-const offered = (kind: PluginCreationEntry['kind'], run: Run): OfferedCreation<Run> => ({
+const offered = (
+  kind: PluginCreationEntry['kind'],
+  run: Run,
+  from: OfferedCreation<Run>['from'] = 'dock',
+): OfferedCreation<Run> => ({
   kind,
+  from,
   name: `${kind === 'markdown' ? 'Markdown' : 'Space'} Resource`,
   run,
 });
@@ -169,20 +177,25 @@ const askFor =
     await host.create(items);
   };
 
-function hosted(opened: OpenSpace, gate = createPluginGate()) {
+function hosted(
+  opened: OpenSpace,
+  gate = createPluginGate(),
+  creating: ReadonlySet<string>[] = [],
+  flights: CreationFlights = createCreationFlights((kinds) => creating.push(kinds)),
+  mapId = MAP_ID,
+) {
   const reportBreak = vi.fn();
-  const creating: ReadonlySet<string>[] = [];
   const host = createCreationHost({
     app: opened.app,
     session: opened.session,
     spaceResources: opened.spaceResources,
     gate,
     assets: { url: (ref) => ref, read: () => Promise.resolve({ refused: 'none' }) },
-    mapId: MAP_ID,
+    mapId,
     reportBreak,
-    onCreatingChange: (kinds) => creating.push(kinds),
+    flights,
   });
-  return { host, reportBreak, creating };
+  return { host, reportBreak, creating, flights };
 }
 
 const gesture = (extra: Partial<CreationGesture> = {}): CreationGesture => ({
@@ -343,11 +356,11 @@ describe('a creation with a new Space', () => {
 
   it('ignores a second one while the first is in flight, and still creates another kind', async () => {
     const opened = openDerivationSpace();
-    const { host, creating } = hosted(opened);
+    const { host, creating, flights } = hosted(opened);
     const newSpace = offered('space', askFor([{ newSpace: true, contentFor: showing }]));
 
     const first = host.run(newSpace, gesture());
-    expect(host.creating()).toEqual(new Set(['space']));
+    expect(flights.kinds()).toEqual(new Set(['space']));
     const second = host.run(newSpace, gesture());
     await host.run(offered('markdown', askFor([{ content: EMPTY_TEXT }])), gesture());
     await Promise.all([first, second]);
@@ -356,7 +369,127 @@ describe('a creation with a new Space', () => {
     expect(kinds.filter((kind) => kind === 'space')).toHaveLength(1);
     expect(kinds.filter((kind) => kind === 'markdown')).toHaveLength(4);
     expect(notice(opened)).toBeNull();
-    expect(host.creating()).toEqual(new Set());
+    expect(flights.kinds()).toEqual(new Set());
     expect(creating.at(-1)).toEqual(new Set());
+  });
+});
+
+describe('a creation from a list of Spaces', () => {
+  const showing = (space: { spaceId: string; map: string; graph: string }): JsonValue => ({
+    ...space,
+  });
+
+  it('links the Space it was offered, titled after it', async () => {
+    const opened = openDerivationSpace();
+    const { host } = hosted(opened);
+    await host.run(offered('space', askFor([{ newSpace: true, contentFor: showing }])), gesture());
+    const first = opened.session
+      .getState()
+      .working.resources.find(({ document }) => document.kind === 'space');
+    if (first?.document.kind !== 'space') throw new Error('No Space was made.');
+    const space = { spaceId: first.document.content.spaceId, title: 'Space 1' };
+    const settle = vi.fn();
+
+    await host.run(
+      offered('space', askFor([{ title: space.title, contentFor: showing }]), 'spaces'),
+      gesture({ offered: space, settle }),
+    );
+
+    expect(settle).toHaveBeenCalledWith(null);
+    const linked = opened.session
+      .getState()
+      .working.resources.filter(({ document }) => document.kind === 'space');
+    expect(linked).toHaveLength(2);
+    expect(linked.map(({ document }) => document.title)).toEqual(['Space 1', 'Space 1']);
+  });
+});
+
+describe('a creation the host keeps its word on', () => {
+  const showing = (space: { spaceId: string; map: string; graph: string }): JsonValue => ({
+    ...space,
+  });
+
+  it('still links a Space from the list while the Dock’s new Space is in flight', async () => {
+    const opened = openDerivationSpace();
+    const { host } = hosted(opened);
+    const newSpace = offered('space', askFor([{ newSpace: true, contentFor: showing }]));
+    await host.run(newSpace, gesture());
+    const [first] = opened.session
+      .getState()
+      .working.resources.filter(({ document }) => document.kind === 'space');
+    if (first?.document.kind !== 'space') throw new Error('No Space was made.');
+    const space = { spaceId: first.document.content.spaceId, title: 'Space 1' };
+    const settle = vi.fn();
+
+    const inFlight = host.run(newSpace, gesture());
+    const linking = host.run(
+      offered('space', askFor([{ title: space.title, contentFor: showing }]), 'spaces'),
+      gesture({ offered: space, settle }),
+    );
+    await Promise.all([inFlight, linking]);
+
+    expect(settle).toHaveBeenCalledWith(null);
+    expect(
+      opened.session
+        .getState()
+        .working.resources.filter(({ document }) => document.kind === 'space'),
+    ).toHaveLength(3);
+  });
+
+  it('keeps a Dock creation in flight across a host built for another Map', async () => {
+    const opened = openDerivationSpace();
+    const creating: ReadonlySet<string>[] = [];
+    const flights = createCreationFlights((kinds) => creating.push(kinds));
+    const onA = hosted(opened, createPluginGate(), creating, flights, MAP_ID);
+    const onB = hosted(opened, createPluginGate(), creating, flights, OTHER_MAP_ID);
+    const newSpace = offered('space', askFor([{ newSpace: true, contentFor: showing }]));
+
+    const first = onA.host.run(newSpace, gesture());
+    await onB.host.run(offered('markdown', askFor([{ content: EMPTY_TEXT }])), gesture());
+    expect(flights.kinds()).toEqual(new Set(['space']));
+    await onB.host.run(newSpace, gesture());
+    await first;
+
+    expect(
+      opened.session
+        .getState()
+        .working.resources.filter(({ document }) => document.kind === 'space'),
+    ).toHaveLength(1);
+  });
+
+  it('tells the author a creation that broke, in the failure’s words', async () => {
+    const opened = openDerivationSpace();
+    const { host, reportBreak } = hosted(opened);
+    const failure = new Error('The asset store is unreachable.');
+
+    await host.run(
+      offered('markdown', () => Promise.reject(failure)),
+      gesture(),
+    );
+
+    expect(reportBreak).toHaveBeenCalledWith(failure);
+    expect(notice(opened)).toEqual({
+      title: 'Markdown Resource not created',
+      message: 'The asset store is unreachable.',
+    });
+  });
+
+  it('places on the Map the gesture names when it is asked, and continues there', async () => {
+    const opened = openDerivationSpace(mintingIds(CREATED));
+    const { host } = hosted(opened);
+    act(() => opened.app.navigation.selectMap(OTHER_MAP_ID));
+
+    await host.run(
+      offered('markdown', askFor([{ content: EMPTY_TEXT }])),
+      gesture({ place: () => ({ anchor: AT, placement: 'exact', mapId: OTHER_MAP_ID }) }),
+    );
+
+    expect(placedOn(opened, OTHER_MAP_ID)).toContain(CREATED);
+    expect(placedOn(opened)).not.toContain(CREATED);
+    expect(opened.app.continuation.getState().pending).toEqual({
+      target: { kind: 'resource', resourceId: CREATED },
+      select: true,
+      then: 'rename',
+    });
   });
 });

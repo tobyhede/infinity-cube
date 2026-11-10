@@ -223,7 +223,7 @@ export interface PluginSurfaceEntries {
 const NOT_JSON: Answer = { refused: 'This change cannot be kept.' };
 
 /** Why a creation was refused before it reached the host: its content was not its plugin's. */
-const NOT_CREATABLE: Answer = { refused: 'This Resource cannot be created.' };
+const NOT_CREATABLE = { refused: 'This Resource cannot be created.' } as const satisfies Answer;
 
 /** Content a plugin created, as the host takes it: its schema's, and JSON; or `undefined`. */
 const creatableJson = <C,>(plugin: ResourcePlugin<C, unknown>, value: C): JsonValue | undefined => {
@@ -236,10 +236,14 @@ const creatableJson = <C,>(plugin: ResourcePlugin<C, unknown>, value: C): JsonVa
 /**
  * A plugin's creation with its types erased: each item's content is parsed by
  * the plugin's own schema and checked to be JSON before the host takes it, so
- * an item the plugin got wrong refuses the whole create, and a content
- * function answering such a value throws inside the host.
+ * an item the plugin got wrong refuses the whole create, reported as the host
+ * reports any refused create, and a content function answering such a value
+ * throws inside the host.
  */
-function hostCreation<C>(plugin: ResourcePlugin<C, unknown>, creation: Creation<C>): HostCreation {
+export function hostCreation<C>(
+  plugin: ResourcePlugin<C, unknown>,
+  creation: Creation<C>,
+): HostCreation {
   const typed = (host: HostCreationHost): CreationHost<C> => ({
     assets: host.assets,
     report: (words) => host.report(words),
@@ -261,7 +265,12 @@ function hostCreation<C>(plugin: ResourcePlugin<C, unknown>, creation: Creation<
           });
         } else {
           const json = creatableJson(plugin, item.content);
-          if (json === undefined) return Promise.resolve(NOT_CREATABLE);
+          if (json === undefined) {
+            // Reported by the host, as every refused create is: the plugin
+            // has no surface of its own to say it on.
+            host.report(NOT_CREATABLE.refused);
+            return Promise.resolve(NOT_CREATABLE);
+          }
           erased.push({ title: item.title, content: json });
         }
       }

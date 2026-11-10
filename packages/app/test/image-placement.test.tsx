@@ -55,8 +55,8 @@ const heldStore = () => {
   };
 };
 
-const drawnMap = () => {
-  const resolved = derivationSpace().lookup.map(MAP_ID);
+const drawnMap = (mapId: MapId = MAP_ID) => {
+  const resolved = derivationSpace().lookup.map(mapId);
   if (resolved === undefined) throw new Error('The fixture has no drawn Map.');
   return resolved.map;
 };
@@ -135,6 +135,52 @@ describe('an Image Resource drop that brought no files', () => {
     storing.release();
     await settled();
 
+    expect(opened.app.continuation.getState().pending).toEqual({
+      target: { kind: 'resource', resourceId: CREATED },
+      select: true,
+      then: 'rename',
+    });
+  });
+});
+
+describe('an Image Resource picked after the author moved to another Map', () => {
+  it('places it on the Map drawn when the picker answers, and continues in its Title there', async () => {
+    let answer: (files: File[]) => void = () => undefined;
+    const assets: Assets = {
+      url: (ref) => ref,
+      read: () => Promise.resolve({ refused: 'Nothing is read here.' }),
+      pick: () =>
+        new Promise((resolve) => {
+          answer = resolve;
+        }),
+      store: () => Promise.resolve(STORED),
+    };
+    const opened = openDerivationSpace(mintingIds(CREATED));
+    let mapId: MapId = MAP_ID;
+    const { result, rerender } = renderHook(
+      () =>
+        useResourcePlacement(opened, {
+          map: drawnMap(mapId),
+          presenting: false,
+          replacementEpoch: 0,
+          reportBreak: () => undefined,
+        }),
+      {
+        wrapper: ({ children }: { readonly children: ReactNode }) => (
+          <PluginAssetsProvider value={assets}>{children}</PluginAssetsProvider>
+        ),
+      },
+    );
+
+    act(() => result.current.createFromDock('image'));
+    act(() => opened.app.navigation.selectMap(OTHER_MAP_ID));
+    mapId = OTHER_MAP_ID;
+    rerender();
+    answer([gif()]);
+    await settled();
+
+    expect(placedIn(opened, OTHER_MAP_ID)).toContain(CREATED);
+    expect(placedIn(opened, MAP_ID)).not.toContain(CREATED);
     expect(opened.app.continuation.getState().pending).toEqual({
       target: { kind: 'resource', resourceId: CREATED },
       select: true,
