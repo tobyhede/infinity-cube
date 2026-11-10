@@ -1,6 +1,6 @@
 import { useMemo, type ComponentType, type ReactElement } from 'react';
 import {
-  declaredOutline,
+  imageKind,
   isPluginKind,
   jsonValueSchema,
   urKind,
@@ -16,6 +16,8 @@ import type {
   PluginView,
   Surface,
 } from '@project/resource-api/view';
+import { imagePlugin } from '@project/plugin-image/domain';
+import { imagePluginView } from '@project/plugin-image/view';
 import { urPlugin } from '@project/plugin-ur/domain';
 import { urPluginView } from '@project/plugin-ur/view';
 import { ResourceFailureBoundary } from '../ResourceFailureBoundary';
@@ -123,6 +125,10 @@ export interface PluginSurfaceInput {
 /** One plugin, both halves, behind a door that takes the host's values. */
 export interface PluginEntry {
   readonly Glyph: ComponentType<{ readonly size?: number | undefined }>;
+  /** Whether the canvas strokes no border while the Resource is in no Graph and not selected. */
+  readonly bareAtRest: boolean;
+  /** Whether the plugin draws its Title; the host draws the Title editor over one that does not. */
+  readonly drawsTitle: boolean;
   readonly render: (input: PluginSurfaceInput) => ReactElement;
 }
 
@@ -227,20 +233,17 @@ export function pluginEntry<C, M>(
     return <view.View surface={surface} />;
   }
   const render = (input: PluginSurfaceInput): ReactElement => <Mounted input={input} />;
-  const PluginGlyph = view.Glyph;
-  /** The plugin's glyph, drawn as nothing where it throws, so the rail or Dock it is in survives. */
-  function Glyph({ size }: { readonly size?: number | undefined }) {
-    return (
-      <ResourceFailureBoundary fallback={null}>
-        <PluginGlyph size={size} />
-      </ResourceFailureBoundary>
-    );
-  }
-  return { Glyph, render };
+  return {
+    Glyph: view.Glyph,
+    bareAtRest: plugin.bareAtRest === true,
+    drawsTitle: plugin.drawsTitle !== false,
+    render,
+  };
 }
 
 /** Every plugin's entry, typed so a plugin the list names and this file omits fails to compile. */
 const PLUGIN_ENTRIES = {
+  [imageKind.id]: pluginEntry(imagePlugin, imagePluginView),
   [urKind.id]: pluginEntry(urPlugin, urPluginView),
 } satisfies Record<PluginKind, PluginEntry>;
 

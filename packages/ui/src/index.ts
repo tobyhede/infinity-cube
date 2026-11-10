@@ -19,7 +19,6 @@ export {
 } from './CanvasResource';
 export { atRest, CLOSED_DISPLAY } from './resource-display';
 export { beginEditing } from './kinds/markdown';
-export { beginReplacing } from './kinds/image';
 export { isSpaceOperations, spaceViewOf } from './kinds/space';
 export type { OwnContent, ResourceDisplay } from './resource-display';
 export { InlineTitleEditor } from './InlineTitleEditor';
@@ -134,17 +133,7 @@ export {
   GraphHeadMarker,
   GraphHeadShapeGlyph,
 } from './GraphHeadShape';
-export type {
-  GraphHeadMarkerProps,
-  GraphHeadShapeGlyphProps,
-  GraphHeadSize,
-} from './GraphHeadShape';
-export { ImageReplaceTarget } from './ImageReplaceTarget';
-export type {
-  ImageReplaceEditor,
-  ImageReplaceTargetProps,
-  ImageReplacement,
-} from './ImageReplaceTarget';
+export type { GraphHeadMarkerProps, GraphHeadShapeGlyphProps } from './GraphHeadShape';
 export { displayImageAsAuthored, ImageDisplayProvider, useImageDisplay } from './image-display';
 export type { ImageDisplay } from './image-display';
 export { PaletteColorPicker } from './PaletteColorPicker';

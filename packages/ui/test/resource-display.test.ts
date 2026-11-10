@@ -2,11 +2,9 @@ import fc from 'fast-check';
 import { uuidSchema, type ResourceContent, type SpaceView } from '@project/core';
 import { describe, expect, it } from 'vitest';
 import { atRest, CLOSED_DISPLAY, type ResourceDisplay } from '../src/resource-display';
-import { beginReplacing } from '../src/kinds/image';
 import { beginEditing } from '../src/kinds/markdown';
 import { spaceViewOf } from '../src/kinds/space';
 import type { CanvasResourceBodyEditor } from '../src/CanvasResource';
-import type { ImageReplaceEditor } from '../src/ImageReplaceTarget';
 
 const view: SpaceView = {
   spaceId: uuidSchema.parse('00000000-0000-4000-8000-000000000001'),
@@ -21,21 +19,15 @@ const content: fc.Arbitrary<ResourceContent> = fc.oneof(
   fc.record({ kind: fc.constant('markdown' as const), source: fc.string(), via }),
   fc.record({
     kind: fc.constant('image' as const),
-    url: fc.webUrl(),
-    naturalSize: fc.constant(undefined),
+    content: fc.record({ url: fc.webUrl() }),
     via,
   }),
   fc.record({ kind: fc.constant('space' as const), view: fc.constant(view), via }),
-  fc.record({ kind: fc.constant('ur' as const), via }),
+  fc.record({ kind: fc.constant('ur' as const), content: fc.constant({}), via }),
   fc.constant({ kind: 'unresolved' as const, via: 'target' as const }),
 );
 
 const editor: CanvasResourceBodyEditor = { onComplete: () => 'completed', onEnd: () => undefined };
-const replacer: ImageReplaceEditor = {
-  pick: () => Promise.resolve([]),
-  onReplace: () => Promise.resolve(null),
-  onEnd: () => undefined,
-};
 
 const shown: fc.Arbitrary<ResourceDisplay> = fc.oneof(
   fc.constant(CLOSED_DISPLAY),
@@ -46,10 +38,9 @@ const shown: fc.Arbitrary<ResourceDisplay> = fc.oneof(
 const display: fc.Arbitrary<ResourceDisplay> = fc.oneof(
   shown,
   fc.tuple(shown, fc.boolean()).map(([value, autoFocus]) => beginEditing(value, editor, autoFocus)),
-  shown.map((value) => beginReplacing(value, replacer)),
 );
 
-const openOwn = (value: ResourceDisplay, kind: 'markdown' | 'image'): boolean =>
+const openOwn = (value: ResourceDisplay, kind: 'markdown'): boolean =>
   value.shown === 'open' && value.content.kind === kind && value.content.via === 'self';
 
 describe('the display states only a Resource’s own content enters', () => {
@@ -71,29 +62,22 @@ describe('the display states only a Resource’s own content enters', () => {
     );
   });
 
-  it('begins replacing only an Open own image, and returns to it at rest', () => {
-    fc.assert(
-      fc.property(display, (value) => {
-        const replacing = beginReplacing(value, replacer);
-        if (!openOwn(value, 'image')) {
-          expect(replacing).toBe(value);
-          return;
-        }
-        expect(replacing).toMatchObject({ shown: 'editing', kind: 'image', edit: replacer });
-        expect(atRest(replacing)).toEqual(value);
-      }),
-    );
-  });
-
-  it('neither edits nor replaces an Open Ur Resource, its own or a Target’s', () => {
+  it('never edits an Open Ur or Image Resource, its own or a Target’s', () => {
     for (const reached of ['self', 'target'] as const) {
-      const open: ResourceDisplay = { shown: 'open', content: { kind: 'ur', via: reached } };
+      const open: ResourceDisplay = {
+        shown: 'open',
+        content: { kind: 'ur', content: {}, via: reached },
+      };
       expect(beginEditing(open, editor, true)).toBe(open);
-      expect(beginReplacing(open, replacer)).toBe(open);
+      const picture: ResourceDisplay = {
+        shown: 'open',
+        content: { kind: 'image', content: { url: 'https://example.com/a.png' }, via: reached },
+      };
+      expect(beginEditing(picture, editor, true)).toBe(picture);
     }
   });
 
-  it('leaves every display that is neither editing nor replacing as it is at rest', () => {
+  it('leaves every display that is not editing as it is at rest', () => {
     fc.assert(
       fc.property(shown, (value) => {
         expect(atRest(value)).toBe(value);

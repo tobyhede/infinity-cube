@@ -362,6 +362,55 @@ describe('the Map host a plugin draws inside (ADR 0142)', () => {
     expect(ownStored).toHaveLength(1);
   });
 
+  it('draws the Title editor over a plugin that draws no Title while it is renamed', () => {
+    const untitled = {
+      ...pluginEntry(
+        probePlugin,
+        definePluginView(probePlugin, { View: () => null, Glyph: () => null }),
+      ),
+      drawsTitle: false,
+    };
+    const onComplete = vi.fn(() => null);
+    const renaming = {
+      title: 'Probe',
+      readOnly: false,
+      onReturnFocus: () => undefined,
+      editor: { onComplete, onCancel: () => undefined },
+    };
+    const { rerender } = render(<PluginSurface {...probeProps()} entry={untitled} />);
+    expect(screen.queryByRole('textbox', { name: 'Resource title' })).toBeNull();
+    rerender(<PluginSurface {...probeProps({ title: renaming })} entry={untitled} />);
+    expect(screen.getByRole('textbox', { name: 'Resource title' })).toBeInTheDocument();
+    rerender(
+      <PluginSurface {...probeProps({ title: renaming, readOnly: true })} entry={untitled} />,
+    );
+    expect(screen.queryByRole('textbox', { name: 'Resource title' })).toBeNull();
+  });
+
+  it('draws a plugin bare at rest only while it is unselected and in no Graph', () => {
+    const bareEntry = { ...probeEntry, bareAtRest: true };
+    const article = () => screen.getByRole('article');
+    const { rerender } = render(<PluginSurface {...probeProps()} entry={bareEntry} />);
+    expect(article()).toHaveAttribute('data-bare', 'true');
+    rerender(<PluginSurface {...probeProps({ state: 'selected' })} entry={bareEntry} />);
+    expect(article()).toHaveAttribute('data-bare', 'false');
+    rerender(<PluginSurface {...probeProps({ borderColor: '#ffc53d' })} entry={bareEntry} />);
+    expect(article()).toHaveAttribute('data-bare', 'false');
+    rerender(<PluginSurface {...probeProps()} entry={probeEntry} />);
+    expect(article()).toHaveAttribute('data-bare', 'false');
+  });
+
+  it('offers no store or pick where the host offers none, whatever the application supplies', () => {
+    surfaces.length = 0;
+    render(
+      <PluginAssetsProvider value={APPLICATION_ASSETS}>
+        <PluginSurface {...probeProps()} entry={probeEntry} />
+      </PluginAssetsProvider>,
+    );
+    expect(surfaces.at(-1)?.assets.store).toBeUndefined();
+    expect(surfaces.at(-1)?.assets.pick).toBeUndefined();
+  });
+
   it('hands a read-only surface the assets to read, and nothing to store or pick', async () => {
     surfaces.length = 0;
     render(

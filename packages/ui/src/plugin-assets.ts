@@ -12,8 +12,9 @@ export const NO_ASSETS: Assets = {
 
 /**
  * The application's asset store as a plugin's surface reaches it (ADR 0142),
- * supplied once at composition, as the picture resolver is. A host hands it on
- * whole where its Resource is authored, and only `url` and `read` elsewhere.
+ * supplied once at composition, as the picture resolver is. A surface reads
+ * `url` and `read` from it wherever it is drawn; its `store` and `pick` reach a
+ * plugin only through the operations the host offers where it is authored.
  */
 const PluginAssetsContext = createContext<Assets>(NO_ASSETS);
 

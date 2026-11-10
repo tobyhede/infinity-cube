@@ -88,7 +88,7 @@ describe('PresentedResource', () => {
         title={'Harbour\nAt dusk'}
         content={{
           kind: 'image',
-          url: 'https://example.com/h.png',
+          content: { url: 'https://example.com/h.png' },
           via: 'self',
         }}
       />,
@@ -126,7 +126,7 @@ describe('PresentedResource', () => {
         title="Harbour, again"
         content={{
           kind: 'image',
-          url: 'https://example.com/h.png',
+          content: { url: 'https://example.com/h.png' },
           via: 'target',
         }}
       />,
@@ -135,8 +135,8 @@ describe('PresentedResource', () => {
     const picture = screen.getByRole('img', { name: 'Harbour, again' });
     expect(picture).toHaveAttribute('src', 'https://example.com/h.png');
     fireEvent.error(picture);
-    expect(screen.getByTestId('resource-image-failed')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Replace image' })).toBeNull();
+    expect(screen.getByTestId('image-failed')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Replace image/ })).toBeNull();
   });
 
   /**
@@ -197,7 +197,10 @@ describe('PresentedResource', () => {
   it('presents an Ur Resource as a title slide, itself or through a Reference Resource', () => {
     for (const via of ['self', 'target'] as const) {
       const { container, unmount } = render(
-        <PresentedResource title={'Gateway\nthe one way in'} content={{ kind: 'ur', via }} />,
+        <PresentedResource
+          title={'Gateway\nthe one way in'}
+          content={{ kind: 'ur', content: {}, via }}
+        />,
       );
 
       const slide = screen.getByTestId('resource-content');

@@ -560,6 +560,21 @@
   opacity: var(--canvas-resource-strength, 1);
 }
 
+/* A plugin drawn bare at rest, as a picture is: no border and no face of its
+   own until it is selected or drawn in a Graph's colour (ADR 0142). */
+.canvas-resource.canvas-resource--plugin[data-bare='true'] {
+  border-color: transparent;
+  background: transparent;
+}
+
+/* The host's Title editor, over a plugin that draws no Title (ADR 0142). */
+.canvas-resource__title-over {
+  position: absolute;
+  inset-inline: 4px;
+  top: 4px;
+  z-index: 1;
+}
+
 /* A rail drawn in the rect stands over the plugin's pixels, which fill it. */
 .canvas-resource--plugin > .canvas-resource__actions {
   position: relative;

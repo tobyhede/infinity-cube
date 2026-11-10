@@ -105,3 +105,59 @@ export function PresentedPluginSurface(
     </article>
   );
 }
+
+/** The room an embedded plugin fills: all of the content area it is drawn in. */
+const EMBEDDED_ROOM = {
+  position: 'relative',
+  flex: 1,
+  width: '100%',
+  height: '100%',
+  minWidth: 0,
+  minHeight: 0,
+} as const;
+
+export interface EmbeddedPluginContentProps {
+  readonly kind: PluginKind;
+  /** The Title the embedding passes, which the plugin draws as it draws any. */
+  readonly title: string;
+  /** The embedded Resource's content, which its plugin's schema parses. */
+  readonly content: unknown;
+}
+
+/**
+ * Another Resource's plugin drawn inside the old frame's content area, as an
+ * Open Reference Resource draws its Target (ADR 0070, ADR 0142): on a surface
+ * offering no authoring of the Target, with the Reference's own Title, and
+ * filling the room it is given.
+ */
+export function EmbeddedPluginContent({ kind, title, content }: EmbeddedPluginContentProps) {
+  const supplied = usePluginAssets();
+  const assets = useMemo(() => readingAssets(supplied), [supplied]);
+  const name = titleName(title);
+  const host: ResourceHost = useMemo(() => {
+    function EmbeddedTitle({ className }: TitleProps) {
+      return <h2 className={className}>{name}</h2>;
+    }
+    return { Title: EmbeddedTitle, Own: StageOwn, rail: createRailStore() };
+  }, [name]);
+  const plugin = pluginEntryFor(kind).render({
+    resourceId: '',
+    kind,
+    title,
+    content,
+    mapContent: mapContentWithoutMap(kind),
+    size: STAGE_SIZE,
+    selected: false,
+    operations: { kind },
+    assets,
+    Embed: NoEmbed,
+    onClaim: (claim) => claim.unmount(),
+  });
+  return (
+    <div className="resource-embedded-plugin" data-content-kind={kind} style={EMBEDDED_ROOM}>
+      <ResourceFailureBoundary>
+        <ResourceHostProvider host={host}>{plugin}</ResourceHostProvider>
+      </ResourceFailureBoundary>
+    </div>
+  );
+}

@@ -1,70 +1,28 @@
-import { authorsContent, isOwnContent, imageKind, type ImageContent } from '@project/core';
-import type { ImageReplaceEditor } from '../ImageReplaceTarget';
-import type { ResourceDisplay } from '../resource-display';
-import { ImageIcon, ReplaceImageIcon } from '../icons';
-import { ImageReplaceTarget } from '../ImageReplaceTarget';
-import { ResourceContentEditProvider } from '../resource-content-edit';
-import { ResourceImage } from '../ResourceImage';
-import type { CanvasArea, KindView } from './kind-view';
-
-/** An Image Resource's running edit: the replacement of its image. */
-export type { ImageReplaceEditor };
-
-/** What an Image Resource offers beyond its Title. */
-export interface ImageOperations {
-  readonly kind: typeof imageKind.id;
-  /** Begin replacing the image: the image kind's counterpart to a Markdown edit. */
-  readonly onBeginEdit?: () => void;
-}
-
-/** An Open Image Resource's picture, or the replacement running in its place. */
-const imageCanvas = (content: ImageContent, area: CanvasArea) =>
-  area.authoring && area.display.shown === 'editing' && area.display.kind === imageKind.id ? (
-    <ResourceContentEditProvider value={area.setContentEdit}>
-      <ImageReplaceTarget name={area.name} editor={area.display.edit} />
-    </ResourceContentEditProvider>
-  ) : (
-    <ResourceImage
-      key={content.url}
-      url={content.url}
-      name={area.name}
-      onReplace={area.authoring ? area.onBeginEdit : undefined}
-    />
-  );
+import { imageKind, type ImageContent } from '@project/core';
+import { imagePlugin } from '@project/plugin-image/domain';
+import { imagePluginView } from '@project/plugin-image/view';
+import { EmbeddedPluginContent } from '../PresentedPluginResource';
+import type { KindView } from './kind-view';
+import type { PluginOperations } from './plugin-views';
 
 /**
- * The view half of the Image kind (ADR 0106): what an Image Resource
- * is called and drawn as, and what it offers beyond the shared Title. Its
- * content view is `ResourceImage`, and its content action is Replace; a
- * presented image is never replaced, its own or a Target's.
+ * The Image kind's place in this package's kind registry, taken from its
+ * plugin (ADR 0106, ADR 0142): its names and glyph are the plugin's, and its
+ * own Resources are drawn by `PluginResource` and `PresentedPluginResource`.
+ * Where the old frame still draws an Image Resource's content — an Open
+ * Reference Resource showing its Target — the plugin draws it there too, on a
+ * surface offering no authoring, named by the Reference's own Title.
  */
-export const imageView: KindView<ImageOperations, ImageContent> = {
-  name: 'Image Resource',
-  listName: 'Image Resources',
-  referenceName: 'Reference to an Image Resource',
-  Glyph: ImageIcon,
+export const imageView: KindView<PluginOperations, ImageContent> = {
+  name: imagePlugin.name,
+  listName: imagePlugin.listName,
+  referenceName: imagePlugin.referenceName,
+  Glyph: imagePluginView.Glyph,
   bareOperations: { kind: imageKind.id },
-  contentCommand: { label: (name) => `Replace image of Resource ${name}`, Icon: ReplaceImageIcon },
-  canvas: imageCanvas,
-  presented: (name, content) => <ResourceImage key={content.url} url={content.url} name={name} />,
+  canvas: (content, area) => (
+    <EmbeddedPluginContent kind={imageKind.id} title={area.name} content={content.content} />
+  ),
+  presented: (name, content) => (
+    <EmbeddedPluginContent kind={imageKind.id} title={name} content={content.content} />
+  ),
 };
-
-/**
- * Replace an Image Resource's image. Answers `display` itself unless it is Open
- * with the Resource's own image.
- */
-export function beginReplacing<D extends ResourceDisplay>(
-  display: D,
-  replacer: ImageReplaceEditor,
-): D | Extract<ResourceDisplay, { readonly kind: typeof imageKind.id }> {
-  if (display.shown !== 'open') return display;
-  const content = display.content;
-  if (!isOwnContent(content) || !authorsContent(content) || content.kind !== imageKind.id)
-    return display;
-  return {
-    shown: 'editing',
-    kind: imageKind.id,
-    content,
-    edit: replacer,
-  };
-}

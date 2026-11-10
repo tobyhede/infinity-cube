@@ -64,10 +64,10 @@
   line-height: 1.2;
 }
 
-/* A picture is fitted inside the frame, whole, so its Resource is exactly the
-   frame's height rather than at least it: the name stacks over the picture, and
-   the picture takes the room left below the name. */
-.stage__body .resource--full:has(> .resource-image) {
+/* A plugin embedded below the name, as a Reference to an Image Resource draws
+   its picture, makes its Resource exactly the frame's height rather than at
+   least it: the name stacks over the plugin, which takes the room left below. */
+.stage__body .resource--full:has(> .resource-embedded-plugin) {
   display: flex;
   flex-direction: column;
   height: 100%;

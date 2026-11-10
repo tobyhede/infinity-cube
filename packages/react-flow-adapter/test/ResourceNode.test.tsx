@@ -16,10 +16,9 @@ import {
 import type { ResourceContent } from '@project/core';
 import {
   beginEditing,
-  beginReplacing,
   graphPaint,
   type CanvasResourceBodyEditor,
-  type ImageReplaceEditor,
+  type PluginOperations,
   type ResourceDisplay,
 } from '@project/ui';
 import { uuid } from './uuid';
@@ -217,8 +216,8 @@ interface Overrides {
   onBeginEdit?: () => void;
   /** A running body edit, entered through the display as decoration enters it. */
   editor?: CanvasResourceBodyEditor;
-  /** A running image replacement, entered through the display as decoration enters it. */
-  replacer?: ImageReplaceEditor;
+  /** What the host offers an Image Resource's plugin. */
+  imageOperations?: Omit<PluginOperations, 'kind'>;
   resize?: ResourceNodeData['resize'];
   readOnly?: boolean;
   connectionAuthoringEnabled?: boolean;
@@ -231,7 +230,7 @@ function ownContent(kind: ResourceNodeData['kind'], source: string, url: string)
     case 'markdown':
       return { kind: 'markdown', source, via: 'self' };
     case 'image':
-      return { kind: 'image', url, via: 'self' };
+      return { kind: 'image', content: { url }, via: 'self' };
     case 'reference':
       return { kind: 'markdown', source, via: 'target' };
     case 'space':
@@ -246,18 +245,16 @@ function ownContent(kind: ResourceNodeData['kind'], source: string, url: string)
         via: 'self',
       };
     case 'ur':
-      return { kind: 'ur', via: 'self' };
+      return { kind: 'ur', content: {}, via: 'self' };
   }
 }
 
-/** The display with the given edit or replacement running, where it may run. */
+/** The display with the given edit running, where it may run. */
 function running(
   display: ResourceDisplay,
   editor: CanvasResourceBodyEditor | undefined,
-  replacer: ImageReplaceEditor | undefined,
 ): ResourceDisplay {
-  const editing = editor === undefined ? display : beginEditing(display, editor, true);
-  return replacer === undefined ? editing : beginReplacing(editing, replacer);
+  return editor === undefined ? display : beginEditing(display, editor, true);
 }
 
 function props({
@@ -276,7 +273,7 @@ function props({
   content,
   onBeginEdit,
   editor,
-  replacer,
+  imageOperations,
   resize,
   readOnly = false,
   connectionAuthoringEnabled,
@@ -287,8 +284,8 @@ function props({
     shape: resourceShape,
     // A kind a plugin draws carries its stored content and Map content, as the
     // projection gives it (ADR 0142).
-    ownContent: kind === 'ur' ? {} : undefined,
-    mapContent: kind === 'ur' ? { shape: resourceShape } : undefined,
+    ownContent: kind === 'ur' ? {} : kind === 'image' ? { url } : undefined,
+    mapContent: kind === 'ur' ? { shape: resourceShape } : kind === 'image' ? {} : undefined,
     resourceId,
     title,
     ...bareKindData(kind),
@@ -298,7 +295,6 @@ function props({
     display: running(
       open === true ? { shown: 'open', content: resolved } : { shown: 'closed' },
       editor,
-      replacer,
     ),
     activeGraphId: graphId,
     activeGraphColor: '#1f77b4',
@@ -316,8 +312,8 @@ function props({
   if (open !== undefined) data.open = open;
   if (onBeginEdit !== undefined && data.kind === 'markdown')
     data.kindOperations = { kind: 'markdown', onBeginEdit };
-  if (onBeginEdit !== undefined && data.kind === 'image')
-    data.kindOperations = { kind: 'image', onBeginEdit };
+  if (imageOperations !== undefined && data.kind === 'image')
+    data.kindOperations = { kind: 'image', ...imageOperations };
   if (resize !== undefined) data.resize = resize;
   if (connectionAuthoringEnabled !== undefined)
     data.connectionAuthoringEnabled = connectionAuthoringEnabled;
@@ -503,65 +499,38 @@ describe('ResourceNode canvas Resource state adapter', () => {
     expect(screen.getByRole('img', { name: 'Markdown Resource' })).toBeVisible();
   });
 
-  it('renders a Closed Image Resource by its Title and kind, with no Markdown to edit', () => {
-    const onOpenChange = vi.fn();
+  it('draws an Image Resource through its plugin: its picture, named by its Title, with no Open or Edit', () => {
+    const url = 'https://example.com/harbour.png';
+    render(
+      <ResourceNode {...props({ kind: 'image', url, selected: true, onOpenChange: vi.fn() })} />,
+    );
+
+    expect(screen.getByRole('article', { name: 'A' })).toHaveAttribute('data-kind', 'image');
+    expect(screen.getByRole('img', { name: 'A' })).toHaveAttribute('src', url);
+    expect(screen.queryByRole('button', { name: 'Open Resource A' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Edit Resource A' })).toBeNull();
+  });
+
+  it('offers an Image Resource Replace on the rail where the host offers its content, Claim and picker', () => {
+    const url = 'https://example.com/harbour.png';
+    const pick = vi.fn(() => Promise.resolve([]));
     render(
       <ResourceNode
         {...props({
           kind: 'image',
-          selected: true,
-          onOpenChange,
-          onBeginEdit: vi.fn(),
-        })}
-      />,
-    );
-
-    expect(screen.getByRole('article', { name: 'A' })).toHaveAttribute('data-kind', 'image');
-    expect(screen.getByRole('img', { name: 'Image Resource' })).toBeVisible();
-    expect(screen.queryByRole('button', { name: 'Edit Resource A' })).toBeNull();
-    screen.getByRole('button', { name: 'Open Resource A' }).click();
-    expect(onOpenChange).toHaveBeenCalledWith(true);
-  });
-
-  it('offers an Image Resource Replace, and draws the upload target while it is replacing', () => {
-    const url = 'https://example.com/harbour.png';
-    const onBeginEdit = vi.fn();
-    const { rerender } = render(
-      <ResourceNode {...props({ kind: 'image', url, open: true, selected: true, onBeginEdit })} />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Replace image of Resource A' }));
-    expect(onBeginEdit).toHaveBeenCalledTimes(1);
-
-    rerender(
-      <ResourceNode
-        {...props({
-          kind: 'image',
           url,
-          open: true,
           selected: true,
-          replacer: {
-            pick: () => Promise.resolve([]),
-            onReplace: () => Promise.resolve(null),
-            onEnd: () => undefined,
+          imageOperations: {
+            commitContent: () => Promise.resolve('completed'),
+            claim: () => undefined,
+            pick,
           },
         })}
       />,
     );
-    expect(screen.getByRole('group', { name: 'Replace image of A' })).toBeVisible();
-  });
 
-  it("keeps drawing a Closing Image Resource's picture while its content fades out", () => {
-    const url = 'https://example.com/harbour.png';
-    const { rerender } = render(<ResourceNode {...props({ kind: 'image', url, open: true })} />);
-
-    // The data the projection hands a Closed Image Resource: a Closed display.
-    rerender(<ResourceNode {...props({ kind: 'image', open: false })} />);
-
-    const content = document.querySelector('.canvas-resource__content');
-    expect(content).toHaveAttribute('data-presence', 'leaving');
-    expect(screen.getByRole('img', { name: 'A' })).toHaveAttribute('src', url);
-    expect(screen.queryByTestId('resource-image-failed')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Replace image of Resource A' }));
+    expect(pick).toHaveBeenCalledTimes(1);
   });
 
   it('renders a Space Resource through explicit non-Markdown kind operations', () => {
@@ -596,7 +565,7 @@ describe('ResourceNode draws what the display shows', () => {
           title: 'Harbour, again',
           open: true,
           selected: true,
-          content: { kind: 'image', url: FIGURE, via: 'target' },
+          content: { kind: 'image', content: { url: FIGURE }, via: 'target' },
           onOpenChange: vi.fn(),
         })}
       />,
@@ -608,7 +577,7 @@ describe('ResourceNode draws what the display shows', () => {
     expect(screen.queryByRole('button', { name: /^Replace image/u })).toBeNull();
 
     fireEvent.error(picture);
-    expect(screen.getByTestId('resource-image-failed')).toBeVisible();
+    expect(screen.getByTestId('image-failed')).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Replace image' })).toBeNull();
   });
 
@@ -677,7 +646,7 @@ describe('ResourceNode Ur Resource', () => {
           title: 'Gateway, again',
           open: true,
           selected: true,
-          content: { kind: 'ur', via: 'target' },
+          content: { kind: 'ur', content: {}, via: 'target' },
           onOpenChange: vi.fn(),
         })}
       />,
@@ -787,25 +756,6 @@ describe("ResourceNode floats a Resource's commands in React Flow's NodeToolbar"
       />,
     );
     expect(toolbar()).not.toBeNull();
-  });
-
-  it('keeps Cancel visible while an unselected image is being replaced', () => {
-    render(
-      <ResourceNode
-        {...props({
-          kind: 'image',
-          url: 'https://example.com/figure.png',
-          open: true,
-          replacer: {
-            pick: () => Promise.resolve([]),
-            onReplace: vi.fn(() => Promise.resolve(null)),
-            onEnd: vi.fn(),
-          },
-        })}
-      />,
-    );
-    expect(toolbar()).not.toBeNull();
-    expect(screen.getByRole('button', { name: 'Cancel editing Resource A' })).toBeVisible();
   });
 });
 
