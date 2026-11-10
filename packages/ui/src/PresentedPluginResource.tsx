@@ -129,3 +129,73 @@ export function PresentedPluginSurface(
     </article>
   );
 }
+
+/** The room the plugin fills: all of the space below the name. */
+const CONTENT_ROOM = {
+  position: 'relative',
+  flex: 1,
+  width: '100%',
+  height: '100%',
+  minWidth: 0,
+  minHeight: 0,
+} as const;
+
+/** The plugin's Title: `PresentedResource` draws the name above it, so at most one draws. */
+function NoTitle() {
+  return null;
+}
+
+export interface PresentedPluginContentProps {
+  readonly kind: PluginKind;
+  /** The name drawn above, which the plugin is given as its Title. */
+  readonly title: string;
+  /** The content, which the plugin's schema parses. */
+  readonly content: unknown;
+}
+
+/**
+ * A plugin kind's content drawn read-only below a name `PresentedResource`
+ * draws, as the Notes window draws a presented note and a preview of each
+ * move (ADR 0129, ADR 0142): no commit, no Claim, no rail drawn anywhere, and
+ * nothing to embed.
+ */
+export function PresentedPluginContent({ kind, title, content }: PresentedPluginContentProps) {
+  const supplied = usePluginAssets();
+  const assets = useMemo(() => readingAssets(supplied), [supplied]);
+  const host: ResourceHost = useMemo(
+    () => ({
+      Title: NoTitle,
+      Own: StageOwn,
+      rail: createRailStore(),
+      RenderedMarkdown: HostRenderedMarkdown,
+      SourceEditor: HostSourceEditor,
+    }),
+    [],
+  );
+  const embedding: Embedding = useMemo(
+    () => ({ resources: [], drawing: [], host, size: STAGE_SIZE, selected: false }),
+    [host],
+  );
+  const plugin = pluginEntryFor(kind).render({
+    resourceId: '',
+    kind,
+    title,
+    content,
+    mapContent: mapContentWithoutMap(kind),
+    size: STAGE_SIZE,
+    selected: false,
+    operations: { kind },
+    assets,
+    Embed: HostEmbed,
+    onClaim: (claim) => claim.unmount(),
+  });
+  return (
+    <div className="resource-presented-plugin" data-content-kind={kind} style={CONTENT_ROOM}>
+      <ResourceFailureBoundary>
+        <EmbeddingProvider embedding={embedding}>
+          <ResourceHostProvider host={host}>{plugin}</ResourceHostProvider>
+        </EmbeddingProvider>
+      </ResourceFailureBoundary>
+    </div>
+  );
+}

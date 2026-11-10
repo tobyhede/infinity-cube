@@ -384,3 +384,47 @@ describe('PresentedResource', () => {
     });
   });
 });
+
+/**
+ * Below a name it draws itself, `PresentedResource` draws a plugin kind's
+ * content read-only, as the Notes window draws a presented note and a
+ * preview of each move (ADR 0129).
+ */
+describe('PresentedResource drawing a plugin kind’s content below its name', () => {
+  it('draws Markdown content, parsed, under the one name it heads with', async () => {
+    const { container } = await presentMarkdown(
+      <PresentedResource
+        title="Demo"
+        content={{
+          kind: 'markdown',
+          content: { url: textAsset('A live walk through checkout.') },
+          via: 'self',
+        }}
+      />,
+    );
+
+    expect(screen.getAllByRole('heading', { name: 'Demo' })).toHaveLength(1);
+    expect(container.querySelector('.resource__body')).toHaveTextContent(
+      'A live walk through checkout.',
+    );
+  });
+
+  it('draws Image content as its picture, the name as the text alternative', () => {
+    render(
+      <PresentedResource
+        title={'Harbour\nAt dusk'}
+        content={{
+          kind: 'image',
+          content: { url: 'https://example.com/h.png' },
+          via: 'self',
+        }}
+      />,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Harbour' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Harbour' })).toHaveAttribute(
+      'src',
+      'https://example.com/h.png',
+    );
+  });
+});

@@ -1,6 +1,7 @@
 import { imageKind, type ImageContent } from '@project/core';
 import { imagePlugin } from '@project/plugin-image/domain';
 import { imagePluginView } from '@project/plugin-image/view';
+import { PresentedPluginContent } from '../PresentedPluginResource';
 import type { KindView } from './kind-view';
 import type { PluginOperations } from './plugin-views';
 
@@ -16,4 +17,7 @@ export const imageView: KindView<PluginOperations, ImageContent> = {
   referenceName: imagePlugin.referenceName,
   Glyph: imagePluginView.Glyph,
   bareOperations: { kind: imageKind.id },
+  presented: (name, content) => (
+    <PresentedPluginContent kind={imageKind.id} title={name} content={content.content} />
+  ),
 };
