@@ -7,6 +7,8 @@ import { z } from 'zod';
  * no view and imports no React, because the server and the CLI load it.
  */
 
+export { titleName } from './title';
+
 /**
  * The version of this API, which every plugin declares it was written for. The
  * build-time plugin list accepts only this one (`pluginList`), so a plugin
@@ -62,6 +64,13 @@ const ASSET_REF = /^\/assets\/[A-Za-z0-9_-]{43}$/u;
 /** Whether a string is an asset reference. */
 export const isAssetRef = (value: string): value is AssetRef => ASSET_REF.test(value);
 
+/** What storing bytes answers: their reference, or why they were not stored. */
+export type StoreAnswer = AssetRef | { readonly refused: string };
+
+/** Whether a store answered a reference rather than a refusal. */
+export const isStoredAsset = (answer: StoreAnswer): answer is AssetRef =>
+  typeof answer === 'string';
+
 /** The runtime parser the host's walk and a plugin's content schema share. */
 export const assetRefSchema = z.string().refine(isAssetRef, 'An asset reference.');
 
@@ -111,6 +120,19 @@ export interface ResourcePlugin<C, M> {
   readonly mapContent: MapContentDeclaration<M>;
   /** The outline the canvas strokes, from this Map's content; a rectangle when absent. */
   outline?(mapContent: M): Outline;
+  /**
+   * Whether the canvas strokes no border on the outline while the Resource is
+   * in no Graph and not selected, as a picture is drawn bare. The ring and a
+   * Graph's colour are still drawn (ADR 0135, ADR 0139).
+   */
+  readonly bareAtRest?: boolean;
+  /**
+   * Whether the plugin draws its Title; true when absent. One that draws none,
+   * as a picture whose Title is its text alternative, has the host draw the
+   * Title editor over its rect while the Title is renamed from outside it, as
+   * when a new Resource is named.
+   */
+  readonly drawsTitle?: boolean;
   /** Whether another Resource may reference one of this kind as its Target (ADR 0113). */
   readonly mayBeTarget?: boolean;
   /** The Resources this content references, which intake resolves. */

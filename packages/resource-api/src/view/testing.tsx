@@ -42,6 +42,8 @@ export interface Commits<C, M> {
   readonly content: C[];
   readonly map: M[];
   readonly stored: Blob[];
+  /** How many times exclusive work ran. */
+  readonly exclusive: number;
 }
 
 export interface RenderPluginOptions<C, M> {
@@ -56,12 +58,17 @@ export interface RenderPluginOptions<C, M> {
   readonly answer?: Answer;
   /** What a granted pick answers. */
   readonly files?: readonly File[];
+  /** Whether a granted `claim()` is refused, as the chain refuses one. */
+  readonly claimRefused?: boolean;
 }
 
 export type RenderedPlugin<C, M> = RenderResult & { readonly commits: Commits<C, M> };
 
+/** Where a test surface draws an asset from: a URL that names the reference, so a test can see it. */
+export const testAssetUrl = (ref: AssetRef): string => `blob:test${ref}`;
+
 const TEST_ASSETS = {
-  url: (ref: AssetRef) => ref,
+  url: testAssetUrl,
   read: () => Promise.resolve({ refused: 'No asset store in this test.' }),
 };
 
@@ -76,7 +83,7 @@ const WITHDRAWN = { refused: 'Exclusive work is running.' } as const;
 const ENDED = { refused: 'The exclusive work has ended.' } as const;
 
 /** A stored Blob's reference: its position, padded to an asset reference's 43 characters. */
-const testAssetRef = (position: number): AssetRef =>
+export const testAssetRef = (position: number): AssetRef =>
   `/assets/${String(position).padStart(43, 'A')}`;
 
 /** Whether exclusive work runs on the test page, and which run it is. */
@@ -176,7 +183,16 @@ export function renderPlugin<C, M>(
   View: ComponentType<PluginViewProps<C, M>>,
   options: RenderPluginOptions<C, M>,
 ): RenderedPlugin<C, M> {
-  const commits: Commits<C, M> = { title: [], content: [], map: [], stored: [] };
+  let exclusiveRuns = 0;
+  const commits: Commits<C, M> = {
+    title: [],
+    content: [],
+    map: [],
+    stored: [],
+    get exclusive() {
+      return exclusiveRuns;
+    },
+  };
   const grants = options.grants ?? {};
   const answer: Answer = options.answer ?? 'completed';
   const gate = createTestGate();
@@ -216,38 +232,40 @@ export function renderPlugin<C, M>(
         map: grants.map === true ? settle(commits.map, setMapValue) : undefined,
         store: grants.store === true ? store : undefined,
       };
-      const idle = () => !gate.running();
-      const offered = <T,>(commit: T | undefined) => (running ? undefined : commit);
-      const plain = <T, A>(commit: ((next: T) => Promise<A>) | undefined) =>
-        offered(commit === undefined ? undefined : guarded(commit, idle, WITHDRAWN));
-      const claim: OwnClaim<C, M> = {
-        release: () => undefined,
-        exclusively: (work) =>
-          gate.exclusively((live) => {
-            const ownCommit = <T, A>(commit: ((next: T) => Promise<A>) | undefined) =>
-              commit === undefined ? undefined : guarded(commit, live, ENDED);
-            const own: Exclusive<C, M> = {
-              title: ownCommit(granted.title),
-              content: ownCommit(granted.content),
-              map: ownCommit(granted.map),
-              store: ownCommit(granted.store),
-            };
-            return work(own);
-          }),
-      };
-      const assets: Assets = {
-        ...TEST_ASSETS,
-        store: plain(granted.store),
-        pick: grants.pick === true ? offered(pick) : undefined,
-      };
-      return {
-        title: plain(granted.title),
-        content: plain(granted.content),
-        map: plain(granted.map),
-        claim: grants.claim === true ? () => claim : undefined,
-        assets,
-      };
-    }, [running]);
+    const titleCommit = settle(commits.title, setTitle);
+    const contentCommit = settle(commits.content, setContent);
+    const mapCommit = settle(commits.map, setMapValue);
+    const granted = {
+      title: grants.title === true ? titleCommit : undefined,
+      content: grants.content === true ? contentCommit : undefined,
+      map: grants.map === true ? mapCommit : undefined,
+      store: grants.store === true ? store : undefined,
+    };
+    const idle = () => !gate.running();
+    const offered = <T,>(commit: T | undefined) => (running ? undefined : commit);
+    const plain = <T, A>(commit: ((next: T) => Promise<A>) | undefined) =>
+      offered(commit === undefined ? undefined : guarded(commit, idle, WITHDRAWN));
+    const claim: OwnClaim<C, M> = {
+      release: () => true,
+      exclusively: (work) =>
+        gate.exclusively((live) => {
+          exclusiveRuns += 1;
+          const ownCommit = <T, A>(commit: ((next: T) => Promise<A>) | undefined) =>
+            commit === undefined ? undefined : guarded(commit, live, ENDED);
+          const own: Exclusive<C, M> = {
+            title: ownCommit(granted.title),
+            content: ownCommit(granted.content),
+            map: ownCommit(granted.map),
+            store: ownCommit(granted.store),
+          };
+          return work(own);
+        }),
+    };
+    const assets: Assets = {
+      ...TEST_ASSETS,
+      store: plain(granted.store),
+      pick: grants.pick === true ? offered(pick) : undefined,
+    };
     const surface: Surface<C, M> = {
       resource: { id: 'resource', title, kind: options.kind ?? 'test', content },
       title: { value: title, commit: offeredNow.title },
@@ -255,8 +273,11 @@ export function renderPlugin<C, M>(
       map: { value: mapValue, commit: offeredNow.map },
       size: options.size ?? DEFAULT_SIZE,
       selected: options.selected ?? false,
-      claim: offeredNow.claim,
-      assets: offeredNow.assets,
+      claim:
+        grants.claim === true
+          ? () => (options.claimRefused === true ? undefined : claim)
+          : undefined,
+      assets,
       Embed: TestEmbed,
     };
     return (
