@@ -1,11 +1,9 @@
 import { useCallback } from 'react';
 import {
-  isMissingKind,
   kindFlags,
   spaceSelection,
   titleName,
   type PluginKind,
-  type ResourceKind,
   type Map as SpaceMap,
   type Resource,
   type ResourceId,
@@ -14,7 +12,6 @@ import type { Space } from '@project/graph';
 import {
   DeleteIcon,
   EnterSpaceIcon,
-  kindNaming,
   PresentIcon,
   FullViewIcon,
   OpenAndExpandIcon,
@@ -37,14 +34,9 @@ import {
   removeFromMapReportedBy,
   type BoundCommand,
 } from './canvas-commands';
+import { referenceTerminal } from './authoring-refusal';
 import { bindingOf } from './key-bindings';
 import { shortcutOf } from './shortcut-sheet';
-
-/** The sentence the unavailable Create Reference row of a Resource that may not be a Target carries. */
-export const referenceTerminal = (kind: ResourceKind): string =>
-  isMissingKind(kind)
-    ? `“${kind}” is not available in this build, so it cannot be referenced.`
-    : `${kindNaming(kind).listName} cannot be referenced.`;
 
 /** A creation a Resource's rail offers on it, as a plugin declares one from a Resource (ADR 0142). */
 export interface RailCreation {

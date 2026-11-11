@@ -1,4 +1,6 @@
+import { isMissingKind, type ResourceKind, type UUID } from '@project/core';
 import type { SpaceAggregateError, SpaceError } from '@project/graph';
+import { kindNaming } from '@project/ui';
 import {
   ASSET_ABSENT,
   ASSET_TOO_LARGE,
@@ -40,6 +42,29 @@ type PresentedAuthoringRefusal =
 const MAP_NO_LONGER_IN_SPACE = 'This Map is no longer part of the Space.';
 
 /** Application-owned copy for a stable Authoring refusal identity. */
+/** The sentence the unavailable Create Reference row of a Resource that may not be a Target carries. */
+export const referenceTerminal = (kind: ResourceKind): string =>
+  isMissingKind(kind)
+    ? `“${kind}” is not available in this build, so it cannot be referenced.`
+    : `${kindNaming(kind).listName} cannot be referenced.`;
+
+/**
+ * {@link describeAuthoringRefusal}, naming the kind when a Reference's Target
+ * is a Resource whose plugin is missing (issue 09): the general sentence says
+ * referencing is a single hop, which is not why that one is refused.
+ * `kindOf` answers the kind of a Resource the Space holds.
+ */
+export const describeAuthoringRefusalIn = (
+  refusal: PresentedAuthoringRefusal,
+  kindOf: (id: UUID) => ResourceKind | undefined,
+): string => {
+  if (refusal.code === 'reference-target-not-targetable') {
+    const kind = kindOf(refusal.targetId);
+    if (kind !== undefined && isMissingKind(kind)) return referenceTerminal(kind);
+  }
+  return describeAuthoringRefusal(refusal);
+};
+
 export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): string => {
   switch (refusal.code) {
     case 'placement-failed':

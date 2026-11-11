@@ -1,6 +1,6 @@
 import { act } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { isOfKind, uuidSchema, type JsonValue } from '@project/core';
+import { isMissingKindId, isOfKind, uuidSchema, type JsonValue } from '@project/core';
 import type { CreationData } from '@project/resource-api/view';
 import {
   NotCreatableContent,
@@ -22,10 +22,9 @@ import {
 } from '../src/plugin-host/creation';
 import { createPluginGate } from '../src/plugin-host/plugin-gate';
 import {
+  derivationSnapshot,
   MAP_ID,
   OTHER_MAP_ID,
-  SPACE_ID,
-  derivationSnapshot,
   openDerivationSpace,
 } from './app-derivation-fixtures';
 import { textAsset } from './markdown-texts';
@@ -357,6 +356,42 @@ describe('a creation the host carries out', () => {
 
     expect(reportBreak).toHaveBeenCalledWith(failure);
     expect(placedOn(opened)).not.toContain(CREATED);
+  });
+});
+
+describe('a creation from a Resource whose plugin is missing', () => {
+  const UNPLUGGED = uuidSchema.parse('00000000-0000-4000-8000-0000000000d1');
+  const kind = 'vnd.example.chart';
+
+  /** The derivation Space with one Resource of a kind no plugin in this build draws. */
+  const withUnplugged = () => {
+    if (!isMissingKindId(kind)) throw new Error('A plugin in this build draws the kind');
+    return openDerivationSpace(mintingIds(CREATED), {
+      ...derivationSnapshot,
+      resources: [
+        ...derivationSnapshot.resources,
+        { id: UNPLUGGED, document: { title: 'Chart', kind, content: { nodes: 3 } } },
+      ],
+    });
+  };
+
+  it('refuses a Reference to it, saying its kind is not available, and creates nothing', async () => {
+    const opened = withUnplugged();
+    const { host } = hosted(opened);
+
+    await host.run(
+      offered(
+        'reference',
+        askFor([{ title: 'Chart', content: { target: UNPLUGGED } }]),
+        'resource',
+      ),
+      gesture(),
+    );
+
+    expect(placedOn(opened)).not.toContain(CREATED);
+    expect(notice(opened)?.message).toBe(
+      '“vnd.example.chart” is not available in this build, so it cannot be referenced.',
+    );
   });
 });
 
