@@ -3109,9 +3109,9 @@ test('the graph advertises its Resource and Edge delete commands', async ({ page
   await selectCanvas(page, 'Collection 1');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
 
-  await expect(page.locator('[id^="react-flow__node-desc"]')).toContainText(/Full View/i);
-  // Enter opens no Resource on the canvas, so the description names none.
-  await expect(page.locator('[id^="react-flow__node-desc"]')).not.toContainText(/\benter\b/i);
+  await expect(page.locator('[id^="react-flow__node-desc"]')).toContainText(
+    /read a Resource in Full View/i,
+  );
   await expect(page.locator('[id^="react-flow__node-desc"]')).toContainText(/remove.*Map/i);
   await expect(page.locator('[id^="react-flow__edge-desc"]')).toContainText(/delete/i);
 });

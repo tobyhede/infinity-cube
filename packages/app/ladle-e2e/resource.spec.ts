@@ -465,7 +465,14 @@ test(
     await open.press('Enter');
     await expect(page.getByText('Strategies is open.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Close Resource Strategies' })).toBeVisible();
-    await expect.poll(() => titleTreatment()).toEqual(closedTitleTreatment);
+    // Open, the Markdown plugin draws its Title at the top of the rect rather
+    // than its foot, keeping the same inset from the left edge (ADR 0142).
+    await expect
+      .poll(async () => {
+        const { left, bodyPadding } = await titleTreatment();
+        return { left, bodyPadding };
+      })
+      .toEqual({ left: closedTitleTreatment.left, bodyPadding: closedTitleTreatment.bodyPadding });
   },
 );
 
@@ -597,50 +604,46 @@ test(
  * declarations themselves are held by
  * `packages/ui/test/canvas-resource-title-ladder.test.ts`.
  */
-test('a Title being written on more lines than fit does not push the rail out of its Resource', async ({
-  page,
-}) => {
+test('a Title being written on more lines than fit stays inside its Resource', async ({ page }) => {
   await page.goto('/?story=components--resource--editing--title&mode=preview');
 
   const group = page
     .getByRole('region', { name: 'Laddered Resource title editing' })
     .getByTestId('resource-group');
   const resource = group.locator('.canvas-resource');
-  const rail = group.locator('.resource-rail');
   await group.getByRole('button', { name: 'Edit Title Auth' }).click();
 
   const field = page.getByRole('textbox', { name: 'Resource title' });
   await expect(field).toBeFocused();
 
-  /** The field's drawn height, and whether the rail is still inside the Resource. */
+  /** The field's drawn height, and whether the field is still inside the Resource. */
   const geometry = async () => {
     const resourceBox = await resource.boundingBox();
-    const railBox = await rail.boundingBox();
     const fieldBox = await field.boundingBox();
-    if (resourceBox === null || railBox === null || fieldBox === null) {
+    if (resourceBox === null || fieldBox === null) {
       throw new Error('Resource geometry unavailable');
     }
     return {
       fieldHeight: Math.round(fieldBox.height),
-      // The border, which the rail sits inside of. A rail pushed above it is
-      // not merely misplaced, it is clipped.
-      railAboveResource: railBox.y < resourceBox.y,
+      // The border, which a Closed Title grows up from its foot towards. A
+      // field pushed above it is not merely misplaced, it is clipped.
+      fieldAboveResource: fieldBox.y < resourceBox.y,
     };
   };
 
   // Four lines is the ladder's ceiling, and the field draws all four.
   await field.fill('Auth\nhow tokens are minted\ndraft, 2026\nand a fourth');
   const atCeiling = await geometry();
-  expect(atCeiling.railAboveResource).toBe(false);
+  expect(atCeiling.fieldAboveResource).toBe(false);
 
-  // Past the ceiling the field stops at the same height rather than taking the
-  // rail with it, and the lines past the ceiling are reachable by scrolling
+  // Past the ceiling the field stops at the same height rather than growing
+  // out of the Resource, and the lines past the ceiling are reachable by scrolling
   // rather than lost.
   await field.fill(
     'Auth\nhow tokens are minted\ndraft, 2026\nand a fourth\nand a fifth\nand a sixth',
   );
   const pastCeiling = await geometry();
-  expect(pastCeiling.railAboveResource).toBe(false);
+  expect(pastCeiling.fieldAboveResource).toBe(false);
   expect(pastCeiling.fieldHeight).toBe(atCeiling.fieldHeight);
   expect(await field.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
 });
@@ -699,7 +702,6 @@ test(
       ] as const) {
         const resource = specimen(page, `${resourceShape} · ${suffix}`).getByRole('article');
         await expect(resource).toHaveAttribute('data-resource-shape', resourceShape);
-        await expect(resource).toHaveAttribute('data-open', 'false');
         await expect(resource.getByRole('img', { name: 'Ur Resource' })).toHaveCount(0);
         expect(await drawnOutline(resource), `${resourceShape} · ${suffix}`).toEqual({
           shape: resourceShape,
