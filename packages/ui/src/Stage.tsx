@@ -1,5 +1,6 @@
 import { useImperativeHandle, useLayoutEffect, useRef, type ReactNode, type Ref } from 'react';
 import './stage.css';
+import './kinds/ur-stage.css';
 
 export interface StageProps {
   /** What the frame shows: the Resource being presented. */
