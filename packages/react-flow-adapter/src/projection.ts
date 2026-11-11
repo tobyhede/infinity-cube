@@ -39,15 +39,15 @@ import { graphHeadMarkerId } from './GraphHeadMarkers';
 
 const FALLBACK_COLOR = FALLBACK_GRAPH_COLOR;
 
+/** The z-index an Open Resource is drawn at, over its Closed neighbours. */
+export const OPEN_RESOURCE_Z_INDEX = 10;
+
 /**
  * Opacity of the Graphs that are not the active one, while one is. With no
  * Graph active every Graph is drawn at full strength; activating one recedes
  * the rest to hairlines with small heads (`RECEDING_STROKE_WIDTH`), which this
  * softens rather than hides.
  */
-
-/** The z-index an Open Resource is drawn at, over its Closed neighbours. */
-export const OPEN_RESOURCE_Z_INDEX = 10;
 export const OTHER_GRAPH_OPACITY = 0.35;
 
 /** What ends an inline title edit. Answers a refusal reason, or `null` when the

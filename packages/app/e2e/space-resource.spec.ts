@@ -437,11 +437,11 @@ test(
     await createSpaceResourceNamed(page, 'Architecture');
     await settled(page);
 
-    // Opened from the keyboard rather than from the Resource's own control, because
-    // the created Resource is placed at the visible centre and the fixture already
-    // has a Resource there — a deliberate partial overlap (`freeAnchor` steps only on
-    // an exact collision), which leaves the rail under another node's box. Enter
-    // on the focused node is the same `opened-resource` completion the control runs.
+    // Opened by pressing its rail's Open from the keyboard rather than clicking
+    // it: the created Resource is placed at the visible centre and the fixture
+    // already has a Resource there — a deliberate partial overlap (`freeAnchor`
+    // steps only on an exact collision), which can leave the rail under another
+    // node's box.
     const resource = nodeByTitle(page, 'Architecture');
     await openFromRail(page, resource);
 
@@ -1197,6 +1197,10 @@ test('a connection between Resources of two different drawings lands no Edge', a
   await page.mouse.move(drop.x, drop.y, { steps: 8 });
   await page.mouse.up();
 
+  // Refused in so many words, rather than dropped silently.
+  await expect(page.getByTestId('canvas-command-refusal')).toHaveText(
+    'An Edge can connect Resources only within the same drawn Map.',
+  );
   await settled(page);
   expect(await embeddedGraphEdgeCount(page, first)).toBe(firstBefore);
   expect(await embeddedGraphEdgeCount(page, second)).toBe(secondBefore);
@@ -1205,6 +1209,13 @@ test('a connection between Resources of two different drawings lands no Edge', a
     decodeLoadedSpace(await stored.json())
       .snapshot.document.maps?.find((candidate) => candidate.id === DEEP_DIVE_MAP_ID)
       ?.graphs.flatMap((graph) => graph.edges),
+  ).toEqual([]);
+  // Nor does the drop on the second drawing land an Edge on the canvas's own Map.
+  const host = await page.request.get(`/api/spaces/${root.snapshot.id}`);
+  expect(
+    decodeLoadedSpace(await host.json()).snapshot.document.maps?.flatMap((candidate) =>
+      candidate.graphs.flatMap((graph) => graph.edges),
+    ),
   ).toEqual([]);
 });
 
