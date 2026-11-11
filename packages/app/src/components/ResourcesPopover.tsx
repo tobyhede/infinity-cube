@@ -11,13 +11,11 @@ import {
 } from 'react';
 import {
   contentTarget,
-  DEFAULT_KIND,
   isMissingKind,
   KIND_IDS,
   spaceReferences,
   titleName,
   type KindId,
-  type MissingKind,
   type Resource,
   type ResourceId,
   type ResourceKind,
@@ -61,6 +59,7 @@ import {
   TooltipTrigger,
   graphPaint,
   kindNaming,
+  missingKindNaming,
 } from '@project/ui';
 import './resources-popover.css';
 
@@ -87,16 +86,10 @@ export type ResourcesFilter = KindId | 'unavailable' | 'spaces';
 
 /**
  * The filter a Resource is listed under: its kind's, or, for every kind no
- * plugin in this build draws, the one `unavailable` filter (issue 09).
+ * plugin in this build draws, the one `unavailable` filter.
  */
 const filterOfKind = (kind: ResourceKind): KindId | 'unavailable' =>
   isMissingKind(kind) ? 'unavailable' : kind;
-
-/** The first kind among `resources` that no plugin in this build draws. */
-const firstMissingKind = (resources: readonly Resource[]): MissingKind | undefined => {
-  for (const { kind } of resources) if (isMissingKind(kind)) return kind;
-  return undefined;
-};
 
 /**
  * Every filter exactly once, in the order they are drawn: each kind's, in the
@@ -131,16 +124,9 @@ const filterName = (filter: ResourcesFilter): string =>
  * with a badge, the badge over the default base; the Meta Space's Spaces draw
  * the Opener mark.
  */
-const FilterGlyph = ({
-  filter,
-  unavailable,
-}: {
-  readonly filter: ResourcesFilter;
-  /** A kind the `unavailable` filter stands for, whose glyph is the default plugin's. */
-  readonly unavailable: MissingKind | undefined;
-}) => {
+const FilterGlyph = ({ filter }: { readonly filter: ResourcesFilter }) => {
   if (filter === 'spaces') return <ParentIcon />;
-  const { Glyph } = kindNaming(filter === 'unavailable' ? (unavailable ?? DEFAULT_KIND) : filter);
+  const { Glyph } = filter === 'unavailable' ? missingKindNaming : kindNaming(filter);
   return Glyph === BADGED_TARGET_GLYPH ? <ReferenceIcon /> : <Glyph />;
 };
 
@@ -590,11 +576,11 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
   /**
    * The `unavailable` toggle is drawn only while the Space holds a Resource of
    * a kind no plugin in this build draws: in every other build it would be a
-   * permanent zero for something that cannot be made (issue 09).
+   * permanent zero for something that cannot be made.
    */
-  const unavailable = firstMissingKind([...resources, ...allResources]);
+  const holdsMissingKind = [...resources, ...allResources].some(({ kind }) => isMissingKind(kind));
   const filters = (connecting === null ? FILTERS : RESOURCE_FILTERS).filter(
-    (filter) => filter !== 'unavailable' || unavailable !== undefined,
+    (filter) => filter !== 'unavailable' || holdsMissingKind,
   );
   const surfaceName = connecting === null ? 'Resources' : `Connect ${connecting.from}`;
   /**
@@ -954,7 +940,7 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
                   title={filterName(filter)}
                   className="resources-popover__toggle"
                 >
-                  <FilterGlyph filter={filter} unavailable={unavailable} />
+                  <FilterGlyph filter={filter} />
                   <span className="resources-popover__count" aria-hidden="true">
                     {countOf(filter)}
                   </span>

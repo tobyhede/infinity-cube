@@ -28,6 +28,7 @@ export {
   isMissingKind,
   isOfKind,
   isMissingKindId,
+  isPluginDrawnKind,
   kindFlags,
   isPluginKind,
   keepsMapContent,

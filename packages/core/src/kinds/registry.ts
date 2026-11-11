@@ -73,7 +73,7 @@ export type MissingKind = string & { readonly [missingKind]: true };
 export type ResourceKind = KindId | MissingKind;
 
 /** A kinded value whose kind names no plugin in this build: its content is unread JSON. */
-type Unplugged = { kind: MissingKind; content: JsonObject };
+export type Unplugged = { kind: MissingKind; content: JsonObject };
 
 /**
  * Whether a kinded value is of this kind, narrowing its content to that kind's.
@@ -236,9 +236,6 @@ const contentTargetOf = <K extends KindId>(resource: Kinded<K>) =>
 export const contentTarget = (resource: KindedResource): UUID | undefined =>
   isPlugged(resource) ? contentTargetOf(resource) : undefined;
 
-/** Whether a plugin draws a Resource of this kind: its own, or the default plugin where it has none. */
-const drawsKind = (kind: ResourceKind): boolean => !isRegisteredKind(kind) || isPluginKind(kind);
-
 /** The Resource this one shows, where it shows one and `resourceOf` resolves it. */
 const targetIn = (
   resource: KindedResource,
@@ -260,11 +257,10 @@ export const drawnByPlugin = (
   resource: KindedResource,
   resourceOf: (id: UUID) => KindedResource | undefined,
 ): boolean => {
-  if (!drawsKind(resource.kind)) return false;
-  const targetId = contentTarget(resource);
-  if (targetId === undefined) return true;
-  const target = resourceOf(targetId);
-  return target === undefined || drawsKind(target.kind);
+  if (!isPluginDrawnKind(resource.kind)) return false;
+  if (contentTarget(resource) === undefined) return true;
+  const target = targetIn(resource, resourceOf);
+  return target === undefined || isPluginDrawnKind(target.kind);
 };
 
 /**
@@ -460,3 +456,10 @@ export const isKindId = (value: string): boolean => KIND_ID.test(value);
 /** Whether a value is a well-formed kind id no plugin in this build draws: a missing plugin's kind. */
 export const isMissingKindId = (value: string): value is MissingKind =>
   !isRegisteredKind(value) && isKindId(value);
+
+/**
+ * Whether a plugin draws a Resource of this kind: its own plugin, or the
+ * default plugin where the kind's plugin is missing.
+ */
+export const isPluginDrawnKind = (kind: string): boolean =>
+  isPluginKind(kind) || isMissingKindId(kind);

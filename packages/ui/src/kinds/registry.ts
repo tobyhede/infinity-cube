@@ -72,6 +72,9 @@ export type KindNaming = Pick<KindView<unknown>, 'name' | 'listName' | 'referenc
 export const kindNaming = (kind: ResourceKind): KindNaming =>
   isRegisteredKind(kind) ? KIND_VIEWS[kind] : defaultView;
 
+/** What every Resource of a kind whose plugin is missing is called and drawn with: the default plugin's. */
+export const missingKindNaming: KindNaming = defaultView;
+
 const registeredBareOperations = <K extends KindId>(kind: K): KindOperationsByKind[K] =>
   KIND_VIEWS[kind].bareOperations;
 

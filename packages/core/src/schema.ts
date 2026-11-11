@@ -6,17 +6,15 @@ import {
   isMissingKindId,
   isRegisteredKind,
   type KindId,
-  type MissingKind,
   type Resource,
   type ResourceDocument,
   type ResourceFileDocument,
+  type Unplugged,
 } from './kinds/registry';
 import { RESOURCE_TITLE_REQUIRED, normalizeTitle } from './title';
 import { uuidSchema } from './uuid';
 import { jsonValueSchema, type JsonObject } from './json-value';
 
-/** A Resource's kind and content where no plugin in this build draws its kind. */
-type Unplugged = { kind: MissingKind; content: JsonObject };
 import { OUTLINES } from '@project/resource-api/domain';
 
 export { newUuid, uuidSchema } from './uuid';

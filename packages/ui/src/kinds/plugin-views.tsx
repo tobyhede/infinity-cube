@@ -2,9 +2,9 @@ import { useMemo, type ComponentType, type ReactElement, type ReactNode } from '
 import {
   declaredOutline,
   imageKind,
+  isPluginDrawnKind,
   isPluginKind,
   PLUGIN_KINDS,
-  isRegisteredKind,
   jsonValueSchema,
   markdownKind,
   referenceKind,
@@ -141,8 +141,7 @@ export interface PluginOperations {
  */
 export const isPluginOperations = (operations: {
   readonly kind: string;
-}): operations is PluginOperations =>
-  isPluginKind(operations.kind) || !isRegisteredKind(operations.kind);
+}): operations is PluginOperations => isPluginDrawnKind(operations.kind);
 
 /** What a host mounts a plugin's view with. */
 export interface PluginSurfaceInput {
