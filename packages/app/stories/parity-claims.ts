@@ -90,7 +90,21 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'surfaces/resources-popover.stories.tsx',
     storyExport: 'MetaSpaces',
     claim:
-      'Each Resource row ends in a Delete <name> from Space control on the row’s own line, a Space row keeps that slot empty, and pressing the control asks to delete that Resource rather than adding it to the Map.',
+      'Each Resource row ends in a Delete <name> from Space control on the row’s own line, drawn only while the row is hovered or holds keyboard focus and without moving the row; a Space row has none, and pressing the control asks to delete that Resource rather than adding it to the Map.',
+  },
+  {
+    id: 'resources-popover-cuts-a-long-name-short',
+    storyFile: 'surfaces/resources-popover.stories.tsx',
+    storyExport: 'LongNames',
+    claim:
+      'A Resource or Space name longer than its row is cut short before the marks at the row’s end — its membership capsules and Delete — rather than running under them or past the row.',
+  },
+  {
+    id: 'resources-popover-delete-takes-the-place-of-the-capsules',
+    storyFile: 'surfaces/resources-popover.stories.tsx',
+    storyExport: 'PlacedElsewhere',
+    claim:
+      'While a Resource row’s Delete is drawn, the membership capsules it is laid over are hidden; during a drag from the list, and on a row a pointer left holding focus, Delete is not drawn and the capsules show.',
   },
   {
     id: 'resources-popover-drags-a-space-onto-the-canvas',
@@ -98,6 +112,13 @@ export const parityClaims: readonly ParityClaim[] = [
     storyExport: 'MetaSpaces',
     claim:
       'A Space row carries the drag grip and a tooltip naming both gestures, and dropping it on the canvas places that Space — authoring the Space Resource that frames it at the drop point — while the list that started the drag stays open to take its answer.',
+  },
+  {
+    id: 'resources-popover-names-each-space-selection',
+    storyFile: 'surfaces/resources-popover.stories.tsx',
+    storyExport: 'SpaceSelections',
+    claim:
+      'Where a Space Resource row and a Space row share a name, each Space Resource row names the Map and Graph it selects, under its name and in its description, and the Space row reads "New Space Resource" and is named as adding a new Space Resource for that Space.',
   },
   {
     id: 'resources-popover-counts-what-each-filter-contributes',

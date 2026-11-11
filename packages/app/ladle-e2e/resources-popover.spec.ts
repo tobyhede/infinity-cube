@@ -45,7 +45,9 @@ test(
     // Interleaved by name rather than sectioned by source: the reader is
     // looking for a name, and the glyph on each row says which it is.
     await expect(page.getByRole('button', { name: /^Add .* to Map$/ })).toHaveCount(7);
-    const spaceRow = page.getByRole('button', { name: 'Add Blueprint to Map' });
+    const spaceRow = page.getByRole('button', {
+      name: 'Add Blueprint as a new Space Resource to Map',
+    });
     await expect(spaceRow).toHaveAttribute('data-space-id', /.+/);
 
     await expect(spaceRow.locator('[data-icon="space"]')).toBeVisible();
@@ -64,7 +66,9 @@ test(
     await expect(page.getByText('Added: Blueprint')).toBeVisible();
 
     await page.getByRole('button', { name: /^Spaces in this Meta Space, \d+$/ }).click();
-    await expect(page.getByRole('button', { name: 'Add Yardstick to Map' })).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: 'Add Yardstick as a new Space Resource to Map' }),
+    ).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Add Architecture to Map' })).toBeVisible();
   },
 );
@@ -76,7 +80,9 @@ test(
     await page.goto(story('meta-spaces'));
     await page.getByRole('button', { name: 'Resources' }).click();
 
-    const spaceRow = page.getByRole('button', { name: 'Add Blueprint to Map' });
+    const spaceRow = page.getByRole('button', {
+      name: 'Add Blueprint as a new Space Resource to Map',
+    });
     await expect(spaceRow).toHaveAttribute('draggable', 'true');
     await expect(spaceRow.locator('.resources-popover__row-grip')).toBeAttached();
     await spaceRow.hover();
@@ -91,7 +97,7 @@ test(
 );
 
 test(
-  'a Resource row ends in Delete from Space and a Space row keeps the slot empty',
+  'a Resource row ends in Delete from Space, drawn on hover or focus, and a Space row has none',
   { tag: '@parity:resources-popover-offers-delete-from-space-on-a-resource-row' },
   async ({ page }) => {
     await page.goto(story('meta-spaces'));
@@ -99,8 +105,21 @@ test(
 
     const row = page.getByRole('button', { name: 'Add Architecture to Map' });
     const deleteControl = page.getByRole('button', { name: 'Delete Architecture from Space' });
-    await expect(deleteControl).toBeVisible();
-    // On its row's line, after the row, not wrapped beneath it.
+    // Not drawn on a row nobody is pointing at, and still in the tab order.
+    await expect(deleteControl).toHaveCSS('opacity', '0');
+    await row.focus();
+    await page.keyboard.press('Tab');
+    await expect(deleteControl).toBeFocused();
+    await expect(deleteControl).toHaveCSS('opacity', '1');
+    await deleteControl.blur();
+    await expect(deleteControl).toHaveCSS('opacity', '0');
+    // Delete is laid over the row: the row keeps its geometry when Delete is drawn.
+    const restingRow = await row.boundingBox();
+    await row.hover();
+    await expect(deleteControl).toHaveCSS('opacity', '1');
+    expect(await row.boundingBox()).toEqual(restingRow);
+
+    // At the end of its row, on the row's line, not wrapped beneath it.
     const rowBox = await row.boundingBox();
     const deleteBox = await deleteControl.boundingBox();
     expect(rowBox, 'the row is drawn').not.toBeNull();
@@ -108,10 +127,13 @@ test(
     if (rowBox === null || deleteBox === null) return;
     expect(deleteBox.y).toBeGreaterThanOrEqual(rowBox.y - 1);
     expect(deleteBox.y + deleteBox.height).toBeLessThanOrEqual(rowBox.y + rowBox.height + 1);
-    expect(deleteBox.x).toBeGreaterThanOrEqual(rowBox.x + rowBox.width - 1);
+    expect(deleteBox.x).toBeGreaterThan(rowBox.x + rowBox.width / 2);
+    expect(deleteBox.x + deleteBox.width).toBeLessThanOrEqual(rowBox.x + rowBox.width + 1);
 
     // A Space is not a Resource of this Space, so there is nothing to delete.
-    await expect(page.getByRole('button', { name: 'Add Blueprint to Map' })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Add Blueprint as a new Space Resource to Map' }),
+    ).toBeVisible();
     await expect(page.getByRole('button', { name: /^Delete Blueprint/ })).toHaveCount(0);
 
     // The press asks for the delete; it does not add the Resource.
@@ -119,6 +141,89 @@ test(
     await expect(page.getByText('Delete requested: Architecture')).toBeVisible();
     await expect(page.getByText('Added: Architecture')).toHaveCount(0);
     await expect(row).toBeVisible();
+  },
+);
+
+test(
+  'a drawn Delete hides the capsules under it, and a drag or a pointer press draws the capsules instead',
+  { tag: '@parity:resources-popover-delete-takes-the-place-of-the-capsules' },
+  async ({ page }) => {
+    await page.goto(story('placed-elsewhere'));
+    await page.getByRole('button', { name: 'Resources' }).click();
+
+    const row = page.getByRole('button', { name: 'Add Resource 4 to Map' });
+    const deleteControl = page.getByRole('button', { name: 'Delete Resource 4 from Space' });
+    const capsule = row.locator('[data-map-id]').first();
+    await expect(capsule).toBeVisible();
+    await expect(deleteControl).toHaveCSS('opacity', '0');
+
+    await row.hover();
+    await expect(deleteControl).toHaveCSS('opacity', '1');
+    await expect(capsule).toBeHidden();
+
+    // A drag the canvas stand-in does not take: the row stays in the list.
+    await page.mouse.down();
+    const canvas = await page.getByRole('button', { name: 'The canvas behind it' }).boundingBox();
+    expect(canvas, 'the canvas stand-in is drawn').not.toBeNull();
+    if (canvas === null) return;
+    await page.mouse.move(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2, {
+      steps: 8,
+    });
+    await expect(deleteControl).toHaveCSS('opacity', '0');
+    await expect(capsule).toBeVisible();
+    await page.mouse.up();
+
+    // The pressed row keeps focus once the pointer has left it; Delete is the
+    // pointer's to draw, so it stays undrawn.
+    await expect(row).toBeFocused();
+    await expect(deleteControl).toHaveCSS('opacity', '0');
+    await expect(capsule).toBeVisible();
+
+    // From the keyboard it is drawn again.
+    await page.keyboard.press('Tab');
+    await expect(deleteControl).toBeFocused();
+    await expect(deleteControl).toHaveCSS('opacity', '1');
+    await expect(capsule).toBeHidden();
+  },
+);
+
+test(
+  'a name longer than its row is cut short before the marks at its end',
+  { tag: '@parity:resources-popover-cuts-a-long-name-short' },
+  async ({ page }) => {
+    await page.goto(story('long-names'));
+    await page.getByRole('button', { name: 'Resources' }).click();
+
+    for (const name of [
+      'A Resource whose name runs far past the width the list can give it',
+      'A Space whose name runs far past the width the list can give it',
+    ]) {
+      const row = page.getByRole('button', { name: new RegExp(`^Add ${name}`) });
+      const title = row.getByText(name, { exact: true });
+      const rowBox = await row.boundingBox();
+      const titleBox = await title.boundingBox();
+      expect(rowBox, 'the row is drawn').not.toBeNull();
+      expect(titleBox, 'the name is drawn').not.toBeNull();
+      if (rowBox === null || titleBox === null) return;
+      expect(titleBox.x + titleBox.width).toBeLessThanOrEqual(rowBox.x + rowBox.width);
+    }
+
+    // The Resource's name ends before its capsule, and before Delete over it.
+    const row = page.getByRole('button', { name: /^Add A Resource whose name/ });
+    const titleBox = await row
+      .getByText('A Resource whose name runs far past the width the list can give it')
+      .boundingBox();
+    const capsuleBox = await row.locator('[data-map-id]').boundingBox();
+    await row.hover();
+    const deleteBox = await page
+      .getByRole('button', { name: /^Delete A Resource whose name/ })
+      .boundingBox();
+    expect(titleBox, 'the name is drawn').not.toBeNull();
+    expect(capsuleBox, 'the capsule is drawn').not.toBeNull();
+    expect(deleteBox, 'Delete is drawn').not.toBeNull();
+    if (titleBox === null || capsuleBox === null || deleteBox === null) return;
+    expect(titleBox.x + titleBox.width).toBeLessThanOrEqual(capsuleBox.x);
+    expect(titleBox.x + titleBox.width).toBeLessThanOrEqual(deleteBox.x);
   },
 );
 
@@ -138,6 +243,28 @@ test(
     await expect(page.getByRole('button', { name: 'Markdown Resources, 1' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Reference Resources, 0' })).toBeVisible();
     await expect(page.getByRole('button', { name: /^Add .* to Map$/ })).toHaveCount(1);
+  },
+);
+
+test(
+  'Resources list tells rows sharing a Space’s name apart by what each adds',
+  { tag: '@parity:resources-popover-names-each-space-selection' },
+  async ({ page }) => {
+    await page.goto(story('space-selections'));
+    await page.getByRole('button', { name: 'Resources' }).click();
+
+    const plan = page
+      .getByRole('button', { name: 'Add Roadmap to Map' })
+      .filter({ hasText: 'Plan · Milestones' });
+    await expect(plan).toBeVisible();
+    await expect(plan).toHaveAccessibleDescription(/Shows Plan · Milestones/);
+    const risks = page
+      .getByRole('button', { name: 'Add Roadmap to Map' })
+      .filter({ hasText: 'Risks · Security' });
+    await expect(risks).toContainText('Risks · Security');
+    await expect(risks).toHaveAccessibleDescription(/Also in Deep dive/);
+    const space = page.getByRole('button', { name: 'Add Roadmap as a new Space Resource to Map' });
+    await expect(space).toContainText('New Space Resource');
   },
 );
 

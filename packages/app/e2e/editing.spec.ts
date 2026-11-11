@@ -2177,15 +2177,21 @@ test(
     await page.getByRole('button', { name: 'Resources' }).click();
     const add = page.getByRole('button', { name: 'Add B to Map' });
     const deleteControl = page.getByRole('button', { name: 'Delete B from Space' });
-    await expect(deleteControl).toBeVisible();
-    // On its row's line, not wrapped beneath it.
+    // Drawn only while its row is pointed at.
+    await expect(deleteControl).toHaveCSS('opacity', '0');
+    await add.hover();
+    await expect(deleteControl).toHaveCSS('opacity', '1');
+    // At the end of its row, on the row's line, not wrapped beneath it.
     const addBox = await boxOf(add, 'the row');
     const deleteControlBox = await boxOf(deleteControl, 'the delete control');
     expect(deleteControlBox.y).toBeGreaterThanOrEqual(addBox.y - 1);
     expect(deleteControlBox.y + deleteControlBox.height).toBeLessThanOrEqual(
       addBox.y + addBox.height + 1,
     );
-    expect(deleteControlBox.x).toBeGreaterThanOrEqual(addBox.x + addBox.width - 1);
+    expect(deleteControlBox.x).toBeGreaterThan(addBox.x + addBox.width / 2);
+    expect(deleteControlBox.x + deleteControlBox.width).toBeLessThanOrEqual(
+      addBox.x + addBox.width + 1,
+    );
 
     await deleteControl.click();
     await page
@@ -2199,6 +2205,73 @@ test(
     await expect(page.getByRole('dialog', { name: 'Resources' })).toBeVisible();
     await expect(add).toHaveCount(0);
     await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+  },
+);
+
+test(
+  'a Resources list row shows its capsules while dragged and Delete in their place while hovered',
+  { tag: '@parity:resources-popover-delete-takes-the-place-of-the-capsules' },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 2');
+    await settled(page);
+
+    // B is placed in Collection 1 and not here, so its row carries a capsule.
+    await page.getByRole('button', { name: 'Resources' }).click();
+    const add = page.getByRole('button', { name: 'Add B to Map' });
+    const deleteControl = page.getByRole('button', { name: 'Delete B from Space' });
+    const capsule = add.locator('[data-map-id]').first();
+    await expect(capsule).toBeVisible();
+
+    await add.hover();
+    await expect(deleteControl).toHaveCSS('opacity', '1');
+    await expect(capsule).toBeHidden();
+
+    const pane = await boxOf(page.locator('.react-flow__pane'), 'the React Flow pane');
+    await page.mouse.down();
+    await page.mouse.move(pane.x + pane.width * 0.5, pane.y + pane.height * 0.8, { steps: 8 });
+    await expect(deleteControl).toHaveCSS('opacity', '0');
+    await expect(capsule).toBeVisible();
+    await page.mouse.up();
+
+    // The drop placed B, and the list it came from draws Delete again.
+    await expect(nodeByTitle(page, 'B')).toBeVisible();
+    await expect(add).toHaveCount(0);
+    const next = page.getByRole('button', { name: /^Add .* to Map$/ }).first();
+    await next.hover();
+    await expect(page.getByRole('button', { name: /^Delete .* from Space$/ }).first()).toHaveCSS(
+      'opacity',
+      '1',
+    );
+  },
+);
+
+test(
+  'a Resource name longer than its Resources list row is cut short before its capsule',
+  { tag: '@parity:resources-popover-cuts-a-long-name-short' },
+  async ({ page }) => {
+    const long = 'B, renamed to run far past the width the Resources list can give it';
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    await settled(page);
+    const resource = nodeByTitle(page, 'B').first();
+    await resourceControls(page, resource);
+    await resource.getByRole('button', { name: 'Edit Title B' }).click();
+    const title = page.getByRole('textbox', { name: 'Resource title' });
+    await title.fill(long);
+    await title.press('Enter');
+    await expect(nodeByTitle(page, long).first()).toBeVisible();
+
+    // Not placed in Collection 2, so its row there carries Collection 1's capsule.
+    await selectCanvas(page, 'Collection 2');
+    await settled(page);
+    await page.getByRole('button', { name: 'Resources' }).click();
+    const add = page.getByRole('button', { name: `Add ${long} to Map` });
+    const addBox = await boxOf(add, 'the row');
+    const nameBox = await boxOf(add.getByText(long, { exact: true }), 'the name');
+    const capsuleBox = await boxOf(add.locator('[data-map-id]'), 'the capsule');
+    expect(nameBox.x + nameBox.width).toBeLessThanOrEqual(capsuleBox.x);
+    expect(nameBox.x + nameBox.width).toBeLessThanOrEqual(addBox.x + addBox.width);
   },
 );
 
