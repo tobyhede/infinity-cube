@@ -1,5 +1,7 @@
 # Prior art: application hosts with typed extensions
 
+**A pre-ADR assessment.** Written on 2026-11-10 against the draft design, before ADR 0142 was accepted, and kept as written. Where it disagrees with the design it read, the ADR and [`spec.md`](spec.md) record what was decided: a missing plugin's Resource is drawn by the default plugin rather than refused, each Resource has its own failure boundary, the spec settles ties among plugins (exact beats wildcard, then build order), and `ResourceFrame` is not part of the API.
+
 Read on 2026-11-10: JupyterLab `v4.6.6`, Lumino `main@44aea97`, VS Code `1.145.2`, vscode-docs `main@2558307`, Grafana `v13.3.0`, plugin-tools `main@263b63c`, Scenes `v9.2.2`, Backstage `v1.56.4`. Theia was skipped. "Inference" marks my reasoning; no source states it.
 
 ## Bottom line

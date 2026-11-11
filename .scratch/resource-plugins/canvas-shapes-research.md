@@ -1,5 +1,7 @@
 # Prior art: spatial canvases and custom object types
 
+**A pre-ADR assessment.** Written on 2026-11-10 against the draft design, before ADR 0142 was accepted, and kept as written. Where it disagrees with the design it read, the ADR and [`spec.md`](spec.md) record what was decided.
+
 Read 2026-11-10. Pins: tldraw `v5.6.0`; `@xyflow/react` 12.12.1 at `1bc405c`; Excalidraw 0.18.0 at `701b901`; BlockSuite in-tree at AFFiNE `63297bc` (0.27.5); Figma `plugin-typings` `dff4874`, `widget-typings` `8815555`; JSON Canvas 1.0 at `456f843`; `obsidian-api` `879c936`. Figma and Miro prose docs carry no version.
 
 ## Bottom line
