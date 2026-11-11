@@ -407,6 +407,8 @@ test(
     await committedSource.press(`${PRIMARY_MODIFIER}+Enter`);
     await expect(persistence).toHaveAttribute('data-revision', String(editingRevision + 1));
     await expect(persistence).toHaveText('Persisted');
+    // Settled at one revision past the edit's start: the Save was one Edit.
+    await expect(persistence).toHaveAttribute('data-revision', String(editingRevision + 1));
     await page.reload();
     const persisted = nodeByTitle(page, 'A').first();
     await expect(persisted).toContainText('two spaces and code');

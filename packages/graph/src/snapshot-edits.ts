@@ -307,8 +307,8 @@ const withEntry = (
 /**
  * Open a Resource in one Map. Only what is drawn inside its rect changes: its
  * size and every position stay as they are. `unchanged` for a Resource already
- * Open, and `open-requires-content` for an Ur Resource, which has no content to
- * show.
+ * Open, and `open-requires-content` for a Resource of a plugin kind, whose
+ * Open is its plugin's Map content rather than the entry's `open`.
  */
 function open(snapshot: SpaceSnapshot, mapId: UUID, resourceId: UUID): SnapshotEditOutcome {
   const placed = placedIn(snapshot, mapId);

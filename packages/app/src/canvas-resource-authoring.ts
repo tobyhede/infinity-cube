@@ -315,15 +315,13 @@ export function useCanvasResourceAuthoring({
       assets: { store: pluginAssets.store, pick: pluginAssets.pick },
       capSizeHint,
     }),
-    // `claimChain` is read by the operations built from this host, not here.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       authoring,
       pluginGate,
       reportPluginFailure,
       claimChain,
-      pluginAssets,
       spaceSession,
+      pluginAssets,
       capSizeHint,
     ],
   );

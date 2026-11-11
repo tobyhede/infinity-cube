@@ -41,7 +41,7 @@ const fixtureContents = await readAggregateFrom(mapSource('fixture', fixtureFile
 
 const PINNED = `github:${OWNER}/${REPO}@${COMMIT}`;
 
-/** A Space's resource file and Markdown sidecar in the fixture, both read after `aggregate.json`. */
+/** A Space's resource file in the fixture, read after `aggregate.json`. */
 const RESOURCE_FILE =
   '00000000-0000-4000-8000-000000000060/resources/00000000-0000-4000-8000-000000000063.json';
 /** One Markdown Resource's text in the fixture's `assets/` (ADR 0142). */

@@ -54,12 +54,13 @@ export function HostRenderedMarkdown({
 }
 
 /**
- * The source editor as a Resource surface draws it, with the two keys it
- * leaves to the plugin named below it.
+ * The source editor as a Resource surface draws it, handing the two keys it
+ * withholds from CodeMirror to the edit that draws it.
  *
  * **The keys are the two the editor withholds from CodeMirror** (ADR 0063,
- * `PANE_OWNED_KEYS`): `Escape` and `Mod-Enter` reach the element a plugin
- * wraps around this, which ends its edit. A focus that leaves ends nothing
+ * `PANE_OWNED_KEYS`): `Escape` runs `onCancel` and `Mod-Enter` runs `onSave`,
+ * and neither goes further, so no element around this sees them (the case in
+ * `packages/ui/test/ResourceTextHost.test.tsx`). A focus that leaves ends nothing
  * (ADR 0064). `nodrag` stops a text selection dragging the Resource and `nopan`
  * stops a click-drag panning the canvas; the wheel stays the canvas's.
  */

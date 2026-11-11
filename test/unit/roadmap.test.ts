@@ -709,9 +709,11 @@ describe('release scope', () => {
     );
     if (parallel?.document.kind !== 'markdown') throw new Error('Expected a Markdown Resource.');
     const hash = parallel.document.content.url.slice('/assets/'.length);
-    expect(readFileSync(join(destination, 'assets', `${hash}.md`), 'utf8')).toContain(
-      '- **Tags:** `release/v1`',
-    );
+    const text = readFileSync(join(destination, 'assets', `${hash}.md`), 'utf8');
+    expect(text).toContain('- **Tags:** `release/v1`');
+    // Named, not linked: a drawn asset has no directory a relative link resolves against.
+    expect(text).toMatch(/- \*\*Issue:\*\* `\.scratch\/[^`]+\.md`/u);
+    expect(text).not.toContain('](');
     const intake = loadSpaceSnapshot(
       spaceSnapshotSchema.parse({
         id: imported.id,

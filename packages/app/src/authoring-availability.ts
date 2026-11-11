@@ -68,7 +68,7 @@ export interface AuthoringInProgress {
   readonly editable: boolean;
   /** A traversal of the Active Graph is running (ADR 0024). */
   readonly presenting: boolean;
-  /** A Resource's Markdown content edit is running on the canvas (ADR 0064). */
+  /** A plugin holds a Claim on the canvas, as a Markdown Resource's text edit does (ADR 0064, ADR 0142). */
   readonly editingResourceBody: boolean;
   /** A Resource's inline title edit is running on the canvas (ADR 0065). */
   readonly editingResourceTitle: boolean;

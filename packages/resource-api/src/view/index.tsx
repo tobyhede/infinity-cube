@@ -214,8 +214,8 @@ export interface ResourceHost {
    */
   readonly RenderedMarkdown: ComponentType<RenderedMarkdownProps>;
   /**
-   * The host's source editor. `Escape` and `Mod-Enter` are left to the plugin:
-   * they reach an element wrapped around it.
+   * The host's source editor. `Escape` and `Mod-Enter` run the plugin's
+   * `onCancel` and `onSave`, and go no further.
    */
   readonly SourceEditor: ComponentType<SourceEditorProps>;
   /**

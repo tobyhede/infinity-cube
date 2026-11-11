@@ -150,7 +150,7 @@ export function EmbeddedPluginContent({ kind, title, content }: EmbeddedPluginCo
     rail: createRailStore(),
     RenderedMarkdown: HostRenderedMarkdown,
     SourceEditor: HostSourceEditor,
-    // The frame around an embedded plugin draws the rail.
+    // The frame around an embedded plugin keeps its own band clear.
     railBand: 0,
   }));
   const plugin = pluginEntryFor(kind).render({

@@ -691,19 +691,11 @@ const stableRoadmapUuid = (name: string): string => {
 
 /**
  * One planned issue as a Markdown Resource and its text, which is an asset
- * named by its SHA-256 (ADR 0142). The text links the issue by a path relative
- * to `assets/`, where it is written.
+ * named by its SHA-256 (ADR 0142). The text names the issue's file by its path
+ * in the scratch tree rather than linking it: a drawn asset has no directory
+ * for a relative link to resolve against.
  */
-const markdownResource = (
-  id: string,
-  planned: PlannedReleaseIssue,
-  assetsDirectory: string,
-  scratchRoot: string,
-) => {
-  const issuePath = relative(assetsDirectory, join(scratchRoot, planned.issue.path)).replaceAll(
-    sep,
-    '/',
-  );
+const markdownResource = (id: string, planned: PlannedReleaseIssue) => {
   const blockers =
     planned.issue.unmetBlockers.length === 0
       ? 'None'
@@ -715,8 +707,7 @@ const markdownResource = (
     `- **Status:** \`${planned.issue.state}\``,
     `- **Tags:** ${planned.issue.tags.map((tag) => `\`${tag}\``).join(', ')}`,
     `- **Blocked by:** ${blockers}`,
-    '',
-    `[Open issue](${issuePath})`,
+    `- **Issue:** \`.scratch/${planned.issue.path}\``,
     '',
   ].join('\n');
   const hash = createHash('sha256').update(text).digest('base64url');
@@ -765,12 +756,7 @@ export const writeReleaseSpace = (
   // relative to the Space directory (ADR 0128), and its text as an asset in
   // `assets/` beside it (ADR 0142).
   for (const planned of issues) {
-    const { resource, text, hash } = markdownResource(
-      resourceId(planned.reference),
-      planned,
-      assetsDirectory,
-      scratchRoot,
-    );
+    const { resource, text, hash } = markdownResource(resourceId(planned.reference), planned);
     for (const file of serializeResource(resource)) {
       writeFileSync(join(destination, file.path), file.text);
     }
