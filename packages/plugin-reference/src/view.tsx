@@ -1,10 +1,12 @@
 import { useMemo, useState, type CSSProperties } from 'react';
 import { Link, Maximize2, Minimize2 } from 'lucide-react';
-import { titleName, type Answer } from '@project/resource-api/domain';
+import { titleName } from '@project/resource-api/domain';
 import {
   definePluginView,
   Rail,
+  refusalOf,
   Title,
+  useRailBand,
   type PluginViewProps,
   type RailCommand,
 } from '@project/resource-api/view';
@@ -27,19 +29,8 @@ const FILL: CSSProperties = {
   minHeight: 0,
 };
 
-/**
- * The band along the top of the rect the canvas keeps clear of controls, as it
- * does for every Resource it draws: eight pixels, the kind glyph's row, eight
- * pixels. A press there selects the Resource rather than beginning a rename.
- */
-const RAIL_BAND = 30;
-
-/** The Reference glyph's place on a Closed face: in the band, at its right. */
+/** The Reference glyph's place on a Closed Resource's rect: at its top right. */
 const GLYPH: CSSProperties = { position: 'absolute', top: 8, right: 8, lineHeight: 0 };
-
-/** Whether a settled commit left nothing to say. */
-const refusalOf = (answer: Answer): string | null =>
-  answer === 'completed' || answer === 'unchanged' ? null : answer.refused;
 
 function ReferenceView({ surface }: PluginViewProps<ReferenceContent, ReferenceMapContent>) {
   const name = titleName(surface.title.value);
@@ -47,6 +38,9 @@ function ReferenceView({ surface }: PluginViewProps<ReferenceContent, ReferenceM
   const commit = surface.map.commit;
   const { Embed } = surface;
   const [refusal, setRefusal] = useState<string | null>(null);
+  // The band the surface keeps clear for its rail, so a press there selects a
+  // Closed Reference rather than beginning a rename.
+  const railBand = useRailBand();
 
   const commands = useMemo((): readonly RailCommand[] => {
     if (commit === undefined) return [];
@@ -86,7 +80,7 @@ function ReferenceView({ surface }: PluginViewProps<ReferenceContent, ReferenceM
           <Embed resource={surface.content.value.target} title={surface.title} />
         </div>
       ) : (
-        <div style={{ padding: `${RAIL_BAND}px 12px 8px`, minHeight: 0 }}>
+        <div style={{ padding: `${String(railBand)}px 12px 8px`, minHeight: 0 }}>
           <Title />
         </div>
       )}
@@ -98,7 +92,7 @@ function ReferenceView({ surface }: PluginViewProps<ReferenceContent, ReferenceM
         </span>
       )}
       {refusal !== null && (
-        <p role="status" style={{ margin: 0, padding: '0 12px', fontSize: 12 }}>
+        <p role="alert" style={{ margin: 0, padding: '0 12px', fontSize: 12 }}>
           {refusal}
         </p>
       )}

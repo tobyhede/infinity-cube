@@ -1,4 +1,5 @@
 import { fireEvent, screen } from '@testing-library/react';
+import { RAIL_BAND } from '@project/resource-api/view';
 import { renderPlugin } from '@project/resource-api/view/testing';
 import {
   referencePlugin,
@@ -41,6 +42,16 @@ describe('the Reference plugin’s view', () => {
     expect(screen.getByRole('img', { name: 'Reference Resource' })).toBeInTheDocument();
     expect(screen.queryByTestId('embedded-resource')).toBeNull();
     expect(screen.queryByRole('toolbar')).toBeNull();
+  });
+
+  it('pads its Closed Title by the band its surface keeps clear, none where it keeps none', () => {
+    const { unmount } = renderPlugin(referencePluginView.View, { content, map: closed });
+    expect(screen.getByTestId('plugin-title').parentElement).toHaveStyle({
+      paddingTop: `${String(RAIL_BAND)}px`,
+    });
+    unmount();
+    renderPlugin(referencePluginView.View, { content, map: closed, railBand: 0 });
+    expect(screen.getByTestId('plugin-title').parentElement).toHaveStyle({ paddingTop: '0px' });
   });
 
   it('embeds its Target when Open, passing its own Title in place of drawing it', () => {
@@ -89,7 +100,7 @@ describe('the Reference plugin’s view', () => {
       answer: { refused: 'Not now.' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Open Resource A′' }));
-    expect(await screen.findByRole('status')).not.toBeEmptyDOMElement();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Not now.');
     expect(screen.getByTestId('plugin-title')).toHaveTextContent('A′');
   });
 });

@@ -81,11 +81,8 @@ export interface RenderPluginOptions<C, M> {
    * and `pick` are offered only where granted.
    */
   readonly assets?: Partial<Assets>;
-  /**
-   * What a granted store answers in place of storing the bytes: a store whose
-   * host cannot be reached rejects.
-   */
-  readonly storing?: (bytes: Blob) => Promise<AssetRef | { readonly refused: string }>;
+  /** The band the surface keeps clear for its rail: `RAIL_BAND`, as the Map's, unless given. */
+  readonly railBand?: number;
 }
 
 export type RenderedPlugin<C, M> = RenderResult & {
@@ -365,7 +362,7 @@ export function renderPlugin<C, M>(
         rail,
         RenderedMarkdown: TestRenderedMarkdown,
         SourceEditor: TestSourceEditor,
-        railBand: RAIL_BAND,
+        railBand: options.railBand ?? RAIL_BAND,
       }),
       [rail],
     );
