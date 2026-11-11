@@ -58,11 +58,6 @@ type KindModules = {
 
 const KIND_MODULES: KindModules = REGISTERED;
 
-/** Each plugin kind's Map content declaration, which a plugin always makes. */
-const PLUGIN_MAP_CONTENT = {
-  [urKind.id]: urKind.mapContent,
-} satisfies Record<PluginKind, KindMapContent>;
-
 /** A kinded value whose content is its kind's, correlated so its module accepts it. */
 type Kinded<K extends KindId> = {
   [P in K]: { kind: P; content: ContentByKind[P] };
@@ -184,7 +179,7 @@ export const resolvedMapContent = (
 
 /** The Map content a plugin is given on a surface with no Map: its `withoutMap`, else its default. */
 export const mapContentWithoutMap = (kind: PluginKind): JsonValue =>
-  PLUGIN_MAP_CONTENT[kind].withoutMap;
+  REGISTERED[kind].mapContent.withoutMap;
 
 /**
  * The outline the canvas strokes a Resource's border and ring on (ADR 0142):
