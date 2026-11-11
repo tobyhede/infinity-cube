@@ -143,9 +143,12 @@ import {
  * Both node keys are set because React Flow picks between them on
  * `disableKeyboardA11y`, and the one it names `keyboardDisabled` is the one an
  * ordinary keyboard-enabled graph gets.
+ *
+ * Enter and Shift+Enter are not named: a plugin keeps every kind's Open (ADR
+ * 0142), so on the canvas they open no Resource.
  */
 const RESOURCE_KEYS_DESCRIPTION =
-  'Press enter to open a Resource, shift enter to open and expand it, space to read it in Full View, backspace or delete to remove it from this Map, and escape to cancel a move or unselect it. From a selected Resource, press the arrow keys to go along the Active Graph, or shift and the arrow keys to move it.';
+  'Press space to read a Resource in Full View, backspace or delete to remove it from this Map, and escape to cancel a move or unselect it. From a selected Resource, press the arrow keys to go along the Active Graph, or shift and the arrow keys to move it.';
 
 const ARIA_LABEL_CONFIG = {
   'node.a11yDescription.default': RESOURCE_KEYS_DESCRIPTION,

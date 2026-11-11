@@ -576,7 +576,7 @@ describe.each([['Reference Resource', spaceReferenceNode(), REFERENCE_ID]] as co
       await mountGraph([held], undefined, undefined, 'replacing');
 
       expect(nodeOf(id)).toHaveAccessibleDescription(
-        'Press enter to open a Resource, shift enter to open and expand it, space to read it in Full View, backspace or delete to remove it from this Map, and escape to cancel a move or unselect it. From a selected Resource, press the arrow keys to go along the Active Graph, or shift and the arrow keys to move it.',
+        'Press space to read a Resource in Full View, backspace or delete to remove it from this Map, and escape to cancel a move or unselect it. From a selected Resource, press the arrow keys to go along the Active Graph, or shift and the arrow keys to move it.',
       );
     });
   },
