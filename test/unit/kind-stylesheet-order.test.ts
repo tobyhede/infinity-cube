@@ -20,7 +20,6 @@ const SURFACES = [
     base: './canvas-resource.css',
     suffix: '-canvas.css',
   },
-  { module: 'packages/ui/src/Stage.tsx', base: './stage.css', suffix: '-stage.css' },
 ] as const;
 
 const cssImports = (file: string): readonly string[] =>
