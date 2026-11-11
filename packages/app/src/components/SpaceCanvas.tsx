@@ -479,14 +479,23 @@ export function SpaceCanvas({
   /** Lands a framing still pending for a Resource whose Map is no longer authored in place. */
   const flushPortalFraming = useRef<(resourceId: ResourceId) => void>(() => undefined);
   const lastEmbeds = useRef(embeds);
+  /** The placements drawn now, which a Resource whose Edit ended must still be among to be selected. */
+  const drawnNodes = useRef(nodes);
+  useLayoutEffect(() => {
+    drawnNodes.current = nodes;
+  }, [nodes]);
   useLayoutEffect(() => {
     const returns = [...editingPortals].map((resourceId) => gate.lend(resourceId));
     for (const resourceId of editedBefore.current) {
       if (editingPortals.has(resourceId)) continue;
       // Done lands what the author framed before the commit is withdrawn by
       // another Claim (ADR 0142).
-      flushPortalFraming.current(resourceId);
-      selectResource(resourceId);
+      flushPortalFraming.current(nodeId);
+      // Done and Close leave the Resource drawn, and it is selected; an Edit
+      // that ended because the placement went, as when the Map is switched or
+      // the Resource is deleted or unplaced, selects nothing.
+      if (left !== undefined && drawnNodes.current.some((node) => node.id === nodeId))
+        selectResource(left.resourceId);
     }
     editedBefore.current = editingPortals;
     return () => {
@@ -494,10 +503,13 @@ export function SpaceCanvas({
     };
   }, [editingPortals, gate, selectResource]);
   // After the flush above, so a flush in the commit that drops an embedding
-  // still finds the request the embedding last made.
+  // still finds the request the embedding last made; once it has landed, a
+  // withdrawn embedding's commit is no longer kept.
   useLayoutEffect(() => {
+    for (const nodeId of lastEmbeds.current.keys())
+      if (!embeds.has(nodeId)) mapEmbeddings.forget(nodeId);
     lastEmbeds.current = embeds;
-  }, [embeds]);
+  }, [embeds, mapEmbeddings]);
 
   const drawnSpaces = useMemo(
     () => [

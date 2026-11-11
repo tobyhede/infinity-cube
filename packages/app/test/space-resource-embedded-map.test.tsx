@@ -860,6 +860,55 @@ describe('the Map an Open Space Resource draws', () => {
     expect(resource.document.content.framing?.zoom).toBe(1.1);
   });
 
+  it('selects nothing when the Space Resource leaves the Map in portal Edit, and selects it on Done', async () => {
+    const value = home({
+      title: 'Elsewhere',
+      kind: 'space',
+      content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
+    });
+    const { session, spaces } = await mountOpenSpaces(value);
+    const adapter = spaces.entry(HOME_ID)?.app.adapter;
+    await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+
+    // Done ends the Edit through the Space Resource's own rail: it is selected.
+    beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
+    const parent = containingNode(SPACE_RESOURCE_ID);
+    fireEvent.click(
+      await within(controlsOf(parent)).findByRole('button', { name: /^Done Resource/ }),
+    );
+    await waitFor(() =>
+      expect(adapter?.getState().selection).toEqual({
+        kind: 'resource',
+        resourceId: SPACE_RESOURCE_ID,
+      }),
+    );
+
+    beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
+    await within(controlsOf(containingNode(SPACE_RESOURCE_ID))).findByRole('button', {
+      name: /^Done Resource/,
+    });
+    act(() => adapter?.getState().clearSelection());
+    // The Map stops placing it, so its embedding unmounts with the Edit: it is
+    // no longer drawn, so nothing selects it.
+    const working = session.getState().working;
+    act(() =>
+      session.submit({
+        ...working,
+        document: {
+          ...working.document,
+          maps: (working.document.maps ?? []).map((authored) => ({
+            ...authored,
+            positions: Object.fromEntries(
+              Object.entries(authored.positions).filter(([id]) => id !== SPACE_RESOURCE_ID),
+            ),
+          })),
+        },
+      }),
+    );
+    await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).toBeNull());
+    expect(adapter?.getState().selection).toEqual({ kind: 'none' });
+  });
+
   /**
    * Portal Edit keeps `editingPortals` populated after Present or a chrome
    * rename withdraws canvas authoring. Wheel must not keep writing framing.

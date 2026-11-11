@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react';
 import type { ResourceId } from '@project/core';
+import { createObservableState, type ObserverErrorReporter } from '@project/persistence';
 import type { MapEmbedRequest } from '@project/ui';
 
 /**
@@ -26,6 +27,12 @@ export interface MapEmbeddings {
     resourceId: ResourceId,
     request: MapEmbedRequest | null,
   ) => void;
+  /**
+   * Placement `nodeId`'s withdrawn embedding needs its latest commit no
+   * longer, as once a framing pending when it was taken down has landed. A
+   * placement still drawing an embedding keeps it.
+   */
+  readonly forget: (nodeId: string) => void;
 }
 
 const NONE: ReadonlyMap<string, MapEmbedEntry> = new Map();
@@ -41,8 +48,13 @@ const sameAsk = (a: MapEmbedRequest, b: MapEmbedRequest): boolean =>
   (a.select?.commit === undefined) === (b.select?.commit === undefined) &&
   a.claim === b.claim;
 
-export function createMapEmbeddings(): MapEmbeddings {
-  let state = NONE;
+const reportToConsole: ObserverErrorReporter = (error) =>
+  console.error('A Map embedding observer failed', error);
+
+export function createMapEmbeddings(
+  reportObserverError: ObserverErrorReporter = reportToConsole,
+): MapEmbeddings {
+  const observable = createObservableState(NONE, reportObserverError);
   /** The request each placement last published, whose `select` the stored one forwards to. */
   const latest = new Map<string, MapEmbedRequest>();
   const listeners = new Set<() => void>();
@@ -70,17 +82,18 @@ export function createMapEmbeddings(): MapEmbeddings {
     };
   };
   return {
-    getState: () => state,
+    getState: observable.getState,
     subscribe: (listener) => {
-      listeners.add(listener);
+      const unsubscribe = observable.subscribe(listener);
       return () => {
-        listeners.delete(listener);
+        unsubscribe();
       };
     },
-    publish: (nodeId, resourceId, request) => {
+    publish: (nodeId, resourceId, request, drawing) => {
+      const state = observable.getState();
       const current = state.get(nodeId);
       // A withdrawn request keeps its latest commit reachable, so a framing
-      // pending when its embedding is taken down still lands.
+      // pending when its embedding is taken down still lands; `forget` drops it.
       if (request === null) {
         if (current === undefined) return;
       } else {
@@ -89,9 +102,11 @@ export function createMapEmbeddings(): MapEmbeddings {
       }
       const next = new Map(state);
       if (request === null) next.delete(nodeId);
-      else next.set(nodeId, { resourceId, request: stored(nodeId, request) });
-      state = next;
-      for (const listener of [...listeners]) listener();
+      else next.set(nodeId, { resourceId, drawing, request: stored(nodeId, request) });
+      observable.publish(next);
+    },
+    forget: (nodeId) => {
+      if (!observable.getState().has(nodeId)) latest.delete(nodeId);
     },
   };
 }
