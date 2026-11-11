@@ -4,6 +4,7 @@ import {
   EMPTY_ASSET_REF,
   EDGE_TITLE_ONE_LINE,
   graphHeadShape,
+  isMissingKindId,
   uuidSchema,
   type Graph,
   type JsonValue,
@@ -2326,6 +2327,60 @@ describe('Delete Resource from Space', () => {
       refusal: { code: 'space-resource-deletion-unsupported' },
     });
     expect(session.getState().working).toBe(before);
+  });
+
+  /*
+   * While the aggregate holds a Space only because a plugin is missing, the
+   * store refuses a commit deleting the last Resource of a missing kind
+   * (ADR 0142). Refused here, the deletion never reaches the working state, so
+   * the Space's later Edits still commit.
+   */
+  describe('of a missing kind while a missing plugin holds a Space', () => {
+    const kind = 'vnd.example.diagram';
+    if (!isMissingKindId(kind)) throw new Error(`${kind} is drawn by a plugin in this build`);
+    const unplugged = (id: UUID) => ({ id, document: { title: 'Diagram', kind, content: {} } });
+    const openHolding = (snapshot: SpaceSnapshot, holdsSpaceForMissingPlugin: boolean) => {
+      const loaded = { snapshot, revision: 0n, exportedRevision: null };
+      const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
+      const { authoring } = composeApp({
+        spaceSession: session,
+        selection: MAP_ID,
+        newId: mintingIds(MINTED),
+        holdsSpaceForMissingPlugin,
+      });
+      return { authoring, session };
+    };
+    const holding = (...ids: UUID[]): SpaceSnapshot => ({
+      ...positionedSnapshot,
+      resources: [...positionedSnapshot.resources, ...ids.map(unplugged)],
+    });
+
+    it('refuses deleting the last one, naming its kind, and leaves the working state', () => {
+      const { authoring, session } = openHolding(holding(RESOURCE_C), true);
+      const before = session.getState().working;
+
+      expect(
+        authoring.complete(CANVAS, { kind: 'deleted-resource', resourceId: RESOURCE_C }),
+      ).toEqual({ kind: 'refused', refusal: { code: 'missing-plugin-holds-space', kind } });
+      expect(session.getState().working).toBe(before);
+    });
+
+    it('deletes one while another of a missing kind remains in the Space', () => {
+      const { authoring, session } = openHolding(holding(RESOURCE_C, MINTED), true);
+
+      expect(
+        authoring.complete(CANVAS, { kind: 'deleted-resource', resourceId: RESOURCE_C }),
+      ).toEqual({ kind: 'completed' });
+      expect(session.getState().working.resources.map(({ id }) => id)).not.toContain(RESOURCE_C);
+    });
+
+    it('deletes the last one where no Space is held', () => {
+      const { authoring } = openHolding(holding(RESOURCE_C), false);
+
+      expect(
+        authoring.complete(CANVAS, { kind: 'deleted-resource', resourceId: RESOURCE_C }),
+      ).toEqual({ kind: 'completed' });
+    });
   });
 
   it('refuses deleting a Space Resource a Reference Resource targets as a Space Resource deletion', () => {

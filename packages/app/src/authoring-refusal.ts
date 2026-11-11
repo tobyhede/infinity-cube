@@ -41,7 +41,6 @@ type PresentedAuthoringRefusal =
  */
 const MAP_NO_LONGER_IN_SPACE = 'This Map is no longer part of the Space.';
 
-/** Application-owned copy for a stable Authoring refusal identity. */
 /** The sentence the unavailable Create Reference row of a Resource that may not be a Target carries. */
 export const referenceTerminal = (kind: ResourceKind): string =>
   isMissingKind(kind)
@@ -50,7 +49,7 @@ export const referenceTerminal = (kind: ResourceKind): string =>
 
 /**
  * {@link describeAuthoringRefusal}, naming the kind when a Reference's Target
- * is a Resource whose plugin is missing (issue 09): the general sentence says
+ * is a Resource whose plugin is missing: the general sentence says
  * referencing is a single hop, which is not why that one is refused.
  * `kindOf` answers the kind of a Resource the Space holds.
  */
@@ -65,6 +64,7 @@ export const describeAuthoringRefusalIn = (
   return describeAuthoringRefusal(refusal);
 };
 
+/** Application-owned copy for a stable Authoring refusal identity. */
 export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): string => {
   switch (refusal.code) {
     case 'placement-failed':
@@ -95,6 +95,8 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
       return 'A Space Resource keeps the target Space it was created with.';
     case 'space-resource-deletion-unsupported':
       return 'Deleting this Space Resource requires a coordinated multi-Space Edit, which this control cannot perform.';
+    case 'missing-plugin-holds-space':
+      return `“${refusal.kind}” is not available in this build, and a Space nothing else refers to may depend on this Resource, so it cannot be deleted.`;
     case 'resource-title-required':
       return 'A Resource title is required.';
     case 'map-title-required':

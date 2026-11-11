@@ -72,7 +72,7 @@ Guards above are omitted below.
 | `changed-map-content` | `resource-not-in-map` → `resource-not-found` → `map-content-not-kept` → `map-content-invalid` → (the same value as the entry's content resolves to, its plugin's default where it stores none ⇒ `unchanged`) → completed |
 | `added-resource-to-map` | `resource-not-found` → `resource-already-in-map` → completed |
 | `removed-resource-from-map` | `resource-not-in-map` → completed |
-| `deleted-resource` | `resource-not-found` → `space-resource-deletion-unsupported` → `resource-has-references` → completed |
+| `deleted-resource` | `resource-not-found` → `space-resource-deletion-unsupported` → `missing-plugin-holds-space` (the last Resource of a missing kind in this Space, while the aggregate as read at opening holds a Space only because a plugin is missing, ADR 0142) → `resource-has-references` → completed |
 
 `open-requires-content` is the code `opened-resource` and `opened-resource-to-fit` raise
 for every Resource: each kind's plugin keeps its Open, if it has one, as Map content (ADR 0142,
@@ -141,10 +141,10 @@ Edit that holds no Map say it needed one.
 | --- | --- |
 | `settled-resource-movement` | none → completed |
 
-## The 31 codes
+## The 33 codes
 
-1 contextual (`map-not-found`) plus 30 action-specific —
-none is produced anywhere else. 26 of those 30 are tabulated above, and
+1 contextual (`map-not-found`) plus 32 action-specific —
+none is produced anywhere else. 28 of those 32 are tabulated above, and
 `exclusive-work-running` is the gate's, asked of every action before its row;
 `map-required` is declared and presented but currently raised nowhere, so it
 appears in no row. `space-replaced` and `edit-abandoned` are no action's:

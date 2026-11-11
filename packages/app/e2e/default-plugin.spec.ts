@@ -1,5 +1,10 @@
 // `test` comes from ./fixtures, not @playwright/test — it carries the auto-use
 // guards every suite shares.
+import { cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createServer } from 'vite';
 import {
   encodeCompactUuid,
   isMissingKindId,
@@ -23,6 +28,8 @@ import {
   stageFrame,
 } from './graph';
 import { SEEDED_MAP_ID, seedPositionedMap } from './seed';
+import { E2E_PORT_BASE, workerScopedViteCacheDir } from './projects';
+import { directoryViteConfig } from '../database-vite-config';
 
 /**
  * ADR 0142: a stored Resource whose kind names no plugin in this build is drawn
@@ -181,3 +188,107 @@ test('it is deleted from its Space as any Resource', async ({ page }) => {
   await expect(nodeByTitle(page, 'Diagram')).toHaveCount(0);
   await expect.poll(async () => (await storedUnplugged(page, spaceId)).document).toBeUndefined();
 });
+
+/** A Space the tracked fixture does not refer to, which only a missing plugin holds. */
+const HELD_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000f0');
+const HELD_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000f1');
+const HELD_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000f2');
+const HELD_UNPLUGGED_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000f3');
+const appRoot = fileURLToPath(new URL('..', import.meta.url));
+
+/**
+ * The tracked fixture with one Space added that nothing refers to, holding the
+ * aggregate's one Resource whose plugin is missing: Import holds that Space
+ * rather than refusing it (ADR 0142), which no commit can make.
+ */
+async function writeHeldAggregate(): Promise<string> {
+  const directory = await mkdtemp(join(tmpdir(), 'infinity-cube-held-'));
+  await cp(fileURLToPath(new URL('../fixture', import.meta.url)), directory, { recursive: true });
+  const held = join(directory, HELD_SPACE_ID);
+  await mkdir(join(held, 'resources'), { recursive: true });
+  const space = {
+    version: 1,
+    id: HELD_SPACE_ID,
+    title: 'Held',
+    defaultMap: HELD_MAP_ID,
+    maps: [
+      {
+        id: HELD_MAP_ID,
+        title: 'Held map',
+        kind: 'positioned',
+        positions: { [HELD_UNPLUGGED_ID]: { x: 0, y: 0 } },
+        graphs: [{ id: HELD_GRAPH_ID, title: 'Graph 1', edges: [] }],
+      },
+    ],
+  };
+  const resource = { id: HELD_UNPLUGGED_ID, title: 'Diagram', kind: KIND, content: CONTENT };
+  await writeFile(join(held, 'space.json'), `${JSON.stringify(space, null, 2)}\n`);
+  await writeFile(
+    join(held, 'resources', `${HELD_UNPLUGGED_ID}.json`),
+    `${JSON.stringify(resource, null, 2)}\n`,
+  );
+  return directory;
+}
+
+/** This file's tests over a host that imported {@link writeHeldAggregate}'s directory. */
+const heldTest = test.extend({
+  e2eServer: async ({ browserName: _browserName }, run, testInfo) => {
+    const directory = await writeHeldAggregate();
+    const server = await createServer({
+      ...directoryViteConfig(directory),
+      configFile: false,
+      root: appRoot,
+      cacheDir: workerScopedViteCacheDir(appRoot, testInfo.workerIndex),
+      server: { host: '127.0.0.1', port: E2E_PORT_BASE + testInfo.workerIndex, strictPort: true },
+    });
+    try {
+      await server.listen();
+      await run(server);
+    } finally {
+      await server.close();
+      await rm(directory, { recursive: true });
+    }
+  },
+});
+
+heldTest(
+  'deleting the last Resource of a missing kind is refused while it may hold a Space',
+  async ({ page }) => {
+    await page.goto(`/spaces/${encodeCompactUuid(HELD_SPACE_ID)}`);
+    await expect(selectedCanvas(page)).toContainText('Held map');
+    await settled(page);
+    const before = await storedSpace(page, HELD_SPACE_ID);
+
+    await (
+      await resourceActions(page, 'Diagram')
+    )
+      .getByRole('menuitem', { name: 'Delete from Space' })
+      .click();
+    await confirmDeletion(page, 'Delete Diagram From Space?');
+
+    await expect(
+      page.getByText(
+        `“${KIND}” is not available in this build, and a Space nothing else refers to may depend on this Resource, so it cannot be deleted.`,
+      ),
+    ).toBeVisible();
+    // Refused before the working state changed: the Resource is still drawn,
+    // and nothing was committed.
+    await expect(nodeByTitle(page, 'Diagram')).toBeVisible();
+    await settled(page);
+    expect((await storedSpace(page, HELD_SPACE_ID)).revision).toBe(before.revision);
+
+    // A later Edit of the Space still commits.
+    await nodeByTitle(page, 'Diagram').getByRole('button', { name: 'Edit Title Diagram' }).click();
+    const title = page.getByRole('textbox', { name: 'Resource title' });
+    await title.fill('Flow');
+    await title.press('Enter');
+    await expect
+      .poll(
+        async () =>
+          (await storedSpace(page, HELD_SPACE_ID)).snapshot.resources.find(
+            ({ id }) => id === HELD_UNPLUGGED_ID,
+          )?.document.title,
+      )
+      .toBe('Flow');
+  },
+);
