@@ -32,16 +32,6 @@ const stylesheet = readFileSync(
 );
 
 /**
- * A Closed Resource's Title is laid out by its plugin (ADR 0142), below the
- * band the host's rail floats over. The Markdown plugin's band is the one each
- * plugin that draws a Closed Title states.
- */
-const markdownView = readFileSync(
-  fileURLToPath(new URL('../../plugin-markdown/src/view.tsx', import.meta.url)),
-  'utf8',
-);
-
-/**
  * The Resource's own structural scale is declared centrally in
  * `tailwind.css`, beside its colour tokens, rather than on `.canvas-resource`
  * itself — the same place `--canvas-resource-ink-color` and its neighbours are.
@@ -212,7 +202,9 @@ describe('the ladder ceiling', () => {
     // declared in `tailwind.css` beside the Resource's colour tokens rather than
     // stated inline in this stylesheet's own `border` shorthand.
     const border = themeToken('--canvas-resource-border-width', 'px');
-    const band = Number.parseFloat(/const RAIL_BAND = (\d+);/u.exec(markdownView)?.[1] ?? '');
+    // A Closed Resource's Title is laid out by its plugin (ADR 0142), below the
+    // band the host's rail floats over, which each plugin reads as `useRailBand()`.
+    const band = RAIL_BAND;
     // The plugin pads the Title's foot by 8px while Closed.
     const foot = 8;
     expect(band).toBeGreaterThan(0);
@@ -287,12 +279,5 @@ describe('the field that writes the Title', () => {
     // Scrolled rather than clipped: the field is the one place the whole Title
     // has to stay reachable, however many lines the author has typed.
     expect(declared(input, 'overflow-y')).toBe('auto');
-  });
-});
-
-describe('the band along the top of a Resource', () => {
-  it('is the band a plugin is told to keep clear for the rail', () => {
-    const body = block(".canvas-resource[data-open='false'] > .canvas-resource__body");
-    expect(declared(body, 'padding-top')).toBe(`${String(RAIL_BAND)}px`);
   });
 });

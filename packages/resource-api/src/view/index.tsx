@@ -339,9 +339,9 @@ export interface SourceEditorProps {
 
 /**
  * The band the canvas keeps clear along the top of every Resource it draws:
- * eight pixels, the kind glyph's row, eight pixels. It is the canvas
- * stylesheet's `padding-top` on a Closed Resource's body, which
- * `packages/ui/test/canvas-resource-title-ladder.test.ts` holds to this value.
+ * eight pixels, the kind glyph's row, eight pixels. Each plugin pads its own
+ * Title by it, read as `useRailBand()`; the Closed Title's room below it is
+ * held by `packages/ui/test/canvas-resource-title-ladder.test.ts`.
  */
 export const RAIL_BAND = 30;
 
