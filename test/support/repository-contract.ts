@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -1217,6 +1217,104 @@ export const spaceRepositoryContract = (
         expect(space?.snapshot).toEqual(snapshot);
         const loaded = await reread.loadAsset(asset.asset.hash);
         expect(loaded?.mediaType).toBe('application/pdf');
+        expect(loaded?.bytes).toEqual(asset.asset.bytes);
+      } finally {
+        await rm(scratch, { recursive: true, force: true });
+      }
+    });
+  });
+
+  /**
+   * Issue 09's restore, simulated by a kind this build does draw: the
+   * Resource is stored under a kind id no plugin names, carrying content the
+   * Image plugin reads, and the plugin's return is that id becoming `image`.
+   * Read again from this store, and from an Export of it into an empty
+   * directory once the source is gone, the Resource parses through the Image
+   * plugin, and its asset, which is not valid UTF-8, is byte-identical.
+   */
+  it(`${name} hands a Resource whose plugin is missing to that plugin when it returns`, async () => {
+    await withHarness(async (repository) => {
+      const kind = 'vnd.example.picture';
+      if (!isMissingKindId(kind)) throw new Error('A plugin in this build draws the kind');
+      const asset = await admitAsset(
+        Uint8Array.from([0xff, 0xfe, 0x00, 0xc3, 0x28, 0xa0, 0xa1]),
+        'application/pdf',
+      );
+      if (asset.kind !== 'admitted') throw new Error(`Not an asset: ${asset.code}`);
+      const content = { url: assetPath(asset.asset.hash) };
+      const snapshot: SpaceSnapshot = {
+        id: SPACE_ID,
+        document: {
+          version: 1,
+          title: 'Picture',
+          defaultMap: MAP_ID,
+          maps: [
+            {
+              id: MAP_ID,
+              title: 'Map',
+              kind: 'positioned',
+              positions: { [SECOND_RESOURCE_ID]: { x: 10, y: 20 } },
+              graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
+            },
+          ],
+        },
+        resources: [
+          resource(RESOURCE_ID, 'Note'),
+          { id: SECOND_RESOURCE_ID, document: { title: 'Picture', kind, content } },
+        ],
+      };
+      /** The plugin returns: the same Resource under the kind its plugin draws. */
+      const restored = (held: SpaceSnapshot): SpaceSnapshot => ({
+        ...held,
+        resources: held.resources.map((entry) =>
+          entry.id === SECOND_RESOURCE_ID
+            ? { id: entry.id, document: { title: entry.document.title, kind: 'image', content } }
+            : entry,
+        ),
+      });
+      const scratch = await mkdtemp(join(tmpdir(), 'infinity-cube-contract-plugin-returns-'));
+      try {
+        const source = join(scratch, 'source');
+        const writer = new MemorySpaceRepository(
+          [{ snapshot, revision: 0n, exportedRevision: null }],
+          SPACE_ID,
+        );
+        await writer.storeAsset(asset.asset);
+        expect((await exportAggregate(writer, source)).kind).toBe('exported');
+        await expect(
+          importAggregate(source, repository, { replace: false, newId: newUuid }),
+        ).resolves.toMatchObject({ kind: 'imported' });
+        await rm(source, { recursive: true });
+
+        // Over the store itself, with no Export or Import.
+        const held = await repository.loadAggregate();
+        if (held.kind !== 'loaded') throw new Error(`The store answered ${held.kind}`);
+        const inPlace = loadSpaceAggregate({
+          metaSpaceId: SPACE_ID,
+          snapshots: held.aggregate.spaces.map(({ snapshot: stored }) => restored(stored)),
+        });
+        if (!inPlace.ok) throw new Error(JSON.stringify(inPlace.errors));
+        expect(inPlace.aggregate.spaces[0]?.lookup.resource(SECOND_RESOURCE_ID)).toMatchObject({
+          kind: 'image',
+          content,
+        });
+
+        // Through an Export into an empty directory, re-read by the returned plugin.
+        const exported = join(scratch, 'exported');
+        expect((await exportAggregate(repository, exported)).kind).toBe('exported');
+        const file = join(exported, SPACE_ID, 'resources', `${SECOND_RESOURCE_ID}.json`);
+        const written: unknown = JSON.parse(await readFile(file, 'utf8'));
+        expect(written).toEqual({ id: SECOND_RESOURCE_ID, title: 'Picture', kind, content });
+        await writeFile(
+          file,
+          `${JSON.stringify({ id: SECOND_RESOURCE_ID, title: 'Picture', kind: 'image', content }, null, 2)}\n`,
+        );
+        const reread = new MemorySpaceRepository();
+        await expect(
+          importAggregate(exported, reread, { replace: false, newId: newUuid }),
+        ).resolves.toMatchObject({ kind: 'imported' });
+        expect((await reread.loadSpace(SPACE_ID))?.snapshot).toEqual(restored(snapshot));
+        const loaded = await reread.loadAsset(asset.asset.hash);
         expect(loaded?.bytes).toEqual(asset.asset.bytes);
       } finally {
         await rm(scratch, { recursive: true, force: true });

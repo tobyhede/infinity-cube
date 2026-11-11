@@ -258,6 +258,15 @@ describe('the Resource file JSON Schema', () => {
     expect(existsSync(join(examples, `${kind}.json`))).toBe(true);
   });
 
+  // The `if` choosing builtInKinds lists the registered ids by hand; a kind
+  // left out of it would be read as one whose plugin is missing.
+  it('applies builtInKinds to exactly the registered kinds', () => {
+    expect([...resourceSchema.if.properties.kind.enum].sort()).toEqual([...KIND_IDS].sort());
+    expect(
+      resourceSchema.$defs.builtInKinds.oneOf.map(({ properties }) => properties.kind.const).sort(),
+    ).toEqual([...KIND_IDS].sort());
+  });
+
   it.each(KIND_IDS)('accepts the published %s example', (kind) => {
     const example: unknown = JSON.parse(readFileSync(join(examples, `${kind}.json`), 'utf8'));
     expect(resourceFileSchema(example), JSON.stringify(resourceFileSchema.errors)).toBe(true);
