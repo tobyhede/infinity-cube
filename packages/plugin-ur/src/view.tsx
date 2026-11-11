@@ -129,7 +129,7 @@ function UrView({ surface }: PluginViewProps<UrContent, UrMapContent>) {
     <div style={style} data-outline={outline}>
       <Title />
       {refusal !== null && (
-        <p role="status" style={{ margin: 0, fontSize: 12 }}>
+        <p role="alert" style={{ margin: 0, fontSize: 12 }}>
           {refusal}
         </p>
       )}

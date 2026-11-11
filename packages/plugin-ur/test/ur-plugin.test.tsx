@@ -64,8 +64,9 @@ describe('the Ur plugin’s view', () => {
       answer: { refused: 'Not now.' },
     });
     fireEvent.click(screen.getByRole('radio', { name: 'Pill' }));
-    // A refusal arrived; its words are the host's.
-    expect(await screen.findByRole('status')).not.toBeEmptyDOMElement();
+    // A refusal arrived, announced as a refusal is (`docs/agents/ui.md`); its words are the host's.
+    expect(await screen.findByRole('alert')).toHaveTextContent('Not now.');
+    expect(screen.queryByRole('status')).toBeNull();
     expect(screen.getByRole('radio', { name: 'Ellipse' })).toHaveAttribute('aria-checked', 'true');
   });
 });
