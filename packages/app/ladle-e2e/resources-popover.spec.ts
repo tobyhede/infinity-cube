@@ -165,6 +165,9 @@ test('every filter toggle sits inside the popover on one line, its count still d
   for (const toggle of await toggles.all()) {
     const box = await boxOf(toggle, 'a filter toggle');
     tops.add(Math.round(box.y));
+    // A crowded row shrinks its toggles rather than overflowing, so a box that
+    // still fits is not proof the row does.
+    expect(box.width).toBe(32);
     expect(box.x).toBeGreaterThanOrEqual(panel.x);
     expect(box.x + box.width).toBeLessThanOrEqual(panel.x + panel.width);
     const count = toggle.locator('.resources-popover__count');
