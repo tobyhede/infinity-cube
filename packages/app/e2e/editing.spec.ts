@@ -400,8 +400,13 @@ test(
     await (await controls(resourceA)).getByRole('button', { name: 'Edit Resource A' }).click();
     const committedSource = page.getByRole('textbox', { name: 'Markdown source of A' });
     await committedSource.fill(exact);
+    // Save stores the text as an asset before it commits, so "Persisted" alone
+    // can still be the status from before it: wait for the Save's one Edit.
+    const persistence = page.getByTestId('persistence-status');
+    const editingRevision = Number(await persistence.getAttribute('data-revision'));
     await committedSource.press(`${PRIMARY_MODIFIER}+Enter`);
-    await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+    await expect(persistence).toHaveAttribute('data-revision', String(editingRevision + 1));
+    await expect(persistence).toHaveText('Persisted');
     await page.reload();
     const persisted = nodeByTitle(page, 'A').first();
     await expect(persisted).toContainText('two spaces and code');
