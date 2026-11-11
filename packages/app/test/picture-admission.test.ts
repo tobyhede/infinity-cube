@@ -1,5 +1,5 @@
 import type { AssetRef } from '@project/core';
-import { servedMediaType, type AssetClient } from '@project/persistence';
+import { servedMediaType, type AssetClient, type AssetRefusal } from '@project/persistence';
 import { describe, expect, it, vi } from 'vitest';
 import {
   admitImage,
@@ -101,7 +101,7 @@ describe('admitting an image', () => {
 describe('storing a picture as an asset', () => {
   const STORED: AssetRef = `/assets/${'A'.repeat(43)}`;
 
-  const recordingAssets = (answer: AssetRef | { readonly refused: string } = STORED) => {
+  const recordingAssets = (answer: AssetRef | AssetRefusal = STORED) => {
     const store = vi.fn((_bytes: Blob) => Promise.resolve(answer));
     const assets: AssetClient = {
       url: (ref) => ref,

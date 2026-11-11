@@ -73,6 +73,8 @@ export {
   OCTET_STREAM,
   servedMediaType,
   ASSET_MEDIA_TYPE_HEADER,
+  type AssetRefusal,
+  type AssetRefusalCode,
   withEmptyAsset,
   type AssetAdmission,
   type AssetClient,

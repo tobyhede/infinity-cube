@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { isAssetRef, type AssetRef } from '@project/core';
-import type { AssetClient } from '@project/persistence';
+import type { AssetClient, AssetRefusalCode } from '@project/persistence';
 import { browserPluginAssets } from '../src/space';
 
 const REF: AssetRef = `/assets/${'A'.repeat(43)}`;
 
 /** An asset store answering each read and store with `refused`. */
-const refusing = (refused: string): AssetClient => ({
+const refusing = (refused: AssetRefusalCode): AssetClient => ({
   url: (ref) => ref,
   read: () => Promise.resolve({ refused }),
   store: () => Promise.resolve({ refused }),
@@ -16,7 +16,7 @@ describe("a plugin's asset store", () => {
   it.each([
     ['asset-too-large', /larger than 10 MB/u],
     ['asset-absent', /not stored here/u],
-  ])('words the store’s %s refusal before a plugin reads it', async (code, sentence) => {
+  ] as const)('words the store’s %s refusal before a plugin reads it', async (code, sentence) => {
     const assets = browserPluginAssets(refusing(code));
 
     const stored = await assets.store?.(new Blob(['x']));
@@ -28,14 +28,6 @@ describe("a plugin's asset store", () => {
       expect(refused).toMatch(sentence);
       expect(refused).not.toContain(code);
     }
-  });
-
-  it('words a refusal it has no sentence for without naming its code', async () => {
-    const read = await browserPluginAssets(refusing('asset-unheard-of')).read(REF);
-
-    if (!('refused' in read)) throw new Error('Expected a refusal.');
-    expect(read.refused).toMatch(/\S/u);
-    expect(read.refused).not.toContain('asset-unheard-of');
   });
 
   it('answers what the store holds unchanged', async () => {

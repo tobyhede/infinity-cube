@@ -1,7 +1,7 @@
 import { httpAssetClient, HttpSpaceBackend, productAddress } from '@project/http';
 import { loadSpaceSnapshot, type Space } from '@project/graph';
 import { newUuid, type AssetRef, type ImageNaturalSize, type UUID } from '@project/core';
-import type { AssetClient, SpaceBackend } from '@project/persistence';
+import type { AssetClient, AssetRefusal, SpaceBackend } from '@project/persistence';
 import type { Assets } from '@project/resource-api/view';
 import { displayImageAsAuthored, type ImageDisplay } from '@project/ui';
 import type { HistoryApi } from './browser-location';
@@ -72,17 +72,16 @@ export const browserImageSources = (
   pick: pickImagesInBrowser,
 });
 
-/** What the asset store answers a read or a store: the bytes, their reference, or a refusal. */
-type AssetAnswer = Blob | AssetRef | AssetRefusal;
-interface AssetRefusal {
+/** A refusal as a plugin reads it: the store's code put into words. */
+interface WordedRefusal {
   readonly refused: string;
 }
 
-const isRefusal = (answer: AssetAnswer): answer is AssetRefusal =>
+const isRefusal = (answer: Blob | AssetRef | AssetRefusal): answer is AssetRefusal =>
   typeof answer === 'object' && 'refused' in answer;
 
 /** A store's answer with its refusal worded, as every refusal a plugin reads is (ADR 0057). */
-const worded = <T extends AssetAnswer>(answer: T | AssetRefusal): T | AssetRefusal =>
+const worded = <T extends Blob | AssetRef>(answer: T | AssetRefusal): T | WordedRefusal =>
   isRefusal(answer) ? { refused: describeAssetRefusal(answer.refused) } : answer;
 
 /**

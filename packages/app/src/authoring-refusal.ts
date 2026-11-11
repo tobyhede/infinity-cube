@@ -3,6 +3,7 @@ import {
   ASSET_ABSENT,
   ASSET_TOO_LARGE,
   MAX_ASSET_BYTES,
+  type AssetRefusalCode,
   type SaveBlock,
   type SpaceSessionState,
 } from '@project/persistence';
@@ -514,15 +515,13 @@ export const describeImageReplacementPending = (): string =>
 /**
  * Application-owned copy for an asset store's refusal (ADR 0057, ADR 0142),
  * from its stable code: what a Resource plugin reads in `{ refused }`, never
- * the code itself. A code this build has no sentence for gets the general one.
+ * the code itself.
  */
-export const describeAssetRefusal = (code: string): string => {
+export const describeAssetRefusal = (code: AssetRefusalCode): string => {
   switch (code) {
     case ASSET_TOO_LARGE:
       return `This file is larger than ${MAX_ASSET_BYTES / (1024 * 1024)} MB, the largest that can be stored.`;
     case ASSET_ABSENT:
       return 'This file is not stored here.';
-    default:
-      return 'This file could not be stored or read.';
   }
 };

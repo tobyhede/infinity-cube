@@ -15,6 +15,7 @@ import {
   normalizeMediaType,
   problemCodeForType,
   type AssetClient,
+  type AssetRefusal,
   type CommitResult,
   type LoadedSpace,
   type ProblemDetails,
@@ -124,12 +125,12 @@ export class HttpSpaceBackend implements SpaceBackend {
    * only refuse them after reading all of them. Throws when the host cannot be
    * reached or answers anything else.
    */
-  storeAsset(bytes: Blob): Promise<AssetRef | { readonly refused: string }> {
+  storeAsset(bytes: Blob): Promise<AssetRef | AssetRefusal> {
     if (bytes.size > MAX_ASSET_BYTES) return Promise.resolve({ refused: ASSET_TOO_LARGE });
     const headers: Record<string, string> = bytes.type === '' ? {} : { 'Content-Type': bytes.type };
     return this.#timedRequest(
       (client) => client.assets.$post(undefined, { init: { body: bytes, headers } }),
-      async (response): Promise<AssetRef | { readonly refused: string }> => {
+      async (response): Promise<AssetRef | AssetRefusal> => {
         if (response.ok) return decodeStoredAssetUrl(await response.json());
         if (hasProblemDetailsMediaType(response)) {
           const code = problemCodeForType(decodeProblemDetails(await response.json()).type);
@@ -147,10 +148,10 @@ export class HttpSpaceBackend implements SpaceBackend {
    * hash. Throws when the host cannot be reached or answers
    * anything else.
    */
-  readAsset(ref: AssetRef): Promise<Blob | { readonly refused: string }> {
+  readAsset(ref: AssetRef): Promise<Blob | AssetRefusal> {
     return this.#timedRequest(
       (client) => client.assets[':hash'].$get({ param: { hash: assetRefHash(ref) } }),
-      async (response): Promise<Blob | { readonly refused: string }> => {
+      async (response): Promise<Blob | AssetRefusal> => {
         if (response.status === 404) return { refused: ASSET_ABSENT };
         if (!response.ok) throw new Error(`Unable to read an asset: HTTP ${response.status}`);
         const stored = normalizeMediaType(response.headers.get(ASSET_MEDIA_TYPE_HEADER) ?? '');

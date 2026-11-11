@@ -39,6 +39,17 @@ export const ASSET_TOO_LARGE = 'asset-too-large';
 export const ASSET_ABSENT = 'asset-absent';
 
 /**
+ * What the asset store answers in place of a reference or bytes: a stable
+ * code, which the application puts into words before a plugin reads it.
+ */
+export type AssetRefusalCode = typeof ASSET_TOO_LARGE | typeof ASSET_ABSENT;
+
+/** An answer from the asset store that refuses, by its code. */
+export interface AssetRefusal {
+  readonly refused: AssetRefusalCode;
+}
+
+/**
  * Assets, by content. Storing bytes already stored stores nothing and answers
  * `existing`, and the first stored media type stands; nothing is ever deleted,
  * because a URL can be copied anywhere and nothing can know an asset is
@@ -61,8 +72,8 @@ export interface AssetStore {
  */
 export interface AssetClient {
   url(ref: AssetRef): string;
-  read(ref: AssetRef): Promise<Blob | { readonly refused: string }>;
-  store(bytes: Blob): Promise<AssetRef | { readonly refused: string }>;
+  read(ref: AssetRef): Promise<Blob | AssetRefusal>;
+  store(bytes: Blob): Promise<AssetRef | AssetRefusal>;
 }
 
 /** The hash content-addressing gives these bytes. */
