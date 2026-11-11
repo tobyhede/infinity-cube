@@ -31,7 +31,8 @@ export const sqliteViteTarget: ViteDatabaseTarget = {
 
 /** The memory catalog an isolated runtime imports in place of the database. */
 type MemoryCatalog =
-  | { readonly catalog: 'fixture' | 'empty' }
+  | { readonly catalog: 'empty' }
+  | { readonly catalog: 'fixture'; readonly aggregate?: string }
   | { readonly catalog: 'directory'; readonly directory: string };
 
 const hostViteConfig = (
@@ -72,11 +73,11 @@ export const databaseViteConfig = (target: ViteDatabaseTarget, { mode }: ConfigE
 
 /**
  * The PostgreSQL host's configuration over a fresh memory runtime that imports
- * the Aggregate directory a caller names, as `roadmap` does its own: for an
- * end-to-end test whose aggregate the tracked fixture does not hold.
+ * the Aggregate directory a caller names in place of the tracked fixture: for
+ * an end-to-end test whose aggregate the tracked fixture does not hold.
  */
 export const directoryViteConfig = (directory: string): UserConfig =>
-  hostViteConfig(postgresViteTarget, { catalog: 'directory', directory });
+  hostViteConfig(postgresViteTarget, { catalog: 'fixture', aggregate: directory });
 
 /**
  * The development server a run serves its application through (ADR 0117).
