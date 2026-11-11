@@ -505,11 +505,13 @@ describe('stored asset bytes', () => {
 
   /** The complete aggregate, with Meta also holding one Image Resource per image. */
   const picturing = async (
-    ...images: readonly { id: UUID; bytes: Uint8Array<ArrayBuffer> }[]
+    ...images: readonly { id: UUID; bytes: Uint8Array<ArrayBuffer>; mediaType?: string }[]
   ): Promise<MemorySpaceRepository> => {
     const [meta, ...targets] = completeAggregate();
     if (meta === undefined) throw new Error('The aggregate names no Meta Space');
-    const stored = await Promise.all(images.map(({ bytes }) => admitted(bytes)));
+    const stored = await Promise.all(
+      images.map(({ bytes, mediaType }) => admitted(bytes, mediaType)),
+    );
     const pictured: SpaceSnapshot = {
       ...meta,
       resources: [
@@ -621,6 +623,66 @@ describe('stored asset bytes', () => {
 
     expect((await readdir(join(directory, 'assets'))).sort()).toEqual(before.sort());
     expect(before).toEqual(expect.arrayContaining(names));
+  });
+
+  /*
+   * The table is what carries a media type through a directory, so a type
+   * stored from the browser that it does not list is written as `.bin` and
+   * reads back as `application/octet-stream`, while a listed one survives.
+   */
+  it('carries a listed media type through Export then Import, and an unlisted one as octet-stream', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'aggregate');
+    const notes = new TextEncoder().encode('# Notes\n');
+    const archive = Uint8Array.from([0x50, 0x4b, 0x03, 0x04]);
+    const markdown = await admitted(notes, 'text/markdown');
+    const zip = await admitted(archive, 'application/zip');
+
+    await exportTo(
+      await picturing(
+        { id: PICTURE_ID, bytes: notes, mediaType: 'text/markdown' },
+        { id: PHOTO_ID, bytes: archive, mediaType: 'application/zip' },
+      ),
+      destination,
+    );
+
+    expect((await readdir(join(destination, 'assets'))).sort()).toEqual(
+      [`${markdown.hash}.md`, `${zip.hash}.bin`].sort(),
+    );
+    const reimported = await importFrom(destination);
+    await expect(reimported.loadAsset(markdown.hash)).resolves.toEqual(markdown);
+    await expect(reimported.loadAsset(zip.hash)).resolves.toEqual({
+      ...zip,
+      mediaType: 'application/octet-stream',
+    });
+  });
+
+  /*
+   * One asset exists per hash, so a store that already holds the bytes keeps
+   * the type it first stored them under; Export keeps the file the directory
+   * has, and names a file in a directory without one from the kept type.
+   */
+  it('keeps the first stored type on Import into a store that holds the bytes, and the file name on Export', async () => {
+    const root = await makeTemporaryDirectory();
+    const directory = join(root, 'aggregate');
+    const notes = new TextEncoder().encode('# Notes\n');
+    const markdown = await admitted(notes, 'text/markdown');
+    const plain = await admitted(notes, 'text/plain');
+    await exportTo(
+      await picturing({ id: PICTURE_ID, bytes: notes, mediaType: 'text/markdown' }),
+      directory,
+    );
+    const target = new MemorySpaceRepository();
+    await target.storeAsset(plain);
+
+    const result = await importAggregate(directory, target, { replace: false, newId: newUuid });
+    expect(result.kind).toBe('imported');
+    await expect(target.loadAsset(markdown.hash)).resolves.toEqual(plain);
+
+    await exportTo(target, directory);
+    await expect(readdir(join(directory, 'assets'))).resolves.toEqual([`${markdown.hash}.md`]);
+    const fresh = join(root, 'fresh');
+    await exportTo(target, fresh);
+    await expect(readdir(join(fresh, 'assets'))).resolves.toEqual([`${markdown.hash}.txt`]);
   });
 
   it('stores one file for two Resources showing the same picture', async () => {
