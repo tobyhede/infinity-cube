@@ -8,7 +8,7 @@ import {
 } from '@project/core';
 import { loadSpace, loadSpaceSnapshot, type LoadSpaceResult } from '../src/index';
 import type { SpaceReferenceError } from '../src/validate';
-import { jsonResourceFile, resourceFile, uuid } from './resource-files';
+import { jsonResourceFile, referenceFile, resourceFile, uuid } from './resource-files';
 
 /**
  * The Space intake contract, run against **both** loaders.
@@ -685,6 +685,22 @@ describe.each([
       );
     });
 
+    it('diagnoses a missing or untargetable Target once, though the Map stores the Reference Open', () => {
+      const openReference = (resources: readonly Resource[]) =>
+        load({
+          resources: [...resources],
+          maps: [
+            positionedMap(WORKING, { [A]: { x: 0, y: 0, open: true } }, [graph(MAIN, 'Main')]),
+          ],
+        });
+      expect(refused(openReference([referenceTo(A, ABSENT)]))).toEqual([
+        expect.objectContaining({ kind: 'reference-target-missing', ref: ABSENT }),
+      ]);
+      expect(
+        refused(openReference([referenceTo(A, B), referenceTo(B, C), markdown(C, 'C')])),
+      ).toEqual([expect.objectContaining({ kind: 'reference-target-not-targetable', ref: B })]);
+    });
+
     /** The loop reads every kind's declared Resource references, so its sentences name no kind (ADR 0128). */
     it('describes a declared Resource reference it refuses without naming a kind', () => {
       const messages = [
@@ -784,9 +800,9 @@ describe.each([
       'refuses Map content on a %s Resource that no plugin keeps',
       (_kind, resources) => {
         for (const content of [{ shape: 'rectangle' }, { shape: 'pill' }, null]) {
-          expect(refused(placedIn(resources, content))).toEqual([
-            expect.objectContaining({ kind: 'map-content-invalid', ref: A }),
-          ]);
+          const errors = refused(placedIn(resources, content));
+          expect(errors).toEqual([expect.objectContaining({ kind: 'map-content-invalid', ref: A })]);
+          expect(errors[0]?.message).not.toContain('its plugin refuses');
         }
       },
     );
@@ -842,10 +858,14 @@ describe.each([
     });
 
     it('refuses Map content on a Reference to a Space Resource, which no plugin draws yet', () => {
-      for (const open of [true, false])
-        expect(refused(placedIn([referenceTo(A, B), spaceResource(B, ABSENT)], { open }))).toEqual([
-          expect.objectContaining({ kind: 'map-content-invalid', ref: A }),
-        ]);
+      for (const open of [true, false]) {
+        const errors = refused(placedIn([referenceTo(A, B), spaceResource(B, ABSENT)], { open }));
+        expect(errors).toEqual([expect.objectContaining({ kind: 'map-content-invalid', ref: A })]);
+        // No plugin draws it, so no plugin refused the content.
+        expect(errors[0]?.message).toBe(
+          `Map "${WORKING}" keeps Map content for reference resource "${A}", which no plugin draws here, so it keeps none`,
+        );
+      }
     });
 
     it('refuses an Image Resource stored Open, which its plugin draws with no Open (ADR 0142)', () => {
@@ -947,5 +967,17 @@ describe.each([
         });
       expect(refused(document())).toEqual(refused(document()));
     });
+  });
+});
+
+describe('a Reference Resource file whose Target is not a UUID', () => {
+  it('is refused with one diagnosis, naming the Target', () => {
+    const result = loadSpace(
+      { version: 1, id: SPACE, title: 'Test space', maps: [] },
+      referenceFile(A, 'A′', 'resource-b'),
+    );
+    if (result.ok) throw new Error('expected the document to be refused');
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]?.message).toContain('content.target');
   });
 });

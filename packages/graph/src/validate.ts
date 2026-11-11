@@ -163,6 +163,7 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
     });
   }
 
+  const kindOf = (id: UUID) => resourceById.get(id)?.kind;
   for (const subject of maps) {
     // A map's position keys **are** its resource membership (ADR 0040). They may
     // omit resources — a resource the map leaves out is simply not in this map — but
@@ -189,21 +190,32 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
       // Which Map content a Resource keeps is its plugin's schema's answer, and a
       // Resource no plugin draws here, as a Reference to a Space Resource, keeps none.
       const resourceOf = (id: UUID) => resourceById.get(id);
-      const mapContentRefusal =
-        placement?.content === undefined
-          ? undefined
-          : (mapContentProblem(member.kind, placement.content) ??
-            (drawnByPlugin(member, resourceOf)
-              ? undefined
-              : 'no plugin draws it here, so it keeps no Map content'));
-      if (mapContentRefusal !== undefined) {
-        errors.push({
-          kind: 'map-content-invalid',
-          ref: resourceId,
-          message: `Map "${subject.id}" keeps Map content for ${member.kind} resource "${resourceId}" that its plugin refuses: ${mapContentRefusal}`,
-        });
+      const byPlugin = drawnByPlugin(member, resourceOf);
+      if (placement?.content !== undefined) {
+        const refusal = byPlugin ? mapContentProblem(member.kind, placement.content) : undefined;
+        if (!byPlugin) {
+          errors.push({
+            kind: 'map-content-invalid',
+            ref: resourceId,
+            message: `Map "${subject.id}" keeps Map content for ${member.kind} resource "${resourceId}", which no plugin draws here, so it keeps none`,
+          });
+        } else if (refusal !== undefined) {
+          errors.push({
+            kind: 'map-content-invalid',
+            ref: resourceId,
+            message: `Map "${subject.id}" keeps Map content for ${member.kind} resource "${resourceId}" that its plugin refuses: ${refusal}`,
+          });
+        }
       }
-      if (placement !== undefined && resourceOpen(placement) && !takesOpen(member, resourceOf)) {
+      // A Resource reference that does not resolve, or names what may not be a
+      // Target, is diagnosed once, by the reference loop below; whether the
+      // Resource may be stored Open waits on what it references.
+      if (
+        placement !== undefined &&
+        resourceOpen(placement) &&
+        resourceReferenceProblems(member.id, member, kindOf).length === 0 &&
+        !takesOpen(member, resourceOf)
+      ) {
         errors.push({
           kind: 'open-requires-content',
           ref: resourceId,
@@ -288,7 +300,6 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
 
   // Every Resource reference a kind declares resolves, to a kind that may be a
   // Target, so referencing stays a single hop (ADR 0113).
-  const kindOf = (id: UUID) => resourceById.get(id)?.kind;
   for (const resource of space.resources) {
     for (const problem of resourceReferenceProblems(resource.id, resource, kindOf)) {
       errors.push(describeReferenceProblem(resource.id, problem));
