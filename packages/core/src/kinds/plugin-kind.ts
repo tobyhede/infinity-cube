@@ -110,8 +110,11 @@ function declaredIds<C, M>(plugin: ResourcePlugin<C, M>, content: C): readonly s
  * rather than its reference going unreported.
  */
 function contentSchemaOf<C, M>(plugin: ResourcePlugin<C, M>): z.ZodType<C, z.ZodTypeDef, unknown> {
-  return plugin.content.superRefine((content, context) => {
-    for (const id of declaredIds(plugin, content)) {
+  // Piped, so only content the plugin's schema accepted is read for its ids:
+  // content it refused is reported once, by the schema, and an id named twice
+  // (a Target is also a Resource reference) is reported once.
+  const declaresOnlyUuids = z.custom<C>(() => true).superRefine((content, context) => {
+    for (const id of new Set(declaredIds(plugin, content))) {
       if (uuidSchema.safeParse(id).success) continue;
       context.addIssue({
         code: z.ZodIssueCode.custom,
@@ -119,6 +122,7 @@ function contentSchemaOf<C, M>(plugin: ResourcePlugin<C, M>): z.ZodType<C, z.Zod
       });
     }
   });
+  return plugin.content.pipe(declaresOnlyUuids);
 }
 
 /** The ids a plugin declares, as the core's UUIDs: content its schema accepted names only UUIDs. */
