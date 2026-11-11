@@ -4,6 +4,7 @@ import {
   SPACE_FILE_VERSION,
   canonicalJsonValue,
   canonicalResource,
+  isMissingKind,
   type GraphEdge,
   type JsonObject,
   type JsonValue,
@@ -87,6 +88,9 @@ const canonicalJson = (value: JsonValue): JsonValue => {
 };
 
 const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
+  const unread = new Set(
+    snapshot.resources.filter(({ document }) => isMissingKind(document.kind)).map(({ id }) => id),
+  );
   const maps = snapshot.document.maps?.map((m) => {
     const mapBase: Omit<NonNullable<SpaceFile['maps']>[number], 'activeGraph'> = {
       id: m.id,
@@ -95,14 +99,15 @@ const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
       // `Placement.fromMap` rebuilds every entry key by key — state and size
       // included — so a stored `{"y":…,"x":…}` exports in the canonical order
       // rather than the one `jsonb` handed back; the sort fixes the entries'
-      // order. Map content is no plugin's here, so it is written in the one
-      // canonical form of a value nothing reads, its keys sorted at every depth.
+      // order. The Map content of a Resource whose plugin is missing is read by
+      // nothing here, so it is written in `canonicalJsonValue`'s one form; a
+      // present plugin's is written as its Resource's plugin keeps it.
       positions: Object.fromEntries(
         [...Placement.fromMap(m)]
           .sort(([left], [right]) => compareOrdinal(left, right))
           .map(([id, entry]) => [
             id,
-            entry.content === undefined
+            entry.content === undefined || !unread.has(id)
               ? entry
               : { ...entry, content: canonicalJsonValue(entry.content) },
           ]),

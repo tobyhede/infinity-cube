@@ -78,10 +78,12 @@ export function sameJsonValue(left: JsonValue, right: JsonValue): boolean {
 }
 
 /**
- * `value` with every object's keys in code-unit order, at every depth: the one
- * canonical form of a JSON value nothing here reads (issue 09). A store need
- * not keep key order — PostgreSQL's `jsonb` does not — so a value Export writes
- * unread would otherwise come back in whatever order its store answered.
+ * `value` with every object's keys inserted in code-unit order, at every
+ * depth: the one canonical form of a JSON value nothing here reads. A
+ * JavaScript object still lists integer-like keys first, ascending, so that
+ * is the order such keys are written in. A store need not keep key order —
+ * PostgreSQL's `jsonb` does not — so a value Export writes unread would
+ * otherwise come back in whatever order its store answered.
  */
 export function canonicalJsonValue(value: JsonValue): JsonValue {
   if (Array.isArray(value)) return value.map(canonicalJsonValue);
