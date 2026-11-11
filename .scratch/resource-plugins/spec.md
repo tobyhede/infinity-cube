@@ -143,6 +143,7 @@ Each step is its own PR, leaves `main` green and rolls fixtures, seeds and tests
 5. `07` — Space, last of the kinds because it is the riskiest.
 6. `08` — creation through the API; `09` — the default plugin.
 7. `10` — retire the shared frame and the core fields.
+8. `11` — list the plugins once, after the Embed amendment is built.
 
 ## Out of scope
 

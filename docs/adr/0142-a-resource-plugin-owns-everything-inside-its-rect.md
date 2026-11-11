@@ -9,6 +9,8 @@ A Resource is drawn and authored by its **Resource plugin**. The canvas owns the
 
 Every plugin, bundled or written outside this repository, is built against one public **Resource API** and may reach nothing else. There is no private door for a bundled plugin and no second tier of the API. Plugins are compiled in and listed once at build time (ADR 0120), and each declares the API version it was written for, checked at build. The Resource API has a domain half that names no view, because the server and the CLI load it, and a view half.
 
+**The plugins are listed once.** One build list, its own package with a domain half and a view half as a plugin has, names every plugin and, separately, the default plugin. The core reads the domain half at intake. The surfaces and the creation host are handed the view half at composition, so a test can mount a plugin the build does not list. Every other list of kinds (the Resources list, the Dock, Add's first choice) is that list's order. Nothing else imports a plugin. The per-package `kinds/` halves of ADR 0128 are retired: a plugin's declarations are its kind module, read through the list. The host gives a Resource no type per kind: to the host, `content` is a value a plugin parses, and what the host needs from it comes from what the plugin declares. A treatment the host draws on the outline for one sort of Resource, such as a Reference's dotted border and badged glyph, is keyed on a declaration (a declared Target), never on a kind, and a plugin's glyph is its own.
+
 **The stored `kind` stays.** It is the Resource kind, the name that selects a plugin. The required Title does not change.
 
 **A Resource is one structure, and it is part of the Resource API.** It is `{ id, title, kind, content }`, the same value in a Resource file, in a store, on the wire and given to a plugin. No plugin translates a Resource between forms, so a plugin's file codec is retired.
@@ -84,6 +86,8 @@ A bundled plugin rolls forward with the fixtures and keeps no reader for an old 
 - **Two embeddings, one for a Resource and one for a Map.** Rejected. They differ only in what is drawn.
 - **A plugin as a functional core returning intents to the host.** Rejected. A file picker must open inside the press, drafts would move out of the editor, and embeddings stay ordinary composition anyway. The host's own decisions are pure cores behind the seam.
 - **A layered helper that draws a titled rectangle around a plugin's body.** Rejected for now. It is the shared frame again on the plugin's side, and only Markdown would use it.
+- **The plugin list in the core, with each package listing its kinds again.** Rejected. The `kinds/` halves became one-line registrations of their plugins, five lists drifted (the host drew its own glyph over two plugins'), and the core and the reusable UI depended on every plugin.
+- **A static type per kind in the host.** Rejected. It makes reading another plugin's content easy and type-checked, which is what the host must not do, and only the Space lifecycle used it.
 - **Runtime-loaded plugins.** Not built, as ADR 0120 left them.
 
 ## Cost accepted
@@ -95,5 +99,6 @@ The accessibility and drawing work now in the shared frame has to be reached thr
 - **Do not add a `readOnly` prop or a surface name to a plugin's view.**
 - **Do not let a plugin write position, size or an Edge.**
 - **Do not give a bundled plugin an import outside the Resource API.**
+- **Do not import a plugin package outside the build list, or list the kinds a second time.**
 - **Do not give a Resource a second shape for a file or a store.**
 - **Do not keep a file beside a Resource file, or give any kind its own path for bytes.** Every file is an asset.
