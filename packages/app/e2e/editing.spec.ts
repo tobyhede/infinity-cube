@@ -98,6 +98,25 @@ async function openResource(node: Locator, title: string): Promise<void> {
   await (await controls(node)).getByRole('button', { name: `Open Resource ${title}` }).click();
 }
 
+/**
+ * Open a Closed Resource and wait for its one Open Edit to persist, answering
+ * the revision it persisted at.
+ *
+ * "Persisted" alone does not show the Open landed: a Markdown Resource commits
+ * Open only once it has read and measured its text, so the status can still be
+ * the settled one from before the click.
+ */
+async function openResourcePersisted(node: Locator, title: string): Promise<string> {
+  const persistence = node.page().getByTestId('persistence-status');
+  await expect(persistence).toHaveText('Persisted');
+  const closedRevision = Number(await persistence.getAttribute('data-revision'));
+  await openResource(node, title);
+  const openedRevision = String(closedRevision + 1);
+  await expect(persistence).toHaveAttribute('data-revision', openedRevision);
+  await expect(persistence).toHaveText('Persisted');
+  return openedRevision;
+}
+
 /** Select a placed Resource so its toolbar is drawn, and open its actions menu. */
 async function resourceActions(page: Page, title: string): Promise<Locator> {
   const resource = nodeByTitle(page, title).first();
@@ -1122,10 +1141,8 @@ test(
     const resource = nodeByTitle(page, 'A').first();
     const closed = nodeByTitle(page, 'B').first();
     await expect(resource).toBeVisible();
-    await openResource(resource, 'A');
+    const openedRevision = await openResourcePersisted(resource, 'A');
     const persistence = page.getByTestId('persistence-status');
-    await expect(persistence).toHaveText('Persisted');
-    const openedRevision = await persistence.getAttribute('data-revision');
     const beforePosition = await positionOf(resource);
     // Opening grows the Resource through a CSS transition, so its rect is still
     // moving for a moment after the Edit persists. Settling it first is what
@@ -1220,7 +1237,7 @@ test(
     );
     // Pointer movement owns only the canvas draft. Persistence sees nothing
     // until the gesture releases.
-    await expect(persistence).toHaveAttribute('data-revision', openedRevision ?? '');
+    await expect(persistence).toHaveAttribute('data-revision', openedRevision);
 
     await page.mouse.up();
 
@@ -1360,10 +1377,8 @@ test.describe('resizing by touch', () => {
     await selectCanvas(page, 'Collection 1');
     const resource = nodeByTitle(page, 'A').first();
     await expect(resource).toBeVisible();
-    await openResource(resource, 'A');
+    const openedRevision = await openResourcePersisted(resource, 'A');
     const persistence = page.getByTestId('persistence-status');
-    await expect(persistence).toHaveText('Persisted');
-    const openedRevision = await persistence.getAttribute('data-revision');
     const beforePosition = await positionOf(resource);
     // Opening grows the Resource through a CSS transition, so its rect is still
     // moving for a moment after the Edit persists — settling it first is what
@@ -1411,7 +1426,7 @@ test.describe('resizing by touch', () => {
     await gesture.moveTo(from.x + dragX, from.y + dragY);
     // Pointer movement owns only the canvas draft; persistence sees nothing
     // until the gesture releases.
-    await expect(persistence).toHaveAttribute('data-revision', openedRevision ?? '');
+    await expect(persistence).toHaveAttribute('data-revision', openedRevision);
 
     await gesture.release();
 
@@ -1483,10 +1498,8 @@ test.describe('resizing by touch', () => {
     await selectCanvas(page, 'Collection 1');
     const resource = nodeByTitle(page, 'A').first();
     await expect(resource).toBeVisible();
-    await openResource(resource, 'A');
+    const openedRevision = await openResourcePersisted(resource, 'A');
     const persistence = page.getByTestId('persistence-status');
-    await expect(persistence).toHaveText('Persisted');
-    const openedRevision = await persistence.getAttribute('data-revision');
     const beforePosition = await positionOf(resource);
     // Opening grows the Resource through a CSS transition, so its rect is still
     // moving for a moment after the Edit persists — settling it first is what
@@ -1513,7 +1526,7 @@ test.describe('resizing by touch', () => {
     // gesture that never grew the Resource would restore the authored rect by
     // having never left it, and prove nothing.
     await expect.poll(async () => (await size()).width).toBeGreaterThan(authored.width);
-    await expect(persistence).toHaveAttribute('data-revision', openedRevision ?? '');
+    await expect(persistence).toHaveAttribute('data-revision', openedRevision);
 
     await gesture.cancel();
 
@@ -1522,7 +1535,7 @@ test.describe('resizing by touch', () => {
     await expect.poll(size).toEqual(authored);
     expect(await positionOf(resource)).toEqual(beforePosition);
     await quiescent(page);
-    await expect(persistence).toHaveAttribute('data-revision', openedRevision ?? '');
+    await expect(persistence).toHaveAttribute('data-revision', openedRevision);
 
     // And the gesture is disarmed. A later, unrelated press anywhere on the
     // page raises the `pointerup` that `finish()` answers, so a cancellation
@@ -1532,7 +1545,7 @@ test.describe('resizing by touch', () => {
     const elsewhere = await emptyCanvasPoint(page);
     await page.mouse.click(elsewhere.x, elsewhere.y);
     await quiescent(page);
-    await expect(persistence).toHaveAttribute('data-revision', openedRevision ?? '');
+    await expect(persistence).toHaveAttribute('data-revision', openedRevision);
     expect(await size()).toEqual(authored);
   });
 });
