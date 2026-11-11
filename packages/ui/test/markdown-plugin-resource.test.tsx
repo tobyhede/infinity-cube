@@ -1,9 +1,15 @@
 import '@testing-library/jest-dom/vitest';
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
-import { EMPTY_ASSET } from '@project/resource-api/domain';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { useState } from 'react';
+import { describe, expect, it, vi } from 'vitest';
+import { EMPTY_ASSET, type Answer } from '@project/resource-api/domain';
 import { markdownPlugin } from '@project/plugin-markdown/domain';
-import { PluginResource, PresentedPluginResource, type PluginResourceProps } from '../src';
+import {
+  PluginResource,
+  PresentedPluginResource,
+  type PluginHostClaim,
+  type PluginResourceProps,
+} from '../src';
 import { textAsset, WithTexts } from './markdown-texts';
 
 /**
@@ -62,5 +68,65 @@ describe('a Markdown Resource drawn by the application', () => {
     );
     expect(await screen.findByText('The whole text, on the Stage.')).toBeVisible();
     expect(screen.queryByRole('button')).toBeNull();
+  });
+  it('keeps a draft up while another drawing of its Resource would Close it', async () => {
+    const commitMap = vi.fn();
+    /**
+     * Two drawings of one Resource on one Map, as two Space Resources showing
+     * that Map draw it: one Map content, and one Claim between them.
+     */
+    function TwoDrawings() {
+      const [open, setOpen] = useState(true);
+      const [holder, setHolder] = useState<symbol | null>(null);
+      const operations: PluginResourceProps['operations'] = {
+        kind: 'markdown',
+        commitContent: () => Promise.resolve<Answer>('completed'),
+        commitStore: () => Promise.resolve(textAsset('stored')),
+        commitMap: (next) => {
+          commitMap(next);
+          setOpen(markdownPlugin.mapContent.schema.parse(next).open);
+          return Promise.resolve<Answer>('completed');
+        },
+        claim: (drawing): PluginHostClaim | undefined => {
+          if (holder !== null && holder !== drawing) return undefined;
+          setHolder(drawing);
+          const end = () => setHolder(null);
+          return {
+            release: () => {
+              end();
+              return true;
+            },
+            exclusively: () => Promise.resolve('busy'),
+            unmount: end,
+          };
+        },
+        claimHolder: (drawing) =>
+          holder === null ? 'none' : holder === drawing ? 'this-drawing' : 'another-drawing',
+      };
+      const drawing = { state: 'selected', mapContent: { open }, operations } as const;
+      const content = { url: textAsset('# Notes\n\nShared text.') };
+      return (
+        <>
+          <PluginResource {...onTheMap({ ...drawing, content })} />
+          <PluginResource {...onTheMap({ ...drawing, content })} />
+        </>
+      );
+    }
+    render(
+      <WithTexts>
+        <TwoDrawings />
+      </WithTexts>,
+    );
+    const [first, second] = await screen.findAllByRole('article');
+    if (first === undefined || second === undefined) throw new Error('Two drawings were drawn.');
+    expect(within(second).getByRole('button', { name: 'Close Resource Notes' })).toBeEnabled();
+    fireEvent.click(await within(first).findByRole('button', { name: 'Edit Resource Notes' }));
+    const editing = () => first.querySelector('[data-editing="true"]');
+    expect(editing()).not.toBeNull();
+    // The other drawing offers nothing that could Close the Resource under the draft.
+    expect(within(second).queryByRole('button', { name: 'Close Resource Notes' })).toBeNull();
+    await act(async () => undefined);
+    expect(commitMap).not.toHaveBeenCalled();
+    expect(editing()).not.toBeNull();
   });
 });
