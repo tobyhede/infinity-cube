@@ -202,6 +202,14 @@ export const decideCommit = (
         error.kind !== 'ordinary-space-unreferenced' || !baselineUnreferenced.has(error.spaceId),
     );
     if (errors.length > 0) return { kind: 'answer', result: { kind: 'aggregate-refused', errors } };
+  } else {
+    // A missing plugin holds a Space the stored aggregate already left
+    // unrooted (ADR 0142), not one this commit leaves unrooted.
+    const baselineHeld = new Set(baseline?.ok === true ? baseline.aggregate.heldSpaceIds : []);
+    const errors = aggregate.aggregate.heldSpaceIds
+      .filter((spaceId) => !baselineHeld.has(spaceId) && !baselineUnreferenced.has(spaceId))
+      .map((spaceId) => ({ kind: 'ordinary-space-unreferenced' as const, spaceId }));
+    if (errors.length > 0) return { kind: 'answer', result: { kind: 'aggregate-refused', errors } };
   }
   return {
     kind: 'write',

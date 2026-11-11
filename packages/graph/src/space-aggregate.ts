@@ -21,6 +21,12 @@ export interface SpaceAggregate {
   readonly metaSpaceId: UUID;
   readonly spaces: readonly Space[];
   readonly lookup: SpaceAggregateLookup;
+  /**
+   * The Spaces no lifetime reference holds that are held rather than refused,
+   * because a Resource whose plugin is missing may be what refers to each
+   * (ADR 0142). Empty while every plugin is present.
+   */
+  readonly heldSpaceIds: readonly UUID[];
   readonly [SPACE_AGGREGATE_INTAKE]: true;
 }
 
@@ -69,11 +75,18 @@ class LoadedSpaceAggregate implements SpaceAggregate {
   readonly metaSpaceId: UUID;
   readonly spaces: readonly Space[];
   readonly lookup: SpaceAggregateLookup;
+  readonly heldSpaceIds: readonly UUID[];
 
-  constructor(metaSpaceId: UUID, spaces: readonly Space[], lookup: SpaceAggregateLookup) {
+  constructor(
+    metaSpaceId: UUID,
+    spaces: readonly Space[],
+    lookup: SpaceAggregateLookup,
+    heldSpaceIds: readonly UUID[],
+  ) {
     this.metaSpaceId = metaSpaceId;
     this.spaces = spaces;
     this.lookup = lookup;
+    this.heldSpaceIds = heldSpaceIds;
   }
 }
 
@@ -165,14 +178,18 @@ export function loadSpaceAggregate({
   const pluginMissing = spaces.some((space) =>
     space.resources.some((resource) => isMissingKind(resource.kind)),
   );
-  for (const spaceId of pluginMissing ? [] : unrootedSpaces(declared, metaSpaceId)) {
+  const unrooted = unrootedSpaces(declared, metaSpaceId);
+  for (const spaceId of pluginMissing ? [] : unrooted) {
     errors.push({ kind: 'ordinary-space-unreferenced', spaceId });
   }
   if (errors.length > 0) return { ok: false, errors };
   return {
     ok: true,
-    aggregate: new LoadedSpaceAggregate(metaSpaceId, spaces, {
-      space: (id) => byId.get(id),
-    }),
+    aggregate: new LoadedSpaceAggregate(
+      metaSpaceId,
+      spaces,
+      { space: (id) => byId.get(id) },
+      pluginMissing ? unrooted : [],
+    ),
   };
 }
