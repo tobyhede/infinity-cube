@@ -1,4 +1,4 @@
-import { uuidSchema, type SpaceView } from '@project/core';
+import { uuidSchema, type SpaceFraming, type SpaceView } from '@project/core';
 import type { EmbedView } from '@project/resource-api/view';
 import type { SpaceResourceTarget } from './space-resource-lifecycle';
 
@@ -34,4 +34,20 @@ export function resolveEmbedView(
   const graph = shown.graphs.find(({ id }) => id === shown.activeGraph) ?? shown.graphs[0];
   if (graph === undefined) return undefined;
   return { spaceId: spaceId.data, map: shown.id, graph: graph.id, framing: view?.framing };
+}
+
+/**
+ * The view a framing is written with (ADR 0142): the plugin's own where it
+ * names a Graph, since that is what the embedding draws; otherwise the Map and
+ * Graph its placement drew from the shown Space, or the view's Map alone.
+ * `undefined` where neither names a Map.
+ */
+export function framedView(
+  view: EmbedView | undefined,
+  drawn: { readonly mapId: string; readonly graphId: string } | undefined,
+  framing: SpaceFraming,
+): EmbedView | undefined {
+  if (view?.graph !== undefined) return { map: view.map, graph: view.graph, framing };
+  if (drawn !== undefined) return { map: drawn.mapId, graph: drawn.graphId, framing };
+  return view === undefined ? undefined : { map: view.map, graph: undefined, framing };
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { uuidSchema } from '@project/core';
-import { resolveEmbedView } from '../src/embed-view';
+import { framedView, resolveEmbedView } from '../src/embed-view';
 import type { SpaceResourceTarget } from '../src/space-resource-lifecycle';
 
 const SPACE = uuidSchema.parse('00000000-0000-4000-8000-000000000020');
@@ -82,5 +82,39 @@ describe('resolveEmbedView', () => {
         target(FIRST_MAP),
       ),
     ).toBeUndefined();
+  });
+});
+
+describe('framedView', () => {
+  const framing = { centreX: 10, centreY: 20, zoom: 2 };
+
+  it("frames the plugin's own view where it names a Graph, whatever is drawn", () => {
+    expect(
+      framedView(
+        { map: SECOND_MAP, graph: THIRD_GRAPH },
+        { mapId: FIRST_MAP, graphId: FIRST_GRAPH },
+        framing,
+      ),
+    ).toEqual({ map: SECOND_MAP, graph: THIRD_GRAPH, framing });
+  });
+
+  it('frames the Map and Graph drawn where the view leaves the Graph to the Space', () => {
+    expect(
+      framedView({ map: FIRST_MAP }, { mapId: FIRST_MAP, graphId: SECOND_GRAPH }, framing),
+    ).toEqual({ map: FIRST_MAP, graph: SECOND_GRAPH, framing });
+    expect(framedView(undefined, { mapId: SECOND_MAP, graphId: THIRD_GRAPH }, framing)).toEqual({
+      map: SECOND_MAP,
+      graph: THIRD_GRAPH,
+      framing,
+    });
+  });
+
+  it('frames nothing while neither the view nor a drawing names a Map', () => {
+    expect(framedView(undefined, undefined, framing)).toBeUndefined();
+    expect(framedView({ map: FIRST_MAP }, undefined, framing)).toEqual({
+      map: FIRST_MAP,
+      graph: undefined,
+      framing,
+    });
   });
 });

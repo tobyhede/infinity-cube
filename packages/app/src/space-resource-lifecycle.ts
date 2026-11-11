@@ -198,5 +198,6 @@ export function spaceResourceTarget(space: Space): SpaceResourceTarget {
     title: space.title,
     maps: space.maps.map((m) => targetMap(m, colorByGraphId)),
   };
-  return space.defaultMap === undefined ? target : { ...target, defaultMap: space.defaultMap };
+  if (space.defaultMap === undefined) return target;
+  return { ...target, defaultMap: space.defaultMap };
 }

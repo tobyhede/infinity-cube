@@ -29,7 +29,7 @@ import {
   useStore,
   useStoreApi,
 } from '@xyflow/react';
-import { DEFAULT_KIND, titleName, uuidSchema, type ResourceId, type MapId } from '@project/core';
+import { DEFAULT_KIND, uuidSchema, type ResourceId, type MapId } from '@project/core';
 import type { SpaceSession } from '@project/persistence';
 import {
   CANVAS_RESOURCE_DRAG_TILT_DEGREES,
@@ -72,6 +72,7 @@ import {
   withEmbeddedEdgeTypes,
 } from '../embedded-map';
 import { editingPortalAncestor, reportsBodyHeight } from '../embedded-open-space-resource';
+import { framedView } from '../embed-view';
 import { useEmbeddedOpenSpaceResources } from '../use-embedded-open-space-resources';
 import { useOpenSpaces } from '../open-spaces-context';
 import type { OpenSpace } from '../open-spaces';
@@ -445,7 +446,7 @@ export function SpaceCanvas({
   const {
     embeddedRequests,
     embeddedPublications,
-    embeddedFailures,
+    failedEmbeddings,
     resumeEmbedded,
     publishEmbedded,
     reportBodyHeight,
@@ -685,15 +686,11 @@ export function SpaceCanvas({
         ownMapEmbed(mapEmbeddings.getState(), nodeId) ?? ownMapEmbed(lastEmbeds.current, nodeId);
       const commit = entry?.request.select?.commit;
       if (entry === undefined || commit === undefined) return;
-      // The Map and Graph the embedding draws: the plugin's view, or what its
-      // Space resolved one it left open to (ADR 0142).
-      const drawn = lastEmbeddedRequests.current.find(
-        (request) => request.parent.data.resourceId === resourceId,
-      );
-      const view = entry.request.view;
-      const mapId = drawn?.mapId ?? view?.map;
-      if (mapId === undefined) return;
-      void commit({ map: mapId, graph: drawn?.graphId ?? view?.graph, framing });
+      // This placement's drawing, which says what its Space resolved a view
+      // that left the Map or Graph open to.
+      const drawn = lastEmbeddedRequests.current.find((request) => request.parent.id === nodeId);
+      const next = framedView(entry.request.view, drawn, framing);
+      if (next !== undefined) void commit(next);
     },
     [mapEmbeddings],
   );
@@ -1999,19 +1996,14 @@ export function SpaceCanvas({
         A failed read is announced on the Space Resource that asked for it, named by
         the Title the author gave that Resource: the canvas can hold several
         embeddings, and a sentence naming none of them says nothing about which
-        one is empty. Drawn from the standing requests, so a Resource that is Closed
+        one is empty. Drawn from the standing embeddings, so a Resource that is Closed
         takes its announcement with it.
       */}
-        {embeddedRequests.flatMap(({ parent, spaceId }) => {
-          const message = embeddedFailures.get(spaceId);
-          return message === undefined
-            ? []
-            : [
-                <span key={parent.id} role="alert" className="canvas-refusal">
-                  {`${titleName(parent.data.title)}: ${message}`}
-                </span>,
-              ];
-        })}
+        {failedEmbeddings.map(({ id, title, message }) => (
+          <span key={id} role="alert" className="canvas-refusal">
+            {`${title}: ${message}`}
+          </span>
+        ))}
         {/*
         The sentence a refused canvas command leaves behind. Placed and styled
         exactly like Edge Authoring's `gesture` refusal, because it is the same

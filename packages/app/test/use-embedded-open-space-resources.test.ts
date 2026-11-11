@@ -2,14 +2,20 @@
 
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { uuidSchema } from '@project/core';
+import { newUuid, uuidSchema, type SpaceSnapshot } from '@project/core';
+import { MemorySpaceBackend } from '@project/persistence';
 import { bareKindData, type ResourceFlowNode } from '@project/react-flow-adapter';
-import type { OpenSpace } from '../src/open-spaces';
+import type { MapEmbedEntry } from '../src/map-embeddings';
+import { createOpenSpaces, type OpenSpace } from '../src/open-spaces';
+import { CANVAS } from '../src/space-authoring';
 import type { SpaceResourceFraming } from '../src/space-resource-framing';
 import {
   useEmbeddedOpenSpaceResources,
   type EmbeddedTargetReader,
 } from '../src/use-embedded-open-space-resources';
+import { recordingHistory } from './browser-history';
+import { refusingFullscreen } from './fullscreen';
+import { unlinkedPresentations } from './presentations';
 import { fixtureFacts } from './render-adapter-fixtures';
 import { publishedEmbeds } from './published-embeds';
 
@@ -23,6 +29,22 @@ const HOST = id(1);
 const TARGET = id(2);
 const MAP = id(3);
 const OTHER_MAP = id(6);
+const GRAPH = id(7);
+const HOST_MAP = id(8);
+const HOST_GRAPH = id(9);
+
+/** What a plugin publishes when it passes `<Embed space>` no view: the Space's own `defaultMap`. */
+const viewlessEmbed = (nodes: readonly ResourceFlowNode[]): ReadonlyMap<string, MapEmbedEntry> =>
+  new Map(
+    nodes.map((node): [string, MapEmbedEntry] => [
+      node.id,
+      {
+        resourceId: node.data.resourceId,
+        drawing: Symbol(node.id),
+        request: { space: TARGET, view: undefined, select: undefined, claim: undefined },
+      },
+    ]),
+  );
 
 const spaceResource = (resourceId: typeof HOST, mapId: typeof MAP): ResourceFlowNode => ({
   id: resourceId,
@@ -223,5 +245,117 @@ describe('useEmbeddedOpenSpaceResources', () => {
       result.current.setPortalDraft(new Map([[HOST, framing]]));
     });
     expect(result.current.portalDraft.get(HOST)).toEqual(framing);
+  });
+
+  it('keeps a failed read for an embedding given no view, and reads it again on resume', async () => {
+    let fail = true;
+    let asked = 0;
+    const spaces = reader(() => {
+      asked += 1;
+      if (fail) return Promise.reject(new Error('Target missing'));
+      return Promise.resolve(undefined);
+    });
+    const nodes = [spaceResource(HOST, MAP)];
+    const embeds = viewlessEmbed(nodes);
+    const { result } = renderHook(() =>
+      useEmbeddedOpenSpaceResources(nodes, embeds, spaces, NO_DRAG, {
+        spaceId: HOST,
+        mapId: OTHER_MAP,
+        policy: 'authoring',
+      }),
+    );
+    await waitFor(() => expect(asked).toBe(1));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    // Nothing is drawn while the Space is unread, so the failure is said on the placement.
+    expect(result.current.embeddedRequests).toHaveLength(0);
+    expect(result.current.embeddedFailures.get(TARGET)).toBe('Target missing');
+    expect(result.current.failedEmbeddings).toEqual([
+      { id: HOST, title: 'Elsewhere', message: 'Target missing' },
+    ]);
+    fail = false;
+    await act(async () => {
+      await result.current.resumeEmbedded(TARGET);
+    });
+    expect(asked).toBe(2);
+    expect(result.current.embeddedFailures.has(TARGET)).toBe(false);
+    expect(result.current.failedEmbeddings).toEqual([]);
+  });
+
+  it("draws an embedding given no view on its Space's defaultMap as it is now", async () => {
+    const containing: SpaceSnapshot = {
+      id: HOST,
+      document: {
+        version: 1,
+        title: 'Talk',
+        defaultMap: HOST_MAP,
+        maps: [
+          {
+            id: HOST_MAP,
+            title: 'Talk Map',
+            kind: 'positioned',
+            positions: {},
+            graphs: [{ id: HOST_GRAPH, title: 'Talk Graph', edges: [] }],
+          },
+        ],
+      },
+      resources: [],
+    };
+    const shown: SpaceSnapshot = {
+      id: TARGET,
+      document: {
+        version: 1,
+        title: 'Architecture',
+        defaultMap: MAP,
+        maps: [
+          {
+            id: MAP,
+            title: 'First',
+            kind: 'positioned',
+            positions: {},
+            graphs: [{ id: GRAPH, title: 'First Graph', edges: [] }],
+          },
+        ],
+      },
+      resources: [],
+    };
+    const spaces = createOpenSpaces({
+      fullscreen: refusingFullscreen,
+      presentations: unlinkedPresentations,
+      backend: new MemorySpaceBackend(
+        HOST,
+        [containing, shown].map((snapshot) => ({
+          snapshot,
+          revision: 0n,
+          exportedRevision: null,
+        })),
+      ),
+      metaSpaceId: HOST,
+      metaSpaceTitle: containing.document.title,
+      newId: newUuid,
+      history: recordingHistory(),
+    });
+    await spaces.open(HOST);
+    const { entry } = await spaces.hold(TARGET);
+    const nodes = [spaceResource(HOST, MAP)];
+    const embeds = viewlessEmbed(nodes);
+    const { result, rerender } = renderHook(() =>
+      useEmbeddedOpenSpaceResources(nodes, embeds, spaces, NO_DRAG, {
+        spaceId: HOST,
+        mapId: OTHER_MAP,
+        policy: 'authoring',
+      }),
+    );
+    await waitFor(() => expect(result.current.embeddedRequests[0]?.mapId).toBe(MAP));
+    // A new Map is the Space's opening Map from then on (ADR 0079).
+    await act(async () => {
+      entry.app.authoring.complete(CANVAS, { kind: 'created-map' });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    const opening = entry.app.currentSpace().defaultMap;
+    expect(opening).not.toBe(MAP);
+    rerender();
+    expect(result.current.embeddedRequests[0]?.mapId).toBe(opening);
   });
 });

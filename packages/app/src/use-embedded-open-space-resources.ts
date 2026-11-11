@@ -8,7 +8,7 @@ import {
   type Dispatch,
   type SetStateAction,
 } from 'react';
-import type { ResourceId } from '@project/core';
+import { titleName, type ResourceId } from '@project/core';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import {
   discoverEmbeddedOpenSpaceResources,
@@ -40,10 +40,21 @@ interface EmbeddedHoldRequest {
   hold?: Pick<SpaceHold, 'release'>;
 }
 
+/** A placement whose Space could not be read: its node id, its Title's name, and why. */
+export interface EmbeddedFailure {
+  readonly id: string;
+  readonly title: string;
+  readonly message: string;
+}
+
+const NO_FAILURES: readonly EmbeddedFailure[] = [];
+
 export interface EmbeddedOpenSpaceResources {
   readonly embeddedRequests: readonly EmbeddedOpenSpaceResourceRequest<OpenSpace>[];
   readonly embeddedPublications: ReadonlyMap<string, EmbeddedPublication>;
   readonly embeddedFailures: ReadonlyMap<ResourceId, string>;
+  /** What to announce for each placement whose Space could not be read. */
+  readonly failedEmbeddings: readonly EmbeddedFailure[];
   readonly resumeEmbedded: (spaceId: ResourceId) => Promise<void>;
   readonly publishEmbedded: (id: string, value: EmbeddedPublication | null) => void;
   readonly reportBodyHeight: (id: string, height: number | null) => void;
@@ -104,7 +115,10 @@ export function useEmbeddedOpenSpaceResources(
     });
   }, []);
   // What an embedding given no view, or no Graph, is resolved against: its
-  // Space once it is composed here (ADR 0142).
+  // Space once it is composed here (ADR 0142). Open Spaces publishes a new
+  // `composed` on every commit of a composed Space, so this is rebuilt when
+  // the Space it reads changes ("draws an embedding given no view on its
+  // Space's defaultMap as it is now").
   const targetOf = useCallback(
     (space: string) => {
       const entry = entries.find((candidate) => candidate.id === space);
@@ -168,11 +182,36 @@ export function useEmbeddedOpenSpaceResources(
   // `use-embedded-open-space-resources.test.ts` ('drops a failure whose embedding
   // is no longer standing') holds that prune.
   if (embeddedFailures.size > 0) {
-    const asked = new Set(embeddedRequests.map((request) => request.spaceId));
+    // An embedding drawn from what is read of its Space asks for that read
+    // before it has a request, so its failure stands on the placement.
+    const asked = new Set([
+      ...embeddedRequests.map((request) => request.spaceId),
+      ...toRead.values(),
+    ]);
     if ([...embeddedFailures.keys()].some((spaceId) => !asked.has(spaceId))) {
       setEmbeddedFailures(new Map([...embeddedFailures].filter(([id]) => asked.has(id))));
     }
   }
+  /**
+   * Each placement whose Space could not be read, named by the Title its author
+   * gave it: one drawn from a standing request, or one given no view, or no
+   * Graph, whose Map waits on that read.
+   */
+  const failedEmbeddings = useMemo((): readonly EmbeddedFailure[] => {
+    if (embeddedFailures.size === 0) return NO_FAILURES;
+    const placed = new Map<string, { readonly title: string; readonly spaceId: ResourceId }>();
+    for (const { parent, spaceId } of embeddedRequests)
+      placed.set(parent.id, { title: parent.data.title, spaceId });
+    for (const [nodeId, spaceId] of toRead) {
+      if (placed.has(nodeId)) continue;
+      const node = nodes.find((candidate) => candidate.id === nodeId);
+      if (node !== undefined) placed.set(nodeId, { title: node.data.title, spaceId });
+    }
+    return [...placed].flatMap(([id, { title, spaceId }]) => {
+      const message = embeddedFailures.get(spaceId);
+      return message === undefined ? [] : [{ id, title: titleName(title), message }];
+    });
+  }, [embeddedFailures, embeddedRequests, toRead, nodes]);
   const requested = useRef(new Map<string, EmbeddedHoldRequest>());
   const acquire = useCallback(
     async (id: string, spaceId: ResourceId) => {
@@ -258,6 +297,7 @@ export function useEmbeddedOpenSpaceResources(
     embeddedRequests,
     embeddedPublications,
     embeddedFailures,
+    failedEmbeddings,
     resumeEmbedded,
     publishEmbedded,
     reportBodyHeight,
