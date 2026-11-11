@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type {
   Map as SpaceMap,
   MapId,
@@ -166,7 +166,9 @@ export function useResourcePlacement(
   // The Map drawn now, which a Dock press reads when its Resources are asked
   // for, after a picker that may outlast the Map it was pressed on.
   const drawnMapId = useRef(mapId);
-  useEffect(() => {
+  // Updated in the commit that draws another Map, before any later task, a
+  // picker's answer among them, can read it.
+  useLayoutEffect(() => {
     drawnMapId.current = mapId;
   }, [mapId]);
 

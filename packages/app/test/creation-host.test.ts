@@ -3,7 +3,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type JsonValue } from '@project/core';
 import { isStoredAsset } from '@project/resource-api/domain';
 import type { CreationData } from '@project/resource-api/view';
-import type { HostCreationHost, HostNew, PluginCreationEntry } from '@project/ui';
+import {
+  NotCreatableContent,
+  type HostCreationHost,
+  type HostNew,
+  type PluginCreationEntry,
+} from '@project/ui';
 import type { OpenSpace } from '../src/open-spaces';
 import {
   createCreationFlights,
@@ -101,6 +106,20 @@ describe('what one create becomes', () => {
       kind: 'refused',
       refusal: 'exclusive',
     });
+  });
+
+  it('refuses an item its plugin’s schema refused only after its own checks', () => {
+    const refused: readonly HostNew[] = [{ content: EMPTY_TEXT }, { notCreatable: true }];
+
+    expect(decideCreate(refused, { ...FACTS, available: false })).toEqual({
+      kind: 'refused',
+      refusal: 'unavailable',
+    });
+    expect(decideCreate(refused, { ...FACTS, exclusive: true })).toEqual({
+      kind: 'refused',
+      refusal: 'exclusive',
+    });
+    expect(decideCreate(refused, FACTS)).toEqual({ kind: 'refused', refusal: 'not-creatable' });
   });
 
   it('changes nothing for no items', () => {
@@ -350,6 +369,28 @@ describe('a creation with a new Space', () => {
     });
   });
 
+  it('normalises the Title it is given as an Edit does, and mints one for a blank Title', async () => {
+    const opened = openDerivationSpace();
+    const { host } = hosted(opened);
+
+    await host.run(
+      offered('space', askFor([{ title: 'Harbour  ', newSpace: true, contentFor: showing }])),
+      gesture(),
+    );
+    await host.run(
+      offered('space', askFor([{ title: '   ', newSpace: true, contentFor: showing }])),
+      gesture(),
+    );
+
+    expect(
+      opened.session
+        .getState()
+        .working.resources.filter(({ document }) => document.kind === 'space')
+        .map(({ document }) => document.title),
+    ).toEqual(['Harbour', 'Space 1']);
+    expect(notice(opened)).toBeNull();
+  });
+
   it('ignores a second one while the first is in flight, and still creates another kind', async () => {
     const opened = openDerivationSpace();
     const { host, creating, flights } = hosted(opened);
@@ -367,6 +408,31 @@ describe('a creation with a new Space', () => {
     expect(notice(opened)).toBeNull();
     expect(flights.kinds()).toEqual(new Set());
     expect(creating.at(-1)).toEqual(new Set());
+  });
+  it('refuses a new Space whose content its plugin’s schema refuses, as not creatable rather than a break', async () => {
+    const opened = openDerivationSpace();
+    const { host, reportBreak } = hosted(opened);
+
+    await host.run(
+      offered(
+        'space',
+        askFor([
+          {
+            newSpace: true,
+            contentFor: () => {
+              throw new NotCreatableContent('space');
+            },
+          },
+        ]),
+      ),
+      gesture(),
+    );
+
+    expect(reportBreak).not.toHaveBeenCalled();
+    expect(notice(opened)).toEqual({
+      title: 'Space Resource not created',
+      message: 'This Resource cannot be created here.',
+    });
   });
 });
 

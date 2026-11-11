@@ -12,12 +12,20 @@ import type { PlacementMode } from '@project/graph';
 import type { ObserverErrorReporter, SpaceSession } from '@project/persistence';
 import type { Answer } from '@project/resource-api/domain';
 import {
+  refusalOf,
   URL_MEDIA_TYPE,
   type Assets,
   type CreationData,
+  type NewSpace,
   type OfferedSpace,
 } from '@project/resource-api/view';
-import type { HostCreation, HostCreationHost, HostNew, PluginCreationEntry } from '@project/ui';
+import {
+  NotCreatableContent,
+  type HostCreation,
+  type HostCreationHost,
+  type HostNew,
+  type PluginCreationEntry,
+} from '@project/ui';
 import {
   describeAuthoringRefusal,
   describeSpaceResourceBreak,
@@ -28,7 +36,7 @@ import type { CreationOutcome } from '../command-outcomes';
 import { failureMessage } from '../failure-message';
 import type { ComposedApp } from '../compose-app';
 import { resolveMap } from '../map-resolution';
-import type { NewResource, SettledResult } from '../space-authoring';
+import { namedResourceTitle, type NewResource, type SettledResult } from '../space-authoring';
 import type {
   SpaceResourceAuthoring,
   SpaceResourceCreationResult,
@@ -147,21 +155,14 @@ export type CreatePlan =
   | {
       readonly kind: 'new-space';
       readonly title: string | undefined;
-      readonly contentFor: (shown: OfferedShown) => JsonValue;
+      readonly contentFor: (shown: NewSpace) => JsonValue;
     }
   | {
       readonly kind: 'link';
       readonly space: OfferedSpace;
       readonly title: string | undefined;
-      readonly contentFor: (shown: OfferedShown) => JsonValue;
+      readonly contentFor: (shown: NewSpace) => JsonValue;
     };
-
-/** The Space a content function is called with. */
-export interface OfferedShown {
-  readonly spaceId: string;
-  readonly map: string;
-  readonly graph: string;
-}
 
 /** What the decision reads about the moment a `create` is called. */
 export interface CreateFacts {
@@ -183,8 +184,12 @@ export function decideCreate(items: readonly HostNew[], facts: CreateFacts): Cre
   if (!facts.available) return { kind: 'refused', refusal: 'unavailable' };
   if (facts.exclusive) return { kind: 'refused', refusal: 'exclusive' };
   if (items.length === 0) return { kind: 'unchanged' };
+  if (items.some((item) => 'notCreatable' in item)) {
+    return { kind: 'refused', refusal: 'not-creatable' };
+  }
   const resources: NewResource[] = [];
   for (const item of items) {
+    if ('notCreatable' in item) continue;
     if ('contentFor' in item) {
       if (items.length !== 1) return { kind: 'refused', refusal: 'not-creatable' };
       if (item.newSpace === true) {
@@ -203,22 +208,20 @@ export function decideCreate(items: readonly HostNew[], facts: CreateFacts): Cre
   return { kind: 'edit', items: resources };
 }
 
-/** The words a refusal the host made itself is said in. */
-const REFUSAL_WORDS = {
-  unavailable: 'Resources cannot be created here now.',
-  exclusive: describeAuthoringRefusal({ code: 'exclusive-work-running' }),
-  'not-creatable': 'This Resource cannot be created here.',
-} as const satisfies Readonly<Record<CreationRefusal, string>>;
-
 /**
- * Whether the host tells the author of its own refusal. A creation no longer
- * available has no one left to tell.
+ * Each refusal the host makes itself: the words it is said in, and whether the
+ * author is told of it. A creation no longer available has no one left to tell.
  */
-const REPORTED = {
-  unavailable: false,
-  exclusive: true,
-  'not-creatable': true,
-} as const satisfies Readonly<Record<CreationRefusal, boolean>>;
+const HOST_REFUSALS = {
+  unavailable: { words: 'Resources cannot be created here now.', reported: false },
+  exclusive: {
+    words: describeAuthoringRefusal({ code: 'exclusive-work-running' }),
+    reported: true,
+  },
+  'not-creatable': { words: 'This Resource cannot be created here.', reported: true },
+} as const satisfies Readonly<
+  Record<CreationRefusal, { readonly words: string; readonly reported: boolean }>
+>;
 
 // ---- The shell
 
@@ -345,8 +348,8 @@ const performedEdit = (result: SettledResult): Performed => {
 const documentFor = (
   kind: string,
   title: string,
-  contentFor: (shown: OfferedShown) => JsonValue,
-  shown: OfferedShown,
+  contentFor: (shown: NewSpace) => JsonValue,
+  shown: NewSpace,
 ): ResourceDocument => resourceDocumentSchema.parse({ title, kind, content: contentFor(shown) });
 
 /**
@@ -394,7 +397,8 @@ export function createCreationHost(deps: CreationHostDependencies): CreationHost
       if (plan.kind === 'new-space') {
         // One title, minted from this Space's own Resource titles, names both
         // the Space and the Resource, so the two agree at creation.
-        const title = plan.title ?? nextSpaceTitle(session.getState().working);
+        const title =
+          namedResourceTitle(plan.title ?? '') ?? nextSpaceTitle(session.getState().working);
         result = await spaceResources.create({
           containingSpaceId,
           mapId: resolved.map.id,
@@ -403,7 +407,7 @@ export function createCreationHost(deps: CreationHostDependencies): CreationHost
           document: (shown) => documentFor(kind, title, plan.contentFor, shown),
         });
       } else {
-        const title = plan.title ?? plan.space.title;
+        const title = namedResourceTitle(plan.title ?? '') ?? plan.space.title;
         result = await spaceResources.link({
           containingSpaceId,
           mapId: resolved.map.id,
@@ -422,6 +426,10 @@ export function createCreationHost(deps: CreationHostDependencies): CreationHost
           return { answer: { refused: describeSpaceResourceRefusal(result.refusal) } };
       }
     } catch (failure) {
+      // Content its plugin's schema refused is refused as any such create is.
+      if (failure instanceof NotCreatableContent) {
+        return { answer: { refused: HOST_REFUSALS['not-creatable'].words } };
+      }
       // Both: the author is told on the creation's own channel, and the
       // diagnostic still reaches the operational one.
       reportBreak(failure);
@@ -451,7 +459,7 @@ export function createCreationHost(deps: CreationHostDependencies): CreationHost
     mapId: MapId = deps.mapId,
   ): void => {
     const { answer } = performed;
-    const refused = answer === 'completed' || answer === 'unchanged' ? null : answer.refused;
+    const refused = refusalOf(answer);
     if (gesture.settle !== undefined) {
       gesture.settle(refused);
     } else {
@@ -482,8 +490,9 @@ export function createCreationHost(deps: CreationHostDependencies): CreationHost
     });
     if (plan.kind === 'unchanged') return 'unchanged';
     if (plan.kind === 'refused') {
-      const answer = { refused: REFUSAL_WORDS[plan.refusal] };
-      if (REPORTED[plan.refusal]) tell(offered.name, gesture, { answer });
+      const { words, reported } = HOST_REFUSALS[plan.refusal];
+      const answer = { refused: words };
+      if (reported) tell(offered.name, gesture, { answer });
       return answer;
     }
     const place = gesture.place();
@@ -518,7 +527,7 @@ export function createCreationHost(deps: CreationHostDependencies): CreationHost
             : (bytes) =>
                 available()
                   ? store(bytes)
-                  : Promise.resolve({ refused: REFUSAL_WORDS.unavailable }),
+                  : Promise.resolve({ refused: HOST_REFUSALS.unavailable.words }),
       },
       create: (items) => create(offered, gesture, items),
       report: (words) => {

@@ -206,7 +206,12 @@ export type Creation<C> =
       readonly run: (host: CreationHost<C>, data: CreationData) => void | Promise<void>;
     }
   | {
-      /** A command on another Resource, given that Resource. */
+      /**
+       * A command on another Resource, given that Resource, which what it
+       * creates references: on a Resource that may not be a Target the host
+       * offers it disabled, saying why (ADR 0113). `accepts` passes over a
+       * Resource it is not offered on at all.
+       */
       readonly from: 'resource';
       readonly accepts?: ((resource: Resource) => boolean) | undefined;
       readonly run: (host: CreationHost<C>, resource: Resource) => void | Promise<void>;
@@ -222,15 +227,26 @@ export interface PluginView<C, M> {
   readonly kind: string;
   readonly View: ComponentType<PluginViewProps<C, M>>;
   readonly Glyph: ComponentType<{ readonly size?: number | undefined }>;
-  /** How its Resources are created, each where it is offered; none, none are. */
+  /** How its Resources are created, each where it is offered, at most one from each place; none, none are. */
   readonly creates?: readonly Creation<C>[] | undefined;
 }
 
-/** Declare a plugin's view half for its domain half. */
+/**
+ * Declare a plugin's view half for its domain half. A plugin offers at most
+ * one creation from each place, since the host finds a creation by its plugin
+ * and where it is offered from; a second throws when the plugin is built.
+ */
 export function definePluginView<const K extends string, C, M>(
   plugin: ResourcePlugin<C, M> & { readonly kind: K },
   view: Omit<PluginView<C, M>, 'kind'>,
 ): PluginView<C, M> & { readonly kind: K } {
+  const offeredFrom = new Set<Creation<C>['from']>();
+  for (const { from } of view.creates ?? []) {
+    if (offeredFrom.has(from)) {
+      throw new Error(`The ${plugin.kind} plugin declares two creations from '${from}'.`);
+    }
+    offeredFrom.add(from);
+  }
   return { kind: plugin.kind, View: view.View, Glyph: view.Glyph, creates: view.creates };
 }
 

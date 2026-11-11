@@ -156,8 +156,10 @@ export interface PluginSurfaceInput {
 
 /**
  * A Resource a creation asks the host for, as the host takes it: its content
- * JSON its plugin's schema accepted, or a function of the Space it names that
- * answers such JSON and throws on anything else.
+ * JSON its plugin's schema accepted; a function of the Space it names that
+ * answers such JSON and throws {@link NotCreatableContent} on anything else; or
+ * an item whose content its schema refused, which the host refuses once its
+ * own checks have passed.
  */
 export type HostNew =
   | { readonly title?: string | undefined; readonly content: JsonValue }
@@ -165,7 +167,16 @@ export type HostNew =
       readonly title?: string | undefined;
       readonly contentFor: (space: NewSpace) => JsonValue;
       readonly newSpace?: true | undefined;
-    };
+    }
+  | { readonly notCreatable: true };
+
+/** Thrown by a content function whose answer its plugin's schema refuses. */
+export class NotCreatableContent extends Error {
+  constructor(kind: string) {
+    super(`The ${kind} plugin created content its schema refuses.`);
+    this.name = 'NotCreatableContent';
+  }
+}
 
 /** What the host gives a creation's `run`, before the plugin's types are put on it. */
 export interface HostCreationHost {
@@ -202,6 +213,8 @@ export interface PluginCreationEntry {
 
 /** One plugin, both halves, behind a door that takes the host's values. */
 export interface PluginEntry {
+  /** What one of its Resources is called. */
+  readonly name: string;
   /** How its Resources are created, in the order it declares them. */
   readonly creations: readonly HostCreation[];
   readonly Glyph: ComponentType<{ readonly size?: number | undefined }>;
@@ -222,9 +235,6 @@ export interface PluginSurfaceEntries {
 /** Why a commit was refused before it reached the host: the value was not JSON. */
 const NOT_JSON: Answer = { refused: 'This change cannot be kept.' };
 
-/** Why a creation was refused before it reached the host: its content was not its plugin's. */
-const NOT_CREATABLE = { refused: 'This Resource cannot be created.' } as const satisfies Answer;
-
 /** Content a plugin created, as the host takes it: its schema's, and JSON; or `undefined`. */
 const creatableJson = <C,>(plugin: ResourcePlugin<C, unknown>, value: C): JsonValue | undefined => {
   const parsed = plugin.content.safeParse(value);
@@ -235,10 +245,11 @@ const creatableJson = <C,>(plugin: ResourcePlugin<C, unknown>, value: C): JsonVa
 
 /**
  * A plugin's creation with its types erased: each item's content is parsed by
- * the plugin's own schema and checked to be JSON before the host takes it, so
- * an item the plugin got wrong refuses the whole create, reported as the host
- * reports any refused create, and a content function answering such a value
- * throws inside the host.
+ * the plugin's own schema and checked to be JSON before the host takes it. An
+ * item the plugin got wrong reaches the host as not creatable, so the host
+ * refuses the whole create after its own checks, and reports it as it reports
+ * any refused create; a content function answering such a value throws
+ * {@link NotCreatableContent} inside the host, which refuses it the same way.
  */
 export function hostCreation<C>(
   plugin: ResourcePlugin<C, unknown>,
@@ -257,21 +268,15 @@ export function hostCreation<C>(
             newSpace: item.newSpace,
             contentFor: (space) => {
               const json = creatableJson(plugin, contentFor(space));
-              if (json === undefined) {
-                throw new Error(`The ${plugin.kind} plugin created content its schema refuses.`);
-              }
+              if (json === undefined) throw new NotCreatableContent(plugin.kind);
               return json;
             },
           });
         } else {
           const json = creatableJson(plugin, item.content);
-          if (json === undefined) {
-            // Reported by the host, as every refused create is: the plugin
-            // has no surface of its own to say it on.
-            host.report(NOT_CREATABLE.refused);
-            return Promise.resolve(NOT_CREATABLE);
-          }
-          erased.push({ title: item.title, content: json });
+          erased.push(
+            json === undefined ? { notCreatable: true } : { title: item.title, content: json },
+          );
         }
       }
       return host.create(erased);
@@ -401,6 +406,7 @@ export function pluginEntry<C, M>(
     );
   }
   return {
+    name: plugin.name,
     creations: (view.creates ?? []).map((creation) => hostCreation(plugin, creation)),
     Glyph: view.Glyph,
     bareAtRest: plugin.bareAtRest === true,
@@ -418,15 +424,6 @@ const PLUGIN_ENTRIES = {
   [urKind.id]: pluginEntry(urPlugin, urPluginView),
 } satisfies Record<PluginKind, PluginEntry>;
 
-/** What one Resource of each plugin's kind is called. */
-const PLUGIN_NAMES = {
-  [imageKind.id]: imagePlugin.name,
-  [markdownKind.id]: markdownPlugin.name,
-  [referenceKind.id]: referencePlugin.name,
-  [spaceKind.id]: spacePlugin.name,
-  [urKind.id]: urPlugin.name,
-} satisfies Record<PluginKind, string>;
-
 /** The entry of the plugin that draws this kind. */
 export const pluginEntryFor = (kind: PluginKind): PluginEntry => PLUGIN_ENTRIES[kind];
 
@@ -441,7 +438,7 @@ export const pluginCreations = (): readonly PluginCreationEntry[] =>
   PLUGIN_KINDS.flatMap((kind) =>
     PLUGIN_ENTRIES[kind].creations.map((creation) => ({
       kind,
-      name: PLUGIN_NAMES[kind],
+      name: PLUGIN_ENTRIES[kind].name,
       creation,
     })),
   );

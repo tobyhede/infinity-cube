@@ -40,7 +40,7 @@ export { NO_ASSETS, PluginAssetsProvider, usePluginAssets } from './plugin-asset
 export type { PresentedPluginResourceProps } from './PresentedPluginResource';
 export { ResourceFailureBoundary } from './ResourceFailureBoundary';
 export type { ResourceFailureBoundaryProps } from './ResourceFailureBoundary';
-export { isPluginOperations, pluginCreations } from './kinds/plugin-views';
+export { isPluginOperations, NotCreatableContent, pluginCreations } from './kinds/plugin-views';
 export type {
   HostCreation,
   HostCreationHost,

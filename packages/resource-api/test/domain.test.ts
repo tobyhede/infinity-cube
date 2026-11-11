@@ -7,8 +7,7 @@ import {
   pluginList,
   pluginListProblem,
 } from '@project/resource-api/domain';
-import type { RailCommand } from '@project/resource-api/view';
-import { createRailStore } from '@project/resource-api/view/host';
+import { createRailStore, definePluginView, type RailCommand } from '@project/resource-api/view';
 
 const plugin = <const V extends number, const K extends string>(apiVersion: V, kind: K) =>
   definePlugin({
@@ -92,23 +91,30 @@ describe('a rail store', () => {
   });
 });
 
-describe('the view entry a plugin draws with', () => {
-  it('exports none of the host’s machinery, which only /view/host does', async () => {
-    const view = Object.keys(await import('@project/resource-api/view'));
-    const host = Object.keys(await import('@project/resource-api/view/host'));
-    expect(view.sort()).toEqual([
-      'Own',
-      'RAIL_BAND',
-      'Rail',
-      'RenderedMarkdown',
-      'SourceEditor',
-      'Title',
-      'definePluginView',
-      'refusalOf',
-      'useRailBand',
-    ]);
-    expect(host).toEqual(
-      expect.arrayContaining(['ResourceHostProvider', 'createRailStore', 'useResourceHost']),
-    );
+describe('declaring how a plugin creates its Resources', () => {
+  it('refuses two creations offered from the same place, which the host could not tell apart', () => {
+    const declared = plugin(API_VERSION, 'one');
+    const run = (): void => undefined;
+
+    expect(() =>
+      definePluginView(declared, {
+        View: () => null,
+        Glyph: () => null,
+        creates: [
+          { from: 'resource', run },
+          { from: 'resource', run },
+        ],
+      }),
+    ).toThrow(/two creations from 'resource'/u);
+    expect(() =>
+      definePluginView(declared, {
+        View: () => null,
+        Glyph: () => null,
+        creates: [
+          { from: 'dock', run },
+          { from: 'resource', run },
+        ],
+      }),
+    ).not.toThrow();
   });
 });

@@ -33,10 +33,7 @@ import { CANVAS } from './space-authoring';
 import type { ResourcesDisclosure } from './resources-disclosure';
 import { useReferenceableSpaces } from './referenceable-spaces';
 
-/**
- * The Dock's Creates in registry order, the order the cluster has always drawn
- * its kinds in, whatever order the plugins are built in.
- */
+/** The Dock's Creates in registry order (`KIND_IDS`), whatever order the plugins are built in. */
 const ORDERED_DOCK_CREATIONS = [...DOCK_CREATIONS].sort(
   (a, b) => KIND_IDS.indexOf(a.kind) - KIND_IDS.indexOf(b.kind),
 );

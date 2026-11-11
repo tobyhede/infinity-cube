@@ -725,7 +725,7 @@ const trimmedNonBlankTitle = (title: string): string | null => {
  * the one intake mints from the same bytes — derived state disagreeing with the
  * code that derives it, which this repo fixes at the source.
  */
-const namedResourceTitle = (title: string): string | null => {
+export const namedResourceTitle = (title: string): string | null => {
   const normalized = normalizeTitle(title);
   return normalized.length === 0 ? null : normalized;
 };
