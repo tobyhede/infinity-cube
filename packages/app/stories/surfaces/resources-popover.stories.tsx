@@ -302,7 +302,12 @@ const ROADMAP_RESOURCES: readonly Resource[] = [
     kind: 'space',
     content: { spaceId: ROADMAP_ID, map: RISKS_MAP, graph: id('000000000044') },
   },
-  { id: id('000000000047'), title: 'Release notes', kind: 'markdown', content: { source: '' } },
+  {
+    id: id('000000000047'),
+    title: 'Release notes',
+    kind: 'markdown',
+    content: { url: EMPTY_ASSET_REF },
+  },
 ];
 
 /**
@@ -329,7 +334,7 @@ SpaceSelections.meta = { iframed: true };
 const LONG_NAME = 'A Resource whose name runs far past the width the list can give it';
 const LONG_SPACE_NAME = 'A Space whose name runs far past the width the list can give it';
 const LONG_NAMED: readonly Resource[] = [
-  { id: id('000000000050'), title: LONG_NAME, kind: 'markdown', content: { source: '' } },
+  { id: id('000000000050'), title: LONG_NAME, kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
 ];
 
 /**
