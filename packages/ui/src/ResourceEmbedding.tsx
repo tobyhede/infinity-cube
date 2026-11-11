@@ -194,6 +194,8 @@ function EmbeddedSurface({
   // A commit the embedded plugin kept answers refused once this surface is
   // gone, whatever the surface around it still offers (ADR 0142).
   const [lifetime] = useState(createEmbeddedLifetime);
+  // The embedded drawing is one of its own, as any surface's is.
+  const [drawing] = useState(() => Symbol('drawing'));
   useEffect(() => {
     lifetime.begin();
     return lifetime.end;
@@ -223,6 +225,7 @@ function EmbeddedSurface({
   const mapTitle = useContext(MapTitleContext);
   const plugin = entry.render({
     resourceId: target.id,
+    drawing,
     kind,
     title: title.value,
     content: target.content,
