@@ -406,9 +406,9 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
    * Insert the asset, and answer a losing insert as the asset already being
    * there: its hash is its content, so a row under that hash holds these bytes,
    * and the first stored media type stands. Outside any transaction, so a
-   * losing insert aborts nothing else.
+   * losing insert aborts nothing else. The asset of zero bytes is held
+   * already, so storing it writes no row.
    */
-  /** The asset of zero bytes is held already, so storing it writes no row. */
   storeAsset(asset: StoredAsset): Promise<'stored' | 'existing'> {
     if (asset.hash === EMPTY_ASSET.hash) return Promise.resolve('existing');
     return this.#naming(() =>
