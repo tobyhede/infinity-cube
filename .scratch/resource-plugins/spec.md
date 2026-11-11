@@ -1,6 +1,6 @@
 # Resource plugins
 
-Delivery for [ADR 0142](../../docs/adr/0142-a-resource-plugin-owns-everything-inside-its-rect.md), which supersedes ADR 0137 and refines ADR 0020, 0051, 0064, 0106, 0118, 0119, 0120, 0121, 0123, 0125, 0128, 0134, 0135 and 0139. The decision and its rejected options are in the ADR, and the terms in `CONTEXT.md`. This file is the plan, and the signatures and treatment an ADR does not bind. Prior art is in `canvas-shapes-research.md`, `block-editors-research.md`, `host-extensions-research.md` and `compound-documents-research.md` beside this file.
+Delivery for [ADR 0142](../../docs/adr/0142-a-resource-plugin-owns-everything-inside-its-rect.md), which supersedes ADR 0137 and refines ADR 0020, 0051, 0064, 0079, 0106, 0118, 0119, 0120, 0121, 0123, 0125, 0128, 0134, 0135 and 0139. The decision and its rejected options are in the ADR, and the terms in `CONTEXT.md`. This file is the plan, and the signatures and treatment an ADR does not bind. Prior art is in `canvas-shapes-research.md`, `block-editors-research.md`, `host-extensions-research.md` and `compound-documents-research.md` beside this file.
 
 ## Where it starts
 
@@ -15,7 +15,7 @@ Read on 2026-11-10.
 - Creation lives in `kind-creation.ts`, each `app/kinds/` module and `resource-placement.ts`.
 - Image bytes are image-specific: `POST /images`, the `images` table, `storeImage`, and `loadReferencedImages` naming the kind in Export.
 - `complete` in `space-authoring.ts` can answer `queued` with no later outcome.
-- No error boundary exists in `packages/app/src`, `packages/ui/src` or `packages/react-flow-adapter/src`.
+- No per-Resource error boundary exists in `packages/app/src`, `packages/ui/src` or `packages/react-flow-adapter/src`. The one boundary, `SpaceAppFailure` in `packages/app/src/components/`, replaces the whole Space's application with a report when a render throws.
 
 ## The target
 
@@ -40,7 +40,8 @@ definePluginView<C, M>({ View, Glyph, creates? })
 
 type Answer = 'completed' | 'unchanged' | { refused: string }
 type Kept<T> = { value: T; commit?: (next: T) => Promise<Answer> }
-type SpaceView = { map: MapId; graph?: GraphId }               // which of a Space's Maps an Embed shows
+type SpaceView = { map: MapId; graph?: GraphId; framing?: Framing }   // which of a Space's Maps an Embed shows, and how it is framed
+type Framing = { centreX: number; centreY: number; zoom: number }    // a Space Resource's authored framing (ADR 0112), kept by the plugin with its view
 
 interface Surface<C, M> {
   resource: Resource<C>                                   // title and content below are its values, with their commits
@@ -52,7 +53,9 @@ interface Surface<C, M> {
   claim?(): OwnClaim<C, M> | undefined
   assets: { url(ref): string; read(ref): Promise<Blob | { refused: string }>; pick?(accept): Promise<File[]>; store?(bytes: Blob): Promise<AssetRef | { refused: string }> }
   // One Embed: a Resource, drawn by its own plugin, or a Space, drawn as one of its Maps.
-  // No `select`: the Space's defaultMap. `select` with a commit: the host's chooser, writing only through it.
+  // No `select`: the Space's defaultMap. `select` with a commit: the host's chooser and framing, writing only through it.
+  // Choosing another Map commits a view with no framing; reframing commits the same Map and Graph with the new framing.
+  // Enter, which navigates into the shown Space, is an embedding command too, offered where navigation is.
   // `claim`: the shown Space's authoring, its Maps and Graphs included. Commands come from these, never from a kind.
   Embed: ComponentType<{ resource: ResourceId; title: Kept<string> } | { space: SpaceId; select?: Kept<SpaceView>; claim?: Claim }>
 }
