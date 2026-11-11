@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { COLLAPSED_RESOURCE_SIZE } from '@project/core';
+import { RAIL_BAND } from '@project/resource-api/view';
 
 /**
  * The Title ladder's typography, read off the stylesheet that declares it.
@@ -285,5 +286,12 @@ describe('the field that writes the Title', () => {
     // Scrolled rather than clipped: the field is the one place the whole Title
     // has to stay reachable, however many lines the author has typed.
     expect(declared(input, 'overflow-y')).toBe('auto');
+  });
+});
+
+describe('the band along the top of a Resource', () => {
+  it('is the band a plugin is told to keep clear for the rail', () => {
+    const body = block(".canvas-resource[data-open='false'] > .canvas-resource__body");
+    expect(declared(body, 'padding-top')).toBe(`${String(RAIL_BAND)}px`);
   });
 });

@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { EMPTY_ASSET, type Answer } from '@project/resource-api/domain';
@@ -69,6 +69,52 @@ describe('a Markdown Resource drawn by the application', () => {
     expect(await screen.findByText('The whole text, on the Stage.')).toBeVisible();
     expect(screen.queryByRole('button')).toBeNull();
   });
+  it('measures its text for Opening once its images have loaded', async () => {
+    const complete = vi.spyOn(HTMLImageElement.prototype, 'complete', 'get').mockReturnValue(false);
+    try {
+      const commitMap = vi.fn(() => Promise.resolve<Answer>('completed'));
+      render(
+        <WithTexts>
+          <PluginResource
+            {...onTheMap({
+              state: 'selected',
+              content: { url: textAsset('# Notes\n\n![Chart](https://example.com/chart.png)') },
+              operations: { kind: 'markdown', commitMap },
+            })}
+          />
+        </WithTexts>,
+      );
+      fireEvent.click(await screen.findByRole('button', { name: 'Open Resource Notes' }));
+      const image = await waitFor(() => {
+        const drawn = document.querySelector('[aria-hidden="true"] img');
+        if (drawn === null) throw new Error('The text was not drawn to be measured.');
+        return drawn;
+      });
+      await act(() => Promise.resolve());
+      expect(commitMap).not.toHaveBeenCalled();
+      fireEvent.load(image);
+      await waitFor(() => expect(commitMap).toHaveBeenCalledTimes(1));
+    } finally {
+      complete.mockRestore();
+    }
+  });
+
+  it('keeps no band clear for a rail on the Stage, which draws none', async () => {
+    render(
+      <WithTexts>
+        <PresentedPluginResource
+          resourceId="notes"
+          kind="markdown"
+          title="Notes"
+          content={{ url: textAsset('Text on the Stage.') }}
+        />
+      </WithTexts>,
+    );
+    await screen.findByText('Text on the Stage.');
+    const header = screen.getByRole('heading', { name: 'Notes' }).parentElement;
+    expect(header?.style.paddingTop).toBe('0px');
+  });
+
   it('keeps a draft up while another drawing of its Resource would Close it', async () => {
     const commitMap = vi.fn();
     /**
@@ -125,7 +171,7 @@ describe('a Markdown Resource drawn by the application', () => {
     expect(editing()).not.toBeNull();
     // The other drawing offers nothing that could Close the Resource under the draft.
     expect(within(second).queryByRole('button', { name: 'Close Resource Notes' })).toBeNull();
-    await act(async () => undefined);
+    await act(() => Promise.resolve());
     expect(commitMap).not.toHaveBeenCalled();
     expect(editing()).not.toBeNull();
   });

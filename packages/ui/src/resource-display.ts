@@ -5,8 +5,8 @@ import type { ResourceContent } from '@project/core';
  * 0006, as narrowed by ADR 0064); an Open one carries its resolved content, its
  * own or its Target's. Presenting draws on the Stage through
  * `PresentedResource`, never through `CanvasResource` (ADR 0123). No edit runs
- * in a content area the old frame draws: a plugin's edit is its own, inside its
- * rect (ADR 0142).
+ * in a content area `CanvasResource` draws: a plugin's edit is its own, inside
+ * its rect (ADR 0142).
  */
 export type ResourceDisplay =
   { readonly shown: 'closed' } | { readonly shown: 'open'; readonly content: ResourceContent };

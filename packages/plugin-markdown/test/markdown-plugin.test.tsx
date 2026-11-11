@@ -1,10 +1,9 @@
 import { z } from 'zod';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
-import { EMPTY_ASSET, type AssetRef } from '@project/resource-api/domain';
+import { EMPTY_ASSET, lineFeedText, type AssetRef } from '@project/resource-api/domain';
 import { renderPlugin } from '@project/resource-api/view/testing';
 import {
   markdownPlugin,
-  markdownText,
   type MarkdownContent,
   type MarkdownMapContent,
 } from '@project/plugin-markdown/domain';
@@ -12,6 +11,7 @@ import { markdownPluginView, READING_WIDTH } from '@project/plugin-markdown/view
 
 const TEXT_REF: AssetRef = '/assets/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 const SAVED_REF: AssetRef = '/assets/BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBA';
+const UNREAD_REF: AssetRef = '/assets/CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCA';
 const content: MarkdownContent = { url: TEXT_REF };
 const open: MarkdownMapContent = { open: true };
 const closed: MarkdownMapContent = { open: false };
@@ -49,7 +49,7 @@ describe('the Markdown plugin’s domain half', () => {
   });
 
   it('stores text with `\\n` line endings', () => {
-    expect(markdownText('a\r\nb\rc\n')).toBe('a\nb\nc\n');
+    expect(lineFeedText('a\r\nb\rc\n')).toBe('a\nb\nc\n');
   });
 });
 
@@ -165,7 +165,7 @@ describe('the Markdown plugin’s view', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Draft' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save Resource Notes' }));
-    expect(await screen.findByRole('status')).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
     expect(screen.getByRole('textbox')).toHaveValue('Draft');
     expect(rendered.commits.content).toEqual([]);
     expect(rendered.commits.claims.released).toBe(0);
@@ -183,7 +183,7 @@ describe('the Markdown plugin’s view', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Draft' } });
     fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter', ctrlKey: true });
-    expect(await screen.findByRole('status')).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
     expect(screen.getByRole('textbox')).toHaveValue('Draft');
     expect(rendered.commits.content).toEqual([{ url: SAVED_REF }]);
   });
@@ -243,7 +243,7 @@ describe('the Markdown plugin’s view', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Draft' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save Resource Notes' }));
-    expect(await screen.findByRole('status')).toHaveTextContent('The text could not be saved.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('The text could not be saved.');
     expect(screen.getByRole('textbox')).toHaveValue('Draft');
     expect(screen.getByRole('button', { name: 'Save Resource Notes' })).toBeEnabled();
     expect(rendered.commits.content).toEqual([]);
@@ -314,7 +314,7 @@ describe('the Markdown plugin’s view', () => {
     fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Escape' });
     expect(screen.getByRole('textbox')).toHaveValue('Draft');
     finish({ refused: 'Not stored.' });
-    expect(await screen.findByRole('status')).toHaveTextContent('Not stored.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Not stored.');
     expect(screen.getByRole('textbox')).toHaveValue('Draft');
   });
 
@@ -348,6 +348,50 @@ describe('the Markdown plugin’s view', () => {
     expect(rendered.commits.map).toEqual([open]);
     expect(rendered.commits.claims.taken).toBe(0);
     expect(screen.queryByRole('textbox')).toBeNull();
+    // The Edit pressed is answered, not dropped.
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'This text cannot be read, so it cannot be edited.',
+    );
+  });
+
+  it('Saves a draft whose content changed meanwhile to text it cannot read', async () => {
+    const rendered = renderPlugin(markdownPluginView.View, {
+      content,
+      map: open,
+      title: 'Notes',
+      grants: editable,
+      assets: { ...reading({ [TEXT_REF]: 'Old' }), store: () => Promise.resolve(SAVED_REF) },
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Draft' } });
+    rendered.changeContent({ url: UNREAD_REF });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Resource Notes' }));
+    await screen.findByRole('button', { name: 'Edit Resource Notes' });
+    expect(rendered.commits.content).toEqual([{ url: SAVED_REF }]);
+    expect(rendered.commits.claims).toEqual({ taken: 1, released: 1 });
+  });
+
+  it('hints the height of its Title as drawn Open, without the room a Closed Title keeps below it', async () => {
+    const offsetHeight = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(50);
+    const scrollHeight = vi
+      .spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
+      .mockReturnValue(100);
+    try {
+      const rendered = renderPlugin(markdownPluginView.View, {
+        content,
+        map: closed,
+        title: 'Notes',
+        grants: { map: true },
+        assets: reading({ [TEXT_REF]: 'Text' }),
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Open Resource Notes' }));
+      await screen.findByRole('button', { name: 'Close Resource Notes' });
+      // The Title's 50px less the Closed Title's 8px foot, the text's 100px, and its inset twice.
+      expect(rendered.commits.hints[0]?.height).toBe(50 - 8 + 100 + 2 * 12);
+    } finally {
+      offsetHeight.mockRestore();
+      scrollHeight.mockRestore();
+    }
   });
   it('keeps its draft and Claim while authoring is withdrawn, and Saves once it returns', async () => {
     const rendered = renderPlugin(markdownPluginView.View, {

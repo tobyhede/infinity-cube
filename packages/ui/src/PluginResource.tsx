@@ -24,6 +24,7 @@ import type { Answer } from '@project/resource-api/domain';
 import type { Assets, OwnProps, RailCommand, TitleProps } from '@project/resource-api/view';
 import {
   createRailStore,
+  RAIL_BAND,
   ResourceHostProvider,
   type ResourceHost,
 } from '@project/resource-api/view/host';
@@ -361,6 +362,7 @@ export function PluginSurface(props: PluginResourceProps & { readonly entry: Plu
       rail,
       RenderedMarkdown: HostRenderedMarkdown,
       SourceEditor: HostSourceEditor,
+      railBand: RAIL_BAND,
     }),
     [rail],
   );

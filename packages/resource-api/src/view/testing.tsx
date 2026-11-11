@@ -1,8 +1,17 @@
-import { useMemo, useState, useSyncExternalStore, type ComponentType } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  type ComponentType,
+} from 'react';
 import { act, render, type RenderResult } from '@testing-library/react';
 import type { Answer, AssetRef, Size } from '../domain';
 import {
   createRailStore,
+  RAIL_BAND,
   ResourceHostProvider,
   type Assets,
   type Exclusive,
@@ -83,6 +92,8 @@ export type RenderedPlugin<C, M> = RenderResult & {
    * the Resource becomes read-only; a Claim already taken stays held.
    */
   readonly withdraw: (withdrawn: boolean) => void;
+  /** Change the content from outside the plugin, as another author's Edit or a replacement does. */
+  readonly changeContent: (next: C) => void;
 };
 
 /** Where a test surface draws an asset from: a URL that names the reference, so a test can see it. */
@@ -291,6 +302,7 @@ export function renderPlugin<C, M>(
     return [...(await (options.picker?.(pickerOpenings) ?? files))];
   };
   const hold = createClaimHold();
+  const contentChanges = new Set<(next: C) => void>();
   /** A commit answering refused when `live` says it is not, as the host's withdrawn and ended commits do. */
   const guarded =
     <T, O, A>(
@@ -304,6 +316,12 @@ export function renderPlugin<C, M>(
   function Harness() {
     const [title, setTitle] = useState(options.title ?? 'Resource');
     const [content, setContent] = useState(options.content);
+    useEffect(() => {
+      contentChanges.add(setContent);
+      return () => {
+        contentChanges.delete(setContent);
+      };
+    }, []);
     const [mapValue, setMapValue] = useState(options.map);
     const rail = useMemo(() => createRailStore(), []);
     const exclusiveRunning = useSyncExternalStore(gate.subscribe, gate.running);
@@ -316,6 +334,7 @@ export function renderPlugin<C, M>(
         rail,
         RenderedMarkdown: TestRenderedMarkdown,
         SourceEditor: TestSourceEditor,
+        railBand: RAIL_BAND,
       }),
       [rail, title],
     );
@@ -407,5 +426,10 @@ export function renderPlugin<C, M>(
       for (const listener of authoringListeners) listener();
     });
   };
-  return Object.assign(rendered, { commits, withdraw });
+  const changeContent = (next: C): void => {
+    act(() => {
+      for (const change of contentChanges) change(next);
+    });
+  };
+  return Object.assign(rendered, { commits, withdraw, changeContent });
 }

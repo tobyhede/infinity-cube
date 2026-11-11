@@ -1,11 +1,6 @@
 /* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import { z } from 'zod';
-import {
-  assetRefSchema,
-  definePlugin,
-  EMPTY_ASSET,
-  lineFeedText,
-} from '@project/resource-api/domain';
+import { assetRefSchema, definePlugin, EMPTY_ASSET } from '@project/resource-api/domain';
 
 /**
  * The Markdown plugin's domain half (ADR 0020, ADR 0142): a Resource whose
@@ -30,12 +25,6 @@ export type MarkdownMapContent = z.infer<typeof markdownMapContentSchema>;
 
 /** The media type a Markdown Resource's text is stored as. */
 export const MARKDOWN_MEDIA_TYPE = 'text/markdown';
-
-/**
- * Text as Markdown stores it: every line ending `\n`, so the bytes, and so the
- * asset's name, do not depend on the platform it was written on.
- */
-export const markdownText: (text: string) => string = lineFeedText;
 
 export const markdownPlugin = definePlugin({
   apiVersion: 1,

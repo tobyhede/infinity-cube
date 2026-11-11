@@ -9,11 +9,12 @@ import {
   type KeyboardEvent,
 } from 'react';
 import { Image as ImageGlyph, ImageUp, Pencil } from 'lucide-react';
-import { isAssetRef, isStoredAsset, titleName, type Answer } from '@project/resource-api/domain';
+import { isAssetRef, isStoredAsset, titleName } from '@project/resource-api/domain';
 import {
   definePluginView,
   Own,
   Rail,
+  refusalOf,
   type Exclusive,
   type OwnClaim,
   type PluginViewProps,
@@ -49,10 +50,6 @@ const ONE_AT_A_TIME = 'Use one image at a time.';
 const BUSY = 'Another change is still being made. Try again when it ends.';
 const NOT_REPLACED = 'This image was not replaced. Try again.';
 const NOT_RENAMED = 'This title was not changed. Try again.';
-
-/** The words of an answer, or `null` for one that leaves nothing to say. */
-const refusalOf = (answer: Answer): string | null =>
-  answer === 'completed' || answer === 'unchanged' ? null : answer.refused;
 
 /**
  * Replace the picture with `file`, inside exclusive work: admitted from its

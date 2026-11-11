@@ -3,8 +3,8 @@ import { z } from 'zod';
 import { Check, Maximize2, Minimize2, Pencil, StickyNote, X } from 'lucide-react';
 import {
   isStoredAsset,
+  lineFeedText,
   titleName,
-  type Answer,
   type AssetRef,
   type Size,
 } from '@project/resource-api/domain';
@@ -12,9 +12,11 @@ import {
   definePluginView,
   Own,
   Rail,
+  refusalOf,
   RenderedMarkdown,
   SourceEditor,
   Title,
+  useRailBand,
   type Assets,
   type Claim,
   type PluginViewProps,
@@ -23,7 +25,6 @@ import {
 import {
   MARKDOWN_MEDIA_TYPE,
   markdownPlugin,
-  markdownText,
   type MarkdownContent,
   type MarkdownMapContent,
 } from './domain';
@@ -32,8 +33,8 @@ import {
  * The Markdown plugin's view (ADR 0020, ADR 0064, ADR 0142). It draws its
  * Title, and its text once that asset is read, where its Map content says it
  * is Open. Open and Close are its rail commands, and Opening carries a size
- * hint for the text read at a reading width, which the canvas caps, floors or
- * ignores. Editing is its own mode: a Claim, the source editor, a draft, and
+ * hint for the text read at a reading width, once its images and fonts have
+ * loaded. Editing is its own mode: a Claim, the source editor, a draft, and
  * four ways out (Save, `Mod-Enter`, Cancel, `Escape`), Save storing the text
  * and committing its URL. A click elsewhere leaves the draft up.
  */
@@ -44,12 +45,11 @@ export const READING_WIDTH = 640;
 /** The inset the text is drawn at inside the rect. */
 const INSET = 12;
 
-/**
- * The band along the top of the rect the canvas keeps clear of controls, as it
- * does for every Resource it draws: eight pixels, the kind glyph's row, eight
- * pixels. A press there selects the Resource rather than beginning a rename.
- */
-const RAIL_BAND = 30;
+/** The room a Closed Title keeps below it, which an Open one does not. */
+const CLOSED_FOOT = 8;
+
+/** How long Opening waits for the text's images to load before measuring without them. */
+const LOAD_WAIT = 2000;
 
 /** The text of the asset at a URL, as far as it has been read. */
 type Text =
@@ -64,6 +64,9 @@ const UNREAD = 'Reading it failed.';
 
 /** What the status says where a Save failed rather than being refused. */
 const UNSAVED = 'The text could not be saved. Your draft is kept; Save again to retry.';
+
+/** What the status says where Edit was pressed while Closed and the text it Opened to cannot be read. */
+const UNEDITABLE = 'This text cannot be read, so it cannot be edited.';
 
 /**
  * Read the text an asset holds, once per URL, starting from text this view
@@ -85,7 +88,7 @@ function useText(url: AssetRef, assets: Assets, known: Map<string, string>, want
         if (!stillLive()) return;
         if (answer instanceof Blob) {
           const text = await textOf(answer);
-          known.set(url, text);
+          remember(known, url, text);
           if (stillLive()) setRead({ url, text: { state: 'read', text } });
         } else {
           setRead({ url, text: { state: 'refused', refused: answer.refused } });
@@ -122,21 +125,51 @@ const textKnown = (known: Map<string, string>, url: string): Text => {
   return text === undefined ? READING : { state: 'read', text };
 };
 
-/** Whether a settled commit or store left the author's work where it was. */
-const refusalOf = (answer: Answer): string | null =>
-  answer === 'completed' || answer === 'unchanged' ? null : answer.refused;
+/** Keep `text` as the one text known, so a view that Saves many times holds one. */
+const remember = (known: Map<string, string>, url: string, text: string): void => {
+  known.clear();
+  known.set(url, text);
+};
 
-/** A running edit: the draft, and whether a Save is under way. */
+/**
+ * Resolve once every image in `element` has loaded or failed, and the fonts
+ * it is set in are ready, or after {@link LOAD_WAIT}, whichever is first.
+ */
+const laidOut = (element: HTMLElement): Promise<void> => {
+  const pending = [...element.querySelectorAll('img')]
+    .filter((image) => !image.complete)
+    .map(
+      (image) =>
+        new Promise<void>((resolve) => {
+          image.addEventListener('load', () => resolve(), { once: true });
+          image.addEventListener('error', () => resolve(), { once: true });
+        }),
+    );
+  // A document without a font loading interface, as jsdom's, has no fonts to wait for.
+  const document: Partial<Pick<Document, 'fonts'>> = element.ownerDocument;
+  if (document.fonts !== undefined) pending.push(document.fonts.ready.then(() => undefined));
+  return Promise.race([
+    Promise.all(pending).then(() => undefined),
+    new Promise<void>((resolve) => {
+      setTimeout(resolve, LOAD_WAIT);
+    }),
+  ]);
+};
+
+/**
+ * A running edit: the draft, the text it is measured against, which is the
+ * text the edit began from or last Saved, and whether a Save is under way.
+ */
 interface Editing {
   readonly draft: string;
+  readonly base: string;
   readonly saving: boolean;
 }
 
 /**
  * The view fills its rect at least, in flow, so text longer than the rect
- * grows past it: the canvas clips it to the Resource, and the Stage clips or
- * scrolls it by its own rule. A running edit keeps to the rect, where the
- * source editor scrolls.
+ * grows past it, for the surface to clip or scroll. A running edit keeps to
+ * the rect, where the source editor scrolls.
  */
 const fill: CSSProperties = {
   position: 'relative',
@@ -164,6 +197,8 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
   const [editing, setEditing] = useState<Editing | null>(null);
   const claim = useRef<Claim | null>(null);
   const header = useRef<HTMLDivElement | null>(null);
+  const measurer = useRef<HTMLDivElement | null>(null);
+  const railBand = useRailBand();
 
   // A Claim the host answers it did not release is kept, so the next end of
   // an edit, or unmounting, releases it again.
@@ -191,7 +226,7 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
     if (held === undefined) return;
     claim.current = held;
     setRefusal(null);
-    setEditing({ draft: readable, saving: false });
+    setEditing({ draft: readable, base: readable, saving: false });
   }, [mayEdit, editing, takeClaim, readable]);
 
   const end = useCallback(() => setEditing(null), []);
@@ -200,24 +235,27 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
   if (editing !== null && !open) setEditing(null);
 
   // An Edit asked for while Closed begins once the Open it caused has landed
-  // and the text is read, and is dropped where the text cannot be read.
+  // and the text is read, and where the text cannot be read says it cannot.
   useEffect(() => {
-    if (text.state === 'refused') editWhenOpen.current = false;
+    if (text.state === 'refused' && editWhenOpen.current) {
+      editWhenOpen.current = false;
+      setRefusal(UNEDITABLE);
+    }
     if (!editWhenOpen.current || !open || text.state !== 'read') return;
     editWhenOpen.current = false;
     beginEdit();
   }, [open, text.state, beginEdit]);
 
   const save = useCallback(() => {
-    if (editing === null || editing.saving || readable === null) return;
+    if (editing === null || editing.saving) return;
     if (contentCommit === undefined || store === undefined) return;
-    const next = markdownText(editing.draft);
-    if (next === readable) {
+    const next = lineFeedText(editing.draft);
+    if (next === editing.base) {
       end();
       return;
     }
     const saved = editing.draft;
-    setEditing({ draft: saved, saving: true });
+    setEditing({ draft: saved, base: editing.base, saving: true });
     // The editor stays live while a Save runs: text typed meanwhile is a new
     // draft, which a Save that lands leaves up rather than discarding.
     const settle = (refused: string | null): void => {
@@ -225,13 +263,13 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
       setEditing((now) =>
         now === null || (refused === null && now.draft === saved)
           ? null
-          : { draft: now.draft, saving: false },
+          : { draft: now.draft, base: refused === null ? next : now.base, saving: false },
       );
     };
     void store(new Blob([next], { type: MARKDOWN_MEDIA_TYPE }))
       .then((answer) => {
         if (!isStoredAsset(answer)) return answer;
-        known.set(answer, next);
+        remember(known, answer, next);
         return contentCommit({ url: answer });
       })
       .then(
@@ -240,7 +278,7 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
         // server error or a timeout does, keeps the draft and Save, to retry.
         () => settle(UNSAVED),
       );
-  }, [editing, readable, contentCommit, store, known, end]);
+  }, [editing, contentCommit, store, known, end]);
 
   const cancel = useCallback(() => {
     setRefusal(null);
@@ -251,11 +289,14 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
     (next: MarkdownMapContent, sizeHint?: Size) => {
       if (mapCommit === undefined) return;
       const committed = sizeHint === undefined ? mapCommit(next) : mapCommit(next, { sizeHint });
+      // What an earlier gesture was refused is cleared by the next press, not
+      // by this answer, which may land after an Edit from Closed is answered.
       void committed.then(
         (answer) => {
           const refused = refusalOf(answer);
+          if (refused === null) return;
           setRefusal(refused);
-          if (refused !== null) editWhenOpen.current = false;
+          editWhenOpen.current = false;
         },
         () => {
           editWhenOpen.current = false;
@@ -265,23 +306,49 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
     [mapCommit],
   );
 
-  // Opening measures the text at a reading width first, once it is read, then
-  // commits Open with what it measured as one size hint: asked once, for this
-  // gesture. Text that cannot be read has no size to hint at. The measurer
-  // measures as it is attached, and is drawn only until then.
-  const measure = (element: HTMLDivElement | null): void => {
-    if (element === null || !measuring) return;
-    setMeasuring(false);
-    if (text.state !== 'read') {
-      commitMap({ open: true });
-      return;
-    }
-    const width = Math.max(surface.size.width, READING_WIDTH);
-    const height = (header.current?.offsetHeight ?? 0) + element.scrollHeight + 2 * INSET;
-    commitMap({ open: true }, { width: Math.round(width), height: Math.round(height) });
-  };
+  // Opening measures the text at a reading width first, once it is read and
+  // its images and fonts have loaded, then commits Open with what it measured
+  // as one size hint: asked once, for this gesture. Text that cannot be read
+  // has no size to hint at. The measurer is drawn only until it has measured.
+  const width = Math.max(surface.size.width, READING_WIDTH);
+  const opening = useRef({ commitMap, width, open });
+  useEffect(() => {
+    opening.current = { commitMap, width, open };
+  });
+  const textState = text.state;
+  useEffect(() => {
+    if (!measuring || textState === 'reading') return undefined;
+    const element = measurer.current;
+    let live = true;
+    void (element === null ? Promise.resolve() : laidOut(element)).then(() => {
+      if (!live) return;
+      setMeasuring(false);
+      const now = opening.current;
+      if (textState !== 'read' || element === null) {
+        now.commitMap({ open: true });
+        return;
+      }
+      // The Title is measured as it is drawn Closed, with the room below it
+      // that an Open Title does not keep.
+      const title = (header.current?.offsetHeight ?? 0) - (now.open ? 0 : CLOSED_FOOT);
+      const height = title + element.scrollHeight + 2 * INSET;
+      now.commitMap({ open: true }, { width: Math.round(now.width), height: Math.round(height) });
+    });
+    return () => {
+      live = false;
+    };
+  }, [measuring, textState]);
 
   const commands = useMemo((): readonly RailCommand[] => {
+    // Open and Close are one command whose name swaps, so a keyboard author's
+    // focus stays on it across both.
+    const openClose = (opens: boolean) =>
+      ({
+        kind: 'action',
+        id: 'open-close',
+        label: `${opens ? 'Open' : 'Close'} Resource ${name}`,
+        icon: opens ? <Maximize2 size={14} /> : <Minimize2 size={14} />,
+      }) as const;
     if (editing !== null) {
       return [
         ...(contentCommit === undefined || store === undefined
@@ -306,20 +373,11 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
           disabled: editing.saving,
           keyshortcuts: 'Escape',
         },
+        // Closing mid-edit would take the draft's box away; the control keeps
+        // its place and says it is unavailable.
         ...(mapCommit === undefined
           ? []
-          : [
-              {
-                kind: 'action' as const,
-                id: 'open-close',
-                label: `Close Resource ${name}`,
-                icon: <Minimize2 size={14} />,
-                run: () => undefined,
-                // Closing mid-edit would take the draft's box away; the
-                // control keeps its place and says it is unavailable.
-                disabled: true,
-              },
-            ]),
+          : [{ ...openClose(false), run: () => undefined, disabled: true }]),
       ];
     }
     const edit: RailCommand[] =
@@ -333,6 +391,7 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
               run: mayEdit
                 ? beginEdit
                 : () => {
+                    setRefusal(null);
                     editWhenOpen.current = true;
                     setMeasuring(true);
                   },
@@ -340,24 +399,22 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
           ]
         : [];
     if (mapCommit === undefined) return edit;
-    // Open and Close are one command whose name swaps, so a keyboard author's
-    // focus stays on it across both.
     return [
       ...edit,
       open
         ? {
-            kind: 'action',
-            id: 'open-close',
-            label: `Close Resource ${name}`,
-            icon: <Minimize2 size={14} />,
-            run: () => commitMap({ open: false }),
+            ...openClose(false),
+            run: () => {
+              setRefusal(null);
+              commitMap({ open: false });
+            },
           }
         : {
-            kind: 'action',
-            id: 'open-close',
-            label: `Open Resource ${name}`,
-            icon: <Maximize2 size={14} />,
-            run: () => setMeasuring(true),
+            ...openClose(true),
+            run: () => {
+              setRefusal(null);
+              setMeasuring(true);
+            },
           },
     ];
   }, [
@@ -397,7 +454,7 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
     >
       <div
         ref={header}
-        style={{ padding: `${RAIL_BAND}px ${INSET}px ${open ? 0 : 8}px`, minHeight: 0 }}
+        style={{ padding: `${railBand}px ${INSET}px ${open ? 0 : CLOSED_FOOT}px`, minHeight: 0 }}
       >
         <Title />
       </div>
@@ -426,7 +483,7 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
               <SourceEditor
                 value={editing.draft}
                 onValueChange={(draft) =>
-                  setEditing((now) => (now === null ? now : { draft, saving: now.saving }))
+                  setEditing((now) => (now === null ? now : { ...now, draft }))
                 }
                 ariaLabel={`Markdown source of ${name}`}
                 autoFocus
@@ -452,19 +509,19 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
         </div>
       )}
       {refusal !== null && (
-        <p role="status" style={{ margin: 0, padding: `0 ${INSET}px`, fontSize: 12 }}>
+        <p role="alert" style={{ margin: 0, padding: `0 ${INSET}px`, fontSize: 12 }}>
           {refusal}
         </p>
       )}
       {measuring && text.state !== 'reading' && (
         <div
-          ref={measure}
+          ref={measurer}
           aria-hidden="true"
           style={{
             position: 'absolute',
             left: 0,
             top: 0,
-            width: Math.max(surface.size.width, READING_WIDTH),
+            width,
             visibility: 'hidden',
             pointerEvents: 'none',
           }}

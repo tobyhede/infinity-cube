@@ -67,18 +67,16 @@ export function PresentedPluginSurface(
   const supplied = usePluginAssets();
   const assets = useMemo(() => readingAssets(supplied), [supplied]);
   const name = titleName(title);
-  const host: ResourceHost = useMemo(() => {
-    function StageTitle({ className }: TitleProps) {
-      return <h2 className={['resource__title', className].filter(Boolean).join(' ')}>{name}</h2>;
-    }
-    return {
-      Title: StageTitle,
-      Own: StageOwn,
-      rail: createRailStore(),
-      RenderedMarkdown: HostRenderedMarkdown,
-      SourceEditor: HostSourceEditor,
-    };
-  }, [name]);
+  const [host] = useState((): ResourceHost => ({
+    Title: StageTitle,
+    Own: StageOwn,
+    rail: createRailStore(),
+    RenderedMarkdown: HostRenderedMarkdown,
+    SourceEditor: HostSourceEditor,
+    // The Stage draws no rail.
+    railBand: 0,
+  }));
+  const [drawing] = useState(() => Symbol('drawing'));
   const plugin = props.entry.render({
     resourceId: props.resourceId,
     kind,
@@ -145,16 +143,16 @@ function NoTitle() {
 export function EmbeddedPluginContent({ kind, title, content }: EmbeddedPluginContentProps) {
   const supplied = usePluginAssets();
   const assets = useMemo(() => readingAssets(supplied), [supplied]);
-  const host: ResourceHost = useMemo(
-    () => ({
-      Title: NoTitle,
-      Own: StageOwn,
-      rail: createRailStore(),
-      RenderedMarkdown: HostRenderedMarkdown,
-      SourceEditor: HostSourceEditor,
-    }),
-    [],
-  );
+  const [drawing] = useState(() => Symbol('drawing'));
+  const [host] = useState((): ResourceHost => ({
+    Title: NoTitle,
+    Own: StageOwn,
+    rail: createRailStore(),
+    RenderedMarkdown: HostRenderedMarkdown,
+    SourceEditor: HostSourceEditor,
+    // The frame around an embedded plugin draws the rail.
+    railBand: 0,
+  }));
   const plugin = pluginEntryFor(kind).render({
     resourceId: '',
     drawing,

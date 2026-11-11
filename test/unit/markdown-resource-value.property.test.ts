@@ -9,11 +9,11 @@ import {
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
+import { lineFeedText } from '@project/resource-api/domain';
 import { isAssetHash } from '@project/persistence';
 import { parseResourceFiles, serializeResource } from '@project/graph';
 import { HttpSpaceBackend } from '@project/http';
 import { createSpaceHost, MemorySpaceRepository } from '@project/aggregate';
-import { markdownText } from '@project/plugin-markdown/domain';
 import { textAssetRef } from '../support/aggregate-directory';
 import { admitted } from '../support/stored-assets';
 
@@ -32,7 +32,7 @@ const titleArb = fc
   .filter((title) => title.length > 0);
 
 /** The text as the plugin stores it: with `\n` line endings. */
-const textArb = fc.string({ maxLength: 200 }).map(markdownText);
+const textArb = fc.string({ maxLength: 200 }).map(lineFeedText);
 
 const resourceArb = fc.record({ id: fc.uuid({ version: 4 }), title: titleArb, text: textArb });
 

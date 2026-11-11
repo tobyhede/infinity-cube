@@ -218,7 +218,25 @@ export interface ResourceHost {
    * they reach an element wrapped around it.
    */
   readonly SourceEditor: ComponentType<SourceEditorProps>;
+  /**
+   * The band along the top of the rect the host keeps clear for its rail, in
+   * pixels: {@link RAIL_BAND} where it draws a rail over the rect, 0 where it
+   * draws none.
+   */
+  readonly railBand: number;
 }
+
+/**
+ * The band the canvas keeps clear along the top of every Resource it draws:
+ * eight pixels, the kind glyph's row, eight pixels. It is the canvas
+ * stylesheet's `padding-top` on a Closed Resource's body, which
+ * `packages/ui/test/canvas-resource-title-ladder.test.ts` holds to this value.
+ */
+export const RAIL_BAND = 30;
+
+/** The words of a settled commit's refusal, or `null` where it completed or changed nothing. */
+export const refusalOf = (answer: Answer): string | null =>
+  answer === 'completed' || answer === 'unchanged' ? null : answer.refused;
 
 const ResourceHostContext = createContext<ResourceHost | null>(null);
 
@@ -261,6 +279,11 @@ export function Own(props: OwnProps) {
 export function RenderedMarkdown(props: RenderedMarkdownProps) {
   const { RenderedMarkdown: HostRenderedMarkdown } = useResourceHost('RenderedMarkdown');
   return <HostRenderedMarkdown {...props} />;
+}
+
+/** The band along the top of the rect this surface keeps clear for its rail, in pixels. */
+export function useRailBand(): number {
+  return useResourceHost('useRailBand').railBand;
 }
 
 /** The host's source editor, for a plugin whose content is text it edits. */

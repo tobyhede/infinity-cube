@@ -10,9 +10,9 @@ import { kindFromPlugin, type PluginContent } from './plugin-kind';
  */
 export const markdownKind = {
   ...kindFromPlugin(markdownPlugin),
-  // An Open Reference Resource still draws its Target in the old frame's
-  // content area, where the Markdown plugin draws its text read-only, until
-  // the Reference plugin embeds it (`.scratch/resource-plugins/issues/06`).
+  // An Open Reference Resource draws its Target in `CanvasResource`'s content
+  // area, where the Markdown plugin draws its text read-only, until the
+  // Reference plugin embeds it (`.scratch/resource-plugins/issues/06`).
   facts: { authored: false, embedsMap: false, drawsContentArea: true },
 };
 

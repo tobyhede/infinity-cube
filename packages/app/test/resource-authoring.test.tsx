@@ -793,9 +793,10 @@ describe('the Resource affordance on the graph', () => {
 
     await selectResource('A');
     fireEvent.click(await screen.findByRole('button', { name: 'Open Resource A' }));
-    expect(await screen.findByText('A source')).toBeVisible();
+    // Opening measures the text in a hidden copy first, so the Open lands before the text is read.
+    expect(await screen.findByRole('button', { name: 'Close Resource A' })).toBeVisible();
+    expect(screen.getByText('A source')).toBeVisible();
     expect(screen.queryByRole('textbox', { name: 'Markdown source of A' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Close Resource A' })).toBeVisible();
     await settled(session);
   });
 
