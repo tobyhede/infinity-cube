@@ -801,7 +801,9 @@ describe.each([
       (_kind, resources) => {
         for (const content of [{ shape: 'rectangle' }, { shape: 'pill' }, null]) {
           const errors = refused(placedIn(resources, content));
-          expect(errors).toEqual([expect.objectContaining({ kind: 'map-content-invalid', ref: A })]);
+          expect(errors).toEqual([
+            expect.objectContaining({ kind: 'map-content-invalid', ref: A }),
+          ]);
           expect(errors[0]?.message).not.toContain('its plugin refuses');
         }
       },
