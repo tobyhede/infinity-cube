@@ -16,8 +16,8 @@ Categories: **one-kind** = a feature that exists for that kind alone; **registry
 | packages/app/src/resource-rail-actions.tsx:93 | `referenceKind.id`: Create Reference glyph | reference | E (display of a creation) | resource-rail-actions.tsx |
 | packages/app/src/resource-rail-actions.tsx:143 | `spaceKind.id`: Space Resource menu | space | one-kind | resource-rail-actions.tsx |
 | packages/app/src/resource-rail-actions.tsx:254 | `spaceKind.id`: Space Resource Enter | space | one-kind | resource-rail-actions.tsx |
-| packages/app/src/space-authoring.ts:115 | `imageKind.id`: new Image Resource document | image | E | space-authoring.ts |
-| packages/app/src/space-authoring.ts:1318 | `referenceKind.id`: new Reference Resource | reference | E | space-authoring.ts |
+| packages/app/src/space-authoring.ts:116 | `imageKind.id`: new Image Resource document | image | E | space-authoring.ts |
+| packages/app/src/space-authoring.ts:1364 | `referenceKind.id`: new Reference Resource | reference | E | space-authoring.ts |
 | packages/persistence/src/space-resource-planning.ts:328 | `spaceKind.id`: new Space Resource document | space | E (lifecycle) | space-resource-planning.ts |
 
 `packages/app/src/resource-deletion.ts` no longer reaches a module id: Delete routes by `kindFlags(kind).ownsReferencedSpaces` (G02).
@@ -32,12 +32,12 @@ Categories: **one-kind** = a feature that exists for that kind alone; **registry
 | packages/ui/src/CanvasResource.tsx:301 | `isSpaceOperations`: the Space rail and portal | space | one-kind (portal) | CanvasResource.tsx |
 | packages/react-flow-adapter/src/ResourceNode.tsx:334 | `isSpaceOperations(...).portal.editing` keeps the toolbar | space | one-kind | ResourceNode.tsx |
 | packages/app/src/components/SpaceCanvas.tsx:1015,1660 | `spaceViewOf(...).view.framing` | space | one-kind (the Space kind's embedded Map) | SpaceCanvas.tsx |
-| packages/app/src/components/SpaceCanvas.tsx:1372 | `isAcceptedImageUrl`: paste creates an Image Resource | image | E (image-URL rule) | SpaceCanvas.tsx |
+| packages/app/src/components/SpaceCanvas.tsx:1704 | `isAcceptedImageUrl`: paste creates an Image Resource | image | E (image-URL rule) | SpaceCanvas.tsx |
 | packages/app/src/embedded-open-space-resource.ts:214 | `spaceViewOf` | space | one-kind (the Space kind's embedded Map) | embedded-open-space-resource.ts |
-| packages/app/src/space-authoring.ts:113 | `Extract<ResourceDocument, { kind: ImageKindId }>` | image | E | space-authoring.ts |
-| packages/app/src/space-authoring.ts | refusal `IMAGE_URL_UNSUPPORTED`, now declared there | image | E (image-URL rule) | space-authoring.ts |
-| packages/app/src/space-authoring.ts | `isAcceptedImageUrl` on Create | image | E (image-URL rule) | space-authoring.ts |
-| packages/app/src/picture-admission.ts | `admitImage` and its refusals from `@project/plugin-image/domain`: creation admits a picture by the plugin's rule | image | one-kind (Image creation, until issue 08) | picture-admission.ts |
+| packages/app/src/space-authoring.ts:114 | `Extract<ResourceDocument, { kind: ImageKindId }>` | image | E | space-authoring.ts |
+| packages/app/src/space-authoring.ts:373,1336 | refusal `IMAGE_URL_UNSUPPORTED`, the Image plugin's code read through core | image | E (image-URL rule) | space-authoring.ts |
+| packages/app/src/space-authoring.ts:1335 | `isAcceptedImageUrl` on Create | image | E (image-URL rule) | space-authoring.ts |
+| packages/app/src/picture-admission.ts:10-25 | `admitImage`, `pictureSize` and its refusals from `@project/plugin-image/domain`: creation admits a picture by the plugin's rule | image | one-kind (Image creation, until issue 08) | picture-admission.ts |
 
 ## Sites now off the list
 

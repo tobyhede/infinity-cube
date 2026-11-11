@@ -142,7 +142,7 @@ export interface PluginMapContent {
 /**
  * A plugin read as a kind module: its content schema, the references it
  * declares, and its Map content. A kind it draws is never Open by the
- * application's rule, because Open is now the plugin's Map content. A plugin
+ * application's rule, because Open is the plugin's Map content. A plugin
  * that declares new content starts empty; one that does not is created only
  * from what an author brings.
  */

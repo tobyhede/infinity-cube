@@ -9,9 +9,9 @@ import type { PluginOperations } from './plugin-views';
  * The Image kind's place in this package's kind registry, taken from its
  * plugin (ADR 0106, ADR 0142): its names and glyph are the plugin's, and its
  * own Resources are drawn by `PluginResource` and `PresentedPluginResource`.
- * Where the old frame still draws an Image Resource's content — an Open
- * Reference Resource showing its Target — the plugin draws it there too, on a
- * surface offering no authoring, named by the Reference's own Title.
+ * Where an Open Reference Resource shows an Image Resource as its Target, the
+ * plugin draws it in the Reference's content area, on a surface offering no
+ * authoring, named by the Reference's own Title.
  */
 export const imageView: KindView<PluginOperations, ImageContent> = {
   name: imagePlugin.name,
