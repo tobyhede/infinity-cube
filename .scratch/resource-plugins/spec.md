@@ -40,6 +40,7 @@ definePluginView<C, M>({ View, Glyph, creates? })
 
 type Answer = 'completed' | 'unchanged' | { refused: string }
 type Kept<T> = { value: T; commit?: (next: T) => Promise<Answer> }
+type SpaceView = { map: MapId; graph?: GraphId }               // which of a Space's Maps an Embed shows
 
 interface Surface<C, M> {
   resource: Resource<C>                                   // title and content below are its values, with their commits
@@ -50,7 +51,10 @@ interface Surface<C, M> {
   selected: boolean
   claim?(): OwnClaim<C, M> | undefined
   assets: { url(ref): string; read(ref): Promise<Blob | { refused: string }>; pick?(accept): Promise<File[]>; store?(bytes: Blob): Promise<AssetRef | { refused: string }> }
-  Embed: ComponentType<{ resource: ResourceId; title: Kept<string> } | { map: SpaceView; claim?: Claim }>
+  // One Embed: a Resource, drawn by its own plugin, or a Space, drawn as one of its Maps.
+  // No `select`: the Space's defaultMap. `select` with a commit: the host's chooser, writing only through it.
+  // `claim`: the shown Space's authoring, its Maps and Graphs included. Commands come from these, never from a kind.
+  Embed: ComponentType<{ resource: ResourceId; title: Kept<string> } | { space: SpaceId; select?: Kept<SpaceView>; claim?: Claim }>
 }
 
 interface Claim { release(): boolean }

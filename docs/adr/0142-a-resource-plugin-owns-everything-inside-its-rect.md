@@ -2,7 +2,7 @@
 
 Status: accepted
 Supersedes: 0137
-Refines: 0020, 0051, 0064, 0106, 0118, 0119, 0120, 0121, 0123, 0125, 0128, 0134, 0135, 0139
+Refines: 0020, 0051, 0064, 0079, 0106, 0118, 0119, 0120, 0121, 0123, 0125, 0128, 0134, 0135, 0139
 Related: 0057, 0070, 0074, 0082, 0089, 0122, 0126, 0140
 
 A Resource is drawn and authored by its **Resource plugin**. The canvas owns the rect and what connects rects: position, size, Resize, which Resource is selected, Edges, and the actions that change the Map. The plugin owns every pixel inside its outline and every way its content is authored. The application keeps no shared drawing of a Resource that a plugin fills a region of. An Image Resource is its picture, because the Image plugin draws nothing else.
@@ -40,7 +40,7 @@ Commands are data that a plugin emits from its view and the canvas draws. "Editi
 
 **A Claim is who is interacting, and exclusivity is reached through one.** Claims nest through what a plugin embeds. The deepest holds the keyboard and shows its commands, a sibling is refused, an inner release returns to the outer, and an outer Claim is not released while an inner one runs. A Claim may run work exclusively, which withdraws authoring and navigation from every composed Space until the work settles (ADR 0126), while the plugin stays mounted to show the answer. That covers the Claims the work nests in and the plugin's own surface: they stay held and mounted, every commit they retain is refused, and only the work itself can still commit, to its plugin's own Resource, and store an asset. Only one runs at a time.
 
-**An embedding is host-owned.** A Space Resource uses the Map embedding. A Reference Resource is an ordinary plugin: it embeds its Target on a surface offering no authoring of the Target, passing the Reference Resource's own Title and rename. The Target's plugin draws that Title as it draws any, so at most one Title draws and a Reference to an Image is a picture. The embedding guards recursion and a deleted Target. Aggregate rules stay in the core, read from what each plugin declares (ADR 0128).
+**An embedding is host-owned.** A plugin draws what it does not own through one `Embed`, given a Resource, or a Space with a view. The host draws it and owns all its authoring and its commands, offered from the embedding and never by kind. A Resource is drawn by its own plugin. A Reference Resource is an ordinary plugin: it embeds its Target on a surface offering no authoring of the Target, passing the Reference Resource's own Title and rename. The Target's plugin draws that Title as it draws any, so at most one Title draws and a Reference to an Image is a picture. A Space is drawn as one of its Maps: the view's, or that Space's `defaultMap` where no view is given (refining ADR 0079). A plugin that passes a commit for the view is given the host's chooser, which writes only through that commit, so whatever withdraws the commit withdraws the choice; where the plugin keeps the view is its own. Authoring the shown Space, its Maps and Graphs included, is offered only under a Claim the plugin passes. The embedding guards recursion and a deleted Target. Aggregate rules stay in the core, read from what each plugin declares (ADR 0128).
 
 **Each Resource is drawn inside its own failure boundary**, so a plugin that throws loses that Resource and not the canvas.
 
@@ -80,6 +80,8 @@ A bundled plugin rolls forward with the fixtures and keeps no reader for an old 
 - **A `readOnly` flag on a plugin's view.** Rejected. It assumes what a surface is. Absent capabilities say the same thing and cover surfaces not yet thought of.
 - **Telling a plugin which surface it is on.** Rejected. Every plugin would branch on a list that grows.
 - **Space as a privileged exception, or a less stable tier of the API.** Rejected. A plugin that needs a private door shows the API is incomplete.
+- **A plugin reads the shown Space and draws its own chooser.** Rejected. A plugin would read a Space it does not own, and the chooser would be redone by each plugin that embeds one.
+- **Two embeddings, one for a Resource and one for a Map.** Rejected. They differ only in what is drawn.
 - **A plugin as a functional core returning intents to the host.** Rejected. A file picker must open inside the press, drafts would move out of the editor, and embeddings stay ordinary composition anyway. The host's own decisions are pure cores behind the seam.
 - **A layered helper that draws a titled rectangle around a plugin's body.** Rejected for now. It is the shared frame again on the plugin's side, and only Markdown would use it.
 - **Runtime-loaded plugins.** Not built, as ADR 0120 left them.
