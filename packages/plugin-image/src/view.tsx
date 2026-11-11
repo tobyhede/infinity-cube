@@ -9,7 +9,7 @@ import {
   type KeyboardEvent,
 } from 'react';
 import { Image as ImageGlyph, ImageUp, Pencil } from 'lucide-react';
-import { isAssetRef, isStoredAsset, titleName } from '@project/resource-api/domain';
+import { isAssetRef, titleName } from '@project/resource-api/domain';
 import {
   definePluginView,
   Own,
@@ -20,17 +20,9 @@ import {
   type PluginViewProps,
   type RailCommand,
 } from '@project/resource-api/view';
-import {
-  admitImage,
-  describeImageRefusal,
-  IMAGE_MEDIA_TYPES,
-  imagePlugin,
-  MAX_IMAGE_BYTES,
-  pictureSize,
-  type ImageContent,
-  type ImageMapContent,
-} from './domain';
+import { imagePlugin, type ImageContent, type ImageMapContent } from './domain';
 import { IMAGE_CREATIONS } from './creation';
+import { admitAndStore, PICKED_IMAGE_TYPES } from './picture';
 
 /**
  * The Image plugin's view (ADR 0106, ADR 0142): the picture, fitted whole into
@@ -43,9 +35,6 @@ import { IMAGE_CREATIONS } from './creation';
  * the bytes are admitted as a picture, stored, and named in one content commit.
  */
 
-/** What the picker offers: the formats an Image Resource draws. */
-const ACCEPT = IMAGE_MEDIA_TYPES.join(',');
-
 const NOT_HERE = 'This image cannot be replaced here.';
 const ONE_AT_A_TIME = 'Use one image at a time.';
 const BUSY = 'Another change is still being made. Try again when it ends.';
@@ -53,23 +42,16 @@ const NOT_REPLACED = 'This image was not replaced. Try again.';
 const NOT_RENAMED = 'This title was not changed. Try again.';
 
 /**
- * Replace the picture with `file`, inside exclusive work: admitted from its
- * bytes, stored, and named by a content commit. Answers what to tell the
- * author, or `null` once it is replaced or already was.
+ * Replace the picture with `file`, inside exclusive work: admitted and stored
+ * by the rule Create stores a picture by (`picture.ts`), and named by a content
+ * commit. Answers what to tell the author, or `null` once it is replaced or
+ * already was.
  */
 async function replacing(file: File, own: Exclusive<ImageContent, ImageMapContent>) {
-  const name = file.name === '' ? 'The image' : file.name;
   if (own.store === undefined || own.content === undefined) return NOT_HERE;
-  if (file.size > MAX_IMAGE_BYTES) return describeImageRefusal('image-too-large', name);
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const admission = admitImage(bytes);
-  if (admission.kind === 'refused') return describeImageRefusal(admission.code, name);
-  const stored = await own.store(new Blob([bytes], { type: admission.mediaType }));
-  if (!isStoredAsset(stored)) return stored.refused;
-  const naturalSize = pictureSize(bytes, admission.mediaType);
-  const content: ImageContent =
-    naturalSize === undefined ? { url: stored } : { url: stored, naturalSize };
-  return refusalOf(await own.content(content));
+  const picture = await admitAndStore(file, own.store);
+  if ('refused' in picture) return picture.refused;
+  return refusalOf(await own.content(picture));
 }
 
 const FILL: CSSProperties = { position: 'absolute', inset: 0 };
@@ -262,7 +244,7 @@ function ImageView({ surface }: PluginViewProps<ImageContent, ImageMapContent>) 
     const claim = claimForReplace();
     if (claim === undefined) return;
     const current = () => presses.isLatest(press);
-    void pick(ACCEPT).then(
+    void pick(PICKED_IMAGE_TYPES).then(
       (files) => {
         if (current()) replaceWith(claim, files);
       },

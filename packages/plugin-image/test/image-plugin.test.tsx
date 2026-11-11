@@ -425,3 +425,85 @@ describe('the Image plugin’s view', () => {
     }
   });
 });
+
+describe('Create and Replace admit a picture alike', () => {
+  /** A PNG's signature and IHDR tag, with no dimensions: admitted, but its header is silent on its size. */
+  const silentPng = () =>
+    file(
+      Uint8Array.from([
+        0x89,
+        0x50,
+        0x4e,
+        0x47,
+        0x0d,
+        0x0a,
+        0x1a,
+        0x0a,
+        0,
+        0,
+        0,
+        13,
+        ...encoded('IHDR'),
+      ]),
+      'silent.png',
+      'image/png',
+    );
+  const namelessText = () => file(encoded('hello'), '', 'text/plain');
+
+  /** What the Image plugin's data creation asks the host for, and what it reports. */
+  async function created(dropped: File) {
+    const data = imagePluginView.creates?.find((each) => each.from === 'data');
+    if (data?.from !== 'data') throw new Error('The Image plugin offers no data creation.');
+    const items: unknown[] = [];
+    const reported: string[] = [];
+    const measure = vi.fn(() => Promise.resolve({ width: 1, height: 1 }));
+    await data.run(
+      {
+        assets: {
+          url: testAssetUrl,
+          read: () => Promise.resolve({ refused: 'Nothing is read here.' }),
+          store: () => Promise.resolve(testAssetRef(1)),
+          measure,
+        },
+        create: (asked) => {
+          items.push(...asked.map((item) => ('content' in item ? item.content : null)));
+          return Promise.resolve('completed');
+        },
+        report: (words) => reported.push(words),
+      },
+      { kind: 'files', files: [dropped] },
+    );
+    return { items, reported, measure };
+  }
+
+  /** What Replace commits, and what it says. */
+  async function replaced(picked: File) {
+    const rendered = renderPlugin(imagePluginView.View, {
+      content: FIGURE,
+      map: {},
+      title: 'Figure',
+      grants: AUTHORING,
+      files: [picked],
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Replace image of Resource Figure' }));
+    await waitFor(() => expect(screen.queryByText('Replacing image…')).toBeNull());
+    return { content: rendered.commits.content, alert: screen.queryByRole('alert')?.textContent };
+  }
+
+  it('records no size for a picture whose header is silent, and loads none to measure it', async () => {
+    const create = await created(silentPng());
+    const replace = await replaced(silentPng());
+
+    expect(create.items).toEqual([{ url: testAssetRef(1) }]);
+    expect(create.measure).not.toHaveBeenCalled();
+    expect(replace.content).toEqual([{ url: testAssetRef(1) }]);
+  });
+
+  it('names a nameless file in the same words', async () => {
+    const create = await created(namelessText());
+    const replace = await replaced(namelessText());
+
+    expect(create.reported).toEqual([replace.alert]);
+    expect(replace.alert).toMatch(/^The image is not /);
+  });
+});

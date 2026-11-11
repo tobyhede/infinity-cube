@@ -1,95 +1,26 @@
-import { isStoredAsset } from '@project/resource-api/domain';
+import { isAssetRef } from '@project/resource-api/domain';
 import {
   URL_MEDIA_TYPE,
-  type Assets,
   type Creation,
   type CreationData,
   type CreationHost,
 } from '@project/resource-api/view';
-import {
-  admitImage,
-  describeImageRefusal,
-  IMAGE_MEDIA_TYPES,
-  isAcceptedImageUrl,
-  MAX_IMAGE_BYTES,
-  pictureSize,
-  type ImageContent,
-  type ImageNaturalSize,
-  refusalForDeclaredType,
-} from './domain';
+import { IMAGE_MEDIA_TYPES, isAcceptedImageUrl, type ImageContent } from './domain';
+import { admitAndStore, declaredRefusal, PICKED_IMAGE_TYPES, pictureAt } from './picture';
+
+export { PICKED_IMAGE_TYPES } from './picture';
 
 /**
  * How Image Resources are created (ADR 0106, ADR 0142): from files chosen in
  * the picker the Dock's press opens, from files dropped on the canvas, and from
  * an image URL pasted there. Every picture is admitted, stored and sized before
- * the host is asked for anything, so the one Edit it makes records what it was
+ * the host is asked for anything (a file from its header, `picture.ts`), so the one Edit it makes records what it was
  * told; a gesture of several files is all or nothing, because the author made
  * one gesture and one Edit answers it.
  */
 
-/** What the picker offers: the formats an Image Resource draws. */
-export const PICKED_IMAGE_TYPES = IMAGE_MEDIA_TYPES.join(',');
-
-/** How long a picture may take to load before it is taken as one that did not. */
-export const MEASURE_TIMEOUT_MS = 10_000;
-
 /** What is said where this surface offers no asset store to keep a picture in. */
 const NOT_STORABLE = 'Images cannot be stored here.';
-
-/**
- * The browser loading a picture to learn its natural size: the one place the
- * plugin builds an `Image`. A picture that errors, never answers within
- * `timeoutMs`, or has no intrinsic size answers `undefined`.
- */
-export const measurePicture = (
-  src: string,
-  timeoutMs: number = MEASURE_TIMEOUT_MS,
-): Promise<ImageNaturalSize | undefined> =>
-  new Promise((resolve) => {
-    const picture = new Image();
-    const settle = (size: ImageNaturalSize | undefined): void => {
-      clearTimeout(timer);
-      picture.onload = null;
-      picture.onerror = null;
-      resolve(size);
-    };
-    const timer = setTimeout(() => settle(undefined), timeoutMs);
-    picture.onload = () => {
-      const { naturalWidth: width, naturalHeight: height } = picture;
-      settle(width > 0 && height > 0 ? { width, height } : undefined);
-    };
-    picture.onerror = () => settle(undefined);
-    picture.src = src;
-  });
-
-/** The content of a picture shown from `url`, with its size where it is known. */
-const pictureAt = (url: string, naturalSize: ImageNaturalSize | undefined): ImageContent =>
-  naturalSize === undefined ? { url } : { url, naturalSize };
-
-/**
- * Admit one file as a picture, store it, and size it from its header, or by
- * loading it where its header says nothing. Answers its content, or why not.
- */
-async function storedPicture(
-  file: File,
-  assets: Assets,
-): Promise<ImageContent | { readonly refused: string }> {
-  if (file.size > MAX_IMAGE_BYTES) {
-    return { refused: describeImageRefusal('image-too-large', file.name) };
-  }
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const admission = admitImage(bytes);
-  if (admission.kind === 'refused') {
-    return { refused: describeImageRefusal(admission.code, file.name) };
-  }
-  if (assets.store === undefined) return { refused: NOT_STORABLE };
-  // Stored under the media type the bytes are, whatever the file declared.
-  const stored = await assets.store(new Blob([bytes], { type: admission.mediaType }));
-  if (!isStoredAsset(stored)) return stored;
-  const naturalSize =
-    pictureSize(bytes, admission.mediaType) ?? (await measurePicture(assets.url(stored)));
-  return pictureAt(stored, naturalSize);
-}
 
 /**
  * Files chosen or dropped: one Image Resource each, in one create. A file whose
@@ -106,14 +37,19 @@ async function createFromFiles(
 ): Promise<void> {
   if (files.length === 0) return;
   const declared = files.flatMap((file): string[] => {
-    const code = refusalForDeclaredType(file.type);
-    return code === undefined ? [] : [describeImageRefusal(code, file.name)];
+    const refused = declaredRefusal(file);
+    return refused === undefined ? [] : [refused];
   });
   if (declared.length > 0) {
     host.report(declared.join(' '));
     return;
   }
-  const pictures = await Promise.all(files.map((file) => storedPicture(file, host.assets)));
+  const { store } = host.assets;
+  if (store === undefined) {
+    host.report(NOT_STORABLE);
+    return;
+  }
+  const pictures = await Promise.all(files.map((file) => admitAndStore(file, store)));
   const refusals = pictures.flatMap((picture) => ('refused' in picture ? [picture.refused] : []));
   if (refusals.length > 0) {
     host.report(refusals.join(' '));
@@ -125,11 +61,16 @@ async function createFromFiles(
 }
 
 /**
- * A pasted URL: one Image Resource showing it, sized by loading it. A picture
- * that does not load is still created, with no recorded size.
+ * A pasted URL: one Image Resource showing it, sized by the surface loading it
+ * from where it is drawn, which for a stored asset is the URL the surface
+ * resolves it to. A picture that does not load, or a surface that measures
+ * nothing, still creates it, with no recorded size.
  */
 async function createFromUrl(host: CreationHost<ImageContent>, url: string): Promise<void> {
-  await host.create([{ content: pictureAt(url, await measurePicture(url)) }]);
+  const { measure } = host.assets;
+  const drawnFrom = isAssetRef(url) ? host.assets.url(url) : url;
+  const naturalSize = measure === undefined ? undefined : await measure(drawnFrom);
+  await host.create([{ content: pictureAt(url, naturalSize) }]);
 }
 
 /**

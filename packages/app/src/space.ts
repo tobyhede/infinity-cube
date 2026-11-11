@@ -8,6 +8,7 @@ import type { HistoryApi } from './browser-location';
 import { createBrowserHistory } from './browser-history';
 import { describeAssetRefusal } from './authoring-refusal';
 import { pickFilesInBrowser } from './browser-file-picker';
+import { measurePictureInBrowser } from './browser-picture-measure';
 import type { Fullscreen } from './presenting-fullscreen';
 import type { PresentationLinks } from './presentation-link';
 import type { ApplicationStartupResult } from './startup';
@@ -45,14 +46,20 @@ const worded = <T extends Blob | AssetRef>(answer: T | AssetRefusal): T | Worded
 /**
  * The asset store as a Resource plugin's surface reaches it (ADR 0142): the
  * client's `url`, `read` and `store`, each refusal worded by
- * `describeAssetRefusal`, and the browser's own file picker. A host
- * hands on only `url` and `read` where its Resource is not authored.
+ * `describeAssetRefusal`, the browser's own file picker, and `measure`, the
+ * browser loading a picture to size it unless a caller supplies its own
+ * (ADR 0109). A host hands on only `url` and `read` where its Resource is not
+ * authored.
  */
-export const browserPluginAssets = (assets: AssetClient): Assets => ({
+export const browserPluginAssets = (
+  assets: AssetClient,
+  measure: NonNullable<Assets['measure']> = measurePictureInBrowser,
+): Assets => ({
   url: (ref) => assets.url(ref),
   read: async (ref) => worded(await assets.read(ref)),
   store: async (bytes) => worded(await assets.store(bytes)),
   pick: async (accept) => [...(await pickFilesInBrowser(document, accept))],
+  measure,
 });
 
 /**

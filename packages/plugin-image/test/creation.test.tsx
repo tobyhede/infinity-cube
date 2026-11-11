@@ -1,14 +1,9 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Answer, AssetRef } from '@project/resource-api/domain';
 import { testAssetRef, testAssetUrl } from '@project/resource-api/view/testing';
 import type { Assets, Creation, CreationData, CreationHost, New } from '@project/resource-api/view';
 import type { ImageContent } from '@project/plugin-image/domain';
-import {
-  IMAGE_CREATIONS,
-  MEASURE_TIMEOUT_MS,
-  PICKED_IMAGE_TYPES,
-  measurePicture,
-} from '../src/creation';
+import { IMAGE_CREATIONS, PICKED_IMAGE_TYPES } from '../src/creation';
 
 /** A 400×300 PNG's signature and IHDR chunk, which is all creation reads. */
 const pngHeader = (): Uint8Array<ArrayBuffer> => {
@@ -92,10 +87,6 @@ const creation = <F extends Creation<ImageContent>['from']>(from: F) => {
 };
 
 const fromFiles = (...files: readonly File[]): CreationData => ({ kind: 'files', files });
-
-afterEach(() => {
-  vi.useRealTimers();
-});
 
 describe('creating Image Resources from the Dock', () => {
   it('opens the picker for the formats an Image Resource draws, and creates one Resource for each picture', async () => {
@@ -205,28 +196,35 @@ describe('creating Image Resources from dropped files', () => {
 });
 
 describe('creating an Image Resource from a pasted URL', () => {
-  it('creates it unsized when the picture never loads', async () => {
-    vi.useFakeTimers();
+  it('records the size the surface measures where the picture is drawn from', async () => {
+    const recorded = recordingHost();
+    const measure = vi.fn(() => Promise.resolve({ width: 640, height: 480 }));
+    const host = { ...recorded.host, assets: { ...recorded.host.assets, measure } };
+
+    await creation('data').run(host, { kind: 'url', url: 'https://example.com/a.png' });
+
+    expect(measure).toHaveBeenCalledWith('https://example.com/a.png');
+    expect(recorded.created).toEqual([
+      [{ content: { url: 'https://example.com/a.png', naturalSize: { width: 640, height: 480 } } }],
+    ]);
+  });
+
+  it('measures a pasted stored asset where the surface draws it from', async () => {
+    const recorded = recordingHost();
+    const measure = vi.fn(() => Promise.resolve(undefined));
+    const host = { ...recorded.host, assets: { ...recorded.host.assets, measure } };
+
+    await creation('data').run(host, { kind: 'url', url: testAssetRef(3) });
+
+    expect(measure).toHaveBeenCalledWith(testAssetUrl(testAssetRef(3)));
+    expect(recorded.created).toEqual([[{ content: { url: testAssetRef(3) } }]]);
+  });
+
+  it('creates it unsized where the surface measures nothing', async () => {
     const recorded = recordingHost();
 
-    const running = creation('data').run(recorded.host, {
-      kind: 'url',
-      url: 'https://example.com/a.png',
-    });
-    await vi.advanceTimersByTimeAsync(MEASURE_TIMEOUT_MS);
-    await running;
+    await creation('data').run(recorded.host, { kind: 'url', url: 'https://example.com/a.png' });
 
     expect(recorded.created).toEqual([[{ content: { url: 'https://example.com/a.png' } }]]);
-  });
-});
-
-describe('measuring a picture', () => {
-  it('answers nothing once the picture has taken too long', async () => {
-    vi.useFakeTimers();
-
-    const measured = measurePicture('https://example.com/slow.png', 50);
-    await vi.advanceTimersByTimeAsync(50);
-
-    await expect(measured).resolves.toBeUndefined();
   });
 });

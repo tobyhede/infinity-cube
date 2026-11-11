@@ -39,6 +39,14 @@ export interface Assets {
   readonly pick?: ((accept: string) => Promise<File[]>) | undefined;
   /** Store bytes, answering their reference. */
   readonly store?: ((bytes: Blob) => Promise<AssetRef | { readonly refused: string }>) | undefined;
+  /**
+   * The natural size of the picture at `src`, as the browser loads it, or
+   * `undefined` for one that does not load or has no intrinsic size. Absent,
+   * the surface measures nothing.
+   */
+  readonly measure?:
+    | ((src: string) => Promise<{ readonly width: number; readonly height: number } | undefined>)
+    | undefined;
 }
 
 /** A Claim: who is interacting (ADR 0142). */
