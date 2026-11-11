@@ -93,12 +93,14 @@ export interface EmbedView {
  * its own plugin under the Title passed, or a Space, drawn as one of its Maps.
  *
  * A Space with no `select` shows that Space's `defaultMap` and the Graph it
- * opens on. `select` names the view to show; passed with a commit, the host
- * offers its Map and Graph chooser, which writes a choice or a framing only
- * through that commit, so whatever withdraws the commit withdraws the choice.
- * Authoring the shown Space, its Maps and Graphs included, is offered only
- * under a `claim` the plugin passes, until that Claim is released. Every
- * command comes from these props, never from the plugin's kind.
+ * opens on. `select` names the view to show; the host offers its Map and
+ * Graph chooser, which writes a choice or a framing only through the commit
+ * passed with it, so whatever withdraws the commit withdraws the choice. The
+ * shown Space's links are offered on the chooser without a Claim; its
+ * authoring, its Maps and Graphs included, only under a `claim` the plugin
+ * passes beside the commit, until that Claim is released. Every command
+ * comes from these props, never from the plugin's kind, as the canvas's
+ * `packages/app/test/embed-commands.test.tsx` holds.
  */
 export type EmbedProps =
   | { readonly resource: ResourceId; readonly title: Kept<string> }

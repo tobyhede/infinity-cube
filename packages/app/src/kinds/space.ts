@@ -29,8 +29,8 @@ export type SpaceResourceDecorationContext = Pick<
 /**
  * A Space Resource's plugin surface (ADR 0142): its Title, content and Map
  * content commits and its Claim, where the canvas authors it. The commands of
- * the Space it embeds are the embedding's, offered from what the plugin passes
- * `Embed` (`embed-commands.ts`), not from this kind.
+ * the Space it embeds are the embedding's, which `embed-commands.ts` offers
+ * from what the plugin passes `Embed` (`embed-commands.test.tsx`).
  */
 export function decorateSpaceResourceNode(
   node: ResourceFlowNodeOf<SpaceKindId>,

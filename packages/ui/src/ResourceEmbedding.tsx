@@ -112,7 +112,8 @@ const EMBEDDED_ROOM = {
  * view it passed (absent: that Space's `defaultMap`), the commit a choice or a
  * framing is written through where it passed one, and the Claim it passed,
  * under which the shown Space is authored in place. Every command the host
- * offers for the embedding is read from this, never from a kind.
+ * offers for the embedding is read from this, never from a kind
+ * (`packages/app/test/embed-commands.test.tsx`).
  */
 export interface MapEmbedRequest {
   readonly space: string;

@@ -121,7 +121,7 @@ The plugin-level test suite renders each plugin with every capability absent, an
 Not bound by the ADR, and free to change with a story and a test.
 
 - Rail: the canvas draws it with `CommandToolbar`. During nested Claims the deepest Claim's commands show. In-rect controls are allowed too.
-- Space: the plugin's rail has Open, Close, Enter and the Title. The host-owned Map embedding draws the Map and Graph chooser, the target Space's Map and Graph authoring and its links. It writes a choice through the plugin's selection commit (`select`), so withdrawal covers it. Issue 01 found that a plugin cannot read the target Space's structure, and that these commands write a Space other than the plugin's own Resource.
+- Space: the plugin's rail has Open, Close, Enter and the Title. The host-owned Map embedding draws the Map and Graph chooser and the target Space's links, and, under the Claim the plugin passes, that Space's Map and Graph authoring. It writes a choice through the plugin's selection commit (`select`), so withdrawal covers it, and while `select` carries no commit the chooser is drawn disabled. Issue 01 found that a plugin cannot read the target Space's structure, and that these commands write a Space other than the plugin's own Resource.
 - Claims: there is one chain at a time, so an entered Space or an open Markdown draft stops every other Resource from claiming until it is released, as availability does today.
 - Title: Ur and Markdown draw it inline with `Title`. Image draws none, keeping it as its text alternative, and is renamed from the rail. An Open Reference passes its own to the Target.
 - Border, ring, receding: the canvas draws them on the outline. Image shows a border only when selected or in a Graph.

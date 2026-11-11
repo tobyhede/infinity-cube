@@ -2,7 +2,7 @@
 
 Status: ready-for-agent
 
-**Blocked by:** the Embed amendment of ADR 0142 being built (the shown Space's chooser and authoring come from the `Embed`, so `packages/app/src/kinds/space.ts` builds no rail).
+**Blocked by:** none. The shown Space's chooser, links and authoring come from the `Embed` (`packages/app/src/embed-commands.ts`), so `packages/app/src/kinds/space.ts` builds no rail.
 
 **What to build:** one build list of plugins, read everywhere a choice among kinds is made, and the retirement of the three `kinds/` halves that issue 10 kept ("`kinds/` halves kept"). ADR 0142, "The plugins are listed once".
 
