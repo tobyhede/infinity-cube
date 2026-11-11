@@ -14,7 +14,6 @@ import {
 import { imageFile, jsonResourceFile, referenceFile, resourceFile } from './resource-files';
 import { ACTIVE_LANE_SPACING, GRAPH_LANE_SPACING } from '../src/edge-lanes';
 import { uuid } from './uuid';
-import { textAsset } from './markdown-texts';
 
 function load(
   input: unknown,
@@ -56,7 +55,7 @@ function spaceFile(
         title: 'Only map',
         kind: 'positioned',
         positions: Object.fromEntries(
-          members.map((id, index) => [uuid(id), { x: index * 300, y: 0, open: false }]),
+          members.map((id, index) => [uuid(id), { x: index * 300, y: 0 }]),
         ),
         graphs: graphs.map(({ id, title, edges }) => ({
           id: uuid(id),
@@ -121,24 +120,16 @@ describe('projectResourceNodes', () => {
         ]),
         [...target, ...referenceFile(referenceId, 'Reference', targetId)],
       );
-      for (const open of [false, true]) {
-        const nodes = projectResourceNodes(loaded, {
-          openResourceIds: new Set(open ? [referenceId] : []),
-        });
-        expect(nodes.find((node) => node.id === referenceId)?.data).toMatchObject({
-          authorsContent: false,
-          embedsMap: kind === 'space',
-        });
-        if (!open)
-          expect(nodes.find((node) => node.id === referenceId)?.data.display).toEqual({
-            shown: 'closed',
-          });
-        // A Markdown Resource's plugin edits its own content (ADR 0142).
-        expect(nodes.find((node) => node.id === targetId)?.data).toMatchObject({
-          authorsContent: kind === 'space',
-          embedsMap: kind === 'space',
-        });
-      }
+      const nodes = projectResourceNodes(loaded);
+      expect(nodes.find((node) => node.id === referenceId)?.data).toMatchObject({
+        authorsContent: false,
+        embedsMap: kind === 'space',
+      });
+      // A Markdown Resource's plugin edits its own content (ADR 0142).
+      expect(nodes.find((node) => node.id === targetId)?.data).toMatchObject({
+        authorsContent: kind === 'space',
+        embedsMap: kind === 'space',
+      });
     },
   );
 
@@ -175,16 +166,6 @@ describe('projectResourceNodes', () => {
     const nodes = projectResourceNodes(space, { resourceShape });
     expect(nodes.find((n) => n.id === a)?.data.shape).toBe('diamond');
     expect(nodes.filter((n) => n.id !== a).map((n) => n.data.shape)).not.toContain('diamond');
-    // The Shape travels whatever the display, Open included: `CanvasResource` decides
-    // what it draws from the two together.
-    const opened = projectResourceNodes(space, {
-      resourceShape,
-      openResourceIds: new Set([a]),
-    });
-    expect(opened.find((n) => n.id === a)?.data).toMatchObject({
-      shape: 'diamond',
-      display: { shown: 'open' },
-    });
   });
 
   it('uses the positions a map put on the resources', () => {
@@ -305,7 +286,7 @@ describe('projectResourceNodes', () => {
     expect('measured' in b).toBe(false);
   });
 
-  it("resolves an Open Reference Resource's Target Markdown under the Reference Resource identity", () => {
+  it("carries a Reference Resource's Target for its plugin to embed, under the Reference Resource identity", () => {
     const referenceId = uuid('00000000-0000-4000-8000-000000000007');
     const withReference = load(
       spaceFile([
@@ -326,21 +307,15 @@ describe('projectResourceNodes', () => {
       ],
     );
 
-    const nodes = projectResourceNodes(withReference, {
-      openResourceIds: new Set([referenceId]),
-    });
+    const nodes = projectResourceNodes(withReference);
+    const target = withReference.resources.find(
+      ({ id }) => id === '00000000-0000-4000-8000-000000000002',
+    );
     expect(nodes.find((node) => node.id === referenceId)?.data).toMatchObject({
       title: 'Return',
       kind: 'reference',
-      open: true,
-      display: {
-        shown: 'open',
-        content: {
-          kind: 'markdown',
-          content: { url: textAsset('## Authored once') },
-          via: 'target',
-        },
-      },
+      ownContent: { target: '00000000-0000-4000-8000-000000000002' },
+      embeddable: [target],
     });
   });
 
@@ -367,12 +342,11 @@ describe('projectResourceNodes', () => {
       kind: 'image',
       ownContent: { url },
       mapContent: {},
-      display: { shown: 'closed' },
     });
   });
 });
 
-describe('projectResourceNodes display', () => {
+describe('projectResourceNodes embeddable', () => {
   const imageId = uuid('00000000-0000-4000-8000-000000000008');
   const referenceId = uuid('00000000-0000-4000-8000-000000000009');
   const markdownId = uuid('00000000-0000-4000-8000-000000000002');
@@ -394,29 +368,15 @@ describe('projectResourceNodes display', () => {
       ...referenceFile(referenceId, 'Harbour, again', imageId),
     ],
   );
-  const display = (id: string, options: Parameters<typeof projectResourceNodes>[1]) =>
-    projectResourceNodes(withKinds, options).find((node) => node.id === id)?.data.display;
+  const embeddable = (id: string) =>
+    projectResourceNodes(withKinds).find((node) => node.id === id)?.data.embeddable;
 
-  it('carries no content on a Closed Resource', () => {
-    for (const id of [markdownId, imageId, referenceId]) {
-      expect(display(id, {})).toStrictEqual({ shown: 'closed' });
-    }
-  });
-
-  it('carries the resolved content on an Open Resource, its own or its Target’s', () => {
-    const openResourceIds = new Set([markdownId, imageId, referenceId]);
-    expect(display(markdownId, { openResourceIds })).toStrictEqual({
-      shown: 'open',
-      content: { kind: 'markdown', content: { url: textAsset('## Authored once') }, via: 'self' },
-    });
-    expect(display(imageId, { openResourceIds })).toStrictEqual({
-      shown: 'open',
-      content: { kind: 'image', content: { url }, via: 'self' },
-    });
-    expect(display(referenceId, { openResourceIds })).toStrictEqual({
-      shown: 'open',
-      content: { kind: 'image', content: { url }, via: 'target' },
-    });
+  it('carries what a Resource references for its plugin to embed, and nothing else', () => {
+    expect(embeddable(markdownId)).toStrictEqual([]);
+    expect(embeddable(imageId)).toStrictEqual([]);
+    expect(embeddable(referenceId)).toStrictEqual(
+      withKinds.resources.filter(({ id }) => id === imageId),
+    );
   });
 });
 

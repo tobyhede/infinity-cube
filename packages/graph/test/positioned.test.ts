@@ -39,12 +39,12 @@ describe('positionedStrategy', () => {
     const positions = Placement.fromEntries([
       [
         uuid('00000000-0000-4000-8000-000000000002'),
-        { x: 0, y: 0, open: true, size: { width: 360, height: 196 } },
+        { x: 0, y: 0, size: { width: 360, height: 196 } },
       ],
-      [uuid('00000000-0000-4000-8000-000000000003'), { x: 300, y: 200, open: false }],
+      [uuid('00000000-0000-4000-8000-000000000003'), { x: 300, y: 200 }],
       [
         uuid('00000000-0000-4000-8000-000000000005'),
-        { x: 900, y: 0, open: false, size: { width: 400, height: 300 } },
+        { x: 900, y: 0, size: { width: 400, height: 300 } },
       ],
     ]);
     const laid = await positionedStrategy(positions)({
@@ -157,10 +157,7 @@ describe('positionedStrategy properties', () => {
         // Authored positions for a prefix of the resources; the rest are omitted.
         const authored = ids.slice(0, Math.floor(coords.length / 2));
         const positions = Placement.fromEntries(
-          authored.map((id, i) => [
-            id,
-            { x: coords[i * 2] ?? 0, y: coords[i * 2 + 1] ?? 0, open: false },
-          ]),
+          authored.map((id, i) => [id, { x: coords[i * 2] ?? 0, y: coords[i * 2 + 1] ?? 0 }]),
         );
         const laid = await positionedStrategy(positions)({
           resources: resourcesOf(...ids),

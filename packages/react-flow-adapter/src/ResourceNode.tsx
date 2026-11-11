@@ -12,12 +12,10 @@ import {
   type ShouldResize,
 } from '@xyflow/react';
 import {
-  CanvasResource,
   graphPaint,
-  isPluginOperations,
   PluginResource,
-  type CanvasResourceProps,
   type MapEmbedRequest,
+  type PluginResourceProps,
 } from '@project/ui';
 import type { ResourceFlowNode } from './projection';
 import { AUTHORING_HANDLE_DIAMETER } from './authoring-handle';
@@ -27,11 +25,11 @@ import { offersConnectionEnd } from './connection-target-reveal';
 
 /**
  * React Flow custom node: a drawn Resource with one Edge anchor on each of its four
- * sides. An Open Resource draws its content inside the same node (ADR 0064).
+ * sides.
  *
- * The drawn Resource itself — Markdown and Reference Resource treatment, title editing, refusal
- * display, Open/Edit controls and interaction-state visuals — is the
- * production `@project/ui` `CanvasResource`. This module owns everything React
+ * The drawn Resource itself — the rect, border, ring and rail around what its
+ * plugin draws inside its outline — is `@project/ui`'s `PluginResource`, the
+ * Map surface's host (ADR 0142). This module owns everything React
  * Flow: handles and their declared geometry, connection state, translating
  * selection/dragging into the Resource's four external visual states, keeping a
  * Resource's controls from leaking into node opening, dragging, panning or canvas
@@ -39,12 +37,6 @@ import { offersConnectionEnd } from './connection-target-reveal';
  * completes or cancels from the keyboard.
  */
 const AUTHORING_SIDES = [Position.Top, Position.Right, Position.Bottom, Position.Left] as const;
-
-/** Strips `readonly` off a props type so an optional slice of it can be built by
- *  conditionally assigning keys rather than by a conditional empty-object
- *  spread — the props themselves stay readonly to every other caller. The keys
- *  are already optional; this changes nothing but their mutability. */
-type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
 /*
  * Handle geometry is *declared*, not measured, so nothing here reports a change
@@ -124,7 +116,6 @@ export function ResourceNode({
   );
 
   const kindOperations = data.kindOperations;
-  const display = data.display;
 
   /**
    * Whether this Resource's anchors are also affordances.
@@ -182,47 +173,12 @@ export function ResourceNode({
     />
   );
 
-  /*
-   * A control reaches the Resource only when the composition supplied the
-   * operation that performs it. Presence is the capability — there is no
-   * separate flag to disagree with it — so `CanvasResource` draws no
-   * control it has no operation for, and withholding it here is the same
-   * answer one layer up.
-   */
-  const canvasResourceOptionalProps: Mutable<
-    Pick<
-      CanvasResourceProps,
-      | 'onBeginTitleEdit'
-      | 'onOpenChange'
-      | 'entityActions'
-      | 'onBodyHeightChange'
-      | 'contextNotice'
-      | 'size'
-      | 'borderColor'
-    >
-  > = {};
   // The rect React Flow draws this Resource at, which the projection declares
-  // from the Resource's Placement (`canvas-projection.test.ts`, "carries each
-  // authored Open rect through strategy input and node projection"). Where React
-  // Flow gives none, the Resource is drawn at the Closed Size.
-  if (width !== undefined && height !== undefined) {
-    canvasResourceOptionalProps.size = { width, height };
-  }
-  if (data.borderColor !== null) {
-    canvasResourceOptionalProps.borderColor = data.borderColor;
-  }
-  if (data.contextNotice !== undefined && data.contextNotice !== null) {
-    canvasResourceOptionalProps.contextNotice = data.contextNotice;
-  }
-  if (reportBodyHeight !== undefined) {
-    canvasResourceOptionalProps.onBodyHeightChange = onBodyHeightChange;
-  }
-  if (data.onBeginTitleEditing !== undefined) {
-    canvasResourceOptionalProps.onBeginTitleEdit = data.onBeginTitleEditing;
-  }
-  if (data.onOpenChange !== undefined) {
-    canvasResourceOptionalProps.onOpenChange = data.onOpenChange;
-  }
+  // from the Resource's Placement. Where React Flow gives none, the Resource is
+  // drawn at the Closed Size.
+  const size: PluginResourceProps['size'] =
+    width !== undefined && height !== undefined ? { width, height } : undefined;
+  const contextNotice = data.contextNotice ?? undefined;
   /*
    * Forwarded whole rather than flag-and-operation, because a command list is
    * already both: each command carries what running it does, and a command the
@@ -231,26 +187,13 @@ export function ResourceNode({
    * canvas draws content and no commands, so the menu goes with the rest of the
    * rail rather than being the one control that survived it.
    */
-  if (!data.readOnly && data.entityActions !== undefined) {
-    canvasResourceOptionalProps.entityActions = data.entityActions;
-  }
+  const entityActions = data.readOnly ? undefined : data.entityActions;
 
   /* The editor's presence is the editing state, and it arrives with the two
      operations that end it — so nothing here has to stand in for a completion
      the composition did not supply. */
   const titleEditor = !data.readOnly ? data.titleEditor : undefined;
 
-  /*
-   * What an open Resource draws below its title is the display (ADR 0064).
-   *
-   * **Not a fourth arm of the branch below.** It is a prop handed to whichever
-   * arm the *title* state selects, so a Resource can be open while it is being
-   * renamed — Opening is what the Map authored and the caret is a gesture,
-   * and a branch would have made them exclusive.
-   *
-   * `data.open` is the Map's authored Open state: the node's `data-open`
-   * publishes it, and nothing drawn here reads it.
-   */
   const resize = data.resize;
   const resizeOperation = useRef(resize);
   useEffect(() => {
@@ -334,7 +277,6 @@ export function ResourceNode({
     resizeOperation.current?.onResize({ width: next.width, height: next.height });
     return false;
   }, []);
-  const open = data.open === true;
   const { zoom } = useViewport();
   const resizeScale = Math.max(1 / zoom, 1);
 
@@ -397,15 +339,6 @@ export function ResourceNode({
       // reads this to withhold the anchors and the resize control for the
       // gesture, exactly as it reads `data-resizing` for the other one.
       data-dragging={dragging}
-      // The wrapper React Flow sizes from `node.width`/`node.height` is this
-      // element's parent, so an Open Resource only reaches its own rect if this
-      // one stops declaring the collapsed constant — which `styles.css` does
-      // unconditionally rather than under this attribute, because keying
-      // geometry on the flag is exactly the discontinuity that makes a close
-      // snap. **No stylesheet reads this**, deliberately: it publishes authored
-      // open state for tests and assistive technology, and geometry is never
-      // allowed to depend on it.
-      data-open={open}
       // Read by `styles.css`, which leans the Resource rather than this element.
       // The Resource is a sibling of the handles, not their ancestor.
       data-drag-tilted={data.dragTilted === true}
@@ -448,74 +381,44 @@ export function ResourceNode({
         </>
       )}
       {/*
-        A Resource a plugin draws is drawn by its host (ADR 0142), which keeps
+        Every Resource is drawn by its plugin's host (ADR 0142), which keeps
         the rect, border, ring and rail and hands the plugin everything inside
-        its outline; every other kind is still drawn by `CanvasResource`.
+        its outline.
       */}
-      {isPluginOperations(kindOperations) &&
-      data.mapContent !== undefined &&
-      data.ownContent !== undefined ? (
-        <PluginResource
-          resourceId={data.resourceId}
-          kind={kindOperations.kind}
-          title={{
-            title: data.title,
-            readOnly: data.readOnly,
-            onBeginTitleEdit: data.onBeginTitleEditing,
-            editor: titleEditor,
-            onReturnFocus,
-          }}
-          content={data.ownContent}
-          mapContent={data.mapContent}
-          embeddable={data.embeddable}
-          outline={data.shape}
-          size={canvasResourceOptionalProps.size}
-          state={
-            titleEditor !== undefined
-              ? 'editing'
-              : dragging
-                ? 'dragging'
-                : visuallySelected
-                  ? 'selected'
-                  : 'rest'
-          }
-          graphColor={data.activeGraphColor}
-          borderColor={canvasResourceOptionalProps.borderColor}
-          readOnly={data.readOnly}
-          operations={kindOperations}
-          entityActions={canvasResourceOptionalProps.entityActions}
-          contextNotice={canvasResourceOptionalProps.contextNotice}
-          renderToolbar={renderToolbar}
-          onMapEmbed={onMapEmbed}
-          onBodyHeightChange={reportBodyHeight === undefined ? undefined : onBodyHeightChange}
-        />
-      ) : titleEditor !== undefined ? (
-        <CanvasResource
-          readOnly={data.readOnly}
-          kindOperations={kindOperations}
-          display={display}
-          renderToolbar={renderToolbar}
-          title={data.title}
-          graphColor={data.activeGraphColor}
-          state="editing"
-          onCompleteTitleEdit={titleEditor.onComplete}
-          onCancelTitleEdit={titleEditor.onCancel}
-          onReturnFocus={onReturnFocus}
-          {...canvasResourceOptionalProps}
-        />
-      ) : (
-        <CanvasResource
-          readOnly={data.readOnly}
-          kindOperations={kindOperations}
-          display={display}
-          renderToolbar={renderToolbar}
-          title={data.title}
-          graphColor={data.activeGraphColor}
-          state={dragging ? 'dragging' : visuallySelected ? 'selected' : 'rest'}
-          onReturnFocus={onReturnFocus}
-          {...canvasResourceOptionalProps}
-        />
-      )}
+      <PluginResource
+        resourceId={data.resourceId}
+        kind={kindOperations.kind}
+        title={{
+          title: data.title,
+          readOnly: data.readOnly,
+          onBeginTitleEdit: data.onBeginTitleEditing,
+          editor: titleEditor,
+          onReturnFocus,
+        }}
+        content={data.ownContent}
+        mapContent={data.mapContent}
+        embeddable={data.embeddable}
+        outline={data.shape}
+        size={size}
+        state={
+          titleEditor !== undefined
+            ? 'editing'
+            : dragging
+              ? 'dragging'
+              : visuallySelected
+                ? 'selected'
+                : 'rest'
+        }
+        graphColor={data.activeGraphColor}
+        borderColor={data.borderColor ?? undefined}
+        readOnly={data.readOnly}
+        operations={kindOperations}
+        entityActions={entityActions}
+        contextNotice={contextNotice}
+        renderToolbar={renderToolbar}
+        onMapEmbed={onMapEmbed}
+        onBodyHeightChange={reportBodyHeight === undefined ? undefined : onBodyHeightChange}
+      />
       {/*
         Every anchor renders *after* the Resource, both roles together.
         `canvas-resource.css` keeps the Resource's hover treatment alive while the

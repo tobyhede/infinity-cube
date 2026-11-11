@@ -163,8 +163,8 @@ const spaceA = (
         title: 'Map',
         kind: 'positioned',
         positions: {
-          [A_FIRST]: { x: 0, y: 0, open: false },
-          [A_SECOND]: { x: secondX, y: 0, open: false },
+          [A_FIRST]: { x: 0, y: 0 },
+          [A_SECOND]: { x: secondX, y: 0 },
         },
         graphs: [
           { id: ids.graph, title: 'Graph', edges: [{ from: A_FIRST, to: A_SECOND }] },
@@ -188,7 +188,7 @@ const spaceB = (x: number): SpaceSnapshot => ({
         id: B_MAP,
         title: 'Map',
         kind: 'positioned',
-        positions: { [B_FIRST]: { x, y: 0, open: false } },
+        positions: { [B_FIRST]: { x, y: 0 } },
         graphs: [{ id: B_GRAPH, title: 'Graph', color: 'teal', edges: [] }],
       },
     ],

@@ -766,8 +766,6 @@ test(
     await expect(controls.getByRole('button', { name: 'Open Resource Title slide' })).toHaveCount(
       0,
     );
-    await expect(ur.locator('.canvas-resource')).toHaveAttribute('data-open', 'false');
-    await expect(ur.locator('.canvas-resource__content')).toHaveCount(0);
     await expect(controls.getByRole('button', { name: 'Edit Resource Title slide' })).toHaveCount(
       0,
     );

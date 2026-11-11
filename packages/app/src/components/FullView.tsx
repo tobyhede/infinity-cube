@@ -1,18 +1,7 @@
 import { useLayoutEffect, useRef, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { ResourceId } from '@project/core';
-import {
-  referencedResources,
-  resolveResourceContent,
-  resourceDrawnByPlugin,
-  type Space,
-} from '@project/graph';
-import {
-  Button,
-  HostMapProvider,
-  PresentedPluginResource,
-  PresentedResource,
-  Stage,
-} from '@project/ui';
+import { referencedResources, type Space } from '@project/graph';
+import { Button, HostMapProvider, PresentedPluginResource, Stage } from '@project/ui';
 import { drawPresentedMapEmbed } from './map-embed-draws';
 import { FULL_VIEW_KEYS } from '../key-bindings';
 
@@ -23,8 +12,6 @@ export interface FullViewProps {
   readonly resourceId: ResourceId;
   /** Leave Full View. */
   readonly onLeave: () => void;
-  /** Leave Full View and Open the Resource on the canvas, or `null` while it cannot be Opened. */
-  readonly onOpen: (() => void) | null;
   /**
    * Every key pressed inside the view, for the walk along the Active Graph.
    * `fromContent` is whether it was pressed on the Resource's content rather
@@ -42,16 +29,14 @@ export interface FullViewProps {
  * floating above it: transient and read-only, so nothing here is an Edit, and
  * nothing about it reaches the Map, the camera or the address.
  *
- * Drawn by the Resource's kind, through the content `resolveResourceContent`
- * answers, exactly as presenting draws it, so it is also a preview of what the
- * audience sees. The Stage's body takes focus when the view appears and each
+ * Drawn by the Resource's plugin, exactly as presenting draws it, so it is
+ * also a preview of what the audience sees. The Stage's body takes focus when the view appears and each
  * time it moves to another Resource, so the keys reach the view at once.
  */
 export function FullView({
   space,
   resourceId,
   onLeave,
-  onOpen,
   onKeyDown,
   onPluginFailure,
   replacementEpoch,
@@ -75,15 +60,6 @@ export function FullView({
         bodyRef={body}
         chrome={
           <div className="flex items-center justify-end gap-3 border-t border-border bg-background p-3">
-            {onOpen === null ? null : (
-              <Button
-                variant="secondary"
-                aria-keyshortcuts={FULL_VIEW_KEYS.openOnCanvas.ariaKeyShortcuts}
-                onClick={onOpen}
-              >
-                Open on Canvas
-              </Button>
-            )}
             <Button
               variant="secondary"
               aria-keyshortcuts={FULL_VIEW_KEYS.leave.ariaKeyShortcuts}
@@ -94,24 +70,17 @@ export function FullView({
           </div>
         }
       >
-        {resourceDrawnByPlugin(space, resource) ? (
-          <HostMapProvider draw={drawPresentedMapEmbed}>
-            <PresentedPluginResource
-              resourceId={resource.id}
-              kind={resource.kind}
-              title={resource.title}
-              content={resource.content}
-              embeddable={referencedResources(space, resource)}
-              onFailure={onPluginFailure}
-              replacementEpoch={replacementEpoch}
-            />
-          </HostMapProvider>
-        ) : (
-          <PresentedResource
+        <HostMapProvider draw={drawPresentedMapEmbed}>
+          <PresentedPluginResource
+            resourceId={resource.id}
+            kind={resource.kind}
             title={resource.title}
-            content={resolveResourceContent(space, resource)}
+            content={resource.content}
+            embeddable={referencedResources(space, resource)}
+            onFailure={onPluginFailure}
+            replacementEpoch={replacementEpoch}
           />
-        )}
+        </HostMapProvider>
       </Stage>
     </div>
   );

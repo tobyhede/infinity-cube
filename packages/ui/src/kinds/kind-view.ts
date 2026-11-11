@@ -1,30 +1,16 @@
-import type { ComponentType, ReactNode } from 'react';
-import type { ResourceDisplay } from '../resource-display';
-
-/** What a drawn Resource tells its kind's content view about the area it draws in. */
-export interface CanvasArea {
-  /** The Resource's name, for the content's accessible names. */
-  readonly name: string;
-  readonly display: ResourceDisplay;
-  /** Whether the content is the Resource's own and not leaving, and so may be authored here (ADR 0070). */
-  readonly authoring: boolean;
-  /** Whether the Resource is selected, which is when its content offers an edit target (ADR 0102). */
-  readonly selected: boolean;
-}
+import type { ComponentType } from 'react';
 
 /** The glyph of a kind that draws the Resource it shows with a badge on it, as a Reference Resource does. */
 export const BADGED_TARGET_GLYPH = 'badged-target';
 
 /**
- * The view half of a Resource kind (ADR 0120): what a Resource of it
- * is called and drawn as, its operations with none offered, and what it draws
- * when presented. Each kind declares one under `kinds/`, and the registry is
- * the one place they are listed, so no surface names a kind (ADR 0128).
+ * The view half of a Resource kind as this package lists it (ADR 0120, ADR
+ * 0142): what a Resource of it is called and drawn as in a list, and its
+ * operations with none offered. Its Resources are drawn by its plugin, on
+ * every surface. Each kind declares one under `kinds/`, and the registry is the
+ * one place they are listed, so no surface names a kind (ADR 0128).
  */
-export type KindView<Operations, OwnContent = never> = KindViewFields<Operations, OwnContent>;
-
-/** The fields of {@link KindView}, each kind's alike. */
-interface KindViewFields<Operations, OwnContent> {
+export interface KindView<Operations> {
   /** What one Resource of this kind is called. */
   readonly name: string;
   /** What the Resources list calls this kind's Resources. */
@@ -39,8 +25,4 @@ interface KindViewFields<Operations, OwnContent> {
   readonly Glyph: ComponentType<{ size?: number | undefined }> | typeof BADGED_TARGET_GLYPH;
   /** What a Resource of this kind offers before the composition offers anything. */
   readonly bareOperations: Operations;
-  /** What an Open Resource of this kind draws in its content area on a Map, when its content draws one. */
-  readonly canvas?: (content: OwnContent, area: CanvasArea) => ReactNode;
-  /** What a presented Resource of this kind draws below its name; absent, its name alone. */
-  readonly presented?: (name: string, content: OwnContent) => ReactNode;
 }

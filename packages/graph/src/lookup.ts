@@ -1,5 +1,4 @@
 import {
-  drawnByPlugin,
   resolveContent,
   resourceReferences,
   takesOpen,
@@ -89,23 +88,6 @@ export function referencedResources(space: Space, resource: Resource): readonly 
     const referenced = space.lookup.resource(id);
     return referenced === undefined ? [] : [referenced];
   });
-}
-
-/**
- * Whether a plugin draws `resource` in this Space (ADR 0142): its kind's, and
- * its content Target's where it shows one (`drawnByPlugin`).
- */
-export function resourceDrawnByPlugin(space: Space, resource: Resource): boolean {
-  return drawnByPlugin(resource, (id) => space.lookup.resource(id));
-}
-
-/**
- * Whether the application keeps `resource`'s Open in this Space, as a Map
- * entry's `open` (`takesOpen`): a Resource no plugin draws whose content, its
- * own or its Target's, declares Open.
- */
-export function resourceTakesOpen(space: Space, resource: Resource): boolean {
-  return takesOpen(resource, (id) => space.lookup.resource(id));
 }
 
 /**

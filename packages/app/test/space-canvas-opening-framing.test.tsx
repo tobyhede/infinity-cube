@@ -14,7 +14,6 @@ import type { OpenSpace, OpenSpaces, OpenSpacesState } from '../src/open-spaces'
 import type { SpaceResourceFraming } from '../src/space-resource-framing';
 import { RESOURCE_SIZE } from '../src/resource';
 import { mountSettled } from './settled-mount';
-import { CLOSED_DISPLAY } from '@project/ui';
 import { stubResizeObserver } from './resize-observer';
 import { canvasReading, IDLE_PLACEMENT } from './map-surfaces';
 import { createPluginGate } from '../src/plugin-host/plugin-gate';
@@ -39,7 +38,7 @@ const snapshot = spaceSnapshotSchema.parse({
         id: MAP_ID,
         title: 'Map',
         kind: 'positioned',
-        positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
+        positions: { [RESOURCE_ID]: { x: 0, y: 0 } },
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
       },
     ],
@@ -73,7 +72,6 @@ function resourceNode(): ResourceFlowNode {
       ...bareKindData('markdown'),
       ...fixtureFacts('markdown'),
       selectedForAuthoring: false,
-      display: CLOSED_DISPLAY,
       activeGraphId: null,
       activeGraphColor: '#8a94a6',
       borderColor: null,

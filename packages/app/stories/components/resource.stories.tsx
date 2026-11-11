@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Story } from '@ladle/react';
 import {
   RESOURCE_SHAPES,
+  resolvedMapContent,
   uuidSchema,
   type JsonValue,
   type Map,
@@ -13,13 +14,10 @@ import type { Answer } from '@project/resource-api/domain';
 import { urMapContentSchema } from '@project/plugin-ur/domain';
 import { productDestinationPath, type ProductDestination } from '@project/http';
 import {
-  CanvasResource,
-  CLOSED_DISPLAY,
   PluginAssetsProvider,
   PluginResource,
-  type KindOperations,
   type CanvasResourceState,
-  type ResourceDisplay,
+  type KindOperations,
 } from '@project/ui';
 import { spaceEntityActions } from '#src/entity-actions';
 import { resourceSizeVars } from '#src/resource';
@@ -39,7 +37,7 @@ export const States: Story = () => (
   <div className="inv inv-sheet" style={resourceSizeVars}>
     <CatalogueSection
       title="Resource states"
-      note="The shared CanvasResource presentation contract, drawn statically for rest, selected and dragging. Hover and selection are proven live in Hover and selection, and title editing in Title editing."
+      note="The shared PluginResource presentation contract, drawn statically for rest, selected and dragging. Hover and selection are proven live in Hover and selection, and title editing in Title editing."
     >
       <div className="inv-row">
         <Specimen label="resource · rest">
@@ -92,7 +90,7 @@ const OVERLONG_TITLE =
 const WRAPPING_TITLE = 'Why authored placement beats a layout engine that reshuffles on every edit';
 
 /**
- * Every kind `CanvasResource` declares, with the label each specimen carries,
+ * Every kind `PluginResource` declares, with the label each specimen carries,
  * but the Image Resource, which is its picture and has no Closed state (ADR
  * 0142); `Image Resource` draws it.
  *
@@ -144,7 +142,7 @@ export const Closed: Story = () => (
   <div className="inv inv-sheet" style={resourceSizeVars}>
     <CatalogueSection
       title="Closed Resource"
-      note="Every kind CanvasResource draws, at rest and at the one authored Closed Size, each with a one-line Title beside a three-line one. A Closed Resource draws its border — dotted only for a Reference Resource — and its Title Lines, and beneath the Title it draws nothing. A Closed Resource draws its kind glyph at its top-right corner, with or without a toolbar; an Open Resource draws none, and nor does an Ur Resource, whose Shape says what it is."
+      note="Every kind PluginResource draws, at rest and at the one authored Closed Size, each with a one-line Title beside a three-line one. A Closed Resource draws its border — dotted only for a Reference Resource — and its Title Lines, and beneath the Title it draws nothing. A Closed Resource draws its kind glyph at its top-right corner, with or without a toolbar; an Open Resource draws none, and nor does an Ur Resource, whose Shape says what it is."
     >
       <div className="inv-row">
         {CLOSED_KINDS.map((entry) => (
@@ -321,7 +319,7 @@ export const Kinds: Story = () => (
   <div className="inv inv-sheet" style={resourceSizeVars}>
     <CatalogueSection
       title="Resource kinds"
-      note="Kind changes the icon and the border treatment (a Reference Resource's dotted border) without adding a textual kind label. This story exercises CanvasResource's presentation interface directly."
+      note="Kind changes the icon and the border treatment (a Reference Resource's dotted border) without adding a textual kind label. This story exercises PluginResource's presentation interface directly."
     >
       <div className="inv-row">
         <Specimen label="markdown">
@@ -483,10 +481,11 @@ ResizeControl.storyName = 'Resize control';
 ResizeControl.meta = { iframed: true };
 
 /**
- * One instance wired the way `ResourceNode` wires the production component: real
- * selection and dragging toggles standing in for React Flow's own, a real
- * Connect operation, and a visible record of when it fired — so the story
- * proves the same exposure the production graph does, not a facsimile of it.
+ * One instance wired the way `ResourceNode` wires the production host: real
+ * selection and dragging toggles standing in for React Flow's own, its
+ * plugin's Open and Close committing its Map content, and a visible record of
+ * when it fired — so the story proves the same exposure the production graph
+ * does, not a facsimile of it.
  */
 function Instance({
   initialTitle,
@@ -499,25 +498,16 @@ function Instance({
   const [selected, setSelected] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [open, setOpen] = useState(false);
-  const changeOpen = (next: boolean) => {
-    setOpen(next);
-    return 'completed' as const;
+  // Open and Close are the plugin's Map content, which it commits (ADR 0142).
+  const commitMap = (next: JsonValue): Promise<Answer> => {
+    setOpen(referenceMapContentSchema.safeParse(next).data?.open === true);
+    return Promise.resolve('completed');
   };
-  // Every kind Opens and Closes through the one operation (ADR 0070), so the
-  // Reference Resource takes it too.
-  const kindOperations: KindOperations = { kind };
-  // `CanvasResource` draws a content area for content it still owns: a
-  // Reference's here is a Target it cannot find, since a Reference to a
-  // Resource a plugin draws is drawn by its plugin (ADR 0142).
-  const display: ResourceDisplay = open
-    ? {
-        shown: 'open',
-        content:
-          kind === 'reference'
-            ? { kind: 'unresolved', via: 'target' }
-            : { kind: 'markdown', content: { url: storyText('Markdown content') }, via: 'self' },
-      }
-    : CLOSED_DISPLAY;
+  const [content] = useState<JsonValue>(() =>
+    kind === 'reference'
+      ? { target: resourceIds.strategies }
+      : { url: storyText('Markdown content') },
+  );
   const state: Exclude<CanvasResourceState, 'editing'> = dragging
     ? 'dragging'
     : selected
@@ -531,13 +521,17 @@ function Instance({
         tabIndex={-1}
         onClick={() => setSelected(true)}
       >
-        <CanvasResource
-          kindOperations={kindOperations}
-          onOpenChange={changeOpen}
-          display={display}
+        <PluginResource
+          resourceId={`instance-${kind}`}
+          kind={kind}
+          title={{ title, readOnly: true, onReturnFocus: () => undefined }}
+          content={content}
+          mapContent={{ open }}
+          outline="rectangle"
           state={state}
-          title={title}
           graphColor="#ffc53d"
+          readOnly={false}
+          operations={{ kind, commitMap }}
         />
       </div>
       <label className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -548,7 +542,7 @@ function Instance({
         />
         Dragging
       </label>
-      {kindOperations.kind === 'markdown' && (
+      {kind === 'markdown' && (
         <p className="text-xs text-muted-foreground" data-testid="open-report">
           {open ? `${title} is open.` : `${title} is closed.`}
         </p>
@@ -808,47 +802,6 @@ export const OpenImageReference: Story = () => {
 OpenImageReference.storyName = 'Open Image Reference Resource';
 OpenImageReference.meta = { iframed: true };
 
-/**
- * Enter is the Space Resource's kind command (ADR 0073, ADR 0068): it sits on the
- * rail whether the Resource is Open or Closed, and activating it is the crossing.
- *
- * The production `CanvasResource` is the component; the application proof is
- * `enter-space-resource.test.tsx` and `space-resource.spec.ts`.
- */
-export const EnterSpace: Story = () => {
-  const [entered, setEntered] = useState(false);
-  const changeOpen = () => 'completed' as const;
-  return (
-    <div className="p-8">
-      <CanvasResource
-        kindOperations={{ kind: 'space' }}
-        onOpenChange={changeOpen}
-        display={CLOSED_DISPLAY}
-        state="selected"
-        entityActions={[
-          [
-            {
-              id: 'enter',
-              label: 'Enter',
-              onSelect: () => {
-                setEntered(true);
-                return 'done';
-              },
-            },
-          ],
-        ]}
-        title="Architecture"
-        graphColor="#35d6c3"
-      />
-      <p className="mt-3 text-xs text-muted-foreground" data-testid="enter-report">
-        {entered ? 'Entered Architecture.' : 'Not entered.'}
-      </p>
-    </div>
-  );
-};
-EnterSpace.storyName = 'Enter Space';
-EnterSpace.meta = { iframed: true };
-
 const ARCHITECTURE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const ARCHITECTURE: Resource = {
   id: ARCHITECTURE_ID,
@@ -864,11 +817,55 @@ const CONTAINING_MAP: Map = {
   id: uuidSchema.parse('00000000-0000-4000-8000-000000000003'),
   title: 'Collection 1',
   kind: 'positioned',
-  positions: { [ARCHITECTURE_ID]: { x: 0, y: 0, open: false } },
+  positions: { [ARCHITECTURE_ID]: { x: 0, y: 0 } },
   graphs: [
     { id: uuidSchema.parse('00000000-0000-4000-8000-000000000004'), title: 'Overview', edges: [] },
   ],
 };
+
+/**
+ * Enter is the Space Resource's kind command (ADR 0073, ADR 0068): it sits on the
+ * rail whether the Resource is Open or Closed, and activating it is the crossing.
+ *
+ * The production `PluginResource` is the host; the application proof is
+ * `enter-space-resource.test.tsx` and `space-resource.spec.ts`.
+ */
+export const EnterSpace: Story = () => {
+  const [entered, setEntered] = useState(false);
+  return (
+    <div className="p-8" style={resourceSizeVars}>
+      <PluginResource
+        resourceId={ARCHITECTURE_ID}
+        kind="space"
+        title={{ title: 'Architecture', readOnly: true, onReturnFocus: () => undefined }}
+        content={ARCHITECTURE.content}
+        mapContent={{ open: false }}
+        outline="rectangle"
+        readOnly={false}
+        operations={{ kind: 'space' }}
+        state="selected"
+        entityActions={[
+          [
+            {
+              id: 'enter',
+              label: 'Enter',
+              onSelect: () => {
+                setEntered(true);
+                return 'done';
+              },
+            },
+          ],
+        ]}
+        graphColor="#35d6c3"
+      />
+      <p className="mt-3 text-xs text-muted-foreground" data-testid="enter-report">
+        {entered ? 'Entered Architecture.' : 'Not entered.'}
+      </p>
+    </div>
+  );
+};
+EnterSpace.storyName = 'Enter Space';
+EnterSpace.meta = { iframed: true };
 
 /**
  * Independently opening the Space a Space Resource shows is a link to that
@@ -877,7 +874,6 @@ const CONTAINING_MAP: Map = {
  */
 export const OpenIndependently: Story = () => {
   const [opened, setOpened] = useState<ProductDestination | null>(null);
-  const changeOpen = () => 'completed' as const;
   const entityActions = spaceEntityActions({
     spaceId: uuidSchema.parse('00000000-0000-4000-8000-000000000001'),
     spaceTitle: 'Home',
@@ -889,13 +885,17 @@ export const OpenIndependently: Story = () => {
     onRename: null,
   })({ kind: 'resource', resource: ARCHITECTURE, map: CONTAINING_MAP });
   return (
-    <div className="p-8">
-      <CanvasResource
-        kindOperations={{ kind: 'space' }}
-        onOpenChange={changeOpen}
-        display={CLOSED_DISPLAY}
+    <div className="p-8" style={resourceSizeVars}>
+      <PluginResource
+        resourceId={ARCHITECTURE_ID}
+        kind="space"
+        title={{ title: 'Architecture', readOnly: true, onReturnFocus: () => undefined }}
+        content={ARCHITECTURE.content}
+        mapContent={{ open: false }}
+        outline="rectangle"
+        readOnly={false}
+        operations={{ kind: 'space' }}
         state="selected"
-        title="Architecture"
         graphColor="#35d6c3"
         entityActions={entityActions}
       />
@@ -933,12 +933,16 @@ export const RailActions: Story = () => {
     <div className="p-8" style={resourceSizeVars}>
       <div className="flex flex-wrap items-start gap-6">
         {authoredSpace.resources.slice(0, 2).map((resource, index) => (
-          <CanvasResource
+          <PluginResource
             key={resource.id}
-            kindOperations={{ kind: 'markdown' }}
-            onOpenChange={() => 'retained'}
-            display={CLOSED_DISPLAY}
-            title={resource.title}
+            resourceId={resource.id}
+            kind={resource.kind}
+            title={{ title: resource.title, readOnly: true, onReturnFocus: () => undefined }}
+            content={resource.content}
+            mapContent={resolvedMapContent(resource.kind, undefined)}
+            outline="rectangle"
+            readOnly={false}
+            operations={{ kind: resource.kind }}
             state={index === 1 ? 'selected' : 'rest'}
             graphColor="#ffc53d"
             entityActions={actions({ kind: 'resource', resource, map: firstMap })}

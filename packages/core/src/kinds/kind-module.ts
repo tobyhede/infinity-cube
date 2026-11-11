@@ -10,8 +10,6 @@ import type { JsonValue } from '../json-value';
  * a kind (ADR 0128). The core reads these; a module sets them.
  */
 export interface KindFlags {
-  /** Whether a Resource of this kind may be Open (ADR 0122). */
-  readonly canOpen: boolean;
   /** Whether another Resource may reference one of this kind as its Target, which keeps referencing a single hop (ADR 0113). */
   readonly mayBeTarget: boolean;
   /** Whether a Space this kind references lives by that reference, and is deleted with its last (ADR 0074). */
@@ -151,8 +149,8 @@ export interface KindModule<
   readonly facts?: ContentFacts;
   /** The content a new Resource of this kind starts with, when it may be created empty. */
   readonly newContent?: Content;
-  /** What a Resource of this kind keeps on each Map, when a plugin draws the kind (ADR 0142). */
-  readonly mapContent?: KindMapContent;
+  /** What a Resource of this kind keeps on each Map: its plugin's Map content (ADR 0142). */
+  readonly mapContent: KindMapContent;
 }
 
 /**
@@ -173,7 +171,8 @@ type DeclaredRule =
   | 'resolveContent'
   | 'resourceReferences'
   | 'contentTarget'
-  | 'spaceReferences';
+  | 'spaceReferences'
+  | 'mapContent';
 
 /** What a kind must declare; the rest takes {@link defineKind}'s answer. */
 type KindDeclaration<K extends string, Content, Resolved extends KindResolvedContent> = Pick<

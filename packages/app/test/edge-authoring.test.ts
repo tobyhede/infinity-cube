@@ -82,9 +82,9 @@ const positionedSnapshot: SpaceSnapshot = {
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [RESOURCE_A]: { x: 10, y: 20, open: false },
-          [RESOURCE_B]: { x: 300, y: 40, open: false },
-          [RESOURCE_C]: { x: 600, y: 40, open: false },
+          [RESOURCE_A]: { x: 10, y: 20 },
+          [RESOURCE_B]: { x: 300, y: 40 },
+          [RESOURCE_C]: { x: 600, y: 40 },
         },
         graphs: [
           { id: GRAPH_ID, title: 'Main', edges: [EDGE] },
@@ -95,7 +95,7 @@ const positionedSnapshot: SpaceSnapshot = {
         id: OTHER_MAP_ID,
         title: 'Map 2',
         kind: 'positioned',
-        positions: { [RESOURCE_C]: { x: 0, y: 0, open: false } },
+        positions: { [RESOURCE_C]: { x: 0, y: 0 } },
         graphs: [{ id: THIRD_GRAPH_ID, title: 'Third', edges: [] }],
       },
     ],
@@ -812,7 +812,6 @@ describe('connecting from the Connect list', () => {
     expect(working.document.maps?.[0]?.positions[MINTED]).toEqual({
       x: 10 + RESOURCE_SIZE.width * 1.5,
       y: 20,
-      open: false,
     });
     expect(continuation.getState().pending).toEqual({
       target: { kind: 'edge', graphId: GRAPH_ID, edge: { from: RESOURCE_A, to: MINTED } },
@@ -835,7 +834,6 @@ describe('connecting from the Connect list', () => {
                   [RESOURCE_A]: {
                     x: 10,
                     y: 20,
-                    open: false,
                     content: { open: true },
                     size: { width: 560, height: 420 },
                   },
@@ -852,7 +850,6 @@ describe('connecting from the Connect list', () => {
     expect(session.getState().working.document.maps?.[0]?.positions[MINTED]).toEqual({
       x: 10 + 560 + RESOURCE_SIZE.width / 2,
       y: 20,
-      open: false,
     });
   });
 

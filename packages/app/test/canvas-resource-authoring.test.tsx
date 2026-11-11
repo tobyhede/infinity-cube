@@ -13,12 +13,8 @@ import {
   NO_SPACE_RESOURCE_TARGETS,
   type SpaceResourceTargets,
 } from '../src/space-resource-targets';
-import { fixtureDisplay, fixtureFacts } from './render-adapter-fixtures';
-import {
-  PluginAssetsProvider,
-  type MapEmbedRequest,
-  type SpaceResourceSelectorsProps,
-} from '@project/ui';
+import { fixtureFacts } from './render-adapter-fixtures';
+import { PluginAssetsProvider, type MapEmbedRequest } from '@project/ui';
 import type { Claim } from '@project/resource-api/view';
 import { createMapEmbeddings, type MapEmbeddings } from '../src/map-embeddings';
 import { CANVAS } from '../src/space-authoring';
@@ -53,10 +49,10 @@ const snapshot = spaceSnapshotSchema.parse({
         title: 'Map',
         kind: 'positioned',
         positions: {
-          [RESOURCE_ID]: { x: 0, y: 0, open: false },
-          [REFERENCE_ID]: { x: 300, y: 0, open: false },
-          [SPACE_RESOURCE_ID]: { x: 600, y: 0, open: false },
-          [UR_ID]: { x: 900, y: 0, open: false },
+          [RESOURCE_ID]: { x: 0, y: 0 },
+          [REFERENCE_ID]: { x: 300, y: 0 },
+          [SPACE_RESOURCE_ID]: { x: 600, y: 0 },
+          [UR_ID]: { x: 900, y: 0 },
         },
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
       },
@@ -119,10 +115,8 @@ const node = (
     title: 'A',
     readOnly: false,
     ...bareKindData(kind),
-    ...fixtureFacts(kind),
-    open,
+    ...fixtureFacts(kind, open, 'A source'),
     selectedForAuthoring: false,
-    display: fixtureDisplay(open, kind, 'A source'),
     activeGraphId: GRAPH_ID,
     activeGraphColor: '#8a94a6',
     borderColor: null,
@@ -234,7 +228,6 @@ describe('canvas Resource authoring', () => {
         resourceId: RESOURCE_ID,
       });
       const markdown = onlyNode(result.current.nodes);
-      expect(markdown.data.onOpenChange).toBeUndefined();
       const operations = markdown.data.kindOperations;
       if (operations.kind !== 'markdown') throw new Error('Expected Markdown operations');
       expect(operations.commitContent).toBeDefined();
@@ -245,11 +238,11 @@ describe('canvas Resource authoring', () => {
 
   /**
    * A Reference Resource's Open is its plugin's Map content (ADR 0142): the
-   * host Opens nothing for it and offers its plugin the Map content commit,
-   * through which Open and Close are its rail commands.
+   * host offers its plugin the Map content commit, through which Open and
+   * Close are its rail commands.
    */
-  it('Opens nothing for a Reference Resource, offering its plugin the Map content commit', () => {
-    const { result, rerender, spaceSession } = mountAuthoring(undefined, 'reference');
+  it('offers a Reference Resource’s plugin the Map content commit', () => {
+    const { result, rerender } = mountAuthoring(undefined, 'reference');
     rerender({
       open: false,
       enabled: true,
@@ -257,12 +250,7 @@ describe('canvas Resource authoring', () => {
       nameOnCreation: null,
       resourceId: REFERENCE_ID,
     });
-    const before = spaceSession.getState().working;
-
-    act(() => expect(result.current.openResource(REFERENCE_ID)).not.toBe('completed'));
-    expect(spaceSession.getState().working).toBe(before);
     const reference = onlyNode(result.current.nodes);
-    expect(reference.data.onOpenChange).toBeUndefined();
     expect(reference.data.onBeginTitleEditing).toBeDefined();
     const operations = reference.data.kindOperations;
     if (operations.kind !== 'reference') throw new Error('Expected Reference operations');
@@ -271,12 +259,11 @@ describe('canvas Resource authoring', () => {
   });
 
   /**
-   * An Ur Resource has no content (ADR 0113): it Opens through the one Resource
-   * operation and keeps Close and its Title, and nothing hands it a caret or an
-   * editor.
+   * An Ur Resource has no content (ADR 0113): it keeps its Title, and nothing
+   * hands it a caret or an editor.
    */
-  it('offers an Ur Resource no Open, Close or content edit, and Opens nothing for it', () => {
-    const { result, rerender, spaceSession } = mountAuthoring(undefined, 'ur');
+  it('offers an Ur Resource its Title and no content edit', () => {
+    const { result, rerender } = mountAuthoring(undefined, 'ur');
     rerender({
       open: false,
       enabled: true,
@@ -285,12 +272,8 @@ describe('canvas Resource authoring', () => {
       resourceId: UR_ID,
     });
     const ur = onlyNode(result.current.nodes);
-    expect(ur.data.onOpenChange).toBeUndefined();
     expect(ur.data.onBeginTitleEditing).toBeDefined();
-    const before = spaceSession.getState().working;
-
-    act(() => expect(result.current.openResource(UR_ID)).toBe('retained'));
-    expect(spaceSession.getState().working).toBe(before);
+    expect(ur.data.titleEditor).toBeUndefined();
   });
 
   /**
@@ -329,32 +312,6 @@ describe('canvas Resource authoring', () => {
 
     rerender({ ...props, presenting: true });
     expect(mapCommitOf(onlyNode(result.current.nodes))).toBeUndefined();
-  });
-
-  /**
-   * `openResource` refuses on `authorOnCanvas`, so presenting withdraws it.
-   *
-   * Unreachable through today's two call sites, both of which are already
-   * behind the same answer, which is exactly why it is pinned here: the
-   * presenting chrome does reach this canvas (`connectOnCanvas` deliberately
-   * survives a presentation), so a future caller Opening a Resource mid-traversal
-   * would otherwise take a silent `'retained'` with nothing failing.
-   */
-  it('withholds Open while presenting, which authorOnCanvas withdraws', () => {
-    const { result, rerender, spaceSession } = mountAuthoring();
-
-    rerender({
-      open: false,
-      enabled: true,
-      presenting: true,
-      nameOnCreation: null,
-      resourceId: RESOURCE_ID,
-    });
-
-    act(() => expect(result.current.openResource(RESOURCE_ID)).toBe('retained'));
-    expect(
-      spaceSession.getState().working.document.maps?.[0]?.positions[RESOURCE_ID]?.open,
-    ).not.toBe(true);
   });
 
   it('forgets a title caret when canvas authoring is withdrawn', () => {
@@ -462,7 +419,6 @@ describe('canvas Resource authoring', () => {
       act(() => result.current.beginTitleEditing(MISSING_RESOURCE_ID));
 
       const missing = onlyNode(result.current.nodes);
-      expect(missing.data.onOpenChange).toBeUndefined();
       expect(missing.data.onBeginTitleEditing).toBeUndefined();
       expect(missing.data.resize).toBeUndefined();
       expect(missing.data.titleEditor).toBeUndefined();
@@ -476,7 +432,6 @@ describe('canvas Resource authoring', () => {
     act(() => spaceSession.submit(snapshotWithoutResource));
 
     const staleProjection = onlyNode(result.current.nodes);
-    expect(staleProjection.data.onOpenChange).toBeUndefined();
     expect(staleProjection.data.onBeginTitleEditing).toBeUndefined();
   });
 
@@ -845,7 +800,7 @@ describe('canvas Resource authoring, an Image Resource’s plugin surface', () =
           title: 'Map',
           kind: 'positioned',
           positions: {
-            [IMAGE_ID]: { x: 0, y: 0, open: false, size: { width: 640, height: 480 } },
+            [IMAGE_ID]: { x: 0, y: 0, size: { width: 640, height: 480 } },
           },
           graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
         },
@@ -870,7 +825,6 @@ describe('canvas Resource authoring, an Image Resource’s plugin surface', () =
       ...bareKindData('image'),
       ...fixtureFacts('image'),
       selectedForAuthoring: false,
-      display: { shown: 'closed' },
       ownContent: { url: OLD_URL },
       mapContent: {},
       activeGraphId: GRAPH_ID,

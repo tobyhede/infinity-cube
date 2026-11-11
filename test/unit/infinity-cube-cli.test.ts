@@ -533,8 +533,8 @@ describe('runInfinityCube', () => {
             title: 'Authored map',
             kind: 'positioned',
             positions: {
-              [THIRD_SPACE_ID]: { x: 30, y: 40, open: false },
-              [RESOURCE_ID]: { x: 10, y: 20, open: false },
+              [THIRD_SPACE_ID]: { x: 30, y: 40 },
+              [RESOURCE_ID]: { x: 10, y: 20 },
             },
             graphs: [
               {
@@ -950,7 +950,7 @@ describe('runInfinityCube', () => {
               id: OTHER_SPACE_ID,
               title: 'First owner',
               kind: 'positioned',
-              positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
+              positions: { [RESOURCE_ID]: { x: 0, y: 0 } },
               graphs: [
                 { id: GRAPH_ID, title: 'Shared', edges: [{ from: RESOURCE_ID, to: RESOURCE_ID }] },
               ],
@@ -959,7 +959,7 @@ describe('runInfinityCube', () => {
               id: THIRD_SPACE_ID,
               title: 'Second owner',
               kind: 'positioned',
-              positions: { [RESOURCE_ID]: { x: 10, y: 10, open: false } },
+              positions: { [RESOURCE_ID]: { x: 10, y: 10 } },
               graphs: [
                 { id: GRAPH_ID, title: 'Shared', edges: [{ from: RESOURCE_ID, to: RESOURCE_ID }] },
               ],
@@ -1443,7 +1443,7 @@ describe('runInfinityCube author verbs', () => {
             {
               title: 'Only map',
               kind: 'positioned',
-              positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
+              positions: { [RESOURCE_ID]: { x: 0, y: 0 } },
               graphs: [{ title: 'Only graph', edges: [] }],
             },
           ],
@@ -1473,7 +1473,7 @@ describe('runInfinityCube author verbs', () => {
               id: OTHER_SPACE_ID,
               title: 'Only map',
               kind: 'positioned',
-              positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
+              positions: { [RESOURCE_ID]: { x: 0, y: 0 } },
               graphs: [{ id: GRAPH_ID, title: 'Only graph', edges: [] }],
             },
           ],

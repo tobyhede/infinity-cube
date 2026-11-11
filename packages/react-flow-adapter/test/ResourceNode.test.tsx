@@ -215,7 +215,6 @@ interface Overrides {
   title?: string;
   kind?: KindId;
   titleEditor?: ResourceTitleEditor;
-  onOpenChange?: (open: boolean) => void;
   onBeginTitleEditing?: () => void;
   open?: boolean;
   /** The Markdown an Open Markdown or Reference Resource draws, stored as an asset. */
@@ -281,7 +280,6 @@ function props({
   title = 'A',
   kind = 'reference',
   titleEditor,
-  onOpenChange,
   onBeginTitleEditing,
   open,
   source = '',
@@ -298,8 +296,8 @@ function props({
   const resolved = content ?? ownContent(kind, source, url);
   const data: ResourceFlowNode['data'] = {
     shape: resourceShape,
-    // A kind a plugin draws carries its stored content and Map content, as the
-    // projection gives it (ADR 0142).
+    // Every kind is drawn by its plugin, from its stored content and Map
+    // content, as the projection gives them (ADR 0142).
     ownContent:
       kind === 'ur'
         ? {}
@@ -307,42 +305,28 @@ function props({
           ? { url }
           : kind === 'markdown'
             ? { url: textAsset(source) }
-            : kind === 'reference' && target !== undefined
-              ? { target: target.id }
-              : kind === 'space' && resolved.kind === 'space'
+            : kind === 'reference'
+              ? { target: target?.id ?? targetId }
+              : resolved.kind === 'space'
                 ? resolved.content
-                : undefined,
+                : {},
     mapContent:
-      kind === 'ur'
-        ? { shape: resourceShape }
-        : kind === 'image'
-          ? {}
-          : kind === 'reference' && target === undefined
-            ? undefined
-            : { open: open === true },
-    embeddable: target === undefined ? undefined : [target],
+      kind === 'ur' ? { shape: resourceShape } : kind === 'image' ? {} : { open: open === true },
+    embeddable: target === undefined ? [] : [target],
     resourceId,
     title,
     ...bareKindData(kind),
     authorsContent: authorsContent(resolved),
     embedsMap: embedsMap(resolved),
-    takesOpen: kind === 'reference' && target === undefined,
     selectedForAuthoring,
-    display: open === true ? { shown: 'open', content: resolved } : { shown: 'closed' },
     activeGraphId: graphId,
     activeGraphColor: '#1f77b4',
     borderColor: null,
     receding: false,
     readOnly,
   };
-  if (onOpenChange !== undefined)
-    data.onOpenChange = (next) => {
-      onOpenChange(next);
-      return 'completed';
-    };
   if (onBeginTitleEditing !== undefined) data.onBeginTitleEditing = onBeginTitleEditing;
   if (titleEditor !== undefined) data.titleEditor = titleEditor;
-  if (open !== undefined) data.open = open;
   if (imageOperations !== undefined && data.kind === 'image')
     data.kindOperations = { kind: 'image', ...imageOperations };
   if (referenceOperations !== undefined && data.kind === 'reference')
@@ -422,7 +406,7 @@ describe('ResourceNode canvas Resource state adapter', () => {
           kind: 'reference',
           title: 'A, again',
           selected: true,
-          onOpenChange: vi.fn(),
+          referenceOperations: referenceMap(),
         })}
       />,
     );
@@ -432,23 +416,6 @@ describe('ResourceNode canvas Resource state adapter', () => {
       'reference',
     );
     expect(screen.getByRole('img', { name: 'Reference Resource' })).toBeVisible();
-  });
-
-  it('passes the Reference Resource metadata Open operation through its own kind operations', () => {
-    const onOpenChange = vi.fn();
-    render(
-      <ResourceNode
-        {...props({
-          kind: 'reference',
-          title: 'A, again',
-          selected: true,
-          onOpenChange,
-        })}
-      />,
-    );
-
-    screen.getByRole('button', { name: 'Open Resource A, again' }).click();
-    expect(onOpenChange).toHaveBeenCalledWith(true);
   });
 
   /**
@@ -529,7 +496,9 @@ describe('ResourceNode canvas Resource state adapter', () => {
   it('draws an Image Resource through its plugin: its picture, named by its Title, with no Open or Edit', () => {
     const url = 'https://example.com/harbour.png';
     render(
-      <ResourceNode {...props({ kind: 'image', url, selected: true, onOpenChange: vi.fn() })} />,
+      <ResourceNode
+        {...props({ kind: 'image', url, selected: true, referenceOperations: referenceMap() })}
+      />,
     );
 
     expect(screen.getByRole('article', { name: 'A' })).toHaveAttribute('data-kind', 'image');
@@ -632,24 +601,17 @@ describe('ResourceNode draws what the display shows', () => {
     expect(screen.queryByRole('button', { name: /^Replace image/u })).toBeNull();
   });
 
-  it('draws an unresolved Target as a notice on the Open Resource', () => {
-    render(
-      <ResourceNode
-        {...props({
-          kind: 'reference',
-          open: true,
-          content: { kind: 'unresolved', via: 'target' },
-        })}
-      />,
-    );
+  it('draws a deleted Target as a note on the Open Resource', () => {
+    render(<ResourceNode {...props({ kind: 'reference', open: true })} />);
 
-    expect(screen.getByTestId('unresolved-content')).toHaveTextContent('Target not found');
+    expect(screen.getByTestId('embedding-note')).toHaveTextContent(
+      'The Resource this shows was deleted.',
+    );
   });
 
   it("draws an Ur Resource's Shape, which its plugin declares", () => {
     render(<ResourceNode {...props({ kind: 'ur', title: 'Gateway', resourceShape: 'diamond' })} />);
     const resource = screen.getByRole('article', { name: 'Gateway' });
-    expect(resource).toHaveAttribute('data-open', 'false');
     expect(resource).toHaveAttribute('data-resource-shape', 'diamond');
   });
 });
@@ -676,7 +638,7 @@ describe('ResourceNode Ur Resource', () => {
           kind: 'ur',
           title: 'Gateway',
           selected: true,
-          onOpenChange: vi.fn(),
+          referenceOperations: referenceMap(),
           resize,
         })}
       />,
@@ -696,15 +658,19 @@ describe('ResourceNode Ur Resource', () => {
           title: 'Gateway, again',
           open: true,
           selected: true,
-          content: { kind: 'ur', content: {}, via: 'target' },
-          onOpenChange: vi.fn(),
+          target: { id: targetId, title: 'Gateway', kind: 'ur', content: {} },
+          referenceOperations: referenceMap(),
         })}
       />,
     );
 
     const resource = screen.getByRole('article', { name: 'Gateway, again' });
-    expect(resource).toHaveAttribute('data-content-kind', 'ur');
-    expect(resource.querySelector('.canvas-resource__content')).toBeNull();
+    expect(resource).toHaveAttribute('data-kind', 'reference');
+    expect(resource.querySelector('.resource-embedded-plugin')).toHaveAttribute(
+      'data-content-kind',
+      'ur',
+    );
+    expect(screen.getByRole('heading', { name: 'Gateway, again' })).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Edit Resource Gateway, again' })).toBeNull();
   });
 });
@@ -714,7 +680,7 @@ describe("ResourceNode floats a Resource's commands in React Flow's NodeToolbar"
 
   it('draws them above the top-right corner while the Resource is the one selected', () => {
     flow.selected = [resourceId];
-    render(<ResourceNode {...props({ selected: true, onOpenChange: vi.fn() })} />);
+    render(<ResourceNode {...props({ selected: true, referenceOperations: referenceMap() })} />);
 
     const floating = toolbar()?.closest('.react-flow__node-toolbar');
     expect(floating).toHaveAttribute('data-position', 'top');
@@ -723,25 +689,33 @@ describe("ResourceNode floats a Resource's commands in React Flow's NodeToolbar"
   });
 
   it('draws none on a Resource at rest', () => {
-    render(<ResourceNode {...props({ onOpenChange: vi.fn() })} />);
+    render(<ResourceNode {...props({ referenceOperations: referenceMap() })} />);
     expect(toolbar()).toBeNull();
   });
 
   it('draws none while several Resources are selected', () => {
     flow.selected = [resourceId, 'other'];
-    render(<ResourceNode {...props({ selected: true, onOpenChange: vi.fn() })} />);
+    render(<ResourceNode {...props({ selected: true, referenceOperations: referenceMap() })} />);
     expect(toolbar()).toBeNull();
   });
 
   it('draws none for the authoring selection while React Flow holds another Resource selected', () => {
     flow.selected = ['other'];
-    render(<ResourceNode {...props({ selectedForAuthoring: true, onOpenChange: vi.fn() })} />);
+    render(
+      <ResourceNode
+        {...props({ selectedForAuthoring: true, referenceOperations: referenceMap() })}
+      />,
+    );
     expect(toolbar()).toBeNull();
   });
 
   it('draws none while the Resource is dragged', () => {
     flow.selected = [resourceId];
-    render(<ResourceNode {...props({ selected: true, dragging: true, onOpenChange: vi.fn() })} />);
+    render(
+      <ResourceNode
+        {...props({ selected: true, dragging: true, referenceOperations: referenceMap() })}
+      />,
+    );
     expect(toolbar()).toBeNull();
   });
 
@@ -761,7 +735,7 @@ describe("ResourceNode floats a Resource's commands in React Flow's NodeToolbar"
           selected: true,
           open: true,
           resize,
-          onOpenChange: vi.fn(),
+          referenceOperations: referenceMap(),
         })}
       />,
     );
@@ -815,17 +789,17 @@ describe("ResourceNode floats a Resource's commands in React Flow's NodeToolbar"
 
 describe('ResourceNode Open authoring', () => {
   /**
-   * The pencil edits the Resource, not one field of it — it opens the Markdown
-   * surface. Renaming is the title's own gesture and `F2`.
+   * Open is the plugin's own Map content commit, not one field of the Resource:
+   * renaming is the title's own gesture and `F2`.
    */
-  it('edits the Resource from the affordance, without touching the title', () => {
-    const onOpenChange = vi.fn();
+  it("opens the Resource through its plugin's Map content commit, without touching the title", () => {
+    const operations = referenceMap();
     const onBeginTitleEditing = vi.fn();
     render(
       <ResourceNode
         {...props({
           selected: true,
-          onOpenChange,
+          referenceOperations: operations,
           onBeginTitleEditing,
         })}
       />,
@@ -833,11 +807,12 @@ describe('ResourceNode Open authoring', () => {
 
     screen.getByRole('button', { name: 'Open Resource A' }).click();
 
-    expect(onOpenChange).toHaveBeenCalledOnce();
+    expect(operations.commitMap).toHaveBeenCalledOnce();
+    expect(operations.commitMap).toHaveBeenCalledWith({ open: true }, undefined);
     expect(onBeginTitleEditing).not.toHaveBeenCalled();
   });
 
-  it('offers no affordance on a Resource with no Open operation supplied', () => {
+  it('offers no affordance on a Resource with no Map content commit supplied', () => {
     render(<ResourceNode {...props({ selected: true })} />);
 
     expect(screen.queryByRole('button', { name: /^Open Resource/ })).not.toBeInTheDocument();
@@ -846,7 +821,7 @@ describe('ResourceNode Open authoring', () => {
 });
 
 /**
- * Presence of the operation is the whole capability. `CanvasResource` omits a
+ * Presence of the operation is the whole capability. `PluginResource` omits a
  * control it has no operation for, and the adapter must not manufacture one on
  * its behalf.
  */
@@ -970,23 +945,32 @@ describe('ResourceNode title authoring', () => {
 /**
  * `readOnly` is the suppression a dormant embedded Resource relies on, and no
  * per-control flag stands beside it. `ResourceNode`
- * forwards `data.readOnly` to `CanvasResource`, which withholds Open/Close and
+ * forwards `data.readOnly` to `PluginResource`, which withholds Open/Close and
  * begin-title-edit regardless of whether the composition supplied the
  * operation — these cases supply it, so the assertion is genuinely about
  * `readOnly` and not about an absent operation.
  */
 describe('ResourceNode readOnly suppresses controls despite a supplied operation', () => {
   it('withholds the Open control from a read-only Closed Resource', () => {
-    const onOpenChange = vi.fn();
-    render(<ResourceNode {...props({ selected: true, readOnly: true, onOpenChange })} />);
+    render(
+      <ResourceNode
+        {...props({ selected: true, readOnly: true, referenceOperations: referenceMap() })}
+      />,
+    );
 
     expect(screen.queryByRole('button', { name: 'Open Resource A' })).not.toBeInTheDocument();
   });
 
   it('withholds the Close control from a read-only Open Resource', () => {
-    const onOpenChange = vi.fn();
     render(
-      <ResourceNode {...props({ selected: true, readOnly: true, open: true, onOpenChange })} />,
+      <ResourceNode
+        {...props({
+          selected: true,
+          readOnly: true,
+          open: true,
+          referenceOperations: referenceMap(),
+        })}
+      />,
     );
 
     expect(screen.queryByRole('button', { name: 'Close Resource A' })).not.toBeInTheDocument();
@@ -1277,35 +1261,26 @@ test('renders every authoring handle as a sibling following the Resource', () =>
 describe('ResourceNode Open Resource', () => {
   const SOURCE = '# Strategies\n\nNo strategy is privileged.';
 
-  it("draws the Resource's rendered Markdown on the Resource, and says the Resource is Open", async () => {
-    const { container } = render(
-      <ResourceNode {...props({ kind: 'markdown', open: true, source: SOURCE })} />,
-      { wrapper: WithTexts },
-    );
+  it("draws the Resource's rendered Markdown on the Resource", async () => {
+    render(<ResourceNode {...props({ kind: 'markdown', open: true, source: SOURCE })} />, {
+      wrapper: WithTexts,
+    });
 
     expect(await screen.findByRole('heading', { name: 'Strategies' })).toBeVisible();
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
     expect(screen.getByText('No strategy is privileged.')).toBeVisible();
-    expect(container.querySelector('.rf-resource-node__inner')).toHaveAttribute(
-      'data-open',
-      'true',
-    );
   });
 
   it('draws its title alone until the Map Opens it', () => {
-    const { container } = render(
-      <ResourceNode {...props({ kind: 'markdown', source: SOURCE })} />,
-      { wrapper: WithTexts },
-    );
+    render(<ResourceNode {...props({ kind: 'markdown', source: SOURCE })} />, {
+      wrapper: WithTexts,
+    });
 
     expect(
       screen.queryByRole('button', { name: 'Edit Markdown source of A' }),
     ).not.toBeInTheDocument();
     expect(screen.queryByText('No strategy is privileged.')).not.toBeInTheDocument();
-    expect(container.querySelector('.rf-resource-node__inner')).toHaveAttribute(
-      'data-open',
-      'false',
-    );
+    expect(screen.getByRole('heading', { name: 'A' })).toBeVisible();
   });
 
   it("draws an Open Reference Resource's Target Markdown read-only under the Reference Resource's Title, once", async () => {

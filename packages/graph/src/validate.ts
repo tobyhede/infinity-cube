@@ -1,9 +1,6 @@
 import {
   spaceReferences,
   mapContentProblem,
-  resourceOpen,
-  drawnByPlugin,
-  takesOpen,
   uuidSchema,
   type Resource,
   type Map,
@@ -67,10 +64,8 @@ export type SpaceReferenceErrorKind =
   | 'reference-target-not-targetable'
   /** A Space reference a kind declares names the Space holding it. */
   | 'space-reference-cycle'
-  /** A Map gives a Resource Map content its plugin's schema refuses, or Map content a kind no plugin draws (ADR 0142). */
-  | 'map-content-invalid'
-  /** A Map stores a Resource with no content to show Open. */
-  | 'open-requires-content';
+  /** A Map gives a Resource Map content its plugin's schema refuses (ADR 0142). */
+  | 'map-content-invalid';
 
 /**
  * One failed cross-reference. Named for the space whose references it is about,
@@ -190,39 +185,16 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
         continue;
       }
       // The kind is read from the Resource, because the entry does not carry it.
-      // Which Map content a Resource keeps is its plugin's schema's answer, and a
-      // Resource no plugin draws here, as a Reference to a Space Resource, keeps none.
-      const resourceOf = (id: UUID) => resourceById.get(id);
-      const byPlugin = drawnByPlugin(member, resourceOf);
-      if (placement?.content !== undefined) {
-        const refusal = byPlugin ? mapContentProblem(member.kind, placement.content) : undefined;
-        if (!byPlugin) {
-          errors.push({
-            kind: 'map-content-invalid',
-            ref: resourceId,
-            message: `Map "${subject.id}" keeps Map content for ${member.kind} resource "${resourceId}", which no plugin draws here, so it keeps none`,
-          });
-        } else if (refusal !== undefined) {
-          errors.push({
-            kind: 'map-content-invalid',
-            ref: resourceId,
-            message: `Map "${subject.id}" keeps Map content for ${member.kind} resource "${resourceId}" that its plugin refuses: ${refusal}`,
-          });
-        }
-      }
-      // A Resource reference that does not resolve, or names what may not be a
-      // Target, is diagnosed once, by the reference loop below; whether the
-      // Resource may be stored Open waits on what it references.
-      if (
-        placement !== undefined &&
-        resourceOpen(placement) &&
-        storedResourceReferenceProblems(member.id, member, kindOf).length === 0 &&
-        !takesOpen(member, resourceOf)
-      ) {
+      // Which Map content a Resource keeps is its plugin's schema's answer.
+      const mapContentRefusal =
+        placement?.content === undefined
+          ? undefined
+          : mapContentProblem(member.kind, placement.content);
+      if (mapContentRefusal !== undefined) {
         errors.push({
-          kind: 'open-requires-content',
+          kind: 'map-content-invalid',
           ref: resourceId,
-          message: `Map "${subject.id}" stores ${member.kind} resource "${resourceId}" Open; the application keeps no Open for a ${member.kind} Resource, whose plugin keeps any in its Map content`,
+          message: `Map "${subject.id}" keeps Map content for ${member.kind} resource "${resourceId}" that its plugin refuses: ${mapContentRefusal}`,
         });
       }
     }

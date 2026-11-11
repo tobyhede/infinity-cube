@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { uuidSchema, type Resource } from '@project/core';
+import { uuidSchema } from '@project/core';
 import { bareKindData, type ResourceFlowNode } from '@project/react-flow-adapter';
-import { CLOSED_DISPLAY, type ResourceDisplay } from '@project/ui';
 import { DRAG_TILT_RADIANS, tiltResourcePosition } from '../src/drag-tilt';
 import { embeddedMap } from '../src/embedded-map';
 import {
@@ -13,7 +12,7 @@ import {
   reportsBodyHeight,
 } from '../src/embedded-open-space-resource';
 import { publishedEmbeds } from './published-embeds';
-import { fixtureDisplay, fixtureFacts } from './render-adapter-fixtures';
+import { fixtureFacts } from './render-adapter-fixtures';
 
 const id = (value: number) =>
   uuidSchema.parse(`00000000-0000-4000-8000-${value.toString().padStart(12, '0')}`);
@@ -45,25 +44,30 @@ const lean = (
     DRAG_TILT_RADIANS,
   );
 
+const SPACE_RESOURCE = id(8);
+
 /**
- * What a Space Resource, or a Reference Resource to one, shows: its Space view
- * once Open, reached through the Reference Resource for the second.
+ * What a fixture of `kind` stores: a Space Resource its view of `target`, a
+ * Reference Resource the Space Resource it embeds, and a Markdown Resource its
+ * text (ADR 0142).
  */
-const spaceDisplay = (
-  open: boolean,
-  kind: Exclude<Resource['kind'], 'image'>,
+const ownData = (
+  kind: 'markdown' | 'reference' | 'space',
   target: { readonly spaceId: typeof TARGET; readonly map: typeof MAP },
-): ResourceDisplay =>
-  open
-    ? {
-        shown: 'open',
-        content: {
-          kind: 'space',
-          content: { ...target, graph: GRAPH },
-          via: kind === 'reference' ? 'target' : 'self',
-        },
-      }
-    : CLOSED_DISPLAY;
+): Pick<ResourceFlowNode['data'], 'ownContent' | 'embeddable'> => {
+  const view = { ...target, graph: GRAPH };
+  switch (kind) {
+    case 'space':
+      return { ownContent: view, embeddable: [] };
+    case 'reference':
+      return {
+        ownContent: { target: SPACE_RESOURCE },
+        embeddable: [{ id: SPACE_RESOURCE, title: 'Elsewhere', kind: 'space', content: view }],
+      };
+    case 'markdown':
+      return { ownContent: fixtureFacts(kind).ownContent };
+  }
+};
 
 const openSpaceResource = (
   resourceId: typeof HOST,
@@ -72,7 +76,7 @@ const openSpaceResource = (
     readonly position?: { readonly x: number; readonly y: number };
     readonly width?: number;
     readonly height?: number;
-    readonly kind?: Exclude<Resource['kind'], 'image'>;
+    readonly kind?: 'markdown' | 'reference' | 'space';
     readonly open?: boolean;
   } = {},
 ): ResourceFlowNode => ({
@@ -89,10 +93,9 @@ const openSpaceResource = (
     ...bareKindData(geometry.kind ?? 'space'),
     authorsContent: geometry.kind !== 'reference',
     embedsMap: geometry.kind !== 'markdown',
-    open: geometry.open ?? true,
-    takesOpen: geometry.kind !== 'markdown',
+    ...ownData(geometry.kind ?? 'space', target),
+    mapContent: { open: geometry.open ?? true },
     selectedForAuthoring: false,
-    display: spaceDisplay(geometry.open ?? true, geometry.kind ?? 'space', target),
     activeGraphId: null,
     activeGraphColor: '#8a94a6',
     borderColor: null,
@@ -356,9 +359,7 @@ describe('embedded open Space Resource discovery', () => {
         readOnly: false,
         ...bareKindData('markdown'),
         ...fixtureFacts('markdown'),
-        open: false,
         selectedForAuthoring: false,
-        display: fixtureDisplay(false, 'markdown'),
         activeGraphId: null,
         activeGraphColor: '#8a94a6',
         borderColor: null,
@@ -486,10 +487,8 @@ describe('embedded open Space Resource discovery', () => {
         title: 'Note',
         readOnly: false,
         ...bareKindData('markdown'),
-        ...fixtureFacts('markdown'),
-        open: true,
+        ...fixtureFacts('markdown', true),
         selectedForAuthoring: false,
-        display: fixtureDisplay(true, 'markdown'),
         activeGraphId: null,
         activeGraphColor: '#8a94a6',
         borderColor: null,

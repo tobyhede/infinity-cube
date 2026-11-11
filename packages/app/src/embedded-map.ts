@@ -306,7 +306,7 @@ export function embeddedMap({
         focusable: node.focusable !== false,
         connectable: node.connectable !== false,
         deletable: false,
-        zIndex: (parent.zIndex ?? 10) + (node.data.open === true ? 2 : 1),
+        zIndex: (parent.zIndex ?? 10) + 1,
       },
       policy,
     );

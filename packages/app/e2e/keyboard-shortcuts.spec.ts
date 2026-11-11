@@ -185,9 +185,11 @@ test('Space reads a Resource in Full View, walks the Active Graph and leaves', a
 
   await page.keyboard.press('Space');
   await expect(fullView.getByRole('heading', { level: 2 })).toHaveText('B');
-  // In Full View Enter only leaves: a Markdown Resource's Open is its rail's
-  // (resource-plugins issue 05).
+  // Enter is not a Full View key: every Open is a plugin's rail command
+  // (resource-plugins issue 10), so it neither leaves nor Opens.
   await page.keyboard.press('Enter');
+  await expect(fullView.getByRole('heading', { level: 2 })).toHaveText('B');
+  await page.keyboard.press('Escape');
   await expect(fullView).toHaveCount(0);
   await expect(b.locator('.canvas-resource__plugin [data-open="false"]')).toHaveCount(1);
 });
@@ -195,8 +197,8 @@ test('Space reads a Resource in Full View, walks the Active Graph and leaves', a
 /**
  * Opening D, the fixture's long Markdown Resource, grows it to fit its content
  * in one Edit, by the size hint its plugin carries: its text no longer
- * overflows and A′ to its right makes room. Shift+Enter and Open and Expand
- * are not a Markdown Resource's (A29, resource-plugins issue 05).
+ * overflows and A′ to its right makes room. Shift+Enter Opens nothing: every
+ * Open is a plugin's rail command (resource-plugins issues 05 and 10).
  */
 test('Opening a Markdown Resource grows it to fit its content, and Shift+Enter Opens nothing', async ({
   page,
@@ -234,9 +236,6 @@ test('Opening a Markdown Resource grows it to fit its content, and Shift+Enter O
   expect(open.left.height).toBeGreaterThan(closed.left.height);
   // A′ took the width change, so the room between them is what it was.
   expect(Math.abs(open.gap - closed.gap)).toBeLessThanOrEqual(1);
-  await expect(
-    (await resourceActions(page, 'D')).getByRole('menuitem', { name: 'Open and Expand' }),
-  ).toHaveCount(0);
 });
 
 /** A presentation clicker sends Page Down and Page Up; Home goes back to where the presentation began. */

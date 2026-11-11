@@ -135,14 +135,6 @@ export interface PluginOperations {
   readonly mapNote?: string | undefined;
 }
 
-/**
- * Whether a kind's operations are drawn by `PluginResource`: a plugin kind's,
- * or a kind no plugin in this build draws, which the default plugin does.
- */
-export const isPluginOperations = (operations: {
-  readonly kind: string;
-}): operations is PluginOperations => isPluginDrawnKind(operations.kind);
-
 /** What a host mounts a plugin's view with. */
 export interface PluginSurfaceInput {
   readonly resourceId: string;

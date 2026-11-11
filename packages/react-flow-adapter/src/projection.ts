@@ -1,12 +1,7 @@
 import type { Node, NodeHandle } from '@xyflow/react';
 import { Position } from '@xyflow/react';
-import { CLOSED_DISPLAY, FALLBACK_GRAPH_COLOR, bareOperations, graphPaint } from '@project/ui';
-import type {
-  EntityActionGroup,
-  KindOperationsOf,
-  MapEmbedRequest,
-  ResourceDisplay,
-} from '@project/ui';
+import { FALLBACK_GRAPH_COLOR, bareOperations, graphPaint } from '@project/ui';
+import type { EntityActionGroup, KindOperationsOf, MapEmbedRequest } from '@project/ui';
 import {
   DEFAULT_GRAPH_HEAD_SHAPE,
   DEFAULT_RESOURCE_SHAPE,
@@ -20,12 +15,7 @@ import {
   type GraphHeadShape,
   type GraphId,
 } from '@project/core';
-import {
-  referencedResources,
-  resolveResourceContent,
-  resourceDrawnByPlugin,
-  resourceTakesOpen,
-} from '@project/graph';
+import { referencedResources, resolveResourceContent } from '@project/graph';
 import type {
   GraphRenderEdge,
   LayoutStrategyResource,
@@ -50,11 +40,12 @@ export const OPEN_RESOURCE_Z_INDEX = 10;
  */
 export const OTHER_GRAPH_OPACITY = 0.8;
 
-/** The stroke width of an Edge outside the Active Graph, while one is: a hairline. */
-export const RECEDING_STROKE_WIDTH = 1;
+/** The z-index a Resource drawing a Map embedding is drawn at, over its neighbours. */
+export const OPEN_RESOURCE_Z_INDEX = 10;
+export const OTHER_GRAPH_OPACITY = 0.35;
 
 /** What ends an inline title edit. Answers a refusal reason, or `null` when the
- *  new title was accepted — the same contract `CanvasResource`'s editor reads, where
+ *  new title was accepted — the contract the host's Title editor reads, where
  *  `null` keeps the editor closed and a string keeps it open beside the message. */
 export type ResourceTitleEditor = {
   onComplete: (title: string) => string | null;
@@ -65,7 +56,7 @@ export type ResourceTitleEditor = {
  * A Resource's own kind beside that kind's operations, one arm per kind, so the
  * two cannot disagree. The kind is drawn as a persistent glyph on the Resource.
  * A Reference Resource is `reference` whatever its Target is; what it draws is
- * its `display`.
+ * its plugin's.
  */
 type KindDataOf<K extends Resource['kind']> = {
   [P in K]: { kind: P; kindOperations: KindOperationsOf<P> };
@@ -89,7 +80,7 @@ export type ResourceNodeDataOf<K extends Resource['kind']> = Extract<ResourceNod
 
 type ResourceNodeCommonData = {
   /**
-   * Resolved content facts, available while the display is Closed.
+   * Resolved content facts.
    * `authorsContent`: whether an author may change this content here, the
    * Resource's own, of a kind whose content is authored.
    */
@@ -115,19 +106,6 @@ type ResourceNodeCommonData = {
   readOnly: boolean;
   /** False withholds hover-reveal; omitted or true offers the host-canvas handles. */
   connectionAuthoringEnabled?: boolean;
-  /**
-   * Opens or Closes this Resource, absent where Resource-level authoring is
-   * withheld: this Resource is outside the working Space, or the canvas is not
-   * authorable. Presence is the whole capability — there is no separate flag
-   * to disagree with it.
-   *
-   * **Not "owns content to edit".** A Reference Resource Opens and
-   * Closes through this same operation (ADR 0070), so a Reference Resource is
-   * offered it exactly as a Markdown Resource is. What separates the kinds is
-   * their `kindOperations`: a content edit is offered to `markdown` and `image`
-   * alone.
-   */
-  onOpenChange?: (open: boolean) => 'completed' | 'retained';
   onBeginTitleEditing?: () => void;
   /**
    * The inline title editor this Resource is currently showing, absent on one that
@@ -135,27 +113,16 @@ type ResourceNodeCommonData = {
    * the two operations that end the edit — so a composition cannot ask for the
    * editor without also saying what completes and cancels it.
    *
-   * This is the pairing `CanvasResourceProps` already makes for its own
-   * `state: 'editing'`, held one layer up. Do not split it into a boolean and
+   * `ResourceNode` hands it to `PluginResource`'s Title as its `editor`, and
+   * draws the Resource `state: 'editing'` while it is present. Do not split it into a boolean and
    * two independent optional callbacks: the adapter would have to manufacture
    * total functions out of partial data, and an absent completion answering
-   * `null` — which `CanvasResource` reads as *accepted* — would close the editor
+   * `null` — which the Title's editor reads as *accepted* — would close the editor
    * on a rename that never happened.
    */
   titleEditor?: ResourceTitleEditor;
   /**
-   * Whether the Map has Opened this Resource, so it draws its content on the Resource
-   * rather than its title alone (ADR 0064).
-   *
-   * Authored, not derived: it is a fact about the Map, and the Resource's rect
-   * follows from it rather than the other way round. The adapter cannot read it
-   * off the geometry — a Resource is not Open just because it is large.
-   *
-   * An Open Reference Resource draws its Target's content read-only (ADR 0070).
-   */
-  open?: boolean;
-  /**
-   * Resizing this Resource, Open or Closed, absent on one that may not be resized.
+   * Resizing this Resource, absent on one that may not be resized.
    *
    * Presence is the capability and it carries its own floor, for the same reason
    * `titleEditor` above carries its own completions: the floor is the Closed Size,
@@ -190,8 +157,7 @@ type ResourceNodeCommonData = {
    * Built by the composition and carried whole, exactly as the operations above
    * are: an address comes from the product destination table and a deletion
    * runs a completed Edit, neither of which this package can reach. Absent
-   * means no control rather than an empty menu, which is the rule `CanvasResource`
-   * already applies to the value it is handed.
+   * means no control rather than an empty menu.
    */
   entityActions?: readonly EntityActionGroup[];
   /**
@@ -200,35 +166,24 @@ type ResourceNodeCommonData = {
    */
   contextNotice?: string | null;
   /**
-   * What this Resource shows now: Closed with no content, or Open with its
-   * resolved content, its own or its Target's.
-   */
-  display: ResourceDisplay;
-  /**
-   * The Shape the Map draws this Resource in, resolved — the rectangle where
-   * its entry stores none — and drawn Open and Closed alike (ADR 0121).
+   * The outline the canvas strokes this Resource's border and ring on, resolved
+   * from its plugin's Map content — the rectangle where it declares none (ADR
+   * 0121, ADR 0142).
    */
   shape: ResourceShape;
-  /** The Resource's content as stored, which a plugin drawing it parses itself (ADR 0142). */
-  ownContent?: Resource['content'] | undefined;
+  /** The Resource's content as stored, which the plugin drawing it parses itself (ADR 0142). */
+  ownContent: Resource['content'];
   /**
    * The Map content the plugin drawing this Resource is given on this Map: its
-   * entry's, else the plugin's default. `undefined` for a Resource no plugin
-   * draws (`drawnByPlugin`), which the application's own drawing draws.
+   * entry's, else the plugin's default.
    */
-  mapContent?: JsonValue | undefined;
+  mapContent: JsonValue;
   /**
    * The Resources this one's content references, as they stand, which the
    * plugin drawing it may draw inside its rect through the host's embedding
    * (ADR 0142): an Open Reference Resource's Target.
    */
   embeddable?: readonly Resource[] | undefined;
-  /**
-   * Whether the application keeps this Resource's Open, a Map entry's `open`
-   * (`takesOpen`): a Space Resource or a Reference to one, never a Resource a
-   * plugin draws, which keeps any Open in its Map content.
-   */
-  takesOpen: boolean;
   /** Ordinary renderer selection, kept outside the authored Space. */
   selectedForAuthoring: boolean;
   /** The graph being emphasised, if any. Drives handle dimming. */
@@ -306,8 +261,6 @@ export interface ProjectResourceNodesOptions {
   strategyGraph?: LayoutStrategyGraph;
   /** Restrict the projection to these resource ids (e.g. one graph's resources). */
   resourceIds?: readonly ResourceId[];
-  /** Map-authored Open Resources whose Markdown body is drawn in place. */
-  openResourceIds?: ReadonlySet<ResourceId>;
   /** The Shape the Map draws each projected Resource in; absent, every one is the rectangle. */
   resourceShape?: (resourceId: ResourceId) => ResourceShape;
   /** The Map content each projected Resource's entry stores; absent, none stores any. */
@@ -360,9 +313,9 @@ function declaredHandles(resource: LayoutStrategyResource): NodeHandle[] {
  * border is the colour of the Graph it is drawn in, and whether it recedes, both
  * from `resourceEmphasis` (ADR 0135).
  *
- * A node carries its resource's *title*, not its content (ADR 0064) — a Closed
- * node's display carries none; resolved content supplies only the facts the
- * canvas needs while Closed.
+ * A node carries its Resource's title, its content as stored and its Map
+ * content, which its plugin draws (ADR 0142); resolved content supplies only
+ * the facts the canvas needs.
  */
 export function projectResourceNodes(
   space: Space,
@@ -373,16 +326,10 @@ export function projectResourceNodes(
   const laidOut = new Map((options.strategyGraph?.resources ?? []).map((r) => [r.id, r]));
 
   const source = visible ? space.resources.filter((r) => visible.has(r.id)) : space.resources;
-
   return source.map((resource) => {
     const placedResource = laidOut.get(resource.id);
-    // Every Resource kind Opens, so the Map's Open set is the whole answer and
-    // there is no kind guard beside it.
-    const open = options.openResourceIds?.has(resource.id) === true;
     const content = resolveResourceContent(space, resource);
-    const display: ResourceDisplay = open ? { shown: 'open', content } : CLOSED_DISPLAY;
     const emphasis = options.resourceEmphasis?.(resource.id) ?? UNEMPHASISED;
-    const byPlugin = resourceDrawnByPlugin(space, resource);
     const node: ResourceFlowNode = {
       id: resource.id,
       type: 'resource',
@@ -395,14 +342,10 @@ export function projectResourceNodes(
         authorsContent: authorsContent(content),
         embedsMap: embedsMap(content),
         selectedForAuthoring: resource.id === (options.selectedResourceId ?? null),
-        display,
         shape: options.resourceShape?.(resource.id) ?? DEFAULT_RESOURCE_SHAPE,
         ownContent: resource.content,
-        mapContent: byPlugin
-          ? resolvedMapContent(resource.kind, options.mapContent?.(resource.id))
-          : undefined,
-        embeddable: byPlugin ? referencedResources(space, resource) : undefined,
-        takesOpen: resourceTakesOpen(space, resource),
+        mapContent: resolvedMapContent(resource.kind, options.mapContent?.(resource.id)),
+        embeddable: referencedResources(space, resource),
         activeGraphId,
         activeGraphColor: options.activeGraphColor ?? FALLBACK_COLOR,
         borderColor: emphasis.borderColor,
@@ -429,10 +372,6 @@ export function projectResourceNodes(
       node.width = placedResource.width;
       node.height = placedResource.height;
       node.handles = declaredHandles(placedResource);
-    }
-    if (open) {
-      node.data.open = true;
-      node.zIndex = OPEN_RESOURCE_Z_INDEX;
     }
     return node;
   });

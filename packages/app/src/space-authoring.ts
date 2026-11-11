@@ -135,19 +135,8 @@ export type AuthoringCompletion =
        */
       readonly moved: ReadonlyMap<ResourceId, MapPosition>;
     }
-  | { readonly kind: 'opened-resource'; readonly resourceId: ResourceId }
-  | { readonly kind: 'closed-resource'; readonly resourceId: ResourceId }
   | {
       readonly kind: 'resized-resource';
-      readonly resourceId: ResourceId;
-      readonly size: { readonly width: number; readonly height: number };
-    }
-  /**
-   * Open and expand: Open one Resource and Resize it to fit its content, as one
-   * Edit (ADR 0137). `size` is the fitted size, floored at the Closed Size.
-   */
-  | {
-      readonly kind: 'opened-resource-to-fit';
       readonly resourceId: ResourceId;
       readonly size: { readonly width: number; readonly height: number };
     }
@@ -302,10 +291,7 @@ type MapRequiredOperation = Extract<
   AuthoringCompletion,
   | { readonly kind: 'added-resource-to-map' }
   | { readonly kind: 'removed-resource-from-map' }
-  | { readonly kind: 'opened-resource' }
-  | { readonly kind: 'closed-resource' }
   | { readonly kind: 'resized-resource' }
-  | { readonly kind: 'opened-resource-to-fit' }
   | { readonly kind: 'changed-map-content' }
   | { readonly kind: 'renamed-map' }
   | { readonly kind: 'renamed-graph' }
@@ -364,9 +350,6 @@ export type AuthoringRefusal =
   | { readonly code: 'reference-target-not-targetable'; readonly targetId: ResourceId }
   | { readonly code: 'resource-already-in-map' }
   | { readonly code: 'resource-not-in-map' }
-  | { readonly code: 'open-requires-content' }
-  /** Map content for a Resource whose kind no plugin draws (ADR 0142). */
-  | { readonly code: 'map-content-not-kept' }
   /** Map content the Resource's plugin's schema refuses. */
   | { readonly code: 'map-content-invalid' }
   /** Exclusive work runs, and this Edit is not its own (ADR 0142). */
@@ -1281,25 +1264,8 @@ export function createSpaceAuthoring({
       const resources = [...snapshot.resources];
       resources[resourceIndex] = { id: resource.id, document };
       snapshot = { ...snapshot, resources };
-    } else if (completion.kind === 'opened-resource') {
-      const outcome = SnapshotEdit.open(snapshot, mapId, completion.resourceId);
-      if (outcome.kind !== 'completed') return notCompleted(outcome);
-      snapshot = outcome.snapshot;
-    } else if (completion.kind === 'closed-resource') {
-      const outcome = SnapshotEdit.close(snapshot, mapId, completion.resourceId);
-      if (outcome.kind !== 'completed') return notCompleted(outcome);
-      snapshot = outcome.snapshot;
     } else if (completion.kind === 'resized-resource') {
       const outcome = SnapshotEdit.resize(snapshot, mapId, completion.resourceId, completion.size);
-      if (outcome.kind !== 'completed') return notCompleted(outcome);
-      snapshot = outcome.snapshot;
-    } else if (completion.kind === 'opened-resource-to-fit') {
-      const outcome = SnapshotEdit.openAndExpand(
-        snapshot,
-        mapId,
-        completion.resourceId,
-        completion.size,
-      );
       if (outcome.kind !== 'completed') return notCompleted(outcome);
       snapshot = outcome.snapshot;
     } else if (completion.kind === 'changed-map-content') {
@@ -1423,7 +1389,7 @@ export function createSpaceAuthoring({
     } else if (completion.kind === 'settled-resource-movement') {
       // The moved Resources' drop points, merged over the Map's own positions
       // this Edit already started from — `Placement.next` is what keeps each
-      // Resource's Open/Closed state, size and Shape while overwriting `x`/`y`.
+      // Resource's size and Map content while overwriting `x`/`y`.
       writePlacement(
         Placement.next(placement, Placement.fromEntries(completion.moved), [
           ...completion.moved.keys(),

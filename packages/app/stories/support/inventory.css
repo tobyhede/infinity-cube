@@ -2,7 +2,7 @@
  * The locked resource design — option `8a`, "Flat" — plus the paper canvas it sits
  * on. Written from the design handoff's token table and geometry section.
  *
- * Resource visuals come from the same `@project/ui` CanvasResource that ResourceNode uses.
+ * Resource visuals come from the same `@project/ui` PluginResource that ResourceNode uses.
  * This stylesheet owns only the paper catalogue and explanatory furniture.
  *
  * Two deliberate departures from the handoff's numbers, both recorded rather
@@ -57,7 +57,7 @@
   height: 540px;
 }
 
-/* Canvas-resource visuals live with CanvasResource in the shared UI package. Ladle owns only the catalogue furniture below. */
+/* Canvas-resource visuals live with PluginResource in the shared UI package. Ladle owns only the catalogue furniture below. */
 
 /* ---- Inventory page furniture ----
    Not part of the design. The frame the specimens are shown in. */

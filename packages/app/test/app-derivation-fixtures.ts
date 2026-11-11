@@ -30,12 +30,11 @@ export const derivationSnapshot: SpaceSnapshot = {
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [PLACED_A]: { x: 10, y: 20, open: false },
+          [PLACED_A]: { x: 10, y: 20 },
           // A Markdown Resource is Open by its Map content (ADR 0142).
           [PLACED_B]: {
             x: 400,
             y: 20,
-            open: false,
             content: { open: true },
             size: { width: 600, height: 400 },
           },
@@ -46,7 +45,7 @@ export const derivationSnapshot: SpaceSnapshot = {
         id: OTHER_MAP_ID,
         title: 'Map 2',
         kind: 'positioned',
-        positions: { [OUTSIDE]: { x: 0, y: 0, open: false } },
+        positions: { [OUTSIDE]: { x: 0, y: 0 } },
         graphs: [{ id: EMPTY_GRAPH_ID, title: 'Empty', edges: [] }],
       },
     ],

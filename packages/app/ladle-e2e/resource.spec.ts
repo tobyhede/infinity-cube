@@ -127,9 +127,8 @@ test(
         const resource = specimen(page, `${entry.label} · ${suffix}`).getByRole('article');
         await expect(resource).toHaveAttribute('data-kind', entry.kind);
         await expect(resource).toHaveAttribute('data-state', 'rest');
-        await expect(resource).toHaveAttribute('data-open', 'false');
         if (entry.glyph === null) {
-          await expect(resource.locator('.resource-rail__kind')).toHaveCount(0);
+          await expect(resource.getByRole('img')).toHaveCount(0);
         } else {
           await expect(resource.getByRole('img', { name: entry.glyph })).toBeVisible();
         }
@@ -151,7 +150,6 @@ test(
         // undecided reference lines would fail.
         await expect(resource.locator(`${entry.body} > *`)).toHaveCount(1);
         await expect(resource.locator(`${entry.body} > .canvas-resource__title`)).toHaveCount(1);
-        await expect(resource.locator('.canvas-resource__content')).toHaveCount(0);
         const text = (await resource.innerText())
           .split('\n')
           .map((line) => line.trim())
@@ -298,12 +296,6 @@ test(
         return resolved;
       }, label);
 
-      // The band behind the commands paints nothing at all; a plugin's
-      // Resource draws no band of its own (ADR 0142).
-      const rail = item.locator('.canvas-resource__rail');
-      if ((await rail.count()) > 0) {
-        await expect(rail).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-      }
       const commands = item.getByTestId('canvas-resource-actions');
       await expect(commands).toHaveCSS('opacity', '1');
       const surface = await commands.evaluate((el) => getComputedStyle(el).backgroundColor);
@@ -476,20 +468,6 @@ test(
     await expect.poll(() => titleTreatment()).toEqual(closedTitleTreatment);
   },
 );
-
-test('reduced motion removes Resource content transitions', async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  // A Resource `CanvasResource` draws Open, whose content it transitions; a
-  // plugin's Resource draws its content with no transition.
-  await page.goto('/?story=components--resource--actions&mode=preview');
-
-  const resource = page.getByRole('article', { name: 'Opening, again' });
-  await page.getByRole('button', { name: 'Open Resource Opening, again' }).click();
-  const content = resource.locator('.canvas-resource__content');
-
-  await expect(content).toHaveCSS('transition-duration', '0s');
-  await expect(content).toHaveCSS('transition-delay', '0s');
-});
 
 test(
   "the Resource's Title control begins editing by pointer or keyboard, stays field-local on a refusal, and completes or cancels from the keyboard",

@@ -20,11 +20,7 @@ import { spaceKind } from './space';
 import { urKind } from './ur';
 import { defaultKind } from './default';
 import { PLUGIN_KINDS, type PluginKind } from './plugins';
-import {
-  RECTANGLE,
-  type Outline,
-  type Resource as ApiResource,
-} from '@project/resource-api/domain';
+import type { Outline, Resource as ApiResource } from '@project/resource-api/domain';
 import { canonicalJsonObject, type JsonObject, type JsonValue } from '../json-value';
 
 /**
@@ -165,39 +161,24 @@ export const kindFlags = (kind: ResourceKind): KindFlags =>
 export const isPluginKind = (kind: string): kind is PluginKind =>
   PLUGIN_KINDS.some((pluginKind) => pluginKind === kind);
 
-const mapContentOf = (kind: ResourceKind): KindMapContent | undefined =>
+/** The Map content a Resource of this kind keeps: its plugin's, or the default plugin's (ADR 0142). */
+const mapContentOf = (kind: ResourceKind): KindMapContent =>
   isRegisteredKind(kind) ? KIND_MODULES[kind].mapContent : defaultKind.mapContent;
-
-/** Whether a Resource of this kind keeps Map content: whether a plugin draws it (ADR 0142). */
-export const keepsMapContent = (kind: ResourceKind): boolean => mapContentOf(kind) !== undefined;
 
 /**
  * Why a Map entry may not hold this Map content for a Resource of this kind,
- * or `undefined` when it may: the kind's plugin's own schema answers, and a
- * kind no plugin draws keeps none.
+ * or `undefined` when it may: the kind's plugin's own schema answers.
  */
-export const mapContentProblem = (kind: ResourceKind, value: JsonValue): string | undefined => {
-  const declared = mapContentOf(kind);
-  if (declared === undefined) return `a ${kind} Resource keeps no Map content`;
-  return declared.problem(value);
-};
+export const mapContentProblem = (kind: ResourceKind, value: JsonValue): string | undefined =>
+  mapContentOf(kind).problem(value);
 
-/**
- * The Map content a plugin is given for its Resource on a Map: what the entry
- * stores, else the plugin's default. `undefined` for a kind no plugin draws.
- */
-export const resolvedMapContent = (
-  kind: ResourceKind,
-  stored: JsonValue | undefined,
-): JsonValue | undefined => {
-  const declared = mapContentOf(kind);
-  if (declared === undefined) return undefined;
-  return stored ?? declared.default;
-};
+/** The Map content a plugin is given for its Resource on a Map: what the entry stores, else the plugin's default. */
+export const resolvedMapContent = (kind: ResourceKind, stored: JsonValue | undefined): JsonValue =>
+  stored ?? mapContentOf(kind).default;
 
 /** The Map content a plugin is given on a surface with no Map: its `withoutMap`, else its default. */
 export const mapContentWithoutMap = (kind: ResourceKind): JsonValue =>
-  isPluginKind(kind) ? REGISTERED[kind].mapContent.withoutMap : defaultKind.mapContent.withoutMap;
+  mapContentOf(kind).withoutMap;
 
 /**
  * The outline the canvas strokes a Resource's border and ring on (ADR 0142):
@@ -205,7 +186,6 @@ export const mapContentWithoutMap = (kind: ResourceKind): JsonValue =>
  */
 export const resourceOutline = (kind: ResourceKind, stored: JsonValue | undefined): Outline => {
   const declared = mapContentOf(kind);
-  if (declared === undefined) return RECTANGLE;
   return declared.outline(stored ?? declared.default);
 };
 
@@ -235,49 +215,6 @@ const contentTargetOf = <K extends KindId>(resource: Kinded<K>) =>
 /** The Resource whose content this one shows, when its kind shows another's (ADR 0070). */
 export const contentTarget = (resource: KindedResource): UUID | undefined =>
   isPlugged(resource) ? contentTargetOf(resource) : undefined;
-
-/** The Resource this one shows, where it shows one and `resourceOf` resolves it. */
-const targetIn = (
-  resource: KindedResource,
-  resourceOf: (id: UUID) => KindedResource | undefined,
-): KindedResource | undefined => {
-  const targetId = contentTarget(resource);
-  return targetId === undefined ? undefined : resourceOf(targetId);
-};
-
-/**
- * Whether a plugin in this build draws this Resource (ADR 0142): its kind's
- * plugin, and, for a Resource that shows a content Target, that Target's
- * kind's plugin too. A Target no plugin draws keeps the Resource showing it on
- * the application's own drawing; every kind in this build is a plugin's, so
- * none does. A missing Target is the plugin's to say, so a Resource showing
- * one is still its plugin's.
- */
-export const drawnByPlugin = (
-  resource: KindedResource,
-  resourceOf: (id: UUID) => KindedResource | undefined,
-): boolean => {
-  if (!isPluginDrawnKind(resource.kind)) return false;
-  if (contentTarget(resource) === undefined) return true;
-  const target = targetIn(resource, resourceOf);
-  return target === undefined || isPluginDrawnKind(target.kind);
-};
-
-/**
- * Whether a Resource may be Open by the application's rule, a Map entry's
- * `open` (ADR 0122): one no plugin draws whose content, its own or its
- * Target's, declares Open. A Resource a plugin draws keeps any Open in its
- * Map content (ADR 0142), so in this build no Resource takes one.
- */
-export const takesOpen = (
-  resource: KindedResource,
-  resourceOf: (id: UUID) => KindedResource | undefined,
-): boolean => {
-  if (drawnByPlugin(resource, resourceOf)) return false;
-  if (kindFlags(resource.kind).canOpen) return true;
-  const target = targetIn(resource, resourceOf);
-  return target !== undefined && kindFlags(target.kind).canOpen;
-};
 
 /** Whether a Resource of this kind may be another's Target (ADR 0113). */
 export const mayBeTarget = (kind: ResourceKind): boolean => kindFlags(kind).mayBeTarget;

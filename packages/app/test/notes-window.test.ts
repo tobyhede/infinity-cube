@@ -47,12 +47,12 @@ const snapshot: SpaceSnapshot = {
         title: 'Map',
         kind: 'positioned',
         positions: {
-          [OPENING]: { x: 0, y: 0, open: false },
-          [LEFT]: { x: 300, y: -100, open: false },
-          [RIGHT]: { x: 300, y: 100, open: false },
-          [LOWER_NOTE]: { x: 0, y: 400, open: false },
-          [UPPER_NOTE]: { x: 0, y: 200, open: false },
-          [LEFT_NOTE]: { x: 300, y: 400, open: false },
+          [OPENING]: { x: 0, y: 0 },
+          [LEFT]: { x: 300, y: -100 },
+          [RIGHT]: { x: 300, y: 100 },
+          [LOWER_NOTE]: { x: 0, y: 400 },
+          [UPPER_NOTE]: { x: 0, y: 200 },
+          [LEFT_NOTE]: { x: 300, y: 400 },
         },
         graphs: [
           {
@@ -94,7 +94,7 @@ const withFurther: SpaceSnapshot = {
     ...snapshot.document,
     maps: snapshot.document.maps?.map((m) => ({
       ...m,
-      positions: { ...m.positions, [FURTHER]: { x: 600, y: -100, open: false } },
+      positions: { ...m.positions, [FURTHER]: { x: 600, y: -100 } },
       graphs: m.graphs.map((graph) =>
         graph.id === TALK
           ? { ...graph, edges: [...graph.edges, { from: LEFT, to: FURTHER }] }

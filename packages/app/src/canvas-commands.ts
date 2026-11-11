@@ -279,66 +279,10 @@ export const RENAME_RESOURCE: CanvasCommand<DrawnResourceTarget> = {
   run: ({ occurrence, nodeId }) => occurrence.beginTitleEditing(nodeId),
 };
 
-/** What Open needs of the drawn Map a focused Resource is on. */
-export interface OpeningOccurrence {
-  readonly authorOnCanvas: boolean;
-  readonly bodyEditing: boolean;
-  /** Open the Resource drawn as `nodeId` on this Map. */
-  readonly openResource: (nodeId: string) => void;
-}
-
-/** A focused Resource to Open, named by its node on the Map that draws it. */
-export interface OpenTarget {
-  readonly occurrence: OpeningOccurrence;
-  readonly nodeId: string;
-  /** Whether its kind takes Open: an Ur Resource has no content to show. */
-  readonly takesOpen: boolean;
-}
-
-/**
- * Open (Enter): Open the focused Resource on whichever drawn Map holds it.
- * Absent while that Map may not be authored, a body is being edited, or the
- * Resource's kind does not take Open.
- */
-export const OPEN_RESOURCE: CanvasCommand<OpenTarget> = {
-  id: 'canvas.openResource',
-  aim: 'focused-resource',
-  serves: 'any',
-  availability: ({ occurrence, takesOpen }) =>
-    takesOpen && occurrence.authorOnCanvas && !occurrence.bodyEditing ? AVAILABLE : ABSENT,
-  run: ({ occurrence, nodeId }) => occurrence.openResource(nodeId),
-};
-
 /** A Resource of the canvas's own Map. */
 export interface OwnResourceTarget {
   readonly resourceId: ResourceId;
 }
-
-/** What Open and expand needs of the canvas whose camera frames the Resource. */
-export interface ExpandingCanvas {
-  /** Whether the Resource can be grown on the canvas's own Map. */
-  readonly expandable: (resourceId: ResourceId) => boolean;
-  readonly openAndExpand: (resourceId: ResourceId) => void;
-}
-
-/** A Resource of the canvas's own Map to grow, on that canvas. */
-export interface ExpandTarget extends OwnResourceTarget {
-  readonly canvas: ExpandingCanvas;
-}
-
-/**
- * Open and expand (Shift+Enter, ADR 0137): Open a Resource of the canvas's own
- * Map at the size its content needs and centre the camera on it. Own Map only,
- * because the camera is the canvas's. Absent where the Resource cannot be
- * grown there.
- */
-export const OPEN_AND_EXPAND: CanvasCommand<ExpandTarget> = {
-  id: 'canvas.openAndExpand',
-  aim: 'focused-resource',
-  serves: 'own-map',
-  availability: ({ resourceId, canvas }) => (canvas.expandable(resourceId) ? AVAILABLE : ABSENT),
-  run: ({ resourceId, canvas }) => canvas.openAndExpand(resourceId),
-};
 
 /**
  * Read in Full View (Space): read a Resource of the canvas's own Map in Full

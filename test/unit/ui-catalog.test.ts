@@ -716,7 +716,7 @@ describe('hand-rolled application styles', () => {
 
   /**
    * A colocated component stylesheet is not inventory debt — `canvas-resource.css` beside
-   * `CanvasResource` is the pattern, not the exception — so the *recorded block* half does
+   * `PluginResource` is the pattern, not the exception — so the *recorded block* half does
    * not apply to it. The dead-rule half does: moving a block out of `styles.css` and
    * beside its component must not be a way to stop the ratchet reading it.
    */
@@ -734,8 +734,8 @@ describe('hand-rolled application styles', () => {
     write(root, 'packages/ui/src/canvas-resource.css', '.canvas-resource__rail { color: red; }');
     write(
       root,
-      'packages/ui/src/CanvasResource.tsx',
-      'export const CanvasResource = () => <div className="canvas-resource__rail" />;',
+      'packages/ui/src/PluginResource.tsx',
+      'export const PluginResource = () => <div className="canvas-resource__rail" />;',
     );
 
     expect(() => buildUiCatalog(root)).not.toThrowError(/canvas-resource__rail.*is not recorded/);

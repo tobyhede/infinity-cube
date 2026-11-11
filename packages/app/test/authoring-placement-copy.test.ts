@@ -45,14 +45,14 @@ describe('Map delete draws the right geometry', () => {
           id: DELETED_MAP_ID,
           title: 'Deleted',
           kind: 'positioned',
-          positions: { [SHARED_RESOURCE_ID]: { x: 10, y: 20, open: false } },
+          positions: { [SHARED_RESOURCE_ID]: { x: 10, y: 20 } },
           graphs: [{ id: DELETED_GRAPH_ID, title: 'Deleted Graph', edges: [] }],
         },
         {
           id: SURVIVING_MAP_ID,
           title: 'Surviving',
           kind: 'positioned',
-          positions: { [SHARED_RESOURCE_ID]: { x: 500, y: 600, open: false } },
+          positions: { [SHARED_RESOURCE_ID]: { x: 500, y: 600 } },
           graphs: [{ id: SURVIVING_GRAPH_ID, title: 'Surviving Graph', edges: [] }],
         },
       ],
@@ -103,7 +103,7 @@ describe('Map delete draws the right geometry', () => {
     const written = session
       .getState()
       .working.document.maps?.find((m) => m.id === SURVIVING_MAP_ID);
-    expect(written?.positions[SHARED_RESOURCE_ID]).toEqual({ x: 500, y: 600, open: false });
+    expect(written?.positions[SHARED_RESOURCE_ID]).toEqual({ x: 500, y: 600 });
   });
 });
 
@@ -130,7 +130,7 @@ describe('Entering draws the entered Map’s geometry', () => {
           id: META_MAP_ID,
           title: 'Meta Map',
           kind: 'positioned',
-          positions: { [META_RESOURCE_ID]: { x: 0, y: 0, open: false } },
+          positions: { [META_RESOURCE_ID]: { x: 0, y: 0 } },
           graphs: [{ id: META_GRAPH_ID, title: 'Meta Graph', edges: [] }],
         },
       ],
@@ -159,14 +159,14 @@ describe('Entering draws the entered Map’s geometry', () => {
           id: DEFAULT_MAP_ID,
           title: 'Default',
           kind: 'positioned',
-          positions: { [SHARED_RESOURCE_ID]: { x: 10, y: 20, open: false } },
+          positions: { [SHARED_RESOURCE_ID]: { x: 10, y: 20 } },
           graphs: [{ id: DEFAULT_GRAPH_ID, title: 'Default Graph', edges: [] }],
         },
         {
           id: ENTERED_MAP_ID,
           title: 'Entered',
           kind: 'positioned',
-          positions: { [SHARED_RESOURCE_ID]: { x: 500, y: 600, open: false } },
+          positions: { [SHARED_RESOURCE_ID]: { x: 500, y: 600 } },
           graphs: [{ id: ENTERED_GRAPH_ID, title: 'Entered Graph', edges: [] }],
         },
       ],
@@ -208,7 +208,7 @@ describe('Entering draws the entered Map’s geometry', () => {
     const written = entered.session
       .getState()
       .working.document.maps?.find((m) => m.id === ENTERED_MAP_ID);
-    expect(written?.positions[SHARED_RESOURCE_ID]).toEqual({ x: 500, y: 600, open: false });
+    expect(written?.positions[SHARED_RESOURCE_ID]).toEqual({ x: 500, y: 600 });
   });
 });
 
@@ -232,14 +232,14 @@ describe('An embedded Edit in an unselected Map leaves no stale member', () => {
           id: TOP_MAP_ID,
           title: 'Top',
           kind: 'positioned',
-          positions: { [TOP_RESOURCE_ID]: { x: 10, y: 20, open: false } },
+          positions: { [TOP_RESOURCE_ID]: { x: 10, y: 20 } },
           graphs: [{ id: TOP_GRAPH_ID, title: 'Top Graph', edges: [] }],
         },
         {
           id: OTHER_MAP_ID,
           title: 'Other',
           kind: 'positioned',
-          positions: { [OTHER_RESOURCE_ID]: { x: 500, y: 600, open: false } },
+          positions: { [OTHER_RESOURCE_ID]: { x: 500, y: 600 } },
           graphs: [{ id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] }],
         },
       ],
@@ -298,7 +298,7 @@ describe('An embedded Edit in an unselected Map leaves no stale member', () => {
     expect(loaded.ok).toBe(true);
 
     const top = written.document.maps?.find((m) => m.id === TOP_MAP_ID);
-    expect(top?.positions[TOP_RESOURCE_ID]).toEqual({ x: 10, y: 20, open: false });
+    expect(top?.positions[TOP_RESOURCE_ID]).toEqual({ x: 10, y: 20 });
     const other = written.document.maps?.find((m) => m.id === OTHER_MAP_ID);
     expect(other?.graphs.map((graph) => ({ id: graph.id, title: graph.title }))).toEqual([
       { id: OTHER_GRAPH_ID, title: 'Renamed Other Graph' },
@@ -325,8 +325,8 @@ describe('A queued drag holds its drop point', () => {
           title: 'Map',
           kind: 'positioned',
           positions: {
-            [RESOURCE_A]: { x: 10, y: 20, open: false },
-            [RESOURCE_B]: { x: 300, y: 20, open: false },
+            [RESOURCE_A]: { x: 10, y: 20 },
+            [RESOURCE_B]: { x: 300, y: 20 },
           },
           graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
         },

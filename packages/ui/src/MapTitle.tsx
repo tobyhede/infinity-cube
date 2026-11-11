@@ -4,6 +4,7 @@ import type { TitleProps } from '@project/resource-api/view';
 import { Button } from './Button';
 import { CardTitle } from './components/card';
 import { InlineTitleEditor } from './InlineTitleEditor';
+import { cn } from './lib/utils';
 import { TitleHeading } from './ResourceTitleHeading';
 
 /** The Title as the Map draws it, and the rename it offers (ADR 0065, ADR 0083). */
@@ -31,7 +32,7 @@ export function MapTitleView({ className }: TitleProps) {
   const props = useContext(MapTitleContext);
   if (props === null) return null;
   const name = titleName(props.title);
-  const titleClass = ['canvas-resource__title', className].filter(Boolean).join(' ');
+  const titleClass = cn('canvas-resource__title', className);
   if (props.editor !== undefined && !props.readOnly) {
     return (
       <InlineTitleEditor

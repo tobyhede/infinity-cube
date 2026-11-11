@@ -14,7 +14,6 @@ import {
   EnterSpaceIcon,
   PresentIcon,
   FullViewIcon,
-  OpenAndExpandIcon,
   RemoveFromMapIcon,
   ResourceKindIcon,
   type EntityActionGroup,
@@ -59,8 +58,6 @@ export interface ResourceRailCommands {
   readonly present: BoundCommand;
   /** Read this Resource in Full View: the canvas's command Space runs. */
   readonly fullView: BoundCommand;
-  /** Open this Resource and expand it to fit its content: the canvas's command Shift+Enter runs. */
-  readonly openAndExpand: BoundCommand;
 }
 
 /**
@@ -69,10 +66,7 @@ export interface ResourceRailCommands {
  * item and the key cannot disagree. A rail drawn with none — a Map inside a
  * Space Resource — offers them as absent.
  */
-export type CanvasRailCommands = Pick<
-  ResourceRailCommands,
-  'openAndExpand' | 'fullView' | 'present'
->;
+export type CanvasRailCommands = Pick<ResourceRailCommands, 'fullView' | 'present'>;
 
 const absent = (id: BoundCommand['id']): BoundCommand => ({
   id,
@@ -81,7 +75,6 @@ const absent = (id: BoundCommand['id']): BoundCommand => ({
 });
 
 const NO_CANVAS_COMMANDS: CanvasRailCommands = {
-  openAndExpand: absent('canvas.openAndExpand'),
   fullView: absent('canvas.showFullView'),
   present: absent('canvas.presentFromHere'),
 };
@@ -139,8 +132,7 @@ export function resourceRailGroups(
   connect: EntityActionGroup,
   commands: ResourceRailCommands,
 ): readonly EntityActionGroup[] {
-  const { createFrom, removeFromMap, deleteFromSpace, enter, present, fullView, openAndExpand } =
-    commands;
+  const { createFrom, removeFromMap, deleteFromSpace, enter, present, fullView } = commands;
   // A Resource no other may reference as its Target offers each creation
   // from it disabled, saying why, since what it creates references it, so
   // referencing stays a single hop (ADR 0113).
@@ -166,21 +158,10 @@ export function resourceRailGroups(
           })),
         ];
   const presentItem = commandItem(present);
-  const openAndExpandItem = commandItem(openAndExpand);
   const fullViewItem = commandItem(fullView);
-  // Seeing a Resource whole: expanding it on the Map, which is an Edit, then
-  // reading it and presenting from it, which change nothing in the Space.
+  // Seeing a Resource whole: reading it and presenting from it, which change
+  // nothing in the Space.
   const presenting: EntityActionGroup = [
-    ...(openAndExpandItem === null
-      ? []
-      : [
-          {
-            id: 'open-and-expand',
-            label: 'Open and Expand',
-            icon: <OpenAndExpandIcon />,
-            ...openAndExpandItem,
-          },
-        ]),
     ...(fullViewItem === null
       ? []
       : [{ id: 'full-view', label: 'Read in Full View', icon: <FullViewIcon />, ...fullViewItem }]),

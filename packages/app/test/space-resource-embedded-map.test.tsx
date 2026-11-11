@@ -104,8 +104,8 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Collection 1',
         kind: 'positioned',
         positions: {
-          [DRAWN_A]: { x: 0, y: 0, open: false },
-          [DRAWN_B]: { x: 264, y: 0, open: false },
+          [DRAWN_A]: { x: 0, y: 0 },
+          [DRAWN_B]: { x: 264, y: 0 },
         },
         graphs: [
           { id: SELECTED_GRAPH_ID, title: 'Overview', edges: [{ from: DRAWN_A, to: DRAWN_B }] },
@@ -115,7 +115,7 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
         id: OTHER_MAP_ID,
         title: 'Collection 2',
         kind: 'positioned',
-        positions: { [UNPLACED]: { x: 0, y: 0, open: false } },
+        positions: { [UNPLACED]: { x: 0, y: 0 } },
         graphs: [{ id: OTHER_GRAPH_ID, title: 'Second pass', edges: [] }],
       },
     ],
@@ -154,7 +154,7 @@ const home = (spaceResource: SpaceResourceDocument): SpaceSnapshot =>
           title: 'Map 1',
           kind: 'positioned',
           positions: {
-            [HOME_RESOURCE_ID]: { x: 10, y: 20, open: false },
+            [HOME_RESOURCE_ID]: { x: 10, y: 20 },
             [SPACE_RESOURCE_ID]: {
               x: 600,
               y: 20,
@@ -187,9 +187,9 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [META_RESOURCE_ID]: { x: 0, y: 0, open: false },
-          [META_TO_HOME_ID]: { x: 300, y: 0, open: false },
-          [META_TO_TARGET_ID]: { x: 600, y: 0, open: false },
+          [META_RESOURCE_ID]: { x: 0, y: 0 },
+          [META_TO_HOME_ID]: { x: 300, y: 0 },
+          [META_TO_TARGET_ID]: { x: 600, y: 0 },
         },
         graphs: [{ id: META_GRAPH_ID, title: 'Graph 1', edges: [] }],
       },
@@ -354,7 +354,7 @@ async function mountNested(): Promise<OpenSpaces> {
           id: THIRD_MAP_ID,
           title: 'Nested Map',
           kind: 'positioned',
-          positions: { [THIRD_RESOURCE_ID]: { x: 0, y: 0, open: false } },
+          positions: { [THIRD_RESOURCE_ID]: { x: 0, y: 0 } },
           graphs: [{ id: THIRD_GRAPH_ID, title: 'Nested Graph', edges: [] }],
         },
       ],
@@ -1581,7 +1581,7 @@ describe('the Map an Open Space Resource draws', () => {
             id: thirdMap,
             title: 'Nested Map',
             kind: 'positioned',
-            positions: { [thirdResource]: { x: 0, y: 0, open: false } },
+            positions: { [thirdResource]: { x: 0, y: 0 } },
             graphs: [{ id: thirdGraph, title: 'Nested Graph', edges: [] }],
           },
         ],
@@ -2017,7 +2017,7 @@ describe('the Map an Open Space Resource draws', () => {
             title: 'Map 1',
             kind: 'positioned',
             positions: {
-              [HOME_RESOURCE_ID]: { x: 10, y: 20, open: false },
+              [HOME_RESOURCE_ID]: { x: 10, y: 20 },
               [GONE_A_RESOURCE_ID]: {
                 x: 600,
                 y: 20,
@@ -2030,7 +2030,7 @@ describe('the Map an Open Space Resource draws', () => {
                 content: { open: true },
                 size: { width: 700, height: 500 },
               },
-              [SPACE_RESOURCE_ID]: { x: 2200, y: 20, open: false },
+              [SPACE_RESOURCE_ID]: { x: 2200, y: 20 },
             },
             graphs: [{ id: HOME_GRAPH_ID, title: 'Graph 1', edges: [] }],
           },

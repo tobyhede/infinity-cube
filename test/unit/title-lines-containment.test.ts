@@ -33,8 +33,8 @@ const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
  * Three files, and nothing wider. The drawn Resource draws the ladder and is the only
  * surface that does (ADR 0083); `@project/core`'s own module is where the rule
  * lives and is what every other reader goes through. The drawn Resource's
- * ladder is `ResourceTitleHeading`, which `CanvasResource` and the plugin
- * host's Title both draw. The render adapter mounts that Resource on the
+ * ladder is `ResourceTitleHeading`, which the plugin
+ * host's Title draws. The render adapter mounts that Resource on the
  * canvas but needs no permission: it hands it a Title and reads no line of one. Every entry here is asserted below to still
  * be reading a Title's lines, which is what a tree could not be held to file by file.
  */

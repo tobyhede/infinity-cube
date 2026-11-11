@@ -48,9 +48,9 @@ describe('shortcutSections', () => {
 
 describe('shortcutOf', () => {
   it('announces the binding’s own aria-keyshortcuts', () => {
-    expect(shortcutOf(CANVAS_KEYS.openAndExpand)).toEqual({
-      aria: 'Shift+Enter',
-      presses: [['Shift', 'Enter']],
+    expect(shortcutOf(CANVAS_KEYS.renameResource)).toEqual({
+      aria: 'F2',
+      presses: [['F2']],
     });
   });
 

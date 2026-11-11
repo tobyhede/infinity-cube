@@ -77,9 +77,8 @@ async function openPictures(
       const markdown = snapshot.resources.find(({ document }) => document.kind === 'markdown');
       if (markdown === undefined) throw new Error('The opened Space holds no Markdown Resource.');
       return {
-        [markdown.id]: { x: 0, y: 0, open: false },
-        [IMAGE_ID]:
-          size === undefined ? { x: 400, y: 0, open: false } : { x: 400, y: 0, open: false, size },
+        [markdown.id]: { x: 0, y: 0 },
+        [IMAGE_ID]: size === undefined ? { x: 400, y: 0 } : { x: 400, y: 0, size },
       };
     },
     [
@@ -360,7 +359,7 @@ async function openForCreation(page: Page): Promise<UUID> {
   const seeded = await seedPositionedMap(page, 'Pictures', (snapshot) => {
     const markdown = snapshot.resources.find(({ document }) => document.kind === 'markdown');
     if (markdown === undefined) throw new Error('The opened Space holds no Markdown Resource.');
-    return { [markdown.id]: { x: 0, y: 0, open: false } };
+    return { [markdown.id]: { x: 0, y: 0 } };
   });
   await page.goto(`/spaces/${encodeCompactUuid(seeded.snapshot.id)}`);
   await expect(selectedCanvas(page)).toContainText('Pictures');
@@ -1024,7 +1023,7 @@ async function seedPresentationFigure(page: Page): Promise<void> {
           ...authored,
           positions: {
             ...authored.positions,
-            [IMAGE_ID]: { x: 1272, y: 12, open: false, size: SIZED_TO_PICTURE },
+            [IMAGE_ID]: { x: 1272, y: 12, size: SIZED_TO_PICTURE },
           },
         }
       : authored,
@@ -1381,7 +1380,7 @@ test('a Replace in an only-drawn Space holds Back and Forward and edits that Spa
                 {
                   ...targetMap,
                   positions: {
-                    [HARBOUR_ID]: { x: 0, y: 0, open: false, size: SIZED_TO_PICTURE },
+                    [HARBOUR_ID]: { x: 0, y: 0, size: SIZED_TO_PICTURE },
                   },
                   graphs: targetMap.graphs.map((graph) => ({ ...graph, edges: [] })),
                 },

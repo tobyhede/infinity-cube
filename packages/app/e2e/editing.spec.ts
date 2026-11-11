@@ -225,7 +225,7 @@ test(
     await expect(page.locator('.react-flow__node.selected')).toHaveCount(0);
     await resource.getByRole('button', { name: 'Edit Title A' }).click();
     await expect(page.locator('.react-flow__node.selected')).toHaveCount(0);
-    await expect(openResources(page)).toHaveCount(0);
+    await expect(page.locator('.canvas-resource__plugin [data-open="true"]')).toHaveCount(0);
     const title = page.getByRole('textbox', { name: 'Resource title' });
     await title.fill('Renamed A');
     await title.press('Enter');
@@ -249,7 +249,7 @@ test(
     await keyboardTitle.fill('');
     await nodeByTitle(page, 'B').first().click();
     await expect(keyboardTitle).toHaveAttribute('aria-invalid', 'true');
-    await expect(openResources(page)).toHaveCount(0);
+    await expect(page.locator('.canvas-resource__plugin [data-open="true"]')).toHaveCount(0);
     await quiescent(page);
     await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '3');
     await keyboardTitle.focus();
@@ -289,7 +289,7 @@ test("a short Title control's hit-area hugs its text, not the whole Resource bod
   };
   await page.mouse.click(blankSpace.x, blankSpace.y);
   await expect(page.getByRole('textbox', { name: 'Resource title' })).toHaveCount(0);
-  await expect(openResources(page)).toHaveCount(0);
+  await expect(page.locator('.canvas-resource__plugin [data-open="true"]')).toHaveCount(0);
 });
 
 test('a click selects a Resource, and no pointer gesture on its body opens it', async ({
@@ -303,12 +303,12 @@ test('a click selects a Resource, and no pointer gesture on its body opens it', 
 
   await resource.click();
   await expect(resource).toHaveClass(/selected/);
-  await expect(openResources(page)).toHaveCount(0);
+  await expect(page.locator('.canvas-resource__plugin [data-open="true"]')).toHaveCount(0);
 
   // Off the Title, which has its own control. React Flow zooms on a double click
   // by default and its filter exempts only `.nopan`, which a Resource is not.
   await resource.dblclick({ position: { x: 24, y: 12 } });
-  await expect(openResources(page)).toHaveCount(0);
+  await expect(page.locator('.canvas-resource__plugin [data-open="true"]')).toHaveCount(0);
   expect(await viewportTransform(page)).toEqual(transform);
 });
 
@@ -776,8 +776,8 @@ test('dragging an Open Resource across a neighbour moves nothing but the dragged
   // Apart on `y` by more than a Resource's height, so the two never overlap and
   // the drag below crosses `x` alone.
   await seedGeometry(page, 'Drag Geometry', {
-    [SUBJECT.id]: { x: 120, y: 400, open: false },
-    [NEIGHBOUR.id]: { x: 0, y: 0, open: false },
+    [SUBJECT.id]: { x: 120, y: 400 },
+    [NEIGHBOUR.id]: { x: 0, y: 0 },
   });
   const subject = seededNode(page, SUBJECT);
 
@@ -833,8 +833,8 @@ test('a closed Resource released inside a resized Open Resource lands at the dro
   page,
 }) => {
   await seedGeometry(page, 'Drop Geometry', {
-    [SUBJECT.id]: { x: 150, y: 150, open: false, size: RESIZED },
-    [NEIGHBOUR.id]: { x: 0, y: 0, open: false },
+    [SUBJECT.id]: { x: 150, y: 150, size: RESIZED },
+    [NEIGHBOUR.id]: { x: 0, y: 0 },
   });
   const subject = seededNode(page, SUBJECT);
   const mover = seededNode(page, NEIGHBOUR);
@@ -890,9 +890,9 @@ test('Open and Close move nobody and keep the size, a Resize displaces once, and
   page,
 }) => {
   await seedGeometry(page, 'Open Geometry', {
-    [SUBJECT.id]: { x: 0, y: 0, open: false, size: RESIZED },
-    [NEIGHBOUR.id]: { x: 600, y: 450, open: false },
-    [BEHIND.id]: { x: -400, y: -300, open: false },
+    [SUBJECT.id]: { x: 0, y: 0, size: RESIZED },
+    [NEIGHBOUR.id]: { x: 600, y: 450 },
+    [BEHIND.id]: { x: -400, y: -300 },
   });
   const subject = seededNode(page, SUBJECT);
   const rect = async () =>
@@ -949,7 +949,7 @@ test('Open and Close move nobody and keep the size, a Resize displaces once, and
   )
     .getByRole('button', { name: `Close Resource ${SUBJECT.title}` })
     .click();
-  await expect(subject.locator('.rf-resource-node__inner')).toHaveAttribute('data-open', 'false');
+  await expect(subject.locator('.canvas-resource__plugin [data-open="false"]')).toHaveCount(1);
   await settled(page);
   expect(await allPositions(page), 'Closing moved a Resource').toEqual(resized);
   expect(await rect(), 'Closing changed the size').toEqual(grown);
@@ -1120,10 +1120,7 @@ test(
       .getByRole('button', { name: 'Close Resource A', exact: true })
       .click();
     // Closing changes what is drawn, never the size.
-    await expect(persisted.locator('.rf-resource-node__inner')).toHaveAttribute(
-      'data-open',
-      'false',
-    );
+    await expect(persisted.locator('.canvas-resource__plugin [data-open="false"]')).toHaveCount(1);
     await expect(persisted).toHaveCSS('width', `${resized.width}px`);
     await expectResourceFillsNode(persisted);
     await (
@@ -2699,7 +2696,7 @@ test('drawing between existing Resources persists one active-Graph Edge and sele
     'opacity',
     '1',
   );
-  await expect(openResources(page)).toHaveCount(0);
+  await expect(page.locator('.canvas-resource__plugin [data-open="true"]')).toHaveCount(0);
 });
 
 /** The head shape the connection preview ends in, through the marker its path names. */
@@ -2996,7 +2993,7 @@ test('clicking a Resource authoring handle neither opens the Resource nor draws 
   const handleBox = (await authoringHandle(resource, 'source', 'right').boundingBox())!;
   await page.mouse.click(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
 
-  await expect(openResources(page)).toHaveCount(0);
+  await expect(page.locator('.canvas-resource__plugin [data-open="true"]')).toHaveCount(0);
   await expect(page.locator('.react-flow__edge')).toHaveCount(drawn);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
@@ -3694,7 +3691,7 @@ test('the Resource menu groups Create Reference, Connect, Full View and Present 
   await expectMenuGroups(menu, [
     ['Create Reference'],
     ['Connect to Resource'],
-    // A Markdown Resource Opens with its plugin's size hint: no Open and Expand (A29).
+    // A Markdown Resource Opens with its plugin's size hint (A29).
     ['Read in Full View', 'Present from Here'],
     ['Copy link to Resource in Map', 'Copy link to Resource'],
     ['Remove from Map', 'Delete from Space'],
@@ -3718,7 +3715,7 @@ test(
     const groups = [
       ['Create Reference'],
       ['Connect to Resource'],
-      // A Markdown Resource Opens with its plugin's size hint: no Open and Expand (A29).
+      // A Markdown Resource Opens with its plugin's size hint (A29).
       ['Read in Full View', 'Present from Here'],
       ['Copy link to Resource in Map', 'Copy link to Resource'],
       ['Remove from Map', 'Delete from Space'],
@@ -3764,8 +3761,7 @@ test('Create Reference is drawn unavailable on a Reference Resource, still leadi
     [/^Create Reference/],
     ['Connect to Resource'],
     // A Resource created just now is on no Graph, so it has nowhere to present
-    // from. A Reference to a Markdown Resource keeps its Open as its plugin's Map
-    // content, so it offers no Open and Expand (ADR 0142).
+    // from.
     ['Read in Full View', /^Present from Here/],
     ['Copy link to Resource in Map', 'Copy link to Resource', 'Copy link to Target'],
     ['Remove from Map', 'Delete from Space'],

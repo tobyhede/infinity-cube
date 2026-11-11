@@ -23,7 +23,7 @@ const snapshot: SpaceSnapshot = {
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [RESOURCE_A]: { x: 10, y: 20, open: false },
+          [RESOURCE_A]: { x: 10, y: 20 },
         },
         graphs: [{ id: GRAPH_ID, title: 'Main', edges: [] }],
       },

@@ -66,7 +66,7 @@ const UNKNOWN_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000098');
 const UNLOADED_MAP = uuidSchema.parse('00000000-0000-4000-8000-000000000097');
 const UNLOADED_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000096');
 
-const CENTRE = { x: 400, y: 300, open: false };
+const CENTRE = { x: 400, y: 300 };
 
 const BLUE = GRAPH_PALETTE[0];
 
@@ -103,8 +103,8 @@ const positionedSnapshot: SpaceSnapshot = {
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [RESOURCE_A]: { x: 10, y: 20, open: false },
-          [RESOURCE_B]: { x: 300, y: 40, open: false },
+          [RESOURCE_A]: { x: 10, y: 20 },
+          [RESOURCE_B]: { x: 300, y: 40 },
         },
         graphs: [MAIN_GRAPH],
       },
@@ -200,8 +200,8 @@ describe('Add Resource', () => {
       document: { title: 'Resource 1', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     });
     expect(mapOf(session.getState().working, MAP_ID)?.positions).toEqual({
-      [RESOURCE_A]: { x: 10, y: 20, open: false },
-      [RESOURCE_B]: { x: 300, y: 40, open: false },
+      [RESOURCE_A]: { x: 10, y: 20 },
+      [RESOURCE_B]: { x: 300, y: 40 },
       [MINTED]: CENTRE,
     });
     // No Edge, and no second Graph: Add Resource adds neither (ADR 0040).
@@ -223,7 +223,7 @@ describe('Add Resource', () => {
     );
     // A visible stack, not collision avoidance: the first Resource never moves, and
     // the second takes one small diagonal step off it.
-    expect(stacked).toEqual([CENTRE, { x: CENTRE.x + 24, y: CENTRE.y + 24, open: false }]);
+    expect(stacked).toEqual([CENTRE, { x: CENTRE.x + 24, y: CENTRE.y + 24 }]);
   });
 
   it('stores the canvas anchor as authored, whatever else is Open', () => {
@@ -238,11 +238,10 @@ describe('Add Resource', () => {
               [RESOURCE_A]: {
                 x: 10,
                 y: 20,
-                open: false,
                 content: { open: true },
                 size: { width: 560, height: 420 },
               },
-              [RESOURCE_B]: { x: 300, y: 40, open: false },
+              [RESOURCE_B]: { x: 300, y: 40 },
             },
           },
         ],
@@ -258,7 +257,6 @@ describe('Add Resource', () => {
     expect(mapOf(session.getState().working, MAP_ID)?.positions[MINTED]).toEqual({
       x: 500,
       y: 400,
-      open: false,
     });
   });
 });
@@ -384,9 +382,9 @@ describe('Create Image Resources', () => {
     const positions = mapOf(session.getState().working, MAP_ID)?.positions ?? {};
     // Side by side, one collapsed width and a gap apart, all on the anchor's row.
     expect([MINTED, SECOND_MINTED, THIRD_MINTED].map((id) => positions[id])).toEqual([
-      { x: 100, y: 200, open: false },
-      { x: 400, y: 200, open: false },
-      { x: 700, y: 200, open: false },
+      { x: 100, y: 200 },
+      { x: 400, y: 200 },
+      { x: 700, y: 200 },
     ]);
     // One Edit: the working Space moved once, from two Resources to five.
     expect(new Set(commits.filter((count) => count !== 2))).toEqual(new Set([5]));
@@ -553,25 +551,16 @@ describe('Resource size and Open', () => {
       },
     ],
     ['Space', spaceSnapshot],
-  ])(
-    'refuses a host Open on a %s Resource, whose plugin keeps its Open in Map content',
-    (_kind, snapshot) => {
-      const { authoring, session } = open(snapshot);
-      const before = session.getState().working;
+  ])('Opens a %s Resource through the Map content its plugin keeps', (_kind, snapshot) => {
+    const { authoring, session } = open(snapshot);
 
-      expect(
-        authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: RESOURCE_A }),
-      ).toEqual({ kind: 'refused', refusal: { code: 'open-requires-content' } });
-      expect(session.getState().working).toBe(before);
-      expect(setOpen(authoring, true)).toEqual({ kind: 'completed' });
-      expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toEqual({
-        x: 10,
-        y: 20,
-        open: false,
-        content: { open: true },
-      });
-    },
-  );
+    expect(setOpen(authoring, true)).toEqual({ kind: 'completed' });
+    expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toEqual({
+      x: 10,
+      y: 20,
+      content: { open: true },
+    });
+  });
 
   it('Opens and Closes a Space Resource changing nothing but its Map content', () => {
     const { authoring, session } = open(spaceSnapshot);
@@ -580,12 +569,12 @@ describe('Resource size and Open', () => {
     expect(setOpen(authoring, true)).toEqual({ kind: 'completed' });
     expect(mapOf(session.getState().working, MAP_ID)?.positions).toEqual({
       ...positionsBefore,
-      [RESOURCE_A]: { x: 10, y: 20, open: false, content: { open: true } },
+      [RESOURCE_A]: { x: 10, y: 20, content: { open: true } },
     });
     expect(setOpen(authoring, false)).toEqual({ kind: 'completed' });
     expect(mapOf(session.getState().working, MAP_ID)?.positions).toEqual({
       ...positionsBefore,
-      [RESOURCE_A]: { x: 10, y: 20, open: false, content: { open: false } },
+      [RESOURCE_A]: { x: 10, y: 20, content: { open: false } },
     });
   });
 
@@ -602,7 +591,6 @@ describe('Resource size and Open', () => {
     expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toEqual({
       x: 10,
       y: 20,
-      open: false,
       size: { width: 640, height: 480 },
     });
 
@@ -610,7 +598,6 @@ describe('Resource size and Open', () => {
     expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toEqual({
       x: 10,
       y: 20,
-      open: false,
       content: { open: true },
       size: { width: 640, height: 480 },
     });
@@ -635,13 +622,12 @@ describe('Resource size and Open', () => {
     expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toEqual({
       x: 10,
       y: 20,
-      open: false,
       content: { open: true },
       size: { width: 260, height: 146 },
     });
   });
 
-  it('refuses to Open an Ur Resource, which has no content to show', () => {
+  it('refuses Open as an Ur Resource’s Map content, which its plugin does not take', () => {
     const { authoring, session } = open({
       ...positionedSnapshot,
       resources: positionedSnapshot.resources.map((resource) =>
@@ -652,9 +638,10 @@ describe('Resource size and Open', () => {
     });
     const before = session.getState().working;
 
-    expect(authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: RESOURCE_A })).toEqual(
-      { kind: 'refused', refusal: { code: 'open-requires-content' } },
-    );
+    expect(setOpen(authoring, true)).toEqual({
+      kind: 'refused',
+      refusal: { code: 'map-content-invalid' },
+    });
     expect(session.getState().working).toBe(before);
   });
 
@@ -663,13 +650,11 @@ describe('Resource size and Open', () => {
     const before = session.getState().working;
 
     expect(
-      authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: UNKNOWN_RESOURCE }),
-    ).toEqual({
-      kind: 'refused',
-      refusal: { code: 'resource-not-in-map' },
-    });
-    expect(
-      authoring.complete(CANVAS, { kind: 'closed-resource', resourceId: UNKNOWN_RESOURCE }),
+      authoring.complete(CANVAS, {
+        kind: 'changed-map-content',
+        resourceId: UNKNOWN_RESOURCE,
+        content: { open: true },
+      }),
     ).toEqual({
       kind: 'refused',
       refusal: { code: 'resource-not-in-map' },
@@ -810,8 +795,8 @@ describe('Change Map content (ADR 0142)', () => {
 
     const after = session.getState().working;
     expect(mapOf(after, MAP_ID)?.positions).toEqual({
-      [RESOURCE_A]: { x: 10, y: 20, open: false, content: { shape: 'diamond' } },
-      [RESOURCE_B]: { x: 300, y: 40, open: false },
+      [RESOURCE_A]: { x: 10, y: 20, content: { shape: 'diamond' } },
+      [RESOURCE_B]: { x: 300, y: 40 },
     });
     expect(after.resources).toEqual(before.resources);
     expect(graphsOf(after)).toEqual(graphsOf(before));
@@ -869,7 +854,6 @@ describe('Change Map content (ADR 0142)', () => {
     expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toEqual({
       x: 10,
       y: 20,
-      open: false,
       content: { shape: 'rectangle' },
     });
   });
@@ -897,7 +881,6 @@ describe('Change Map content (ADR 0142)', () => {
     expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toEqual({
       x: 10,
       y: 20,
-      open: false,
       size: { width: 700, height: 500 },
       content: { shape: 'pill' },
     });
@@ -919,7 +902,6 @@ describe('Change Map content (ADR 0142)', () => {
     expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toEqual({
       x: 90,
       y: 120,
-      open: false,
       content: { shape: 'ellipse' },
     });
   });
@@ -942,7 +924,6 @@ describe('Change Map content (ADR 0142)', () => {
     expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toEqual({
       x: 10,
       y: 20,
-      open: false,
     });
   });
 
@@ -971,7 +952,7 @@ describe('Change Map content (ADR 0142)', () => {
             id: OTHER_MAP_ID,
             title: 'Map 2',
             kind: 'positioned',
-            positions: { [RESOURCE_A]: { x: 0, y: 0, open: false } },
+            positions: { [RESOURCE_A]: { x: 0, y: 0 } },
             graphs: [{ id: OTHER_GRAPH_ID, title: 'Other', edges: [] }],
           },
         ],
@@ -1307,8 +1288,8 @@ describe('Add Graph', () => {
             title: 'Map 2',
             kind: 'positioned',
             positions: {
-              [RESOURCE_A]: { x: 20, y: 30, open: false },
-              [RESOURCE_B]: { x: 310, y: 50, open: false },
+              [RESOURCE_A]: { x: 20, y: 30 },
+              [RESOURCE_B]: { x: 310, y: 50 },
             },
             // The colour this Map's Graphs alone would choose, carried by
             // another Map, so counting it would choose something else.
@@ -1678,11 +1659,10 @@ describe('Rename Space', () => {
           {
             ...positionedSnapshot.document.maps![0]!,
             positions: {
-              [RESOURCE_A]: { x: 10, y: 20, open: false, size: { width: 500, height: 300 } },
+              [RESOURCE_A]: { x: 10, y: 20, size: { width: 500, height: 300 } },
               [RESOURCE_B]: {
                 x: 300,
                 y: 40,
-                open: false,
                 content: { open: true },
                 size: { width: 640, height: 360 },
               },
@@ -1745,7 +1725,7 @@ describe('Graph ownership', () => {
             id: OTHER_MAP_ID,
             title: 'Map 2',
             kind: 'positioned',
-            positions: { [RESOURCE_A]: { x: 0, y: 400, open: false } },
+            positions: { [RESOURCE_A]: { x: 0, y: 400 } },
             graphs: [{ id: OTHER_GRAPH_ID, title: 'Aside', edges: [] }],
           },
         ],
@@ -1818,9 +1798,9 @@ describe('Edge Title', () => {
         {
           ...positionedSnapshot.document.maps![0]!,
           positions: {
-            [RESOURCE_A]: { x: 10, y: 20, open: false },
-            [RESOURCE_B]: { x: 300, y: 40, open: false },
-            [RESOURCE_C]: { x: 600, y: 40, open: false },
+            [RESOURCE_A]: { x: 10, y: 20 },
+            [RESOURCE_B]: { x: 300, y: 40 },
+            [RESOURCE_C]: { x: 600, y: 40 },
           },
           graphs: [{ id: GRAPH_ID, title: 'Main', edges }],
         },
@@ -2224,8 +2204,8 @@ describe('Map membership', () => {
     ).toEqual({ kind: 'completed' });
 
     expect(mapOf(session.getState().working, MAP_ID)?.positions).toEqual({
-      [RESOURCE_A]: { x: 10, y: 20, open: false },
-      [RESOURCE_B]: { x: 300, y: 40, open: false },
+      [RESOURCE_A]: { x: 10, y: 20 },
+      [RESOURCE_B]: { x: 300, y: 40 },
       [RESOURCE_C]: CENTRE,
     });
     expect(graphsOf(session.getState().working)).toEqual([MAIN_GRAPH]);
@@ -2547,8 +2527,8 @@ describe('connecting Resources on an embedded Map', () => {
     title: 'Other Map',
     kind: 'positioned' as const,
     positions: {
-      [RESOURCE_A]: { x: 500, y: 600, open: false as const },
-      [RESOURCE_C]: { x: 800, y: 600, open: false as const },
+      [RESOURCE_A]: { x: 500, y: 600 },
+      [RESOURCE_C]: { x: 800, y: 600 },
     },
     graphs: [
       { id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] },
@@ -2576,7 +2556,7 @@ describe('connecting Resources on an embedded Map', () => {
     expect(
       authoring.complete(
         { kind: 'drawn', mapId: OTHER_MAP_ID, graphId: UNKNOWN_GRAPH },
-        { kind: 'opened-resource', resourceId: RESOURCE_A },
+        { kind: 'changed-map-content', resourceId: RESOURCE_A, content: { open: true } },
       ),
     ).toEqual({ kind: 'refused', refusal: { code: 'graph-not-owned' } });
     expect(session.getState().working).toBe(before);
@@ -2601,7 +2581,6 @@ describe('connecting Resources on an embedded Map', () => {
     expect(mapOf(session.getState().working, OTHER_MAP_ID)?.positions[MINTED]).toEqual({
       x: 950,
       y: 650,
-      open: false,
     });
     expect(mapOf(session.getState().working, OTHER_MAP_ID)?.graphs[1]?.edges).toEqual([
       { from: RESOURCE_A, to: MINTED },
@@ -2696,7 +2675,7 @@ describe('context commands on an embedded Map', () => {
       id: OTHER_MAP_ID,
       title: 'Other Map',
       kind: 'positioned' as const,
-      positions: { [RESOURCE_A]: { x: 500, y: 600, open: false as const } },
+      positions: { [RESOURCE_A]: { x: 500, y: 600 } },
       graphs: [{ id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] }],
       activeGraph: OTHER_GRAPH_ID,
     };

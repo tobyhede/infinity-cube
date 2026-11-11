@@ -28,7 +28,7 @@ function composition() {
           id: MAP,
           title: 'Canvas',
           kind: 'positioned',
-          positions: { [RESOURCE]: { x: 10, y: 20, open: false } },
+          positions: { [RESOURCE]: { x: 10, y: 20 } },
           graphs: [{ id: GRAPH, title: 'Graph', edges: [] }],
         },
       ],

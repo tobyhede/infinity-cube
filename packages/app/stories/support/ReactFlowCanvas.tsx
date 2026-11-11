@@ -19,11 +19,10 @@ import type {
   MapId,
 } from '@project/core';
 import type { Answer } from '@project/resource-api/domain';
-import { isPluginOperations, type PluginOperations } from '@project/ui';
+import type { PluginOperations } from '@project/ui';
 import {
   Placement,
   positionedStrategy,
-  resolveResourceContent,
   type LayoutStrategyGraph,
   type Space,
 } from '@project/graph';
@@ -407,10 +406,9 @@ interface CanvasResourceNodeSpecimenBaseProps {
   readonly editingTitle?: boolean;
   readonly graphColor?: string;
   /**
-   * Whether this specimen supplies the Open/Close operation, `onOpenChange`.
-   * Every Resource kind Opens and Closes through the same operation (ADR
-   * 0070), so this defaults to true regardless of kind; a story asking for a
-   * Resource with no Open capability at all sets it false.
+   * Whether this specimen offers a Markdown Resource's Open and Close, its Map
+   * content commit (ADR 0142), reported through `onOpenChange`; true unless a
+   * story asks for a Resource that offers none.
    */
   readonly openOperationEnabled?: boolean;
   readonly nodeSize?: { readonly width: number; readonly height: number };
@@ -420,10 +418,7 @@ interface CanvasResourceNodeSpecimenBaseProps {
   readonly stageClassName?: string;
   readonly zoom?: number | undefined;
   readonly title?: string;
-  /**
-   * What the specimen draws while Open. Omitted, it draws the fixture
-   * Resource's own resolved content.
-   */
+  /** A Markdown Resource's own content, which its plugin draws. Omitted, the fixture Resource's. */
   readonly content?: ResourceContent;
   readonly readOnly?: boolean;
   /**
@@ -435,8 +430,7 @@ interface CanvasResourceNodeSpecimenBaseProps {
   readonly draggable?: boolean;
   /**
    * Which Map of which Space holds the fixture Resource; the inventory's own
-   * when absent. The Resource's Open content is resolved in that Space, so a
-   * Reference Resource draws its real Target.
+   * when absent. A Reference Resource embeds its real Target from that Space.
    */
   readonly drawn?: DrawnMap;
   /**
@@ -516,8 +510,6 @@ export function CanvasResourceNodeSpecimen({
     readOnly,
     onBeginTitleEditing: () => undefined,
   };
-  if (openOperationEnabled) data.onOpenChange = onOpenChange ?? (() => 'completed');
-  if (open !== undefined) data.open = open;
   if (title !== undefined) data.title = title;
   if (kind === 'image') {
     // An Image Resource, drawn by its plugin from its own content (ADR 0142).
@@ -531,7 +523,7 @@ export function CanvasResourceNodeSpecimen({
       mapContent: { shape: resourceShape },
     });
   }
-  if (data.kind === 'markdown' && data.ownContent !== undefined) {
+  if (data.kind === 'markdown') {
     // A Markdown Resource, drawn by its plugin (ADR 0142): Open is its Map
     // content, which this specimen's Open/Close operation commits.
     const own = content?.kind === 'markdown' ? content.content : data.ownContent;
@@ -547,24 +539,16 @@ export function CanvasResourceNodeSpecimen({
       commitMap === undefined ? { kind: 'markdown' } : { kind: 'markdown', commitMap };
     Object.assign(data, { ownContent: own, mapContent: { open: open === true }, kindOperations });
   }
-  if (mapContent !== undefined && data.mapContent !== undefined) data.mapContent = mapContent;
-  if (isPluginOperations(data.kindOperations)) {
-    if (commitMap !== undefined) data.kindOperations = { ...data.kindOperations, commitMap };
-    if (commitTitle !== undefined) data.kindOperations = { ...data.kindOperations, commitTitle };
-  }
-  if (open === true) {
-    data.display = {
-      shown: 'open',
-      content: content ?? resolveResourceContent(drawnSpace, resource),
-    };
-  }
+  if (mapContent !== undefined) data.mapContent = mapContent;
+  if (commitMap !== undefined) data.kindOperations = { ...data.kindOperations, commitMap };
+  if (commitTitle !== undefined) data.kindOperations = { ...data.kindOperations, commitTitle };
   // The editor is the state, so a specimen that asks to be renaming supplies
   // what ends the edit along with it.
   if (editingTitle) {
     data.titleEditor = { onComplete: () => null, onCancel: () => undefined };
   }
   if (graphColor !== undefined) data.activeGraphColor = graphColor;
-  // Set as the decoration sets it: every kind resizes, Open or Closed, and
+  // Set as the decoration sets it: every kind resizes, and
   // `ResourceNode` draws the control only while the Resource is selected.
   if (onResize !== undefined) {
     data.resize = {

@@ -1,4 +1,4 @@
-import { spaceKind, type SpaceContent } from '@project/core';
+import { spaceKind } from '@project/core';
 import { spacePlugin } from '@project/plugin-space/domain';
 import { SpaceResourceIcon } from '../icons';
 import type { KindView } from './kind-view';
@@ -11,7 +11,7 @@ import type { PluginOperations } from './plugin-views';
  * embedding draws the Map it selects. Its silhouette is the Space cube every
  * list draws a Space with.
  */
-export const spaceView: KindView<PluginOperations, SpaceContent> = {
+export const spaceView: KindView<PluginOperations> = {
   name: spacePlugin.name,
   listName: spacePlugin.listName,
   referenceName: spacePlugin.referenceName,

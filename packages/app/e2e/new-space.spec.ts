@@ -27,7 +27,7 @@ const seedNewSpaceMap = (page: Page) =>
   seedPositionedMap(page, 'Authored Map', (snapshot) => {
     const resourceId = snapshot.resources[0]?.id;
     if (resourceId === undefined) throw new Error('The new Space must hold Resource 1.');
-    return { [resourceId]: { x: 0, y: 0, open: false } };
+    return { [resourceId]: { x: 0, y: 0 } };
   });
 
 /** A new Space already owns its complete first Map and centered Resource. */
@@ -202,7 +202,7 @@ test('Alt empty-drop creates, connects and selects Resource 2 at the previewed p
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
   await expect(authoringHandle(created, 'source', 'left')).toHaveCSS('opacity', '1');
-  await expect(openResources(page)).toHaveCount(0);
+  await expect(page.locator('.canvas-resource__plugin [data-open="true"]')).toHaveCount(0);
 
   await settled(page);
   await created.hover();
@@ -494,7 +494,7 @@ test(
                   id: mapId,
                   title: 'Map',
                   kind: 'positioned',
-                  positions: { [resourceId]: { x: 0, y: 0, open: false } },
+                  positions: { [resourceId]: { x: 0, y: 0 } },
                   graphs: [
                     {
                       id: graphId,

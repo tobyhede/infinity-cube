@@ -37,7 +37,7 @@ interface InlineTitleEditorBase {
    * Map or Graph title is a label in a list with no drawn Resource to put one on,
    * and giving all three the capability because they share a field type would
    * be the model following the implementation. Where a Title stands in that
-   * decision is the mounting surface's to know, so `CanvasResource` sets this and
+   * decision is the mounting surface's to know, so `MapTitle`, a Resource's Title, sets this and
    * the Dock's header does not — which is also what keeps the answer
    * visible at the call site rather than buried in a `variant` check here.
    *
@@ -104,7 +104,7 @@ export type InlineTitleEditorProps = InlineTitleEditorBase &
  * - Custom behavior: only that lifecycle, in the two shapes {@link InlineTitleEditorBase.multiline}
  *   selects; product identity and authorship stay in the caller.
  * - Tests: `InlineTitleEditor.test.tsx`; `EdgeTitle.test.tsx` and the app's
- *   `edge-authoring-react.test.tsx` for `edge`; `CanvasResource.test.tsx` for `resource`;
+ *   `edge-authoring-react.test.tsx` for `edge`; `PluginResource.test.tsx` and `canvas-resource-title-ladder.test.ts` for `resource`;
  *   `SpaceApp.test.tsx` for `header`; application
  *   Playwright in `e2e/editing.spec.ts` and Ladle Playwright in
  *   `ladle-e2e/command-dock.spec.ts` and `ladle-e2e/edge-toolbar.spec.ts`.

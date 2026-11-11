@@ -50,19 +50,6 @@ export const CANVAS_KEYS = {
     ariaKeyShortcuts: 'C',
     description: 'Add a Resource',
   },
-  openResource: {
-    keys: ['Enter'],
-    press: 'plain',
-    ariaKeyShortcuts: 'Enter',
-    description: 'Open the focused Resource, where the application keeps its Open',
-  },
-  openAndExpand: {
-    keys: ['Enter'],
-    press: 'shift',
-    ariaKeyShortcuts: 'Shift+Enter',
-    description:
-      'Open the focused Resource, where the application keeps its Open, and expand it to fit its content',
-  },
   showFullView: {
     keys: [' '],
     press: 'plain',
@@ -141,12 +128,6 @@ export const FULL_VIEW_KEYS = {
     press: 'plain',
     ariaKeyShortcuts: 'Space Escape',
     description: 'Leave Full View',
-  },
-  openOnCanvas: {
-    keys: ['Enter'],
-    press: 'plain',
-    ariaKeyShortcuts: 'Enter',
-    description: 'Leave Full View and Open the Resource on the canvas',
   },
 } as const satisfies Record<string, KeyBinding>;
 
@@ -231,8 +212,6 @@ export const HELP_KEYS = {
  */
 const DEFAULT_KEYMAP = {
   'canvas.addResource': CANVAS_KEYS.addResource,
-  'canvas.openResource': CANVAS_KEYS.openResource,
-  'canvas.openAndExpand': CANVAS_KEYS.openAndExpand,
   'canvas.showFullView': CANVAS_KEYS.showFullView,
   'canvas.renameResource': CANVAS_KEYS.renameResource,
   'canvas.presentFromHere': CANVAS_KEYS.presentFromHere,

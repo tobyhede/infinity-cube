@@ -128,11 +128,9 @@ const simple = (defaultMap?: string): Document => {
   const document: Document = {
     resources: [markdown(A, 'A'), markdown(B, 'B')],
     maps: [
-      positionedMap(
-        WORKING,
-        { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
-        [graph(MAIN, 'Main', [{ from: A, to: B }])],
-      ),
+      positionedMap(WORKING, { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } }, [
+        graph(MAIN, 'Main', [{ from: A, to: B }]),
+      ]),
     ],
   };
   return defaultMap === undefined ? document : { ...document, defaultMap };
@@ -167,15 +165,11 @@ describe.each([
         load({
           resources: [markdown(A, 'A'), markdown(B, 'B')],
           maps: [
-            positionedMap(
-              WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
-              [
-                graph(MAIN, 'Main', [{ from: A, to: B }]),
-                graph(ASIDE, 'Aside', [{ from: B, to: A }]),
-              ],
-            ),
-            positionedMap(SECOND, { [A]: { x: 0, y: 200, open: false } }, [graph(THIRD, 'Third')]),
+            positionedMap(WORKING, { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } }, [
+              graph(MAIN, 'Main', [{ from: A, to: B }]),
+              graph(ASIDE, 'Aside', [{ from: B, to: A }]),
+            ]),
+            positionedMap(SECOND, { [A]: { x: 0, y: 200 } }, [graph(THIRD, 'Third')]),
           ],
         }),
       );
@@ -210,7 +204,7 @@ describe.each([
           maps: [
             positionedMap(
               WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } },
               [graph(MAIN, 'Main', [{ from: A, to: B }]), graph(ASIDE, 'Aside')],
               { activeGraph: ASIDE },
             ),
@@ -227,11 +221,10 @@ describe.each([
         load({
           resources: [markdown(A, 'A'), markdown(B, 'B')],
           maps: [
-            positionedMap(
-              WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
-              [graph(MAIN, 'Main', [{ from: A, to: B }]), graph(ASIDE, 'Aside')],
-            ),
+            positionedMap(WORKING, { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } }, [
+              graph(MAIN, 'Main', [{ from: A, to: B }]),
+              graph(ASIDE, 'Aside'),
+            ]),
           ],
         }),
       );
@@ -275,9 +268,7 @@ describe.each([
       const space = loaded(
         load({
           resources: [image],
-          maps: [
-            positionedMap(WORKING, { [A]: { x: 0, y: 0, open: false } }, [graph(MAIN, 'Graph 1')]),
-          ],
+          maps: [positionedMap(WORKING, { [A]: { x: 0, y: 0 } }, [graph(MAIN, 'Graph 1')])],
         }),
       );
       expect(space.lookup.resource(A)).toEqual(image);
@@ -289,11 +280,9 @@ describe.each([
         load({
           resources: [ur, markdown(B, 'B')],
           maps: [
-            positionedMap(
-              WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
-              [graph(MAIN, 'Graph 1', [{ from: A, to: B }])],
-            ),
+            positionedMap(WORKING, { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } }, [
+              graph(MAIN, 'Graph 1', [{ from: A, to: B }]),
+            ]),
           ],
         }),
       );
@@ -306,9 +295,7 @@ describe.each([
       const space = loaded(
         load({
           resources: [markdown(A, 'A')],
-          maps: [
-            positionedMap(WORKING, { [A]: { x: 0, y: 0, open: false } }, [graph(MAIN, 'Graph 1')]),
-          ],
+          maps: [positionedMap(WORKING, { [A]: { x: 0, y: 0 } }, [graph(MAIN, 'Graph 1')])],
         }),
       );
       expect(space.lookup.graph(MAIN)?.graph.edges).toEqual([]);
@@ -324,9 +311,9 @@ describe.each([
             positionedMap(
               WORKING,
               {
-                [A]: { x: 0, y: 0, open: false },
-                [B]: { x: 320, y: 0, open: false },
-                [C]: { x: 640, y: 0, open: false },
+                [A]: { x: 0, y: 0 },
+                [B]: { x: 320, y: 0 },
+                [C]: { x: 640, y: 0 },
               },
               [
                 graph(MAIN, 'Main', [
@@ -349,14 +336,10 @@ describe.each([
         load({
           resources: [markdown(A, 'A'), markdown(B, 'B')],
           maps: [
-            positionedMap(
-              WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
-              [
-                graph(MAIN, 'Main', [{ from: A, to: B }]),
-                graph(ASIDE, 'Alt', [{ from: A, to: B }]),
-              ],
-            ),
+            positionedMap(WORKING, { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } }, [
+              graph(MAIN, 'Main', [{ from: A, to: B }]),
+              graph(ASIDE, 'Alt', [{ from: A, to: B }]),
+            ]),
           ],
         }),
       );
@@ -368,16 +351,12 @@ describe.each([
         load({
           resources: [markdown(A, 'A'), markdown(B, 'B')],
           maps: [
-            positionedMap(
-              WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
-              [
-                graph(MAIN, 'Main', [
-                  { from: A, to: B },
-                  { from: A, to: B },
-                ]),
-              ],
-            ),
+            positionedMap(WORKING, { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } }, [
+              graph(MAIN, 'Main', [
+                { from: A, to: B },
+                { from: A, to: B },
+              ]),
+            ]),
           ],
         }),
       );
@@ -391,16 +370,12 @@ describe.each([
         load({
           resources: [markdown(A, 'A'), markdown(B, 'B')],
           maps: [
-            positionedMap(
-              WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
-              [
-                graph(MAIN, 'Main', [
-                  { from: A, to: B, title: 'On success' },
-                  { from: A, to: B, title: 'On failure' },
-                ]),
-              ],
-            ),
+            positionedMap(WORKING, { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } }, [
+              graph(MAIN, 'Main', [
+                { from: A, to: B, title: 'On success' },
+                { from: A, to: B, title: 'On failure' },
+              ]),
+            ]),
           ],
         }),
       );
@@ -415,11 +390,9 @@ describe.each([
         load({
           resources: [markdown(A, 'A'), markdown(B, 'B')],
           maps: [
-            positionedMap(
-              WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
-              [graph(MAIN, 'Main', [edge])],
-            ),
+            positionedMap(WORKING, { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } }, [
+              graph(MAIN, 'Main', [edge]),
+            ]),
           ],
         }),
       );
@@ -431,11 +404,9 @@ describe.each([
         load({
           resources: [markdown(A, 'A'), markdown(B, 'B')],
           maps: [
-            positionedMap(
-              WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
-              [graph(MAIN, 'Main', [{ from: A, to: ABSENT }])],
-            ),
+            positionedMap(WORKING, { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } }, [
+              graph(MAIN, 'Main', [{ from: A, to: ABSENT }]),
+            ]),
           ],
         }),
       );
@@ -455,11 +426,9 @@ describe.each([
         load({
           resources: [markdown(A, 'A'), markdown(B, 'B'), markdown(C, 'C')],
           maps: [
-            positionedMap(
-              WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
-              [graph(MAIN, 'Main', [{ from: B, to: C }])],
-            ),
+            positionedMap(WORKING, { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } }, [
+              graph(MAIN, 'Main', [{ from: B, to: C }]),
+            ]),
           ],
         }),
       );
@@ -474,12 +443,10 @@ describe.each([
         load({
           resources: [markdown(A, 'A'), markdown(B, 'B'), markdown(C, 'C')],
           maps: [
-            positionedMap(
-              WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
-              [graph(MAIN, 'Main', [{ from: A, to: C }])],
-            ),
-            positionedMap(SECOND, { [C]: { x: 0, y: 200, open: false } }, [graph(ASIDE, 'Aside')]),
+            positionedMap(WORKING, { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } }, [
+              graph(MAIN, 'Main', [{ from: A, to: C }]),
+            ]),
+            positionedMap(SECOND, { [C]: { x: 0, y: 200 } }, [graph(ASIDE, 'Aside')]),
           ],
         }),
       );
@@ -493,11 +460,9 @@ describe.each([
         load({
           resources: [markdown(A, 'A')],
           maps: [
-            positionedMap(
-              WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [ABSENT]: { x: 320, y: 0, open: false } },
-              [graph(MAIN, 'Main', [{ from: A, to: ABSENT }])],
-            ),
+            positionedMap(WORKING, { [A]: { x: 0, y: 0 }, [ABSENT]: { x: 320, y: 0 } }, [
+              graph(MAIN, 'Main', [{ from: A, to: ABSENT }]),
+            ]),
           ],
         }),
       );
@@ -511,11 +476,9 @@ describe.each([
         load({
           resources: [markdown(A, 'A'), markdown(B, 'B'), markdown(C, 'C')],
           maps: [
-            positionedMap(
-              WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
-              [graph(MAIN, 'Main', [{ from: A, to: B }])],
-            ),
+            positionedMap(WORKING, { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } }, [
+              graph(MAIN, 'Main', [{ from: A, to: B }]),
+            ]),
           ],
         }),
       );
@@ -531,7 +494,7 @@ describe.each([
           maps: [
             positionedMap(
               WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } },
               [graph(MAIN, 'Main', [{ from: A, to: B }]), graph(ASIDE, 'Aside')],
               { activeGraph: ASIDE },
             ),
@@ -548,7 +511,7 @@ describe.each([
           maps: [
             positionedMap(
               WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } },
               [graph(MAIN, 'Main', [{ from: A, to: B }])],
               { activeGraph: ABSENT },
             ),
@@ -570,11 +533,11 @@ describe.each([
           maps: [
             positionedMap(
               WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } },
               [graph(MAIN, 'Main', [{ from: A, to: B }])],
               { activeGraph: ASIDE },
             ),
-            positionedMap(SECOND, { [A]: { x: 0, y: 200, open: false } }, [graph(ASIDE, 'Aside')]),
+            positionedMap(SECOND, { [A]: { x: 0, y: 200 } }, [graph(ASIDE, 'Aside')]),
           ],
         }),
       );
@@ -595,14 +558,11 @@ describe.each([
         load({
           resources: [markdown(A, 'A'), markdown(B, 'B')],
           maps: [
-            positionedMap(
-              WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
-              [graph(MAIN, 'Main', [{ from: A, to: B }]), graph(MAIN, 'Main again')],
-            ),
-            positionedMap(SECOND, { [A]: { x: 0, y: 200, open: false } }, [
-              graph(MAIN, 'Main a third time'),
+            positionedMap(WORKING, { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } }, [
+              graph(MAIN, 'Main', [{ from: A, to: B }]),
+              graph(MAIN, 'Main again'),
             ]),
+            positionedMap(SECOND, { [A]: { x: 0, y: 200 } }, [graph(MAIN, 'Main a third time')]),
           ],
         }),
       );
@@ -620,16 +580,12 @@ describe.each([
         load({
           resources: [markdown(A, 'A'), markdown(B, 'B')],
           maps: [
-            positionedMap(
-              WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
-              [graph(MAIN, 'Main', [{ from: A, to: B }])],
-            ),
-            positionedMap(
-              SECOND,
-              { [A]: { x: 0, y: 200, open: false }, [B]: { x: 320, y: 200, open: false } },
-              [graph(ASIDE, 'Aside', [{ from: B, to: A }])],
-            ),
+            positionedMap(WORKING, { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } }, [
+              graph(MAIN, 'Main', [{ from: A, to: B }]),
+            ]),
+            positionedMap(SECOND, { [A]: { x: 0, y: 200 }, [B]: { x: 320, y: 200 } }, [
+              graph(ASIDE, 'Aside', [{ from: B, to: A }]),
+            ]),
           ],
         }),
       );
@@ -641,8 +597,8 @@ describe.each([
         load({
           resources: [markdown(A, 'A')],
           maps: [
-            positionedMap(WORKING, { [A]: { x: 0, y: 0, open: false } }, [graph(MAIN, 'Main')]),
-            positionedMap(WORKING, { [A]: { x: 0, y: 200, open: false } }, [graph(ASIDE, 'Aside')]),
+            positionedMap(WORKING, { [A]: { x: 0, y: 0 } }, [graph(MAIN, 'Main')]),
+            positionedMap(WORKING, { [A]: { x: 0, y: 200 } }, [graph(ASIDE, 'Aside')]),
           ],
         }),
       );
@@ -750,20 +706,14 @@ describe.each([
     const placedIn = (resources: readonly Resource[], content: JsonValue) =>
       load({
         resources,
-        maps: [
-          positionedMap(WORKING, { [A]: { x: 0, y: 0, open: false, content } }, [
-            graph(MAIN, 'Main'),
-          ]),
-        ],
+        maps: [positionedMap(WORKING, { [A]: { x: 0, y: 0, content } }, [graph(MAIN, 'Main')])],
       });
 
     it.each(everyKind)('loads a %s Resource with no Map content stored', (_kind, resources) => {
       const space = loaded(
         load({
           resources,
-          maps: [
-            positionedMap(WORKING, { [A]: { x: 0, y: 0, open: false } }, [graph(MAIN, 'Main')]),
-          ],
+          maps: [positionedMap(WORKING, { [A]: { x: 0, y: 0 } }, [graph(MAIN, 'Main')])],
         }),
       );
       expect(space.resources).toHaveLength(resources.length);
@@ -780,7 +730,7 @@ describe.each([
               positionedMap(
                 WORKING,
                 {
-                  [A]: { x: 0, y: 0, open: false, content: { shape: resourceShape } },
+                  [A]: { x: 0, y: 0, content: { shape: resourceShape } },
                   [B]: {
                     x: 320,
                     y: 0,
@@ -820,13 +770,7 @@ describe.each([
       }
     });
 
-    const openIn = (resources: readonly Resource[], open: boolean) =>
-      load({
-        resources: [...resources],
-        maps: [positionedMap(WORKING, { [A]: { x: 0, y: 0, open } }, [graph(MAIN, 'Main')])],
-      });
-
-    it('loads an entry with neither open nor size stored', () => {
+    it('loads an entry with no size stored', () => {
       const space = loaded(
         load({
           resources: [{ id: A, title: 'Node', kind: 'ur', content: {} }],
@@ -836,33 +780,21 @@ describe.each([
       expect(space.maps[0]?.positions[A]).toEqual({ x: 0, y: 0 });
     });
 
-    it('loads a Reference Resource Open or Closed by its Map content, and refuses the Map storing Open', () => {
+    it('loads a Reference Resource Open or Closed by its Map content', () => {
       const recap = [referenceTo(A, B), markdown(B, 'B')];
       for (const open of [true, false])
         expect(loaded(placedIn(recap, { open })).maps[0]?.positions[A]?.content).toEqual({ open });
       expect(refused(placedIn(recap, { shape: 'pill' }))).toEqual([
         expect.objectContaining({ kind: 'map-content-invalid', ref: A }),
       ]);
-      expect(refused(openIn(recap, true))).toEqual([
-        expect.objectContaining({ kind: 'open-requires-content', ref: A }),
-      ]);
     });
 
-    it('loads a Space Resource Open or Closed by its Map content, and refuses the Map storing Open', () => {
+    it('loads a Space Resource Open or Closed by its Map content', () => {
       const inner = [spaceResource(A, ABSENT)];
       for (const open of [true, false])
         expect(loaded(placedIn(inner, { open })).maps[0]?.positions[A]?.content).toEqual({ open });
       expect(refused(placedIn(inner, { shape: 'pill' }))).toEqual([
         expect.objectContaining({ kind: 'map-content-invalid', ref: A }),
-      ]);
-      expect(refused(openIn(inner, true))).toEqual([
-        expect.objectContaining({ kind: 'open-requires-content', ref: A }),
-      ]);
-    });
-
-    it('refuses a Reference to a Space Resource stored Open: the Reference plugin keeps its Open', () => {
-      expect(refused(openIn([referenceTo(A, B), spaceResource(B, ABSENT)], true))).toEqual([
-        expect.objectContaining({ kind: 'open-requires-content', ref: A }),
       ]);
     });
 
@@ -874,35 +806,10 @@ describe.each([
         ).toEqual({ open });
     });
 
-    it('refuses an Image Resource stored Open, which its plugin draws with no Open (ADR 0142)', () => {
-      const image: Resource = {
-        id: A,
-        title: 'Figure',
-        kind: 'image',
-        content: { url: 'https://example.com/figure.png' },
-      };
-      expect(refused(openIn([image], true))).toEqual([
-        expect.objectContaining({ kind: 'open-requires-content', ref: A }),
-      ]);
-      expect(loaded(openIn([image], false)).resources).toHaveLength(1);
-    });
-
-    it('loads a Markdown Resource Open or Closed by its Map content, and refuses the Map storing Open', () => {
+    it('loads a Markdown Resource Open or Closed by its Map content', () => {
       const prose = [markdown(A, 'A')];
       for (const open of [true, false])
         expect(loaded(placedIn(prose, { open })).maps[0]?.positions[A]?.content).toEqual({ open });
-      expect(refused(openIn(prose, true))).toEqual([
-        expect.objectContaining({ kind: 'open-requires-content', ref: A }),
-      ]);
-    });
-
-    it('refuses an Ur Resource stored Open, which has no content to show', () => {
-      expect(refused(openIn([{ id: A, title: 'Node', kind: 'ur', content: {} }], true))).toEqual([
-        expect.objectContaining({ kind: 'open-requires-content', ref: A }),
-      ]);
-      expect(
-        loaded(openIn([{ id: A, title: 'Node', kind: 'ur', content: {} }], false)).resources,
-      ).toHaveLength(1);
     });
   });
 
@@ -947,8 +854,8 @@ describe.each([
         load({
           resources: [markdown(A, 'A'), referenceTo(B, ABSENT)],
           maps: [
-            positionedMap(WORKING, { [A]: { x: 0, y: 0, open: false } }, [graph(MAIN, 'Main')]),
-            positionedMap(WORKING, { [A]: { x: 0, y: 200, open: false } }, [graph(ASIDE, 'Aside')]),
+            positionedMap(WORKING, { [A]: { x: 0, y: 0 } }, [graph(MAIN, 'Main')]),
+            positionedMap(WORKING, { [A]: { x: 0, y: 200 } }, [graph(ASIDE, 'Aside')]),
           ],
           defaultMap: ABSENT,
         }),
@@ -964,11 +871,10 @@ describe.each([
         load({
           resources: [markdown(A, 'A')],
           maps: [
-            positionedMap(
-              WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [ABSENT]: { x: 1, y: 1, open: false } },
-              [graph(MAIN, 'Main'), graph(MAIN, 'Main again')],
-            ),
+            positionedMap(WORKING, { [A]: { x: 0, y: 0 }, [ABSENT]: { x: 1, y: 1 } }, [
+              graph(MAIN, 'Main'),
+              graph(MAIN, 'Main again'),
+            ]),
           ],
         });
       expect(refused(document())).toEqual(refused(document()));

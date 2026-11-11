@@ -11,13 +11,7 @@ import { useSyncExternalStore, type ReactElement } from 'react';
 import { z } from 'zod';
 import { ReactFlowProvider } from '@xyflow/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import {
-  resourceOpen,
-  spaceSnapshotSchema,
-  uuidSchema,
-  type KindId,
-  type ResourceId,
-} from '@project/core';
+import { spaceSnapshotSchema, uuidSchema, type KindId, type ResourceId } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { bareKindData, type ResourceFlowNode } from '@project/react-flow-adapter';
 import { RESOURCE_DRAG_TYPE, SPACE_DRAG_TYPE } from '../src/components/ResourcesPopover';
@@ -26,8 +20,7 @@ import { composeApp } from '../src/compose-app';
 import { RESOURCE_SIZE } from '../src/resource';
 import type { ResourceResize } from '../src/render-adapter';
 import { mountSettled } from './settled-mount';
-import { CLOSED_DISPLAY } from '@project/ui';
-import { fixtureDisplay, fixtureFacts } from './render-adapter-fixtures';
+import { fixtureFacts } from './render-adapter-fixtures';
 import { stubResizeObserver } from './resize-observer';
 import { canvasReading, holdCanvasPolicy, IDLE_PLACEMENT } from './map-surfaces';
 import type { MapSurfacePolicy } from '../src/map-surface-policy';
@@ -53,10 +46,10 @@ const snapshot = spaceSnapshotSchema.parse({
         title: 'Map',
         kind: 'positioned',
         positions: {
-          [RESOURCE_ID]: { x: 0, y: 0, open: false },
-          [OTHER_RESOURCE_ID]: { x: 300, y: 0, open: false },
-          [REFERENCE_ID]: { x: 600, y: 0, open: false },
-          [UR_ID]: { x: 900, y: 0, open: false },
+          [RESOURCE_ID]: { x: 0, y: 0 },
+          [OTHER_RESOURCE_ID]: { x: 300, y: 0 },
+          [REFERENCE_ID]: { x: 600, y: 0 },
+          [UR_ID]: { x: 900, y: 0 },
         },
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
       },
@@ -144,7 +137,6 @@ const drawnNode = (
     ...bareKindData(kind),
     ...fixtureFacts(kind),
     selectedForAuthoring: false,
-    display: CLOSED_DISPLAY,
     activeGraphId: null,
     activeGraphColor: '#8a94a6',
     borderColor: null,
@@ -275,12 +267,10 @@ async function mountGraph(
     opened: () => {
       const { maps = [] } = spaceSession.getState().working.document;
       const positions = maps.find(({ id }) => id === MAP_ID)?.positions ?? {};
-      // Open by the host, or by a plugin's Map content, as Markdown's is (ADR 0142).
+      // Open is a plugin's Map content, as Markdown's is (ADR 0142).
       return Object.entries(positions)
         .filter(
-          ([, entry]) =>
-            entry !== undefined &&
-            (resourceOpen(entry) || OPEN_MAP_CONTENT.safeParse(entry.content).success),
+          ([, entry]) => entry !== undefined && OPEN_MAP_CONTENT.safeParse(entry.content).success,
         )
         .map(([resourceId]) => resourceId);
     },
@@ -496,22 +486,8 @@ it.each(['Enter', ' '])('leaves %s to a `.nokey` region inside a Resource', asyn
 });
 
 /**
- * Shift+Enter is Open and expand (ADR 0137), an Edit of the host's Open; each
- * kind's Open is its plugin's Map content (ADR 0142), so no kind takes it.
- */
-it('leaves Shift+Enter to the plugin on a focused Reference Resource', async () => {
-  const { opened } = await mountGraph([spaceReferenceNode()]);
-
-  const focused = nodeOf(REFERENCE_ID);
-  focused.focus();
-  fireEvent.keyDown(focused, { key: 'Enter', shiftKey: true });
-
-  expect(opened()).toEqual([]);
-});
-
-/**
  * The application keeps no Open for a Markdown Resource (ADR 0142): its Open
- * is its plugin's rail command, so the canvas's Open keys leave it alone.
+ * is its plugin's rail command, so the canvas leaves Enter and Shift+Enter alone.
  */
 it.each([
   ['Enter', false],
@@ -523,17 +499,6 @@ it.each([
   focused.focus();
   fireEvent.keyDown(focused, { key, shiftKey });
 
-  expect(opened()).toEqual([]);
-});
-
-it('leaves Shift+Enter alone on a Resource it cannot open and expand', async () => {
-  const { opened } = await mountGraph([resourceNode('Gateway', UR_ID, false, 'ur')]);
-
-  const focused = nodeOf(UR_ID);
-  focused.focus();
-  const unhandled = fireEvent.keyDown(focused, { key: 'Enter', shiftKey: true });
-
-  expect(unhandled).toBe(true);
   expect(opened()).toEqual([]);
 });
 
@@ -725,9 +690,8 @@ function dragResizeControlTo(clientX: number, clientY: number): void {
 describe('resize belongs to Resource rather than to a Resource kind', () => {
   it('offers a resize operation to a selected Resource whatever its kind', async () => {
     const reference = spaceReferenceNode();
-    reference.data.open = true;
+    reference.data.mapContent = { open: true };
     reference.data.selectedForAuthoring = true;
-    reference.data.display = fixtureDisplay(true, 'reference');
     const { view } = await mountGraph([reference]);
 
     expect(view.container.querySelector('.react-flow__resize-control')).toBeInTheDocument();
@@ -753,9 +717,8 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
    */
   it('routes one resize lifecycle from the control to the canvas capability', async () => {
     const opened = resourceNode('A', RESOURCE_ID, false);
-    opened.data.open = true;
+    opened.data.mapContent = { open: true };
     opened.data.selectedForAuthoring = true;
-    opened.data.display = fixtureDisplay(true, 'markdown', '# A');
     const onSelectResource = vi.fn();
     const resourceResize: ResourceResize = {
       beginResize: vi.fn(),
@@ -790,9 +753,8 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
    */
   it('proposes no node change to React Flow while it resizes', async () => {
     const opened = resourceNode('A', RESOURCE_ID, false);
-    opened.data.open = true;
+    opened.data.mapContent = { open: true };
     opened.data.selectedForAuthoring = true;
-    opened.data.display = fixtureDisplay(true, 'markdown');
     const resourceResize: ResourceResize = {
       beginResize: vi.fn(),
       previewResize: vi.fn(),
@@ -813,9 +775,8 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
 
   it('routes loss of an active resize to cancellation', async () => {
     const opened = resourceNode('A', RESOURCE_ID, false);
-    opened.data.open = true;
+    opened.data.mapContent = { open: true };
     opened.data.selectedForAuthoring = true;
-    opened.data.display = fixtureDisplay(true, 'markdown');
     const resourceResize: ResourceResize = {
       beginResize: vi.fn(),
       previewResize: vi.fn(),
@@ -849,9 +810,8 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
    */
   it('keeps a touch gesture alive across the projection its own frames publish', async () => {
     const opened = resourceNode('A', RESOURCE_ID, false);
-    opened.data.open = true;
+    opened.data.mapContent = { open: true };
     opened.data.selectedForAuthoring = true;
-    opened.data.display = fixtureDisplay(true, 'markdown');
     const resourceResize: ResourceResize = {
       beginResize: vi.fn(),
       previewResize: vi.fn(),
@@ -864,9 +824,8 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
     expect(resourceResize.beginResize).toHaveBeenCalledWith(RESOURCE_ID);
 
     const republished = resourceNode('A', RESOURCE_ID, false);
-    republished.data.open = true;
+    republished.data.mapContent = { open: true };
     republished.data.selectedForAuthoring = true;
-    republished.data.display = fixtureDisplay(true, 'markdown');
     setNodes([republished]);
 
     touchResizeControl('touchmove', 80, 60);
@@ -1022,8 +981,7 @@ describe('the C shortcut', () => {
 
 /**
  * Space reads the focused Resource in Full View: drawn over the canvas,
- * read-only, and left with Space or Escape back to the Resource, or with Enter
- * into the Resource Opened on the canvas.
+ * read-only, and left with Space or Escape back to the Resource.
  */
 describe('Full View', () => {
   const enterFullView = async () => {
@@ -1055,8 +1013,8 @@ describe('Full View', () => {
     expect(opened()).toEqual([]);
   });
 
-  // The host keeps no Open for a Markdown Resource (ADR 0142), so Enter only leaves.
-  it('leaves on Enter, Opening nothing for a Markdown Resource', async () => {
+  // The host keeps no Open (ADR 0142), so Enter neither leaves nor Opens.
+  it('stays on Enter, Opening nothing', async () => {
     const { opened, fullViewOf } = await enterFullView();
 
     // Flushes the updates the press schedules, which land after it returns.
@@ -1065,7 +1023,7 @@ describe('Full View', () => {
       return Promise.resolve();
     });
 
-    expect(fullViewOf()).toBeNull();
+    expect(fullViewOf()).toBe(RESOURCE_ID);
     expect(opened()).toEqual([]);
   });
 

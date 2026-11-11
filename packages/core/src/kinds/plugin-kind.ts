@@ -182,33 +182,26 @@ export interface PluginContent<K extends string, C = unknown> {
   readonly content: C;
 }
 
-/** A plugin kind's Map content, which every plugin declares. */
-export interface PluginMapContent {
-  readonly mapContent: KindMapContent;
-}
-
 /**
  * A plugin read as a kind module: its content schema, the references it
- * declares, and its Map content. A kind it draws is never Open by the
- * application's rule, because Open is the plugin's Map content. A plugin
- * that declares new content starts empty; one that does not is created only
+ * declares, and its Map content, where any Open or Shape it keeps lives. A
+ * plugin that declares new content starts empty; one that does not is created only
  * from what an author brings.
  */
 export function kindFromPlugin<const K extends string, C, M>(
   plugin: ResourcePlugin<C, M> & { readonly kind: K; readonly newContent: C },
-): KindModule<K, C, PluginContent<K, C>> & StartsEmpty<C> & PluginMapContent;
+): KindModule<K, C, PluginContent<K, C>> & StartsEmpty<C>;
 export function kindFromPlugin<const K extends string, C, M>(
   plugin: ResourcePlugin<C, M> & { readonly kind: K },
-): KindModule<K, C, PluginContent<K, C>> & PluginMapContent;
+): KindModule<K, C, PluginContent<K, C>>;
 export function kindFromPlugin<const K extends string, C, M>(
   plugin: ResourcePlugin<C, M> & { readonly kind: K },
-): KindModule<K, C, PluginContent<K, C>> & PluginMapContent {
+): KindModule<K, C, PluginContent<K, C>> {
   const kind = plugin.kind;
   const declaration = {
     id: kind,
     contentSchema: contentSchemaOf(plugin),
     flags: {
-      canOpen: false,
       mayBeTarget: plugin.mayBeTarget === true,
       ownsReferencedSpaces: plugin.ownsReferencedSpaces === true,
     },
@@ -220,14 +213,12 @@ export function kindFromPlugin<const K extends string, C, M>(
       return target === undefined ? undefined : uuids([target])[0];
     },
     spaceReferences: (content: C) => uuids(plugin.spaceReferences?.(content) ?? []),
+    mapContent: mapContentOf(kind, plugin.mapContent, plugin.outline?.bind(plugin)),
   };
   // A plugin that declares its selection has the core check it (ADR 0079).
   const module =
     plugin.selection === undefined
       ? defineKind(declaration)
       : defineKind({ ...declaration, selection: selectionOf(plugin.selection) });
-  const mapContent = mapContentOf(plugin, plugin.mapContent);
-  return plugin.newContent === undefined
-    ? { ...module, mapContent }
-    : { ...module, newContent: plugin.newContent, mapContent };
+  return plugin.newContent === undefined ? module : { ...module, newContent: plugin.newContent };
 }

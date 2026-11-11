@@ -62,7 +62,7 @@ const nextTargets = (
  * working state can say what its Maps are called (ADR 0068). The map is
  * therefore incomplete on the first render after a Space Resource appears, and every
  * surface reading it draws that Resource without its target's context until the read
- * lands — which is why `CanvasResource` takes an absent selection as a state rather
+ * lands — which is why a Space Resource's surface takes an absent selection as a state rather
  * than as an error.
  *
  * Reads fill the unopened targets. Open Spaces publishes changes to its live

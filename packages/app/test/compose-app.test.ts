@@ -38,8 +38,8 @@ const snapshot: SpaceSnapshot = {
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [RESOURCE_A]: { x: 10, y: 20, open: false },
-          [RESOURCE_B]: { x: 300, y: 40, open: false },
+          [RESOURCE_A]: { x: 10, y: 20 },
+          [RESOURCE_B]: { x: 300, y: 40 },
         },
         graphs: [{ id: GRAPH_ID, title: 'Main', edges: [{ from: RESOURCE_A, to: RESOURCE_B }] }],
       },
@@ -106,8 +106,8 @@ describe('what the composition opens on', () => {
 
     expect(authoring.mapPlacement()).toEqual(
       Placement.fromEntries([
-        [RESOURCE_A, { x: 10, y: 20, open: false }],
-        [RESOURCE_B, { x: 300, y: 40, open: false }],
+        [RESOURCE_A, { x: 10, y: 20 }],
+        [RESOURCE_B, { x: 300, y: 40 }],
       ]),
     );
   });

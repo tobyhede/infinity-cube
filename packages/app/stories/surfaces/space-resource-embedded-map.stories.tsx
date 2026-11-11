@@ -61,8 +61,8 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Collection 1',
         kind: 'positioned',
         positions: {
-          [INTAKE_ID]: { x: 0, y: 0, open: false },
-          [STORAGE_ID]: { x: 300, y: 0, open: false },
+          [INTAKE_ID]: { x: 0, y: 0 },
+          [STORAGE_ID]: { x: 300, y: 0 },
         },
         graphs: [
           {
@@ -79,7 +79,7 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Collection 2',
         kind: 'positioned',
         positions: {
-          [REVIEW_ID]: { x: 0, y: 0, open: false },
+          [REVIEW_ID]: { x: 0, y: 0 },
         },
         graphs: [{ id: TARGET_SECOND_GRAPH_ID, title: 'Detail', edges: [] }],
       },
@@ -124,7 +124,7 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [HOME_RESOURCE_ID]: { x: 0, y: 0, open: false },
+          [HOME_RESOURCE_ID]: { x: 0, y: 0 },
           [SPACE_RESOURCE_ID]: {
             x: 340,
             y: 0,
@@ -222,8 +222,8 @@ const pairTarget: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Overview',
         kind: 'positioned',
         positions: {
-          [PAIR_INTAKE_ID]: { x: 0, y: 0, open: false },
-          [PAIR_STORAGE_ID]: { x: 220, y: 0, open: false },
+          [PAIR_INTAKE_ID]: { x: 0, y: 0 },
+          [PAIR_STORAGE_ID]: { x: 220, y: 0 },
         },
         graphs: [
           {
@@ -238,8 +238,8 @@ const pairTarget: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Detail',
         kind: 'positioned',
         positions: {
-          [PAIR_STORAGE_ID]: { x: 0, y: 0, open: false },
-          [PAIR_INDEX_ID]: { x: 220, y: 0, open: false },
+          [PAIR_STORAGE_ID]: { x: 0, y: 0 },
+          [PAIR_INDEX_ID]: { x: 220, y: 0 },
         },
         graphs: [
           {

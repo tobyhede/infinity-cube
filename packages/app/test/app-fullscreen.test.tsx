@@ -29,8 +29,8 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Map',
         kind: 'positioned',
         positions: {
-          [RESOURCE_A]: { x: 10, y: 20, open: false },
-          [RESOURCE_B]: { x: 300, y: 20, open: false },
+          [RESOURCE_A]: { x: 10, y: 20 },
+          [RESOURCE_B]: { x: 300, y: 20 },
         },
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [{ from: RESOURCE_A, to: RESOURCE_B }] }],
       },

@@ -56,8 +56,6 @@ const OFFERED_VALUES = [
   'repeatedGraphEdges',
   'referencedResources',
   'resolveResourceContent',
-  'resourceDrawnByPlugin',
-  'resourceTakesOpen',
   'graphResourceIds',
   'graphStartResource',
   'serializeResource',

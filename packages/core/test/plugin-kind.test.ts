@@ -5,7 +5,6 @@ import { declaredOutline, kindFromPlugin } from '../src/kinds/plugin-kind';
 import {
   isPluginKind,
   jsonValueSchema,
-  keepsMapContent,
   mapContentProblem,
   mapContentWithoutMap,
   PLUGIN_KINDS,
@@ -15,18 +14,13 @@ import {
 } from '../src/index';
 
 describe('a Resource plugin read as a kind (ADR 0142)', () => {
-  it('lists every plugin this build draws, and only those keep Map content', () => {
+  it('lists every plugin this build draws', () => {
     expect(PLUGIN_KINDS).toEqual(['image', 'markdown', 'reference', 'space', 'ur']);
     expect(isPluginKind('ur')).toBe(true);
     expect(isPluginKind('image')).toBe(true);
     expect(isPluginKind('markdown')).toBe(true);
     expect(isPluginKind('reference')).toBe(true);
     expect(isPluginKind('space')).toBe(true);
-    expect(keepsMapContent('image')).toBe(true);
-    expect(keepsMapContent('ur')).toBe(true);
-    expect(keepsMapContent('markdown')).toBe(true);
-    expect(keepsMapContent('reference')).toBe(true);
-    expect(keepsMapContent('space')).toBe(true);
     expect(isPluginKind('chart')).toBe(false);
   });
 

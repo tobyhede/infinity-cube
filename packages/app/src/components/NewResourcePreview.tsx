@@ -1,6 +1,10 @@
-import { DEFAULT_KIND } from '@project/core';
+import {
+  DEFAULT_RESOURCE_SHAPE,
+  newDefaultResourceDocument,
+  resolvedMapContent,
+} from '@project/core';
 import { ViewportPortal, useConnection } from '@xyflow/react';
-import { CanvasResource, CLOSED_DISPLAY, bareOperations } from '@project/ui';
+import { PluginResource, bareOperations } from '@project/ui';
 import { RESOURCE_SIZE } from '../resource';
 import { dropTarget, newResourceDrop, type ElementDropTarget } from '../edge-authoring';
 
@@ -56,6 +60,7 @@ export function NewResourcePreview({
     accepts,
   );
   if (drop === null) return null;
+  const ghost = newDefaultResourceDocument(title);
 
   return (
     <ViewportPortal>
@@ -63,10 +68,11 @@ export function NewResourcePreview({
         className="new-resource-preview"
         data-testid="new-resource-preview"
         // A ghost of a Resource the author has not created. It draws through the
-        // production `CanvasResource` so the preview and the rendered Resource cannot
-        // drift, and that component names itself an `article` for the Resource it
-        // is — which this is not one of yet. Hidden from the accessibility tree
-        // so no Resource is announced before there is a Resource.
+        // production `PluginResource`, as a new Resource of the default kind, so
+        // the preview and the rendered Resource cannot drift, and that component
+        // names itself an `article` for the Resource it is — which this is not
+        // one of yet. Hidden from the accessibility tree so no Resource is
+        // announced before there is a Resource.
         aria-hidden="true"
         style={{
           transform: `translate(${drop.position.x + (RESOURCE_SIZE.width * (1 - scale)) / 2}px, ${drop.position.y + (RESOURCE_SIZE.height * (1 - scale)) / 2}px) scale(${scale})`,
@@ -74,12 +80,17 @@ export function NewResourcePreview({
           width: RESOURCE_SIZE.width,
         }}
       >
-        <CanvasResource
-          kindOperations={bareOperations(DEFAULT_KIND)}
-          display={CLOSED_DISPLAY}
+        <PluginResource
+          resourceId="new-resource-preview"
+          kind={ghost.kind}
+          title={{ title, readOnly: true, onReturnFocus: () => undefined }}
+          content={ghost.content}
+          mapContent={resolvedMapContent(ghost.kind, undefined)}
+          outline={DEFAULT_RESOURCE_SHAPE}
           state="rest"
-          title={title}
           graphColor="var(--accent)"
+          readOnly
+          operations={bareOperations(ghost.kind)}
         />
       </div>
     </ViewportPortal>

@@ -31,8 +31,13 @@ const stylesheet = readFileSync(
   'utf8',
 );
 
-const railStylesheet = readFileSync(
-  fileURLToPath(new URL('../src/resource-rail.css', import.meta.url)),
+/**
+ * A Closed Resource's Title is laid out by its plugin (ADR 0142), below the
+ * band the host's rail floats over. The Markdown plugin's band is the one each
+ * plugin that draws a Closed Title states.
+ */
+const markdownView = readFileSync(
+  fileURLToPath(new URL('../../plugin-markdown/src/view.tsx', import.meta.url)),
   'utf8',
 );
 
@@ -119,11 +124,6 @@ describe('a single-line Title', () => {
     expect(declared(rung('title'), 'font-weight')).toBe('var(--canvas-resource-title-weight)');
   });
 
-  /** Bottom-anchored: the body puts its passengers at the foot of the Resource. */
-  it('is still bottom-anchored in the Resource body', () => {
-    expect(declared(block('.canvas-resource__body'), 'justify-content')).toBe('flex-end');
-  });
-
   /**
    * And it wraps at the `title` role for as many visual lines as it needs, to
    * a three-line clamp. The break the box
@@ -200,23 +200,24 @@ describe('the ladder ceiling', () => {
    *
    * The ceiling is a count of `title`-role lines rather than the room the Resource
    * happens to have, so that the ladder draws the same Open and Closed. What
-   * makes that count safe is this: it fits inside the body of a **Closed** Resource,
-   * which is the smaller of the two and the authored default. Nothing in the
-   * type system connects the pixels in this stylesheet to `COLLAPSED_RESOURCE_SIZE`,
-   * so this is what does — a border, a rail or a padding change that stole the
-   * room would otherwise show up as a Title quietly overrunning its Resource.
+   * makes that count safe is this: it fits inside the room a plugin leaves a
+   * **Closed** Resource's Title, which is the smaller of the two and the
+   * authored default. Nothing in the type system connects these pixels to
+   * `COLLAPSED_RESOURCE_SIZE`, so this is what does — a border, a band or a
+   * padding change that stole the room would otherwise show up as a Title
+   * quietly overrunning its Resource.
    */
-  it('fits inside the body of a Closed Resource', () => {
+  it('fits inside the room a Closed Resource leaves its Title', () => {
     // The Resource's own border width is `--canvas-resource-border-width`,
     // declared in `tailwind.css` beside the Resource's colour tokens rather than
     // stated inline in this stylesheet's own `border` shorthand.
     const border = themeToken('--canvas-resource-border-width', 'px');
-    const railHeight = Number.parseFloat(/min-height:\s*(\d+)px/u.exec(railStylesheet)?.[1] ?? '');
-    const bodyPadding = Number.parseFloat(
-      declared(block('.canvas-resource__body'), 'padding')?.split('px')[0] ?? '',
-    );
+    const band = Number.parseFloat(/const RAIL_BAND = (\d+);/u.exec(markdownView)?.[1] ?? '');
+    // The plugin pads the Title's foot by 8px while Closed.
+    const foot = 8;
+    expect(band).toBeGreaterThan(0);
 
-    const room = COLLAPSED_RESOURCE_SIZE.height - 2 * border - railHeight - 2 * bodyPadding;
+    const room = COLLAPSED_RESOURCE_SIZE.height - 2 * border - band - foot;
     const ceiling =
       token('--canvas-resource-title-size', 'px') *
       token('--canvas-resource-title-leading') *

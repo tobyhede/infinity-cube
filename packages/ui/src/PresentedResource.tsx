@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { titleName, UNRESOLVED_CONTENT, type ResourceContent } from '@project/core';
-import { presentedContent } from './kinds/registry';
+import { PresentedPluginContent } from './PresentedPluginResource';
 import { UnresolvedContent } from './UnresolvedContent';
 
 export interface PresentedResourceProps {
@@ -15,16 +15,15 @@ export interface PresentedResourceProps {
   readonly content: ResourceContent;
   /**
    * Drawn in place of the content's own view, for content only the composing
-   * application can draw: a Space Resource's Map, which needs the Space it
-   * points at.
+   * application can draw.
    */
   readonly children?: ReactNode;
 }
 
 /**
- * Renders a resource's title and its content for presenting, its content as
- * its kind's view half draws it: a Markdown Resource's **parsed**, through
- * `RenderedMarkdown`.
+ * Renders a resource's title and its content for presenting, as the Notes
+ * window draws a note and a preview of each move: its name, and below it its
+ * content drawn read-only by the plugin of the content's kind (ADR 0142).
  */
 export function PresentedResource({ title, content, children }: PresentedResourceProps) {
   const name = titleName(title);
@@ -39,30 +38,12 @@ export function PresentedResource({ title, content, children }: PresentedResourc
       data-content-kind={content.kind}
     >
       <h2 className="resource__title">{name}</h2>
-      {children ?? <PresentedContent name={name} content={content} />}
+      {children ??
+        (content.kind === UNRESOLVED_CONTENT.kind ? (
+          <UnresolvedContent />
+        ) : (
+          <PresentedPluginContent kind={content.kind} title={name} content={content.content} />
+        ))}
     </article>
-  );
-}
-
-/**
- * The content below a presented Resource's name, drawn by its kind's view half
- * (`kinds/registry.ts`). A presented image is never replaced, its own or a
- * Target's, so no view offers Replace. A Space Resource's view half draws
- * nothing here: the application draws its Map instead, through `children`. An
- * Ur Resource has no content (ADR 0113), so it draws its name alone. The
- * article carries the kind as `data-content-kind` so a stylesheet can address
- * each kind's frame.
- */
-function PresentedContent({
-  name,
-  content,
-}: {
-  readonly name: string;
-  readonly content: ResourceContent;
-}) {
-  return content.kind === UNRESOLVED_CONTENT.kind ? (
-    <UnresolvedContent />
-  ) : (
-    presentedContent(name, content)
   );
 }

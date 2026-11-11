@@ -53,8 +53,8 @@ export const picturesSnapshot: SpaceSnapshot = {
         title: 'Pictures',
         kind: 'positioned',
         positions: {
-          [FIGURE]: { x: 0, y: 0, open: false },
-          [MISSING]: { x: 360, y: 0, open: false, size: { width: 460, height: 380 } },
+          [FIGURE]: { x: 0, y: 0 },
+          [MISSING]: { x: 360, y: 0, size: { width: 460, height: 380 } },
         },
         graphs: [{ id: PICTURES_GRAPH, title: 'Main', edges: [{ from: FIGURE, to: MISSING }] }],
         activeGraph: PICTURES_GRAPH,

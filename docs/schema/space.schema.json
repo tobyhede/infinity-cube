@@ -64,17 +64,13 @@
       }
     },
     "placement": {
-      "description": "One Resource's place on a Map. Size and Map content are the Map's, not the Resource's (ADR 0122, ADR 0142). Every kind is drawn by a plugin, so a Resource that Opens keeps its Open in its Map content, and `open` is never true; both, and what Map content a Resource's plugin accepts, are intake's checks, because they need the Resource's kind.",
+      "description": "One Resource's place on a Map. Size and Map content are the Map's, not the Resource's (ADR 0122, ADR 0142). Every kind is drawn by a plugin, so a Resource that Opens keeps its Open in its Map content. What Map content a Resource's plugin accepts is intake's check, because it needs the Resource's kind.",
       "type": "object",
       "required": ["x", "y"],
       "additionalProperties": false,
       "properties": {
         "x": { "type": "number" },
         "y": { "type": "number" },
-        "open": {
-          "description": "False or absent: a Markdown, Reference or Space Resource is Open by its Map content, {\"open\": true}, which intake refuses here.",
-          "type": "boolean"
-        },
         "size": {
           "description": "Absent means the Closed Size, 260 by 146, which is also the floor on each axis.",
           "type": "object",
@@ -86,7 +82,7 @@
           }
         },
         "content": {
-          "description": "The Map content the plugin drawing this Resource keeps on this Map, any JSON value: an Ur Resource's is {\"shape\": \"rectangle\" | \"pill\" | \"ellipse\" | \"diamond\"}, and a Markdown, Reference or Space Resource's is {\"open\": boolean} (ADR 0142). Absent means the plugin's default. Whether the plugin's own schema accepts it, and that a kind no plugin draws keeps none, are intake's checks, because they need the Resource's kind."
+          "description": "The Map content the plugin drawing this Resource keeps on this Map, any JSON value: an Ur Resource's is {\"shape\": \"rectangle\" | \"pill\" | \"ellipse\" | \"diamond\"}, and a Markdown, Reference or Space Resource's is {\"open\": boolean} (ADR 0142). Absent means the plugin's default. Whether the plugin's own schema accepts it is intake's check, because it needs the Resource's kind; a Resource whose kind names no plugin in this build keeps whatever is stored, unread."
         }
       }
     },

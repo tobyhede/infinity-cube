@@ -131,15 +131,14 @@
    with it — its children are React Flow sub-flow nodes, drawn as DOM siblings
    of its wrapper rather than inside this element — so the canvas moves those
    children's positions and the frame's clip about this same centre. This rule
-   reads the angle as `--canvas-resource-drag-tilt`, which `CanvasResource` publishes
+   reads the angle as `--canvas-resource-drag-tilt`, which `PluginResource` publishes
    onto the element from `CANVAS_RESOURCE_DRAG_TILT_DEGREES`. */
 .canvas-resource[data-state='dragging'] {
   box-shadow: var(--canvas-resource-shadow-dragging);
   transform: rotate(var(--canvas-resource-drag-tilt));
 }
 
-/* The rail's geometry is `ResourceRail`'s, in `resource-rail.css`, and it has no
-   colour at all. **When the commands show is not decided here.** On the canvas `ResourceNode` floats the toolbar
+/* The rail has no colour at all. **When the commands show is not decided here.** On the canvas `ResourceNode` floats the toolbar
    out of the Resource in React Flow's `NodeToolbar`, which draws it while the
    Resource is selected, or an edit is running, and not otherwise. The row, gap,
    border, paper and shadow are the shared `.command-surface`'s. What is left is
@@ -155,25 +154,6 @@
    quiet icon button on the shared command surface, and its unavailable
    treatment is `Button`'s recipe (`Button.tsx`), so the Command Dock and a
    Resource's rail draw one answer. Do not correct it from this file. */
-
-.canvas-resource__body {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  justify-content: flex-end;
-  min-height: 0;
-  /* 8px and not 10px: the rail above is the command strip's own height, and a
-     Closed Resource's remaining room still has to hold the whole Title ladder —
-     which `packages/ui/test/canvas-resource-title-ladder.test.ts` computes from this
-     number, the rail's and the border's. */
-  padding: 8px 12px;
-}
-
-.canvas-resource__body,
-.canvas-resource__rail {
-  opacity: var(--canvas-resource-strength, 1);
-  transition: opacity var(--resource-hover-duration, 120ms) var(--resource-hover-easing, ease);
-}
 
 /* The heading box holds the ladder and caps it. Its own type is the `title`
    role's, so the Title Lines below it inherit the leading, the tracking and the
@@ -303,49 +283,6 @@
   flex: 1 1 auto;
 }
 
-/* A drawn content area sits above its Title. The attribute follows that area's
-   presence through Close, keeping the ordering until its exit fade completes. */
-.canvas-resource[data-content-area='true'] .canvas-resource__body {
-  order: 2;
-  flex: none;
-  margin-top: auto;
-}
-
-.canvas-resource__content {
-  order: 1;
-  display: flex;
-  flex: 1;
-  min-height: 0;
-  flex-direction: column;
-  border-bottom: var(--canvas-resource-content-divider-width) solid var(--canvas-resource-ink);
-  /* The Resource's ink, not the ambient `--foreground`. A Resource's face is its own
-     paper and a body drawn in the surrounding theme's text colour is the one
-     part of an Open Resource that would not look like the Resource. */
-  color: var(--canvas-resource-title);
-  opacity: var(--canvas-resource-strength, 1);
-  transition-property: opacity;
-  transition-duration: calc(var(--resource-placement-duration, 200ms) * 0.4);
-  transition-timing-function: var(--resource-placement-easing, ease);
-}
-
-/* Markdown enters over the tail of the node's growth, after its reflow has
-   mostly settled. It leaves immediately and is gone before the node finishes
-   shrinking. The border belongs to this container, so it travels with the
-   document rather than appearing as a separate full-strength line. */
-.canvas-resource__content[data-presence='entering'],
-.canvas-resource__content[data-presence='leaving'] {
-  opacity: 0;
-}
-
-.canvas-resource__content[data-presence='entering'] {
-  transition-delay: calc(var(--resource-placement-duration, 200ms) * 0.6);
-}
-
-.canvas-resource__content[data-presence='leaving'] {
-  pointer-events: none;
-  transition-delay: 0ms;
-}
-
 .canvas-resource .resource__title-editor,
 .canvas-resource .resource__title-input {
   width: 100%;
@@ -405,55 +342,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .canvas-resource,
-  .canvas-resource__content {
+  .canvas-resource {
     transition: none;
   }
-
-  .canvas-resource__content {
-    transition-delay: 0ms;
-  }
-
-  /* The content cross-fade reads the placement token rather than a transition
-     of its own, so it is withdrawn through the token — the same one the
-     application sets on `.graph-area`. Declared here as well so a Resource mounted
-     outside that container, which every story is, honours the preference. */
-  .canvas-resource {
-    --resource-placement-duration: 1ms;
-  }
-}
-
-/* The rail sits eight pixels inside the Resource's paper border and holds its kind
-   glyph at the top-right corner; on the canvas the commands float outside the
-   Resource (ADR 0102). The room above the content is the glyph's row: eight pixels,
-   the glyph, eight pixels. An Open rectangle draws no glyph, so its Markdown sits as
-   far from the top as from the sides: 12px here and the rendered body's own 10px
-   (`--markdown-resource-content-top`) make its 22px side inset. */
-.canvas-resource__rail {
-  position: absolute;
-  inset: 8px 8px auto;
-  height: auto;
-  min-height: 0;
-  padding: 0;
-  z-index: 2;
-  pointer-events: none;
-  gap: 8px;
-}
-.canvas-resource__content {
-  padding-top: 12px;
-}
-.canvas-resource[data-open='false'] > .canvas-resource__body {
-  padding-top: 30px;
-}
-
-/* Where no adapter floats the toolbar it is drawn in the rail, and the room below
-   it is the command strip's: its 38px, clear of its cast shadow. */
-.canvas-resource:has(> .canvas-resource__rail .canvas-resource__actions) .canvas-resource__content {
-  padding-top: calc(54px + var(--shadow-chrome-elevated-offset, 0px));
-}
-.canvas-resource[data-open='false']:has(> .canvas-resource__rail .canvas-resource__actions)
-  > .canvas-resource__body {
-  padding-top: 46px;
 }
 
 /* A Shape other than the rectangle (ADR 0121), drawn Open and Closed alike.
@@ -521,26 +412,11 @@
 }
 
 /* The Title lays out in the rectangle inscribed in the Shape, whose insets
-   `CanvasResource` publishes from the Shape's outline, centred in it. The field
+   `PluginResource` publishes from the Shape's outline, centred in it. The field
    the Title is written in is capped at the lines that room holds; the diamond's
    inscribed rectangle is the smallest. */
 .canvas-resource[data-resource-shape='diamond'] {
   --canvas-resource-title-ladder-lines: 2;
-}
-
-.canvas-resource:not([data-resource-shape='rectangle']) > .canvas-resource__rail {
-  inset: var(--canvas-resource-shape-inset-block) var(--canvas-resource-shape-inset-inline) auto;
-  padding: 0;
-}
-
-.canvas-resource:not([data-resource-shape='rectangle']) > .canvas-resource__body {
-  position: absolute;
-  inset: var(--canvas-resource-shape-inset-block) var(--canvas-resource-shape-inset-inline);
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  overflow: hidden;
-  text-align: center;
 }
 
 /* The heading and its control are held to the inscribed rectangle's width,

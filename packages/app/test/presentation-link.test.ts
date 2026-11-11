@@ -54,10 +54,10 @@ const snapshot: SpaceSnapshot = {
         title: 'Map',
         kind: 'positioned',
         positions: {
-          [OPENING]: { x: 0, y: 0, open: false },
-          [LEFT]: { x: 300, y: -100, open: false },
-          [RIGHT]: { x: 300, y: 100, open: false },
-          [CLOSING]: { x: 600, y: 0, open: false },
+          [OPENING]: { x: 0, y: 0 },
+          [LEFT]: { x: 300, y: -100 },
+          [RIGHT]: { x: 300, y: 100 },
+          [CLOSING]: { x: 600, y: 0 },
         },
         graphs: [
           {

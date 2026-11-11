@@ -84,7 +84,7 @@ function CreatePeers({ creates }: { readonly creates: readonly DockCreate[] }) {
 
 function ResourcesTrigger() {
   return (
-    /* The Resource glyph the rows in its own list carry, not `OpenResourceIcon`'s
+    /* The Resource glyph the rows in its own list carry, not a plugin Open's
        expand arrows: beside a Space, a Map and a Graph's colour, the icon
        slot names what the cluster is about, and "expand" named a gesture this
        cluster does not have. */
