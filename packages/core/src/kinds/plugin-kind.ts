@@ -4,6 +4,7 @@ import {
   type Outline,
   type ResourcePlugin,
 } from '@project/resource-api/domain';
+import { z } from 'zod';
 import { jsonValueSchema, type JsonValue } from '../json-value';
 import type { ContentFacts } from '../resource-content';
 import type { UUID } from '../types';
@@ -64,16 +65,36 @@ function mapContentOf<M>(
   };
 }
 
+/** Every id a plugin declares for its content, Resources and Spaces alike. */
+function declaredIds<C, M>(plugin: ResourcePlugin<C, M>, content: C): readonly string[] {
+  const target = plugin.contentTarget?.(content);
+  return [
+    ...(plugin.resourceReferences?.(content) ?? []),
+    ...(target === undefined ? [] : [target]),
+    ...(plugin.spaceReferences?.(content) ?? []),
+  ];
+}
+
 /**
- * The ids a plugin declares, as the core's UUIDs. A plugin's own content
- * schema is what holds a reference to a UUID, so an id that is not one names
- * nothing the core can resolve and is not a reference.
+ * The plugin's content schema, which also refuses content declaring an id
+ * that is not a UUID: such an id names nothing the core can resolve, so the
+ * Resource is refused where its content is parsed, at intake among them,
+ * rather than its reference going unreported.
  */
-const uuids = (ids: readonly string[]): readonly UUID[] =>
-  ids.flatMap((id) => {
-    const parsed = uuidSchema.safeParse(id);
-    return parsed.success ? [parsed.data] : [];
+function contentSchemaOf<C, M>(plugin: ResourcePlugin<C, M>): z.ZodType<C, z.ZodTypeDef, unknown> {
+  return plugin.content.superRefine((content, context) => {
+    for (const id of declaredIds(plugin, content)) {
+      if (uuidSchema.safeParse(id).success) continue;
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `The "${plugin.kind}" plugin's content names "${id}" as a reference, which is not a UUID.`,
+      });
+    }
   });
+}
+
+/** The ids a plugin declares, as the core's UUIDs: content its schema accepted names only UUIDs. */
+const uuids = (ids: readonly string[]): readonly UUID[] => ids.map((id) => uuidSchema.parse(id));
 
 /** What every plugin kind resolves its content to: its kind, which its own view draws. */
 export interface PluginContent<K extends string> {
@@ -96,7 +117,7 @@ export function kindFromPlugin<const K extends string, C, M>(
   const kind = plugin.kind;
   const module = defineKind({
     id: kind,
-    contentSchema: plugin.content,
+    contentSchema: contentSchemaOf(plugin),
     flags: {
       canOpen: false,
       opensToFit: false,

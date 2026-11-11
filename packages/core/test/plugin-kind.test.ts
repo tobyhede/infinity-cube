@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
+import { definePlugin } from '@project/resource-api/domain';
+import { kindFromPlugin } from '../src/kinds/plugin-kind';
 import {
   isPluginKind,
   jsonValueSchema,
@@ -38,6 +41,40 @@ describe('a Resource plugin read as a kind (ADR 0142)', () => {
     expect(resourceOutline('ur', undefined)).toBe('rectangle');
     expect(resourceOutline('ur', { shape: 'hexagon' })).toBe('rectangle');
     expect(resourceOutline('markdown', undefined)).toBe('rectangle');
+  });
+});
+
+describe('the references a plugin declares', () => {
+  const linking = kindFromPlugin(
+    definePlugin({
+      apiVersion: 1,
+      kind: 'linking',
+      name: 'Linking',
+      listName: 'Linkings',
+      referenceName: null,
+      content: z.object({ to: z.string(), space: z.string() }).strict(),
+      newContent: { to: '', space: '' },
+      mapContent: { schema: z.null(), default: null },
+      resourceReferences: (content) => [content.to],
+      contentTarget: (content) => content.to,
+      spaceReferences: (content) => [content.space],
+    }),
+  );
+  const target = '00000000-0000-4000-8000-0000000000a1';
+  const space = '00000000-0000-4000-8000-0000000000b1';
+
+  it('are the UUIDs it names', () => {
+    const content = linking.contentSchema.parse({ to: target, space });
+    expect(linking.resourceReferences(content)).toEqual([target]);
+    expect(linking.contentTarget(content)).toBe(target);
+    expect(linking.spaceReferences(content)).toEqual([space]);
+  });
+
+  it('refuse content declaring an id that is not a UUID, rather than dropping the reference', () => {
+    const notResource = linking.contentSchema.safeParse({ to: 'not-a-uuid', space });
+    expect(notResource.success).toBe(false);
+    expect(notResource.error?.issues.map(({ message }) => message).join()).toMatch(/not-a-uuid/u);
+    expect(linking.contentSchema.safeParse({ to: target, space: 'elsewhere' }).success).toBe(false);
   });
 });
 
