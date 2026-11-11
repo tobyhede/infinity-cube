@@ -36,13 +36,14 @@ const refusalOf = (answer: Answer): string | null =>
   answer === 'completed' || answer === 'unchanged' ? null : answer.refused;
 
 /**
- * `node` with the commands of the Space it embeds, whatever its kind (ADR 0142):
- * each read from what its plugin passed `Embed`, never from the kind. The Map
- * and Graph chooser is offered only where the plugin passed a commit for the
- * view, and writes only through it, so whatever withdraws the commit withdraws
- * the choice. Authoring the shown Space, its Maps and Graphs included, is
- * offered on the chooser's lists only while the plugin also passes a Claim. A
- * Resource that embeds no Space, or passed no commit, is left as it is.
+ * `node` with the commands of the Space it embeds, whatever its kind (ADR 0142),
+ * each read from what its plugin passed `Embed`. The Map and Graph chooser is
+ * drawn wherever the plugin passed a view, and chooses only through the commit
+ * passed with it: with none, as while another drawing holds the Claim, it is
+ * drawn disabled, unless the Resource shows content not its own, as a
+ * Reference does, which offers no choice to withdraw. The shown Space's links
+ * are offered beside the chooser, and its authoring, its Maps and Graphs
+ * included, only while the plugin passes a Claim as well as the commit.
  */
 export function decorateEmbedCommands(
   node: ResourceFlowNode,
@@ -53,17 +54,16 @@ export function decorateEmbedCommands(
   const embed = ownMapEmbed(context.mapEmbeds, resourceId);
   if (embed === undefined) return node;
   const { space, view, select, claim } = embed.request;
-  const commit = select?.commit;
-  // No commit, no chooser; and the shown Space's authoring is drawn on the
-  // chooser's lists, so a Claim offers it only beside one.
-  if (commit === undefined) return node;
+  if (select === undefined) return node;
+  const commit = select.commit;
+  if (commit === undefined && !node.data.authorsContent) return node;
   const spaceId = uuidSchema.safeParse(space);
   const target = spaceId.success ? context.spaceResourceTargets.get(spaceId.data) : undefined;
   const selection = resolveEmbedView(space, view, target);
   if (target === undefined || selection === undefined) {
     return withEmbedCommands(node, { mapNote: READING_SPACE_NOTE });
   }
-  const entry = claim === undefined ? undefined : context.spaces?.entry(target.id);
+  const entry = context.spaces?.entry(target.id);
   const railContext: SpaceResourceRailContext | undefined =
     entry === undefined ||
     context.spaces === null ||
@@ -77,12 +77,15 @@ export function decorateEmbedCommands(
           containingSpaceId: context.containingSpaceId,
           deleteConfirmation: entry.app.deleteConfirmation,
         };
-  const authoring = context.authorOnCanvas && context.editableResourceIds.has(resourceId);
+  const chooses =
+    commit !== undefined && context.authorOnCanvas && context.editableResourceIds.has(resourceId);
   const mapRail = buildSpaceResourceRail({
     target,
     selection,
-    disabled: !authoring,
+    disabled: !chooses,
+    authorsShownSpace: claim !== undefined,
     complete: (targetMap, graphId) => {
+      if (commit === undefined) return null;
       void commit({ ...view, map: targetMap.id, graph: graphId }).then((answer) =>
         context.onContextReport(resourceId, refusalOf(answer)),
       );

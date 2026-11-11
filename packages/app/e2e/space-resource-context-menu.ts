@@ -28,7 +28,23 @@ export async function exerciseSpaceResourceContextMenus(
       },
     });
   });
-  // The shown Space is authored only under the Claim Edit takes (ADR 0142).
+  const openMenu = async (kind: 'map' | 'graph') => {
+    const trigger = (await resourceControls(page, resource)).getByTestId(`space-resource-${kind}`);
+    await trigger.focus();
+    await trigger.press('Enter');
+  };
+  // A link authors nothing, so it is offered before any Claim is taken.
+  await openMenu('map');
+  await page.getByRole('menuitem', { name: 'Copy link to Map', exact: true }).click();
+  await expect(resource.getByRole('status')).toHaveText('Link copied.');
+  const mapLink = await page.evaluate(() => navigator.clipboard.readText());
+  expect(new URL(mapLink).pathname).toMatch(/^\/spaces\/[^/]+\/maps\/[^/]+$/);
+  await openMenu('graph');
+  await page.getByRole('menuitem', { name: 'Copy link to Graph', exact: true }).click();
+  const graphLink = await page.evaluate(() => navigator.clipboard.readText());
+  expect(graphLink).toContain(mapLink);
+  // The shown Space's own Maps and Graphs are authored only under the Claim
+  // Edit takes (ADR 0142).
   await (
     await resourceControls(page, resource)
   )
@@ -37,11 +53,6 @@ export async function exerciseSpaceResourceContextMenus(
   await expect(
     (await resourceControls(page, resource)).getByRole('button', { name: /^Done Resource/ }),
   ).toBeVisible();
-  const openMenu = async (kind: 'map' | 'graph') => {
-    const trigger = (await resourceControls(page, resource)).getByTestId(`space-resource-${kind}`);
-    await trigger.focus();
-    await trigger.press('Enter');
-  };
   // One grouping grammar: the
   // Map list, New Map on its own, Rename beside Copy link to
   // Map, then Delete — one separator between each group.
@@ -65,11 +76,6 @@ export async function exerciseSpaceResourceContextMenus(
   await canvas.focus();
   await expect(page.getByRole('textbox', { name: 'Map name', exact: true })).toHaveCount(0);
   await expect(canvas).toBeFocused();
-  await openMenu('map');
-  await page.getByRole('menuitem', { name: 'Copy link to Map', exact: true }).click();
-  await expect(resource.getByRole('status')).toHaveText('Link copied.');
-  const mapLink = await page.evaluate(() => navigator.clipboard.readText());
-  expect(new URL(mapLink).pathname).toMatch(/^\/spaces\/[^/]+\/maps\/[^/]+$/);
 
   // Same grammar, with Colour… and Shape… heading the commands on this Graph —
   // and no permanent address offered.
@@ -135,10 +141,6 @@ export async function exerciseSpaceResourceContextMenus(
   ).toHaveAttribute('aria-checked', 'true');
   await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
-  await openMenu('graph');
-  await page.getByRole('menuitem', { name: 'Copy link to Graph', exact: true }).click();
-  const graphLink = await page.evaluate(() => navigator.clipboard.readText());
-  expect(graphLink).toContain(mapLink);
 
   await openMenu('graph');
   await expect(

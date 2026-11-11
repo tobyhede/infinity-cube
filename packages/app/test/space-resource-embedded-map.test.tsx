@@ -1167,8 +1167,11 @@ describe('the Map an Open Space Resource draws', () => {
     const parent = document.querySelector(`.react-flow__node[data-id="${SPACE_RESOURCE_ID}"]`);
     if (!(parent instanceof HTMLElement)) throw new Error('Space Resource missing');
     expect(within(controlsOf(parent)).queryByRole('button', { name: /Close Resource/ })).toBeNull();
-    // The Space Resource's own commit is withdrawn, so its embedding offers no chooser.
-    expect(within(controlsOf(parent)).queryByTestId('space-resource-map')).toBeNull();
+    // The Space Resource's own commit is withdrawn, so its chooser is drawn disabled.
+    expect(within(controlsOf(parent)).getByTestId('space-resource-map')).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
     const sibling = document.querySelector(`.react-flow__node[data-id="${HOME_RESOURCE_ID}"]`);
     if (!(sibling instanceof HTMLElement)) throw new Error('Containing Markdown Resource missing');
     expect(queryCommand(sibling, /Edit Resource/)).toBeNull();
@@ -1319,7 +1322,10 @@ describe('the Map an Open Space Resource draws', () => {
     expect(
       within(controlsOf(editing)).queryByRole('button', { name: /Close Resource/ }),
     ).toBeNull();
-    expect(within(controlsOf(editing)).queryByTestId('space-resource-map')).toBeNull();
+    expect(within(controlsOf(editing)).getByTestId('space-resource-map')).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
 
     fireEvent.keyDown(
       within(embeddedNode(DRAWN_A)).getByRole('textbox', { name: 'Resource title' }),
