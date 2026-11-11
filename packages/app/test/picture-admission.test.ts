@@ -1,8 +1,9 @@
 import type { AssetRef } from '@project/core';
-import type { AssetClient } from '@project/persistence';
+import { servedMediaType, type AssetClient } from '@project/persistence';
 import { describe, expect, it, vi } from 'vitest';
 import {
   admitImage,
+  IMAGE_MEDIA_TYPES,
   MAX_IMAGE_BYTES,
   refusalForDeclaredType,
   storePicture,
@@ -90,6 +91,10 @@ describe('admitting an image', () => {
 
   it('is ten MiB', () => {
     expect(MAX_IMAGE_BYTES).toBe(10_485_760);
+  });
+
+  it('admits only formats the host serves under their own type, so every stored picture draws', () => {
+    expect(IMAGE_MEDIA_TYPES.map(servedMediaType)).toEqual([...IMAGE_MEDIA_TYPES]);
   });
 });
 

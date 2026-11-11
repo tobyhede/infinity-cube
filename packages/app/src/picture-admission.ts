@@ -8,14 +8,19 @@
 import { isAssetRef } from '@project/core';
 import { ASSET_TOO_LARGE, MAX_ASSET_BYTES, type AssetClient } from '@project/persistence';
 
-/** The largest image the host stores, in bytes: 10 MiB. */
+/** The largest picture an Image Resource stores, in bytes: the asset store's 10 MiB cap. */
 export const MAX_IMAGE_BYTES = MAX_ASSET_BYTES;
 
-/** The formats the host stores, each identified from the bytes. */
+/**
+ * The formats an Image Resource's picture may be, each identified from the
+ * bytes. Each is one the host serves under its own type (`servedMediaType`,
+ * `@project/persistence`), which a picture needs to be drawn from its URL;
+ * `packages/app/test/picture-admission.test.ts` holds the two lists together.
+ */
 export const IMAGE_MEDIA_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'] as const;
 export type ImageMediaType = (typeof IMAGE_MEDIA_TYPES)[number];
 
-/** Whether a stored media type is one the host stores images as. */
+/** Whether a media type is one an Image Resource's picture may be. */
 export const isImageMediaType = (value: string): value is ImageMediaType =>
   IMAGE_MEDIA_TYPES.some((type) => type === value);
 
@@ -24,28 +29,19 @@ export const isImageMediaType = (value: string): value is ImageMediaType =>
  * SVG has its own because it is not refused as unrecognised: it is left for its
  * own decision (ADR 0106).
  */
-const IMAGE_REFUSALS = [
-  'image-too-large',
-  'image-format-unsupported',
-  'image-svg-unsupported',
-] as const;
-export type ImageRefusal = (typeof IMAGE_REFUSALS)[number];
+export type ImageRefusal = 'image-too-large' | 'image-format-unsupported' | 'image-svg-unsupported';
 
 /** What storing a picture answered: the asset URL it is stored at, or why not. */
 export type ImageStoring =
   | { readonly kind: 'stored'; readonly url: string }
   | { readonly kind: 'refused'; readonly code: ImageRefusal };
 
-/** Whether a problem code is one of the refusals storing an image answers. */
-export const isImageRefusal = (code: string): code is ImageRefusal =>
-  IMAGE_REFUSALS.some((refusal) => refusal === code);
-
 /**
  * The refusal the browser can answer from the media type it declares for a
  * file, before sending it, or `undefined` when only the bytes can tell.
  *
  * A declared type comes from the file's name or the platform, not its bytes,
- * so this only refuses a type it knows is not stored: a declared image type
+ * so this only refuses a type it knows is not a picture: a declared image type
  * or no type at all is read, and `admitImage` decides from the bytes.
  */
 export const refusalForDeclaredType = (type: string): ImageRefusal | undefined => {

@@ -177,7 +177,9 @@ export const extensionForMediaType = (mediaType: string): string =>
 /**
  * The only media types served inline from the application's origin: the four
  * picture types a browser draws without running anything. Every other asset is
- * served as `application/octet-stream`.
+ * served as `application/octet-stream`. An Image Resource's picture rule
+ * (`IMAGE_MEDIA_TYPES`, `packages/app/src/picture-admission.ts`) admits only
+ * types listed here, which `packages/app/test/picture-admission.test.ts` holds.
  */
 const INLINE_MEDIA_TYPES: readonly string[] = [
   'image/png',
