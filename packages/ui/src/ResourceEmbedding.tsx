@@ -11,6 +11,7 @@ import type { Answer, Kept, ResourceId, Size } from '@project/resource-api/domai
 import {
   ResourceHostProvider,
   type EmbedProps,
+  type RailOutlet,
   type ResourceHost,
   type TitleProps,
 } from '@project/resource-api/view';
@@ -30,11 +31,12 @@ import { ResourceFailureBoundary } from './ResourceFailureBoundary';
  * the embedding passed, with the rename passed with it, so the embedded plugin
  * draws that Title as it draws any and at most one Title draws; a picture is
  * named by it. The embedded plugin's rail commands join the embedding
- * Resource's rail, which is where a picture's rename is offered.
+ * Resource's rail, after its own, which is where a picture's rename is offered.
  *
  * The embedding guards recursion and a deleted Target, drawing a short note in
  * the rect for each: a Resource is never drawn inside itself, nor is one whose
- * kind may not be a Target (ADR 0113), which keeps referencing to one hop.
+ * kind may not be a Target (ADR 0113), which keeps referencing to one hop, and
+ * a Resource embedded inside an embedding embeds nothing further.
  *
  * `HostEmbed` is one component for every surface's lifetime, reading what it
  * draws from context. Do not make `Embed` a new component per render: React
@@ -49,8 +51,12 @@ export interface Embedding {
   readonly resources: readonly Resource[];
   /** The Resources already being drawn around this point, outermost first. */
   readonly drawing: readonly ResourceId[];
-  /** The host of the surface the embedding is drawn in, whose rail and own region it shares. */
+  /** Whether this point is inside an embedded Resource, which embeds nothing further. */
+  readonly nested: boolean;
+  /** The host of the surface the embedding is drawn in, whose own region it shares. */
   readonly host: ResourceHost;
+  /** Where the embedded Resource's rail commands go: the surface's rail, after its own plugin's. */
+  readonly rail: RailOutlet;
   /** The size the embedding draws into: the surface's. */
   readonly size: Size;
   readonly selected: boolean;
@@ -74,6 +80,7 @@ export function EmbeddingProvider({
 /** Why the embedding draws nothing of the Resource asked for. */
 const NOTES = {
   recursive: 'This Resource cannot be shown inside itself.',
+  nested: 'A Resource shown inside another shows nothing further.',
   deleted: 'The Resource this shows was deleted.',
   untargetable: 'This Resource cannot be shown here.',
 } as const;
@@ -103,6 +110,7 @@ export function HostEmbed(props: EmbedProps) {
   if (embedding === null || !('resource' in props)) return null;
   const { resource: id, title } = props;
   if (embedding.drawing.includes(id)) return <EmbeddingNote>{NOTES.recursive}</EmbeddingNote>;
+  if (embedding.nested) return <EmbeddingNote>{NOTES.nested}</EmbeddingNote>;
   const target = embedding.resources.find((resource) => resource.id === id);
   if (target === undefined) return <EmbeddingNote>{NOTES.deleted}</EmbeddingNote>;
   if (!isPluginKind(target.kind) || !mayBeTarget(target.kind))
@@ -210,13 +218,18 @@ function EmbeddedSurface({
     [title.value, commitTitle],
   );
   const outer = embedding.host;
-  const host: ResourceHost = useMemo(() => ({ ...outer, Title: EmbeddedTitle }), [outer]);
+  const outerRail = embedding.rail;
+  const host: ResourceHost = useMemo(
+    () => ({ ...outer, Title: EmbeddedTitle, rail: outerRail }),
+    [outer, outerRail],
+  );
   const inner: Embedding = useMemo(
     () => ({
       ...embedding,
       // The embedded Resource's own references are not this surface's to
       // offer: a Resource embedded here embeds nothing further.
       resources: [],
+      nested: true,
       drawing: [...embedding.drawing, target.id],
     }),
     [embedding, target.id],

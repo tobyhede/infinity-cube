@@ -364,12 +364,14 @@ export function PluginSurface(props: PluginResourceProps & { readonly entry: Plu
     () => ({
       resources: embeddable ?? [],
       drawing: [props.resourceId],
+      nested: false,
       host,
+      rail: rail.embedded,
       size,
       selected: state === 'selected' || state === 'editing',
       onFailure,
     }),
-    [embeddable, props.resourceId, host, size, state, onFailure],
+    [embeddable, props.resourceId, host, rail, size, state, onFailure],
   );
 
   const entityActions = props.entityActions;

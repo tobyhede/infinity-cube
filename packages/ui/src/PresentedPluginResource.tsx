@@ -103,7 +103,10 @@ export function PresentedPluginSurface(
     () => ({
       resources: embeddable ?? [],
       drawing: [props.resourceId],
+      nested: false,
       host,
+      // The Stage draws no rail, so no order among its commands.
+      rail: host.rail,
       size: STAGE_SIZE,
       selected: false,
       onFailure,
@@ -173,7 +176,15 @@ export function PresentedPluginContent({ kind, title, content }: PresentedPlugin
     [],
   );
   const embedding: Embedding = useMemo(
-    () => ({ resources: [], drawing: [], host, size: STAGE_SIZE, selected: false }),
+    () => ({
+      resources: [],
+      drawing: [],
+      nested: false,
+      host,
+      rail: host.rail,
+      size: STAGE_SIZE,
+      selected: false,
+    }),
     [host],
   );
   const plugin = pluginEntryFor(kind).render({
