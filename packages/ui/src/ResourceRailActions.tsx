@@ -13,9 +13,8 @@ import { cn } from './lib/utils';
 /**
  * The command cluster at a Resource rail's trailing edge, as one toolbar (ADR 0073).
  *
- * The rail itself is `ResourceRail` and stays a plain band with one slot at its
- * trailing edge. This is what a Resource that carries several commands puts in
- * that slot, trailed by the Resource's kind glyph.
+ * `PluginResource` draws it as the Resource's toolbar, holding the plugin's
+ * commands and the host's beside them.
  *
  * It is `CanvasCommandToolbar`, the Command Dock's surface, so a Resource's
  * commands read as the same chrome as the Dock's and an Edge's.

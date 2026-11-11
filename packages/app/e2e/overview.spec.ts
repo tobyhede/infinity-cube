@@ -129,10 +129,6 @@ test(
     const resource = nodeByTitle(page, 'A').first();
     const controls = await resourceControls(page, resource);
 
-    // No band, even with a Graph active and the Resource selected: a plugin's
-    // Resource draws no rail of its own on its face (ADR 0142).
-    await expect(resource.locator('.canvas-resource__rail')).toHaveCount(0);
-
     // One surface, drawn twice. Read off both elements in the page, so a change
     // to either that the other did not follow fails here.
     const treatment = (locator: Locator) =>
@@ -552,9 +548,7 @@ test('a resource shows its title in the graph, and opens to show rendered Markdo
 /**
  * Close on an Open Reference Resource: its plugin draws what its Map content
  * says, so its Target's content goes in the commit that Closes it (ADR 0142).
- * The fade a content area of `CanvasResource`'s draws on Close is held by
- * `packages/ui/test/CanvasResource.test.tsx`; no Resource the fixture Opens
- * draws one.
+ * Nothing fades on Close: the plugin draws its Closed state at once.
  */
 test('the Close action closes an opened resource', async ({ page }) => {
   await page.goto('/');

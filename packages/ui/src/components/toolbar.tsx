@@ -22,7 +22,7 @@ import { Button } from '../Button';
  * Both halves stay `forwardRef` although neither takes a ref here. Base UI's
  * prop types include `ref`, and a plain function component under React 18
  * would advertise one and then drop it — silently, and at the call site that
- * needed it most (`CanvasResource` returns focus to its Edit control this way).
+ * needed it most, where a caller returns focus to a toolbar item.
  */
 const Toolbar = React.forwardRef<HTMLDivElement, ToolbarPrimitive.Root.Props>(
   function Toolbar(props, ref) {

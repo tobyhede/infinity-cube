@@ -314,7 +314,7 @@ test(
 );
 
 test(
-  "hovering the real React Flow node reveals the adapter's Edge handles and none of CanvasResource's commands; selecting it draws them",
+  "hovering the real React Flow node reveals the adapter's Edge handles and none of the Resource's commands; selecting it draws them",
   { tag: '@parity:canvas-resource-hover-reveals-handles-and-selection-draws-commands' },
   async ({ page }) => {
     await page.goto('/?story=components--resource--hover&mode=preview');

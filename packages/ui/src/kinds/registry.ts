@@ -29,8 +29,8 @@ export interface KindOperationsByKind {
 /**
  * What a Resource's kind offers beyond its shared Title (ADR 0051): a kind-owned
  * choice of operations, not a kind tag plus an optional field every other kind
- * ignores. Opening and Closing are every Resource's and are not here; what it
- * draws, and whether it is Open, is the display's.
+ * ignores. Whether it has an Open state at all, and what it draws, is its
+ * plugin's (ADR 0142).
  */
 export type KindOperations = KindOperationsByKind[KindId];
 

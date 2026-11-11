@@ -170,7 +170,7 @@ test(
     const boxes = await node.evaluate((element) => {
       const resourceElement = element.querySelector('.canvas-resource');
       if (resourceElement === null)
-        throw new Error('The React Flow node contains no CanvasResource');
+        throw new Error('The React Flow node contains no drawn Resource');
       const nodeBox = element.getBoundingClientRect();
       const resourceBox = resourceElement.getBoundingClientRect();
       return {

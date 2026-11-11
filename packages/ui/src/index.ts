@@ -51,8 +51,6 @@ export type {
   CanvasSpaceResourceSelection,
   SpaceResourceSelectorsProps,
 } from './SpaceResourceSelectors';
-export { usePresence } from './use-presence';
-export type { Presence, PresenceState } from './use-presence';
 export {
   ResourceRailAction,
   ResourceRailActions,
