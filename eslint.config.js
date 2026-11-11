@@ -232,8 +232,8 @@ const packageInternalsPattern = (exemptApp) => ({
  */
 const KIND_NEUTRAL_MODULES = new Set([
   'registry',
-  'kind-module',
-  'kind-view',
+  'plugin-module',
+  'plugin-listing',
   'plugins',
   'plugin-kind',
   'plugin-views',

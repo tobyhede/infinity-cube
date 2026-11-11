@@ -10,7 +10,7 @@ export const BADGED_TARGET_GLYPH = 'badged-target';
  * every surface. Each kind declares one under `kinds/`, and the registry is the
  * one place they are listed, so no surface names a kind (ADR 0128).
  */
-export interface KindView<Operations> {
+export interface PluginListing<Operations> {
   /** What one Resource of this kind is called. */
   readonly name: string;
   /** What the Resources list calls this kind's Resources. */

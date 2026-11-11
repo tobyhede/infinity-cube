@@ -1,7 +1,8 @@
 import { urKind } from '@project/core';
 import { urPlugin } from '@project/plugin-ur/domain';
-import type { KindView } from './kind-view';
-import { pluginGlyph, type PluginOperations } from './plugin-views';
+import { urPluginView } from '@project/plugin-ur/view';
+import type { PluginListing } from './plugin-listing';
+import type { PluginOperations } from './plugin-views';
 
 /**
  * The Ur kind's place in this package's kind registry, taken from its plugin
@@ -9,7 +10,7 @@ import { pluginGlyph, type PluginOperations } from './plugin-views';
  * by `PluginResource` and `PresentedPluginResource` from `plugin-views.tsx`, so
  * it declares no content view of its own.
  */
-export const urView: KindView<PluginOperations> = {
+export const urView: PluginListing<PluginOperations> = {
   name: urPlugin.name,
   listName: urPlugin.listName,
   referenceName: urPlugin.referenceName,

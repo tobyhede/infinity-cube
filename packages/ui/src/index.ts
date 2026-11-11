@@ -88,7 +88,7 @@ export type {
   ChoiceMenuTriggerProps,
 } from './ChoiceMenu';
 export { ResourceKindIcon, resourceKindName } from './ResourceKindIcon';
-export { BADGED_TARGET_GLYPH } from './kinds/kind-view';
+export { BADGED_TARGET_GLYPH } from './kinds/plugin-listing';
 export { bareOperations, kindNaming } from './kinds/registry';
 export type {
   KindNaming,

@@ -1,6 +1,6 @@
 import { referenceKind } from '@project/core';
 import { referencePlugin } from '@project/plugin-reference/domain';
-import { BADGED_TARGET_GLYPH, type KindView } from './kind-view';
+import { BADGED_TARGET_GLYPH, type PluginListing } from './plugin-listing';
 import type { PluginOperations } from './plugin-views';
 
 /**
@@ -11,7 +11,7 @@ import type { PluginOperations } from './plugin-views';
  * The canvas strokes its border dotted at rest (`reference-canvas.css`, which
  * `PluginResource` imports).
  */
-export const referenceView: KindView<PluginOperations> = {
+export const referenceView: PluginListing<PluginOperations> = {
   name: referencePlugin.name,
   listName: referencePlugin.listName,
   referenceName: referencePlugin.referenceName,

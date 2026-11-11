@@ -15,12 +15,12 @@ import { uuidSchema } from '../uuid';
 import {
   defineKind,
   selectionProblem,
-  type KindModule,
+  type PluginModule,
   type KindMapContent,
   type SpaceSelection,
   type SpaceView,
   type StartsEmpty,
-} from './kind-module';
+} from './plugin-module';
 
 /**
  * A Resource plugin's domain half read as the core reads every kind (ADR
@@ -190,13 +190,13 @@ export interface PluginContent<K extends string, C = unknown> {
  */
 export function kindFromPlugin<const K extends string, C, M>(
   plugin: ResourcePlugin<C, M> & { readonly kind: K; readonly newContent: C },
-): KindModule<K, C, PluginContent<K, C>> & StartsEmpty<C>;
+): PluginModule<K, C, PluginContent<K, C>> & StartsEmpty<C>;
 export function kindFromPlugin<const K extends string, C, M>(
   plugin: ResourcePlugin<C, M> & { readonly kind: K },
-): KindModule<K, C, PluginContent<K, C>>;
+): PluginModule<K, C, PluginContent<K, C>>;
 export function kindFromPlugin<const K extends string, C, M>(
   plugin: ResourcePlugin<C, M> & { readonly kind: K },
-): KindModule<K, C, PluginContent<K, C>> {
+): PluginModule<K, C, PluginContent<K, C>> {
   const kind = plugin.kind;
   const declaration = {
     id: kind,

@@ -1,6 +1,6 @@
 import type { Resource } from '@project/core';
 import { kindNaming } from './kinds/registry';
-import { BADGED_TARGET_GLYPH } from './kinds/kind-view';
+import { BADGED_TARGET_GLYPH } from './kinds/plugin-listing';
 import { ReferenceIcon, type ResourceBaseKind } from './icons';
 
 /**

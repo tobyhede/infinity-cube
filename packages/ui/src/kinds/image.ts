@@ -1,7 +1,7 @@
 import { imageKind } from '@project/core';
 import { imagePlugin } from '@project/plugin-image/domain';
 import { imagePluginView } from '@project/plugin-image/view';
-import type { KindView } from './kind-view';
+import type { PluginListing } from './plugin-listing';
 import type { PluginOperations } from './plugin-views';
 
 /**
@@ -10,7 +10,7 @@ import type { PluginOperations } from './plugin-views';
  * own Resources are drawn by `PluginResource` and `PresentedPluginResource`,
  * and a Reference Resource's view of one by the host's embedding.
  */
-export const imageView: KindView<PluginOperations> = {
+export const imageView: PluginListing<PluginOperations> = {
   name: imagePlugin.name,
   listName: imagePlugin.listName,
   referenceName: imagePlugin.referenceName,

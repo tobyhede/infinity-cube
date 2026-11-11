@@ -10,7 +10,7 @@ import {
 } from '@project/core';
 import { defaultView } from './default';
 import { imageView } from './image';
-import type { KindView } from './kind-view';
+import type { PluginListing } from './plugin-listing';
 import { markdownView } from './markdown';
 import { referenceView } from './reference';
 import { spaceView } from './space';
@@ -44,7 +44,7 @@ export type KindOperationsOf<K extends ResourceKind> = K extends KindId
 
 /** Each kind's view half, typed so a surface over a kinded value calls its own kind's view. */
 type KindViews = {
-  readonly [K in KindId]: KindView<KindOperationsByKind[K]>;
+  readonly [K in KindId]: PluginListing<KindOperationsByKind[K]>;
 };
 
 /** The kinds' view halves: the one place in this package each kind is named (ADR 0128). */
@@ -57,7 +57,10 @@ const KIND_VIEWS: KindViews = {
 };
 
 /** What a kind's Resources are called and drawn as. */
-export type KindNaming = Pick<KindView<unknown>, 'name' | 'listName' | 'referenceName' | 'Glyph'>;
+export type KindNaming = Pick<
+  PluginListing<unknown>,
+  'name' | 'listName' | 'referenceName' | 'Glyph'
+>;
 
 /**
  * What a kind's Resources are called and drawn as, from its view half, or the

@@ -1,7 +1,7 @@
 import { markdownKind } from '@project/core';
 import { markdownPlugin } from '@project/plugin-markdown/domain';
 import { markdownPluginView } from '@project/plugin-markdown/view';
-import type { KindView } from './kind-view';
+import type { PluginListing } from './plugin-listing';
 import type { PluginOperations } from './plugin-views';
 
 /**
@@ -10,7 +10,7 @@ import type { PluginOperations } from './plugin-views';
  * Resources are drawn by `PluginResource` and `PresentedPluginResource`, and a
  * Reference Resource's view of one by the host's embedding.
  */
-export const markdownView: KindView<PluginOperations> = {
+export const markdownView: PluginListing<PluginOperations> = {
   name: markdownPlugin.name,
   listName: markdownPlugin.listName,
   referenceName: markdownPlugin.referenceName,

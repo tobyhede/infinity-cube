@@ -120,7 +120,7 @@ export interface KindResolvedContent {
  * kind; a kind with nothing to say about a rule takes `defineKind`'s answer.
  * The view half is the application's.
  */
-export interface KindModule<
+export interface PluginModule<
   K extends string,
   Content,
   Resolved extends KindResolvedContent = KindResolvedContent,
@@ -176,10 +176,10 @@ type DeclaredRule =
 
 /** What a kind must declare; the rest takes {@link defineKind}'s answer. */
 type KindDeclaration<K extends string, Content, Resolved extends KindResolvedContent> = Pick<
-  KindModule<K, Content, Resolved>,
+  PluginModule<K, Content, Resolved>,
   DeclaredRule
 > &
-  Partial<Omit<KindModule<K, Content, Resolved>, DeclaredRule>>;
+  Partial<Omit<PluginModule<K, Content, Resolved>, DeclaredRule>>;
 
 /** The content in its schema's key order, or as given when the schema refuses it, so this never throws. */
 const inSchemaOrder =
@@ -197,13 +197,13 @@ const inSchemaOrder =
  */
 export function defineKind<const K extends string, Content, Resolved extends KindResolvedContent>(
   declaration: KindDeclaration<K, Content, Resolved> & StartsEmpty<Content>,
-): KindModule<K, Content, Resolved> & StartsEmpty<Content>;
+): PluginModule<K, Content, Resolved> & StartsEmpty<Content>;
 export function defineKind<const K extends string, Content, Resolved extends KindResolvedContent>(
   declaration: KindDeclaration<K, Content, Resolved>,
-): KindModule<K, Content, Resolved>;
+): PluginModule<K, Content, Resolved>;
 export function defineKind<K extends string, Content, Resolved extends KindResolvedContent>(
   declaration: KindDeclaration<K, Content, Resolved>,
-): KindModule<K, Content, Resolved> {
+): PluginModule<K, Content, Resolved> {
   return {
     canonicalContent: inSchemaOrder(declaration.contentSchema),
     ...declaration,

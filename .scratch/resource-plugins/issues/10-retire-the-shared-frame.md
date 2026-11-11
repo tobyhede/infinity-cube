@@ -28,5 +28,5 @@ Status: ready-for-agent
 - **Embedded nodes** stack one above their parent (`zIndex + 1`) rather than above an Open frame's `OPEN_RESOURCE_Z_INDEX`, which stays for the Space Resource a Map is embedded in.
 - **`visibleCanvasCap`** (the cap on a plugin's size hint) moved to `visible-canvas-cap.ts`, the one survivor of `open-and-expand.tsx`.
 - **The Title ladder's ceiling test** now measures the room a plugin leaves a Closed Title (the plugins' 30px band and 8px foot) instead of the frame's rail and body padding.
-- **Vocabulary**: `KindModule` and `KindView` become Resource plugin names in a separate rename commit.
+- **Vocabulary**, in its own rename commit: core's `KindModule` is `PluginModule` (`kinds/plugin-module.ts`, the registry's `PLUGIN_MODULES`), and ui's `KindView` is `PluginListing` (`kinds/plugin-listing.ts`), named for what it now holds: a plugin's names, glyph and bare operations as lists show them. `PluginView` (resource-api) and `PluginEntry` (ui) were taken. `KindId`, `KindFlags`, `defineKind` and the `kinds/` directories keep their names: a Resource kind is still the glossary's word for what names the plugin.
 - **Not touched**: who owns a Space Resource's controls (a separate thread), and the plugin skills, whose text stays true (an `"open"` key on a placement is still refused), so no manifest bump.

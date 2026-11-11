@@ -5,14 +5,15 @@ import type { UUID } from '../types';
 import type {
   KindFlags,
   KindMapContent,
-  KindModule,
+  PluginModule,
+  SpaceFraming,
   SpaceSelection,
   SpaceSelectionProblem,
   SpaceSelectionTarget,
   SpaceView,
   SpaceViewChoice,
   StartsEmpty,
-} from './kind-module';
+} from './plugin-module';
 import { imageKind } from './image';
 import { markdownKind } from './markdown';
 import { referenceKind } from './reference';
@@ -45,11 +46,11 @@ type ContentByKind = { [K in KindId]: z.output<Registered[K]['contentSchema']> }
 type ResolvedByKind = { [K in KindId]: ReturnType<Registered[K]['resolveContent']> };
 
 /** Each kind's module, typed so a rule over a kinded value calls its own kind's module. */
-type KindModules = {
-  readonly [K in KindId]: KindModule<K, ContentByKind[K], ResolvedByKind[K]>;
+type PluginModules = {
+  readonly [K in KindId]: PluginModule<K, ContentByKind[K], ResolvedByKind[K]>;
 };
 
-const KIND_MODULES: KindModules = REGISTERED;
+const PLUGIN_MODULES: PluginModules = REGISTERED;
 
 /** A kinded value whose content is its kind's, correlated so its module accepts it. */
 type Kinded<K extends KindId> = {
@@ -93,7 +94,7 @@ interface KindParsers<K extends KindId> {
 }
 
 const parsersOf = <K extends KindId>(kind: K): KindParsers<K> => ({
-  content: KIND_MODULES[kind].contentSchema.transform((content) => ({ kind, content })),
+  content: PLUGIN_MODULES[kind].contentSchema.transform((content) => ({ kind, content })),
 });
 
 const builtParsers = new Map<KindId, KindParsers<KindId>>();
@@ -147,7 +148,7 @@ export type ResourceContent = Reached<ResolvedByKind[KindId]> | ContentUnresolve
 export const UNRESOLVED_CONTENT: ContentUnresolved = { kind: 'unresolved', via: 'target' };
 
 /** Every registered kind's id, in registration order. */
-export const KIND_IDS: readonly KindId[] = Object.values(KIND_MODULES).map(({ id }) => id);
+export const KIND_IDS: readonly KindId[] = Object.values(PLUGIN_MODULES).map(({ id }) => id);
 
 /** Whether a module registers this kind with this build. */
 export const isRegisteredKind = (kind: string): kind is KindId =>
@@ -155,7 +156,7 @@ export const isRegisteredKind = (kind: string): kind is KindId =>
 
 /** The rules a kind declares for every Resource of it: the default plugin's for a kind with no plugin. */
 export const kindFlags = (kind: ResourceKind): KindFlags =>
-  isRegisteredKind(kind) ? KIND_MODULES[kind].flags : defaultKind.flags;
+  isRegisteredKind(kind) ? PLUGIN_MODULES[kind].flags : defaultKind.flags;
 
 /** Whether a plugin in this build draws this kind (ADR 0142). */
 export const isPluginKind = (kind: string): kind is PluginKind =>
@@ -163,7 +164,7 @@ export const isPluginKind = (kind: string): kind is PluginKind =>
 
 /** The Map content a Resource of this kind keeps: its plugin's, or the default plugin's (ADR 0142). */
 const mapContentOf = (kind: ResourceKind): KindMapContent =>
-  isRegisteredKind(kind) ? KIND_MODULES[kind].mapContent : defaultKind.mapContent;
+  isRegisteredKind(kind) ? PLUGIN_MODULES[kind].mapContent : defaultKind.mapContent;
 
 /**
  * Why a Map entry may not hold this Map content for a Resource of this kind,
@@ -193,7 +194,7 @@ export const resourceOutline = (kind: ResourceKind, stored: JsonValue | undefine
 export type KindedResource = Kinded<KindId> | Unplugged;
 
 const resourceReferencesOf = <K extends KindId>(resource: Kinded<K>) =>
-  KIND_MODULES[resource.kind].resourceReferences(resource.content);
+  PLUGIN_MODULES[resource.kind].resourceReferences(resource.content);
 
 /**
  * Whether a Resource's kind names a plugin in this build, so its content is
@@ -210,7 +211,7 @@ export const resourceReferences = (resource: KindedResource): readonly UUID[] =>
   isPlugged(resource) ? resourceReferencesOf(resource) : [];
 
 const contentTargetOf = <K extends KindId>(resource: Kinded<K>) =>
-  KIND_MODULES[resource.kind].contentTarget(resource.content);
+  PLUGIN_MODULES[resource.kind].contentTarget(resource.content);
 
 /** The Resource whose content this one shows, when its kind shows another's (ADR 0070). */
 export const contentTarget = (resource: KindedResource): UUID | undefined =>
@@ -220,7 +221,7 @@ export const contentTarget = (resource: KindedResource): UUID | undefined =>
 export const mayBeTarget = (kind: ResourceKind): boolean => kindFlags(kind).mayBeTarget;
 
 const spaceReferencesOf = <K extends KindId>(resource: Kinded<K>) =>
-  KIND_MODULES[resource.kind].spaceReferences(resource.content);
+  PLUGIN_MODULES[resource.kind].spaceReferences(resource.content);
 
 /** The Spaces this Resource's content references, from which the core enforces cycles and lifetime. */
 export const spaceReferences = (resource: KindedResource): readonly UUID[] =>
@@ -231,7 +232,7 @@ export const lifetimeSpaceReferences = (resource: KindedResource): readonly UUID
   kindFlags(resource.kind).ownsReferencedSpaces ? spaceReferences(resource) : [];
 
 const selectionProblemOf = <K extends KindId>(resource: Kinded<K>, target: SpaceSelectionTarget) =>
-  KIND_MODULES[resource.kind].selection?.problem(resource.content, target);
+  PLUGIN_MODULES[resource.kind].selection?.problem(resource.content, target);
 
 /** Why this Resource's selection does not resolve in its target Space, by its kind's own check. */
 export const spaceSelectionProblem = (
@@ -241,7 +242,7 @@ export const spaceSelectionProblem = (
   isPlugged(resource) ? selectionProblemOf(resource, target) : undefined;
 
 const selectionOf = <K extends KindId>(resource: Kinded<K>) =>
-  KIND_MODULES[resource.kind].selection?.of(resource.content);
+  PLUGIN_MODULES[resource.kind].selection?.of(resource.content);
 
 /** The view of another Space this Resource shows, when its kind shows one (ADR 0068). */
 export const spaceSelection = (resource: KindedResource): SpaceView | undefined =>
@@ -254,7 +255,7 @@ const reselectedOf = <K extends KindId>(
     content: ContentByKind[K],
   ) => ContentByKind[K],
 ): Kinded<K> | undefined => {
-  const selection = KIND_MODULES[resource.kind].selection;
+  const selection = PLUGIN_MODULES[resource.kind].selection;
   return selection === undefined
     ? undefined
     : { ...resource, content: change(selection, resource.content) };
@@ -278,7 +279,7 @@ const pluggedContentOf = <K extends KindId>(
   resource: Kinded<K>,
   via: ContentVia,
 ): ResourceContent => {
-  const resolved: ResolvedByKind[KindId] = KIND_MODULES[resource.kind].resolveContent(
+  const resolved: ResolvedByKind[KindId] = PLUGIN_MODULES[resource.kind].resolveContent(
     resource.content,
   );
   return { ...resolved, via };
@@ -314,11 +315,11 @@ const UNRESOLVED_CONTENT_FACTS: ContentFacts = {
 
 /** What resolved content lets an author do and how it lays out, as its kind declares (ADR 0114). */
 export const contentFacts = (content: ResourceContent): ContentFacts =>
-  (content.kind === UNRESOLVED_CONTENT.kind ? undefined : KIND_MODULES[content.kind].facts) ??
+  (content.kind === UNRESOLVED_CONTENT.kind ? undefined : PLUGIN_MODULES[content.kind].facts) ??
   UNRESOLVED_CONTENT_FACTS;
 
 const canonicalContentOf = <K extends KindId>(resource: Kinded<K>) =>
-  KIND_MODULES[resource.kind].canonicalContent(resource.content);
+  PLUGIN_MODULES[resource.kind].canonicalContent(resource.content);
 
 /**
  * A Resource with its content as Export writes it, so a file's bytes do not
@@ -363,7 +364,7 @@ export const newResourceDocument = (kind: EmptyCreatableKindId, title: string): 
 
 /** Whether a Resource of this kind may be created empty. */
 export const startsEmpty = (kind: KindId): kind is EmptyCreatableKindId =>
-  KIND_MODULES[kind].newContent !== undefined;
+  PLUGIN_MODULES[kind].newContent !== undefined;
 
 /** A new Resource of the default kind with this Title, its body empty. */
 export const newDefaultResourceDocument = (title: string): ResourceDocument =>
