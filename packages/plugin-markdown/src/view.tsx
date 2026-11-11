@@ -165,9 +165,10 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
   const claim = useRef<Claim | null>(null);
   const header = useRef<HTMLDivElement | null>(null);
 
+  // A Claim the host answers it did not release is kept, so the next end of
+  // an edit, or unmounting, releases it again.
   const release = useCallback(() => {
-    claim.current?.release();
-    claim.current = null;
+    if (claim.current?.release() === true) claim.current = null;
   }, []);
   // Every way an edit ends releases its Claim, and an unmounted view holds
   // nothing; the host releases its Claims too.

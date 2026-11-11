@@ -456,6 +456,43 @@ describe('the Map host a plugin draws inside (ADR 0142)', () => {
     expect(claim).toHaveBeenCalledTimes(1);
   });
 
+  it('counts a Claim held while the host answers that releasing it did not release it', () => {
+    surfaces.length = 0;
+    let releases = true;
+    const held: PluginHostClaim = {
+      release: () => releases,
+      exclusively: () => Promise.resolve('busy'),
+      unmount: () => undefined,
+    };
+    const toolbarHeld: boolean[] = [];
+    render(
+      <PluginSurface
+        {...probeProps({ operations: { kind: 'ur', claim: () => held } })}
+        renderToolbar={(toolbar, isHeld) => {
+          toolbarHeld.push(isHeld);
+          return toolbar;
+        }}
+        entry={probeEntry}
+      />,
+    );
+    let taken: ReturnType<NonNullable<ProbeSurface['claim']>> | undefined;
+    act(() => {
+      taken = surfaces.at(-1)?.claim?.();
+    });
+    expect(toolbarHeld.at(-1)).toBe(true);
+    // The host keeps the Claim while exclusive work or an inner Claim runs.
+    releases = false;
+    act(() => {
+      expect(taken?.release()).toBe(false);
+    });
+    expect(toolbarHeld.at(-1)).toBe(true);
+    releases = true;
+    act(() => {
+      expect(taken?.release()).toBe(true);
+    });
+    expect(toolbarHeld.at(-1)).toBe(false);
+  });
+
   it.each([
     ['a modal or presenting withdraws authoring', { withdrawn: true }],
     ['the Resource becomes read-only', { readOnly: true }],

@@ -310,9 +310,11 @@ function guarded(
       onHeld(-1);
     };
     return {
+      // A Claim the host did not release, as while exclusive work or an
+      // inner Claim runs, is still held.
       release: () => {
         const released = taken.release();
-        settle();
+        if (released) settle();
         return released;
       },
       exclusively: (work) => taken.exclusively(work),
