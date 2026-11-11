@@ -125,7 +125,7 @@ describe('the kinds a Resource may be created empty as', () => {
   });
 
   it('start a Resource created with no kind chosen as the first of them in list order', () => {
-    expect(newEmptyResourceDocument('New').kind).toBe(PLUGIN_KINDS.filter(startsEmpty)[0]);
+    expect(newEmptyResourceDocument('New').kind).toBe(PLUGIN_KINDS.find(startsEmpty));
   });
 
   it('do not include a kind whose plugin declares no new content', () => {
