@@ -25,9 +25,7 @@ describe('shortcutSections', () => {
     expect(
       sections.flatMap(({ shortcuts }) => shortcuts.map((entry) => entry.description)),
     ).toEqual([
-      ...descriptionsOf(CANVAS_KEYS).filter(
-        (description) => !OPENS_NOTHING.includes(description),
-      ),
+      ...descriptionsOf(CANVAS_KEYS).filter((description) => !OPENS_NOTHING.includes(description)),
       ...descriptionsOf(HELP_KEYS),
       ...descriptionsOf(FULL_VIEW_KEYS),
     ]);
@@ -35,9 +33,7 @@ describe('shortcutSections', () => {
 
   it('lists no Enter on the canvas, which opens no Resource (resource-plugins issue 07)', () => {
     const canvas = shortcutSections('authoring').find(({ title }) => title === 'On the canvas');
-    expect(canvas?.shortcuts.filter(({ shortcut }) => shortcut.aria.includes('Enter'))).toEqual(
-      [],
-    );
+    expect(canvas?.shortcuts.filter(({ shortcut }) => shortcut.aria.includes('Enter'))).toEqual([]);
   });
 
   it('lists every presenting key while presenting, and the sheet’s own', () => {

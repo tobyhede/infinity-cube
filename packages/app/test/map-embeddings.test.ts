@@ -59,11 +59,8 @@ describe('the Map embeddings drawn on one canvas', () => {
     const commit = vi.fn(() => Promise.resolve('completed' as const));
     embeddings.publish('node', SPACE_RESOURCE, request(commit), Symbol('drawing'));
     embeddings.forget('node');
-    await embeddings.getState().get('node')?.request.select?.commit({
-      spaceId: TARGET,
-      map: TARGET,
-      graph: TARGET,
-    });
+    const stored = embeddings.getState().get('node')?.request.select?.commit;
+    await stored?.({ spaceId: TARGET, map: TARGET, graph: TARGET });
     expect(commit).toHaveBeenCalledOnce();
   });
 
