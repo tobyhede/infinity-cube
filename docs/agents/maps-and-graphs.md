@@ -20,7 +20,7 @@ Or it touches any of these paths:
 
 - `packages/graph/src/layout.ts`, `positioned.ts` or `grid.ts`
 - `packages/graph/src/new-space.ts`
-- `packages/graph/src/placement.ts` or `snapshot-edits.ts` (the open, close, resize, add-to-Map, remove-from-Map and delete-from-Space Edits)
+- `packages/graph/src/placement.ts` or `snapshot-edits.ts` (the resize, Map content, add-to-Map, remove-from-Map and delete-from-Space Edits)
 - `packages/graph/src/validate.ts`, for Map, Graph or Edge refusals
 - `packages/core/src/schema.ts`, for the Map, Graph or position schemas
 - `packages/persistence/src/working-space.ts` (first working load)
@@ -92,9 +92,9 @@ Older ADRs use retired names. Read Layout or Diagram as Map, Card or Thing as Re
 ## 6. Size, Open and displacement
 
 - **R37. Size is the canvas's and Map content the Resource plugin's, both authored on the Map, independently.** A Map entry holds the canvas's `x`, `y` and optional `size`, and its plugin's optional Map content. A Resize and a Map content commit are Edits and survive reload and export. An entry with no `size` is the Closed Size (260×146), resolved through `resourceSize` in `@project/core`, and an entry with no Map content takes the default its plugin declares. Add Resource and Add to Map write neither. Coupling size to Open made a bigger Resource a two-step gesture that also changed what it drew and moved its neighbours (A17). ([0142], [0122], [0064])
-- **R38. Only the canvas changes a size, on a Resize or a plugin's hint, and a plugin writes only its own Map content.** Opening or Closing, for a plugin that has them, changes what is drawn inside the Resource's rect and no position. A Map content commit made on an author's gesture may carry a size hint: the canvas applies the floor, a cap and a Resize's displacement in that one Edit, or ignores it, as it always does on an entry with a stored size, and a plugin asks once per gesture. A plugin never writes a position, a size or an Edge. A Resize back to the Closed Size is an ordinary Resize and changes no Map content; there is no magnetic Close (A26). ([0142], [0122], [0064])
-- **R39. Open and Close belong to a Resource plugin that keeps them** in its Map content: Markdown, Space and Reference. An Image Resource is always its image, and an Ur Resource has no content to show (A25). Map content a plugin's schema does not accept is refused at intake, so no core rule names which Resources may be Open. The other half of that choice is A27 and A28. ([0142], [0122], [0113])
-- **R40. The Closed Size is the one floor for every kind, Open or Closed, and only a size change displaces, whether a Resize or an accepted hint.** No kind has its own minimum, and no size is a kind's own: a plugin's Open may hint at a size (R38), which the canvas floors, caps and stores as the entry's one size, displacing as a Resize does, or ignores. Otherwise content adapts to the rect it is given — a small Open document scrolls, a picture scales down, an embedded Map fits (A24). A Resize moves the Resources its growth passes, once, writing their positions into the Map. Between Edits a drawn position *is* the authored one: a drop lands where it was dropped, with no conversion and no `move` draft, and a resize preview shows only the resizing Resource. `Placement.drawn` and `authoredPoint` must not return. Render-derived displacement coupled every position to every size, jumped, and needed a non-total inverse that misplaced drops (A13). ([0142], [0122], [0084])
+- **R38. Only the canvas changes a size, on a Resize or a plugin's hint, and a plugin writes only its own Map content.** Opening or Closing, for a plugin that has them, changes what is drawn inside the Resource's rect and no position. A Map content commit made on an author's gesture may carry a size hint: the canvas applies the floor, a cap and a Resize's displacement in that one Edit, or ignores it, and a plugin asks once per gesture. A plugin never writes a position, a size or an Edge. A Resize back to the Closed Size is an ordinary Resize and changes no Map content; there is no magnetic Close (A26). ([0142], [0122], [0064])
+- **R39. Open and Close belong to a Resource plugin that keeps them** in its Map content: Markdown, Space and Reference. An Image Resource is always its image, and an Ur Resource has no content to show (A25). Map content a plugin's schema does not accept is refused at intake, so no core rule names which Resources may be Open. The other half of that choice is A27 and A28. Each keeps it as `{ open }`, written by the `changed-map-content` Edit: a Markdown Resource is Closed by default and Open where there is no Map, and is Opened with a size hint the canvas caps and the Edit applies as a Resize does; a Reference Resource is Opened with no size hint; a Space Resource is Closed by default and Open where there is no Map, and is Opened and Closed from its plugin's rail with no size hint. No host Open remains: the canvas's Enter reads a Resource in Full View and opens nothing, and there is no Open Edit or Open and expand. A Map entry is `{ x, y, size?, content? }` and strict, so an entry storing `open` or `shape` beside them is refused at intake. ([0142], [0122], [0113])
+- **R40. The Closed Size is the one floor for every kind, Open or Closed, and only a size change displaces, whether a Resize or an accepted hint.** No kind has its own minimum and no kind chooses a first-Open size: content adapts to the rect it is given — a small Open document scrolls, a picture scales down, an embedded Map fits (A24). A Resize moves the Resources its growth passes, once, writing their positions into the Map. Between Edits a drawn position *is* the authored one: a drop lands where it was dropped, with no conversion and no `move` draft, and a resize preview shows only the resizing Resource. `Placement.drawn` and `authoredPoint` must not return. Render-derived displacement coupled every position to every size, jumped, and needed a non-total inverse that misplaced drops (A13). ([0122], [0084])
 - **R41. A Resource makes room on at most one axis, decided against the subject's rect before the Resize.** The change is the new size less the old one, per axis, negative for a shrink. At or past the old right edge, a Resource takes the width change only. Otherwise, at or past the old bottom edge, it takes the height change only. Otherwise it does not move. One axis is enough to stay clear; `x` first keeps a Resource beside the subject from moving vertically; touching counts as clear. Cost: a grid no longer scales uniformly, and a Resource below the subject but not clear on `x` moves down however far left it sits (A15, A16). ([0093], [0122])
 - **R42. A Resize is memoryless.** It reads the Map as it is now and never records which Resources it pushed (A14). A grow then the shrink back restores every position, because the grow carries each clear Resource clear of the grown rect, which the shrink measures from. The other order is stated, not clamped: a Resource overlapping the larger rect but clear of the smaller one is not moved by a shrink, and the grow back pushes it. ([0084], [0093], [0122])
 - **R43. One Resize Edit may move many Resources, as one unit.** ([0084])
@@ -191,15 +191,15 @@ The rule-to-source [inventory] accounts for every rule, rejected alternative, om
 | R32 | §5 | [0040], [0064], [0122] |
 | R33, R34, R36 | §5 | [0040] |
 | R35 | §5 | [0122] |
-| R37, R38 | §6; Accepted, not built | [0142], [0064], [0122] |
-| R39 | §6; Accepted, not built | [0142], [0122], [0113] (reversing its rejected option) |
-| R40 | §6; Accepted, not built | [0142], [0122], [0084] |
+| R37, R38 | §6 | [0142], [0064], [0122] |
+| R39 | §6 | [0142], [0122], [0113] (reversing its rejected option) |
+| R40 | §6 | [0122], [0084] |
 | R41 | §6 | [0093], [0122] |
 | R42 | §6 | [0084], [0093], [0122] |
 | R43 | §6 | [0084] |
 | R44 | §6 | [0122] |
-| R45, R47, R49 | §7 (R45, R47 also Accepted, not built) | [0121] (R45 also [0142]; R47 also [0142], [0105]; R49 also [0122]) |
-| R46 | §7; Accepted, not built | [0142], [0121], [0113] |
+| R45, R47, R49 | §7 | [0121] (R45 also [0142]; R47 also [0142], [0105]; R49 also [0122]) |
+| R46 | §7 | [0142], [0121], [0113] |
 | R48 | §7 | [0121], [0110] |
 | R50 | §7 | [0121], [0112] |
 | A1–A29 | Rejected alternatives | Cited in each row |
