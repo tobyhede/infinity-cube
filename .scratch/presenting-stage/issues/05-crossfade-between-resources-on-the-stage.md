@@ -6,8 +6,8 @@
 
 **Status:** needs-triage — deferred on 2026-10-07: ticket 02 ships an instant swap, and this waits until someone wants the fade.
 
-- [ ] The crossfade reuses the mechanism the Open Resource content cross-fade built — `usePresence` (`packages/ui/src/use-presence.ts`) and the `--resource-placement-duration` and `--resource-placement-easing` tokens (`packages/app/src/styles.css:95-96`, read by `packages/ui/src/canvas-resource.css:320-341`); there is one fade mechanism in the product.
-- [ ] `usePresence` as written cannot overlap two Resources: it compares visibility only, and a new non-null value replaces the old one as it arrives. Either the hook is extended to hold the outgoing value while the incoming one enters, or the ticket records why a sequential fade-out then fade-in is enough.
+- [ ] The crossfade uses the product's placement motion tokens, `--resource-placement-duration` and `--resource-placement-easing` (`packages/app/src/styles.css:95-96`), so there is one fade timing in the product.
+- [ ] No fade mechanism exists to reuse: `usePresence` (`packages/ui/src/use-presence.ts`) drew the Open Resource content cross-fade, and it went with the shared frame (resource-plugins issue 10). The ticket decides how the outgoing Resource is held while the incoming one enters, or records why a sequential fade-out then fade-in is enough.
 - [ ] No View Transitions API and no animation library.
 - [ ] Reduced motion swaps instantly.
 
@@ -20,3 +20,7 @@
 **Category:** enhancement. **State:** needs-triage.
 
 Still wanted as parked work (spec decision 6), but the reuse criterion named a retired thing. "The expanded-card crossfade" is the Open Resource content cross-fade: `usePresence` plus the placement duration and easing tokens (`canvas-resource.css:320-341`). The body now names those, records that `usePresence` compares visibility only and cannot overlap an outgoing and an incoming Resource as is, and marks ticket 02 resolved (`8b2e02d6`). It stays parked until someone wants the fade; when it is picked up, the decision to make is whether to extend `usePresence` for a true overlap or accept a sequential fade.
+
+### Restack, 2026-11-12
+
+`usePresence` and the Open Resource content cross-fade it drew were deleted with the shared frame (resource-plugins issue 10), so the first two criteria no longer name them as a mechanism to reuse; the placement tokens they read are still in `styles.css`.
