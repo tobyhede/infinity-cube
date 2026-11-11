@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -47,6 +48,7 @@ const NOT_HERE = 'This image cannot be replaced here.';
 const ONE_AT_A_TIME = 'Use one image at a time.';
 const BUSY = 'Another change is still being made. Try again when it ends.';
 const NOT_REPLACED = 'This image was not replaced. Try again.';
+const NOT_RENAMED = 'This title was not changed. Try again.';
 
 /** The words of an answer, or `null` for one that leaves nothing to say. */
 const refusalOf = (answer: Answer): string | null =>
@@ -108,6 +110,13 @@ const FAILED: CSSProperties = {
 /** The picture, a skeleton until it loads, or what is said when it does not. */
 function Picture({ src, url, name }: { src: string; url: string; name: string }) {
   const [load, setLoad] = useState<'loading' | 'loaded' | 'failed'>('loading');
+  const picture = useRef<HTMLImageElement>(null);
+  // A picture the browser already holds may finish before React listens for
+  // its load, so it is read before the first paint rather than skeletoned.
+  useLayoutEffect(() => {
+    const drawn = picture.current;
+    if (drawn !== null && drawn.complete && drawn.naturalWidth > 0) setLoad('loaded');
+  }, []);
   if (load === 'failed') {
     return (
       <div style={FAILED} data-testid="image-failed">
@@ -120,6 +129,7 @@ function Picture({ src, url, name }: { src: string; url: string; name: string })
   return (
     <div style={FILL} aria-busy={load === 'loading'}>
       <img
+        ref={picture}
         src={src}
         alt={name}
         draggable={false}
@@ -183,6 +193,18 @@ function Rename({
   );
 }
 
+/**
+ * Each Replace press and drop numbered, so a picker that settles after a later
+ * one began is ignored: the later one holds the same Claim.
+ */
+function createPressCount() {
+  let latest = 0;
+  return {
+    next: (): number => ++latest,
+    isLatest: (press: number): boolean => press === latest,
+  };
+}
+
 /** Whether a drag carries files, which is all a drop on the picture takes. */
 const carriesFiles = (event: DragEvent): boolean => event.dataTransfer.types.includes('Files');
 
@@ -198,6 +220,7 @@ function ImageView({ surface }: PluginViewProps<ImageContent, ImageMapContent>) 
   const [working, setWorking] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [renaming, setRenaming] = useState(false);
+  const [presses] = useState(createPressCount);
 
   const replaceable = commitContent !== undefined && claimOf !== undefined;
 
@@ -231,6 +254,26 @@ function ImageView({ surface }: PluginViewProps<ImageContent, ImageMapContent>) 
     [],
   );
 
+  /**
+   * The Claim is taken in the press, then the picker opens in it too, before
+   * anything is awaited: a browser opens one only in a press.
+   */
+  const pickToReplace = useCallback(() => {
+    if (pick === undefined) return;
+    const press = presses.next();
+    const claim = claimForReplace();
+    if (claim === undefined) return;
+    const current = () => presses.isLatest(press);
+    void pick(ACCEPT).then(
+      (files) => {
+        if (current()) replaceWith(claim, files);
+      },
+      () => {
+        if (current()) claim.release();
+      },
+    );
+  }, [pick, presses, claimForReplace, replaceWith]);
+
   const commands = useMemo((): readonly RailCommand[] => {
     const offered: RailCommand[] = [];
     if (commitTitle !== undefined) {
@@ -253,37 +296,44 @@ function ImageView({ surface }: PluginViewProps<ImageContent, ImageMapContent>) 
         label: `Replace image of Resource ${name}`,
         icon: <ImageUp size={14} aria-hidden />,
         disabled: working,
-        // The Claim is taken in the press, then the picker opens in it too,
-        // before anything is awaited: a browser opens one only in a press.
-        run: () => {
-          const claim = claimForReplace();
-          if (claim === undefined) return;
-          void pick(ACCEPT).then(
-            (files) => replaceWith(claim, files),
-            () => claim.release(),
-          );
-        },
+        run: pickToReplace,
       });
     }
     return offered;
-  }, [commitTitle, name, working, replaceable, pick, claimForReplace, replaceWith]);
+  }, [commitTitle, name, working, replaceable, pick, pickToReplace]);
 
   // A refused Title keeps the editor open with the draft and says why (ADR
-  // 0057); only a settled one closes it. One commit is in flight at a time.
+  // 0057); only a settled one closes it. One commit is in flight at a time, and
+  // a different draft committed meanwhile is sent once it settles.
   const renameInFlight = useRef(false);
+  const queuedDraft = useRef<string | null>(null);
+  const sendTitle = (next: string) => {
+    if (commitTitle === undefined) return;
+    renameInFlight.current = true;
+    void commitTitle(next)
+      .then(refusalOf, () => NOT_RENAMED)
+      .then((refusal) => {
+        renameInFlight.current = false;
+        const queued = queuedDraft.current;
+        queuedDraft.current = null;
+        if (queued !== null && queued !== next) {
+          sendTitle(queued);
+          return;
+        }
+        setNotice(refusal);
+        if (refusal === null) setRenaming(false);
+      });
+  };
   const rename = (next: string) => {
+    if (renameInFlight.current) {
+      queuedDraft.current = next;
+      return;
+    }
     if (commitTitle === undefined || next === title) {
       setRenaming(false);
       return;
     }
-    if (renameInFlight.current) return;
-    renameInFlight.current = true;
-    void commitTitle(next).then((answer) => {
-      renameInFlight.current = false;
-      const refusal = refusalOf(answer);
-      setNotice(refusal);
-      if (refusal === null) setRenaming(false);
-    });
+    sendTitle(next);
   };
 
   const drop = replaceable
@@ -305,6 +355,7 @@ function ImageView({ surface }: PluginViewProps<ImageContent, ImageMapContent>) 
             setNotice(ONE_AT_A_TIME);
             return;
           }
+          presses.next();
           const claim = claimForReplace();
           if (claim !== undefined) replaceWith(claim, files);
         },
@@ -320,7 +371,7 @@ function ImageView({ surface }: PluginViewProps<ImageContent, ImageMapContent>) 
         </p>
       )}
       {!working && notice !== null && (
-        <p role="status" style={NOTE} data-testid="image-notice">
+        <p role="alert" style={NOTE} data-testid="image-notice">
           {notice}
         </p>
       )}

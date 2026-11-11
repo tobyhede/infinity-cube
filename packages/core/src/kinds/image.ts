@@ -2,6 +2,7 @@ import { imagePlugin, type ImageContent as ImagePluginContent } from '@project/p
 import { kindFromPlugin, type PluginContent } from './plugin-kind';
 
 export {
+  IMAGE_URL_UNSUPPORTED,
   imageNaturalSizeSchema,
   isAcceptedImageUrl,
   type ImageNaturalSize,
@@ -14,9 +15,9 @@ export {
  */
 export const imageKind = {
   ...kindFromPlugin(imagePlugin),
-  // An Open Reference Resource still draws its Target in the old frame's
-  // content area, where the Image plugin draws the picture read-only, until
-  // the Reference plugin embeds it (`.scratch/resource-plugins/issues/06`).
+  // An Open Reference Resource draws its Target in its content area, where
+  // the Image plugin draws the picture read-only, until the Reference plugin
+  // embeds it (`.scratch/resource-plugins/issues/06`).
   facts: { authored: false, embedsMap: false, drawsContentArea: true },
 };
 

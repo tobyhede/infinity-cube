@@ -22,6 +22,9 @@ export { pictureSize, type PictureSize } from './domain/picture-size';
  * or Closed, and may be a Reference's Target.
  */
 
+/** The refusal code for a URL an Image Resource may not hold; the application owns the wording. */
+export const IMAGE_URL_UNSUPPORTED = 'image-url-unsupported';
+
 /**
  * Whether an Image Resource may hold this URL (ADR 0106): an `https:` or
  * `http:` URL, or an asset reference (ADR 0142). `data:` is refused because it
@@ -58,9 +61,10 @@ export type ImageNaturalSize = z.infer<typeof imageNaturalSizeSchema>;
  */
 export const imageContentSchema = z
   .object({
-    url: z
-      .string()
-      .refine(isAcceptedImageUrl, 'An image URL must be https:, http:, or a stored asset.'),
+    url: z.string().refine(isAcceptedImageUrl, {
+      message: 'An image URL must be https:, http:, or a stored asset.',
+      params: { code: IMAGE_URL_UNSUPPORTED },
+    }),
     naturalSize: imageNaturalSizeSchema.optional(),
   })
   .strict();

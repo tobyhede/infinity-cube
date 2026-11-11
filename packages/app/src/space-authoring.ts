@@ -20,6 +20,7 @@ import {
   COLLAPSED_RESOURCE_SIZE,
   resourceSize,
   EDGE_TITLE_ONE_LINE,
+  IMAGE_URL_UNSUPPORTED,
   isAcceptedImageUrl,
   resourceDocumentSchema,
   type ImageNaturalSize,
@@ -101,13 +102,6 @@ const assertValidAuthoredSnapshot = (snapshot: SpaceSnapshot): void => {
     );
   }
 };
-
-/**
- * The refusal code for an image URL an Image Resource may not hold (ADR 0106);
- * the Image plugin's content schema is the rule, and this names it for the
- * Create Image Resources Edit, which checks each URL before intake.
- */
-export const IMAGE_URL_UNSUPPORTED = 'image-url-unsupported';
 
 /** One picture an Image Resource is created for: its URL, and its size when it loaded. */
 export interface CreatedImage {

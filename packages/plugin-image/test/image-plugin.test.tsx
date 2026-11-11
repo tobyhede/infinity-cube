@@ -1,6 +1,10 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { renderPlugin, testAssetRef, testAssetUrl } from '@project/resource-api/view/testing';
-import { imagePlugin, type ImageContent } from '@project/plugin-image/domain';
+import {
+  IMAGE_URL_UNSUPPORTED,
+  imagePlugin,
+  type ImageContent,
+} from '@project/plugin-image/domain';
 import { imagePluginView } from '@project/plugin-image/view';
 
 const FIGURE: ImageContent = { url: 'https://example.com/figure.png' };
@@ -37,6 +41,15 @@ describe('the Image plugin’s domain half', () => {
       expect(imagePlugin.content.safeParse({ url }).success).toBe(false);
     }
     expect(imagePlugin.content.safeParse({ url: FIGURE.url, open: true }).success).toBe(false);
+  });
+
+  it('names a URL it refuses by its own refusal code', () => {
+    const parsed = imagePlugin.content.safeParse({ url: 'data:image/png;base64,AA==' });
+    expect(parsed.success).toBe(false);
+    expect(parsed.error?.issues).toEqual([
+      expect.objectContaining({ params: { code: IMAGE_URL_UNSUPPORTED } }),
+    ]);
+    expect(IMAGE_URL_UNSUPPORTED).toBe('image-url-unsupported');
   });
 
   it('keeps nothing per Map, is a Target, is drawn bare at rest with no Title, and never starts empty', () => {
@@ -163,7 +176,7 @@ describe('the Image plugin’s view', () => {
       files: [refused()],
     });
     fireEvent.click(screen.getByRole('button', { name: 'Replace image of Resource Figure' }));
-    expect(await screen.findByTestId('image-notice')).not.toBeEmptyDOMElement();
+    expect(await screen.findByRole('alert')).not.toBeEmptyDOMElement();
     await waitFor(() => expect(screen.queryByText('Replacing image…')).toBeNull());
     expect(rendered.commits.stored).toEqual([]);
     expect(rendered.commits.content).toEqual([]);
@@ -205,7 +218,7 @@ describe('the Image plugin’s view', () => {
     fireEvent.drop(screen.getByTestId('image-plugin'), {
       dataTransfer: { files: [pngFile(), pngFile()], types: ['Files'] },
     });
-    expect(await screen.findByTestId('image-notice')).toHaveTextContent('Use one image at a time.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Use one image at a time.');
     expect(rendered.commits.exclusive).toBe(0);
   });
 
@@ -219,7 +232,7 @@ describe('the Image plugin’s view', () => {
       claimRefused: true,
     });
     fireEvent.click(screen.getByRole('button', { name: 'Replace image of Resource Figure' }));
-    expect(await screen.findByTestId('image-notice')).not.toBeEmptyDOMElement();
+    expect(await screen.findByRole('alert')).not.toBeEmptyDOMElement();
     // The Claim is taken in the press, so a refused one opens no picker.
     expect(rendered.commits.picked).toBe(0);
     expect(rendered.commits.exclusive).toBe(0);
@@ -241,7 +254,103 @@ describe('the Image plugin’s view', () => {
     });
     // A refusal arrived; its words are the host's.
     await waitFor(() => expect(screen.queryByText('Replacing image…')).toBeNull());
-    expect(screen.getByTestId('image-notice')).not.toBeEmptyDOMElement();
+    expect(screen.getByRole('alert')).toHaveTextContent('Not now.');
     expect(screen.getByRole('img', { name: 'Figure' })).toHaveAttribute('src', FIGURE.url);
+  });
+
+  it('announces a replacement in progress politely, as a status', async () => {
+    const read = Promise.withResolvers<ArrayBuffer>();
+    const slow = Object.assign(new File([pngHeader()], 'harbour.png', { type: 'image/png' }), {
+      arrayBuffer: () => read.promise,
+    });
+    renderPlugin(imagePluginView.View, {
+      content: FIGURE,
+      map: {},
+      title: 'Figure',
+      grants: AUTHORING,
+      files: [slow],
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Replace image of Resource Figure' }));
+    expect(await screen.findByText('Replacing image…')).toHaveAttribute('role', 'status');
+    read.resolve(pngHeader().buffer);
+    await waitFor(() => expect(screen.queryByText('Replacing image…')).toBeNull());
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('replaces with a second pick when the first picker settles empty as the second opens', async () => {
+    const first = Promise.withResolvers<readonly File[]>();
+    const rendered = renderPlugin(imagePluginView.View, {
+      content: FIGURE,
+      map: {},
+      title: 'Figure',
+      grants: AUTHORING,
+      // A browser settles a picker left open with nothing when the next one opens.
+      picker: (opening) => {
+        if (opening === 1) return first.promise;
+        first.resolve([]);
+        return Promise.resolve([pngFile()]);
+      },
+    });
+    const replace = screen.getByRole('button', { name: 'Replace image of Resource Figure' });
+    fireEvent.click(replace);
+    fireEvent.click(replace);
+    await waitFor(() => expect(rendered.commits.content).toHaveLength(1));
+    expect(screen.queryByRole('alert')).toBeNull();
+    await waitFor(() =>
+      expect(screen.getByRole('img', { name: 'Figure' })).toHaveAttribute(
+        'src',
+        testAssetUrl(testAssetRef(1)),
+      ),
+    );
+  });
+
+  it('replaces with a second pick while the first picker never settles', async () => {
+    const rendered = renderPlugin(imagePluginView.View, {
+      content: FIGURE,
+      map: {},
+      title: 'Figure',
+      grants: AUTHORING,
+      picker: (opening) =>
+        opening === 1 ? new Promise<never>(() => undefined) : Promise.resolve([pngFile()]),
+    });
+    const replace = screen.getByRole('button', { name: 'Replace image of Resource Figure' });
+    fireEvent.click(replace);
+    fireEvent.click(replace);
+    await waitFor(() => expect(rendered.commits.content).toHaveLength(1));
+    expect(rendered.commits.exclusive).toBe(1);
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('commits a newer draft entered while a rename is still settling', async () => {
+    const rendered = renderPlugin(imagePluginView.View, {
+      content: FIGURE,
+      map: {},
+      title: 'Figure',
+      grants: { title: true },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Rename Resource Figure' }));
+    const field = screen.getByRole('textbox', { name: 'Resource title' });
+    fireEvent.change(field, { target: { value: 'Harbour' } });
+    fireEvent.keyDown(field, { key: 'Enter' });
+    fireEvent.change(field, { target: { value: 'Harbour wall' } });
+    fireEvent.keyDown(field, { key: 'Enter' });
+    await waitFor(() => expect(rendered.commits.title).toEqual(['Harbour', 'Harbour wall']));
+    await waitFor(() =>
+      expect(screen.getByRole('img', { name: 'Harbour wall' })).toBeInTheDocument(),
+    );
+    expect(screen.queryByRole('textbox')).toBeNull();
+  });
+
+  it('draws a picture the browser already holds at once, with no skeleton', () => {
+    const complete = vi.spyOn(HTMLImageElement.prototype, 'complete', 'get').mockReturnValue(true);
+    const width = vi.spyOn(HTMLImageElement.prototype, 'naturalWidth', 'get').mockReturnValue(400);
+    try {
+      renderPlugin(imagePluginView.View, { content: FIGURE, map: {}, title: 'Figure' });
+      expect(screen.queryByRole('status', { name: 'Loading image' })).toBeNull();
+      expect(screen.getByRole('img', { name: 'Figure' })).toHaveStyle({ opacity: '1' });
+    } finally {
+      complete.mockRestore();
+      width.mockRestore();
+    }
   });
 });

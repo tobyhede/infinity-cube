@@ -165,7 +165,8 @@ describe('reading a picture’s size from its header', () => {
     const lossless = riff(
       'VP8L',
       joined(
-        new Uint8Array(5),
+        new Uint8Array(4),
+        bytes(0x2f),
         bytes(packed & 255, (packed >>> 8) & 255, (packed >>> 16) & 255, packed >>> 24),
       ),
     );
@@ -175,6 +176,35 @@ describe('reading a picture’s size from its header', () => {
       joined(new Uint8Array(8), bytes(399 & 255, 399 >>> 8, 0), bytes(299 & 255, 299 >>> 8, 0)),
     );
     expect(pictureSize(extended, 'image/webp')).toEqual({ width: 400, height: 300 });
+  });
+
+  it('answers no size for a truncated or unsigned WebP header rather than reading missing bytes as 0', () => {
+    const riff = (chunk: string, body: Uint8Array) =>
+      joined(ascii('RIFF'), bytes(0, 0, 0, 0), ascii('WEBP'), ascii(chunk), body);
+    const packed = 398 | (298 << 14);
+    const sizeBytes = bytes(
+      packed & 255,
+      (packed >>> 8) & 255,
+      (packed >>> 16) & 255,
+      packed >>> 24,
+    );
+    expect(pictureSize(riff('VP8L', new Uint8Array(4)), 'image/webp')).toBeUndefined();
+    expect(
+      pictureSize(
+        riff('VP8L', joined(new Uint8Array(4), bytes(0x2f), sizeBytes.subarray(0, 2))),
+        'image/webp',
+      ),
+    ).toBeUndefined();
+    expect(
+      pictureSize(riff('VP8L', joined(new Uint8Array(4), bytes(0x00), sizeBytes)), 'image/webp'),
+    ).toBeUndefined();
+    expect(pictureSize(riff('VP8X', new Uint8Array(8)), 'image/webp')).toBeUndefined();
+    expect(
+      pictureSize(
+        riff('VP8X', joined(new Uint8Array(8), bytes(143, 1, 0), bytes(43))),
+        'image/webp',
+      ),
+    ).toBeUndefined();
   });
 
   it('answers no size where the header does not say', () => {

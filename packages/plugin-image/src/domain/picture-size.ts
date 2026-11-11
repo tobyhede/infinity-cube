@@ -108,16 +108,22 @@ const jpegSize = (bytes: Uint8Array): PictureSize | undefined => {
   return undefined;
 };
 
+/** The byte a WebP lossless bitstream begins with. */
+const VP8L_SIGNATURE = 0x2f;
+
 /** WebP: the first chunk is lossy, lossless or extended, each writing its size its own way. */
 const webpSize = (bytes: Uint8Array): PictureSize | undefined => {
   switch (ascii(bytes, 12, 4)) {
     case 'VP8 ':
       return sized(littleEndian16(bytes, 26) & 0x3fff, littleEndian16(bytes, 28) & 0x3fff);
     case 'VP8L': {
+      // A lossless bitstream opens with its signature byte, then the size.
+      if (bytes.length < 25 || bytes[20] !== VP8L_SIGNATURE) return undefined;
       const [b0 = 0, b1 = 0, b2 = 0, b3 = 0] = bytes.subarray(21, 25);
       return sized(1 + (((b1 & 0x3f) << 8) | b0), 1 + (((b3 & 0xf) << 10) | (b2 << 2) | (b1 >> 6)));
     }
     case 'VP8X':
+      if (bytes.length < 30) return undefined;
       return sized(1 + littleEndian24(bytes, 24), 1 + littleEndian24(bytes, 27));
     default:
       return undefined;

@@ -60,6 +60,11 @@ export interface RenderPluginOptions<C, M> {
   readonly answer?: Answer;
   /** What a granted pick answers. */
   readonly files?: readonly File[];
+  /**
+   * What the nth opening of a granted picker answers, counting from 1, in
+   * place of `files`: a picker the author leaves open is one that never settles.
+   */
+  readonly picker?: (opening: number) => Promise<readonly File[]>;
   /** Whether a granted `claim()` is refused, as the chain refuses one. */
   readonly claimRefused?: boolean;
 }
@@ -112,6 +117,26 @@ function createTestGate() {
       } finally {
         install(null);
       }
+    },
+  };
+}
+
+/**
+ * One Claim per surface, as a host's chain holds one per drawing: taking it
+ * again answers the same Claim, and one release ends it, so exclusive work
+ * asked for after that answers busy.
+ */
+function createClaimHold() {
+  let held = false;
+  return {
+    held: () => held,
+    take: () => {
+      held = true;
+    },
+    release: (): boolean => {
+      const released = held;
+      held = false;
+      return released;
     },
   };
 }
@@ -208,10 +233,12 @@ export function renderPlugin<C, M>(
     commits.stored.push(bytes);
     return Promise.resolve(testAssetRef(commits.stored.length));
   };
-  const pick = () => {
+  const pick = async (): Promise<File[]> => {
     pickerOpenings += 1;
-    return Promise.resolve(gate.running() ? [] : files);
+    if (gate.running()) return [];
+    return [...(await (options.picker?.(pickerOpenings) ?? files))];
   };
+  const hold = createClaimHold();
   /** A commit answering refused when `live` says it is not, as the host's withdrawn and ended commits do. */
   const guarded =
     <T, A>(commit: (next: T) => Promise<A>, live: () => boolean, refusal: { refused: string }) =>
@@ -255,9 +282,10 @@ export function renderPlugin<C, M>(
     const plain = <T, A>(commit: ((next: T) => Promise<A>) | undefined) =>
       offered(commit === undefined ? undefined : guarded(commit, idle, WITHDRAWN));
     const claim: OwnClaim<C, M> = {
-      release: () => true,
-      exclusively: (work) =>
-        gate.exclusively((live) => {
+      release: () => hold.release(),
+      exclusively: (work) => {
+        if (!hold.held()) return Promise.resolve('busy' as const);
+        return gate.exclusively((live) => {
           exclusiveRuns += 1;
           const ownCommit = <T, A>(commit: ((next: T) => Promise<A>) | undefined) =>
             commit === undefined ? undefined : guarded(commit, live, ENDED);
@@ -268,7 +296,8 @@ export function renderPlugin<C, M>(
             store: ownCommit(granted.store),
           };
           return work(own);
-        }),
+        });
+      },
     };
     const assets: Assets = {
       ...TEST_ASSETS,
@@ -284,7 +313,11 @@ export function renderPlugin<C, M>(
       selected: options.selected ?? false,
       claim:
         grants.claim === true
-          ? () => (options.claimRefused === true ? undefined : claim)
+          ? () => {
+              if (options.claimRefused === true) return undefined;
+              hold.take();
+              return claim;
+            }
           : undefined,
       assets,
       Embed: TestEmbed,
