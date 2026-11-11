@@ -1,6 +1,7 @@
 import { act } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type JsonValue } from '@project/core';
+import { isStoredAsset } from '@project/resource-api/domain';
 import type { CreationData } from '@project/resource-api/view';
 import type { HostCreationHost, HostNew, PluginCreationEntry } from '@project/ui';
 import type { OpenSpace } from '../src/open-spaces';
@@ -86,21 +87,16 @@ describe('which creation arriving data goes to', () => {
 const FACTS: CreateFacts = {
   kind: 'markdown',
   available: true,
-  creating: false,
   exclusive: false,
   offered: undefined,
 };
 const named = (): JsonValue => ({ spaceId: 'x' });
 
 describe('what one create becomes', () => {
-  it('refuses unavailable, then a creation of the kind already running, then exclusive work', () => {
-    const all = { ...FACTS, available: false, creating: true, exclusive: true };
+  it('refuses unavailable, then exclusive work', () => {
+    const all = { ...FACTS, available: false, exclusive: true };
 
     expect(decideCreate([], all)).toEqual({ kind: 'refused', refusal: 'unavailable' });
-    expect(decideCreate([], { ...all, available: true })).toEqual({
-      kind: 'refused',
-      refusal: 'creating',
-    });
     expect(decideCreate([], { ...FACTS, exclusive: true })).toEqual({
       kind: 'refused',
       refusal: 'exclusive',
@@ -491,5 +487,87 @@ describe('a creation the host keeps its word on', () => {
       select: true,
       then: 'rename',
     });
+  });
+});
+
+describe('a Dock creation whose picker is open', () => {
+  const deferred = () => {
+    let resolve: () => void = ignore;
+    const promise = new Promise<void>((settle) => {
+      resolve = settle;
+    });
+    return { promise, resolve };
+  };
+
+  it('is in flight from its press, so a second press while the picker is open is ignored', async () => {
+    const opened = openDerivationSpace(mintingIds(CREATED, SECOND));
+    const { host, flights } = hosted(opened);
+    const picked = deferred();
+    const runs = vi.fn();
+    const picking = offered('markdown', async (creation) => {
+      runs();
+      await picked.promise;
+      await creation.create([{ content: EMPTY_TEXT }]);
+    });
+
+    const first = host.run(picking, gesture());
+    expect(flights.kinds()).toEqual(new Set(['markdown']));
+    const second = host.run(picking, gesture());
+    picked.resolve();
+    await Promise.all([first, second]);
+
+    expect(runs).toHaveBeenCalledTimes(1);
+    expect(placedOn(opened)).toContain(CREATED);
+    expect(placedOn(opened)).not.toContain(SECOND);
+    expect(flights.kinds()).toEqual(new Set());
+  });
+
+  it('stores nothing, and says nothing, once the Dock has gone while the picker was open', async () => {
+    const opened = openDerivationSpace();
+    const store = vi.fn(() => Promise.resolve(textAsset('')));
+    const host = createCreationHost({
+      app: opened.app,
+      session: opened.session,
+      spaceResources: opened.spaceResources,
+      gate: createPluginGate(),
+      assets: { url: (ref) => ref, read: () => Promise.resolve({ refused: 'none' }), store },
+      mapId: MAP_ID,
+      reportBreak: vi.fn(),
+      flights: createCreationFlights(ignore),
+    });
+    const picked = deferred();
+    let available = true;
+
+    const running = host.run(
+      offered('markdown', async (creation) => {
+        await picked.promise;
+        const stored = await creation.assets.store?.(new Blob(['bytes']));
+        if (stored !== undefined && !isStoredAsset(stored)) creation.report(stored.refused);
+      }),
+      gesture({ available: () => available }),
+    );
+    available = false;
+    picked.resolve();
+    await running;
+
+    expect(store).not.toHaveBeenCalled();
+    expect(notice(opened)).toBeNull();
+  });
+
+  it('is not single flight when the gesture is not a Dock press, as the canvas Add Resource', async () => {
+    const opened = openDerivationSpace(mintingIds(CREATED, SECOND));
+    const { host } = hosted(opened);
+    const picked = deferred();
+    const waiting = offered('markdown', async (creation) => {
+      await picked.promise;
+      await creation.create([{ content: EMPTY_TEXT }]);
+    });
+
+    const first = host.run(waiting, gesture({ flight: false }));
+    const second = host.run(waiting, gesture({ flight: false }));
+    picked.resolve();
+    await Promise.all([first, second]);
+
+    expect(placedOn(opened)).toEqual(expect.arrayContaining([CREATED, SECOND]));
   });
 });

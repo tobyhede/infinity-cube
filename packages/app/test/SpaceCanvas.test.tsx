@@ -231,7 +231,7 @@ async function mountGraph(
   });
   const placement = {
     ...IDLE_PLACEMENT,
-    createFromDock: addResource,
+    createOnCanvas: addResource,
     dropExistingResource: addExistingResource,
     dropSpace: placeSpace,
   };

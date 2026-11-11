@@ -128,7 +128,7 @@ export function canvasReading(
 
 /** Resource placement that places nothing, for a canvas test that drops nothing. */
 export const IDLE_PLACEMENT: SpaceCanvasProps['placement'] = {
-  createFromDock: ignore,
+  createOnCanvas: ignore,
   dropExistingResource: ignore,
   dropSpace: ignore,
   createFromData: ignore,

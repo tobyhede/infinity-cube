@@ -134,8 +134,6 @@ export function dataCreation(
 export type CreationRefusal =
   /** The gesture's creation is no longer available, as when the Dock that offered it has gone. */
   | 'unavailable'
-  /** A creation of the same kind runs: the press is ignored. */
-  | 'creating'
   /** Exclusive work runs elsewhere, which withdraws every creation. */
   | 'exclusive'
   /** What was asked for is not something this gesture may create. */
@@ -169,8 +167,6 @@ export interface OfferedShown {
 export interface CreateFacts {
   readonly kind: string;
   readonly available: boolean;
-  /** Whether a creation of this kind runs now. */
-  readonly creating: boolean;
   readonly exclusive: boolean;
   /** The Space a creation from a list of Spaces was offered, if it was. */
   readonly offered: OfferedSpace | undefined;
@@ -185,7 +181,6 @@ export interface CreateFacts {
  */
 export function decideCreate(items: readonly HostNew[], facts: CreateFacts): CreatePlan {
   if (!facts.available) return { kind: 'refused', refusal: 'unavailable' };
-  if (facts.creating) return { kind: 'refused', refusal: 'creating' };
   if (facts.exclusive) return { kind: 'refused', refusal: 'exclusive' };
   if (items.length === 0) return { kind: 'unchanged' };
   const resources: NewResource[] = [];
@@ -211,19 +206,16 @@ export function decideCreate(items: readonly HostNew[], facts: CreateFacts): Cre
 /** The words a refusal the host made itself is said in. */
 const REFUSAL_WORDS = {
   unavailable: 'Resources cannot be created here now.',
-  creating: 'This Resource is still being created.',
   exclusive: describeAuthoringRefusal({ code: 'exclusive-work-running' }),
   'not-creatable': 'This Resource cannot be created here.',
 } as const satisfies Readonly<Record<CreationRefusal, string>>;
 
 /**
  * Whether the host tells the author of its own refusal. A creation no longer
- * available has no one left to tell, and a second press while one runs is
- * ignored rather than answered.
+ * available has no one left to tell.
  */
 const REPORTED = {
   unavailable: false,
-  creating: false,
   exclusive: true,
   'not-creatable': true,
 } as const satisfies Readonly<Record<CreationRefusal, boolean>>;
@@ -277,8 +269,18 @@ export function createCreationFlights(
 /** One gesture that runs a creation. */
 export interface CreationGesture {
   readonly place: () => CreationPlace;
-  /** Whether the creation is still available when `create` is called; absent, it is. */
+  /**
+   * Whether the creation is still available, asked when `create` is called,
+   * before each store and before a report; absent, it is.
+   */
   readonly available?: (() => boolean) | undefined;
+  /**
+   * Whether the gesture is single flight for its kind: from its press until
+   * its `run` settles, a second gesture of the kind that is also single flight
+   * is ignored. Absent, a Dock creation is and every other is not; the
+   * canvas's own Add Resource runs a Dock creation without it.
+   */
+  readonly flight?: boolean | undefined;
   /** The Space a creation from a list of Spaces was offered. */
   readonly offered?: OfferedSpace | undefined;
   /**
@@ -349,11 +351,11 @@ const documentFor = (
 
 /**
  * The host behind every creation gesture on one Map surface. A Dock press is
- * single flight for its kind: while one `create` of a kind from the Dock runs,
- * another is refused unreported, which is how a second press is ignored. A
- * creation of another kind, or from anywhere else, still runs, as a Markdown
- * Resource may land, or a listed Space be shown, while a new Space's
- * coordination is open.
+ * single flight for its kind from the press itself, so a picker it opens is
+ * inside the flight: while one runs, another press of that kind is ignored
+ * before its `run` is called. A creation of another kind, or from anywhere
+ * else, still runs, as a Markdown Resource may land, or a listed Space be
+ * shown, while a new Space's coordination is open.
  */
 export function createCreationHost(deps: CreationHostDependencies): CreationHostShell {
   const { app, session, spaceResources, gate, assets, reportBreak, flights } = deps;
@@ -475,7 +477,6 @@ export function createCreationHost(deps: CreationHostDependencies): CreationHost
     const plan = decideCreate(items, {
       kind: offered.kind,
       available: gesture.available?.() ?? true,
-      creating: offered.from === 'dock' && flights.has(offered.kind),
       exclusive: gate.withdraws(),
       offered: gesture.offered,
     });
@@ -485,31 +486,44 @@ export function createCreationHost(deps: CreationHostDependencies): CreationHost
       if (REPORTED[plan.refusal]) tell(offered.name, gesture, { answer });
       return answer;
     }
-    const flies = offered.from === 'dock';
-    if (flies) flights.start(offered.kind);
-    try {
-      const place = gesture.place();
-      const performed =
-        plan.kind === 'edit'
-          ? await edit(plan.items, place)
-          : await lifecycle(plan, offered.kind, place);
-      tell(
-        offered.name,
-        gesture,
-        performed.answer === 'unchanged' ? COMPLETED : performed,
-        mapOf(place),
-      );
-      return performed.answer;
-    } finally {
-      if (flies) flights.end(offered.kind);
-    }
+    const place = gesture.place();
+    const performed =
+      plan.kind === 'edit'
+        ? await edit(plan.items, place)
+        : await lifecycle(plan, offered.kind, place);
+    tell(
+      offered.name,
+      gesture,
+      performed.answer === 'unchanged' ? COMPLETED : performed,
+      mapOf(place),
+    );
+    return performed.answer;
   };
 
-  const run: CreationHostShell['run'] = (offered, gesture) => {
+  /** Run `offered` for one gesture, answering once its `run` has settled. */
+  const runOnce = (
+    offered: OfferedCreation<(host: HostCreationHost) => void | Promise<void>>,
+    gesture: CreationGesture,
+  ): Promise<void> => {
+    const available = (): boolean => gesture.available?.() ?? true;
+    const { store } = assets;
     const host: HostCreationHost = {
-      assets,
+      // A store is asked whether the creation is still available first, so
+      // bytes gathered after the Dock that offered it has gone are never sent.
+      assets: {
+        ...assets,
+        store:
+          store === undefined
+            ? undefined
+            : (bytes) =>
+                available()
+                  ? store(bytes)
+                  : Promise.resolve({ refused: REFUSAL_WORDS.unavailable }),
+      },
       create: (items) => create(offered, gesture, items),
-      report: (words) => tell(offered.name, gesture, { answer: { refused: words } }),
+      report: (words) => {
+        if (available()) tell(offered.name, gesture, { answer: { refused: words } });
+      },
     };
     // A creation that breaks is told as the channel tells every break: the
     // author hears the failure's words, and the diagnostic still reaches the
@@ -524,6 +538,18 @@ export function createCreationHost(deps: CreationHostDependencies): CreationHost
     } catch (failure) {
       broke(failure);
       return Promise.resolve();
+    }
+  };
+
+  const run: CreationHostShell['run'] = async (offered, gesture) => {
+    const flies = gesture.flight ?? offered.from === 'dock';
+    if (!flies) return runOnce(offered, gesture);
+    if (flights.has(offered.kind)) return;
+    flights.start(offered.kind);
+    try {
+      await runOnce(offered, gesture);
+    } finally {
+      flights.end(offered.kind);
     }
   };
 

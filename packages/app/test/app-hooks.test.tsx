@@ -44,6 +44,7 @@ import { mintingIds } from './minting';
  */
 
 const CREATED = uuidSchema.parse('00000000-0000-4000-8000-0000000000c1');
+const CREATED_NEXT = uuidSchema.parse('00000000-0000-4000-8000-0000000000c2');
 const TARGET_SPACE = uuidSchema.parse('00000000-0000-4000-8000-0000000000d1');
 
 /** An observable value, as the stores these hooks subscribe to publish one. */
@@ -313,6 +314,35 @@ describe('useResourcePlacement', () => {
       select: true,
       then: 'rename',
     });
+  });
+
+  it('runs a second quick canvas Add Resource, which is not a Dock press and so not single flight', async () => {
+    const opened = openDerivationSpace(mintingIds(CREATED, CREATED_NEXT));
+    const { result } = place(opened);
+    act(() => result.current.reportVisibleCentre(() => ({ x: 70, y: 80 })));
+
+    await act(async () => {
+      result.current.createOnCanvas('markdown');
+      result.current.createOnCanvas('markdown');
+      await Promise.resolve();
+    });
+
+    expect(placedIds(opened)).toEqual(expect.arrayContaining([CREATED, CREATED_NEXT]));
+  });
+
+  it('ignores a second quick Dock press of the same kind', async () => {
+    const opened = openDerivationSpace(mintingIds(CREATED, CREATED_NEXT));
+    const { result } = place(opened);
+    act(() => result.current.reportVisibleCentre(() => ({ x: 70, y: 80 })));
+
+    await act(async () => {
+      result.current.createFromDock('markdown');
+      result.current.createFromDock('markdown');
+      await Promise.resolve();
+    });
+
+    expect(placedIds(opened)).toContain(CREATED);
+    expect(placedIds(opened)).not.toContain(CREATED_NEXT);
   });
 
   it('creates an Ur Resource at the visible centre and continues in its Title', async () => {

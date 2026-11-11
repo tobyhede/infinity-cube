@@ -209,7 +209,7 @@ export interface SpaceCanvasProps {
   /** Every way a Resource arrives on this canvas: created, dropped or pasted. */
   readonly placement: Pick<
     ResourcePlacementCommands,
-    'createFromDock' | 'dropExistingResource' | 'dropSpace' | 'createFromData'
+    'createOnCanvas' | 'dropExistingResource' | 'dropSpace' | 'createFromData'
   >;
   readonly onDrawnClipboardFailuresChange?: (failures: readonly DrawnClipboardFailure[]) => void;
   readonly onDrawnSpacesChange?: (entries: readonly OpenSpace[]) => void;
@@ -407,8 +407,8 @@ export function SpaceCanvas({
   const presenting = context.kind === 'canvas' && context.presentingResourceId !== null;
   const placedResources = view.placedResources;
   const { visibleGraphs: graphs, colors: colorByGraphId } = view.projection;
-  const { createFromDock, dropExistingResource, dropSpace, createFromData } = placement;
-  const addCanvasResource = useCallback(() => createFromDock(DEFAULT_KIND), [createFromDock]);
+  const { createOnCanvas, dropExistingResource, dropSpace, createFromData } = placement;
+  const addCanvasResource = useCallback(() => createOnCanvas(DEFAULT_KIND), [createOnCanvas]);
   const { screenToFlowPosition, getZoom, setCenter } = useReactFlow();
 
   const spaces = useOpenSpaces();
@@ -934,7 +934,7 @@ export function SpaceCanvas({
       },
       ...liveEmbeddings.map((value) => ({
         id: value.surface.occurrence(),
-        addResource: () => value.placement.createFromDock(DEFAULT_KIND),
+        addResource: () => value.placement.createOnCanvas(DEFAULT_KIND),
         nodes: value.nodes,
         authoring: value.surface.authoring,
         availability: value.availability,

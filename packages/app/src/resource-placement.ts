@@ -105,6 +105,12 @@ export interface ResourcePlacementCommands extends VisibleCentreReporting {
    * then, and a creation no longer available creates nothing.
    */
   readonly createFromDock: (kind: string, available?: () => boolean) => void;
+  /**
+   * Run the Dock's creation of `kind` from the canvas's own Add Resource,
+   * placed as a Dock press is. It is not a Dock press, so it is not single
+   * flight: a quick second Add runs too.
+   */
+  readonly createOnCanvas: (kind: string) => void;
   /** The kinds whose creation is between its `create` and its installed Edit. */
   readonly creating: ReadonlySet<string>;
   /** Place a Resource this Map leaves out, answering a refusal's sentence or `null`. */
@@ -186,8 +192,8 @@ export function useResourcePlacement(
    * there. The toolbar stays available for an empty authored Map: it is
    * the zero-Resource Space's way to create the first Resource.
    */
-  const createFromDock = useCallback(
-    (kind: string, available?: () => boolean): void => {
+  const runAtCentre = useCallback(
+    (kind: string, flight: boolean, available?: () => boolean): void => {
       const offered = DOCK_CREATIONS.find((creation) => creation.kind === kind);
       if (offered === undefined) return;
       void host.run(offered, {
@@ -197,9 +203,18 @@ export function useResourcePlacement(
           mapId: drawnMapId.current,
         }),
         available,
+        flight,
       });
     },
     [host, centreAnchor],
+  );
+  const createFromDock = useCallback(
+    (kind: string, available?: () => boolean): void => runAtCentre(kind, true, available),
+    [runAtCentre],
+  );
+  const createOnCanvas = useCallback(
+    (kind: string): void => runAtCentre(kind, false),
+    [runAtCentre],
   );
 
   /** Data aimed at a point keeps it exactly. Data no plugin takes creates nothing. */
@@ -346,6 +361,7 @@ export function useResourcePlacement(
       reportVisibleCentre,
       centreAnchor,
       createFromDock,
+      createOnCanvas,
       creating,
       addExistingResource,
       addSpaceResourceFor,
@@ -361,6 +377,7 @@ export function useResourcePlacement(
       reportVisibleCentre,
       centreAnchor,
       createFromDock,
+      createOnCanvas,
       creating,
       addExistingResource,
       addSpaceResourceFor,
