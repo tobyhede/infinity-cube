@@ -23,6 +23,21 @@ const answer = (text: string, isError = false): CallToolResult => ({
 class PathRefusal extends Error {}
 
 /**
+ * Markdown text as the Markdown plugin stores what it saves: UTF-8 with `\n`
+ * line endings, so the same text is one asset. Bytes that are not UTF-8 are
+ * refused rather than decoded with replacement characters.
+ */
+const markdownBytes = (given: Uint8Array<ArrayBuffer>): Uint8Array<ArrayBuffer> => {
+  let text: string;
+  try {
+    text = new TextDecoder('utf-8', { fatal: true }).decode(given);
+  } catch {
+    throw new PathRefusal('Markdown is UTF-8 text, and these bytes are not.');
+  }
+  return new TextEncoder().encode(lineFeedText(text));
+};
+
+/**
  * The absolute path `path` names inside `root`, refusing an absolute path, one
  * that leaves `root`, one naming a dot-entry, which Import does not read, and
  * the directory itself.
@@ -158,30 +173,36 @@ export const createAggregateMcpServer = (given: string, newId: () => UUID): McpS
           .regex(/^[A-Za-z0-9]+$/u)
           .optional()
           .describe(
-            'The file extension, which names its media type: md, the default, for Markdown',
+            'The file extension, which names its media type: md, the default for text, for Markdown. Bytes carried as base64 name theirs.',
           ),
       },
       annotations: { destructiveHint: false, idempotentHint: true },
     },
-    ({ content, encoding: carried, extension = 'md' }) =>
+    ({ content, encoding: carried, extension: named }) =>
       attempt(async () => {
+        // Bytes carry no media type of their own, so they name the extension
+        // that gives them one rather than being taken for Markdown.
+        if (carried === 'base64' && named === undefined) {
+          throw new PathRefusal(
+            'Name the extension of bytes carried as base64, such as png for a PNG image.',
+          );
+        }
+        const extension = named ?? 'md';
         const given = new Uint8Array(
           carried === 'base64' ? Buffer.from(content, 'base64') : new TextEncoder().encode(content),
         );
-        // Markdown text is stored with `\n` line endings, as the Markdown
-        // plugin stores what it saves, so the same text is one asset.
-        const bytes =
-          extension.toLowerCase() === 'md'
-            ? new TextEncoder().encode(lineFeedText(new TextDecoder().decode(given)))
-            : given;
+        const bytes = extension.toLowerCase() === 'md' ? markdownBytes(given) : given;
         const hash = await assetHashOf(bytes);
+        // The empty asset always exists, so no file is written for it.
+        if (bytes.length === 0) return answer(`Name it as /assets/${hash}; it needs no file.`);
         const file = `assets/${hash}.${extension}`;
         const target = await fileInside(directory, file);
         await mkdir(dirname(target), { recursive: true });
-        // One hash names one file: a file of another extension holding these
-        // bytes is the asset already, and a second would be refused by Import.
+        // One hash names one file: a file of another extension, or of none,
+        // holding these bytes is the asset already, and Import refuses a second.
         const held = (await readdir(dirname(target))).find(
-          (name) => name.startsWith(`${hash}.`) && name !== `${hash}.${extension}`,
+          (name) =>
+            (name === hash || name.startsWith(`${hash}.`)) && name !== `${hash}.${extension}`,
         );
         if (held !== undefined) {
           throw new PathRefusal(

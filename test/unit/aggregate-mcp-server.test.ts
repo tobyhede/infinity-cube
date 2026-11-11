@@ -1,10 +1,10 @@
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { PassThrough } from 'node:stream';
 import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { newUuid, uuidSchema } from '@project/core';
+import { EMPTY_ASSET_REF, newUuid, uuidSchema } from '@project/core';
 import { AGGREGATE_FILE_NAME } from '@project/aggregate';
 import { afterEach, describe, expect, it } from 'vitest';
 import { serveMcpOverStdio } from '../../src/cli/mcp-stdio';
@@ -298,6 +298,66 @@ describe('the Aggregate directory MCP server', () => {
       text: `${directory} is a valid aggregate.\n`,
       isError: false,
     });
+  });
+
+  it('refuses bytes carried as base64 that name no extension, writing nothing', async () => {
+    const directory = await writeTalk();
+    const client = await connect(directory);
+    const assets = join(directory, 'assets');
+    const before = await readdir(assets);
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).toString('base64');
+
+    const refused = await callTool(client, 'write_asset', { content: png, encoding: 'base64' });
+
+    expect(refused.isError).toBe(true);
+    expect(refused.text).toContain('extension');
+    expect(await readdir(assets)).toEqual(before);
+  });
+
+  it('refuses Markdown whose bytes are not UTF-8 text, writing nothing', async () => {
+    const directory = await writeTalk();
+    const client = await connect(directory);
+    const assets = join(directory, 'assets');
+    const before = await readdir(assets);
+    const notText = Buffer.from([0x23, 0x20, 0xff, 0xfe, 0x0a]).toString('base64');
+
+    const refused = await callTool(client, 'write_asset', {
+      content: notText,
+      encoding: 'base64',
+      extension: 'md',
+    });
+
+    expect(refused.isError).toBe(true);
+    expect(refused.text).toContain('UTF-8');
+    expect(await readdir(assets)).toEqual(before);
+  });
+
+  it('answers the empty asset’s URL without writing a file, as no file is needed for it', async () => {
+    const directory = await writeTalk();
+    const client = await connect(directory);
+    const assets = join(directory, 'assets');
+    const before = await readdir(assets);
+
+    const stored = await callTool(client, 'write_asset', { content: '' });
+
+    expect(stored.isError).toBe(false);
+    expect(stored.text).toContain(EMPTY_ASSET_REF);
+    expect(await readdir(assets)).toEqual(before);
+  });
+
+  it('refuses to write an asset whose bytes a file named by the bare hash already holds', async () => {
+    const directory = await writeTalk();
+    const client = await connect(directory);
+    const assets = join(directory, 'assets');
+    const before = await readdir(assets);
+    const hash = textAssetRef('Plain.\n').slice('/assets/'.length);
+    await callTool(client, 'write_file', { path: `assets/${hash}`, content: 'Plain.\n' });
+
+    const refused = await callTool(client, 'write_asset', { content: 'Plain.\n' });
+
+    expect(refused.isError).toBe(true);
+    expect(refused.text).toContain(`assets/${hash} already`);
+    expect((await readdir(assets)).sort()).toEqual([...before, hash].sort());
   });
 
   it('checks an empty directory by saying what to write, naming no command', async () => {
