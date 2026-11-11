@@ -230,14 +230,25 @@
    border and no ground, read as decoration on the popover's paper. A control
    that can be pressed says so before it is pressed, which leaves the fill free
    to mean only "on" rather than carrying the affordance as well as the state. */
+/* One line at the popover's width however many kinds are registered: each
+   toggle is about glyph-wide, with its count on the glyph's corner rather than
+   beside it, and the row spreads them across its width. The top padding is the
+   room the badges rise into. `resources-popover.spec.ts` measures the fit
+   against the kind registry. */
 .resources-popover__filter {
   display: flex;
+  justify-content: space-between;
   gap: 4px;
+  padding-top: 6px;
 }
 
 .resources-popover__toggle {
-  gap: 5px;
-  padding: 5px 8px;
+  position: relative;
+  /* One box for every glyph, so a larger mark does not make its toggle taller
+     than its neighbours. */
+  width: 32px;
+  height: 28px;
+  padding: 0;
   border-color: var(--border);
   background: var(--card);
   /* A hairline in the theme's ink, as every other hairline is, rather than
@@ -262,17 +273,25 @@
   opacity: 0.72;
 }
 
-/* How many rows this switch is contributing under the current search. Tabular
-   figures so the row does not shuffle as the reader types. */
+/* How many rows this switch is contributing under the current search, as a
+   badge over the toggle's top-right corner. Tabular figures so the badge does
+   not shuffle as the reader types; its own border keeps it legible where it
+   overlaps the toggle's. */
 .resources-popover__count {
-  min-width: 16px;
-  padding: 0 4px;
+  position: absolute;
+  top: -6px;
+  right: -5px;
+  min-width: 14px;
+  padding: 0 3px;
+  border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--secondary);
-  font-size: 11px;
+  color: var(--foreground);
+  font-size: 10px;
   font-variant-numeric: tabular-nums;
-  line-height: 16px;
+  line-height: 13px;
   text-align: center;
+  pointer-events: none;
 }
 
 .resources-popover__toggle[data-pressed] .resources-popover__count {

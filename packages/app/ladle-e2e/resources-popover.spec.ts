@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test';
+import { KIND_IDS } from '@project/core';
+import { boxOf } from '../e2e/graph';
 
 const STORY = '/?story=surfaces--resources-popover--available-resources&mode=preview';
 const story = (name: string) => `/?story=surfaces--resources-popover--${name}&mode=preview`;
@@ -245,6 +247,42 @@ test(
     await expect(page.getByRole('button', { name: /^Add .* to Map$/ })).toHaveCount(1);
   },
 );
+
+/**
+ * The row is one line in a popover of fixed width and gains a toggle with every
+ * kind module, so it is measured against the registry rather than a list
+ * written here: the next kind that would push a toggle off the panel fails
+ * this rather than shipping.
+ */
+test('every filter toggle sits inside the popover on one line, its count still drawn', async ({
+  page,
+}) => {
+  await page.goto(story('meta-spaces'));
+  await page.getByRole('button', { name: 'Resources' }).click();
+  const popup = page.getByRole('dialog', { name: 'Resources' });
+  await expect(popup).toBeVisible();
+
+  const toggles = popup.getByRole('group', { name: 'Filter the list by kind' }).getByRole('button');
+  await expect(toggles).toHaveCount(KIND_IDS.length + 1);
+  const panel = await boxOf(popup, 'the Resources popover');
+  expect(panel.width).toBe(288);
+  const tops = new Set<number>();
+  for (const toggle of await toggles.all()) {
+    const box = await boxOf(toggle, 'a filter toggle');
+    tops.add(Math.round(box.y));
+    // A crowded row shrinks its toggles rather than overflowing, so a box that
+    // still fits is not proof the row does.
+    expect(box.width).toBe(32);
+    expect(box.x).toBeGreaterThanOrEqual(panel.x);
+    expect(box.x + box.width).toBeLessThanOrEqual(panel.x + panel.width);
+    const count = toggle.locator('.resources-popover__count');
+    await expect(count).toBeVisible();
+    const badge = await boxOf(count, 'a filter count');
+    expect(badge.x + badge.width).toBeLessThanOrEqual(panel.x + panel.width);
+    expect(badge.y).toBeGreaterThanOrEqual(panel.y);
+  }
+  expect(tops.size).toBe(1);
+});
 
 test(
   'Resources list tells rows sharing a Space’s name apart by what each adds',
