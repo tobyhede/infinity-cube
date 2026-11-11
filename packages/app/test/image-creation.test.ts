@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type ImageNaturalSize, type SpaceSnapshot } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { ImageStoring } from '../src/picture-admission';
@@ -105,14 +105,14 @@ const file = (name: string): File => new File(['bytes'], name, { type: 'image/pn
 const AT = { x: 100, y: 200 };
 
 describe('creating Image Resources from files', () => {
-  it('stores each file, measures it, and creates one Resource per file in one Edit', async () => {
+  it('stores each file and creates one Resource per file in one Edit', async () => {
     const { session, authoring } = open(FIRST, SECOND);
     const images = sources(
       {
-        'diagram.png': { kind: 'stored', url: STORED_A },
+        'diagram.png': { kind: 'stored', url: STORED_A, naturalSize: { width: 640, height: 480 } },
         'photo.png': { kind: 'stored', url: STORED_B },
       },
-      { [STORED_A]: { width: 640, height: 480 } },
+      {},
     );
 
     const created = await createImageResources(
@@ -135,15 +135,17 @@ describe('creating Image Resources from files', () => {
     ]);
   });
 
-  it('records the size storing read from the bytes, and measures only a picture it could not size', async () => {
+  it('records only the size storing read from the bytes, as Replace does, and loads no stored picture to measure it', async () => {
     const { session, authoring } = open(FIRST, SECOND);
-    const images = sources(
+    const tables = sources(
       {
         'diagram.png': { kind: 'stored', url: STORED_A, naturalSize: { width: 300, height: 400 } },
         'photo.png': { kind: 'stored', url: STORED_B },
       },
       { [STORED_A]: { width: 640, height: 480 }, [STORED_B]: { width: 20, height: 10 } },
     );
+    const measure = vi.fn(tables.measure);
+    const images: ImageSources = { ...tables, measure };
 
     await createImageResources(
       { images, authoring },
@@ -156,10 +158,8 @@ describe('creating Image Resources from files', () => {
         .getState()
         .working.resources.slice(1)
         .map(({ document }) => document.content),
-    ).toEqual([
-      { url: STORED_A, naturalSize: { width: 300, height: 400 } },
-      { url: STORED_B, naturalSize: { width: 20, height: 10 } },
-    ]);
+    ).toEqual([{ url: STORED_A, naturalSize: { width: 300, height: 400 } }, { url: STORED_B }]);
+    expect(measure).not.toHaveBeenCalled();
   });
 
   it('creates nothing when any file is refused, and names the file and the code', async () => {

@@ -117,7 +117,7 @@ export const storeEach = async (
 /**
  * One creation gesture, from what it brought to one completed Edit.
  *
- * Every picture is stored and measured before the Edit, so the Edit records
+ * Every picture is stored or measured before the Edit, so the Edit records
  * what it was told and nothing after it has to be written back. A drop of
  * several files is all or nothing: one refused file creates none, because the
  * author made one gesture and one Edit answers it.
@@ -127,24 +127,18 @@ export async function createImageResources(
   origin: ImageOrigin,
   { mapId, drawing, anchor, placement }: ImageTarget,
 ): Promise<ImageEditResult> {
-  let brought: readonly CreatedImage[];
+  let created: readonly CreatedImage[];
   if (origin.kind === 'url') {
-    brought = [{ url: origin.url }];
+    // A web URL is loaded to be measured. A stored picture is sized from its
+    // bytes alone, as Replace sizes it, and records none where its header is silent.
+    const naturalSize = await images.measure(origin.url);
+    created = [naturalSize === undefined ? { url: origin.url } : { url: origin.url, naturalSize }];
   } else {
     const stored = await storeEach(images, origin.files);
     if (stored.kind === 'not-stored') return stored;
-    brought = stored.images;
+    created = stored.images;
   }
-  if (brought.length === 0) return { kind: 'unchanged' };
-  // A stored picture is sized from its bytes, as Replace sizes it; only a web
-  // URL, or a picture whose header said nothing, is loaded to be measured.
-  const created = await Promise.all(
-    brought.map(async (image): Promise<CreatedImage> => {
-      if (image.naturalSize !== undefined) return image;
-      const naturalSize = await images.measure(image.url);
-      return naturalSize === undefined ? { url: image.url } : { url: image.url, naturalSize };
-    }),
-  );
+  if (created.length === 0) return { kind: 'unchanged' };
   const completion: ImagesCompletion = {
     kind: 'created-images',
     images: created,
