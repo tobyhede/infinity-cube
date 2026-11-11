@@ -1,5 +1,7 @@
 # Compound documents and embedding: prior art for Resource plugins
 
+**A pre-ADR assessment.** Written on 2026-11-10 against the draft design, before ADR 0142 was accepted, and kept as written. Where it disagrees with the design it read, the ADR and [`spec.md`](spec.md) record what was decided: a missing plugin's Resource is drawn by the default plugin rather than refused, the deepest of nested Claims shows its commands, and Undo across a Claim is out of scope.
+
 Read 2026-11-10. **Versions:** Microsoft Learn Win32 pages (`ms.date` 2018-12-05, updated 2024-02-22); *OpenDoc Programmer's Guide*, 16 Jul 1996, via Apple's June 1998 Developer CD on discmaster; MCP Apps Stable 2026-01-26; HTML Living Standard, 9 Nov 2026; Adaptive Cards renderer spec, updated 2025-07-03; reveal.js 4.0.0 page; Slidev v53.1.0. **Caveat:** OpenDoc, MCP Apps, HTML and Slack quotes arrived through a summarising fetch; recheck before quoting onward. **Unreachable:** `preserve.mactech.com` (expired certificate; two *develop* articles read through discmaster).
 
 ## Bottom line

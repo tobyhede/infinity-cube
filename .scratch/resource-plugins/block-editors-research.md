@@ -1,5 +1,7 @@
 # Prior art: block and rich-text editors
 
+**A pre-ADR assessment.** Written on 2026-11-10 against the draft design, before ADR 0142 was accepted, and kept as written. Where it disagrees with the design it read, the ADR and [`spec.md`](spec.md) record what was decided: Claims nest through what a plugin embeds, and a missing plugin's Resource is drawn by the default plugin rather than blocking its aggregate.
+
 Read 2026-11-10, in source or first-party docs: Gutenberg `v24.3.1`, Editor.js `v2.31.7`, prosemirror-view `1.41.7`, TipTap `v3.33.0`, Lexical `v0.53.0`, Slate at `fd42a80`, BlockNote `v0.57.0`, obsidian-api at `879c936`. ProseMirror's model, its footnote example and Obsidian's developer docs were read at their default branches, unpinned. Logseq was not read. Issue text is maintainer statements, dated.
 
 ## Bottom line
