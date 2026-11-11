@@ -20,6 +20,7 @@ While any plugin is missing, an unrooted Space is held rather than refused. A Re
 - Delete → Export → Import leaves no such Resource and no asset only it referenced, and an asset another Resource references stays.
 - For each of PostgreSQL and SQLite: Import, discard the source directory, Export into an empty directory, restore the plugin and Import that directory. The Resource reads through its plugin, and an asset that is not valid UTF-8 is byte-identical.
 - Deleting a Resource with no plugin that alone rooted a Space, then restoring the plugin, refuses the aggregate naming that Space.
-- An asset's file name and media type survive the round trip.
+- Where a Resource with no plugin and a Space Resource both own one Space (ADR 0074's shared ownership), the host cannot read the first's reference, so deleting the Space Resource deletes the Space with it, and restoring the plugin refuses the aggregate naming the Resource whose Space is gone. This is the cost ADR 0142 accepts, not a held Space.
+- An asset's file name and media type survive the round trip, under issue 03's naming rule.
 - A build that gains the plugin over a store already holding the Resource reads it through the plugin, with no Export or Import.
 - `CI passed` is green, including the PostgreSQL and SQLite jobs.

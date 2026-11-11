@@ -8,7 +8,7 @@ Status: ready-for-agent
 
 Ur moves first because it is the smallest. Its package holds both halves, it declares its outline from its Shape, and `shape` moves into its Map content. `Title`, `Own` and `<Rail>` are built here.
 
-**Roll forward:** every stored Ur `shape` moves to Map content, `docs/schema/space.schema.json` follows, and `CanvasResource`'s Ur branch goes (`.scratch/resource-kind-modules/kind-sites.md`). The Shape Edit and intake refusal for another kind become that plugin's schema answering.
+**Roll forward:** every stored Ur `shape` moves to Map content, `docs/schema/space.schema.json` follows, and `CanvasResource`'s Ur branch goes (`.scratch/resource-kind-modules/kind-sites.md`). The Shape Edit and intake refusal for another kind become that plugin's schema answering, so this step removes the Map entry's `shape`, the core's `takesResourceShape` and the `shape-not-taken` refusal: a Map content commit no plugin keeps is refused `map-content-not-kept`, and one a plugin's schema rejects `map-content-invalid`, at intake and at `complete` alike. `open`, `canOpen`, `takesOpen` and `open-requires-content` stay until `10`.
 
 **Acceptance:**
 
