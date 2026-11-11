@@ -199,6 +199,15 @@ const contentTargetOf = <K extends KindId>(resource: Kinded<K>) =>
 export const contentTarget = (resource: KindedResource): UUID | undefined =>
   contentTargetOf(resource);
 
+/** The Resource this one shows, where it shows one and `resourceOf` resolves it. */
+const targetIn = (
+  resource: KindedResource,
+  resourceOf: (id: UUID) => KindedResource | undefined,
+): KindedResource | undefined => {
+  const targetId = contentTarget(resource);
+  return targetId === undefined ? undefined : resourceOf(targetId);
+};
+
 /**
  * Whether a plugin in this build draws this Resource (ADR 0142): its kind's
  * plugin, and, for a Resource that shows a content Target, that Target's
@@ -212,9 +221,8 @@ export const drawnByPlugin = (
   resourceOf: (id: UUID) => KindedResource | undefined,
 ): boolean => {
   if (!isPluginKind(resource.kind)) return false;
-  const targetId = contentTarget(resource);
-  if (targetId === undefined) return true;
-  const target = resourceOf(targetId);
+  if (contentTarget(resource) === undefined) return true;
+  const target = targetIn(resource, resourceOf);
   return target === undefined || isPluginKind(target.kind);
 };
 
@@ -230,8 +238,7 @@ export const takesOpen = (
 ): boolean => {
   if (drawnByPlugin(resource, resourceOf)) return false;
   if (kindFlags(resource.kind).canOpen) return true;
-  const targetId = contentTarget(resource);
-  const target = targetId === undefined ? undefined : resourceOf(targetId);
+  const target = targetIn(resource, resourceOf);
   return target !== undefined && kindFlags(target.kind).canOpen;
 };
 

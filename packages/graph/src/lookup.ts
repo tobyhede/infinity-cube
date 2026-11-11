@@ -2,6 +2,7 @@ import {
   drawnByPlugin,
   resolveContent,
   resourceReferences,
+  takesOpen,
   type Resource,
   type ResourceContent,
   type ResourceId,
@@ -96,6 +97,15 @@ export function referencedResources(space: Space, resource: Resource): readonly 
  */
 export function resourceDrawnByPlugin(space: Space, resource: Resource): boolean {
   return drawnByPlugin(resource, (id) => space.lookup.resource(id));
+}
+
+/**
+ * Whether the application keeps `resource`'s Open in this Space, as a Map
+ * entry's `open` (`takesOpen`): a Resource no plugin draws whose content, its
+ * own or its Target's, declares Open.
+ */
+export function resourceTakesOpen(space: Space, resource: Resource): boolean {
+  return takesOpen(resource, (id) => space.lookup.resource(id));
 }
 
 /**

@@ -8,7 +8,6 @@ import {
   authorsContent,
   embedsMap,
   resolvedMapContent,
-  takesOpen,
   type JsonValue,
   type Resource,
   type ResourceId,
@@ -16,7 +15,12 @@ import {
   type GraphHeadShape,
   type GraphId,
 } from '@project/core';
-import { referencedResources, resolveResourceContent, resourceDrawnByPlugin } from '@project/graph';
+import {
+  referencedResources,
+  resolveResourceContent,
+  resourceDrawnByPlugin,
+  resourceTakesOpen,
+} from '@project/graph';
 import type {
   GraphRenderEdge,
   LayoutStrategyResource,
@@ -349,7 +353,6 @@ export function projectResourceNodes(
   const laidOut = new Map((options.strategyGraph?.resources ?? []).map((r) => [r.id, r]));
 
   const source = visible ? space.resources.filter((r) => visible.has(r.id)) : space.resources;
-  const resourceOf = (id: ResourceId) => space.lookup.resource(id);
 
   return source.map((resource) => {
     const placedResource = laidOut.get(resource.id);
@@ -379,7 +382,7 @@ export function projectResourceNodes(
           ? resolvedMapContent(resource.kind, options.mapContent?.(resource.id))
           : undefined,
         embeddable: byPlugin ? referencedResources(space, resource) : undefined,
-        takesOpen: takesOpen(resource, resourceOf),
+        takesOpen: resourceTakesOpen(space, resource),
         activeGraphId,
         activeGraphColor: options.activeGraphColor ?? FALLBACK_COLOR,
         borderColor: emphasis.borderColor,

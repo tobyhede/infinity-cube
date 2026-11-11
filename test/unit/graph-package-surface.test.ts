@@ -56,6 +56,7 @@ const OFFERED_VALUES = [
   'referencedResources',
   'resolveResourceContent',
   'resourceDrawnByPlugin',
+  'resourceTakesOpen',
   'graphResourceIds',
   'graphStartResource',
   'serializeResource',
