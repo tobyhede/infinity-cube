@@ -28,6 +28,15 @@ export async function exerciseSpaceResourceContextMenus(
       },
     });
   });
+  // The shown Space is authored only under the Claim Edit takes (ADR 0142).
+  await (
+    await resourceControls(page, resource)
+  )
+    .getByRole('button', { name: /^Edit Resource/ })
+    .click();
+  await expect(
+    (await resourceControls(page, resource)).getByRole('button', { name: /^Done Resource/ }),
+  ).toBeVisible();
   const openMenu = async (kind: 'map' | 'graph') => {
     const trigger = (await resourceControls(page, resource)).getByTestId(`space-resource-${kind}`);
     await trigger.focus();
@@ -195,6 +204,11 @@ export async function exerciseSpaceResourceContextMenus(
     (await resourceControls(page, resource)).getByTestId('space-resource-map'),
   ).toHaveText('Target context');
   await expect(canvas).toHaveText(containingMap ?? '');
+  await (
+    await resourceControls(page, resource)
+  )
+    .getByRole('button', { name: /^Done Resource/ })
+    .click();
 }
 
 /** The Space Resource entity menu and its Reference Resource creation, through both production hosts. */
