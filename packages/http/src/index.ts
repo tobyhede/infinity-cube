@@ -7,6 +7,7 @@ import {
   isAssetHash,
   MAX_ASSET_BYTES,
   servedMediaType,
+  ASSET_MEDIA_TYPE_HEADER,
   decodeCommitRequest,
   encodeCommitConflict,
   encodeCommitRefusal,
@@ -73,11 +74,6 @@ const STORED_ASSET_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'Content-Security-Policy': "default-src 'none'; sandbox",
 } as const;
-
-/**
- * The media type an asset is served as: one of the four picture types inline,
- * and everything else as `application/octet-stream`, whatever it was stored as.
- */
 
 export interface SpaceHttpAppOptions {
   logError?: (message: string, error: unknown) => void;
@@ -606,6 +602,7 @@ export const createSpaceHttpApp = (
         return context.body(asset.bytes, 200, {
           ...STORED_ASSET_HEADERS,
           'Content-Type': servedMediaType(asset.mediaType),
+          [ASSET_MEDIA_TYPE_HEADER]: asset.mediaType,
         });
       } catch (error) {
         invokeLogError(logError, `Failed to load asset ${hash}`, error);

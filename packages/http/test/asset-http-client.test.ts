@@ -71,6 +71,21 @@ describe('the asset client over HTTP', () => {
     expect(empty.size).toBe(0);
   });
 
+  it('reads an asset back under the media type it was stored as, whatever it is served as', async () => {
+    const { backend } = backendOverHost();
+    const client = httpAssetClient(backend);
+    await client.store(new Blob([text], { type: 'text/markdown; charset=utf-8' }));
+    await client.store(new Blob([png], { type: 'image/png' }));
+
+    const markdown = await client.read(TEXT_URL);
+    const picture = await client.read(PNG_URL);
+    const empty = await client.read(EMPTY_ASSET_REF);
+
+    expect(
+      [markdown, picture, empty].map((read) => (read instanceof Blob ? read.type : read)),
+    ).toEqual(['text/markdown', 'image/png', 'application/octet-stream']);
+  });
+
   it('answers refused when the bytes are absent', async () => {
     const { backend } = backendOverHost();
     const absent: AssetRef = `/assets/${'A'.repeat(43)}`;

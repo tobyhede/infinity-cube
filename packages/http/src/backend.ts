@@ -9,8 +9,10 @@ import {
   decodeStoredAssetUrl,
   encodeCommitRequest,
   ASSET_ABSENT,
+  ASSET_MEDIA_TYPE_HEADER,
   ASSET_TOO_LARGE,
   MAX_ASSET_BYTES,
+  normalizeMediaType,
   problemCodeForType,
   type AssetClient,
   type CommitResult,
@@ -140,8 +142,9 @@ export class HttpSpaceBackend implements SpaceBackend {
   }
 
   /**
-   * Read a stored asset's bytes, answering `asset-absent` when the host holds
-   * none under its hash. Throws when the host cannot be reached or answers
+   * Read a stored asset's bytes, typed as they were stored rather than as they
+   * are served, answering `asset-absent` when the host holds none under its
+   * hash. Throws when the host cannot be reached or answers
    * anything else.
    */
   readAsset(ref: AssetRef): Promise<Blob | { readonly refused: string }> {
@@ -150,7 +153,8 @@ export class HttpSpaceBackend implements SpaceBackend {
       async (response): Promise<Blob | { readonly refused: string }> => {
         if (response.status === 404) return { refused: ASSET_ABSENT };
         if (!response.ok) throw new Error(`Unable to read an asset: HTTP ${response.status}`);
-        return await response.blob();
+        const stored = normalizeMediaType(response.headers.get(ASSET_MEDIA_TYPE_HEADER) ?? '');
+        return new Blob([await response.arrayBuffer()], { type: stored });
       },
       this.#uploadTimeoutMs,
     );

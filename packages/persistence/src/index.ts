@@ -72,6 +72,7 @@ export {
   normalizeMediaType,
   OCTET_STREAM,
   servedMediaType,
+  ASSET_MEDIA_TYPE_HEADER,
   withEmptyAsset,
   type AssetAdmission,
   type AssetClient,

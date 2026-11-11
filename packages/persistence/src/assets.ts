@@ -195,3 +195,11 @@ const INLINE_MEDIA_TYPES: readonly string[] = [
  */
 export const servedMediaType = (mediaType: string): string =>
   INLINE_MEDIA_TYPES.includes(mediaType) ? mediaType : OCTET_STREAM;
+
+/**
+ * The response header naming the media type an asset was stored as, beside a
+ * `Content-Type` that names the type it is served as. A reader that wants the
+ * bytes as their author typed them reads this one; a browser drawing the URL
+ * reads `Content-Type` alone.
+ */
+export const ASSET_MEDIA_TYPE_HEADER = 'X-Asset-Media-Type';

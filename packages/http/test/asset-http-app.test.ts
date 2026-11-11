@@ -233,6 +233,7 @@ describe('serving an asset', () => {
       expect(served.headers.get('content-type')).toBe('application/octet-stream');
       expect(served.headers.get('x-content-type-options')).toBe('nosniff');
       expect(served.headers.get('content-security-policy')).toBe("default-src 'none'; sandbox");
+      expect(served.headers.get('x-asset-media-type')).toBe(type);
       expect(new Uint8Array(await served.arrayBuffer())).toEqual(bytes);
     },
   );
