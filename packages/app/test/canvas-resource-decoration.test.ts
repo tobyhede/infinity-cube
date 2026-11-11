@@ -36,6 +36,7 @@ import {
 import type { KindDecorationContext } from '../src/kinds/registry';
 import type { PluginHost } from '../src/plugin-host/plugin-commits';
 import { createPluginGate } from '../src/plugin-host/plugin-gate';
+import { NO_CLAIMS } from '../src/plugin-host/claim-chain';
 import type { AuthoringResult } from '../src/space-authoring';
 import { RESOURCE_SIZE } from '../src/resource';
 import { NO_SPACE_RESOURCE_TARGETS } from '../src/space-resource-targets';
@@ -352,6 +353,7 @@ describe('an Ur Resource’s decoration', () => {
     const complete = vi.fn((): AuthoringResult => ({ kind: 'completed' }));
     const pluginHost: PluginHost = {
       gate: createPluginGate(),
+      claims: NO_CLAIMS,
       replacementEpoch: () => 0,
       complete,
       report: () => undefined,
@@ -584,6 +586,7 @@ describe('decorating each kind from its own part of the context', () => {
     const urNodes = [projectionNode(UR_ID, 'ur')];
     const host = (complete: PluginHost['complete']): PluginHost => ({
       gate: createPluginGate(),
+      claims: NO_CLAIMS,
       replacementEpoch: () => 0,
       complete,
       report: () => undefined,

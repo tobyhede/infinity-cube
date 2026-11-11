@@ -1,4 +1,11 @@
-import { useMemo, useState, useSyncExternalStore, type ComponentType } from 'react';
+import {
+  createContext,
+  useContext,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  type ComponentType,
+} from 'react';
 import { render, type RenderResult } from '@testing-library/react';
 import type { Answer, AssetRef, Size } from '../domain';
 import {
@@ -102,14 +109,19 @@ function createTestGate() {
   };
 }
 
-function TestTitle({ title }: { readonly title: string }) {
-  return function Title({ className }: TitleProps) {
-    return (
-      <h2 className={className} data-testid="plugin-title">
-        {title}
-      </h2>
-    );
-  };
+/**
+ * The Title, read from context rather than closed over, so the harness hands
+ * the plugin one Title component for its lifetime, as a host does.
+ */
+const TestTitleContext = createContext('');
+
+function TestTitle({ className }: TitleProps) {
+  const title = useContext(TestTitleContext);
+  return (
+    <h2 className={className} data-testid="plugin-title">
+      {title}
+    </h2>
+  );
 }
 
 function TestOwn({ children, className }: OwnProps) {
@@ -189,10 +201,7 @@ export function renderPlugin<C, M>(
     const [mapValue, setMapValue] = useState(options.map);
     const rail = useMemo(() => createRailStore(), []);
     const running = useSyncExternalStore(gate.subscribe, gate.running);
-    const host: ResourceHost = useMemo(
-      () => ({ Title: TestTitle({ title }), Own: TestOwn, rail }),
-      [rail, title],
-    );
+    const host: ResourceHost = useMemo(() => ({ Title: TestTitle, Own: TestOwn, rail }), [rail]);
     const settle =
       <T,>(record: T[], apply: (next: T) => void) =>
       (next: T) => {
@@ -245,10 +254,12 @@ export function renderPlugin<C, M>(
       Embed: TestEmbed,
     };
     return (
-      <ResourceHostProvider host={host}>
-        <View surface={surface} />
-        <TestRail host={rail} />
-      </ResourceHostProvider>
+      <TestTitleContext.Provider value={title}>
+        <ResourceHostProvider host={host}>
+          <View surface={surface} />
+          <TestRail host={rail} />
+        </ResourceHostProvider>
+      </TestTitleContext.Provider>
     );
   }
 

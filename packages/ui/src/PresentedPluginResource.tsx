@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { createContext, useContext, useState } from 'react';
 import { mapContentWithoutMap, titleName, type PluginKind } from '@project/core';
 import type { Size } from '@project/resource-api/domain';
 import {
@@ -22,6 +22,17 @@ import { ResourceFailureBoundary } from './ResourceFailureBoundary';
 /** The frame's nominal size: the Stage's 16:9 frame, which the plugin's rect fills. */
 const STAGE_SIZE: Size = { width: 1600, height: 900 };
 
+/**
+ * The name the Stage draws, read from context rather than closed over, so the
+ * host hands the plugin one Title component for the drawing's lifetime.
+ */
+const StageNameContext = createContext('');
+
+function StageTitle({ className }: TitleProps) {
+  const name = useContext(StageNameContext);
+  return <h2 className={['resource__title', className].filter(Boolean).join(' ')}>{name}</h2>;
+}
+
 function StageOwn({ children, className }: OwnProps) {
   return <div className={className}>{children}</div>;
 }
@@ -42,12 +53,12 @@ export interface PresentedPluginResourceProps {
 export function PresentedPluginResource(props: PresentedPluginResourceProps) {
   const { kind, title } = props;
   const name = titleName(title);
-  const host: ResourceHost = useMemo(() => {
-    function StageTitle({ className }: TitleProps) {
-      return <h2 className={['resource__title', className].filter(Boolean).join(' ')}>{name}</h2>;
-    }
-    return { Title: StageTitle, Own: StageOwn, rail: createRailStore() };
-  }, [name]);
+  const [host] = useState((): ResourceHost => ({
+    Title: StageTitle,
+    Own: StageOwn,
+    rail: createRailStore(),
+  }));
+  const [drawing] = useState(() => Symbol('drawing'));
   const plugin = pluginEntryFor(kind).render({
     resourceId: props.resourceId,
     kind,
@@ -57,6 +68,7 @@ export function PresentedPluginResource(props: PresentedPluginResourceProps) {
     size: STAGE_SIZE,
     selected: false,
     operations: { kind },
+    drawing,
     assets: NO_ASSETS,
     Embed: NoEmbed,
     onClaim: (claim) => claim.unmount(),
@@ -73,7 +85,9 @@ export function PresentedPluginResource(props: PresentedPluginResourceProps) {
         key={`${props.resourceId}:${String(props.replacementEpoch ?? 0)}`}
         onFailure={props.onFailure}
       >
-        <ResourceHostProvider host={host}>{plugin}</ResourceHostProvider>
+        <StageNameContext.Provider value={name}>
+          <ResourceHostProvider host={host}>{plugin}</ResourceHostProvider>
+        </StageNameContext.Provider>
       </ResourceFailureBoundary>
     </article>
   );

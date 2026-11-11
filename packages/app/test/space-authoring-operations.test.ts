@@ -613,7 +613,7 @@ describe('Exclusive work withdraws every Edit (ADR 0142)', () => {
     const other = openOn(pluginGate);
     let finish: () => void = () => undefined;
     const work = pluginGate
-      .claim(['surface'], () => null)
+      .claim([{ resource: 'resource', key: Symbol('drawing') }], () => null)
       ?.exclusively(
         () =>
           new Promise<void>((resolve) => {

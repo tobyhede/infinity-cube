@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { type JsonValue, type ResourceShape } from '@project/core';
@@ -39,12 +39,16 @@ function ProbeView({ surface }: { readonly surface: ProbeSurface }) {
   surfaces.push(surface);
   if (surface.content.value.fails) throw new Error('The probe was told to fail.');
   const claim = surface.claim;
+  const [count, setCount] = useState(0);
   useEffect(() => {
     if (claimOnMount) claim?.();
   }, [claim]);
   return (
     <div data-testid="probe">
       <Title />
+      <button type="button" onClick={() => setCount(count + 1)}>
+        Counted {count}
+      </button>
     </div>
   );
 }
@@ -84,6 +88,12 @@ const props = (
   operations: { kind: 'ur' },
   ...overrides,
 });
+
+/** Why an answer refused, or undefined for one that did not. */
+const reasonOf = (answer: Answer | undefined): string | undefined =>
+  answer === undefined || answer === 'completed' || answer === 'unchanged'
+    ? undefined
+    : answer.refused;
 
 const outline = (resource: HTMLElement) => resource.querySelector('.canvas-resource__outline');
 
@@ -384,17 +394,123 @@ describe('the Map host a plugin draws inside (ADR 0142)', () => {
     expect(screen.queryByRole('button', { name: 'Actions for Resource Decide' })).toBeNull();
   });
 
-  it('gives the plugin the whole rect while it holds a Claim', () => {
+  it('gives the plugin the whole rect while this drawing holds a Claim, and not another', () => {
     const { rerender } = render(<PluginResource {...props('pill')} />);
     const layer = () =>
       screen.getByRole('article', { name: 'Decide' }).querySelector('.canvas-resource__plugin');
     expect(layer()).not.toHaveClass('nodrag');
-    rerender(<PluginResource {...props('pill')} operations={{ kind: 'ur', claimed: true }} />);
+    rerender(
+      <PluginResource
+        {...props('pill')}
+        operations={{ kind: 'ur', claimHolder: () => 'another-drawing' }}
+      />,
+    );
+    expect(layer()).not.toHaveClass('nodrag');
+    rerender(
+      <PluginResource
+        {...props('pill')}
+        operations={{ kind: 'ur', claimHolder: () => 'this-drawing' }}
+      />,
+    );
     expect(layer()).toHaveClass('nodrag', 'nopan', 'nowheel');
+  });
+
+  it('keeps a drawn plugin, its state and its Claim through a change of its Map content', () => {
+    surfaces.length = 0;
+    claimOnMount = true;
+    const unmountClaim = vi.fn();
+    const claim = vi.fn((): PluginHostClaim => ({
+      release: () => true,
+      exclusively: () => Promise.resolve('busy'),
+      unmount: unmountClaim,
+    }));
+    const operations = { kind: 'ur' as const, claim };
+    const { rerender } = render(
+      <PluginSurface {...probeProps({ operations })} entry={probeEntry} />,
+    );
+    claimOnMount = false;
+    fireEvent.click(screen.getByRole('button', { name: 'Counted 0' }));
+    rerender(
+      <PluginSurface {...probeProps({ operations, mapContent: { n: 2 } })} entry={probeEntry} />,
+    );
+    expect(screen.getByRole('button', { name: 'Counted 1' })).toBeInTheDocument();
+    expect(claim).toHaveBeenCalledTimes(1);
+    expect(unmountClaim).not.toHaveBeenCalled();
+  });
+
+  it('offers no commit to a drawing while another drawing of its Resource holds a Claim', async () => {
+    surfaces.length = 0;
+    let holder: symbol | undefined;
+    const commitMap = vi.fn(() => Promise.resolve<Answer>('completed'));
+    const operations = {
+      kind: 'ur' as const,
+      commitMap,
+      claim: (drawing: symbol): PluginHostClaim | undefined => {
+        if (holder !== undefined && holder !== drawing) return undefined;
+        holder = drawing;
+        return {
+          release: () => true,
+          exclusively: () => Promise.resolve('busy'),
+          unmount: () => {
+            holder = undefined;
+          },
+        };
+      },
+      claimHolder: (drawing: symbol) =>
+        holder === undefined ? 'none' : holder === drawing ? 'this-drawing' : 'another-drawing',
+    } as const;
+    const second = render(
+      <PluginSurface
+        {...probeProps({ operations, title: { ...title, title: 'Second' } })}
+        entry={probeEntry}
+      />,
+    );
+    const kept = surfaces.at(-1)?.map.commit;
+    expect(kept).toBeDefined();
+    claimOnMount = true;
+    render(
+      <PluginSurface
+        {...probeProps({ operations, title: { ...title, title: 'First' } })}
+        entry={probeEntry}
+      />,
+    );
+    claimOnMount = false;
+    expect(holder).toBeDefined();
+    const claimant = surfaces.at(-1);
+
+    // A commit the second drawing kept from before the Claim answers refused.
+    expect(reasonOf(await kept?.({ n: 5 }))).toMatch(/\S/u);
+    expect(commitMap).not.toHaveBeenCalled();
+    // Drawn again, it is offered none, and no Claim.
+    second.rerender(
+      <PluginSurface
+        {...probeProps({ operations, title: { ...title, title: 'Second' } })}
+        entry={probeEntry}
+      />,
+    );
+    expect(surfaces.at(-1)?.map.commit).toBeUndefined();
+    expect(surfaces.at(-1)?.claim).toBeUndefined();
+    // The claimant's commits stay.
+    await expect(claimant?.map.commit?.({ n: 6 })).resolves.toBe('completed');
+    expect(commitMap).toHaveBeenCalledTimes(1);
+    // Unmounting the second drawing leaves the claimant's Claim held.
+    second.unmount();
+    expect(holder).toBeDefined();
   });
 });
 
 describe('the Stage host a plugin draws inside (ADR 0142)', () => {
+  it('hands the plugin one Title for the drawing’s lifetime, which a rename does not remount', () => {
+    const { rerender } = render(
+      <PresentedPluginResource resourceId="decide" kind="ur" title="Decide" content={{}} />,
+    );
+    const drawn = screen.getByRole('heading', { name: 'Decide' });
+    rerender(
+      <PresentedPluginResource resourceId="decide" kind="ur" title="Decided" content={{}} />,
+    );
+    expect(screen.getByRole('heading', { name: 'Decided' })).toBe(drawn);
+  });
+
   it('gives the plugin the value withoutMap gives, and no commit', () => {
     render(
       <PresentedPluginResource

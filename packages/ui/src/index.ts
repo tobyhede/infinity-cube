@@ -40,7 +40,12 @@ export type { PresentedPluginResourceProps } from './PresentedPluginResource';
 export { ResourceFailureBoundary } from './ResourceFailureBoundary';
 export type { ResourceFailureBoundaryProps } from './ResourceFailureBoundary';
 export { isPluginOperations } from './kinds/plugin-views';
-export type { PluginCommits, PluginHostClaim, PluginOperations } from './kinds/plugin-views';
+export type {
+  ClaimHolder,
+  PluginCommits,
+  PluginHostClaim,
+  PluginOperations,
+} from './kinds/plugin-views';
 export type {
   CanvasSpaceResourceChoice,
   CanvasSpaceResourceGraphChoice,

@@ -38,7 +38,6 @@ import {
   NoEmbed,
   pluginEntryFor,
   type PluginEntry,
-  type PluginCommits,
   type PluginHostClaim,
   type PluginOperations,
 } from './kinds/plugin-views';
@@ -70,6 +69,9 @@ import './canvas-resource.css';
  */
 
 const SURFACE_GONE: Answer = { refused: 'This Resource is no longer drawn here.' };
+const HELD_ELSEWHERE: Answer = {
+  refused: 'This Resource is being changed where it is drawn elsewhere. Try again when that ends.',
+};
 
 /** Stop the canvas reading a press or key meant for the plugin's own region. */
 const stop = (event: PointerEvent | KeyboardEvent): void => {
@@ -211,10 +213,12 @@ export interface PluginResourceProps {
 }
 
 /**
- * One mounted surface's lifetime: whether it is still drawn, and the Claims
- * it was granted, which go with it when it unmounts.
+ * One mounted surface's lifetime: the key its drawing is known by, whether it
+ * is still drawn, and the Claims it was granted, which go with it when it
+ * unmounts.
  */
 interface SurfaceLifetime {
+  readonly drawing: symbol;
   readonly drawn: () => boolean;
   readonly hold: (claim: PluginHostClaim) => void;
   readonly begin: () => void;
@@ -225,6 +229,7 @@ function createSurfaceLifetime(): SurfaceLifetime {
   let drawn = true;
   const held: PluginHostClaim[] = [];
   return {
+    drawing: Symbol('drawing'),
     drawn: () => drawn,
     hold: (claim) => {
       held.push(claim);
@@ -239,24 +244,36 @@ function createSurfaceLifetime(): SurfaceLifetime {
   };
 }
 
-/** What the surface offers, less what has gone with an unmounted surface. */
+/**
+ * What the surface offers, less what has gone with an unmounted surface, and
+ * less every commit while another drawing of the Resource holds a Claim.
+ */
 function guarded(
   operations: PluginOperations,
   lifetime: SurfaceLifetime,
   readOnly: boolean,
 ): PluginOperations {
   if (readOnly) return { kind: operations.kind };
+  const withheld = (): Answer | null => {
+    if (!lifetime.drawn()) return SURFACE_GONE;
+    return operations.claimHolder?.(lifetime.drawing) === 'another-drawing' ? HELD_ELSEWHERE : null;
+  };
   const whileMounted =
     <A extends readonly unknown[]>(commit: (...args: A) => Promise<Answer>) =>
-    (...args: A): Promise<Answer> =>
-      lifetime.drawn() ? commit(...args) : Promise.resolve(SURFACE_GONE);
+    (...args: A): Promise<Answer> => {
+      const refusal = withheld();
+      return refusal === null ? commit(...args) : Promise.resolve(refusal);
+    };
   const { commitTitle, commitContent, commitMap, claim } = operations;
   return {
     kind: operations.kind,
     commitTitle: commitTitle === undefined ? undefined : whileMounted(commitTitle),
     commitContent: commitContent === undefined ? undefined : whileMounted(commitContent),
     commitMap: commitMap === undefined ? undefined : whileMounted(commitMap),
-    claim: claim === undefined ? undefined : () => (lifetime.drawn() ? claim() : undefined),
+    claim:
+      claim === undefined
+        ? undefined
+        : (drawing) => (lifetime.drawn() ? claim(drawing) : undefined),
   };
 }
 
@@ -273,13 +290,17 @@ export function PluginSurface(props: PluginResourceProps & { readonly entry: Plu
   const { kind, title, state } = props;
   // Exclusive work elsewhere withdraws every authoring control the surface
   // draws, not only the plugin's commits (ADR 0142).
-  const readOnly = props.readOnly || props.operations.withdrawn === true;
-  const drawnTitle = props.operations.withdrawn === true ? { ...title, readOnly: true } : title;
+  const [lifetime] = useState(createSurfaceLifetime);
+  const holder = props.operations.claimHolder?.(lifetime.drawing) ?? 'none';
+  // So is a Claim held by another drawing of this Resource: this drawing then
+  // offers nothing that could change the Resource under that Claim's work.
+  const withdrawn = props.operations.withdrawn === true || holder === 'another-drawing';
+  const readOnly = props.readOnly || withdrawn;
+  const drawnTitle = withdrawn ? { ...title, readOnly: true } : title;
   const name = titleName(title.title);
   const size = props.size ?? COLLAPSED_RESOURCE_SIZE;
   const rail = useMemo(() => createRailStore(), []);
   const commands = useSyncExternalStore(rail.subscribe, rail.commands, rail.commands);
-  const [lifetime] = useState(createSurfaceLifetime);
   useEffect(() => {
     lifetime.begin();
     return lifetime.end;
@@ -300,6 +321,7 @@ export function PluginSurface(props: PluginResourceProps & { readonly entry: Plu
     size,
     selected: state === 'selected' || state === 'editing',
     operations,
+    drawing: lifetime.drawing,
     assets: NO_ASSETS,
     Embed: NoEmbed,
     onClaim: lifetime.hold,
@@ -364,15 +386,18 @@ export function PluginSurface(props: PluginResourceProps & { readonly entry: Plu
         className={
           // A Claim gives the plugin the whole rect: the canvas neither drags,
           // pans nor zooms from inside it while one is held.
-          props.operations.claimed === true
+          holder === 'this-drawing'
             ? 'canvas-resource__plugin nodrag nopan nowheel'
             : 'canvas-resource__plugin'
         }
       >
         <ResourceFailureBoundary
-          // A throw is this drawing's: the boundary starts again for another
-          // Resource, after a replacement, or for another Map content value.
-          key={`${props.resourceId}:${String(props.operations.epoch ?? 0)}:${JSON.stringify(props.mapContent)}`}
+          // A throw is this drawing's: the boundary mounts afresh for another
+          // Resource or after a replacement, and a failed drawing is tried
+          // again on another Map content value, which leaves a drawn plugin,
+          // its state and its Claims as they are.
+          key={`${props.resourceId}:${String(props.operations.epoch ?? 0)}`}
+          retryOn={props.mapContent}
           onFailure={props.onFailure ?? props.operations.onFailure}
         >
           <MapTitleContext.Provider value={drawnTitle}>
@@ -393,5 +418,3 @@ export function PluginSurface(props: PluginResourceProps & { readonly entry: Plu
     resource
   );
 }
-
-export type { PluginCommits };

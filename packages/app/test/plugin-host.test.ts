@@ -9,11 +9,13 @@ import {
   claim,
   deepest,
   endExclusive,
+  heldByAnotherDrawing,
   holds,
   NO_CLAIMS,
   release,
   unmount,
   type ClaimChain,
+  type Drawing,
 } from '../src/plugin-host/claim-chain';
 import {
   answerOf,
@@ -33,67 +35,112 @@ const reasonOf = (answer: Answer | undefined): string | undefined =>
     ? undefined
     : answer.refused;
 
+/** Drawings of Resources `a`, `b` and `c`, each keyed for its own surface. */
+const drawingOf = (resource: string): Drawing => ({ resource, key: Symbol(resource) });
+const A = drawingOf('a');
+const B = drawingOf('b');
+const C = drawingOf('c');
+
 describe('the Claim chain (ADR 0142)', () => {
-  it('grants a first Claim to any surface, and a later one only inside the deepest', () => {
-    const outer = claim(NO_CLAIMS, ['a']);
-    expect(outer).toEqual({ holders: [['a']], exclusive: null });
+  it('grants a first Claim to any drawing, and a later one only inside the deepest', () => {
+    const outer = claim(NO_CLAIMS, [A]);
+    expect(outer).toEqual({ holders: [[A]], exclusive: null });
     if (outer === undefined) return;
-    expect(claim(outer, ['b'])).toBeUndefined();
-    expect(claim(outer, ['a'])).toBe(outer);
-    const inner = claim(outer, ['a', 'b']);
-    expect(inner?.holders).toEqual([['a'], ['a', 'b']]);
+    expect(claim(outer, [B])).toBeUndefined();
+    expect(claim(outer, [A])).toBe(outer);
+    const inner = claim(outer, [A, B]);
+    expect(inner?.holders).toEqual([[A], [A, B]]);
     if (inner === undefined) return;
-    expect(deepest(inner)).toBe('b');
-    expect(claim(inner, ['a', 'c'])).toBeUndefined();
+    expect(deepest(inner)).toBe(B.key);
+    expect(claim(inner, [A, C])).toBeUndefined();
   });
 
   it('releases only the deepest Claim, returning to the one outside it', () => {
-    const chain: ClaimChain = { holders: [['a'], ['a', 'b']], exclusive: null };
-    expect(release(chain, 'a')).toBeUndefined();
-    expect(release(chain, 'b')).toEqual({ holders: [['a']], exclusive: null });
+    const chain: ClaimChain = { holders: [[A], [A, B]], exclusive: null };
+    expect(release(chain, A.key)).toBeUndefined();
+    expect(release(chain, B.key)).toEqual({ holders: [[A]], exclusive: null });
   });
 
-  it('releases a surface and every Claim inside it when it unmounts, ending their work', () => {
-    const chain: ClaimChain = { holders: [['a'], ['a', 'b'], ['a', 'b', 'c']], exclusive: 'c' };
-    expect(unmount(chain, 'b')).toEqual({ holders: [['a']], exclusive: null });
-    expect(unmount(chain, 'z')).toBe(chain);
+  it('releases a drawing and every Claim inside it when it unmounts, ending their work', () => {
+    const chain: ClaimChain = { holders: [[A], [A, B], [A, B, C]], exclusive: C.key };
+    expect(unmount(chain, B.key)).toEqual({ holders: [[A]], exclusive: null });
+    expect(unmount(chain, Symbol('z'))).toBe(chain);
   });
 
   it('runs exclusive work one at a time, for a holder, and grants nothing while it runs', () => {
-    const held: ClaimChain = { holders: [['a'], ['a', 'b']], exclusive: null };
-    expect(beginExclusive(NO_CLAIMS, 'a')).toBe('not-held');
-    const running = beginExclusive(held, 'b');
-    expect(running).toEqual({ ...held, exclusive: 'b' });
+    const held: ClaimChain = { holders: [[A], [A, B]], exclusive: null };
+    expect(beginExclusive(NO_CLAIMS, A.key)).toBe('not-held');
+    const running = beginExclusive(held, B.key);
+    expect(running).toEqual({ ...held, exclusive: B.key });
     if (running === 'busy' || running === 'not-held') return;
-    expect(beginExclusive(running, 'a')).toBe('busy');
-    expect(claim(running, ['a', 'b', 'c'])).toBeUndefined();
-    expect(release(running, 'b')).toBeUndefined();
-    expect(endExclusive(running, 'b')).toEqual(held);
+    expect(beginExclusive(running, A.key)).toBe('busy');
+    expect(claim(running, [A, B, C])).toBeUndefined();
+    expect(release(running, B.key)).toBeUndefined();
+    expect(endExclusive(running, B.key)).toEqual(held);
   });
 
-  it('keeps every chain a run of surfaces each embedded in the one before', () => {
+  it('keeps two drawings of one Resource apart: one Claim, and unmounting the other keeps it', () => {
+    const first = drawingOf('a');
+    const second = drawingOf('a');
+    const held = claim(NO_CLAIMS, [first]);
+    expect(held).toBeDefined();
+    if (held === undefined) return;
+    expect(claim(held, [second])).toBeUndefined();
+    expect(holds(held, first.key)).toBe(true);
+    expect(holds(held, second.key)).toBe(false);
+    expect(unmount(held, second.key)).toBe(held);
+    expect(release(held, second.key)).toBeUndefined();
+  });
+
+  it('says another drawing holds the Resource only to a drawing of it that does not hold', () => {
+    const first = drawingOf('a');
+    const second = drawingOf('a');
+    const held = claim(NO_CLAIMS, [first]);
+    if (held === undefined) throw new Error('A first Claim is granted.');
+    expect(heldByAnotherDrawing(held, second)).toBe(true);
+    expect(heldByAnotherDrawing(held, first)).toBe(false);
+    expect(heldByAnotherDrawing(held, B)).toBe(false);
+    expect(heldByAnotherDrawing(NO_CLAIMS, second)).toBe(false);
+    // Nor to a drawing embedded in the holder, which is not the same Resource.
+    const inner = claim(held, [first, B]);
+    if (inner === undefined) throw new Error('An embedded drawing may claim.');
+    expect(heldByAnotherDrawing(inner, second)).toBe(true);
+    expect(heldByAnotherDrawing(inner, drawingOf('b'))).toBe(true);
+  });
+
+  it('keeps every chain a run of drawings each embedded in the one before', () => {
+    const drawings = [A, B, C, drawingOf('a')];
     const step = fc.oneof(
       fc.record({
         kind: fc.constant('claim' as const),
-        path: fc.array(fc.constantFrom('a', 'b', 'c'), { minLength: 1, maxLength: 3 }),
+        embedding: fc.array(fc.constantFrom(...drawings), { minLength: 1, maxLength: 3 }),
       }),
-      fc.record({ kind: fc.constant('release' as const), surface: fc.constantFrom('a', 'b', 'c') }),
-      fc.record({ kind: fc.constant('unmount' as const), surface: fc.constantFrom('a', 'b', 'c') }),
+      fc.record({ kind: fc.constant('release' as const), drawing: fc.constantFrom(...drawings) }),
+      fc.record({ kind: fc.constant('unmount' as const), drawing: fc.constantFrom(...drawings) }),
     );
     fc.assert(
       fc.property(fc.array(step, { maxLength: 20 }), (steps) => {
         let chain = NO_CLAIMS;
         for (const next of steps) {
-          if (next.kind === 'claim') chain = claim(chain, next.path) ?? chain;
-          else if (next.kind === 'release') chain = release(chain, next.surface) ?? chain;
-          else chain = unmount(chain, next.surface);
-          chain.holders.forEach((path, index) => {
+          if (next.kind === 'claim') chain = claim(chain, next.embedding) ?? chain;
+          else if (next.kind === 'release') chain = release(chain, next.drawing.key) ?? chain;
+          else chain = unmount(chain, next.drawing.key);
+          chain.holders.forEach((embedding, index) => {
             const outer = chain.holders[index - 1];
             if (outer === undefined) return;
-            expect(path.slice(0, outer.length)).toEqual(outer);
-            expect(path.length).toBeGreaterThan(outer.length);
+            expect(embedding.slice(0, outer.length)).toEqual(outer);
+            expect(embedding.length).toBeGreaterThan(outer.length);
           });
           if (chain.exclusive !== null) expect(holds(chain, chain.exclusive)).toBe(true);
+          // At most one drawing of a Resource holds a Claim.
+          const held = chain.holders.map((embedding) => embedding.at(-1));
+          for (const drawing of held) {
+            if (drawing === undefined) continue;
+            const others = held.filter(
+              (other) => other?.resource === drawing.resource && other.key !== drawing.key,
+            );
+            expect(others).toEqual([]);
+          }
         }
       }),
     );
@@ -103,7 +150,7 @@ describe('the Claim chain (ADR 0142)', () => {
 describe('the plugin gate', () => {
   it('answers busy to exclusive work while other work runs, and withdraws the gate after', async () => {
     const gate = createPluginGate();
-    const held = gate.claim(['a'], (live) => ({ live }));
+    const held = gate.claim([A], (live) => ({ live }));
     expect(held).toBeDefined();
     let liveInside: () => boolean = () => false;
     let finish: () => void = () => undefined;
@@ -127,11 +174,11 @@ describe('the plugin gate', () => {
     const gate = createPluginGate();
     const listener = vi.fn();
     gate.subscribe(listener);
-    expect(gate.claim(['a'], () => null)).toBeDefined();
-    expect(gate.claim(['b'], () => null)).toBeUndefined();
-    gate.unmount('a');
+    expect(gate.claim([A], () => null)).toBeDefined();
+    expect(gate.claim([B], () => null)).toBeUndefined();
+    gate.unmount(A.key);
     expect(gate.getState()).toEqual(NO_CLAIMS);
-    expect(gate.claim(['b'], () => null)).toBeDefined();
+    expect(gate.claim([B], () => null)).toBeDefined();
     expect(listener).toHaveBeenCalledTimes(3);
   });
 
@@ -140,7 +187,7 @@ describe('the plugin gate', () => {
     let firstLive: () => boolean = () => true;
     let finishFirst: () => void = () => undefined;
     const first = gate
-      .claim(['a'], (live) => ({ live }))
+      .claim([A], (live) => ({ live }))
       ?.exclusively(
         (own) =>
           new Promise<void>((resolve) => {
@@ -150,7 +197,7 @@ describe('the plugin gate', () => {
       );
     expect(firstLive()).toBe(true);
 
-    gate.unmount('a');
+    gate.unmount(A.key);
     expect(firstLive()).toBe(false);
     expect(gate.exclusiveRunning()).toBe(false);
 
@@ -158,7 +205,7 @@ describe('the plugin gate', () => {
     let secondLive: () => boolean = () => false;
     let finishSecond: () => void = () => undefined;
     const second = gate
-      .claim(['b'], (live) => ({ live }))
+      .claim([B], (live) => ({ live }))
       ?.exclusively(
         (own) =>
           new Promise<void>((resolve) => {
@@ -184,7 +231,7 @@ describe('the plugin gate', () => {
     let firstLive: () => boolean = () => true;
     let finishFirst: () => void = () => undefined;
     const first = gate
-      .claim(['a'], (live) => ({ live }))
+      .claim([A], (live) => ({ live }))
       ?.exclusively(
         (own) =>
           new Promise<void>((resolve) => {
@@ -192,11 +239,11 @@ describe('the plugin gate', () => {
             finishFirst = resolve;
           }),
       );
-    gate.unmount('a');
+    gate.unmount(A.key);
     let againLive: () => boolean = () => false;
     let finishAgain: () => void = () => undefined;
     const again = gate
-      .claim(['a'], (live) => ({ live }))
+      .claim([A], (live) => ({ live }))
       ?.exclusively(
         (own) =>
           new Promise<void>((resolve) => {
@@ -220,12 +267,19 @@ describe('a plugin surface’s commits on the canvas', () => {
     complete: PluginHost['complete'],
     epoch: { value: number } = { value: 0 },
     report: ObserverErrorReporter = () => undefined,
-  ): PluginHost => ({
-    gate: createPluginGate(),
-    replacementEpoch: () => epoch.value,
-    complete,
-    report,
-  });
+  ): PluginHost => {
+    const gate = createPluginGate();
+    return {
+      gate,
+      // As the canvas reads it: the chain the gate last published.
+      get claims() {
+        return gate.getState();
+      },
+      replacementEpoch: () => epoch.value,
+      complete,
+      report,
+    };
+  };
 
   it('answers a settled Edit in the words every refusal is reported in', () => {
     expect(answerOf({ kind: 'completed' })).toBe('completed');
@@ -290,7 +344,7 @@ describe('a plugin surface’s commits on the canvas', () => {
       FACTS,
       host,
     );
-    const held = operations.claim?.();
+    const held = operations.claim?.(Symbol('drawing'));
     expect(held).toBeDefined();
     let ownMap: ((next: { shape: string }) => Promise<Answer>) | undefined;
     let finish: () => void = () => undefined;
@@ -330,7 +384,7 @@ describe('a plugin surface’s commits on the canvas', () => {
     const operations = pluginSurfaceOperations('ur', RESOURCE, FACTS, host);
     let ownMap: ((next: { shape: string }) => Promise<Answer>) | undefined;
     let finish: () => void = () => undefined;
-    const work = operations.claim?.()?.exclusively(
+    const work = operations.claim?.(Symbol('drawing'))?.exclusively(
       (own) =>
         new Promise<void>((resolve) => {
           ownMap = own.map;
@@ -346,7 +400,7 @@ describe('a plugin surface’s commits on the canvas', () => {
   it('offers no commit and no Claim while exclusive work runs, and says the surface is withdrawn', () => {
     const host = hostWith(() => ({ kind: 'completed' }));
     const running = pluginSurfaceOperations('ur', RESOURCE, FACTS, host);
-    void running.claim?.()?.exclusively(() => new Promise<void>(() => undefined));
+    void running.claim?.(Symbol('drawing'))?.exclusively(() => new Promise<void>(() => undefined));
     const other = pluginSurfaceOperations(
       'ur',
       uuidSchema.parse('00000000-0000-4000-8000-0000000000a2'),
@@ -356,16 +410,20 @@ describe('a plugin surface’s commits on the canvas', () => {
     expect(other.commitMap).toBeUndefined();
     expect(other.claim).toBeUndefined();
     expect(other.withdrawn).toBe(true);
-    expect(pluginSurfaceOperations('ur', RESOURCE, FACTS, host).claimed).toBe(true);
   });
 
-  it('says whether the surface holds a Claim, and reports what its plugin throws while drawing', () => {
+  it('says which drawing holds a Claim, and reports what its plugin throws while drawing', () => {
     const report = vi.fn();
     const host = hostWith(() => ({ kind: 'completed' }), { value: 2 }, report);
-    expect(pluginSurfaceOperations('ur', RESOURCE, FACTS, host).claimed).toBe(false);
-    pluginSurfaceOperations('ur', RESOURCE, FACTS, host).claim?.();
+    const drawing = Symbol('drawing');
+    const elsewhere = Symbol('elsewhere');
+    expect(pluginSurfaceOperations('ur', RESOURCE, FACTS, host).claimHolder?.(drawing)).toBe(
+      'none',
+    );
+    pluginSurfaceOperations('ur', RESOURCE, FACTS, host).claim?.(drawing);
     const held = pluginSurfaceOperations('ur', RESOURCE, FACTS, host);
-    expect(held.claimed).toBe(true);
+    expect(held.claimHolder?.(drawing)).toBe('this-drawing');
+    expect(held.claimHolder?.(elsewhere)).toBe('another-drawing');
     expect(held.epoch).toBe(2);
     const thrown = new Error('drawing broke');
     held.onFailure?.(thrown);
@@ -374,5 +432,22 @@ describe('a plugin surface’s commits on the canvas', () => {
     const bare = pluginSurfaceOperations('ur', RESOURCE, { ...FACTS, editable: false }, host);
     bare.onFailure?.(thrown);
     expect(report).toHaveBeenCalledTimes(2);
+  });
+
+  it('grants one Claim across two drawings of one Resource, which unmounting the other keeps', () => {
+    const host = hostWith(() => ({ kind: 'completed' }));
+    const first = pluginSurfaceOperations('ur', RESOURCE, FACTS, host);
+    const second = pluginSurfaceOperations('ur', RESOURCE, FACTS, host);
+    const firstDrawing = Symbol('first');
+    const secondDrawing = Symbol('second');
+    const held = first.claim?.(firstDrawing);
+    expect(held).toBeDefined();
+    expect(second.claim?.(secondDrawing)).toBeUndefined();
+    expect(second.claimHolder?.(secondDrawing)).toBe('another-drawing');
+    expect(first.claimHolder?.(firstDrawing)).toBe('this-drawing');
+    host.gate.unmount(secondDrawing);
+    expect(first.claimHolder?.(firstDrawing)).toBe('this-drawing');
+    held?.unmount();
+    expect(second.claimHolder?.(secondDrawing)).toBe('none');
   });
 });

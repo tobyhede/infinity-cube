@@ -3,75 +3,101 @@
  * exclusive work runs. The shell (`plugin-gate.ts`) holds one of these for the
  * whole application and publishes each next state.
  *
- * A surface is named by its path: the surfaces it is embedded in, outermost
- * first, then itself. Claims nest through what a plugin embeds, so the chain is
- * always a run of surfaces each embedded in the one before:
+ * A Claim is a drawing's: one mounted surface drawing one Resource, named by a
+ * key minted for that surface's lifetime, so two drawings of the same Resource
+ * never share a Claim. A drawing is placed by its embedding: the drawings it is
+ * embedded in, outermost first, then itself. Claims nest through what a plugin
+ * embeds, so the chain is always a run of drawings each embedded in the one
+ * before:
  *
- * - The first Claim may be any surface's. A later one is granted only to a
- *   surface embedded in the deepest holder; a sibling, an outer surface or
- *   another chain is answered `undefined`. Asking again from the deepest holder
- *   answers the Claim it holds.
+ * - The first Claim may be any drawing's. A later one is granted only to a
+ *   drawing embedded in the deepest holder; a sibling, an outer drawing, another
+ *   drawing of a held Resource or another chain is answered `undefined`. Asking
+ *   again from the deepest holder answers the Claim it holds.
  * - Only the deepest Claim releases: an outer Claim is not released while an
  *   inner one runs, and an inner release returns to the outer.
- * - Unmounting a surface releases its Claim and every Claim inside it.
+ * - Unmounting a drawing releases its Claim and every Claim inside it.
  * - Exclusive work is one at a time, run by a held Claim, and nothing is
  *   claimed while it runs.
+ * - While a drawing of a Resource holds a Claim, every other drawing of that
+ *   Resource is offered no commit (`heldByAnotherDrawing`).
  */
 
-/** A surface's path: the surfaces it is embedded in, outermost first, then itself. */
-export type SurfacePath = readonly string[];
+/** What names one drawing for its surface's lifetime: unique to that mount. */
+export type DrawingKey = symbol;
+
+/** One drawing: the Resource drawn, and the key of the surface drawing it. */
+export interface Drawing {
+  readonly resource: string;
+  readonly key: DrawingKey;
+}
+
+/** A drawing's embedding: the drawings it is embedded in, outermost first, then itself. */
+export type Embedding = readonly Drawing[];
 
 export interface ClaimChain {
   /** The holders, outermost first; each is embedded in the one before. */
-  readonly holders: readonly SurfacePath[];
-  /** The holder whose exclusive work runs, by its surface, or `null`. */
-  readonly exclusive: string | null;
+  readonly holders: readonly Embedding[];
+  /** The holder whose exclusive work runs, by its key, or `null`. */
+  readonly exclusive: DrawingKey | null;
 }
 
 export const NO_CLAIMS: ClaimChain = { holders: [], exclusive: null };
 
-const surfaceOf = (path: SurfacePath): string | undefined => path.at(-1);
+const drawingOf = (embedding: Embedding): Drawing | undefined => embedding.at(-1);
 
-const isStrictPrefix = (outer: SurfacePath, inner: SurfacePath): boolean =>
-  outer.length < inner.length && outer.every((surface, index) => inner[index] === surface);
+const isStrictPrefix = (outer: Embedding, inner: Embedding): boolean =>
+  outer.length < inner.length && outer.every((drawing, index) => inner[index]?.key === drawing.key);
 
-/** Whether this surface holds a Claim in the chain. */
-export const holds = (chain: ClaimChain, surface: string): boolean =>
-  chain.holders.some((path) => surfaceOf(path) === surface);
+/** Whether this drawing holds a Claim in the chain. */
+export const holds = (chain: ClaimChain, key: DrawingKey): boolean =>
+  chain.holders.some((embedding) => drawingOf(embedding)?.key === key);
 
-/** The deepest holder's surface, whose commands show and which holds the keyboard. */
-export const deepest = (chain: ClaimChain): string | undefined => {
+/**
+ * Whether a drawing of this drawing's Resource other than it holds a Claim:
+ * the one state in which this drawing is offered no commit, so a second
+ * drawing cannot change the Resource under the claimant's work.
+ */
+export const heldByAnotherDrawing = (chain: ClaimChain, drawing: Drawing): boolean =>
+  chain.holders.some((embedding) => {
+    const holder = drawingOf(embedding);
+    return holder?.resource === drawing.resource && holder.key !== drawing.key;
+  });
+
+/** The deepest holder's key, whose commands show and which holds the keyboard. */
+export const deepest = (chain: ClaimChain): DrawingKey | undefined => {
   const last = chain.holders.at(-1);
-  return last === undefined ? undefined : surfaceOf(last);
+  return last === undefined ? undefined : drawingOf(last)?.key;
 };
 
-/** The chain with this surface's Claim granted, or `undefined` when it is refused. */
-export function claim(chain: ClaimChain, path: SurfacePath): ClaimChain | undefined {
-  const surface = surfaceOf(path);
-  if (surface === undefined || chain.exclusive !== null) return undefined;
+/** The chain with this drawing's Claim granted, or `undefined` when it is refused. */
+export function claim(chain: ClaimChain, embedding: Embedding): ClaimChain | undefined {
+  const drawing = drawingOf(embedding);
+  if (drawing === undefined || chain.exclusive !== null) return undefined;
   const last = chain.holders.at(-1);
-  if (last === undefined) return { ...chain, holders: [path] };
-  if (surfaceOf(last) === surface) return chain;
-  if (!isStrictPrefix(last, path)) return undefined;
-  return { ...chain, holders: [...chain.holders, path] };
+  if (last === undefined) return { ...chain, holders: [embedding] };
+  if (drawingOf(last)?.key === drawing.key) return chain;
+  if (!isStrictPrefix(last, embedding) || heldByAnotherDrawing(chain, drawing)) return undefined;
+  return { ...chain, holders: [...chain.holders, embedding] };
 }
 
-/** The chain with this surface's Claim released, or `undefined` when it may not be. */
-export function release(chain: ClaimChain, surface: string): ClaimChain | undefined {
-  if (deepest(chain) !== surface || chain.exclusive === surface) return undefined;
+/** The chain with this drawing's Claim released, or `undefined` when it may not be. */
+export function release(chain: ClaimChain, key: DrawingKey): ClaimChain | undefined {
+  if (deepest(chain) !== key || chain.exclusive === key) return undefined;
   return { ...chain, holders: chain.holders.slice(0, -1) };
 }
 
 /**
- * The chain once this surface is unmounted: its Claim and every Claim inside
+ * The chain once this drawing is unmounted: its Claim and every Claim inside
  * it released, and exclusive work run by any of them ended.
  */
-export function unmount(chain: ClaimChain, surface: string): ClaimChain {
-  const at = chain.holders.findIndex((path) => surfaceOf(path) === surface);
+export function unmount(chain: ClaimChain, key: DrawingKey): ClaimChain {
+  const at = chain.holders.findIndex((embedding) => drawingOf(embedding)?.key === key);
   if (at < 0) return chain;
   const holders = chain.holders.slice(0, at);
   const exclusive =
-    chain.exclusive !== null && holders.some((path) => surfaceOf(path) === chain.exclusive)
+    chain.exclusive !== null &&
+    holders.some((embedding) => drawingOf(embedding)?.key === chain.exclusive)
       ? chain.exclusive
       : null;
   return { holders, exclusive };
@@ -80,14 +106,14 @@ export function unmount(chain: ClaimChain, surface: string): ClaimChain {
 /** Why exclusive work cannot start, or the chain with it running. */
 export function beginExclusive(
   chain: ClaimChain,
-  surface: string,
+  key: DrawingKey,
 ): ClaimChain | 'busy' | 'not-held' {
   if (chain.exclusive !== null) return 'busy';
-  if (!holds(chain, surface)) return 'not-held';
-  return { ...chain, exclusive: surface };
+  if (!holds(chain, key)) return 'not-held';
+  return { ...chain, exclusive: key };
 }
 
-/** The chain with this surface's exclusive work ended. */
-export function endExclusive(chain: ClaimChain, surface: string): ClaimChain {
-  return chain.exclusive === surface ? { ...chain, exclusive: null } : chain;
+/** The chain with this drawing's exclusive work ended. */
+export function endExclusive(chain: ClaimChain, key: DrawingKey): ClaimChain {
+  return chain.exclusive === key ? { ...chain, exclusive: null } : chain;
 }

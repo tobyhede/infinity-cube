@@ -1,7 +1,13 @@
 import { useEffect } from 'react';
 import { act, waitFor } from '@testing-library/react';
-import type { Exclusive, PluginViewProps, Surface } from '@project/resource-api/view';
+import {
+  Title,
+  type Exclusive,
+  type PluginViewProps,
+  type Surface,
+} from '@project/resource-api/view';
 import { renderPlugin } from '@project/resource-api/view/testing';
+import type { Answer } from '@project/resource-api/domain';
 
 interface Seen {
   surface?: Surface<string, string>;
@@ -94,5 +100,27 @@ describe('renderPlugin’s exclusive work', () => {
       expect(await plain('after')).toBe('completed');
     });
     expect(rendered.commits.content).toEqual(['own', 'after']);
+  });
+});
+
+describe('renderPlugin’s Title', () => {
+  it('is one Title for the harness’s lifetime, which a rename does not remount', async () => {
+    let rename: ((next: string) => Promise<Answer>) | undefined;
+    function Titled({ surface }: PluginViewProps<string, string>) {
+      rename = surface.title.commit;
+      return <Title />;
+    }
+    const rendered = renderPlugin(Titled, {
+      content: '',
+      map: '',
+      title: 'Before',
+      grants: { title: true },
+    });
+    const drawn = rendered.getByTestId('plugin-title');
+    await act(async () => {
+      await rename?.('After');
+    });
+    expect(rendered.getByTestId('plugin-title')).toBe(drawn);
+    expect(drawn.textContent).toBe('After');
   });
 });

@@ -1,10 +1,10 @@
 import type { JsonValue, PluginKind, ResourceId } from '@project/core';
 import type { ObserverErrorReporter } from '@project/persistence';
 import type { Answer } from '@project/resource-api/domain';
-import type { PluginCommits, PluginHostClaim, PluginOperations } from '@project/ui';
+import type { ClaimHolder, PluginCommits, PluginHostClaim, PluginOperations } from '@project/ui';
 import { describeAuthoringRefusal } from '../authoring-refusal';
 import type { AuthoringResult, DrawnCompletion, Settle, SettledResult } from '../space-authoring';
-import { holds } from './claim-chain';
+import { heldByAnotherDrawing, holds, type ClaimChain, type Drawing } from './claim-chain';
 import type { PluginGate } from './plugin-gate';
 
 /**
@@ -67,6 +67,12 @@ export function completeAsAnswer(
 /** What the canvas hands a plugin surface's commits to. */
 export interface PluginHost {
   readonly gate: PluginGate;
+  /**
+   * The gate's chain as last published, which the canvas read to decorate its
+   * Resources: what a surface is offered is built from it, and each commit
+   * asks the gate itself when it is called.
+   */
+  readonly claims: ClaimChain;
   /** The Replacement epoch now, which a commit compares with the one it was built in. */
   readonly replacementEpoch: () => number;
   /** Complete an Edit where this canvas lands its Edits, told when a queued one settles. */
@@ -75,21 +81,22 @@ export interface PluginHost {
   readonly report: ObserverErrorReporter;
 }
 
+/** Who holds a Claim on a drawing's Resource, as that drawing reads it. */
+export const claimHolderOf = (chain: ClaimChain, drawing: Drawing): ClaimHolder => {
+  if (holds(chain, drawing.key)) return 'this-drawing';
+  return heldByAnotherDrawing(chain, drawing) ? 'another-drawing' : 'none';
+};
+
 /**
  * The commits a surface's Resource may make, each running only while `live()`
- * answers. Exclusive work's own commits are admitted past the gate every
- * Space's Authoring asks at `complete`; a plain one is not.
+ * answers, and each landing through `complete`.
  */
 function commitsFor(
   host: PluginHost,
   resourceId: ResourceId,
   live: () => Answer | null,
-  own: boolean,
+  complete: PluginHost['complete'],
 ): PluginCommits {
-  const complete = own
-    ? (completion: DrawnCompletion, settle: Settle) =>
-        host.gate.admit(() => host.complete(completion, settle))
-    : host.complete;
   const changeMapContent = (content: JsonValue): Promise<Answer> => {
     const withdrawn = live();
     if (withdrawn !== null) return Promise.resolve(withdrawn);
@@ -98,6 +105,8 @@ function commitsFor(
       host.report,
     );
   };
+  // A size hint is ignored: Ur, the one plugin drawn here, commits none, and
+  // the canvas applies none yet (`docs/agents/maps-and-graphs.md`, R38, R40).
   return { map: (next) => changeMapContent(next) };
 }
 
@@ -119,38 +128,34 @@ export function pluginSurfaceOperations(
   const drawn = {
     kind,
     epoch: builtIn,
-    claimed: holds(host.gate.getState(), resourceId),
+    // Read when called, so a commit kept from an earlier render is withheld
+    // once another drawing of the Resource holds a Claim.
+    claimHolder: (drawing: symbol) =>
+      claimHolderOf(host.gate.getState(), { resource: resourceId, key: drawing }),
     onFailure: (error: Error) => host.report(error),
   };
   if (!offersCommits(facts)) return drawn;
-  if (host.gate.exclusiveRunning()) return { ...drawn, withdrawn: true };
+  if (host.claims.exclusive !== null) return { ...drawn, withdrawn: true };
+  const replaced = (): Answer | null => (host.replacementEpoch() === builtIn ? null : GONE);
   const plain = commitsFor(
     host,
     resourceId,
-    () => {
-      if (host.replacementEpoch() !== builtIn) return GONE;
-      if (host.gate.exclusiveRunning()) return BUSY;
-      return null;
-    },
-    false,
+    () => replaced() ?? (host.gate.exclusiveRunning() ? BUSY : null),
+    host.complete,
   );
-  const claim = (): PluginHostClaim | undefined => {
-    const held = host.gate.claim([resourceId], (running) =>
-      commitsFor(
-        host,
-        resourceId,
-        () => {
-          if (host.replacementEpoch() !== builtIn) return GONE;
-          return running() ? null : BUSY;
-        },
-        true,
-      ),
+  // Exclusive work's own commits are admitted past the gate every Space's
+  // Authoring asks at `complete`; a plain one is not.
+  const admitted: PluginHost['complete'] = (completion, settle) =>
+    host.gate.admit(() => host.complete(completion, settle));
+  const claim = (drawing: symbol): PluginHostClaim | undefined => {
+    const held = host.gate.claim([{ resource: resourceId, key: drawing }], (running) =>
+      commitsFor(host, resourceId, () => replaced() ?? (running() ? null : BUSY), admitted),
     );
     if (held === undefined) return undefined;
     return {
       release: () => held.release(),
       exclusively: (work) => held.exclusively(work),
-      unmount: () => host.gate.unmount(resourceId),
+      unmount: () => host.gate.unmount(drawing),
     };
   };
   return { ...drawn, commitMap: plain.map, claim };

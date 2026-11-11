@@ -44,6 +44,12 @@ export interface PluginHostClaim {
 }
 
 /**
+ * Who holds a Claim on a Resource, as one drawing of it reads it: that drawing,
+ * another drawing of the same Resource, or none.
+ */
+export type ClaimHolder = 'this-drawing' | 'another-drawing' | 'none';
+
+/**
  * What a plugin kind offers beyond its Title on a surface: the commits the
  * surface offers, each present or absent, and a Claim where one may be taken.
  * Flat, so a kind offering nothing carries its kind alone.
@@ -53,14 +59,22 @@ export interface PluginOperations {
   readonly commitTitle?: PluginCommits['title'];
   readonly commitContent?: PluginCommits['content'];
   readonly commitMap?: PluginCommits['map'];
-  readonly claim?: (() => PluginHostClaim | undefined) | undefined;
+  /**
+   * A Claim for the drawing keyed `drawing`: a key the surface mints for its
+   * own lifetime, so two drawings of one Resource never share a Claim.
+   */
+  readonly claim?: ((drawing: symbol) => PluginHostClaim | undefined) | undefined;
+  /**
+   * Who holds a Claim on this Resource, as the drawing keyed `drawing` reads it
+   * when asked. A drawing whose Resource another drawing holds is offered no
+   * commit, and a commit it kept answers refused.
+   */
+  readonly claimHolder?: ((drawing: symbol) => ClaimHolder) | undefined;
   /**
    * Exclusive work runs elsewhere: the surface offers no authoring, its
    * host-drawn Title and Actions included, until it ends (ADR 0142).
    */
   readonly withdrawn?: boolean | undefined;
-  /** The surface holds a Claim, which gives the plugin the whole rect. */
-  readonly claimed?: boolean | undefined;
   /** The Replacement epoch the surface was offered in, which its failure boundary is keyed on. */
   readonly epoch?: number | undefined;
   /** Told what the plugin threw while drawing. */
@@ -84,6 +98,8 @@ export interface PluginSurfaceInput {
   readonly size: Size;
   readonly selected: boolean;
   readonly operations: PluginOperations;
+  /** The key the surface minted for its lifetime, which a Claim taken through it is granted to. */
+  readonly drawing: symbol;
   readonly assets: Assets;
   readonly Embed: ComponentType<EmbedProps>;
   /** Told of each Claim handed out through this surface, so unmounting releases it. */
@@ -140,7 +156,7 @@ export function pluginEntry<C, M>(
    * render of the host.
    */
   function Mounted({ input }: { readonly input: PluginSurfaceInput }) {
-    const { operations, onClaim } = input;
+    const { operations, onClaim, drawing } = input;
     const { commitTitle, commitContent, commitMap, claim: hostClaim } = operations;
     const mapCommit = useMemo(
       () =>
@@ -159,7 +175,7 @@ export function pluginEntry<C, M>(
         hostClaim === undefined
           ? undefined
           : (): OwnClaim<C, M> | undefined => {
-              const held = hostClaim();
+              const held = hostClaim(drawing);
               if (held === undefined) return undefined;
               onClaim(held);
               return {
@@ -167,7 +183,7 @@ export function pluginEntry<C, M>(
                 exclusively: (work) => held.exclusively((own) => work(exclusiveOf(own))),
               };
             },
-      [hostClaim, onClaim],
+      [hostClaim, onClaim, drawing],
     );
     const content = plugin.content.safeParse(input.content);
     if (!content.success) {

@@ -6,7 +6,8 @@ import {
   release as releaseIn,
   unmount as unmountIn,
   type ClaimChain,
-  type SurfacePath,
+  type DrawingKey,
+  type Embedding,
 } from './claim-chain';
 
 /**
@@ -37,15 +38,16 @@ export interface PluginGate {
   /** Run `edit`, synchronously, as the running exclusive work's own. */
   readonly admit: <T>(edit: () => T) => T;
   /**
-   * Claim for the surface at `path`, or `undefined` when the chain refuses.
-   * `own` builds the commits exclusive work may use, live while `live()` is.
+   * Claim for the drawing at the end of `embedding`, or `undefined` when the
+   * chain refuses. `own` builds the commits exclusive work may use, live while
+   * `live()` is.
    */
   readonly claim: <Own>(
-    path: SurfacePath,
+    embedding: Embedding,
     own: (live: () => boolean) => Own,
   ) => HostClaim<Own> | undefined;
-  /** The surface is gone: its Claim and every Claim inside it are released. */
-  readonly unmount: (surface: string) => void;
+  /** The drawing is gone: its Claim and every Claim inside it are released. */
+  readonly unmount: (drawing: DrawingKey) => void;
 }
 
 export function createPluginGate(): PluginGate {
@@ -67,22 +69,22 @@ export function createPluginGate(): PluginGate {
   };
 
   const claim = <Own>(
-    path: SurfacePath,
+    embedding: Embedding,
     own: (live: () => boolean) => Own,
   ): HostClaim<Own> | undefined => {
-    const surface = path.at(-1);
-    const next = claimIn(chain, path);
-    if (surface === undefined || next === undefined) return undefined;
+    const drawing = embedding.at(-1)?.key;
+    const next = claimIn(chain, embedding);
+    if (drawing === undefined || next === undefined) return undefined;
     install(next);
     return {
       release: () => {
-        const released = releaseIn(chain, surface);
+        const released = releaseIn(chain, drawing);
         if (released === undefined) return false;
         install(released);
         return true;
       },
       exclusively: async <T>(work: (own: Own) => Promise<T>): Promise<T | 'busy'> => {
-        const begun = beginExclusive(chain, surface);
+        const begun = beginExclusive(chain, drawing);
         if (begun === 'busy' || begun === 'not-held') return 'busy';
         const run = {};
         liveRun = run;
@@ -90,7 +92,7 @@ export function createPluginGate(): PluginGate {
         try {
           return await work(own(() => liveRun === run));
         } finally {
-          if (liveRun === run) install(endExclusive(chain, surface));
+          if (liveRun === run) install(endExclusive(chain, drawing));
         }
       },
     };
@@ -115,6 +117,6 @@ export function createPluginGate(): PluginGate {
       }
     },
     claim,
-    unmount: (surface) => install(unmountIn(chain, surface)),
+    unmount: (drawing) => install(unmountIn(chain, drawing)),
   };
 }

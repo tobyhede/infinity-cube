@@ -363,12 +363,11 @@ export function useCanvasResourceAuthoring({
   const pluginHost = useMemo(
     (): PluginHost => ({
       gate: pluginGate,
+      claims: claimChain,
       replacementEpoch: () => authoring.getState().replacementEpoch,
       complete: (completion, settle) => authoring.complete(completion, settle),
       report: reportPluginFailure,
     }),
-    // `claimChain` is read by the operations built from this host, not here.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [authoring, pluginGate, reportPluginFailure, claimChain],
   );
 
