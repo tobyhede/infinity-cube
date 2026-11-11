@@ -42,7 +42,7 @@ import {
 import {
   authorsEmbeddedMap,
   nodeTypes,
-  OPEN_RESOURCE_Z_INDEX,
+  EMBEDDING_RESOURCE_Z_INDEX,
   GraphConnectionLine,
   GraphHeadMarkers,
   GraphConnectionLineHeadShape,
@@ -727,7 +727,7 @@ export function SpaceCanvas({
               focusable: false,
               deletable: false,
             })),
-            // The three Resource commands aimed at a retained read answer it the
+            // The two Resource commands aimed at a retained read answer it the
             // same way: reopen the target's session so the next press acts.
             // The canvas still announces that delete removes the focused Resource
             // from its Map, and this drawing is still focusable, so an
@@ -1137,11 +1137,11 @@ export function SpaceCanvas({
   const canvasNodes = useMemo(
     () =>
       [...editableNodes, ...liveEmbeddings.flatMap((value) => value.nodes)].map((node) => {
-        // A Resource drawing a Map embedding is drawn over its Closed neighbours,
-        // as an Open Resource is, so the Map drawn over its rect is reachable.
+        // A Resource drawing a Map embedding is drawn over its neighbours, so the
+        // Map drawn over its rect is reachable; no other Resource is raised.
         const raised =
           node.zIndex === undefined && embeds.has(node.id)
-            ? { ...node, zIndex: OPEN_RESOURCE_Z_INDEX }
+            ? { ...node, zIndex: EMBEDDING_RESOURCE_Z_INDEX }
             : node;
         const withEmbed = { ...raised, data: { ...raised.data, onMapEmbed: publishMapEmbed } };
         const withHeight = reportsBodyHeight(node)

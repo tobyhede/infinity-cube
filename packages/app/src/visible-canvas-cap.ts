@@ -1,10 +1,4 @@
-import { COLLAPSED_RESOURCE_SIZE } from '@project/core';
-
-/** A width and a height, in canvas units unless named otherwise. */
-export interface Extent {
-  readonly width: number;
-  readonly height: number;
-}
+import { COLLAPSED_RESOURCE_SIZE, type ResourceSize } from '@project/core';
 
 /** The screen pixels kept clear on each side of the visible canvas. */
 const VIEW_MARGIN = 48;
@@ -14,7 +8,10 @@ const VIEW_MARGIN = 48;
  * canvas at the current zoom, less a margin on each side, never below the
  * Closed Size.
  */
-export function visibleCanvasCap(viewport: Extent, zoom: number): Extent {
+export function visibleCanvasCap(
+  viewport: { readonly width: number; readonly height: number },
+  zoom: number,
+): ResourceSize {
   return {
     width: Math.max(COLLAPSED_RESOURCE_SIZE.width, (viewport.width - 2 * VIEW_MARGIN) / zoom),
     height: Math.max(COLLAPSED_RESOURCE_SIZE.height, (viewport.height - 2 * VIEW_MARGIN) / zoom),

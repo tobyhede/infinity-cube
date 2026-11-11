@@ -8,6 +8,7 @@ import {
 } from '@project/core';
 import {
   AUTHORING_HANDLE_DIAMETER,
+  EMBEDDING_RESOURCE_Z_INDEX,
   RoutedEdge,
   ROUTED_EDGE_TYPE,
   type ResourceFlowNode,
@@ -306,7 +307,7 @@ export function embeddedMap({
         focusable: node.focusable !== false,
         connectable: node.connectable !== false,
         deletable: false,
-        zIndex: (parent.zIndex ?? 10) + 1,
+        zIndex: (parent.zIndex ?? EMBEDDING_RESOURCE_Z_INDEX) + 1,
       },
       policy,
     );
@@ -356,7 +357,7 @@ export function embeddedMap({
             selectable: enabled,
             focusable: enabled,
             deletable: enabled,
-            zIndex: (parent.zIndex ?? 10) + 1,
+            zIndex: (parent.zIndex ?? EMBEDDING_RESOURCE_Z_INDEX) + 1,
             style: { ...edge.style, clipPath: `url("#${embeddedClipId(parent.id)}")` },
           },
         ];

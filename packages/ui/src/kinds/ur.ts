@@ -10,7 +10,7 @@ import type { PluginOperations } from './plugin-views';
  * by `PluginResource` and `PresentedPluginResource` from `plugin-views.tsx`, so
  * it declares no content view of its own.
  */
-export const urView: PluginListing<PluginOperations> = {
+export const urListing: PluginListing<PluginOperations> = {
   name: urPlugin.name,
   listName: urPlugin.listName,
   referenceName: urPlugin.referenceName,

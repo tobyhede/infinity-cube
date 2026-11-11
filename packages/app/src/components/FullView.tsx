@@ -1,8 +1,8 @@
 import { useLayoutEffect, useRef, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { ResourceId } from '@project/core';
-import { referencedResources, type Space } from '@project/graph';
-import { Button, HostMapProvider, PresentedPluginResource, Stage } from '@project/ui';
-import { drawPresentedMapEmbed } from './map-embed-draws';
+import type { Space } from '@project/graph';
+import { Button, Stage } from '@project/ui';
+import { StagedResource } from './StagedResource';
 import { FULL_VIEW_KEYS } from '../key-bindings';
 
 export interface FullViewProps {
@@ -70,17 +70,12 @@ export function FullView({
           </div>
         }
       >
-        <HostMapProvider draw={drawPresentedMapEmbed}>
-          <PresentedPluginResource
-            resourceId={resource.id}
-            kind={resource.kind}
-            title={resource.title}
-            content={resource.content}
-            embeddable={referencedResources(space, resource)}
-            onFailure={onPluginFailure}
-            replacementEpoch={replacementEpoch}
-          />
-        </HostMapProvider>
+        <StagedResource
+          space={space}
+          resourceId={resource.id}
+          onPluginFailure={onPluginFailure}
+          replacementEpoch={replacementEpoch}
+        />
       </Stage>
     </div>
   );

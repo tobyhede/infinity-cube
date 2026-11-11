@@ -29,8 +29,12 @@ import { graphHeadMarkerId } from './GraphHeadMarkers';
 
 const FALLBACK_COLOR = FALLBACK_GRAPH_COLOR;
 
-/** The z-index an Open Resource is drawn at, over its Closed neighbours. */
-export const OPEN_RESOURCE_Z_INDEX = 10;
+/**
+ * The z-index a Resource drawing a Map embedding is drawn at, over its
+ * neighbours; the embedded Resources and Edges stand one above it. The
+ * projection raises no other Resource.
+ */
+export const EMBEDDING_RESOURCE_Z_INDEX = 10;
 
 /**
  * Opacity of the Graphs that are not the active one, while one is. With no

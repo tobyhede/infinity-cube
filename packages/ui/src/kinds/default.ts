@@ -7,7 +7,7 @@ import type { KindNaming } from './registry';
  * as: the default plugin's names and glyph (ADR 0142). Its Resources are drawn
  * by `PluginResource` through the default plugin's entry in `plugin-views.tsx`.
  */
-export const defaultView: KindNaming = {
+export const defaultListing: KindNaming = {
   name: defaultPlugin.name,
   listName: defaultPlugin.listName,
   referenceName: defaultPlugin.referenceName,

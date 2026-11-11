@@ -9,6 +9,7 @@ import { loadSpaceSnapshot, Placement, positionedStrategy } from '@project/graph
 import {
   bareKindData,
   AUTHORING_HANDLE_DIAMETER,
+  EMBEDDING_RESOURCE_Z_INDEX,
   ROUTED_EDGE_TYPE,
   type ResourceFlowNode,
 } from '@project/react-flow-adapter';
@@ -199,6 +200,24 @@ describe('an embedded production projection', () => {
     expect(drawFrom({ ...initial, zIndex: (initial.zIndex ?? 0) + 1 }, projected)).not.toEqual(
       drawFrom(initial, projected),
     );
+  });
+
+  it('stacks embedded Resources and Edges one above their containing Resource', async () => {
+    const { projected, parent: containing } = await draw();
+    for (const zIndex of [containing.zIndex, undefined]) {
+      const drawn = embeddedMap({
+        parent: { ...containing, zIndex },
+        projection: projected,
+        offset: { x: 16, y: 42 },
+        policy: 'authoring',
+      });
+      // A containing Resource not yet raised stands at the embedding z-index.
+      const above = (zIndex ?? EMBEDDING_RESOURCE_Z_INDEX) + 1;
+      expect(drawn.nodes.length).toBeGreaterThan(0);
+      expect(drawn.edges.length).toBeGreaterThan(0);
+      for (const node of drawn.nodes) expect(node.zIndex).toBe(above);
+      for (const edge of drawn.edges) expect(edge.zIndex).toBe(above);
+    }
   });
 
   it('redraws when the target projection or ancestor bounds change', async () => {

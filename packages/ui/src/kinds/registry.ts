@@ -8,14 +8,14 @@ import {
   type KindId,
   type ResourceKind,
 } from '@project/core';
-import { defaultView } from './default';
-import { imageView } from './image';
+import { defaultListing } from './default';
+import { imageListing } from './image';
 import type { PluginListing } from './plugin-listing';
-import { markdownView } from './markdown';
-import { referenceView } from './reference';
-import { spaceView } from './space';
+import { markdownListing } from './markdown';
+import { referenceListing } from './reference';
+import { spaceListing } from './space';
 import type { PluginOperations } from './plugin-views';
-import { urView } from './ur';
+import { urListing } from './ur';
 
 /** What each kind offers beyond its shared Title, by its id. */
 export interface KindOperationsByKind {
@@ -42,18 +42,18 @@ export type KindOperationsOf<K extends ResourceKind> = K extends KindId
   ? KindOperationsByKind[K]
   : PluginOperations;
 
-/** Each kind's view half, typed so a surface over a kinded value calls its own kind's view. */
-type KindViews = {
+/** Each kind's listing, its view half, typed so a surface over a kinded value reads its own kind's. */
+type PluginListings = {
   readonly [K in KindId]: PluginListing<KindOperationsByKind[K]>;
 };
 
-/** The kinds' view halves: the one place in this package each kind is named (ADR 0128). */
-const KIND_VIEWS: KindViews = {
-  [markdownKind.id]: markdownView,
-  [imageKind.id]: imageView,
-  [urKind.id]: urView,
-  [referenceKind.id]: referenceView,
-  [spaceKind.id]: spaceView,
+/** The kinds' listings: the one place in this package each kind is named (ADR 0128). */
+const PLUGIN_LISTINGS: PluginListings = {
+  [markdownKind.id]: markdownListing,
+  [imageKind.id]: imageListing,
+  [urKind.id]: urListing,
+  [referenceKind.id]: referenceListing,
+  [spaceKind.id]: spaceListing,
 };
 
 /** What a kind's Resources are called and drawn as. */
@@ -67,13 +67,13 @@ export type KindNaming = Pick<
  * default plugin's for a kind no plugin in this build draws.
  */
 export const kindNaming = (kind: ResourceKind): KindNaming =>
-  isRegisteredKind(kind) ? KIND_VIEWS[kind] : defaultView;
+  isRegisteredKind(kind) ? PLUGIN_LISTINGS[kind] : defaultListing;
 
 /** What every Resource of a kind whose plugin is missing is called and drawn with: the default plugin's. */
-export const missingKindNaming: KindNaming = defaultView;
+export const missingKindNaming: KindNaming = defaultListing;
 
 const registeredBareOperations = <K extends KindId>(kind: K): KindOperationsByKind[K] =>
-  KIND_VIEWS[kind].bareOperations;
+  PLUGIN_LISTINGS[kind].bareOperations;
 
 /** What a Resource of this kind offers before the composition offers anything. */
 export function bareOperations<K extends ResourceKind>(kind: K): KindOperationsOf<K>;

@@ -1,8 +1,5 @@
-import {
-  DEFAULT_RESOURCE_SHAPE,
-  newDefaultResourceDocument,
-  resolvedMapContent,
-} from '@project/core';
+import { useMemo } from 'react';
+import { newDefaultResourceDocument, resolvedMapContent, resourceOutline } from '@project/core';
 import { ViewportPortal, useConnection } from '@xyflow/react';
 import { PluginResource, bareOperations } from '@project/ui';
 import { RESOURCE_SIZE } from '../resource';
@@ -47,6 +44,8 @@ export function NewResourcePreview({
   const sourceId = useConnection((connection) =>
     connection.inProgress ? connection.fromNode.id : null,
   );
+  // Built once per title rather than on every pointer frame the preview draws.
+  const ghost = useMemo(() => newDefaultResourceDocument(title), [title]);
   const drop = newResourceDrop(
     endpoint === null || sourceId === null
       ? { kind: 'idle' }
@@ -60,7 +59,6 @@ export function NewResourcePreview({
     accepts,
   );
   if (drop === null) return null;
-  const ghost = newDefaultResourceDocument(title);
 
   return (
     <ViewportPortal>
@@ -86,7 +84,7 @@ export function NewResourcePreview({
           title={{ title, readOnly: true, onReturnFocus: () => undefined }}
           content={ghost.content}
           mapContent={resolvedMapContent(ghost.kind, undefined)}
-          outline={DEFAULT_RESOURCE_SHAPE}
+          outline={resourceOutline(ghost.kind, undefined)}
           state="rest"
           graphColor="var(--accent)"
           readOnly

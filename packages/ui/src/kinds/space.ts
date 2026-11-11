@@ -11,7 +11,7 @@ import type { PluginOperations } from './plugin-views';
  * embedding draws the Map it selects. Its silhouette is the Space cube every
  * list draws a Space with.
  */
-export const spaceView: PluginListing<PluginOperations> = {
+export const spaceListing: PluginListing<PluginOperations> = {
   name: spacePlugin.name,
   listName: spacePlugin.listName,
   referenceName: spacePlugin.referenceName,

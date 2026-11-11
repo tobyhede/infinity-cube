@@ -1,10 +1,10 @@
 import type { GraphId, MapId, ResourceId } from '@project/core';
-import { referencedResources, type Space } from '@project/graph';
-import { HostMapProvider, PresentedPluginResource, Stage } from '@project/ui';
+import type { Space } from '@project/graph';
+import { Stage } from '@project/ui';
 import { presentedNotes } from '../notes-window';
-import { drawPresentedMapEmbed } from './map-embed-draws';
 import { PresentedNotesList } from './PresentedNotesList';
 import { PresentingChrome, type PresentingChromeProps } from './PresentingChrome';
+import { StagedResource } from './StagedResource';
 import './rehearsal-notes.css';
 
 export interface PresentingStageProps extends PresentingChromeProps {
@@ -60,17 +60,12 @@ export function PresentingStage({
         </>
       }
     >
-      <HostMapProvider draw={drawPresentedMapEmbed}>
-        <PresentedPluginResource
-          resourceId={resource.id}
-          kind={resource.kind}
-          title={resource.title}
-          content={resource.content}
-          embeddable={referencedResources(space, resource)}
-          onFailure={onPluginFailure}
-          replacementEpoch={replacementEpoch}
-        />
-      </HostMapProvider>
+      <StagedResource
+        space={space}
+        resourceId={resource.id}
+        onPluginFailure={onPluginFailure}
+        replacementEpoch={replacementEpoch}
+      />
     </Stage>
   );
 }

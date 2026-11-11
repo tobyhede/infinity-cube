@@ -11,7 +11,7 @@ import type { PluginOperations } from './plugin-views';
  * The canvas strokes its border dotted at rest (`reference-canvas.css`, which
  * `PluginResource` imports).
  */
-export const referenceView: PluginListing<PluginOperations> = {
+export const referenceListing: PluginListing<PluginOperations> = {
   name: referencePlugin.name,
   listName: referencePlugin.listName,
   referenceName: referencePlugin.referenceName,

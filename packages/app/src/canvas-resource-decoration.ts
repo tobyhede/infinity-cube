@@ -268,8 +268,10 @@ export function decorateSharedResourceNode(
     // otherwise reinstate the one cluster that survived it. Withdrawn is `[]`,
     // never `undefined`: `PluginResource` keeps its `EntityActions` wrapper
     // mounted for any defined list, so withdrawing authoring does not remount
-    // the Resource. Held by `canvas-resource-decoration.test.ts` ('asks for
-    // entity actions only where authoring is on…').
+    // the Resource. `[]` is held by `canvas-resource-decoration.test.ts` ('asks
+    // for entity actions only where authoring is on…'), and the plugin kept
+    // mounted by `packages/ui/test/PluginResource.test.tsx` ('keeps a drawing
+    // plugin and its state mounted when its Actions are withdrawn…').
     patch.entityActions = context.authorOnCanvas
       ? context.resourceEntityActions(node.data.resourceId)
       : [];
