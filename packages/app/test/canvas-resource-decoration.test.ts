@@ -36,10 +36,6 @@ import { createPluginGate } from '../src/plugin-host/plugin-gate';
 import { NO_CLAIMS } from '../src/plugin-host/claim-chain';
 import type { AuthoringResult } from '../src/space-authoring';
 import { RESOURCE_SIZE } from '../src/resource';
-import { NO_SPACE_RESOURCE_TARGETS } from '../src/space-resource-targets';
-import type { SpaceResourceTarget } from '../src/space-resource-lifecycle';
-import type { Continuation } from '../src/continuation';
-import type { MapEmbedEntry } from '../src/map-embeddings';
 import { fixtureFacts } from './render-adapter-fixtures';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -51,18 +47,6 @@ const TARGET_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 const TARGET_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
 const MISSING_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const UR_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000b');
-
-const target: SpaceResourceTarget = {
-  id: TARGET_SPACE_ID,
-  title: 'Architecture',
-  maps: [
-    {
-      id: TARGET_MAP_ID,
-      title: 'Collection 1',
-      graphs: [{ id: TARGET_GRAPH_ID, title: 'Overview', color: '#1f77b4', headShape: 'arrow' }],
-    },
-  ],
-};
 
 const projectionNode = (
   resourceId: ResourceId,
@@ -105,18 +89,6 @@ const spaceDocument = {
   content: { spaceId: TARGET_SPACE_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
 };
 
-/**
- * Never spent: these contexts hold `spaces: null`, so no Space Resource rail is
- * built and nothing reads the continuation.
- */
-const continuation: Continuation = {
-  getState: () => ({ pending: null }),
-  subscribe: () => () => undefined,
-  request: () => undefined,
-  take: () => undefined,
-  dispose: () => undefined,
-};
-
 /** A plugin host that lands Edits through `complete`, with no document and no assets. */
 const testPluginHost = (complete: PluginHost['complete']): PluginHost => ({
   gate: createPluginGate(),
@@ -147,22 +119,6 @@ const context = (overrides: Partial<DecorationContext> = {}): DecorationContext 
   editingTitleResourceId: null,
   completeResourceTitle: () => null,
   clearCaret: () => undefined,
-  continuation,
-  containingSpaceId: SPACE_ID,
-  spaceSelections: new Map([
-    [
-      SPACE_RESOURCE_ID,
-      { spaceId: TARGET_SPACE_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID, framing: undefined },
-    ],
-  ]),
-  spaceResourceTargets: new Map([[TARGET_SPACE_ID, target]]),
-  spaces: null,
-  commandOutcomes: undefined,
-  deleteConfirmation: undefined,
-  mapEmbeds: new Map(),
-  contextNotices: new Map(),
-  onContextEditingChange: () => undefined,
-  onContextReport: () => undefined,
   ...overrides,
 });
 
@@ -457,91 +413,9 @@ describe('the Image kind’s decoration', () => {
   });
 });
 
-/** The Map embedding a drawn Space Resource's plugin publishes, choosing through `select` when given. */
-const embedding = (
-  select: MapEmbedEntry['request']['select'] = {
-    value: { spaceId: TARGET_SPACE_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
-    commit: () => Promise.resolve('completed'),
-  },
-): ReadonlyMap<string, MapEmbedEntry> =>
-  new Map([
-    [
-      SPACE_RESOURCE_ID,
-      {
-        resourceId: SPACE_RESOURCE_ID,
-        drawing: Symbol('space drawing'),
-        request: {
-          view: { spaceId: TARGET_SPACE_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
-          select,
-          claim: undefined,
-        },
-      },
-    ],
-  ]);
-
 describe('decorateSpaceResourceNode', () => {
   const openSpaceNode = (readOnly = false) =>
     ofKind(projectionNode(SPACE_RESOURCE_ID, 'space', true, readOnly), 'space');
-
-  it('draws no Map embedding commands while its plugin embeds no Map, as while Closed', () => {
-    const operations = decorateSpaceResourceNode(
-      ofKind(projectionNode(SPACE_RESOURCE_ID, 'space'), 'space'),
-      context(),
-    ).kindOperations;
-    expect(operations.mapRail).toBeUndefined();
-    expect(operations.mapNote).toBeUndefined();
-  });
-
-  it('says the Space is being read in place of the chooser while its target is unread', () => {
-    const operations = decorateSpaceResourceNode(
-      openSpaceNode(),
-      context({ mapEmbeds: embedding(), spaceResourceTargets: NO_SPACE_RESOURCE_TARGETS }),
-    ).kindOperations;
-    expect(operations.mapRail).toBeUndefined();
-    expect(operations.mapNote).toBe('Reading the referenced Space…');
-  });
-
-  it('draws no Map embedding commands on a read-only Resource', () => {
-    expect(
-      decorateSpaceResourceNode(openSpaceNode(true), context({ mapEmbeds: embedding() }))
-        .kindOperations.mapRail,
-    ).toBeUndefined();
-  });
-
-  it('builds the chooser for an embedded Map whose target is read, and still when authoring is withdrawn', () => {
-    expect(
-      decorateSpaceResourceNode(openSpaceNode(), context({ mapEmbeds: embedding() })).kindOperations
-        .mapRail,
-    ).toBeDefined();
-    expect(
-      decorateSpaceResourceNode(
-        openSpaceNode(),
-        context({ mapEmbeds: embedding(), authorOnCanvas: false }),
-      ).kindOperations.mapRail,
-    ).toBeDefined();
-    // With no `select`, as while the plugin's content commit is withdrawn, the
-    // chooser is drawn and disabled rather than taken away.
-    expect(
-      decorateSpaceResourceNode(openSpaceNode(), context({ mapEmbeds: embedding(undefined) }))
-        .kindOperations.mapRail,
-    ).toBeDefined();
-  });
-
-  it('withholds a context notice while the chooser is absent, and carries it once present', () => {
-    const notices = new Map([[SPACE_RESOURCE_ID, 'Link copied.']]);
-    expect(
-      decorateSpaceResourceNode(
-        ofKind(projectionNode(SPACE_RESOURCE_ID, 'space'), 'space'),
-        context({ contextNotices: notices }),
-      ).contextNotice,
-    ).toBeUndefined();
-    expect(
-      decorateSpaceResourceNode(
-        openSpaceNode(),
-        context({ contextNotices: notices, mapEmbeds: embedding() }),
-      ).contextNotice,
-    ).toBe('Link copied.');
-  });
 
   it("offers the plugin's commits and Claim where the canvas authors it", () => {
     const pluginHost = testPluginHost(vi.fn());

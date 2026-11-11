@@ -201,9 +201,10 @@ const spaceOperationsOf = (data: ResourceFlowNode['data']) =>
 const SPACE_DRAWING = Symbol('space drawing');
 
 const spaceEmbed = (claim?: Claim): MapEmbedRequest => ({
-  view: { spaceId: TARGET_SPACE_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
+  space: TARGET_SPACE_ID,
+  view: { map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
   select: {
-    value: { spaceId: TARGET_SPACE_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
+    value: { map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
     commit: () => Promise.resolve('completed'),
   },
   claim,

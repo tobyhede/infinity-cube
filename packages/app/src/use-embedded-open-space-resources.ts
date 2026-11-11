@@ -12,12 +12,14 @@ import type { ResourceId } from '@project/core';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import {
   discoverEmbeddedOpenSpaceResources,
+  embedSpacesToRead,
   type EmbeddedOpenSpaceResourceRequest,
   type EmbeddedRoot,
 } from './embedded-open-space-resource';
 import type { EmbeddedPublication } from './embedded-publication';
 import { editingMapEmbeds, type MapEmbedEntry } from './map-embeddings';
 import type { OpenSpace, SpaceHold } from './open-spaces';
+import { spaceResourceTarget } from './space-resource-lifecycle';
 import type { SpaceResourceFraming } from './space-resource-framing';
 
 const EMPTY_ENTRIES = [] as const;
@@ -101,9 +103,20 @@ export function useEmbeddedOpenSpaceResources(
       return next;
     });
   }, []);
+  // What an embedding given no view, or no Graph, is resolved against: its
+  // Space once it is composed here (ADR 0142).
+  const targetOf = useCallback(
+    (space: string) => {
+      const entry = entries.find((candidate) => candidate.id === space);
+      return entry === undefined ? undefined : spaceResourceTarget(entry.app.currentSpace());
+    },
+    [entries],
+  );
+  const toRead = useMemo(() => embedSpacesToRead(embeds), [embeds]);
   const embeddedRequests = useMemo(
     () =>
       discoverEmbeddedOpenSpaceResources({
+        targetOf,
         root,
         editingPortals,
         embeds,
@@ -124,6 +137,7 @@ export function useEmbeddedOpenSpaceResources(
       root,
       editingPortals,
       embeddedFailures,
+      targetOf,
     ],
   );
   /**
@@ -211,21 +225,26 @@ export function useEmbeddedOpenSpaceResources(
   }, [spaces]);
   useEffect(() => {
     if (!projectionReady) return;
-    const visible = new Map(
-      embeddedRequests.map((request) => [
+    const visible = new Map<string, ResourceId>([
+      ...embeddedRequests.map((request): [string, ResourceId] => [
         `${request.parent.id}:${request.spaceId}:${request.mapId}:${request.graphId}`,
-        request,
+        request.spaceId,
       ]),
-    );
+      // A Space an embedding draws from what is read of it is held as well.
+      ...[...toRead].map(([nodeId, spaceId]): [string, ResourceId] => [
+        `${nodeId}:${spaceId}:read`,
+        spaceId,
+      ]),
+    ]);
     for (const [id, request] of requested.current) {
       if (visible.has(id)) continue;
       void request.hold?.release();
       requested.current.delete(id);
     }
-    for (const [id, request] of visible) {
-      if (!requested.current.has(id)) void acquire(id, request.spaceId);
+    for (const [id, spaceId] of visible) {
+      if (!requested.current.has(id)) void acquire(id, spaceId);
     }
-  }, [embeddedRequests, acquire, projectionReady]);
+  }, [embeddedRequests, toRead, acquire, projectionReady]);
   const publishEmbedded = useCallback((id: string, value: EmbeddedPublication | null) => {
     setEmbeddedPublications((previous) => {
       if (previous.get(id) === value || (value === null && !previous.has(id))) return previous;

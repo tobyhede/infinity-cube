@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { Box, Check, Maximize2, Minimize2, Pencil } from 'lucide-react';
-import { titleName, type Kept, type SpaceView } from '@project/resource-api/domain';
+import { titleName, type Answer, type Kept } from '@project/resource-api/domain';
 import {
   definePluginView,
   Rail,
@@ -8,6 +8,7 @@ import {
   Title,
   useRailBand,
   type Claim,
+  type EmbedView,
   type Creation,
   type NewSpace,
   type PluginViewProps,
@@ -35,6 +36,13 @@ const FILL: CSSProperties = {
 
 /** The Space glyph's place on a Closed face: in the band, at its right. */
 const GLYPH: CSSProperties = { position: 'absolute', top: 8, right: 8, lineHeight: 0 };
+
+/** Refused: a choice of another Map that names none of its Graphs. */
+const GRAPH_REQUIRED = { refused: 'Choose a Graph on that Map.' } as const satisfies Answer;
+
+/** Whether a settled commit left nothing to say. */
+const refusalOf = (answer: Answer): string | null =>
+  answer === 'completed' || answer === 'unchanged' ? null : answer.refused;
 
 function SpacePluginView({ surface }: PluginViewProps<SpaceContent, SpaceMapContent>) {
   const name = titleName(surface.title.value);
@@ -68,8 +76,7 @@ function SpacePluginView({ surface }: PluginViewProps<SpaceContent, SpaceMapCont
   const centreY = framing?.centreY;
   const zoom = framing?.zoom;
   const view = useMemo(
-    (): SpaceView => ({
-      spaceId,
+    (): EmbedView => ({
       map: mapId,
       graph,
       framing:
@@ -77,16 +84,31 @@ function SpacePluginView({ surface }: PluginViewProps<SpaceContent, SpaceMapCont
           ? undefined
           : { centreX, centreY, zoom },
     }),
-    [spaceId, mapId, graph, centreX, centreY, zoom],
+    [mapId, graph, centreX, centreY, zoom],
   );
-  // The embedding writes a choice through this plugin's own content commit, so
+  // The view it keeps is always shown, so it is always passed. With its own
+  // content commit, the embedding's chooser writes a choice through it, so
   // what withdraws the commit withdraws the choice (ADR 0142).
   const select = useMemo(
-    (): Kept<SpaceView> | undefined =>
-      commitContent === undefined
-        ? undefined
-        : { value: view, commit: (next) => commitContent(selectView(view, next)) },
-    [commitContent, view],
+    (): Kept<EmbedView> => ({
+      value: view,
+      commit:
+        commitContent === undefined
+          ? undefined
+          : (next) => {
+              // A choice naming no Graph keeps the Graph only on the same Map;
+              // on another Map there is no Graph to keep.
+              const chosen = next.graph ?? (next.map === mapId ? graph : undefined);
+              if (chosen === undefined) return Promise.resolve(GRAPH_REQUIRED);
+              return commitContent(
+                selectView(
+                  { spaceId, map: mapId, graph, framing: view.framing },
+                  { spaceId, map: next.map, graph: chosen, framing: next.framing },
+                ),
+              );
+            },
+    }),
+    [commitContent, view, spaceId, mapId, graph],
   );
 
   const commands = useMemo((): readonly RailCommand[] => {
@@ -157,7 +179,7 @@ function SpacePluginView({ surface }: PluginViewProps<SpaceContent, SpaceMapCont
       {open ? (
         <>
           <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
-            <Embed map={view} select={select} claim={held ?? undefined} />
+            <Embed space={spaceId} select={select} claim={held ?? undefined} />
           </div>
           <div style={{ padding: '4px 12px 8px' }} data-testid="space-resource-footer">
             <Title />

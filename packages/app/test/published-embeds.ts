@@ -45,7 +45,8 @@ export const publishedEmbeds = (
             resourceId: node.data.resourceId,
             drawing: Symbol(node.id),
             request: {
-              view,
+              space: view.spaceId,
+              view: { map: view.map, graph: view.graph, framing: view.framing },
               select: undefined,
               claim: claimed.has(node.data.resourceId) ? { release: () => undefined } : undefined,
             },

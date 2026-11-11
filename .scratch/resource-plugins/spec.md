@@ -40,8 +40,7 @@ definePluginView<C, M>({ View, Glyph, creates? })
 
 type Answer = 'completed' | 'unchanged' | { refused: string }
 type Kept<T> = { value: T; commit?: (next: T) => Promise<Answer> }
-type SpaceView = { map: MapId; graph?: GraphId; framing?: Framing }   // which of a Space's Maps an Embed shows, and how it is framed
-type Framing = { centreX: number; centreY: number; zoom: number }    // a Space Resource's authored framing (ADR 0112), kept by the plugin with its view
+type EmbedView = { map: MapId; graph?: GraphId; framing?: SpaceFraming } // which of a Space's Maps an Embed shows, and where
 
 interface Surface<C, M> {
   resource: Resource<C>                                   // title and content below are its values, with their commits
@@ -58,7 +57,7 @@ interface Surface<C, M> {
   // Choosing another Map commits a view with no framing; reframing commits the same Map and Graph with the new framing.
   // Enter, which navigates into the shown Space, is an embedding command too, offered where navigation is.
   // `claim`: the shown Space's authoring, its Maps and Graphs included. Commands come from these, never from a kind.
-  Embed: ComponentType<{ resource: ResourceId; title: Kept<string> } | { space: SpaceId; select?: Kept<SpaceView>; claim?: Claim }>
+  Embed: ComponentType<{ resource: ResourceId; title: Kept<string> } | { space: SpaceId; select?: Kept<EmbedView>; claim?: Claim }>
 }
 
 interface Claim { release(): void }   // never refused: while an inner Claim or its own exclusive work runs, the host releases it when that ends

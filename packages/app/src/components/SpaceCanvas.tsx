@@ -434,7 +434,7 @@ export function SpaceCanvas({
     [thisSpaceId, mapId, rootPolicy],
   );
   // The Map embeddings drawn on this canvas, nested ones too: a plugin's
-  // `<Embed map>` publishes what it asks for while it is drawn (ADR 0142).
+  // `<Embed space>` publishes what it asks for while it is drawn (ADR 0142).
   const [mapEmbeddings] = useState(createMapEmbeddings);
   const embeds = useSyncExternalStore(mapEmbeddings.subscribe, mapEmbeddings.getState);
   const publishMapEmbed = useCallback(
@@ -469,8 +469,7 @@ export function SpaceCanvas({
   /** Lands a framing still pending for a placement whose Map is no longer authored in place. */
   const flushPortalFraming = useRef<(nodeId: string) => void>(() => undefined);
   const lastEmbeds = useRef(embeds);
-  /** The placements drawn now, which a Resource whose Edit ended must still be among to be selected. */
-  const drawnNodes = useRef(nodes);
+  const lastEmbeddedRequests = useRef(embeddedRequests);
   useLayoutEffect(() => {
     drawnNodes.current = nodes;
   }, [nodes]);
@@ -503,7 +502,10 @@ export function SpaceCanvas({
     for (const nodeId of lastEmbeds.current.keys())
       if (!embeds.has(nodeId)) mapEmbeddings.forget(nodeId);
     lastEmbeds.current = embeds;
-  }, [embeds, mapEmbeddings]);
+  }, [embeds]);
+  useLayoutEffect(() => {
+    lastEmbeddedRequests.current = embeddedRequests;
+  }, [embeddedRequests]);
 
   const drawnSpaces = useMemo(
     () => [
@@ -683,7 +685,15 @@ export function SpaceCanvas({
         ownMapEmbed(mapEmbeddings.getState(), nodeId) ?? ownMapEmbed(lastEmbeds.current, nodeId);
       const commit = entry?.request.select?.commit;
       if (entry === undefined || commit === undefined) return;
-      void commit({ ...entry.request.view, framing });
+      // The Map and Graph the embedding draws: the plugin's view, or what its
+      // Space resolved one it left open to (ADR 0142).
+      const drawn = lastEmbeddedRequests.current.find(
+        (request) => request.parent.data.resourceId === resourceId,
+      );
+      const view = entry.request.view;
+      const mapId = drawn?.mapId ?? view?.map;
+      if (mapId === undefined) return;
+      void commit({ map: mapId, graph: drawn?.graphId ?? view?.graph, framing });
     },
     [mapEmbeddings],
   );
@@ -1293,7 +1303,7 @@ export function SpaceCanvas({
       const session = portalGestureSnapshot.current;
       const drafted = session.portalDraft.get(parentId);
       if (drafted !== undefined) return drafted;
-      const stored = session.embeds.get(parentId)?.request.view.framing;
+      const stored = session.embeds.get(parentId)?.request.view?.framing;
       if (stored !== undefined) return stored;
       const published = session.embeddedPublications.get(parentId);
       const request = session.embeddedRequests.find(

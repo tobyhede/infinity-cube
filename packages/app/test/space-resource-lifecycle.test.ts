@@ -176,6 +176,7 @@ describe('what a Space Resource may reference', () => {
     await expect(lifecycle.target(TARGET_ID)).resolves.toEqual({
       id: TARGET_ID,
       title: 'Architecture',
+      defaultMap: TARGET_MAP_ID,
       maps: [
         {
           id: TARGET_MAP_ID,

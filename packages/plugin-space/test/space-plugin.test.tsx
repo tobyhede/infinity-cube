@@ -102,6 +102,21 @@ describe('the Space plugin’s view', () => {
     expect(rendered.commits.content).toEqual([{ spaceId: SPACE, map: `${MAP}′`, graph: GRAPH }]);
   });
 
+  it('refuses a choice of another Map that names no Graph, writing nothing', async () => {
+    const rendered = renderPlugin(spacePluginView.View, {
+      content,
+      map: open,
+      title: 'Elsewhere',
+      grants: { content: true },
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: `Choose another Map than ${MAP}, naming no Graph` }),
+    );
+    await Promise.resolve();
+    expect(rendered.commits.content).toEqual([]);
+    expect(screen.getByTestId('embedded-map')).toHaveAttribute('data-map', MAP);
+  });
+
   it('Opens and Closes through its Map content', async () => {
     const rendered = renderPlugin(spacePluginView.View, {
       content,

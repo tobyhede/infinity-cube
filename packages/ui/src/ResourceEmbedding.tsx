@@ -7,11 +7,12 @@ import {
   type ResourceKind,
   type Resource,
 } from '@project/core';
-import type { Answer, Kept, ResourceId, Size, SpaceView } from '@project/resource-api/domain';
-import type { Claim, EmbedProps, TitleProps } from '@project/resource-api/view';
+import type { Answer, Kept, ResourceId, Size } from '@project/resource-api/domain';
 import {
   ResourceHostProvider,
-  type RailOutlet,
+  type Claim,
+  type EmbedProps,
+  type EmbedView,
   type ResourceHost,
 } from '@project/resource-api/view/host';
 import type { PluginEntry } from './kinds/plugin-views';
@@ -107,14 +108,16 @@ const EMBEDDED_ROOM = {
 } as const;
 
 /**
- * What a plugin asked the Map embedding for (ADR 0142): the view of another
- * Space it shows, the commit a choice or a framing is written through where
- * the surface offers one, and the Claim it passed, under which the Map is
- * authored in place.
+ * What a plugin asked the Map embedding for (ADR 0142): the Space to show, the
+ * view it passed (absent: that Space's `defaultMap`), the commit a choice or a
+ * framing is written through where it passed one, and the Claim it passed,
+ * under which the shown Space is authored in place. Every command the host
+ * offers for the embedding is read from this, never from a kind.
  */
 export interface MapEmbedRequest {
-  readonly view: SpaceView;
-  readonly select: Kept<SpaceView> | undefined;
+  readonly space: string;
+  readonly view: EmbedView | undefined;
+  readonly select: Kept<EmbedView> | undefined;
   readonly claim: Claim | undefined;
 }
 
@@ -169,13 +172,13 @@ export function MapEmbedSlotProvider({
 export const useMapEmbedSlot = (): MapEmbedSlot | null => useContext(MapEmbedSlotContext);
 
 /** The Map embedding: the host's drawing of what the plugin asked for. */
-function HostMapEmbed({
-  map: view,
-  select,
-  claim,
-}: Extract<EmbedProps, { readonly map: SpaceView }>) {
+function HostMapEmbed({ space, select, claim }: Extract<EmbedProps, { readonly space: string }>) {
   const draw = useContext(HostMapContext);
-  const request = useMemo((): MapEmbedRequest => ({ view, select, claim }), [view, select, claim]);
+  const view = select?.value;
+  const request = useMemo(
+    (): MapEmbedRequest => ({ space, view, select, claim }),
+    [space, view, select, claim],
+  );
   return draw === null ? null : draw(request);
 }
 

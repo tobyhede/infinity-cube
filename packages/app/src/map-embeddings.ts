@@ -5,15 +5,11 @@ import type { MapEmbedRequest } from '@project/ui';
 
 /**
  * The Map embeddings drawn on one canvas (ADR 0142): what each asks for, by
- * the placement whose rect it is drawn in. A plugin's `<Embed map>` publishes
+ * the placement whose rect it is drawn in. A plugin's `<Embed space>` publishes
  * here while it is drawn, and nothing else does, so a Closed Space Resource
  * requests nothing. The canvas draws each request's Map over its rect, the
- * drawing whose Claim is passed authors it in place, and the host's chooser
- * writes a choice through the request's `select`.
- *
- * A placement is one drawing on this canvas: a Resource drawn twice, as two
- * embeddings of one Map draw it, is two placements, each with its own entry
- * and its own drawing key, so nothing here is looked up by Resource.
+ * Resource whose Claim is passed authors it in place, and the host's chooser,
+ * offered where the request passes a commit, writes a choice through it.
  */
 
 /**
@@ -50,14 +46,14 @@ export interface MapEmbeddings {
 
 const NONE: ReadonlyMap<string, MapEmbedEntry> = new Map();
 
-/** Whether two requests ask for the same view, a choice where the other offers one, and the same Claim. */
+/** Whether two requests ask for the same Space and view, a choice where the other offers one, and the same Claim. */
 const sameAsk = (a: MapEmbedRequest, b: MapEmbedRequest): boolean =>
-  a.view.spaceId === b.view.spaceId &&
-  a.view.map === b.view.map &&
-  a.view.graph === b.view.graph &&
-  a.view.framing?.centreX === b.view.framing?.centreX &&
-  a.view.framing?.centreY === b.view.framing?.centreY &&
-  a.view.framing?.zoom === b.view.framing?.zoom &&
+  a.space === b.space &&
+  a.view?.map === b.view?.map &&
+  a.view?.graph === b.view?.graph &&
+  a.view?.framing?.centreX === b.view?.framing?.centreX &&
+  a.view?.framing?.centreY === b.view?.framing?.centreY &&
+  a.view?.framing?.zoom === b.view?.framing?.zoom &&
   (a.select?.commit === undefined) === (b.select?.commit === undefined) &&
   a.claim === b.claim;
 

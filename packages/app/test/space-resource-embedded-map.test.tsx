@@ -535,6 +535,8 @@ describe('the Map an Open Space Resource draws', () => {
       }),
     );
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+    // The shown Space is authored only under the Claim Edit takes.
+    beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
     fireEvent.click(
       within(controlsOf(containingNode(SPACE_RESOURCE_ID))).getByTestId('space-resource-map'),
     );
@@ -595,6 +597,8 @@ describe('the Map an Open Space Resource draws', () => {
       },
     });
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+    // The shown Space is authored only under the Claim Edit takes.
+    beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
     fireEvent.click(
       within(controlsOf(containingNode(SPACE_RESOURCE_ID))).getByTestId('space-resource-graph'),
     );
@@ -648,6 +652,8 @@ describe('the Map an Open Space Resource draws', () => {
       kind: 'refused',
       refusal: { code: 'map-not-found', mapId: SELECTED_MAP_ID },
     });
+    // The shown Space is authored only under the Claim Edit takes.
+    beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
     fireEvent.click(
       within(controlsOf(containingNode(SPACE_RESOURCE_ID))).getByTestId('space-resource-map'),
     );
@@ -1161,10 +1167,8 @@ describe('the Map an Open Space Resource draws', () => {
     const parent = document.querySelector(`.react-flow__node[data-id="${SPACE_RESOURCE_ID}"]`);
     if (!(parent instanceof HTMLElement)) throw new Error('Space Resource missing');
     expect(within(controlsOf(parent)).queryByRole('button', { name: /Close Resource/ })).toBeNull();
-    expect(
-      within(controlsOf(parent)).getByTestId('space-resource-map').getAttribute('aria-disabled') ===
-        'true',
-    ).toBe(true);
+    // The Space Resource's own commit is withdrawn, so its embedding offers no chooser.
+    expect(within(controlsOf(parent)).queryByTestId('space-resource-map')).toBeNull();
     const sibling = document.querySelector(`.react-flow__node[data-id="${HOME_RESOURCE_ID}"]`);
     if (!(sibling instanceof HTMLElement)) throw new Error('Containing Markdown Resource missing');
     expect(queryCommand(sibling, /Edit Resource/)).toBeNull();
@@ -1315,11 +1319,7 @@ describe('the Map an Open Space Resource draws', () => {
     expect(
       within(controlsOf(editing)).queryByRole('button', { name: /Close Resource/ }),
     ).toBeNull();
-    expect(
-      within(controlsOf(editing))
-        .getByTestId('space-resource-map')
-        .getAttribute('aria-disabled') === 'true',
-    ).toBe(true);
+    expect(within(controlsOf(editing)).queryByTestId('space-resource-map')).toBeNull();
 
     fireEvent.keyDown(
       within(embeddedNode(DRAWN_A)).getByRole('textbox', { name: 'Resource title' }),
@@ -1536,6 +1536,8 @@ describe('the Map an Open Space Resource draws', () => {
       }),
     );
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+    // The shown Space is authored only under the Claim Edit takes.
+    beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
     fireEvent.click(
       within(controlsOf(containingNode(SPACE_RESOURCE_ID))).getByTestId('space-resource-map'),
     );

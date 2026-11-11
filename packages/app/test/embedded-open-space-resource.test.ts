@@ -445,7 +445,8 @@ describe('embedded open Space Resource discovery', () => {
             resourceId: HOST,
             drawing: Symbol('host drawing'),
             request: {
-              view: { spaceId: TARGET, map: OTHER_MAP, graph: GRAPH },
+              space: TARGET,
+              view: { map: OTHER_MAP, graph: GRAPH },
               select: undefined,
               claim: undefined,
             },

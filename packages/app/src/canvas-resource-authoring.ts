@@ -1,12 +1,9 @@
 import type { Continuation } from './continuation';
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
-  spaceSelection,
-  type SpaceView,
   RESOURCE_TITLE_REQUIRED,
   resourceDocumentSchema,
   uuidSchema,
-  type ResourceDocument,
   type ResourceId,
 } from '@project/core';
 import type { Size } from '@project/resource-api/domain';
@@ -22,6 +19,7 @@ import type { CommandOutcomes } from './command-outcomes';
 import type { DeleteConfirmation } from './delete-confirmation';
 import { NO_SPACE_RESOURCE_TARGETS, type SpaceResourceTargets } from './space-resource-targets';
 import { applyResourceDataPatch, decorateSharedResourceNode } from './canvas-resource-decoration';
+import { decorateEmbedCommands, type EmbedCommandsContext } from './embed-commands';
 import { useKindDecoratedNodes } from './kinds/registry';
 import type { Embedding } from './plugin-host/claim-chain';
 import type { PluginHost } from './plugin-host/plugin-commits';
@@ -38,35 +36,6 @@ const embeddedResourceIds = (embeds: ReadonlyMap<string, MapEmbedEntry>): Readon
   new Set([...embeds.values()].map((entry) => entry.resourceId));
 
 type Caret = { readonly resourceId: string; readonly field: 'title' } | null;
-
-const spaceViewIdentity = (view: SpaceView): string => {
-  const framing = view.framing;
-  const framingKey =
-    framing === undefined ? '' : `${framing.centreX}:${framing.centreY}:${framing.zoom}`;
-  return `${view.spaceId}:${view.map}:${view.graph}:${framingKey}`;
-};
-
-/** The view of another Space each Resource shows, for the kinds that show one. */
-const spaceSelectionsOf = (
-  resources: readonly { readonly id: ResourceId; readonly document: ResourceDocument }[],
-): ReadonlyMap<ResourceId, SpaceView> => {
-  const next = new Map<ResourceId, SpaceView>();
-  for (const resource of resources) {
-    const view = spaceSelection(resource.document);
-    if (view !== undefined) next.set(resource.id, view);
-  }
-  return next;
-};
-
-const spaceSelectionsKeyOf = (
-  resources: readonly { readonly id: ResourceId; readonly document: ResourceDocument }[],
-): string =>
-  resources
-    .flatMap((resource) => {
-      const view = spaceSelection(resource.document);
-      return view === undefined ? [] : [`${resource.id}:${spaceViewIdentity(view)}`];
-    })
-    .join();
 
 /** What this canvas's plugin surfaces claim on, and where what they throw is reported. */
 export interface CanvasPlugins {
@@ -340,8 +309,6 @@ export function useCanvasResourceAuthoring({
     () => new Set(working.resources.map((resource) => resource.id)),
     [editableResourceIdsKey],
   );
-  const spaceSelectionsKey = spaceSelectionsKeyOf(working.resources);
-  const spaceSelections = useMemo(() => spaceSelectionsOf(working.resources), [spaceSelectionsKey]);
   /* eslint-enable react-hooks/exhaustive-deps */
   const clearCaret = useCallback(() => {
     setCaret(null);
@@ -400,23 +367,48 @@ export function useCanvasResourceAuthoring({
       ),
     [nodes, sharedContext],
   );
-  const decoratedNodes = useKindDecoratedNodes(withShared, {
+  const kindDecorated = useKindDecoratedNodes(withShared, {
     authorOnCanvas: availability.authorOnCanvas,
     embeddedMapEdit: availability.embeddedMapEdit,
     editableResourceIds,
     pluginHost,
-    continuation,
-    containingSpaceId: working.id,
-    spaceSelections,
-    spaceResourceTargets,
-    spaces,
-    commandOutcomes,
-    deleteConfirmation,
-    mapEmbeds,
-    contextNotices,
-    onContextEditingChange,
-    onContextReport,
   });
+  // The commands of each Space a Resource embeds, read from what its plugin
+  // passed `Embed`, whatever the kind (ADR 0142).
+  const embedContext = useMemo(
+    (): EmbedCommandsContext => ({
+      authorOnCanvas: availability.authorOnCanvas,
+      editableResourceIds,
+      continuation,
+      containingSpaceId: working.id,
+      spaceResourceTargets,
+      spaces,
+      commandOutcomes,
+      deleteConfirmation,
+      mapEmbeds,
+      contextNotices,
+      onContextEditingChange,
+      onContextReport,
+    }),
+    [
+      availability.authorOnCanvas,
+      editableResourceIds,
+      continuation,
+      working.id,
+      spaceResourceTargets,
+      spaces,
+      commandOutcomes,
+      deleteConfirmation,
+      mapEmbeds,
+      contextNotices,
+      onContextEditingChange,
+      onContextReport,
+    ],
+  );
+  const decoratedNodes = useMemo(
+    () => kindDecorated.map((node) => decorateEmbedCommands(node, embedContext)),
+    [kindDecorated, embedContext],
+  );
 
   return {
     nodes: decoratedNodes,
