@@ -345,8 +345,11 @@ test('a selected Open Resource offers only Edit and Close, and its body begins t
   await open(page, markdownStory);
   const resource = page.getByRole('article', { name: 'Strategies' });
 
-  const labels = await resource
-    .getByTestId('canvas-resource-actions')
+  const actions = resource.getByTestId('canvas-resource-actions');
+  // Edit joins the rail once the plugin has read its text, so wait for it
+  // before reading the rail once.
+  await expect(actions.getByRole('button', { name: 'Edit Resource Strategies' })).toBeVisible();
+  const labels = await actions
     .getByRole('button')
     .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label')));
   expect(labels).toEqual(['Edit Resource Strategies', 'Close Resource Strategies']);
