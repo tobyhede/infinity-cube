@@ -100,6 +100,8 @@ export type RenderedPlugin<C, M> = RenderResult & {
   readonly withdraw: (withdrawn: boolean) => void;
   /** Change the content from outside the plugin, as another author's Edit or a replacement does. */
   readonly changeContent: (next: C) => void;
+  /** Change the Map content from outside the plugin, as another author's Close or a replacement does. */
+  readonly changeMap: (next: M) => void;
 };
 
 /** Where a test surface draws an asset from: a URL that names the reference, so a test can see it. */
@@ -358,6 +360,7 @@ export function renderPlugin<C, M>(
   };
   const hold = createClaimHold();
   const contentChanges = new Set<(next: C) => void>();
+  const mapChanges = new Set<(next: M) => void>();
   /** A commit answering refused when `live` says it is not, as the host's withdrawn and ended commits do. */
   const guarded =
     <T, O, A>(
@@ -378,6 +381,12 @@ export function renderPlugin<C, M>(
       };
     }, []);
     const [mapValue, setMapValue] = useState(options.map);
+    useEffect(() => {
+      mapChanges.add(setMapValue);
+      return () => {
+        mapChanges.delete(setMapValue);
+      };
+    }, []);
     const rail = useMemo(() => createRailStore(), []);
     const exclusiveRunning = useSyncExternalStore(gate.subscribe, gate.running);
     const authoringOff = useSyncExternalStore(subscribeAuthoring, withdrawn);
@@ -500,5 +509,10 @@ export function renderPlugin<C, M>(
       for (const change of contentChanges) change(next);
     });
   };
-  return Object.assign(rendered, { commits, withdraw, changeContent });
+  const changeMap = (next: M): void => {
+    act(() => {
+      for (const change of mapChanges) change(next);
+    });
+  };
+  return Object.assign(rendered, { commits, withdraw, changeContent, changeMap });
 }

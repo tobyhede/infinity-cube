@@ -150,7 +150,24 @@ describe('the Space plugin’s view', () => {
     expect(await screen.findByRole('button', { name: 'Edit Resource Elsewhere' })).toBeVisible();
   });
 
-  it('offers no Edit while Closed, and stays out of editing where the Claim is refused', () => {
+  it('releases its Claim when Closed from outside, so nothing stays held behind a Closed face', async () => {
+    const rendered = renderPlugin(spacePluginView.View, {
+      content,
+      map: open,
+      title: 'Elsewhere',
+      grants: { claim: true, map: true },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Elsewhere' }));
+    expect(await screen.findByTestId('embedded-map')).toHaveAttribute('data-claimed', 'true');
+    // Another author's Close, or an undo, Closes it without this plugin's Close.
+    rendered.changeMap(closed);
+    await screen.findByRole('img', { name: 'Space Resource' });
+    expect(rendered.commits.claims).toEqual({ taken: 1, released: 1 });
+    rendered.changeMap(open);
+    expect(await screen.findByRole('button', { name: 'Edit Resource Elsewhere' })).toBeVisible();
+  });
+
+  it('offers no Edit while Closed', () => {
     renderPlugin(spacePluginView.View, {
       content,
       map: closed,
@@ -182,7 +199,7 @@ describe('the Space plugin’s view', () => {
       answer: { refused: 'Not now.' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Open Resource Elsewhere' }));
-    expect(await screen.findByRole('status')).toHaveTextContent('Not now.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Not now.');
     expect(screen.queryByTestId('embedded-map')).toBeNull();
   });
 });

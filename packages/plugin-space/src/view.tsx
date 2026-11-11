@@ -1,10 +1,12 @@
-import { useMemo, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Box, Check, Maximize2, Minimize2, Pencil } from 'lucide-react';
-import { titleName, type Answer, type Kept, type SpaceView } from '@project/resource-api/domain';
+import { titleName, type Kept, type SpaceView } from '@project/resource-api/domain';
 import {
   definePluginView,
   Rail,
+  refusalOf,
   Title,
+  useRailBand,
   type Claim,
   type PluginViewProps,
   type RailCommand,
@@ -29,19 +31,8 @@ const FILL: CSSProperties = {
   minHeight: 0,
 };
 
-/**
- * The band along the top of the rect the canvas keeps clear of controls, as it
- * does for every Resource it draws: eight pixels, the kind glyph's row, eight
- * pixels. A press there selects the Resource rather than beginning a rename.
- */
-const RAIL_BAND = 30;
-
 /** The Space glyph's place on a Closed face: in the band, at its right. */
 const GLYPH: CSSProperties = { position: 'absolute', top: 8, right: 8, lineHeight: 0 };
-
-/** Whether a settled commit left nothing to say. */
-const refusalOf = (answer: Answer): string | null =>
-  answer === 'completed' || answer === 'unchanged' ? null : answer.refused;
 
 function SpacePluginView({ surface }: PluginViewProps<SpaceContent, SpaceMapContent>) {
   const name = titleName(surface.title.value);
@@ -52,6 +43,28 @@ function SpacePluginView({ surface }: PluginViewProps<SpaceContent, SpaceMapCont
   const { Embed } = surface;
   const [held, setHeld] = useState<Claim | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
+  const railBand = useRailBand();
+
+  // The Claim as the host granted it, which every end of an Edit releases:
+  // one the host answers it did not release is kept, so the next end, or
+  // unmounting, releases it again.
+  const claim = useRef<Claim | null>(null);
+  const release = useCallback((): boolean => {
+    if (claim.current !== null && !claim.current.release()) return false;
+    claim.current = null;
+    return true;
+  }, []);
+  // Closed from outside, as by another author's Close, the Edit ends with it:
+  // a Closed face draws no Done, so nothing else would release its Claim.
+  const [openWas, setOpenWas] = useState(open);
+  if (openWas !== open) {
+    setOpenWas(open);
+    if (!open) setHeld(null);
+  }
+  useEffect(() => {
+    if (!open) release();
+  }, [open, release]);
+  useEffect(() => () => void release(), [release]);
 
   // Keyed by the values, not by the parsed content's identity, which the host
   // may mint afresh each render: what the embedding is asked for changes only
@@ -96,7 +109,7 @@ function SpacePluginView({ surface }: PluginViewProps<SpaceContent, SpaceMapCont
               label: `Done Resource ${name}`,
               icon: <Check size={14} />,
               run: () => {
-                if (held.release()) setHeld(null);
+                if (release()) setHeld(null);
               },
             },
           ]
@@ -109,8 +122,10 @@ function SpacePluginView({ surface }: PluginViewProps<SpaceContent, SpaceMapCont
                 label: `Edit Resource ${name}`,
                 icon: <Pencil size={14} />,
                 run: () => {
-                  const claim = takeClaim();
-                  if (claim !== undefined) setHeld(claim);
+                  const taken = takeClaim();
+                  if (taken === undefined) return;
+                  claim.current = taken;
+                  setHeld(taken);
                 },
               },
             ];
@@ -132,7 +147,7 @@ function SpacePluginView({ surface }: PluginViewProps<SpaceContent, SpaceMapCont
               // A Closed face draws no Done, so Close ends the Edit first; a
               // Claim held inside this one keeps both until it is released.
               if (held !== null) {
-                if (!held.release()) return;
+                if (!release()) return;
                 setHeld(null);
               }
               toggle({ open: false });
@@ -146,7 +161,7 @@ function SpacePluginView({ surface }: PluginViewProps<SpaceContent, SpaceMapCont
             run: () => toggle({ open: true }),
           },
     ];
-  }, [commitMap, open, name, held, takeClaim]);
+  }, [commitMap, open, name, held, takeClaim, release]);
 
   return (
     <div
@@ -166,7 +181,7 @@ function SpacePluginView({ surface }: PluginViewProps<SpaceContent, SpaceMapCont
         </>
       ) : (
         <>
-          <div style={{ padding: `${RAIL_BAND}px 12px 8px`, minHeight: 0 }}>
+          <div style={{ padding: `${railBand}px 12px 8px`, minHeight: 0 }}>
             <Title />
           </div>
           {/* What it is, in the band along the top, as every Closed Resource
@@ -177,7 +192,7 @@ function SpacePluginView({ surface }: PluginViewProps<SpaceContent, SpaceMapCont
         </>
       )}
       {refusal !== null && (
-        <p role="status" style={{ margin: 0, padding: '0 12px', fontSize: 12 }}>
+        <p role="alert" style={{ margin: 0, padding: '0 12px', fontSize: 12 }}>
           {refusal}
         </p>
       )}

@@ -5,7 +5,7 @@ import {
   type SpaceView,
   type UUID,
 } from '@project/core';
-import type { Answer } from '@project/resource-api/domain';
+import { refusalOf } from '@project/resource-api/view';
 import type { ResourceFlowNodeOf } from '@project/react-flow-adapter';
 import type { PluginOperations } from '@project/ui';
 import { buildSpaceResourceRail } from '../build-space-resource-rail';
@@ -57,10 +57,6 @@ export type SpaceResourceDecorationContext = Pick<
 
 /** What the Map embedding says while the Space it shows has not been read. */
 export const READING_SPACE_NOTE = 'Reading the referenced Space…';
-
-/** Whether a settled commit left nothing to say. */
-const refusalOf = (answer: Answer): string | null =>
-  answer === 'completed' || answer === 'unchanged' ? null : answer.refused;
 
 /**
  * A Space Resource's plugin surface (ADR 0142): its Title, content and Map
