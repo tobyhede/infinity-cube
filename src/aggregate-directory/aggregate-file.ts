@@ -42,16 +42,12 @@ const assetFileNamed = (paths: readonly string[], hash: AssetHash): string | und
 /**
  * Every file an aggregate and the stored assets it references serialise to,
  * by path relative to the Aggregate directory: `aggregate.json`, each Space's
- * directory named for its id, and `assets/<hash>.<ext>` (ADR 0142, ADR 0118).
- *
- * An asset already in the directory, among `existing`, keeps the name it has
- * there, so Export writes back the extension Import read; any other is named
- * by the host table from its media type.
+ * directory named for its id, and `assets/<hash>.<ext>` (ADR 0142, ADR 0118),
+ * each asset named by the host table from its media type.
  */
 export const aggregateFiles = (
   aggregate: LoadedAggregate,
   assets: readonly StoredAsset[],
-  existing: readonly string[] = [],
 ): DirectoryFiles => {
   const files = new Map<string, Uint8Array>([
     [
@@ -67,11 +63,27 @@ export const aggregateFiles = (
     }
   }
   for (const asset of assets) {
-    const name = assetFileNamed(existing, asset.hash) ?? assetFileName(asset);
-    files.set(`${ASSETS_DIRECTORY_NAME}/${name}`, asset.bytes);
+    files.set(`${ASSETS_DIRECTORY_NAME}/${assetFileName(asset)}`, asset.bytes);
   }
   return files;
 };
+
+/**
+ * `files` with each asset already in the directory, among `existing`, under
+ * the name it has there, so Export writes back the extension Import read.
+ */
+export const keepingExistingAssetNames = (
+  files: DirectoryFiles,
+  existing: readonly string[],
+): DirectoryFiles =>
+  new Map(
+    [...files].map(([path, bytes]) => {
+      if (!path.startsWith(`${ASSETS_DIRECTORY_NAME}/`)) return [path, bytes] as const;
+      const hash = assetFileHash(path.slice(ASSETS_DIRECTORY_NAME.length + 1));
+      const kept = hash === undefined ? undefined : assetFileNamed(existing, hash);
+      return [kept === undefined ? path : `${ASSETS_DIRECTORY_NAME}/${kept}`, bytes] as const;
+    }),
+  );
 
 /**
  * Every file Import would read in `directory`, by path relative to it: what

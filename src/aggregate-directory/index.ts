@@ -1,6 +1,7 @@
 export {
   aggregateFiles,
   assertExportableDestination,
+  keepingExistingAssetNames,
   readAggregate,
   scannedAggregateFiles,
   writeAggregateDirectory,

@@ -6,6 +6,7 @@ import type { LoadedAggregate } from '@project/persistence';
 import {
   aggregateFiles,
   assertExportableDestination,
+  keepingExistingAssetNames,
   loadReferencedAssets,
   rejectSymbolicLinks,
   scannedAggregateFiles,
@@ -160,16 +161,17 @@ const markAggregateExported = async (
  * in the directory comes from one consistent view rather than from a series of
  * reads a concurrent commit could fall between. The bytes of every stored asset
  * the aggregate references are written to `assets/` (ADR 0142, ADR 0118), found
- * by walking each Resource's `content` without naming a kind; assets are read
- * after the aggregate and outside its revision, and an asset's hash is its
- * content, so no commit can change one between the two reads. An asset no
- * Resource references is left out, and its file removed. A referenced asset
+ * by walking each Resource's `content` and each Map entry's content without
+ * naming a kind; assets are read after the aggregate and outside its revision,
+ * and an asset's hash is its content, so no commit can change one between the
+ * two reads. An asset no Resource references is left out, and its file removed. A referenced asset
  * whose bytes the store does not hold is not an error: the URL stays, the
  * Export completes, and a file of that name in the directory is kept.
  *
  * The files are checked to read back before any is written, with the asset
- * files kept for absent bytes, and a refusal writes nothing. Then each file whose bytes differ is replaced, and each file
- * Import would read that the aggregate no longer serialises to is removed. The
+ * files kept for absent bytes, and a refusal writes nothing. Then each file
+ * whose bytes differ is replaced, and each file Import would read that the
+ * aggregate no longer serialises to is removed. The
  * destination and its Space directories are never renamed or recreated, and
  * nothing Import does not read is touched. A failure part-way leaves some files
  * written and some not; git, not InfinityCube, restores the directory.
@@ -187,13 +189,17 @@ export const exportAggregate = async (
   );
 
   const destination = resolve(destinationPath);
-  await rejectSymbolicLinks(destination, aggregateFiles(aggregate, assets.carried).keys());
+  const serialised = aggregateFiles(aggregate, assets.carried);
+  await rejectSymbolicLinks(destination, serialised.keys());
   await assertExportableDestination(destination);
-  // An asset already in the directory keeps its name there, so the files are
-  // named once the directory is known to scan.
+  // An asset already in the directory keeps its name there, so it is renamed
+  // once the directory is known to scan, and only a renamed path is checked again.
   const scanned = await scannedAggregateFiles(destination);
-  const files = aggregateFiles(aggregate, assets.carried, scanned);
-  await rejectSymbolicLinks(destination, files.keys());
+  const files = keepingExistingAssetNames(serialised, scanned);
+  await rejectSymbolicLinks(
+    destination,
+    [...files.keys()].filter((path) => !serialised.has(path)),
+  );
 
   // A file of a referenced asset the store holds no bytes for is kept rather
   // than written, and the next Import reads it as it reads the rest, so it is
