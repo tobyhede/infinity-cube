@@ -1,3 +1,4 @@
+import { isValidElement } from 'react';
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { spaceSnapshotSchema, uuidSchema, type ResourceId } from '@project/core';
@@ -13,7 +14,11 @@ import {
   type SpaceResourceTargets,
 } from '../src/space-resource-targets';
 import { fixtureDisplay, fixtureFacts } from './render-adapter-fixtures';
-import { PluginAssetsProvider, type MapEmbedRequest } from '@project/ui';
+import {
+  PluginAssetsProvider,
+  type MapEmbedRequest,
+  type SpaceResourceSelectorsProps,
+} from '@project/ui';
 import type { Claim } from '@project/resource-api/view';
 import { createMapEmbeddings, type MapEmbeddings } from '../src/map-embeddings';
 import { unusedImageSources } from './image-sources';
@@ -603,7 +608,8 @@ describe('canvas Resource authoring decoration identity', () => {
     embeddings.publish(
       SPACE_RESOURCE_ID,
       SPACE_RESOURCE_ID,
-      spaceEmbed(editing ? { release: () => true } : undefined),
+      spaceEmbed(editing ? { release: () => undefined } : undefined),
+      SPACE_DRAWING,
     );
 
   const dataOf = (nodes: readonly ResourceFlowNode[], resourceId: ResourceId) => {
@@ -686,8 +692,79 @@ describe('canvas Resource authoring decoration identity', () => {
         },
       },
     );
-    return { ...hook, spaceSession };
+    return { ...hook, spaceSession, mapEmbeddings };
   };
+
+  /** The Space Resource's chooser, as the canvas hands it to the plugin's rail. */
+  const chooserOf = (nodes: readonly ResourceFlowNode[]): SpaceResourceSelectorsProps => {
+    const rail = spaceOperationsOf(dataOf(nodes, SPACE_RESOURCE_ID))?.mapRail;
+    if (!isValidElement<SpaceResourceSelectorsProps>(rail)) throw new Error('No chooser drawn.');
+    return rail.props;
+  };
+
+  /** The canvas with its Space Resource's chooser drawn, saying something and mid-rename. */
+  const mountSpeakingChooser = () => {
+    const mounted = mountIdentity();
+    mounted.rerender({
+      spaceResourceTargets: new Map([[TARGET_SPACE_ID, target]]),
+      portalEditing: new Set<ResourceId>(),
+    });
+    const chooser = chooserOf(mounted.result.current.nodes);
+    act(() => {
+      chooser.onReport('Link copied.');
+      chooser.onEditingChange?.(true);
+    });
+    expect(dataOf(mounted.result.current.nodes, SPACE_RESOURCE_ID).contextNotice).toBe(
+      'Link copied.',
+    );
+    expect(mounted.result.current.titleEditing).toBe(true);
+    return mounted;
+  };
+
+  /** Whether the Space Resource, Opened again, draws its chooser afresh: no notice, no editing. */
+  const expectAfreshOnReopen = ({ result, mapEmbeddings }: ReturnType<typeof mountIdentity>) => {
+    expect(result.current.titleEditing).toBe(false);
+    act(() => publishSpaceEmbed(mapEmbeddings, false));
+    expect(
+      spaceOperationsOf(dataOf(result.current.nodes, SPACE_RESOURCE_ID))?.mapRail,
+    ).toBeDefined();
+    expect(dataOf(result.current.nodes, SPACE_RESOURCE_ID).contextNotice).toBeUndefined();
+    expect(result.current.titleEditing).toBe(false);
+  };
+
+  it("drops its chooser's notice and editing when its plugin Closes it, so neither returns on reopen", async () => {
+    const mounted = mountSpeakingChooser();
+    const commitMap = (next: { open: boolean }) =>
+      spaceOperationsOf(dataOf(mounted.result.current.nodes, SPACE_RESOURCE_ID))?.commitMap?.(next);
+    // The fixture stores it Closed: its plugin Opens it, then Closes it.
+    await act(async () => {
+      await expect(commitMap({ open: true })).resolves.toBe('completed');
+    });
+    await act(async () => {
+      await expect(commitMap({ open: false })).resolves.toBe('completed');
+    });
+    // The plugin's own Close leaves what its chooser said in place until the
+    // embedding goes.
+    expect(dataOf(mounted.result.current.nodes, SPACE_RESOURCE_ID).contextNotice).toBe(
+      'Link copied.',
+    );
+    // Closed, the plugin draws no `<Embed>`, which takes the embedding down.
+    act(() =>
+      mounted.mapEmbeddings.publish(SPACE_RESOURCE_ID, SPACE_RESOURCE_ID, null, SPACE_DRAWING),
+    );
+    expectAfreshOnReopen(mounted);
+  });
+
+  it("drops its chooser's notice and editing when a Close arrives from outside, as another author's Edit", () => {
+    const mounted = mountSpeakingChooser();
+    // No commit of this canvas's: the Resource Closed under it, as another
+    // author's Edit or a replacement Closes it, and its plugin took the
+    // embedding down.
+    act(() =>
+      mounted.mapEmbeddings.publish(SPACE_RESOURCE_ID, SPACE_RESOURCE_ID, null, SPACE_DRAWING),
+    );
+    expectAfreshOnReopen(mounted);
+  });
 
   it('keeps markdown and Reference Resource node.data when only Space Resource targets change', () => {
     const { result, rerender } = mountIdentity();

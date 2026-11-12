@@ -568,45 +568,6 @@ describe('decorateSpaceResourceNode', () => {
     ).not.toHaveProperty('commitContent');
   });
 
-  it('drops its context notice and editing when its plugin Closes it, so neither returns on reopen', async () => {
-    const complete = vi.fn((): AuthoringResult => ({ kind: 'completed' }));
-    const onContextReport = vi.fn();
-    const onContextEditingChange = vi.fn();
-    const decorated = (pluginHost: PluginHost) =>
-      decorateSpaceResourceNode(
-        openSpaceNode(),
-        context({
-          pluginHost,
-          mapEmbeds: embedding(),
-          contextNotices: new Map([[SPACE_RESOURCE_ID, 'Link copied.']]),
-          onContextReport,
-          onContextEditingChange,
-        }),
-      ).kindOperations;
-
-    await expect(decorated(testPluginHost(complete)).commitMap?.({ open: true })).resolves.toBe(
-      'completed',
-    );
-    expect(onContextReport).not.toHaveBeenCalled();
-
-    await expect(decorated(testPluginHost(complete)).commitMap?.({ open: false })).resolves.toBe(
-      'completed',
-    );
-    expect(onContextReport).toHaveBeenCalledWith(SPACE_RESOURCE_ID, null);
-    expect(onContextEditingChange).toHaveBeenCalledWith(SPACE_RESOURCE_ID, false);
-
-    // A refused Close leaves it Open, and what it says stands.
-    onContextReport.mockClear();
-    const refusing = testPluginHost(
-      vi.fn((): AuthoringResult => ({
-        kind: 'refused',
-        refusal: { code: 'resource-not-found' },
-      })),
-    );
-    await decorated(refusing).commitMap?.({ open: false });
-    expect(onContextReport).not.toHaveBeenCalled();
-  });
-
   it('offers no Claim where the Map surface policy withholds a Space Resource its Edit, keeping its commits', () => {
     // As inside an embedded Map: authoring stops at the canvas's own Map.
     const operations = decorateSpaceResourceNode(

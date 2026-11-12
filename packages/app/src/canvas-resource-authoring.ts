@@ -33,6 +33,10 @@ const NO_SUBSCRIPTION = () => () => undefined;
 const NONE_EMBEDDED: ReadonlyMap<string, MapEmbedEntry> = new Map();
 const NO_MAP_EMBEDS = () => NONE_EMBEDDED;
 
+/** The Resources a Map embedding is drawn for on this canvas, in any of their placements. */
+const embeddedResourceIds = (embeds: ReadonlyMap<string, MapEmbedEntry>): ReadonlySet<ResourceId> =>
+  new Set([...embeds.values()].map((entry) => entry.resourceId));
+
 type Caret = { readonly resourceId: string; readonly field: 'title' } | null;
 
 const spaceViewIdentity = (view: SpaceView): string => {
@@ -211,6 +215,26 @@ export function useCanvasResourceAuthoring({
     mapEmbeddings?.subscribe ?? NO_SUBSCRIPTION,
     mapEmbeddings?.getState ?? NO_MAP_EMBEDS,
   );
+  // What the canvas says about a Map embedding, and its rail editing, go with
+  // the embedding. Every Close takes it down, whoever makes it: the canvas, the
+  // plugin's own Map content commit, another author's Edit or a replacement.
+  // So neither outlives the chooser it belongs to, and a Resource Opened again
+  // starts afresh.
+  const [embedsWere, setEmbedsWere] = useState(mapEmbeds);
+  if (embedsWere !== mapEmbeds) {
+    setEmbedsWere(mapEmbeds);
+    const embedded = embeddedResourceIds(mapEmbeds);
+    setContextNotices((previous) =>
+      [...previous.keys()].every((id) => embedded.has(id))
+        ? previous
+        : new Map([...previous].filter(([id]) => embedded.has(id))),
+    );
+    setContextEditingIds((previous) =>
+      [...previous].every((id) => embedded.has(id))
+        ? previous
+        : new Set([...previous].filter((id) => embedded.has(id))),
+    );
+  }
 
   useEffect(() => {
     onBodyEditingChange?.(bodyEditing);
@@ -267,18 +291,6 @@ export function useCanvasResourceAuthoring({
 
   const closeResource = useCallback(
     (resourceId: ResourceId): 'completed' | 'retained' => {
-      setContextNotices((previous) => {
-        if (!previous.has(resourceId)) return previous;
-        const next = new Map(previous);
-        next.delete(resourceId);
-        return next;
-      });
-      setContextEditingIds((previous) => {
-        if (!previous.has(resourceId)) return previous;
-        const next = new Set(previous);
-        next.delete(resourceId);
-        return next;
-      });
       const result = authoring.complete({ kind: 'closed-resource', resourceId });
       return result.kind === 'completed' || result.kind === 'unchanged' ? 'completed' : 'retained';
     },

@@ -5,7 +5,6 @@ import {
   type SpaceView,
   type UUID,
 } from '@project/core';
-import { spaceMapContentSchema } from '@project/plugin-space/domain';
 import { refusalOf } from '@project/resource-api/view';
 import type { ResourceFlowNodeOf } from '@project/react-flow-adapter';
 import type { PluginOperations } from '@project/ui';
@@ -80,21 +79,6 @@ export function decorateSpaceResourceNode(
     context.pluginHost,
   );
   if (!context.embeddedMapEdit) delete kindOperations.claim;
-  // The plugin's own Close is a Map content commit, not the canvas's Close, so
-  // what the canvas says about the embedding and its rail editing go with it
-  // here: Closed, the chooser is not drawn, and Opened again it starts afresh.
-  const commitMap = kindOperations.commitMap;
-  if (commitMap !== undefined) {
-    kindOperations.commitMap = async (next, options) => {
-      const answer = await commitMap(next, options);
-      const closed = spaceMapContentSchema.safeParse(next);
-      if (answer === 'completed' && closed.success && !closed.data.open) {
-        context.onContextReport(resourceId, null);
-        context.onContextEditingChange(resourceId, false);
-      }
-      return answer;
-    };
-  }
   const decoration: Mutable<KindDecoration<SpaceKindId>> = { kindOperations };
   const embed = ownMapEmbed(context.mapEmbeds, resourceId);
   if (embed === undefined || node.data.readOnly || !node.data.authorsContent) return decoration;
