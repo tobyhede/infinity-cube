@@ -1,8 +1,6 @@
 import { useLayoutEffect, useRef } from 'react';
 import { useMapEmbedSlot, type MapEmbedRequest } from '@project/ui';
-
-/** The border a measured footer is drawn above, which `embedBounds` adds back. */
-const FOOTER_BORDER = 4;
+import { FOOTER_BORDER } from '../embedded-open-space-resource';
 
 /**
  * The Map embedding as the canvas draws it (ADR 0068, ADR 0142). The Map's

@@ -1079,11 +1079,15 @@ const SECOND_DRAWING_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000d1
 
 /**
  * Two Space Resources drawing the same Map are two drawings (ADR 0112), so a
- * drag from a Resource in one to a Resource in the other authors nothing in
- * the Space both of them draw; while one holds its Claim the other is drawn
- * without authoring (ADR 0142).
+ * drag from a Resource in one authors nothing in the other. While one holds
+ * its Claim the other is drawn without authoring (ADR 0142), so its Resources
+ * take no pointer and the drag can only end on that drawing's own node: that
+ * is the gesture driven here. Routing a connection between two drawings'
+ * Resources is held by `canvasNodeConnection` in `embedded-map.test.ts`.
  */
-test('a connection between Resources of two different drawings lands no Edge', async ({ page }) => {
+test('a connection from one drawing dropped on another drawing is refused and lands no Edge', async ({
+  page,
+}) => {
   // The drawn Space keeps two Resources side by side and no Edges, so each
   // drawing frames both and any authored Edge is a new one.
   const response = await page.request.get(`/api/spaces/${DEEP_DIVE_SPACE_ID}`);

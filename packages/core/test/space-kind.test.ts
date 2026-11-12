@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  frameSpaceView,
   lifetimeSpaceReferences,
   selectSpaceView,
   spaceReferences,
@@ -150,16 +149,11 @@ describe("a Resource's view of another Space, through its kind's own selection",
     });
   });
 
-  it('frames a Space Resource as given', () => {
-    expect(frameSpaceView(SPACE_RESOURCE, FRAMING)).toEqual(FRAMED);
-  });
-
   it.each([MARKDOWN, REFERENCE])(
     'shows no view of another Space for a $kind Resource',
     (document) => {
       expect(spaceSelection(document)).toBeUndefined();
       expect(selectSpaceView(document, { map: MAP, graph: GRAPH })).toBeUndefined();
-      expect(frameSpaceView(document, FRAMING)).toBeUndefined();
     },
   );
 });

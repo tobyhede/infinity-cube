@@ -6,7 +6,6 @@ import type {
   KindFlags,
   KindMapContent,
   KindModule,
-  SpaceFraming,
   SpaceSelection,
   SpaceSelectionProblem,
   SpaceSelectionTarget,
@@ -297,15 +296,6 @@ export const selectSpaceView = (
   choice: SpaceViewChoice,
 ): ResourceDocument | undefined => {
   const content = reselectedOf(document, (selection, current) => selection.select(current, choice));
-  return content === undefined ? undefined : { ...document, ...content };
-};
-
-/** The document framed as given, or `undefined` when its kind shows no view of another Space. */
-export const frameSpaceView = (
-  document: ResourceDocument,
-  framing: SpaceFraming,
-): ResourceDocument | undefined => {
-  const content = reselectedOf(document, (selection, current) => selection.frame(current, framing));
   return content === undefined ? undefined : { ...document, ...content };
 };
 

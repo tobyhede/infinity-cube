@@ -1,5 +1,5 @@
-import { uuidSchema } from '@project/core';
 import type { MapEmbedRequest } from '@project/ui';
+import { embeddedViewIds } from '../embedded-open-space-resource';
 import { PresentedSpaceMap } from './PresentedSpaceMap';
 
 /**
@@ -7,9 +7,7 @@ import { PresentedSpaceMap } from './PresentedSpaceMap';
  * Graph the plugin selects, read-only, whatever the plugin passed with it.
  */
 export function PresentedMapEmbed({ request }: { readonly request: MapEmbedRequest }) {
-  const spaceId = uuidSchema.safeParse(request.view.spaceId);
-  const mapId = uuidSchema.safeParse(request.view.map);
-  const graphId = uuidSchema.safeParse(request.view.graph);
-  if (!spaceId.success || !mapId.success || !graphId.success) return null;
-  return <PresentedSpaceMap spaceId={spaceId.data} mapId={mapId.data} graphId={graphId.data} />;
+  const ids = embeddedViewIds(request.view);
+  if (ids === undefined) return null;
+  return <PresentedSpaceMap spaceId={ids.spaceId} mapId={ids.map} graphId={ids.graph} />;
 }

@@ -618,7 +618,7 @@ describe('SnapshotEdit.open, close and resize properties', () => {
    * floor below is measured against is a fixed fact of the suite rather than a
    * roll of the dice: a floor that holds once holds on every machine.
    */
-  const SEED = 84;
+  const SEED = 1;
   const RUNS = 200;
   const COVERAGE_FLOOR = 40;
 
@@ -680,8 +680,6 @@ describe('SnapshotEdit.open, close and resize properties', () => {
         ur: fc.boolean(),
         x: coordinateArb,
         y: coordinateArb,
-        // Drawn and dropped, which keeps the seeded cases the coverage floors were set on.
-        open: fc.boolean(),
         size: fc.option(storedSizeArb, { nil: undefined }),
         shape: fc.option(fc.constantFrom(...RESOURCE_SHAPES), { nil: undefined }),
       })
@@ -873,33 +871,22 @@ describe('SnapshotEdit.open, close and resize properties', () => {
     coverage.expectEveryCaseGenerated();
   });
 
-  it('refuses to Open and expand a Resource of any kind, resizing nothing', () => {
+  it('refuses to Open and expand a Reference or an Ur Resource, resizing nothing', () => {
     fc.assert(
       fc.property(entriesArb, subjectArb, sizeArb, (generated, subjectIndex, size) => {
         const subjectId = RESOURCE_IDS[subjectIndex];
         if (subjectId === undefined) return;
-        const snapshot = snapshotOf(openableSubject(generated, subjectIndex));
-
-        expect(SnapshotEdit.openAndExpand(snapshot, MAP_ID, subjectId, size)).toEqual({
-          kind: 'refused',
-          refusal: { code: 'open-requires-content' },
-        });
+        for (const entries of [
+          openableSubject(generated, subjectIndex),
+          with_(generated, subjectIndex, { kind: 'ur', open: false }),
+        ]) {
+          expect(SnapshotEdit.openAndExpand(snapshotOf(entries), MAP_ID, subjectId, size)).toEqual({
+            kind: 'refused',
+            refusal: { code: 'open-requires-content' },
+          });
+        }
       }),
-    );
-  });
-
-  it('refuses to Open and expand an Ur Resource, resizing nothing', () => {
-    fc.assert(
-      fc.property(entriesArb, subjectArb, sizeArb, (generated, subjectIndex, size) => {
-        const subjectId = RESOURCE_IDS[subjectIndex];
-        if (subjectId === undefined) return;
-        const snapshot = snapshotOf(with_(generated, subjectIndex, { kind: 'ur', open: false }));
-
-        expect(SnapshotEdit.openAndExpand(snapshot, MAP_ID, subjectId, size)).toEqual({
-          kind: 'refused',
-          refusal: { code: 'open-requires-content' },
-        });
-      }),
+      { seed: SEED, numRuns: RUNS },
     );
   });
 

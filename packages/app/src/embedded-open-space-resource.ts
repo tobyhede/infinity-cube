@@ -117,7 +117,7 @@ interface EmbedWindow {
 }
 
 /** The ids a Map embedding asks for, as the core's, or `undefined` when one is not a UUID. */
-const embeddedViewIds = (view: {
+export const embeddedViewIds = (view: {
   readonly spaceId: string;
   readonly map: string;
   readonly graph: string;
@@ -131,7 +131,7 @@ const embeddedViewIds = (view: {
 };
 
 /** Title-footer border, added to a measured footer in place of the reserved inset. */
-const FOOTER_BORDER = 4;
+export const FOOTER_BORDER = 4;
 
 /**
  * The containing-relative position a nested window is built from.

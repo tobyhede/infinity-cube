@@ -160,15 +160,14 @@ const coreView = (view: ApiSpaceView): SpaceView => ({
 
 /**
  * A plugin's selection read as the core reads every selection (ADR 0079): its
- * view, the content showing a choice or a framing, and the core's own check
- * that the selection resolves in the Space it shows (ADR 0128).
+ * view, the content showing a choice, and the core's own check that the
+ * selection resolves in the Space it shows (ADR 0128).
  */
 function selectionOf<C>(declared: SelectionDeclaration<C>): SpaceSelection<C> {
   const of = (content: C): SpaceView => coreView(declared.of(content));
   return {
     of,
     select: (content, choice) => declared.select(content, { ...of(content), ...choice }),
-    frame: (content, framing) => declared.select(content, { ...of(content), framing }),
     problem: (content, target) => selectionProblem(of(content), target),
   };
 }

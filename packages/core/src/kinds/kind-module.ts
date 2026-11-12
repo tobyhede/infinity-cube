@@ -104,8 +104,6 @@ export interface SpaceSelection<Content> {
   readonly of: (content: Content) => SpaceView;
   /** The content showing `choice` in the same Space. A framing is the old Map's, so a different Map drops it. */
   readonly select: (content: Content, choice: SpaceViewChoice) => Content;
-  /** The content framed as given. */
-  readonly frame: (content: Content, framing: SpaceFraming) => Content;
   /** The kind's own check of this content's selection in a target Space it alone understands. */
   readonly problem: (
     content: Content,
