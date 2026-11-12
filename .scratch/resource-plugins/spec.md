@@ -40,8 +40,7 @@ definePluginView<C, M>({ View, Glyph, creates? })
 
 type Answer = 'completed' | 'unchanged' | { refused: string }
 type Kept<T> = { value: T; commit?: (next: T) => Promise<Answer> }
-type SpaceView = { map: MapId; graph?: GraphId; framing?: Framing }   // which of a Space's Maps an Embed shows, and how it is framed
-type Framing = { centreX: number; centreY: number; zoom: number }    // a Space Resource's authored framing (ADR 0112), kept by the plugin with its view
+type EmbedView = { map: MapId; graph?: GraphId; framing?: SpaceFraming } // which of a Space's Maps an Embed shows, and where
 
 interface Surface<C, M> {
   resource: Resource<C>                                   // title and content below are its values, with their commits
@@ -58,7 +57,7 @@ interface Surface<C, M> {
   // Choosing another Map commits a view with no framing; reframing commits the same Map and Graph with the new framing.
   // Enter, which navigates into the shown Space, is an embedding command too, offered where navigation is.
   // `claim`: the shown Space's authoring, its Maps and Graphs included. Commands come from these, never from a kind.
-  Embed: ComponentType<{ resource: ResourceId; title: Kept<string> } | { space: SpaceId; select?: Kept<SpaceView>; claim?: Claim }>
+  Embed: ComponentType<{ resource: ResourceId; title: Kept<string> } | { space: SpaceId; select?: Kept<EmbedView>; claim?: Claim }>
 }
 
 interface Claim { release(): void }   // never refused: while an inner Claim or its own exclusive work runs, the host releases it when that ends
@@ -122,7 +121,7 @@ The plugin-level test suite renders each plugin with every capability absent, an
 Not bound by the ADR, and free to change with a story and a test.
 
 - Rail: the canvas draws it with `CommandToolbar`. During nested Claims the deepest Claim's commands show. In-rect controls are allowed too.
-- Space: the plugin's rail has Open, Close, Enter and the Title. The host-owned Map embedding draws the Map and Graph chooser, the target Space's Map and Graph authoring and its links. It writes a choice through the plugin's selection commit (`select`), so withdrawal covers it. Issue 01 found that a plugin cannot read the target Space's structure, and that these commands write a Space other than the plugin's own Resource.
+- Space: the plugin's rail has Open, Close, Enter and the Title. The host-owned Map embedding draws the Map and Graph chooser and the target Space's links, and, under the Claim the plugin passes, that Space's Map and Graph authoring. It writes a choice through the plugin's selection commit (`select`), so withdrawal covers it, and while `select` carries no commit the chooser is drawn disabled. Issue 01 found that a plugin cannot read the target Space's structure, and that these commands write a Space other than the plugin's own Resource.
 - Claims: there is one chain at a time, so an entered Space or an open Markdown draft stops every other Resource from claiming until it is released, as availability does today.
 - Title: Ur and Markdown draw it inline with `Title`. Image draws none, keeping it as its text alternative, and is renamed from the rail. An Open Reference passes its own to the Target.
 - Border, ring, receding: the canvas draws them on the outline. Image shows a border only when selected or in a Graph.
@@ -143,6 +142,7 @@ Each step is its own PR, leaves `main` green and rolls fixtures, seeds and tests
 5. `07` — Space, last of the kinds because it is the riskiest.
 6. `08` — creation through the API; `09` — the default plugin.
 7. `10` — retire the shared frame and the core fields.
+8. `11` — list the plugins once, after the Embed amendment is built.
 
 ## Out of scope
 

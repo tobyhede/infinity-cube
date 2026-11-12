@@ -119,26 +119,35 @@ const DEFAULT_SIZE: Size = { width: 200, height: 120 };
  * render, as a host must. A Resource embedding is drawn as what it was asked
  * for, the Resource's id and the Title passed, with a rename where that Title
  * carries a commit, so a plugin's test reads what it embedded. A Map embedding
- * is drawn as the view asked for and whether a Claim was passed, with a choice
- * of another Map where `select` carries a commit.
+ * is drawn as the Space and view asked for (`default` where none is) and
+ * whether a Claim was passed, with a choice of another Map where `select`
+ * carries a commit: one keeping the Graph it names, and one naming none.
  */
 function TestEmbed(props: EmbedProps) {
   if (!('resource' in props)) {
-    const { map: view, select, claim } = props;
+    const { space, select, claim } = props;
+    const view = select?.value;
     const choose = select?.commit;
     return (
       <div
         data-testid="embedded-map"
-        data-space={view.spaceId}
-        data-map={view.map}
-        data-graph={view.graph}
+        data-space={space}
+        data-map={view?.map ?? 'default'}
+        data-graph={view?.graph ?? 'default'}
         data-claimed={claim !== undefined}
       >
-        {choose !== undefined && (
+        {choose !== undefined && view !== undefined && (
           <button
             type="button"
             aria-label={`Choose another Map than ${view.map}`}
             onClick={() => void choose({ ...view, map: `${view.map}′` })}
+          />
+        )}
+        {choose !== undefined && view !== undefined && (
+          <button
+            type="button"
+            aria-label={`Choose another Map than ${view.map}, naming no Graph`}
+            onClick={() => void choose({ map: `${view.map}′` })}
           />
         )}
       </div>

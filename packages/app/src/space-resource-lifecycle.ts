@@ -42,6 +42,8 @@ export interface SpaceResourceTargetMap {
 export interface SpaceResourceTarget {
   readonly id: UUID;
   readonly title: string;
+  /** The Map the Space opens on, which an embedding given no view shows (ADR 0142). */
+  readonly defaultMap?: UUID;
   readonly maps: readonly SpaceResourceTargetMap[];
 }
 
@@ -191,9 +193,11 @@ export function createSpaceResourceLifecycle({
 
 export function spaceResourceTarget(space: Space): SpaceResourceTarget {
   const colorByGraphId = graphColorsByGraphId(space);
-  return {
+  const target = {
     id: space.id,
     title: space.title,
     maps: space.maps.map((m) => targetMap(m, colorByGraphId)),
   };
+  if (space.defaultMap === undefined) return target;
+  return { ...target, defaultMap: space.defaultMap };
 }

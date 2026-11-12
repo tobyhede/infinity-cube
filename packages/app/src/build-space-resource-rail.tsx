@@ -22,6 +22,12 @@ export interface BuildSpaceResourceRailInput {
   readonly target: SpaceResourceTarget;
   readonly selection: SpaceView | undefined;
   readonly disabled: boolean;
+  /**
+   * Whether the shown Space's own authoring, its Maps and Graphs, is offered
+   * on the lists while they are enabled: under a Claim (ADR 0142). The links
+   * are offered either way, since they author nothing.
+   */
+  readonly authorsShownSpace: boolean;
   readonly complete: (
     targetMap: Pick<SpaceResourceTargetMap, 'id'>,
     graphId: GraphId,
@@ -35,6 +41,7 @@ export function buildSpaceResourceRail({
   target,
   selection,
   disabled,
+  authorsShownSpace,
   complete,
   onEditingChange,
   onReport,
@@ -46,7 +53,12 @@ export function buildSpaceResourceRail({
   const commands =
     context === undefined || selection === undefined
       ? undefined
-      : spaceResourceContextCommands(context, selection, complete, () => !disabled);
+      : spaceResourceContextCommands(
+          context,
+          selection,
+          complete,
+          () => authorsShownSpace && !disabled,
+        );
   const optional: Mutable<
     Pick<SpaceResourceSelectorsProps, 'onEditingChange' | 'mapCommands' | 'graphCommands'>
   > = {};

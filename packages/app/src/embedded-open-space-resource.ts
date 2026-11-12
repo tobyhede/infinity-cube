@@ -12,7 +12,9 @@ import { mapSurfacePolicy, type MapSurfacePolicy } from './map-surface-policy';
 
 import { DRAG_TILT_RADIANS, tiltResourcePosition } from './drag-tilt';
 import type { EmbeddedBounds } from './embedded-map';
+import { resolveEmbedView } from './embed-view';
 import type { MapEmbedEntry } from './map-embeddings';
+import type { SpaceResourceTarget } from './space-resource-lifecycle';
 
 /**
  * The containing Resource's box in canvas space, which bounds math reads without
@@ -51,11 +53,17 @@ export interface DiscoverEmbeddedOpenSpaceResourcesInput<
   readonly nodes: readonly ResourceFlowNode[];
   /**
    * The Map embeddings drawn, by the placement whose rect each is drawn in: a
-   * plugin's `<Embed map>` publishes one while it is drawn, so a Closed Space
+   * plugin's `<Embed space>` publishes one while it is drawn, so a Closed Space
    * Resource requests nothing (ADR 0142).
    */
   readonly embeds: ReadonlyMap<string, MapEmbedEntry>;
   readonly entries: readonly Entry[];
+  /**
+   * The shown Space's Maps, where it has been read: what an embedding given no
+   * view, or no Graph, is resolved against. Absent, such an embedding is not
+   * drawn until it is.
+   */
+  readonly targetOf?: ((space: string) => SpaceResourceTarget | undefined) | undefined;
   readonly publications: ReadonlyMap<string, EmbeddedPublicationSnapshot>;
   readonly bodyHeights: ReadonlyMap<string, number>;
   /**
@@ -129,6 +137,32 @@ export const embeddedViewIds = (view: {
   return spaceId.success && mapId.success && graphId.success
     ? { spaceId: spaceId.data, map: mapId.data, graph: graphId.data }
     : undefined;
+};
+
+/** The view an embedding draws, read off its shown Space only where the request leaves that to it. */
+const resolvedEmbedView = (
+  embedded: MapEmbedEntry,
+  targetOf: ((space: string) => SpaceResourceTarget | undefined) | undefined,
+) => {
+  const { space, view } = embedded.request;
+  return resolveEmbedView(space, view, view?.graph === undefined ? targetOf?.(space) : undefined);
+};
+
+/**
+ * The Spaces whose embeddings are drawn from what is read of them: each was
+ * given no view, or no Graph, so its Map is that Space's to say (ADR 0142). A
+ * drawing holds each for as long as the embedding stands, so it is read and
+ * stays read while the embedding draws from it.
+ */
+export const embedSpacesToRead = (
+  embeds: ReadonlyMap<string, MapEmbedEntry>,
+): ReadonlyMap<string, ResourceId> => {
+  const toRead = new Map<string, ResourceId>();
+  for (const [nodeId, { request }] of embeds) {
+    const spaceId = uuidSchema.safeParse(request.space);
+    if (spaceId.success && request.view?.graph === undefined) toRead.set(nodeId, spaceId.data);
+  }
+  return toRead;
 };
 
 /** Title-footer border, added to a measured footer in place of the reserved inset. */
@@ -237,9 +271,10 @@ export function discoverEmbeddedOpenSpaceResources<Entry extends { readonly id: 
     const { parent, origin, containingDrawn, clip, path } = item;
     const embedded = input.embeds.get(parent.id);
     if (embedded === undefined) continue;
-    const ids = embeddedViewIds(embedded.request.view);
-    if (ids === undefined) continue;
-    const view = { ...ids, framing: embedded.request.view.framing };
+    const resolved = resolvedEmbedView(embedded, input.targetOf);
+    const ids = resolved === undefined ? undefined : embeddedViewIds(resolved);
+    if (resolved === undefined || ids === undefined) continue;
+    const view = { ...ids, framing: resolved.framing };
     const policy = mapSurfacePolicy({
       inherited: item.policy,
       // A Map embedded by a Resource that does not show its own Map, as a

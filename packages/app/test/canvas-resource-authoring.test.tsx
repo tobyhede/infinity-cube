@@ -1,6 +1,6 @@
 import { isValidElement } from 'react';
-import { act, renderHook } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, renderHook, screen } from '@testing-library/react';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { spaceSnapshotSchema, uuidSchema, type ResourceId } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { bareKindData, type ResourceFlowNode } from '@project/react-flow-adapter';
@@ -16,6 +16,7 @@ import {
 import { fixtureFacts } from './render-adapter-fixtures';
 import {
   PluginAssetsProvider,
+  ResourceRailActions,
   type MapEmbedRequest,
   type SpaceResourceSelectorsProps,
 } from '@project/ui';
@@ -201,9 +202,10 @@ const spaceOperationsOf = (data: ResourceFlowNode['data']) =>
 const SPACE_DRAWING = Symbol('space drawing');
 
 const spaceEmbed = (claim?: Claim): MapEmbedRequest => ({
-  view: { spaceId: TARGET_SPACE_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
+  space: TARGET_SPACE_ID,
+  view: { map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
   select: {
-    value: { spaceId: TARGET_SPACE_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
+    value: { map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
     commit: () => Promise.resolve('completed'),
   },
   claim,
@@ -969,5 +971,120 @@ describe('canvas Resource authoring, an Image Resource’s plugin surface', () =
       operationsOf(onlyNode(result.current.nodes))?.commitStore?.(new Blob(['png'])),
     ).resolves.toBe(STORED);
     expect(store).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("canvas Resource authoring: an embedding's notice", () => {
+  beforeAll(() => {
+    HTMLElement.prototype.hasPointerCapture = () => false;
+    HTMLElement.prototype.setPointerCapture = () => undefined;
+    HTMLElement.prototype.releasePointerCapture = () => undefined;
+  });
+
+  const OTHER_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000c');
+  const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000d');
+  const target: SpaceResourceTarget = {
+    id: TARGET_SPACE_ID,
+    title: 'Architecture',
+    maps: [
+      {
+        id: TARGET_MAP_ID,
+        title: 'Collection 1',
+        graphs: [{ id: TARGET_GRAPH_ID, title: 'Overview', color: '#1f77b4', headShape: 'arrow' }],
+      },
+      {
+        id: OTHER_MAP_ID,
+        title: 'Collection 2',
+        graphs: [{ id: OTHER_GRAPH_ID, title: 'Detail', color: '#ff7f0e', headShape: 'dot' }],
+      },
+    ],
+  };
+  const UR_DRAWING = Symbol('ur drawing');
+  const refusingEmbed: MapEmbedRequest = {
+    ...spaceEmbed(),
+    select: {
+      value: { map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
+      commit: () => Promise.resolve({ refused: 'That Map is not offered.' }),
+    },
+  };
+
+  const mountEmbedding = (request: MapEmbedRequest) => {
+    const mapEmbeddings = createMapEmbeddings();
+    mapEmbeddings.publish(UR_ID, UR_ID, request, UR_DRAWING);
+    const loaded = { snapshot, revision: 0n, exportedRevision: null };
+    const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
+    const { authoring, adapter, continuation } = composeApp({ spaceSession });
+    const { result } = renderHook(() =>
+      useCanvasResourceAuthoring({
+        continuation,
+        nodes: [node(false, UR_ID, 'ur')],
+        availability: authoringAvailability({
+          editable: true,
+          replacingImage: false,
+          presenting: false,
+          editingResourceBody: false,
+          editingResourceTitle: false,
+          editingChromeTitle: false,
+          spaceOnCanvas: true,
+          editingEmbeddedMap: false,
+        }),
+        nameOnCreation: null,
+        authoring: canvasAuthoring(authoring),
+        spaceSession,
+        resourceResize: adapter.getState().resourceResize,
+        onSelectResource: () => undefined,
+        spaceResourceTargets: new Map([[TARGET_SPACE_ID, target]]),
+        mapEmbeddings,
+      }),
+    );
+    const rail = render(
+      <ResourceRailActions aria-label="Resource rail">
+        {onlyNode(result.current.nodes).data.kindOperations.mapRail}
+      </ResourceRailActions>,
+    );
+    const chooseOtherMap = async () => {
+      fireEvent.click(screen.getByTestId('space-resource-map'));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('menuitemradio', { name: 'Collection 2' }));
+        await Promise.resolve();
+      });
+    };
+    return { result, rail, mapEmbeddings, chooseOtherMap };
+  };
+
+  it('drops what the embedding said once its plugin stops embedding, whatever the kind, so reopening starts afresh', async () => {
+    const { result, rail, mapEmbeddings, chooseOtherMap } = mountEmbedding(refusingEmbed);
+    await chooseOtherMap();
+    expect(onlyNode(result.current.nodes).data.contextNotice).toBe('That Map is not offered.');
+    rail.unmount();
+
+    act(() => mapEmbeddings.publish(UR_ID, UR_ID, null, UR_DRAWING));
+    act(() => mapEmbeddings.publish(UR_ID, UR_ID, refusingEmbed, UR_DRAWING));
+    expect(onlyNode(result.current.nodes).data.kindOperations.mapRail).toBeDefined();
+    expect(onlyNode(result.current.nodes).data.contextNotice).toBeUndefined();
+  });
+
+  it('says nothing of a choice answered after its embedding is gone', async () => {
+    let answer: (refused: { readonly refused: string }) => void = () => undefined;
+    const late: MapEmbedRequest = {
+      ...refusingEmbed,
+      select: {
+        value: { map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
+        commit: () =>
+          new Promise((resolve) => {
+            answer = resolve;
+          }),
+      },
+    };
+    const { result, rail, mapEmbeddings, chooseOtherMap } = mountEmbedding(late);
+    await chooseOtherMap();
+    rail.unmount();
+    act(() => mapEmbeddings.publish(UR_ID, UR_ID, null, UR_DRAWING));
+    await act(async () => {
+      answer({ refused: 'That Map is not offered.' });
+      await Promise.resolve();
+    });
+    act(() => mapEmbeddings.publish(UR_ID, UR_ID, refusingEmbed, UR_DRAWING));
+    expect(onlyNode(result.current.nodes).data.contextNotice).toBeUndefined();
   });
 });

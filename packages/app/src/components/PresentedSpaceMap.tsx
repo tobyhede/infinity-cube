@@ -1,12 +1,15 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ReactFlow, ReactFlowProvider, useReactFlow } from '@xyflow/react';
-import { titleName, type GraphId, type MapId, type UUID } from '@project/core';
+import { titleName, uuidSchema, type GraphId, type MapId, type UUID } from '@project/core';
+import type { EmbedView } from '@project/resource-api/view';
 import { edgeTypes, GraphHeadMarkers, nodeTypes } from '@project/react-flow-adapter';
 import { Empty, EmptyHeader, EmptyTitle, HostMapProvider } from '@project/ui';
+import { resolveEmbedView } from '../embed-view';
 import { createMapSurface } from '../map-surface';
 import { withSurfacePolicy } from '../map-surface-policy';
 import type { OpenSpace } from '../open-spaces';
 import { useOpenSpaces } from '../open-spaces-context';
+import { spaceResourceTarget } from '../space-resource-lifecycle';
 import { useMapSurface } from '../use-map-surface';
 import './presented-space-map.css';
 
@@ -26,12 +29,11 @@ const STAGE_FIT = { padding: 0.08, maxZoom: 4 } as const;
  */
 export function PresentedSpaceMap({
   spaceId,
-  mapId,
-  graphId,
+  view,
 }: {
   readonly spaceId: UUID;
-  readonly mapId: MapId;
-  readonly graphId: GraphId;
+  /** The view a plugin passed its embedding; absent, the Space's `defaultMap` (ADR 0142). */
+  readonly view: EmbedView | undefined;
 }) {
   const spaces = useOpenSpaces();
   const [entry, setEntry] = useState<OpenSpace | null>(null);
@@ -60,8 +62,19 @@ export function PresentedSpaceMap({
       void release?.();
     };
   }, [spaces, spaceId]);
-  const drawn = entry?.app.currentSpace().lookup.map(mapId);
-  if (unheld || (entry !== null && drawn === undefined)) {
+  const space = entry?.app.currentSpace();
+  const resolved =
+    space === undefined
+      ? undefined
+      : resolveEmbedView(
+          spaceId,
+          view,
+          view?.graph === undefined ? spaceResourceTarget(space) : undefined,
+        );
+  const mapId = uuidSchema.safeParse(resolved?.map);
+  const graphId = uuidSchema.safeParse(resolved?.graph);
+  const drawn = mapId.success ? space?.lookup.map(mapId.data) : undefined;
+  if (unheld || (entry !== null && (drawn === undefined || !graphId.success))) {
     return (
       <Empty className="presented-map" data-testid="presented-map-missing">
         <EmptyHeader>
@@ -70,15 +83,15 @@ export function PresentedSpaceMap({
       </Empty>
     );
   }
-  if (entry === null || drawn === undefined) {
+  if (entry === null || drawn === undefined || !mapId.success || !graphId.success) {
     return <div className="presented-map" data-testid="presented-map" aria-busy="true" />;
   }
   return (
     <ReactFlowProvider>
       <PresentedMapDrawing
         entry={entry}
-        mapId={mapId}
-        graphId={graphId}
+        mapId={mapId.data}
+        graphId={graphId.data}
         mapTitle={drawn.map.title}
       />
     </ReactFlowProvider>

@@ -7,7 +7,7 @@ import type {
   ResourceId,
   ResourcePlugin,
   Size,
-  SpaceView,
+  SpaceFraming,
 } from '../domain';
 import { useResourceHost } from './host';
 
@@ -79,18 +79,34 @@ export interface OwnClaim<C, M> extends Claim {
 }
 
 /**
- * What the host-owned embedding draws: another Resource, or a Map of another
- * Space. The Map embedding draws the Map and Graph chooser, the shown Space's
- * Map and Graph authoring and its links, and writes a choice or a framing
- * through `select`, so withdrawal covers it; absent, it offers none. Passed a
- * held Claim, it authors the Map in place, as far as the host's depth allows,
- * until that Claim is released.
+ * Which of a Space's Maps an embedding shows: a Map, the Graph it opens on, and
+ * how the window is framed. Without a Graph, the Map's own opening Graph.
+ */
+export interface EmbedView {
+  readonly map: string;
+  readonly graph?: string | undefined;
+  readonly framing?: SpaceFraming | undefined;
+}
+
+/**
+ * What the host-owned embedding draws (ADR 0142): another Resource, drawn by
+ * its own plugin under the Title passed, or a Space, drawn as one of its Maps.
+ *
+ * A Space with no `select` shows that Space's `defaultMap` and the Graph it
+ * opens on. `select` names the view to show; the host offers its Map and
+ * Graph chooser, which writes a choice or a framing only through the commit
+ * passed with it, so whatever withdraws the commit withdraws the choice. The
+ * shown Space's links are offered on the chooser without a Claim; its
+ * authoring, its Maps and Graphs included, only under a `claim` the plugin
+ * passes beside the commit, until that Claim is released. Every command
+ * comes from these props, never from the plugin's kind, as the canvas's
+ * `packages/app/test/embed-commands.test.tsx` holds.
  */
 export type EmbedProps =
   | { readonly resource: ResourceId; readonly title: Kept<string> }
   | {
-      readonly map: SpaceView;
-      readonly select?: Kept<SpaceView> | undefined;
+      readonly space: string;
+      readonly select?: Kept<EmbedView> | undefined;
       readonly claim?: Claim | undefined;
     };
 
