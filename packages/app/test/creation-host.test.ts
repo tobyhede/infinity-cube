@@ -232,6 +232,9 @@ const gesture = (extra: Partial<CreationGesture> = {}): CreationGesture => ({
   ...extra,
 });
 
+/** A Dock press: the one gesture that is single flight. */
+const press = (): CreationGesture => gesture({ flight: true });
+
 const placedOn = (opened: OpenSpace, mapId = MAP_ID): readonly string[] =>
   Object.keys(
     opened.session.getState().working.document.maps?.find(({ id }) => id === mapId)?.positions ??
@@ -410,9 +413,9 @@ describe('a creation with a new Space', () => {
     const { host, creating, flights } = hosted(opened);
     const newSpace = offered('space', askFor([{ newSpace: true, contentFor: showing }]));
 
-    const first = host.run(newSpace, gesture());
+    const first = host.run(newSpace, press());
     expect(flights.kinds()).toEqual(new Set(['space']));
-    const second = host.run(newSpace, gesture());
+    const second = host.run(newSpace, press());
     await host.run(offered('markdown', askFor([{ content: EMPTY_TEXT }])), gesture());
     await Promise.all([first, second]);
 
@@ -489,7 +492,7 @@ describe('a creation the host keeps its word on', () => {
     const opened = openDerivationSpace();
     const { host } = hosted(opened);
     const newSpace = offered('space', askFor([{ newSpace: true, contentFor: showing }]));
-    await host.run(newSpace, gesture());
+    await host.run(newSpace, press());
     const [first] = opened.session
       .getState()
       .working.resources.filter(({ document }) => document.kind === 'space');
@@ -497,7 +500,7 @@ describe('a creation the host keeps its word on', () => {
     const space = { spaceId: first.document.content.spaceId, title: 'Space 1' };
     const settle = vi.fn();
 
-    const inFlight = host.run(newSpace, gesture());
+    const inFlight = host.run(newSpace, press());
     const linking = host.run(
       offered('space', askFor([{ title: space.title, contentFor: showing }]), 'spaces'),
       gesture({ offered: space, settle }),
@@ -520,10 +523,10 @@ describe('a creation the host keeps its word on', () => {
     const onB = hosted(opened, createPluginGate(), creating, flights, OTHER_MAP_ID);
     const newSpace = offered('space', askFor([{ newSpace: true, contentFor: showing }]));
 
-    const first = onA.host.run(newSpace, gesture());
+    const first = onA.host.run(newSpace, press());
     await onB.host.run(offered('markdown', askFor([{ content: EMPTY_TEXT }])), gesture());
     expect(flights.kinds()).toEqual(new Set(['space']));
-    await onB.host.run(newSpace, gesture());
+    await onB.host.run(newSpace, press());
     await first;
 
     expect(
@@ -590,9 +593,9 @@ describe('a Dock creation whose picker is open', () => {
       await creation.create([{ content: EMPTY_TEXT }]);
     });
 
-    const first = host.run(picking, gesture());
+    const first = host.run(picking, press());
     expect(flights.kinds()).toEqual(new Set(['markdown']));
-    const second = host.run(picking, gesture());
+    const second = host.run(picking, press());
     picked.resolve();
     await Promise.all([first, second]);
 
@@ -634,7 +637,7 @@ describe('a Dock creation whose picker is open', () => {
     expect(notice(opened)).toBeNull();
   });
 
-  it('is not single flight when the gesture is not a Dock press, as the canvas Add Resource', async () => {
+  it('is not single flight unless the gesture says so, as the canvas Add Resource', async () => {
     const opened = openDerivationSpace(mintingIds(CREATED, SECOND));
     const { host } = hosted(opened);
     const picked = deferred();
@@ -643,8 +646,8 @@ describe('a Dock creation whose picker is open', () => {
       await creation.create([{ content: EMPTY_TEXT }]);
     });
 
-    const first = host.run(waiting, gesture({ flight: false }));
-    const second = host.run(waiting, gesture({ flight: false }));
+    const first = host.run(waiting, gesture());
+    const second = host.run(waiting, gesture());
     picked.resolve();
     await Promise.all([first, second]);
 

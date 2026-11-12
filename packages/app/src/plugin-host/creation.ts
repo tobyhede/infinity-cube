@@ -60,7 +60,7 @@ import type { PluginGate } from './plugin-gate';
 /** A plugin's creation offered from one place, with what it creates. */
 export interface OfferedCreation<Run> {
   readonly kind: PluginCreationEntry['kind'];
-  /** Where it is offered from: only a Dock press is single flight. */
+  /** Where it is offered from. */
   readonly from: HostCreation['from'];
   readonly name: string;
   /** The title its refusal is shown under as the standing notice; absent, its refusals are not shown. */
@@ -303,7 +303,7 @@ export interface CreationGesture {
   /**
    * Whether the gesture is single flight for its kind: from its press until
    * its `run` settles, a second gesture of the kind that is also single flight
-   * is ignored. Absent, a Dock creation is and every other is not; the
+   * is ignored. Absent, it is not: only a Dock press passes it, and the
    * canvas's own Add Resource runs a Dock creation without it.
    */
   readonly flight?: boolean | undefined;
@@ -610,7 +610,7 @@ export function createCreationHost(deps: CreationHostDependencies): CreationHost
   };
 
   const run: CreationHostShell['run'] = async (offered, gesture) => {
-    const flies = gesture.flight ?? offered.from === 'dock';
+    const flies = gesture.flight === true;
     if (!flies) return runOnce(offered, gesture);
     if (flights.has(offered.kind)) return;
     flights.start(offered.kind);
