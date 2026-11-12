@@ -1,7 +1,6 @@
 import {
   resolveContent,
   resourceReferences,
-  takesOpen,
   type Resource,
   type ResourceContent,
   type ResourceId,

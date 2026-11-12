@@ -2,7 +2,6 @@ import { useMemo, type ComponentType, type ReactElement, type ReactNode } from '
 import {
   declaredOutline,
   imageKind,
-  isPluginDrawnKind,
   isPluginKind,
   PLUGIN_KINDS,
   jsonValueSchema,

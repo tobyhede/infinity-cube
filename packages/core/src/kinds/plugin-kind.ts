@@ -213,7 +213,7 @@ export function kindFromPlugin<const K extends string, C, M>(
       return target === undefined ? undefined : uuids([target])[0];
     },
     spaceReferences: (content: C) => uuids(plugin.spaceReferences?.(content) ?? []),
-    mapContent: mapContentOf(kind, plugin.mapContent, plugin.outline?.bind(plugin)),
+    mapContent: mapContentOf(plugin, plugin.mapContent),
   };
   // A plugin that declares its selection has the core check it (ADR 0079).
   const module =

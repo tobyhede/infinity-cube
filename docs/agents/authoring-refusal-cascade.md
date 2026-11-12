@@ -135,10 +135,10 @@ Edit that holds no Map say it needed one.
 | --- | --- |
 | `settled-resource-movement` | none → completed |
 
-## The 33 codes
+## The 32 codes
 
-1 contextual (`map-not-found`) plus 32 action-specific —
-none is produced anywhere else. 28 of those 32 are tabulated above, and
+1 contextual (`map-not-found`) plus 31 action-specific —
+none is produced anywhere else. 27 of those 31 are tabulated above, and
 `exclusive-work-running` is the gate's, asked of every action before its row;
 `map-required` is declared and presented but currently raised nowhere, so it
 appears in no row. `space-replaced` and `edit-abandoned` are no action's:

@@ -26,6 +26,11 @@ import {
   type OwnProps,
   type RailCommand,
 } from '@project/resource-api/view';
+import {
+  createRailStore,
+  ResourceHostProvider,
+  type ResourceHost,
+} from '@project/resource-api/view/host';
 import { Card } from './components/card';
 import { EntityActions, EntityActionsTrigger, type EntityActionGroup } from './EntityActionsMenu';
 import { graphPaint } from './graph-color';
@@ -94,6 +99,9 @@ export const CANVAS_RESOURCE_DRAG_TILT_DEGREES = -1;
 
 const SURFACE_GONE = {
   refused: 'This Resource is no longer drawn here.',
+} as const satisfies Answer;
+const HELD_ELSEWHERE = {
+  refused: 'This Resource is being changed where it is drawn elsewhere. Try again when that ends.',
 } as const satisfies Answer;
 
 /** Stop the canvas reading a press or key meant for the plugin's own region. */

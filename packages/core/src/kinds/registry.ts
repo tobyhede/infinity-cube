@@ -6,7 +6,6 @@ import type {
   KindFlags,
   KindMapContent,
   PluginModule,
-  SpaceFraming,
   SpaceSelection,
   SpaceSelectionProblem,
   SpaceSelectionTarget,
@@ -388,10 +387,3 @@ export const isKindId = (value: string): boolean => KIND_ID.test(value);
 /** Whether a value is a well-formed kind id no plugin in this build draws: a missing plugin's kind. */
 export const isMissingKindId = (value: string): value is MissingKind =>
   !isRegisteredKind(value) && isKindId(value);
-
-/**
- * Whether a plugin draws a Resource of this kind: its own plugin, or the
- * default plugin where the kind's plugin is missing.
- */
-export const isPluginDrawnKind = (kind: string): boolean =>
-  isPluginKind(kind) || isMissingKindId(kind);

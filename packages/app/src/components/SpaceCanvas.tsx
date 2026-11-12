@@ -111,7 +111,7 @@ import {
   type NavigationDirection,
 } from '../graph-navigation';
 import { FullView } from './FullView';
-import { visibleCanvasCap } from '../visible-canvas-cap';
+import { capSizeHint as capHintAt, visibleCanvasCap } from '../visible-canvas-cap';
 import type { CommandOutcomes } from '../command-outcomes';
 import type { DeleteConfirmation } from '../delete-confirmation';
 import {
@@ -386,8 +386,8 @@ export function SpaceCanvas({
   const presenting = context.kind === 'canvas' && context.presentingResourceId !== null;
   const placedResources = view.placedResources;
   const { visibleGraphs: graphs, colors: colorByGraphId } = view.projection;
-  const { createFromDock, dropExistingResource, dropSpace, createFromData } = placement;
-  const addCanvasResource = useCallback(() => createFromDock(DEFAULT_KIND), [createFromDock]);
+  const { createOnCanvas, dropExistingResource, dropSpace, createFromData } = placement;
+  const addCanvasResource = useCallback(() => createOnCanvas(DEFAULT_KIND), [createOnCanvas]);
   const { screenToFlowPosition, getZoom } = useReactFlow();
 
   const spaces = useOpenSpaces();

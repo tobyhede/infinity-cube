@@ -44,9 +44,8 @@ export const EMBEDDING_RESOURCE_Z_INDEX = 10;
  */
 export const OTHER_GRAPH_OPACITY = 0.8;
 
-/** The z-index a Resource drawing a Map embedding is drawn at, over its neighbours. */
-export const OPEN_RESOURCE_Z_INDEX = 10;
-export const OTHER_GRAPH_OPACITY = 0.35;
+/** The stroke width of an Edge outside the Active Graph, while one is: a hairline. */
+export const RECEDING_STROKE_WIDTH = 1;
 
 /** What ends an inline title edit. Answers a refusal reason, or `null` when the
  *  new title was accepted — the contract the host's Title editor reads, where

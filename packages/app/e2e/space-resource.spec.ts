@@ -437,8 +437,11 @@ test(
     await createSpaceResourceNamed(page, 'Architecture');
     await settled(page);
 
-    // Opened from its plugin's rail command, the one Open a Space Resource has
-    // (ADR 0142).
+    // Opened by pressing its rail's Open from the keyboard rather than clicking
+    // it: the created Resource is placed at the visible centre and the fixture
+    // already has a Resource there — a deliberate partial overlap (`freeAnchor`
+    // steps only on an exact collision), which can leave the rail under another
+    // node's box.
     const resource = nodeByTitle(page, 'Architecture');
     await openFromRail(page, resource);
 

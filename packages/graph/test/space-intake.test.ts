@@ -647,7 +647,9 @@ describe.each([
         load({
           resources: [...resources],
           maps: [
-            positionedMap(WORKING, { [A]: { x: 0, y: 0, open: true } }, [graph(MAIN, 'Main')]),
+            positionedMap(WORKING, { [A]: { x: 0, y: 0, content: { open: true } } }, [
+              graph(MAIN, 'Main'),
+            ]),
           ],
         });
       expect(refused(openReference([referenceTo(A, ABSENT)]))).toEqual([

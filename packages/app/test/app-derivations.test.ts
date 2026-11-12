@@ -5,7 +5,7 @@ import type { EntityActionGroup, EntityActionOutcome } from '@project/ui';
 import { activeGraphOf } from '../src/dock-chrome';
 import { mapView } from '../src/map-view';
 import { nameOnCreationOf } from '../src/name-on-creation';
-import { capSizeHint } from '../src/open-and-expand';
+import { capSizeHint } from '../src/visible-canvas-cap';
 import { showsSpace } from '../src/open-spaces-context';
 import { RESOURCE_HEIGHT, RESOURCE_WIDTH } from '../src/resource';
 import { REFERENCE_OFFSET_RATIO, referenceAnchor } from '../src/resource-placement';

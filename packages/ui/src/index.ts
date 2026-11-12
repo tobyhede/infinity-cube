@@ -32,7 +32,7 @@ export { NO_ASSETS, PluginAssetsProvider, usePluginAssets } from './plugin-asset
 export type { PresentedPluginResourceProps } from './PresentedPluginResource';
 export { ResourceFailureBoundary } from './ResourceFailureBoundary';
 export type { ResourceFailureBoundaryProps } from './ResourceFailureBoundary';
-export { pluginCreations } from './kinds/plugin-views';
+export { NotCreatableContent, pluginCreations } from './kinds/plugin-views';
 export type {
   ClaimHolder,
   HostCreation,
@@ -87,7 +87,7 @@ export type {
 } from './ChoiceMenu';
 export { ResourceKindIcon, resourceKindName } from './ResourceKindIcon';
 export { BADGED_TARGET_GLYPH } from './kinds/plugin-listing';
-export { bareOperations, kindNaming } from './kinds/registry';
+export { bareOperations, kindNaming, missingKindNaming } from './kinds/registry';
 export type {
   KindNaming,
   KindOperations,
