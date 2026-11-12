@@ -4,7 +4,8 @@ import { createSurfaceLifetime } from '../src/surface-lifetime';
 
 /**
  * The lifetime every Map and embedded surface mints: a drawing of its own, and
- * the Claims handed out through it, which go with it when it ends.
+ * the latest Claim handed out through it, whose `unmount` tells the host once
+ * that the surface is gone when it ends.
  */
 
 const claim = () => {
@@ -18,7 +19,7 @@ const claim = () => {
 };
 
 describe('a surface lifetime', () => {
-  it('unmounts each Claim it holds when it ends, once', () => {
+  it('tells the host once that it is gone, through the latest Claim it holds', () => {
     const lifetime = createSurfaceLifetime();
     const first = claim();
     const second = claim();
@@ -30,7 +31,7 @@ describe('a surface lifetime', () => {
     lifetime.begin();
     lifetime.end();
 
-    expect(first.unmount).toHaveBeenCalledTimes(1);
+    expect(first.unmount).not.toHaveBeenCalled();
     expect(second.unmount).toHaveBeenCalledTimes(1);
   });
 

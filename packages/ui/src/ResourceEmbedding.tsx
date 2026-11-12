@@ -8,13 +8,12 @@ import {
   type Resource,
 } from '@project/core';
 import type { Answer, Kept, ResourceId, Size } from '@project/resource-api/domain';
+import type { EmbedProps, TitleProps } from '@project/resource-api/view';
 import {
   ResourceHostProvider,
-  type EmbedProps,
   type RailOutlet,
   type ResourceHost,
-  type TitleProps,
-} from '@project/resource-api/view';
+} from '@project/resource-api/view/host';
 import type { PluginEntry } from './kinds/plugin-views';
 import { MapTitleContext, MapTitleView } from './MapTitle';
 import { readingAssets, usePluginAssets } from './plugin-assets';

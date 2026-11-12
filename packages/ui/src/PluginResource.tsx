@@ -25,8 +25,12 @@ import {
   type Assets,
   type OwnProps,
   type RailCommand,
-  type ResourceHost,
 } from '@project/resource-api/view';
+import {
+  createRailStore,
+  ResourceHostProvider,
+  type ResourceHost,
+} from '@project/resource-api/view/host';
 import { CANVAS_RESOURCE_DRAG_TILT_DEGREES, type CanvasResourceState } from './CanvasResource';
 import { Card } from './components/card';
 import { EntityActions, EntityActionsTrigger, type EntityActionGroup } from './EntityActionsMenu';
@@ -422,7 +426,7 @@ export function PluginSurface(props: PluginResourceProps & PluginSurfaceEntries)
           // again on another Map content value, which leaves a drawn plugin,
           // its state and its Claims as they are.
           key={`${props.resourceId}:${String(props.operations.epoch ?? 0)}`}
-          retryKey={JSON.stringify(props.mapContent)}
+          retryOn={props.mapContent}
           onFailure={onFailure}
         >
           <MapTitleContext.Provider value={drawnTitle}>
@@ -452,4 +456,4 @@ export function PluginSurface(props: PluginResourceProps & PluginSurfaceEntries)
   );
 }
 
-export type { MapTitle, PluginCommits };
+export type { MapTitle };

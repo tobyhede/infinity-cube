@@ -83,6 +83,11 @@ export interface RenderPluginOptions<C, M> {
   readonly assets?: Partial<Assets>;
   /** The band the surface keeps clear for its rail: `RAIL_BAND`, as the Map's, unless given. */
   readonly railBand?: number;
+  /**
+   * What a granted store answers in place of storing the bytes: a store whose
+   * host cannot be reached rejects.
+   */
+  readonly storing?: (bytes: Blob) => Promise<AssetRef | { readonly refused: string }>;
 }
 
 export type RenderedPlugin<C, M> = RenderResult & {

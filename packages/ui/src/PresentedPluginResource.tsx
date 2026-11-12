@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { createContext, useContext, useMemo, useState } from 'react';
 import { mapContentWithoutMap, titleName, type PluginKind, type Resource } from '@project/core';
 import type { Size } from '@project/resource-api/domain';
 import type { OwnProps, TitleProps } from '@project/resource-api/view';
@@ -6,8 +6,7 @@ import {
   createRailStore,
   ResourceHostProvider,
   type ResourceHost,
-  type TitleProps,
-} from '@project/resource-api/view';
+} from '@project/resource-api/view/host';
 import { pluginEntryFor, type PluginSurfaceEntries } from './kinds/plugin-views';
 import { readingAssets, usePluginAssets } from './plugin-assets';
 import { EmbeddingProvider, HostEmbed, type Embedding } from './ResourceEmbedding';
@@ -125,9 +124,11 @@ export function PresentedPluginSurface(props: PresentedPluginResourceProps & Plu
         key={`${props.resourceId}:${String(props.replacementEpoch ?? 0)}`}
         onFailure={props.onFailure}
       >
-        <EmbeddingProvider embedding={embedding}>
-          <ResourceHostProvider host={host}>{plugin}</ResourceHostProvider>
-        </EmbeddingProvider>
+        <StageNameContext.Provider value={name}>
+          <EmbeddingProvider embedding={embedding}>
+            <ResourceHostProvider host={host}>{plugin}</ResourceHostProvider>
+          </EmbeddingProvider>
+        </StageNameContext.Provider>
       </ResourceFailureBoundary>
     </article>
   );
@@ -165,16 +166,16 @@ export interface PresentedPluginContentProps {
 export function PresentedPluginContent({ kind, title, content }: PresentedPluginContentProps) {
   const supplied = usePluginAssets();
   const assets = useMemo(() => readingAssets(supplied), [supplied]);
-  const host: ResourceHost = useMemo(
-    () => ({
-      Title: NoTitle,
-      Own: StageOwn,
-      rail: createRailStore(),
-      RenderedMarkdown: HostRenderedMarkdown,
-      SourceEditor: HostSourceEditor,
-    }),
-    [],
-  );
+  const [drawing] = useState(() => Symbol('drawing'));
+  const [host] = useState((): ResourceHost => ({
+    Title: NoTitle,
+    Own: StageOwn,
+    rail: createRailStore(),
+    RenderedMarkdown: HostRenderedMarkdown,
+    SourceEditor: HostSourceEditor,
+    // `PresentedResource` draws no rail around this content.
+    railBand: 0,
+  }));
   const embedding: Embedding = useMemo(
     () => ({
       resources: [],
@@ -190,6 +191,7 @@ export function PresentedPluginContent({ kind, title, content }: PresentedPlugin
   );
   const plugin = pluginEntryFor(kind).render({
     resourceId: '',
+    drawing,
     kind,
     title,
     content,

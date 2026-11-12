@@ -13,10 +13,10 @@ Categories: **one-kind** = a feature that exists for that kind alone; **registry
 | packages/app/src/components/CommandDockSpaces.tsx:459 | `spaceKind.id`: Space glyph | space | display | CommandDockSpaces.tsx |
 | packages/app/src/components/CommandDockSpaces.tsx:564 | `spaceKind.id`: Space glyph | space | display | CommandDockSpaces.tsx |
 | packages/app/src/resource-rail-actions.tsx:162 | `referenceKind.id`: Create Reference glyph | reference | E (display of a creation, until issue 08) | resource-rail-actions.tsx |
-| packages/app/src/resource-rail-actions.tsx:143 | `spaceKind.id`: Space Resource menu | space | one-kind | resource-rail-actions.tsx |
-| packages/app/src/resource-rail-actions.tsx:254 | `spaceKind.id`: Space Resource Enter | space | one-kind | resource-rail-actions.tsx |
-| packages/app/src/space-authoring.ts:115 | `imageKind.id`: new Image Resource document | image | E | space-authoring.ts |
-| packages/app/src/space-authoring.ts:1374 | `referenceKind.id`: new Reference Resource | reference | E (until issue 08) | space-authoring.ts |
+| packages/app/src/resource-rail-actions.tsx:240 | `spaceKind.id`: Space Resource menu | space | one-kind | resource-rail-actions.tsx |
+| packages/app/src/resource-rail-actions.tsx:373 | `spaceKind.id`: Space Resource Enter | space | one-kind | resource-rail-actions.tsx |
+| packages/app/src/space-authoring.ts:116 | `imageKind.id`: new Image Resource document | image | E | space-authoring.ts |
+| packages/app/src/space-authoring.ts:1368 | `referenceKind.id`: new Reference Resource | reference | E (until issue 08) | space-authoring.ts |
 | packages/persistence/src/space-resource-planning.ts:328 | `spaceKind.id`: new Space Resource document | space | E (lifecycle) | space-resource-planning.ts |
 
 `packages/app/src/canvas-resource-authoring.ts` no longer reaches a module id: a Markdown Resource's body is its plugin's (ADR 0142, resource-plugins issue 05), so the canvas keeps no Markdown completion.
