@@ -17,8 +17,6 @@ import { FALLBACK_GRAPH_COLOR, GraphHeadMarker, type GraphHeadSize } from '@proj
 export const graphHeadMarkerId = (graphId: GraphId, size: GraphHeadSize = 'full'): string =>
   size === 'full' ? `graph-head-${graphId}` : `graph-head-${graphId}-small`;
 
-const headSizeOf = (value: unknown): GraphHeadSize => (value === 'small' ? 'small' : 'full');
-
 /** A marker named by id — the form a head marker takes — rather than one of React Flow's own. */
 const isMarkerId = (marker: EdgeMarkerType | undefined): marker is string =>
   typeof marker === 'string';
@@ -45,7 +43,8 @@ function drawnHeads(edges: readonly Edge[]): DrawnHead[] {
       id: markerEnd,
       headShape: headShape.data,
       color: edge.style?.stroke ?? FALLBACK_GRAPH_COLOR,
-      size: headSizeOf(edge.data?.['headSize']),
+      // Any value but `small` draws the full head, as an Edge naming no size did before.
+      size: edge.data?.['headSize'] === 'small' ? 'small' : 'full',
     });
   }
   return [...heads.values()];
