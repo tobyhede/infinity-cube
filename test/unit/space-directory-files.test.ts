@@ -199,7 +199,7 @@ describe("a Map entry's content, however its store ordered it", () => {
               id: MAP_ID,
               title: 'Map 1',
               kind: 'positioned',
-              positions: { [PICTURE_ID]: { x: 0, y: 0, open: false, content } },
+              positions: { [PICTURE_ID]: { x: 0, y: 0, content } },
               graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
             },
           ],

@@ -12,20 +12,12 @@ export { PresentedResource } from './PresentedResource';
 export type { PresentedResourceProps } from './PresentedResource';
 export { Stage } from './Stage';
 export type { StageProps } from './Stage';
-export {
-  CanvasResource,
-  CANVAS_RESOURCE_DRAG_TILT_DEGREES,
-  canvasResourceContentOverflow,
-} from './CanvasResource';
-export { CLOSED_DISPLAY } from './resource-display';
-export type { ResourceDisplay } from './resource-display';
 export { InlineTitleEditor } from './InlineTitleEditor';
 export type { InlineTitleEditorProps, InlineTitleEditorVariant } from './InlineTitleEditor';
-export type { KindOperations, CanvasResourceProps, CanvasResourceState } from './CanvasResource';
 export { SpaceResourceSelectors } from './SpaceResourceSelectors';
 export { RailChoiceMenu } from './RailChoiceMenu';
 export type { RailChoiceMenuProps } from './RailChoiceMenu';
-export { PluginResource } from './PluginResource';
+export { CANVAS_RESOURCE_DRAG_TILT_DEGREES, PluginResource } from './PluginResource';
 export {
   HostMapProvider,
   MapEmbedSlotProvider,
@@ -34,13 +26,13 @@ export {
   type MapEmbedRequest,
   type MapEmbedSlot,
 } from './ResourceEmbedding';
-export type { MapTitle, PluginResourceProps } from './PluginResource';
+export type { CanvasResourceState, MapTitle, PluginResourceProps } from './PluginResource';
 export { PresentedPluginResource } from './PresentedPluginResource';
 export { NO_ASSETS, PluginAssetsProvider, usePluginAssets } from './plugin-assets';
 export type { PresentedPluginResourceProps } from './PresentedPluginResource';
 export { ResourceFailureBoundary } from './ResourceFailureBoundary';
 export type { ResourceFailureBoundaryProps } from './ResourceFailureBoundary';
-export { isPluginOperations, NotCreatableContent, pluginCreations } from './kinds/plugin-views';
+export { NotCreatableContent, pluginCreations } from './kinds/plugin-views';
 export type {
   ClaimHolder,
   HostCreation,
@@ -59,10 +51,6 @@ export type {
   CanvasSpaceResourceSelection,
   SpaceResourceSelectorsProps,
 } from './SpaceResourceSelectors';
-export { usePresence } from './use-presence';
-export type { Presence, PresenceState } from './use-presence';
-export { ResourceRail } from './ResourceRail';
-export type { ResourceRailProps } from './ResourceRail';
 export {
   ResourceRailAction,
   ResourceRailActions,
@@ -98,9 +86,14 @@ export type {
   ChoiceMenuTriggerProps,
 } from './ChoiceMenu';
 export { ResourceKindIcon, resourceKindName } from './ResourceKindIcon';
-export { BADGED_TARGET_GLYPH } from './kinds/kind-view';
+export { BADGED_TARGET_GLYPH } from './kinds/plugin-listing';
 export { bareOperations, kindNaming, missingKindNaming } from './kinds/registry';
-export type { KindNaming, KindOperationsByKind, KindOperationsOf } from './kinds/registry';
+export type {
+  KindNaming,
+  KindOperations,
+  KindOperationsByKind,
+  KindOperationsOf,
+} from './kinds/registry';
 export type { ResourceKindIconProps } from './ResourceKindIcon';
 export { ResourceSearchCombobox } from './ResourceSearchCombobox';
 export type { ResourceChoice, ResourceSearchComboboxProps } from './ResourceSearchCombobox';
@@ -156,7 +149,6 @@ export {
   CommitEditIcon,
   ChevronDownIcon,
   CloseIcon,
-  CloseResourceIcon,
   CopyIcon,
   DeleteIcon,
   EditIcon,
@@ -170,7 +162,6 @@ export {
   MapIcon,
   MarkdownIcon,
   OpenIndependentlyIcon,
-  OpenResourceIcon,
   ParentIcon,
   SpaceResourceIcon,
   SpaceIcon,
@@ -179,7 +170,6 @@ export {
   PlusIcon,
   RemoveFromMapIcon,
   FullViewIcon,
-  OpenAndExpandIcon,
   ZoomInIcon,
   ZoomOutIcon,
   PresentIcon,

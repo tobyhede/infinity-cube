@@ -95,7 +95,7 @@ const spaceFileArb = resourceIdPool.chain((pool) =>
             title: 'Only map',
             kind: 'positioned',
             positions: Object.fromEntries(
-              visited.map((id, index) => [id, { x: index * 300, y: 0, open: false }]),
+              visited.map((id, index) => [id, { x: index * 300, y: 0 }]),
             ),
             graphs: graphs.map((graph, index) => ({
               id: uuidFrom(index + 100),
@@ -255,45 +255,22 @@ const kindsArb = fc.array(
 
 describe('what each node shows', () => {
   /**
-   * A Resource's own content is of its own kind: the display and the kind the
-   * drawing is chosen by are made from one Resource, so they cannot disagree for
-   * content that is the Resource's own.
+   * A node carries its Resource's own kind and stored content, which its plugin
+   * draws (ADR 0142): both are made from one Resource, so they cannot disagree.
    */
-  it('draws content of the node’s own kind whenever the content is its own', () => {
+  it('carries each Resource’s own kind and stored content', () => {
     fc.assert(
       fc.property(spaceFileArb, kindsArb, (generated, kinds) => {
         const kinded = withKinds(generated, kinds);
         const result = loadSpace(kinded.file, kinded.resourceFiles);
         if (!result.ok) throw new Error(JSON.stringify(result.errors));
         const space = result.space;
-        const nodes = projectResourceNodes(space, {
-          openResourceIds: new Set(space.resources.map((resource) => resource.id)),
-        });
+        const nodes = projectResourceNodes(space);
 
         for (const node of nodes) {
-          const { display } = node.data;
-          if (display.shown === 'closed') throw new Error('an Open Resource was drawn Closed');
-          if (display.content.via === 'self') expect(display.content.kind).toBe(node.data.kind);
-        }
-      }),
-    );
-  });
-
-  /** A canvas Resource is Open or Closed, exactly as its Map authors it (ADR 0123). */
-  it('shows the Open Resources as open and the rest Closed', () => {
-    fc.assert(
-      fc.property(spaceFileArb, fc.array(fc.boolean(), { minLength: 1 }), (generated, openings) => {
-        const result = loadSpace(generated.file, generated.resourceFiles);
-        if (!result.ok) throw new Error(JSON.stringify(result.errors));
-        const space = result.space;
-        const ids = space.resources.map((resource) => resource.id);
-        const openIds = new Set(ids.filter((_, index) => openings[index % openings.length]));
-        const nodes = projectResourceNodes(space, { openResourceIds: openIds });
-
-        for (const node of nodes) {
-          const open = openIds.has(node.data.resourceId);
-          expect(node.data.display.shown).toBe(open ? 'open' : 'closed');
-          expect(node.data.open === true).toBe(open);
+          const resource = space.resources.find(({ id }) => id === node.data.resourceId);
+          expect(node.data.kind).toBe(resource?.kind);
+          expect(node.data.ownContent).toEqual(resource?.content);
         }
       }),
     );

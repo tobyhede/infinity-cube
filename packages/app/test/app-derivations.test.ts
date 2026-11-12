@@ -5,7 +5,7 @@ import type { EntityActionGroup, EntityActionOutcome } from '@project/ui';
 import { activeGraphOf } from '../src/dock-chrome';
 import { mapView } from '../src/map-view';
 import { nameOnCreationOf } from '../src/name-on-creation';
-import { capSizeHint } from '../src/open-and-expand';
+import { capSizeHint } from '../src/visible-canvas-cap';
 import { showsSpace } from '../src/open-spaces-context';
 import { RESOURCE_HEIGHT, RESOURCE_WIDTH } from '../src/resource';
 import { REFERENCE_OFFSET_RATIO, referenceAnchor } from '../src/resource-placement';
@@ -122,18 +122,17 @@ describe('referenceAnchor', () => {
   const centre = () => ({ x: -7, y: -9 });
 
   it('steps three quarters of a collapsed Resource from a Closed source', () => {
-    expect(referenceAnchor({ x: 10, y: 20, open: false }, centre)).toEqual({
+    expect(referenceAnchor({ x: 10, y: 20 }, centre)).toEqual({
       x: 10 + Math.round(RESOURCE_WIDTH * REFERENCE_OFFSET_RATIO),
       y: 20 + Math.round(RESOURCE_HEIGHT * REFERENCE_OFFSET_RATIO),
     });
   });
 
-  it('steps from a resized source’s bottom-right corner, Open or Closed', () => {
-    for (const open of [true, false]) {
-      expect(
-        referenceAnchor({ x: 0, y: 0, open, size: { width: 600, height: 400 } }, centre),
-      ).toEqual({ x: 600 - 260 + 195, y: 400 - 146 + 110 });
-    }
+  it('steps from a resized source’s bottom-right corner', () => {
+    expect(referenceAnchor({ x: 0, y: 0, size: { width: 600, height: 400 } }, centre)).toEqual({
+      x: 600 - 260 + 195,
+      y: 400 - 146 + 110,
+    });
   });
 
   it('lands at the visible centre for a source the Map does not place', () => {
@@ -256,7 +255,6 @@ describe('resourceRailGroups', () => {
     enter: { run: () => undefined, available: true },
     present: bound('canvas.presentFromHere', AVAILABLE),
     fullView: bound('canvas.showFullView', AVAILABLE),
-    openAndExpand: bound('canvas.openAndExpand', AVAILABLE),
   };
   const ids = (groups: readonly EntityActionGroup[]) =>
     groups.map((group) => group.map(({ id }) => id));
@@ -267,7 +265,7 @@ describe('resourceRailGroups', () => {
     expect(ids(resourceRailGroups(ur, addresses, connect, everything))).toEqual([
       ['create-reference'],
       ['connect-resource'],
-      ['open-and-expand', 'full-view', 'present-from-here'],
+      ['full-view', 'present-from-here'],
       ['copy-link'],
       ['remove-from-map', 'delete-resource'],
     ]);
@@ -331,7 +329,6 @@ describe('resourceRailGroups', () => {
           enter: null,
           present: bound('canvas.presentFromHere', ABSENT),
           fullView: bound('canvas.showFullView', ABSENT),
-          openAndExpand: bound('canvas.openAndExpand', ABSENT),
         }),
       ),
     ).toEqual([['connect-resource'], ['copy-link']]);

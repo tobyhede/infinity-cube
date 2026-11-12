@@ -115,10 +115,6 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
       return 'This Resource is already in this Map.';
     case 'resource-not-in-map':
       return 'This Resource is not in this Map.';
-    case 'open-requires-content':
-      return 'An Ur Resource has no content to open.';
-    case 'map-content-not-kept':
-      return 'This Resource keeps nothing of its own on a Map.';
     case 'map-content-invalid':
       return 'This Resource cannot be drawn that way on a Map.';
     case 'resource-content-invalid':

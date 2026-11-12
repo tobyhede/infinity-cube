@@ -282,12 +282,11 @@ export const RESOURCE_SHAPES = OUTLINES;
 export const resourceShapeSchema = z.enum(RESOURCE_SHAPES);
 
 /**
- * What a Map stores for one Resource: its origin, and optionally whether it is
- * Open, its size and its plugin's Map content (ADR 0142). An entry with no
- * `open` is Closed (`resourceOpen`), one with no `size` is the Closed Size
- * (`resourceSize`), and one with no `content` gives its plugin the plugin's
- * declared default (`resolvedMapContent`). Size and Open/Closed are
- * independent: Open changes what is drawn inside the rect, never the rect.
+ * What a Map stores for one Resource: its origin, and optionally its size and
+ * its plugin's Map content (ADR 0142). An entry with no `size` is the Closed
+ * Size (`resourceSize`), and one with no `content` gives its plugin the
+ * plugin's declared default (`resolvedMapContent`). Whether a Resource is Open,
+ * and an Ur Resource's Shape, are its plugin's Map content, never the entry's.
  *
  * `content` is any JSON value here: which values a Resource may keep is its
  * plugin's schema's answer, which intake asks with the Resource's kind in view.
@@ -296,7 +295,6 @@ export const resourceShapeSchema = z.enum(RESOURCE_SHAPES);
  */
 export const resourcePlacementSchema = mapPositionSchema
   .extend({
-    open: z.boolean().optional(),
     size: resourceSizeSchema.optional(),
     content: jsonValueSchema.optional(),
   })

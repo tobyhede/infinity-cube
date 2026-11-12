@@ -101,7 +101,7 @@ export function benchmarkScenario(
     size: { width: 640, height: 360 },
   };
   const metaPositions: Record<UUID, ResourcePlacement> = {};
-  metaPositions[ordinaryId] = { x: 20, y: 20, open: false };
+  metaPositions[ordinaryId] = { x: 20, y: 20 };
   parentIds.forEach((resourceId, index) => {
     metaPositions[resourceId] = {
       x: 380 + index * 760,

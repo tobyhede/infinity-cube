@@ -1,5 +1,5 @@
-/* The Reference kind's frame on a Map (ADR 0070, ADR 0120): a dotted border at
-   rest, solid while active. `CanvasResource` imports it after
+/* The Reference kind's border on a Map (ADR 0070, ADR 0120): dotted at rest,
+   solid while active. `PluginResource` imports it after
    `canvas-resource.css`, whose solid border it overrides.
    The order is held by `test/unit/kind-stylesheet-order.test.ts`.
    The kind is matched inside `:where()` so the dotted rule is only as specific

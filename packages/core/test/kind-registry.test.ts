@@ -2,10 +2,10 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   KIND_IDS,
   contentTarget,
-  drawnByPlugin,
-  takesOpen,
   isKindId,
+  isMissingKindId,
   isRegisteredKind,
+  mapContentProblem,
   newResourceDocument,
   resolveContent,
   startsEmpty,
@@ -35,6 +35,13 @@ describe('the kind registry', () => {
       expect(isRegisteredKind(kind)).toBe(false);
     },
   );
+
+  it('lets a Resource whose kind no plugin draws keep whatever Map content is stored', () => {
+    const missing = 'vnd.example.chart';
+    if (!isMissingKindId(missing)) throw new Error('A plugin in this build draws the kind');
+    expect(mapContentProblem(missing, { zoom: 2, open: true })).toBeUndefined();
+    expect(mapContentProblem(urKind.id, { open: true })).toBeDefined();
+  });
 });
 
 const TARGET = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -95,34 +102,6 @@ describe('where resolved content came from', () => {
     expectTypeOf<ReturnType<typeof referenceKind.resolveContent>>().not.toHaveProperty('via');
     for (const doc of OWN)
       expect(resolveContent(doc, () => undefined)).toHaveProperty('via', 'self');
-  });
-});
-
-describe('who draws a Resource, and who keeps its Open', () => {
-  const NOTES = { kind: markdownKind.id, content: { url: EMPTY_ASSET_REF } } as const;
-  const INNER = {
-    kind: spaceKind.id,
-    content: { spaceId: SPACE, map: SPACE, graph: SPACE },
-  } as const;
-  const RECAP = { kind: referenceKind.id, content: { target: TARGET } } as const;
-
-  it('is a plugin for a plugin kind, and a Reference whose Target a plugin draws', () => {
-    expect(drawnByPlugin(NOTES, () => undefined)).toBe(true);
-    expect(drawnByPlugin(RECAP, () => NOTES)).toBe(true);
-    expect(takesOpen(NOTES, () => undefined)).toBe(false);
-    expect(takesOpen(RECAP, () => NOTES)).toBe(false);
-  });
-
-  it('is the plugin for a Reference whose Target is gone, which draws the note', () => {
-    expect(drawnByPlugin(RECAP, () => undefined)).toBe(true);
-    expect(takesOpen(RECAP, () => undefined)).toBe(false);
-  });
-
-  it('is the plugin, which keeps the Open, for a Space Resource and a Reference to one', () => {
-    expect(drawnByPlugin(INNER, () => undefined)).toBe(true);
-    expect(drawnByPlugin(RECAP, () => INNER)).toBe(true);
-    expect(takesOpen(INNER, () => undefined)).toBe(false);
-    expect(takesOpen(RECAP, () => INNER)).toBe(false);
   });
 });
 

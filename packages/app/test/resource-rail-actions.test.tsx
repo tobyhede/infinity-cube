@@ -67,8 +67,8 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Map',
         kind: 'positioned',
         positions: {
-          [RESOURCE_ID]: { x: 0, y: 0, open: false },
-          [OTHER_RESOURCE_ID]: { x: 400, y: 0, open: false },
+          [RESOURCE_ID]: { x: 0, y: 0 },
+          [OTHER_RESOURCE_ID]: { x: 400, y: 0 },
         },
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
       },
@@ -97,7 +97,7 @@ const withReference: SpaceSnapshot = spaceSnapshotSchema.parse({
         ...snapshot.document.maps?.[0],
         positions: {
           ...snapshot.document.maps?.[0]?.positions,
-          [REFERENCE_ID]: { x: 0, y: 400, open: false },
+          [REFERENCE_ID]: { x: 0, y: 400 },
         },
       },
     ],
@@ -121,7 +121,7 @@ const withImage: SpaceSnapshot = spaceSnapshotSchema.parse({
         ...snapshot.document.maps?.[0],
         positions: {
           ...snapshot.document.maps?.[0]?.positions,
-          [IMAGE_ID]: { x: 0, y: 400, open: false },
+          [IMAGE_ID]: { x: 0, y: 400 },
         },
       },
     ],
@@ -155,7 +155,6 @@ const withUr: SpaceSnapshot = spaceSnapshotSchema.parse({
           [UR_ID]: {
             x: 0,
             y: 400,
-            open: false,
             size: { width: RESOURCE_WIDTH * 2, height: RESOURCE_HEIGHT * 2 },
           },
         },
@@ -178,7 +177,7 @@ const withSpaceResource: SpaceSnapshot = spaceSnapshotSchema.parse({
         ...snapshot.document.maps?.[0],
         positions: {
           ...snapshot.document.maps?.[0]?.positions,
-          [SPACE_RESOURCE_ID]: { x: 0, y: 400, open: false },
+          [SPACE_RESOURCE_ID]: { x: 0, y: 400 },
         },
       },
     ],
@@ -216,7 +215,6 @@ const openedA = () =>
             [RESOURCE_ID]: {
               x: 0,
               y: 0,
-              open: false,
               content: { open: true },
               size: { width: RESOURCE_WIDTH, height: RESOURCE_HEIGHT },
             },
@@ -690,7 +688,6 @@ describe('a Resource’s commands on the canvas rail', () => {
               [RESOURCE_ID]: {
                 x: 0,
                 y: 0,
-                open: false,
                 content: { open: true },
                 size: { width, height },
               },
@@ -719,7 +716,7 @@ describe('a Resource’s commands on the canvas rail', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Close Resource A' }));
     await waitFor(() => {
       const positions = session.getState().working.document.maps?.[0]?.positions;
-      expect(positions?.[RESOURCE_ID]?.open).toBe(false);
+      expect(positions?.[RESOURCE_ID]?.content).toEqual({ open: false });
       expect(positions?.[reference]).toMatchObject(placed);
     });
     await settled(session);
@@ -997,7 +994,7 @@ describe('a Resource’s commands on the canvas rail', () => {
             ...withUr.document.maps?.[0],
             positions: {
               ...withUr.document.maps?.[0]?.positions,
-              [UR_ID]: { x: 0, y: 400, open: false, content: { shape: 'diamond' } },
+              [UR_ID]: { x: 0, y: 400, content: { shape: 'diamond' } },
             },
           },
         ],
@@ -1319,8 +1316,8 @@ describe('Connect to Resource in a Resource’s Actions menu', () => {
             title: 'Other Map',
             kind: 'positioned',
             positions: {
-              [RESOURCE_ID]: { x: 0, y: 0, open: false },
-              [OTHER_RESOURCE_ID]: { x: 400, y: 0, open: false },
+              [RESOURCE_ID]: { x: 0, y: 0 },
+              [OTHER_RESOURCE_ID]: { x: 400, y: 0 },
             },
             graphs: [{ id: GRAPH_ID_2, title: 'Graph', edges: [] }],
           },

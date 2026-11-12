@@ -73,7 +73,7 @@ const targetSpace = (
         id: mapId,
         title: 'Map 1',
         kind: 'positioned',
-        positions: { [resourceId]: { x: 0, y: 0, open: false } },
+        positions: { [resourceId]: { x: 0, y: 0 } },
         graphs: [{ id: graphId, title: 'Graph 1', edges: [] }],
         activeGraph: graphId,
       },
@@ -104,15 +104,15 @@ const metaSpace = (): SpaceSnapshot => ({
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [MARKDOWN_RESOURCE_ID]: { x: 0, y: 0, open: false },
-          [FIRST_LINK_ID]: { x: 340, y: 0, open: false },
+          [MARKDOWN_RESOURCE_ID]: { x: 0, y: 0 },
+          [FIRST_LINK_ID]: { x: 340, y: 0 },
           [SECOND_LINK_ID]: {
             x: 680,
             y: 0,
             content: { open: true },
             size: { width: 480, height: 270 },
           },
-          [CONVERGING_LINK_ID]: { x: 1020, y: 0, open: false },
+          [CONVERGING_LINK_ID]: { x: 1020, y: 0 },
         },
         graphs: [
           {
@@ -493,12 +493,11 @@ describe('exporting and importing one complete aggregate', () => {
           ...m,
           positions: {
             ...m.positions,
-            [FIRST_LINK_ID]: { x: 340, y: 0, open: false },
+            [FIRST_LINK_ID]: { x: 340, y: 0 },
             [CLOSED_UR_ID]: { x: 0, y: 400, content: { shape: 'diamond' } },
             [RESIZED_UR_ID]: {
               x: 340,
               y: 400,
-              open: false,
               size: { width: 480, height: 270 },
               content: { shape: 'ellipse' },
             },
@@ -524,13 +523,12 @@ describe('exporting and importing one complete aggregate', () => {
     expect(positions?.[RESIZED_UR_ID]).toEqual({
       x: 340,
       y: 400,
-      open: false,
       size: { width: 480, height: 270 },
       content: { shape: 'ellipse' },
     });
-    expect(positions?.[FIRST_LINK_ID]).toEqual({ x: 340, y: 0, open: false });
+    expect(positions?.[FIRST_LINK_ID]).toEqual({ x: 340, y: 0 });
     // An entry with no Map content or size stored is written and read back without one.
-    expect(positions?.[MARKDOWN_RESOURCE_ID]).toEqual({ x: 0, y: 0, open: false });
+    expect(positions?.[MARKDOWN_RESOURCE_ID]).toEqual({ x: 0, y: 0 });
   });
 
   /*

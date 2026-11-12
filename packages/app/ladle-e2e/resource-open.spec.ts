@@ -139,9 +139,7 @@ test(
     await expect(sourceHandle).toHaveCSS('opacity', '0');
     expect(await sourceHandle.evaluate(transitionDuration, 'opacity')).toBe(120);
 
-    const leavingContent = resource.locator('.canvas-resource__content');
-    await expect(leavingContent).toHaveCount(0);
-    await expect(resource).toHaveAttribute('data-open', 'false');
+    await expect(resource.locator('.canvas-resource__plugin [data-open="false"]')).toHaveCount(1);
     await selectResource(node);
     await expect(toolbar.getByRole('button', { name: 'Open Resource Strategies' })).toBeVisible();
     const longResource = page.getByRole('region', { name: 'Long Markdown Resource' });
@@ -172,7 +170,7 @@ test(
     const boxes = await node.evaluate((element) => {
       const resourceElement = element.querySelector('.canvas-resource');
       if (resourceElement === null)
-        throw new Error('The React Flow node contains no CanvasResource');
+        throw new Error('The React Flow node contains no drawn Resource');
       const nodeBox = element.getBoundingClientRect();
       const resourceBox = resourceElement.getBoundingClientRect();
       return {
@@ -478,7 +476,7 @@ test('an Open Resource running an edit keeps its commands drawn, however it is l
   const commands = resource.getByTestId('canvas-resource-actions');
 
   await page.mouse.move(0, 0);
-  await expect(resource.locator('.resource-rail__kind')).toHaveCount(0);
+  await expect(resource.getByRole('img', { name: 'Markdown Resource' })).toHaveCount(0);
   await expect(commands).toBeVisible();
 
   await page.getByRole('button', { name: 'Edit Resource Strategies' }).click();

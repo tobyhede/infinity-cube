@@ -37,8 +37,8 @@ const mapOwning = (...graphs: readonly object[]) => ({
   title: 'Working',
   kind: 'positioned',
   positions: {
-    [RESOURCE_A]: { x: 0, y: 0, open: false },
-    [RESOURCE_B]: { x: 400, y: 0, open: false },
+    [RESOURCE_A]: { x: 0, y: 0 },
+    [RESOURCE_B]: { x: 400, y: 0 },
   },
   graphs,
 });
@@ -192,8 +192,8 @@ describe('canvasProjection', () => {
     expect(nodes.map((node) => Object.keys(node.data))).not.toContainEqual(
       expect.arrayContaining(['active']),
     );
-    expect(byId[RESOURCE_A]?.display.shown).toBe('closed');
-    expect(byId[RESOURCE_B]?.display.shown).toBe('closed');
+    expect(byId[RESOURCE_A]?.mapContent).toEqual({ open: false });
+    expect(byId[RESOURCE_B]?.mapContent).toEqual({ open: false });
   });
 
   it('draws every Graph a selected Map owns', async () => {
@@ -239,11 +239,10 @@ describe('canvasProjection', () => {
         [RESOURCE_A]: {
           x: 0,
           y: 0,
-          open: false,
           content: { open: true },
           size: { width: 560, height: 420 },
         },
-        [RESOURCE_B]: { x: 700, y: 0, open: false, size: { width: 400, height: 300 } },
+        [RESOURCE_B]: { x: 700, y: 0, size: { width: 400, height: 300 } },
       },
     };
     const space = spaceWith({ maps: [authoredMap] });
@@ -265,7 +264,7 @@ describe('canvasProjection', () => {
     expect(nodes.find(({ id }) => id === RESOURCE_B)).toMatchObject({
       width: 400,
       height: 300,
-      data: { display: { shown: 'closed' } },
+      data: { mapContent: { open: false } },
     });
   });
 
@@ -273,11 +272,10 @@ describe('canvasProjection', () => {
     const diamondMap = {
       ...mapOwning(DRAWN),
       positions: {
-        [RESOURCE_A]: { x: 0, y: 0, open: false, content: { shape: 'diamond' } },
+        [RESOURCE_A]: { x: 0, y: 0, content: { shape: 'diamond' } },
         [RESOURCE_B]: {
           x: 700,
           y: 0,
-          open: false,
           size: { width: 560, height: 420 },
           content: { shape: 'diamond' },
         },
@@ -303,8 +301,8 @@ describe('canvasProjection', () => {
     const rectangleMap = {
       ...mapOwning(DRAWN),
       positions: {
-        [RESOURCE_A]: { x: 0, y: 0, open: false },
-        [RESOURCE_B]: { x: 700, y: 0, open: false },
+        [RESOURCE_A]: { x: 0, y: 0 },
+        [RESOURCE_B]: { x: 700, y: 0 },
       },
     };
     const ur = jsonResourceFile(RESOURCE_A, RESOURCE_A, 'ur', {});

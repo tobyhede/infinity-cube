@@ -31,7 +31,6 @@ import {
   ResourceHostProvider,
   type ResourceHost,
 } from '@project/resource-api/view/host';
-import { CANVAS_RESOURCE_DRAG_TILT_DEGREES, type CanvasResourceState } from './CanvasResource';
 import { Card } from './components/card';
 import { EntityActions, EntityActionsTrigger, type EntityActionGroup } from './EntityActionsMenu';
 import { graphPaint } from './graph-color';
@@ -64,6 +63,7 @@ import {
 import { resourceShapeOutline, type OutlineSize } from './resource-shape-outline';
 import { ResourceShapeOutlineDrawing } from './ResourceShapeOutlineDrawing';
 import './canvas-resource.css';
+import './kinds/reference-canvas.css';
 
 /**
  * The Map surface's host for a Resource a plugin draws (ADR 0142).
@@ -80,10 +80,29 @@ import './canvas-resource.css';
  * earlier render answers refused once this surface has unmounted.
  */
 
-const SURFACE_GONE = { refused: 'This Resource is no longer drawn here.' } as const;
+/** External visual facts the adapter knows and the host cannot derive:
+ *  React Flow selection, drag and inline-title-editing. Hover and the
+ *  selected+hover combination are the Resource's own CSS, driven by real
+ *  pointer/focus pseudo-classes rather than a computed React state. */
+export type CanvasResourceState = 'rest' | 'selected' | 'dragging' | 'editing';
+
+/**
+ * How far a Resource leans while it is being moved.
+ *
+ * The number lives here and nowhere else. CSS reads it as
+ * `--canvas-resource-drag-tilt`, published below. The canvas reads the same
+ * number for an embedded canvas this element cannot carry — React Flow
+ * renders sub-flow children as DOM siblings of their parent's wrapper.
+ * `embedded-map.test.ts` holds that motion as a rigid one.
+ */
+export const CANVAS_RESOURCE_DRAG_TILT_DEGREES = -1;
+
+const SURFACE_GONE = {
+  refused: 'This Resource is no longer drawn here.',
+} as const satisfies Answer;
 const HELD_ELSEWHERE = {
   refused: 'This Resource is being changed where it is drawn elsewhere. Try again when that ends.',
-} as const;
+} as const satisfies Answer;
 
 /** Stop the canvas reading a press or key meant for the plugin's own region. */
 const stop = (event: PointerEvent | KeyboardEvent): void => {
@@ -432,7 +451,6 @@ export function PluginSurface(props: PluginResourceProps & PluginSurfaceEntries)
       data-kind={kind}
       data-content-kind={kind}
       data-state={state}
-      data-open={false}
       // A surface holding a Claim is being worked in, which keeps its active
       // face as an edit does (`canvas-resource.css`).
       data-content-editing={holder === 'this-drawing'}

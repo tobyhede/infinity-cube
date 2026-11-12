@@ -242,7 +242,6 @@ describe('aggregate wire protocol', () => {
       { kind: 'reference-target-not-targetable', ...described },
       { kind: 'space-reference-cycle', ...described },
       { kind: 'map-content-invalid', ...described },
-      { kind: 'open-requires-content', ...described },
     ];
     const location = { spaceId: SPACE_ID, resourceId: RESOURCE_ID, targetSpaceId: secondId };
     const errors: SpaceAggregateError[] = [

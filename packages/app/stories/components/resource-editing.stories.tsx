@@ -2,14 +2,10 @@ import { useRef, useState } from 'react';
 import type { Story } from '@ladle/react';
 import { titleName, type JsonValue } from '@project/core';
 import {
-  CanvasResource,
-  CLOSED_DISPLAY,
   PluginResource,
-  type KindOperations,
   type PluginCommits,
   type PluginHostClaim,
   type PluginOperations,
-  type ResourceDisplay,
 } from '@project/ui';
 import { resourceSizeVars } from '#src/resource';
 import type { ResourceFrameStyle } from '../support/CanvasResourceSpecimen';
@@ -18,40 +14,20 @@ import { storeStoryText, storyText } from '../support/story-assets';
 export default { title: 'Components/Resource/Editing' };
 
 /**
- * The Resource's own title editor, entirely private to this component: begins from
+ * The Resource's own title editor, entirely private to the host: begins from
  * the Title's native control, keeps a refused draft local with a field-local
  * error, completes and exits on Enter, cancels on Escape, and returns focus to
- * the Resource around it.
+ * the Resource around it. A Closed Markdown Resource, drawn by its plugin
+ * through the Map surface's host (ADR 0142).
  */
-function TitleEditingResource({
-  initiallyOpen,
-  initialTitle,
-}: {
-  readonly initiallyOpen: boolean;
-  readonly initialTitle: string;
-}) {
+function TitleEditingResource({ initialTitle }: { readonly initialTitle: string }) {
   const [title, setTitle] = useState(initialTitle);
   const [editing, setEditing] = useState(false);
-  const [open, setOpen] = useState(initiallyOpen);
-  const changeOpen = (next: boolean) => {
-    setOpen(next);
-    return 'completed' as const;
-  };
   const group = useRef<HTMLDivElement>(null);
-  const kindOperations: KindOperations = { kind: 'markdown' };
-  const display: ResourceDisplay = open
-    ? {
-        shown: 'open',
-        content: {
-          kind: 'markdown',
-          content: { url: storyText('## Open Resource body') },
-          via: 'self',
-        },
-      }
-    : CLOSED_DISPLAY;
+  const [content] = useState<JsonValue>(() => ({ url: storyText('## Open Resource body') }));
 
   return (
-    <div style={open ? openFrame : resourceSizeVars}>
+    <div style={resourceSizeVars}>
       <div
         role="group"
         // The Resource's **name**, which is the Title's first line: everything that
@@ -62,28 +38,33 @@ function TitleEditingResource({
         ref={group}
         data-testid="resource-group"
       >
-        <CanvasResource
-          kindOperations={kindOperations}
-          onOpenChange={changeOpen}
-          display={display}
-          title={title}
+        <PluginResource
+          resourceId="story-closed-title"
+          kind="markdown"
+          title={{
+            title,
+            readOnly: false,
+            onReturnFocus: () => group.current?.focus(),
+            onBeginTitleEdit: editing ? undefined : () => setEditing(true),
+            editor: editing
+              ? {
+                  onComplete: (draft: string) => {
+                    if (draft.trim().length === 0) return 'A Resource title is required.';
+                    setTitle(draft);
+                    setEditing(false);
+                    return null;
+                  },
+                  onCancel: () => setEditing(false),
+                }
+              : undefined,
+          }}
+          content={content}
+          mapContent={{ open: false }}
+          outline="rectangle"
+          state={editing ? 'editing' : 'rest'}
           graphColor="#ffc53d"
-          {...(editing
-            ? {
-                state: 'editing' as const,
-                onCompleteTitleEdit: (draft: string) => {
-                  if (draft.trim().length === 0) return 'A Resource title is required.';
-                  setTitle(draft);
-                  setEditing(false);
-                  return null;
-                },
-                onCancelTitleEdit: () => setEditing(false),
-                onReturnFocus: () => group.current?.focus(),
-              }
-            : {
-                state: 'rest' as const,
-                onBeginTitleEdit: () => setEditing(true),
-              })}
+          readOnly={false}
+          operations={{ kind: 'markdown' }}
         />
       </div>
     </div>
@@ -163,7 +144,7 @@ export const Title: Story = () => (
   <div className="flex flex-wrap items-start gap-8 p-8">
     <section aria-label="Closed Resource title editing" className="flex flex-col gap-2">
       <p className="text-xs text-muted-foreground">Closed</p>
-      <TitleEditingResource initiallyOpen={false} initialTitle="Draft entry" />
+      <TitleEditingResource initialTitle="Draft entry" />
     </section>
     <section aria-label="Open Resource title editing" className="flex flex-col gap-2">
       <p className="text-xs text-muted-foreground">Open</p>
@@ -171,7 +152,7 @@ export const Title: Story = () => (
     </section>
     <section aria-label="Laddered Resource title editing" className="flex flex-col gap-2">
       <p className="text-xs text-muted-foreground">Title Lines</p>
-      <TitleEditingResource initiallyOpen={false} initialTitle={ladderTitle} />
+      <TitleEditingResource initialTitle={ladderTitle} />
     </section>
   </div>
 );

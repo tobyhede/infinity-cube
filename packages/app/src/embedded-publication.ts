@@ -22,7 +22,6 @@ export interface EmbeddedPublication extends EmbeddedPublicationSnapshot {
   readonly surface: MapSurface;
   readonly edgeSurface: EdgeAuthoringSurface;
   readonly availability: AuthoringAvailability;
-  readonly openResource: CanvasResourceAuthoring['openResource'];
   readonly beginTitleEditing: CanvasResourceAuthoring['beginTitleEditing'];
   readonly bodyEditing: boolean;
   readonly titleEditing: boolean;

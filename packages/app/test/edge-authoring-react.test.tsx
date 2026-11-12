@@ -7,7 +7,7 @@ import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { graphRenderEdgeId } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession, type SpaceSession } from '@project/persistence';
 import { bareKindData, ROUTED_EDGE_TYPE, type ResourceFlowNode } from '@project/react-flow-adapter';
-import { CLOSED_DISPLAY, Toolbar, ToolbarButton } from '@project/ui';
+import { Toolbar, ToolbarButton } from '@project/ui';
 import { RESOURCES_TRIGGER } from '../src/components/command-dock-triggers';
 import { composeApp, type EdgeCollaborators } from '../src/compose-app';
 import type { ConnectionCompletion } from '../src/connection-completion';
@@ -56,9 +56,9 @@ const snapshot: SpaceSnapshot = {
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [RESOURCE_A]: { x: 0, y: 0, open: false },
-          [RESOURCE_B]: { x: 400, y: 0, open: false },
-          [RESOURCE_C]: { x: 800, y: 0, open: false },
+          [RESOURCE_A]: { x: 0, y: 0 },
+          [RESOURCE_B]: { x: 400, y: 0 },
+          [RESOURCE_C]: { x: 800, y: 0 },
         },
         graphs: [
           { id: GRAPH_ID, title: 'Main', edges: [EDGE] },
@@ -138,7 +138,6 @@ function resourceNode(id: string, x: number, title: string): ResourceFlowNode {
       ...bareKindData('markdown'),
       ...fixtureFacts('markdown'),
       selectedForAuthoring: false,
-      display: CLOSED_DISPLAY,
       activeGraphId: GRAPH_ID,
       activeGraphColor: '#8a94a6',
       borderColor: null,

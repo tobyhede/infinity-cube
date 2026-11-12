@@ -3,12 +3,12 @@ import {
   authorsContent,
   embedsMap,
   uuidSchema,
+  type JsonValue,
   type KindId,
   type ResourceContent,
   type UUID,
 } from '@project/core';
 import { bareKindData, type ResourceFlowNode } from '@project/react-flow-adapter';
-import { CLOSED_DISPLAY, type ResourceDisplay } from '@project/ui';
 import type { RenderAdapter } from '../src/render-adapter';
 import { textAsset } from './markdown-texts';
 
@@ -26,7 +26,6 @@ export function node(id: string, x: number, y: number, title = id): ResourceFlow
       ...bareKindData('markdown'),
       ...fixtureFacts('markdown'),
       selectedForAuthoring: false,
-      display: CLOSED_DISPLAY,
       activeGraphId: null,
       activeGraphColor: '#8a94a6',
       borderColor: null,
@@ -35,33 +34,20 @@ export function node(id: string, x: number, y: number, title = id): ResourceFlow
   };
 }
 
+const FIXTURE_TARGET = uuidSchema.parse('00000000-0000-4000-8000-0000000000f9');
 const FIXTURE_TARGET_SPACE = uuidSchema.parse('00000000-0000-4000-8000-0000000000fa');
 const FIXTURE_TARGET_MAP = uuidSchema.parse('00000000-0000-4000-8000-0000000000fb');
 const FIXTURE_TARGET_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-0000000000fc');
 
-/**
- * What the projection shows for a fixture Resource of `kind`: Closed with no
- * content, or Open with content of its own kind (a Reference Resource's is a
- * Target's Markdown). `space` names the view an Open Space Resource shows.
- */
-export function fixtureDisplay(
-  open: boolean,
-  kind: Exclude<KindId, 'image'>,
-  source = '',
-  space: { readonly spaceId: UUID; readonly map: UUID } = {
-    spaceId: FIXTURE_TARGET_SPACE,
-    map: FIXTURE_TARGET_MAP,
-  },
-): ResourceDisplay {
-  if (!open) return CLOSED_DISPLAY;
-  return { shown: 'open', content: fixtureContent(kind, source, space) };
+/** Where a fixture Space Resource's view goes. */
+interface FixtureView {
+  readonly spaceId: UUID;
+  readonly map: UUID;
 }
 
-function fixtureContent(
-  kind: KindId,
-  source: string,
-  space: { readonly spaceId: UUID; readonly map: UUID },
-): ResourceContent {
+const FIXTURE_VIEW: FixtureView = { spaceId: FIXTURE_TARGET_SPACE, map: FIXTURE_TARGET_MAP };
+
+function fixtureContent(kind: KindId, source: string, space: FixtureView): ResourceContent {
   switch (kind) {
     case 'markdown':
       return { kind: 'markdown', content: { url: textAsset(source) }, via: 'self' };
@@ -84,20 +70,61 @@ function fixtureContent(
   }
 }
 
-/** The projection's answers for the content used by node fixtures. */
+/** What a fixture Resource of `kind` stores; a Reference Resource names a Target. */
+function fixtureOwnContent(
+  kind: KindId,
+  source: string,
+  space: FixtureView,
+): ResourceFlowNode['data']['ownContent'] {
+  switch (kind) {
+    case 'markdown':
+      return { url: textAsset(source) };
+    case 'reference':
+      return { target: FIXTURE_TARGET };
+    case 'space':
+      return { ...space, graph: FIXTURE_TARGET_GRAPH };
+    case 'image':
+      return { url: 'https://example.com/picture.png' };
+    case 'ur':
+      return {};
+  }
+}
+
+/**
+ * The Map content a fixture Resource of `kind` carries, as its plugin reads it
+ * (ADR 0142): Open for the kinds whose plugin keeps it, the Shape for an Ur
+ * Resource and nothing for an Image Resource.
+ */
+export function fixtureMapContent(open: boolean, kind: KindId): JsonValue {
+  switch (kind) {
+    case 'image':
+      return {};
+    case 'ur':
+      return { shape: 'rectangle' };
+    case 'markdown':
+    case 'reference':
+    case 'space':
+      return { open };
+  }
+}
+
+/**
+ * The projection's answers for a fixture Resource of `kind`: its content facts,
+ * its stored content and its Map content. `source` is a Markdown Resource's
+ * text and `space` the view a Space Resource goes to.
+ */
 export function fixtureFacts(
   kind: KindId,
-): Pick<ResourceFlowNode['data'], 'authorsContent' | 'embedsMap' | 'takesOpen'> {
-  const content = fixtureContent(kind, '', {
-    spaceId: FIXTURE_TARGET_SPACE,
-    map: FIXTURE_TARGET_MAP,
-  });
+  open = false,
+  source = '',
+  space: FixtureView = FIXTURE_VIEW,
+): Pick<ResourceFlowNode['data'], 'authorsContent' | 'embedsMap' | 'ownContent' | 'mapContent'> {
+  const content = fixtureContent(kind, source, space);
   return {
     authorsContent: authorsContent(content),
     embedsMap: embedsMap(content),
-    // The application keeps Open for a Space Resource alone among these: every
-    // other kind here is drawn by its plugin (ADR 0142).
-    takesOpen: kind === 'space',
+    ownContent: fixtureOwnContent(kind, source, space),
+    mapContent: fixtureMapContent(open, kind),
   };
 }
 

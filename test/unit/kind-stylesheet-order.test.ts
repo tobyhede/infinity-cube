@@ -16,7 +16,7 @@ const kindsDirectory = 'packages/ui/src/kinds';
 /** Each surface, the stylesheet it overrides, and the suffix its kinds' stylesheets carry. */
 const SURFACES = [
   {
-    module: 'packages/ui/src/CanvasResource.tsx',
+    module: 'packages/ui/src/PluginResource.tsx',
     base: './canvas-resource.css',
     suffix: '-canvas.css',
   },

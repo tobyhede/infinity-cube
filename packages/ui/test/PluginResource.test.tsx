@@ -708,6 +708,20 @@ describe('the Map host a plugin draws inside (ADR 0142)', () => {
     expect(probeMounts).toBe(1);
   });
 
+  it('keeps a drawing plugin and its state mounted when its Actions are withdrawn and offered again', () => {
+    probeMounts = 0;
+    const actions = [[{ id: 'delete', label: 'Delete', onSelect: () => 'done' as const }]];
+    const { rerender } = render(
+      <PluginSurface {...probeProps({ entityActions: actions })} entry={probeEntry} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Counted 0' }));
+    rerender(<PluginSurface {...probeProps({ entityActions: [] })} entry={probeEntry} />);
+    expect(screen.getByRole('button', { name: 'Counted 1' })).toBeInTheDocument();
+    rerender(<PluginSurface {...probeProps({ entityActions: actions })} entry={probeEntry} />);
+    expect(screen.getByRole('button', { name: 'Counted 1' })).toBeInTheDocument();
+    expect(probeMounts).toBe(1);
+  });
+
   it('offers no authoring while exclusive work runs elsewhere, its own Title and Actions included', () => {
     render(
       <PluginResource

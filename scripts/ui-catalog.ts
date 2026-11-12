@@ -972,7 +972,7 @@ export const buildUiCatalog = (repositoryRoot = process.cwd()): UiCatalog => {
 
   /**
    * The dead-rule half of the ratchet, over the stylesheets that live beside their
-   * component rather than in `styles.css` — `canvas-resource.css` beside `CanvasResource`,
+   * component rather than in `styles.css` — `canvas-resource.css` beside `PluginResource`,
    * `resource-search-combobox.css` beside `ResourceSearchCombobox`,
    * `markdown-source-editor.css` beside `MarkdownSourceEditor`, and
    * `command-dock.css` beside `CommandDock`, which is the first of them under

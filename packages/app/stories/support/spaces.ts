@@ -91,9 +91,7 @@ const RESOURCE_E = uuidSchema.parse('00000000-0000-4000-8000-00000000000c');
 const SPINE = [RESOURCE_A, RESOURCE_B, RESOURCE_C, RESOURCE_D, RESOURCE_E] as const;
 
 const positions = (count: number): Record<string, ResourcePlacement> =>
-  Object.fromEntries(
-    SPINE.slice(0, count).map((id, index) => [id, { x: index * 420, y: 0, open: false }]),
-  );
+  Object.fromEntries(SPINE.slice(0, count).map((id, index) => [id, { x: index * 420, y: 0 }]));
 
 /** The first `links` steps along the spine: three Graphs of one shape at three lengths. */
 const chain = (links: number): GraphEdge[] =>
@@ -381,7 +379,7 @@ export const storyGraphIds = (): (() => GraphId) => {
  * judge a row of choices whose labels are all the same length.
  */
 const traversalPositions = (ids: readonly ResourceId[]): Record<string, ResourcePlacement> =>
-  Object.fromEntries(ids.map((id, index) => [id, { x: index * 420, y: 0, open: false }]));
+  Object.fromEntries(ids.map((id, index) => [id, { x: index * 420, y: 0 }]));
 
 const traversalResources = (
   titled: readonly (readonly [ResourceId, string])[],
@@ -681,10 +679,7 @@ const dockChain = (links: number): GraphEdge[] =>
 
 const dockPositions = (count: number): Record<string, ResourcePlacement> =>
   Object.fromEntries(
-    DOCK_PLACED.slice(0, count).map((resource, index) => [
-      resource.id,
-      { x: index * 420, y: 0, open: false },
-    ]),
+    DOCK_PLACED.slice(0, count).map((resource, index) => [resource.id, { x: index * 420, y: 0 }]),
   );
 
 /**
@@ -788,7 +783,7 @@ const crossingSpace = (
         positions: Object.fromEntries(
           targets.map((_, index): [string, ResourcePlacement] => [
             chainId(block + 3 + index),
-            { x: (index % 2) * 420, y: Math.floor(index / 2) * 320, open: false },
+            { x: (index % 2) * 420, y: Math.floor(index / 2) * 320 },
           ]),
         ),
         graphs: [{ id: chainId(block + 2), title: 'Catalogue', edges: [] }],
@@ -885,7 +880,7 @@ export const metaSnapshot: SpaceSnapshot = {
         positions: Object.fromEntries(
           META_TARGETS.map((_, index): [string, ResourcePlacement] => [
             metaId(0x8 + index),
-            { x: (index % 2) * 420, y: Math.floor(index / 2) * 320, open: false },
+            { x: (index % 2) * 420, y: Math.floor(index / 2) * 320 },
           ]),
         ),
         graphs: [{ id: META_GRAPH, title: 'Catalogue', edges: [] }],
@@ -963,12 +958,12 @@ export const edgeToolbarSnapshot: SpaceSnapshot = {
         title: 'Titled Edges',
         kind: 'positioned',
         positions: {
-          [EDGE_R1]: { x: 0, y: 0, open: false },
-          [EDGE_R2]: { x: 260 + EDGE_SHORT_GAP, y: 0, open: false },
-          [EDGE_R3]: { x: 2 * 260 + EDGE_SHORT_GAP + EDGE_LONG_GAP, y: 0, open: false },
-          [EDGE_R4]: { x: 0, y: 420, open: false },
-          [EDGE_R5]: { x: 260 + EDGE_LONG_GAP, y: 420, open: false },
-          [EDGE_R6]: { x: 2 * (260 + EDGE_LONG_GAP), y: 420, open: false },
+          [EDGE_R1]: { x: 0, y: 0 },
+          [EDGE_R2]: { x: 260 + EDGE_SHORT_GAP, y: 0 },
+          [EDGE_R3]: { x: 2 * 260 + EDGE_SHORT_GAP + EDGE_LONG_GAP, y: 0 },
+          [EDGE_R4]: { x: 0, y: 420 },
+          [EDGE_R5]: { x: 260 + EDGE_LONG_GAP, y: 420 },
+          [EDGE_R6]: { x: 2 * (260 + EDGE_LONG_GAP), y: 420 },
         },
         graphs: [
           {
@@ -1044,10 +1039,10 @@ export const imageReferenceSnapshot: SpaceSnapshot = {
         title: 'Pictures',
         kind: 'positioned',
         positions: {
-          [imageReferenceIds.harbour]: { x: 0, y: 0, open: false },
-          [imageReferenceIds.harbourReference]: { x: 360, y: 0, open: false },
-          [imageReferenceIds.missing]: { x: 0, y: 200, open: false },
-          [imageReferenceIds.missingReference]: { x: 360, y: 200, open: false },
+          [imageReferenceIds.harbour]: { x: 0, y: 0 },
+          [imageReferenceIds.harbourReference]: { x: 360, y: 0 },
+          [imageReferenceIds.missing]: { x: 0, y: 200 },
+          [imageReferenceIds.missingReference]: { x: 360, y: 200 },
         },
         graphs: [{ id: imageReferenceId(1), title: 'Main', edges: [] }],
         activeGraph: imageReferenceId(1),
@@ -1221,13 +1216,13 @@ export const notesSnapshot: SpaceSnapshot = {
         title: 'Launch',
         kind: 'positioned',
         positions: {
-          [notesIds.welcome]: { x: 0, y: 0, open: false },
-          [notesIds.demo]: { x: 420, y: -200, open: false },
-          [notesIds.architecture]: { x: 420, y: 200, open: false },
-          [notesIds.questions]: { x: 840, y: 0, open: false },
-          [notesIds.outage]: { x: 0, y: 400, open: false },
-          [notesIds.thanks]: { x: 0, y: 700, open: false },
-          [notesIds.backup]: { x: 420, y: 400, open: false },
+          [notesIds.welcome]: { x: 0, y: 0 },
+          [notesIds.demo]: { x: 420, y: -200 },
+          [notesIds.architecture]: { x: 420, y: 200 },
+          [notesIds.questions]: { x: 840, y: 0 },
+          [notesIds.outage]: { x: 0, y: 400 },
+          [notesIds.thanks]: { x: 0, y: 700 },
+          [notesIds.backup]: { x: 420, y: 400 },
         },
         graphs: [
           {

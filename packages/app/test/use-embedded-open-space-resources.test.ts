@@ -10,7 +10,7 @@ import {
   useEmbeddedOpenSpaceResources,
   type EmbeddedTargetReader,
 } from '../src/use-embedded-open-space-resources';
-import { fixtureDisplay, fixtureFacts } from './render-adapter-fixtures';
+import { fixtureFacts } from './render-adapter-fixtures';
 import { publishedEmbeds } from './published-embeds';
 
 /** No gesture in flight: the lean is a drag's, and these tests run none. */
@@ -36,10 +36,8 @@ const spaceResource = (resourceId: typeof HOST, mapId: typeof MAP): ResourceFlow
     title: 'Elsewhere',
     readOnly: false,
     ...bareKindData('space'),
-    ...fixtureFacts('space'),
-    open: true,
+    ...fixtureFacts('space', true, '', { spaceId: TARGET, map: mapId }),
     selectedForAuthoring: false,
-    display: fixtureDisplay(true, 'space', '', { spaceId: TARGET, map: mapId }),
     activeGraphId: null,
     activeGraphColor: '#8a94a6',
     borderColor: null,

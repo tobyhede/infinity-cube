@@ -9,7 +9,7 @@ export * from './resource-shape';
 export * from './resource-size';
 export * from './resource-content';
 export * from './json-value';
-export * from './kinds/kind-module';
+export * from './kinds/plugin-module';
 export { PLUGINS, PLUGIN_KINDS, type PluginKind } from './kinds/plugins';
 export { declaredOutline, type PluginContent } from './kinds/plugin-kind';
 export * from './kinds/ur';
@@ -21,18 +21,14 @@ export {
   KIND_IDS,
   canonicalResource,
   contentTarget,
-  drawnByPlugin,
-  takesOpen,
   KIND_ID_FORM,
   isKindId,
   isRegisteredKind,
   isMissingKind,
   isOfKind,
   isMissingKindId,
-  isPluginDrawnKind,
   kindFlags,
   isPluginKind,
-  keepsMapContent,
   mapContentProblem,
   mapContentWithoutMap,
   resolvedMapContent,

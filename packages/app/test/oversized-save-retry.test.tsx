@@ -42,7 +42,7 @@ const withNotes = (body: string): SpaceSnapshot => ({
         id: MAP_ID,
         title: 'Map',
         kind: 'positioned',
-        positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
+        positions: { [RESOURCE_ID]: { x: 0, y: 0 } },
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
         activeGraph: GRAPH_ID,
       },

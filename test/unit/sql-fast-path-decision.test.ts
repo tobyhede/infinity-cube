@@ -48,7 +48,7 @@ const S_LINK_TO_T = idAt(51);
 const META_LINK_TO_T = idAt(60);
 const META_LINK_TO_S = idAt(61);
 
-const closed = (x: number, y: number) => ({ x, y, open: false as const });
+const closed = (x: number, y: number) => ({ x, y });
 
 const markdown = (id: UUID, title: string) => ({
   id,
@@ -348,7 +348,7 @@ const applyOps = (snapshot: SpaceSnapshot, ops: readonly Op[]): SpaceSnapshot =>
           const next =
             current.kind === 'resize'
               ? { ...placed, size: { width: current.width, height: current.height } }
-              : { ...placed, open: false as const };
+              : placed;
           return { ...m, positions: { ...m.positions, [resource]: next } };
         });
         break;

@@ -21,8 +21,8 @@ const snapshot: SpaceSnapshot = {
         title: 'Working',
         kind: 'positioned',
         positions: {
-          [RESOURCE_A]: { x: 0, y: 0, open: false },
-          [RESOURCE_B]: { x: 320, y: 0, open: false },
+          [RESOURCE_A]: { x: 0, y: 0 },
+          [RESOURCE_B]: { x: 320, y: 0 },
         },
         graphs: [{ id: GRAPH_ID, title: 'Main', edges: [{ from: RESOURCE_A, to: RESOURCE_B }] }],
       },
@@ -82,7 +82,7 @@ describe('loadSpaceSnapshot', () => {
             ...firstMap,
             positions: {
               ...firstMap.positions,
-              [RESOURCE_A]: { x: 0, y: 0, open: true, size: { width: Infinity, height: 146 } },
+              [RESOURCE_A]: { x: 0, y: 0, size: { width: Infinity, height: 146 } },
             },
           },
         ],

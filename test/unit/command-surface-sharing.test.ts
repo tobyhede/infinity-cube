@@ -23,7 +23,6 @@ const read = (path: string): string =>
 const sharedSheet = read('packages/ui/src/command-surface.css');
 const dockSheet = read('packages/app/src/components/command-dock.css');
 const resourceSheet = read('packages/ui/src/canvas-resource.css');
-const railSheet = read('packages/ui/src/resource-rail.css');
 const dock = read('packages/app/src/components/CommandDock.tsx');
 const canvasCommandToolbar = read('packages/ui/src/CanvasCommandToolbar.tsx');
 const dockMapGraph = read('packages/app/src/components/CommandDockMapGraph.tsx');
@@ -31,7 +30,7 @@ const resourceRailActions = read('packages/ui/src/ResourceRailActions.tsx');
 const edgeToolbar = read('packages/ui/src/EdgeToolbar.tsx');
 const spaceResourceSelectors = read('packages/ui/src/SpaceResourceSelectors.tsx');
 const spaceResourceRail = read('packages/app/src/build-space-resource-rail.tsx');
-const canvasResource = read('packages/ui/src/CanvasResource.tsx');
+const pluginResource = read('packages/ui/src/PluginResource.tsx');
 
 /** The declaration block of the rule whose selector is exactly `selector`. */
 const block = (stylesheet: string, selector: string): string => {
@@ -134,15 +133,9 @@ describe('the Resource rail', () => {
    * painted `activeGraphColor` by `ResourceNode` and each Graph's Edges are drawn in
    * its own — which is where a colour that says *which Graph* belongs.
    */
-  it('paints no background of its own', () => {
-    expect(railSheet).not.toMatch(/(?<![\w-])background(-color)?:/u);
-    expect(railSheet).not.toContain('--resource-rail-graph');
-  });
-
-  /** And no Resource puts one back behind the strip. */
-  it('is not banded by the Resource that mounts it either', () => {
+  it('is not banded by the Resource that mounts it', () => {
     const railRules = [
-      ...resourceSheet.matchAll(/\.(?:canvas-)?resource(?:-|__)rail[^{]*\{([^}]*)\}/gu),
+      ...resourceSheet.matchAll(/\.canvas-resource__actions[^{]*\{([^}]*)\}/gu),
     ].map((found) => found[1] ?? '');
 
     expect(railRules.length).toBeGreaterThan(0);
@@ -173,7 +166,7 @@ describe('choosing a Map or a Graph', () => {
    * And an Open Space Resource's two choices are themselves **one** control:
    * `@project/ui`'s `SpaceResourceSelectors` is the sole place a Map or Graph
    * choice is turned into a `ChoiceMenu`. The application's Space Resource rail
-   * (`buildSpaceResourceRail`) mounts it, and `CanvasResource` draws that rail
+   * (`buildSpaceResourceRail`) mounts it, and `PluginResource` draws that rail
    * as it is handed, restating neither.
    */
   it('is owned once by @project/ui, not copied onto the canvas Resource or the app rail', () => {
@@ -182,7 +175,7 @@ describe('choosing a Map or a Graph', () => {
     expect(spaceResourceRail).not.toContain('<ChoiceMenu');
     expect(spaceResourceRail).not.toMatch(/function SpaceResourceSelector/u);
 
-    expect(canvasResource).not.toContain('<ChoiceMenu');
-    expect(canvasResource).not.toMatch(/function SpaceResourceSelector/u);
+    expect(pluginResource).not.toContain('<ChoiceMenu');
+    expect(pluginResource).not.toMatch(/function SpaceResourceSelector/u);
   });
 });

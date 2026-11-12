@@ -29,15 +29,7 @@ import {
   useStore,
   useStoreApi,
 } from '@xyflow/react';
-import {
-  DEFAULT_KIND,
-  COLLAPSED_RESOURCE_SIZE,
-  titleName,
-  uuidSchema,
-  type ResourceId,
-  type MapId,
-} from '@project/core';
-import { resolveResourceContent, resourceTakesOpen } from '@project/graph';
+import { DEFAULT_KIND, titleName, uuidSchema, type ResourceId, type MapId } from '@project/core';
 import type { SpaceSession } from '@project/persistence';
 import {
   CANVAS_RESOURCE_DRAG_TILT_DEGREES,
@@ -50,7 +42,7 @@ import {
 import {
   authorsEmbeddedMap,
   nodeTypes,
-  OPEN_RESOURCE_Z_INDEX,
+  EMBEDDING_RESOURCE_Z_INDEX,
   GraphConnectionLine,
   GraphHeadMarkers,
   GraphConnectionLineHeadShape,
@@ -100,15 +92,12 @@ import {
   bindCommand,
   keyAnswerOf,
   NOT_A_CANVAS_COMMAND,
-  OPEN_AND_EXPAND,
-  OPEN_RESOURCE,
   presentFromHereCommand,
   REMOVE_SELECTION,
   removeFromMapReportedBy,
   RENAME_RESOURCE,
   showFullViewCommand,
   type AuthoringOccurrence,
-  type OpenTarget,
   type OwnResourceTarget,
   type RemovalTarget,
   type PresentFrom,
@@ -122,12 +111,7 @@ import {
   type NavigationDirection,
 } from '../graph-navigation';
 import { FullView } from './FullView';
-import {
-  capSizeHint as capHintAt,
-  openAndExpandSize,
-  openHeight,
-  visibleCanvasCap,
-} from '../open-and-expand';
+import { capSizeHint as capHintAt, visibleCanvasCap } from '../visible-canvas-cap';
 import type { CommandOutcomes } from '../command-outcomes';
 import type { DeleteConfirmation } from '../delete-confirmation';
 import {
@@ -379,10 +363,6 @@ export function SpaceCanvas({
     reportEmbeddedMapEditing,
   } = canvasRendering;
   const nodes = useMemo(() => liveProjection?.nodes ?? [], [liveProjection]);
-  const latestNodes = useRef(nodes);
-  useLayoutEffect(() => {
-    latestNodes.current = nodes;
-  }, [nodes]);
   const edges = useMemo(() => liveProjection?.edges ?? [], [liveProjection]);
   // Null while a replacement placement resolves. The canvas keeps drawing the
   // Resources on screen through that window, so a connection is reachable with
@@ -408,7 +388,7 @@ export function SpaceCanvas({
   const { visibleGraphs: graphs, colors: colorByGraphId } = view.projection;
   const { createOnCanvas, dropExistingResource, dropSpace, createFromData } = placement;
   const addCanvasResource = useCallback(() => createOnCanvas(DEFAULT_KIND), [createOnCanvas]);
-  const { screenToFlowPosition, getZoom, setCenter } = useReactFlow();
+  const { screenToFlowPosition, getZoom } = useReactFlow();
 
   const spaces = useOpenSpaces();
   const thisSpaceId = spaceSession.getState().working.id;
@@ -604,43 +584,6 @@ export function SpaceCanvas({
       ? null
       : { from: connectingFrom, anchor: connecting.anchor };
   /**
-   * Open and expand (ADR 0137): one Edit Opening the Resource at the size its
-   * content needs, capped at what this canvas shows at the current zoom, after
-   * which the camera centres it at that zoom. The camera is the canvas's own,
-   * so only its own Map's Resources are given it.
-   */
-  const openAndExpand = useCallback(
-    (resourceId: ResourceId): 'completed' | 'retained' => {
-      // Read when pressed, so the action factory below is not rebuilt on every
-      // projection a drag or a selection publishes.
-      const node = latestNodes.current.find((each) => each.data.resourceId === resourceId);
-      const resource = view.space.lookup.resource(resourceId);
-      const area = canvasRef.current;
-      if (node === undefined || resource === undefined || area === null) return 'retained';
-      if (!resourceTakesOpen(view.space, resource)) return 'retained';
-      const zoom = getZoom();
-      const content = resolveResourceContent(view.space, resource);
-      const size = openAndExpandSize(
-        {
-          width: node.width ?? COLLAPSED_RESOURCE_SIZE.width,
-          height: node.height ?? COLLAPSED_RESOURCE_SIZE.height,
-        },
-        visibleCanvasCap(area.getBoundingClientRect(), zoom),
-        (at) => openHeight(area, node, content, at),
-      );
-      const result = authoring.complete({ kind: 'opened-resource-to-fit', resourceId, size });
-      if (result.kind === 'refused') return 'retained';
-      // Issued, never awaited (ADR 0043). The Resource's top-left stays where
-      // it is, so its new rect is known before the projection draws it.
-      void setCenter(node.position.x + size.width / 2, node.position.y + size.height / 2, {
-        zoom,
-        duration: 0,
-      });
-      return 'completed';
-    },
-    [view.space, getZoom, setCenter, authoring],
-  );
-  /**
    * A plugin's size hint capped at what this canvas shows at the current zoom
    * (ADR 0142): the most a gesture may grow a Resource to, a canvas fact. Read
    * when a commit is made, so nothing is rebuilt on every zoom.
@@ -657,19 +600,6 @@ export function SpaceCanvas({
   const presentFromHere = useMemo(
     () => presentFromHereCommand({ presentFrom, mayPresent: availability.present }),
     [presentFrom, availability.present],
-  );
-  /** Whether Open and expand is offered on a Resource of the canvas's own Map. */
-  const expandable = useCallback(
-    (resourceId: ResourceId): boolean => {
-      const resource = view.space.lookup.resource(resourceId);
-      return (
-        availability.authorOnCanvas &&
-        resource !== undefined &&
-        resourceTakesOpen(view.space, resource) &&
-        placedResources.some((placed) => placed.id === resourceId)
-      );
-    },
-    [availability.authorOnCanvas, view.space, placedResources],
   );
   /** Read in Full View, on the canvas's own Map: what Space and the rail item both run. */
   const showFullViewHere = useMemo(
@@ -709,10 +639,6 @@ export function SpaceCanvas({
                   ]
                 : [],
               {
-                openAndExpand: bindCommand(OPEN_AND_EXPAND, {
-                  resourceId,
-                  canvas: { expandable, openAndExpand },
-                }),
                 fullView: bindCommand(showFullViewHere, { resourceId }),
                 present: bindCommand(presentFromHere, resourceId),
               },
@@ -723,8 +649,6 @@ export function SpaceCanvas({
       placedResources,
       selectResource,
       mapId,
-      expandable,
-      openAndExpand,
       showFullViewHere,
       presentFromHere,
     ],
@@ -746,7 +670,7 @@ export function SpaceCanvas({
     capSizeHint,
     mapEmbeddings,
   });
-  const { bodyEditing, openResource: onOpenResource, beginTitleEditing } = resourceAuthoring;
+  const { bodyEditing, beginTitleEditing } = resourceAuthoring;
   /**
    * The framing an author gave a Map authored in place, written through the
    * embedding's `select`, the plugin's own commit, so withdrawal covers it.
@@ -799,7 +723,7 @@ export function SpaceCanvas({
               focusable: false,
               deletable: false,
             })),
-            // The three Resource commands aimed at a retained read answer it the
+            // The two Resource commands aimed at a retained read answer it the
             // same way: reopen the target's session so the next press acts.
             // The canvas still announces that delete removes the focused Resource
             // from its Map, and this drawing is still focusable, so an
@@ -818,10 +742,6 @@ export function SpaceCanvas({
                 ...stamped,
                 data: {
                   ...stamped.data,
-                  onOpenChange: () => {
-                    void resumeEmbedded(request.spaceId);
-                    return 'retained';
-                  },
                   onBeginTitleEditing: () => {
                     void resumeEmbedded(request.spaceId);
                   },
@@ -923,7 +843,6 @@ export function SpaceCanvas({
         authoring,
         availability,
         bodyEditing: resourceAuthoring.bodyEditing,
-        openResource: onOpenResource,
         beginTitleEditing,
         selection,
         removeFromMap: removeFromMapReportedBy(commandOutcomes, authoring),
@@ -939,10 +858,6 @@ export function SpaceCanvas({
         availability: value.availability,
         bodyEditing: value.bodyEditing,
         selection: value.surface.adapter.getState().selection,
-        openResource: (id: string) => {
-          const resourceId = resourceOfNode(value.nodes, id);
-          if (resourceId !== undefined) value.openResource(resourceId);
-        },
         beginTitleEditing: (id: string) => {
           const resourceId = resourceOfNode(value.nodes, id);
           if (resourceId !== undefined) value.beginTitleEditing(resourceId);
@@ -972,7 +887,6 @@ export function SpaceCanvas({
       commandOutcomes,
       availability,
       resourceAuthoring.bodyEditing,
-      onOpenResource,
       beginTitleEditing,
       selection,
       edgeAuthoring,
@@ -1069,12 +983,7 @@ export function SpaceCanvas({
     if (keyBelongsElsewhere(event.nativeEvent)) return;
     if (pressesBinding(FULL_VIEW_KEYS.leave, event.nativeEvent)) {
       event.preventDefault();
-      leaveFullView(false);
-      return;
-    }
-    if (pressesBinding(FULL_VIEW_KEYS.openOnCanvas, event.nativeEvent)) {
-      event.preventDefault();
-      leaveFullView(true);
+      leaveFullView();
       return;
     }
     // The walk is the content's: an arrow on the view's own buttons is theirs.
@@ -1092,8 +1001,8 @@ export function SpaceCanvas({
     }
   };
 
-  /** Back to the canvas, on the Resource last read, Opening it there when asked and allowed. */
-  const leaveFullView = (open: boolean): void => {
+  /** Back to the canvas, on the Resource last read. */
+  const leaveFullView = (): void => {
     if (fullView === undefined || fullViewOf === null) return;
     fullView.show(null);
     const node = nodes.find((each) => each.data.resourceId === fullViewOf);
@@ -1104,7 +1013,6 @@ export function SpaceCanvas({
     canvasRef.current
       ?.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(node.id)}"]`)
       ?.focus();
-    if (open && availability.authorOnCanvas && !bodyEditing) onOpenResource(node.id);
   };
 
   // Full View lasts while its Resource is drawn here and the canvas may be
@@ -1127,21 +1035,20 @@ export function SpaceCanvas({
   }, [fullViewShown]);
   useKeyCover('full-view', fullViewShown);
 
-  // Enter, Shift+Enter and Space are aimed at the focused Resource: the node the
-  // press landed on, inside this canvas, and never one of its own controls,
-  // content or editor. The narrow guard is load-bearing rather than defensive:
-  // an Open Resource draws its editor *inside* the node, so a Space typed into
-  // it would otherwise be taken before the document ever received the
-  // character. Enter Opens on whichever drawn Map holds the node; Shift+Enter
-  // and Space act on the canvas's own Map, whose camera and Full View they use.
+  // Space is aimed at the focused Resource: the node the press landed on,
+  // inside this canvas, and never one of its own controls, content or editor.
+  // The narrow guard is load-bearing rather than defensive: a plugin draws its
+  // editor *inside* the node, so a Space typed into it would otherwise be taken
+  // before the document ever received the character. Space acts on the
+  // canvas's own Map, whose Full View it uses.
   const focusedNodeOf = useCallback((event: KeyboardEvent): string | undefined => {
     if (!(event.target instanceof Element)) return undefined;
     const node = event.target.closest<HTMLElement>('.react-flow__node[data-id]');
     if (node === null || canvasRef.current?.contains(node) !== true) return undefined;
     return node.dataset['id'];
   }, []);
-  // A body edit holds the canvas's Enter and Space keys though not its rail, so
-  // a press while one is open finds no Resource to aim at.
+  // A body edit holds the canvas's Space key though not its rail, so a press
+  // while one is open finds no Resource to aim at.
   const ownResourceOf = (event: KeyboardEvent): OwnResourceTarget | undefined => {
     const nodeId = bodyEditing ? undefined : focusedNodeOf(event);
     const resourceId = nodeId === undefined ? undefined : resourceOfNode(nodes, nodeId);
@@ -1149,39 +1056,6 @@ export function SpaceCanvas({
   };
   useKeyAnswers(
     [
-      {
-        id: OPEN_RESOURCE.id,
-        answer: (event: KeyboardEvent) =>
-          answerCommand(OPEN_RESOURCE, event, (): OpenTarget | undefined => {
-            const nodeId = focusedNodeOf(event);
-            if (nodeId === undefined) return undefined;
-            for (const occurrence of occurrences) {
-              const node = occurrence.nodes.find((each) => each.id === nodeId);
-              if (node === undefined) continue;
-              return {
-                occurrence: {
-                  authorOnCanvas: occurrence.availability.authorOnCanvas,
-                  // The canvas's own body edit holds the keyboard on every Map it draws.
-                  bodyEditing: bodyEditing || occurrence.bodyEditing,
-                  openResource: occurrence.openResource,
-                },
-                nodeId,
-                takesOpen: node.data.takesOpen,
-              };
-            }
-            return undefined;
-          }),
-      },
-      {
-        id: OPEN_AND_EXPAND.id,
-        answer: (event: KeyboardEvent) =>
-          answerCommand(OPEN_AND_EXPAND, event, () => {
-            const own = ownResourceOf(event);
-            return own === undefined
-              ? undefined
-              : { ...own, canvas: { expandable, openAndExpand } };
-          }),
-      },
       {
         id: showFullViewHere.id,
         answer: (event: KeyboardEvent) =>
@@ -1259,11 +1133,11 @@ export function SpaceCanvas({
   const canvasNodes = useMemo(
     () =>
       [...editableNodes, ...liveEmbeddings.flatMap((value) => value.nodes)].map((node) => {
-        // A Resource drawing a Map embedding is drawn over its Closed neighbours,
-        // as an Open Resource is, so the Map drawn over its rect is reachable.
+        // A Resource drawing a Map embedding is drawn over its neighbours, so the
+        // Map drawn over its rect is reachable; no other Resource is raised.
         const raised =
           node.zIndex === undefined && embeds.has(node.id)
-            ? { ...node, zIndex: OPEN_RESOURCE_Z_INDEX }
+            ? { ...node, zIndex: EMBEDDING_RESOURCE_Z_INDEX }
             : node;
         const withEmbed = { ...raised, data: { ...raised.data, onMapEmbed: publishMapEmbed } };
         const withHeight = reportsBodyHeight(node)
@@ -2156,8 +2030,7 @@ export function SpaceCanvas({
         <FullView
           space={view.space}
           resourceId={fullViewOf}
-          onLeave={() => leaveFullView(false)}
-          onOpen={availability.authorOnCanvas ? () => leaveFullView(true) : null}
+          onLeave={leaveFullView}
           onKeyDown={fullViewKeyDown}
           onPluginFailure={plugins?.report}
         />

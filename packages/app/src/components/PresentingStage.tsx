@@ -1,15 +1,10 @@
 import type { GraphId, MapId, ResourceId } from '@project/core';
-import {
-  referencedResources,
-  resolveResourceContent,
-  resourceDrawnByPlugin,
-  type Space,
-} from '@project/graph';
-import { HostMapProvider, PresentedPluginResource, PresentedResource, Stage } from '@project/ui';
+import type { Space } from '@project/graph';
+import { Stage } from '@project/ui';
 import { presentedNotes } from '../notes-window';
-import { drawPresentedMapEmbed } from './map-embed-draws';
 import { PresentedNotesList } from './PresentedNotesList';
 import { PresentingChrome, type PresentingChromeProps } from './PresentingChrome';
+import { StagedResource } from './StagedResource';
 import './rehearsal-notes.css';
 
 export interface PresentingStageProps extends PresentingChromeProps {
@@ -32,11 +27,10 @@ export interface PresentingStageProps extends PresentingChromeProps {
  * with the presenting chrome in the strip below the frame, and below that the
  * Resource's notes while the presenter rehearses with them (ADR 0129).
  *
- * The Resource is drawn by its kind, through the content
- * `resolveResourceContent` answers, or by its plugin with the Map content its
- * plugin gives where there is no Map (ADR 0142), and never by its position,
- * size, Shape or Open state on any Map — so nothing about how it sits on the canvas reaches
- * the audience. Nothing here authors the Space.
+ * The Resource is drawn by its plugin with the Map content its plugin gives
+ * where there is no Map (ADR 0142), and never by its position, size or Map
+ * content on any Map — so nothing about how it sits on the canvas reaches the
+ * audience. Nothing here authors the Space.
  */
 export function PresentingStage({
   space,
@@ -49,7 +43,6 @@ export function PresentingStage({
 }: PresentingStageProps) {
   const resource = space.lookup.resource(resourceId);
   if (resource === undefined) return null;
-  const content = resolveResourceContent(space, resource);
   const notes = chrome.notesShown ? presentedNotes(space, mapId, graphId, resourceId) : undefined;
   return (
     <Stage
@@ -67,21 +60,12 @@ export function PresentingStage({
         </>
       }
     >
-      {resourceDrawnByPlugin(space, resource) ? (
-        <HostMapProvider draw={drawPresentedMapEmbed}>
-          <PresentedPluginResource
-            resourceId={resource.id}
-            kind={resource.kind}
-            title={resource.title}
-            content={resource.content}
-            embeddable={referencedResources(space, resource)}
-            onFailure={onPluginFailure}
-            replacementEpoch={replacementEpoch}
-          />
-        </HostMapProvider>
-      ) : (
-        <PresentedResource title={resource.title} content={content} />
-      )}
+      <StagedResource
+        space={space}
+        resourceId={resource.id}
+        onPluginFailure={onPluginFailure}
+        replacementEpoch={replacementEpoch}
+      />
     </Stage>
   );
 }

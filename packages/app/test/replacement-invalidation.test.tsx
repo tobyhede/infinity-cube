@@ -85,8 +85,8 @@ const snapshot = (
           kind: 'positioned',
           positions: {
             [RESOURCE_ID]: open
-              ? { x, y, open: false, content: { open: true }, size: { width: 560, height: 420 } }
-              : { x, y, open: false },
+              ? { x, y, content: { open: true }, size: { width: 560, height: 420 } }
+              : { x, y },
           },
           graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
         },

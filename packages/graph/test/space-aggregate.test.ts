@@ -73,7 +73,7 @@ const snapshot = (
                 positions: Object.fromEntries(
                   resources.map(({ id: resourceId }, index) => [
                     resourceId,
-                    { x: index * 100, y: 0, open: false },
+                    { x: index * 100, y: 0 },
                   ]),
                 ),
                 graphs: [{ id: GRAPH, title: 'Graph', edges: [] }],
@@ -90,7 +90,7 @@ const snapshot = (
                 positions: Object.fromEntries(
                   resources.map(({ id: resourceId }, index) => [
                     resourceId,
-                    { x: index * 100, y: 100, open: false },
+                    { x: index * 100, y: 100 },
                   ]),
                 ),
                 graphs: [{ id: SECOND_GRAPH, title: 'Second Graph', edges: [] }],

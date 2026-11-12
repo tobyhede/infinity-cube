@@ -10,7 +10,6 @@ import {
   type UUID,
 } from '@project/core';
 import { bareKindData, type ResourceFlowNode } from '@project/react-flow-adapter';
-import { CLOSED_DISPLAY } from '@project/ui';
 import {
   MemorySpaceBackend,
   MemorySpaceBackendTestControl,
@@ -89,10 +88,10 @@ const snapshot = (id: UUID, title: string): SpaceSnapshot => {
           kind: 'positioned',
           positions: meta
             ? {
-                [resourceId]: { x: 0, y: 0, open: false },
-                [META_SPACE_RESOURCE_ID]: { x: 0, y: 40, open: false },
+                [resourceId]: { x: 0, y: 0 },
+                [META_SPACE_RESOURCE_ID]: { x: 0, y: 40 },
               }
-            : { [resourceId]: { x: 0, y: 0, open: false } },
+            : { [resourceId]: { x: 0, y: 0 } },
           graphs: [
             { id: graphOne, title: 'One', edges: [] },
             { id: graphTwo, title: 'Two', edges: [] },
@@ -369,11 +368,8 @@ describe('Open Spaces', () => {
     const containing = await openSpaces.open(META_ID);
     // What the projection draws for an Open Reference Resource whose Target is
     // `Meta`'s Space Resource: the Target's Space view, reached by reference.
-    const content: ResourceContent = {
-      kind: 'space',
-      content: { spaceId: OTHER_ID, map: MAP_ID, graph: GRAPH_ONE },
-      via: 'target',
-    };
+    const view = { spaceId: OTHER_ID, map: MAP_ID, graph: GRAPH_ONE };
+    const content: ResourceContent = { kind: 'space', content: view, via: 'target' };
     const reference = (open: boolean): ResourceFlowNode => ({
       id: MINTED_RESOURCE_ID,
       type: 'resource',
@@ -388,10 +384,17 @@ describe('Open Spaces', () => {
         ...bareKindData('reference'),
         authorsContent: authorsContent(content),
         embedsMap: embedsMap(content),
-        takesOpen: true,
-        open,
+        ownContent: { target: META_SPACE_RESOURCE_ID },
+        mapContent: { open },
+        embeddable: [
+          {
+            id: META_SPACE_RESOURCE_ID,
+            title: 'Other',
+            kind: 'space',
+            content: view,
+          },
+        ],
         selectedForAuthoring: false,
-        display: open ? { shown: 'open', content } : CLOSED_DISPLAY,
         activeGraphId: null,
         activeGraphColor: '#8a94a6',
         borderColor: null,

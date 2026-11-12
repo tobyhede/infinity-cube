@@ -23,8 +23,8 @@ const RULE = '@typescript-eslint/no-restricted-imports';
 /** The modules under a `kinds/` directory that name no kind: the interface and the registry. */
 const KIND_NEUTRAL_MODULES = new Set([
   'registry',
-  'kind-module',
-  'kind-view',
+  'plugin-module',
+  'plugin-listing',
   'plugins',
   'plugin-kind',
   'plugin-views',

@@ -6,8 +6,6 @@ import {
   AVAILABLE,
   bindCommand,
   keyAnswerOf,
-  OPEN_AND_EXPAND,
-  OPEN_RESOURCE,
   PRESENT_OFF_GRAPH,
   PRESENT_WHILE_EDITING,
   presentFromHereCommand,
@@ -216,70 +214,20 @@ describe('Add Resource and Rename', () => {
   });
 });
 
-describe('Open, Open and expand and Full View', () => {
-  const opening = (overrides: { authorOnCanvas?: boolean; bodyEditing?: boolean } = {}) => ({
-    authorOnCanvas: true,
-    bodyEditing: false,
-    openResource: vi.fn(),
-    ...overrides,
-  });
-  const expanding = () => ({
-    expandable: (id: string) => id === ON_GRAPH,
-    openAndExpand: vi.fn(),
-  });
+describe('Full View', () => {
   const reading = () => {
     const show = vi.fn();
     return { show, command: showFullViewCommand({ show, selectNodes: true }) };
   };
 
-  /**
-   * Open serves any drawn Map, so Enter Opens a Resource of a Map drawn inside a
-   * Space Resource; the other two use the canvas's own camera and Full View.
-   */
-  it('Opens on any drawn Map, and expands or reads in Full View on the canvas’s own', () => {
-    expect(OPEN_RESOURCE.serves).toBe('any');
-    expect(OPEN_AND_EXPAND.serves).toBe('own-map');
-    expect(reading().command.serves).toBe('own-map');
-
-    const embedded = opening();
-    OPEN_RESOURCE.run({ occurrence: embedded, nodeId: 'embedded-node', takesOpen: true });
-    expect(embedded.openResource).toHaveBeenCalledWith('embedded-node');
-  });
-
-  it('runs each at its Resource', () => {
-    const canvas = expanding();
+  /** Full View is the canvas's own, so it serves the Map the canvas draws alone. */
+  it('reads in Full View on the canvas’s own Map, at its Resource', () => {
     const { show, command } = reading();
+    expect(command.serves).toBe('own-map');
 
-    OPEN_AND_EXPAND.run({ resourceId: ON_GRAPH, canvas });
     command.run({ resourceId: ON_GRAPH });
 
-    expect(canvas.openAndExpand).toHaveBeenCalledWith(ON_GRAPH);
     expect(show).toHaveBeenCalledWith(ON_GRAPH);
-  });
-
-  it('offers no Open, and no Open and expand, on a Resource whose kind does not take Open', () => {
-    expect(
-      OPEN_RESOURCE.availability({ occurrence: opening(), nodeId: 'n', takesOpen: false }),
-    ).toEqual(ABSENT);
-    expect(
-      OPEN_AND_EXPAND.availability({
-        resourceId: OFF_GRAPH,
-        canvas: expanding(),
-      }),
-    ).toEqual(ABSENT);
-    expect(
-      OPEN_RESOURCE.availability({ occurrence: opening(), nodeId: 'n', takesOpen: true }),
-    ).toEqual(AVAILABLE);
-  });
-
-  it('offers no Open while a body is being edited', () => {
-    expect(
-      OPEN_RESOURCE.availability({
-        occurrence: opening({ bodyEditing: true }),
-        nodeId: 'n',
-        takesOpen: true,
-      }),
-    ).toEqual(ABSENT);
   });
 
   it('offers no Full View where the canvas cannot be selected on or draws none', () => {
@@ -295,24 +243,20 @@ describe('Open, Open and expand and Full View', () => {
 
   /**
    * Aimed at the focused Resource, so its own content, toolbar and editor keep
-   * Enter and Space, as a field anywhere does.
+   * Space, as a field anywhere does.
    */
-  it('leaves Enter to a Resource’s own content and controls, and takes it from the Resource', () => {
-    const drawn = opening();
-    const answer = keyAnswerOf(OPEN_RESOURCE, () => ({
-      occurrence: drawn,
-      nodeId: 'n',
-      takesOpen: true,
-    }));
+  it('leaves Space to a Resource’s own content and controls, and takes it from the Resource', () => {
+    const { show, command } = reading();
+    const answer = keyAnswerOf(command, () => ({ resourceId: ON_GRAPH }));
     const node = document.createElement('div');
     const content = document.createElement('div');
     content.className = 'nokey';
     node.append(content);
 
     for (const target of [content, document.createElement('button')])
-      expect(answer.answer(pressOn(target, 'Enter'))).toBe(false);
-    expect(drawn.openResource).not.toHaveBeenCalled();
-    expect(answer.answer(pressOn(node, 'Enter'))).toBe(true);
-    expect(drawn.openResource).toHaveBeenCalledOnce();
+      expect(answer.answer(pressOn(target, ' '))).toBe(false);
+    expect(show).not.toHaveBeenCalled();
+    expect(answer.answer(pressOn(node, ' '))).toBe(true);
+    expect(show).toHaveBeenCalledOnce();
   });
 });

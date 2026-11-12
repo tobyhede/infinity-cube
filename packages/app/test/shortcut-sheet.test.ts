@@ -11,12 +11,6 @@ import { shortcutOf, shortcutSections } from '../src/shortcut-sheet';
 const descriptionsOf = (bindings: Readonly<Record<string, KeyBinding>>) =>
   Object.values(bindings).map(({ description }) => description);
 
-/** The canvas keys no Resource answers: a plugin keeps every kind's Open (ADR 0142). */
-const OPENS_NOTHING: readonly string[] = [
-  CANVAS_KEYS.openResource.description,
-  CANVAS_KEYS.openAndExpand.description,
-];
-
 describe('shortcutSections', () => {
   it('lists every canvas and Full View key while authoring, and the sheet’s own', () => {
     const sections = shortcutSections('authoring');
@@ -25,13 +19,13 @@ describe('shortcutSections', () => {
     expect(
       sections.flatMap(({ shortcuts }) => shortcuts.map((entry) => entry.description)),
     ).toEqual([
-      ...descriptionsOf(CANVAS_KEYS).filter((description) => !OPENS_NOTHING.includes(description)),
+      ...descriptionsOf(CANVAS_KEYS),
       ...descriptionsOf(HELP_KEYS),
       ...descriptionsOf(FULL_VIEW_KEYS),
     ]);
   });
 
-  it('lists no Enter on the canvas, which opens no Resource (resource-plugins issue 07)', () => {
+  it('lists no Enter on the canvas, which opens no Resource', () => {
     const canvas = shortcutSections('authoring').find(({ title }) => title === 'On the canvas');
     expect(canvas?.shortcuts.filter(({ shortcut }) => shortcut.aria.includes('Enter'))).toEqual([]);
   });
@@ -48,9 +42,9 @@ describe('shortcutSections', () => {
 
 describe('shortcutOf', () => {
   it('announces the binding’s own aria-keyshortcuts', () => {
-    expect(shortcutOf(CANVAS_KEYS.openAndExpand)).toEqual({
-      aria: 'Shift+Enter',
-      presses: [['Shift', 'Enter']],
+    expect(shortcutOf(CANVAS_KEYS.renameResource)).toEqual({
+      aria: 'F2',
+      presses: [['F2']],
     });
   });
 

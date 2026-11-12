@@ -1,5 +1,4 @@
 import {
-  resourceOpen,
   resourceOutline,
   resourceSize,
   type JsonValue,
@@ -92,9 +91,6 @@ export function canvasProjection(space: Space, resolved: ResolvedMap): PendingCa
   // reveals those Resources without manufacturing positions (ADR 0040, ADR 0069).
   const resourceIds = mapResources(space, resolved.map).map((resource) => resource.id);
   const authored = Placement.fromMap(resolved.map);
-  const openResourceIds = new Set(
-    [...authored].filter(([, at]) => resourceOpen(at)).map(([resourceId]) => resourceId),
-  );
   // Every Resource drawn is one of `resourceIds`, the Map's own members, so
   // each has an entry.
   const entry = (resourceId: ResourceId) => {
@@ -106,8 +102,7 @@ export function canvasProjection(space: Space, resolved: ResolvedMap): PendingCa
   };
   const kinds = new Map(space.resources.map((resource) => [resource.id, resource.kind]));
   // The outline the canvas strokes, from the Map content the entry stores, as
-  // the plugin drawing the Resource declares it (ADR 0142); a rectangle for a
-  // kind no plugin draws.
+  // the plugin drawing the Resource declares it (ADR 0142).
   const drawnResourceShape = (resourceId: ResourceId): ResourceShape => {
     const kind = kinds.get(resourceId);
     const at = entry(resourceId);
@@ -136,7 +131,6 @@ export function canvasProjection(space: Space, resolved: ResolvedMap): PendingCa
           activeGraphColor: activeGraphColor(colors, activeGraphId),
           strategyGraph: laidOut,
           resourceIds,
-          openResourceIds,
           resourceShape: drawnResourceShape,
           mapContent: storedMapContent,
           resourceEmphasis: emphasisUnder(activeGraphId),

@@ -173,8 +173,8 @@ const graphedSpace = (
           title: 'Owner',
           kind: 'positioned',
           positions: {
-            [from]: { x: 0, y: 0, open: false },
-            [to]: { x: 300, y: 0, open: false },
+            [from]: { x: 0, y: 0 },
+            [to]: { x: 300, y: 0 },
           },
           graphs: [{ id: graphId, title: input.graphTitle ?? 'Graph', edges: [{ from, to }] }],
           activeGraph: graphId,
@@ -203,7 +203,7 @@ const spaceWithDanglingEdge = (id: UUID, title: string, memberId: UUID): SpaceSn
         id: MAP_ID,
         title: 'Dangling',
         kind: 'positioned',
-        positions: { [memberId]: { x: 0, y: 0, open: false } },
+        positions: { [memberId]: { x: 0, y: 0 } },
         graphs: [
           { id: GRAPH_ID, title: 'Dangling', edges: [{ from: memberId, to: MISSING_RESOURCE_ID }] },
         ],
@@ -1457,16 +1457,15 @@ export const spaceRepositoryContract = (
             maps: (base.document.maps ?? []).map((m) => ({
               ...m,
               positions: {
-                [RESOURCE_ID]: { x: 0, y: 0, open: false, content: { shape: first } },
+                [RESOURCE_ID]: { x: 0, y: 0, content: { shape: first } },
                 [SECOND_RESOURCE_ID]: secondResized
                   ? {
                       x: 300,
                       y: 0,
-                      open: false,
                       size: { width: 560, height: 420 },
                       content: { shape: second },
                     }
-                  : { x: 300, y: 0, open: false, content: { shape: second } },
+                  : { x: 300, y: 0, content: { shape: second } },
               },
             })),
           },
@@ -1681,7 +1680,7 @@ export const spaceRepositoryContract = (
               id: MAP_ID,
               title: 'First map',
               kind: 'positioned',
-              positions: { [OTHER_RESOURCE_ID]: { x: 0, y: 0, open: false } },
+              positions: { [OTHER_RESOURCE_ID]: { x: 0, y: 0 } },
               graphs: [
                 { id: GRAPH_ID, title: 'First graph', edges: [] },
                 { id: THIRD_GRAPH_ID, title: 'Second graph', edges: [] },
@@ -1692,7 +1691,7 @@ export const spaceRepositoryContract = (
               id: SECOND_MAP_ID,
               title: 'Second map',
               kind: 'positioned',
-              positions: { [OTHER_RESOURCE_ID]: { x: 100, y: 100, open: false } },
+              positions: { [OTHER_RESOURCE_ID]: { x: 100, y: 100 } },
               graphs: [
                 { id: SECOND_GRAPH_ID, title: 'Third graph', edges: [] },
                 { id: FOURTH_GRAPH_ID, title: 'Fourth graph', edges: [] },
@@ -2310,8 +2309,8 @@ export const spaceRepositoryContract = (
               ...firstMap,
               positions: {
                 ...firstMap.positions,
-                [RESOURCE_ID]: { x: 40, y: 40, open: false },
-                [OTHER_RESOURCE_ID]: { x: 600, y: 0, open: false },
+                [RESOURCE_ID]: { x: 40, y: 40 },
+                [OTHER_RESOURCE_ID]: { x: 600, y: 0 },
               },
             },
           ],

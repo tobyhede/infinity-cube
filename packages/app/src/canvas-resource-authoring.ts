@@ -5,7 +5,6 @@ import {
   type SpaceView,
   RESOURCE_TITLE_REQUIRED,
   resourceDocumentSchema,
-  takesOpen,
   uuidSchema,
   type ResourceDocument,
   type ResourceId,
@@ -98,11 +97,8 @@ export interface CanvasResourceAuthoringInput {
   readonly deleteConfirmation?: DeleteConfirmation;
   readonly nodes: readonly ResourceFlowNode[];
   /**
-   * What may be authored right now, answered once for the whole application.
-   *
-   * Two answers are read here, and they are deliberately different: every
-   * control drawn on a Resource is `authorOnCanvas`, while a *live* content editor
-   * is `editResourceBody`, which a modal dialog does not withdraw.
+   * What may be authored right now, answered once for the whole application:
+   * every control drawn on a Resource is `authorOnCanvas`.
    */
   readonly availability: AuthoringAvailability;
   readonly nameOnCreation: string | null;
@@ -150,7 +146,6 @@ export interface CanvasResourceAuthoring {
   readonly nodes: ResourceFlowNode[];
   readonly bodyEditing: boolean;
   readonly titleEditing: boolean;
-  readonly openResource: (resourceId: string) => 'completed' | 'retained';
   readonly beginTitleEditing: (resourceId: string) => void;
 }
 
@@ -275,32 +270,6 @@ export function useCanvasResourceAuthoring({
     }
   }
 
-  const openResource = useCallback(
-    (resourceIdInput: string): 'completed' | 'retained' => {
-      if (!availability.authorOnCanvas) return 'retained';
-      const resourceId = uuidSchema.safeParse(resourceIdInput);
-      if (!resourceId.success) return 'retained';
-      const { resources } = spaceSession.getState().working;
-      const documentOf = (id: string) => resources.find((resource) => resource.id === id)?.document;
-      const stored = resources.find((resource) => resource.id === resourceId.data);
-      // The application keeps Open only for a Resource no plugin draws (ADR
-      // 0142); a plugin keeps any in its Map content, so Enter or Space on one
-      // asks nothing here. `takesOpen` is the domain's one answer, which intake and the Edit ask too.
-      if (stored === undefined || !takesOpen(stored.document, documentOf)) return 'retained';
-      const result = authoring.complete({ kind: 'opened-resource', resourceId: resourceId.data });
-      return result.kind === 'completed' || result.kind === 'unchanged' ? 'completed' : 'retained';
-    },
-    [authoring, availability.authorOnCanvas, spaceSession],
-  );
-
-  const closeResource = useCallback(
-    (resourceId: ResourceId): 'completed' | 'retained' => {
-      const result = authoring.complete({ kind: 'closed-resource', resourceId });
-      return result.kind === 'completed' || result.kind === 'unchanged' ? 'completed' : 'retained';
-    },
-    [authoring],
-  );
-
   const pluginHost = useMemo(
     (): PluginHost => ({
       gate: pluginGate,
@@ -403,8 +372,6 @@ export function useCanvasResourceAuthoring({
       authorOnCanvas: availability.authorOnCanvas,
       bodyEditing,
       editableResourceIds,
-      openResource,
-      closeResource,
       beginTitleEditing,
       onSelectResource,
       resourceResize,
@@ -417,8 +384,6 @@ export function useCanvasResourceAuthoring({
       availability.authorOnCanvas,
       bodyEditing,
       editableResourceIds,
-      openResource,
-      closeResource,
       beginTitleEditing,
       onSelectResource,
       resourceResize,
@@ -457,7 +422,6 @@ export function useCanvasResourceAuthoring({
     nodes: decoratedNodes,
     bodyEditing,
     titleEditing: editingTitleResourceId !== null || contextEditingIds.size > 0,
-    openResource,
     beginTitleEditing,
   };
 }

@@ -75,7 +75,7 @@ export const drawnOutline = (resource: Locator): Promise<DrawnOutline> =>
       touchesSideMidpoints,
       fillsCorner: inside(outer.left + 2, outer.top + 2),
       holdsTitle,
-      drawsKindGlyph: element.querySelector('.resource-rail__kind') !== null,
+      drawsKindGlyph: element.querySelector('[role="img"]') !== null,
     };
   });
 

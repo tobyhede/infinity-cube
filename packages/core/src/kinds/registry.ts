@@ -5,14 +5,14 @@ import type { UUID } from '../types';
 import type {
   KindFlags,
   KindMapContent,
-  KindModule,
+  PluginModule,
   SpaceSelection,
   SpaceSelectionProblem,
   SpaceSelectionTarget,
   SpaceView,
   SpaceViewChoice,
   StartsEmpty,
-} from './kind-module';
+} from './plugin-module';
 import { imageKind } from './image';
 import { markdownKind } from './markdown';
 import { referenceKind } from './reference';
@@ -20,11 +20,7 @@ import { spaceKind } from './space';
 import { urKind } from './ur';
 import { defaultKind } from './default';
 import { PLUGIN_KINDS, type PluginKind } from './plugins';
-import {
-  RECTANGLE,
-  type Outline,
-  type Resource as ApiResource,
-} from '@project/resource-api/domain';
+import type { Outline, Resource as ApiResource } from '@project/resource-api/domain';
 import { canonicalJsonObject, type JsonObject, type JsonValue } from '../json-value';
 
 /**
@@ -49,11 +45,11 @@ type ContentByKind = { [K in KindId]: z.output<Registered[K]['contentSchema']> }
 type ResolvedByKind = { [K in KindId]: ReturnType<Registered[K]['resolveContent']> };
 
 /** Each kind's module, typed so a rule over a kinded value calls its own kind's module. */
-type KindModules = {
-  readonly [K in KindId]: KindModule<K, ContentByKind[K], ResolvedByKind[K]>;
+type PluginModules = {
+  readonly [K in KindId]: PluginModule<K, ContentByKind[K], ResolvedByKind[K]>;
 };
 
-const KIND_MODULES: KindModules = REGISTERED;
+const PLUGIN_MODULES: PluginModules = REGISTERED;
 
 /** A kinded value whose content is its kind's, correlated so its module accepts it. */
 type Kinded<K extends KindId> = {
@@ -97,7 +93,7 @@ interface KindParsers<K extends KindId> {
 }
 
 const parsersOf = <K extends KindId>(kind: K): KindParsers<K> => ({
-  content: KIND_MODULES[kind].contentSchema.transform((content) => ({ kind, content })),
+  content: PLUGIN_MODULES[kind].contentSchema.transform((content) => ({ kind, content })),
 });
 
 const builtParsers = new Map<KindId, KindParsers<KindId>>();
@@ -151,7 +147,7 @@ export type ResourceContent = Reached<ResolvedByKind[KindId]> | ContentUnresolve
 export const UNRESOLVED_CONTENT: ContentUnresolved = { kind: 'unresolved', via: 'target' };
 
 /** Every registered kind's id, in registration order. */
-export const KIND_IDS: readonly KindId[] = Object.values(KIND_MODULES).map(({ id }) => id);
+export const KIND_IDS: readonly KindId[] = Object.values(PLUGIN_MODULES).map(({ id }) => id);
 
 /** Whether a module registers this kind with this build. */
 export const isRegisteredKind = (kind: string): kind is KindId =>
@@ -159,45 +155,30 @@ export const isRegisteredKind = (kind: string): kind is KindId =>
 
 /** The rules a kind declares for every Resource of it: the default plugin's for a kind with no plugin. */
 export const kindFlags = (kind: ResourceKind): KindFlags =>
-  isRegisteredKind(kind) ? KIND_MODULES[kind].flags : defaultKind.flags;
+  isRegisteredKind(kind) ? PLUGIN_MODULES[kind].flags : defaultKind.flags;
 
 /** Whether a plugin in this build draws this kind (ADR 0142). */
 export const isPluginKind = (kind: string): kind is PluginKind =>
   PLUGIN_KINDS.some((pluginKind) => pluginKind === kind);
 
-const mapContentOf = (kind: ResourceKind): KindMapContent | undefined =>
-  isRegisteredKind(kind) ? KIND_MODULES[kind].mapContent : defaultKind.mapContent;
-
-/** Whether a Resource of this kind keeps Map content: whether a plugin draws it (ADR 0142). */
-export const keepsMapContent = (kind: ResourceKind): boolean => mapContentOf(kind) !== undefined;
+/** The Map content a Resource of this kind keeps: its plugin's, or the default plugin's (ADR 0142). */
+const mapContentOf = (kind: ResourceKind): KindMapContent =>
+  isRegisteredKind(kind) ? PLUGIN_MODULES[kind].mapContent : defaultKind.mapContent;
 
 /**
  * Why a Map entry may not hold this Map content for a Resource of this kind,
- * or `undefined` when it may: the kind's plugin's own schema answers, and a
- * kind no plugin draws keeps none.
+ * or `undefined` when it may: the kind's plugin's own schema answers.
  */
-export const mapContentProblem = (kind: ResourceKind, value: JsonValue): string | undefined => {
-  const declared = mapContentOf(kind);
-  if (declared === undefined) return `a ${kind} Resource keeps no Map content`;
-  return declared.problem(value);
-};
+export const mapContentProblem = (kind: ResourceKind, value: JsonValue): string | undefined =>
+  mapContentOf(kind).problem(value);
 
-/**
- * The Map content a plugin is given for its Resource on a Map: what the entry
- * stores, else the plugin's default. `undefined` for a kind no plugin draws.
- */
-export const resolvedMapContent = (
-  kind: ResourceKind,
-  stored: JsonValue | undefined,
-): JsonValue | undefined => {
-  const declared = mapContentOf(kind);
-  if (declared === undefined) return undefined;
-  return stored ?? declared.default;
-};
+/** The Map content a plugin is given for its Resource on a Map: what the entry stores, else the plugin's default. */
+export const resolvedMapContent = (kind: ResourceKind, stored: JsonValue | undefined): JsonValue =>
+  stored ?? mapContentOf(kind).default;
 
 /** The Map content a plugin is given on a surface with no Map: its `withoutMap`, else its default. */
 export const mapContentWithoutMap = (kind: ResourceKind): JsonValue =>
-  isPluginKind(kind) ? REGISTERED[kind].mapContent.withoutMap : defaultKind.mapContent.withoutMap;
+  mapContentOf(kind).withoutMap;
 
 /**
  * The outline the canvas strokes a Resource's border and ring on (ADR 0142):
@@ -205,7 +186,6 @@ export const mapContentWithoutMap = (kind: ResourceKind): JsonValue =>
  */
 export const resourceOutline = (kind: ResourceKind, stored: JsonValue | undefined): Outline => {
   const declared = mapContentOf(kind);
-  if (declared === undefined) return RECTANGLE;
   return declared.outline(stored ?? declared.default);
 };
 
@@ -213,7 +193,7 @@ export const resourceOutline = (kind: ResourceKind, stored: JsonValue | undefine
 export type KindedResource = Kinded<KindId> | Unplugged;
 
 const resourceReferencesOf = <K extends KindId>(resource: Kinded<K>) =>
-  KIND_MODULES[resource.kind].resourceReferences(resource.content);
+  PLUGIN_MODULES[resource.kind].resourceReferences(resource.content);
 
 /**
  * Whether a Resource's kind names a plugin in this build, so its content is
@@ -230,60 +210,17 @@ export const resourceReferences = (resource: KindedResource): readonly UUID[] =>
   isPlugged(resource) ? resourceReferencesOf(resource) : [];
 
 const contentTargetOf = <K extends KindId>(resource: Kinded<K>) =>
-  KIND_MODULES[resource.kind].contentTarget(resource.content);
+  PLUGIN_MODULES[resource.kind].contentTarget(resource.content);
 
 /** The Resource whose content this one shows, when its kind shows another's (ADR 0070). */
 export const contentTarget = (resource: KindedResource): UUID | undefined =>
   isPlugged(resource) ? contentTargetOf(resource) : undefined;
 
-/** The Resource this one shows, where it shows one and `resourceOf` resolves it. */
-const targetIn = (
-  resource: KindedResource,
-  resourceOf: (id: UUID) => KindedResource | undefined,
-): KindedResource | undefined => {
-  const targetId = contentTarget(resource);
-  return targetId === undefined ? undefined : resourceOf(targetId);
-};
-
-/**
- * Whether a plugin in this build draws this Resource (ADR 0142): its kind's
- * plugin, and, for a Resource that shows a content Target, that Target's
- * kind's plugin too. A Target no plugin draws keeps the Resource showing it on
- * the application's own drawing; every kind in this build is a plugin's, so
- * none does. A missing Target is the plugin's to say, so a Resource showing
- * one is still its plugin's.
- */
-export const drawnByPlugin = (
-  resource: KindedResource,
-  resourceOf: (id: UUID) => KindedResource | undefined,
-): boolean => {
-  if (!isPluginDrawnKind(resource.kind)) return false;
-  if (contentTarget(resource) === undefined) return true;
-  const target = targetIn(resource, resourceOf);
-  return target === undefined || isPluginDrawnKind(target.kind);
-};
-
-/**
- * Whether a Resource may be Open by the application's rule, a Map entry's
- * `open` (ADR 0122): one no plugin draws whose content, its own or its
- * Target's, declares Open. A Resource a plugin draws keeps any Open in its
- * Map content (ADR 0142), so in this build no Resource takes one.
- */
-export const takesOpen = (
-  resource: KindedResource,
-  resourceOf: (id: UUID) => KindedResource | undefined,
-): boolean => {
-  if (drawnByPlugin(resource, resourceOf)) return false;
-  if (kindFlags(resource.kind).canOpen) return true;
-  const target = targetIn(resource, resourceOf);
-  return target !== undefined && kindFlags(target.kind).canOpen;
-};
-
 /** Whether a Resource of this kind may be another's Target (ADR 0113). */
 export const mayBeTarget = (kind: ResourceKind): boolean => kindFlags(kind).mayBeTarget;
 
 const spaceReferencesOf = <K extends KindId>(resource: Kinded<K>) =>
-  KIND_MODULES[resource.kind].spaceReferences(resource.content);
+  PLUGIN_MODULES[resource.kind].spaceReferences(resource.content);
 
 /** The Spaces this Resource's content references, from which the core enforces cycles and lifetime. */
 export const spaceReferences = (resource: KindedResource): readonly UUID[] =>
@@ -294,7 +231,7 @@ export const lifetimeSpaceReferences = (resource: KindedResource): readonly UUID
   kindFlags(resource.kind).ownsReferencedSpaces ? spaceReferences(resource) : [];
 
 const selectionProblemOf = <K extends KindId>(resource: Kinded<K>, target: SpaceSelectionTarget) =>
-  KIND_MODULES[resource.kind].selection?.problem(resource.content, target);
+  PLUGIN_MODULES[resource.kind].selection?.problem(resource.content, target);
 
 /** Why this Resource's selection does not resolve in its target Space, by its kind's own check. */
 export const spaceSelectionProblem = (
@@ -304,7 +241,7 @@ export const spaceSelectionProblem = (
   isPlugged(resource) ? selectionProblemOf(resource, target) : undefined;
 
 const selectionOf = <K extends KindId>(resource: Kinded<K>) =>
-  KIND_MODULES[resource.kind].selection?.of(resource.content);
+  PLUGIN_MODULES[resource.kind].selection?.of(resource.content);
 
 /** The view of another Space this Resource shows, when its kind shows one (ADR 0068). */
 export const spaceSelection = (resource: KindedResource): SpaceView | undefined =>
@@ -317,7 +254,7 @@ const reselectedOf = <K extends KindId>(
     content: ContentByKind[K],
   ) => ContentByKind[K],
 ): Kinded<K> | undefined => {
-  const selection = KIND_MODULES[resource.kind].selection;
+  const selection = PLUGIN_MODULES[resource.kind].selection;
   return selection === undefined
     ? undefined
     : { ...resource, content: change(selection, resource.content) };
@@ -341,7 +278,7 @@ const pluggedContentOf = <K extends KindId>(
   resource: Kinded<K>,
   via: ContentVia,
 ): ResourceContent => {
-  const resolved: ResolvedByKind[KindId] = KIND_MODULES[resource.kind].resolveContent(
+  const resolved: ResolvedByKind[KindId] = PLUGIN_MODULES[resource.kind].resolveContent(
     resource.content,
   );
   return { ...resolved, via };
@@ -377,11 +314,11 @@ const UNRESOLVED_CONTENT_FACTS: ContentFacts = {
 
 /** What resolved content lets an author do and how it lays out, as its kind declares (ADR 0114). */
 export const contentFacts = (content: ResourceContent): ContentFacts =>
-  (content.kind === UNRESOLVED_CONTENT.kind ? undefined : KIND_MODULES[content.kind].facts) ??
+  (content.kind === UNRESOLVED_CONTENT.kind ? undefined : PLUGIN_MODULES[content.kind].facts) ??
   UNRESOLVED_CONTENT_FACTS;
 
 const canonicalContentOf = <K extends KindId>(resource: Kinded<K>) =>
-  KIND_MODULES[resource.kind].canonicalContent(resource.content);
+  PLUGIN_MODULES[resource.kind].canonicalContent(resource.content);
 
 /**
  * A Resource with its content as Export writes it, so a file's bytes do not
@@ -426,7 +363,7 @@ export const newResourceDocument = (kind: EmptyCreatableKindId, title: string): 
 
 /** Whether a Resource of this kind may be created empty. */
 export const startsEmpty = (kind: KindId): kind is EmptyCreatableKindId =>
-  KIND_MODULES[kind].newContent !== undefined;
+  PLUGIN_MODULES[kind].newContent !== undefined;
 
 /** A new Resource of the default kind with this Title, its body empty. */
 export const newDefaultResourceDocument = (title: string): ResourceDocument =>
@@ -450,10 +387,3 @@ export const isKindId = (value: string): boolean => KIND_ID.test(value);
 /** Whether a value is a well-formed kind id no plugin in this build draws: a missing plugin's kind. */
 export const isMissingKindId = (value: string): value is MissingKind =>
   !isRegisteredKind(value) && isKindId(value);
-
-/**
- * Whether a plugin draws a Resource of this kind: its own plugin, or the
- * default plugin where the kind's plugin is missing.
- */
-export const isPluginDrawnKind = (kind: string): boolean =>
-  isPluginKind(kind) || isMissingKindId(kind);

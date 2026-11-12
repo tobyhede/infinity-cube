@@ -89,7 +89,7 @@ export const uncataloguedComponents = [
  * A block earns its place by being React Flow's geometry, React Flow's
  * integration, or a placement the framework forces into the application layer.
  * Product appearance does not: it belongs beside the component that draws it,
- * hand-rolled the way `canvas-resource.css` sits beside `CanvasResource`.
+ * hand-rolled the way `canvas-resource.css` sits beside `PluginResource`.
  *
  * A rule naming no class at all — `#root`, the `*` and `body` resets — is keyed by
  * its leading attribute or id, or failing both by its leading element name, so those
@@ -113,7 +113,7 @@ export const handRolledStyles = [
   {
     block: 'canvas-resource',
     reason:
-      "Application state rather than appearance: the lean an embedded Resource is given while the Resource framing it is dragged — which is the application's, because only it knows which Resource frames which. `CanvasResource`'s own appearance is in `packages/ui/src/canvas-resource.css`, beside the component.",
+      "Application state rather than appearance: the lean an embedded Resource is given while the Resource framing it is dragged — which is the application's, because only it knows which Resource frames which. `PluginResource`'s own appearance is in `packages/ui/src/canvas-resource.css`, beside the component.",
   },
   {
     block: 'graph-area',
@@ -138,7 +138,7 @@ export const handRolledStyles = [
   {
     block: 'new-resource-preview',
     reason:
-      'Placement and opacity for the ghost Resource drawn over the canvas mid-drag. What it draws is a real `CanvasResource`; this is only where it sits.',
+      'Placement and opacity for the ghost Resource drawn over the canvas mid-drag. What it draws is a real `PluginResource`; this is only where it sits.',
   },
   {
     block: 'edge-control-layer',

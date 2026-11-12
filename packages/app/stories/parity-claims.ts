@@ -174,7 +174,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'ResizeControl',
     claim:
-      'The production CanvasResource fills a React Flow node whose authored rect differs from the collapsed default.',
+      'The production PluginResource fills a React Flow node whose authored rect differs from the collapsed default.',
   },
   {
     id: 'selected-resource-offers-one-resize-control',
@@ -225,7 +225,7 @@ export const parityClaims: readonly ParityClaim[] = [
     claim:
       'Rest, selected and dragging are visually distinct states for both a Markdown and a Reference Resource.',
     // React Flow's own selection/dragging booleans, and ResourceNode's translation
-    // of them into CanvasResource's four-value `state`, are unit-tested directly
+    // of them into PluginResource's four-value `state`, are unit-tested directly
     // (`ResourceNode.test.tsx`, "translates React Flow selection and dragging into
     // shared visual states"). Dragging a real Resource is exercised throughout
     // `editing.spec.ts`'s drag-and-drop coverage, and selection through
@@ -233,11 +233,11 @@ export const parityClaims: readonly ParityClaim[] = [
     // evidence above. What this story adds beyond those is the *visual*
     // pairing of state with treatment (box-shadow ring, rotated drop shadow)
     // side by side for review — and it renders through `CanvasResourceSpecimen`,
-    // a thin pass-through to the shipped `CanvasResource`, so there is no
+    // a thin pass-through to the shipped `PluginResource`, so there is no
     // facsimile that could drift from what the translated state actually
     // draws.
     applicationEvidence:
-      'React Flow selection/dragging and their translation into state are covered by ResourceNode.test.tsx and by editing.spec.ts drag coverage; selection is also exercised by canvas-resource-exposes-kind-and-keyboard-actions. This story renders the shipped CanvasResource through CanvasResourceSpecimen (no facsimile) to pin the visual treatment per state for review, which is not itself a distinct browser-observable product behaviour beyond those.',
+      'React Flow selection/dragging and their translation into state are covered by ResourceNode.test.tsx and by editing.spec.ts drag coverage; selection is also exercised by canvas-resource-exposes-kind-and-keyboard-actions. This story renders the shipped PluginResource through CanvasResourceSpecimen (no facsimile) to pin the visual treatment per state for review, which is not itself a distinct browser-observable product behaviour beyond those.',
   },
   {
     id: 'closed-resource-draws-only-its-title-lines',
@@ -338,7 +338,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'Hover',
     claim:
-      "Hovering the real React Flow node reveals the adapter's Edge handles and none of CanvasResource's commands; selecting it draws its commands in React Flow's NodeToolbar.",
+      "Hovering the real React Flow node reveals the adapter's Edge handles and none of PluginResource's commands; selecting it draws its commands in React Flow's NodeToolbar.",
   },
   {
     id: 'canvas-resource-owns-title-editing-and-refusal',

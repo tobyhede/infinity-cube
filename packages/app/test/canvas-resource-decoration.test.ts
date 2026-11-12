@@ -40,7 +40,7 @@ import { NO_SPACE_RESOURCE_TARGETS } from '../src/space-resource-targets';
 import type { SpaceResourceTarget } from '../src/space-resource-lifecycle';
 import type { Continuation } from '../src/continuation';
 import type { MapEmbedEntry } from '../src/map-embeddings';
-import { fixtureDisplay, fixtureFacts } from './render-adapter-fixtures';
+import { fixtureFacts } from './render-adapter-fixtures';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -81,10 +81,8 @@ const projectionNode = (
     title: 'A',
     readOnly,
     ...bareKindData(kind),
-    ...fixtureFacts(kind),
-    open,
+    ...fixtureFacts(kind, open),
     selectedForAuthoring: false,
-    display: fixtureDisplay(open, kind),
     activeGraphId: null,
     activeGraphColor: '#8a94a6',
     borderColor: null,
@@ -138,8 +136,6 @@ const context = (overrides: Partial<DecorationContext> = {}): DecorationContext 
   embeddedMapEdit: true,
   bodyEditing: false,
   editableResourceIds: new Set([RESOURCE_ID, REFERENCE_ID, SPACE_RESOURCE_ID, UR_ID]),
-  openResource: () => 'completed',
-  closeResource: () => 'completed',
   beginTitleEditing: () => undefined,
   onSelectResource: () => undefined,
   resourceResize: {
@@ -171,12 +167,11 @@ const context = (overrides: Partial<DecorationContext> = {}): DecorationContext 
 });
 
 describe('decorateSharedResourceNode', () => {
-  it('offers Open, title editing and entity actions on a Resource of the working Space', () => {
+  it('offers title editing and entity actions on a Resource of the working Space', () => {
     const patch = decorateSharedResourceNode(
       projectionNode(RESOURCE_ID, 'space'),
       context({ resourceEntityActions: () => [] }),
     );
-    expect(patch.onOpenChange).toBeTypeOf('function');
     expect(patch.onBeginTitleEditing).toBeTypeOf('function');
     expect(patch.entityActions).toEqual([]);
   });
@@ -214,7 +209,6 @@ describe('decorateSharedResourceNode', () => {
       context({ bodyEditing: true }),
     );
     expect(patch.onBeginTitleEditing).toBeUndefined();
-    expect(patch.onOpenChange).toBeTypeOf('function');
   });
 
   it('withholds every authoring control from a projected Resource absent from the working Space', () => {
@@ -222,7 +216,6 @@ describe('decorateSharedResourceNode', () => {
       projectionNode(MISSING_RESOURCE_ID, 'markdown', true),
       context(),
     );
-    expect(patch.onOpenChange).toBeUndefined();
     expect(patch.onBeginTitleEditing).toBeUndefined();
     expect(patch.resize).toBeUndefined();
     expect(patch.titleEditor).toBeUndefined();
@@ -247,7 +240,7 @@ describe('decorateSharedResourceNode', () => {
     } satisfies SpaceSnapshot);
     if (!loaded.ok) throw new Error('Expected a valid reference fixture');
     const node = projectResourceNodes(loaded.space, {
-      openResourceIds: new Set([REFERENCE_ID]),
+      mapContent: (id) => (id === REFERENCE_ID ? { open: true } : undefined),
     }).find((candidate) => candidate.id === REFERENCE_ID);
     if (node === undefined) throw new Error('Expected the Reference projection');
     const previewResize = vi.fn();
@@ -309,12 +302,11 @@ describe('decorateSharedResourceNode', () => {
  * operation and no content edit from any decorator.
  */
 describe('an Ur Resource’s decoration', () => {
-  it('offers title editing and entity actions, and no Open, Close or body editing', () => {
+  it('offers title editing and entity actions', () => {
     const patch = decorateSharedResourceNode(
       projectionNode(UR_ID, 'ur'),
       context({ resourceEntityActions: () => [] }),
     );
-    expect(patch.onOpenChange).toBeUndefined();
     expect(patch.onBeginTitleEditing).toBeTypeOf('function');
     expect(patch.entityActions).toEqual([]);
   });

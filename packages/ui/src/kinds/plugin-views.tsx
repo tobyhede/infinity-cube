@@ -2,7 +2,6 @@ import { useMemo, type ComponentType, type ReactElement, type ReactNode } from '
 import {
   declaredOutline,
   imageKind,
-  isPluginDrawnKind,
   isPluginKind,
   PLUGIN_KINDS,
   jsonValueSchema,
@@ -134,14 +133,6 @@ export interface PluginOperations {
   /** What the Map embedding says in place of the Map, as while the Space it shows is read. */
   readonly mapNote?: string | undefined;
 }
-
-/**
- * Whether a kind's operations are drawn by `PluginResource`: a plugin kind's,
- * or a kind no plugin in this build draws, which the default plugin does.
- */
-export const isPluginOperations = (operations: {
-  readonly kind: string;
-}): operations is PluginOperations => isPluginDrawnKind(operations.kind);
 
 /** What a host mounts a plugin's view with. */
 export interface PluginSurfaceInput {

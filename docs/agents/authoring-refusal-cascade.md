@@ -65,20 +65,14 @@ Guards above are omitted below.
 | `edited-resource` | `resource-not-found` → `resource-kind-immutable` → `reference-target-immutable` → `space-resource-target-immutable` → `resource-title-required` → (identical to current ⇒ `unchanged`) → `reference-target-missing` → `reference-target-not-targetable` → completed |
 | `changed-content` | `resource-not-found` → `resource-content-invalid` (the kind's content schema refuses it) → then `edited-resource`'s checks from `resource-kind-immutable` on, over the document with that content |
 | `created-resources` | (no items ⇒ `unchanged`) → for each item in order: `resource-content-invalid` (its kind's content schema refuses it) → `space-reference-creation-unsupported` (its content names a Space, which only the coordinated lifecycle creates) → `reference-targets-self` → `reference-target-missing` → `reference-target-not-targetable` → completed |
-| `opened-resource` | `resource-not-in-map` → `resource-not-found` → `open-requires-content` → (already Open ⇒ `unchanged`) → completed |
-| `closed-resource` | `resource-not-in-map` → (already Closed ⇒ `unchanged`) → completed |
 | `resized-resource` | `resource-not-in-map` → (same size as `resourceSize` resolves it ⇒ `unchanged`) → completed |
-| `opened-resource-to-fit` | `resource-not-in-map` → `resource-not-found` → `open-requires-content` → (already Open at the floored size ⇒ `unchanged`) → completed |
-| `changed-map-content` | `resource-not-in-map` → `resource-not-found` → `map-content-not-kept` → `map-content-invalid` → (the same value as the entry's content resolves to, its plugin's default where it stores none ⇒ `unchanged`) → completed |
+| `changed-map-content` | `resource-not-in-map` → `resource-not-found` → `map-content-invalid` → (the same value as the entry's content resolves to, its plugin's default where it stores none ⇒ `unchanged`) → completed |
 | `added-resource-to-map` | `resource-not-found` → `resource-already-in-map` → completed |
 | `removed-resource-from-map` | `resource-not-in-map` → completed |
 | `deleted-resource` | `resource-not-found` → `space-resource-deletion-unsupported` → `missing-plugin-holds-space` (the last Resource of a missing kind in this Space, while the aggregate as read at opening holds a Space only because a plugin is missing: the store's `refusedUnrootedSpaceIds` over this Space, ADR 0142) → `resource-has-references` → completed |
 
-`open-requires-content` is the code `opened-resource` and `opened-resource-to-fit` raise
-for every Resource: each kind's plugin keeps its Open, if it has one, as Map content (ADR 0142,
-resource-plugins issue 07); intake raises the same code for a Map entry storing one Open.
-`map-content-not-kept` is raised for a kind no plugin draws, and no kind is one now;
-intake refuses Map content stored for one as `map-content-invalid`. Every code string here is quoted exactly as `AuthoringRefusal['code']`
+There is no Open or Close Edit: each kind's plugin keeps its Open, if it has
+one, as Map content, written by `changed-map-content` (ADR 0142). Every code string here is quoted exactly as `AuthoringRefusal['code']`
 declares it. A refusal code is a stable identity across the seam (ADR 0057), so
 renaming one is a change to the domain surface rather than a wording fix, made in
 source and quoted here afterwards.
@@ -141,10 +135,10 @@ Edit that holds no Map say it needed one.
 | --- | --- |
 | `settled-resource-movement` | none → completed |
 
-## The 33 codes
+## The 32 codes
 
-1 contextual (`map-not-found`) plus 32 action-specific —
-none is produced anywhere else. 28 of those 32 are tabulated above, and
+1 contextual (`map-not-found`) plus 31 action-specific —
+none is produced anywhere else. 27 of those 31 are tabulated above, and
 `exclusive-work-running` is the gate's, asked of every action before its row;
 `map-required` is declared and presented but currently raised nowhere, so it
 appears in no row. `space-replaced` and `edit-abandoned` are no action's:

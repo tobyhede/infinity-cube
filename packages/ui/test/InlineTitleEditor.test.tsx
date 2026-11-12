@@ -186,6 +186,37 @@ describe('InlineTitleEditor multiline capability', () => {
     fireEvent.keyDown(field, { key: 'Escape' });
     expect(onCancel).toHaveBeenCalledOnce();
   });
+
+  /**
+   * A key exit skips the blur it expects to follow. When the caller moves no
+   * focus, no blur follows, so further editing must re-arm completion on blur.
+   */
+  it('still completes on blur after further editing when a key exit moved no focus', () => {
+    const onComplete = vi.fn((_draft: string) => null);
+    render(
+      <InlineTitleEditor
+        title="A"
+        label="Title"
+        variant="resource"
+        multiline
+        onComplete={onComplete}
+        onCancel={noop}
+        onReturnFocus={noop}
+      />,
+    );
+    const field = titleField();
+
+    fireEvent.change(field, { target: { value: 'Renamed' } });
+    fireEvent.keyDown(field, { key: 'Enter' });
+    expect(onComplete).toHaveBeenCalledOnce();
+    expect(onComplete).toHaveBeenCalledWith('Renamed');
+
+    // The caller left the editor open, so the author keeps typing and clicks away.
+    fireEvent.change(field, { target: { value: 'Renamed again' } });
+    fireEvent.blur(field);
+    expect(onComplete).toHaveBeenCalledTimes(2);
+    expect(onComplete).toHaveBeenLastCalledWith('Renamed again');
+  });
 });
 
 /** The declarations of the one rule whose selector is exactly `selector`. */

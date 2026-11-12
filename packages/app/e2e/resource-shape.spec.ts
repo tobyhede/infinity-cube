@@ -138,7 +138,7 @@ async function seedResizedUr(page: Page): Promise<Locator> {
     page,
     'Shapes',
     () => ({
-      [RESIZED_UR]: { x: 0, y: 0, open: false, size: { width: RESIZED[0], height: RESIZED[1] } },
+      [RESIZED_UR]: { x: 0, y: 0, size: { width: RESIZED[0], height: RESIZED[1] } },
     }),
     [{ id: RESIZED_UR, document: { title: UR, kind: 'ur', content: {} } }],
   );
@@ -210,7 +210,6 @@ test(
     await expect(reloadedControls.getByRole('button', { name: `Open Resource ${UR}` })).toHaveCount(
       0,
     );
-    await expect(face(reloaded)).toHaveAttribute('data-open', 'false');
   },
 );
 
@@ -436,6 +435,5 @@ test(
     const [width, height] = await drawnSize(ur);
     expect(width).toBeGreaterThan(RESIZED[0]);
     expect(height).toBeGreaterThan(RESIZED[1]);
-    await expect(ur.locator('.rf-resource-node__inner')).toHaveAttribute('data-open', 'false');
   },
 );

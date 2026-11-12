@@ -73,8 +73,8 @@ const targetSnapshot: SpaceSnapshot = {
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [TARGET_RESOURCE_ID]: { x: 0, y: 0, open: false },
-          [TARGET_RESOURCE_TWO]: { x: 300, y: 0, open: false },
+          [TARGET_RESOURCE_ID]: { x: 0, y: 0 },
+          [TARGET_RESOURCE_TWO]: { x: 300, y: 0 },
         },
         graphs: [
           {
@@ -111,8 +111,8 @@ const metaSnapshot: SpaceSnapshot = {
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [META_RESOURCE_ID]: { x: 0, y: 0, open: false },
-          [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false },
+          [META_RESOURCE_ID]: { x: 0, y: 0 },
+          [SPACE_RESOURCE_ID]: { x: 240, y: 80 },
         },
         graphs: [{ id: META_GRAPH_ID, title: 'Graph 1', edges: [] }],
         activeGraph: META_GRAPH_ID,

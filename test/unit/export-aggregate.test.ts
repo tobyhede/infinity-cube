@@ -56,8 +56,8 @@ const storedSpace: LoadedSpace = {
           title: 'Spine',
           kind: 'positioned',
           positions: {
-            [RESOURCE_B]: { x: 260, y: 0, open: false, content: { shape: 'diamond' } },
-            [RESOURCE_A]: { x: 0, y: 0, open: false },
+            [RESOURCE_B]: { x: 260, y: 0, content: { shape: 'diamond' } },
+            [RESOURCE_A]: { x: 0, y: 0 },
           },
           graphs: [
             {
@@ -75,8 +75,8 @@ const storedSpace: LoadedSpace = {
           title: 'Echo',
           kind: 'positioned',
           positions: {
-            [RESOURCE_E]: { x: 0, y: 200, open: false, content: { shape: 'pill' } },
-            [RESOURCE_F]: { x: 260, y: 200, open: false },
+            [RESOURCE_E]: { x: 0, y: 200, content: { shape: 'pill' } },
+            [RESOURCE_F]: { x: 260, y: 200 },
           },
           graphs: [
             { id: ECHO_GRAPH_ID, title: 'Echo', edges: [{ from: RESOURCE_E, to: RESOURCE_F }] },
@@ -148,8 +148,8 @@ describe('canonical export', () => {
           title: 'Spine',
           kind: 'positioned',
           positions: {
-            [RESOURCE_A]: { x: 0, y: 0, open: false },
-            [RESOURCE_B]: { x: 260, y: 0, open: false, content: { shape: 'diamond' } },
+            [RESOURCE_A]: { x: 0, y: 0 },
+            [RESOURCE_B]: { x: 260, y: 0, content: { shape: 'diamond' } },
           },
           graphs: [
             {
@@ -167,8 +167,8 @@ describe('canonical export', () => {
           title: 'Echo',
           kind: 'positioned',
           positions: {
-            [RESOURCE_E]: { x: 0, y: 200, open: false, content: { shape: 'pill' } },
-            [RESOURCE_F]: { x: 260, y: 200, open: false },
+            [RESOURCE_E]: { x: 0, y: 200, content: { shape: 'pill' } },
+            [RESOURCE_F]: { x: 260, y: 200 },
           },
           graphs: [
             { id: ECHO_GRAPH_ID, title: 'Echo', edges: [{ from: RESOURCE_E, to: RESOURCE_F }] },
@@ -228,16 +228,16 @@ describe('canonical export', () => {
             ],
             title: 'Spine',
             positions: {
-              [RESOURCE_A]: { y: 0, x: 0, open: false },
-              [RESOURCE_B]: { y: 0, content: { shape: 'diamond' }, x: 260, open: false },
+              [RESOURCE_A]: { y: 0, x: 0 },
+              [RESOURCE_B]: { y: 0, content: { shape: 'diamond' }, x: 260 },
             },
             id: SPINE_MAP_ID,
           },
           {
             title: 'Echo',
             positions: {
-              [RESOURCE_F]: { open: false, y: 200, x: 260 },
-              [RESOURCE_E]: { content: { shape: 'pill' }, y: 200, x: 0, open: false },
+              [RESOURCE_F]: { y: 200, x: 260 },
+              [RESOURCE_E]: { content: { shape: 'pill' }, y: 200, x: 0 },
             },
             graphs: [
               { title: 'Echo', edges: [{ to: RESOURCE_F, from: RESOURCE_E }], id: ECHO_GRAPH_ID },
@@ -296,11 +296,10 @@ describe('canonical export', () => {
               [RESOURCE_A]: {
                 x: 0,
                 y: 0,
-                open: false,
                 content: { open: true },
                 size: { height: 420, width: 560 },
               },
-              [RESOURCE_B]: { x: 260, y: 0, open: false, size: { height: 300, width: 400 } },
+              [RESOURCE_B]: { x: 260, y: 0, size: { height: 300, width: 400 } },
             },
             graphs: [
               { id: LONG_GRAPH_ID, title: 'Long', edges: [{ from: RESOURCE_A, to: RESOURCE_B }] },
@@ -359,11 +358,10 @@ describe('canonical export', () => {
             [RESOURCE_A]: {
               x: 0,
               y: 0,
-              open: false,
               content: { open: true },
               size: { width: 560, height: 420 },
             },
-            [RESOURCE_B]: { x: 260, y: 0, open: false, size: { width: 400, height: 300 } },
+            [RESOURCE_B]: { x: 260, y: 0, size: { width: 400, height: 300 } },
           },
           graphs: [
             { id: LONG_GRAPH_ID, title: 'Long', edges: [{ from: RESOURCE_A, to: RESOURCE_B }] },

@@ -78,7 +78,7 @@ const graph = (edges: Json[] = [edge()]) => ({
   headShape: 'arrow',
   edges,
 });
-const placement = () => ({ x: 0, y: 0, open: false });
+const placement = () => ({ x: 0, y: 0 });
 const mapEntry = (
   positions: Record<string, Json> = { [resourceA]: placement() },
   graphs: Json[] = [graph()],

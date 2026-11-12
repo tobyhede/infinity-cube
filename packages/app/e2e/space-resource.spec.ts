@@ -961,7 +961,6 @@ test('a Shape chosen inside an Open Space Resource is the target Map’s, drawn 
     .locator(`.react-flow__node[data-id^="embedded:${referenceId}:"]`)
     .filter({ has: page.getByRole('heading', { name: 'Step', exact: true }) });
   await expect(throughReference).toHaveCount(1);
-  await expect(throughReference.locator('.canvas-resource')).toHaveAttribute('data-open', 'false');
   await expect(throughReference.locator('.canvas-resource')).toHaveAttribute(
     'data-resource-shape',
     'diamond',
@@ -977,7 +976,6 @@ test('a Shape chosen inside an Open Space Resource is the target Map’s, drawn 
     .locator('.react-flow__node:visible')
     .filter({ has: page.getByRole('heading', { name: 'Step', exact: true }) })
     .locator('.canvas-resource');
-  await expect(entered).toHaveAttribute('data-open', 'false');
   await expect(entered).toHaveAttribute('data-resource-shape', 'diamond');
   await page.reload();
   await expect(
@@ -1113,8 +1111,8 @@ test('a connection from one drawing dropped on another drawing is refused and la
                   ? {
                       ...candidate,
                       positions: {
-                        [DEEP_DIVE_FIRST_ID]: { x: 0, y: 0, open: false },
-                        [DEEP_DIVE_SECOND_ID]: { x: 300, y: 0, open: false },
+                        [DEEP_DIVE_FIRST_ID]: { x: 0, y: 0 },
+                        [DEEP_DIVE_SECOND_ID]: { x: 300, y: 0 },
                       },
                       graphs: candidate.graphs.map((graph) => ({ ...graph, edges: [] })),
                     }
