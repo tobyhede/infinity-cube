@@ -19,6 +19,13 @@ const lintImport = async (specifier: string, filePath: string): Promise<readonly
 };
 
 const lintConfigSchema = z.object({ rules: z.record(z.unknown()) });
+const restrictedImportsSchema = z.tuple([
+  z.unknown(),
+  z.object({
+    paths: z.array(z.unknown()),
+    patterns: z.array(z.object({ regex: z.string().optional() }).passthrough()),
+  }),
+]);
 
 const PLUGIN_FILES = ['packages/plugin-ur/src/domain.ts', 'packages/plugin-ur/src/view.tsx'];
 
@@ -60,15 +67,41 @@ describe('Resource plugin import restrictions', () => {
     },
   );
 
-  it('zones every file under a plugin’s domain entry as the entry itself', async () => {
-    // A file that does not exist cannot be linted under the project service, so its zone is compared.
+  it.each(['./shapes', '../shapes'])(
+    'keeps %s, a file outside its domain/, out of a plugin’s domain entry',
+    async (specifier) => {
+      expect(await lintImport(specifier, 'packages/plugin-ur/src/domain.ts')).not.toHaveLength(0);
+    },
+  );
+
+  it('permits a plugin’s domain entry its own files under domain/', async () => {
+    expect(await lintImport('./domain/rules', 'packages/plugin-ur/src/domain.ts')).toEqual([]);
+  });
+
+  it('zones every file under a plugin’s domain entry as the entry, kept inside domain/', async () => {
+    // A file that does not exist cannot be linted under the project service, so its zone is read.
     const zone = async (file: string) =>
-      lintConfigSchema.parse(await eslint.calculateConfigForFile(file)).rules[
-        'no-restricted-imports'
-      ];
-    expect(await zone('packages/plugin-ur/src/domain/rules.ts')).toEqual(
-      await zone('packages/plugin-ur/src/domain.ts'),
+      restrictedImportsSchema.parse(
+        lintConfigSchema.parse(await eslint.calculateConfigForFile(file)).rules[
+          'no-restricted-imports'
+        ],
+      )[1];
+    const entry = await zone('packages/plugin-ur/src/domain.ts');
+    const nested = await zone('packages/plugin-ur/src/domain/rules.ts');
+    expect(nested.paths).toEqual(entry.paths);
+    expect(nested.patterns.slice(0, -1)).toEqual(entry.patterns.slice(0, -1));
+    const staysInDomain = new RegExp(nested.patterns.at(-1)?.regex ?? '(?!)', 'u');
+    expect(['../shapes', '../view'].filter((specifier) => staysInDomain.test(specifier))).toEqual([
+      '../shapes',
+      '../view',
+    ]);
+    expect(['./rules', '../domain/rules'].some((specifier) => staysInDomain.test(specifier))).toBe(
+      false,
     );
+  });
+
+  it.each(PLUGIN_FILES)('keeps the host half of the view out of %s', async (file) => {
+    expect(await lintImport('@project/resource-api/view/host', file)).not.toHaveLength(0);
   });
 
   it.each(PLUGIN_FILES)('keeps the test host out of %s', async (file) => {

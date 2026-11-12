@@ -18,14 +18,12 @@ import {
   type ResourceShape,
 } from '@project/core';
 import type { Answer } from '@project/resource-api/domain';
+import type { OwnProps, RailCommand, TitleProps } from '@project/resource-api/view';
 import {
   createRailStore,
   ResourceHostProvider,
-  type OwnProps,
-  type RailCommand,
   type ResourceHost,
-  type TitleProps,
-} from '@project/resource-api/view';
+} from '@project/resource-api/view/host';
 import { Button } from './Button';
 import { CANVAS_RESOURCE_DRAG_TILT_DEGREES, type CanvasResourceState } from './CanvasResource';
 import { Card, CardTitle } from './components/card';
@@ -214,8 +212,10 @@ export interface PluginResourceProps {
 
 /**
  * One mounted surface's lifetime: the key its drawing is known by, whether it
- * is still drawn, and the Claims it was granted, which go with it when it
- * unmounts.
+ * is still drawn, and a Claim it was granted, whose `unmount` tells the host
+ * this surface is gone, releasing every Claim taken through it. One is kept,
+ * the latest, since each says the same of the same surface; keeping every one
+ * would grow with each Claim taken and tell the host once per Claim.
  */
 interface SurfaceLifetime {
   readonly drawing: symbol;
@@ -227,19 +227,21 @@ interface SurfaceLifetime {
 
 function createSurfaceLifetime(): SurfaceLifetime {
   let drawn = true;
-  const held: PluginHostClaim[] = [];
+  let held: PluginHostClaim | null = null;
   return {
     drawing: Symbol('drawing'),
     drawn: () => drawn,
     hold: (claim) => {
-      held.push(claim);
+      held = claim;
     },
     begin: () => {
       drawn = true;
     },
     end: () => {
       drawn = false;
-      for (const claim of held.splice(0)) claim.unmount();
+      const last = held;
+      held = null;
+      last?.unmount();
     },
   };
 }

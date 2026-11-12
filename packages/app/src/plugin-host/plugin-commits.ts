@@ -1,4 +1,11 @@
-import type { JsonValue, PluginKind, ResourceId } from '@project/core';
+import {
+  RESOURCE_TITLE_REQUIRED,
+  resourceDocumentSchema,
+  type JsonValue,
+  type PluginKind,
+  type ResourceDocument,
+  type ResourceId,
+} from '@project/core';
 import type { ObserverErrorReporter } from '@project/persistence';
 import type { Answer } from '@project/resource-api/domain';
 import type { ClaimHolder, PluginCommits, PluginHostClaim, PluginOperations } from '@project/ui';
@@ -31,6 +38,7 @@ export const offersCommits = (facts: PluginSurfaceFacts): boolean =>
 const GONE: Answer = { refused: 'This Resource has changed since it was drawn. Try again.' };
 const BUSY: Answer = { refused: 'Another change is still being made. Try again when it ends.' };
 const BROKE: Answer = { refused: 'This change could not be made.' };
+const INVALID: Answer = { refused: 'This change cannot be kept.' };
 
 /** A settled Edit as a plugin reads it, its refusal in the words every refusal is reported in. */
 export const answerOf = (result: SettledResult): Answer => {
@@ -75,6 +83,8 @@ export interface PluginHost {
   readonly claims: ClaimChain;
   /** The Replacement epoch now, which a commit compares with the one it was built in. */
   readonly replacementEpoch: () => number;
+  /** A Resource's stored document now, which a Title or content commit changes one field of. */
+  readonly document: (resourceId: ResourceId) => ResourceDocument | undefined;
   /** Complete an Edit where this canvas lands its Edits, told when a queued one settles. */
   readonly complete: (completion: DrawnCompletion, settle: Settle) => AuthoringResult;
   /** Where an Edit that threw, or a plugin that threw while drawing, is reported. */
@@ -105,9 +115,39 @@ function commitsFor(
       host.report,
     );
   };
+  /** One Edit of the Resource's document, its kind's schema answering for the next one. */
+  const editDocument = (
+    change: { readonly title: string } | { readonly content: JsonValue },
+  ): Promise<Answer> => {
+    const withdrawn = live();
+    if (withdrawn !== null) return Promise.resolve(withdrawn);
+    const stored = host.document(resourceId);
+    if (stored === undefined) {
+      return Promise.resolve({ refused: describeAuthoringRefusal({ code: 'resource-not-found' }) });
+    }
+    const parsed = resourceDocumentSchema.safeParse({ ...stored, ...change });
+    if (!parsed.success) {
+      const titleRequired = parsed.error.issues.some(
+        (issue) => issue.code === 'custom' && issue.params?.['code'] === RESOURCE_TITLE_REQUIRED,
+      );
+      return Promise.resolve(
+        titleRequired
+          ? { refused: describeAuthoringRefusal({ code: RESOURCE_TITLE_REQUIRED }) }
+          : INVALID,
+      );
+    }
+    return completeAsAnswer(
+      (settle) => complete({ kind: 'edited-resource', resourceId, document: parsed.data }, settle),
+      host.report,
+    );
+  };
   // A size hint is ignored: Ur, the one plugin drawn here, commits none, and
   // the canvas applies none yet (`docs/agents/maps-and-graphs.md`, R38, R40).
-  return { map: (next) => changeMapContent(next) };
+  return {
+    title: (next) => editDocument({ title: next }),
+    content: (next) => editDocument({ content: next }),
+    map: (next) => changeMapContent(next),
+  };
 }
 
 /**
@@ -158,5 +198,11 @@ export function pluginSurfaceOperations(
       unmount: () => host.gate.unmount(drawing),
     };
   };
-  return { ...drawn, commitMap: plain.map, claim };
+  return {
+    ...drawn,
+    commitTitle: plain.title,
+    commitContent: plain.content,
+    commitMap: plain.map,
+    claim,
+  };
 }

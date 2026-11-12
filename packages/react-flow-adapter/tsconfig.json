@@ -12,6 +12,7 @@
       "@project/resource-api/domain": ["../resource-api/src/domain/index.ts"],
       "@project/plugin-ur/view": ["../plugin-ur/src/view.tsx"],
       "@project/resource-api/view": ["../resource-api/src/view/index.tsx"],
+      "@project/resource-api/view/host": ["../resource-api/src/view/host.tsx"],
       "@project/graph": ["../graph/src/index.ts"],
       "@project/ui": ["../ui/src/index.ts"]
     }

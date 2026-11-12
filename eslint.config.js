@@ -75,7 +75,26 @@ const RESOURCE_API_OWN_PATTERN = {
 const PLUGIN_PATTERN = {
   regex: '^@project/(?!resource-api/(?:domain|view)$)',
   message:
-    'A Resource plugin imports no @project/* package but @project/resource-api/domain and /view; /view/testing is for its tests (ADR 0142).',
+    "A Resource plugin imports no @project/* package but @project/resource-api/domain and /view; /view/host is the host's and /view/testing is for its tests (ADR 0142).",
+};
+
+/**
+ * A file outside a plugin's domain half, refused to its domain entry: a
+ * sibling such as `./shapes` falls under the plugin-wide zone, which allows
+ * React, so the domain half keeps its files under `domain/` (ADR 0142).
+ */
+const DOMAIN_ENTRY_STAYS_IN_DOMAIN_PATTERN = {
+  // A climb out of the package is ESCAPE_PATTERN's to report.
+  regex: '^(?:\\./(?!domain/)|\\.\\./(?!\\.\\./))',
+  message:
+    'A plugin’s domain entry imports only files under its own domain/, which the domain zone covers (ADR 0142).',
+};
+
+/** The same, for a file under a plugin's `domain/`: it climbs out only back into `domain/`. */
+const DOMAIN_FILE_STAYS_IN_DOMAIN_PATTERN = {
+  regex: '^\\.\\./(?!domain/|\\.\\./)',
+  message:
+    'A file of a plugin’s domain half imports only files under its own domain/, which the domain zone covers (ADR 0142).',
 };
 
 /** A view, refused to a domain half, which the server and the CLI load (ADR 0142). */
@@ -679,8 +698,11 @@ export default tseslint.config(
       ],
     },
   },
-  {
-    files: ['packages/plugin-*/src/domain.ts', 'packages/plugin-*/src/domain/**/*.{ts,tsx}'],
+  ...[
+    ['packages/plugin-*/src/domain.ts', DOMAIN_ENTRY_STAYS_IN_DOMAIN_PATTERN],
+    ['packages/plugin-*/src/domain/**/*.{ts,tsx}', DOMAIN_FILE_STAYS_IN_DOMAIN_PATTERN],
+  ].map(([files, staysInDomain]) => ({
+    files: [files],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -692,11 +714,12 @@ export default tseslint.config(
             REACT_DOM_PATTERN,
             PLUGIN_PATTERN,
             DOMAIN_NAMES_NO_VIEW_PATTERN,
+            staysInDomain,
           ],
         },
       ],
     },
-  },
+  })),
   {
     files: ['packages/aggregate/**/*.{ts,tsx}'],
     rules: {

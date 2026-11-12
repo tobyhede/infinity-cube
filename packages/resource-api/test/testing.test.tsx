@@ -124,3 +124,25 @@ describe('renderPlugin’s Title', () => {
     expect(drawn.textContent).toBe('After');
   });
 });
+
+describe('renderPlugin’s commits', () => {
+  it('keep their identity across renders while what is offered stays the same, as a host’s do', async () => {
+    const { Probe, surface } = probe();
+    renderPlugin(Probe, {
+      content: '',
+      map: '',
+      grants: { title: true, content: true, map: true, claim: true, store: true },
+    });
+    const before = surface();
+    await act(async () => {
+      await before.title.commit?.('Renamed');
+    });
+    const after = surface();
+    expect(after.title.value).toBe('Renamed');
+    expect(after.title.commit).toBe(before.title.commit);
+    expect(after.content.commit).toBe(before.content.commit);
+    expect(after.map.commit).toBe(before.map.commit);
+    expect(after.claim).toBe(before.claim);
+    expect(after.assets.store).toBe(before.assets.store);
+  });
+});

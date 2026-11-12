@@ -10,6 +10,8 @@ export interface ResourceFailureBoundaryProps {
    * JSON, key order aside. A drawing that has not failed is left as it is.
    */
   readonly retryOn?: JsonValue | undefined;
+  /** What a failed drawing shows; absent, the short note a failed Resource draws. */
+  readonly fallback?: ReactNode;
 }
 
 interface ResourceFailureBoundaryState {
@@ -54,6 +56,7 @@ export class ResourceFailureBoundary extends Component<
 
   override render(): ReactNode {
     if (this.state.failed) {
+      if (this.props.fallback !== undefined) return this.props.fallback;
       return (
         <p role="note" className="resource-failure" data-testid="resource-failure">
           This Resource could not be drawn.

@@ -10,7 +10,7 @@ export * from './resource-content';
 export * from './json-value';
 export * from './kinds/kind-module';
 export { PLUGINS, PLUGIN_KINDS, type PluginKind } from './kinds/plugins';
-export type { PluginContent } from './kinds/plugin-kind';
+export { declaredOutline, type PluginContent } from './kinds/plugin-kind';
 export * from './kinds/ur';
 export * from './kinds/image';
 export * from './kinds/markdown';

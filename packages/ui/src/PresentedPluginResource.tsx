@@ -1,13 +1,12 @@
 import { createContext, useContext, useState } from 'react';
 import { mapContentWithoutMap, titleName, type PluginKind } from '@project/core';
 import type { Size } from '@project/resource-api/domain';
+import type { OwnProps, TitleProps } from '@project/resource-api/view';
 import {
   createRailStore,
   ResourceHostProvider,
-  type OwnProps,
   type ResourceHost,
-  type TitleProps,
-} from '@project/resource-api/view';
+} from '@project/resource-api/view/host';
 import { NO_ASSETS, NoEmbed, pluginEntryFor } from './kinds/plugin-views';
 import { ResourceFailureBoundary } from './ResourceFailureBoundary';
 

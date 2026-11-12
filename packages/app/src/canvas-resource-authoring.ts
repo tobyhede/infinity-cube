@@ -365,10 +365,13 @@ export function useCanvasResourceAuthoring({
       gate: pluginGate,
       claims: claimChain,
       replacementEpoch: () => authoring.getState().replacementEpoch,
+      document: (resourceId) =>
+        spaceSession.getState().working.resources.find((resource) => resource.id === resourceId)
+          ?.document,
       complete: (completion, settle) => authoring.complete(completion, settle),
       report: reportPluginFailure,
     }),
-    [authoring, pluginGate, reportPluginFailure, claimChain],
+    [authoring, spaceSession, pluginGate, reportPluginFailure, claimChain],
   );
 
   const replaceResourceImage = useMemo(() => {

@@ -8,17 +8,15 @@ import {
 } from 'react';
 import { render, type RenderResult } from '@testing-library/react';
 import type { Answer, AssetRef, Size } from '../domain';
-import {
-  createRailStore,
-  type Assets,
-  ResourceHostProvider,
-  type Exclusive,
-  type OwnClaim,
-  type OwnProps,
-  type PluginViewProps,
-  type ResourceHost,
-  type Surface,
-  type TitleProps,
+import { createRailStore, ResourceHostProvider, type ResourceHost } from './host';
+import type {
+  Assets,
+  Exclusive,
+  OwnClaim,
+  OwnProps,
+  PluginViewProps,
+  Surface,
+  TitleProps,
 } from './index';
 
 /**
@@ -202,55 +200,63 @@ export function renderPlugin<C, M>(
     const rail = useMemo(() => createRailStore(), []);
     const running = useSyncExternalStore(gate.subscribe, gate.running);
     const host: ResourceHost = useMemo(() => ({ Title: TestTitle, Own: TestOwn, rail }), [rail]);
-    const settle =
-      <T,>(record: T[], apply: (next: T) => void) =>
-      (next: T) => {
-        record.push(next);
-        if (answer === 'completed') apply(next);
-        return Promise.resolve(answer);
+    // One set of commits while what is offered stays the same, as a host keeps
+    // its own, so a plugin keying work on a commit sees what a host gives it.
+    const offeredNow = useMemo(() => {
+      const settle =
+        <T,>(record: T[], apply: (next: T) => void) =>
+        (next: T) => {
+          record.push(next);
+          if (answer === 'completed') apply(next);
+          return Promise.resolve(answer);
+        };
+      const granted = {
+        title: grants.title === true ? settle(commits.title, setTitle) : undefined,
+        content: grants.content === true ? settle(commits.content, setContent) : undefined,
+        map: grants.map === true ? settle(commits.map, setMapValue) : undefined,
+        store: grants.store === true ? store : undefined,
       };
-    const titleCommit = settle(commits.title, setTitle);
-    const contentCommit = settle(commits.content, setContent);
-    const mapCommit = settle(commits.map, setMapValue);
-    const granted = {
-      title: grants.title === true ? titleCommit : undefined,
-      content: grants.content === true ? contentCommit : undefined,
-      map: grants.map === true ? mapCommit : undefined,
-      store: grants.store === true ? store : undefined,
-    };
-    const idle = () => !gate.running();
-    const offered = <T,>(commit: T | undefined) => (running ? undefined : commit);
-    const plain = <T, A>(commit: ((next: T) => Promise<A>) | undefined) =>
-      offered(commit === undefined ? undefined : guarded(commit, idle, WITHDRAWN));
-    const claim: OwnClaim<C, M> = {
-      release: () => undefined,
-      exclusively: (work) =>
-        gate.exclusively((live) => {
-          const ownCommit = <T, A>(commit: ((next: T) => Promise<A>) | undefined) =>
-            commit === undefined ? undefined : guarded(commit, live, ENDED);
-          const own: Exclusive<C, M> = {
-            title: ownCommit(granted.title),
-            content: ownCommit(granted.content),
-            map: ownCommit(granted.map),
-            store: ownCommit(granted.store),
-          };
-          return work(own);
-        }),
-    };
-    const assets: Assets = {
-      ...TEST_ASSETS,
-      store: plain(granted.store),
-      pick: grants.pick === true ? offered(pick) : undefined,
-    };
+      const idle = () => !gate.running();
+      const offered = <T,>(commit: T | undefined) => (running ? undefined : commit);
+      const plain = <T, A>(commit: ((next: T) => Promise<A>) | undefined) =>
+        offered(commit === undefined ? undefined : guarded(commit, idle, WITHDRAWN));
+      const claim: OwnClaim<C, M> = {
+        release: () => undefined,
+        exclusively: (work) =>
+          gate.exclusively((live) => {
+            const ownCommit = <T, A>(commit: ((next: T) => Promise<A>) | undefined) =>
+              commit === undefined ? undefined : guarded(commit, live, ENDED);
+            const own: Exclusive<C, M> = {
+              title: ownCommit(granted.title),
+              content: ownCommit(granted.content),
+              map: ownCommit(granted.map),
+              store: ownCommit(granted.store),
+            };
+            return work(own);
+          }),
+      };
+      const assets: Assets = {
+        ...TEST_ASSETS,
+        store: plain(granted.store),
+        pick: grants.pick === true ? offered(pick) : undefined,
+      };
+      return {
+        title: plain(granted.title),
+        content: plain(granted.content),
+        map: plain(granted.map),
+        claim: grants.claim === true ? () => claim : undefined,
+        assets,
+      };
+    }, [running]);
     const surface: Surface<C, M> = {
       resource: { id: 'resource', title, kind: options.kind ?? 'test', content },
-      title: { value: title, commit: plain(granted.title) },
-      content: { value: content, commit: plain(granted.content) },
-      map: { value: mapValue, commit: plain(granted.map) },
+      title: { value: title, commit: offeredNow.title },
+      content: { value: content, commit: offeredNow.content },
+      map: { value: mapValue, commit: offeredNow.map },
       size: options.size ?? DEFAULT_SIZE,
       selected: options.selected ?? false,
-      claim: grants.claim === true ? () => claim : undefined,
-      assets,
+      claim: offeredNow.claim,
+      assets: offeredNow.assets,
       Embed: TestEmbed,
     };
     return (

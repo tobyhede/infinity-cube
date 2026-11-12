@@ -1,8 +1,7 @@
 import { urKind, type UrContent } from '@project/core';
 import { urPlugin } from '@project/plugin-ur/domain';
-import { urPluginView } from '@project/plugin-ur/view';
 import type { KindView } from './kind-view';
-import type { PluginOperations } from './plugin-views';
+import { pluginGlyph, type PluginOperations } from './plugin-views';
 
 /**
  * The Ur kind's place in this package's kind registry, taken from its plugin
@@ -14,6 +13,6 @@ export const urView: KindView<PluginOperations, UrContent> = {
   name: urPlugin.name,
   listName: urPlugin.listName,
   referenceName: urPlugin.referenceName,
-  Glyph: urPluginView.Glyph,
+  Glyph: pluginGlyph(urKind.id),
   bareOperations: { kind: urKind.id },
 };

@@ -46,6 +46,7 @@
       "@project/resource-api/domain": ["./packages/resource-api/src/domain/index.ts"],
       "@project/resource-api/view": ["./packages/resource-api/src/view/index.tsx"],
       "@project/resource-api/view/testing": ["./packages/resource-api/src/view/testing.tsx"],
+      "@project/resource-api/view/host": ["./packages/resource-api/src/view/host.tsx"],
       "@project/ui": ["./packages/ui/src/index.ts"],
       "@project/ui/MarkdownSourceEditor": ["./packages/ui/src/MarkdownSourceEditor.tsx"]
     }

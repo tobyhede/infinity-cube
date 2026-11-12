@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { definePlugin } from '@project/resource-api/domain';
-import { kindFromPlugin } from '../src/kinds/plugin-kind';
+import { definePlugin, type Outline } from '@project/resource-api/domain';
+import { declaredOutline, kindFromPlugin } from '../src/kinds/plugin-kind';
 import {
   isPluginKind,
   jsonValueSchema,
@@ -98,5 +98,35 @@ describe('jsonValueSchema', () => {
     expect(jsonValueSchema.parse(JSON.parse('{"proto":{"a":[1,"b",null,true]}}'))).toEqual({
       proto: { a: [1, 'b', null, true] },
     });
+  });
+});
+
+describe('a plugin’s outline that fails', () => {
+  const outlining = (outline: () => Outline) =>
+    definePlugin({
+      apiVersion: 1,
+      kind: 'outlining',
+      name: 'Outlining',
+      listName: 'Outlinings',
+      referenceName: null,
+      content: z.object({}).strict(),
+      newContent: {},
+      mapContent: { schema: z.null(), default: null },
+      outline,
+    });
+  const throwing = outlining(() => {
+    throw new Error('The outline was told to fail.');
+  });
+  // A plugin outside this repository's type checker can answer any string.
+  const unknown = outlining(() => z.custom<Outline>(() => true).parse('hexagon'));
+
+  it('is stroked as a rectangle, so projecting the canvas never throws', () => {
+    expect(kindFromPlugin(throwing).mapContent.outline(null)).toBe('rectangle');
+    expect(kindFromPlugin(unknown).mapContent.outline(null)).toBe('rectangle');
+  });
+
+  it('throws where its host draws the Resource, which reports it', () => {
+    expect(() => declaredOutline(throwing, null)).toThrow('The outline was told to fail.');
+    expect(() => declaredOutline(unknown, null)).toThrow(/"hexagon", which is not one of/u);
   });
 });

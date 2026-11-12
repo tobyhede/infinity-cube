@@ -14,7 +14,12 @@ import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { GRAPH_PALETTE, nextGraphColor } from '@project/graph';
 import { composeApp } from '../src/compose-app';
 
-import { CANVAS, type AuthoringResult, type Settle } from '../src/space-authoring';
+import {
+  CANVAS,
+  type AuthoringResult,
+  type Settle,
+  type SettledResult,
+} from '../src/space-authoring';
 import { createPluginGate, type PluginGate } from '../src/plugin-host/plugin-gate';
 import { mintingIds } from './minting';
 import { unusedImageSources } from './image-sources';
@@ -635,6 +640,56 @@ describe('Exclusive work withdraws every Edit (ADR 0142)', () => {
     finish();
     await work;
     expect(other.authoring.complete(CANVAS, rename('After'))).toEqual({ kind: 'completed' });
+  });
+});
+
+describe('Exclusive work begun while Edits are queued (ADR 0142)', () => {
+  it('refuses a queued Edit that is not the work’s own when it drains, and drains the work’s own', async () => {
+    const pluginGate = createPluginGate();
+    const loaded = { snapshot: positionedSnapshot, revision: 0n, exportedRevision: null };
+    const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
+    const { authoring } = composeApp({
+      images: unusedImageSources,
+      spaceSession: session,
+      selection: MAP_ID,
+      newId: mintingIds(MINTED),
+      pluginGate,
+    });
+    const rename = (title: string) => ({ kind: 'renamed-map' as const, mapId: MAP_ID, title });
+    const settled = new Map<string, SettledResult>();
+    let finish: () => void = () => undefined;
+    let work: Promise<unknown> | undefined;
+    // An observer of the first Edit's publication queues a plain Edit, then
+    // begins exclusive work, then queues that work's own Edit.
+    const stop = session.subscribe(() => {
+      if (work !== undefined) return;
+      authoring.complete(CANVAS, rename('Plain'), (result) => {
+        settled.set('plain', result);
+      });
+      work = pluginGate
+        .claim([{ resource: 'resource', key: Symbol('drawing') }], () => null)
+        ?.exclusively(
+          () =>
+            new Promise<void>((resolve) => {
+              finish = resolve;
+            }),
+        );
+      pluginGate.admit(() =>
+        authoring.complete(CANVAS, rename('By the work'), (result) => {
+          settled.set('own', result);
+        }),
+      );
+    });
+
+    expect(authoring.complete(CANVAS, rename('First'))).toEqual({ kind: 'completed' });
+    stop();
+    expect(Object.fromEntries(settled)).toEqual({
+      plain: { kind: 'refused', refusal: { code: 'exclusive-work-running' } },
+      own: { kind: 'completed' },
+    });
+    expect(mapOf(session.getState().working, MAP_ID)?.title).toBe('By the work');
+    finish();
+    await work;
   });
 });
 

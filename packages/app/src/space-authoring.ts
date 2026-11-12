@@ -601,6 +601,12 @@ interface QueuedCompletion extends ReportedCompletion {
    * current in — read by the drain, and the only reason it is recorded.
    */
   readonly replacementEpoch: number;
+  /**
+   * Whether it was admitted as running exclusive work's own (ADR 0142). The
+   * drain refuses one that was not while exclusive work runs, since that work
+   * may have begun after it queued.
+   */
+  readonly admitted: boolean;
   /** Told how the queued Edit settled, when its caller asked. */
   readonly settle?: Settle;
 }
@@ -652,7 +658,8 @@ interface SpaceAuthoringDependencies {
    * work runs, every Edit that is not that work's own is refused here, at the
    * one door every Edit enters by, whichever control or Space made it.
    */
-  readonly exclusiveWork?: { readonly withdraws: () => boolean } | undefined;
+  readonly exclusiveWork?:
+    { readonly withdraws: () => boolean; readonly exclusiveRunning: () => boolean } | undefined;
 }
 
 /**
@@ -1679,10 +1686,12 @@ export function createSpaceAuthoring({
     }
     const reported: ReportedCompletion = { target, completion };
     if (completing) {
+      // Past the gate while exclusive work runs: this Edit is that work's own.
+      const admitted = exclusiveWork?.exclusiveRunning() === true;
       const entry: QueuedCompletion =
         settle === undefined
-          ? { ...reported, replacementEpoch }
-          : { ...reported, replacementEpoch, settle };
+          ? { ...reported, replacementEpoch, admitted }
+          : { ...reported, replacementEpoch, admitted, settle };
       queued.push(entry);
       return { kind: 'queued' };
     }
@@ -1710,6 +1719,15 @@ export function createSpaceAuthoring({
         if (next.replacementEpoch !== replacementEpoch) {
           discardedAsReplaced += 1;
           settleSafely(next.settle, { kind: 'refused', refusal: { code: 'space-replaced' } });
+          continue;
+        }
+        // Exclusive work an observer began while this Edit waited withdraws it
+        // as it would have at `complete`, unless it is that work's own.
+        if (!next.admitted && exclusiveWork?.exclusiveRunning() === true) {
+          settleSafely(next.settle, {
+            kind: 'refused',
+            refusal: { code: 'exclusive-work-running' },
+          });
           continue;
         }
         try {

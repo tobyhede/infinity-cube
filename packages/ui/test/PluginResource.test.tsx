@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { type JsonValue, type ResourceShape } from '@project/core';
-import { definePlugin, type Answer } from '@project/resource-api/domain';
+import { definePlugin, type Answer, type Outline } from '@project/resource-api/domain';
 import { definePluginView, Title, type Surface } from '@project/resource-api/view';
 import {
   PluginResource,
@@ -297,6 +297,24 @@ describe('the Map host a plugin draws inside (ADR 0142)', () => {
     expect(claim).toHaveBeenCalledTimes(1);
   });
 
+  it('tells the host once that it is gone, however many Claims it took and released', () => {
+    surfaces.length = 0;
+    const unmountClaim = vi.fn();
+    const claim = vi.fn((): PluginHostClaim => ({
+      release: () => undefined,
+      exclusively: () => Promise.resolve('busy'),
+      unmount: unmountClaim,
+    }));
+    const { unmount } = render(
+      <PluginSurface {...probeProps({ operations: { kind: 'ur', claim } })} entry={probeEntry} />,
+    );
+    const take = surfaces.at(-1)?.claim;
+    for (let taken = 0; taken < 3; taken += 1) take?.()?.release();
+    expect(claim).toHaveBeenCalledTimes(3);
+    unmount();
+    expect(unmountClaim).toHaveBeenCalledTimes(1);
+  });
+
   it('hands the host a release the plugin asks for during its exclusive work, which needs no retry', async () => {
     surfaces.length = 0;
     const release = vi.fn();
@@ -350,6 +368,59 @@ describe('the Map host a plugin draws inside (ADR 0142)', () => {
     );
     expect(screen.getByRole('article', { name: 'Other' })).toHaveTextContent('Other');
     expect(onFailure).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    [
+      'throws',
+      (): never => {
+        throw new Error('The outline was told to fail.');
+      },
+    ],
+    // A plugin outside this repository's type checker can answer any string.
+    ['answers no outline', (): Outline => z.custom<Outline>(() => true).parse('hexagon')],
+  ] as const)('loses only its own Resource when its plugin’s outline %s', (_, failing) => {
+    const onFailure = vi.fn();
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const outlined = definePlugin({ ...probePlugin, outline: failing });
+    const entry = pluginEntry(
+      outlined,
+      definePluginView(outlined, { View: ProbeView, Glyph: () => null }),
+    );
+    render(
+      <PluginSurface
+        {...probeProps({ title: { ...title, title: 'Decide' } })}
+        entry={entry}
+        onFailure={onFailure}
+      />,
+    );
+    error.mockRestore();
+    expect(screen.getByRole('article', { name: 'Decide' })).toContainElement(
+      screen.getByTestId('resource-failure'),
+    );
+    expect(screen.queryByTestId('probe')).toBeNull();
+    expect(onFailure).toHaveBeenCalledTimes(1);
+  });
+
+  it('draws a glyph that throws as nothing, and what it is drawn in survives', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { Glyph } = pluginEntry(
+      probePlugin,
+      definePluginView(probePlugin, {
+        View: ProbeView,
+        Glyph: () => {
+          throw new Error('The glyph was told to fail.');
+        },
+      }),
+    );
+    render(
+      <p data-testid="rail">
+        <Glyph size={16} />
+        Rail
+      </p>,
+    );
+    error.mockRestore();
+    expect(screen.getByTestId('rail')).toHaveTextContent('Rail');
   });
 
   it('reports a throw to the reporter the surface was offered', () => {

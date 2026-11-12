@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import fc from 'fast-check';
-import { uuidSchema } from '@project/core';
+import { resourceDocumentSchema, uuidSchema } from '@project/core';
 import type { ObserverErrorReporter } from '@project/persistence';
 import type { Answer } from '@project/resource-api/domain';
 import type { PluginOperations } from '@project/ui';
@@ -27,6 +27,7 @@ import { createPluginGate } from '../src/plugin-host/plugin-gate';
 import type { AuthoringResult, Settle } from '../src/space-authoring';
 
 const RESOURCE = uuidSchema.parse('00000000-0000-4000-8000-0000000000a1');
+const STORED = resourceDocumentSchema.parse({ title: 'Decide', kind: 'ur', content: {} });
 const FACTS = { authorOnCanvas: true, editable: true };
 
 /** Why an answer refused, or undefined for one that did not. */
@@ -341,6 +342,7 @@ describe('a plugin surface’s commits on the canvas', () => {
         return gate.getState();
       },
       replacementEpoch: () => epoch.value,
+      document: (resourceId) => (resourceId === RESOURCE ? STORED : undefined),
       complete,
       report,
     };
@@ -397,6 +399,20 @@ describe('a plugin surface’s commits on the canvas', () => {
     epoch.value = 4;
     expect(reasonOf(await operations.commitMap?.({ shape: 'ellipse' }))).toMatch(/\S/u);
     expect(complete).toHaveBeenCalledTimes(1);
+  });
+
+  it('commits the Title and the content as one Edit of the Resource, and refuses either invalid', async () => {
+    const complete = vi.fn<PluginHost['complete']>(() => ({ kind: 'completed' }));
+    const operations = pluginSurfaceOperations('ur', RESOURCE, FACTS, hostWith(complete));
+    await expect(operations.commitTitle?.('Decided')).resolves.toBe('completed');
+    await expect(operations.commitContent?.({})).resolves.toBe('completed');
+    expect(complete.mock.calls.map(([completion]) => completion)).toEqual([
+      { kind: 'edited-resource', resourceId: RESOURCE, document: { ...STORED, title: 'Decided' } },
+      { kind: 'edited-resource', resourceId: RESOURCE, document: STORED },
+    ]);
+    expect(reasonOf(await operations.commitTitle?.('   '))).toMatch(/\S/u);
+    expect(reasonOf(await operations.commitContent?.({ stray: true }))).toMatch(/\S/u);
+    expect(complete).toHaveBeenCalledTimes(2);
   });
 
   it('withdraws every plain commit while exclusive work runs, and keeps that work’s own live', async () => {

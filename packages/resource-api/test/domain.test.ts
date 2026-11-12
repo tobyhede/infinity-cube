@@ -7,7 +7,8 @@ import {
   pluginList,
   pluginListProblem,
 } from '@project/resource-api/domain';
-import { createRailStore, type RailCommand } from '@project/resource-api/view';
+import type { RailCommand } from '@project/resource-api/view';
+import { createRailStore } from '@project/resource-api/view/host';
 
 const plugin = <const V extends number, const K extends string>(apiVersion: V, kind: K) =>
   definePlugin({
@@ -86,5 +87,16 @@ describe('a rail store', () => {
     store.publish(source, commands);
     store.withdraw(Symbol('other'));
     expect(heard).toBe(1);
+  });
+});
+
+describe('the view entry a plugin draws with', () => {
+  it('exports none of the host’s machinery, which only /view/host does', async () => {
+    const view = Object.keys(await import('@project/resource-api/view'));
+    const host = Object.keys(await import('@project/resource-api/view/host'));
+    expect(view.sort()).toEqual(['Own', 'Rail', 'Title', 'definePluginView']);
+    expect(host).toEqual(
+      expect.arrayContaining(['ResourceHostProvider', 'createRailStore', 'useResourceHost']),
+    );
   });
 });

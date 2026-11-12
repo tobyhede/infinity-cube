@@ -1,19 +1,14 @@
-import {
-  createContext,
-  useContext,
-  useLayoutEffect,
-  useState,
-  type ComponentType,
-  type ReactNode,
-} from 'react';
+import { useLayoutEffect, useState, type ComponentType, type ReactNode } from 'react';
 import type { Answer, AssetRef, Kept, Resource, ResourceId, ResourcePlugin, Size } from '../domain';
+import { useResourceHost } from './host';
 
 /**
  * The view half of the Resource API (ADR 0142): what a surface gives a
  * plugin's one view, and the components a plugin draws its Title, its own
  * pointer region and its commands with. A host provides those components'
- * behaviour through {@link ResourceHostProvider}; a plugin never learns which
- * surface it is on, only which capabilities are present.
+ * behaviour through `ResourceHostProvider`, which the host-only `/view/host`
+ * entry exports; a plugin never learns which surface it is on, only which
+ * capabilities are present.
  */
 
 /** A Map content commit, which may carry a size hint on an author's gesture. */
@@ -167,38 +162,6 @@ export interface OwnProps {
   readonly className?: string;
 }
 
-/** Where a plugin's rail commands go, so the host can draw them wherever its rail is. */
-export interface RailOutlet {
-  readonly publish: (source: symbol, commands: readonly RailCommand[]) => void;
-  readonly withdraw: (source: symbol) => void;
-}
-
-/** What a host provides the API's components with. */
-export interface ResourceHost {
-  readonly Title: ComponentType<TitleProps>;
-  readonly Own: ComponentType<OwnProps>;
-  readonly rail: RailOutlet;
-}
-
-const ResourceHostContext = createContext<ResourceHost | null>(null);
-
-/** Provide a host for the plugin view rendered inside it. */
-export function ResourceHostProvider({
-  host,
-  children,
-}: {
-  readonly host: ResourceHost;
-  readonly children?: ReactNode;
-}) {
-  return <ResourceHostContext.Provider value={host}>{children}</ResourceHostContext.Provider>;
-}
-
-const useResourceHost = (component: string): ResourceHost => {
-  const host = useContext(ResourceHostContext);
-  if (host === null) throw new Error(`<${component}> is drawn only inside a Resource surface.`);
-  return host;
-};
-
 /** The Resource's Title, drawn as the surface draws a Title, with the rename it offers. */
 export function Title(props: TitleProps) {
   const { Title: HostTitle } = useResourceHost('Title');
@@ -212,41 +175,6 @@ export function Title(props: TitleProps) {
 export function Own(props: OwnProps) {
   const { Own: HostOwn } = useResourceHost('Own');
   return <HostOwn {...props} />;
-}
-
-/** A rail outlet a host reads back: the commands published, in the order their sources first published. */
-export interface RailStore extends RailOutlet {
-  readonly commands: () => readonly RailCommand[];
-  readonly subscribe: (listener: () => void) => () => void;
-}
-
-/** A rail outlet that keeps what is published, for a host to draw. */
-export function createRailStore(): RailStore {
-  const published = new Map<symbol, readonly RailCommand[]>();
-  const listeners = new Set<() => void>();
-  let snapshot: readonly RailCommand[] = [];
-  const changed = () => {
-    snapshot = [...published.values()].flat();
-    for (const listener of [...listeners]) listener();
-  };
-  return {
-    publish: (source, commands) => {
-      if (published.get(source) === commands) return;
-      published.set(source, commands);
-      changed();
-    },
-    withdraw: (source) => {
-      if (!published.delete(source)) return;
-      changed();
-    },
-    commands: () => snapshot,
-    subscribe: (listener) => {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
-    },
-  };
 }
 
 /** Emit commands for the canvas to draw on this Resource's rail. Draws nothing in place. */

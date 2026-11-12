@@ -355,6 +355,7 @@ describe('an Ur Resource’s decoration', () => {
       gate: createPluginGate(),
       claims: NO_CLAIMS,
       replacementEpoch: () => 0,
+      document: () => undefined,
       complete,
       report: () => undefined,
     };
@@ -588,6 +589,7 @@ describe('decorating each kind from its own part of the context', () => {
       gate: createPluginGate(),
       claims: NO_CLAIMS,
       replacementEpoch: () => 0,
+      document: () => undefined,
       complete,
       report: () => undefined,
     });

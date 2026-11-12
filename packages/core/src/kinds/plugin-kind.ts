@@ -1,4 +1,5 @@
 import {
+  OUTLINES,
   RECTANGLE,
   type MapContentDeclaration,
   type Outline,
@@ -30,16 +31,40 @@ const PLUGIN_CONTENT_FACTS: ContentFacts = {
 const describeIssues = (issues: readonly { readonly message: string }[]): string =>
   issues.map(({ message }) => message).join('; ');
 
+const isOutline = (value: string): value is Outline => OUTLINES.some((name) => name === value);
+
+/**
+ * The outline a plugin declares for a Map content value its schema accepted:
+ * a rectangle where it declares none. Throws what the plugin's `outline`
+ * throws, and when it answers anything but one of `OUTLINES`, so a host can
+ * report either as that Resource's failure (ADR 0142).
+ */
+export function declaredOutline<M>(
+  plugin: Pick<ResourcePlugin<unknown, M>, 'kind' | 'outline'>,
+  mapContent: M,
+): Outline {
+  if (plugin.outline === undefined) return RECTANGLE;
+  // Typed an outline, but a plugin's answer is checked: it is the plugin's code.
+  const answered: string = plugin.outline(mapContent);
+  if (isOutline(answered)) return answered;
+  throw new Error(
+    `The "${plugin.kind}" plugin declared the outline "${answered}", which is not one of ${OUTLINES.join(', ')}.`,
+  );
+}
+
 /**
  * A plugin's Map content as JSON values the core can store, compare and carry:
  * its default and its value with no Map, each checked to be JSON once, here,
- * and the plugin's schema and outline behind a JSON value.
+ * and the plugin's schema and outline behind a JSON value. The outline the
+ * canvas strokes is a rectangle where the plugin's throws or answers no
+ * outline: projecting the canvas never runs plugin code that can fail it, and
+ * the plugin's host reports the failure on the Resource itself.
  */
 function mapContentOf<M>(
-  kind: string,
+  plugin: Pick<ResourcePlugin<unknown, M>, 'kind' | 'outline'>,
   declaration: MapContentDeclaration<M>,
-  outline: ((mapContent: M) => Outline) | undefined,
 ): KindMapContent {
+  const kind = plugin.kind;
   const asJson = (value: M, which: string): JsonValue => {
     const parsed = jsonValueSchema.safeParse(value);
     if (!parsed.success)
@@ -58,9 +83,12 @@ function mapContentOf<M>(
       return parsed.success ? undefined : describeIssues(parsed.error.issues);
     },
     outline: (value) => {
-      if (outline === undefined) return RECTANGLE;
       const parsed = declaration.schema.safeParse(value);
-      return outline(parsed.success ? parsed.data : declaration.default);
+      try {
+        return declaredOutline(plugin, parsed.success ? parsed.data : declaration.default);
+      } catch {
+        return RECTANGLE;
+      }
     },
   };
 }
@@ -136,6 +164,6 @@ export function kindFromPlugin<const K extends string, C, M>(
   });
   return {
     ...module,
-    mapContent: mapContentOf(kind, plugin.mapContent, plugin.outline?.bind(plugin)),
+    mapContent: mapContentOf(plugin, plugin.mapContent),
   };
 }

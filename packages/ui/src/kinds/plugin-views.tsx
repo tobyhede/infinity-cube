@@ -1,5 +1,6 @@
 import { useMemo, type ComponentType, type ReactElement } from 'react';
 import {
+  declaredOutline,
   isPluginKind,
   jsonValueSchema,
   urKind,
@@ -17,6 +18,7 @@ import type {
 } from '@project/resource-api/view';
 import { urPlugin } from '@project/plugin-ur/domain';
 import { urPluginView } from '@project/plugin-ur/view';
+import { ResourceFailureBoundary } from '../ResourceFailureBoundary';
 
 /**
  * Each plugin's view half, keyed to the build-time plugin list
@@ -196,6 +198,10 @@ export function pluginEntry<C, M>(
         `Resource ${input.resourceId}'s Map content is not the ${plugin.kind} plugin's.`,
       );
     }
+    // The outline the canvas strokes was asked for outside any boundary, where
+    // a throw or a value outside the vocabulary is drawn as a rectangle; asked
+    // again here, either fails this Resource's drawing and is reported.
+    declaredOutline(plugin, mapContent.data);
     const surface: Surface<C, M> = {
       resource: {
         id: input.resourceId,
@@ -215,7 +221,16 @@ export function pluginEntry<C, M>(
     return <view.View surface={surface} />;
   }
   const render = (input: PluginSurfaceInput): ReactElement => <Mounted input={input} />;
-  return { Glyph: view.Glyph, render };
+  const PluginGlyph = view.Glyph;
+  /** The plugin's glyph, drawn as nothing where it throws, so the rail or Dock it is in survives. */
+  function Glyph({ size }: { readonly size?: number | undefined }) {
+    return (
+      <ResourceFailureBoundary fallback={null}>
+        <PluginGlyph size={size} />
+      </ResourceFailureBoundary>
+    );
+  }
+  return { Glyph, render };
 }
 
 /** Every plugin's entry, typed so a plugin the list names and this file omits fails to compile. */
