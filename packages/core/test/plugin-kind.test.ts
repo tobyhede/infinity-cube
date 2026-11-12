@@ -16,25 +16,32 @@ import {
 
 describe('a Resource plugin read as a kind (ADR 0142)', () => {
   it('lists every plugin this build draws, and only those keep Map content', () => {
-    expect(PLUGIN_KINDS).toEqual(['image', 'ur']);
+    expect(PLUGIN_KINDS).toEqual(['image', 'markdown', 'ur']);
     expect(isPluginKind('ur')).toBe(true);
     expect(isPluginKind('image')).toBe(true);
+    expect(isPluginKind('markdown')).toBe(true);
+    expect(isPluginKind('reference')).toBe(false);
     expect(keepsMapContent('image')).toBe(true);
-    expect(isPluginKind('markdown')).toBe(false);
     expect(keepsMapContent('ur')).toBe(true);
-    expect(keepsMapContent('markdown')).toBe(false);
+    expect(keepsMapContent('markdown')).toBe(true);
+    expect(keepsMapContent('reference')).toBe(false);
   });
 
   it("answers Map content with the plugin's own schema", () => {
     expect(mapContentProblem('ur', { shape: 'pill' })).toBeUndefined();
     expect(mapContentProblem('ur', { shape: 'hexagon' })).toMatch(/\S/u);
-    expect(mapContentProblem('markdown', { shape: 'rectangle' })).toMatch(/keeps no Map content/u);
+    expect(mapContentProblem('markdown', { open: true })).toBeUndefined();
+    expect(mapContentProblem('markdown', { shape: 'rectangle' })).toMatch(/\S/u);
+    expect(mapContentProblem('reference', { open: true })).toMatch(/keeps no Map content/u);
   });
 
   it('gives the plugin its default where the entry stores none, and its value with no Map', () => {
     expect(resolvedMapContent('ur', undefined)).toEqual({ shape: 'rectangle' });
     expect(resolvedMapContent('ur', { shape: 'diamond' })).toEqual({ shape: 'diamond' });
-    expect(resolvedMapContent('markdown', undefined)).toBeUndefined();
+    // A fresh Markdown Resource is Closed on a Map and Open with no Map.
+    expect(resolvedMapContent('markdown', undefined)).toEqual({ open: false });
+    expect(mapContentWithoutMap('markdown')).toEqual({ open: true });
+    expect(resolvedMapContent('reference', undefined)).toBeUndefined();
     expect(mapContentWithoutMap('ur')).toEqual({ shape: 'rectangle' });
   });
 

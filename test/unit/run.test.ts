@@ -363,16 +363,19 @@ describe('Running an Aggregate directory', () => {
   });
 
   /*
-   * A Markdown Resource is written as its Resource file and the sidecar it
-   * names, and a Resource deleted during the run takes both with it.
+   * A Markdown Resource is written as its Resource file and its text as the
+   * asset its content names, and a Resource deleted during the run takes both
+   * with it.
    */
-  it('writes a Markdown Resource as its Resource file and sidecar, and removes both on delete', async () => {
+  it('writes a Markdown Resource as its Resource file and its text as an asset, and removes both on delete', async () => {
     const directory = await fixtureCopy();
     const { clock, start, nextEvent } = await started(directory);
     const run = running(start);
     const backend = backendFor(run);
     const resources = join(directory, META_SPACE_ID, 'resources');
+    const assets = join(directory, 'assets');
     const before = (await readdir(resources)).sort();
+    const assetsBefore = (await readdir(assets)).sort();
     const resourceId = newUuid();
     /** Commit the Meta Space's Resources as `change` makes them, and wait for the write. */
     const commitResources = async (
@@ -396,30 +399,30 @@ describe('Running an Aggregate directory', () => {
       await written;
     };
 
+    // The text is stored first, as the Markdown plugin stores it before it
+    // commits the URL (ADR 0142).
+    const url = await backend.storeAsset(new Blob(['# Written\n'], { type: 'text/markdown' }));
+    if (!isAssetRef(url)) throw new Error('Expected the text to be stored');
     await commitResources((current) => [
       ...current,
-      {
-        id: resourceId,
-        document: { title: 'Written', kind: 'markdown', content: { source: '# Written\n' } },
-      },
+      { id: resourceId, document: { title: 'Written', kind: 'markdown', content: { url } } },
     ]);
 
     expect(JSON.parse(await readFile(join(resources, `${resourceId}.json`), 'utf8'))).toEqual({
       id: resourceId,
       title: 'Written',
       kind: 'markdown',
-      content: { path: `${resourceId}.md`, mediaType: 'text/markdown' },
+      content: { url },
     });
-    await expect(readFile(join(resources, `${resourceId}.md`), 'utf8')).resolves.toBe(
-      '# Written\n',
-    );
-    expect((await readdir(resources)).sort()).toEqual(
-      [...before, `${resourceId}.json`, `${resourceId}.md`].sort(),
-    );
+    const asset = `${url.slice('/assets/'.length)}.md`;
+    await expect(readFile(join(assets, asset), 'utf8')).resolves.toBe('# Written\n');
+    expect((await readdir(resources)).sort()).toEqual([...before, `${resourceId}.json`].sort());
+    expect((await readdir(assets)).sort()).toEqual([...assetsBefore, asset].sort());
 
     await commitResources((current) => current.filter(({ id }) => id !== resourceId));
 
     expect((await readdir(resources)).sort()).toEqual(before);
+    expect((await readdir(assets)).sort()).toEqual(assetsBefore);
     await run.stop();
   });
 

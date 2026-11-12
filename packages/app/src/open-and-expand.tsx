@@ -34,6 +34,18 @@ export function visibleCanvasCap(viewport: Extent, zoom: number): Extent {
 }
 
 /**
+ * A plugin's size hint capped at `cap` (ADR 0142). Each side is capped, and
+ * a hint the cap narrows keeps its area as far as the cap's height allows:
+ * the hint measured text at its own width, and that text reflowed at a
+ * narrower width needs about as much more height as the width it lost.
+ */
+export function capSizeHint(hint: Extent, cap: Extent): Extent {
+  const width = Math.min(hint.width, cap.width);
+  const height = width < hint.width ? Math.ceil((hint.height * hint.width) / width) : hint.height;
+  return { width, height: Math.min(height, cap.height) };
+}
+
+/**
  * The size Open and expand asks for (ADR 0137): the reading width, or the
  * Resource's own when it is wider, and the height its Open content needs at
  * that width, at least the Stage's frame. Both are capped at the visible

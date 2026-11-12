@@ -10,6 +10,7 @@ import { unlinkedPresentations } from './presentations';
 import { recordingHistory } from './browser-history';
 import { unusedImageSources } from './image-sources';
 import { stubResizeObserver } from './resize-observer';
+import { textAsset } from './markdown-texts';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -38,8 +39,14 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
     defaultMap: MAP_ID,
   },
   resources: [
-    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
-    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', content: { source: 'B' } } },
+    {
+      id: RESOURCE_A,
+      document: { title: 'A', kind: 'markdown', content: { url: textAsset('A') } },
+    },
+    {
+      id: RESOURCE_B,
+      document: { title: 'B', kind: 'markdown', content: { url: textAsset('B') } },
+    },
   ],
 });
 

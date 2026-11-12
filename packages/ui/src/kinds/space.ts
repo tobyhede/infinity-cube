@@ -62,7 +62,6 @@ export function spaceViewOf(
         ? { view: display.content.view, via: display.content.via }
         : undefined;
     case 'closed':
-    case 'editing':
       return undefined;
   }
 }

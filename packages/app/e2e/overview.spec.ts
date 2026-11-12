@@ -103,7 +103,9 @@ test(
     await expect(source).toBeVisible();
     await expect(controls.getByRole('button', { name: 'Close Resource A' })).toBeDisabled();
     await source.press('Escape');
-    await expect(controls.getByRole('button', { name: 'Edit Resource A' })).toBeFocused();
+    // An ended edit returns focus to the Resource (resource-plugins issue 05).
+    await expect(markdown).toBeFocused();
+    await expect(controls.getByRole('button', { name: 'Edit Resource A' })).toBeVisible();
   },
 );
 
@@ -127,11 +129,9 @@ test(
     const resource = nodeByTitle(page, 'A').first();
     const controls = await resourceControls(page, resource);
 
-    // No band, even with a Graph active and the Resource selected.
-    await expect(resource.locator('.canvas-resource__rail')).toHaveCSS(
-      'background-color',
-      'rgba(0, 0, 0, 0)',
-    );
+    // No band, even with a Graph active and the Resource selected: a plugin's
+    // Resource draws no rail of its own on its face (ADR 0142).
+    await expect(resource.locator('.canvas-resource__rail')).toHaveCount(0);
 
     // One surface, drawn twice. Read off both elements in the page, so a change
     // to either that the other did not follow fails here.
@@ -410,8 +410,7 @@ test(
     );
     expect(sizes[0]! > sizes[1]!).toBe(true);
     expect(sizes[1]! > sizes[2]!).toBe(true);
-    await expect(resource.locator('.canvas-resource__body > *')).toHaveCount(1);
-    await expect(resource.locator('.canvas-resource__content')).toHaveCount(0);
+    await expect(resource.locator('.markdown-resource-body__rendered')).toHaveCount(0);
 
     // A Title never resizes a Resource (ADR 0014, ADR 0083): three rungs draw in
     // the same box every other Resource on this Map has.
@@ -488,7 +487,8 @@ test('a Resource is drawn in its Graph colour, and recedes off the Active Graph 
   const long = await graphLegendLineStroke(page, 'Long');
   const short = await graphLegendLineStroke(page, 'Short');
 
-  const strength = (title: string) => nodeByTitle(page, title).locator('.canvas-resource__body');
+  // A plugin's region is what recedes (`.canvas-resource__plugin`).
+  const strength = (title: string) => nodeByTitle(page, title).locator('.canvas-resource__plugin');
   const border = (title: string) => nodeByTitle(page, title).getByTestId('resource');
   // The border is a `color-mix`, which the browser reports as `color(srgb …)`
   // rather than `rgb(…)`, so both are read as 0–255 channels.
@@ -554,8 +554,10 @@ interface PresenceCommit {
 test('the Close action closes an opened resource', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
-  const resource = nodeByTitle(page, 'A').first();
-  await openResource(resource, 'A');
+  // A Reference Resource, which `CanvasResource` draws and fades on Close; a
+  // plugin's Resource draws what its Map content says at once (ADR 0142).
+  const resource = nodeByTitle(page, 'A′').first();
+  await openResource(resource, 'A′');
   const controls = await resourceControls(page, resource);
   await expect(resource.locator('.canvas-resource__content')).toHaveAttribute(
     'data-presence',
@@ -604,7 +606,7 @@ test('the Close action closes an opened resource', async ({ page }) => {
     return commits;
   });
 
-  await controls.getByRole('button', { name: 'Close Resource A' }).click();
+  await controls.getByRole('button', { name: 'Close Resource A′' }).click();
   // The unmount is a fact worth asserting on its own and also the proof that
   // the leaving window has closed, so what the observer caught is read once
   // after it rather than polled for.
@@ -612,7 +614,7 @@ test('the Close action closes an opened resource', async ({ page }) => {
   expect(await leaving.jsonValue()).toEqual([
     { presence: 'leaving', inert: '', text: expect.stringMatching(/\S/) },
   ]);
-  await expect(controls.getByRole('button', { name: 'Open Resource A' })).toBeVisible();
+  await expect(controls.getByRole('button', { name: 'Open Resource A′' })).toBeVisible();
 });
 
 test('resources are drawn at exactly the size the strategy placed them at', async ({ page }) => {

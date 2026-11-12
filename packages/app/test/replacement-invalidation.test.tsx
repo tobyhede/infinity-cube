@@ -19,6 +19,7 @@ import { beginRename } from './command-dock';
 import { selectResource } from './resource-selection';
 import { unusedImageSources } from './image-sources';
 import { stubResizeObserver } from './resize-observer';
+import { textAsset } from './markdown-texts';
 
 /**
  * ADR 0042's "one shared contract test": an Interaction draft open when a stored
@@ -85,7 +86,7 @@ const snapshot = (
           kind: 'positioned',
           positions: {
             [RESOURCE_ID]: open
-              ? { x, y, open: true, size: { width: 560, height: 420 } }
+              ? { x, y, open: false, content: { open: true }, size: { width: 560, height: 420 } }
               : { x, y, open: false },
           },
           graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
@@ -96,7 +97,7 @@ const snapshot = (
     resources: [
       {
         id: RESOURCE_ID,
-        document: { title: resourceTitle, kind: 'markdown', content: { source: body } },
+        document: { title: resourceTitle, kind: 'markdown', content: { url: textAsset(body) } },
       },
     ],
   });

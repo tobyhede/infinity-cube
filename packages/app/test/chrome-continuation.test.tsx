@@ -6,6 +6,7 @@ import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { ChromeContinuation } from '../src/components/ChromeContinuation';
 import { composeApp, type ComposedApp } from '../src/compose-app';
 import { unusedImageSources } from './image-sources';
+import { textAsset } from './markdown-texts';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -31,7 +32,10 @@ const snapshot: SpaceSnapshot = {
     defaultMap: MAP_ID,
   },
   resources: [
-    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
+    {
+      id: RESOURCE_A,
+      document: { title: 'A', kind: 'markdown', content: { url: textAsset('A') } },
+    },
   ],
 };
 

@@ -28,6 +28,7 @@ import { resourceIds, GRAPH_PALETTE } from '../support/fixture';
 import { authoredSpace, imageReferenceIds, imageReferenceSpace } from '../support/spaces';
 import harbour from '#fixture-assets/fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs.png';
 import '../support/inventory.css';
+import { storyText } from '../support/story-assets';
 
 export default { title: 'Components/Resource' };
 
@@ -485,7 +486,7 @@ function Instance({
         shown: 'open',
         content: {
           kind: 'markdown',
-          source: 'Markdown content',
+          content: { url: storyText('Markdown content') },
           via: kind === 'reference' ? 'target' : 'self',
         },
       }
@@ -573,7 +574,7 @@ export const OpenAndClose: Story = () => {
         <CanvasResourceNodeSpecimen
           open={open}
           onOpenChange={changeOpen}
-          content={{ kind: 'markdown', source: openMarkdown, via: 'self' }}
+          content={{ kind: 'markdown', content: { url: storyText(openMarkdown) }, via: 'self' }}
           nodeSize={open ? openFrame : closedFrame}
           stageClassName="inv-resource-node-stage--large"
         />
@@ -588,7 +589,11 @@ export const OpenAndClose: Story = () => {
           title="Long Markdown"
           content={{
             kind: 'markdown',
-            source: `${openMarkdown}\n\n### A deliberately long section\n\n${openMarkdown}\n\n${openMarkdown}`,
+            content: {
+              url: storyText(
+                `${openMarkdown}\n\n### A deliberately long section\n\n${openMarkdown}\n\n${openMarkdown}`,
+              ),
+            },
             via: 'self',
           }}
           nodeSize={longOpen ? openFrame : closedFrame}
@@ -614,7 +619,7 @@ export const OpenReference: Story = () => {
         onOpenChange={changeOpen}
         content={{
           kind: 'markdown',
-          source: '## Strategies\n\nNo strategy is privileged.',
+          content: { url: storyText('## Strategies\n\nNo strategy is privileged.') },
           via: 'target',
         }}
         nodeSize={open ? openFrame : closedFrame}

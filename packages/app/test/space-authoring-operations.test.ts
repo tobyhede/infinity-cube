@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  EMPTY_ASSET_REF,
   EDGE_TITLE_ONE_LINE,
   graphHeadShape,
   uuidSchema,
@@ -23,6 +24,7 @@ import {
 import { createPluginGate, type PluginGate } from '../src/plugin-host/plugin-gate';
 import { mintingIds } from './minting';
 import { unusedImageSources } from './image-sources';
+import { textAsset } from './markdown-texts';
 
 /**
  * The semantic operations Space Authoring offers for Resource and Graph
@@ -78,8 +80,14 @@ const automaticSnapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: { version: 1, title: 'Space' },
   resources: [
-    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
-    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', content: { source: 'B' } } },
+    {
+      id: RESOURCE_A,
+      document: { title: 'A', kind: 'markdown', content: { url: textAsset('A') } },
+    },
+    {
+      id: RESOURCE_B,
+      document: { title: 'B', kind: 'markdown', content: { url: textAsset('B') } },
+    },
   ],
 };
 
@@ -195,7 +203,7 @@ describe('Add Resource', () => {
 
     expect(session.getState().working.resources[2]).toEqual({
       id: MINTED,
-      document: { title: 'Resource 1', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Resource 1', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     });
     expect(mapOf(session.getState().working, MAP_ID)?.positions).toEqual({
       [RESOURCE_A]: { x: 10, y: 20, open: false },
@@ -241,7 +249,13 @@ describe('Add Resource', () => {
           {
             ...positionedSnapshot.document.maps![0]!,
             positions: {
-              [RESOURCE_A]: { x: 10, y: 20, open: true, size: { width: 560, height: 420 } },
+              [RESOURCE_A]: {
+                x: 10,
+                y: 20,
+                open: false,
+                content: { open: true },
+                size: { width: 560, height: 420 },
+              },
               [RESOURCE_B]: { x: 300, y: 40, open: false },
             },
           },
@@ -429,7 +443,7 @@ describe('Edit Resource', () => {
       authoring.complete(CANVAS, {
         kind: 'edited-resource',
         resourceId: RESOURCE_A,
-        document: { title: '', kind: 'markdown', content: { source: 'A' } },
+        document: { title: '', kind: 'markdown', content: { url: textAsset('A') } },
       }),
     ).toEqual({ kind: 'refused', refusal: { code: 'resource-title-required' } });
     expect(session.getState().working).toBe(before);
@@ -445,7 +459,7 @@ describe('Edit Resource', () => {
       authoring.complete(CANVAS, {
         kind: 'edited-resource',
         resourceId: RESOURCE_A,
-        document: { title: '   ', kind: 'markdown', content: { source: 'A' } },
+        document: { title: '   ', kind: 'markdown', content: { url: textAsset('A') } },
       }),
     ).toEqual({ kind: 'refused', refusal: { code: 'resource-title-required' } });
     expect(session.getState().working).toBe(before);
@@ -461,7 +475,11 @@ describe('Edit Resource', () => {
       authoring.complete(CANVAS, {
         kind: 'edited-resource',
         resourceId: RESOURCE_A,
-        document: { title: 'Renamed  \nA subtitle   ', kind: 'markdown', content: { source: 'A' } },
+        document: {
+          title: 'Renamed  \nA subtitle   ',
+          kind: 'markdown',
+          content: { url: textAsset('A') },
+        },
       }),
     ).toEqual({ kind: 'completed' });
     expect(session.getState().working.resources[0]?.document.title).toBe('Renamed\nA subtitle');
@@ -472,13 +490,58 @@ describe('Edit Resource', () => {
       authoring.complete(CANVAS, {
         kind: 'edited-resource',
         resourceId: RESOURCE_A,
-        document: { title: 'Renamed\nA subtitle\n', kind: 'markdown', content: { source: 'A' } },
+        document: {
+          title: 'Renamed\nA subtitle\n',
+          kind: 'markdown',
+          content: { url: textAsset('A') },
+        },
       }),
     ).toEqual({ kind: 'unchanged' });
   });
 });
 
 describe('Resource size and Open', () => {
+  /**
+   * `positionedSnapshot` with Resource A a Reference Resource to B: a kind the
+   * host keeps Open for. A Markdown Resource's Open is its plugin's Map content
+   * (ADR 0142), which the next test holds.
+   */
+  const openPositioned = () =>
+    open({
+      ...positionedSnapshot,
+      resources: positionedSnapshot.resources.map((resource) =>
+        resource.id === RESOURCE_A
+          ? {
+              id: RESOURCE_A,
+              document: { title: 'A', kind: 'reference', content: { target: RESOURCE_B } },
+            }
+          : resource,
+      ),
+    });
+
+  it('refuses a host Open on a Markdown Resource, whose plugin keeps its Open in Map content', () => {
+    const { authoring, session } = open();
+    const before = session.getState().working;
+
+    expect(authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: RESOURCE_A })).toEqual(
+      { kind: 'refused', refusal: { code: 'open-requires-content' } },
+    );
+    expect(session.getState().working).toBe(before);
+    expect(
+      authoring.complete(CANVAS, {
+        kind: 'changed-map-content',
+        resourceId: RESOURCE_A,
+        content: { open: true },
+      }),
+    ).toEqual({ kind: 'completed' });
+    expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toEqual({
+      x: 10,
+      y: 20,
+      open: false,
+      content: { open: true },
+    });
+  });
+
   it('Opens and Closes changing nothing but open', () => {
     const { authoring, session } = openPositioned();
     const positionsBefore = mapOf(session.getState().working, MAP_ID)?.positions;
@@ -936,6 +999,29 @@ describe('Change Map content (ADR 0142)', () => {
       ).toEqual({ kind: 'unchanged' });
     });
 
+    it('replaces a Markdown Resource’s text by its URL, and refuses text kept inline', () => {
+      const { authoring, session } = open(
+        withA({ title: 'Notes', kind: 'markdown', content: { url: textAsset('Old') } }),
+      );
+      expect(
+        authoring.complete(CANVAS, {
+          kind: 'changed-content',
+          resourceId: RESOURCE_A,
+          content: { url: textAsset('Old'), source: '# Text kept inline' },
+        }),
+      ).toEqual({ kind: 'refused', refusal: { code: 'resource-content-invalid' } });
+      expect(
+        authoring.complete(CANVAS, {
+          kind: 'changed-content',
+          resourceId: RESOURCE_A,
+          content: { url: textAsset('New') },
+        }),
+      ).toEqual({ kind: 'completed' });
+      expect(
+        session.getState().working.resources.find(({ id }) => id === RESOURCE_A)?.document,
+      ).toEqual({ title: 'Notes', kind: 'markdown', content: { url: textAsset('New') } });
+    });
+
     it('refuses content its kind’s schema refuses, and a Resource that is gone', () => {
       const { authoring, session } = open(imageSnapshot);
       const before = session.getState().working;
@@ -991,7 +1077,6 @@ describe('Change Map content (ADR 0142)', () => {
   });
 
   it.each([
-    ['Markdown', withA({ title: 'A', kind: 'markdown', content: { source: 'A' } })],
     [
       'Space',
       withA({
@@ -1586,7 +1671,13 @@ describe('Rename Space', () => {
             ...positionedSnapshot.document.maps![0]!,
             positions: {
               [RESOURCE_A]: { x: 10, y: 20, open: false, size: { width: 500, height: 300 } },
-              [RESOURCE_B]: { x: 300, y: 40, open: true, size: { width: 640, height: 360 } },
+              [RESOURCE_B]: {
+                x: 300,
+                y: 40,
+                open: false,
+                content: { open: true },
+                size: { width: 640, height: 360 },
+              },
             },
           },
         ],
@@ -1710,7 +1801,10 @@ describe('Edge Title', () => {
     ...positionedSnapshot,
     resources: [
       ...positionedSnapshot.resources,
-      { id: RESOURCE_C, document: { title: 'C', kind: 'markdown', content: { source: 'C' } } },
+      {
+        id: RESOURCE_C,
+        document: { title: 'C', kind: 'markdown', content: { url: textAsset('C') } },
+      },
     ],
     document: {
       ...positionedSnapshot.document,
@@ -2058,7 +2152,10 @@ describe('Edge eligibility', () => {
       ...positionedSnapshot,
       resources: [
         ...positionedSnapshot.resources,
-        { id: RESOURCE_C, document: { title: 'C', kind: 'markdown', content: { source: 'C' } } },
+        {
+          id: RESOURCE_C,
+          document: { title: 'C', kind: 'markdown', content: { url: textAsset('C') } },
+        },
       ],
     };
     const { authoring } = open(sparse);
@@ -2102,7 +2199,10 @@ describe('Map membership', () => {
     ...positionedSnapshot,
     resources: [
       ...positionedSnapshot.resources,
-      { id: RESOURCE_C, document: { title: 'C', kind: 'markdown', content: { source: 'C' } } },
+      {
+        id: RESOURCE_C,
+        document: { title: 'C', kind: 'markdown', content: { url: textAsset('C') } },
+      },
     ],
   };
 
@@ -2406,7 +2506,7 @@ describe('connecting Resources on an embedded Map', () => {
       ...positionedSnapshot.resources,
       {
         id: RESOURCE_C,
-        document: { title: 'C', kind: 'markdown' as const, content: { source: 'C' } },
+        document: { title: 'C', kind: 'markdown' as const, content: { url: textAsset('C') } },
       },
     ],
   };

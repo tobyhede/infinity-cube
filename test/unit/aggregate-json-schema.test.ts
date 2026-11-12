@@ -181,6 +181,8 @@ describe('the aggregate JSON Schemas agree with intake', () => {
 
 const id = '6f1d6a2e-3b7c-4d2a-9c1e-0a5b7d9e1f20';
 const envelope = (kind: string, content: Json) => ({ id, title: 'A', kind, content });
+/** A Markdown Resource's text, by its asset reference: here the empty text's. */
+const TEXT = '/assets/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU';
 
 const refused: [string, Json, { instancePath: string; keyword: string }][] = [
   [
@@ -206,7 +208,7 @@ const refused: [string, Json, { instancePath: string; keyword: string }][] = [
   ],
   [
     'an unknown Markdown content key',
-    envelope('markdown', { path: `${id}.md`, mediaType: 'text/markdown', source: 'x' }),
+    envelope('markdown', { url: TEXT, source: 'x' }),
     { instancePath: '/content', keyword: 'unevaluatedProperties' },
   ],
   [
@@ -225,8 +227,13 @@ const refused: [string, Json, { instancePath: string; keyword: string }][] = [
     { instancePath: '/content', keyword: 'additionalProperties' },
   ],
   [
-    'Markdown content by URL',
+    'Markdown content by an external URL',
     envelope('markdown', { url: 'https://example.com/a.md' }),
+    { instancePath: '/content/url', keyword: 'pattern' },
+  ],
+  [
+    'Markdown content by path',
+    envelope('markdown', { path: `${id}.md`, mediaType: 'text/markdown' }),
     { instancePath: '/content', keyword: 'required' },
   ],
   [
@@ -260,10 +267,6 @@ describe('the Resource file JSON Schema', () => {
   it.each([
     ['a vendor kind with any content', envelope('vnd.acme.chart', { series: [1, 2] })],
     ['a vendor kind in upper case', envelope('vnd.Acme.Chart', {})],
-    [
-      'a Markdown media type in another case',
-      envelope('markdown', { path: `${id}.md`, mediaType: 'Text/Markdown' }),
-    ],
   ])('accepts %s', (_name, file) => {
     expect(resourceFileSchema(file), JSON.stringify(resourceFileSchema.errors)).toBe(true);
   });
@@ -281,21 +284,24 @@ describe('the Resource file JSON Schema', () => {
     },
   );
 
-  it.each(['a.md', 'dir/a.md', 'a..b/c.md', '.hidden/a.md'])('locates by the path %j', (path) => {
-    expect(locator({ path, mediaType: 'text/markdown' }), JSON.stringify(locator.errors)).toBe(
+  it.each([
+    { path: 'a.md', mediaType: 'text/markdown' },
+    { path: 'a.md', url: '/assets/a' },
+    { url: '/assets/a', mediaType: 'text/markdown' },
+  ])('refuses a locator naming a path or a media type, %j', (content) => {
+    expect(locator(content)).toBe(false);
+  });
+
+  it('locates by a URL', () => {
+    expect(locator({ url: 'https://example.com/a.png' }), JSON.stringify(locator.errors)).toBe(
       true,
     );
   });
 
-  it.each(['/a.md', 'a//b.md', 'dir/', '../a.md', 'a/./b.md', 'a/..', 'a\\b.md', ''])(
-    'refuses the path %j',
-    (path) => {
-      expect(locator({ path, mediaType: 'text/markdown' })).toBe(false);
-    },
-  );
-
-  it("names a Markdown sidecar by the Id schema's own pattern", () => {
-    expect(markdownSchema.properties.path.pattern).toBe(`${idSchema.pattern.slice(0, -1)}\\.md$`);
+  it("names a Markdown text by the Image schema's stored-asset pattern", () => {
+    expect(markdownSchema.properties.url.pattern).toBe(
+      imageSchema.properties.url.anyOf[1]?.pattern,
+    );
   });
 });
 
@@ -310,12 +316,9 @@ describe('the Resource file JSON Schema refuses only what intake refuses', () =>
   const examples = join(repoRoot, 'docs/schema/resource/examples');
   const space = uuidSchema.parse('c0000000-0000-4000-8000-000000000001');
   const other = 'c0000000-0000-4000-8000-000000000002';
-  const markdown = (path: string) => envelope('markdown', { path, mediaType: 'text/markdown' });
-
-  /** A Resource file at `resources/<id>.json`, with whatever sidecars the row puts beside it. */
-  const filesOf = (file: Json, sidecars: readonly string[] = []): ResourceFile[] => [
+  /** A Resource file at `resources/<id>.json`. */
+  const filesOf = (file: Json): ResourceFile[] => [
     { path: `resources/${id}.json`, text: JSON.stringify(file) },
-    ...sidecars.map((name) => ({ path: `resources/${name}`, text: 'Body.\n' })),
   ];
 
   const intakeRefuses = (files: readonly ResourceFile[]): boolean => {
@@ -338,19 +341,13 @@ describe('the Resource file JSON Schema refuses only what intake refuses', () =>
     const text = readFileSync(join(examples, `${kind}.json`), 'utf8');
     const example: unknown = JSON.parse(text);
     expect(resourceFileSchema(example)).toBe(true);
-    const sidecars = (kind === 'markdown' ? ['0b9e4f3a-1c2d-4e5f-8a6b-7c8d9e0f1a2b.md'] : []).map(
-      (name) => ({
-        path: `resources/${name}`,
-        text: readFileSync(join(examples, name), 'utf8'),
-      }),
-    );
-    const decoded = parseResourceFiles([{ path: `resources/${kind}.json`, text }, ...sidecars]);
+    const decoded = parseResourceFiles([{ path: `resources/${kind}.json`, text }]);
     expect(decoded.ok, JSON.stringify(decoded)).toBe(true);
   });
 
   it('admits a valid Resource file through the whole of intake', () => {
     expect(intakeRefuses(filesOf(envelope('ur', {})))).toBe(false);
-    expect(intakeRefuses(filesOf(markdown(`${id}.md`), [`${id}.md`]))).toBe(false);
+    expect(intakeRefuses(filesOf(envelope('markdown', { url: TEXT })))).toBe(false);
     const target = {
       path: `resources/${other}.json`,
       text: JSON.stringify({ id: other, title: 'T', kind: 'ur', content: {} }),
@@ -383,16 +380,13 @@ describe('the Resource file JSON Schema refuses only what intake refuses', () =>
       'only intake',
     ],
     [
-      "a Markdown path naming another Resource's <id>.md",
-      filesOf(markdown(`${other}.md`), [`${other}.md`]),
-      'only intake',
+      'Markdown content by an external URL',
+      filesOf(envelope('markdown', { url: 'https://example.com/a.md' })),
+      'both',
     ],
-    ['a Markdown sidecar that does not exist', filesOf(markdown(`${id}.md`)), 'only intake'],
     [
-      'a Markdown media type spelled with the Kelvin sign',
-      filesOf(envelope('markdown', { path: `${id}.md`, mediaType: 'text/mar\u212Adown' }), [
-        `${id}.md`,
-      ]),
+      'Markdown content by path',
+      filesOf(envelope('markdown', { path: `${id}.md`, mediaType: 'text/markdown' })),
       'both',
     ],
     [

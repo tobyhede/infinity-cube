@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { uuidSchema, type SpaceSnapshot } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { loadSpaceAggregate } from '@project/graph';
 import type { LoadedSpace } from '../src/backend';
 import { MemorySpaceBackend } from '../src/memory';
@@ -103,11 +103,11 @@ describe('MemorySpaceBackend aggregate persistence', () => {
       resources: [
         {
           id: RESOURCE_TWO_ID,
-          document: { title: 'Two', kind: 'markdown', content: { source: 'Two' } },
+          document: { title: 'Two', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
         {
           id: RESOURCE_ONE_ID,
-          document: { title: 'One', kind: 'markdown', content: { source: 'One' } },
+          document: { title: 'One', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
       ],
     };
@@ -116,11 +116,11 @@ describe('MemorySpaceBackend aggregate persistence', () => {
       resources: [
         {
           id: RESOURCE_ONE_ID,
-          document: { title: 'One', kind: 'markdown', content: { source: 'One' } },
+          document: { title: 'One', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
         {
           id: RESOURCE_TWO_ID,
-          document: { title: 'Two', kind: 'markdown', content: { source: 'Two' } },
+          document: { title: 'Two', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
       ],
     };
@@ -154,11 +154,11 @@ describe('MemorySpaceBackend aggregate persistence', () => {
       resources: [
         {
           id: RESOURCE_TWO_ID,
-          document: { title: 'Two', kind: 'markdown', content: { source: 'Two' } },
+          document: { title: 'Two', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
         {
           id: RESOURCE_ONE_ID,
-          document: { title: 'One', kind: 'markdown', content: { source: 'One' } },
+          document: { title: 'One', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
       ],
     };
@@ -167,11 +167,11 @@ describe('MemorySpaceBackend aggregate persistence', () => {
       resources: [
         {
           id: RESOURCE_ONE_ID,
-          document: { title: 'One', kind: 'markdown', content: { source: 'One' } },
+          document: { title: 'One', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
         {
           id: RESOURCE_TWO_ID,
-          document: { title: 'Two', kind: 'markdown', content: { source: 'Two' } },
+          document: { title: 'Two', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
       ],
     };

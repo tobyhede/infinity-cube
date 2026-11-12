@@ -33,7 +33,6 @@ import {
   DEFAULT_KIND,
   COLLAPSED_RESOURCE_SIZE,
   isAcceptedImageUrl,
-  opensToFit,
   takesOpen,
   titleName,
   uuidSchema,
@@ -114,7 +113,12 @@ import {
   type NavigationDirection,
 } from '../graph-navigation';
 import { FullView } from './FullView';
-import { openAndExpandSize, openHeight, visibleCanvasCap } from '../open-and-expand';
+import {
+  capSizeHint as capHintAt,
+  openAndExpandSize,
+  openHeight,
+  visibleCanvasCap,
+} from '../open-and-expand';
 import type { CommandOutcomes } from '../command-outcomes';
 import type { DeleteConfirmation } from '../delete-confirmation';
 import {
@@ -551,22 +555,17 @@ export function SpaceCanvas({
     [view.space, getZoom, setCenter, authoring],
   );
   /**
-   * Open on the canvas's own Map, front to back: a Resource whose
-   * kind opens to fit and that was never resized Opens grown to its content, as
-   * Open and expand does, so it is read in the box rather than in two lines of
-   * the Closed Size; one the author has sized Opens at that size. Answers
-   * nothing where the plain Open Edit serves.
+   * A plugin's size hint capped at what this canvas shows at the current zoom
+   * (ADR 0142): the most a gesture may grow a Resource to, a canvas fact. Read
+   * when a commit is made, so nothing is rebuilt on every zoom.
    */
-  const openToFit = useCallback(
-    (resourceId: ResourceId): 'completed' | 'retained' | undefined => {
-      const resource = view.space.lookup.resource(resourceId);
-      return resource !== undefined &&
-        opensToFit(resource.kind) &&
-        view.selectedMap.map.positions[resourceId]?.size === undefined
-        ? openAndExpand(resourceId)
-        : undefined;
+  const capSizeHint = useCallback(
+    (hint: { readonly width: number; readonly height: number }) => {
+      const area = canvasRef.current;
+      if (area === null) return undefined;
+      return capHintAt(hint, visibleCanvasCap(area.getBoundingClientRect(), getZoom()));
     },
-    [view.space, view.selectedMap, openAndExpand],
+    [getZoom],
   );
   /** Present from Here, on the canvas's own Map: what `P` and the rail item both run. */
   const presentFromHere = useMemo(
@@ -658,7 +657,7 @@ export function SpaceCanvas({
     onSelectResource: selectResource,
     spaceResourceTargets,
     resourceEntityActions: resourceActions,
-    openToFit,
+    capSizeHint,
     portalEditing: editingPortals,
     onPortalEditingChange,
   });

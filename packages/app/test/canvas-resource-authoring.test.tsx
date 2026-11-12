@@ -17,7 +17,7 @@ import { PluginAssetsProvider } from '@project/ui';
 import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
 import { canvasAuthoring } from './canvas-authoring';
-import { holdExclusive } from './held-exclusive';
+import { textAsset } from './markdown-texts';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -60,7 +60,7 @@ const snapshot = spaceSnapshotSchema.parse({
   resources: [
     {
       id: RESOURCE_ID,
-      document: { title: 'A', kind: 'markdown', content: { source: 'A source' } },
+      document: { title: 'A', kind: 'markdown', content: { url: textAsset('A source') } },
     },
     {
       id: REFERENCE_ID,
@@ -185,12 +185,6 @@ const mountAuthoring = (
   return { ...hook, spaceSession, authoring, adapter, commandOutcomes, pluginGate };
 };
 
-/** The content edit a Resource's kind offers, where its kind has one. */
-const beginEditOf = (node: ResourceFlowNode): (() => void) | undefined => {
-  const operations = node.data.kindOperations;
-  return operations.kind === 'markdown' ? operations.onBeginEdit : undefined;
-};
-
 /** An Ur Resource's Map content commit, where its plugin surface is offered one. */
 const mapCommitOf = (node: ResourceFlowNode) =>
   node.data.kindOperations.kind === 'ur' ? node.data.kindOperations.commitMap : undefined;
@@ -206,59 +200,29 @@ const onlyNode = (nodes: readonly ResourceFlowNode[]): ResourceFlowNode => {
 };
 
 describe('canvas Resource authoring', () => {
-  it('authors Open before installing the body editor for Edit on a Closed Resource', () => {
-    const { result, rerender, spaceSession } = mountAuthoring();
-
-    const closed = onlyNode(result.current.nodes);
-    expect(closed.data.display.shown).not.toBe('editing');
-
-    act(() => {
-      expect(closed.data.onOpenChange?.(true)).toBe('completed');
-      beginEditOf(closed)?.();
-    });
-    expect(spaceSession.getState().working.document.maps?.[0]?.positions[RESOURCE_ID]?.open).toBe(
-      true,
-    );
-    expect(result.current.nodes[0]?.data.display.shown).not.toBe('editing');
-
-    rerender({
-      open: true,
-      enabled: true,
-      presenting: false,
-      nameOnCreation: null,
-      resourceId: RESOURCE_ID,
-    });
-    expect(result.current.nodes[0]?.data.display.shown).toBe('editing');
-  });
-
-  it('refuses a Markdown body save while a plugin’s exclusive work runs, keeping the draft', async () => {
-    const { result, rerender, spaceSession, pluginGate } = mountAuthoring();
-    act(() => {
-      onlyNode(result.current.nodes).data.onOpenChange?.(true);
-      beginEditOf(onlyNode(result.current.nodes))?.();
-    });
-    rerender({
-      open: true,
-      enabled: true,
-      presenting: false,
-      nameOnCreation: null,
-      resourceId: RESOURCE_ID,
-    });
-    const display = onlyNode(result.current.nodes).data.display;
-    const editor = display.shown === 'editing' ? display.edit.editor : undefined;
-    expect(editor).toBeDefined();
-    const before = spaceSession.getState().working;
-
-    // A Replace on an Image Resource elsewhere holds the gate every Edit asks.
-    const held = holdExclusive(pluginGate, 'an Image Resource');
-    expect(held).toBeDefined();
-    act(() => expect(editor?.onComplete('Written during a Replace')).toBe('retained'));
-    expect(spaceSession.getState().working).toBe(before);
-
-    held?.release();
-    await held?.running;
-    act(() => expect(editor?.onComplete('Written during a Replace')).toBe('completed'));
-    expect(spaceSession.getState().working).not.toBe(before);
+  /**
+   * The host holds no `editing` state for a Markdown Resource (ADR 0142): its
+   * plugin owns the edit, so the host offers commits and a Claim and never a
+   * body editor of its own, whatever the Resource's Map content says.
+   */
+  it('holds no editing state for a Markdown Resource, offering its plugin commits and a Claim', () => {
+    const { result, rerender } = mountAuthoring();
+    for (const open of [false, true]) {
+      rerender({
+        open,
+        enabled: true,
+        presenting: false,
+        nameOnCreation: null,
+        resourceId: RESOURCE_ID,
+      });
+      const markdown = onlyNode(result.current.nodes);
+      expect(markdown.data.onOpenChange).toBeUndefined();
+      const operations = markdown.data.kindOperations;
+      if (operations.kind !== 'markdown') throw new Error('Expected Markdown operations');
+      expect(operations.commitContent).toBeDefined();
+      expect(operations.commitMap).toBeDefined();
+      expect(operations.claim).toBeDefined();
+    }
   });
 
   it('authors Open for a Reference Resource through the same Resource operation', () => {
@@ -291,8 +255,6 @@ describe('canvas Resource authoring', () => {
     const reference = onlyNode(result.current.nodes);
     expect(reference.data.onOpenChange).toBeDefined();
     expect(reference.data.onBeginTitleEditing).toBeDefined();
-    expect(beginEditOf(reference)).toBeUndefined();
-    expect(reference.data.display.shown).not.toBe('editing');
   });
 
   /**
@@ -312,7 +274,6 @@ describe('canvas Resource authoring', () => {
     const ur = onlyNode(result.current.nodes);
     expect(ur.data.onOpenChange).toBeUndefined();
     expect(ur.data.onBeginTitleEditing).toBeDefined();
-    expect(beginEditOf(ur)).toBeUndefined();
     const before = spaceSession.getState().working;
 
     act(() => expect(result.current.openResource(UR_ID)).toBe('retained'));
@@ -384,7 +345,7 @@ describe('canvas Resource authoring', () => {
   });
 
   it('forgets a title caret when canvas authoring is withdrawn', () => {
-    const { result, rerender, spaceSession } = mountAuthoring();
+    const { result, rerender } = mountAuthoring();
     act(() => result.current.beginTitleEditing(RESOURCE_ID));
     expect(onlyNode(result.current.nodes).data.titleEditor).toBeDefined();
 
@@ -405,81 +366,8 @@ describe('canvas Resource authoring', () => {
       resourceId: RESOURCE_ID,
     });
     expect(onlyNode(result.current.nodes).data.titleEditor).toBeUndefined();
-    act(() => expect(result.current.openResource(RESOURCE_ID)).toBe('completed'));
-    expect(spaceSession.getState().working.document.maps?.[0]?.positions[RESOURCE_ID]?.open).toBe(
-      true,
-    );
-  });
-
-  it('keeps a live body editor when a modal withdraws canvas controls', () => {
-    const { result, rerender } = mountAuthoring();
-    rerender({
-      open: true,
-      enabled: true,
-      presenting: false,
-      nameOnCreation: null,
-      resourceId: RESOURCE_ID,
-    });
-    act(() => beginEditOf(onlyNode(result.current.nodes))?.());
-
-    rerender({
-      open: true,
-      enabled: false,
-      presenting: false,
-      nameOnCreation: null,
-      resourceId: RESOURCE_ID,
-    });
-
-    const withdrawn = onlyNode(result.current.nodes);
-    expect(withdrawn.data.display.shown).toBe('editing');
-    expect(withdrawn.data.resize).toBeUndefined();
-  });
-
-  it('withholds competing Resource edits while a body caret is live', () => {
-    const { result, rerender } = mountAuthoring();
-    rerender({
-      open: true,
-      enabled: true,
-      presenting: false,
-      nameOnCreation: null,
-      resourceId: RESOURCE_ID,
-    });
-    act(() => beginEditOf(onlyNode(result.current.nodes))?.());
-
-    const editing = onlyNode(result.current.nodes);
-    expect(editing.data.onBeginTitleEditing).toBeUndefined();
-    expect(beginEditOf(editing)).toBeUndefined();
-  });
-
-  it('temporarily hides a body editor while presenting without discarding its caret', () => {
-    const { result, rerender } = mountAuthoring();
-    rerender({
-      open: true,
-      enabled: true,
-      presenting: false,
-      nameOnCreation: null,
-      resourceId: RESOURCE_ID,
-    });
-    act(() => beginEditOf(onlyNode(result.current.nodes))?.());
-    expect(onlyNode(result.current.nodes).data.display.shown).toBe('editing');
-
-    rerender({
-      open: true,
-      enabled: true,
-      presenting: true,
-      nameOnCreation: null,
-      resourceId: RESOURCE_ID,
-    });
-    expect(onlyNode(result.current.nodes).data.display.shown).not.toBe('editing');
-
-    rerender({
-      open: true,
-      enabled: true,
-      presenting: false,
-      nameOnCreation: null,
-      resourceId: RESOURCE_ID,
-    });
-    expect(onlyNode(result.current.nodes).data.display.shown).toBe('editing');
+    act(() => result.current.beginTitleEditing(RESOURCE_ID));
+    expect(onlyNode(result.current.nodes).data.titleEditor).toBeDefined();
   });
 
   /**
@@ -558,54 +446,20 @@ describe('canvas Resource authoring', () => {
       const missing = onlyNode(result.current.nodes);
       expect(missing.data.onOpenChange).toBeUndefined();
       expect(missing.data.onBeginTitleEditing).toBeUndefined();
-      expect(beginEditOf(missing)).toBeUndefined();
       expect(missing.data.resize).toBeUndefined();
       expect(missing.data.titleEditor).toBeUndefined();
-      expect(missing.data.display.shown).not.toBe('editing');
     },
   );
 
   it('withdraws authoring when the working Space changes without a projection render', () => {
     const { result, spaceSession } = mountAuthoring();
-    expect(onlyNode(result.current.nodes).data.onOpenChange).toBeDefined();
+    expect(onlyNode(result.current.nodes).data.onBeginTitleEditing).toBeDefined();
 
     act(() => spaceSession.submit(snapshotWithoutResource));
 
     const staleProjection = onlyNode(result.current.nodes);
     expect(staleProjection.data.onOpenChange).toBeUndefined();
     expect(staleProjection.data.onBeginTitleEditing).toBeUndefined();
-  });
-
-  it('forgets an observed body caret when the Resource stops being Open', () => {
-    const bodyEditingChanged = vi.fn();
-    const { result, rerender } = mountAuthoring(bodyEditingChanged);
-    rerender({
-      open: true,
-      enabled: true,
-      presenting: false,
-      nameOnCreation: null,
-      resourceId: RESOURCE_ID,
-    });
-    act(() => beginEditOf(onlyNode(result.current.nodes))?.());
-    expect(bodyEditingChanged).toHaveBeenLastCalledWith(true);
-
-    rerender({
-      open: false,
-      enabled: true,
-      presenting: false,
-      nameOnCreation: null,
-      resourceId: RESOURCE_ID,
-    });
-    rerender({
-      open: true,
-      enabled: true,
-      presenting: false,
-      nameOnCreation: null,
-      resourceId: RESOURCE_ID,
-    });
-
-    expect(onlyNode(result.current.nodes).data.display.shown).not.toBe('editing');
-    expect(bodyEditingChanged).toHaveBeenLastCalledWith(false);
   });
 
   it('opens title editing only when a newly created Resource identity changes', () => {
@@ -742,7 +596,7 @@ describe('canvas Resource authoring decoration identity', () => {
       resources: [
         {
           id: RESOURCE_ID,
-          document: { title: 'A', kind: 'markdown', content: { source: 'Edited source' } },
+          document: { title: 'A', kind: 'markdown', content: { url: textAsset('Edited source') } },
         },
         {
           id: REFERENCE_ID,

@@ -307,8 +307,8 @@ const withEntry = (
 /**
  * Open a Resource in one Map. Only what is drawn inside its rect changes: its
  * size and every position stay as they are. `unchanged` for a Resource already
- * Open, and `open-requires-content` for an Ur Resource, which has no content to
- * show.
+ * Open, and `open-requires-content` for a Resource of a plugin kind, whose
+ * Open is its plugin's Map content rather than the entry's `open`.
  */
 function open(snapshot: SpaceSnapshot, mapId: UUID, resourceId: UUID): SnapshotEditOutcome {
   const placed = placedIn(snapshot, mapId);
@@ -394,16 +394,20 @@ function openAndExpand(
  * for it there, as an Ur Resource keeps its Shape (ADR 0121). The plugin's own
  * schema decides what is accepted, and a kind no plugin draws keeps none.
  *
- * It changes no rect, so no neighbour moves and the Resource's Open/Closed
- * state and size are kept. `unchanged` for the value the plugin is already
- * given there, so the plugin's default is `unchanged` on an entry that stores
- * none.
+ * Alone it changes no rect, so no neighbour moves and the Resource's size is
+ * kept. A size hint, which a plugin's gesture may carry (ADR 0142), is applied
+ * in this same Edit only on an entry with no stored size: floored at the Closed
+ * Size and applied as a Resize is, moving the Resources its growth passes. An
+ * entry with a stored size ignores it. `unchanged` for the value the plugin is
+ * already given there, whatever the hint, so the plugin's default is
+ * `unchanged` on an entry that stores none.
  */
 function changeMapContent(
   snapshot: SpaceSnapshot,
   mapId: UUID,
   resourceId: UUID,
   content: JsonValue,
+  sizeHint?: Extent,
 ): SnapshotEditOutcome {
   const placed = placedIn(snapshot, mapId);
   if ('code' in placed) return refused(placed);
@@ -418,11 +422,19 @@ function changeMapContent(
   }
   const current = resolvedMapContent(kind, at.content);
   if (current !== undefined && sameJsonValue(current, content)) return UNCHANGED;
-  return withPlacement(
+  const written = withPlacement(
     snapshot,
     mapId,
     Placement.place(placed.placement, resourceId, { ...at, content }),
   );
+  if (sizeHint === undefined || at.size !== undefined || written.kind !== 'completed') {
+    return written;
+  }
+  const resized = resize(written.snapshot, mapId, resourceId, {
+    width: Math.max(Math.round(sizeHint.width), COLLAPSED_RESOURCE_SIZE.width),
+    height: Math.max(Math.round(sizeHint.height), COLLAPSED_RESOURCE_SIZE.height),
+  });
+  return resized.kind === 'completed' ? resized : written;
 }
 
 /**

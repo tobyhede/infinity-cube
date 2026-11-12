@@ -1,8 +1,11 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
   type CSSProperties,
@@ -18,7 +21,13 @@ import {
   type ResourceShape,
 } from '@project/core';
 import type { Answer } from '@project/resource-api/domain';
-import type { Assets, OwnProps, RailCommand, TitleProps } from '@project/resource-api/view';
+import {
+  RAIL_BAND,
+  type Assets,
+  type OwnProps,
+  type RailCommand,
+  type TitleProps,
+} from '@project/resource-api/view';
 import {
   createRailStore,
   ResourceHostProvider,
@@ -41,6 +50,7 @@ import {
 import { readingAssets, usePluginAssets } from './plugin-assets';
 import { RailChoiceMenu } from './RailChoiceMenu';
 import { ResourceFailureBoundary } from './ResourceFailureBoundary';
+import { HostRenderedMarkdown, HostSourceEditor } from './ResourceTextHost';
 import {
   ResourceRailAction,
   ResourceRailActions,
@@ -165,6 +175,10 @@ function PluginRailCommands({ commands }: { readonly commands: readonly RailComm
           <ResourceRailAction
             key={command.id}
             aria-label={command.label}
+            aria-keyshortcuts={command.keyshortcuts}
+            // A command naming keys belongs to work running in the rect, which
+            // has the focus: pressing it does not take the focus away.
+            holdFocus={command.keyshortcuts !== undefined}
             disabled={command.disabled === true}
             onClick={command.run}
           >
@@ -204,8 +218,12 @@ export interface PluginResourceProps {
   readonly operations: PluginOperations;
   readonly entityActions?: readonly EntityActionGroup[] | undefined;
   readonly contextNotice?: string | null | undefined;
-  /** Where the rail is drawn, and when; absent, it is drawn in the rect. */
-  readonly renderToolbar?: ((toolbar: ReactNode) => ReactNode) | undefined;
+  /**
+   * Where the rail is drawn, and when; absent, it is drawn in the rect.
+   * `held` says the plugin holds a Claim, so its rail carries the ends of an
+   * edit that must stay reachable whether or not the Resource is selected.
+   */
+  readonly renderToolbar?: ((toolbar: ReactNode, held: boolean) => ReactNode) | undefined;
   /** Told what a plugin threw while drawing. */
   readonly onFailure?: ((error: Error) => void) | undefined;
 }
@@ -254,6 +272,7 @@ function guarded(
   operations: PluginOperations,
   lifetime: SurfaceLifetime,
   readOnly: boolean,
+  onHeld: (change: 1 | -1) => void,
 ): PluginOperations {
   if (readOnly) return { kind: operations.kind };
   const withheld = (): { readonly refused: string } | null => {
@@ -286,8 +305,33 @@ function guarded(
     claim:
       claim === undefined
         ? undefined
-        : (drawing) => (lifetime.drawn() ? claim(drawing) : undefined),
+        : (drawing) => counted(lifetime.drawn() ? claim(drawing) : undefined),
   };
+
+  /** A Claim whose release, however it comes, is counted once. */
+  function counted(taken: PluginHostClaim | undefined): PluginHostClaim | undefined {
+    if (taken === undefined) return undefined;
+    onHeld(1);
+    let settled = false;
+    const settle = () => {
+      if (settled) return;
+      settled = true;
+      onHeld(-1);
+    };
+    return {
+      // The host completes a release asked while exclusive work or an inner
+      // Claim runs once that ends, so the plugin holds nothing from here.
+      release: () => {
+        settle();
+        taken.release();
+      },
+      exclusively: (work) => taken.exclusively(work),
+      unmount: () => {
+        settle();
+        taken.unmount();
+      },
+    };
+  }
 }
 
 /** A Resource a plugin in this build draws, on the Map. */
@@ -318,12 +362,42 @@ export function PluginSurface(props: PluginResourceProps & { readonly entry: Plu
     lifetime.begin();
     return lifetime.end;
   }, [lifetime]);
-  const host: ResourceHost = useMemo(() => ({ Title: MapTitleView, Own: MapOwn, rail }), [rail]);
+  const host: ResourceHost = useMemo(
+    () => ({
+      Title: MapTitleView,
+      Own: MapOwn,
+      rail,
+      RenderedMarkdown: HostRenderedMarkdown,
+      SourceEditor: HostSourceEditor,
+      railBand: RAIL_BAND,
+    }),
+    [rail],
+  );
   // One set of commits while the operations the surface is handed stay the
   // same, so the plugin's own render, and the rail it publishes, settle.
+  const [held, setHeld] = useState(0);
+  const onHeld = useCallback((change: 1 | -1) => setHeld((count) => count + change), []);
+  // An edit that ends takes the focus it held with it, so the focus goes back
+  // to the Resource, as a renamed Title's does — unless the author has already
+  // put it somewhere else.
+  const surfaceElement = useRef<HTMLDivElement | null>(null);
+  const heldWas = useRef(false);
+  const returnFocus = title.onReturnFocus;
+  useLayoutEffect(() => {
+    const active = surfaceElement.current?.ownerDocument.activeElement ?? null;
+    if (
+      heldWas.current &&
+      held === 0 &&
+      (active === null ||
+        active === active.ownerDocument.body ||
+        surfaceElement.current?.contains(active))
+    )
+      returnFocus();
+    heldWas.current = held > 0;
+  }, [held, returnFocus]);
   const operations = useMemo(
-    () => guarded(props.operations, lifetime, readOnly),
-    [props.operations, lifetime, readOnly],
+    () => guarded(props.operations, lifetime, readOnly, onHeld),
+    [props.operations, lifetime, readOnly, onHeld],
   );
   // Assets are drawn and read from the application's store; storing and
   // picking are what the host offers with its commits, withdrawn as they are.
@@ -393,6 +467,7 @@ export function PluginSurface(props: PluginResourceProps & { readonly entry: Plu
   const bare = props.entry.bareAtRest && props.borderColor === undefined && !selected;
   const resource = (
     <Card
+      ref={surfaceElement}
       role="article"
       aria-label={name}
       className="canvas-resource canvas-resource--plugin"
@@ -401,6 +476,9 @@ export function PluginSurface(props: PluginResourceProps & { readonly entry: Plu
       data-content-kind={kind}
       data-state={state}
       data-open={false}
+      // A surface holding a Claim is being worked in, which keeps its active
+      // face as an edit does (`canvas-resource.css`).
+      data-content-editing={holder === 'this-drawing'}
       // The outline the plugin declared, which `canvas-resource.css` strokes
       // the border and ring on (ADR 0142).
       data-resource-shape={outline}
@@ -410,13 +488,14 @@ export function PluginSurface(props: PluginResourceProps & { readonly entry: Plu
       {outline !== 'rectangle' && (
         <ResourceShapeOutlineDrawing outline={resourceShapeOutline(outline, size)} size={size} />
       )}
-      {props.renderToolbar === undefined ? toolbar : props.renderToolbar(toolbar)}
+      {props.renderToolbar === undefined ? toolbar : props.renderToolbar(toolbar, held > 0)}
       <div
         className={
-          // A Claim gives the plugin the whole rect: the canvas neither drags,
-          // pans nor zooms from inside it while one is held.
+          // A Claim gives the plugin the whole rect to point in: the canvas
+          // neither drags nor pans from inside it while one is held. The wheel
+          // stays the canvas's, so it still zooms over the Resource (ADR 0064).
           holder === 'this-drawing'
-            ? 'canvas-resource__plugin nodrag nopan nowheel'
+            ? 'canvas-resource__plugin nodrag nopan'
             : 'canvas-resource__plugin'
         }
       >

@@ -4,15 +4,15 @@
 the one Playwright drives. It is a **test bed**, not the product demo — the
 narrative demo lives in `example/` and is kept as a single Space directory.
 
-This file sits here rather than in `fixture/` on purpose. Import reads every
-`.md` beside a space file and refuses one that is not a Markdown Resource's own
-sidecar (ADR 0128), so a `README.md` in there would refuse the fixture.
+This file sits here rather than in `fixture/`, so the fixture holds only the
+files Import reads.
 
 The fixture is Meta-rooted. `aggregate.json` names Meta; ordinary Spaces live in
 sibling `<space-uuid>/` directories. Each Space is a directory: `space.json`
 holding structure — `version`, `id`, `title`, `maps` and `defaultMap` —
-and one JSON Resource file per resource under `resources/`, with a Markdown
-Resource's source in the `<id>.md` sidecar beside it.
+and one JSON Resource file per resource under `resources/`. A Markdown
+Resource's text is an asset in the aggregate's own `assets/`, named by its
+SHA-256 (ADR 0142).
 
 `defaultMap` is the opening canvas (ADR 0079). A selected Map draws only
 the Graphs it owns. Cycle refusal is an aggregate-intake test, not an invalid

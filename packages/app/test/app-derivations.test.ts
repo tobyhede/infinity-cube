@@ -5,6 +5,7 @@ import type { EntityActionGroup, EntityActionOutcome } from '@project/ui';
 import { activeGraphOf } from '../src/dock-chrome';
 import { mapView } from '../src/map-view';
 import { nameOnCreationOf } from '../src/name-on-creation';
+import { capSizeHint } from '../src/open-and-expand';
 import { showsSpace } from '../src/open-spaces-context';
 import { RESOURCE_HEIGHT, RESOURCE_WIDTH } from '../src/resource';
 import { REFERENCE_OFFSET_RATIO, referenceAnchor } from '../src/resource-placement';
@@ -43,6 +44,30 @@ const resource = (id: typeof PLACED_A): Resource => {
   if (found === undefined) throw new Error(`No Resource ${id} in the fixture.`);
   return found;
 };
+
+describe('capSizeHint', () => {
+  it('keeps a hint the cap holds as it is', () => {
+    expect(capSizeHint({ width: 640, height: 300 }, { width: 1000, height: 800 })).toEqual({
+      width: 640,
+      height: 300,
+    });
+  });
+
+  it('grows a hint the cap narrows taller, so text reflowed at the narrower width still fits', () => {
+    // 640 by 300 holds 192000 square units of text; at 400 wide that is 480 tall.
+    expect(capSizeHint({ width: 640, height: 300 }, { width: 400, height: 800 })).toEqual({
+      width: 400,
+      height: 480,
+    });
+  });
+
+  it('never grows a hint past the cap’s height', () => {
+    expect(capSizeHint({ width: 640, height: 300 }, { width: 320, height: 500 })).toEqual({
+      width: 320,
+      height: 500,
+    });
+  });
+});
 
 describe('showsSpace', () => {
   it('answers true for an isolated mount, which has no open set', () => {

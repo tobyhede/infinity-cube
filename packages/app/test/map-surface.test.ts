@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { uuidSchema, type SpaceSnapshot } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { positionedStrategy } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
@@ -43,11 +43,11 @@ function composition() {
     resources: [
       {
         id: RESOURCE,
-        document: { title: 'Canvas Resource', kind: 'markdown', content: { source: '' } },
+        document: { title: 'Canvas Resource', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       },
       {
         id: OTHER_RESOURCE,
-        document: { title: 'Drawn Resource', kind: 'markdown', content: { source: '' } },
+        document: { title: 'Drawn Resource', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       },
     ],
   };
@@ -84,7 +84,11 @@ describe("the canvas's Map surface", () => {
     expect(app.surface.view()).toBe(other);
 
     expect(
-      app.authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: OTHER_RESOURCE }),
+      app.authoring.complete(CANVAS, {
+        kind: 'changed-map-content',
+        resourceId: OTHER_RESOURCE,
+        content: { open: true },
+      }),
     ).toMatchObject({ kind: 'completed' });
     const edited = app.surface.view();
     expect(edited).not.toBe(other);
@@ -120,9 +124,13 @@ describe('a drawn Map', () => {
       policy: 'authoring',
     });
     expect(
-      surface.authoring.complete({ kind: 'opened-resource', resourceId: OTHER_RESOURCE }),
+      surface.authoring.complete({
+        kind: 'changed-map-content',
+        resourceId: OTHER_RESOURCE,
+        content: { open: true },
+      }),
     ).toMatchObject({ kind: 'completed' });
-    expect(surface.view().mapPlacement.get(OTHER_RESOURCE)?.open).toBe(true);
+    expect(surface.view().mapPlacement.get(OTHER_RESOURCE)?.content).toEqual({ open: true });
     const view = surface.view();
     const placed = await positionedStrategy(view.mapPlacement)(view.projection.strategyGraph);
     const projection = surface.project(placed);

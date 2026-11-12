@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { type JsonValue, type Resource, type ResourcePlacement } from '@project/core';
+import {
+  EMPTY_ASSET_REF,
+  type JsonValue,
+  type Resource,
+  type ResourcePlacement,
+} from '@project/core';
 import { loadSpace, loadSpaceSnapshot, type LoadSpaceResult } from '../src/index';
 import type { SpaceReferenceError } from '../src/validate';
 import { jsonResourceFile, resourceFile, uuid } from './resource-files';
@@ -43,14 +48,14 @@ type Loader = (document: Document) => LoadSpaceResult;
 
 /**
  * The file loader: resources arrive as the Resource files an author wrote, so
- * the document under test is written back out as JSON and sidecars on the way in.
+ * the document under test is written back out as JSON on the way in.
  */
 const viaFiles: Loader = ({ resources, ...structure }) =>
   loadSpace(
     { version: 1, id: SPACE, title: 'Test space', ...structure },
     resources.flatMap((resource) =>
       resource.kind === 'markdown'
-        ? resourceFile(resource.id, resource.title, resource.content.source)
+        ? resourceFile(resource.id, resource.title, resource.content.url)
         : jsonResourceFile(resource.id, resource.title, resource.kind, resource.content),
     ),
   );
@@ -69,7 +74,7 @@ const markdown = (id: string, title = id): Resource => ({
   id: uuid(id),
   title,
   kind: 'markdown',
-  content: { source: '' },
+  content: { url: EMPTY_ASSET_REF },
 });
 
 const referenceTo = (id: string, target: string): Resource => ({
@@ -262,7 +267,7 @@ describe.each([
         title: 'Figure',
         kind: 'image',
         content: {
-          url: '/assets/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU',
+          url: EMPTY_ASSET_REF,
           naturalSize: { width: 640, height: 480 },
         },
       };
@@ -714,7 +719,7 @@ describe.each([
       title: 'Figure',
       kind: 'image',
       content: {
-        url: '/assets/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU',
+        url: EMPTY_ASSET_REF,
         naturalSize: { width: 640, height: 480 },
       },
     };
@@ -775,8 +780,8 @@ describe.each([
       },
     );
 
-    it.each(everyKind.filter(([kind]) => kind !== 'ur' && kind !== 'image'))(
-      'refuses Map content on a %s Resource, which no plugin draws',
+    it.each(everyKind.filter(([kind]) => kind !== 'ur' && kind !== 'image' && kind !== 'markdown'))(
+      'refuses Map content on a %s Resource that no plugin keeps',
       (_kind, resources) => {
         for (const content of [{ shape: 'rectangle' }, { shape: 'pill' }, null]) {
           expect(refused(placedIn(resources, content))).toEqual([
@@ -811,7 +816,7 @@ describe.each([
       expect(space.maps[0]?.positions[A]).toEqual({ x: 0, y: 0 });
     });
 
-    it.each(everyKind.filter(([kind]) => kind !== 'ur' && kind !== 'image'))(
+    it.each(everyKind.filter(([kind]) => kind !== 'ur' && kind !== 'image' && kind !== 'markdown'))(
       'loads a %s Resource Open',
       (_kind, resources) => {
         expect(loaded(openIn(resources, true)).resources).toHaveLength(resources.length);
@@ -829,6 +834,15 @@ describe.each([
         expect.objectContaining({ kind: 'open-requires-content', ref: A }),
       ]);
       expect(loaded(openIn([image], false)).resources).toHaveLength(1);
+    });
+
+    it('loads a Markdown Resource Open or Closed by its Map content, and refuses the Map storing Open', () => {
+      const prose = [markdown(A, 'A')];
+      for (const open of [true, false])
+        expect(loaded(placedIn(prose, { open })).maps[0]?.positions[A]?.content).toEqual({ open });
+      expect(refused(openIn(prose, true))).toEqual([
+        expect.objectContaining({ kind: 'open-requires-content', ref: A }),
+      ]);
     });
 
     it('refuses an Ur Resource stored Open, which has no content to show', () => {

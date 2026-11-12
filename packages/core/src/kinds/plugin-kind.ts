@@ -148,20 +148,19 @@ export interface PluginMapContent {
  */
 export function kindFromPlugin<const K extends string, C, M>(
   plugin: ResourcePlugin<C, M> & { readonly kind: K; readonly newContent: C },
-): KindModule<K, C, C, PluginContent<K, C>> & StartsEmpty<C> & PluginMapContent;
+): KindModule<K, C, PluginContent<K, C>> & StartsEmpty<C> & PluginMapContent;
 export function kindFromPlugin<const K extends string, C, M>(
   plugin: ResourcePlugin<C, M> & { readonly kind: K },
-): KindModule<K, C, C, PluginContent<K, C>> & PluginMapContent;
+): KindModule<K, C, PluginContent<K, C>> & PluginMapContent;
 export function kindFromPlugin<const K extends string, C, M>(
   plugin: ResourcePlugin<C, M> & { readonly kind: K },
-): KindModule<K, C, C, PluginContent<K, C>> & PluginMapContent {
+): KindModule<K, C, PluginContent<K, C>> & PluginMapContent {
   const kind = plugin.kind;
   const module = defineKind({
     id: kind,
     contentSchema: contentSchemaOf(plugin),
     flags: {
       canOpen: false,
-      opensToFit: false,
       mayBeTarget: plugin.mayBeTarget === true,
       ownsReferencedSpaces: plugin.ownsReferencedSpaces === true,
     },

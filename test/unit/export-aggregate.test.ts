@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { EMPTY_ASSET_REF, uuidSchema, type UUID } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type AssetRef, type UUID } from '@project/core';
 import { createSpaceHttpApp, httpAssetClient, HttpSpaceBackend } from '@project/http';
 import type { LoadedSpace, StoredAsset } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -89,11 +89,11 @@ const storedSpace: LoadedSpace = {
       { id: RESOURCE_B, document: { title: 'B', kind: 'ur', content: {} } },
       {
         id: RESOURCE_A,
-        document: { title: 'A', kind: 'markdown', content: { source: 'A body.\n' } },
+        document: { title: 'A', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       },
       {
         id: RESOURCE_F,
-        document: { title: 'F', kind: 'markdown', content: { source: 'F body.\n' } },
+        document: { title: 'F', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       },
       { id: RESOURCE_E, document: { title: 'E', kind: 'ur', content: {} } },
     ],
@@ -201,13 +201,13 @@ describe('canonical export', () => {
       resources: [
         {
           id: RESOURCE_A,
-          document: { kind: 'markdown', content: { source: 'A body.\n' }, title: 'A' },
+          document: { kind: 'markdown', content: { url: EMPTY_ASSET_REF }, title: 'A' },
         },
         { id: RESOURCE_E, document: { title: 'E', kind: 'ur', content: {} } },
         { id: RESOURCE_B, document: { kind: 'ur', content: {}, title: 'B' } },
         {
           id: RESOURCE_F,
-          document: { kind: 'markdown', title: 'F', content: { source: 'F body.\n' } },
+          document: { kind: 'markdown', title: 'F', content: { url: EMPTY_ASSET_REF } },
         },
       ],
       id: SPACE_ID,
@@ -262,15 +262,13 @@ describe('canonical export', () => {
       await readFile(spaceFileIn(second), 'utf8'),
     );
     const resources = join(SPACE_ID, 'resources');
-    // Every Resource file, and the sidecar of each Markdown Resource.
+    // Every Resource file and nothing else: a Markdown Resource's text is an asset (ADR 0142).
     expect((await readdir(join(first, resources))).sort()).toEqual(
       [
         `${RESOURCE_A}.json`,
-        `${RESOURCE_A}.md`,
         `${RESOURCE_B}.json`,
         `${RESOURCE_E}.json`,
         `${RESOURCE_F}.json`,
-        `${RESOURCE_F}.md`,
       ].sort(),
     );
     expect(await directoryTree(join(second, resources))).toEqual(
@@ -294,7 +292,14 @@ describe('canonical export', () => {
             title: 'Spine',
             kind: 'positioned',
             positions: {
-              [RESOURCE_A]: { x: 0, y: 0, open: true, size: { height: 420, width: 560 } },
+              // A Markdown Resource is Open by its Map content (ADR 0142).
+              [RESOURCE_A]: {
+                x: 0,
+                y: 0,
+                open: false,
+                content: { open: true },
+                size: { height: 420, width: 560 },
+              },
               [RESOURCE_B]: { x: 260, y: 0, open: false, size: { height: 300, width: 400 } },
             },
             graphs: [
@@ -306,11 +311,11 @@ describe('canonical export', () => {
       resources: [
         {
           id: RESOURCE_A,
-          document: { title: 'A', kind: 'markdown', content: { source: 'A body.\n' } },
+          document: { title: 'A', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
         {
           id: RESOURCE_B,
-          document: { title: 'B', kind: 'markdown', content: { source: 'B body.\n' } },
+          document: { title: 'B', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
       ],
     },
@@ -351,7 +356,13 @@ describe('canonical export', () => {
           title: 'Spine',
           kind: 'positioned',
           positions: {
-            [RESOURCE_A]: { x: 0, y: 0, open: true, size: { width: 560, height: 420 } },
+            [RESOURCE_A]: {
+              x: 0,
+              y: 0,
+              open: false,
+              content: { open: true },
+              size: { width: 560, height: 420 },
+            },
             [RESOURCE_B]: { x: 260, y: 0, open: false, size: { width: 400, height: 300 } },
           },
           graphs: [
@@ -507,13 +518,13 @@ describe('stored asset bytes', () => {
   });
 
   /**
-   * A Markdown Resource whose whole source is `url`. The walk reads no kind,
-   * so a string that is an asset URL is a reference wherever it stands, in a
-   * Resource of a kind other than Image as in an Image's.
+   * A Markdown Resource whose text is the asset `url` names. The walk reads no
+   * kind, so an asset URL is a reference wherever it stands, in a Resource of
+   * a kind other than Image as in an Image's, whatever bytes it names.
    */
-  const markdownNaming = (id: typeof PICTURE_ID, url: string): StoredResource => ({
+  const markdownNaming = (id: typeof PICTURE_ID, url: AssetRef): StoredResource => ({
     id,
-    document: { title: 'Notes', kind: 'markdown', content: { source: url } },
+    document: { title: 'Notes', kind: 'markdown', content: { url } },
   });
 
   const holding = async (

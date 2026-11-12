@@ -6,9 +6,9 @@
  * these entries and the controls that perform a command announce its entry, so a
  * key cannot be answered under one name and advertised under another.
  *
- * The Open Markdown Resource's Save and Cancel stay with the editor in
- * `@project/ui` (`MarkdownResourceBody`), which this package's bindings cannot
- * reach into: `ui` depends on `core` alone.
+ * The Open Markdown Resource's Save and Cancel stay with its plugin's view
+ * (`@project/plugin-markdown`, ADR 0142), which this package's bindings cannot
+ * reach into.
  */
 
 /**

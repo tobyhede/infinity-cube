@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  EMPTY_ASSET_REF,
   encodeCompactUuid,
   spaceSnapshotSchema,
   uuidSchema,
@@ -64,9 +65,18 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
     ],
   },
   resources: [
-    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: '' } } },
-    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', content: { source: '' } } },
-    { id: RESOURCE_OFF_MAP, document: { title: 'C', kind: 'markdown', content: { source: '' } } },
+    {
+      id: RESOURCE_A,
+      document: { title: 'A', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+    },
+    {
+      id: RESOURCE_B,
+      document: { title: 'B', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+    },
+    {
+      id: RESOURCE_OFF_MAP,
+      document: { title: 'C', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+    },
   ],
 });
 

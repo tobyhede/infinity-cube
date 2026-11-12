@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { uuidSchema, type SpaceSnapshot } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
 import { createMapSurface } from '../src/map-surface';
@@ -46,7 +46,10 @@ function composition(newId?: () => ReturnType<typeof id>) {
       ],
     },
     resources: [
-      { id: RESOURCE, document: { title: 'Resource', kind: 'markdown', content: { source: '' } } },
+      {
+        id: RESOURCE,
+        document: { title: 'Resource', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+      },
     ],
   };
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
@@ -64,7 +67,11 @@ describe('the canvas surface', () => {
     app.navigation.selectMap(OTHER_MAP);
 
     expect(
-      app.surface.authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE }),
+      app.surface.authoring.complete({
+        kind: 'changed-map-content',
+        resourceId: RESOURCE,
+        content: { open: true },
+      }),
     ).toMatchObject({ kind: 'completed' });
 
     expect(spaceSession.getState().working.document.defaultMap).toBe(OTHER_MAP);
@@ -95,12 +102,16 @@ describe('a drawn surface', () => {
     drawing.observe();
 
     expect(
-      drawing.authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE }),
+      drawing.authoring.complete({
+        kind: 'changed-map-content',
+        resourceId: RESOURCE,
+        content: { open: true },
+      }),
     ).toMatchObject({ kind: 'completed' });
 
     const working = spaceSession.getState().working;
     expect(mapOf(working, OTHER_MAP)?.activeGraph).toBe(STORED_GRAPH);
-    expect(mapOf(working, OTHER_MAP)?.positions[RESOURCE]?.open).toBe(true);
+    expect(mapOf(working, OTHER_MAP)?.positions[RESOURCE]?.content).toEqual({ open: true });
     expect(working.document.defaultMap).toBe(OPENING_MAP);
     expect(app.navigation.getState()).toMatchObject({
       selectedMapId: OPENING_MAP,

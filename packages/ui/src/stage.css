@@ -37,8 +37,9 @@
 }
 
 /* A slide scrolls only when its author marked further content with a
-   horizontal rule; content with none is clipped to the frame, however long. */
-.stage__body:has(.resource__body hr) {
+   horizontal rule; content with none is clipped to the frame, however long.
+   A plugin's text is drawn by the host's rendered-Markdown component. */
+.stage__body:has(:is(.resource__body, .markdown-resource-body__rendered) hr) {
   overflow-y: auto;
 }
 
@@ -135,11 +136,27 @@
 }
 
 /* A Resource a plugin draws fills the frame, which is its rect (ADR 0142): the
-   plugin lays out everything inside it, its Title included. */
+   plugin lays out everything inside it, its Title included. A plugin drawing
+   text in flow grows past the frame, for the body to clip or scroll by its
+   rule; one drawn at the rect's size fills it. */
 .stage__body .resource--full.resource--plugin {
   position: relative;
-  height: 100%;
+  min-height: 100%;
   padding: 0;
+}
+
+/* The plugin's rendered text grows to its length on the Stage rather than
+   being clipped to the room it was given, so the body clips or scrolls it, and
+   it reads at the Stage's type scale, as every presented text does. */
+.stage__body .resource--plugin :is(.markdown-resource-body, .markdown-resource-body__rendered) {
+  flex: none;
+  min-height: auto;
+  overflow: visible;
+}
+
+.stage__body .resource--plugin .markdown-resource-body__rendered {
+  font-size: inherit;
+  line-height: inherit;
 }
 
 .stage__body .resource--plugin .resource__title {

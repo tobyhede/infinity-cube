@@ -41,11 +41,11 @@ const fixtureContents = await readAggregateFrom(mapSource('fixture', fixtureFile
 
 const PINNED = `github:${OWNER}/${REPO}@${COMMIT}`;
 
-/** A Space's resource file and Markdown sidecar in the fixture, both read after `aggregate.json`. */
+/** A Space's resource file in the fixture, read after `aggregate.json`. */
 const RESOURCE_FILE =
   '00000000-0000-4000-8000-000000000060/resources/00000000-0000-4000-8000-000000000063.json';
-const SIDECAR_FILE =
-  '00000000-0000-4000-8000-000000000080/resources/00000000-0000-4000-8000-000000000083.md';
+/** One Markdown Resource's text in the fixture's `assets/` (ADR 0142). */
+const TEXT_FILE = 'assets/-LWoxo4p00EssCIJYBPjgsOvwD08ukL-Kl3uecNJBfc.md';
 
 /** The source a read answered, failing the test when it answered a GitHub failure. */
 const sourceOf = (result: GitHubSourceResult): AggregateSource => {
@@ -518,7 +518,7 @@ describe('readGitHubAggregate', () => {
       holdRaw: true,
       blobFailures: new Map([
         [RESOURCE_FILE, [{ status: 404 }]],
-        [SIDECAR_FILE, [{ status: 404 }]],
+        [TEXT_FILE, [{ status: 404 }]],
       ]),
     });
 
@@ -526,7 +526,7 @@ describe('readGitHubAggregate', () => {
 
     expect((await refusalOf(result)).diagnostics).toEqual([
       `${PINNED}/${RESOURCE_FILE}: could not be fetched from GitHub: the request failed with HTTP 404`,
-      `${PINNED}/${SIDECAR_FILE}: could not be fetched from GitHub: the request failed with HTTP 404`,
+      `${PINNED}/${TEXT_FILE}: could not be fetched from GitHub: the request failed with HTTP 404`,
     ]);
     expect(github.rawRequests()).toEqual(sorted(fixtureFiles.keys()));
     expect(github.cancelledRaw()).toBe(0);
@@ -545,7 +545,7 @@ describe('readGitHubAggregate', () => {
       ok: false,
       reason: 'could not be fetched from GitHub: the request failed with HTTP 429',
     });
-    expect(await source.read(SIDECAR_FILE)).toEqual({
+    expect(await source.read(TEXT_FILE)).toEqual({
       ok: false,
       reason: 'not fetched: GitHub is throttling requests',
     });
@@ -557,29 +557,29 @@ describe('readGitHubAggregate', () => {
       files: fixtureFiles,
       blobFailures: new Map([
         [RESOURCE_FILE, [{ status: 429 }, { status: 429 }]],
-        [SIDECAR_FILE, [{ status: 429 }]],
+        [TEXT_FILE, [{ status: 429 }]],
       ]),
     });
     const held = Promise.withResolvers<undefined>();
-    const holdingSidecar: typeof fetch = async (input, init) => {
-      if (new Request(input).url.endsWith(SIDECAR_FILE)) await held.promise;
+    const holdingText: typeof fetch = async (input, init) => {
+      if (new Request(input).url.endsWith(TEXT_FILE)) await held.promise;
       return await github.fetch(input, init);
     };
     const { wait, waits } = recordingWait();
     const source = sourceOf(
-      await readGitHubAggregate(`github:${OWNER}/${REPO}`, holdingSidecar, wait),
+      await readGitHubAggregate(`github:${OWNER}/${REPO}`, holdingText, wait),
     );
 
-    const sidecar = source.read(SIDECAR_FILE);
+    const reading = source.read(TEXT_FILE);
     await source.read(RESOURCE_FILE);
     held.resolve(undefined);
 
-    expect(await sidecar).toEqual({
+    expect(await reading).toEqual({
       ok: false,
       reason: 'not fetched: GitHub is throttling requests',
     });
     expect(waits).toEqual([1000]);
-    expect(requestsFor(github, SIDECAR_FILE)).toBe(1);
+    expect(requestsFor(github, TEXT_FILE)).toBe(1);
   });
 
   it('reports every file read after GitHub went on throttling as not fetched', async () => {

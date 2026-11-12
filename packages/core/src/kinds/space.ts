@@ -118,7 +118,6 @@ export const spaceKind = defineKind({
   contentSchema: spaceResourceContentSchema,
   flags: {
     canOpen: true,
-    opensToFit: false,
     mayBeTarget: true,
     ownsReferencedSpaces: true,
   },

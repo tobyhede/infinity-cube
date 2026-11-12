@@ -2,6 +2,7 @@ import fc from 'fast-check';
 import { expect, it } from 'vitest';
 
 import {
+  EMPTY_ASSET_REF,
   GRAPH_HEAD_SHAPES,
   normalizeTitle,
   uuidSchema,
@@ -16,6 +17,7 @@ import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
 import { CANVAS, type AuthoringCompletion, type AuthoringResult } from '../src/space-authoring';
 import { unusedImageSources } from './image-sources';
+import { textAsset } from './markdown-texts';
 
 /**
  * What every semantic operation owes, whatever order they arrive in.
@@ -95,8 +97,14 @@ const start: SpaceSnapshot = {
     defaultMap: MAP_ID,
   },
   resources: [
-    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
-    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', content: { source: 'B' } } },
+    {
+      id: RESOURCE_A,
+      document: { title: 'A', kind: 'markdown', content: { url: textAsset('A') } },
+    },
+    {
+      id: RESOURCE_B,
+      document: { title: 'B', kind: 'markdown', content: { url: textAsset('B') } },
+    },
     {
       id: RESOURCE_C,
       document: { title: 'A again', kind: 'reference', content: { target: RESOURCE_A } },
@@ -311,7 +319,7 @@ function resolve(
         return {
           kind: 'edited-resource',
           resourceId,
-          document: { title: generated.title, kind: 'markdown', content: { source: '' } },
+          document: { title: generated.title, kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         };
       }
       const { id: _id, ...document } = resource;

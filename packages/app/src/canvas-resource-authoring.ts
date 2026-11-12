@@ -2,7 +2,6 @@ import type { Continuation } from './continuation';
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
   frameSpaceView,
-  markdownKind,
   selectSpaceView,
   spaceSelection,
   type SpaceView,
@@ -14,6 +13,7 @@ import {
   type ResourceId,
   type GraphId,
 } from '@project/core';
+import type { Size } from '@project/resource-api/domain';
 import type { ObserverErrorReporter, SpaceSession } from '@project/persistence';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import { usePluginAssets, type EntityActionGroup } from '@project/ui';
@@ -33,10 +33,7 @@ import type { PluginHost } from './plugin-host/plugin-commits';
 import type { PluginGate } from './plugin-host/plugin-gate';
 import { usePluginGate } from './plugin-host/plugin-gate-context';
 
-type Caret =
-  | { readonly resourceId: string; readonly field: 'title' }
-  | { readonly resourceId: string; readonly field: 'body'; readonly openObserved: boolean }
-  | null;
+type Caret = { readonly resourceId: string; readonly field: 'title' } | null;
 
 const spaceViewIdentity = (view: SpaceView): string => {
   const framing = view.framing;
@@ -160,11 +157,11 @@ export interface CanvasResourceAuthoringInput {
   readonly portalEditing?: ReadonlySet<ResourceId>;
   readonly onPortalEditingChange?: ((resourceId: ResourceId, editing: boolean) => void) | undefined;
   /**
-   * Open a Resource grown to its content, answering nothing where a plain Open
-   * serves. Only the canvas's own Map offers it, because growing centres its
-   * camera; absent, every Open is the plain Open Edit.
+   * A plugin's size hint capped at what this canvas shows. Only the canvas's
+   * own Map offers it, because it knows its viewport; absent, a hint is
+   * ignored.
    */
-  readonly openToFit?: (resourceId: ResourceId) => 'completed' | 'retained' | undefined;
+  readonly capSizeHint?: ((hint: Size) => Size | undefined) | undefined;
 }
 
 export interface CanvasResourceAuthoring {
@@ -201,8 +198,8 @@ export function useCanvasResourceAuthoring({
   resourceEntityActions,
   portalEditing,
   onPortalEditingChange,
-  openToFit,
   plugins,
+  capSizeHint,
 }: CanvasResourceAuthoringInput): CanvasResourceAuthoring {
   const spaces = useOpenSpaces();
   const [contextEditingIds, setContextEditingIds] = useState<ReadonlySet<ResourceId>>(
@@ -214,33 +211,23 @@ export function useCanvasResourceAuthoring({
   const [caret, setCaret] = useState<Caret>(null);
   const editingTitleResourceId = caret?.field === 'title' ? caret.resourceId : null;
   /**
-   * The body caret is on content that can be edited in place: an Open
-   * Resource's own authored content that does not embed a Map, which is
-   * authored in that Map instead.
+   * Where a plugin surface's commits go (ADR 0142): this canvas's Edits, each
+   * answering how it settled, withdrawn by the application's one gate and by
+   * the Space being replaced. A Claim held on the gate is a plugin's running
+   * work, as a Markdown Resource's edit is: it holds the keyboard and withdraws
+   * what a body edit does, while the canvas keeps no editing state of its own
+   * for it.
    */
-  const bodyCaretNamesOpenContent =
-    caret?.field === 'body' &&
-    nodes.some(
-      (node) =>
-        node.id === caret.resourceId &&
-        node.data.open === true &&
-        node.data.authorsContent &&
-        !node.data.embedsMap,
-    );
-
-  if (caret?.field === 'body') {
-    if (bodyCaretNamesOpenContent && !caret.openObserved) {
-      setCaret({ ...caret, openObserved: true });
-    } else if (!bodyCaretNamesOpenContent && caret.openObserved) {
-      setCaret(null);
-    }
-  }
-
-  const bodyEditorResourceId =
-    caret?.field === 'body' && availability.editResourceBody && bodyCaretNamesOpenContent
-      ? caret.resourceId
-      : null;
-  const bodyEditing = bodyEditorResourceId !== null;
+  const pageGate = usePluginGate();
+  const pluginGate = plugins?.gate ?? pageGate;
+  const reportPluginFailure = plugins?.report ?? reportPluginFailureToConsole;
+  // Read so every plugin surface is decorated again when a Claim is taken or
+  // exclusive work begins or ends, and offers only what is not withdrawn.
+  const claimChain = useSyncExternalStore(pluginGate.subscribe, pluginGate.getState);
+  // The application's asset store, which a surface stores and picks through
+  // only where it offers commits, and only while they are not withdrawn.
+  const pluginAssets = usePluginAssets();
+  const bodyEditing = claimChain.holders.length > 0;
 
   useEffect(() => {
     onBodyEditingChange?.(bodyEditing);
@@ -289,12 +276,10 @@ export function useCanvasResourceAuthoring({
       // an Ur Resource has none to show, so Enter or Space on one asks nothing.
       // `takesOpen` is the domain's one answer, which intake and the Edit ask too.
       if (stored === undefined || !takesOpen(stored.document.kind)) return 'retained';
-      const fitted = openToFit?.(resourceId.data);
-      if (fitted !== undefined) return fitted;
       const result = authoring.complete({ kind: 'opened-resource', resourceId: resourceId.data });
       return result.kind === 'completed' || result.kind === 'unchanged' ? 'completed' : 'retained';
     },
-    [authoring, availability.authorOnCanvas, spaceSession, openToFit],
+    [authoring, availability.authorOnCanvas, spaceSession],
   );
 
   const closeResource = useCallback(
@@ -318,41 +303,6 @@ export function useCanvasResourceAuthoring({
     [authoring, onPortalEditingChange],
   );
 
-  const completeResourceBody = useCallback(
-    (resourceId: ResourceId, body: string): 'completed' | 'retained' => {
-      const stored = spaceSession
-        .getState()
-        .working.resources.find((resource) => resource.id === resourceId);
-      if (stored?.document.kind !== markdownKind.id) return 'retained';
-      const parsed = resourceDocumentSchema.safeParse({
-        ...stored.document,
-        content: { ...stored.document.content, source: body },
-      });
-      if (!parsed.success) return 'retained';
-      const result = authoring.complete({
-        kind: 'edited-resource',
-        resourceId,
-        document: parsed.data,
-      });
-      return result.kind === 'completed' || result.kind === 'unchanged' ? 'completed' : 'retained';
-    },
-    [authoring, spaceSession],
-  );
-
-  /**
-   * Where a plugin surface's commits go (ADR 0142): this canvas's Edits, each
-   * answering how it settled, withdrawn by the application's one gate and by
-   * the Space being replaced.
-   */
-  const pageGate = usePluginGate();
-  const pluginGate = plugins?.gate ?? pageGate;
-  const reportPluginFailure = plugins?.report ?? reportPluginFailureToConsole;
-  // Read so every plugin surface is decorated again when a Claim is taken or
-  // exclusive work begins or ends, and offers only what is not withdrawn.
-  const claimChain = useSyncExternalStore(pluginGate.subscribe, pluginGate.getState);
-  // The application's asset store, which a surface stores and picks through
-  // only where it offers commits, and only while they are not withdrawn.
-  const pluginAssets = usePluginAssets();
   const pluginHost = useMemo(
     (): PluginHost => ({
       gate: pluginGate,
@@ -363,8 +313,17 @@ export function useCanvasResourceAuthoring({
       document: (resourceId) =>
         spaceSession.getState().working.resources.find(({ id }) => id === resourceId)?.document,
       assets: { store: pluginAssets.store, pick: pluginAssets.pick },
+      capSizeHint,
     }),
-    [authoring, pluginGate, reportPluginFailure, claimChain, spaceSession, pluginAssets],
+    [
+      authoring,
+      pluginGate,
+      reportPluginFailure,
+      claimChain,
+      spaceSession,
+      pluginAssets,
+      capSizeHint,
+    ],
   );
 
   const completeResourceTitle = useCallback(
@@ -465,13 +424,6 @@ export function useCanvasResourceAuthoring({
   const clearCaret = useCallback(() => {
     setCaret(null);
   }, []);
-  const beginBodyEditing = useCallback((node: ResourceFlowNode) => {
-    setCaret({
-      resourceId: node.id,
-      field: 'body',
-      openObserved: node.data.open === true,
-    });
-  }, []);
   const onContextEditingChange = useCallback((resourceId: ResourceId, editing: boolean) => {
     setContextEditingIds((prev) => {
       const has = prev.has(resourceId);
@@ -497,7 +449,6 @@ export function useCanvasResourceAuthoring({
     () => ({
       authorOnCanvas: availability.authorOnCanvas,
       bodyEditing,
-      bodyEditorResourceId,
       editableResourceIds,
       openResource,
       closeResource,
@@ -512,7 +463,6 @@ export function useCanvasResourceAuthoring({
     [
       availability.authorOnCanvas,
       bodyEditing,
-      bodyEditorResourceId,
       editableResourceIds,
       openResource,
       closeResource,
@@ -534,12 +484,7 @@ export function useCanvasResourceAuthoring({
   );
   const decoratedNodes = useKindDecoratedNodes(withShared, {
     authorOnCanvas: availability.authorOnCanvas,
-    bodyEditing,
     editableResourceIds,
-    beginBodyEditing,
-    bodyEditorResourceId,
-    completeResourceBody,
-    clearCaret,
     pluginHost,
     continuation,
     containingSpaceId: working.id,

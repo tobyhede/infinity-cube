@@ -195,9 +195,9 @@ const trackedFiles = (): readonly string[] =>
     });
 
 /**
- * A Markdown Resource's sidecar is Markdown too, and it is product data the
- * fixtures and the example Space seed, so it is read like its Resource file
- * and `space.json`.
+ * A Markdown Resource's text is a Markdown asset, `assets/<hash>.md`, and it
+ * is product data the fixtures and the example Space seed, so it is read like
+ * its Resource file and `space.json`.
  */
 const SPACE_CONTENT_TREES = ['packages/app/example/', 'packages/app/fixture/'] as const;
 
@@ -268,7 +268,7 @@ describe('the retired domain vocabulary is gone from tracked files', () => {
 
   it('reaches the kinds of file the rename actually touched', () => {
     // A file list that quietly stopped resolving would report nothing forever.
-    // The scan crosses source, Markdown sidecars, and Resource files and
+    // The scan crosses source, Markdown text assets, and Resource files and
     // `space.json` fixtures, and only the first is a compiler's concern.
     expect(scanned).toContain('packages/core/src/schema.ts');
     expect(scanned).not.toContain('AGENTS.md');

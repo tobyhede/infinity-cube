@@ -1,4 +1,5 @@
 import {
+  EMPTY_ASSET_REF,
   newUuid,
   uuidSchema,
   type ResourcePlacement,
@@ -9,6 +10,7 @@ import {
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
+import { storyText } from './story-assets';
 import {
   loadSpace,
   loadSpaceSnapshot,
@@ -168,7 +170,11 @@ export const authoredSnapshot: SpaceSnapshot = {
   },
   resources: SPINE.map((id, index) => ({
     id,
-    document: { title: `Resource ${index + 1}`, kind: 'markdown', content: { source: '' } },
+    document: {
+      title: `Resource ${index + 1}`,
+      kind: 'markdown',
+      content: { url: EMPTY_ASSET_REF },
+    },
   })),
 };
 
@@ -382,7 +388,7 @@ const traversalResources = (
 ): SpaceSnapshot['resources'] =>
   titled.map(([id, title]) => ({
     id,
-    document: { title, kind: 'markdown', content: { source: '' } },
+    document: { title, kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
   }));
 
 const TRAVERSAL_MAP = uuidSchema.parse('00000000-0000-4000-8000-000000000060');
@@ -652,7 +658,7 @@ const dockResourceDocument = (
       content: { url: DOCK_IMAGE_URL, naturalSize: { width: 400, height: 300 } },
     };
   if (kind === 'ur') return { title, kind, content: {} };
-  return { title, kind, content: { source: '' } };
+  return { title, kind, content: { url: EMPTY_ASSET_REF } };
 };
 
 const DOCK_RESOURCES: SpaceSnapshot['resources'] = [
@@ -987,7 +993,11 @@ export const edgeToolbarSnapshot: SpaceSnapshot = {
   },
   resources: [EDGE_R1, EDGE_R2, EDGE_R3, EDGE_R4, EDGE_R5, EDGE_R6].map((id, index) => ({
     id,
-    document: { title: `Resource ${index + 1}`, kind: 'markdown', content: { source: '' } },
+    document: {
+      title: `Resource ${index + 1}`,
+      kind: 'markdown',
+      content: { url: EMPTY_ASSET_REF },
+    },
   })),
 };
 
@@ -1154,7 +1164,11 @@ export const stageSnapshot: SpaceSnapshot = {
   resources: [
     {
       id: stageIds.longRead,
-      document: { title: 'Long read', kind: 'markdown', content: { source: LONG_READ_BODY } },
+      document: {
+        title: 'Long read',
+        kind: 'markdown',
+        content: { url: storyText(LONG_READ_BODY) },
+      },
     },
     {
       id: stageIds.picture,
@@ -1163,7 +1177,7 @@ export const stageSnapshot: SpaceSnapshot = {
     { id: stageIds.titleSlide, document: { title: 'Title slide', kind: 'ur', content: {} } },
     {
       id: stageIds.unbroken,
-      document: { title: 'Unbroken', kind: 'markdown', content: { source: UNBROKEN_BODY } },
+      document: { title: 'Unbroken', kind: 'markdown', content: { url: storyText(UNBROKEN_BODY) } },
     },
   ],
 };
@@ -1187,8 +1201,8 @@ export const notesIds = {
   backup: notesId(0x22),
 } as const;
 
-const markdownResource = (id: UUID, title: string, source: string) =>
-  ({ id, document: { title, kind: 'markdown', content: { source } } }) as const;
+const markdownResource = (id: UUID, title: string, text: string) =>
+  ({ id, document: { title, kind: 'markdown', content: { url: storyText(text) } } }) as const;
 
 /**
  * A talk that forks after its welcome and rejoins for questions, with a

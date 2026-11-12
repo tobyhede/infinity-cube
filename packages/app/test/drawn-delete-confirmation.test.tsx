@@ -1,6 +1,12 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
-import { newUuid, spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
+import {
+  EMPTY_ASSET_REF,
+  newUuid,
+  spaceSnapshotSchema,
+  uuidSchema,
+  type SpaceSnapshot,
+} from '@project/core';
 import { MemorySpaceBackend } from '@project/persistence';
 import { embeddedNodeId } from '../src/embedded-map';
 import { createOpenSpaces } from '../src/open-spaces';
@@ -57,8 +63,14 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
     defaultMap: TARGET_MAP_ID,
   },
   resources: [
-    { id: INTAKE, document: { title: 'Intake', kind: 'markdown', content: { source: '' } } },
-    { id: STORAGE, document: { title: 'Storage', kind: 'markdown', content: { source: '' } } },
+    {
+      id: INTAKE,
+      document: { title: 'Intake', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+    },
+    {
+      id: STORAGE,
+      document: { title: 'Storage', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+    },
   ],
 });
 

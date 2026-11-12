@@ -2,7 +2,7 @@ import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/pr
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { titleName, uuidSchema, type Resource, type UUID } from '@project/core';
+import { assetHashOfPath, titleName, uuidSchema, type Resource, type UUID } from '@project/core';
 import { loadSpaceAggregate } from '@project/graph';
 import { isAssetHash } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -100,7 +100,11 @@ describe('tracked fixture aggregate', () => {
       for (const resource of space.resources) {
         if (resource.kind !== 'markdown') continue;
         expect(titleName(resource.title).length).toBeGreaterThan(1);
-        expect(resource.content.source.trim().length).toBeGreaterThan(0);
+        // Its text is an asset the fixture carries, and says something (ADR 0142).
+        const hash = assetHashOfPath(resource.content.url);
+        if (hash === undefined || !isAssetHash(hash)) throw new Error('expected an asset URL');
+        const text = await repository.loadAsset(hash);
+        expect(new TextDecoder().decode(text?.bytes).trim().length).toBeGreaterThan(0);
       }
     }
   });
@@ -212,7 +216,7 @@ describe('tracked fixture export', () => {
 
     const first = await exportOf(trackedFixture, join(root, 'first'));
     const second = await exportOf(join(root, 'first'), join(root, 'second'));
-    // Both Resource files and Markdown sidecars are among what round-trips.
+    // Both Resource files and Markdown text assets are among what round-trips.
     expect(Object.keys(first).filter((path) => path.endsWith('.json')).length).toBeGreaterThan(0);
     expect(Object.keys(first).filter((path) => path.endsWith('.md')).length).toBeGreaterThan(0);
     expect(second).toEqual(first);

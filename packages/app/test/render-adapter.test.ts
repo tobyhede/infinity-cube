@@ -19,6 +19,7 @@ import type {
 
 import { completeDrag, fixtureDisplay, moving, node, settled } from './render-adapter-fixtures';
 import { unusedImageSources } from './image-sources';
+import { textAsset } from './markdown-texts';
 
 const RESOURCE_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const RESOURCE_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
@@ -159,15 +160,15 @@ function sparsePositionedAdapter(newId?: () => UUID) {
     resources: [
       {
         id: uuidSchema.parse(RESOURCE_A),
-        document: { title: 'A', kind: 'markdown', content: { source: 'A' } },
+        document: { title: 'A', kind: 'markdown', content: { url: textAsset('A') } },
       },
       {
         id: uuidSchema.parse(RESOURCE_B),
-        document: { title: 'B', kind: 'markdown', content: { source: 'B' } },
+        document: { title: 'B', kind: 'markdown', content: { url: textAsset('B') } },
       },
       {
         id: uuidSchema.parse(RESOURCE_C),
-        document: { title: 'C', kind: 'markdown', content: { source: 'C' } },
+        document: { title: 'C', kind: 'markdown', content: { url: textAsset('C') } },
       },
     ],
   };
@@ -204,11 +205,11 @@ function storedSpaceAdapter() {
     resources: [
       {
         id: uuidSchema.parse(RESOURCE_A),
-        document: { title: 'A', kind: 'markdown', content: { source: 'A' } },
+        document: { title: 'A', kind: 'markdown', content: { url: textAsset('A') } },
       },
       {
         id: uuidSchema.parse(RESOURCE_B),
-        document: { title: 'B', kind: 'markdown', content: { source: 'B' } },
+        document: { title: 'B', kind: 'markdown', content: { url: textAsset('B') } },
       },
     ],
   };
@@ -1046,9 +1047,13 @@ describe('render adapter', () => {
     store.getState().syncProjection(PROJECTED, [EDGE]);
     completeDrag(store, RESOURCE_A, 500, 400);
     await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));
-    expect(authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A }).kind).toBe(
-      'completed',
-    );
+    expect(
+      authoring.complete({
+        kind: 'changed-map-content',
+        resourceId: RESOURCE_A,
+        content: { open: true },
+      }).kind,
+    ).toBe('completed');
     store.getState().resourceResize.beginResize(RESOURCE_A);
     store.getState().resourceResize.previewResize(RESOURCE_A, { width: 620, height: 440 });
     expect(store.getState().projection).not.toBeNull();

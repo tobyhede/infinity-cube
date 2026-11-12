@@ -6,6 +6,7 @@ import type { ImageSources } from '../src/image-creation';
 import type { OpenSpace } from '../src/open-spaces';
 import { openTestSpace } from './opened-space';
 import { unusedImageSources } from './image-sources';
+import { textAsset } from './markdown-texts';
 
 /**
  * One Space for the derivations `App` composes: two Resources placed on its one
@@ -32,7 +33,14 @@ export const derivationSnapshot: SpaceSnapshot = {
         kind: 'positioned',
         positions: {
           [PLACED_A]: { x: 10, y: 20, open: false },
-          [PLACED_B]: { x: 400, y: 20, open: true, size: { width: 600, height: 400 } },
+          // A Markdown Resource is Open by its Map content (ADR 0142).
+          [PLACED_B]: {
+            x: 400,
+            y: 20,
+            open: false,
+            content: { open: true },
+            size: { width: 600, height: 400 },
+          },
         },
         graphs: [{ id: GRAPH_ID, title: 'Main', edges: [{ from: PLACED_A, to: PLACED_B }] }],
       },
@@ -47,9 +55,12 @@ export const derivationSnapshot: SpaceSnapshot = {
     defaultMap: MAP_ID,
   },
   resources: [
-    { id: PLACED_A, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
-    { id: PLACED_B, document: { title: 'B', kind: 'markdown', content: { source: 'B' } } },
-    { id: OUTSIDE, document: { title: 'Outside', kind: 'markdown', content: { source: 'C' } } },
+    { id: PLACED_A, document: { title: 'A', kind: 'markdown', content: { url: textAsset('A') } } },
+    { id: PLACED_B, document: { title: 'B', kind: 'markdown', content: { url: textAsset('B') } } },
+    {
+      id: OUTSIDE,
+      document: { title: 'Outside', kind: 'markdown', content: { url: textAsset('C') } },
+    },
   ],
 };
 

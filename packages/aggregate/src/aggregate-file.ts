@@ -63,7 +63,7 @@ const parseAggregateFile = (path: string, text: string): UUID => {
 /** One Space directory's files Importing reads, by path inside it. */
 interface ScannedSpace {
   readonly name: string;
-  /** `*.md` beside `space.json`, `resources/*.json` and `resources/*.md`, in ordinal order. */
+  /** `resources/*.json`, the Resource files, in ordinal order. */
   readonly resources: readonly string[];
 }
 
@@ -157,7 +157,7 @@ const listRoot = async (source: AggregateSource): Promise<DirectoryListing> => {
 /**
  * The child directory `name` as a Space directory, or `undefined` when it
  * holds no `space.json` and so is not one: then nothing in it is read, and its
- * `resources/` is not listed. A Space directory whose `space.json`, `*.md`,
+ * `resources/` is not listed. A Space directory whose `space.json`,
  * `resources/` or Resource file is a symbolic link is refused, naming each,
  * beside a `resources/` that could not be listed. A linked `resources/` is not
  * listed: what it holds is outside the directory.
@@ -173,7 +173,7 @@ const scanSpaceDirectory = async (
   const links = ownedLinks(
     name,
     inside,
-    (entry) => entry === 'space.json' || entry === 'resources' || entry.endsWith('.md'),
+    (entry) => entry === 'space.json' || entry === 'resources',
   );
   if (links.includes(`${name}/resources`)) refuseLinks(source, links);
   const listed = await settledListing(listOrRefuse(source, `${name}/resources`));
@@ -181,11 +181,7 @@ const scanSpaceDirectory = async (
     ...linkDiagnostics(source, [
       ...links,
       ...(listed.ok
-        ? ownedLinks(
-            `${name}/resources`,
-            listed.value,
-            (entry) => entry.endsWith('.json') || entry.endsWith('.md'),
-          )
+        ? ownedLinks(`${name}/resources`, listed.value, (entry) => entry.endsWith('.json'))
         : []),
     ]),
     ...(listed.ok ? [] : listed.refusal.diagnostics),
@@ -194,12 +190,10 @@ const scanSpaceDirectory = async (
   const resources = listed.ok ? listed.value : { files: [] };
   return {
     name,
-    resources: [
-      ...inside.files.filter((file) => file.endsWith('.md')),
-      ...resources.files
-        .filter((file) => file.endsWith('.json') || file.endsWith('.md'))
-        .map((file) => `resources/${file}`),
-    ].sort(compareOrdinal),
+    resources: resources.files
+      .filter((file) => file.endsWith('.json'))
+      .map((file) => `resources/${file}`)
+      .sort(compareOrdinal),
   };
 };
 
@@ -280,8 +274,8 @@ export interface AggregateScan {
  * The files Importing reads in a source's directory, in the order it reads
  * them, found by listing alone: `aggregate.json`; then, for each child directory
  * holding a `space.json`, in ordinal name order, that `space.json` followed by
- * the `*.md` beside it and the `resources/*.json` and `resources/*.md`, in
- * ordinal order of their path inside the Space directory; then the files
+ * its `resources/*.json`, in ordinal order of their path inside the Space
+ * directory; then the files
  * directly in `assets/` named by a valid hash, in ordinal order.
  *
  * This is the one discovery rule: `readAggregateFrom` reads what it finds, and

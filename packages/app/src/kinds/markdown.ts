@@ -1,63 +1,45 @@
-import { markdownKind, type MarkdownKindId, type ResourceId } from '@project/core';
+import { markdownKind, type MarkdownKindId } from '@project/core';
 import type { ResourceFlowNodeOf } from '@project/react-flow-adapter';
-import { beginEditing, type KindOperationsByKind } from '@project/ui';
 import type {
   CanvasResourceDecorationContext,
   KindCanvasDecoration,
   KindDecoration,
-  Mutable,
 } from '../canvas-resource-decoration';
 import type { KindCreation } from '../kind-creation';
+import { pluginSurfaceOperations, type PluginHost } from '../plugin-host/plugin-commits';
 import type { ResourcePlacementCommands } from '../resource-placement';
-
-/** The Markdown kind's operations and decoration, built by assigning what a gate allows. */
-type MarkdownOperations = Mutable<KindOperationsByKind[MarkdownKindId]>;
-type MarkdownDecoration = Mutable<KindDecoration<MarkdownKindId>>;
 
 export type MarkdownResourceDecorationContext = Pick<
   CanvasResourceDecorationContext,
-  | 'authorOnCanvas'
-  | 'bodyEditing'
-  | 'editableResourceIds'
-  | 'beginBodyEditing'
-  | 'bodyEditorResourceId'
-  | 'clearCaret'
+  'authorOnCanvas' | 'editableResourceIds'
 > & {
-  readonly completeResourceBody: (resourceId: ResourceId, body: string) => 'completed' | 'retained';
+  /**
+   * Where the plugin's commits go and the gate that withdraws them (ADR 0142).
+   * Absent where this canvas offers a plugin no commit.
+   */
+  readonly pluginHost?: PluginHost | undefined;
 };
 
+/**
+ * A Markdown Resource's plugin surface: its Title, content and Map content
+ * commits and a Claim, where the canvas authors it. Open, Close and editing
+ * are the plugin's own, so the canvas holds no editing state for one.
+ */
 export function decorateMarkdownResourceNode(
   node: ResourceFlowNodeOf<MarkdownKindId>,
   context: MarkdownResourceDecorationContext,
 ): KindDecoration<MarkdownKindId> {
-  const kindOperations: MarkdownOperations = { kind: markdownKind.id };
-  const decoration: MarkdownDecoration = { kindOperations };
-  const resourceBelongsToWorkingSpace = context.editableResourceIds.has(node.data.resourceId);
-  if (
-    resourceBelongsToWorkingSpace &&
-    context.authorOnCanvas &&
-    !context.bodyEditing &&
-    node.data.authorsContent
-  ) {
-    kindOperations.onBeginEdit = () => context.beginBodyEditing(node);
-  }
-  if (
-    resourceBelongsToWorkingSpace &&
-    node.data.authorsContent &&
-    context.bodyEditorResourceId === node.id
-  ) {
-    const editor = {
-      onComplete: (body: string) => context.completeResourceBody(node.data.resourceId, body),
-      onEnd: () => context.clearCaret(),
-    };
-    // The editor is drawn only once the display is Open with this Resource's
-    // own Markdown: a caret that lands before the Open projection draws
-    // nothing until it arrives. It takes focus, since the author just asked
-    // to write.
-    const display = beginEditing(node.data.display, editor, true);
-    if (display !== node.data.display) decoration.display = display;
-  }
-  return decoration;
+  return {
+    kindOperations: pluginSurfaceOperations(
+      markdownKind.id,
+      node.data.resourceId,
+      {
+        authorOnCanvas: context.authorOnCanvas,
+        editable: context.editableResourceIds.has(node.data.resourceId),
+      },
+      context.pluginHost,
+    ),
+  };
 }
 
 /** The Markdown kind's canvas decoration, from its own part of the context. */
@@ -66,29 +48,17 @@ export const markdownDecoration: KindCanvasDecoration<
   MarkdownResourceDecorationContext
 > = {
   kind: markdownKind.id,
-  slice: ({
+  slice: ({ authorOnCanvas, editableResourceIds, pluginHost }) => ({
     authorOnCanvas,
-    bodyEditing,
     editableResourceIds,
-    beginBodyEditing,
-    bodyEditorResourceId,
-    completeResourceBody,
-    clearCaret,
-  }) => ({
-    authorOnCanvas,
-    bodyEditing,
-    editableResourceIds,
-    beginBodyEditing,
-    bodyEditorResourceId,
-    completeResourceBody,
-    clearCaret,
+    pluginHost,
   }),
   decorate: decorateMarkdownResourceNode,
 };
 
 export type MarkdownCreationContext = Pick<ResourcePlacementCommands, 'createResource'>;
 
-/** Create Markdown Resource: one press, an empty body, continuing in its Title. */
+/** Create Markdown Resource: one press, the empty text, continuing in its Title. */
 export const markdownCreation: KindCreation<MarkdownCreationContext> = {
   create: ({ createResource }) => createResource(markdownKind.id),
 };

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { KIND_IDS, type Resource } from '@project/core';
+import { EMPTY_ASSET_REF, KIND_IDS, type Resource } from '@project/core';
 import {
   parseResourceFiles,
   serializeResource,
@@ -20,16 +20,11 @@ const json = (value: Json, name = RESOURCE_A): ResourceFile => ({
   text: `${JSON.stringify(value, null, 2)}\n`,
 });
 
-const sidecar = (text: string, name = RESOURCE_A): ResourceFile => ({
-  path: `resources/${name}.md`,
-  text,
-});
-
 const markdownEnvelope = (overrides: Record<string, Json> = {}) => ({
   id: RESOURCE_A,
   title: 'A',
   kind: 'markdown',
-  content: { path: `${RESOURCE_A}.md`, mediaType: 'text/markdown' },
+  content: { url: EMPTY_ASSET_REF },
   ...overrides,
 });
 
@@ -68,8 +63,8 @@ const messages = (files: readonly ResourceFile[]) =>
   errorsOf(parseResourceFiles(files)).map(({ message }) => message);
 
 describe('parseResourceFiles reads each kind from its Resource file', () => {
-  it('reads a Markdown Resource whose source is its sidecar, and says which file it came from', () => {
-    expect(parseResourceFiles([json(markdownEnvelope()), sidecar('Resource **A**.\n')])).toEqual({
+  it('reads a Markdown Resource naming its text by URL, and says which file it came from', () => {
+    expect(parseResourceFiles([json(markdownEnvelope())])).toEqual({
       ok: true,
       resources: [
         {
@@ -78,40 +73,15 @@ describe('parseResourceFiles reads each kind from its Resource file', () => {
             id: RESOURCE_A,
             title: 'A',
             kind: 'markdown',
-            content: { source: 'Resource **A**.\n' },
+            content: { url: EMPTY_ASSET_REF },
           },
         },
       ],
     });
   });
 
-  it('keeps the sidecar verbatim: no fence is read, and no newline is added or removed', () => {
-    for (const source of [
-      '',
-      'No trailing newline',
-      '---\ntitle: not frontmatter\n---\n\nBody\n',
-      '# A\n\nAbove.\n\n---\n\nBelow.\n',
-      'Line one\r\nLine two\r\n',
-      '\n\n  leading blank lines and indent\n',
-    ]) {
-      expect(onlyResource([json(markdownEnvelope()), sidecar(source)])).toEqual({
-        id: RESOURCE_A,
-        title: 'A',
-        kind: 'markdown',
-        content: { source },
-      });
-    }
-  });
-
-  it('reads the media type case-insensitively', () => {
-    const file = json(
-      markdownEnvelope({ content: { path: `${RESOURCE_A}.md`, mediaType: 'Text/Markdown' } }),
-    );
-    expect(onlyResource([file, sidecar('Body\n')]).kind).toBe('markdown');
-  });
-
   it('takes identity from inside the file, never from its name', () => {
-    const result = parseResourceFiles([json(markdownEnvelope(), 'renamed'), sidecar('Body\n')]);
+    const result = parseResourceFiles([json(markdownEnvelope(), 'renamed')]);
     expect(result.ok && result.resources.map(({ path, resource }) => [path, resource.id])).toEqual([
       ['resources/renamed.json', RESOURCE_A],
     ]);
@@ -160,10 +130,9 @@ describe('parseResourceFiles reads each kind from its Resource file', () => {
     expect(onlyResource([file]).title).toBe('A\n  B');
   });
 
-  it('reads several Resources in one call, each beside its own sidecar', () => {
+  it('reads several Resources in one call', () => {
     const result = parseResourceFiles([
       json(markdownEnvelope()),
-      sidecar('A body\n'),
       json({ id: RESOURCE_B, title: 'B', kind: 'ur', content: {} }, RESOURCE_B),
     ]);
     expect(result.ok && result.resources.map(({ resource }) => resource.id)).toEqual([
@@ -267,13 +236,8 @@ describe('Resource files are strict at both levels (ADR 0127)', () => {
 
   it('refuses a content key the kind does not declare, naming it', () => {
     const cases: readonly [Json, string][] = [
-      [
-        markdownEnvelope({
-          content: { path: `${RESOURCE_A}.md`, mediaType: 'text/markdown', encoding: 'utf-8' },
-        }),
-        'encoding',
-      ],
-      [markdownEnvelope({ content: { source: 'Body\n' } }), 'source'],
+      [markdownEnvelope({ content: { url: EMPTY_ASSET_REF, encoding: 'utf-8' } }), 'encoding'],
+      [markdownEnvelope({ content: { url: EMPTY_ASSET_REF, source: '# A' } }), 'source'],
       [
         {
           id: RESOURCE_A,
@@ -311,91 +275,18 @@ describe('Resource files are strict at both levels (ADR 0127)', () => {
   });
 });
 
-describe('a Markdown Resource and its sidecar', () => {
-  it('refuses a media type other than Markdown', () => {
-    const files = [
-      json(markdownEnvelope({ content: { path: `${RESOURCE_A}.md`, mediaType: 'text/plain' } })),
-      sidecar('Body\n'),
-    ];
-    expect(errorKinds(files)).toContain('invalid-resource-file');
-    expect(messages(files).join('\n')).toContain('content.mediaType');
-  });
-
-  it("refuses a path naming another Resource's sidecar, even one that exists", () => {
-    const files = [
-      json(markdownEnvelope({ content: { path: `${RESOURCE_B}.md`, mediaType: 'text/markdown' } })),
-      sidecar('Body\n', RESOURCE_B),
-    ];
-    const result = parseResourceFiles(files);
-    expect(errorsOf(result).map(({ kind, path }) => [kind, path])).toEqual([
-      ['invalid-resource-file', `resources/${RESOURCE_A}.json`],
-      ['unclaimed-sidecar', `resources/${RESOURCE_B}.md`],
-    ]);
-    expect(errorsOf(result)[0]?.message).toContain(`"${RESOURCE_A}.md"`);
-  });
-
-  it('does not report a refused Resource file’s own sidecar as unclaimed', () => {
-    const unknownKey = [
-      json(markdownEnvelope({ description: 'Where every graph begins' })),
-      sidecar('Body\n'),
-    ];
-    expect(errorKinds(unknownKey)).toEqual(['invalid-resource-file']);
-    const wrongPath = [
-      json(markdownEnvelope({ content: { path: `${RESOURCE_B}.md`, mediaType: 'text/markdown' } })),
-      sidecar('Body\n'),
-    ];
-    expect(errorKinds(wrongPath)).toEqual(['invalid-resource-file']);
-  });
-
-  it('refuses a path that leaves the Resource file’s directory', () => {
-    const files = [
-      json(
-        markdownEnvelope({ content: { path: `../${RESOURCE_A}.md`, mediaType: 'text/markdown' } }),
-      ),
-      { path: `${RESOURCE_A}.md`, text: 'Body\n' },
-    ];
-    expect(errorKinds(files)).toEqual(['invalid-resource-file', 'unclaimed-sidecar']);
-  });
-
-  it('refuses a Markdown Resource whose sidecar does not exist, naming the sidecar', () => {
-    const files = [json(markdownEnvelope())];
-    expect(errorKinds(files)).toEqual(['missing-sidecar']);
-    expect(messages(files)[0]).toContain(`resources/${RESOURCE_A}.json`);
-    expect(messages(files)[0]).toContain(`${RESOURCE_A}.md`);
-  });
-
-  it('reads the sidecar beside its Resource file, and nowhere else', () => {
-    const files = [json(markdownEnvelope()), { path: `${RESOURCE_A}.md`, text: 'Body\n' }];
-    expect(errorsOf(parseResourceFiles(files)).map(({ kind, path }) => [kind, path])).toEqual([
-      ['missing-sidecar', `resources/${RESOURCE_A}.json`],
-      ['unclaimed-sidecar', `${RESOURCE_A}.md`],
-    ]);
-  });
-});
-
-describe('a .md no Resource file names is refused', () => {
-  it('refuses a stray .md under resources/, naming it', () => {
-    const files = [sidecar('Orphan\n', 'orphan')];
-    expect(errorsOf(parseResourceFiles(files)).map(({ kind, path }) => [kind, path])).toEqual([
-      ['unclaimed-sidecar', 'resources/orphan.md'],
-    ]);
-    expect(messages(files)[0]).toContain('resources/orphan.md');
-  });
-
-  it('refuses a Resource in the frontmatter format beside space.json', () => {
-    const files = [
-      { path: 'a.md', text: `---\nid: ${RESOURCE_A}\ntitle: A\nkind: markdown\n---\n\nBody\n` },
-    ];
-    expect(errorKinds(files)).toEqual(['unclaimed-sidecar']);
-    expect(messages(files)[0]).toContain('a.md');
-  });
-
-  it("refuses a sidecar a non-Markdown Resource's id would name", () => {
-    const files = [
-      json({ id: RESOURCE_A, title: 'Node', kind: 'ur', content: {} }),
-      sidecar('Prose.\n'),
-    ];
-    expect(errorKinds(files)).toEqual(['unclaimed-sidecar']);
+describe("a Markdown Resource's text is an asset it names (ADR 0142)", () => {
+  it('refuses a sidecar locator, an inline source, or a URL outside the asset store', () => {
+    for (const content of [
+      { path: `${RESOURCE_A}.md`, mediaType: 'text/markdown' },
+      { source: 'Body\n' },
+      { url: 'https://example.com/a.md' },
+      { url: '/assets/short' },
+    ]) {
+      const files = [json(markdownEnvelope({ content }))];
+      expect(errorKinds(files), JSON.stringify(content)).toContain('invalid-resource-file');
+      expect(messages(files)[0]).toContain(`resources/${RESOURCE_A}.json`);
+    }
   });
 });
 
@@ -403,28 +294,25 @@ describe('parseResourceFiles accumulates every fault', () => {
   it('reports each failing file, and gives back no Resources when any fails', () => {
     const files = [
       json(markdownEnvelope()),
-      sidecar('Body\n'),
       { path: 'resources/broken.json', text: 'not json' },
       json({ id: RESOURCE_B, title: 'B', content: {} }, RESOURCE_B),
-      sidecar('Stray\n', 'stray'),
     ];
     const result = parseResourceFiles(files);
     expect(result.ok).toBe(false);
     expect(errorsOf(result).map(({ kind, path }) => [kind, path])).toEqual([
       ['invalid-json', 'resources/broken.json'],
       ['invalid-resource-file', `resources/${RESOURCE_B}.json`],
-      ['unclaimed-sidecar', 'resources/stray.md'],
     ]);
   });
 });
 
 describe('serializeResource', () => {
-  it('writes a Markdown Resource as its Resource file and its sidecar', () => {
+  it('writes a Markdown Resource as its one Resource file, naming its text by URL', () => {
     const resource: Resource = {
       id: uuid(RESOURCE_A),
       title: 'A',
       kind: 'markdown',
-      content: { source: 'Resource **A**.\n' },
+      content: { url: EMPTY_ASSET_REF },
     };
 
     expect(serializeResource(resource)).toEqual([
@@ -436,14 +324,12 @@ describe('serializeResource', () => {
           '  "title": "A",',
           '  "kind": "markdown",',
           '  "content": {',
-          `    "path": "${RESOURCE_A}.md",`,
-          '    "mediaType": "text/markdown"',
+          `    "url": "${EMPTY_ASSET_REF}"`,
           '  }',
           '}',
           '',
         ].join('\n'),
       },
-      { path: `resources/${RESOURCE_A}.md`, text: 'Resource **A**.\n' },
     ]);
   });
 

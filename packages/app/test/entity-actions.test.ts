@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type Resource, type Graph, type Map } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type Resource, type Graph, type Map } from '@project/core';
 import type { ProductDestination } from '@project/http';
 import type { EntityActionGroup } from '@project/ui';
 import { isOpenIndependently, spaceEntityActions, type SpaceEntity } from '../src/entity-actions';
@@ -27,7 +27,7 @@ const resource = (id: Resource['id'], title: string): Resource => ({
   id,
   title,
   kind: 'markdown',
-  content: { source: '' },
+  content: { url: EMPTY_ASSET_REF },
 });
 
 const spaceResource = (id: typeof PLACED_RESOURCE_ID, title: string): Resource => ({

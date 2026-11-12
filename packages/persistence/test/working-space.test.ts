@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import { nextGraphColor } from '@project/graph';
 import {
   createWorkingSpaceLoader,
@@ -16,7 +16,7 @@ const mapless: SpaceSnapshot = {
   id: SPACE,
   document: { version: 1, title: 'Imported' },
   resources: [
-    { id: RESOURCE, document: { title: 'A', kind: 'markdown', content: { source: '' } } },
+    { id: RESOURCE, document: { title: 'A', kind: 'markdown', content: { url: EMPTY_ASSET_REF } } },
   ],
 };
 

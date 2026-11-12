@@ -120,8 +120,8 @@ const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
 
 /**
  * One Space's canonical files, by path relative to its Space directory:
- * `space.json`, one `resources/<id>.json` per Resource, and a Markdown
- * Resource's sidecar `resources/<id>.md` beside its Resource file.
+ * `space.json` and one `resources/<id>.json` per Resource. No file sits beside
+ * a Resource file: its bytes are assets, which `assets/` holds (ADR 0142).
  */
 export const spaceDirectoryFiles = (stored: LoadedSpace): ReadonlyMap<string, string> => {
   const files = new Map<string, string>([
@@ -158,19 +158,12 @@ export const scannedSpaceFiles = async (directory: string): Promise<readonly str
  * whatever the reader would have discovered there and leaving everything else
  * alone.
  *
- * What it removes is exactly what `readSingleSpace` scans — `*.md` beside the
- * space file, `resources/*.json` and `resources/*.md`, and `space.json` — so a
- * Resource deleted since the last export leaves neither its Resource file nor
- * its sidecar behind to be read back, and every other Resource's files stay.
- * Anything the reader would not have looked at survives, which is what lets a
- * Space directory carry notes or assets across a round trip.
- *
- * **Markdown is not among what survives, and a `README.md` here is no
- * exception.** The reader scans root `*.md` so that it can refuse one no
- * Resource file names, so a README beside `space.json` is not an ignored file
- * at all — left in place it would refuse the import. Removing it is the
- * correct behaviour rather than a gap; prose that belongs with a Space directory
- * has to sit under a name the reader does not scan.
+ * What it removes is exactly what `readSingleSpace` scans — `resources/*.json`
+ * and `space.json` — so a Resource deleted since the last export leaves no
+ * Resource file behind to be read back, and every other Resource's file stays.
+ * Anything the reader would not have looked at survives, a `README.md` or any
+ * other `*.md` included (ADR 0119, ADR 0142), which is what lets a Space
+ * directory carry notes across a round trip.
  */
 export const writeSpaceDirectory = async (
   stored: LoadedSpace,

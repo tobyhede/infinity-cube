@@ -1,4 +1,4 @@
-import { uuidSchema, type SpaceSnapshot } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type SpaceSnapshot } from '@project/core';
 import type { LoadedAggregate } from '@project/persistence';
 import { describe, expect, it } from 'vitest';
 import { classifyInitializedAggregate } from '../src/aggregate-lifecycle';
@@ -32,11 +32,11 @@ const meta: SpaceSnapshot = {
   resources: [
     {
       id: FIRST_RESOURCE,
-      document: { title: 'First', kind: 'markdown', content: { source: 'One.\n' } },
+      document: { title: 'First', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
     {
       id: SECOND_RESOURCE,
-      document: { title: 'Second', kind: 'markdown', content: { source: 'Two.\n' } },
+      document: { title: 'Second', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
   ],
 };

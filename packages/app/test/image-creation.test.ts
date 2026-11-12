@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type ImageNaturalSize, type SpaceSnapshot } from '@project/core';
+import {
+  EMPTY_ASSET_REF,
+  uuidSchema,
+  type ImageNaturalSize,
+  type SpaceSnapshot,
+} from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { ImageStoring } from '../src/picture-admission';
 import { composeApp } from '../src/compose-app';
@@ -40,7 +45,7 @@ const snapshot: SpaceSnapshot = {
   resources: [
     {
       id: RESOURCE_A,
-      document: { title: 'Resource 1', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Resource 1', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
   ],
 };

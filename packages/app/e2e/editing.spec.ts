@@ -37,6 +37,7 @@ import {
   drawnHeadShape,
   settleNewMapName,
   nodeByTitle,
+  openResources,
   positionOf,
   presentControl,
   recolorActiveGraph,
@@ -96,6 +97,25 @@ function controls(resource: Locator): Promise<Locator> {
  */
 async function openResource(node: Locator, title: string): Promise<void> {
   await (await controls(node)).getByRole('button', { name: `Open Resource ${title}` }).click();
+}
+
+/**
+ * Open a Closed Resource and wait for its one Open Edit to persist, answering
+ * the revision it persisted at.
+ *
+ * "Persisted" alone does not show the Open landed: a Markdown Resource commits
+ * Open only once it has read and measured its text, so the status can still be
+ * the settled one from before the click.
+ */
+async function openResourcePersisted(node: Locator, title: string): Promise<string> {
+  const persistence = node.page().getByTestId('persistence-status');
+  await expect(persistence).toHaveText('Persisted');
+  const closedRevision = Number(await persistence.getAttribute('data-revision'));
+  await openResource(node, title);
+  const openedRevision = String(closedRevision + 1);
+  await expect(persistence).toHaveAttribute('data-revision', openedRevision);
+  await expect(persistence).toHaveText('Persisted');
+  return openedRevision;
 }
 
 /** Select a placed Resource so its toolbar is drawn, and open its actions menu. */
@@ -205,7 +225,7 @@ test(
     await expect(page.locator('.react-flow__node.selected')).toHaveCount(0);
     await resource.getByRole('button', { name: 'Edit Title A' }).click();
     await expect(page.locator('.react-flow__node.selected')).toHaveCount(0);
-    await expect(page.locator('.canvas-resource[data-open="true"]')).toHaveCount(0);
+    await expect(openResources(page)).toHaveCount(0);
     const title = page.getByRole('textbox', { name: 'Resource title' });
     await title.fill('Renamed A');
     await title.press('Enter');
@@ -229,7 +249,7 @@ test(
     await keyboardTitle.fill('');
     await nodeByTitle(page, 'B').first().click();
     await expect(keyboardTitle).toHaveAttribute('aria-invalid', 'true');
-    await expect(page.locator('.canvas-resource[data-open="true"]')).toHaveCount(0);
+    await expect(openResources(page)).toHaveCount(0);
     await quiescent(page);
     await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '3');
     await keyboardTitle.focus();
@@ -269,7 +289,7 @@ test("a short Title control's hit-area hugs its text, not the whole Resource bod
   };
   await page.mouse.click(blankSpace.x, blankSpace.y);
   await expect(page.getByRole('textbox', { name: 'Resource title' })).toHaveCount(0);
-  await expect(page.locator('.canvas-resource[data-open="true"]')).toHaveCount(0);
+  await expect(openResources(page)).toHaveCount(0);
 });
 
 test('a click selects a Resource, and no pointer gesture on its body opens it', async ({
@@ -283,12 +303,12 @@ test('a click selects a Resource, and no pointer gesture on its body opens it', 
 
   await resource.click();
   await expect(resource).toHaveClass(/selected/);
-  await expect(page.locator('.canvas-resource[data-open="true"]')).toHaveCount(0);
+  await expect(openResources(page)).toHaveCount(0);
 
   // Off the Title, which has its own control. React Flow zooms on a double click
   // by default and its filter exempts only `.nopan`, which a Resource is not.
   await resource.dblclick({ position: { x: 24, y: 12 } });
-  await expect(page.locator('.canvas-resource[data-open="true"]')).toHaveCount(0);
+  await expect(openResources(page)).toHaveCount(0);
   expect(await viewportTransform(page)).toEqual(transform);
 });
 
@@ -323,7 +343,7 @@ test(
     await settled(page);
     await openResource(resourceA, 'A');
     await resourceA.hover();
-    const bodyTarget = resourceA.getByTestId('markdown-resource-body-edit-target');
+    const bodyTarget = resourceA.getByRole('button', { name: 'Edit Markdown source of A' });
     await expect(bodyTarget).toHaveCSS('opacity', '0');
     await expect(bodyTarget.locator('svg')).toHaveCount(0);
     expect(
@@ -381,8 +401,15 @@ test(
     await (await controls(resourceA)).getByRole('button', { name: 'Edit Resource A' }).click();
     const committedSource = page.getByRole('textbox', { name: 'Markdown source of A' });
     await committedSource.fill(exact);
+    // Save stores the text as an asset before it commits, so "Persisted" alone
+    // can still be the status from before it: wait for the Save's one Edit.
+    const persistence = page.getByTestId('persistence-status');
+    const editingRevision = Number(await persistence.getAttribute('data-revision'));
     await committedSource.press(`${PRIMARY_MODIFIER}+Enter`);
-    await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+    await expect(persistence).toHaveAttribute('data-revision', String(editingRevision + 1));
+    await expect(persistence).toHaveText('Persisted');
+    // Settled at one revision past the edit's start: the Save was one Edit.
+    await expect(persistence).toHaveAttribute('data-revision', String(editingRevision + 1));
     await page.reload();
     const persisted = nodeByTitle(page, 'A').first();
     await expect(persisted).toContainText('two spaces and code');
@@ -521,7 +548,7 @@ test('Opening an unresized Markdown Resource grows it to its content, and Closin
   expect(openedId).not.toBeNull();
 
   await openResource(resource, 'A');
-  await expect(resource.locator('.canvas-resource[data-open="true"]')).toHaveCount(1);
+  await expect(resource.locator('.canvas-resource__plugin [data-open="true"]')).toHaveCount(1);
   await settled(page);
   const opened = await allPositions(page);
   const openWidth = await restingWidth();
@@ -539,13 +566,13 @@ test('Opening an unresized Markdown Resource grows it to its content, and Closin
   expect(await allPositions(page)).toEqual(opened);
 
   await (await controls(resource)).getByRole('button', { name: 'Close Resource A' }).click();
-  await expect(resource.locator('.canvas-resource[data-open="true"]')).toHaveCount(0);
+  await expect(resource.locator('.canvas-resource__plugin [data-open="true"]')).toHaveCount(0);
   expect(await allPositions(page)).toEqual(opened);
   expect(await restingWidth()).toBeCloseTo(openWidth, 0);
 
   // Sized now, so Opening again changes what it draws and no rect.
   await openResource(resource, 'A');
-  await expect(resource.locator('.canvas-resource[data-open="true"]')).toHaveCount(1);
+  await expect(resource.locator('.canvas-resource__plugin [data-open="true"]')).toHaveCount(1);
   expect(await allPositions(page)).toEqual(opened);
 
   await page.reload();
@@ -1122,10 +1149,8 @@ test(
     const resource = nodeByTitle(page, 'A').first();
     const closed = nodeByTitle(page, 'B').first();
     await expect(resource).toBeVisible();
-    await openResource(resource, 'A');
+    const openedRevision = await openResourcePersisted(resource, 'A');
     const persistence = page.getByTestId('persistence-status');
-    await expect(persistence).toHaveText('Persisted');
-    const openedRevision = await persistence.getAttribute('data-revision');
     const beforePosition = await positionOf(resource);
     // Opening grows the Resource through a CSS transition, so its rect is still
     // moving for a moment after the Edit persists. Settling it first is what
@@ -1220,7 +1245,7 @@ test(
     );
     // Pointer movement owns only the canvas draft. Persistence sees nothing
     // until the gesture releases.
-    await expect(persistence).toHaveAttribute('data-revision', openedRevision ?? '');
+    await expect(persistence).toHaveAttribute('data-revision', openedRevision);
 
     await page.mouse.up();
 
@@ -1360,10 +1385,8 @@ test.describe('resizing by touch', () => {
     await selectCanvas(page, 'Collection 1');
     const resource = nodeByTitle(page, 'A').first();
     await expect(resource).toBeVisible();
-    await openResource(resource, 'A');
+    const openedRevision = await openResourcePersisted(resource, 'A');
     const persistence = page.getByTestId('persistence-status');
-    await expect(persistence).toHaveText('Persisted');
-    const openedRevision = await persistence.getAttribute('data-revision');
     const beforePosition = await positionOf(resource);
     // Opening grows the Resource through a CSS transition, so its rect is still
     // moving for a moment after the Edit persists — settling it first is what
@@ -1411,7 +1434,7 @@ test.describe('resizing by touch', () => {
     await gesture.moveTo(from.x + dragX, from.y + dragY);
     // Pointer movement owns only the canvas draft; persistence sees nothing
     // until the gesture releases.
-    await expect(persistence).toHaveAttribute('data-revision', openedRevision ?? '');
+    await expect(persistence).toHaveAttribute('data-revision', openedRevision);
 
     await gesture.release();
 
@@ -1483,10 +1506,8 @@ test.describe('resizing by touch', () => {
     await selectCanvas(page, 'Collection 1');
     const resource = nodeByTitle(page, 'A').first();
     await expect(resource).toBeVisible();
-    await openResource(resource, 'A');
+    const openedRevision = await openResourcePersisted(resource, 'A');
     const persistence = page.getByTestId('persistence-status');
-    await expect(persistence).toHaveText('Persisted');
-    const openedRevision = await persistence.getAttribute('data-revision');
     const beforePosition = await positionOf(resource);
     // Opening grows the Resource through a CSS transition, so its rect is still
     // moving for a moment after the Edit persists — settling it first is what
@@ -1513,7 +1534,7 @@ test.describe('resizing by touch', () => {
     // gesture that never grew the Resource would restore the authored rect by
     // having never left it, and prove nothing.
     await expect.poll(async () => (await size()).width).toBeGreaterThan(authored.width);
-    await expect(persistence).toHaveAttribute('data-revision', openedRevision ?? '');
+    await expect(persistence).toHaveAttribute('data-revision', openedRevision);
 
     await gesture.cancel();
 
@@ -1522,7 +1543,7 @@ test.describe('resizing by touch', () => {
     await expect.poll(size).toEqual(authored);
     expect(await positionOf(resource)).toEqual(beforePosition);
     await quiescent(page);
-    await expect(persistence).toHaveAttribute('data-revision', openedRevision ?? '');
+    await expect(persistence).toHaveAttribute('data-revision', openedRevision);
 
     // And the gesture is disarmed. A later, unrelated press anywhere on the
     // page raises the `pointerup` that `finish()` answers, so a cancellation
@@ -1532,7 +1553,7 @@ test.describe('resizing by touch', () => {
     const elsewhere = await emptyCanvasPoint(page);
     await page.mouse.click(elsewhere.x, elsewhere.y);
     await quiescent(page);
-    await expect(persistence).toHaveAttribute('data-revision', openedRevision ?? '');
+    await expect(persistence).toHaveAttribute('data-revision', openedRevision);
     expect(await size()).toEqual(authored);
   });
 });
@@ -2680,7 +2701,7 @@ test('drawing between existing Resources persists one active-Graph Edge and sele
     'opacity',
     '1',
   );
-  await expect(page.locator('.canvas-resource[data-open="true"]')).toHaveCount(0);
+  await expect(openResources(page)).toHaveCount(0);
 });
 
 /** The head shape the connection preview ends in, through the marker its path names. */
@@ -2977,7 +2998,7 @@ test('clicking a Resource authoring handle neither opens the Resource nor draws 
   const handleBox = (await authoringHandle(resource, 'source', 'right').boundingBox())!;
   await page.mouse.click(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
 
-  await expect(page.locator('.canvas-resource[data-open="true"]')).toHaveCount(0);
+  await expect(openResources(page)).toHaveCount(0);
   await expect(page.locator('.react-flow__edge')).toHaveCount(drawn);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
@@ -3673,7 +3694,8 @@ test('the Resource menu groups Create Reference, Connect, Full View and Present 
   await expectMenuGroups(menu, [
     ['Create Reference'],
     ['Connect to Resource'],
-    ['Open and Expand', 'Read in Full View', 'Present from Here'],
+    // A Markdown Resource Opens with its plugin's size hint: no Open and Expand (A29).
+    ['Read in Full View', 'Present from Here'],
     ['Copy link to Resource in Map', 'Copy link to Resource'],
     ['Remove from Map', 'Delete from Space'],
   ]);
@@ -3696,7 +3718,8 @@ test(
     const groups = [
       ['Create Reference'],
       ['Connect to Resource'],
-      ['Open and Expand', 'Read in Full View', 'Present from Here'],
+      // A Markdown Resource Opens with its plugin's size hint: no Open and Expand (A29).
+      ['Read in Full View', 'Present from Here'],
       ['Copy link to Resource in Map', 'Copy link to Resource'],
       ['Remove from Map', 'Delete from Space'],
     ];

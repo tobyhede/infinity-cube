@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
+  EMPTY_ASSET_REF,
   spaceSnapshotSchema,
   uuidSchema,
   type ResourceDocument,
@@ -27,6 +28,7 @@ import { refusingFullscreen } from './fullscreen';
 import { unlinkedPresentations } from './presentations';
 import { stubResizeObserver } from './resize-observer';
 import { holdCanvasPolicy } from './map-surfaces';
+import { withTestAssets } from './markdown-texts';
 
 /**
  * What an Open Space Resource *shows* (ADR 0068).
@@ -119,11 +121,21 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
     defaultMap: OTHER_MAP_ID,
   },
   resources: [
-    { id: DRAWN_A, document: { title: 'Intake', kind: 'markdown', content: { source: '' } } },
-    { id: DRAWN_B, document: { title: 'Storage', kind: 'markdown', content: { source: '' } } },
+    {
+      id: DRAWN_A,
+      document: { title: 'Intake', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+    },
+    {
+      id: DRAWN_B,
+      document: { title: 'Storage', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+    },
     {
       id: UNPLACED,
-      document: { title: 'Elsewhere entirely', kind: 'markdown', content: { source: '' } },
+      document: {
+        title: 'Elsewhere entirely',
+        kind: 'markdown',
+        content: { url: EMPTY_ASSET_REF },
+      },
     },
   ],
 });
@@ -157,7 +169,7 @@ const home = (spaceResource: SpaceResourceDocument): SpaceSnapshot =>
     resources: [
       {
         id: HOME_RESOURCE_ID,
-        document: { title: 'Start here', kind: 'markdown', content: { source: '' } },
+        document: { title: 'Start here', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       },
       { id: SPACE_RESOURCE_ID, document: spaceResource },
     ],
@@ -186,7 +198,7 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
   resources: [
     {
       id: META_RESOURCE_ID,
-      document: { title: 'Meta', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Meta', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
     {
       id: META_TO_HOME_ID,
@@ -234,6 +246,19 @@ async function mountOpenSpaces(
   await mountSettled(<OpenSpacesApplication spaces={spaces} initial={initial} />);
   return { session: initial.session, spaces };
 }
+
+/**
+ * Open the drawn Intake through its plugin's rail, then begin its edit: a
+ * Markdown Resource offers Edit only while Open (ADR 0142).
+ */
+const beginEmbeddedEdit = async (): Promise<void> => {
+  fireEvent.click(
+    within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Open Resource/ }),
+  );
+  fireEvent.click(
+    await within(controlsOf(embeddedNode(DRAWN_A))).findByRole('button', { name: /Edit Resource/ }),
+  );
+};
 
 const queryEmbeddedNode = (resourceId: ResourceId): HTMLElement | null => {
   const node = document.querySelector(
@@ -337,7 +362,7 @@ async function mountNested(): Promise<OpenSpaces> {
     resources: [
       {
         id: THIRD_RESOURCE_ID,
-        document: { title: 'Nested content', kind: 'markdown', content: { source: '' } },
+        document: { title: 'Nested content', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       },
     ],
   });
@@ -438,7 +463,7 @@ describe('the Map an Open Space Resource draws', () => {
         history: recordingHistory(),
       });
       const initial = await spaces.open(HOME_ID);
-      render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
+      render(withTestAssets(<OpenSpacesApplication spaces={spaces} initial={initial} />));
       await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
       beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
       const remote = { ...target, document: { ...target.document, title: 'Remote Architecture' } };
@@ -676,18 +701,18 @@ describe('the Map an Open Space Resource draws', () => {
     });
     await mount(value);
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
-    expect(queryCommand(embeddedNode(DRAWN_A), /Edit Resource/)).toBeNull();
+    expect(queryCommand(embeddedNode(DRAWN_A), /Open Resource/)).toBeNull();
     const parent = containingNode(SPACE_RESOURCE_ID);
     expect(within(controlsOf(parent)).getByRole('button', { name: /Edit Resource/ })).toBeTruthy();
     beginPortalEdit(parent);
     await waitFor(() =>
       expect(
-        within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Edit Resource/ }),
+        within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Open Resource/ }),
       ).toBeTruthy(),
     );
     expect(within(controlsOf(parent)).getByRole('button', { name: /Done Resource/ })).toBeTruthy();
     fireEvent.click(within(controlsOf(parent)).getByRole('button', { name: /Done Resource/ }));
-    await waitFor(() => expect(queryCommand(embeddedNode(DRAWN_A), /Edit Resource/)).toBeNull());
+    await waitFor(() => expect(queryCommand(embeddedNode(DRAWN_A), /Open Resource/)).toBeNull());
     expect(within(controlsOf(parent)).getByRole('button', { name: /Edit Resource/ })).toBeTruthy();
   });
 
@@ -732,7 +757,7 @@ describe('the Map an Open Space Resource draws', () => {
     beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
     await waitFor(() =>
       expect(
-        within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Edit Resource/ }),
+        within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Open Resource/ }),
       ).toBeTruthy(),
     );
     const parent = containingNode(SPACE_RESOURCE_ID);
@@ -775,7 +800,7 @@ describe('the Map an Open Space Resource draws', () => {
     beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
     await waitFor(() =>
       expect(
-        within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Edit Resource/ }),
+        within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Open Resource/ }),
       ).toBeTruthy(),
     );
     fireEvent.click(anyPresentControl());
@@ -802,7 +827,7 @@ describe('the Map an Open Space Resource draws', () => {
     beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
     await waitFor(() =>
       expect(
-        within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Edit Resource/ }),
+        within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Open Resource/ }),
       ).toBeTruthy(),
     );
     openSpaceMenu('Home');
@@ -885,11 +910,11 @@ describe('the Map an Open Space Resource draws', () => {
     beginPortalEdit(second);
     await waitFor(() => {
       expect(
-        within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Edit Resource/ }),
+        within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Open Resource/ }),
       ).toBeTruthy();
       expect(
         within(controlsOf(embeddedNodeOf(HOME_RESOURCE_ID, DRAWN_A))).getByRole('button', {
-          name: /Edit Resource/,
+          name: /Open Resource/,
         }),
       ).toBeTruthy();
     });
@@ -934,12 +959,14 @@ describe('the Map an Open Space Resource draws', () => {
       history: recordingHistory(),
     });
     const initial = await spaces.open(HOME_ID);
-    const { unmount } = render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
+    const { unmount } = render(
+      withTestAssets(<OpenSpacesApplication spaces={spaces} initial={initial} />),
+    );
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
     beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
     await waitFor(() =>
       expect(
-        within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Edit Resource/ }),
+        within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Open Resource/ }),
       ).toBeTruthy(),
     );
     fireEvent.wheel(containingNode(SPACE_RESOURCE_ID), { deltaY: -120, bubbles: true });
@@ -973,9 +1000,7 @@ describe('the Map an Open Space Resource draws', () => {
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
     expect(unavailable(anyPresentControl())).toBe(false);
     beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
-    fireEvent.click(
-      within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Edit Resource/ }),
-    );
+    await beginEmbeddedEdit();
     await waitFor(() =>
       expect(
         within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Save/ }),
@@ -991,7 +1016,7 @@ describe('the Map an Open Space Resource draws', () => {
     const sibling = document.querySelector(`.react-flow__node[data-id="${HOME_RESOURCE_ID}"]`);
     if (!(sibling instanceof HTMLElement)) throw new Error('Containing Markdown Resource missing');
     expect(queryCommand(sibling, /Edit Resource/)).toBeNull();
-    expect(queryCommand(embeddedNode(DRAWN_B), /Edit Resource/)).toBeNull();
+    expect(queryCommand(embeddedNode(DRAWN_B), /Open Resource/)).toBeNull();
     expect(unavailable(anyPresentControl())).toBe(true);
     fireEvent.click(
       within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Cancel/ }),
@@ -1029,9 +1054,7 @@ describe('the Map an Open Space Resource draws', () => {
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
     beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
     beginPortalEdit(containingNode(HOME_RESOURCE_ID));
-    fireEvent.click(
-      within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Edit Resource/ }),
-    );
+    await beginEmbeddedEdit();
     await waitFor(() =>
       expect(
         within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Save/ }),
@@ -1041,8 +1064,12 @@ describe('the Map an Open Space Resource draws', () => {
       `.react-flow__node[data-id="${embeddedNodeId(HOME_RESOURCE_ID, DRAWN_A)}"]`,
     );
     if (!(duplicate instanceof HTMLElement)) throw new Error('Duplicate embedded Resource missing');
-    expect(queryCommand(duplicate, /Edit Resource/)).toBeNull();
+    // The two draw one Map entry, so the duplicate is Open too; its plugin holds
+    // no Claim, so it runs no edit of its own and a press on its Edit starts none.
     expect(queryCommand(duplicate, /Save/)).toBeNull();
+    const duplicateEdit = queryCommand(duplicate, /Edit Resource/);
+    if (duplicateEdit !== null) fireEvent.click(duplicateEdit);
+    expect(await screen.findAllByRole('textbox', { name: /Markdown source/ })).toHaveLength(1);
     fireEvent.click(
       within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Cancel/ }),
     );
@@ -1172,7 +1199,7 @@ describe('the Map an Open Space Resource draws', () => {
       history: recordingHistory(),
     });
     const initial = await spaces.open(HOME_ID);
-    render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
+    render(withTestAssets(<OpenSpacesApplication spaces={spaces} initial={initial} />));
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_B)).not.toBeNull());
     const previous = embeddedNode(DRAWN_B).style.clipPath;
     await act(async () => {
@@ -1189,7 +1216,7 @@ describe('the Map an Open Space Resource draws', () => {
     await waitFor(() => expect(embeddedNode(DRAWN_B).style.clipPath).not.toBe(previous));
     expect(spaces.entry(TARGET_ID)).toBeDefined();
     expect(spaces.getState().entries.some((entry) => entry.id === TARGET_ID)).toBe(false);
-    expect(queryCommand(embeddedNode(DRAWN_B), /Edit Resource/)).toBeNull();
+    expect(queryCommand(embeddedNode(DRAWN_B), /Open Resource/)).toBeNull();
     await waitFor(() => expect(initial.session.getState().persistence.kind).toBe('settled'));
   });
 
@@ -1214,7 +1241,7 @@ describe('the Map an Open Space Resource draws', () => {
       history: recordingHistory(),
     });
     const initial = await spaces.open(HOME_ID);
-    render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
+    render(withTestAssets(<OpenSpacesApplication spaces={spaces} initial={initial} />));
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_B)).not.toBeNull());
     await act(async () => {
       await spaces.enter(TARGET_ID, SELECTED_MAP_ID, SELECTED_GRAPH_ID);
@@ -1260,7 +1287,7 @@ describe('the Map an Open Space Resource draws', () => {
       'false',
     );
     expect(queryCommand(embeddedNode(DRAWN_B), /Close Resource/)).not.toBeNull();
-    expect(queryCommand(embeddedNode(DRAWN_B), /Edit Resource/)).toBeNull();
+    expect(queryCommand(embeddedNode(DRAWN_B), /Open Resource/)).toBeNull();
   });
 
   /** The selected Map of a Space's working state, by id. */
@@ -1403,7 +1430,11 @@ describe('the Map an Open Space Resource draws', () => {
       resources: [
         {
           id: thirdResource,
-          document: { title: 'Nested content', kind: 'markdown', content: { source: '' } },
+          document: {
+            title: 'Nested content',
+            kind: 'markdown',
+            content: { url: EMPTY_ASSET_REF },
+          },
         },
       ],
     });
@@ -1460,7 +1491,7 @@ describe('the Map an Open Space Resource draws', () => {
       history: recordingHistory(),
     });
     const initial = await spaces.open(HOME_ID);
-    render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
+    render(withTestAssets(<OpenSpacesApplication spaces={spaces} initial={initial} />));
     await waitFor(() => expect(spaces.entry(thirdId)).not.toBeUndefined());
 
     const targetHold = await spaces.hold(TARGET_ID);
@@ -1562,7 +1593,7 @@ describe('the Map an Open Space Resource draws', () => {
       history: recordingHistory(),
     });
     const initial = await spaces.open(HOME_ID);
-    render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
+    render(withTestAssets(<OpenSpacesApplication spaces={spaces} initial={initial} />));
     const query = (id: string): Element | null =>
       document.querySelector(`.react-flow__node[data-id="${id}"]`);
     // The canvas Map is already on the path, so the return to Home is closed.
@@ -1600,22 +1631,22 @@ describe('the Map an Open Space Resource draws', () => {
       history: recordingHistory(),
     });
     const initial = await spaces.open(HOME_ID);
-    render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
+    render(withTestAssets(<OpenSpacesApplication spaces={spaces} initial={initial} />));
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
     beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
-    fireEvent.click(
-      within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Edit Resource/ }),
-    );
+    await beginEmbeddedEdit();
     await waitFor(() =>
       expect(
         spaces
           .entry(TARGET_ID)
           ?.session.getState()
-          .working.document.maps?.find((m) => m.id === SELECTED_MAP_ID)?.positions[DRAWN_A]?.open,
-      ).toBe(true),
+          .working.document.maps?.find((m) => m.id === SELECTED_MAP_ID)?.positions[DRAWN_A]
+          ?.content,
+      ).toEqual({ open: true }),
     );
+    // The edit begins once the Open has drawn the text, a render after it lands.
     expect(
-      within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Save/ }),
+      await within(controlsOf(embeddedNode(DRAWN_A))).findByRole('button', { name: /Save/ }),
     ).toBeTruthy();
     expect(initial.session.getState().working).toEqual(value);
     expect(spaces.getState().activeSpaceId).toBe(HOME_ID);
@@ -1781,7 +1812,7 @@ describe('the Map an Open Space Resource draws', () => {
       resources: [
         {
           id: HOME_RESOURCE_ID,
-          document: { title: 'Start here', kind: 'markdown', content: { source: '' } },
+          document: { title: 'Start here', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
         {
           id: GONE_A_RESOURCE_ID,
@@ -1840,7 +1871,7 @@ describe('the Map an Open Space Resource draws', () => {
       history: recordingHistory(),
     });
     const initial = await spaces.open(HOME_ID);
-    render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
+    render(withTestAssets(<OpenSpacesApplication spaces={spaces} initial={initial} />));
     const first = await screen.findByText(new RegExp(GONE_A_ID));
     expect(first.textContent).toContain('First gone:');
     // The Resource's name and no more of its Title: this is one sentence, and a
@@ -1895,7 +1926,7 @@ describe('the Map an Open Space Resource draws', () => {
       },
     };
     const initial = await spaces.open(HOME_ID);
-    render(<OpenSpacesApplication spaces={counted} initial={initial} />);
+    render(withTestAssets(<OpenSpacesApplication spaces={counted} initial={initial} />));
     await waitFor(() => expect(attempts).toEqual([GONE_A_ID, GONE_B_ID]));
 
     for (let edit = 0; edit < 5; edit += 1) {
@@ -1903,7 +1934,11 @@ describe('the Map an Open Space Resource draws', () => {
         initial.app.authoring.complete(CANVAS, {
           kind: 'edited-resource',
           resourceId: HOME_RESOURCE_ID,
-          document: { title: `Start here ${edit}`, kind: 'markdown', content: { source: '' } },
+          document: {
+            title: `Start here ${edit}`,
+            kind: 'markdown',
+            content: { url: EMPTY_ASSET_REF },
+          },
         });
       });
       await act(async () => {

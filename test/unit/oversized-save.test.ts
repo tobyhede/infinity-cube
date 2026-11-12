@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import {
   canRetry,
   createSpaceSessionRegistry,
@@ -49,7 +49,10 @@ const withBody = (body: string): SpaceSnapshot => ({
     ],
   },
   resources: [
-    { id: RESOURCE_ID, document: { title: 'Notes', kind: 'markdown', content: { source: body } } },
+    {
+      id: RESOURCE_ID,
+      document: { title: `Notes${body}`, kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+    },
   ],
 });
 
@@ -57,14 +60,17 @@ const reduced = (space: SpaceSnapshot, body: string): SpaceSnapshot => ({
   ...space,
   resources: space.resources.map((resource) =>
     resource.id === RESOURCE_ID
-      ? { ...resource, document: { title: 'Notes', kind: 'markdown', content: { source: body } } }
+      ? {
+          ...resource,
+          document: { title: `Notes${body}`, kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+        }
       : resource,
   ),
 });
 
 const bodyOf = (space: SpaceSnapshot): string | undefined => {
   const document = space.resources.find(({ id }) => id === RESOURCE_ID)?.document;
-  return document?.kind === 'markdown' ? document.content.source : undefined;
+  return document?.title.slice('Notes'.length);
 };
 
 const requestBytes = (request: SpaceCommit): number =>
@@ -74,7 +80,10 @@ const update = (snapshot: SpaceSnapshot, expectedRevision: bigint): SpaceCommit 
   changes: [{ kind: 'update', spaceId: snapshot.id, snapshot, expectedRevision }],
 });
 
-/** A body that makes Meta's own update request exactly `bytes` long. */
+/**
+ * A Title that makes Meta's own update request exactly `bytes` long. The Title
+ * carries the bulk because a Markdown Resource's text is an asset (ADR 0142).
+ */
 const bodyForRequestOf = (bytes: number): string =>
   'x'.repeat(bytes - requestBytes(update(withBody(''), 3n)));
 

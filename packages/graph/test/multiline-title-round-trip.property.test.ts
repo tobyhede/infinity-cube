@@ -1,6 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { normalizeTitle, titleLines, type Resource } from '@project/core';
+import { EMPTY_ASSET_REF, normalizeTitle, titleLines, type Resource } from '@project/core';
 import { parseResourceFiles, serializeResource } from '../src/index';
 import { uuid } from './resource-files';
 
@@ -38,7 +38,7 @@ const EVERY_KIND: readonly ResourceKind[] = ['markdown', 'reference', 'space', '
 function resourceOf(kind: ResourceKind, title: string): Resource {
   switch (kind) {
     case 'markdown':
-      return { id: ID, title, kind, content: { source: 'The body, which is not the Title.\n' } };
+      return { id: ID, title, kind, content: { url: EMPTY_ASSET_REF } };
     case 'reference':
       return { id: ID, title, kind, content: { target: TARGET } };
     case 'space':

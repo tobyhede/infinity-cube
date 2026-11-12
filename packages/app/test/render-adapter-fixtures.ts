@@ -10,6 +10,7 @@ import {
 import { bareKindData, type ResourceFlowNode } from '@project/react-flow-adapter';
 import { CLOSED_DISPLAY, type ResourceDisplay } from '@project/ui';
 import type { RenderAdapter } from '../src/render-adapter';
+import { textAsset } from './markdown-texts';
 
 export function node(id: string, x: number, y: number, title = id): ResourceFlowNode {
   return {
@@ -63,9 +64,9 @@ function fixtureContent(
 ): ResourceContent {
   switch (kind) {
     case 'markdown':
-      return { kind: 'markdown', source, via: 'self' };
+      return { kind: 'markdown', content: { url: textAsset(source) }, via: 'self' };
     case 'reference':
-      return { kind: 'markdown', source, via: 'target' };
+      return { kind: 'markdown', content: { url: textAsset(source) }, via: 'target' };
     case 'space':
       return {
         kind: 'space',

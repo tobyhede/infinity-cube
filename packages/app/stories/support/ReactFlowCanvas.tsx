@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ComponentProps, type ReactNode } from 'react';
+import { z } from 'zod';
 import {
   Background,
   ReactFlow,
@@ -25,6 +26,7 @@ import {
   ZoomSlider,
   type ResourceFlowNode,
 } from '@project/react-flow-adapter';
+import type { PluginOperations } from '@project/ui';
 import { spaceEntityActions } from '#src/entity-actions';
 import { MAX_ZOOM, OVERVIEW_FIT } from '#src/camera';
 import {
@@ -35,6 +37,9 @@ import {
 import { RESOURCE_SIZE, resourceSizeVars } from '#src/resource';
 import { resolveMap } from '#src/map-resolution';
 import { resourceIds, graphIds, mapId, space } from './fixture';
+
+/** A Markdown Resource's Map content, as the specimen reads back what its plugin commits. */
+const markdownMapContent = z.object({ open: z.boolean() });
 
 /**
  * Which authored Map of which Space a fixture draws.
@@ -506,6 +511,22 @@ export function CanvasResourceNodeSpecimen({
       ownContent: {},
       mapContent: { shape: resourceShape },
     });
+  }
+  if (data.kind === 'markdown' && data.ownContent !== undefined) {
+    // A Markdown Resource, drawn by its plugin (ADR 0142): Open is its Map
+    // content, which this specimen's Open/Close operation commits.
+    const own = content?.kind === 'markdown' ? content.content : data.ownContent;
+    const changeOpen = openOperationEnabled ? (onOpenChange ?? (() => 'completed')) : undefined;
+    const commitMap: PluginOperations['commitMap'] =
+      changeOpen === undefined
+        ? undefined
+        : (next) => {
+            changeOpen(markdownMapContent.safeParse(next).data?.open === true);
+            return Promise.resolve('completed');
+          };
+    const kindOperations: PluginOperations =
+      commitMap === undefined ? { kind: 'markdown' } : { kind: 'markdown', commitMap };
+    Object.assign(data, { ownContent: own, mapContent: { open: open === true }, kindOperations });
   }
   if (open === true) {
     data.display = {

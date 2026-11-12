@@ -47,6 +47,7 @@ const probePlugin = definePlugin({
 type ProbeSurface = Surface<z.output<typeof probeContent>, z.output<typeof probeMap>>;
 const surfaces: ProbeSurface[] = [];
 let claimOnMount = false;
+let probeMounts = 0;
 function ProbeView({ surface }: { readonly surface: ProbeSurface }) {
   surfaces.push(surface);
   if (surface.content.value.fails) throw new Error('The probe was told to fail.');
@@ -55,6 +56,9 @@ function ProbeView({ surface }: { readonly surface: ProbeSurface }) {
   useEffect(() => {
     if (claimOnMount) claim?.();
   }, [claim]);
+  useEffect(() => {
+    probeMounts += 1;
+  }, []);
   return (
     <div data-testid="probe">
       <Title />
@@ -354,9 +358,11 @@ describe('the Map host a plugin draws inside (ADR 0142)', () => {
       />,
     );
     claimOnMount = false;
-    const claim = surfaces.at(-1)?.claim?.();
-    const answer = await claim?.exclusively(
-      (own) => own.store?.(new Blob(['own'])) ?? Promise.resolve(undefined),
+    const answer = await act(async () =>
+      surfaces
+        .at(-1)
+        ?.claim?.()
+        ?.exclusively((own) => own.store?.(new Blob(['own'])) ?? Promise.resolve(undefined)),
     );
     expect(answer).toBe(REF);
     expect(ownStored).toHaveLength(1);
@@ -450,6 +456,51 @@ describe('the Map host a plugin draws inside (ADR 0142)', () => {
     expect(claim).toHaveBeenCalledTimes(1);
   });
 
+  it.each([
+    ['a modal or presenting withdraws authoring', { withdrawn: true }],
+    ['the Resource becomes read-only', { readOnly: true }],
+  ] as const)(
+    'keeps a plugin drawn and its Claim held while %s, and offers its commits again after',
+    (_, withdrawal) => {
+      surfaces.length = 0;
+      probeMounts = 0;
+      claimOnMount = true;
+      const release = vi.fn();
+      const unmountClaim = vi.fn();
+      const held: PluginHostClaim = {
+        release,
+        exclusively: () => Promise.resolve('busy'),
+        unmount: unmountClaim,
+      };
+      const authoring = {
+        kind: 'ur',
+        claim: () => held,
+        commitContent: () => Promise.resolve('completed' as const),
+      } satisfies PluginResourceProps['operations'];
+      const { rerender } = render(
+        <PluginSurface {...probeProps({ operations: authoring })} entry={probeEntry} />,
+      );
+      claimOnMount = false;
+      expect(surfaces.at(-1)?.content.commit).toBeDefined();
+      rerender(
+        <PluginSurface
+          {...probeProps({
+            readOnly: 'readOnly' in withdrawal,
+            operations: { ...authoring, withdrawn: 'withdrawn' in withdrawal },
+          })}
+          entry={probeEntry}
+        />,
+      );
+      expect(surfaces.at(-1)?.content.commit).toBeUndefined();
+      rerender(<PluginSurface {...probeProps({ operations: authoring })} entry={probeEntry} />);
+      expect(surfaces.at(-1)?.content.commit).toBeDefined();
+      // One mount throughout, and the Claim neither released nor dropped.
+      expect(probeMounts).toBe(1);
+      expect(release).not.toHaveBeenCalled();
+      expect(unmountClaim).not.toHaveBeenCalled();
+    },
+  );
+
   it('tells the host once that it is gone, however many Claims it took and released', () => {
     surfaces.length = 0;
     const unmountClaim = vi.fn();
@@ -462,7 +513,9 @@ describe('the Map host a plugin draws inside (ADR 0142)', () => {
       <PluginSurface {...probeProps({ operations: { kind: 'ur', claim } })} entry={probeEntry} />,
     );
     const take = surfaces.at(-1)?.claim;
-    for (let taken = 0; taken < 3; taken += 1) take?.()?.release();
+    act(() => {
+      for (let taken = 0; taken < 3; taken += 1) take?.()?.release();
+    });
     expect(claim).toHaveBeenCalledTimes(3);
     unmount();
     expect(unmountClaim).toHaveBeenCalledTimes(1);
@@ -477,13 +530,22 @@ describe('the Map host a plugin draws inside (ADR 0142)', () => {
       exclusively: (work) => work({}),
       unmount: () => undefined,
     };
+    const toolbarHeld: boolean[] = [];
     render(
       <PluginSurface
         {...probeProps({ operations: { kind: 'ur', claim: () => held } })}
+        renderToolbar={(toolbar, isHeld) => {
+          toolbarHeld.push(isHeld);
+          return toolbar;
+        }}
         entry={probeEntry}
       />,
     );
-    const own = surfaces.at(-1)?.claim?.();
+    let own: ReturnType<NonNullable<ProbeSurface['claim']>> | undefined;
+    act(() => {
+      own = surfaces.at(-1)?.claim?.();
+    });
+    expect(toolbarHeld.at(-1)).toBe(true);
     const work = own?.exclusively(
       () =>
         new Promise<void>((resolve) => {
@@ -492,7 +554,12 @@ describe('the Map host a plugin draws inside (ADR 0142)', () => {
     );
     // Asked once, mid-work: the host completes it when the work ends
     // (`packages/app/test/plugin-host.test.ts`), so the plugin asks no more.
-    expect(own?.release()).toBeUndefined();
+    act(() => {
+      own?.release();
+    });
+    // The plugin holds nothing from its ask, so the rail no longer carries the
+    // edit's ends.
+    expect(toolbarHeld.at(-1)).toBe(false);
     finish();
     await work;
     expect(release).toHaveBeenCalledTimes(1);
@@ -633,6 +700,14 @@ describe('the Map host a plugin draws inside (ADR 0142)', () => {
     expect(screen.getByTestId('probe')).toBeInTheDocument();
   });
 
+  it('keeps a drawing plugin mounted when its Map content changes, so what it holds survives an Open', () => {
+    probeMounts = 0;
+    const { rerender } = render(<PluginSurface {...probeProps()} entry={probeEntry} />);
+    rerender(<PluginSurface {...probeProps({ mapContent: { n: 2 } })} entry={probeEntry} />);
+    expect(screen.getByTestId('probe')).toBeInTheDocument();
+    expect(probeMounts).toBe(1);
+  });
+
   it('offers no authoring while exclusive work runs elsewhere, its own Title and Actions included', () => {
     render(
       <PluginResource
@@ -648,7 +723,7 @@ describe('the Map host a plugin draws inside (ADR 0142)', () => {
     expect(screen.queryByRole('button', { name: 'Actions for Resource Decide' })).toBeNull();
   });
 
-  it('gives the plugin the whole rect while this drawing holds a Claim, and not another', () => {
+  it('gives the plugin the whole rect to drag in while this drawing holds a Claim, and not another, leaving the wheel the canvas’s', () => {
     const { rerender } = render(<PluginResource {...props('pill')} />);
     const layer = () =>
       screen.getByRole('article', { name: 'Decide' }).querySelector('.canvas-resource__plugin');
@@ -666,7 +741,9 @@ describe('the Map host a plugin draws inside (ADR 0142)', () => {
         operations={{ kind: 'ur', claimHolder: () => 'this-drawing' }}
       />,
     );
-    expect(layer()).toHaveClass('nodrag', 'nopan', 'nowheel');
+    expect(layer()).toHaveClass('nodrag', 'nopan');
+    // The canvas still zooms over a claimed Resource (ADR 0064): no `nowheel`.
+    expect(layer()).not.toHaveClass('nowheel');
   });
 
   it('keeps a drawn plugin, its state and its Claim through a change of its Map content', () => {

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import { MemorySpaceBackend, MemorySpaceBackendTestControl } from '@project/persistence';
 import { createOpenSpaces, type OpenSpace, type OpenSpaces } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
@@ -39,7 +39,10 @@ const metaSnapshot: SpaceSnapshot = {
     ],
   },
   resources: [
-    { id: RESOURCE_ID, document: { title: 'Notes', kind: 'markdown', content: { source: '' } } },
+    {
+      id: RESOURCE_ID,
+      document: { title: 'Notes', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+    },
   ],
 };
 
@@ -50,7 +53,7 @@ const countingIds = (): (() => UUID) => {
 };
 
 const EDITED = 'Notes edited while blocked';
-const notes = { title: 'Notes', kind: 'markdown', content: { source: '' } } as const;
+const notes = { title: 'Notes', kind: 'markdown', content: { url: EMPTY_ASSET_REF } } as const;
 
 /** Meta with its one Resource retitled: the Edit a blocked save keeps. */
 const withNotesTitled = (space: SpaceSnapshot, title: string): SpaceSnapshot => ({

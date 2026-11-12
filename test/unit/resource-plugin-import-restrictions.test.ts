@@ -27,7 +27,12 @@ const restrictedImportsSchema = z.tuple([
   }),
 ]);
 
-const PLUGIN_FILES = ['packages/plugin-ur/src/domain.ts', 'packages/plugin-ur/src/view.tsx'];
+const PLUGIN_FILES = [
+  'packages/plugin-ur/src/domain.ts',
+  'packages/plugin-ur/src/view.tsx',
+  'packages/plugin-markdown/src/domain.ts',
+  'packages/plugin-markdown/src/view.tsx',
+];
 
 describe('Resource plugin import restrictions', () => {
   it.each(

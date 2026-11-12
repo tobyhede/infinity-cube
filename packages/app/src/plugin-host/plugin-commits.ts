@@ -1,11 +1,17 @@
-import type { PluginKind, ResourceDocument, ResourceId } from '@project/core';
+import type { JsonValue, PluginKind, ResourceDocument, ResourceId } from '@project/core';
 import type { ObserverErrorReporter } from '@project/persistence';
-import type { Answer } from '@project/resource-api/domain';
+import type { Answer, Size } from '@project/resource-api/domain';
 import type { Assets } from '@project/resource-api/view';
 import type { ClaimHolder, PluginCommits, PluginHostClaim, PluginOperations } from '@project/ui';
 import { describeAuthoringRefusal } from '../authoring-refusal';
 import type { AuthoringResult, DrawnCompletion, Settle, SettledResult } from '../space-authoring';
-import { heldByAnotherDrawing, holds, type ClaimChain, type Drawing } from './claim-chain';
+import {
+  claimedElsewhere,
+  heldByAnotherDrawing,
+  holds,
+  type ClaimChain,
+  type Drawing,
+} from './claim-chain';
 import type { PluginGate } from './plugin-gate';
 
 /**
@@ -35,6 +41,7 @@ type Refusal = { readonly refused: string };
 const GONE: Refusal = { refused: 'This Resource has changed since it was drawn. Try again.' };
 const BUSY: Refusal = { refused: 'Another change is still being made. Try again when it ends.' };
 const BROKE: Answer = { refused: 'This change could not be made.' };
+const NOT_FOUND: Refusal = { refused: 'This Resource is no longer available.' };
 
 /** A settled Edit as a plugin reads it, its refusal in the words every refusal is reported in. */
 export const answerOf = (result: SettledResult): Answer => {
@@ -85,11 +92,14 @@ export interface PluginHost {
   readonly report: ObserverErrorReporter;
   /** The asset store and file picker a surface offers where it offers commits; absent, neither. */
   readonly assets?: Pick<Assets, 'store' | 'pick'> | undefined;
-  /** The Resource's stored document as it stands now, which a Title commit edits. */
+  /** A Resource's stored document now, which a Title commit rewrites the Title of. */
   readonly document: (resourceId: ResourceId) => ResourceDocument | undefined;
+  /**
+   * A plugin's size hint capped at what this canvas shows (`visibleCanvasCap`),
+   * a canvas fact; absent, or answering `undefined`, the hint is ignored.
+   */
+  readonly capSizeHint?: ((hint: Size) => Size | undefined) | undefined;
 }
-
-const NOT_FOUND: Refusal = { refused: 'This Resource is no longer available.' };
 
 /** Who holds a Claim on a drawing's Resource, as that drawing reads it. */
 export const claimHolderOf = (chain: ClaimChain, drawing: Drawing): ClaimHolder => {
@@ -122,13 +132,20 @@ function commitsFor(
     if (document === undefined) return undefined;
     return { kind: 'edited-resource', resourceId, document: { ...document, title } };
   };
+  const changeMapContent = (
+    content: JsonValue,
+    options?: { readonly sizeHint?: Size },
+  ): Promise<Answer> =>
+    run(() => {
+      const hint = options?.sizeHint;
+      const size = hint === undefined ? undefined : host.capSizeHint?.(hint);
+      return { kind: 'changed-map-content', resourceId, content, size };
+    });
   const store = host.assets?.store;
   return {
     title: (next) => run(retitled(next)),
     content: (next) => run(() => ({ kind: 'changed-content', resourceId, content: next })),
-    // A size hint is ignored: the canvas applies none yet
-    // (`docs/agents/maps-and-graphs.md`, R38, R40).
-    map: (next) => run(() => ({ kind: 'changed-map-content', resourceId, content: next })),
+    map: changeMapContent,
     store:
       store === undefined
         ? undefined
@@ -165,6 +182,11 @@ export function pluginSurfaceOperations(
   };
   if (!offersCommits(facts)) return drawn;
   if (host.claims.exclusive !== null) return { ...drawn, withdrawn: true };
+  // While a Claim is held by drawings that draw some other Resource, this one
+  // offers nothing to compete with it (ADR 0064, ADR 0142): its commands come
+  // back when that Claim ends. Another drawing of a held Resource is withheld
+  // per drawing, by `claimHolder`.
+  if (claimedElsewhere(host.claims, resourceId)) return drawn;
   const replaced = (): Refusal | null => (host.replacementEpoch() === builtIn ? null : GONE);
   const plain = commitsFor(
     host,

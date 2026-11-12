@@ -201,7 +201,7 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
         errors.push({
           kind: 'open-requires-content',
           ref: resourceId,
-          message: `Map "${subject.id}" stores ${member.kind} resource "${resourceId}" Open; a Resource whose kind is never Open is always Closed`,
+          message: `Map "${subject.id}" stores ${member.kind} resource "${resourceId}" Open; the application keeps no Open for a ${member.kind} Resource, whose plugin keeps any in its Map content`,
         });
       }
     }

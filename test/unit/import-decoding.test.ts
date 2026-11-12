@@ -1,4 +1,5 @@
 import {
+  EMPTY_ASSET_REF,
   importSpaceSchema,
   KIND_IDS,
   spaceSnapshotSchema,
@@ -113,11 +114,11 @@ describe('import decoding', () => {
       resources: [
         {
           id: RESOURCE_ID,
-          document: { title: title(4, 'One'), kind: 'markdown', content: { source: '' } },
+          document: { title: title(4, 'One'), kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
         {
           id: SECOND_RESOURCE_ID,
-          document: { title: title(5, 'Two'), kind: 'markdown', content: { source: '' } },
+          document: { title: title(5, 'Two'), kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
       ],
     };
@@ -207,7 +208,10 @@ describe('import decoding', () => {
       id: SPACE_ID,
       document: { version: 1, title: 'Space' },
       resources: [
-        { id: RESOURCE_ID, document: { title: '   ', kind: 'markdown', content: { source: '' } } },
+        {
+          id: RESOURCE_ID,
+          document: { title: '   ', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+        },
       ],
     };
 
@@ -243,7 +247,10 @@ describe('import decoding', () => {
         id: SPACE_ID,
         document: { version: 1, title: 'T' },
         resources: [
-          { id: 'nope', document: { title: 'C', kind: 'markdown', content: { source: '' } } },
+          {
+            id: 'nope',
+            document: { title: 'C', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+          },
         ],
       },
       {
@@ -275,7 +282,10 @@ describe('import decoding', () => {
         id: SPACE_ID,
         document: { version: 1, title: 'T' },
         resources: [
-          { id: RESOURCE_ID, document: { title: 'C', kind: 'Nope', content: { source: '' } } },
+          {
+            id: RESOURCE_ID,
+            document: { title: 'C', kind: 'Nope', content: { url: EMPTY_ASSET_REF } },
+          },
         ],
       },
       {
@@ -335,7 +345,10 @@ describe('import decoding', () => {
       id: SPACE_ID,
       document: { version: 1, title: 'T' },
       resources: [
-        { id: RESOURCE_ID, document: { title: 'C', kind: 'Nope', content: { source: '' } } },
+        {
+          id: RESOURCE_ID,
+          document: { title: 'C', kind: 'Nope', content: { url: EMPTY_ASSET_REF } },
+        },
       ],
     });
     if (parsed.success) throw new Error('Expected an unknown resource kind to be refused');
@@ -354,7 +367,10 @@ describe('import decoding', () => {
       id: SPACE_ID,
       document: { version: 1, title: 'T' },
       resources: [
-        { id: RESOURCE_ID, document: { title: 'C', kind: 'Markdown', content: { source: '' } } },
+        {
+          id: RESOURCE_ID,
+          document: { title: 'C', kind: 'Markdown', content: { url: EMPTY_ASSET_REF } },
+        },
       ],
     });
     if (parsed.success) throw new Error('Expected an unregistered resource kind to be refused');

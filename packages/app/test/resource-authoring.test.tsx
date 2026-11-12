@@ -29,6 +29,7 @@ import {
 import { selectResource } from './resource-selection';
 import { unusedImageSources } from './image-sources';
 import { stubResizeObserver } from './resize-observer';
+import { textAsset, textAt } from './markdown-texts';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -78,11 +79,11 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
   resources: [
     {
       id: RESOURCE_ID,
-      document: { title: 'A', kind: 'markdown', content: { source: 'A source' } },
+      document: { title: 'A', kind: 'markdown', content: { url: textAsset('A source') } },
     },
     {
       id: OTHER_RESOURCE_ID,
-      document: { title: 'B', kind: 'markdown', content: { source: 'B source' } },
+      document: { title: 'B', kind: 'markdown', content: { url: textAsset('B source') } },
     },
   ],
 });
@@ -204,7 +205,7 @@ const bodyOf = (session: SpaceSession, resourceId: string): string | undefined =
   const document = session
     .getState()
     .working.resources.find((resource) => resource.id === resourceId)?.document;
-  return document?.kind === 'markdown' ? document.content.source : undefined;
+  return document?.kind === 'markdown' ? textAt(document.content.url) : undefined;
 };
 
 /**
@@ -499,7 +500,7 @@ describe('the browser location, from the surface', () => {
 async function openEditor(): Promise<void> {
   await selectResource('A');
   fireEvent.click(await screen.findByRole('button', { name: 'Open Resource A' }));
-  await screen.findByTestId('markdown-resource-body-edit-target');
+  await screen.findByRole('button', { name: 'Edit Markdown source of A' });
   fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource A' }));
   await screen.findByRole('textbox', { name: 'Markdown source of A' });
 }
@@ -561,7 +562,10 @@ describe('authoring an opened Resource', () => {
     replaceMarkdownSource('Written once, shown everywhere');
     fireEvent.click(screen.getByRole('button', { name: 'Save Resource A' }));
 
-    expect(bodyOf(session, RESOURCE_ID)).toBe('Written once, shown everywhere');
+    // Save stores the text, then commits its URL (ADR 0142).
+    await waitFor(() =>
+      expect(bodyOf(session, RESOURCE_ID)).toBe('Written once, shown everywhere'),
+    );
     expect(session.getState().working.resources).toContainEqual(twiceReferenced.resources[2]);
     expect(session.getState().working.resources).toContainEqual(twiceReferenced.resources[3]);
     await settled(session);
@@ -789,9 +793,10 @@ describe('the Resource affordance on the graph', () => {
 
     await selectResource('A');
     fireEvent.click(await screen.findByRole('button', { name: 'Open Resource A' }));
-    expect(await screen.findByText('A source')).toBeVisible();
+    // Opening measures the text in a hidden copy first, so the Open lands before the text is read.
+    expect(await screen.findByRole('button', { name: 'Close Resource A' })).toBeVisible();
+    expect(screen.getByText('A source')).toBeVisible();
     expect(screen.queryByRole('textbox', { name: 'Markdown source of A' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Close Resource A' })).toBeVisible();
     await settled(session);
   });
 

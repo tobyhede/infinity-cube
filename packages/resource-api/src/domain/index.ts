@@ -79,6 +79,20 @@ export const isStoredAsset = (answer: StoreAnswer): answer is AssetRef =>
 export const assetRefSchema = z.string().refine(isAssetRef, 'An asset reference.');
 
 /**
+ * Text with every line ending `\n`, so the bytes it is stored as, and so the
+ * asset's name, do not depend on the platform it was written on. A text plugin
+ * stores its text so, and so does anything writing that text for it.
+ */
+export const lineFeedText = (text: string): string => text.replace(/\r\n?/gu, '\n');
+
+/**
+ * The asset of zero bytes, which always exists (ADR 0142): a Resource whose
+ * bytes are empty names it, so creating one stores nothing and stays
+ * synchronous. It is the SHA-256 of nothing.
+ */
+export const EMPTY_ASSET: AssetRef = '/assets/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU';
+
+/**
  * The outlines the canvas strokes a Resource's border and ring on (ADR 0135,
  * ADR 0139). Each touches the midpoint of every side of the rect, where Edges
  * attach.

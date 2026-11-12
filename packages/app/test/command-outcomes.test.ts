@@ -17,6 +17,7 @@ import type {
 } from '../src/space-resource-lifecycle';
 import { openTestSpace } from './opened-space';
 import { unusedImageSources } from './image-sources';
+import { textAsset } from './markdown-texts';
 
 /**
  * Command outcomes through its interface, over a real composition: a real
@@ -62,8 +63,14 @@ const snapshot: SpaceSnapshot = {
     defaultMap: MAP_A,
   },
   resources: [
-    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
-    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', content: { source: 'B' } } },
+    {
+      id: RESOURCE_A,
+      document: { title: 'A', kind: 'markdown', content: { url: textAsset('A') } },
+    },
+    {
+      id: RESOURCE_B,
+      document: { title: 'B', kind: 'markdown', content: { url: textAsset('B') } },
+    },
   ],
 };
 

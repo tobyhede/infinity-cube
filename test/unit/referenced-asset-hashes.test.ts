@@ -42,7 +42,7 @@ const space: SpaceSnapshot = {
     { id: UR_ID, document: { title: 'Ur', kind: 'ur', content: {} } },
     {
       id: NOTES_ID,
-      document: { title: 'Notes', kind: 'markdown', content: { source: `/assets/${IN_CONTENT}` } },
+      document: { title: 'Notes', kind: 'markdown', content: { url: `/assets/${IN_CONTENT}` } },
     },
   ],
 };

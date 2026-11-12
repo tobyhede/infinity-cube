@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 import {
+  EMPTY_ASSET_REF,
   authorsContent,
   embedsMap,
   uuidSchema,
@@ -120,7 +121,7 @@ const snapshot = (id: UUID, title: string): SpaceSnapshot => {
       ? [
           {
             id: resourceId,
-            document: { title: 'Resource', kind: 'markdown', content: { source: '' } },
+            document: { title: 'Resource', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
           },
           {
             id: META_SPACE_RESOURCE_ID,
@@ -137,7 +138,7 @@ const snapshot = (id: UUID, title: string): SpaceSnapshot => {
       : [
           {
             id: resourceId,
-            document: { title: 'Resource', kind: 'markdown', content: { source: '' } },
+            document: { title: 'Resource', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
           },
           ...(id === OTHER_ID
             ? [
@@ -328,15 +329,16 @@ describe('Open Spaces', () => {
       target.app.authoring.complete(
         { kind: 'drawn', mapId: MAP_ID, graphId: null },
         {
-          kind: 'opened-resource',
+          kind: 'changed-map-content',
           resourceId: OTHER_RESOURCE_ID,
+          content: { open: true },
         },
       ).kind,
     ).toBe('completed');
     const after = target.session.getState().working;
     expect(
-      after.document.maps?.find((m) => m.id === MAP_ID)?.positions[OTHER_RESOURCE_ID]?.open,
-    ).toBe(true);
+      after.document.maps?.find((m) => m.id === MAP_ID)?.positions[OTHER_RESOURCE_ID]?.content,
+    ).toEqual({ open: true });
     expect(after.document.maps?.find((m) => m.id === SECOND_MAP_ID)).toEqual(
       before.document.maps?.find((m) => m.id === SECOND_MAP_ID),
     );

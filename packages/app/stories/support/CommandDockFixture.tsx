@@ -292,13 +292,7 @@ export async function openDockStory(scenario: DockScenario) {
     const result = target.app.authoring.complete(CANVAS, {
       kind: 'edited-resource',
       resourceId: resource.id,
-      document:
-        resource.document.kind === 'markdown'
-          ? {
-              ...resource.document,
-              content: { source: `${resource.document.content.source}\nStory edit` },
-            }
-          : { ...resource.document, title: `${resource.document.title} edited` },
+      document: { ...resource.document, title: `${resource.document.title} edited` },
     });
     if (result.kind !== 'completed')
       throw new Error('The failure scenario did not complete an Edit.');

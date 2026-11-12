@@ -1,6 +1,12 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { newUuid, spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
+import {
+  EMPTY_ASSET_REF,
+  newUuid,
+  spaceSnapshotSchema,
+  uuidSchema,
+  type SpaceSnapshot,
+} from '@project/core';
 import { MemorySpaceBackend } from '@project/persistence';
 import { createOpenSpaces } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
@@ -63,7 +69,7 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
   resources: [
     {
       id: META_RESOURCE_ID,
-      document: { title: 'Meta', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Meta', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
     {
       id: META_TO_HOME_ID,
@@ -103,7 +109,7 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
   resources: [
     {
       id: HOME_RESOURCE_ID,
-      document: { title: 'Start here', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Start here', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
   ],
 });
@@ -127,7 +133,7 @@ const other: SpaceSnapshot = spaceSnapshotSchema.parse({
   resources: [
     {
       id: OTHER_RESOURCE_ID,
-      document: { title: 'Resource 1', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Resource 1', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
   ],
 });

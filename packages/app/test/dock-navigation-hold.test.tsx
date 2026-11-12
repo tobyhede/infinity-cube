@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
-import { uuidSchema, type SpaceSnapshot } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { MemorySpaceBackend } from '@project/persistence';
 import { createOpenSpaces } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
@@ -54,7 +54,7 @@ const meta: SpaceSnapshot = {
   resources: [
     {
       id: META_RESOURCE_ID,
-      document: { title: 'Resource', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Resource', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
     {
       id: META_SPACE_RESOURCE_ID,
@@ -87,7 +87,7 @@ const other: SpaceSnapshot = {
   resources: [
     {
       id: OTHER_RESOURCE_ID,
-      document: { title: 'Resource', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Resource', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
     {
       id: OTHER_IMAGE_ID,

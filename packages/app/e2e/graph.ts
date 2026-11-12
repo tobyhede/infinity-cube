@@ -100,6 +100,28 @@ export function nodeByTitle(page: Page, title: string): Locator {
     .filter({ has: page.getByRole('heading', { name: title, exact: true }) });
 }
 
+/**
+ * Every Open Resource on the page, however it is drawn.
+ *
+ * A Resource the shared frame draws carries its Open on `.canvas-resource`. A
+ * plugin's Card always carries `data-open="false"`, since Open is the plugin's
+ * Map content (ADR 0142); the Markdown plugin carries it on its own element
+ * inside `.canvas-resource__plugin`. A guard that a gesture Opened nothing reads
+ * both.
+ */
+export function openResources(page: Page): Locator {
+  return page.locator(
+    '.canvas-resource:not(.canvas-resource--plugin)[data-open="true"], .canvas-resource__plugin [data-open="true"]',
+  );
+}
+
+/** Every Closed Resource on the page that could be Open, read as `openResources` reads Open. */
+export function closedResources(page: Page): Locator {
+  return page.locator(
+    '.canvas-resource:not(.canvas-resource--plugin)[data-open="false"], .canvas-resource__plugin [data-open="false"]',
+  );
+}
+
 /** The visible face shares its node's complete rectangle, including during resize. */
 export async function expectResourceFillsNode(node: Locator): Promise<void> {
   await expect

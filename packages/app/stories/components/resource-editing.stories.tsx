@@ -1,16 +1,19 @@
 import { useRef, useState } from 'react';
 import type { Story } from '@ladle/react';
-import { titleName } from '@project/core';
+import { titleName, type JsonValue } from '@project/core';
 import {
-  beginEditing,
-  Button,
   CanvasResource,
   CLOSED_DISPLAY,
+  PluginResource,
   type KindOperations,
+  type PluginCommits,
+  type PluginHostClaim,
+  type PluginOperations,
   type ResourceDisplay,
 } from '@project/ui';
 import { resourceSizeVars } from '#src/resource';
 import type { ResourceFrameStyle } from '../support/CanvasResourceSpecimen';
+import { storeStoryText, storyText } from '../support/story-assets';
 
 export default { title: 'Components/Resource/Editing' };
 
@@ -39,7 +42,11 @@ function TitleEditingResource({
   const display: ResourceDisplay = open
     ? {
         shown: 'open',
-        content: { kind: 'markdown', source: '## Open Resource body', via: 'self' },
+        content: {
+          kind: 'markdown',
+          content: { url: storyText('## Open Resource body') },
+          via: 'self',
+        },
       }
     : CLOSED_DISPLAY;
 
@@ -128,61 +135,74 @@ const markdown = `## Placement is authored
 
 A **Map** owns explicit Resource rects. A strategy only computes placement.`;
 
-type Mode = 'rendered' | 'focused' | 'unfocused';
-
-/** An open Markdown Resource begins editing from its rendered body or rail, keeps blur inert, and ends through Save, Cancel, Escape or Mod-Enter. */
-export const Markdown: Story = () => {
-  const [source, setSource] = useState(markdown);
-  const [mode, setMode] = useState<Mode>('rendered');
-  const [open, setOpen] = useState(true);
-  const changeOpen = (next: boolean) => {
-    setOpen(next);
-    return 'completed' as const;
+/**
+ * The story's own host for one Markdown Resource: its content and Map content
+ * in state, every commit answered `completed`, and a Claim that hands the
+ * plugin those same commits while it is held.
+ */
+function useStoryHost(initialText: string) {
+  const [content, setContent] = useState<JsonValue>({ url: storyText(initialText) });
+  const [mapContent, setMapContent] = useState<JsonValue>({ open: true });
+  const commits: PluginCommits = {
+    content: (next) => {
+      setContent(next);
+      return Promise.resolve('completed');
+    },
+    map: (next) => {
+      setMapContent(next);
+      return Promise.resolve('completed');
+    },
   };
-  const editing = mode !== 'rendered';
-  const shown: ResourceDisplay =
-    editing || open
-      ? { shown: 'open', content: { kind: 'markdown', source, via: 'self' } }
-      : CLOSED_DISPLAY;
-  const display = editing
-    ? beginEditing(
-        shown,
-        {
-          onComplete: (next) => {
-            setSource(next);
-            return 'completed';
-          },
-          onEnd: () => setMode('rendered'),
-        },
-        mode === 'focused',
-      )
-    : shown;
-  const kindOperations: KindOperations = {
+  const claim = (): PluginHostClaim => ({
+    release: () => true,
+    exclusively: (work) => work(commits),
+    unmount: () => undefined,
+  });
+  const operations: PluginOperations = {
     kind: 'markdown',
-    onBeginEdit: () => setMode('focused'),
+    commitContent: commits.content,
+    commitMap: commits.map,
+    // The host offers a store only where it says so: Save stores its text in
+    // the catalogue's asset store.
+    commitStore: storeStoryText,
+    claim,
   };
+  return { content, mapContent, operations };
+}
 
+/**
+ * An Open Markdown Resource drawn by its plugin through the Map surface's host
+ * (ADR 0142): it begins an edit from its rendered body or rail, keeps blur
+ * inert, and ends through Save, Cancel, Escape or Mod-Enter, storing its text
+ * in the catalogue's asset store.
+ */
+export const Markdown: Story = () => {
+  const { content, mapContent, operations } = useStoryHost(markdown);
+  const group = useRef<HTMLDivElement>(null);
   return (
     <div className="flex flex-col items-start gap-3 p-8">
-      <div className="flex gap-2" aria-label="Markdown editing state">
-        <Button type="button" variant="ghost" onClick={() => setMode('rendered')}>
-          Rendered
-        </Button>
-        <Button type="button" variant="ghost" onClick={() => setMode('focused')}>
-          Focused edit
-        </Button>
-        <Button type="button" variant="ghost" onClick={() => setMode('unfocused')}>
-          Unfocused edit
-        </Button>
-      </div>
-      <div style={openFrame}>
-        <CanvasResource
-          kindOperations={kindOperations}
-          onOpenChange={changeOpen}
-          display={display}
+      <div
+        role="group"
+        aria-label="Strategies on the canvas"
+        tabIndex={-1}
+        ref={group}
+        style={openFrame}
+      >
+        <PluginResource
+          resourceId="story-markdown"
+          kind="markdown"
+          title={{
+            title: 'Strategies',
+            readOnly: true,
+            onReturnFocus: () => group.current?.focus(),
+          }}
+          content={content}
+          mapContent={mapContent}
+          outline="rectangle"
           state="selected"
-          title="Strategies"
           graphColor="#ffc53d"
+          readOnly={false}
+          operations={operations}
         />
       </div>
     </div>

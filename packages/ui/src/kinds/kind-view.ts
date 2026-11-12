@@ -1,5 +1,4 @@
 import type { ComponentType, ReactNode } from 'react';
-import type { ResourceContentEdit } from '../resource-content-edit';
 import type { ResourceDisplay } from '../resource-display';
 
 /** What a drawn Resource tells its kind's content view about the area it draws in. */
@@ -11,10 +10,6 @@ export interface CanvasArea {
   readonly authoring: boolean;
   /** Whether the Resource is selected, which is when its content offers an edit target (ADR 0102). */
   readonly selected: boolean;
-  /** Begin authoring the content, when the Resource offers it. */
-  readonly onBeginEdit: (() => void) | undefined;
-  /** Publish the edit running inside the content, or `null` when none is. */
-  readonly setContentEdit: (edit: ResourceContentEdit | null) => void;
 }
 
 /** The command that begins an edit of a Resource's own content, as its kind names and draws it. */

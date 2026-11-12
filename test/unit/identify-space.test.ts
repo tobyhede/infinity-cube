@@ -1,4 +1,10 @@
-import { uuidSchema, type ImportSpace, type SpaceSnapshot, type UUID } from '@project/core';
+import {
+  EMPTY_ASSET_REF,
+  uuidSchema,
+  type ImportSpace,
+  type SpaceSnapshot,
+  type UUID,
+} from '@project/core';
 import { describe, expect, it } from 'vitest';
 import { describeSchemaFailure, identifySpace } from '@project/aggregate';
 
@@ -55,11 +61,11 @@ describe('identifySpace', () => {
       resources: [
         {
           id: RESOURCE_ID,
-          document: { title: 'First', kind: 'markdown', content: { source: 'One' } },
+          document: { title: 'First', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
         {
           id: SECOND_RESOURCE_ID,
-          document: { title: 'Second', kind: 'markdown', content: { source: 'Two' } },
+          document: { title: 'Second', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
       ],
     };

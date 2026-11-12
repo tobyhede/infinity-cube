@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { uuidSchema } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema } from '@project/core';
 import { MemorySpaceBackend, MemorySpaceBackendTestControl } from '../src/memory';
 import { createSpaceSessionRegistry } from '../src/session-registry';
 import type { SpaceSession, SpaceSessionState } from '../src/session';
@@ -51,7 +51,11 @@ const loaded = {
     resources: [
       {
         id: RESOURCE_ID,
-        document: { title: 'Resource', kind: 'markdown' as const, content: { source: '' } },
+        document: {
+          title: 'Resource',
+          kind: 'markdown' as const,
+          content: { url: EMPTY_ASSET_REF },
+        },
       },
     ],
   },
@@ -669,7 +673,11 @@ describe('Space session registry', () => {
         resources: [
           {
             id: SIBLING_RESOURCE_ID,
-            document: { title: 'Sibling', kind: 'markdown' as const, content: { source: '' } },
+            document: {
+              title: 'Sibling',
+              kind: 'markdown' as const,
+              content: { url: EMPTY_ASSET_REF },
+            },
           },
         ],
         document: { version: 1 as const, title: 'Sibling' },
@@ -777,7 +785,11 @@ describe('Space session registry', () => {
         resources: [
           {
             id: SIBLING_RESOURCE_ID,
-            document: { title: 'Sibling', kind: 'markdown' as const, content: { source: '' } },
+            document: {
+              title: 'Sibling',
+              kind: 'markdown' as const,
+              content: { url: EMPTY_ASSET_REF },
+            },
           },
           {
             id: SIBLING_LINK_ID,
@@ -808,7 +820,11 @@ describe('Space session registry', () => {
       resources: [
         {
           id: SIBLING_RESOURCE_ID,
-          document: { title: 'Sibling', kind: 'markdown' as const, content: { source: '' } },
+          document: {
+            title: 'Sibling',
+            kind: 'markdown' as const,
+            content: { url: EMPTY_ASSET_REF },
+          },
         },
         {
           id: SIBLING_LINK_ID,
@@ -962,7 +978,11 @@ describe('Space session registry', () => {
             },
             {
               id: DISPLACED_RESOURCE_ID,
-              document: { title: 'Displaced', kind: 'markdown' as const, content: { source: '' } },
+              document: {
+                title: 'Displaced',
+                kind: 'markdown' as const,
+                content: { url: EMPTY_ASSET_REF },
+              },
             },
           ],
         },
@@ -1531,7 +1551,11 @@ describe('Space session registry', () => {
           resources: [
             {
               id: OCCUPYING_RESOURCE_ID,
-              document: { title: 'Occupying', kind: 'markdown' as const, content: { source: '' } },
+              document: {
+                title: 'Occupying',
+                kind: 'markdown' as const,
+                content: { url: EMPTY_ASSET_REF },
+              },
             },
           ],
         },

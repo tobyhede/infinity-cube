@@ -21,6 +21,7 @@ import { mountSettled } from './settled-mount';
 import { unusedImageSources } from './image-sources';
 import { stubResizeObserver } from './resize-observer';
 import { canvasReading, IDLE_PLACEMENT } from './map-surfaces';
+import { textAsset } from './markdown-texts';
 
 /**
  * Edge Authoring's React interface: what it hands React Flow, and the controls
@@ -69,9 +70,18 @@ const snapshot: SpaceSnapshot = {
     defaultMap: MAP_ID,
   },
   resources: [
-    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
-    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', content: { source: 'B' } } },
-    { id: RESOURCE_C, document: { title: 'C', kind: 'markdown', content: { source: 'C' } } },
+    {
+      id: RESOURCE_A,
+      document: { title: 'A', kind: 'markdown', content: { url: textAsset('A') } },
+    },
+    {
+      id: RESOURCE_B,
+      document: { title: 'B', kind: 'markdown', content: { url: textAsset('B') } },
+    },
+    {
+      id: RESOURCE_C,
+      document: { title: 'C', kind: 'markdown', content: { url: textAsset('C') } },
+    },
   ],
 };
 

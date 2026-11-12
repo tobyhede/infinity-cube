@@ -1,8 +1,8 @@
 # The Aggregate directory
 
-An **Aggregate directory** is the on-disk form of everything InfinityCube holds: every Space, rooted at the Meta Space, plus the pictures its Image Resources show. `pnpm cube init <dir>` creates one, `pnpm cube run <dir>` runs one ([ADR 0117](adr/0117-running-serves-an-aggregate-directory-as-the-durable-copy.md)), `pnpm cube check <dir>` reads one as a run would without serving or writing it, `pnpm cube mcp <dir>` serves a local MCP server that edits one's files, and `pnpm cube import` and `pnpm cube export` Import one into a database and Export one back out ([ADR 0124](adr/0124-one-hyper-cli.md)). Exporting writes the same format whichever store it reads from.
+An **Aggregate directory** is the on-disk form of everything InfinityCube holds: every Space, rooted at the Meta Space, plus the assets its Resources use: a Markdown Resource's text and the pictures its Image Resources show. `pnpm cube init <dir>` creates one, `pnpm cube run <dir>` runs one ([ADR 0117](adr/0117-running-serves-an-aggregate-directory-as-the-durable-copy.md)), `pnpm cube check <dir>` reads one as a run would without serving or writing it, `pnpm cube mcp <dir>` serves a local MCP server that edits one's files, and `pnpm cube import` and `pnpm cube export` Import one into a database and Export one back out ([ADR 0124](adr/0124-one-hyper-cli.md)). Exporting writes the same format whichever store it reads from.
 
-The directory is plain files meant for git: JSON in a fixed key order, one JSON Resource file per Resource with a Markdown Resource's source beside it, and pictures named by their content. Exporting the same content twice writes the same bytes, so a diff shows only what changed.
+The directory is plain files meant for git: JSON in a fixed key order, one JSON Resource file per Resource, and assets (a Markdown Resource's text, a picture) named by their content. Exporting the same content twice writes the same bytes, so a diff shows only what changed.
 
 ```
 my-talk/
@@ -11,13 +11,13 @@ my-talk/
     space.json
     resources/
       a0000000-0000-4000-8000-000000000001.json
-      a0000000-0000-4000-8000-000000000001.md    its Markdown source
       a0000000-0000-4000-8000-000000000002.json
   7e4f0d2a-3c1b-4a6e-8f9d-0a1b2c3d4e5f/          an ordinary Space
     space.json
     resources/…
   assets/
     fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs.png
+    rcWY21QI-7ex4GKEZMhDprdPTIkEFjNXTGe9e9omKy4.md     a Markdown Resource's text
 ```
 
 The bundled example is [`packages/app/fixture`](../packages/app/fixture).
@@ -58,13 +58,13 @@ A child directory without a `space.json` is not a Space and is left alone.
       "title": "Talk",
       "kind": "positioned",
       "positions": {
-        "a0000000-0000-4000-8000-000000000001": { "x": 0, "y": 0, "open": false },
-        "a0000000-0000-4000-8000-000000000002": {
-          "x": 340,
+        "a0000000-0000-4000-8000-000000000001": {
+          "x": 0,
           "y": 0,
-          "open": true,
-          "size": { "width": 480, "height": 320 }
-        }
+          "size": { "width": 480, "height": 320 },
+          "content": { "open": true }
+        },
+        "a0000000-0000-4000-8000-000000000002": { "x": 340, "y": 0 }
       },
       "graphs": [
         {
@@ -98,7 +98,7 @@ Every object here is **strict**: a key the format does not declare is refused ra
 | `maps` | Optional. The Space's Maps, in order. A Space with none is given one the first time it is opened ([ADR 0079](adr/0079-v1-exposes-only-layouts-and-first-open-initializes-one.md)). Only the Meta Space can be written without Maps, because a Space Resource must name a Map of the ordinary Space it targets. |
 | `maps[].id`, `.title` | The Map's Id and name. Map Ids are unique within the Space. |
 | `maps[].kind` | `"positioned"`, the only kind. May be omitted. |
-| `maps[].positions` | Resource Id → placement. **The keys are the Map's membership**: a Map may leave Resources out, and may not name one the Space does not hold. A placement is `{ "x", "y" }`, with an optional `open`, `size` and `content`. `open` is `true` or `false`; absent means Closed, and an Ur or Image Resource may not be Open. `size` is `{ "width", "height" }`, no smaller than the Closed Size (260×146) on either axis; absent means the Closed Size, Open or Closed. `content` is the Resource's Map content (ADR 0142): any JSON value, which the Resource's plugin's schema accepts or refuses, and absent means that plugin's default. Only a plugin kind keeps Map content; an Ur Resource's is its Shape, `{ "shape": … }` with one of `rectangle`, `pill`, `ellipse` or `diamond`, absent meaning `rectangle`. |
+| `maps[].positions` | Resource Id → placement. **The keys are the Map's membership**: a Map may leave Resources out, and may not name one the Space does not hold. A placement is `{ "x", "y" }`, with an optional `open`, `size` and `content`. `open` is `true` or `false`; absent means Closed, and an Ur, Markdown or Image Resource may not be Open, because its plugin keeps any Open in its Map content. `size` is `{ "width", "height" }`, no smaller than the Closed Size (260×146) on either axis; absent means the Closed Size, Open or Closed. `content` is the Resource's Map content (ADR 0142): any JSON value, which the Resource's plugin's schema accepts or refuses, and absent means that plugin's default. Only a plugin kind keeps Map content; an Ur Resource's is its Shape, `{ "shape": … }` with one of `rectangle`, `pill`, `ellipse` or `diamond`, absent meaning `rectangle`, and a Markdown Resource's is `{ "open": true }` or `{ "open": false }`, absent meaning Closed, so one Map may draw it Open and another Closed. |
 | `maps[].graphs` | The Graphs this Map owns, in order, **at least one**. A Graph Id is unique across the whole Space, not just the Map ([ADR 0108](adr/0108-graph-identity-is-unique-within-the-space.md)). `color` is a non-empty string used as the Graph's CSS colour, which is not checked as a colour, and `headShape` is one of `arrow`, `vee`, `dot`, `diamond`; both are optional. |
 | `maps[].graphs[].edges` | Directed `{ "from", "to" }` Edges between Resources **this Map places**. Forks, merges, cycles and self-edges are allowed; an exact duplicate in one Graph is not. An Edge may carry a `title` that is one line with no leading or trailing whitespace, and `"titleHidden": true` beside it. The list may be empty. |
 | `maps[].activeGraph` | Which Graph is active when the Map opens. Absent means the first. |
@@ -115,33 +115,29 @@ A Resource is **one JSON Resource file**, `resources/<id>.json`, holding `{ id, 
   "id": "a0000000-0000-4000-8000-000000000001",
   "title": "Why async?",
   "kind": "markdown",
-  "content": { "path": "a0000000-0000-4000-8000-000000000001.md", "mediaType": "text/markdown" }
+  "content": { "url": "/assets/rcWY21QI-7ex4GKEZMhDprdPTIkEFjNXTGe9e9omKy4" }
 }
 ```
 
-A Markdown Resource's source is its **sidecar**: a plain Markdown file, with no frontmatter, beside its Resource file and named for its own Id, here `resources/a0000000-0000-4000-8000-000000000001.md`:
+A Markdown Resource's text is an **asset** ([ADR 0142](adr/0142-a-resource-plugin-owns-everything-inside-its-rect.md)), as a picture is: a plain Markdown file with no frontmatter and `\n` line endings, in [`assets/`](#assets) under the hash of its bytes, here `assets/rcWY21QI-7ex4GKEZMhDprdPTIkEFjNXTGe9e9omKy4.md`. Nothing is written beside the Resource file. A new Markdown Resource names the asset of zero bytes, `/assets/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU`, which needs no file.
 
-```markdown
-Futures are **lazy**.
-```
-
-A Resource's identity is its `id`, never its file name. Exporting writes every Resource as `resources/<id>.json`, and a Markdown Resource's sidecar as `resources/<id>.md`, whatever they were called before.
+A Resource's identity is its `id`, never its file name. Exporting writes every Resource as `resources/<id>.json`, whatever it was called before.
 
 Every Resource has `id`, `title`, `kind` and `content`, and none may be left out. The Title must have at least one non-blank line, and may run to several. `kind` is a kind's id; one this version of InfinityCube does not know is refused. A Resource file is strict, as `space.json` is: a key the envelope or the kind's `content` does not declare, at any depth, is refused, naming the key and the file, so a misspelt key fails loudly. `content` depends on the kind:
 
 | `kind` | `content` |
 | --- | --- |
-| `markdown` | `path`: the Resource's own `<id>.md`, which must exist beside its Resource file. `mediaType`: `text/markdown`. |
+| `markdown` | `url`: `/assets/<hash>`, its text in `assets/`. No other URL, and no `path` or `mediaType`. |
 | `ur` | `{}`. An Ur Resource is its Title alone. |
 | `image` | `url`: `https:` or `http:`, or `/assets/<hash>` for a picture in `assets/`. Optional `naturalSize: { width, height }` in pixels. The Title is the image's text alternative. An Image Resource is never Open: a placement storing `"open": true` for one is refused. |
 | `reference` | `target`: the Id of another Resource **in the same Space**, not itself and not another Reference Resource. It shows its Target's content, read-only. |
 | `space` | `spaceId`, `map`, `graph`: the target Space and the Map and Graph it shows. Optional `framing: { centreX, centreY, zoom }`. |
 
-**A `.md` no Resource file names is refused**, naming it, whether it sits in `resources/` or beside `space.json`.
+Only `resources/*.json` is read: a `.md` in `resources/` or beside `space.json` is not a Resource and is left alone.
 
 ## `assets/`
 
-The bytes of every stored asset the aggregate's Resources reference ([ADR 0142](adr/0142-a-resource-plugin-owns-everything-inside-its-rect.md), [ADR 0118](adr/0118-an-aggregate-directory-carries-stored-image-bytes.md)). An asset is any file a Resource uses, of any media type; today an Image Resource's picture is the one a Resource kind writes.
+The bytes of every stored asset the aggregate's Resources reference ([ADR 0142](adr/0142-a-resource-plugin-owns-everything-inside-its-rect.md), [ADR 0118](adr/0118-an-aggregate-directory-carries-stored-image-bytes.md)). An asset is any file a Resource uses, of any media type: a Markdown Resource's text and an Image Resource's picture are the ones a Resource kind writes today.
 
 - Each file is `assets/<hash>.<ext>`. The hash is the SHA-256 of the file's bytes as 43 characters of unpadded base64url, and it is also the last segment of the asset's URL, `/assets/<hash>`. The same bytes always have the same name, so they are stored once however many Resources reference them.
 - The extension gives the asset's media type, through one table: `png`, `jpg` and `jpeg`, `webp`, `gif`, `avif`, `svg`, `md`, `txt`, `csv`, `html`, `css`, `js`, `json`, `pdf`, `mp4`, `webm`, `mp3` and `woff2`. Any other extension, or none, is `application/octet-stream`. Exporting keeps the name of a file already there, so the extension you chose is written back; a new file gets the table's extension for its media type, or `.bin` for one the table does not list.
@@ -152,8 +148,10 @@ The bytes of every stored asset the aggregate's Resources reference ([ADR 0142](
   cp picture.png "my-talk/assets/$hash.png"   # then use  url: /assets/<hash>  in the Resource
   ```
 
+  A Markdown Resource's text is added the same way, as `assets/<hash>.md`; through `pnpm cube mcp`, its `write_asset` tool names the bytes and answers the URL.
+
 - Importing reads every file directly in `assets/` named by a hash, alone or followed by a dot and any extension, and admits it whatever its type, up to 10 MiB. A file over that, one **not named for its own content**, or two files named by the same hash refuse the whole directory. A file whose name is not a hash is not read, and is left alone.
-- An asset reference is a whole string value of exactly `/assets/<hash>`, anywhere in a Resource's `content` or a Map entry's `content`. A reference whose file is not in `assets/` is allowed: the reference stays, and a picture draws as one that will not load.
+- An asset reference is a whole string value of exactly `/assets/<hash>`, anywhere in a Resource's `content` or a Map entry's `content`. A reference whose file is not in `assets/` is allowed: the reference stays, a picture draws as one that will not load, and a Markdown Resource draws a note in place of its text and offers no Edit. `pnpm cube check` accepts such a directory and names each such reference and the file it needs.
 - The asset of zero bytes always exists, so no file is needed for it.
 - An `https:` or `http:` URL stays a URL. InfinityCube does not download it, and nothing is written to `assets/` for it.
 - Exporting owns the hash-named files in `assets/`: an asset no Resource references any more is removed, and an `assets/` left empty is removed. A file of a referenced asset whose bytes the store does not hold is kept. Other files, dotfiles, subdirectories and links inside `assets/` are left alone.
@@ -175,20 +173,18 @@ The next Export writes every minted Id into the files.
 
 Exporting writes the directory **in place** ([ADR 0119](adr/0119-export-writes-in-place-and-git-answers-for-a-partial-write.md)). It owns exactly what Importing reads, and never reads, copies or touches anything else:
 
-- **Owned:** `aggregate.json`; each Space directory's `space.json`, every `*.md` beside it, and every `resources/*.json` and `resources/*.md`; the hash-named files in `assets/`.
-- **Kept:** any other file or directory, at the root or inside a Space directory, such as `.git`, a `README.md` at the root, notes in a `notes/` directory or a `.gitignore`.
+- **Owned:** `aggregate.json`; each Space directory's `space.json` and every `resources/*.json`; the hash-named files in `assets/`.
+- **Kept:** any other file or directory, at the root or inside a Space directory, such as `.git`, a `README.md` at the root or in a Space directory, notes in a `notes/` directory or a `.gitignore`.
 
 One write goes like this:
 
 1. Every file the aggregate serialises to is computed in memory and checked the way Importing would read it. If it would not read back, nothing is written.
 2. A file whose bytes are already on disk is left alone, so an unchanged file keeps its timestamp. Every other file is written to a dot-prefixed temporary file beside it and renamed over it, so no file is ever half-written.
-3. Each owned file the aggregate no longer has is removed: a removed Resource's Resource file and its own sidecar, a `*.md` beside `space.json`, a picture no Resource shows, the files of a Space that is gone. A directory that removal leaves empty is removed too, so a gone Space's directory disappears unless it holds files of yours.
+3. Each owned file the aggregate no longer has is removed: a removed Resource's Resource file, an asset no Resource references, the files of a Space that is gone. A directory that removal leaves empty is removed too, so a gone Space's directory disappears unless it holds files of yours.
 
 The directory itself, and each Space directory in it, is never renamed or recreated, so a shell or editor open inside one keeps working. A missing directory is created. Exporting refuses to write or remove anything through a symbolic link.
 
 **There is no whole-write atomicity, backup or recovery copy.** A crash in the middle of a write can leave some files new and some old. Keep the directory under git: git restores it.
-
-**Markdown beside `space.json` is not kept.** A `README.md` or any other `*.md` in a Space directory or its `resources/` is read: unless it is a Markdown Resource's own sidecar, Importing refuses the directory naming it, and the next Export removes it. Keep prose about a Space under a name or directory InfinityCube does not scan.
 
 ## How a directory is checked
 
@@ -201,7 +197,7 @@ Two layers:
 
 ## Editing over MCP
 
-`pnpm cube mcp <dir>` serves a local [MCP](https://modelcontextprotocol.io) server over standard input and output, for a client that calls MCP tools but has no shell or filesystem of its own. Its tools are `list_files`, `read_file`, `write_file` and `delete_file` over the files of `<dir>`, and `check`, which answers what `pnpm cube check` prints. A path is relative to `<dir>`; one that leaves it, names a dot-entry such as `.git`, or passes through a symbolic link is refused, and `list_files` follows no link either. A refused `check` and a refused path answer as tool errors. `read_file` and `write_file` carry a file as UTF-8 text unless `encoding` is `base64`, which carries a binary file such as a picture under `assets/` byte for byte; reading a file that is not UTF-8 as text is refused, naming `base64`. `write_file` replaces a file by renaming a written temporary file over it. A missing `<dir>` is refused, naming `pnpm cube init`; an empty one is served, so a client can write a new aggregate into it, and `check` there says to write `aggregate.json` and the Meta Space's directory rather than naming a command the client cannot run.
+`pnpm cube mcp <dir>` serves a local [MCP](https://modelcontextprotocol.io) server over standard input and output, for a client that calls MCP tools but has no shell or filesystem of its own. Its tools are `list_files`, `read_file`, `write_file` and `delete_file` over the files of `<dir>`; `write_asset`, which writes text or base64 bytes as `assets/<hash>.<extension>` (`md` unless another is named) and answers the `/assets/<hash>` a Resource names it by, so a client adds a Markdown Resource with tools alone — `md` text is written with `\n` line endings, as the Markdown plugin saves it, and bytes a file of another extension already holds are refused, naming that file; and `check`, which answers what `pnpm cube check` prints. A path is relative to `<dir>`; one that leaves it, names a dot-entry such as `.git`, or passes through a symbolic link is refused, and `list_files` follows no link either. A refused `check` and a refused path answer as tool errors. `read_file` and `write_file` carry a file as UTF-8 text unless `encoding` is `base64`, which carries a binary file such as a picture under `assets/` byte for byte; reading a file that is not UTF-8 as text is refused, naming `base64`. `write_file` replaces a file by renaming a written temporary file over it. A missing `<dir>` is refused, naming `pnpm cube init`; an empty one is served, so a client can write a new aggregate into it, and `check` there says to write `aggregate.json` and the Meta Space's directory rather than naming a command the client cannot run.
 
 Standard output carries the protocol alone, so start it with pnpm's `--silent`, which drops the line pnpm prints before running a script, from the InfinityCube clone and with an absolute `<dir>`. A client whose configuration names a command but no working directory can start it through a shell:
 

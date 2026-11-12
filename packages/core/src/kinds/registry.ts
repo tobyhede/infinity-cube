@@ -3,11 +3,9 @@ import type { z } from 'zod';
 import type { ContentFacts, ContentUnresolved, ContentVia } from '../resource-content';
 import type { UUID } from '../types';
 import type {
-  FileContentDecoding,
   KindFlags,
   KindMapContent,
   KindModule,
-  KindSidecar,
   SpaceFraming,
   SpaceSelection,
   SpaceView,
@@ -46,14 +44,12 @@ export type KindId = keyof Registered;
 
 /** Each kind's content, as its own schema parses it. */
 type ContentByKind = { [K in KindId]: z.output<Registered[K]['contentSchema']> };
-/** Each kind's Resource file content, as its file codec's schema parses it. */
-type FileContentByKind = { [K in KindId]: z.output<Registered[K]['file']['contentSchema']> };
 /** What each kind's content resolves to. */
 type ResolvedByKind = { [K in KindId]: ReturnType<Registered[K]['resolveContent']> };
 
 /** Each kind's module, typed so a rule over a kinded value calls its own kind's module. */
 type KindModules = {
-  readonly [K in KindId]: KindModule<K, ContentByKind[K], FileContentByKind[K], ResolvedByKind[K]>;
+  readonly [K in KindId]: KindModule<K, ContentByKind[K], ResolvedByKind[K]>;
 };
 
 const KIND_MODULES: KindModules = REGISTERED;
@@ -63,23 +59,16 @@ type Kinded<K extends KindId> = {
   [P in K]: { kind: P; content: ContentByKind[P] };
 }[K];
 
-/** A Resource file whose content is its kind's file content, correlated so its module's codec accepts it. */
-type KindedFile<K extends KindId> = {
-  [P in K]: { kind: P; content: FileContentByKind[P] };
-}[K];
-
 /** The parser of a kinded value's content, answering it with its kind. */
 type KindedParser<T> = z.ZodType<T, z.ZodTypeDef, unknown>;
 
-/** A kind's parsers: of a Resource's content, and of its Resource file's content. */
+/** A kind's parser of a Resource's content, the same in a store, a Resource file and on the wire. */
 interface KindParsers<K extends KindId> {
   readonly content: KindedParser<Kinded<K>>;
-  readonly file: KindedParser<KindedFile<K>>;
 }
 
 const parsersOf = <K extends KindId>(kind: K): KindParsers<K> => ({
   content: KIND_MODULES[kind].contentSchema.transform((content) => ({ kind, content })),
-  file: KIND_MODULES[kind].file.contentSchema.transform((content) => ({ kind, content })),
 });
 
 const builtParsers = new Map<KindId, KindParsers<KindId>>();
@@ -97,10 +86,6 @@ const parsersFor = (kind: KindId): KindParsers<KindId> => {
 export const contentParser = (kind: KindId): KindedParser<Kinded<KindId>> =>
   parsersFor(kind).content;
 
-/** The parser of a Resource file's `content`: its kind's file codec's schema. */
-export const fileContentParser = (kind: KindId): KindedParser<KindedFile<KindId>> =>
-  parsersFor(kind).file;
-
 /**
  * A Resource: the Resource API's one structure (ADR 0142), its envelope `id`,
  * `title` and `kind`, and the content its kind's module parses. Typed from the
@@ -117,10 +102,8 @@ export type ResourceDocument = {
   [K in KindId]: { title: string; kind: K; content: ContentByKind[K] };
 }[KindId];
 
-/** A Resource file as intake reads it: the envelope, with its kind's file content. */
-export type ResourceFileDocument = {
-  [K in KindId]: { id: UUID; title: string; kind: K; content: FileContentByKind[K] };
-}[KindId];
+/** A Resource file as intake reads it: the Resource itself, one structure everywhere (ADR 0142). */
+export type ResourceFileDocument = Resource;
 
 /** Content a kind resolved, with whether it is the Resource's own or its content Target's. */
 type Reached<Resolved> = Resolved extends unknown ? Resolved & { readonly via: ContentVia } : never;
@@ -356,31 +339,6 @@ export const startsEmpty = (kind: KindId): kind is EmptyCreatableKindId =>
 /** A new Resource of the default kind with this Title, its body empty. */
 export const newDefaultResourceDocument = (title: string): ResourceDocument =>
   newResourceDocument(DEFAULT_KIND, title);
-
-const encodeFileContentOf = <K extends KindId>(id: string, resource: Kinded<K>) =>
-  KIND_MODULES[resource.kind].file.encode(id, resource.content);
-
-/** The content a Resource's file holds, and the sidecars beside it, by its kind's file codec. */
-export const encodeFileContent = (
-  resource: Resource,
-): { readonly content: unknown; readonly sidecars: readonly KindSidecar[] } =>
-  encodeFileContentOf(resource.id, resource);
-
-const decodeFileContentOf = <K extends KindId>(
-  id: string,
-  file: KindedFile<K>,
-  sidecar: (name: string) => string | undefined,
-) => KIND_MODULES[file.kind].file.decode(id, file.content, sidecar);
-
-/** A Resource file's content as the document's, read by its kind's file codec through `sidecar`. */
-export const decodeFileContent = (
-  file: ResourceFileDocument,
-  sidecar: (name: string) => string | undefined,
-): FileContentDecoding => decodeFileContentOf(file.id, file, sidecar);
-
-/** Every sidecar a Resource with this id could name, whatever its kind, so a refused file still claims its own. */
-export const sidecarNames = (id: string): readonly string[] =>
-  Object.values(KIND_MODULES).flatMap((module) => module.file.sidecarNames(id));
 
 /**
  * A kind id as ADR 0128 fixes it: a bare id, or a vendor kind's

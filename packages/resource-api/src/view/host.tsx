@@ -1,5 +1,11 @@
 import { createContext, useContext, type ComponentType, type ReactNode } from 'react';
-import type { OwnProps, RailCommand, TitleProps } from './index';
+import type {
+  OwnProps,
+  RailCommand,
+  RenderedMarkdownProps,
+  SourceEditorProps,
+  TitleProps,
+} from './index';
 
 /**
  * The host half of the Resource API's view (ADR 0142): what a surface provides
@@ -19,6 +25,22 @@ export interface ResourceHost {
   readonly Title: ComponentType<TitleProps>;
   readonly Own: ComponentType<OwnProps>;
   readonly rail: RailOutlet;
+  /**
+   * Markdown rendered as every surface renders it: one parser and sanitiser,
+   * so the same text never reads differently on the Map and on the Stage.
+   */
+  readonly RenderedMarkdown: ComponentType<RenderedMarkdownProps>;
+  /**
+   * The host's source editor. `Escape` and `Mod-Enter` run the plugin's
+   * `onCancel` and `onSave`, and go no further.
+   */
+  readonly SourceEditor: ComponentType<SourceEditorProps>;
+  /**
+   * The band along the top of the rect the host keeps clear for its rail, in
+   * pixels: {@link RAIL_BAND} where it draws a rail over the rect, 0 where it
+   * draws none.
+   */
+  readonly railBand: number;
 }
 
 const ResourceHostContext = createContext<ResourceHost | null>(null);

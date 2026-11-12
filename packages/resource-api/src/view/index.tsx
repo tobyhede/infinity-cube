@@ -23,9 +23,9 @@ export interface KeptMap<M> {
 /** What a surface offers for reaching assets (ADR 0142). */
 export interface Assets {
   /** The URL an asset is drawn from. */
-  url(ref: AssetRef): string;
+  readonly url: (ref: AssetRef) => string;
   /** An asset's bytes, or why they cannot be read. */
-  read(ref: AssetRef): Promise<Blob | { readonly refused: string }>;
+  readonly read: (ref: AssetRef) => Promise<Blob | { readonly refused: string }>;
   /** Ask the author for files, called in the press. */
   readonly pick?: ((accept: string) => Promise<File[]>) | undefined;
   /** Store bytes, answering their reference. */
@@ -140,6 +140,12 @@ export type RailCommand =
       readonly icon: ReactNode;
       readonly run: () => void;
       readonly disabled?: boolean;
+      /**
+       * The keys that run it too, as `aria-keyshortcuts` names them. A command
+       * that names keys belongs to work running inside the plugin's rect, so
+       * pressing it keeps the focus where that work has it.
+       */
+      readonly keyshortcuts?: string;
     }
   | {
       readonly kind: 'choice';
@@ -162,6 +168,47 @@ export interface OwnProps {
   readonly className?: string;
 }
 
+/** What the host renders Markdown text with. */
+export interface RenderedMarkdownProps {
+  readonly markdown: string;
+  /** A name already drawn above the text: a first heading that only repeats it is left out. */
+  readonly drawnName?: string | undefined;
+  readonly className?: string;
+  /**
+   * A press anywhere on the text begins an edit: the host draws the target,
+   * named `label` for a screen reader, over the text with nothing visible, so
+   * the rail's Edit stays the one keyboard way in.
+   */
+  readonly edit?: { readonly label: string; readonly begin: () => void } | undefined;
+}
+
+/** What the host draws a source editor with. */
+export interface SourceEditorProps {
+  readonly value: string;
+  readonly onValueChange: (value: string) => void;
+  /** Names the writing surface for a screen reader. */
+  readonly ariaLabel: string;
+  /** Whether the caret is put in it when it is drawn. */
+  readonly autoFocus?: boolean;
+  /** What `Mod-Enter` in the editor does: the edit's Save. */
+  readonly onSave?: () => void;
+  /** What `Escape` in the editor does: the edit's Cancel. */
+  readonly onCancel?: () => void;
+  readonly className?: string;
+}
+
+/**
+ * The band the canvas keeps clear along the top of every Resource it draws:
+ * eight pixels, the kind glyph's row, eight pixels. It is the canvas
+ * stylesheet's `padding-top` on a Closed Resource's body, which
+ * `packages/ui/test/canvas-resource-title-ladder.test.ts` holds to this value.
+ */
+export const RAIL_BAND = 30;
+
+/** The words of a settled commit's refusal, or `null` where it completed or changed nothing. */
+export const refusalOf = (answer: Answer): string | null =>
+  answer === 'completed' || answer === 'unchanged' ? null : answer.refused;
+
 /** The Resource's Title, drawn as the surface draws a Title, with the rename it offers. */
 export function Title(props: TitleProps) {
   const { Title: HostTitle } = useResourceHost('Title');
@@ -175,6 +222,26 @@ export function Title(props: TitleProps) {
 export function Own(props: OwnProps) {
   const { Own: HostOwn } = useResourceHost('Own');
   return <HostOwn {...props} />;
+}
+
+/**
+ * Markdown text rendered by the host's one parser and sanitiser. Text a plugin
+ * reads is untrusted, and is never inserted otherwise.
+ */
+export function RenderedMarkdown(props: RenderedMarkdownProps) {
+  const { RenderedMarkdown: HostRenderedMarkdown } = useResourceHost('RenderedMarkdown');
+  return <HostRenderedMarkdown {...props} />;
+}
+
+/** The band along the top of the rect this surface keeps clear for its rail, in pixels. */
+export function useRailBand(): number {
+  return useResourceHost('useRailBand').railBand;
+}
+
+/** The host's source editor, for a plugin whose content is text it edits. */
+export function SourceEditor(props: SourceEditorProps) {
+  const { SourceEditor: HostSourceEditor } = useResourceHost('SourceEditor');
+  return <HostSourceEditor {...props} />;
 }
 
 /** Emit commands for the canvas to draw on this Resource's rail. Draws nothing in place. */

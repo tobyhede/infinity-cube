@@ -1,38 +1,54 @@
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { beginEditing, CanvasResource, CLOSED_DISPLAY } from '../src';
+import { uuidSchema, type ResourceContent } from '@project/core';
+import { CanvasResource, CLOSED_DISPLAY } from '../src';
 
 /**
  * The Resource rail's keyboard contract (ADR 0073).
  *
  * These assert what the roving-tabindex toolbar buys and what a plain group of
  * buttons could not: one tab stop for a rail however many commands it carries,
- * arrow traversal inside it, and an unavailable command that is still reachable.
+ * and arrow traversal inside it.
  *
  * They also assert the rail's two groups, which are what stops "whose command
  * is this?" being answered by where a control happens to have been typed.
+ *
+ * They draw a Space Resource, the kind `CanvasResource` draws that has a
+ * command of its own: its portal's Edit and Done. Markdown and Image
+ * Resources are plugins', drawn by `PluginResource` (ADR 0142).
  */
+
+const SPACE_CONTENT: ResourceContent = {
+  kind: 'space',
+  view: {
+    spaceId: uuidSchema.parse('00000000-0000-4000-8000-0000000000aa'),
+    map: uuidSchema.parse('00000000-0000-4000-8000-0000000000ab'),
+    graph: uuidSchema.parse('00000000-0000-4000-8000-0000000000ac'),
+    framing: undefined,
+  },
+  via: 'self',
+};
+const openSpace = { shown: 'open', content: SPACE_CONTENT } as const;
 
 const railActions = () => screen.getByTestId('canvas-resource-actions');
 const railButtons = () => Array.from(railActions().querySelectorAll('button'));
 const tabStops = () => railButtons().filter((button) => button.tabIndex === 0);
 
-const openMarkdownResource = () =>
-  render(
-    <CanvasResource
-      kindOperations={{ kind: 'markdown', onBeginEdit: vi.fn() }}
-      onOpenChange={vi.fn()}
-      display={{ shown: 'open', content: { kind: 'markdown', source: 'Markdown', via: 'self' } }}
-      state="rest"
-      title="A"
-      graphColor="#ffc53d"
-    />,
-  );
+const spaceResource = (editing = false) => (
+  <CanvasResource
+    kindOperations={{ kind: 'space', portal: { editing, onEditingChange: vi.fn() } }}
+    onOpenChange={vi.fn()}
+    display={openSpace}
+    state="rest"
+    title="A"
+    graphColor="#ffc53d"
+  />
+);
 
 describe('the Resource rail is one toolbar', () => {
   it("names the Resource it commands, so its controls are heard as that Resource's", () => {
-    openMarkdownResource();
+    render(spaceResource());
 
     const toolbar = screen.getByRole('toolbar', { name: 'Resource A' });
     expect(toolbar).toContainElement(railActions());
@@ -40,35 +56,23 @@ describe('the Resource rail is one toolbar', () => {
   });
 
   it('costs one tab stop however many commands it carries', () => {
-    const { rerender } = openMarkdownResource();
+    const { rerender } = render(spaceResource());
 
     expect(railButtons()).toHaveLength(2);
     expect(tabStops()).toHaveLength(1);
 
-    // The same rail, running a content edit: Save, Cancel and an unavailable
-    // Close. Three controls, still one tab stop — which is the whole argument,
-    // because a canvas draws many Resources and each one has a rail.
-    rerender(
-      <CanvasResource
-        kindOperations={{ kind: 'markdown', onBeginEdit: vi.fn() }}
-        onOpenChange={vi.fn()}
-        display={beginEditing(
-          { shown: 'open', content: { kind: 'markdown', source: 'Markdown', via: 'self' } },
-          { onComplete: vi.fn(), onEnd: vi.fn() },
-          true,
-        )}
-        state="rest"
-        title="A"
-        graphColor="#ffc53d"
-      />,
-    );
+    // The same rail while its Map is edited: Done and Close, still one tab
+    // stop — which is the whole argument, because a canvas draws many
+    // Resources and each one has a rail.
+    rerender(spaceResource(true));
 
-    expect(railButtons()).toHaveLength(3);
+    expect(railButtons()).toHaveLength(2);
+    expect(railButtons()[0]).toHaveAccessibleName('Done Resource A');
     expect(tabStops()).toHaveLength(1);
   });
 
   it('moves between its commands on the arrow keys', async () => {
-    openMarkdownResource();
+    render(spaceResource());
 
     const edit = screen.getByRole('button', { name: 'Edit Resource A' });
     const close = screen.getByRole('button', { name: 'Close Resource A' });
@@ -83,61 +87,9 @@ describe('the Resource rail is one toolbar', () => {
     await waitFor(() => expect(edit).toHaveFocus());
   });
 
-  it('keeps an unavailable command reachable, and refuses to run it', async () => {
-    const onOpenChange = vi.fn();
-    render(
-      <CanvasResource
-        kindOperations={{ kind: 'markdown', onBeginEdit: vi.fn() }}
-        onOpenChange={onOpenChange}
-        display={beginEditing(
-          { shown: 'open', content: { kind: 'markdown', source: 'Markdown', via: 'self' } },
-          { onComplete: vi.fn(), onEnd: vi.fn() },
-          true,
-        )}
-        state="rest"
-        title="A"
-        graphColor="#ffc53d"
-      />,
-    );
-
-    const save = screen.getByRole('button', { name: 'Save Resource A' });
-    const close = screen.getByRole('button', { name: 'Close Resource A' });
-    expect(close).toHaveAttribute('aria-disabled', 'true');
-
-    // Two arrows from Save, past Cancel, and the unavailable Close still
-    // answers. A toolbar skips an item that is disabled *and* not focusable
-    // when disabled; this one is focusable, so it stays in the order — which
-    // is precisely what the native `disabled` property took away.
-    const cancel = screen.getByRole('button', { name: 'Cancel editing Resource A' });
-    await waitFor(() => expect(screen.getByRole('textbox')).toHaveFocus());
-    save.focus();
-    fireEvent.keyDown(save, { key: 'ArrowRight' });
-    await waitFor(() => expect(cancel).toHaveFocus());
-
-    fireEvent.keyDown(cancel, { key: 'ArrowRight' });
-    await waitFor(() => expect(close).toHaveFocus());
-
-    fireEvent.click(close);
-    expect(onOpenChange).not.toHaveBeenCalled();
-  });
-
   it('keeps an arrow pressed on the rail off the canvas behind it', async () => {
     const onKeyDown = vi.fn();
-    render(
-      <div onKeyDown={onKeyDown}>
-        <CanvasResource
-          kindOperations={{ kind: 'markdown', onBeginEdit: vi.fn() }}
-          onOpenChange={vi.fn()}
-          display={{
-            shown: 'open',
-            content: { kind: 'markdown', source: 'Markdown', via: 'self' },
-          }}
-          state="rest"
-          title="A"
-          graphColor="#ffc53d"
-        />
-      </div>,
-    );
+    render(<div onKeyDown={onKeyDown}>{spaceResource()}</div>);
 
     const edit = screen.getByRole('button', { name: 'Edit Resource A' });
     const close = screen.getByRole('button', { name: 'Close Resource A' });
@@ -157,15 +109,15 @@ const sharedGroup = () => within(railActions()).getByRole('group', { name: 'Reso
 
 describe('the rail says whose command each one is', () => {
   it("puts a kind's own command in that kind's group", () => {
-    openMarkdownResource();
+    render(spaceResource());
 
     const edit = screen.getByRole('button', { name: 'Edit Resource A' });
-    expect(kindGroup('Markdown Resource commands')).toContainElement(edit);
+    expect(kindGroup('Space Resource commands')).toContainElement(edit);
     expect(sharedGroup()).not.toContainElement(edit);
   });
 
   it('puts Open and Close in the shared group, because every Resource has them', () => {
-    openMarkdownResource();
+    render(spaceResource());
 
     const close = screen.getByRole('button', { name: 'Close Resource A' });
     expect(sharedGroup()).toContainElement(close);
@@ -173,34 +125,18 @@ describe('the rail says whose command each one is', () => {
     // kind of Resource it is drawn on.
     const groups = within(railActions()).getAllByRole('group');
     expect(groups.map((group) => group.getAttribute('aria-label'))).toEqual([
-      'Markdown Resource commands',
+      'Space Resource commands',
       'Resource commands',
     ]);
   });
 
-  it("keeps the shared group while an edit replaces the kind's own commands", () => {
-    render(
-      <CanvasResource
-        kindOperations={{ kind: 'markdown', onBeginEdit: vi.fn() }}
-        onOpenChange={vi.fn()}
-        display={beginEditing(
-          { shown: 'open', content: { kind: 'markdown', source: 'Markdown', via: 'self' } },
-          { onComplete: vi.fn(), onEnd: vi.fn() },
-          true,
-        )}
-        state="rest"
-        title="A"
-        graphColor="#ffc53d"
-      />,
-    );
+  it("keeps the shared group while an edit replaces the kind's own command", () => {
+    render(spaceResource(true));
 
-    // Save and Cancel are a Markdown edit's two ends and belong with Edit,
-    // which they replace while editing. Close is unavailable but still the Resource's.
-    const markdown = kindGroup('Markdown Resource commands');
-    expect(within(markdown).getByRole('button', { name: 'Save Resource A' })).toBeInTheDocument();
-    expect(
-      within(markdown).getByRole('button', { name: 'Cancel editing Resource A' }),
-    ).toBeInTheDocument();
+    // Done ends the edit and belongs with Edit, which it replaces while the
+    // Map is edited. Close is still the Resource's.
+    const space = kindGroup('Space Resource commands');
+    expect(within(space).getByRole('button', { name: 'Done Resource A' })).toBeInTheDocument();
     expect(sharedGroup()).toContainElement(
       screen.getByRole('button', { name: 'Close Resource A' }),
     );
@@ -224,11 +160,11 @@ describe('the rail says whose command each one is', () => {
   });
 
   it('groups the commands without dividing the keyboard', async () => {
-    openMarkdownResource();
+    render(spaceResource());
 
     const edit = screen.getByRole('button', { name: 'Edit Resource A' });
     const close = screen.getByRole('button', { name: 'Close Resource A' });
-    expect(kindGroup('Markdown Resource commands')).toContainElement(edit);
+    expect(kindGroup('Space Resource commands')).toContainElement(edit);
     expect(sharedGroup()).toContainElement(close);
 
     // One arrow crosses the group boundary, because the roving tabindex is the

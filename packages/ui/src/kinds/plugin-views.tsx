@@ -4,6 +4,7 @@ import {
   imageKind,
   isPluginKind,
   jsonValueSchema,
+  markdownKind,
   urKind,
   type JsonValue,
   type PluginKind,
@@ -19,6 +20,8 @@ import type {
 } from '@project/resource-api/view';
 import { imagePlugin } from '@project/plugin-image/domain';
 import { imagePluginView } from '@project/plugin-image/view';
+import { markdownPlugin } from '@project/plugin-markdown/domain';
+import { markdownPluginView } from '@project/plugin-markdown/view';
 import { urPlugin } from '@project/plugin-ur/domain';
 import { urPluginView } from '@project/plugin-ur/view';
 import { ResourceFailureBoundary } from '../ResourceFailureBoundary';
@@ -254,6 +257,7 @@ export function pluginEntry<C, M>(
 /** Every plugin's entry, typed so a plugin the list names and this file omits fails to compile. */
 const PLUGIN_ENTRIES = {
   [imageKind.id]: pluginEntry(imagePlugin, imagePluginView),
+  [markdownKind.id]: pluginEntry(markdownPlugin, markdownPluginView),
   [urKind.id]: pluginEntry(urPlugin, urPluginView),
 } satisfies Record<PluginKind, PluginEntry>;
 

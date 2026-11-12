@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { uuidSchema, type SpaceSnapshot } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { MemorySpaceBackend } from '@project/persistence';
 import { createOpenSpaces, type OpenSpace } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
@@ -12,6 +12,7 @@ import { unlinkedPresentations } from './presentations';
 import { selectResource } from './resource-selection';
 import { mintingIds } from './minting';
 import { stubResizeObserver } from './resize-observer';
+import { textAsset } from './markdown-texts';
 
 /**
  * A mounted session authors as any session does (ADR 0131): its Edits are
@@ -61,7 +62,7 @@ const meta: SpaceSnapshot = {
   resources: [
     {
       id: NOTE_ID,
-      document: { title: 'Note', kind: 'markdown', content: { source: 'Body' } },
+      document: { title: 'Note', kind: 'markdown', content: { url: textAsset('Body') } },
     },
     {
       id: SPACE_RESOURCE_ID,
@@ -94,7 +95,7 @@ const other: SpaceSnapshot = {
   resources: [
     {
       id: OTHER_RESOURCE_ID,
-      document: { title: 'Inside', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Inside', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
   ],
 };
@@ -255,9 +256,10 @@ describe('the canvas of a mounted session', () => {
     await waitFor(() => expect(initial.session.getState().working.resources).toHaveLength(3));
   });
 
+  // A Space Resource, whose Open the host keeps: a Markdown Resource's is its plugin's (ADR 0142).
   it.each(BOTH)('mounted %s: Enter on a Resource opens it', async (mounted) => {
     const initial = await openMeta(mounted);
-    const node = nodeOf('Note');
+    const node = nodeOf('Other');
 
     act(() => {
       node.focus();
@@ -266,7 +268,7 @@ describe('the canvas of a mounted session', () => {
 
     await waitFor(() => {
       const { maps } = initial.session.getState().working.document;
-      expect(maps?.[0]?.positions[NOTE_ID]?.open).toBe(true);
+      expect(maps?.[0]?.positions[SPACE_RESOURCE_ID]?.open).toBe(true);
     });
   });
 

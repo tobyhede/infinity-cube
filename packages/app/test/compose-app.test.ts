@@ -10,6 +10,7 @@ import type { Fullscreen } from '../src/presenting-fullscreen';
 import { channelHub } from './presentation-channels';
 import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
+import { textAsset } from './markdown-texts';
 
 /**
  * What an opened Space is composed of, asserted at the composition.
@@ -47,8 +48,14 @@ const snapshot: SpaceSnapshot = {
     defaultMap: MAP_ID,
   },
   resources: [
-    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
-    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', content: { source: 'B' } } },
+    {
+      id: RESOURCE_A,
+      document: { title: 'A', kind: 'markdown', content: { url: textAsset('A') } },
+    },
+    {
+      id: RESOURCE_B,
+      document: { title: 'B', kind: 'markdown', content: { url: textAsset('B') } },
+    },
   ],
 };
 
@@ -79,7 +86,7 @@ describe('the composed working Space', () => {
       authoring.complete(CANVAS, {
         kind: 'edited-resource',
         resourceId: RESOURCE_A,
-        document: { title: 'Renamed', kind: 'markdown', content: { source: 'A' } },
+        document: { title: 'Renamed', kind: 'markdown', content: { url: textAsset('A') } },
       }),
     ).toMatchObject({ kind: 'completed' });
 

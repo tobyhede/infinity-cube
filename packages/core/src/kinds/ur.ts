@@ -13,4 +13,4 @@ export const urKind = kindFromPlugin(urPlugin);
 export type UrKindId = typeof urKind.id;
 
 /** What an Ur Resource's content resolves to: nothing but its kind. */
-export type UrContent = PluginContent<UrKindId>;
+export type UrContent = PluginContent<UrKindId, typeof urKind.newContent>;

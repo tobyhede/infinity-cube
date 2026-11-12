@@ -160,8 +160,15 @@ test('the toolbar floats above its Resource’s top-right corner at a constant s
     // Outside the Resource, above it and above its top anchor.
     expect(strip.y + strip.height).toBeLessThanOrEqual(face.y);
     expect(strip.y + strip.height).toBeLessThanOrEqual(anchor.y);
-    // Aligned to the Resource's right edge.
-    expect(strip.x + strip.width).toBeCloseTo(face.x + face.width, 0);
+    // Aligned to the Resource's right edge, once a rect an Open grew has
+    // finished animating to its size.
+    await expect
+      .poll(async () => {
+        const right = await boxOf(resource, 'the Resource');
+        const edge = await boxOf(commands, 'the toolbar');
+        return Math.abs(edge.x + edge.width - (right.x + right.width));
+      })
+      .toBeLessThan(0.5);
     // Every control at the Dock's size, on screen, whatever the zoom.
     const sizes = await commands.getByRole('button').evaluateAll((buttons) =>
       buttons.map((button) => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { newUuid, uuidSchema, type SpaceSnapshot } from '@project/core';
+import { EMPTY_ASSET_REF, newUuid, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
@@ -61,7 +61,7 @@ describe('Map delete draws the right geometry', () => {
     resources: [
       {
         id: SHARED_RESOURCE_ID,
-        document: { title: 'Shared', kind: 'markdown', content: { source: '' } },
+        document: { title: 'Shared', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       },
     ],
   };
@@ -139,7 +139,7 @@ describe('Entering draws the entered Map’s geometry', () => {
     resources: [
       {
         id: META_RESOURCE_ID,
-        document: { title: 'Meta Resource', kind: 'markdown', content: { source: '' } },
+        document: { title: 'Meta Resource', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       },
     ],
   };
@@ -175,7 +175,7 @@ describe('Entering draws the entered Map’s geometry', () => {
     resources: [
       {
         id: SHARED_RESOURCE_ID,
-        document: { title: 'Shared', kind: 'markdown', content: { source: '' } },
+        document: { title: 'Shared', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       },
     ],
   };
@@ -249,11 +249,11 @@ describe('An embedded Edit in an unselected Map leaves no stale member', () => {
     resources: [
       {
         id: TOP_RESOURCE_ID,
-        document: { title: 'Top Resource', kind: 'markdown', content: { source: '' } },
+        document: { title: 'Top Resource', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       },
       {
         id: OTHER_RESOURCE_ID,
-        document: { title: 'Other Resource', kind: 'markdown', content: { source: '' } },
+        document: { title: 'Other Resource', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       },
     ],
   };
@@ -335,8 +335,14 @@ describe('A queued drag holds its drop point', () => {
       ],
     },
     resources: [
-      { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: '' } } },
-      { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', content: { source: '' } } },
+      {
+        id: RESOURCE_A,
+        document: { title: 'A', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+      },
+      {
+        id: RESOURCE_B,
+        document: { title: 'B', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+      },
     ],
   };
 

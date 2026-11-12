@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { newUuid, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { EMPTY_ASSET_REF, newUuid, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import type { LoadedSpace } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { runDatabaseCli } from '../../src/cli/database-entry';
@@ -18,9 +18,12 @@ import { readSingleSpace } from '../../src/aggregate-directory';
 import {
   filesUnder,
   markdownResourceFiles,
+  textAssetFiles,
+  textAssetRef,
   writeAggregateInto,
   type SpaceDirectory,
 } from '../support/aggregate-directory';
+import { admitted } from '../support/stored-assets';
 import { MemorySpaceRepository } from '@project/aggregate';
 import { runCommand } from '../support/infinity-cube-command';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -40,7 +43,7 @@ const STORED_RESOURCE_FILE = `${JSON.stringify(
     id: RESOURCE_ID,
     title: 'Stored resource',
     kind: 'markdown',
-    content: { path: `${RESOURCE_ID}.md`, mediaType: 'text/markdown' },
+    content: { url: EMPTY_ASSET_REF },
   },
   null,
   2,
@@ -58,7 +61,7 @@ const storedSpace: LoadedSpace = {
         document: {
           title: 'Stored resource',
           kind: 'markdown',
-          content: { source: 'Stored body.\n' },
+          content: { url: EMPTY_ASSET_REF },
         },
       },
     ],
@@ -84,17 +87,23 @@ const makeTemporaryDirectory = async (): Promise<string> => {
 const writeAggregate = async (
   metaSpaceId: UUID,
   spaces: readonly SpaceDirectory[],
-): Promise<string> => writeAggregateInto(await makeTemporaryDirectory(), metaSpaceId, spaces);
+  assets?: Readonly<Record<string, string>>,
+): Promise<string> =>
+  writeAggregateInto(await makeTemporaryDirectory(), metaSpaceId, spaces, assets);
 
 /** One Meta Space alone, which is the smallest complete aggregate there is. */
 const writeSingleSpaceAggregate = (id: UUID = SPACE_ID, title = 'Imported talk'): Promise<string> =>
-  writeAggregate(id, [
-    {
-      name: id,
-      spaceFile: JSON.stringify({ version: 1, id, title }),
-      resources: markdownResourceFiles(OPENING_ID, 'Opening', 'Hello.\n'),
-    },
-  ]);
+  writeAggregate(
+    id,
+    [
+      {
+        name: id,
+        spaceFile: JSON.stringify({ version: 1, id, title }),
+        resources: markdownResourceFiles(OPENING_ID, 'Opening', 'Hello.\n'),
+      },
+    ],
+    textAssetFiles('Hello.\n'),
+  );
 
 interface CapturedIo {
   readonly io: CliIo;
@@ -186,9 +195,11 @@ describe('runInfinityCube', () => {
     await expect(
       readFile(join(destination, SPACE_ID, 'resources', `${RESOURCE_ID}.json`), 'utf8'),
     ).resolves.toBe(STORED_RESOURCE_FILE);
+    // Its text is the empty asset, which needs no file under `assets/` (ADR 0142).
+    await expect(access(join(destination, 'assets'))).rejects.toMatchObject({ code: 'ENOENT' });
     await expect(
-      readFile(join(destination, SPACE_ID, 'resources', `${RESOURCE_ID}.md`), 'utf8'),
-    ).resolves.toBe('Stored body.\n');
+      access(join(destination, SPACE_ID, 'resources', `${RESOURCE_ID}.md`)),
+    ).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
   /*
@@ -235,12 +246,12 @@ describe('runInfinityCube', () => {
     });
 
     expect(exitCode).toBe(0);
-    await expect(access(join(spaceDirectory, 'stale-root.md'))).rejects.toMatchObject({
-      code: 'ENOENT',
-    });
-    await expect(access(join(spaceDirectory, 'resources', 'stale.md'))).rejects.toMatchObject({
-      code: 'ENOENT',
-    });
+    // A Space directory's root `*.md` is no longer read (ADR 0142), so it is kept.
+    await expect(readFile(join(spaceDirectory, 'stale-root.md'), 'utf8')).resolves.toBe('stale\n');
+    // Nor is `resources/*.md`: a Resource file is `resources/<id>.json` alone.
+    await expect(readFile(join(spaceDirectory, 'resources', 'stale.md'), 'utf8')).resolves.toBe(
+      'stale\n',
+    );
     await expect(access(join(spaceDirectory, 'resources', 'stale.json'))).rejects.toMatchObject({
       code: 'ENOENT',
     });
@@ -552,7 +563,7 @@ describe('runInfinityCube', () => {
           document: {
             title: 'Opening: why',
             kind: 'markdown',
-            content: { source: '# Opening\n\nHello.\n' },
+            content: { url: EMPTY_ASSET_REF },
           },
         },
       ],
@@ -592,7 +603,7 @@ describe('runInfinityCube', () => {
             id: RESOURCE_ID,
             document: {
               kind: 'markdown',
-              content: { source: 'Stored body.\n' },
+              content: { url: EMPTY_ASSET_REF },
               title: 'Stored resource',
             },
           },
@@ -613,36 +624,36 @@ describe('runInfinityCube', () => {
     ).resolves.toBe(STORED_RESOURCE_FILE);
   });
 
-  it('normalizes exported Markdown line endings to LF', async () => {
+  it("exports a Markdown Resource's text as the bytes of the asset it names", async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
-    const withMixedLineEndings: LoadedSpace = {
+    const text = 'First\nSecond\nThird\n';
+    const url = textAssetRef(text);
+    const withText: LoadedSpace = {
       ...storedSpace,
       snapshot: {
         ...storedSpace.snapshot,
         resources: [
           {
             id: RESOURCE_ID,
-            document: {
-              title: 'Stored resource',
-              kind: 'markdown',
-              content: { source: 'First\r\nSecond\rThird\n' },
-            },
+            document: { title: 'Stored resource', kind: 'markdown', content: { url } },
           },
         ],
       },
     };
+    const repository = new MemorySpaceRepository([withText], SPACE_ID);
+    await repository.storeAsset(await admitted(new TextEncoder().encode(text), 'text/markdown'));
 
     await expect(
       infinityCubeOver(['export', destination], {
-        repository: new MemorySpaceRepository([withMixedLineEndings], SPACE_ID),
+        repository,
         io: captureIo().io,
         newId: newUuid,
       }),
     ).resolves.toBe(0);
 
     await expect(
-      readFile(join(destination, SPACE_ID, 'resources', `${RESOURCE_ID}.md`), 'utf8'),
-    ).resolves.toBe('First\nSecond\nThird\n');
+      readFile(join(destination, 'assets', `${url.slice('/assets/'.length)}.md`), 'utf8'),
+    ).resolves.toBe(text);
   });
 
   /*
@@ -893,10 +904,10 @@ describe('runInfinityCube', () => {
     );
     await mkdir(join(spaceDirectory, 'resources'));
     const firstResourcePath = join(spaceDirectory, 'resources', `${RESOURCE_ID}.json`);
-    const secondResourcePath = join(spaceDirectory, 'second.md');
+    const secondResourcePath = join(spaceDirectory, 'resources', 'second.json');
     await writeFile(join(spaceDirectory, 'space.json'), '{ invalid JSON');
     await writeFile(firstResourcePath, '{ invalid JSON');
-    await writeFile(secondResourcePath, 'No Resource file names this.\n');
+    await writeFile(secondResourcePath, 'Not a Resource file.\n');
     const output = captureIo();
     const repository = new MemorySpaceRepository();
 

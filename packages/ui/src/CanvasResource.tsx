@@ -23,32 +23,21 @@ import {
   ResourceRailKindActions,
   ResourceRailSharedActions,
 } from './ResourceRailActions';
-import type { ResourceContentEdit } from './resource-content-edit';
 import { EntityActions, EntityActionsTrigger, type EntityActionGroup } from './EntityActionsMenu';
 import { ResourceRail, ResourceRailKind } from './ResourceRail';
 import { Card, CardContent, CardTitle } from './components/card';
-import {
-  AbandonEditIcon,
-  CloseResourceIcon,
-  CommitEditIcon,
-  EntityActionsIcon,
-  OpenResourceIcon,
-} from './icons';
-import type { MarkdownResourceBodyEditor } from './MarkdownResourceBody';
+import { CloseResourceIcon, CommitEditIcon, EntityActionsIcon, OpenResourceIcon } from './icons';
 import './canvas-resource.css';
 import './kinds/reference-canvas.css';
 import './kinds/space-canvas.css';
 import { usePresence } from './use-presence';
 import { InlineTitleEditor } from './InlineTitleEditor';
 import { UnresolvedContent } from './UnresolvedContent';
-import { atRest, type ResourceDisplay } from './resource-display';
+import type { ResourceDisplay } from './resource-display';
 import type { OutlineSize } from './resource-shape-outline';
 import { TitleHeading } from './ResourceTitleHeading';
 
 export type { KindOperations } from './kinds/registry';
-
-/** The two authored operations that end a live Markdown body edit. */
-export type CanvasResourceBodyEditor = MarkdownResourceBodyEditor;
 
 /** External visual facts the adapter knows and CanvasResource cannot derive:
  *  React Flow selection, drag and inline-title-editing. Hover and the
@@ -59,8 +48,7 @@ export type CanvasResourceState = 'rest' | 'selected' | 'dragging' | 'editing';
 interface CanvasResourceCommonProps {
   readonly kindOperations: KindOperations;
   /**
-   * Whether this Resource is Open, the content it draws when it is, and the
-   * body editor or image replacer while one runs. `CanvasResource` reads Open from
+   * Whether this Resource is Open, and the content it draws when it is. `CanvasResource` reads Open from
    * this alone; the Map's authored Open state reaches it only through the
    * display the projection made from it.
    */
@@ -171,33 +159,6 @@ type CanvasResourceStyle = CSSProperties & {
 };
 
 /**
- * What the rail's Edit control runs, or `undefined` when the Resource has no such
- * control to draw.
- *
- * On an open Resource it is simply the caret operation the caller supplied. On a
- * **closed** one it is ADR 0064's rule — open the Resource, then place the caret —
- * composed from the Resource's own two existing operations and nothing else.
- * Opening is not reimplemented or approximated here: `onOpenChange` is the same
- * call the Open control makes, so the growth, the neighbours' displacement and
- * the transition are the ones opening always produces.
- *
- * A closed Resource that cannot be opened has no Edit control, because the first
- * half of that pair would be missing and the caret would have nowhere to land.
- */
-const contentEditAction = (
-  open: boolean,
-  onOpenChange: ((open: boolean) => 'completed' | 'retained') | undefined,
-  onBeginContentEdit: (() => void) | undefined,
-): (() => void) | undefined => {
-  if (onBeginContentEdit === undefined) return undefined;
-  if (open) return onBeginContentEdit;
-  if (onOpenChange === undefined) return undefined;
-  return () => {
-    if (onOpenChange(true) === 'completed') onBeginContentEdit();
-  };
-};
-
-/**
  * How long the content's own opacity transition runs, in milliseconds.
  *
  * Read from the computed style rather than restated in TypeScript, so the
@@ -265,20 +226,14 @@ export function CanvasResource(props: CanvasResourceProps) {
   const name = titleName(title);
   const kind = kindOperations.kind;
   /*
-   * Read-only is decided here, once: a read-only Resource draws its content at
-   * rest, and every authoring affordance below reads one of these operations,
-   * each absent on a read-only Resource.
+   * Read-only is decided here, once: every authoring affordance below reads one
+   * of these operations, each absent on a read-only Resource.
    */
-  const display = readOnly ? atRest(props.display) : props.display;
+  const display = props.display;
   const open = display.shown !== 'closed';
   const content = display.shown === 'closed' ? null : display.content;
   const onBeginTitleEdit = readOnly ? undefined : props.onBeginTitleEdit;
   const onOpenChange = readOnly ? undefined : props.onOpenChange;
-  const contentOperations =
-    !readOnly && 'onBeginEdit' in kindOperations && (content === null || authorsContent(content))
-      ? kindOperations
-      : undefined;
-  const onBeginContentEdit = contentOperations?.onBeginEdit;
   const command = contentCommand(kind);
   const spaceOperations =
     !readOnly && content !== null && authorsContent(content) && isSpaceOperations(kindOperations)
@@ -304,21 +259,7 @@ export function CanvasResource(props: CanvasResourceProps) {
    */
   const contentAuthoring =
     contentPresence.mounted && !contentLeaving && authorsContent(contentPresence.value);
-  /**
-   * The edit running inside the Markdown content this Resource owns.
-   *
-   * State rather than a second prop because the draft and caret live inside
-   * the body. The display's editor supplies domain completion; the body publishes
-   * the Save and Cancel closures for its current draft (`resource-content-edit.ts`).
-   */
-  const [contentEdit, setContentEdit] = useState<ResourceContentEdit | null>(null);
-  const visibleContentEdit = readOnly ? null : contentEdit;
   const editControl = useRef<HTMLButtonElement>(null);
-  const contentEditingWas = useRef(false);
-  // Begun only through the command its kind names, so a rail is never drawn
-  // for a begin it has no control to run.
-  const beginContentEdit =
-    command === undefined ? undefined : contentEditAction(open, onOpenChange, onBeginContentEdit);
   const actionableEntityActions =
     !readOnly && entityActions?.some((group) => group.length > 0) === true;
   const contextNotice = props.contextNotice ?? null;
@@ -330,10 +271,8 @@ export function CanvasResource(props: CanvasResourceProps) {
     state !== 'editing' &&
     (spaceRail !== undefined ||
       portal !== undefined ||
-      visibleContentEdit !== null ||
       onOpenChange !== undefined ||
-      actionableEntityActions ||
-      beginContentEdit !== undefined);
+      actionableEntityActions);
   const style: CanvasResourceStyle = {
     '--canvas-resource-graph': graphPaint(graphColor),
     '--canvas-resource-border':
@@ -352,19 +291,8 @@ export function CanvasResource(props: CanvasResourceProps) {
         display,
         authoring: contentAuthoring,
         selected: state === 'selected',
-        onBeginEdit: onBeginContentEdit,
-        setContentEdit,
       })
     );
-
-  const returnFocus = props.onReturnFocus;
-  useLayoutEffect(() => {
-    if (contentEditingWas.current && contentEdit === null) {
-      if (editControl.current !== null) editControl.current.focus();
-      else returnFocus?.();
-    }
-    contentEditingWas.current = contentEdit !== null;
-  }, [contentEdit, returnFocus]);
 
   useLayoutEffect(() => {
     if (contentControl.current !== null) {
@@ -398,12 +326,12 @@ export function CanvasResource(props: CanvasResourceProps) {
     // `ResourceRailAction`'s; what is left here is which commands this Resource
     // has, and what each one runs.
     //
-    // The two groups are the answer to "whose command is this?". Editing
-    // this Resource's Markdown is an Open Markdown Resource's business and means
-    // nothing on another kind; opening and closing is every Resource's.
+    // The two groups are the answer to "whose command is this?". A Space
+    // Resource's portal is its own business and means nothing on another kind;
+    // opening and closing is every Resource's.
     //
-    // The entity actions lead, then a Space Resource's choices, the content-edit
-    // commands, and Open/Close last.
+    // The entity actions lead, then a Space Resource's choices, its portal
+    // command, and Open/Close last.
     <ResourceRailActions
       aria-label={`Resource ${name}`}
       className="canvas-resource__actions"
@@ -419,17 +347,7 @@ export function CanvasResource(props: CanvasResourceProps) {
       )}
       {spaceRail}
       <ResourceRailKindActions kind={kind}>
-        {visibleContentEdit !== null ? (
-          <ContentEditActions name={name} edit={visibleContentEdit} />
-        ) : beginContentEdit !== undefined && command !== undefined ? (
-          <ResourceRailAction
-            ref={editControl}
-            aria-label={command.label(name)}
-            onClick={beginContentEdit}
-          >
-            <command.Icon data-icon="inline-start" />
-          </ResourceRailAction>
-        ) : portal !== undefined ? (
+        {portal !== undefined ? (
           portalEditing ? (
             <ResourceRailAction
               ref={editControl}
@@ -453,17 +371,6 @@ export function CanvasResource(props: CanvasResourceProps) {
         {onOpenChange !== undefined && (
           <ResourceRailAction
             aria-label={`${open ? 'Close' : 'Open'} Resource ${name}`}
-            // Closing mid-edit would drop the Resource's box out from under a
-            // live caret with a draft in it. The control keeps its slot and
-            // goes unavailable rather than disappearing: the rail's row does
-            // not reshuffle while the author writes, and what is unavailable
-            // says so instead of vanishing.
-            //
-            // A toolbar item stays focusable while disabled (ADR 0073), so
-            // that promise holds for the keyboard too — the control keeps
-            // its place in the arrow order and announces itself unavailable,
-            // instead of being drawn and unreachable.
-            disabled={visibleContentEdit !== null}
             onClick={() => {
               onOpenChange(!open);
             }}
@@ -508,7 +415,7 @@ export function CanvasResource(props: CanvasResourceProps) {
       // A running edit is not a hover, so `canvas-resource.css` draws the active
       // face off this as well as `:hover` — a Resource being written in reads as
       // active without the pointer on it.
-      data-content-editing={visibleContentEdit !== null || portalEditing}
+      data-content-editing={portalEditing}
       style={style}
     >
       {/* Neutral: the band carries no colour and the commands on it sit on the
@@ -534,9 +441,9 @@ export function CanvasResource(props: CanvasResourceProps) {
         ) : (
           <CardTitle
             className="canvas-resource__title"
-            data-editable={onBeginTitleEdit !== undefined && visibleContentEdit === null}
+            data-editable={onBeginTitleEdit !== undefined}
           >
-            {onBeginTitleEdit === undefined || visibleContentEdit !== null ? (
+            {onBeginTitleEdit === undefined ? (
               <TitleHeading title={title} />
             ) : (
               // ADR 0065's one-activation control, wrapping the heading rather
@@ -602,54 +509,6 @@ export function CanvasResource(props: CanvasResourceProps) {
     <EntityActions groups={readOnly ? [] : entityActions} render={resource} />
   ) : (
     resource
-  );
-}
-
-interface ContentEditActionsProps {
-  /** The Resource's name, which is what an accessible name says (ADR 0083). */
-  readonly name: string;
-  readonly edit: ResourceContentEdit;
-}
-
-/**
- * The two ends of an edit running inside the Resource's content, in the rail slot
- * the Edit control had. Close keeps its own slot beside them — it belongs to the
- * Resource rather than to the edit, and a Resource stays closable while one runs.
- *
- * The same `ResourceRailAction` as everything else on the rail: same box, same
- * border, same paper and ink, same hover inversion. The key each one spends is
- * stated with `aria-keyshortcuts` and drawn by the body's own shortcut hint,
- * which is where a canvas Resource names a key.
- *
- * `holdFocus` is the one behaviour these two ask for that the other rail controls
- * do not, and it is asked for because the caret is in the content while the
- * control is on the band: without it the press that activates one is also a
- * focus leaving the writing surface, mid-edit and for a control that may well
- * be Cancel.
- */
-function ContentEditActions({ name, edit }: ContentEditActionsProps) {
-  return (
-    <>
-      {edit.onSave !== undefined && (
-        <ResourceRailAction
-          holdFocus
-          aria-label={`Save Resource ${name}`}
-          aria-keyshortcuts="Meta+Enter Control+Enter"
-          onClick={edit.onSave}
-        >
-          <CommitEditIcon data-icon="inline-start" />
-        </ResourceRailAction>
-      )}
-      <ResourceRailAction
-        holdFocus
-        aria-label={`Cancel editing Resource ${name}`}
-        aria-keyshortcuts="Escape"
-        disabled={edit.busy === true}
-        onClick={edit.onCancel}
-      >
-        <AbandonEditIcon data-icon="inline-start" />
-      </ResourceRailAction>
-    </>
   );
 }
 

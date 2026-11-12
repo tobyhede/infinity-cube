@@ -1,7 +1,9 @@
 import { expect, test } from './fixtures';
 import { nodeByTitle, resourceControls, selectCanvas, settled } from './graph';
 
-test('a focused Resource opens with Enter, and Space reads it in Full View', async ({ page }) => {
+test('a focused Markdown Resource Opens from its rail and not on Enter, and Space reads it in Full View', async ({
+  page,
+}) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   const resource = nodeByTitle(page, 'A').first();
@@ -12,11 +14,15 @@ test('a focused Resource opens with Enter, and Space reads it in Full View', asy
   // stopped being a gesture (ADR 0036).
   await resource.focus();
   await expect(resource).toBeFocused();
+  // A Markdown Resource's Open is its Map content, which only its rail
+  // commits (resource-plugins issue 05): Enter Opens nothing.
   await page.keyboard.press('Enter');
-  await expect(resource).toContainText('entry point');
+  await expect(resource).not.toContainText('entry point');
 
-  // Close is on the Resource's toolbar, drawn while it is selected (ADR 0102).
+  // Open and Close are on the Resource's toolbar, drawn while it is selected (ADR 0102).
   const controls = await resourceControls(page, resource);
+  await controls.getByRole('button', { name: 'Open Resource A' }).click();
+  await expect(resource).toContainText('entry point');
   await controls.getByRole('button', { name: 'Close Resource A' }).click();
   await resource.focus();
   await expect(resource).toBeFocused();
