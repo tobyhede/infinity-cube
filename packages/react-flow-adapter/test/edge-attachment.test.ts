@@ -116,7 +116,7 @@ describe('facingSides', () => {
   /*
    * An Edge and its reverse must face opposite ways, or a pair running both
    * ways reads each direction's left of travel from the same side and draws
-   * both directions on one side, on top of each other (ADR 0142). Overlapping
+   * both directions on one side, on top of each other (ADR 0143). Overlapping
    * Resources level on the chosen axis are where a tie on that axis could
    * send both directions the same way.
    */

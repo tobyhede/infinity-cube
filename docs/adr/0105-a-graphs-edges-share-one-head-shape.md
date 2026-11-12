@@ -2,7 +2,7 @@
 
 Status: accepted
 Refines: 0100
-Refined by: 0142
+Refined by: 0143
 Related: 0033, 0104
 
 A Graph carries a **head shape**, one of `arrow`, `vee`, `dot` or `diamond`. Every Edge in the Graph draws it at its head, meaning the `to` end. Its job is to tell Graphs apart where colour cannot: in greyscale, in print, and for a viewer who cannot tell the palette's hues apart. The head shape is authored per Graph, beside colour, because ADR 0104 already put the line's appearance with the Graph. A per-Edge style would give an Edge a second way to say which Graph it belongs to.

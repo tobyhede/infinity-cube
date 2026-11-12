@@ -78,7 +78,7 @@ export const MAX_END_TRIM = 0.3;
 
 /**
  * The lane of every Edge, keyed by Edge id, laid out from the centre out
- * (ADR 0142).
+ * (ADR 0143).
  *
  * Every Edge joins two Resources, and each attaches from where those Resources are
  * (ADR 0087) rather than from which Graph it belongs to, so every Graph's Edge
@@ -219,7 +219,7 @@ export interface LaneGeometry {
  * bottom — along the side the anchors sit on, whichever way the Edge travels;
  * a negative one runs above or left. With `side` at `travel`, a positive
  * offset runs on the Edge's left as it travels, read from the side it leaves
- * as it is drawn (ADR 0142). A self-Edge's two sides are on different axes, so its lane is not an offset:
+ * as it is drawn (ADR 0143). A self-Edge's two sides are on different axes, so its lane is not an offset:
  * each anchor moves along its own side, away from the corner the loop goes
  * round, so a connecting Edge's head still lands on its Resource, and the curve between
  * them is `getBezierPath` over the moved anchors. The lane is then a loop of

@@ -21,7 +21,7 @@ Lanes are laid out from the centre out, and length is ranked in each direction s
 - **Loops.** Several Graphs' self-Edges on one Resource nest outwards from the Resource, as they did. The Active Graph's loop is innermost and full length, and the rest follow in Graph order, one trim increment shorter each.
 - **Activation moves lanes and recedes the rest.** Changing the Active Graph brings its Edges to the centre. While a Graph is active every other Graph's Edge is a 1-unit hairline at 0.8 opacity with a small fixed head; the Active Graph keeps its 3-unit line and a head sized in stroke widths. With no Graph active every Edge is a 2-unit line at full strength. Colour, paint order and head shapes do not change.
 
-This is recorded as ADR 0142, which refines ADR 0100 (which Edges shorten, and the two-way layout), ADR 0103 (in a two-way pair the side of an offset follows the direction of travel) and ADR 0105 (a receding Edge's head is small).
+This is recorded as ADR 0143, which refines ADR 0100 (which Edges shorten, and the two-way layout), ADR 0103 (in a two-way pair the side of an offset follows the direction of travel) and ADR 0105 (a receding Edge's head is small).
 
 ## User Stories
 
@@ -50,7 +50,7 @@ This is recorded as ADR 0142, which refines ADR 0100 (which Edges shorten, and t
 23. As a presenter, I want a Map drawn inside a Space Resource to lay out its lanes by the same rule, so that a Map reads the same wherever it is drawn (ADR 0112).
 24. As a developer, I want the whole ranking and placement rule decided in one module from the Edges and the Active Graph, so that a change to it touches one function and its tests.
 25. As a developer, I want the side of a lane decided from the direction the Edge travels at the moment it is drawn, so that it stays right during a drag, when the projection does not run again.
-26. As a developer, I want the rule recorded in ADR 0142 and in the canvas rendering guide, so that the next reader doesn't take ADR 0100's old rule as current.
+26. As a developer, I want the rule recorded in ADR 0143 and in the canvas rendering guide, so that the next reader doesn't take ADR 0100's old rule as current.
 
 ## Implementation Decisions
 
@@ -64,7 +64,7 @@ This is recorded as ADR 0142, which refines ADR 0100 (which Edges shorten, and t
 - **A two-way pair's offset is relative to the direction of travel.** Each lane says how its offset is read. In a two-way pair a positive offset is the Edge's left as it travels from source to target, and the lane geometry turns that into a screen side from the side the Edge leaves, which the facing rule always resolves opposite for an Edge and its reverse, so a rightward or upward Edge runs on the opposite screen side from its leftward or downward reverse. A one-way pair and a loop keep the screen-fixed sign, so that conversion is the one geometric change. Bridges, spans and the translate fallback (ADR 0103) take the converted offset exactly as they take one today. Loops keep their own geometry.
 - **The projection copies the lane and recedes the rest.** `projectGraphEdges` hands each Edge its offset, reach and trim. While a Graph is active it draws every other Graph's Edge at `RECEDING_STROKE_WIDTH` (1) and `OTHER_GRAPH_OPACITY` (0.8) with its `small` head marker; colour and paint order are kept. Graph order reaches the lane module as the order the Map's Graphs give their Edges, which it already does.
 - **The Active Graph argument is required.** The lane module takes the Active Graph, or none, explicitly, with no default.
-- **Records.** ADR 0142, "Lanes are laid out from the centre out, each direction on its own left", refines ADR 0100 and ADR 0103. Their status lines gain `Refined by: 0142`, and the ADR index gains its row. It records the rejected alternatives and their costs:
+- **Records.** ADR 0143, "Lanes are laid out from the centre out, each direction on its own left", refines ADR 0100 and ADR 0103. Their status lines gain `Refined by: 0143`, and the ADR index gains its row. It records the rejected alternatives and their costs:
   - every inactive Edge stopping short (ADR 0100), which made reached Resources look disconnected
   - lanes in Graph order whichever Graph is active, which keeps lanes still but takes the Active Graph off the centre
   - alternating a one-way pair's lanes either side of the centre, which changes a layout that was not wrong
@@ -72,7 +72,7 @@ This is recorded as ADR 0142, which refines ADR 0100 (which Edges shorten, and t
   - splitting the centre by Resource id (`issues/02`), which picks a side without meaning
   - shortening at the tail only, which was rejected as a reading of the sketch rather than a requirement
 
-  The canvas rendering guide gains a short lanes section stating the current rule and citing ADR 0142, since the Maps and Graphs contract already sends readers there for lanes.
+  The canvas rendering guide gains a short lanes section stating the current rule and citing ADR 0143, since the Maps and Graphs contract already sends readers there for lanes.
 
 ## Testing Decisions
 
