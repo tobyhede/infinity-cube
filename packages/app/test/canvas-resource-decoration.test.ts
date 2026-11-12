@@ -477,6 +477,7 @@ const embedding = (
       SPACE_RESOURCE_ID,
       {
         resourceId: SPACE_RESOURCE_ID,
+        drawing: Symbol('space drawing'),
         request: {
           view: { spaceId: TARGET_SPACE_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
           select,

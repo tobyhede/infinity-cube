@@ -797,14 +797,15 @@ describe.each([
     );
 
     it.each(everyKind.filter(([kind]) => kind === 'space'))(
-      'refuses Map content on a %s Resource that no plugin keeps',
+      'refuses Map content its plugin refuses on a %s Resource, naming the plugin',
       (_kind, resources) => {
         for (const content of [{ shape: 'rectangle' }, { shape: 'pill' }, null]) {
           const errors = refused(placedIn(resources, content));
           expect(errors).toEqual([
             expect.objectContaining({ kind: 'map-content-invalid', ref: A }),
           ]);
-          expect(errors[0]?.message).not.toContain('its plugin refuses');
+          // The Space plugin keeps `{ open }` (resource-plugins issue 07), so it refused this.
+          expect(errors[0]?.message).toContain('its plugin refuses');
         }
       },
     );

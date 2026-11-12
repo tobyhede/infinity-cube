@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { Box, Check, Maximize2, Minimize2, Pencil } from 'lucide-react';
 import { titleName, type Kept, type SpaceView } from '@project/resource-api/domain';
 import {
@@ -45,26 +45,16 @@ function SpacePluginView({ surface }: PluginViewProps<SpaceContent, SpaceMapCont
   const [refusal, setRefusal] = useState<string | null>(null);
   const railBand = useRailBand();
 
-  // The Claim as the host granted it, which every end of an Edit releases:
-  // one the host answers it did not release is kept, so the next end, or
-  // unmounting, releases it again.
-  const claim = useRef<Claim | null>(null);
-  const release = useCallback((): boolean => {
-    if (claim.current !== null && !claim.current.release()) return false;
-    claim.current = null;
-    return true;
-  }, []);
-  // Closed from outside, as by another author's Close, the Edit ends with it:
-  // a Closed face draws no Done, so nothing else would release its Claim.
-  const [openWas, setOpenWas] = useState(open);
-  if (openWas !== open) {
-    setOpenWas(open);
-    if (!open) setHeld(null);
-  }
+  // The Claim is released whenever it stops being held: on Done, on Close, on
+  // unmounting, and when Closed from outside, as by another author's Close,
+  // since a Closed face draws no Done. The host completes the release.
+  if (!open && held !== null) setHeld(null);
   useEffect(() => {
-    if (!open) release();
-  }, [open, release]);
-  useEffect(() => () => void release(), [release]);
+    if (held === null) return;
+    return () => {
+      held.release();
+    };
+  }, [held]);
 
   // Keyed by the values, not by the parsed content's identity, which the host
   // may mint afresh each render: what the embedding is asked for changes only
@@ -108,9 +98,7 @@ function SpacePluginView({ surface }: PluginViewProps<SpaceContent, SpaceMapCont
               id: 'edit',
               label: `Done Resource ${name}`,
               icon: <Check size={14} />,
-              run: () => {
-                if (release()) setHeld(null);
-              },
+              run: () => setHeld(null),
             },
           ]
         : takeClaim === undefined
@@ -123,9 +111,7 @@ function SpacePluginView({ surface }: PluginViewProps<SpaceContent, SpaceMapCont
                 icon: <Pencil size={14} />,
                 run: () => {
                   const taken = takeClaim();
-                  if (taken === undefined) return;
-                  claim.current = taken;
-                  setHeld(taken);
+                  if (taken !== undefined) setHeld(taken);
                 },
               },
             ];
@@ -144,12 +130,8 @@ function SpacePluginView({ surface }: PluginViewProps<SpaceContent, SpaceMapCont
             label: `Close Resource ${name}`,
             icon: <Minimize2 size={14} />,
             run: () => {
-              // A Closed face draws no Done, so Close ends the Edit first; a
-              // Claim held inside this one keeps both until it is released.
-              if (held !== null) {
-                if (!release()) return;
-                setHeld(null);
-              }
+              // A Closed face draws no Done, so Close ends the Edit first.
+              setHeld(null);
               toggle({ open: false });
             },
           }
@@ -161,7 +143,7 @@ function SpacePluginView({ surface }: PluginViewProps<SpaceContent, SpaceMapCont
             run: () => toggle({ open: true }),
           },
     ];
-  }, [commitMap, open, name, held, takeClaim, release]);
+  }, [commitMap, open, name, held, takeClaim]);
 
   return (
     <div

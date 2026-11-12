@@ -48,7 +48,10 @@ export const OPEN_RESOURCE_Z_INDEX = 10;
  * the rest to hairlines with small heads (`RECEDING_STROKE_WIDTH`), which this
  * softens rather than hides.
  */
-export const OTHER_GRAPH_OPACITY = 0.35;
+export const OTHER_GRAPH_OPACITY = 0.8;
+
+/** The stroke width of an Edge outside the Active Graph, while one is: a hairline. */
+export const RECEDING_STROKE_WIDTH = 1;
 
 /** What ends an inline title edit. Answers a refusal reason, or `null` when the
  *  new title was accepted — the same contract `CanvasResource`'s editor reads, where
@@ -97,9 +100,15 @@ type ResourceNodeCommonData = {
   /**
    * Told, by placement, what a Map embedding drawn in this Resource's rect asks
    * for, and `null` once it is gone, so the canvas draws that Map over the
-   * rect (ADR 0142). Supplied by the canvas to every node, nested ones too.
+   * rect (ADR 0142), with the key of the drawing it is drawn in. Supplied by
+   * the canvas to every node, nested ones too.
    */
-  onMapEmbed?: (id: string, resourceId: ResourceId, request: MapEmbedRequest | null) => void;
+  onMapEmbed?: (
+    id: string,
+    resourceId: ResourceId,
+    request: MapEmbedRequest | null,
+    drawing: symbol,
+  ) => void;
   resourceId: ResourceId;
   title: string;
   /** Whether the Resource's reusable component must withhold authoring affordances. */

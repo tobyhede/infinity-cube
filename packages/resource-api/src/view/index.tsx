@@ -1,11 +1,4 @@
-import {
-  createContext,
-  useContext,
-  useLayoutEffect,
-  useState,
-  type ComponentType,
-  type ReactNode,
-} from 'react';
+import { useLayoutEffect, useState, type ComponentType, type ReactNode } from 'react';
 import type {
   Answer,
   AssetRef,
@@ -16,6 +9,7 @@ import type {
   Size,
   SpaceView,
 } from '../domain';
+import { useResourceHost } from './host';
 
 /**
  * The view half of the Resource API (ADR 0142): what a surface gives a

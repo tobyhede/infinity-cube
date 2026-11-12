@@ -8,24 +8,37 @@ import type { MapEmbedRequest } from '@project/ui';
  * the placement whose rect it is drawn in. A plugin's `<Embed map>` publishes
  * here while it is drawn, and nothing else does, so a Closed Space Resource
  * requests nothing. The canvas draws each request's Map over its rect, the
- * Resource whose Claim is passed authors it in place, and the host's chooser
+ * drawing whose Claim is passed authors it in place, and the host's chooser
  * writes a choice through the request's `select`.
+ *
+ * A placement is one drawing on this canvas: a Resource drawn twice, as two
+ * embeddings of one Map draw it, is two placements, each with its own entry
+ * and its own drawing key, so nothing here is looked up by Resource.
  */
 
-/** One drawn Map embedding: the Resource whose rect it is drawn in, and what it asks for. */
+/**
+ * One drawn Map embedding: the Resource whose rect it is drawn in, the key of
+ * the drawing that rect is (whose Claim the embedding is passed), and what it
+ * asks for.
+ */
 export interface MapEmbedEntry {
   readonly resourceId: ResourceId;
+  readonly drawing: symbol;
   readonly request: MapEmbedRequest;
 }
 
 export interface MapEmbeddings {
   readonly getState: () => ReadonlyMap<string, MapEmbedEntry>;
   readonly subscribe: (listener: () => void) => () => void;
-  /** The embedding in placement `nodeId`'s rect asks for `request`, or is gone (`null`). */
+  /**
+   * The embedding in placement `nodeId`'s rect, drawn by `drawing`, asks for
+   * `request`, or is gone (`null`).
+   */
   readonly publish: (
     nodeId: string,
     resourceId: ResourceId,
     request: MapEmbedRequest | null,
+    drawing: symbol,
   ) => void;
   /**
    * Placement `nodeId`'s withdrawn embedding needs its latest commit no
@@ -57,7 +70,6 @@ export function createMapEmbeddings(
   const observable = createObservableState(NONE, reportObserverError);
   /** The request each placement last published, whose `select` the stored one forwards to. */
   const latest = new Map<string, MapEmbedRequest>();
-  const listeners = new Set<() => void>();
   /**
    * The request as it is stored: its choice forwards to the latest one
    * published. A host mints a plugin's commits afresh as it redraws, and the
@@ -98,7 +110,12 @@ export function createMapEmbeddings(
         if (current === undefined) return;
       } else {
         latest.set(nodeId, request);
-        if (current?.resourceId === resourceId && sameAsk(current.request, request)) return;
+        if (
+          current?.resourceId === resourceId &&
+          current.drawing === drawing &&
+          sameAsk(current.request, request)
+        )
+          return;
       }
       const next = new Map(state);
       if (request === null) next.delete(nodeId);
@@ -111,23 +128,16 @@ export function createMapEmbeddings(
   };
 }
 
-/** The entry drawn for a Resource's own rect, where its plugin embeds a Map it may choose for. */
+/** The entry drawn for placement `nodeId`'s own rect, where its plugin embeds a Map it may choose for. */
 export const ownMapEmbed = (
   embeds: ReadonlyMap<string, MapEmbedEntry>,
-  resourceId: ResourceId,
-): MapEmbedEntry | undefined => {
-  for (const entry of embeds.values()) if (entry.resourceId === resourceId) return entry;
-  return undefined;
-};
+  nodeId: string,
+): MapEmbedEntry | undefined => embeds.get(nodeId);
 
-/** The Resources whose embedded Map is authored in place: each passed its Claim to the embedding. */
-export const editingMapEmbeds = (
-  embeds: ReadonlyMap<string, MapEmbedEntry>,
-): ReadonlySet<ResourceId> =>
+/** The placements whose embedded Map is authored in place: each drawing passed its Claim to the embedding. */
+export const editingMapEmbeds = (embeds: ReadonlyMap<string, MapEmbedEntry>): ReadonlySet<string> =>
   new Set(
-    [...embeds.values()]
-      .filter((entry) => entry.request.claim !== undefined)
-      .map((entry) => entry.resourceId),
+    [...embeds].flatMap(([nodeId, entry]) => (entry.request.claim === undefined ? [] : [nodeId])),
   );
 
 const MapEmbeddingsContext = createContext<MapEmbeddings | null>(null);

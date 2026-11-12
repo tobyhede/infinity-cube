@@ -32,6 +32,7 @@ import { authoredFromDrawn, type SpaceResourceFraming } from '../space-resource-
 import { spaceResourceEmbedCamera } from '../camera';
 import { CanvasContinuation } from './CanvasContinuation';
 import { useNameOnCreation } from '../name-on-creation';
+import { sameEmbedding, type Embedding } from '../plugin-host/claim-chain';
 
 export type { EmbeddedPublication };
 
@@ -85,7 +86,7 @@ export function EmbeddedMapAuthoring({
    * one embedding it, so a Claim taken on a Resource drawn here nests under
    * the Claim that Resource holds (ADR 0142).
    */
-  readonly embeddedIn: readonly ResourceId[];
+  readonly embeddedIn: Embedding;
 }) {
   const parentId = parent.id;
   const chromeRoot = useRef<HTMLElement>(null);
@@ -174,16 +175,17 @@ export function EmbeddedMapAuthoring({
   const readTarget = useCallback((id: ResourceId) => entry.spaceResources.target(id), [entry]);
   const targets = useSpaceResourceTargets(space.resources, readTarget);
   const nameOnCreation = useNameOnCreation(composition.continuation);
-  const embeddedInKey = embeddedIn.join();
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- the ids, not the array's identity
-  const embeddedInIds = useMemo(() => embeddedIn, [embeddedInKey]);
+  // The drawings, not the array's identity, which the canvas mints afresh each render.
+  const [embeddedInDrawings, setEmbeddedInDrawings] = useState(embeddedIn);
+  if (embeddedInDrawings !== embeddedIn && !sameEmbedding(embeddedInDrawings, embeddedIn))
+    setEmbeddedInDrawings(embeddedIn);
   const plugins = useMemo(
     () => ({
       gate: entry.app.pluginGate,
       report: entry.app.reportObserverError,
-      embeddedIn: embeddedInIds,
+      embeddedIn: embeddedInDrawings,
     }),
-    [entry.app, embeddedInIds],
+    [entry.app, embeddedInDrawings],
   );
   const authoring = useCanvasResourceAuthoring({
     plugins,

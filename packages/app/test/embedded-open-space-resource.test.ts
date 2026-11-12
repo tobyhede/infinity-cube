@@ -143,7 +143,7 @@ describe('embedded open Space Resource discovery', () => {
   it('never draws the root Map inside itself', () => {
     const requests = discover({
       root: { spaceId: TARGET, mapId: MAP, policy: 'authoring' },
-      editingResources: new Set(),
+      editingPortals: new Set(),
       staleSpaces: new Set(),
       nodes: [openSpaceResource(HOST, { spaceId: TARGET, map: MAP })],
       entries: [{ id: TARGET }],
@@ -159,7 +159,7 @@ describe('embedded open Space Resource discovery', () => {
     const nested = openSpaceResource(NESTED, { spaceId: TARGET, map: OTHER_MAP });
     const input = {
       root: { spaceId: HOST, mapId: OTHER_MAP, policy: 'authoring' as const },
-      editingResources: new Set([HOST, NESTED]),
+      editingPortals: new Set([HOST, NESTED]),
       nodes: [parent],
       entries: [{ id: TARGET }],
       publications: new Map([[HOST, { mapId: MAP, nodes: [nested] }]]),
@@ -187,7 +187,7 @@ describe('embedded open Space Resource discovery', () => {
     );
     const requests = discover({
       root: { spaceId: HOST, mapId: OTHER_MAP, policy: 'authoring' },
-      editingResources: new Set(),
+      editingPortals: new Set(),
       staleSpaces: new Set(),
       nodes: [parent],
       entries: [{ id: TARGET }],
@@ -207,7 +207,7 @@ describe('embedded open Space Resource discovery', () => {
     );
     const requests = discover({
       root: { spaceId: HOST, mapId: OTHER_MAP, policy: 'authoring' },
-      editingResources: new Set(),
+      editingPortals: new Set(),
       staleSpaces: new Set(),
       nodes: [parent],
       entries: [{ id: TARGET }],
@@ -234,7 +234,7 @@ describe('embedded open Space Resource discovery', () => {
     );
     const requests = discover({
       root: { spaceId: HOST, mapId: OTHER_MAP, policy: 'authoring' },
-      editingResources: new Set(),
+      editingPortals: new Set(),
       staleSpaces: new Set(),
       nodes: [parent],
       entries: [{ id: TARGET }],
@@ -270,7 +270,7 @@ describe('embedded open Space Resource discovery', () => {
     );
     const requests = discover({
       root: { spaceId: HOST, mapId: OTHER_MAP, policy: 'authoring' },
-      editingResources: new Set(),
+      editingPortals: new Set(),
       staleSpaces: new Set(),
       nodes: [parent],
       entries: [{ id: TARGET }],
@@ -315,7 +315,7 @@ describe('embedded open Space Resource discovery', () => {
     );
     const requests = discover({
       root: { spaceId: HOST, mapId: OTHER_MAP, policy: 'authoring' },
-      editingResources: new Set(),
+      editingPortals: new Set(),
       staleSpaces: new Set(),
       nodes: [parent],
       entries: [{ id: TARGET }],
@@ -399,7 +399,7 @@ describe('embedded open Space Resource discovery', () => {
     const parent = openSpaceResource(HOST, { spaceId: TARGET, map: MAP });
     const requests = discover({
       root: { spaceId: HOST, mapId: OTHER_MAP, policy: 'authoring' },
-      editingResources: new Set(),
+      editingPortals: new Set(),
       staleSpaces: new Set(),
       nodes: [parent],
       entries: [{ id: TARGET }],
@@ -419,7 +419,7 @@ describe('embedded open Space Resource discovery', () => {
     );
     const requests = discover({
       root: { spaceId: HOST, mapId: OTHER_MAP, policy: 'authoring' },
-      editingResources: new Set(),
+      editingPortals: new Set(),
       staleSpaces: new Set(),
       nodes: [parent],
       entries: [{ id: TARGET }],
@@ -434,7 +434,7 @@ describe('embedded open Space Resource discovery', () => {
     const parent = openSpaceResource(HOST, { spaceId: TARGET, map: MAP });
     const requests = discoverEmbeddedOpenSpaceResources({
       root: { spaceId: HOST, mapId: OTHER_MAP, policy: 'authoring' },
-      editingResources: new Set(),
+      editingPortals: new Set(),
       staleSpaces: new Set(),
       nodes: [parent],
       embeds: new Map([
@@ -442,6 +442,7 @@ describe('embedded open Space Resource discovery', () => {
           HOST,
           {
             resourceId: HOST,
+            drawing: Symbol('host drawing'),
             request: {
               view: { spaceId: TARGET, map: OTHER_MAP, graph: GRAPH },
               select: undefined,
@@ -461,7 +462,7 @@ describe('embedded open Space Resource discovery', () => {
   it('discovers nothing for an Open Space Resource whose plugin embeds no Map', () => {
     const requests = discoverEmbeddedOpenSpaceResources({
       root: { spaceId: HOST, mapId: OTHER_MAP, policy: 'authoring' },
-      editingResources: new Set(),
+      editingPortals: new Set(),
       staleSpaces: new Set(),
       nodes: [openSpaceResource(HOST, { spaceId: TARGET, map: MAP })],
       embeds: new Map(),
@@ -498,7 +499,7 @@ describe('embedded open Space Resource discovery', () => {
     expect(
       discover({
         root: { spaceId: HOST, mapId: OTHER_MAP, policy: 'authoring' },
-        editingResources: new Set(),
+        editingPortals: new Set(),
         staleSpaces: new Set(),
         nodes: [closed, markdown],
         entries: [],
@@ -519,7 +520,7 @@ describe('the body height an embedding is clipped by', () => {
     const opened = openSpaceResource(HOST, { spaceId: TARGET, map: MAP });
     const [first] = discover({
       root: { spaceId: HOST, mapId: OTHER_MAP, policy: 'authoring' },
-      editingResources: new Set(),
+      editingPortals: new Set(),
       staleSpaces: new Set(),
       nodes: [opened],
       entries: [{ id: TARGET }],

@@ -45,7 +45,8 @@ export interface DiscoverEmbeddedOpenSpaceResourcesInput<
   Entry extends { readonly id: ResourceId },
 > {
   readonly root: EmbeddedRoot;
-  readonly editingResources: ReadonlySet<ResourceId>;
+  /** The placements whose embedded Map is authored in place, by node id. */
+  readonly editingPortals: ReadonlySet<string>;
   readonly staleSpaces: ReadonlySet<ResourceId>;
   readonly nodes: readonly ResourceFlowNode[];
   /**
@@ -249,7 +250,7 @@ export function discoverEmbeddedOpenSpaceResources<Entry extends { readonly id: 
         (input.publications.has(parent.id) &&
           !input.entries.some((entry) => entry.id === view.spaceId)),
       depth: item.depth,
-      editing: input.editingResources.has(parent.data.resourceId),
+      editing: input.editingPortals.has(parent.id),
     });
     const crossing = `${view.spaceId}:${view.map}`;
     if (path.has(crossing)) continue;
@@ -311,11 +312,11 @@ export function discoverEmbeddedOpenSpaceResources<Entry extends { readonly id: 
 export function editingPortalAncestor(
   start: ResourceFlowNode | undefined,
   nodesById: ReadonlyMap<string, ResourceFlowNode>,
-  editingPortals: ReadonlySet<ResourceId>,
+  editingPortals: ReadonlySet<string>,
 ): ResourceFlowNode | undefined {
   let current = start;
   while (current !== undefined) {
-    if (authorsEmbeddedMap(current.data) && editingPortals.has(current.data.resourceId)) {
+    if (authorsEmbeddedMap(current.data) && editingPortals.has(current.id)) {
       return current;
     }
     current = current.parentId === undefined ? undefined : nodesById.get(current.parentId);
@@ -326,7 +327,7 @@ export function editingPortalAncestor(
 export function embeddingIsPortalEditing(
   parent: ResourceFlowNode,
   nodesById: ReadonlyMap<string, ResourceFlowNode>,
-  editingPortals: ReadonlySet<ResourceId>,
+  editingPortals: ReadonlySet<string>,
 ): boolean {
   return editingPortalAncestor(parent, nodesById, editingPortals) !== undefined;
 }

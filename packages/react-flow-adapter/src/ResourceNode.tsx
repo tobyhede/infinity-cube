@@ -118,7 +118,8 @@ export function ResourceNode({
     () =>
       reportMapEmbed === undefined
         ? undefined
-        : (request: MapEmbedRequest | null) => reportMapEmbed(id, data.resourceId, request),
+        : (request: MapEmbedRequest | null, drawing: symbol) =>
+            reportMapEmbed(id, data.resourceId, request, drawing),
     [id, data.resourceId, reportMapEmbed],
   );
 

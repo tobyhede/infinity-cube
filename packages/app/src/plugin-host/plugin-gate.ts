@@ -47,17 +47,17 @@ export interface PluginGate {
     embedding: Embedding,
     own: (live: () => boolean) => Own,
   ) => HostClaim<Own> | undefined;
-  /** The surface is gone: its Claim and every Claim inside it are released. */
-  readonly unmount: (surface: string) => void;
+  /** The drawing is gone: its Claim and every Claim inside it are released. */
+  readonly unmount: (drawing: DrawingKey) => void;
   /**
-   * The surfaces whose Claim is passed to a Map embedding, which authors that
+   * The drawings whose Claim is passed to a Map embedding, which authors that
    * Map in place under it. Such a Claim is held for the Map's authoring, not
    * for running work in the plugin's own rect, so it withdraws nothing a
    * plugin's edit does (`canvas-resource-authoring.ts`).
    */
-  readonly lent: () => ReadonlySet<string>;
-  /** This surface's Claim is passed to a Map embedding until the answer is called. */
-  readonly lend: (surface: string) => () => void;
+  readonly lent: () => ReadonlySet<DrawingKey>;
+  /** This drawing's Claim is passed to a Map embedding until the answer is called. */
+  readonly lend: (drawing: DrawingKey) => () => void;
 }
 
 export function createPluginGate(): PluginGate {
@@ -70,17 +70,17 @@ export function createPluginGate(): PluginGate {
    */
   let liveRun: object | null = null;
   let admitting = 0;
-  const lentCounts = new Map<string, number>();
-  let lentSurfaces: ReadonlySet<string> = new Set();
+  const lentCounts = new Map<DrawingKey, number>();
+  let lentDrawings: ReadonlySet<DrawingKey> = new Set();
   const listeners = new Set<() => void>();
-  const changeLent = (surface: string, by: 1 | -1): void => {
-    const count = (lentCounts.get(surface) ?? 0) + by;
-    if (count > 0) lentCounts.set(surface, count);
-    else lentCounts.delete(surface);
+  const changeLent = (drawing: DrawingKey, by: 1 | -1): void => {
+    const count = (lentCounts.get(drawing) ?? 0) + by;
+    if (count > 0) lentCounts.set(drawing, count);
+    else lentCounts.delete(drawing);
     const next = new Set(lentCounts.keys());
-    if (next.size === lentSurfaces.size && [...next].every((each) => lentSurfaces.has(each)))
+    if (next.size === lentDrawings.size && [...next].every((each) => lentDrawings.has(each)))
       return;
-    lentSurfaces = next;
+    lentDrawings = next;
     for (const listener of [...listeners]) listener();
   };
   const install = (next: ClaimChain): void => {
@@ -134,15 +134,15 @@ export function createPluginGate(): PluginGate {
       }
     },
     claim,
-    unmount: (surface) => install(unmountIn(chain, surface)),
-    lent: () => lentSurfaces,
-    lend: (surface) => {
-      changeLent(surface, 1);
+    unmount: (drawing) => install(unmountIn(chain, drawing)),
+    lent: () => lentDrawings,
+    lend: (drawing) => {
+      changeLent(drawing, 1);
       let returned = false;
       return () => {
         if (returned) return;
         returned = true;
-        changeLent(surface, -1);
+        changeLent(drawing, -1);
       };
     },
   };

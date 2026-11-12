@@ -53,6 +53,7 @@ import {
   type MapEmbedRequest,
   type MapEmbedSlot,
 } from './ResourceEmbedding';
+import { createSurfaceLifetime, type SurfaceLifetime } from './surface-lifetime';
 import { ResourceFailureBoundary } from './ResourceFailureBoundary';
 import { HostRenderedMarkdown, HostSourceEditor } from './ResourceTextHost';
 import {
@@ -173,9 +174,10 @@ export interface PluginResourceProps {
   readonly onFailure?: ((error: Error) => void) | undefined;
   /**
    * Told what a Map embedding drawn in this rect asks for, and `null` once it
-   * is gone, so the canvas draws the Map over the rect (ADR 0142).
+   * is gone, so the canvas draws the Map over the rect (ADR 0142), with the
+   * key of the drawing it is drawn in, whose Claim the embedding is passed.
    */
-  readonly onMapEmbed?: ((request: MapEmbedRequest | null) => void) | undefined;
+  readonly onMapEmbed?: ((request: MapEmbedRequest | null, drawing: symbol) => void) | undefined;
   /** Told how far a Map embedding's room stops short of the rect's bottom, which clips the Map. */
   readonly onBodyHeightChange?: ((height: number | null) => void) | undefined;
 }
@@ -364,8 +366,14 @@ export function PluginSurface(props: PluginResourceProps & PluginSurfaceEntries)
   const reportFooter = props.onBodyHeightChange;
   const mapSlot = useMemo(
     (): MapEmbedSlot | null =>
-      onMapEmbed === undefined ? null : { publish: onMapEmbed, note: mapNote, reportFooter },
-    [onMapEmbed, mapNote, reportFooter],
+      onMapEmbed === undefined
+        ? null
+        : {
+            publish: (request) => onMapEmbed(request, lifetime.drawing),
+            note: mapNote,
+            reportFooter,
+          },
+    [onMapEmbed, mapNote, reportFooter, lifetime],
   );
 
   const entityActions = props.entityActions;
@@ -427,7 +435,7 @@ export function PluginSurface(props: PluginResourceProps & PluginSurfaceEntries)
       data-open={false}
       // A surface holding a Claim is being worked in, which keeps its active
       // face as an edit does (`canvas-resource.css`).
-      data-content-editing={props.operations.claimed === true}
+      data-content-editing={holder === 'this-drawing'}
       // The outline the plugin declared, which `canvas-resource.css` strokes
       // the border and ring on (ADR 0142).
       data-resource-shape={outline}

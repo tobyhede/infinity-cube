@@ -20,6 +20,7 @@ export const publishedEmbeds = (
           node.id,
           {
             resourceId: node.data.resourceId,
+            drawing: Symbol(node.id),
             request: {
               view: display.content.content,
               select: undefined,

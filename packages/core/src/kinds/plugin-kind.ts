@@ -226,7 +226,7 @@ export function kindFromPlugin<const K extends string, C, M>(
     plugin.selection === undefined
       ? defineKind(declaration)
       : defineKind({ ...declaration, selection: selectionOf(plugin.selection) });
-  const mapContent = mapContentOf(kind, plugin.mapContent, plugin.outline?.bind(plugin));
+  const mapContent = mapContentOf(plugin, plugin.mapContent);
   return plugin.newContent === undefined
     ? { ...module, mapContent }
     : { ...module, newContent: plugin.newContent, mapContent };

@@ -13,8 +13,8 @@ Categories: **one-kind** = a feature that exists for that kind alone; **registry
 | packages/app/src/components/CommandDockSpaces.tsx:459 | `spaceKind.id`: Space glyph | space | display | CommandDockSpaces.tsx |
 | packages/app/src/components/CommandDockSpaces.tsx:564 | `spaceKind.id`: Space glyph | space | display | CommandDockSpaces.tsx |
 | packages/app/src/resource-rail-actions.tsx:162 | `referenceKind.id`: Create Reference glyph | reference | E (display of a creation, until issue 08) | resource-rail-actions.tsx |
-| packages/app/src/space-authoring.ts:115 | `imageKind.id`: new Image Resource document | image | E | space-authoring.ts |
-| packages/app/src/space-authoring.ts:1374 | `referenceKind.id`: new Reference Resource | reference | E (until issue 08) | space-authoring.ts |
+| packages/app/src/space-authoring.ts:116 | `imageKind.id`: new Image Resource document | image | E | space-authoring.ts |
+| packages/app/src/space-authoring.ts:1368 | `referenceKind.id`: new Reference Resource | reference | E (until issue 08) | space-authoring.ts |
 | packages/persistence/src/space-resource-planning.ts:328 | `spaceKind.id`: new Space Resource document | space | E (lifecycle) | space-resource-planning.ts |
 
 `packages/app/src/canvas-resource-authoring.ts` no longer reaches a module id: a Markdown Resource's body is its plugin's (ADR 0142, resource-plugins issue 05), so the canvas keeps no Markdown completion.
@@ -27,11 +27,11 @@ Categories: **one-kind** = a feature that exists for that kind alone; **registry
 |---|---|---|---|---|
 | packages/core/src/index.ts:11-15 | `export *` of each kind module | all | package surface | core/src/index.ts |
 | packages/ui/src/icons.tsx:287 | `ResourceBaseKind = Exclude<Resource['kind'], ReferenceKindId>` | reference | display (kinds a Reference badge sits on) | icons.tsx |
-| packages/app/src/components/SpaceCanvas.tsx:1372 | `isAcceptedImageUrl`: paste creates an Image Resource | image | E (image-URL rule) | SpaceCanvas.tsx |
-| packages/app/src/space-authoring.ts:113 | `Extract<ResourceDocument, { kind: ImageKindId }>` | image | E | space-authoring.ts |
-| packages/app/src/space-authoring.ts | refusal `IMAGE_URL_UNSUPPORTED`, now declared there | image | E (image-URL rule) | space-authoring.ts |
-| packages/app/src/space-authoring.ts | `isAcceptedImageUrl` on Create | image | E (image-URL rule) | space-authoring.ts |
-| packages/app/src/picture-admission.ts | `admitImage` and its refusals from `@project/plugin-image/domain`: creation admits a picture by the plugin's rule | image | one-kind (Image creation, until issue 08) | picture-admission.ts |
+| packages/app/src/components/SpaceCanvas.tsx:1780 | `isAcceptedImageUrl`: paste creates an Image Resource | image | E (image-URL rule) | SpaceCanvas.tsx |
+| packages/app/src/space-authoring.ts:114 | `Extract<ResourceDocument, { kind: ImageKindId }>` | image | E | space-authoring.ts |
+| packages/app/src/space-authoring.ts:376,1340 | refusal `IMAGE_URL_UNSUPPORTED`, the Image plugin's code read through core | image | E (image-URL rule) | space-authoring.ts |
+| packages/app/src/space-authoring.ts:1339 | `isAcceptedImageUrl` on Create | image | E (image-URL rule) | space-authoring.ts |
+| packages/app/src/picture-admission.ts:10-25 | `admitImage`, `pictureSize` and its refusals from `@project/plugin-image/domain`: creation admits a picture by the plugin's rule | image | one-kind (Image creation, until issue 08) | picture-admission.ts |
 
 ## Sites now off the list
 

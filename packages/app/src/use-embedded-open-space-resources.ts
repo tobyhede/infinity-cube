@@ -46,9 +46,11 @@ export interface EmbeddedOpenSpaceResources {
   readonly publishEmbedded: (id: string, value: EmbeddedPublication | null) => void;
   readonly reportBodyHeight: (id: string, height: number | null) => void;
   /** The Resources whose embedded Map is authored in place: each passed its Claim to the embedding. */
-  readonly editingPortals: ReadonlySet<ResourceId>;
-  readonly portalDraft: ReadonlyMap<ResourceId, SpaceResourceFraming>;
-  readonly setPortalDraft: Dispatch<SetStateAction<ReadonlyMap<ResourceId, SpaceResourceFraming>>>;
+  /** The placements whose embedded Map is authored in place, by node id. */
+  readonly editingPortals: ReadonlySet<string>;
+  /** The framing being drawn on each placement's embedded Map, by node id. */
+  readonly portalDraft: ReadonlyMap<string, SpaceResourceFraming>;
+  readonly setPortalDraft: Dispatch<SetStateAction<ReadonlyMap<string, SpaceResourceFraming>>>;
 }
 
 /**
@@ -85,7 +87,7 @@ export function useEmbeddedOpenSpaceResources(
   const editingKey = [...editingMapEmbeds(embeds)].sort().join();
   // eslint-disable-next-line react-hooks/exhaustive-deps -- membership key, not snapshot identity
   const editingPortals = useMemo(() => editingMapEmbeds(embeds), [editingKey]);
-  const [portalDraft, setPortalDraft] = useState<ReadonlyMap<ResourceId, SpaceResourceFraming>>(
+  const [portalDraft, setPortalDraft] = useState<ReadonlyMap<string, SpaceResourceFraming>>(
     () => new Map(),
   );
   const reportBodyHeight = useCallback((id: string, height: number | null) => {
@@ -103,7 +105,7 @@ export function useEmbeddedOpenSpaceResources(
     () =>
       discoverEmbeddedOpenSpaceResources({
         root,
-        editingResources: editingPortals,
+        editingPortals,
         embeds,
         staleSpaces: new Set(embeddedFailures.keys()),
         nodes,

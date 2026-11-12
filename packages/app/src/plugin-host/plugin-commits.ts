@@ -9,8 +9,10 @@ import {
   claimedElsewhere,
   heldByAnotherDrawing,
   holds,
+  nestsUnderDeepest,
   type ClaimChain,
   type Drawing,
+  type Embedding,
 } from './claim-chain';
 import type { PluginGate } from './plugin-gate';
 
@@ -100,11 +102,11 @@ export interface PluginHost {
    */
   readonly capSizeHint?: ((hint: Size) => Size | undefined) | undefined;
   /**
-   * The Resources whose Map embedding this canvas draws inside, outermost
-   * first: a surface here is embedded in each, so its Claim nests under one
+   * The drawings whose Map embedding this canvas draws inside, outermost
+   * first: a drawing here is embedded in each, so its Claim nests under one
    * they hold (ADR 0142). Empty, or absent, on a canvas drawn in no embedding.
    */
-  readonly embeddedIn?: readonly ResourceId[] | undefined;
+  readonly embeddedIn?: Embedding | undefined;
 }
 
 /** Who holds a Claim on a drawing's Resource, as that drawing reads it. */
@@ -163,9 +165,6 @@ function commitsFor(
 }
 
 /** Whether two Claim chains name the same surface. */
-const sameChain = (a: readonly string[], b: readonly string[]): boolean =>
-  a.length === b.length && a.every((surface, index) => surface === b[index]);
-
 /**
  * A plugin kind's operations on the canvas: bare where the surface offers no
  * commits, and otherwise its commits and a Claim, both withdrawn by the host.
@@ -191,39 +190,32 @@ export function pluginSurfaceOperations(
     onFailure: (error: Error) => host.report(error),
   };
   if (!offersCommits(facts)) return drawn;
-  if (host.gate.exclusiveRunning()) return { ...drawn, withdrawn: true };
-  // While another surface holds a Claim, this one offers nothing to compete
-  // with it (ADR 0064, ADR 0142): its commands come back when that Claim ends.
-  // A Resource drawn twice, as two embeddings of one Map draw it, is held by
-  // one of its surfaces at a time: once one holds it, none offers a second.
-  // A surface inside a Map embedding whose Resource holds the Claim may nest
-  // its own under it, as an Image inside an entered Space may (ADR 0142).
-  const chain = [...(host.embeddedIn ?? []), resourceId];
-  const { holders } = host.gate.getState();
-  const heldHere = holders.some((held) => held.includes(resourceId));
-  const deepest = holders.at(-1);
-  const nests =
-    deepest !== undefined &&
-    deepest.length < chain.length &&
-    deepest.every((surface, index) => chain[index] === surface);
-  if (holders.length > 0 && !heldHere && !nests) return drawn;
+  if (host.claims.exclusive !== null) return { ...drawn, withdrawn: true };
+  // While a Claim is held by drawings that draw some other Resource, this one
+  // offers nothing to compete with it (ADR 0064, ADR 0142): its commands come
+  // back when that Claim ends. Another drawing of a held Resource is withheld
+  // per drawing, by `claimHolder`. A drawing inside a Map embedding whose
+  // drawing holds the deepest Claim may nest its own under it, as an Image
+  // inside an entered Space may (ADR 0142).
+  const embeddedIn = host.embeddedIn ?? [];
+  if (claimedElsewhere(host.claims, resourceId) && !nestsUnderDeepest(host.claims, embeddedIn))
+    return drawn;
+  const replaced = (): Refusal | null => (host.replacementEpoch() === builtIn ? null : GONE);
   const plain = commitsFor(
     host,
     resourceId,
     () => replaced() ?? (host.gate.exclusiveRunning() ? BUSY : null),
     host.complete,
   );
-  const claim = (): PluginHostClaim | undefined => {
-    const held = host.gate.claim(chain, (running) =>
-      commitsFor(
-        host,
-        resourceId,
-        () => {
-          if (host.replacementEpoch() !== builtIn) return GONE;
-          return running() ? null : BUSY;
-        },
-        true,
-      ),
+  // Exclusive work's own commits are admitted past the gate every Space's
+  // Authoring asks at `complete`; a plain one is not.
+  const admitted: PluginHost['complete'] = (completion, settle) =>
+    host.gate.admit(() => host.complete(completion, settle));
+  const claim = (drawing: symbol): PluginHostClaim | undefined => {
+    const held = host.gate.claim(
+      [...embeddedIn, { resource: resourceId, key: drawing }],
+      (running) =>
+        commitsFor(host, resourceId, () => replaced() ?? (running() ? null : BUSY), admitted),
     );
     if (held === undefined) return undefined;
     return {
@@ -247,11 +239,6 @@ export function pluginSurfaceOperations(
     commitMap: plain.map,
     commitStore: plain.store,
     pick,
-    // The surface holding the Claim keeps offering one, so the render in
-    // which its own release lands, before the gate's publication rebuilds
-    // these operations, does not draw it without its Edit for a frame and
-    // drop the focus that was on its Done. Another drawing of the same
-    // Resource offers none while it is held.
-    claim: heldHere && !holders.some((held) => sameChain(held, chain)) ? undefined : claim,
+    claim,
   };
 }

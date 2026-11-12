@@ -24,6 +24,7 @@ import type { DeleteConfirmation } from './delete-confirmation';
 import { NO_SPACE_RESOURCE_TARGETS, type SpaceResourceTargets } from './space-resource-targets';
 import { applyResourceDataPatch, decorateSharedResourceNode } from './canvas-resource-decoration';
 import { useKindDecoratedNodes } from './kinds/registry';
+import type { Embedding } from './plugin-host/claim-chain';
 import type { PluginHost } from './plugin-host/plugin-commits';
 import type { PluginGate } from './plugin-host/plugin-gate';
 import { usePluginGate } from './plugin-host/plugin-gate-context';
@@ -74,11 +75,11 @@ export interface CanvasPlugins {
   readonly gate: PluginGate;
   readonly report: ObserverErrorReporter;
   /**
-   * The Resources whose Map embedding this canvas is drawn inside, outermost
+   * The drawings whose Map embedding this canvas is drawn inside, outermost
    * first, so a Claim here nests under one they hold. Absent on a canvas drawn
    * in no embedding.
    */
-  readonly embeddedIn?: readonly ResourceId[] | undefined;
+  readonly embeddedIn?: Embedding | undefined;
 }
 
 const reportPluginFailureToConsole: ObserverErrorReporter = (error) =>
@@ -206,7 +207,10 @@ export function useCanvasResourceAuthoring({
   // A Claim passed to a Map embedding authors that Map, not the plugin's own
   // rect, so it withdraws nothing a plugin's edit does.
   const lent = useSyncExternalStore(pluginGate.subscribe, pluginGate.lent);
-  const bodyEditing = claimChain.holders.some((held) => !lent.has(held.at(-1) ?? ''));
+  const bodyEditing = claimChain.holders.some((held) => {
+    const drawing = held.at(-1);
+    return drawing !== undefined && !lent.has(drawing.key);
+  });
   // The Map embeddings drawn on this canvas, which a Space Resource's host
   // chooser writes a choice through (ADR 0142).
   const providedMapEmbeddings = useMapEmbeddings();

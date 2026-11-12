@@ -642,16 +642,12 @@ describe('a plugin surface’s commits on the canvas', () => {
     const other = pluginSurfaceOperations('markdown', OTHER, FACTS, host);
     expect(other.commitMap).toBeUndefined();
     expect(other.claim).toBeUndefined();
-    expect(pluginSurfaceOperations('markdown', RESOURCE, FACTS, host).commitContent).toBeTypeOf(
-      'function',
-    );
-    // The surface holding the Claim keeps offering one, so the render its own
-    // release lands in still draws its command; taking it adds no second holder.
-    pluginSurfaceOperations('markdown', RESOURCE, FACTS, host).claim?.();
-    expect(host.gate.getState().holders).toEqual([[RESOURCE]]);
-    // Another drawing of the same Resource, inside a Map embedding, offers none.
-    const elsewhere: PluginHost = { ...host, embeddedIn: [OTHER] };
-    expect(pluginSurfaceOperations('markdown', RESOURCE, FACTS, elsewhere).claim).toBeUndefined();
+    const again = pluginSurfaceOperations('markdown', RESOURCE, FACTS, host);
+    expect(again.commitContent).toBeTypeOf('function');
+    expect(again.claimHolder?.(drawing)).toBe('this-drawing');
+    const second = Symbol('second drawing');
+    expect(again.claimHolder?.(second)).toBe('another-drawing');
+    expect(again.claim?.(second)).toBeUndefined();
     held?.release();
     expect(pluginSurfaceOperations('markdown', OTHER, FACTS, host).commitMap).toBeTypeOf(
       'function',
@@ -674,16 +670,24 @@ describe('a plugin surface’s commits on the canvas', () => {
     // Kept by the Space plugin before the Claim: the chooser's select and Close.
     const keptSelect = space.commitContent;
     const keptClose = space.commitMap;
-    const outer = space.claim?.();
+    const spaceDrawing = { resource: SPACE_RESOURCE, key: Symbol('space drawing') };
+    const outer = space.claim?.(spaceDrawing.key);
     expect(outer).toBeDefined();
 
-    // The Image inside the embedding is drawn on a host embedded in the Space Resource.
-    const inside: PluginHost = { ...host, embeddedIn: [SPACE_RESOURCE] };
+    // The Image inside the embedding is drawn on a host embedded in the Space Resource's drawing.
+    const inside: PluginHost = {
+      ...host,
+      get claims() {
+        return host.gate.getState();
+      },
+      embeddedIn: [spaceDrawing],
+    };
     const image = pluginSurfaceOperations('image', RESOURCE, FACTS, inside);
     expect(image.claim).toBeTypeOf('function');
-    const inner = image.claim?.();
+    const imageDrawing = { resource: RESOURCE, key: Symbol('image drawing') };
+    const inner = image.claim?.(imageDrawing.key);
     expect(inner).toBeDefined();
-    expect(host.gate.getState().holders).toEqual([[SPACE_RESOURCE], [SPACE_RESOURCE, RESOURCE]]);
+    expect(host.gate.getState().holders).toEqual([[spaceDrawing], [spaceDrawing, imageDrawing]]);
 
     let replace: ((next: { url: string }) => Promise<Answer>) | undefined;
     let finish: () => void = () => undefined;

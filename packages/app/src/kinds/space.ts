@@ -48,7 +48,7 @@ export type SpaceResourceDecorationContext = Pick<
   readonly spaces: OpenSpaces | null;
   readonly commandOutcomes: CommandOutcomes | undefined;
   readonly deleteConfirmation: Pick<DeleteConfirmation, 'arm'> | undefined;
-  /** The Map embeddings drawn on this canvas, by placement. */
+  /** The Map embeddings drawn on this canvas, by placement: the one in this node's rect is its own. */
   readonly mapEmbeds: ReadonlyMap<string, MapEmbedEntry>;
   readonly contextNotices: ReadonlyMap<ResourceId, string>;
   readonly onContextEditingChange: (resourceId: ResourceId, editing: boolean) => void;
@@ -80,7 +80,7 @@ export function decorateSpaceResourceNode(
   );
   if (!context.embeddedMapEdit) delete kindOperations.claim;
   const decoration: Mutable<KindDecoration<SpaceKindId>> = { kindOperations };
-  const embed = ownMapEmbed(context.mapEmbeds, resourceId);
+  const embed = ownMapEmbed(context.mapEmbeds, node.id);
   if (embed === undefined || node.data.readOnly || !node.data.authorsContent) return decoration;
   const selection = context.spaceSelections.get(resourceId);
   const target =

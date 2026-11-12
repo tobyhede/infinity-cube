@@ -86,7 +86,13 @@ import { useOpenSpaces } from '../open-spaces-context';
 import type { OpenSpace } from '../open-spaces';
 import { EmbeddedMapAuthoring } from './EmbeddedMapAuthoring';
 import { drawCanvasMapEmbed } from './map-embed-draws';
-import { createMapEmbeddings, MapEmbeddingsProvider, ownMapEmbed } from '../map-embeddings';
+import {
+  createMapEmbeddings,
+  MapEmbeddingsProvider,
+  ownMapEmbed,
+  type MapEmbedEntry,
+} from '../map-embeddings';
+import type { Drawing, Embedding } from '../plugin-host/claim-chain';
 import { usePluginGate } from '../plugin-host/plugin-gate-context';
 import { CANVAS_KEYS, FULL_VIEW_KEYS, keyBelongsElsewhere, pressesBinding } from '../key-bindings';
 import {
@@ -307,11 +313,16 @@ const neighbourOnScreen = (
 const embeddingChainOf = (
   node: ResourceFlowNode,
   nodesById: ReadonlyMap<string, ResourceFlowNode>,
-): readonly ResourceId[] => {
-  const chain: ResourceId[] = [];
+  embeds: ReadonlyMap<string, MapEmbedEntry>,
+): Embedding => {
+  const chain: Drawing[] = [];
   let current: ResourceFlowNode | undefined = node;
   while (current !== undefined) {
-    chain.unshift(current.data.resourceId);
+    // Each placement in the chain draws a Map embedding, so it has published
+    // the key of its drawing; one that has not yet is left out, and a Claim
+    // under it is refused until it has.
+    const key = embeds.get(current.id)?.drawing;
+    if (key !== undefined) chain.unshift({ resource: current.data.resourceId, key });
     current = current.parentId === undefined ? undefined : nodesById.get(current.parentId);
   }
   return chain;
@@ -448,8 +459,8 @@ export function SpaceCanvas({
   const [mapEmbeddings] = useState(createMapEmbeddings);
   const embeds = useSyncExternalStore(mapEmbeddings.subscribe, mapEmbeddings.getState);
   const publishMapEmbed = useCallback(
-    (nodeId: string, resourceId: ResourceId, request: MapEmbedRequest | null) =>
-      mapEmbeddings.publish(nodeId, resourceId, request),
+    (nodeId: string, resourceId: ResourceId, request: MapEmbedRequest | null, drawing: symbol) =>
+      mapEmbeddings.publish(nodeId, resourceId, request, drawing),
     [mapEmbeddings],
   );
   const {
@@ -475,9 +486,9 @@ export function SpaceCanvas({
   // whose Map it authored is selected.
   const pageGate = usePluginGate();
   const gate = plugins?.gate ?? pageGate;
-  const editedBefore = useRef<ReadonlySet<ResourceId>>(editingPortals);
-  /** Lands a framing still pending for a Resource whose Map is no longer authored in place. */
-  const flushPortalFraming = useRef<(resourceId: ResourceId) => void>(() => undefined);
+  const editedBefore = useRef<ReadonlySet<string>>(editingPortals);
+  /** Lands a framing still pending for a placement whose Map is no longer authored in place. */
+  const flushPortalFraming = useRef<(nodeId: string) => void>(() => undefined);
   const lastEmbeds = useRef(embeds);
   /** The placements drawn now, which a Resource whose Edit ended must still be among to be selected. */
   const drawnNodes = useRef(nodes);
@@ -485,9 +496,13 @@ export function SpaceCanvas({
     drawnNodes.current = nodes;
   }, [nodes]);
   useLayoutEffect(() => {
-    const returns = [...editingPortals].map((resourceId) => gate.lend(resourceId));
-    for (const resourceId of editedBefore.current) {
-      if (editingPortals.has(resourceId)) continue;
+    const returns = [...editingPortals].flatMap((nodeId) => {
+      const drawing = mapEmbeddings.getState().get(nodeId)?.drawing;
+      return drawing === undefined ? [] : [gate.lend(drawing)];
+    });
+    for (const nodeId of editedBefore.current) {
+      if (editingPortals.has(nodeId)) continue;
+      const left = lastEmbeds.current.get(nodeId);
       // Done lands what the author framed before the commit is withdrawn by
       // another Claim (ADR 0142).
       flushPortalFraming.current(nodeId);
@@ -501,7 +516,7 @@ export function SpaceCanvas({
     return () => {
       for (const give of returns) give();
     };
-  }, [editingPortals, gate, selectResource]);
+  }, [editingPortals, gate, selectResource, mapEmbeddings]);
   // After the flush above, so a flush in the commit that drops an embedding
   // still finds the request the embedding last made; once it has landed, a
   // withdrawn embedding's commit is no longer kept.
@@ -738,12 +753,11 @@ export function SpaceCanvas({
    * embedding's `select`, the plugin's own commit, so withdrawal covers it.
    */
   const completeSpaceResourceFraming = useCallback(
-    (resourceId: ResourceId, framing: SpaceResourceFraming) => {
+    (nodeId: string, framing: SpaceResourceFraming) => {
       // Unmounting, the embedding is gone before the canvas flushes what was
       // pending: the last one drawn still names the commit.
       const entry =
-        ownMapEmbed(mapEmbeddings.getState(), resourceId) ??
-        ownMapEmbed(lastEmbeds.current, resourceId);
+        ownMapEmbed(mapEmbeddings.getState(), nodeId) ?? ownMapEmbed(lastEmbeds.current, nodeId);
       const commit = entry?.request.select?.commit;
       if (entry === undefined || commit === undefined) return;
       void commit({ ...entry.request.view, framing });
@@ -1259,10 +1273,7 @@ export function SpaceCanvas({
               data: { ...withEmbed.data, onBodyHeightChange: reportBodyHeight },
             }
           : withEmbed;
-        if (
-          !editingPortals.has(withHeight.data.resourceId) ||
-          !authorsEmbeddedMap(withHeight.data)
-        ) {
+        if (!editingPortals.has(withHeight.id) || !authorsEmbeddedMap(withHeight.data)) {
           return withHeight;
         }
         // `nopan` only: an Open Resource does not take `nowheel` (ADR 0064).
@@ -1377,40 +1388,37 @@ export function SpaceCanvas({
 
     let pan: {
       pointerId: number;
-      resourceId: ResourceId;
+      portalId: string;
       lastX: number;
       lastY: number;
       framing: SpaceResourceFraming;
     } | null = null;
-    const zoomPending = new Map<ResourceId, SpaceResourceFraming>();
-    const zoomTimers = new Map<ResourceId, ReturnType<typeof setTimeout>>();
+    const zoomPending = new Map<string, SpaceResourceFraming>();
+    const zoomTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
-    const persist = (resourceId: ResourceId, framing: SpaceResourceFraming, dropDraft = true) => {
+    const persist = (portalId: string, framing: SpaceResourceFraming, dropDraft = true) => {
       if (dropDraft) {
         setPortalDraft((previous) => {
           const next = new Map(previous);
-          next.delete(resourceId);
+          next.delete(portalId);
           return next;
         });
       }
-      portalGestureSnapshot.current.completeSpaceResourceFraming(resourceId, framing);
+      portalGestureSnapshot.current.completeSpaceResourceFraming(portalId, framing);
     };
 
-    const flushPendingZoom = (resourceId: ResourceId, dropDraft = true) => {
-      const pending = zoomPending.get(resourceId);
-      const timer = zoomTimers.get(resourceId);
+    const flushPendingZoom = (portalId: string, dropDraft = true) => {
+      const pending = zoomPending.get(portalId);
+      const timer = zoomTimers.get(portalId);
       if (timer !== undefined) clearTimeout(timer);
-      zoomPending.delete(resourceId);
-      zoomTimers.delete(resourceId);
-      if (pending !== undefined) persist(resourceId, pending, dropDraft);
+      zoomPending.delete(portalId);
+      zoomTimers.delete(portalId);
+      if (pending !== undefined) persist(portalId, pending, dropDraft);
     };
 
-    const framingOf = (
-      resourceId: ResourceId,
-      parentId: string,
-    ): SpaceResourceFraming | undefined => {
+    const framingOf = (parentId: string): SpaceResourceFraming | undefined => {
       const session = portalGestureSnapshot.current;
-      const drafted = session.portalDraft.get(resourceId);
+      const drafted = session.portalDraft.get(parentId);
       if (drafted !== undefined) return drafted;
       const stored = session.embeds.get(parentId)?.request.view.framing;
       if (stored !== undefined) return stored;
@@ -1436,7 +1444,7 @@ export function SpaceCanvas({
       const node = portalGestureSnapshot.current.portalNodesById.get(id);
       if (node === undefined || node.parentId !== undefined) return undefined;
       if (!authorsEmbeddedMap(node.data)) return undefined;
-      if (!portalGestureSnapshot.current.editingPortals.has(node.data.resourceId)) return undefined;
+      if (!portalGestureSnapshot.current.editingPortals.has(node.id)) return undefined;
       return node;
     };
 
@@ -1459,18 +1467,18 @@ export function SpaceCanvas({
       if (!portalGestureSnapshot.current.authorOnCanvas) return;
       const parent = portalParent(event.target);
       if (parent === undefined) return;
-      const resourceId = parent.data.resourceId;
-      const existingTimer = zoomTimers.get(resourceId);
+      const portalId = parent.id;
+      const existingTimer = zoomTimers.get(portalId);
       if (existingTimer !== undefined) clearTimeout(existingTimer);
-      zoomTimers.delete(resourceId);
-      const pendingZoom = zoomPending.get(resourceId);
-      if (pendingZoom !== undefined) zoomPending.delete(resourceId);
-      const framing = pendingZoom ?? framingOf(resourceId, parent.id);
+      zoomTimers.delete(portalId);
+      const pendingZoom = zoomPending.get(portalId);
+      if (pendingZoom !== undefined) zoomPending.delete(portalId);
+      const framing = pendingZoom ?? framingOf(portalId);
       if (framing === undefined) return;
       event.preventDefault();
       pan = {
         pointerId: event.pointerId,
-        resourceId,
+        portalId,
         lastX: event.clientX,
         lastY: event.clientY,
         framing,
@@ -1489,19 +1497,19 @@ export function SpaceCanvas({
         y: event.clientY,
       });
       const next = panFraming(pan.framing, { x: to.x - from.x, y: to.y - from.y });
-      const resourceId = pan.resourceId;
+      const portalId = pan.portalId;
       pan = { ...pan, lastX: event.clientX, lastY: event.clientY, framing: next };
       setPortalDraft((previous) => {
-        if (previous.get(resourceId) === next) return previous;
+        if (previous.get(portalId) === next) return previous;
         const drafted = new Map(previous);
-        drafted.set(resourceId, next);
+        drafted.set(portalId, next);
         return drafted;
       });
     };
 
     const onPointerUp = (event: PointerEvent) => {
       if (pan?.pointerId !== event.pointerId) return;
-      persist(pan.resourceId, pan.framing);
+      persist(pan.portalId, pan.framing);
       pan = null;
     };
 
@@ -1511,22 +1519,22 @@ export function SpaceCanvas({
       if (parent === undefined) return;
       event.preventDefault();
       event.stopPropagation();
-      const resourceId = parent.data.resourceId;
-      const current = zoomPending.get(resourceId) ?? framingOf(resourceId, parent.id);
+      const portalId = parent.id;
+      const current = zoomPending.get(portalId) ?? framingOf(portalId);
       if (current === undefined) return;
       const next = zoomFraming(current, event.deltaY < 0 ? 1.1 : 1 / 1.1);
-      zoomPending.set(resourceId, next);
+      zoomPending.set(portalId, next);
       setPortalDraft((previous) => {
         const drafted = new Map(previous);
-        drafted.set(resourceId, next);
+        drafted.set(portalId, next);
         return drafted;
       });
-      const existing = zoomTimers.get(resourceId);
+      const existing = zoomTimers.get(portalId);
       if (existing !== undefined) clearTimeout(existing);
       zoomTimers.set(
-        resourceId,
+        portalId,
         setTimeout(() => {
-          flushPendingZoom(resourceId);
+          flushPendingZoom(portalId);
         }, 160),
       );
     };
@@ -1536,7 +1544,7 @@ export function SpaceCanvas({
     root.addEventListener('pointerup', onPointerUp);
     root.addEventListener('pointercancel', onPointerUp);
     root.addEventListener('wheel', onWheel, { capture: true, passive: false });
-    flushPortalFraming.current = (resourceId) => flushPendingZoom(resourceId);
+    flushPortalFraming.current = (portalId) => flushPendingZoom(portalId);
     return () => {
       flushPortalFraming.current = () => undefined;
       root.removeEventListener('pointerdown', onPointerDown);
@@ -1544,7 +1552,7 @@ export function SpaceCanvas({
       root.removeEventListener('pointerup', onPointerUp);
       root.removeEventListener('pointercancel', onPointerUp);
       root.removeEventListener('wheel', onWheel, { capture: true });
-      for (const resourceId of [...zoomPending.keys()]) flushPendingZoom(resourceId, false);
+      for (const portalId of [...zoomPending.keys()]) flushPendingZoom(portalId, false);
     };
   }, [setPortalDraft]);
 
@@ -2084,8 +2092,8 @@ export function SpaceCanvas({
                 availability.authorInEmbeddedMap &&
                 (!embeddedEditing || editingEmbeddingIds.has(request.parent.id))
               }
-              framing={portalDraft.get(request.parent.data.resourceId) ?? request.framing}
-              embeddedIn={embeddingChainOf(request.parent, portalNodesById)}
+              framing={portalDraft.get(request.parent.id) ?? request.framing}
+              embeddedIn={embeddingChainOf(request.parent, portalNodesById, embeds)}
               bounds={request.bounds}
               absolute={request.absolute}
               drawnAbsolute={request.drawnAbsolute}

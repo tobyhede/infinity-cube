@@ -8,10 +8,10 @@ import {
   type Resource,
 } from '@project/core';
 import type { Answer, Kept, ResourceId, Size, SpaceView } from '@project/resource-api/domain';
+import type { Claim, EmbedProps, TitleProps } from '@project/resource-api/view';
 import {
   ResourceHostProvider,
-  type Claim,
-  type EmbedProps,
+  type RailOutlet,
   type ResourceHost,
 } from '@project/resource-api/view/host';
 import type { PluginEntry } from './kinds/plugin-views';

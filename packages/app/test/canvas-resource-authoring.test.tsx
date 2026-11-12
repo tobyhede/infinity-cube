@@ -201,6 +201,9 @@ const spaceOperationsOf = (data: ResourceFlowNode['data']) =>
   data.kindOperations.kind === 'space' ? data.kindOperations : undefined;
 
 /** What an Open Space Resource's plugin asks its Map embedding for. */
+/** The key of the drawing the Space Resource's plugin embeds its Map from. */
+const SPACE_DRAWING = Symbol('space drawing');
+
 const spaceEmbed = (claim?: Claim): MapEmbedRequest => ({
   view: { spaceId: TARGET_SPACE_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
   select: {
@@ -523,7 +526,8 @@ describe('canvas Resource authoring Space rail', () => {
   const mountRail = (open: boolean, withTarget: boolean, readOnly = false, enabled = true) => {
     // What the drawn plugin publishes: an Open Space Resource embeds its Map.
     const mapEmbeddings = createMapEmbeddings();
-    if (open) mapEmbeddings.publish(SPACE_RESOURCE_ID, SPACE_RESOURCE_ID, spaceEmbed());
+    if (open)
+      mapEmbeddings.publish(SPACE_RESOURCE_ID, SPACE_RESOURCE_ID, spaceEmbed(), SPACE_DRAWING);
     const loaded = { snapshot, revision: 0n, exportedRevision: null };
     const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
     const { authoring, adapter, continuation } = composeApp({
