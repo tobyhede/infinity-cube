@@ -113,7 +113,12 @@ import {
   type NavigationDirection,
 } from '../graph-navigation';
 import { FullView } from './FullView';
-import { openAndExpandSize, openHeight, visibleCanvasCap } from '../open-and-expand';
+import {
+  capSizeHint as capHintAt,
+  openAndExpandSize,
+  openHeight,
+  visibleCanvasCap,
+} from '../open-and-expand';
 import type { CommandOutcomes } from '../command-outcomes';
 import type { DeleteConfirmation } from '../delete-confirmation';
 import {
@@ -558,11 +563,7 @@ export function SpaceCanvas({
     (hint: { readonly width: number; readonly height: number }) => {
       const area = canvasRef.current;
       if (area === null) return undefined;
-      const cap = visibleCanvasCap(area.getBoundingClientRect(), getZoom());
-      return {
-        width: Math.min(hint.width, cap.width),
-        height: Math.min(hint.height, cap.height),
-      };
+      return capHintAt(hint, visibleCanvasCap(area.getBoundingClientRect(), getZoom()));
     },
     [getZoom],
   );

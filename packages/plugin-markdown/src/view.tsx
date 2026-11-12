@@ -79,6 +79,9 @@ function useText(url: AssetRef, assets: Assets, known: KnownText, wanted: boolea
     text: READING,
   }));
   const readAsset = assets.read;
+  // A refusal answers the read that was wanted: once the text is not wanted,
+  // the next time it is reads again rather than answering with that refusal.
+  if (!wanted && read.text.state === 'refused') setRead({ url, text: READING });
   useEffect(() => {
     if (!wanted || known.text(url) !== undefined) return undefined;
     let live = true;
@@ -208,7 +211,6 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
   const [refusal, setRefusal] = useState<string | null>(null);
   const [editing, setEditing] = useState<Editing | null>(null);
   const claim = useRef<Claim | null>(null);
-  const header = useRef<HTMLDivElement | null>(null);
   const measurer = useRef<HTMLDivElement | null>(null);
   const railBand = useRailBand();
 
@@ -238,7 +240,9 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
     if (held === undefined) return;
     claim.current = held;
     setRefusal(null);
-    setEditing({ draft: readable, base: readable, saving: false });
+    // Measured as Save stores it, so a text stored with other line endings
+    // is unchanged until its draft is.
+    setEditing({ draft: readable, base: lineFeedText(readable), saving: false });
   }, [mayEdit, editing, takeClaim, readable]);
 
   const end = useCallback(() => setEditing(null), []);
@@ -323,10 +327,10 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
   // as one size hint: asked once, for this gesture. Text that cannot be read
   // has no size to hint at. The measurer is drawn only until it has measured.
   const width = Math.max(surface.size.width, READING_WIDTH);
-  const opening = useRef({ commitMap, width, open });
+  const opening = useRef({ commitMap, width });
   useEffect(() => {
-    opening.current = { commitMap, width, open };
-  }, [commitMap, width, open]);
+    opening.current = { commitMap, width };
+  }, [commitMap, width]);
   const textState = text.state;
   useEffect(() => {
     if (!measuring || textState === 'reading') return undefined;
@@ -341,10 +345,9 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
         now.commitMap({ open: true });
         return;
       }
-      // The Title is measured as it is drawn Closed, with the room below it
-      // that an Open Title does not keep.
-      const title = (header.current?.offsetHeight ?? 0) - (now.open ? 0 : CLOSED_FOOT);
-      const height = title + element.scrollHeight + 2 * INSET;
+      // The measurer draws the Title as an Open one is drawn, above the text,
+      // both at the width the hint asks for.
+      const height = element.scrollHeight + 2 * INSET;
       now.commitMap({ open: true }, { width: Math.round(now.width), height: Math.round(height) });
     });
     return () => measured.abort();
@@ -464,7 +467,6 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
       data-editing={editing !== null}
     >
       <div
-        ref={header}
         style={{ padding: `${railBand}px ${INSET}px ${open ? 0 : CLOSED_FOOT}px`, minHeight: 0 }}
       >
         <Title />
@@ -537,6 +539,9 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
             pointerEvents: 'none',
           }}
         >
+          <div style={{ padding: `${railBand}px ${INSET}px 0` }}>
+            <Title />
+          </div>
           {readable !== null && <RenderedMarkdown markdown={readable} drawnName={name} />}
         </div>
       )}

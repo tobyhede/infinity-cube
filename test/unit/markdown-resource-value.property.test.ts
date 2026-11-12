@@ -4,10 +4,8 @@ import {
   newUuid,
   normalizeTitle,
   uuidSchema,
-  type AssetRef,
   type Resource,
   type SpaceSnapshot,
-  type UUID,
 } from '@project/core';
 import { lineFeedText } from '@project/resource-api/domain';
 import { isAssetHash } from '@project/persistence';
@@ -36,10 +34,17 @@ const textArb = fc.string({ maxLength: 200 }).map(lineFeedText);
 
 const resourceArb = fc.record({ id: fc.uuid({ version: 4 }), title: titleArb, text: textArb });
 
-const snapshotHolding = (id: UUID, title: string, url: AssetRef): SpaceSnapshot => ({
+/** A Space holding `resources`, each stored as its id and its document. */
+const snapshotOf = (resources: readonly Resource[]): SpaceSnapshot => ({
   id: SPACE_ID,
   document: { version: 1, title: 'Talk' },
-  resources: [{ id, document: { title, kind: 'markdown', content: { url } } }],
+  resources: resources.map(({ id, ...document }) => ({ id, document })),
+});
+
+/** A stored Resource as the Resource it is. */
+const resourceOf = ({ id, document }: SpaceSnapshot['resources'][number]): Resource => ({
+  id,
+  ...document,
 });
 
 describe('a Markdown Resource', () => {
@@ -58,26 +63,22 @@ describe('a Markdown Resource', () => {
         const files = serializeResource(resource);
         expect(files.map(({ path }) => path)).toEqual([`resources/${resource.id}.json`]);
         const decoded = parseResourceFiles(files);
-        expect(decoded.ok && decoded.resources.map((each) => each.resource)).toEqual([resource]);
+        if (!decoded.ok) throw new Error('The Resource file is read.');
+        const fromFile = decoded.resources.map((each) => each.resource);
+        expect(fromFile).toEqual([resource]);
 
-        // The store.
+        // The store, holding the Resource its file decodes to. The SQL stores
+        // hold the same through the repository contract
+        // (`test/support/repository-contract.ts`).
         const repository = new MemorySpaceRepository(
-          [
-            {
-              snapshot: snapshotHolding(resource.id, title, url),
-              revision: 0n,
-              exportedRevision: null,
-            },
-          ],
+          [{ snapshot: snapshotOf(fromFile), revision: 0n, exportedRevision: null }],
           SPACE_ID,
         );
         await repository.storeAsset(
           await admitted(new TextEncoder().encode(text), 'text/markdown'),
         );
         const stored = await repository.loadSpace(SPACE_ID);
-        expect(stored?.snapshot.resources).toEqual(
-          snapshotHolding(resource.id, title, url).resources,
-        );
+        expect(stored?.snapshot.resources.map(resourceOf)).toEqual([resource]);
         const hash = url.slice('/assets/'.length);
         if (!isAssetHash(hash)) throw new Error(`${url} does not name an asset`);
         const storedText = await repository.loadAsset(hash);
@@ -91,9 +92,7 @@ describe('a Markdown Resource', () => {
           fetch: (input, init) => Promise.resolve(host.fetch(new Request(input, init))),
         });
         const served = await backend.loadSpace(SPACE_ID);
-        expect(served?.snapshot.resources).toEqual(
-          snapshotHolding(resource.id, title, url).resources,
-        );
+        expect(served?.snapshot.resources.map(resourceOf)).toEqual([resource]);
         const read = await backend.readAsset(url);
         expect(read instanceof Blob ? await read.text() : read).toBe(text);
       }),

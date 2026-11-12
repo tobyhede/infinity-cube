@@ -7,7 +7,7 @@ import {
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
-import { loadSpaceAggregate } from '@project/graph';
+import { loadSpaceAggregate, parseResourceFiles, serializeResource } from '@project/graph';
 import {
   admitAsset,
   AggregateInvariantError,
@@ -2238,6 +2238,46 @@ export const spaceRepositoryContract = (
         hash: binary.hash,
         mediaType: 'application/x-made-up',
         bytes: binaryBytes(),
+      });
+    });
+  });
+
+  /**
+   * A Markdown Resource is one value wherever it is held (ADR 0142): the
+   * Resource its file decodes to is what this store holds and loads back, and
+   * writing what it loads gives the same file; its text, an asset, loads back
+   * as it was stored.
+   */
+  it(`${name} holds a Markdown Resource decoded from its file, and its text, as the same value`, async () => {
+    await withHarness(async (repository) => {
+      const text = await storedAsset(textBytes(), 'text/markdown');
+      const files = serializeResource({
+        id: RESOURCE_ID,
+        title: 'Notes',
+        kind: 'markdown',
+        content: { url: `/assets/${text.hash}` },
+      });
+      const decoded = parseResourceFiles(files);
+      if (!decoded.ok) throw new Error('The Resource file is read.');
+      const fromFile = decoded.resources.map(({ resource: { id, ...document } }) => ({
+        id,
+        document,
+      }));
+      const first: SpaceSnapshot = { ...space(SPACE_ID, 'Talk', []), resources: fromFile };
+      await expect(repository.storeAsset(text)).resolves.toBe('stored');
+      await seed(repository, first);
+
+      const loaded = await repository.loadSpace(SPACE_ID);
+      expect(loaded?.snapshot.resources).toEqual(fromFile);
+      expect(
+        loaded?.snapshot.resources.flatMap(({ id, document }) =>
+          serializeResource({ id, ...document }),
+        ),
+      ).toEqual(files);
+      await expect(repository.loadAsset(text.hash)).resolves.toEqual({
+        hash: text.hash,
+        mediaType: 'text/markdown',
+        bytes: textBytes(),
       });
     });
   });

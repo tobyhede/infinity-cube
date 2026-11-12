@@ -7,6 +7,7 @@ import {
   createResourceControl,
   dragBy,
   nodeByTitle,
+  openResources,
   positionOf,
   presentControl,
   selectedCanvas,
@@ -201,7 +202,7 @@ test('Alt empty-drop creates, connects and selects Resource 2 at the previewed p
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
   await expect(authoringHandle(created, 'source', 'left')).toHaveCSS('opacity', '1');
-  await expect(page.locator('.canvas-resource[data-open="true"]')).toHaveCount(0);
+  await expect(openResources(page)).toHaveCount(0);
 
   await settled(page);
   await created.hover();

@@ -166,6 +166,9 @@ describe('a Markdown Resource drawn by the application', () => {
     fireEvent.click(await within(first).findByRole('button', { name: 'Edit Resource Notes' }));
     const editing = () => first.querySelector('[data-editing="true"]');
     expect(editing()).not.toBeNull();
+    // The drawing being written in keeps its active face; the other does not.
+    expect(first).toHaveAttribute('data-content-editing', 'true');
+    expect(second).toHaveAttribute('data-content-editing', 'false');
     // The other drawing offers nothing that could Close the Resource under the draft.
     expect(within(second).queryByRole('button', { name: 'Close Resource Notes' })).toBeNull();
     await act(() => Promise.resolve());

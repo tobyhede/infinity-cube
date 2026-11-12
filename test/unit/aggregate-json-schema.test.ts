@@ -284,18 +284,19 @@ describe('the Resource file JSON Schema', () => {
     },
   );
 
-  it.each(['a.md', 'dir/a.md', 'a..b/c.md', '.hidden/a.md'])('locates by the path %j', (path) => {
-    expect(locator({ path, mediaType: 'text/markdown' }), JSON.stringify(locator.errors)).toBe(
+  it.each([
+    { path: 'a.md', mediaType: 'text/markdown' },
+    { path: 'a.md', url: '/assets/a' },
+    { url: '/assets/a', mediaType: 'text/markdown' },
+  ])('refuses a locator naming a path or a media type, %j', (content) => {
+    expect(locator(content)).toBe(false);
+  });
+
+  it('locates by a URL', () => {
+    expect(locator({ url: 'https://example.com/a.png' }), JSON.stringify(locator.errors)).toBe(
       true,
     );
   });
-
-  it.each(['/a.md', 'a//b.md', 'dir/', '../a.md', 'a/./b.md', 'a/..', 'a\\b.md', ''])(
-    'refuses the path %j',
-    (path) => {
-      expect(locator({ path, mediaType: 'text/markdown' })).toBe(false);
-    },
-  );
 
   it("names a Markdown text by the Image schema's stored-asset pattern", () => {
     expect(markdownSchema.properties.url.pattern).toBe(

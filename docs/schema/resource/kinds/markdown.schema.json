@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/tobyhede/infinity-cube/main/docs/schema/resource/kinds/markdown.schema.json",
   "title": "Markdown content",
-  "description": "A Markdown Resource's text is an asset (ADR 0142): its content is the URL form of the locator, /assets/<hash>, naming the text by the SHA-256 of its bytes. Export writes the text to the Aggregate directory's assets/<hash>.md while a Resource references it; a Resource keeps no text of its own, no path and no media type.",
+  "description": "A Markdown Resource's text is an asset (ADR 0142): its content is a locator whose URL is /assets/<hash>, naming the text by the SHA-256 of its bytes. Export writes the text to the Aggregate directory's assets/<hash>.md while a Resource references it; a Resource keeps no text of its own, no path and no media type.",
   "type": "object",
   "$ref": "../locator.schema.json",
   "required": ["url"],

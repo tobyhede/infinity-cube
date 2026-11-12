@@ -469,6 +469,9 @@ export function PluginSurface(props: PluginResourceProps & { readonly entry: Plu
       data-content-kind={kind}
       data-state={state}
       data-open={false}
+      // A surface holding a Claim is being worked in, which keeps its active
+      // face as an edit does (`canvas-resource.css`).
+      data-content-editing={holder === 'this-drawing'}
       // The outline the plugin declared, which `canvas-resource.css` strokes
       // the border and ring on (ADR 0142).
       data-resource-shape={outline}

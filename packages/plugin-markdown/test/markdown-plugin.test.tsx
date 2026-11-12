@@ -151,6 +151,22 @@ describe('the Markdown plugin’s view', () => {
     expect(screen.getByTestId('rendered-markdown')).toHaveTextContent('New line');
   });
 
+  it('Saves nothing for an unchanged draft of a text stored with `\\r\\n` endings', async () => {
+    const store = vi.fn(() => Promise.resolve(SAVED_REF));
+    const rendered = renderPlugin(markdownPluginView.View, {
+      content,
+      map: open,
+      title: 'Notes',
+      grants: editable,
+      assets: { ...reading({ [TEXT_REF]: 'Old\r\nline' }), store },
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save Resource Notes' }));
+    await screen.findByRole('button', { name: 'Edit Resource Notes' });
+    expect(store).not.toHaveBeenCalled();
+    expect(rendered.commits.content).toEqual([]);
+  });
+
   it('keeps the draft up when the store is refused, and commits nothing', async () => {
     const rendered = renderPlugin(markdownPluginView.View, {
       content,
@@ -265,6 +281,57 @@ describe('the Markdown plugin’s view', () => {
     expect(rendered.commits.map).toEqual([open]);
   });
 
+  it('reads its text again on a later Open, and hints at its size, after an earlier read failed', async () => {
+    let readable = false;
+    const rendered = renderPlugin(markdownPluginView.View, {
+      content,
+      map: closed,
+      title: 'Notes',
+      grants: { map: true },
+      assets: {
+        read: () =>
+          readable
+            ? Promise.resolve(new Blob(['Text'], { type: 'text/markdown' }))
+            : Promise.reject(new Error('timeout')),
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Open Resource Notes' }));
+    expect(await screen.findByRole('note')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Close Resource Notes' }));
+    await screen.findByRole('button', { name: 'Open Resource Notes' });
+    readable = true;
+    fireEvent.click(screen.getByRole('button', { name: 'Open Resource Notes' }));
+    expect(await screen.findByTestId('rendered-markdown')).toHaveTextContent('Text');
+    expect(rendered.commits.map).toEqual([open, closed, open]);
+    // The failed read had no size to hint at; the later one, read, does.
+    expect(rendered.commits.hints[2]?.width).toBe(READING_WIDTH);
+  });
+
+  it('begins an Edit from Closed, after an earlier read failed, once its text reads', async () => {
+    let readable = false;
+    const rendered = renderPlugin(markdownPluginView.View, {
+      content,
+      map: closed,
+      title: 'Notes',
+      grants: editable,
+      assets: {
+        read: () =>
+          readable
+            ? Promise.resolve(new Blob(['Text'], { type: 'text/markdown' }))
+            : Promise.reject(new Error('timeout')),
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Open Resource Notes' }));
+    expect(await screen.findByRole('note')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Close Resource Notes' }));
+    await screen.findByRole('button', { name: 'Open Resource Notes' });
+    readable = true;
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
+    expect(await screen.findByRole('textbox')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(rendered.commits.hints[2]?.width).toBe(READING_WIDTH);
+  });
+
   it('keeps editing what was typed while a Save was under way', async () => {
     let finish: (ref: AssetRef) => void = () => undefined;
     const rendered = renderPlugin(markdownPluginView.View, {
@@ -371,28 +438,38 @@ describe('the Markdown plugin’s view', () => {
     expect(rendered.commits.claims).toEqual({ taken: 1, released: 1 });
   });
 
-  it('hints the height of its Title as drawn Open, without the room a Closed Title keeps below it', async () => {
-    const offsetHeight = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(50);
+  it('hints the height of its Title and text drawn together at the width it hints', async () => {
+    // jsdom lays nothing out: the measured box answers 100px for the text and
+    // 50px more where the Title is drawn inside it, at the width it was given.
+    const widths: string[] = [];
     const scrollHeight = vi
       .spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
-      .mockReturnValue(100);
+      .mockImplementation(function (this: HTMLElement) {
+        widths.push(this.style.width);
+        return 100 + (this.querySelector('[data-testid="plugin-title"]') === null ? 0 : 50);
+      });
     try {
       const rendered = renderPlugin(markdownPluginView.View, {
         content,
         map: closed,
         title: 'Notes',
         grants: { map: true },
+        size: { width: 260, height: 146 },
         assets: reading({ [TEXT_REF]: 'Text' }),
       });
       fireEvent.click(screen.getByRole('button', { name: 'Open Resource Notes' }));
       await screen.findByRole('button', { name: 'Close Resource Notes' });
-      // The Title's 50px less the Closed Title's 8px foot, the text's 100px, and its inset twice.
-      expect(rendered.commits.hints[0]?.height).toBe(50 - 8 + 100 + 2 * 12);
+      // The Title's 50px and the text's 100px, measured together, and the inset twice.
+      expect(rendered.commits.hints[0]).toEqual({
+        width: READING_WIDTH,
+        height: 50 + 100 + 2 * 12,
+      });
+      expect(widths).toContain(`${READING_WIDTH}px`);
     } finally {
-      offsetHeight.mockRestore();
       scrollHeight.mockRestore();
     }
   });
+
   it('keeps its draft and Claim while authoring is withdrawn, and Saves once it returns', async () => {
     const rendered = renderPlugin(markdownPluginView.View, {
       content,

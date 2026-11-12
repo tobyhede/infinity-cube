@@ -585,7 +585,7 @@ describe('exporting and importing one complete aggregate', () => {
 
   /*
    * An Ur Resource is its Title and its kind (ADR 0113): its Resource file's
-   * content is empty and it has no sidecar, and a Reference Resource to it comes
+   * content is empty and names no asset, and a Reference Resource to it comes
    * back still pointing at it.
    */
   it('round-trips an Ur Resource and a Reference Resource to it', async () => {
@@ -950,7 +950,7 @@ describe('re-exporting over an earlier export', () => {
    * `resources/*`. Everything else is the author's — notes, a README — and
    * re-export has to carry it across rather than tidy it away. A Markdown
    * Resource's text is an asset (ADR 0142), so a `README.md` in a Space
-   * directory is no longer read as a sidecar and survives with the rest.
+   * directory is not read and survives with the rest.
    */
   it('preserves root files it ignores and undiscovered contents of a Space it keeps', async () => {
     const destination = join(await makeTemporaryDirectory(), 'aggregate');
@@ -969,7 +969,7 @@ describe('re-exporting over an earlier export', () => {
     expect(await readFile(join(destination, META_SPACE_ID, 'README.md'), 'utf8')).toBe('# Notes\n');
   });
 
-  it('removes the Resource file and sidecar of a Resource the Space no longer holds', async () => {
+  it('removes the Resource file of a Resource the Space no longer holds', async () => {
     const destination = join(await makeTemporaryDirectory(), 'aggregate');
     const complete = completeAggregate();
 
@@ -996,7 +996,6 @@ describe('re-exporting over an earlier export', () => {
 
     const remaining = await readdir(join(destination, META_SPACE_ID, 'resources'));
     expect(remaining).not.toContain(`${MARKDOWN_RESOURCE_ID}.json`);
-    expect(remaining).not.toContain(`${MARKDOWN_RESOURCE_ID}.md`);
     expect(remaining).toContain(`${FIRST_LINK_ID}.json`);
   });
 });

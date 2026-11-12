@@ -363,8 +363,9 @@ describe('Running an Aggregate directory', () => {
   });
 
   /*
-   * A Markdown Resource is written as its Resource file and the sidecar it
-   * names, and a Resource deleted during the run takes both with it.
+   * A Markdown Resource is written as its Resource file and its text as the
+   * asset its content names, and a Resource deleted during the run takes both
+   * with it.
    */
   it('writes a Markdown Resource as its Resource file and its text as an asset, and removes both on delete', async () => {
     const directory = await fixtureCopy();

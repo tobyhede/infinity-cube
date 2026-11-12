@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/tobyhede/infinity-cube/main/docs/schema/resource/kinds/image.schema.json",
   "title": "Image content",
-  "description": "An Image Resource owns its picture's URL, not its bytes (ADR 0106), so it uses the URL form of the locator: an https: or http: URL, or /assets/<hash> for a picture in the asset store, whose bytes Export carries in the Aggregate directory's assets/ (ADR 0142, ADR 0118).",
+  "description": "An Image Resource owns its picture's URL, not its bytes (ADR 0106), so its locator URL is an https: or http: URL, or /assets/<hash> for a picture in the asset store, whose bytes Export carries in the Aggregate directory's assets/ (ADR 0142, ADR 0118).",
   "type": "object",
   "$ref": "../locator.schema.json",
   "required": ["url"],

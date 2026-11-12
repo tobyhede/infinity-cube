@@ -216,7 +216,7 @@ describe('tracked fixture export', () => {
 
     const first = await exportOf(trackedFixture, join(root, 'first'));
     const second = await exportOf(join(root, 'first'), join(root, 'second'));
-    // Both Resource files and Markdown sidecars are among what round-trips.
+    // Both Resource files and Markdown text assets are among what round-trips.
     expect(Object.keys(first).filter((path) => path.endsWith('.json')).length).toBeGreaterThan(0);
     expect(Object.keys(first).filter((path) => path.endsWith('.md')).length).toBeGreaterThan(0);
     expect(second).toEqual(first);
