@@ -1,6 +1,6 @@
 # Resource plugins
 
-Delivery for [ADR 0142](../../docs/adr/0142-a-resource-plugin-owns-everything-inside-its-rect.md), which supersedes ADR 0137 and refines ADR 0020, 0051, 0064, 0079, 0106, 0118, 0119, 0120, 0121, 0123, 0125, 0128, 0134, 0135 and 0139. The decision and its rejected options are in the ADR, and the terms in `CONTEXT.md`. This file is the plan, and the signatures and treatment an ADR does not bind. Prior art is in `canvas-shapes-research.md`, `block-editors-research.md`, `host-extensions-research.md` and `compound-documents-research.md` beside this file.
+Delivery for [ADR 0142](../../docs/adr/0142-a-resource-plugin-owns-everything-inside-its-rect.md), which supersedes ADR 0137 and refines ADR 0020, 0051, 0056, 0064, 0070, 0079, 0084, 0093, 0106, 0113, 0114, 0118, 0119, 0120, 0121, 0122, 0123, 0125, 0128, 0134, 0135 and 0139. The decision and its rejected options are in the ADR, and the terms in `CONTEXT.md`. This file is the plan, and the signatures and treatment an ADR does not bind. Prior art is in `canvas-shapes-research.md`, `block-editors-research.md`, `host-extensions-research.md` and `compound-documents-research.md` beside this file.
 
 ## Where it starts
 
@@ -80,13 +80,13 @@ type Creation<C> = {
 type New<C> = { title?: string; content: C | ((s: NewSpace) => C); newSpace?: true }
 ```
 
-The API also exports `Title`, `Own` (the region that is the plugin's for the pointer), `<Rail commands>`, and `/view/testing`'s `renderPlugin(View, { content, map, grants })`.
+The API also exports `Title`, `Own` (the region that is the plugin's for the pointer), `<Rail commands>` (which draws nothing: it publishes the plugin's commands as data to its surface, and the canvas draws them on the rail), and `/view/testing`'s `renderPlugin(View, { content, map, grants })`.
 
 Invariants:
 
 - A Resource has one shape everywhere. **Every file is an asset: the current Markdown setup is explicitly abandoned, and all assets follow the same approach.** Markdown, Image, Mermaid and a kind with no plugin differ in nothing the host sees.
 - A plugin saves bytes by `store`, which answers their `AssetRef`, then a content commit naming it. A plugin creating a Resource stores first, or names the asset of zero bytes, which always exists, so it needs no id and `newContent` stays a plain value.
-- The host finds asset references by walking `content` and Map content for whole string values that `assetRefSchema` accepts, whether or not it can read them. Export carries what it finds. Import admits every asset in the directory. A string that only looks like a reference is treated as one, and absent bytes are not an error: Export keeps the URL, completes (ADR 0118) and removes no file of that name.
+- The host finds asset references by walking `content` and Map content for whole string values that `assetRefSchema` accepts, whether or not it can read them. Export carries what it finds. Import admits every asset in the directory. A string that only looks like a reference is treated as one, and absent bytes are not an error: Export keeps the URL, completes (ADR 0118) and removes no file of that name. An external URL, such as an Image Resource's `https:` one (ADR 0106), is not an asset: the walk does not find it and Export carries no bytes for it (ADR 0118).
 - A commit settles once its Edit has been applied, including one `queued` behind another. It answers refused from a replaced working Space and from a withdrawn surface.
 - `run` and rail actions are called in the press, so a picker can open. An `await` before `pick` loses the press.
 - `host.create` takes no position; the gesture gave it. A second press while a creation runs is ignored. `run` has no surface, so the host reports a refused `store` or `create` made through `host`.

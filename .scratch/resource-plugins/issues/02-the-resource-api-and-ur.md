@@ -17,4 +17,7 @@ Ur moves first because it is the smallest. Its package holds both halves, it dec
 - A plugin with a wrong `apiVersion` fails the build.
 - A plugin that throws loses its Resource and not the canvas.
 - On the Stage it gets no commit and the value `withoutMap` gives.
+- A commit settles once its Edit has been applied, including one `queued` behind another, and answers refused from a replaced working Space and from a withdrawn surface.
+- A Claim held by one chain answers `undefined` to another, an inner release returns to the outer, and an outer Claim is not released while an inner one runs.
+- `exclusively` is one at a time and answers `busy` before any work starts; while it runs, every retained commit, the surrounding Claims' included, answers refused, and only the work's own commits land.
 - `CI passed` is green, including the PostgreSQL and SQLite jobs.
