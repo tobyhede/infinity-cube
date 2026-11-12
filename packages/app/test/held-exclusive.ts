@@ -18,7 +18,7 @@ export const holdExclusive = (
   gate: PluginGate | undefined,
   resourceId: string,
 ): HeldExclusive | undefined => {
-  const claim = gate?.claim([resourceId], () => ({}));
+  const claim = gate?.claim([{ resource: resourceId, key: Symbol('held exclusive') }], () => ({}));
   if (claim === undefined) return undefined;
   const ended = Promise.withResolvers<undefined>();
   const running = claim

@@ -1,10 +1,25 @@
 import type { AssetRef } from '@project/core';
-import { servedMediaType, type AssetClient, type AssetRefusal } from '@project/persistence';
+import {
+  MAX_ASSET_BYTES,
+  servedMediaType,
+  type AssetClient,
+  type AssetRefusal,
+} from '@project/persistence';
 import { describe, expect, it, vi } from 'vitest';
-import { MAX_IMAGE_BYTES, storePicture } from '../src/picture-admission';
+import { IMAGE_MEDIA_TYPES, MAX_IMAGE_BYTES, storePicture } from '../src/picture-admission';
 
 const ascii = (text: string): Uint8Array<ArrayBuffer> => new TextEncoder().encode(text);
 const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, ...ascii('IHDR')]);
+
+describe("an Image Resource's picture rule, as the host stores and serves it", () => {
+  it('caps a picture at the asset store cap', () => {
+    expect(MAX_IMAGE_BYTES).toBe(MAX_ASSET_BYTES);
+  });
+
+  it('admits only formats the host serves under their own type, so every stored picture draws', () => {
+    expect(IMAGE_MEDIA_TYPES.map(servedMediaType)).toEqual([...IMAGE_MEDIA_TYPES]);
+  });
+});
 
 describe('storing a picture as an asset', () => {
   const STORED: AssetRef = `/assets/${'A'.repeat(43)}`;

@@ -133,7 +133,11 @@ export {
   GraphHeadMarker,
   GraphHeadShapeGlyph,
 } from './GraphHeadShape';
-export type { GraphHeadMarkerProps, GraphHeadShapeGlyphProps } from './GraphHeadShape';
+export type {
+  GraphHeadMarkerProps,
+  GraphHeadShapeGlyphProps,
+  GraphHeadSize,
+} from './GraphHeadShape';
 export { displayImageAsAuthored } from './image-display';
 export type { ImageDisplay } from './image-display';
 export { PaletteColorPicker } from './PaletteColorPicker';

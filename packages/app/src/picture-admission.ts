@@ -17,14 +17,10 @@ import {
 import { ASSET_TOO_LARGE, type AssetClient } from '@project/persistence';
 
 export {
-  admitImage,
   describeImageRefusal,
   IMAGE_MEDIA_TYPES,
-  isImageMediaType,
-  isImageRefusal,
   MAX_IMAGE_BYTES,
   refusalForDeclaredType,
-  type ImageMediaType,
   type ImageRefusal,
 } from '@project/plugin-image/domain';
 

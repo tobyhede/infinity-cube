@@ -27,7 +27,6 @@ import { createPluginGate } from '../src/plugin-host/plugin-gate';
 import type { AuthoringResult, Settle } from '../src/space-authoring';
 
 const RESOURCE = uuidSchema.parse('00000000-0000-4000-8000-0000000000a1');
-const STORED = resourceDocumentSchema.parse({ title: 'Decide', kind: 'ur', content: {} });
 const FACTS = { authorOnCanvas: true, editable: true };
 
 /** Why storing refused, or undefined for a store that answered a reference. */
@@ -363,14 +362,21 @@ describe('a plugin surface’s commits on the canvas', () => {
     epoch: { value: number } = { value: 0 },
     report: ObserverErrorReporter = () => undefined,
     assets: PluginHost['assets'] = {},
-  ): PluginHost => ({
-    gate: createPluginGate(),
-    replacementEpoch: () => epoch.value,
-    complete,
-    report,
-    document: (resourceId) => (resourceId === RESOURCE ? DOCUMENT : undefined),
-    assets,
-  });
+  ): PluginHost => {
+    const gate = createPluginGate();
+    return {
+      gate,
+      // As the canvas reads it: the chain the gate last published.
+      get claims() {
+        return gate.getState();
+      },
+      replacementEpoch: () => epoch.value,
+      complete,
+      report,
+      document: (resourceId) => (resourceId === RESOURCE ? DOCUMENT : undefined),
+      assets,
+    };
+  };
 
   it('answers a settled Edit in the words every refusal is reported in', () => {
     expect(answerOf({ kind: 'completed' })).toBe('completed');
@@ -477,7 +483,7 @@ describe('a plugin surface’s commits on the canvas', () => {
     const operations = pluginSurfaceOperations('image', RESOURCE, FACTS, host);
     await expect(operations.commitStore?.(new Blob(['a']))).resolves.toBe(STORED);
     await expect(operations.pick?.('image/png')).resolves.toHaveLength(1);
-    const held = operations.claim?.();
+    const held = operations.claim?.(Symbol('drawing'));
     let ownStore: ((bytes: Blob) => Promise<StoreAnswer>) | undefined;
     let finish: () => void = () => undefined;
     const work = held?.exclusively(

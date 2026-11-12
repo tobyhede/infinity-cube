@@ -1,7 +1,7 @@
 import { httpAssetClient, HttpSpaceBackend, productAddress } from '@project/http';
 import { loadSpaceSnapshot, type Space } from '@project/graph';
 import { newUuid, type AssetRef, type UUID } from '@project/core';
-import type { AssetClient, SpaceBackend } from '@project/persistence';
+import type { AssetClient, AssetRefusal, SpaceBackend } from '@project/persistence';
 import type { Assets } from '@project/resource-api/view';
 import { displayImageAsAuthored, type ImageDisplay } from '@project/ui';
 import type { HistoryApi } from './browser-location';

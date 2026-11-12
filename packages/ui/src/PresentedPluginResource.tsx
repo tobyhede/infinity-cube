@@ -125,14 +125,15 @@ export interface EmbeddedPluginContentProps {
 }
 
 /**
- * Another Resource's plugin drawn inside the old frame's content area, as an
- * Open Reference Resource draws its Target (ADR 0070, ADR 0142): on a surface
+ * Another Resource's plugin drawn inside a Resource's content area, as an Open
+ * Reference Resource draws its Target (ADR 0070, ADR 0142): on a surface
  * offering no authoring of the Target, with the Reference's own Title, and
  * filling the room it is given.
  */
 export function EmbeddedPluginContent({ kind, title, content }: EmbeddedPluginContentProps) {
   const supplied = usePluginAssets();
   const assets = useMemo(() => readingAssets(supplied), [supplied]);
+  const [drawing] = useState(() => Symbol('drawing'));
   const name = titleName(title);
   const host: ResourceHost = useMemo(() => {
     function EmbeddedTitle({ className }: TitleProps) {
@@ -142,6 +143,7 @@ export function EmbeddedPluginContent({ kind, title, content }: EmbeddedPluginCo
   }, [name]);
   const plugin = pluginEntryFor(kind).render({
     resourceId: '',
+    drawing,
     kind,
     title,
     content,

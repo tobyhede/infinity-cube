@@ -35,7 +35,6 @@ type Refusal = { readonly refused: string };
 const GONE: Refusal = { refused: 'This Resource has changed since it was drawn. Try again.' };
 const BUSY: Refusal = { refused: 'Another change is still being made. Try again when it ends.' };
 const BROKE: Answer = { refused: 'This change could not be made.' };
-const INVALID: Answer = { refused: 'This change cannot be kept.' };
 
 /** A settled Edit as a plugin reads it, its refusal in the words every refusal is reported in. */
 export const answerOf = (result: SettledResult): Answer => {
@@ -80,8 +79,6 @@ export interface PluginHost {
   readonly claims: ClaimChain;
   /** The Replacement epoch now, which a commit compares with the one it was built in. */
   readonly replacementEpoch: () => number;
-  /** A Resource's stored document now, which a Title or content commit changes one field of. */
-  readonly document: (resourceId: ResourceId) => ResourceDocument | undefined;
   /** Complete an Edit where this canvas lands its Edits, told when a queued one settles. */
   readonly complete: (completion: DrawnCompletion, settle: Settle) => AuthoringResult;
   /** Where an Edit that threw, or a plugin that threw while drawing, is reported. */
@@ -94,13 +91,18 @@ export interface PluginHost {
 
 const NOT_FOUND: Refusal = { refused: 'This Resource is no longer available.' };
 
+/** Who holds a Claim on a drawing's Resource, as that drawing reads it. */
+export const claimHolderOf = (chain: ClaimChain, drawing: Drawing): ClaimHolder => {
+  if (holds(chain, drawing.key)) return 'this-drawing';
+  return heldByAnotherDrawing(chain, drawing) ? 'another-drawing' : 'none';
+};
+
 /**
  * The commits a surface's Resource may make, each running only while `live()`
- * answers: its Title as one ordinary `edited-resource` Edit of the document as
- * it stands, its content as a `changed-content` Edit, its Map content as a
- * `changed-map-content` Edit, and the asset store where the canvas offers one.
- * Exclusive work's own commits are admitted past the gate every Space's
- * Authoring asks at `complete`; a plain one is not.
+ * answers, and each landing through `complete`: its Title as one ordinary
+ * `edited-resource` Edit of the document as it stands, its content as a
+ * `changed-content` Edit, its Map content as a `changed-map-content` Edit, and
+ * the asset store where the canvas offers one.
  */
 function commitsFor(
   host: PluginHost,
@@ -108,10 +110,6 @@ function commitsFor(
   live: () => Refusal | null,
   complete: PluginHost['complete'],
 ): PluginCommits {
-  const complete = own
-    ? (completion: DrawnCompletion, settle: Settle) =>
-        host.gate.admit(() => host.complete(completion, settle))
-    : host.complete;
   const run = (completion: () => DrawnCompletion | undefined): Promise<Answer> => {
     const withdrawn = live();
     if (withdrawn !== null) return Promise.resolve(withdrawn);
@@ -124,38 +122,12 @@ function commitsFor(
     if (document === undefined) return undefined;
     return { kind: 'edited-resource', resourceId, document: { ...document, title } };
   };
-  /** One Edit of the Resource's document, its kind's schema answering for the next one. */
-  const editDocument = (
-    change: { readonly title: string } | { readonly content: JsonValue },
-  ): Promise<Answer> => {
-    const withdrawn = live();
-    if (withdrawn !== null) return Promise.resolve(withdrawn);
-    const stored = host.document(resourceId);
-    if (stored === undefined) {
-      return Promise.resolve({ refused: describeAuthoringRefusal({ code: 'resource-not-found' }) });
-    }
-    const parsed = resourceDocumentSchema.safeParse({ ...stored, ...change });
-    if (!parsed.success) {
-      const titleRequired = parsed.error.issues.some(
-        (issue) => issue.code === 'custom' && issue.params?.['code'] === RESOURCE_TITLE_REQUIRED,
-      );
-      return Promise.resolve(
-        titleRequired
-          ? { refused: describeAuthoringRefusal({ code: RESOURCE_TITLE_REQUIRED }) }
-          : INVALID,
-      );
-    }
-    return completeAsAnswer(
-      (settle) => complete({ kind: 'edited-resource', resourceId, document: parsed.data }, settle),
-      host.report,
-    );
-  };
   const store = host.assets?.store;
-  // A size hint is ignored: Ur, the one plugin drawn here, commits none, and
-  // the canvas applies none yet (`docs/agents/maps-and-graphs.md`, R38, R40).
   return {
     title: (next) => run(retitled(next)),
     content: (next) => run(() => ({ kind: 'changed-content', resourceId, content: next })),
+    // A size hint is ignored: the canvas applies none yet
+    // (`docs/agents/maps-and-graphs.md`, R38, R40).
     map: (next) => run(() => ({ kind: 'changed-map-content', resourceId, content: next })),
     store:
       store === undefined

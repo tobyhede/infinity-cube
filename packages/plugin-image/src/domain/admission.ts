@@ -5,10 +5,19 @@
  * anything else, from its bytes alone, and SVG is refused as active content.
  */
 
-/** The largest picture an Image Resource stores, in bytes: 10 MiB, the asset store's own cap. */
+/**
+ * The largest picture an Image Resource stores, in bytes: 10 MiB, the same as
+ * the asset store's cap, which `packages/app/test/picture-admission.test.ts`
+ * holds equal to it.
+ */
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
-/** The picture formats an Image Resource draws, each identified from the bytes. */
+/**
+ * The picture formats an Image Resource draws, each identified from the bytes.
+ * Each is one the host serves under its own type, which a picture needs to be
+ * drawn from its URL; `packages/app/test/picture-admission.test.ts` holds the
+ * two lists together.
+ */
 export const IMAGE_MEDIA_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'] as const;
 export type ImageMediaType = (typeof IMAGE_MEDIA_TYPES)[number];
 
@@ -21,16 +30,7 @@ export const isImageMediaType = (value: string): value is ImageMediaType =>
  * SVG has its own because it is not refused as unrecognised: it is left for its
  * own decision (ADR 0106).
  */
-const IMAGE_REFUSALS = [
-  'image-too-large',
-  'image-format-unsupported',
-  'image-svg-unsupported',
-] as const;
-export type ImageRefusal = (typeof IMAGE_REFUSALS)[number];
-
-/** Whether a problem code is one of the refusals storing an image answers. */
-export const isImageRefusal = (code: string): code is ImageRefusal =>
-  IMAGE_REFUSALS.some((refusal) => refusal === code);
+export type ImageRefusal = 'image-too-large' | 'image-format-unsupported' | 'image-svg-unsupported';
 
 /**
  * The refusal the browser can answer from the media type it declares for a

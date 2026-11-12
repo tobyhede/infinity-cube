@@ -1,5 +1,6 @@
 import { useMemo, type ComponentType, type ReactElement } from 'react';
 import {
+  declaredOutline,
   imageKind,
   isPluginKind,
   jsonValueSchema,
@@ -233,8 +234,17 @@ export function pluginEntry<C, M>(
     return <view.View surface={surface} />;
   }
   const render = (input: PluginSurfaceInput): ReactElement => <Mounted input={input} />;
+  const PluginGlyph = view.Glyph;
+  /** The plugin's glyph, drawn as nothing where it throws, so the rail or Dock it is in survives. */
+  function Glyph({ size }: { readonly size?: number | undefined }) {
+    return (
+      <ResourceFailureBoundary fallback={null}>
+        <PluginGlyph size={size} />
+      </ResourceFailureBoundary>
+    );
+  }
   return {
-    Glyph: view.Glyph,
+    Glyph,
     bareAtRest: plugin.bareAtRest === true,
     drawsTitle: plugin.drawsTitle !== false,
     render,

@@ -121,6 +121,7 @@ const continuation: Continuation = {
 /** A plugin host that lands Edits through `complete`, with no document and no assets. */
 const testPluginHost = (complete: PluginHost['complete']): PluginHost => ({
   gate: createPluginGate(),
+  claims: NO_CLAIMS,
   replacementEpoch: () => 0,
   complete,
   report: () => undefined,

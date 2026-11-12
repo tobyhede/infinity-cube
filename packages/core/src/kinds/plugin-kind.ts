@@ -174,7 +174,7 @@ export function kindFromPlugin<const K extends string, C, M>(
     },
     spaceReferences: (content) => uuids(plugin.spaceReferences?.(content) ?? []),
   });
-  const mapContent = mapContentOf(kind, plugin.mapContent, plugin.outline?.bind(plugin));
+  const mapContent = mapContentOf(plugin, plugin.mapContent);
   return plugin.newContent === undefined
     ? { ...module, mapContent }
     : { ...module, newContent: plugin.newContent, mapContent };

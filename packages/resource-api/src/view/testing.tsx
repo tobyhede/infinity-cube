@@ -138,10 +138,8 @@ function createClaimHold() {
     take: () => {
       held = true;
     },
-    release: (): boolean => {
-      const released = held;
+    release: () => {
       held = false;
-      return released;
     },
   };
 }
@@ -274,42 +272,48 @@ export function renderPlugin<C, M>(
         map: grants.map === true ? settle(commits.map, setMapValue) : undefined,
         store: grants.store === true ? store : undefined,
       };
-    const titleCommit = settle(commits.title, setTitle);
-    const contentCommit = settle(commits.content, setContent);
-    const mapCommit = settle(commits.map, setMapValue);
-    const granted = {
-      title: grants.title === true ? titleCommit : undefined,
-      content: grants.content === true ? contentCommit : undefined,
-      map: grants.map === true ? mapCommit : undefined,
-      store: grants.store === true ? store : undefined,
-    };
-    const idle = () => !gate.running();
-    const offered = <T,>(commit: T | undefined) => (running ? undefined : commit);
-    const plain = <T, A>(commit: ((next: T) => Promise<A>) | undefined) =>
-      offered(commit === undefined ? undefined : guarded(commit, idle, WITHDRAWN));
-    const claim: OwnClaim<C, M> = {
-      release: () => hold.release(),
-      exclusively: (work) => {
-        if (!hold.held()) return Promise.resolve('busy' as const);
-        return gate.exclusively((live) => {
-          exclusiveRuns += 1;
-          const ownCommit = <T, A>(commit: ((next: T) => Promise<A>) | undefined) =>
-            commit === undefined ? undefined : guarded(commit, live, ENDED);
-          const own: Exclusive<C, M> = {
-            title: ownCommit(granted.title),
-            content: ownCommit(granted.content),
-            map: ownCommit(granted.map),
-            store: ownCommit(granted.store),
-          };
-          return work(own);
-        });
-      },
-    };
-    const assets: Assets = {
-      ...TEST_ASSETS,
-      store: plain(granted.store),
-      pick: grants.pick === true ? offered(pick) : undefined,
-    };
+      const idle = () => !gate.running();
+      const offered = <T,>(commit: T | undefined) => (running ? undefined : commit);
+      const plain = <T, A>(commit: ((next: T) => Promise<A>) | undefined) =>
+        offered(commit === undefined ? undefined : guarded(commit, idle, WITHDRAWN));
+      const claim: OwnClaim<C, M> = {
+        release: () => hold.release(),
+        exclusively: (work) => {
+          if (!hold.held()) return Promise.resolve('busy' as const);
+          return gate.exclusively((live) => {
+            exclusiveRuns += 1;
+            const ownCommit = <T, A>(commit: ((next: T) => Promise<A>) | undefined) =>
+              commit === undefined ? undefined : guarded(commit, live, ENDED);
+            const own: Exclusive<C, M> = {
+              title: ownCommit(granted.title),
+              content: ownCommit(granted.content),
+              map: ownCommit(granted.map),
+              store: ownCommit(granted.store),
+            };
+            return work(own);
+          });
+        },
+      };
+      const assets: Assets = {
+        ...TEST_ASSETS,
+        store: plain(granted.store),
+        pick: grants.pick === true ? offered(pick) : undefined,
+      };
+      return {
+        title: plain(granted.title),
+        content: plain(granted.content),
+        map: plain(granted.map),
+        claim:
+          grants.claim === true
+            ? () => {
+                if (options.claimRefused === true) return undefined;
+                hold.take();
+                return claim;
+              }
+            : undefined,
+        assets,
+      };
+    }, [running]);
     const surface: Surface<C, M> = {
       resource: { id: 'resource', title, kind: options.kind ?? 'test', content },
       title: { value: title, commit: offeredNow.title },
@@ -317,15 +321,8 @@ export function renderPlugin<C, M>(
       map: { value: mapValue, commit: offeredNow.map },
       size: options.size ?? DEFAULT_SIZE,
       selected: options.selected ?? false,
-      claim:
-        grants.claim === true
-          ? () => {
-              if (options.claimRefused === true) return undefined;
-              hold.take();
-              return claim;
-            }
-          : undefined,
-      assets,
+      claim: offeredNow.claim,
+      assets: offeredNow.assets,
       Embed: TestEmbed,
     };
     return (

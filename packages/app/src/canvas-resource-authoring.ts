@@ -358,17 +358,12 @@ export function useCanvasResourceAuthoring({
       gate: pluginGate,
       claims: claimChain,
       replacementEpoch: () => authoring.getState().replacementEpoch,
-      document: (resourceId) =>
-        spaceSession.getState().working.resources.find((resource) => resource.id === resourceId)
-          ?.document,
       complete: (completion, settle) => authoring.complete(completion, settle),
       report: reportPluginFailure,
       document: (resourceId) =>
         spaceSession.getState().working.resources.find(({ id }) => id === resourceId)?.document,
       assets: { store: pluginAssets.store, pick: pluginAssets.pick },
     }),
-    // `claimChain` is read by the operations built from this host, not here.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [authoring, pluginGate, reportPluginFailure, claimChain, spaceSession, pluginAssets],
   );
 
