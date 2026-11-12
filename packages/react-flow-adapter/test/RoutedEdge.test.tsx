@@ -126,6 +126,7 @@ describe("an Edge's head", () => {
     laneReach: 8,
     endTrim: 0.2,
     headShape: 'dot',
+    headSize: 'full',
   } as const;
 
   // React Flow resolves the Edge object's `markerEnd` and hands the custom

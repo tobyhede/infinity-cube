@@ -8,10 +8,11 @@ import {
   projectResourceNodes,
   projectGraphEdges,
   OTHER_GRAPH_OPACITY,
+  RECEDING_STROKE_WIDTH,
   ROUTED_EDGE_TYPE,
 } from '../src/index';
 import { imageFile, jsonResourceFile, referenceFile, resourceFile } from './resource-files';
-import { GRAPH_LANE_SPACING } from '../src/edge-lanes';
+import { ACTIVE_LANE_SPACING, GRAPH_LANE_SPACING } from '../src/edge-lanes';
 import { uuid } from './uuid';
 
 function load(
@@ -441,6 +442,7 @@ describe('projectGraphEdges', () => {
       laneReach: GRAPH_LANE_SPACING / 2,
       endTrim: 0,
       headShape: 'arrow',
+      headSize: 'full',
     });
     expect(edges.find((e) => e.id === ALT_EDGE_ID)!.data).toEqual({
       graphId: uuid('00000000-0000-4000-8000-000000000030'),
@@ -449,6 +451,7 @@ describe('projectGraphEdges', () => {
       laneReach: GRAPH_LANE_SPACING / 2,
       endTrim: 0,
       headShape: 'arrow',
+      headSize: 'full',
     });
   });
 
@@ -473,6 +476,9 @@ describe('projectGraphEdges', () => {
   it('draws every graph the same when nothing is emphasised', () => {
     const edges = projectGraphEdges(graphRenderEdges, colors, {});
     expect(edges.every((e) => e.style?.opacity === 1)).toBe(true);
+    expect(edges.every((e) => e.style?.strokeWidth === 2 && e.data?.headSize === 'full')).toBe(
+      true,
+    );
     expect(edges.some((e) => e.animated)).toBe(false);
   });
 
@@ -490,9 +496,12 @@ describe('projectGraphEdges', () => {
     // Drawn wider; `EDGE_TITLE_BOX_CHROME` in `@project/ui` reckons with this
     // 3, since a Title's border is its Edge's stroke.
     expect(main.style?.strokeWidth).toBe(3);
-    expect(alt.style?.strokeWidth).toBe(2);
+    expect(main.data?.headSize).toBe('full');
 
-    // The others recede but are still drawn, and none are dropped.
+    // The others recede to hairlines with small heads but are still drawn,
+    // and none are dropped.
+    expect(alt.style?.strokeWidth).toBe(RECEDING_STROKE_WIDTH);
+    expect(alt.data?.headSize).toBe('small');
     expect(alt.style?.opacity).toBe(OTHER_GRAPH_OPACITY);
     expect(OTHER_GRAPH_OPACITY).toBeGreaterThan(0);
     expect(alt.animated).toBe(false);
@@ -525,13 +534,14 @@ describe('projectGraphEdges', () => {
       expect(dataOf(edges, BLUE!)).toMatchObject({
         laneOffset: 0,
         laneSide: 'screen',
-        laneReach: GRAPH_LANE_SPACING,
+        laneReach: ACTIVE_LANE_SPACING,
         endTrim: 0,
       });
+      // Beside the Active Graph's Edge the lane opens to clear its full-size head.
       expect(dataOf(edges, RED!)).toMatchObject({
-        laneOffset: GRAPH_LANE_SPACING,
+        laneOffset: ACTIVE_LANE_SPACING,
         laneSide: 'screen',
-        laneReach: GRAPH_LANE_SPACING,
+        laneReach: ACTIVE_LANE_SPACING,
         endTrim: 0.1,
       });
       // Green is alone on its pair, so it runs anchor to anchor although it is
@@ -559,10 +569,12 @@ describe('projectGraphEdges', () => {
         headShapes: { [uuid(BLUE!)]: 'dot' },
       });
 
-      // One marker per Graph, whichever Edge of it this is and however short; Green stores no head shape and still names its own.
+      // One marker per Graph and size, whichever Edge of it this is and however
+      // short; Green stores no head shape and still names its own. The Graphs
+      // that recede name their small head.
       expect(edges.map((e) => [e.data!.graphId, e.markerEnd])).toEqual([
-        [RED, 'graph-head-00000000-0000-4000-8000-000000000201'],
-        [GREEN, 'graph-head-00000000-0000-4000-8000-000000000203'],
+        [RED, 'graph-head-00000000-0000-4000-8000-000000000201-small'],
+        [GREEN, 'graph-head-00000000-0000-4000-8000-000000000203-small'],
         [BLUE, 'graph-head-00000000-0000-4000-8000-000000000202'],
       ]);
     });

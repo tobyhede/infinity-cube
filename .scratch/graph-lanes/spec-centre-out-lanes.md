@@ -92,8 +92,7 @@ This is recorded as ADR 0142, which refines ADR 0100 (which Edges shorten, and t
 
 ## Out of Scope
 
-- Colour, receding opacity, stroke widths, paint order and head shapes.
-- Lane spacing.
+- Colour, paint order and head shapes. Receding opacity, stroke widths, head size and lane spacing were out of scope here and are `issues/09`'s.
 - Edge receding while the Active Graph has no Edges, and the gathering of Graph drawing policy into one module. Both were discussed in the earlier `graphDrawing` design and are separate work.
 - Edge anchors and the facing rule (ADR 0087, ADR 0110).
 
@@ -101,4 +100,5 @@ This is recorded as ADR 0142, which refines ADR 0100 (which Edges shorten, and t
 
 - This replaces `issues/02`'s centring rule. That ticket stays resolved as history.
 - All of this ships on PR #455, which is reset to `main` and rebuilt from this spec.
+- `issues/09` revises this spec after review on #455: the gap beside the Active Graph's Edge opens to 12 to clear its full-size head, an Active Graph running a pair both ways is drawn as one line on the centre with a head at each end, and while a Graph is active the others are hairlines with small heads. Where this spec says "a lane", read the gap that ticket gives.
 - `issues/06` and `issues/07` first changed the one-way layout too, alternating it either side of the centre and reading its side by travel. That was never in scope. `issues/08` restores it and records the approved design canvas.

@@ -121,7 +121,11 @@ export {
   GraphHeadMarker,
   GraphHeadShapeGlyph,
 } from './GraphHeadShape';
-export type { GraphHeadMarkerProps, GraphHeadShapeGlyphProps } from './GraphHeadShape';
+export type {
+  GraphHeadMarkerProps,
+  GraphHeadShapeGlyphProps,
+  GraphHeadSize,
+} from './GraphHeadShape';
 export { ImageReplaceTarget } from './ImageReplaceTarget';
 export type {
   ImageReplaceEditor,

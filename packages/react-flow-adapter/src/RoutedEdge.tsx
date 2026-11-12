@@ -8,6 +8,7 @@ import {
   type Node,
 } from '@xyflow/react';
 import type { GraphHeadShape, GraphId } from '@project/core';
+import type { GraphHeadSize } from '@project/ui';
 
 import {
   edgeAttachment,
@@ -57,6 +58,11 @@ export type RoutedEdgeData = {
    * short.
    */
   headShape: GraphHeadShape;
+  /**
+   * How large that head is drawn: `small` on an Edge outside the Active Graph
+   * while one is active, drawn as a hairline, and `full` otherwise.
+   */
+  headSize: GraphHeadSize;
   /** The Edge's Title and whether it is hidden at rest; drawn by the application, not here. */
   title?: string;
   titleHidden?: true;

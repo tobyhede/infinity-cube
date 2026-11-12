@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useStore, type Edge, type EdgeMarkerType } from '@xyflow/react';
 import { graphHeadShapeSchema, type GraphHeadShape, type GraphId } from '@project/core';
-import { FALLBACK_GRAPH_COLOR, GraphHeadMarker } from '@project/ui';
+import { FALLBACK_GRAPH_COLOR, GraphHeadMarker, type GraphHeadSize } from '@project/ui';
 
 /**
  * The id of the marker a Graph's Edges end in, which each Edge names as its
@@ -11,9 +11,13 @@ import { FALLBACK_GRAPH_COLOR, GraphHeadMarker } from '@project/ui';
  * the same colour. Keyed by the Graph's UUID alone, which is unique on the page
  * because a page draws Graph Edges in one `<ReactFlow>`: an embedded Map's
  * Edges are the host flow's own, and the same Graph drawn twice there names the
- * same marker with the same content.
+ * same marker with the same content. A Graph's `small` head, which its Edges
+ * end in while another Graph is active, is a second marker beside it.
  */
-export const graphHeadMarkerId = (graphId: GraphId): string => `graph-head-${graphId}`;
+export const graphHeadMarkerId = (graphId: GraphId, size: GraphHeadSize = 'full'): string =>
+  size === 'full' ? `graph-head-${graphId}` : `graph-head-${graphId}-small`;
+
+const headSizeOf = (value: unknown): GraphHeadSize => (value === 'small' ? 'small' : 'full');
 
 /** A marker named by id — the form a head marker takes — rather than one of React Flow's own. */
 const isMarkerId = (marker: EdgeMarkerType | undefined): marker is string =>
@@ -23,6 +27,7 @@ interface DrawnHead {
   readonly id: string;
   readonly headShape: GraphHeadShape;
   readonly color: string;
+  readonly size: GraphHeadSize;
 }
 
 /**
@@ -40,6 +45,7 @@ function drawnHeads(edges: readonly Edge[]): DrawnHead[] {
       id: markerEnd,
       headShape: headShape.data,
       color: edge.style?.stroke ?? FALLBACK_GRAPH_COLOR,
+      size: headSizeOf(edge.data?.['headSize']),
     });
   }
   return [...heads.values()];
@@ -53,7 +59,7 @@ function drawnHeads(edges: readonly Edge[]): DrawnHead[] {
  * store, so Edges added to the canvas beside the projection's (an embedded
  * Map's) are covered too. A marker is painted as part of the path that names
  * it, so each Edge's head takes that Edge's opacity wherever the marker lives —
- * held by `a receding Graph's head is painted at its Edge's opacity` in
+ * held by `a receding Graph's head is small, and painted at its Edge's opacity` in
  * `packages/app/e2e/edge-attachment.spec.ts`.
  */
 export function GraphHeadMarkers() {

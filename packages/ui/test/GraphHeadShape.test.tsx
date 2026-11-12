@@ -77,4 +77,25 @@ describe('GraphHeadMarker', () => {
     expect(marker).toHaveAttribute('orient', 'auto-start-reverse');
     expect(marker?.querySelector('[data-head-shape="diamond"]')).toHaveAttribute('fill', '#2ca02c');
   });
+
+  it("sizes a full head in stroke widths and a small one in the line's own units", () => {
+    const { container } = render(
+      <svg>
+        <defs>
+          <GraphHeadMarker id="full" headShape="arrow" color="#2ca02c" />
+          <GraphHeadMarker id="small" headShape="arrow" color="#2ca02c" size="small" />
+        </defs>
+      </svg>,
+    );
+
+    // A full head grows with its Edge's stroke; a small one stays one size
+    // whatever the stroke, so a hairline's head is still legible.
+    expect(container.querySelector('marker#full')).toHaveAttribute('markerUnits', 'strokeWidth');
+    expect(container.querySelector('marker#full')).toHaveAttribute('data-head-size', 'full');
+    expect(container.querySelector('marker#small')).toHaveAttribute(
+      'markerUnits',
+      'userSpaceOnUse',
+    );
+    expect(container.querySelector('marker#small')).toHaveAttribute('data-head-size', 'small');
+  });
 });

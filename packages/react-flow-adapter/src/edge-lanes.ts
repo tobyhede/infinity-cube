@@ -12,6 +12,17 @@ import type { EdgeAttachment } from './edge-attachment';
  */
 export const GRAPH_LANE_SPACING = 8;
 
+/**
+ * How far, in flow units, the lane beside the Active Graph's Edge runs from it.
+ *
+ * The Active Graph's head is drawn at full size, wider than a lane: an arrow
+ * at its 3-unit stroke reaches about 8.4 units either side of its line. This
+ * gap clears that head, and the next Edge's stroke, with a visible gap. Every
+ * other gap stays `GRAPH_LANE_SPACING`, because the other Graphs' heads are
+ * small.
+ */
+export const ACTIVE_LANE_SPACING = 12;
+
 /** The Edge facts lanes are decided from: which Resources it joins, and for which Graph. */
 export interface LaneEdge {
   readonly id: string;
@@ -30,7 +41,11 @@ export type LaneSide = 'screen' | 'travel';
 
 /** Where an Edge is drawn beside the others joining its pair, and how much of it is drawn. */
 export interface GraphLane {
-  /** How far from the centre line the Edge runs, read by `side`. Zero for a lone Edge. */
+  /**
+   * How far from the centre line the Edge runs, read by `side`. Zero for a lone
+   * Edge, and for both of an Active Graph's Edges where it runs a pair both
+   * ways, which are drawn as one line with a head at each end.
+   */
   readonly offset: number;
   /**
    * How `offset` is read: on the screen where every Edge of the pair runs one
@@ -75,11 +90,17 @@ export const MAX_END_TRIM = 0.3;
  * runs anchor to anchor and each one after it is one trim increment shorter.
  *
  * Where the pair runs one way, the first takes the centre and the rest stack
- * one lane further out each on the screen's positive side. Loops on one
- * Resource are laid out the same way, nesting outwards from it. Where the pair
- * runs both ways, each direction stacks on its own left of travel from half a
- * lane out; `laneBezier` turns that into a side of the screen as it draws, so
- * the side holds while a Resource is dragged.
+ * outwards from it on the screen's positive side. Loops on one Resource are
+ * laid out the same way, nesting outwards from it. Where the pair runs both
+ * ways, each direction stacks on its own left of travel, either side of the
+ * centre; `laneBezier` turns that into a side of the screen as it draws, so the
+ * side holds while a Resource is dragged. Where the Active Graph runs it both
+ * ways, its two Edges share the centre, one line with a head at each end, and
+ * each direction's others stack outwards from it.
+ *
+ * Neighbouring lanes run `ACTIVE_LANE_SPACING` apart beside the Active Graph's
+ * Edge, to clear its full-size head, and `GRAPH_LANE_SPACING` apart everywhere
+ * else.
  */
 export function graphLanes(
   edges: readonly LaneEdge[],
@@ -104,15 +125,31 @@ export function graphLanes(
     const directions = [...new Set(bundle.map((edge) => edge.source))].map((source) =>
       ranked(bundle.filter((edge) => edge.source === source)),
     );
-    const bothWays = directions.length === 2;
-    const side: LaneSide = bothWays ? 'travel' : 'screen';
-    const placed = directions.flatMap((direction) =>
-      direction.map((edge, rank) => ({ edge, rank, lane: bothWays ? rank + 0.5 : rank })),
-    );
-    const reach = Math.max(...placed.map(({ lane }) => lane)) * GRAPH_LANE_SPACING;
-    for (const { edge, rank, lane } of placed) {
+    const side: LaneSide = directions.length === 2 ? 'travel' : 'screen';
+    const gapBeside = (edge: LaneEdge | undefined) =>
+      edge !== undefined && isActive(edge) ? ACTIVE_LANE_SPACING : GRAPH_LANE_SPACING;
+    // Each direction stacks outwards from `start`, each Edge a gap further out
+    // than the one before it.
+    const stack = (direction: readonly LaneEdge[], start: number) => {
+      let at = start;
+      return direction.map((edge, rank) => {
+        if (rank > 0) at += gapBeside(direction[rank - 1]);
+        return { edge, rank, offset: at };
+      });
+    };
+    const [one, other] = directions;
+    const innermost = [one?.[0], other?.[0]];
+    const start =
+      other === undefined
+        ? 0
+        : innermost.every((edge) => edge !== undefined && isActive(edge))
+          ? 0
+          : Math.max(...innermost.map(gapBeside)) / 2;
+    const placed = directions.flatMap((direction) => stack(direction, start));
+    const reach = Math.max(...placed.map(({ offset }) => offset));
+    for (const { edge, rank, offset } of placed) {
       lanes.set(edge.id, {
-        offset: lane * GRAPH_LANE_SPACING,
+        offset,
         side,
         reach,
         endTrim: Math.min(rank * END_TRIM_INCREMENT, MAX_END_TRIM),

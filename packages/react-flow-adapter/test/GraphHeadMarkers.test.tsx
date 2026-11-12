@@ -24,8 +24,8 @@ const edge = (graphId: typeof RED, source: string, target: string) => ({
 const drawn = [edge(RED, A!, B!), edge(RED, B!, C!), edge(BLUE, A!, B!)];
 const colors = { [RED]: '#d62728', [BLUE]: '#1f77b4' };
 
-const canvas = () => {
-  const edges = projectGraphEdges(drawn, colors, { headShapes: { [RED]: 'dot' } });
+const canvas = (activeGraphId: typeof RED | null = null) => {
+  const edges = projectGraphEdges(drawn, colors, { activeGraphId, headShapes: { [RED]: 'dot' } });
   return (
     <ReactFlowProvider initialEdges={edges}>
       <GraphHeadMarkers />
@@ -40,6 +40,7 @@ const markersIn = (container: HTMLElement) =>
       id: marker.id,
       headShape: glyph?.getAttribute('data-head-shape'),
       fill: glyph instanceof SVGElement ? glyph.style.fill : undefined,
+      size: marker.getAttribute('data-head-size'),
     };
   });
 
@@ -48,11 +49,25 @@ describe('GraphHeadMarkers', () => {
     const { container } = render(canvas());
 
     expect(markersIn(container)).toEqual([
-      { id: `graph-head-${RED}`, headShape: 'dot', fill: graphPaint('#d62728') },
-      { id: `graph-head-${BLUE}`, headShape: 'arrow', fill: graphPaint('#1f77b4') },
+      { id: `graph-head-${RED}`, headShape: 'dot', fill: graphPaint('#d62728'), size: 'full' },
+      { id: `graph-head-${BLUE}`, headShape: 'arrow', fill: graphPaint('#1f77b4'), size: 'full' },
     ]);
     // All in one hidden `<defs>`, as React Flow draws its own markers.
     expect(container.querySelectorAll('defs')).toHaveLength(1);
     expect(container.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it("draws a receding Graph's head small, under its own id, beside the Active Graph's full one", () => {
+    const { container } = render(canvas(BLUE));
+
+    expect(markersIn(container)).toEqual([
+      {
+        id: `graph-head-${RED}-small`,
+        headShape: 'dot',
+        fill: graphPaint('#d62728'),
+        size: 'small',
+      },
+      { id: `graph-head-${BLUE}`, headShape: 'arrow', fill: graphPaint('#1f77b4'), size: 'full' },
+    ]);
   });
 });
