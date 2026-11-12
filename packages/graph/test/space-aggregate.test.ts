@@ -433,9 +433,9 @@ describe('loadSpaceAggregate', () => {
 });
 
 describe('refusedUnrootedSpaceIds', () => {
-  const DIAGRAM = 'vnd.example.diagram';
-  if (!isMissingKindId(DIAGRAM)) throw new Error('A plugin draws the diagram kind');
-  const unplugged = { kind: DIAGRAM };
+  const MISSING = 'vnd.example.chart';
+  if (!isMissingKindId(MISSING)) throw new Error('A plugin draws the chart kind');
+  const unplugged = { kind: MISSING };
   const drawn = { kind: 'markdown' as const };
 
   it('holds a Space already held while a Resource of a missing kind remains', () => {
