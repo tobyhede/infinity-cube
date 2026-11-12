@@ -1,3 +1,4 @@
+import fc from 'fast-check';
 import { Position } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 import { AUTHORING_HANDLE_DIAMETER } from '../src/authoring-handle';
@@ -62,8 +63,9 @@ describe('facingSides', () => {
    *
    * The first is the axis: a Resource on the exact diagonal is as far away
    * horizontally as vertically, and the horizontal axis takes it. The second is
-   * the direction: two Resources level on the chosen axis have centres that
-   * coincide on it, and the positive side takes that.
+   * the direction: two Resources whose centres coincide have no direction
+   * between them, and the positive side takes that. Centres level on the
+   * chosen axis alone take their direction from the other axis, below.
    *
    * Neither is arbitrary in the sense of being unobservable — a Map placed
    * on a grid puts Resources on exact diagonals and exact rows constantly — and
@@ -109,6 +111,40 @@ describe('facingSides', () => {
       source: Position.Right,
       target: Position.Left,
     });
+  });
+
+  /*
+   * An Edge and its reverse must face opposite ways, or a pair running both
+   * ways reads each direction's left of travel from the same side and draws
+   * both directions on one side, on top of each other (ADR 0142). Overlapping
+   * Resources level on the chosen axis are where a tie on that axis could
+   * send both directions the same way.
+   */
+  it('faces an Edge and its reverse opposite ways when the two are level on the chosen axis', () => {
+    // They overlap deeper vertically than horizontally, so the horizontal axis
+    // is chosen, and their middles are level on it.
+    const above = { x: 0, y: 0, width: 100, height: 300 };
+    const below = { x: 0, y: 100, width: 100, height: 300 };
+
+    const down = facingSides(above, below);
+    const up = facingSides(below, above);
+
+    expect(up).toEqual({ source: down.target, target: down.source });
+  });
+
+  it('faces an Edge and its reverse opposite ways wherever their middles differ', () => {
+    const coordinate = fc.integer({ min: -20, max: 20 });
+    const size = fc.integer({ min: 1, max: 40 });
+    const rect = fc.record({ x: coordinate, y: coordinate, width: size, height: size });
+    fc.assert(
+      fc.property(rect, rect, (a, b) => {
+        fc.pre(
+          a.x * 2 + a.width !== b.x * 2 + b.width || a.y * 2 + a.height !== b.y * 2 + b.height,
+        );
+        const forward = facingSides(a, b);
+        expect(facingSides(b, a)).toEqual({ source: forward.target, target: forward.source });
+      }),
+    );
   });
 });
 

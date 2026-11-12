@@ -122,9 +122,11 @@ describe("an Edge's head", () => {
   const DOTTED = {
     graphId: uuid('00000000-0000-4000-8000-000000000001'),
     laneOffset: 8,
+    laneSide: 'screen',
     laneReach: 8,
     endTrim: 0.2,
     headShape: 'dot',
+    headSize: 'full',
   } as const;
 
   // React Flow resolves the Edge object's `markerEnd` and hands the custom

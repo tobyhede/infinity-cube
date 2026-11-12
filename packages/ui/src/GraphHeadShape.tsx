@@ -58,30 +58,45 @@ export function GraphHeadShapeGlyph({ headShape, color }: GraphHeadShapeGlyphPro
   }
 }
 
+/**
+ * How large a head marker is drawn: `full` grows with its Edge's stroke, and
+ * `small` is one fixed size, for an Edge drawn as a hairline beside the Active
+ * Graph's.
+ */
+export type GraphHeadSize = 'full' | 'small';
+
+/** A `small` head's frame in flow units: an arrow about seven units tall. */
+const SMALL_HEAD_EXTENT = 140 / 9;
+
 export interface GraphHeadMarkerProps extends GraphHeadShapeGlyphProps {
   /** Unique in the document: every path that ends in it names it by `url('#id')`. */
   readonly id: string;
+  /** Defaults to `full`. */
+  readonly size?: GraphHeadSize;
 }
 
 /**
  * A head shape as an SVG `<marker>`, for a path's `marker-end`.
  *
  * Its reference point is the tip, so the shape ends exactly where the line
- * does, and it turns with the line's direction there. Sized in stroke widths,
- * so a wider Edge carries a larger head. A
- * marker is drawn as part of the path that references it, so it takes that
- * path's opacity and clip.
+ * does, and it turns with the line's direction there. A `full` head is sized
+ * in stroke widths, so a wider Edge carries a larger head; a `small` one is
+ * sized in the path's own units, so a hairline's head stays legible. A marker
+ * is drawn as part of the path that references it, so it takes that path's
+ * opacity and clip.
  */
-export function GraphHeadMarker({ id, headShape, color }: GraphHeadMarkerProps) {
+export function GraphHeadMarker({ id, headShape, color, size = 'full' }: GraphHeadMarkerProps) {
+  const extent = size === 'full' ? 12.5 : SMALL_HEAD_EXTENT;
   return (
     <marker
       id={id}
+      data-head-size={size}
       viewBox={GRAPH_HEAD_SHAPE_FRAME}
       refX={0}
       refY={0}
-      markerWidth={12.5}
-      markerHeight={12.5}
-      markerUnits="strokeWidth"
+      markerWidth={extent}
+      markerHeight={extent}
+      markerUnits={size === 'full' ? 'strokeWidth' : 'userSpaceOnUse'}
       orient="auto-start-reverse"
     >
       <GraphHeadShapeGlyph headShape={headShape} color={color} />

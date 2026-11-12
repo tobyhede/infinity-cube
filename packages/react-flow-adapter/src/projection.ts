@@ -22,7 +22,7 @@ import type {
 } from '@project/graph';
 import { ROUTED_EDGE_TYPE, type RoutedEdgeData, type RoutedFlowEdge } from './RoutedEdge';
 import { AUTHORING_HANDLE_DIAMETER } from './authoring-handle';
-import { DETACHED_END_TRIM, graphLanes } from './edge-lanes';
+import { graphLanes } from './edge-lanes';
 import { graphHeadMarkerId } from './GraphHeadMarkers';
 
 const FALLBACK_COLOR = FALLBACK_GRAPH_COLOR;
@@ -30,9 +30,13 @@ const FALLBACK_COLOR = FALLBACK_GRAPH_COLOR;
 /**
  * Opacity of the Graphs that are not the active one, while one is. With no
  * Graph active every Graph is drawn at full strength; activating one recedes
- * the rest rather than hiding them.
+ * the rest to hairlines with small heads (`RECEDING_STROKE_WIDTH`), which this
+ * softens rather than hides.
  */
-export const OTHER_GRAPH_OPACITY = 0.35;
+export const OTHER_GRAPH_OPACITY = 0.8;
+
+/** The stroke width of an Edge outside the Active Graph, while one is: a hairline. */
+export const RECEDING_STROKE_WIDTH = 1;
 
 /** What ends an inline title edit. Answers a refusal reason, or `null` when the
  *  new title was accepted — the same contract `CanvasResource`'s editor reads, where
@@ -403,15 +407,18 @@ export function projectGraphEdges(
   const drawn = graphRenderEdges.map((edge) => {
     const color = colors[edge.graphId] ?? FALLBACK_COLOR;
     const isActiveGraph = edge.graphId === activeGraphId;
-    const emphasized = isActiveGraph || activeGraphId === null;
-    const lane = lanes.get(edge.id) ?? { offset: 0, reach: 0, connects: true };
+    const receding = activeGraphId !== null && !isActiveGraph;
+    const headSize = receding ? 'small' : 'full';
+    const lane = lanes.get(edge.id) ?? { offset: 0, side: 'screen', reach: 0, endTrim: 0 };
 
     const data: RoutedEdgeData = {
       graphId: edge.graphId,
       laneOffset: lane.offset,
+      laneSide: lane.side,
       laneReach: lane.reach,
-      endTrim: lane.connects ? 0 : DETACHED_END_TRIM,
+      endTrim: lane.endTrim,
       headShape: options.headShapes?.[edge.graphId] ?? DEFAULT_GRAPH_HEAD_SHAPE,
+      headSize,
     };
     if (edge.title !== undefined) data.title = edge.title;
     if (edge.titleHidden === true) data.titleHidden = true;
@@ -427,13 +434,13 @@ export function projectGraphEdges(
       // constant motion, which competes with every Resource on the canvas for
       // attention. Emphasis is the stroke's width, opacity and paint order.
       animated: false,
-      // Its Graph's one head marker, which `GraphHeadMarkers` draws once for
-      // the canvas and React Flow hands the Edge as `url('#…')`.
-      markerEnd: graphHeadMarkerId(edge.graphId),
+      // Its Graph's head marker at this size, which `GraphHeadMarkers` draws
+      // once for the canvas and React Flow hands the Edge as `url('#…')`.
+      markerEnd: graphHeadMarkerId(edge.graphId, headSize),
       style: {
         stroke: graphPaint(color),
-        strokeWidth: isActiveGraph ? 3 : 2,
-        opacity: emphasized ? 1 : OTHER_GRAPH_OPACITY,
+        strokeWidth: isActiveGraph ? 3 : receding ? RECEDING_STROKE_WIDTH : 2,
+        opacity: receding ? OTHER_GRAPH_OPACITY : 1,
       },
       data,
     };
