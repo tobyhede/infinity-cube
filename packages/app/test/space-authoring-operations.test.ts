@@ -2339,14 +2339,15 @@ describe('Delete Resource from Space', () => {
     const kind = 'vnd.example.diagram';
     if (!isMissingKindId(kind)) throw new Error(`${kind} is drawn by a plugin in this build`);
     const unplugged = (id: UUID) => ({ id, document: { title: 'Diagram', kind, content: {} } });
-    const openHolding = (snapshot: SpaceSnapshot, holdsSpaceForMissingPlugin: boolean) => {
+    const heldSpace = uuidSchema.parse('00000000-0000-4000-8000-0000000000e1');
+    const openHolding = (snapshot: SpaceSnapshot, holdsSpace: boolean) => {
       const loaded = { snapshot, revision: 0n, exportedRevision: null };
       const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
       const { authoring } = composeApp({
         spaceSession: session,
         selection: MAP_ID,
         newId: mintingIds(MINTED),
-        holdsSpaceForMissingPlugin,
+        heldSpaceIds: holdsSpace ? [heldSpace] : [],
       });
       return { authoring, session };
     };

@@ -72,7 +72,7 @@ Guards above are omitted below.
 | `changed-map-content` | `resource-not-in-map` → `resource-not-found` → `map-content-not-kept` → `map-content-invalid` → (the same value as the entry's content resolves to, its plugin's default where it stores none ⇒ `unchanged`) → completed |
 | `added-resource-to-map` | `resource-not-found` → `resource-already-in-map` → completed |
 | `removed-resource-from-map` | `resource-not-in-map` → completed |
-| `deleted-resource` | `resource-not-found` → `space-resource-deletion-unsupported` → `missing-plugin-holds-space` (the last Resource of a missing kind in this Space, while the aggregate as read at opening holds a Space only because a plugin is missing, ADR 0142) → `resource-has-references` → completed |
+| `deleted-resource` | `resource-not-found` → `space-resource-deletion-unsupported` → `missing-plugin-holds-space` (the last Resource of a missing kind in this Space, while the aggregate as read at opening holds a Space only because a plugin is missing: the store's `refusedUnrootedSpaceIds` over this Space, ADR 0142) → `resource-has-references` → completed |
 
 `open-requires-content` is the code `opened-resource` and `opened-resource-to-fit` raise
 for every Resource: each kind's plugin keeps its Open, if it has one, as Map content (ADR 0142,

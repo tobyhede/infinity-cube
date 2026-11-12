@@ -7,7 +7,11 @@ import {
   type UUID,
 } from '@project/core';
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import { loadSpaceAggregate, type SpaceAggregateError } from '../src/index';
+import {
+  loadSpaceAggregate,
+  refusedUnrootedSpaceIds,
+  type SpaceAggregateError,
+} from '../src/index';
 
 const uuid = (value: string): UUID => uuidSchema.parse(value);
 const META = uuid('00000000-0000-4000-8000-000000000101');
@@ -425,5 +429,33 @@ describe('loadSpaceAggregate', () => {
       kind: 'space',
       content: { map: SECOND_MAP, graph: SECOND_GRAPH },
     });
+  });
+});
+
+describe('refusedUnrootedSpaceIds', () => {
+  const DIAGRAM = 'vnd.example.diagram';
+  if (!isMissingKindId(DIAGRAM)) throw new Error('A plugin draws the diagram kind');
+  const unplugged = { kind: DIAGRAM };
+  const drawn = { kind: 'markdown' as const };
+
+  it('holds a Space already held while a Resource of a missing kind remains', () => {
+    expect(
+      refusedUnrootedSpaceIds([CHILD], { unrooted: [CHILD], spaces: [{ resources: [unplugged] }] }),
+    ).toEqual([]);
+  });
+
+  it('refuses a Space no longer held once no Resource of a missing kind remains', () => {
+    expect(
+      refusedUnrootedSpaceIds([CHILD], { unrooted: [CHILD], spaces: [{ resources: [drawn] }] }),
+    ).toEqual([CHILD]);
+  });
+
+  it('refuses a Space left unrooted that was not already held', () => {
+    expect(
+      refusedUnrootedSpaceIds([CHILD], {
+        unrooted: [CHILD, OTHER],
+        spaces: [{ resources: [drawn] }, { resources: [unplugged] }],
+      }),
+    ).toEqual([OTHER]);
   });
 });

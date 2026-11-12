@@ -271,11 +271,11 @@ export interface OpenSpacesOptions {
    */
   readonly mounted?: boolean | undefined;
   /**
-   * Whether the aggregate, as read when the application opened, holds a Space
-   * nothing refers to because a plugin is missing (ADR 0142), which Space
-   * Authoring reads before deleting a Resource of a missing kind. Absent, none is.
+   * The Spaces the aggregate, as read when the application opened, holds
+   * because a plugin is missing (ADR 0142), which Space Authoring reads before
+   * deleting a Resource of a missing kind. Absent, none is.
    */
-  readonly holdsSpaceForMissingPlugin?: boolean | undefined;
+  readonly heldSpaceIds?: readonly UUID[] | undefined;
 }
 
 interface ValidatedLoadedSpace {
@@ -399,7 +399,7 @@ export function createOpenSpaces({
   presentations,
   reportObserverError,
   mounted,
-  holdsSpaceForMissingPlugin,
+  heldSpaceIds,
 }: OpenSpacesOptions): OpenSpaces {
   const report: ObserverErrorReporter =
     reportObserverError ?? console.error.bind(console, 'Open Spaces observer failed');
@@ -618,7 +618,7 @@ export function createOpenSpaces({
         fullscreen,
         mounted,
         pluginGate,
-        holdsSpaceForMissingPlugin,
+        heldSpaceIds,
         // The Notes window's address carries the query as every other address
         // the location writes does, `source` included only when Mounting.
         addressOf: browserLocation.href,

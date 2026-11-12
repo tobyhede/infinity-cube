@@ -116,7 +116,7 @@ export type { GraphRenderEdge } from './graph-rendering';
 export { documentRefusal, loadSpace, loadSpaceSnapshot } from './space';
 export type { LoadSpaceResult, LoadSpaceSnapshotResult, Space, SpaceError } from './space';
 
-export { loadSpaceAggregate } from './space-aggregate';
+export { loadSpaceAggregate, refusedUnrootedSpaceIds } from './space-aggregate';
 export type {
   LoadSpaceAggregateInput,
   LoadSpaceAggregateResult,

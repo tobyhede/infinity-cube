@@ -1,4 +1,10 @@
-import { isMissingKind, spaceReferences, spaceSelectionProblem, type UUID } from '@project/core';
+import {
+  isMissingKind,
+  spaceReferences,
+  spaceSelectionProblem,
+  type ResourceKind,
+  type UUID,
+} from '@project/core';
 import {
   declaredSpaceReferences,
   missingSpaceReferences,
@@ -175,11 +181,9 @@ export function loadSpaceAggregate({
   // While any plugin is missing, a Space nothing else refers to is held rather
   // than refused (ADR 0142): the Resource with no plugin may be what refers to
   // it, and nothing can read its content to say.
-  const pluginMissing = spaces.some((space) =>
-    space.resources.some((resource) => isMissingKind(resource.kind)),
-  );
+  const holding = pluginMissing(spaces);
   const unrooted = unrootedSpaces(declared, metaSpaceId);
-  for (const spaceId of pluginMissing ? [] : unrooted) {
+  for (const spaceId of holding ? [] : unrooted) {
     errors.push({ kind: 'ordinary-space-unreferenced', spaceId });
   }
   if (errors.length > 0) return { ok: false, errors };
@@ -189,7 +193,33 @@ export function loadSpaceAggregate({
       metaSpaceId,
       spaces,
       { space: (id) => byId.get(id) },
-      pluginMissing ? unrooted : [],
+      holding ? unrooted : [],
     ),
   };
 }
+
+/** The Resources the held rule reads: only their kinds. */
+interface KindedSpace {
+  readonly resources: readonly { readonly kind: ResourceKind }[];
+}
+
+/** Whether a Resource of a missing kind is among these Spaces' (ADR 0142). */
+const pluginMissing = (spaces: readonly KindedSpace[]): boolean =>
+  spaces.some((space) => space.resources.some((resource) => isMissingKind(resource.kind)));
+
+/**
+ * The Spaces nothing refers to that ADR 0142's held rule refuses after a
+ * change: a Space is held only while a Resource of a missing kind remains in
+ * `after.spaces`, and only one `held` already names — the Spaces the stored
+ * aggregate holds or already refuses. The store applies it to a commit's
+ * candidate aggregate (`decideCommit`), and Space Authoring to a deletion
+ * before its working state changes.
+ */
+export const refusedUnrootedSpaceIds = (
+  held: Iterable<UUID>,
+  after: { readonly unrooted: readonly UUID[]; readonly spaces: readonly KindedSpace[] },
+): readonly UUID[] => {
+  if (!pluginMissing(after.spaces)) return after.unrooted;
+  const already = new Set(held);
+  return after.unrooted.filter((spaceId) => !already.has(spaceId));
+};

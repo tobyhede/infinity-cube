@@ -32,6 +32,7 @@ import {
   loadSpaceSnapshot,
   newGraph,
   Placement,
+  refusedUnrootedSpaceIds,
   SnapshotEdit,
   type PlacementMode,
   type SnapshotEditOutcome,
@@ -638,13 +639,13 @@ interface SpaceAuthoringDependencies {
    */
   readonly exclusiveWork?: { readonly withdraws: () => boolean } | undefined;
   /**
-   * Whether the aggregate, as read when the application opened, holds a Space
-   * nothing refers to because a plugin is missing (ADR 0142). The store
-   * refuses a commit deleting the last Resource of a missing kind while one
-   * is held; this seam reads one Space, so it refuses deleting the last such
-   * Resource in its Space before the working state changes. Absent, none is held.
+   * The Spaces the aggregate, as read when the application opened, holds
+   * because a plugin is missing (ADR 0142). The store refuses a commit that
+   * leaves one unrooted and no longer held (`refusedUnrootedSpaceIds`); this
+   * seam asks the same of a deletion before the working state changes, over
+   * the one Space it reads. Absent, none is held.
    */
-  readonly holdsSpaceForMissingPlugin?: boolean | undefined;
+  readonly heldSpaceIds?: readonly UUID[] | undefined;
 }
 
 /**
@@ -794,7 +795,7 @@ export function createSpaceAuthoring({
   reportObserverError = (error) => console.error('SpaceAuthoring observer failed', error),
   newId,
   exclusiveWork,
-  holdsSpaceForMissingPlugin = false,
+  heldSpaceIds = [],
 }: SpaceAuthoringDependencies): SpaceAuthoring {
   let replacementEpoch = 0;
   let installing = 0;
@@ -1371,14 +1372,16 @@ export function createSpaceAuthoring({
         return refuse({ code: 'space-resource-deletion-unsupported' });
       }
       // The store would refuse this commit with the Resource already gone from
-      // the working state, so it is refused here first. Another Space's
+      // the working state, so it is refused here first, by the store's own
+      // rule. Deleting leaves every held Space unrooted, and another Space's
       // Resource of a missing kind is not counted: this seam reads one Space.
       if (
-        holdsSpaceForMissingPlugin &&
+        heldSpaceIds.length > 0 &&
         isMissingKind(deleted.kind) &&
-        !space.resources.some(
-          (resource) => resource.id !== deleted.id && isMissingKind(resource.kind),
-        )
+        refusedUnrootedSpaceIds(heldSpaceIds, {
+          unrooted: heldSpaceIds,
+          spaces: [{ resources: space.resources.filter(({ id }) => id !== deleted.id) }],
+        }).length > 0
       ) {
         return refuse({ code: 'missing-plugin-holds-space', kind: deleted.kind });
       }

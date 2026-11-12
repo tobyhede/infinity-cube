@@ -44,6 +44,7 @@ const OFFERED_VALUES = [
   'initializeSpace',
   'loadSpace',
   'loadSpaceAggregate',
+  'refusedUnrootedSpaceIds',
   'loadSpaceSnapshot',
   'newGraph',
   'newSpace',
