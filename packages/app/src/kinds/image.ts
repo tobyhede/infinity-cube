@@ -1,22 +1,10 @@
 import { imageKind, type ImageKindId } from '@project/core';
-import type { ResourceFlowNodeOf } from '@project/react-flow-adapter';
-import type {
-  CanvasResourceDecorationContext,
-  KindCanvasDecoration,
-  KindDecoration,
-} from '../canvas-resource-decoration';
-import { pluginSurfaceOperations, type PluginHost } from '../plugin-host/plugin-commits';
-
-export type ImageResourceDecorationContext = Pick<
-  CanvasResourceDecorationContext,
-  'authorOnCanvas' | 'editableResourceIds'
-> & {
-  /**
-   * Where the plugin's commits go and the gate that withdraws them (ADR 0142).
-   * Absent where this canvas offers a plugin no commit.
-   */
-  readonly pluginHost?: PluginHost | undefined;
-};
+import type { KindCanvasDecoration } from '../canvas-resource-decoration';
+import {
+  pluginDecorationSlice,
+  pluginResourceOperations,
+  type PluginResourceDecorationContext,
+} from './plugin-decoration';
 
 /**
  * The Image kind's canvas decoration: its plugin surface (ADR 0142), whose

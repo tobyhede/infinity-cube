@@ -42,6 +42,7 @@ export { ResourceFailureBoundary } from './ResourceFailureBoundary';
 export type { ResourceFailureBoundaryProps } from './ResourceFailureBoundary';
 export { isPluginOperations, NotCreatableContent, pluginCreations } from './kinds/plugin-views';
 export type {
+  ClaimHolder,
   HostCreation,
   HostCreationHost,
   HostNew,

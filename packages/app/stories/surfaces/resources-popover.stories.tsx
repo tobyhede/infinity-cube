@@ -9,6 +9,7 @@ import { composeApp } from '#src/compose-app';
 import { resolveMap, resourcesOutsideMap } from '#src/map-resolution';
 import { otherMapMemberships, type MapMemberships } from '#src/map-memberships';
 import type { SpaceDrag } from '#src/resources-drag';
+import { spaceTitlesById, spaceSelectionNamesById } from '#src/space-resource-targets';
 import { sparseAuthoredSnapshot, widelyPlacedSpace } from '../support/spaces';
 import { CANVAS } from '#src/space-authoring';
 

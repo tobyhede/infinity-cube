@@ -7,7 +7,8 @@ import {
   pluginList,
   pluginListProblem,
 } from '@project/resource-api/domain';
-import { createRailStore, definePluginView, type RailCommand } from '@project/resource-api/view';
+import { definePluginView, type RailCommand } from '@project/resource-api/view';
+import { createRailStore } from '@project/resource-api/view/host';
 
 const plugin = <const V extends number, const K extends string>(apiVersion: V, kind: K) =>
   definePlugin({

@@ -7,7 +7,7 @@
 
 /**
  * The largest picture an Image Resource stores, in bytes: 10 MiB, the same as
- * the asset store's cap, which `packages/app/test/picture-admission.test.ts`
+ * the asset store's cap, which `packages/app/test/image-picture-rule.test.ts`
  * holds equal to it.
  */
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -15,7 +15,7 @@ export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 /**
  * The picture formats an Image Resource draws, each identified from the bytes.
  * Each is one the host serves under its own type, which a picture needs to be
- * drawn from its URL; `packages/app/test/picture-admission.test.ts` holds the
+ * drawn from its URL; `packages/app/test/image-picture-rule.test.ts` holds the
  * two lists together.
  */
 export const IMAGE_MEDIA_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'] as const;

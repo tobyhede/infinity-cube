@@ -420,7 +420,7 @@ export function pluginEntry<C, M>(
   return {
     name: plugin.name,
     creations: (view.creates ?? []).map((creation) => hostCreation(plugin, creation)),
-    Glyph: view.Glyph,
+    Glyph,
     bareAtRest: plugin.bareAtRest === true,
     drawsTitle: plugin.drawsTitle !== false,
     render,

@@ -8,6 +8,7 @@ import { createMapSurface } from '../src/map-surface';
 import { CANVAS } from '../src/space-authoring';
 import { useMapSurface } from '../src/use-map-surface';
 import { createdEmpty } from './created-resources';
+import { holdExclusive } from './held-exclusive';
 
 const id = (tail: string) => uuidSchema.parse(`00000000-0000-4000-8000-${tail.padStart(12, '0')}`);
 const SPACE = id('1');

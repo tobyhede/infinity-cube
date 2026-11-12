@@ -3,7 +3,6 @@ import { loadSpaceSnapshot, type Space } from '@project/graph';
 import { newUuid, type AssetRef, type UUID } from '@project/core';
 import type { AssetClient, AssetRefusal, SpaceBackend } from '@project/persistence';
 import type { Assets } from '@project/resource-api/view';
-import { displayImageAsAuthored, type ImageDisplay } from '@project/ui';
 import type { HistoryApi } from './browser-location';
 import { createBrowserHistory } from './browser-history';
 import { describeAssetRefusal } from './authoring-refusal';
@@ -30,9 +29,8 @@ export interface SpaceStartup {
  */
 const browserHistory = (): HistoryApi => createBrowserHistory(window);
 
-/** What the asset store answers a read or a store: the bytes, their reference, or a refusal. */
-type AssetAnswer = Blob | AssetRef | AssetRefusal;
-interface AssetRefusal {
+/** A refusal as a plugin reads it: the store's code put into words. */
+interface WordedRefusal {
   readonly refused: string;
 }
 
@@ -81,7 +79,6 @@ export const createSpaceStartup = (
   backend: SpaceBackend = new HttpSpaceBackend(),
   newId: () => UUID = newUuid,
   history: HistoryApi = browserHistory(),
-  displayImage: ImageDisplay = displayImageAsAuthored,
   {
     mounted = false,
     assets = httpAssetClient(new HttpSpaceBackend()),

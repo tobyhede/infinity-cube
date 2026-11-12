@@ -742,7 +742,6 @@ describe('Exclusive work begun while Edits are queued (ADR 0142)', () => {
     const loaded = { snapshot: positionedSnapshot, revision: 0n, exportedRevision: null };
     const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
     const { authoring } = composeApp({
-      images: unusedImageSources,
       spaceSession: session,
       selection: MAP_ID,
       newId: mintingIds(MINTED),

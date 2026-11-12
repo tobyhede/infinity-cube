@@ -32,7 +32,6 @@ import {
 import {
   DEFAULT_KIND,
   COLLAPSED_RESOURCE_SIZE,
-  takesOpen,
   titleName,
   uuidSchema,
   type ResourceId,

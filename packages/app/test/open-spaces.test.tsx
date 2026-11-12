@@ -1512,11 +1512,7 @@ it('releases the hold on every composed Space when a replacement fails', async (
   const replacement = holdExclusive(openSpaces.pluginGate, OTHER_IMAGE_ID);
   expect(openSpaces.getState().replacingImage).toBe(true);
   expect(
-    meta.app.authoring.complete(CANVAS, {
-      kind: 'created-resource',
-      resourceKind: 'markdown',
-      anchor: { x: 100, y: 100 },
-    }),
+    meta.app.authoring.complete(CANVAS, createdEmpty('markdown', { x: 100, y: 100 })),
   ).toMatchObject({ kind: 'refused' });
   await expect(openSpaces.enter(OTHER_ID)).rejects.toThrow(NavigationUnavailableError);
 
@@ -1525,11 +1521,7 @@ it('releases the hold on every composed Space when a replacement fails', async (
   expect(openSpaces.getState().replacingImage).toBe(false);
   expect(openSpaces.pluginGate.getState()).toEqual(NO_CLAIMS);
   expect(
-    meta.app.authoring.complete(CANVAS, {
-      kind: 'created-resource',
-      resourceKind: 'markdown',
-      anchor: { x: 100, y: 100 },
-    }).kind,
+    meta.app.authoring.complete(CANVAS, createdEmpty('markdown', { x: 100, y: 100 })).kind,
   ).toBe('completed');
   await expect(openSpaces.enter(OTHER_ID)).resolves.toBeDefined();
   await drawing.release();

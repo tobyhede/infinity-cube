@@ -80,14 +80,13 @@ export const createMountedStartup = (options: MountedStartupOptions): SpaceStart
         createObjectUrl: options.createObjectUrl,
       });
       if (!result.ok) throw new Error(describeAggregateReadRefusal(result.refusal, pinned));
-      const { backend, assets, displayImage, metaSpaceId } = result.mounted;
+      const { backend, assets, metaSpaceId } = result.mounted;
       const startup = createSpaceStartup(
         options.fullscreen,
         options.presentations(pinned),
         backend,
         options.newId,
         history,
-        displayImage,
         { mounted: true, assets },
       );
       return { startup, backend, metaSpaceId, pinned, resolved: read.aggregate.location };
