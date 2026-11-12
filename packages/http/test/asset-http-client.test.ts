@@ -95,6 +95,17 @@ describe('the asset client over HTTP', () => {
     });
   });
 
+  it('answers refused for a reference whose hash no bytes can have', async () => {
+    const { backend } = backendOverHost();
+    // 43 base64url characters, as AssetRef and resource-api's check admit, but a
+    // last character that carries bits no SHA-256 spelling sets.
+    const unspellable: AssetRef = `/assets/${'A'.repeat(42)}B`;
+
+    await expect(httpAssetClient(backend).read(unspellable)).resolves.toEqual({
+      refused: 'asset-absent',
+    });
+  });
+
   it('answers url as authored unless told where an asset is drawn from', () => {
     const { backend } = backendOverHost();
 

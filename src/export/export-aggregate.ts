@@ -163,9 +163,10 @@ const markAggregateExported = async (
  * by walking each Resource's `content` and each Map entry's content without
  * naming a kind; assets are read after the aggregate and outside its revision,
  * and an asset's hash is its content, so no commit can change one between the
- * two reads. An asset no Resource references is left out, and its file removed. A referenced asset
- * whose bytes the store does not hold is not an error: the URL stays, the
- * Export completes, and a file of that name in the directory is kept.
+ * two reads. An asset no Resource's content or Map entry's content references
+ * is left out, and its file removed. A referenced asset whose bytes the store
+ * does not hold is not an error: the URL stays, the Export completes, and a
+ * file of that name in the directory is kept.
  *
  * The files are checked to read back before any is written, with the asset
  * files kept for absent bytes, and a refusal writes nothing. Then each file

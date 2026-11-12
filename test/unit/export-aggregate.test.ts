@@ -1,13 +1,15 @@
 import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { EMPTY_ASSET_REF, uuidSchema } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type UUID } from '@project/core';
+import { createSpaceHttpApp, httpAssetClient, HttpSpaceBackend } from '@project/http';
 import type { LoadedSpace, StoredAsset } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { exportAggregate } from '../../src/export/export-aggregate';
 import { captureError } from '../support/capture-error';
 import { MemorySpaceRepository } from '@project/aggregate';
 import { admitted, directoryTree, pngBytes, showing } from '../support/stored-assets';
+import { browserPluginAssets } from '../../packages/app/src/space';
 
 const SPACE_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000001');
 const RESOURCE_A = uuidSchema.parse('a0000000-0000-4000-8000-000000000010');
@@ -577,6 +579,48 @@ describe('stored asset bytes', () => {
 
     await exportTo(await holding(storedSpace, [text, binary]), destination);
     expect(await readdir(destination)).not.toContain('assets');
+  });
+
+  /*
+   * The bytes reach the store the way a plugin stores them: through the asset
+   * client the application hands a plugin, over the real Fetch application, into
+   * the repository Export reads. The Resources referencing them were authored
+   * with the references the store answers.
+   */
+  it('carries text and binary bytes a plugin stored through its asset client', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'exported');
+    const text = await admitted(new TextEncoder().encode('# Notes\n'), 'text/markdown');
+    const binary = await admitted(Uint8Array.from([0x00, 0xff, 0x10]), 'font/woff2');
+    const repository = await holding(
+      withImages(
+        markdownNaming(NOTES_ID, `/assets/${text.hash}`),
+        markdownNaming(DATA_ID, `/assets/${binary.hash}`),
+      ),
+      [],
+    );
+    const mintsNothing = (): UUID => {
+      throw new Error('Storing an asset mints no identity.');
+    };
+    const app = createSpaceHttpApp(repository, { newId: mintsNothing });
+    const plugin = browserPluginAssets(
+      httpAssetClient(
+        new HttpSpaceBackend('http://example.test', {
+          fetch: async (input, init) => app.fetch(new Request(input, init)),
+        }),
+      ),
+    );
+
+    const stored = [
+      await plugin.store?.(new Blob(['# Notes\n'], { type: 'text/markdown' })),
+      await plugin.store?.(new Blob([Uint8Array.from([0x00, 0xff, 0x10])], { type: 'font/woff2' })),
+    ];
+    await exportTo(repository, destination);
+
+    expect(stored).toEqual([`/assets/${text.hash}`, `/assets/${binary.hash}`]);
+    expect(await directoryTree(join(destination, 'assets'))).toEqual({
+      [`${text.hash}.md`]: Buffer.from('# Notes\n'),
+      [`${binary.hash}.woff2`]: Buffer.from([0x00, 0xff, 0x10]),
+    });
   });
 
   /*

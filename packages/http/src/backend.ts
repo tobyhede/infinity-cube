@@ -1,4 +1,4 @@
-import { assetRefHash, type AssetRef, type UUID } from '@project/core';
+import { assetRefHash, isAssetHash, type AssetRef, type UUID } from '@project/core';
 import {
   CANONICAL_DECIMAL,
   commitOutcomeDecoder,
@@ -145,12 +145,15 @@ export class HttpSpaceBackend implements SpaceBackend {
   /**
    * Read a stored asset's bytes, typed as they were stored rather than as they
    * are served, answering `asset-absent` when the host holds none under its
-   * hash. Throws when the host cannot be reached or answers
-   * anything else.
+   * hash. A reference whose hash is not the canonical spelling of a SHA-256
+   * names bytes no store can hold, so it answers `asset-absent` without a
+   * request. Throws when the host cannot be reached or answers anything else.
    */
   readAsset(ref: AssetRef): Promise<Blob | AssetRefusal> {
+    const hash = assetRefHash(ref);
+    if (!isAssetHash(hash)) return Promise.resolve({ refused: ASSET_ABSENT });
     return this.#timedRequest(
-      (client) => client.assets[':hash'].$get({ param: { hash: assetRefHash(ref) } }),
+      (client) => client.assets[':hash'].$get({ param: { hash } }),
       async (response): Promise<Blob | AssetRefusal> => {
         if (response.status === 404) return { refused: ASSET_ABSENT };
         if (!response.ok) throw new Error(`Unable to read an asset: HTTP ${response.status}`);
