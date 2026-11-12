@@ -14,6 +14,9 @@ import type { SpaceResourceTargets } from './space-resource-targets';
 /** What the Map embedding says while the Space it shows has not been read. */
 export const READING_SPACE_NOTE = 'Reading the referenced Space…';
 
+/** What the Map embedding says where the Space it shows, once read, has no Map the view resolves to. */
+export const NO_SUCH_MAP_NOTE = 'The referenced Space has no such Map.';
+
 /** What the host reads to offer a Space embedding's commands on the canvas. */
 export interface EmbedCommandsContext {
   readonly authorOnCanvas: boolean;
@@ -60,9 +63,8 @@ export function decorateEmbedCommands(
   const spaceId = uuidSchema.safeParse(space);
   const target = spaceId.success ? context.spaceResourceTargets.get(spaceId.data) : undefined;
   const selection = resolveEmbedView(space, view, target);
-  if (target === undefined || selection === undefined) {
-    return withEmbedCommands(node, { mapNote: READING_SPACE_NOTE });
-  }
+  if (target === undefined) return withEmbedCommands(node, { mapNote: READING_SPACE_NOTE });
+  if (selection === undefined) return withEmbedCommands(node, { mapNote: NO_SUCH_MAP_NOTE });
   const entry = context.spaces?.entry(target.id);
   const railContext: SpaceResourceRailContext | undefined =
     entry === undefined ||

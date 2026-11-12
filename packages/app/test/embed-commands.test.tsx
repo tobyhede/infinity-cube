@@ -8,6 +8,7 @@ import { ResourceRailActions, type MapEmbedRequest } from '@project/ui';
 import type { Continuation } from '../src/continuation';
 import {
   decorateEmbedCommands,
+  NO_SUCH_MAP_NOTE,
   READING_SPACE_NOTE,
   type EmbedCommandsContext,
 } from '../src/embed-commands';
@@ -176,6 +177,27 @@ describe('decorateEmbedCommands', () => {
     );
     expect(railOf(decorated)).toBeUndefined();
     expect(decorated.data.kindOperations.mapNote).toBe(READING_SPACE_NOTE);
+  });
+
+  it('says the read Space has no such Map, rather than that it is still being read', () => {
+    const { defaultMap: _, ...withoutDefault } = target;
+    for (const [view, shown] of [
+      [{ map: OTHER_MAP_ID }, target],
+      [undefined, withoutDefault],
+    ] as const) {
+      const decorated = decorateEmbedCommands(
+        node('space'),
+        context({
+          spaceResourceTargets: new Map([[TARGET_SPACE_ID, shown]]),
+          mapEmbeds: embedded({
+            view,
+            select: { value: { map: OTHER_MAP_ID }, commit: () => Promise.resolve('completed') },
+          }),
+        }),
+      );
+      expect(railOf(decorated)).toBeUndefined();
+      expect(decorated.data.kindOperations.mapNote).toBe(NO_SUCH_MAP_NOTE);
+    }
   });
 
   it('carries a context notice once the chooser is drawn', () => {

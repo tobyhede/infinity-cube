@@ -204,6 +204,22 @@ export function useCanvasResourceAuthoring({
     );
   }
 
+  // What the canvas says about an embedding, and its rail's editing, last
+  // only while the Resource's drawing here embeds a Space: once its plugin
+  // stops embedding, as a Closed Space Resource does, both go, whatever the
+  // kind, so embedding again starts afresh (ADR 0142).
+  const embeddingKey = nodes
+    .flatMap((node) => (mapEmbeds.has(node.id) ? [node.data.resourceId] : []))
+    .sort()
+    .join(' ');
+  const [embeddingWas, setEmbeddingWas] = useState(embeddingKey);
+  if (embeddingWas !== embeddingKey) {
+    setEmbeddingWas(embeddingKey);
+    const embedding = new Set(embeddingKey.split(' '));
+    setContextNotices((prev) => noticesOf(prev, embedding));
+    setContextEditingIds((prev) => editingOf(prev, embedding));
+  }
+
   useEffect(() => {
     onBodyEditingChange?.(bodyEditing);
   }, [bodyEditing, onBodyEditingChange]);
@@ -323,16 +339,21 @@ export function useCanvasResourceAuthoring({
       return next;
     });
   }, []);
-  const onContextReport = useCallback((resourceId: ResourceId, message: string | null) => {
-    setContextNotices((prev) => {
-      const current = prev.get(resourceId) ?? null;
-      if (current === message) return prev;
-      const next = new Map(prev);
-      if (message === null) next.delete(resourceId);
-      else next.set(resourceId, message);
-      return next;
-    });
-  }, []);
+  const onContextReport = useCallback(
+    (resourceId: ResourceId, message: string | null) => {
+      // A choice whose answer lands after its embedding is gone says nothing.
+      if (message !== null && !embeds(mapEmbeddings, resourceId)) return;
+      setContextNotices((prev) => {
+        const current = prev.get(resourceId) ?? null;
+        if (current === message) return prev;
+        const next = new Map(prev);
+        if (message === null) next.delete(resourceId);
+        else next.set(resourceId, message);
+        return next;
+      });
+    },
+    [mapEmbeddings],
+  );
 
   const sharedContext = useMemo(
     () => ({
@@ -416,4 +437,27 @@ export function useCanvasResourceAuthoring({
     titleEditing: editingTitleResourceId !== null || contextEditingIds.size > 0,
     beginTitleEditing,
   };
+}
+
+/** Whether some drawing on this canvas embeds a Space in a rect of `resourceId`'s. */
+const embeds = (mapEmbeddings: MapEmbeddings | null, resourceId: ResourceId): boolean =>
+  mapEmbeddings !== null &&
+  [...mapEmbeddings.getState().values()].some((entry) => entry.resourceId === resourceId);
+
+/** The notices of the Resources in `embedding`, or `notices` itself where it has no other. */
+function noticesOf(
+  notices: ReadonlyMap<ResourceId, string>,
+  embedding: ReadonlySet<string>,
+): ReadonlyMap<ResourceId, string> {
+  const kept = [...notices].filter(([resourceId]) => embedding.has(resourceId));
+  return kept.length === notices.size ? notices : new Map(kept);
+}
+
+/** The Resources of `editing` in `embedding`, or `editing` itself where it has no other. */
+function editingOf(
+  editing: ReadonlySet<ResourceId>,
+  embedding: ReadonlySet<string>,
+): ReadonlySet<ResourceId> {
+  const kept = [...editing].filter((resourceId) => embedding.has(resourceId));
+  return kept.length === editing.size ? editing : new Set(kept);
 }

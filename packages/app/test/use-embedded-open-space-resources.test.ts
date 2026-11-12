@@ -358,4 +358,73 @@ describe('useEmbeddedOpenSpaceResources', () => {
     rerender();
     expect(result.current.embeddedRequests[0]?.mapId).toBe(opening);
   });
+  it('draws an embedding given no view once the Space it shows is read after it is drawn', async () => {
+    const containing: SpaceSnapshot = {
+      id: HOST,
+      document: {
+        version: 1,
+        title: 'Talk',
+        defaultMap: HOST_MAP,
+        maps: [
+          {
+            id: HOST_MAP,
+            title: 'Talk Map',
+            kind: 'positioned',
+            positions: {},
+            graphs: [{ id: HOST_GRAPH, title: 'Talk Graph', edges: [] }],
+          },
+        ],
+      },
+      resources: [],
+    };
+    const shown: SpaceSnapshot = {
+      id: TARGET,
+      document: {
+        version: 1,
+        title: 'Architecture',
+        defaultMap: MAP,
+        maps: [
+          {
+            id: MAP,
+            title: 'First',
+            kind: 'positioned',
+            positions: {},
+            graphs: [{ id: GRAPH, title: 'First Graph', edges: [] }],
+          },
+        ],
+      },
+      resources: [],
+    };
+    const spaces = createOpenSpaces({
+      fullscreen: refusingFullscreen,
+      presentations: unlinkedPresentations,
+      backend: new MemorySpaceBackend(
+        HOST,
+        [containing, shown].map((snapshot) => ({
+          snapshot,
+          revision: 0n,
+          exportedRevision: null,
+        })),
+      ),
+      metaSpaceId: HOST,
+      metaSpaceTitle: containing.document.title,
+      newId: newUuid,
+      history: recordingHistory(),
+    });
+    await spaces.open(HOST);
+    // Not read before the embedding is drawn: the drawing reads it, and draws
+    // its Map once it is composed here.
+    expect(spaces.getState().composed.some(({ id: composed }) => composed === TARGET)).toBe(false);
+    const nodes = [spaceResource(HOST, MAP)];
+    const embeds = viewlessEmbed(nodes);
+    const { result } = renderHook(() =>
+      useEmbeddedOpenSpaceResources(nodes, embeds, spaces, NO_DRAG, {
+        spaceId: HOST,
+        mapId: OTHER_MAP,
+        policy: 'authoring',
+      }),
+    );
+    expect(result.current.embeddedRequests).toHaveLength(0);
+    await waitFor(() => expect(result.current.embeddedRequests[0]?.mapId).toBe(MAP));
+  });
 });
