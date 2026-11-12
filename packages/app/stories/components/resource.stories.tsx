@@ -12,6 +12,7 @@ import { productDestinationPath, type ProductDestination } from '@project/http';
 import {
   CanvasResource,
   CLOSED_DISPLAY,
+  PluginAssetsProvider,
   PluginResource,
   type KindOperations,
   type CanvasResourceState,
@@ -87,7 +88,9 @@ const OVERLONG_TITLE =
 const WRAPPING_TITLE = 'Why authored placement beats a layout engine that reshuffles on every edit';
 
 /**
- * Every kind `CanvasResource` declares, with the label each specimen carries.
+ * Every kind `CanvasResource` declares, with the label each specimen carries,
+ * but the Image Resource, which is its picture and has no Closed state (ADR
+ * 0142); `Image Resource` draws it.
  *
  * The creation ghost is in the list and is not a Resource: it is what the canvas
  * draws while a new Resource is being placed, a Markdown Resource with no
@@ -98,7 +101,6 @@ const CLOSED_KINDS = [
   { kind: 'markdown', label: 'markdown' },
   { kind: 'reference', label: 'reference' },
   { kind: 'space', label: 'space' },
-  { kind: 'image', label: 'image' },
   { kind: 'ur', label: 'ur' },
   { kind: 'markdown', label: 'creation ghost' },
 ] as const satisfies readonly { kind: KindOperations['kind']; label: string }[];
@@ -625,75 +627,93 @@ OpenReference.storyName = 'Open Reference Resource';
 OpenReference.meta = { iframed: true };
 
 /**
- * An Open Image Resource is drawn as an Open Markdown Resource with its picture as the
- * content. Three specimens at one canvas unit per pixel: a 400×300 picture in
- * a Resource sized to hold it — the picture plus the Resource's chrome — the same
- * picture in a Resource resized larger, where it keeps its natural size rather
- * than being enlarged, and a URL that does not load.
+ * An Image Resource is its picture (ADR 0106, ADR 0142), drawn whole into the
+ * rect it is given at any size and never cropped, named by its Title and with
+ * no drawn Title. Each is the image Space's Harbour, which is in no Graph and
+ * so drawn in no Graph's colour. Four specimens at one canvas
+ * unit per pixel: a 400×300 picture at rest, which has no border; the same picture selected, which the
+ * canvas strokes; the picture in a wider, shorter rect, which it fits whole;
+ * and a URL that does not load.
  */
-export const OpenImage: Story = () => {
-  const [open, setOpen] = useState(true);
-  const changeOpen = (next: boolean) => {
-    setOpen(next);
-    return 'completed' as const;
-  };
-  const sizedToPicture = { width: 408, height: 359 };
+/** The stored picture the Image Resource story draws, which its asset store resolves to the tracked file. */
+const HARBOUR_REF = '/assets/fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs';
+/** A stored picture the story's asset store resolves to a URL that does not load. */
+const MISSING_REF = '/assets/MISSINGpictureMISSINGpictureMISSINGpicture0';
+
+/** The catalogue's asset store: Harbour from the tracked file, and nothing else. */
+const imageStoryAssets = {
+  url: (ref: string) => (ref === HARBOUR_REF ? harbour : '/missing-picture.png'),
+  read: () => Promise.resolve({ refused: 'The catalogue reads no asset.' }),
+};
+
+export const ImageResource: Story = () => {
+  const sizedToPicture = { width: 400, height: 300 };
   return (
-    <div className="flex flex-wrap items-start gap-8 p-8">
-      <section aria-label="Sized to its picture" className="flex flex-col gap-2">
-        <p className="text-xs text-muted-foreground">400×300 in a Resource sized to hold it</p>
-        <CanvasResourceNodeSpecimen
-          title="Harbour"
-          kind="image"
-          content={{
-            kind: 'image',
-            url: harbour,
-            via: 'self',
-          }}
-          open={open}
-          onOpenChange={changeOpen}
-          nodeSize={open ? sizedToPicture : closedFrame}
-          zoom={1}
-          stageClassName="inv-resource-node-stage--large"
-        />
-      </section>
-      <section aria-label="Resized larger" className="flex flex-col gap-2">
-        <p className="text-xs text-muted-foreground">400×300 in a Resource resized larger</p>
-        <CanvasResourceNodeSpecimen
-          title="Harbour, larger"
-          kind="image"
-          content={{
-            kind: 'image',
-            url: harbour,
-            via: 'self',
-          }}
-          open
-          nodeSize={{ width: 600, height: 440 }}
-          zoom={1}
-          stageClassName="inv-resource-node-stage--large"
-        />
-      </section>
-      <section aria-label="Failed image" className="flex flex-col gap-2">
-        <p className="text-xs text-muted-foreground">a URL that does not load</p>
-        <CanvasResourceNodeSpecimen
-          title="Missing"
-          kind="image"
-          content={{
-            kind: 'image',
-            url: '/assets/missing-picture.png',
-            via: 'self',
-          }}
-          open
-          nodeSize={sizedToPicture}
-          zoom={1}
-          stageClassName="inv-resource-node-stage--large"
-        />
-      </section>
-    </div>
+    <PluginAssetsProvider value={imageStoryAssets}>
+      <div className="flex flex-wrap items-start gap-8 p-8">
+        <section aria-label="At rest" className="flex flex-col gap-2">
+          <p className="text-xs text-muted-foreground">400×300, at rest</p>
+          <CanvasResourceNodeSpecimen
+            title="Harbour"
+            kind="image"
+            drawn={imageReferenceMap}
+            resourceId={imageReferenceIds.harbour}
+            picture={HARBOUR_REF}
+            openOperationEnabled={false}
+            nodeSize={sizedToPicture}
+            zoom={1}
+            stageClassName="inv-resource-node-stage--large"
+          />
+        </section>
+        <section aria-label="Selected" className="flex flex-col gap-2">
+          <p className="text-xs text-muted-foreground">400×300, selected</p>
+          <CanvasResourceNodeSpecimen
+            title="Harbour, selected"
+            kind="image"
+            drawn={imageReferenceMap}
+            resourceId={imageReferenceIds.harbour}
+            picture={HARBOUR_REF}
+            openOperationEnabled={false}
+            selected
+            nodeSize={sizedToPicture}
+            zoom={1}
+            stageClassName="inv-resource-node-stage--large"
+          />
+        </section>
+        <section aria-label="Wider" className="flex flex-col gap-2">
+          <p className="text-xs text-muted-foreground">400×300 in a wider, shorter rect</p>
+          <CanvasResourceNodeSpecimen
+            title="Harbour, wider"
+            kind="image"
+            drawn={imageReferenceMap}
+            resourceId={imageReferenceIds.harbour}
+            picture={HARBOUR_REF}
+            openOperationEnabled={false}
+            nodeSize={{ width: 600, height: 200 }}
+            zoom={1}
+            stageClassName="inv-resource-node-stage--large"
+          />
+        </section>
+        <section aria-label="Failed image" className="flex flex-col gap-2">
+          <p className="text-xs text-muted-foreground">a URL that does not load</p>
+          <CanvasResourceNodeSpecimen
+            title="Missing"
+            kind="image"
+            drawn={imageReferenceMap}
+            resourceId={imageReferenceIds.harbour}
+            picture={MISSING_REF}
+            openOperationEnabled={false}
+            nodeSize={sizedToPicture}
+            zoom={1}
+            stageClassName="inv-resource-node-stage--large"
+          />
+        </section>
+      </div>
+    </PluginAssetsProvider>
   );
 };
-OpenImage.storyName = 'Open Image Resource';
-OpenImage.meta = { iframed: true };
+ImageResource.storyName = 'Image Resource';
+ImageResource.meta = { iframed: true };
 
 const imageReferenceMap: DrawnMap = {
   space: imageReferenceSpace,

@@ -24,7 +24,9 @@ import { unavailable } from './command-dock';
 import { recordingHistory } from './browser-history';
 import { productDestinationPath } from '@project/http';
 import { mintingIds } from './minting';
-import { heldImageSources, unusedImageSources } from './image-sources';
+import { NO_CLAIMS } from '../src/plugin-host/claim-chain';
+import { holdExclusive } from './held-exclusive';
+import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
 import { refusingFullscreen } from './fullscreen';
 import { unlinkedPresentations } from './presentations';
@@ -200,75 +202,71 @@ const setup = (
 
 it('holds Space navigation and an Exit already waiting on persistence during replacement', async () => {
   const control = new MemorySpaceBackendTestControl();
-  const held = heldImageSources();
-  const { openSpaces } = setup(control, undefined, undefined, held.images);
+  const { openSpaces } = setup(control);
   await openSpaces.open(META_ID);
   const other = await openSpaces.open(OTHER_ID);
   const releaseCommit = control.deferNextCommit();
   other.session.submit(edit(other.session.getState().working));
   const exiting = openSpaces.exit(OTHER_ID);
-  const replacement = other.app.imageReplacement.replace(OTHER_IMAGE_ID, HELD_REPLACEMENT);
+  const replacement = holdExclusive(openSpaces.pluginGate, OTHER_IMAGE_ID);
   await expect(openSpaces.select(META_ID)).rejects.toThrow('Navigation is unavailable');
   const refusedExit = expect(exiting).rejects.toThrow('Navigation is unavailable');
   releaseCommit();
   await refusedExit;
   expect(openSpaces.getState().activeSpaceId).toBe(OTHER_ID);
   expect(openSpaces.entry(OTHER_ID)).toBe(other);
-  held.release();
-  await replacement;
+  replacement?.release();
+  await replacement?.running;
   await openSpaces.select(META_ID);
   expect(openSpaces.getState().activeSpaceId).toBe(META_ID);
 });
 
 it('refuses opening an address and entering a Space during replacement', async () => {
-  const held = heldImageSources();
-  const { openSpaces, history } = setup(undefined, undefined, undefined, held.images);
+  const { openSpaces, history } = setup();
   await openSpaces.open(META_ID);
-  const other = await openSpaces.open(OTHER_ID);
+  await openSpaces.open(OTHER_ID);
   const writes = [...history.writes];
-  const replacement = other.app.imageReplacement.replace(OTHER_IMAGE_ID, HELD_REPLACEMENT);
+  const replacement = holdExclusive(openSpaces.pluginGate, OTHER_IMAGE_ID);
   const metaPath = productDestinationPath({ kind: 'map', spaceId: META_ID, mapId: META_MAP_ID });
   await expect(openSpaces.openPath(metaPath)).rejects.toThrow(NavigationUnavailableError);
   await expect(openSpaces.enter(META_ID)).rejects.toThrow(NavigationUnavailableError);
   await expect(openSpaces.open(META_ID)).rejects.toThrow(NavigationUnavailableError);
   expect(openSpaces.getState().activeSpaceId).toBe(OTHER_ID);
   expect(history.writes).toEqual(writes);
-  held.release();
-  await replacement;
+  replacement?.release();
+  await replacement?.running;
   await openSpaces.enter(META_ID);
   expect(openSpaces.getState().activeSpaceId).toBe(META_ID);
 });
 
 it('holds a Back to another Space when a replacement starts while that Space opens', async () => {
-  const held = heldImageSources();
-  const { openSpaces, history } = setup(undefined, undefined, undefined, held.images);
+  const { openSpaces, history } = setup();
   await openSpaces.open(META_ID);
   const metaPath = productDestinationPath({ kind: 'map', spaceId: META_ID, mapId: META_MAP_ID });
-  const other = await openSpaces.open(OTHER_ID);
+  await openSpaces.open(OTHER_ID);
   const otherPath = history.pathname();
   history.popTo(metaPath);
   // The traversal passed the lock check; the replacement begins while the
   // destination is still being resolved.
-  const replacement = other.app.imageReplacement.replace(OTHER_IMAGE_ID, HELD_REPLACEMENT);
+  const replacement = holdExclusive(openSpaces.pluginGate, OTHER_IMAGE_ID);
   await vi.waitFor(() => expect(history.pathname()).toBe(otherPath));
   expect(openSpaces.getState().activeSpaceId).toBe(OTHER_ID);
   expect(openSpaces.browserLocation.getState().destinationNotFound).toBe(false);
-  held.release();
-  await replacement;
+  replacement?.release();
+  await replacement?.running;
   history.popTo(metaPath);
   await vi.waitFor(() => expect(openSpaces.getState().activeSpaceId).toBe(META_ID));
   expect(openSpaces.browserLocation.getState().destinationNotFound).toBe(false);
 });
 
 it('releases a newly composed target when image replacement prevents its activation', async () => {
-  const held = heldImageSources();
-  const { openSpaces } = setup(undefined, undefined, undefined, held.images);
-  const other = await openSpaces.open(OTHER_ID);
+  const { openSpaces } = setup();
+  await openSpaces.open(OTHER_ID);
   const opening = openSpaces.open(META_ID);
-  const replacement = other.app.imageReplacement.replace(OTHER_IMAGE_ID, HELD_REPLACEMENT);
+  const replacement = holdExclusive(openSpaces.pluginGate, OTHER_IMAGE_ID);
   await expect(opening).rejects.toBeInstanceOf(NavigationUnavailableError);
-  held.release();
-  await replacement;
+  replacement?.release();
+  await replacement?.running;
   expect(openSpaces.entry(META_ID)).toBeUndefined();
 });
 
@@ -277,9 +275,6 @@ const countingIds = (): (() => UUID) => {
   let next = 0x20;
   return () => uuidSchema.parse(`00000000-0000-4000-8000-0000000000${(next++).toString(16)}`);
 };
-
-/** A replacement of `Other`'s Image Resource, held by {@link heldImageSources} while it measures. */
-const HELD_REPLACEMENT = { kind: 'url', url: 'https://example.com/replacement.png' } as const;
 
 const edit = (space: SpaceSnapshot): SpaceSnapshot => ({
   ...space,
@@ -1507,9 +1502,38 @@ describe('Open Spaces', () => {
   });
 });
 
+it('releases the hold on every composed Space when a replacement fails', async () => {
+  const { openSpaces } = setup(undefined, mintingIds(MINTED_RESOURCE_ID));
+  const meta = await openSpaces.open(META_ID);
+  const drawing = await openSpaces.hold(OTHER_ID);
+  const replacement = holdExclusive(openSpaces.pluginGate, OTHER_IMAGE_ID);
+  expect(openSpaces.getState().replacingImage).toBe(true);
+  expect(
+    meta.app.authoring.complete(CANVAS, {
+      kind: 'created-resource',
+      resourceKind: 'markdown',
+      anchor: { x: 100, y: 100 },
+    }),
+  ).toMatchObject({ kind: 'refused' });
+  await expect(openSpaces.enter(OTHER_ID)).rejects.toThrow(NavigationUnavailableError);
+
+  replacement?.fail(new Error('Unable to store an asset: HTTP 500'));
+  await replacement?.running;
+  expect(openSpaces.getState().replacingImage).toBe(false);
+  expect(openSpaces.pluginGate.getState()).toEqual(NO_CLAIMS);
+  expect(
+    meta.app.authoring.complete(CANVAS, {
+      kind: 'created-resource',
+      resourceKind: 'markdown',
+      anchor: { x: 100, y: 100 },
+    }).kind,
+  ).toBe('completed');
+  await expect(openSpaces.enter(OTHER_ID)).resolves.toBeDefined();
+  await drawing.release();
+});
+
 it('holds Back and Forward while an only-drawn Space replaces an image', async () => {
-  const held = heldImageSources();
-  const { openSpaces, history } = setup(undefined, undefined, undefined, held.images);
+  const { openSpaces, history } = setup();
   const meta = await openSpaces.open(META_ID);
   const drawing = await openSpaces.hold(OTHER_ID);
   const firstPath = productDestinationPath({
@@ -1527,25 +1551,25 @@ it('holds Back and Forward while an only-drawn Space replaces an image', async (
   const unsubscribe = openSpaces.subscribe(() => {
     observations.push(openSpaces.getState().replacingImage);
   });
-  const replacement = drawing.entry.app.imageReplacement.replace(OTHER_IMAGE_ID, HELD_REPLACEMENT);
+  const replacement = holdExclusive(openSpaces.pluginGate, OTHER_IMAGE_ID);
   expect(openSpaces.getState().replacingImage).toBe(true);
   expect(observations).toContain(true);
   history.popTo(firstPath);
   await vi.waitFor(() => expect(history.pathname()).toBe(secondPath));
   expect(meta.app.navigation.getState().activeGraphId).toBe(META_GRAPH_TWO);
   await expect(openSpaces.enter(OTHER_ID)).rejects.toThrow(NavigationUnavailableError);
-  held.release();
-  await replacement;
+  replacement?.release();
+  await replacement?.running;
   expect(openSpaces.getState().replacingImage).toBe(false);
   expect(observations.at(-1)).toBe(false);
   history.popTo(firstPath);
   await vi.waitFor(() => expect(meta.app.navigation.getState().activeGraphId).toBe(META_GRAPH_ONE));
-  const again = drawing.entry.app.imageReplacement.replace(OTHER_IMAGE_ID, HELD_REPLACEMENT);
+  const again = holdExclusive(openSpaces.pluginGate, OTHER_IMAGE_ID);
   history.popTo(secondPath);
   await vi.waitFor(() => expect(history.pathname()).toBe(firstPath));
   expect(meta.app.navigation.getState().activeGraphId).toBe(META_GRAPH_ONE);
-  held.release();
-  await again;
+  again?.release();
+  await again?.running;
   history.popTo(secondPath);
   await vi.waitFor(() => expect(meta.app.navigation.getState().activeGraphId).toBe(META_GRAPH_TWO));
   unsubscribe();

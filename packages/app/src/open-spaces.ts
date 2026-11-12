@@ -425,6 +425,14 @@ export function createOpenSpaces({
     },
     report,
   );
+  // Exclusive work anywhere is the hold ADR 0126 sets on every composed Space:
+  // it is published as `replacingImage`, withdrawing authoring and navigation
+  // until the work settles (ADR 0142).
+  pluginGate.subscribe(() => {
+    const state = observable.getState();
+    const replacingImage = pluginGate.exclusiveRunning();
+    if (state.replacingImage !== replacingImage) observable.publish({ ...state, replacingImage });
+  });
   const mountedEdits = createMountedEdits(report);
   const compositions = new Map<UUID, Promise<OpenSpace>>();
   const drawingHolds = new Map<UUID, number>();
@@ -638,11 +646,6 @@ export function createOpenSpaces({
       const state = observable.getState();
       if (!state.composed.some((entry) => entry.session === session)) return;
       observable.publish({ ...state, entries: [...state.entries], composed: [...state.composed] });
-    });
-    opened.app.imageReplacement.subscribe(() => {
-      const state = observable.getState();
-      const replacingImage = state.composed.some((entry) => entry.app.imageReplacement.getState());
-      if (state.replacingImage !== replacingImage) observable.publish({ ...state, replacingImage });
     });
     const state = observable.getState();
     observable.publish({ ...state, composed: [...state.composed, opened] });
@@ -881,11 +884,7 @@ export function createOpenSpaces({
 
     const state = observable.getState();
     const composed = state.composed.filter((entry) => entry !== target);
-    observable.publish({
-      ...state,
-      composed,
-      replacingImage: composed.some((entry) => entry.app.imageReplacement.getState()),
-    });
+    observable.publish({ ...state, composed });
   };
 
   const releaseUnheld = async (target: OpenSpace): Promise<void> => {

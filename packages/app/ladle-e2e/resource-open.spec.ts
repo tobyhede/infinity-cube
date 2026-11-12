@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { resourceToolbar, selectResource } from '../e2e/graph';
 import { expectPictureAtOwnSize, expectPictureLoaded, HARBOUR_SIZE } from '../e2e/image';
 
@@ -743,67 +743,70 @@ test(
   },
 );
 
-const openImageStory = '/?story=components--resource--open-image-resource&mode=preview';
+const imageStory = '/?story=components--resource--image-resource&mode=preview';
+
+/** The picture's box and the region the host gives its plugin, in screen pixels. */
+const boxesOf = async (section: Locator, title: string) => {
+  const node = section.locator('.canvas-resource__plugin');
+  const picture = section.getByRole('img', { name: title });
+  await expectPictureLoaded(picture, HARBOUR_SIZE.width);
+  return {
+    node: await node.boundingBox(),
+    picture: await picture.boundingBox(),
+    pictureElement: picture,
+  };
+};
 
 /**
- * An Open Image Resource is drawn as an Open Markdown Resource with its picture as the
- * content. Drawn at one canvas unit per pixel in a Resource sized to hold it,
- * the picture is drawn at its own size; in a Resource resized larger the
- * picture keeps its natural size rather than being enlarged.
+ * An Image Resource is its picture (ADR 0142): drawn over the whole region its
+ * host gives it inside its rect, fitted
+ * whole by `object-fit: contain` and never cropped, at any size, named by its
+ * Title and with no drawn Title. At rest the canvas strokes no border; selected,
+ * it strokes its border and ring.
  */
 test(
-  'an Open Image Resource draws its picture at its own size where Markdown content is drawn',
-  { tag: '@parity:open-image-resource-draws-its-image' },
+  'an Image Resource draws its picture whole into its rect, bare at rest and bordered when selected',
+  { tag: '@parity:image-resource-draws-its-picture-bare' },
   async ({ page }) => {
-    await page.goto(openImageStory);
-    const first = page.getByRole('region', { name: 'Sized to its picture' });
-    const resource = first.getByRole('article', { name: 'Harbour' });
-    const picture = resource.getByRole('img', { name: 'Harbour' });
-    await expect(picture).toBeVisible();
-    await expectPictureLoaded(picture, HARBOUR_SIZE.width);
-    await expect(resource.locator('.canvas-resource__content img')).toHaveCount(1);
-    await expect(resource.getByRole('heading', { name: 'Harbour' })).toBeVisible();
-    await expectPictureAtOwnSize(resource, picture, HARBOUR_SIZE);
+    await page.goto(imageStory);
+    for (const [region, title] of [
+      ['At rest', 'Harbour'],
+      ['Selected', 'Harbour, selected'],
+      ['Wider', 'Harbour, wider'],
+    ] as const) {
+      const section = page.getByRole('region', { name: region, exact: true });
+      const { node, picture, pictureElement } = await boxesOf(section, title);
+      await expect(pictureElement).toHaveCSS('object-fit', 'contain');
+      expect(picture?.width).toBeCloseTo(node?.width ?? 0, 0);
+      expect(picture?.height).toBeCloseTo(node?.height ?? 0, 0);
+      await expect(section.getByRole('heading')).toHaveCount(0);
+    }
 
-    // Larger than the picture, the content area draws it at its natural size.
-    const larger = page
-      .getByRole('region', { name: 'Resized larger' })
-      .getByRole('img', { name: 'Harbour, larger' });
-    await expect(larger).toBeVisible();
-    const drawn = await larger.evaluate((image) => {
-      if (!(image instanceof HTMLImageElement)) return null;
-      const box = image.getBoundingClientRect();
-      const scale = Math.min(box.width / image.naturalWidth, box.height / image.naturalHeight, 1);
-      return {
-        fit: getComputedStyle(image).objectFit,
-        scale,
-        roomy: box.width > image.naturalWidth,
-      };
-    });
-    expect(drawn).toEqual({ fit: 'scale-down', scale: 1, roomy: true });
-
-    // Close and Title editing are an Open Markdown Resource's, and there is no content Edit.
-    const node = first.locator('.react-flow__node');
-    await selectResource(node);
-    const toolbar = await resourceToolbar(page, node);
-    await expect(toolbar.getByRole('button', { name: 'Close Resource Harbour' })).toBeVisible();
-    await expect(toolbar.getByRole('button', { name: /Edit Resource/ })).toHaveCount(0);
+    const rest = page.getByRole('region', { name: 'At rest', exact: true }).getByRole('article');
+    await expect(rest).toHaveAttribute('data-bare', 'true');
+    await expect(rest).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+    const selected = page
+      .getByRole('region', { name: 'Selected', exact: true })
+      .getByRole('article');
+    await expect(selected).toHaveAttribute('data-bare', 'false');
+    await expect(selected).not.toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
   },
 );
 
-/** A picture that will not load keeps the Title and names its URL (ADR 0106). */
+/** A picture that will not load names its URL in the Resource's rect (ADR 0106). */
 test(
-  'an Open Image Resource whose picture does not load names its URL and keeps its Title',
-  { tag: '@parity:open-image-resource-shows-failed-state' },
+  'an Image Resource whose picture does not load names its URL',
+  { tag: '@parity:image-resource-shows-failed-state' },
   async ({ page }) => {
-    await page.goto(openImageStory);
+    await page.goto(imageStory);
     const resource = page
       .getByRole('region', { name: 'Failed image' })
       .getByRole('article', { name: 'Missing' });
     await expect(resource.getByText('Image did not load')).toBeVisible();
-    await expect(resource.getByText('/assets/missing-picture.png')).toBeVisible();
+    await expect(
+      resource.getByText('/assets/MISSINGpictureMISSINGpictureMISSINGpicture0'),
+    ).toBeVisible();
     await expect(resource.getByRole('img', { name: 'Missing' })).toHaveCount(0);
-    await expect(resource.getByRole('heading', { name: 'Missing' })).toBeVisible();
   },
 );
 
@@ -879,7 +882,8 @@ test(
       .getByRole('article', { name: 'Harbour, again' });
     const skeleton = resource.getByRole('status', { name: 'Loading image' });
     await expect(skeleton).toBeVisible();
-    await expect(resource.getByRole('img', { name: 'Harbour, again' })).toHaveCount(0);
+    // The picture is laid out but drawn transparent until it loads.
+    await expect(resource.getByRole('img', { name: 'Harbour, again' })).toHaveCSS('opacity', '0');
 
     release(null);
     await expectPictureLoaded(

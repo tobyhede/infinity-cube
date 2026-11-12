@@ -4,7 +4,6 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type ResourceContent } from '@project/core';
 import {
   beginEditing,
-  beginReplacing,
   CanvasResource,
   canvasResourceContentOverflow,
   CLOSED_DISPLAY,
@@ -36,7 +35,7 @@ it('takes a Reference Resource’s content-area layout from its Target, includin
     graphColor: '#ffc53d',
   };
   const { rerender } = render(
-    <CanvasResource {...props} display={opened({ kind: 'ur', via: 'target' })} />,
+    <CanvasResource {...props} display={opened({ kind: 'ur', content: {}, via: 'target' })} />,
   );
   const resource = screen.getByRole('article', { name: 'A' });
   expect(resource).not.toHaveAttribute('data-content-area');
@@ -50,48 +49,6 @@ it('takes a Reference Resource’s content-area layout from its Target, includin
   rerender(<CanvasResource {...props} display={CLOSED_DISPLAY} />);
   expect(resource).toHaveAttribute('data-content-area', 'true');
   expect(resource).toHaveTextContent('Target body');
-});
-
-it('keeps a pending replacement mounted when its entity actions become unavailable', async () => {
-  const waiting = Promise.withResolvers<string | null>();
-  const kindOperations: KindOperations = { kind: 'image' };
-  const display = beginReplacing(opened({ kind: 'image', url: FIGURE_URL, via: 'self' }), {
-    pick: () => Promise.resolve([]),
-    onReplace: () => waiting.promise,
-    onEnd: () => undefined,
-  });
-  const { rerender } = render(
-    <CanvasResource
-      state="selected"
-      kindOperations={kindOperations}
-      display={display}
-      title="Figure"
-      graphColor="#ffc53d"
-      entityActions={[[{ id: 'copy', label: 'Copy', onSelect: () => 'done' }]]}
-    />,
-  );
-  const field = screen.getByRole('textbox', { name: 'Image URL' });
-  fireEvent.change(field, { target: { value: 'https://example.com/new.png' } });
-  fireEvent.submit(field);
-  rerender(
-    <CanvasResource
-      state="selected"
-      kindOperations={kindOperations}
-      display={display}
-      title="Figure"
-      graphColor="#ffc53d"
-      entityActions={[]}
-    />,
-  );
-  expect(screen.getByRole('textbox', { name: 'Image URL' })).toHaveAttribute(
-    'aria-disabled',
-    'true',
-  );
-  await act(async () => {
-    waiting.resolve('The host refused this image.');
-    await waiting.promise;
-  });
-  expect(screen.getByRole('alert')).toHaveTextContent('The host refused this image.');
 });
 
 /**
@@ -201,239 +158,6 @@ describe('CanvasResource kind and interaction state', () => {
     expect(screen.getByRole('img', { name: 'Reference Resource' })).toBeVisible();
   });
 
-  /**
-   * A Closed Image Resource looks like any Resource (ADR 0106): its Title and
-   * its kind, and no thumbnail — the picture it shows from its URL is drawn
-   * only when it is Open.
-   */
-  it('presents a Closed Image Resource by its Title and kind alone, with no picture', () => {
-    render(
-      <CanvasResource
-        kindOperations={{ kind: 'image' }}
-        display={CLOSED_DISPLAY}
-        state="rest"
-        title="Figure"
-        graphColor="#ffc53d"
-      />,
-    );
-
-    const resource = screen.getByRole('article', { name: 'Figure' });
-    expect(resource).toHaveAttribute('data-kind', 'image');
-    expect(screen.getByRole('heading', { name: 'Figure' })).toBeVisible();
-    expect(screen.getByRole('img', { name: 'Image Resource' })).toBeVisible();
-    expect(resource.querySelector('img')).toBeNull();
-  });
-
-  it('offers an Image Resource the shared Open operation', () => {
-    const onOpenChange = vi.fn(() => 'completed' as const);
-    render(
-      <CanvasResource
-        kindOperations={{ kind: 'image' }}
-        onOpenChange={onOpenChange}
-        display={CLOSED_DISPLAY}
-        state="selected"
-        title="Figure"
-        graphColor="#ffc53d"
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open Resource Figure' }));
-    expect(onOpenChange).toHaveBeenCalledWith(true);
-  });
-
-  it('draws an Open Image Resource as an Open Markdown Resource with its image as the content', () => {
-    render(
-      <CanvasResource
-        kindOperations={{ kind: 'image' }}
-        display={{
-          shown: 'open',
-          content: { kind: 'image', url: FIGURE_URL, via: 'self' },
-        }}
-        state="rest"
-        title={'Figure\nFrom the north mole'}
-        graphColor="#ffc53d"
-      />,
-    );
-
-    const resource = screen.getByRole('article', { name: 'Figure' });
-    const image = screen.getByRole('img', { name: 'Figure' });
-    expect(image).toHaveAttribute('src', FIGURE_URL);
-    // An Open Markdown Resource's content area, and the Title ladder in its footer.
-    expect(image.closest('.canvas-resource__content')).not.toBeNull();
-    expect(resource.querySelector('.canvas-resource__body')).toHaveTextContent(
-      'FigureFrom the north mole',
-    );
-    expect(screen.queryByRole('img', { name: 'Image Resource' })).toBeNull();
-  });
-
-  it('names the URL when an Open Image Resource cannot load its image, keeping the Title', () => {
-    render(
-      <CanvasResource
-        kindOperations={{ kind: 'image' }}
-        display={{
-          shown: 'open',
-          content: { kind: 'image', url: FIGURE_URL, via: 'self' },
-        }}
-        state="rest"
-        title="Figure"
-        graphColor="#ffc53d"
-      />,
-    );
-
-    fireEvent.error(screen.getByRole('img', { name: 'Figure' }));
-
-    expect(screen.queryByRole('img', { name: 'Figure' })).toBeNull();
-    expect(screen.getByText('Image did not load')).toBeVisible();
-    expect(screen.getByText(FIGURE_URL)).toBeVisible();
-    expect(screen.getByRole('heading', { name: 'Figure' })).toBeVisible();
-  });
-
-  it('offers Close and Title editing on an Open Image Resource, and no content Edit', () => {
-    const onOpenChange = vi.fn(() => 'completed' as const);
-    render(
-      <CanvasResource
-        kindOperations={{ kind: 'image' }}
-        onOpenChange={onOpenChange}
-        display={{
-          shown: 'open',
-          content: { kind: 'image', url: FIGURE_URL, via: 'self' },
-        }}
-        state="selected"
-        title="Figure"
-        graphColor="#ffc53d"
-        onBeginTitleEdit={() => undefined}
-      />,
-    );
-
-    expect(screen.getByRole('button', { name: 'Edit Title Figure' })).toBeVisible();
-    expect(screen.queryByRole('button', { name: 'Edit Resource Figure' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Close Resource Figure' }));
-    expect(onOpenChange).toHaveBeenCalledWith(false);
-  });
-
-  it('offers Replace where a Markdown Resource offers Edit, opening a Closed one first', () => {
-    const calls: string[] = [];
-    const onOpenChange = vi.fn(() => {
-      calls.push('open');
-      return 'completed' as const;
-    });
-    const onBeginEdit = vi.fn(() => calls.push('replace'));
-    render(
-      <CanvasResource
-        kindOperations={{ kind: 'image', onBeginEdit }}
-        onOpenChange={onOpenChange}
-        display={CLOSED_DISPLAY}
-        state="selected"
-        title="Figure"
-        graphColor="#ffc53d"
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Replace image of Resource Figure' }));
-
-    expect(onOpenChange).toHaveBeenCalledWith(true);
-    expect(calls).toEqual(['open', 'replace']);
-    expect(screen.queryByRole('button', { name: 'Edit Resource Figure' })).toBeNull();
-  });
-
-  it('draws the upload target while replacing, with Cancel for Replace and Close unavailable', () => {
-    const onEnd = vi.fn();
-    render(
-      <CanvasResource
-        kindOperations={{ kind: 'image', onBeginEdit: () => undefined }}
-        onOpenChange={() => 'completed'}
-        display={beginReplacing(opened({ kind: 'image', url: FIGURE_URL, via: 'self' }), {
-          pick: () => Promise.resolve([]),
-          onReplace: () => Promise.resolve(null),
-          onEnd,
-        })}
-        state="selected"
-        title="Figure"
-        graphColor="#ffc53d"
-      />,
-    );
-
-    expect(screen.getByRole('group', { name: 'Replace image of Figure' })).toBeVisible();
-    expect(screen.queryByRole('img', { name: 'Figure' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Replace image of Resource Figure' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Save Resource Figure' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Close Resource Figure' })).toHaveAttribute(
-      'aria-disabled',
-      'true',
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel editing Resource Figure' }));
-    expect(onEnd).toHaveBeenCalledTimes(1);
-  });
-
-  it('draws Cancel unavailable while a replacement is busy', () => {
-    const onEnd = vi.fn();
-    render(
-      <CanvasResource
-        kindOperations={{ kind: 'image' }}
-        onOpenChange={() => 'completed'}
-        display={beginReplacing(opened({ kind: 'image', url: FIGURE_URL, via: 'self' }), {
-          pick: () => Promise.resolve([]),
-          onReplace: () => new Promise(() => undefined),
-          onEnd,
-        })}
-        state="selected"
-        title="Figure"
-        graphColor="#ffc53d"
-      />,
-    );
-    const field = screen.getByRole('textbox', { name: 'Image URL' });
-    fireEvent.change(field, { target: { value: 'https://example.com/new.png' } });
-    fireEvent.submit(field);
-
-    const cancel = screen.getByRole('button', { name: 'Cancel editing Resource Figure' });
-    expect(cancel).toHaveAttribute('aria-disabled', 'true');
-    fireEvent.click(cancel);
-    expect(onEnd).not.toHaveBeenCalled();
-  });
-
-  it('offers the same Replace from the failed-image state', () => {
-    const onBeginEdit = vi.fn();
-    render(
-      <CanvasResource
-        kindOperations={{ kind: 'image', onBeginEdit }}
-        display={{
-          shown: 'open',
-          content: { kind: 'image', url: FIGURE_URL, via: 'self' },
-        }}
-        state="selected"
-        title="Figure"
-        graphColor="#ffc53d"
-      />,
-    );
-
-    fireEvent.error(screen.getByRole('img', { name: 'Figure' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Replace image' }));
-
-    expect(onBeginEdit).toHaveBeenCalledTimes(1);
-  });
-
-  it('offers no Replace from the failed-image state of a read-only Resource', () => {
-    render(
-      <CanvasResource
-        kindOperations={{ kind: 'image', onBeginEdit: () => undefined }}
-        display={{
-          shown: 'open',
-          content: { kind: 'image', url: FIGURE_URL, via: 'self' },
-        }}
-        state="selected"
-        title="Figure"
-        graphColor="#ffc53d"
-        readOnly
-      />,
-    );
-
-    fireEvent.error(screen.getByRole('img', { name: 'Figure' }));
-
-    expect(screen.getByText('Image did not load')).toBeVisible();
-    expect(screen.queryByRole('button', { name: 'Replace image' })).toBeNull();
-  });
-
   it('offers a Reference Resource the shared Open operation', () => {
     const onOpenChange = vi.fn(() => 'completed' as const);
     render(
@@ -459,7 +183,7 @@ describe('CanvasResource kind and interaction state', () => {
         onOpenChange={() => 'completed'}
         display={opened({
           kind: 'image',
-          url: FIGURE_URL,
+          content: { url: FIGURE_URL },
           via: 'target',
         })}
         state="selected"
@@ -476,31 +200,6 @@ describe('CanvasResource kind and interaction state', () => {
     expect(screen.queryByRole('button', { name: /^Replace image/u })).toBeNull();
 
     fireEvent.error(picture);
-
-    expect(screen.getByText('Image did not load')).toBeVisible();
-    expect(screen.queryByRole('button', { name: 'Replace image' })).toBeNull();
-  });
-
-  /**
-   * Whose content is drawn, not which kind draws it, decides whether it may be
-   * replaced: a Target's image is read-only wherever it appears (ADR 0070).
-   */
-  it('offers no Replace for an image it draws through a Reference Resource', () => {
-    render(
-      <CanvasResource
-        kindOperations={{ kind: 'image', onBeginEdit: () => undefined }}
-        display={opened({
-          kind: 'image',
-          url: FIGURE_URL,
-          via: 'target',
-        })}
-        state="selected"
-        title="Figure"
-        graphColor="#ffc53d"
-      />,
-    );
-
-    fireEvent.error(screen.getByRole('img', { name: 'Figure' }));
 
     expect(screen.getByText('Image did not load')).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Replace image' })).toBeNull();
@@ -1114,8 +813,8 @@ describe('CanvasResource Title ladder', () => {
       [{ kind: 'space' }, CLOSED_DISPLAY],
       [{ kind: 'space' }, opened(SPACE_CONTENT)],
       [{ kind: 'ur' }, CLOSED_DISPLAY],
-      [{ kind: 'ur' }, opened({ kind: 'ur', via: 'self' })],
-      [{ kind: 'reference' }, opened({ kind: 'ur', via: 'target' })],
+      [{ kind: 'ur' }, opened({ kind: 'ur', content: {}, via: 'self' })],
+      [{ kind: 'reference' }, opened({ kind: 'ur', content: {}, via: 'target' })],
     ];
 
     for (const [kindOperations, display] of cases) {
@@ -1890,39 +1589,13 @@ describe('CanvasResource Close fade', () => {
     expect(content.querySelector('.markdown-resource-body__rendered')).not.toBeNull();
   });
 
-  it('keeps the picture an Image Resource last drew while the content fades out', () => {
-    const { rerender } = render(
-      <CanvasResource
-        kindOperations={{ kind: 'image' }}
-        display={{
-          shown: 'open',
-          content: { kind: 'image', url: FIGURE_URL, via: 'self' },
-        }}
-        state="rest"
-        title="A"
-        graphColor="#ffc53d"
-      />,
-    );
-    rerender(
-      <CanvasResource
-        kindOperations={{ kind: 'image' }}
-        display={CLOSED_DISPLAY}
-        state="rest"
-        title="A"
-        graphColor="#ffc53d"
-      />,
-    );
-
-    expect(leavingContent().querySelector('img')).toHaveAttribute('src', FIGURE_URL);
-  });
-
   it('keeps the Target’s picture a Reference Resource last drew while the content fades out', () => {
     const { rerender } = render(
       <CanvasResource
         kindOperations={{ kind: 'reference' }}
         display={opened({
           kind: 'image',
-          url: FIGURE_URL,
+          content: { url: FIGURE_URL },
           via: 'target',
         })}
         state="rest"
@@ -1955,7 +1628,7 @@ describe('CanvasResource Reference to an Ur Resource', () => {
       <CanvasResource
         kindOperations={{ kind: 'reference' }}
         onOpenChange={() => 'completed'}
-        display={opened({ kind: 'ur', via: 'target' })}
+        display={opened({ kind: 'ur', content: {}, via: 'target' })}
         state="selected"
         title="Gateway, again"
         graphColor="#ffc53d"

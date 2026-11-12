@@ -1,4 +1,5 @@
 import { pluginList } from '@project/resource-api/domain';
+import { imagePlugin } from '@project/plugin-image/domain';
 import { urPlugin } from '@project/plugin-ur/domain';
 
 /**
@@ -8,7 +9,7 @@ import { urPlugin } from '@project/plugin-ur/domain';
  * Each plugin's view half is keyed to this list by its kind in
  * `packages/ui/src/kinds/plugin-views.tsx`, whose type requires one per entry.
  */
-export const PLUGINS = pluginList([urPlugin]);
+export const PLUGINS = pluginList([imagePlugin, urPlugin]);
 
 /** A kind a plugin in this build draws. */
 export type PluginKind = (typeof PLUGINS)[number]['kind'];

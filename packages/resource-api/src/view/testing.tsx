@@ -42,6 +42,10 @@ export interface Commits<C, M> {
   readonly content: C[];
   readonly map: M[];
   readonly stored: Blob[];
+  /** How many times exclusive work ran. */
+  readonly exclusive: number;
+  /** How many times the picker was opened. */
+  readonly picked: number;
 }
 
 export interface RenderPluginOptions<C, M> {
@@ -56,12 +60,27 @@ export interface RenderPluginOptions<C, M> {
   readonly answer?: Answer;
   /** What a granted pick answers. */
   readonly files?: readonly File[];
+  /**
+   * What the nth opening of a granted picker answers, counting from 1, in
+   * place of `files`: a picker the author leaves open is one that never settles.
+   */
+  readonly picker?: (opening: number) => Promise<readonly File[]>;
+  /** Whether a granted `claim()` is refused, as the chain refuses one. */
+  readonly claimRefused?: boolean;
+  /**
+   * What a granted store answers in place of storing the bytes: a store whose
+   * host cannot be reached rejects.
+   */
+  readonly storing?: (bytes: Blob) => Promise<AssetRef | { readonly refused: string }>;
 }
 
 export type RenderedPlugin<C, M> = RenderResult & { readonly commits: Commits<C, M> };
 
+/** Where a test surface draws an asset from: a URL that names the reference, so a test can see it. */
+export const testAssetUrl = (ref: AssetRef): string => `blob:test${ref}`;
+
 const TEST_ASSETS = {
-  url: (ref: AssetRef) => ref,
+  url: testAssetUrl,
   read: () => Promise.resolve({ refused: 'No asset store in this test.' }),
 };
 
@@ -75,9 +94,9 @@ function TestEmbed() {
 const WITHDRAWN = { refused: 'Exclusive work is running.' } as const;
 const ENDED = { refused: 'The exclusive work has ended.' } as const;
 
-/** A stored Blob's reference: its position, padded to an asset reference's 43 characters. */
-const testAssetRef = (position: number): AssetRef =>
-  `/assets/${String(position).padStart(43, 'A')}`;
+/** A stored Blob's reference: its position, padded to a canonical asset reference's 43 characters. */
+export const testAssetRef = (position: number): AssetRef =>
+  `/assets/${String(position).padStart(42, 'A')}A`;
 
 /** Whether exclusive work runs on the test page, and which run it is. */
 function createTestGate() {
@@ -103,6 +122,24 @@ function createTestGate() {
       } finally {
         install(null);
       }
+    },
+  };
+}
+
+/**
+ * One Claim per surface, as a host's chain holds one per drawing: taking it
+ * again answers the same Claim, and one release ends it, so exclusive work
+ * asked for after that answers busy.
+ */
+function createClaimHold() {
+  let held = false;
+  return {
+    held: () => held,
+    take: () => {
+      held = true;
+    },
+    release: () => {
+      held = false;
     },
   };
 }
@@ -176,17 +213,36 @@ export function renderPlugin<C, M>(
   View: ComponentType<PluginViewProps<C, M>>,
   options: RenderPluginOptions<C, M>,
 ): RenderedPlugin<C, M> {
-  const commits: Commits<C, M> = { title: [], content: [], map: [], stored: [] };
+  let exclusiveRuns = 0;
+  let pickerOpenings = 0;
+  const commits: Commits<C, M> = {
+    title: [],
+    content: [],
+    map: [],
+    stored: [],
+    get exclusive() {
+      return exclusiveRuns;
+    },
+    get picked() {
+      return pickerOpenings;
+    },
+  };
   const grants = options.grants ?? {};
   const answer: Answer = options.answer ?? 'completed';
   const gate = createTestGate();
   const files = [...(options.files ?? [])];
   const store = (bytes: Blob): Promise<AssetRef | { readonly refused: string }> => {
+    if (options.storing !== undefined) return options.storing(bytes);
     if (answer !== 'completed' && answer !== 'unchanged') return Promise.resolve(answer);
     commits.stored.push(bytes);
     return Promise.resolve(testAssetRef(commits.stored.length));
   };
-  const pick = () => Promise.resolve(gate.running() ? [] : files);
+  const pick = async (): Promise<File[]> => {
+    pickerOpenings += 1;
+    if (gate.running()) return [];
+    return [...(await (options.picker?.(pickerOpenings) ?? files))];
+  };
+  const hold = createClaimHold();
   /** A commit answering refused when `live` says it is not, as the host's withdrawn and ended commits do. */
   const guarded =
     <T, A>(commit: (next: T) => Promise<A>, live: () => boolean, refusal: { refused: string }) =>
@@ -221,9 +277,11 @@ export function renderPlugin<C, M>(
       const plain = <T, A>(commit: ((next: T) => Promise<A>) | undefined) =>
         offered(commit === undefined ? undefined : guarded(commit, idle, WITHDRAWN));
       const claim: OwnClaim<C, M> = {
-        release: () => undefined,
-        exclusively: (work) =>
-          gate.exclusively((live) => {
+        release: () => hold.release(),
+        exclusively: (work) => {
+          if (!hold.held()) return Promise.resolve('busy' as const);
+          return gate.exclusively((live) => {
+            exclusiveRuns += 1;
             const ownCommit = <T, A>(commit: ((next: T) => Promise<A>) | undefined) =>
               commit === undefined ? undefined : guarded(commit, live, ENDED);
             const own: Exclusive<C, M> = {
@@ -233,7 +291,8 @@ export function renderPlugin<C, M>(
               store: ownCommit(granted.store),
             };
             return work(own);
-          }),
+          });
+        },
       };
       const assets: Assets = {
         ...TEST_ASSETS,
@@ -244,7 +303,14 @@ export function renderPlugin<C, M>(
         title: plain(granted.title),
         content: plain(granted.content),
         map: plain(granted.map),
-        claim: grants.claim === true ? () => claim : undefined,
+        claim:
+          grants.claim === true
+            ? () => {
+                if (options.claimRefused === true) return undefined;
+                hold.take();
+                return claim;
+              }
+            : undefined,
         assets,
       };
     }, [running]);

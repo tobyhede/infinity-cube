@@ -7,6 +7,7 @@ import { composeApp } from '../src/compose-app';
 import { createMapSurface } from '../src/map-surface';
 import { CANVAS } from '../src/space-authoring';
 import { useMapSurface } from '../src/use-map-surface';
+import { holdExclusive } from './held-exclusive';
 import { unusedImageSources } from './image-sources';
 
 const id = (tail: string) => uuidSchema.parse(`00000000-0000-4000-8000-${tail.padStart(12, '0')}`);
@@ -123,5 +124,33 @@ describe('useMapSurface', () => {
 
     expect(committed).not.toHaveLength(0);
     expect(new Set(committed)).toEqual(new Set(['Resource 3']));
+  });
+
+  it("withholds authoring while exclusive work runs behind its composition's gate, with no open set mounted", async () => {
+    const app = composition();
+    const surface = createMapSurface(app, () => ({
+      kind: 'drawn',
+      mapId: MAP,
+      graphId: GRAPH,
+      policy: 'authoring',
+      occurrence: 'drawing',
+    }));
+    const { result } = renderHook(() => {
+      useEffect(() => surface.observe(), []);
+      return useMapSurface(app, surface, { presenting: false, spaceOnCanvas: true });
+    });
+    await act(() => Promise.resolve());
+    expect(result.current.availability.addResource).toBe(true);
+
+    let held: ReturnType<typeof holdExclusive>;
+    act(() => {
+      held = holdExclusive(app.pluginGate, RESOURCE);
+    });
+    expect(result.current.availability.addResource).toBe(false);
+    await act(async () => {
+      held?.release();
+      await held?.running;
+    });
+    expect(result.current.availability.addResource).toBe(true);
   });
 });

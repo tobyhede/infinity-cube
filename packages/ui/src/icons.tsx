@@ -13,7 +13,6 @@ import {
   Eye,
   EyeOff,
   Image as ImageGlyph,
-  ImageUp,
   LayoutGrid,
   Link2Off,
   LogIn,
@@ -112,11 +111,6 @@ export const StopPresentingIcon = ({ color }: { color: string }) => (
 
 /** Edit the content of a Markdown Resource. */
 export const EditIcon = (props: ResourceActionIconProps) => <Pencil size={14} {...props} />;
-
-/** Replace an Image Resource's image: the image kind's counterpart to Edit. */
-export const ReplaceImageIcon = (props: ResourceActionIconProps) => (
-  <ImageUp size={14} {...props} />
-);
 
 /** Commit the edit running on a Resource's content. */
 export const CommitEditIcon = (props: ResourceActionIconProps) => <Check size={14} {...props} />;

@@ -34,7 +34,14 @@ describe('the Ur plugin’s view', () => {
     });
     expect(screen.getByTestId('plugin-title')).toHaveTextContent('Start');
     expect(screen.queryByRole('toolbar')).toBeNull();
-    expect(rendered.commits).toEqual({ title: [], content: [], map: [], stored: [] });
+    expect(rendered.commits).toEqual({
+      title: [],
+      content: [],
+      map: [],
+      stored: [],
+      exclusive: 0,
+      picked: 0,
+    });
   });
 
   it('offers its Shape on the rail where the Map content commit is present, and commits the choice', async () => {

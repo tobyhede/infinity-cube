@@ -13,13 +13,11 @@ Categories: **one-kind** = a feature that exists for that kind alone; **registry
 | packages/app/src/canvas-resource-authoring.ts:309 | `markdownKind.id`: body completion guard | markdown | C | canvas-resource-authoring.ts |
 | packages/app/src/components/CommandDockSpaces.tsx:459 | `spaceKind.id`: Space glyph | space | display | CommandDockSpaces.tsx |
 | packages/app/src/components/CommandDockSpaces.tsx:564 | `spaceKind.id`: Space glyph | space | display | CommandDockSpaces.tsx |
-| packages/app/src/image-replacement.ts:89 | `imageKind.id`: Replace guard | image | C | image-replacement.ts |
 | packages/app/src/resource-rail-actions.tsx:93 | `referenceKind.id`: Create Reference glyph | reference | E (display of a creation) | resource-rail-actions.tsx |
 | packages/app/src/resource-rail-actions.tsx:143 | `spaceKind.id`: Space Resource menu | space | one-kind | resource-rail-actions.tsx |
 | packages/app/src/resource-rail-actions.tsx:254 | `spaceKind.id`: Space Resource Enter | space | one-kind | resource-rail-actions.tsx |
-| packages/app/src/space-authoring.ts:115 | `imageKind.id`: new Image Resource document | image | E | space-authoring.ts |
-| packages/app/src/space-authoring.ts:1244 | `imageKind.id`: Replace refuses another kind | image | C | space-authoring.ts |
-| packages/app/src/space-authoring.ts:1318 | `referenceKind.id`: new Reference Resource | reference | E | space-authoring.ts |
+| packages/app/src/space-authoring.ts:116 | `imageKind.id`: new Image Resource document | image | E | space-authoring.ts |
+| packages/app/src/space-authoring.ts:1364 | `referenceKind.id`: new Reference Resource | reference | E | space-authoring.ts |
 | packages/persistence/src/space-resource-planning.ts:328 | `spaceKind.id`: new Space Resource document | space | E (lifecycle) | space-resource-planning.ts |
 
 `packages/app/src/resource-deletion.ts` no longer reaches a module id: Delete routes by `kindFlags(kind).ownsReferencedSpaces` (G02).
@@ -29,18 +27,17 @@ Categories: **one-kind** = a feature that exists for that kind alone; **registry
 | file:line | what it names | kind | category | G19 exemption |
 |---|---|---|---|---|
 | packages/core/src/index.ts:11-15 | `export *` of each kind module | all | package surface | core/src/index.ts |
-| packages/core/src/types.ts:46 | `imageNaturalSizeSchema` -> `ImageNaturalSize` | image | one-kind | types.ts |
-| packages/ui/src/index.ts:17-19 | re-exports `beginEditing`, `beginReplacing`, `isSpaceOperations`, `spaceViewOf` | markdown, image, space | package surface | ui/src/index.ts |
+| packages/ui/src/index.ts:17-19 | re-exports `beginEditing`, `isSpaceOperations`, `spaceViewOf` | markdown, space | package surface | ui/src/index.ts |
 | packages/ui/src/icons.tsx:263 | `ResourceBaseKind = Exclude<Resource['kind'], ReferenceKindId>` | reference | display (kinds a Reference badge sits on) | icons.tsx |
 | packages/ui/src/CanvasResource.tsx:301 | `isSpaceOperations`: the Space rail and portal | space | one-kind (portal) | CanvasResource.tsx |
 | packages/react-flow-adapter/src/ResourceNode.tsx:334 | `isSpaceOperations(...).portal.editing` keeps the toolbar | space | one-kind | ResourceNode.tsx |
 | packages/app/src/components/SpaceCanvas.tsx:1015,1660 | `spaceViewOf(...).view.framing` | space | one-kind (the Space kind's embedded Map) | SpaceCanvas.tsx |
-| packages/app/src/components/SpaceCanvas.tsx:1372 | `isAcceptedImageUrl`: paste creates an Image Resource | image | E (image-URL rule) | SpaceCanvas.tsx |
+| packages/app/src/components/SpaceCanvas.tsx:1704 | `isAcceptedImageUrl`: paste creates an Image Resource | image | E (image-URL rule) | SpaceCanvas.tsx |
 | packages/app/src/embedded-open-space-resource.ts:214 | `spaceViewOf` | space | one-kind (the Space kind's embedded Map) | embedded-open-space-resource.ts |
-| packages/app/src/image-replacement.ts:113-114 | `isAcceptedImageUrl`, `IMAGE_URL_UNSUPPORTED` | image | C (image-URL rule) | image-replacement.ts |
-| packages/app/src/space-authoring.ts:113 | `Extract<ResourceDocument, { kind: ImageKindId }>` | image | E | space-authoring.ts |
-| packages/app/src/space-authoring.ts:360 | refusal `IMAGE_URL_UNSUPPORTED` | image | C/E (image-URL rule) | space-authoring.ts |
-| packages/app/src/space-authoring.ts:1251,1289-1290 | `isAcceptedImageUrl` on Replace and Create | image | C, E (image-URL rule) | space-authoring.ts |
+| packages/app/src/space-authoring.ts:114 | `Extract<ResourceDocument, { kind: ImageKindId }>` | image | E | space-authoring.ts |
+| packages/app/src/space-authoring.ts:373,1336 | refusal `IMAGE_URL_UNSUPPORTED`, the Image plugin's code read through core | image | E (image-URL rule) | space-authoring.ts |
+| packages/app/src/space-authoring.ts:1335 | `isAcceptedImageUrl` on Create | image | E (image-URL rule) | space-authoring.ts |
+| packages/app/src/picture-admission.ts:10-25 | `admitImage`, `pictureSize` and its refusals from `@project/plugin-image/domain`: creation admits a picture by the plugin's rule | image | one-kind (Image creation, until issue 08) | picture-admission.ts |
 
 ## Sites now off the list
 
@@ -49,6 +46,8 @@ Categories: **one-kind** = a feature that exists for that kind alone; **registry
 - Candidate C (2026-10-13): `ContentAction` and its literals, the `replacing` display state, `CanvasResource`'s Replace label and glyph, and the literal checks in `canvas-resource-authoring.ts`, `SpaceCanvas.tsx`, `embedded-open-space-resource.ts` and `ResourceNode.tsx`. `resource-display.ts` left the exemptions.
 - Issue 12 (2026-10-14): content provenance is `'self' | 'target'`, said by the registry and no kind module, and unresolved content is the registry's, so `resource-content.ts` names no kind and `PresentedResource.tsx` and `CanvasResource.tsx` read `UNRESOLVED_CONTENT` from it. `resource-content.ts` and `PresentedResource.tsx` left the exemptions.
 - Resource plugins issue 02 (ADR 0142): an Ur Resource is drawn by its plugin, `packages/plugin-ur`, through the plugin hosts, and its Shape is its Map content. `CanvasResource.tsx`'s Ur branch and `isUrOperations` are gone, and `CanvasResource.tsx`'s exemption is the Space portal's alone. The plugin list and its adapters (`kinds/plugins.ts`, `kinds/plugin-kind.ts`, `kinds/plugin-views.tsx`) read every plugin alike and are kind-neutral; a plugin package counts as a kind module in `kind-ids-in-modules.test.ts`.
+
+- Resource plugins issue 04 (ADR 0142): an Image Resource is drawn by its plugin, `packages/plugin-image`, which owns its content schema, picture admission and Replace. `image-replacement.ts` and the `replaced-image` completion are gone: Replace is the plugin's exclusive work, landing an ordinary `changed-content` Edit, so `space-authoring.ts` no longer names `imageKind.id` for it. `ImageNaturalSize` is the plugin's, so `core/src/types.ts` left the exemptions. Image creation keeps its sites until issue 08.
 
 ## What is not covered by any mechanism
 

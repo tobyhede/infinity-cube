@@ -320,7 +320,7 @@ describe('projectResourceNodes', () => {
     });
   });
 
-  it('carries an Image Resource’s own kind whether it is Closed or Open', () => {
+  it('carries an Image Resource’s own kind, stored content and Map content to its plugin', () => {
     const imageId = uuid('00000000-0000-4000-8000-000000000008');
     const url = 'https://example.com/harbour.png';
     const withImage = load(
@@ -339,12 +339,11 @@ describe('projectResourceNodes', () => {
     const imageNode = (options: Parameters<typeof projectResourceNodes>[1]) =>
       projectResourceNodes(withImage, options).find((node) => node.id === imageId)?.data;
 
-    const picture = { kind: 'image', url, via: 'self' };
-    expect(imageNode({})).toMatchObject({ kind: 'image', display: { shown: 'closed' } });
-    expect(imageNode({ openResourceIds: new Set([imageId]) })).toMatchObject({
+    expect(imageNode({})).toMatchObject({
       kind: 'image',
-      open: true,
-      display: { shown: 'open', content: picture },
+      ownContent: { url },
+      mapContent: {},
+      display: { shown: 'closed' },
     });
   });
 });
@@ -388,11 +387,11 @@ describe('projectResourceNodes display', () => {
     });
     expect(display(imageId, { openResourceIds })).toStrictEqual({
       shown: 'open',
-      content: { kind: 'image', url, via: 'self' },
+      content: { kind: 'image', content: { url }, via: 'self' },
     });
     expect(display(referenceId, { openResourceIds })).toStrictEqual({
       shown: 'open',
-      content: { kind: 'image', url, via: 'target' },
+      content: { kind: 'image', content: { url }, via: 'target' },
     });
   });
 });

@@ -30,7 +30,7 @@ const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
 /**
  * Where a Title's later lines may be read.
  *
- * Two files, and nothing wider. The drawn Resource draws the ladder and is the only
+ * Three files, and nothing wider. The drawn Resource draws the ladder and is the only
  * surface that does (ADR 0083); `@project/core`'s own module is where the rule
  * lives and is what every other reader goes through. The drawn Resource's
  * ladder is `ResourceTitleHeading`, which `CanvasResource` and the plugin
@@ -40,6 +40,9 @@ const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
  */
 const LADDER_READERS: readonly string[] = [
   'packages/core/src/title.ts',
+  // `titleName` itself, published where a plugin can reach it (ADR 0142) and
+  // re-exported by `packages/core/src/title.ts`.
+  'packages/resource-api/src/domain/title.ts',
   'packages/ui/src/ResourceTitleHeading.tsx',
 ];
 

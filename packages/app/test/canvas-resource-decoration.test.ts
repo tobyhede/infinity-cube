@@ -25,14 +25,11 @@ import {
   type KindCanvasDecoration,
   type KindDecorator,
 } from '../src/canvas-resource-decoration';
-import { decorateImageResourceNode } from '../src/kinds/image';
+import { imageDecoration } from '../src/kinds/image';
 import { decorateMarkdownResourceNode } from '../src/kinds/markdown';
 import { decorateSpaceResourceNode } from '../src/kinds/space';
-import {
-  decorateUrResourceNode,
-  urDecoration,
-  type UrResourceDecorationContext,
-} from '../src/kinds/ur';
+import type { PluginResourceDecorationContext } from '../src/kinds/plugin-decoration';
+import { urDecoration } from '../src/kinds/ur';
 import type { KindDecorationContext } from '../src/kinds/registry';
 import type { PluginHost } from '../src/plugin-host/plugin-commits';
 import { createPluginGate } from '../src/plugin-host/plugin-gate';
@@ -121,14 +118,23 @@ const continuation: Continuation = {
   dispose: () => undefined,
 };
 
+/** A plugin host that lands Edits through `complete`, with no document and no assets. */
+const testPluginHost = (complete: PluginHost['complete']): PluginHost => ({
+  gate: createPluginGate(),
+  claims: NO_CLAIMS,
+  replacementEpoch: () => 0,
+  complete,
+  report: () => undefined,
+  document: () => undefined,
+  assets: {},
+});
+
 /** Every field a decoration reads: the shared ones and each kind's own. */
 type DecorationContext = CanvasResourceDecorationContext & KindDecorationContext;
 
 const context = (overrides: Partial<DecorationContext> = {}): DecorationContext => ({
   authorOnCanvas: true,
   bodyEditing: false,
-  pickImageFiles: () => Promise.resolve([]),
-  replaceResourceImage: () => Promise.resolve(null),
   editableResourceIds: new Set([RESOURCE_ID, REFERENCE_ID, SPACE_RESOURCE_ID, UR_ID]),
   openResource: () => 'completed',
   closeResource: () => 'completed',
@@ -351,16 +357,9 @@ describe('an Ur Resource’s decoration', () => {
   /** An Ur Resource's plugin surface commits its Map content where the Map may be authored (ADR 0142). */
   it('offers the plugin its Map content commit where the Map may be authored', async () => {
     const complete = vi.fn((): AuthoringResult => ({ kind: 'completed' }));
-    const pluginHost: PluginHost = {
-      gate: createPluginGate(),
-      claims: NO_CLAIMS,
-      replacementEpoch: () => 0,
-      document: () => undefined,
-      complete,
-      report: () => undefined,
-    };
+    const pluginHost = testPluginHost(complete);
     const ur = () => ofKind(projectionNode(UR_ID, 'ur'), 'ur');
-    const commit = decorateUrResourceNode(ur(), context({ pluginHost })).kindOperations.commitMap;
+    const commit = urDecoration.decorate(ur(), context({ pluginHost })).kindOperations.commitMap;
     await expect(commit?.({ shape: 'ellipse' })).resolves.toBe('completed');
     expect(complete).toHaveBeenCalledWith(
       { kind: 'changed-map-content', resourceId: UR_ID, content: { shape: 'ellipse' } },
@@ -368,14 +367,14 @@ describe('an Ur Resource’s decoration', () => {
     );
 
     expect(
-      decorateUrResourceNode(ur(), context({ pluginHost, authorOnCanvas: false })).kindOperations
+      urDecoration.decorate(ur(), context({ pluginHost, authorOnCanvas: false })).kindOperations
         .commitMap,
     ).toBeUndefined();
     expect(
-      decorateUrResourceNode(ur(), context({ pluginHost, editableResourceIds: new Set() }))
+      urDecoration.decorate(ur(), context({ pluginHost, editableResourceIds: new Set() }))
         .kindOperations.commitMap,
     ).toBeUndefined();
-    expect(decorateUrResourceNode(ur(), context()).kindOperations.commitMap).toBeUndefined();
+    expect(urDecoration.decorate(ur(), context()).kindOperations.commitMap).toBeUndefined();
   });
 });
 
@@ -421,46 +420,51 @@ describe('decorateMarkdownResourceNode', () => {
   });
 });
 
-describe('decorateImageResourceNode', () => {
-  const IMAGE_URL = 'https://example.com/figure.png';
-  const imageNode = (open: boolean): ResourceFlowNodeOf<'image'> => {
-    const node = projectionNode(RESOURCE_ID, 'markdown', open);
+describe('the Image kind’s decoration', () => {
+  const imageNode = (): ResourceFlowNodeOf<'image'> => {
+    const node = projectionNode(RESOURCE_ID, 'markdown', false);
     return ofKind(
       {
         ...node,
-        data: {
-          ...node.data,
-          ...bareKindData('image'),
-          ...fixtureFacts('image'),
-          display: open
-            ? {
-                shown: 'open',
-                content: { kind: 'image', url: IMAGE_URL, via: 'self' },
-              }
-            : node.data.display,
-        },
+        data: { ...node.data, ...bareKindData('image'), ...fixtureFacts('image') },
       },
       'image',
     );
   };
-  const pickImageFiles = (): Promise<readonly File[]> => Promise.resolve([]);
-  const replacing = context({
-    bodyEditorResourceId: RESOURCE_ID,
-    replaceResourceImage: () => Promise.resolve(null),
-    pickImageFiles,
+
+  it('offers the plugin its commits and a Claim where the canvas authors the Resource', async () => {
+    const complete = vi.fn((): AuthoringResult => ({ kind: 'completed' }));
+    const operations = imageDecoration.decorate(
+      imageNode(),
+      context({ pluginHost: testPluginHost(complete) }),
+    ).kindOperations;
+    expect(operations.claim).toBeTypeOf('function');
+    await expect(operations.commitContent?.({ url: 'https://example.com/b.png' })).resolves.toBe(
+      'completed',
+    );
+    expect(complete).toHaveBeenCalledWith(
+      {
+        kind: 'changed-content',
+        resourceId: RESOURCE_ID,
+        content: { url: 'https://example.com/b.png' },
+      },
+      expect.any(Function),
+    );
   });
 
-  it('enters the replacement on an Open Image Resource whose caret is live', () => {
-    expect(decorateImageResourceNode(imageNode(true), replacing).display).toMatchObject({
-      shown: 'editing',
+  it('offers nothing where the Resource is not editable or there is no host', () => {
+    const pluginHost = testPluginHost(vi.fn());
+    expect(
+      imageDecoration.decorate(imageNode(), context({ pluginHost, editableResourceIds: new Set() }))
+        .kindOperations,
+    ).toEqual(expect.objectContaining({ kind: 'image' }));
+    expect(
+      imageDecoration.decorate(imageNode(), context({ pluginHost, editableResourceIds: new Set() }))
+        .kindOperations,
+    ).not.toHaveProperty('commitContent');
+    expect(imageDecoration.decorate(imageNode(), context()).kindOperations).toEqual({
       kind: 'image',
-      content: { kind: 'image', url: IMAGE_URL, via: 'self' },
-      edit: { pick: pickImageFiles },
     });
-  });
-
-  it('leaves a Closed Image Resource’s display alone although its caret is live', () => {
-    expect(decorateImageResourceNode(imageNode(false), replacing).display).toBeUndefined();
   });
 });
 
@@ -585,14 +589,7 @@ describe('decorating each kind from its own part of the context', () => {
   it('decorates an Ur Resource again when only its optional plugin host is replaced', async () => {
     const decorate = kindDecorationMemo([kindDecorator(urDecoration)]);
     const urNodes = [projectionNode(UR_ID, 'ur')];
-    const host = (complete: PluginHost['complete']): PluginHost => ({
-      gate: createPluginGate(),
-      claims: NO_CLAIMS,
-      replacementEpoch: () => 0,
-      document: () => undefined,
-      complete,
-      report: () => undefined,
-    });
+    const host = testPluginHost;
     const first = vi.fn((): AuthoringResult => ({ kind: 'completed' }));
     const second = vi.fn((): AuthoringResult => ({ kind: 'completed' }));
     decorate(urNodes, context({ pluginHost: host(first) }));
@@ -604,11 +601,11 @@ describe('decorating each kind from its own part of the context', () => {
   });
 
   it('names every field of a kind’s context in the part it reads', () => {
-    const dropsOptional: KindCanvasDecoration<UrKindId, UrResourceDecorationContext> = {
+    const dropsOptional: KindCanvasDecoration<UrKindId, PluginResourceDecorationContext> = {
       kind: urKind.id,
       // @ts-expect-error A part read field by field names every field, the optional ones too.
       slice: ({ authorOnCanvas, editableResourceIds }) => ({ authorOnCanvas, editableResourceIds }),
-      decorate: decorateUrResourceNode,
+      decorate: urDecoration.decorate,
     };
     expect(dropsOptional.kind).toBe(urKind.id);
   });

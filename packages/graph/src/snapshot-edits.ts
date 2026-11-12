@@ -55,7 +55,7 @@ export type SnapshotEditRefusal =
   | { readonly code: 'reference-target-missing'; readonly targetId: UUID }
   /** A Resource created referencing a Resource whose kind may not be a Target. */
   | { readonly code: 'reference-target-not-targetable'; readonly targetId: UUID }
-  /** An Open of a Resource with no content to show: an Ur Resource is always Closed. */
+  /** An Open of a Resource whose kind is never Open: an Ur or Image Resource is always Closed. */
   | { readonly code: 'open-requires-content' }
   /** A Map content Edit on a Resource whose kind no plugin draws, so it keeps none (ADR 0142). */
   | { readonly code: 'map-content-not-kept' }

@@ -9,7 +9,7 @@ import {
   type ContentUnresolved,
   type ResourceContent,
 } from '@project/core';
-import { imageView, type ImageOperations, type ImageReplaceEditor } from './image';
+import { imageView } from './image';
 import type { CanvasArea, ContentCommand, KindView } from './kind-view';
 import { markdownView, type MarkdownEdit, type MarkdownOperations } from './markdown';
 import { referenceView, type ReferenceOperations } from './reference';
@@ -21,7 +21,7 @@ import { urView } from './ur';
 export interface KindOperationsByKind {
   [markdownKind.id]: MarkdownOperations;
   [referenceKind.id]: ReferenceOperations;
-  [imageKind.id]: ImageOperations;
+  [imageKind.id]: PluginOperations;
   [urKind.id]: PluginOperations;
   [spaceKind.id]: SpaceOperations;
 }
@@ -33,7 +33,6 @@ export interface KindOperationsByKind {
  */
 export interface KindEditByKind {
   [markdownKind.id]: MarkdownEdit;
-  [imageKind.id]: ImageReplaceEditor;
 }
 
 /**

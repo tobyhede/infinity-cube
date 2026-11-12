@@ -3,7 +3,6 @@ import type { ZodIssue } from 'zod';
 import {
   EDGE_TITLE_ONE_LINE,
   GRAPH_HEAD_SHAPES,
-  IMAGE_URL_UNSUPPORTED,
   DEFAULT_RESOURCE_SHAPE,
   RESOURCE_SHAPES,
   graphEdgeSchema,
@@ -929,11 +928,9 @@ describe('an Image Resource', () => {
   /** The unpadded base64url SHA-256 of the empty string, a real stored-image id. */
   const STORED_ID = '47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU';
 
-  /** Whether a refusal carries the domain's identity for an image URL it does not accept. */
+  /** Whether a refusal names the image URL, which the Image plugin's content schema refuses. */
   const refusesUrl = (issues: readonly ZodIssue[]): boolean =>
-    issues.some(
-      (issue) => issue.code === 'custom' && issue.params?.['code'] === IMAGE_URL_UNSUPPORTED,
-    );
+    issues.some((issue) => issue.code === 'custom' && issue.path.at(-1) === 'url');
 
   it.each([
     'https://example.com/figure.png',

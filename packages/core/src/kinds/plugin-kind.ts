@@ -124,9 +124,14 @@ function contentSchemaOf<C, M>(plugin: ResourcePlugin<C, M>): z.ZodType<C, z.Zod
 /** The ids a plugin declares, as the core's UUIDs: content its schema accepted names only UUIDs. */
 const uuids = (ids: readonly string[]): readonly UUID[] => ids.map((id) => uuidSchema.parse(id));
 
-/** What every plugin kind resolves its content to: its kind, which its own view draws. */
-export interface PluginContent<K extends string> {
+/**
+ * What every plugin kind resolves its content to: its kind, which its own view
+ * draws, and its content as its plugin's schema parsed it, which a surface
+ * embedding it hands that view.
+ */
+export interface PluginContent<K extends string, C = unknown> {
   readonly kind: K;
+  readonly content: C;
 }
 
 /** A plugin kind's Map content, which every plugin declares. */
@@ -135,13 +140,21 @@ export interface PluginMapContent {
 }
 
 /**
- * A plugin that starts empty, read as a kind module: its content schema, the
- * references it declares, and its Map content. A kind it draws is never Open
- * by the application's rule: Open, where a plugin has it, is its Map content.
+ * A plugin read as a kind module: its content schema, the references it
+ * declares, and its Map content. A kind it draws is never Open by the
+ * application's rule, because Open is the plugin's Map content. A plugin
+ * that declares new content starts empty; one that does not is created only
+ * from what an author brings.
  */
 export function kindFromPlugin<const K extends string, C, M>(
   plugin: ResourcePlugin<C, M> & { readonly kind: K; readonly newContent: C },
-): KindModule<K, C, C, PluginContent<K>> & StartsEmpty<C> & PluginMapContent {
+): KindModule<K, C, C, PluginContent<K, C>> & StartsEmpty<C> & PluginMapContent;
+export function kindFromPlugin<const K extends string, C, M>(
+  plugin: ResourcePlugin<C, M> & { readonly kind: K },
+): KindModule<K, C, C, PluginContent<K, C>> & PluginMapContent;
+export function kindFromPlugin<const K extends string, C, M>(
+  plugin: ResourcePlugin<C, M> & { readonly kind: K },
+): KindModule<K, C, C, PluginContent<K, C>> & PluginMapContent {
   const kind = plugin.kind;
   const module = defineKind({
     id: kind,
@@ -153,17 +166,16 @@ export function kindFromPlugin<const K extends string, C, M>(
       ownsReferencedSpaces: plugin.ownsReferencedSpaces === true,
     },
     facts: PLUGIN_CONTENT_FACTS,
-    resolveContent: (): PluginContent<K> => ({ kind }),
+    resolveContent: (content): PluginContent<K, C> => ({ kind, content }),
     resourceReferences: (content) => uuids(plugin.resourceReferences?.(content) ?? []),
     contentTarget: (content) => {
       const target = plugin.contentTarget?.(content);
       return target === undefined ? undefined : uuids([target])[0];
     },
     spaceReferences: (content) => uuids(plugin.spaceReferences?.(content) ?? []),
-    newContent: plugin.newContent,
   });
-  return {
-    ...module,
-    mapContent: mapContentOf(plugin, plugin.mapContent),
-  };
+  const mapContent = mapContentOf(plugin, plugin.mapContent);
+  return plugin.newContent === undefined
+    ? { ...module, mapContent }
+    : { ...module, newContent: plugin.newContent, mapContent };
 }

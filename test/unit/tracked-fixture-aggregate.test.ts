@@ -127,7 +127,7 @@ const copyOf = async (tracked: string): Promise<string> => {
 const copyOfTrackedFixture = (): Promise<string> => copyOf(trackedFixture);
 
 describe('tracked fixture assets', () => {
-  it('seeds an Open Image Resource whose stored image loads from the repository', async () => {
+  it('seeds a placed Image Resource whose stored image loads from the repository', async () => {
     const repository = new MemorySpaceRepository();
     await importFixture(repository);
     const loaded = await repository.loadAggregate();
@@ -137,7 +137,7 @@ describe('tracked fixture assets', () => {
       snapshot.resources.flatMap(({ id, document }) =>
         document.kind === 'image' &&
         document.content.url.startsWith(STORED_IMAGE_PREFIX) &&
-        (snapshot.document.maps ?? []).some((m) => m.positions[id]?.open === true)
+        (snapshot.document.maps ?? []).some((m) => m.positions[id] !== undefined)
           ? [document.content.url]
           : [],
       ),

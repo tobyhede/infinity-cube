@@ -1,6 +1,6 @@
 import { httpAssetClient, HttpSpaceBackend, productAddress } from '@project/http';
 import { loadSpaceSnapshot, type Space } from '@project/graph';
-import { newUuid, type AssetRef, type ImageNaturalSize, type UUID } from '@project/core';
+import { newUuid, type AssetRef, type UUID } from '@project/core';
 import type { AssetClient, AssetRefusal, SpaceBackend } from '@project/persistence';
 import type { Assets } from '@project/resource-api/view';
 import { displayImageAsAuthored, type ImageDisplay } from '@project/ui';
@@ -8,7 +8,7 @@ import type { HistoryApi } from './browser-location';
 import { createBrowserHistory } from './browser-history';
 import { describeAssetRefusal } from './authoring-refusal';
 import { pickFilesInBrowser, pickImagesInBrowser } from './browser-file-picker';
-import type { ImageSources } from './image-creation';
+import type { ImageSize, ImageSources } from './image-creation';
 import { storePicture } from './picture-admission';
 import type { Fullscreen } from './presenting-fullscreen';
 import type { PresentationLinks } from './presentation-link';
@@ -39,10 +39,10 @@ const MEASURE_TIMEOUT_MS = 10_000;
  * place the application builds an `Image`. A picture that errors, never
  * answers, or has no intrinsic size answers `undefined`.
  */
-const measureInBrowser = (url: string): Promise<ImageNaturalSize | undefined> =>
+const measureInBrowser = (url: string): Promise<ImageSize | undefined> =>
   new Promise((resolve) => {
     const picture = new Image();
-    const settle = (size: ImageNaturalSize | undefined): void => {
+    const settle = (size: ImageSize | undefined): void => {
       clearTimeout(timer);
       picture.onload = null;
       picture.onerror = null;
@@ -104,13 +104,9 @@ export const browserPluginAssets = (assets: AssetClient): Assets => ({
  * names `document`, `window` and `BroadcastChannel` and hands each to its one
  * adapter, and a test supplies hosts of its own.
  *
- * The other five seams default together and for one reason: this is the composition
+ * The other four seams default together and for one reason: this is the composition
  * root, and it is where the ambient browser, the ambient generator and the real
  * transport — for Spaces and for images — are named. Everything below takes each of them required.
- *
- * `displayImage` is where a picture is drawn from; a host serves its own stored
- * images, so the default draws every URL as authored, and a mounted aggregate
- * supplies its own (ADR 0130, `mount/mounted-startup.ts`).
  *
  * `session.mounted` says the session is Mounting an aggregate (ADR 0130), so
  * every Space it opens marks its Edits as lost on reload (ADR 0131). It is
@@ -125,7 +121,6 @@ export const createSpaceStartup = (
   newId: () => UUID = newUuid,
   history: HistoryApi = browserHistory(),
   images: ImageSources = browserImageSources(),
-  displayImage: ImageDisplay = displayImageAsAuthored,
   {
     mounted = false,
     assets = httpAssetClient(new HttpSpaceBackend()),
@@ -186,7 +181,6 @@ export const createSpaceStartup = (
             reportObserverError: (error) => console.error('Notes window observer failed', error),
           }),
           now: presentations.now,
-          displayImage,
           assets: pluginAssets,
         };
       }
@@ -197,7 +191,6 @@ export const createSpaceStartup = (
         opened,
         spaces,
         opening,
-        displayImage,
         assets: pluginAssets,
       };
     },

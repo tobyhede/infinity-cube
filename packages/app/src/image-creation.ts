@@ -1,4 +1,4 @@
-import type { ImageNaturalSize, MapId, MapPosition } from '@project/core';
+import type { MapId, MapPosition } from '@project/core';
 import type { PlacementMode } from '@project/graph';
 import type { RefusedFile } from './authoring-refusal';
 import type { SurfaceDrawing } from './map-surface-policy';
@@ -10,6 +10,9 @@ import {
   type ImagesCompletion,
   type SpaceAuthoring,
 } from './space-authoring';
+
+/** A picture's natural size, as an Image Resource records it. */
+export type ImageSize = NonNullable<CreatedImage['naturalSize']>;
 
 /**
  * Where an Image Resource's picture comes from, and how big it is (ADR 0106).
@@ -25,7 +28,7 @@ export interface ImageSources {
    */
   readonly store: (image: Blob) => Promise<ImageStoring>;
   /** Load the picture at a URL, answering its natural size, or `undefined` when it does not load. */
-  readonly measure: (url: string) => Promise<ImageNaturalSize | undefined>;
+  readonly measure: (url: string) => Promise<ImageSize | undefined>;
   /**
    * Choose image files with the browser's own picker, offering
    * {@link PICKED_IMAGE_TYPES}; a cancelled picker answers nothing, and it
@@ -68,7 +71,8 @@ export type ImageEditResult =
   AuthoringResult | { readonly kind: 'not-stored'; readonly refusals: readonly RefusedFile[] };
 
 /**
- * The URL each file is stored at, in order, or the files refused.
+ * The URL each file is stored at, with the size its bytes give, in order, or
+ * the files refused.
  *
  * Files whose declared type is refused are answered before any file is sent,
  * so a drop holding one sends nothing and names only those files: a file the
@@ -83,7 +87,7 @@ export const storeEach = async (
   images: ImageSources,
   files: readonly File[],
 ): Promise<
-  | { readonly kind: 'stored'; readonly urls: readonly string[] }
+  | { readonly kind: 'stored'; readonly images: readonly CreatedImage[] }
   | Extract<ImageEditResult, { readonly kind: 'not-stored' }>
 > => {
   const declaredRefusals = files.flatMap((file): RefusedFile[] => {
@@ -94,21 +98,26 @@ export const storeEach = async (
   const answers = await Promise.all(
     files.map(async (file) => ({ name: file.name, answer: await images.store(file) })),
   );
-  const urls: string[] = [];
+  const pictures: CreatedImage[] = [];
   const storedRefusals: RefusedFile[] = [];
   for (const { name, answer } of answers) {
     if (answer.kind === 'refused') storedRefusals.push({ code: answer.code, name });
-    else urls.push(answer.url);
+    else
+      pictures.push(
+        answer.naturalSize === undefined
+          ? { url: answer.url }
+          : { url: answer.url, naturalSize: answer.naturalSize },
+      );
   }
   return storedRefusals.length > 0
     ? { kind: 'not-stored', refusals: storedRefusals }
-    : { kind: 'stored', urls };
+    : { kind: 'stored', images: pictures };
 };
 
 /**
  * One creation gesture, from what it brought to one completed Edit.
  *
- * Every picture is stored and measured before the Edit, so the Edit records
+ * Every picture is stored or measured before the Edit, so the Edit records
  * what it was told and nothing after it has to be written back. A drop of
  * several files is all or nothing: one refused file creates none, because the
  * author made one gesture and one Edit answers it.
@@ -118,20 +127,18 @@ export async function createImageResources(
   origin: ImageOrigin,
   { mapId, drawing, anchor, placement }: ImageTarget,
 ): Promise<ImageEditResult> {
-  let urls: readonly string[];
+  let created: readonly CreatedImage[];
   if (origin.kind === 'url') {
-    urls = [origin.url];
+    // A web URL is loaded to be measured. A stored picture is sized from its
+    // bytes alone, as Replace sizes it, and records none where its header is silent.
+    const naturalSize = await images.measure(origin.url);
+    created = [naturalSize === undefined ? { url: origin.url } : { url: origin.url, naturalSize }];
   } else {
     const stored = await storeEach(images, origin.files);
     if (stored.kind === 'not-stored') return stored;
-    urls = stored.urls;
+    created = stored.images;
   }
-  if (urls.length === 0) return { kind: 'unchanged' };
-  const sizes = await Promise.all(urls.map((url) => images.measure(url)));
-  const created = urls.map((url, index): CreatedImage => {
-    const naturalSize = sizes[index];
-    return naturalSize === undefined ? { url } : { url, naturalSize };
-  });
+  if (created.length === 0) return { kind: 'unchanged' };
   const completion: ImagesCompletion = {
     kind: 'created-images',
     images: created,

@@ -172,11 +172,6 @@ const ONE_KIND_FEATURES = new Map<string, readonly string[]>([
       'icon={<ResourceKindIcon kind={spaceKind.id} decorative />}',
     ],
   ],
-  // Replace is an Image Resource's (ADR 0106).
-  [
-    'packages/app/src/image-replacement.ts',
-    ['if (stored?.document.kind !== imageKind.id) return undefined;'],
-  ],
   // Create Reference's glyph, and a Space Resource's Enter and menu.
   [
     'packages/app/src/resource-rail-actions.tsx',
@@ -186,14 +181,10 @@ const ONE_KIND_FEATURES = new Map<string, readonly string[]>([
       'spaces === null || resource.kind !== spaceKind.id',
     ],
   ],
-  // Creating an Image or a Reference Resource, and Replace.
+  // Creating an Image or a Reference Resource.
   [
     'packages/app/src/space-authoring.ts',
-    [
-      'return { title, kind: imageKind.id, content };',
-      'if (resource.document.kind !== imageKind.id)',
-      'kind: referenceKind.id,',
-    ],
+    ['return { title, kind: imageKind.id, content };', 'kind: referenceKind.id,'],
   ],
   // The Space Resource lifecycle (ADR 0074): its create.
   ['packages/persistence/src/space-resource-planning.ts', ['kind: spaceKind.id,']],

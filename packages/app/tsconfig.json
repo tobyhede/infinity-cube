@@ -12,8 +12,10 @@
     "paths": {
       "@project/aggregate": ["../aggregate/src/index.ts"],
       "@project/core": ["../core/src/index.ts"],
+      "@project/plugin-image/domain": ["../plugin-image/src/domain.ts"],
       "@project/plugin-ur/domain": ["../plugin-ur/src/domain.ts"],
       "@project/resource-api/domain": ["../resource-api/src/domain/index.ts"],
+      "@project/plugin-image/view": ["../plugin-image/src/view.tsx"],
       "@project/plugin-ur/view": ["../plugin-ur/src/view.tsx"],
       "@project/resource-api/view": ["../resource-api/src/view/index.tsx"],
       "@project/resource-api/view/host": ["../resource-api/src/view/host.tsx"],

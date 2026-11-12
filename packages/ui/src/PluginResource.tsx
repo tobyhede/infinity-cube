@@ -387,6 +387,10 @@ export function PluginSurface(props: PluginResourceProps & { readonly entry: Plu
     '--canvas-resource-drag-tilt': `${CANVAS_RESOURCE_DRAG_TILT_DEGREES}deg`,
   };
   const contextNotice = props.contextNotice ?? null;
+  const selected = state === 'selected' || state === 'editing';
+  // A plugin drawn bare at rest has no border until it is selected or drawn in
+  // a Graph's colour (ADR 0142); the ring and that colour are the canvas's.
+  const bare = props.entry.bareAtRest && props.borderColor === undefined && !selected;
   const resource = (
     <Card
       role="article"
@@ -400,6 +404,7 @@ export function PluginSurface(props: PluginResourceProps & { readonly entry: Plu
       // The outline the plugin declared, which `canvas-resource.css` strokes
       // the border and ring on (ADR 0142).
       data-resource-shape={outline}
+      data-bare={bare}
       style={style}
     >
       {outline !== 'rectangle' && (
@@ -426,6 +431,12 @@ export function PluginSurface(props: PluginResourceProps & { readonly entry: Plu
         >
           <MapTitleContext.Provider value={drawnTitle}>
             <ResourceHostProvider host={host}>{plugin}</ResourceHostProvider>
+            {/* A plugin that draws no Title is renamed in the host's editor, drawn over it. */}
+            {!props.entry.drawsTitle && title.editor !== undefined && !readOnly && (
+              <div className="canvas-resource__title-over">
+                <MapTitleView />
+              </div>
+            )}
           </MapTitleContext.Provider>
         </ResourceFailureBoundary>
       </div>

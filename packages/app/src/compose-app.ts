@@ -31,7 +31,6 @@ import {
   type ImageSources,
   type ImageTarget,
 } from './image-creation';
-import { createImageReplacements, type ImageReplacements } from './image-replacement';
 
 /**
  * What an opened Space is composed of.
@@ -185,16 +184,8 @@ export interface ComposedApp extends AppCore {
     origin: ImageOrigin,
     target: ImageTarget,
   ) => Promise<ImageEditResult>;
-  /**
-   * This Space's image picker, {@link ImageSources.pick}: the one Create Image
-   * Resource and Replace image both open.
-   */
+  /** This Space's image picker, {@link ImageSources.pick}, which Create Image Resource opens. */
   readonly pickImages: ImageSources['pick'];
-  /**
-   * This Space's image replacements: the one way to replace an Image
-   * Resource's picture, and its busy state.
-   */
-  readonly imageReplacement: ImageReplacements;
   readonly authoring: SpaceAuthoring;
   /** The gate this Space's Authoring asks at `complete`, which its plugin surfaces claim on. */
   readonly pluginGate: PluginGate;
@@ -342,11 +333,6 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     createImageResources: (origin, target) =>
       createImageResources({ images, authoring }, origin, target),
     pickImages: images.pick,
-    imageReplacement: createImageReplacements({
-      images,
-      authoring,
-      reportObserverError: compositionReporter,
-    }),
     authoring,
     pluginGate,
     adapter,

@@ -16,8 +16,7 @@ import {
 } from '@project/core';
 import type { ObserverErrorReporter, SpaceSession } from '@project/persistence';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
-import { usePluginAssets, type EntityActionGroup, type ImageReplacement } from '@project/ui';
-import { describeImageReplacement, type ImageReplacements } from './image-replacement';
+import { usePluginAssets, type EntityActionGroup } from '@project/ui';
 import type { AuthoringAvailability } from './authoring-availability';
 import { describeAuthoringRefusal } from './authoring-refusal';
 import type { ResourceResize } from './render-adapter';
@@ -131,13 +130,6 @@ export interface CanvasResourceAuthoringInput {
   readonly onBodyEditingChange?: ((editing: boolean) => void) | undefined;
   readonly onTitleEditingChange?: ((editing: boolean) => void) | undefined;
   /**
-   * The Space's image replacements (ADR 0106), which own the whole attempt;
-   * this hook keeps only the caret on the target and says the answer.
-   */
-  readonly imageReplacement: Pick<ImageReplacements, 'replace'>;
-  /** The Space's image picker, which Replace's Upload opens. */
-  readonly pickImages: () => Promise<readonly File[]>;
-  /**
    * What each referenced Space offers a Space Resource to select, keyed by target.
    *
    * Absent, or missing an entry, means the target has not been read yet — the
@@ -205,8 +197,6 @@ export function useCanvasResourceAuthoring({
   onSelectResource,
   onBodyEditingChange,
   onTitleEditingChange,
-  imageReplacement,
-  pickImages,
   spaceResourceTargets = NO_SPACE_RESOURCE_TARGETS,
   resourceEntityActions,
   portalEditing,
@@ -368,20 +358,14 @@ export function useCanvasResourceAuthoring({
       gate: pluginGate,
       claims: claimChain,
       replacementEpoch: () => authoring.getState().replacementEpoch,
-      document: (resourceId) =>
-        spaceSession.getState().working.resources.find((resource) => resource.id === resourceId)
-          ?.document,
       complete: (completion, settle) => authoring.complete(completion, settle),
       report: reportPluginFailure,
+      document: (resourceId) =>
+        spaceSession.getState().working.resources.find(({ id }) => id === resourceId)?.document,
       assets: { store: pluginAssets.store, pick: pluginAssets.pick },
     }),
-    [authoring, spaceSession, pluginGate, reportPluginFailure, claimChain, pluginAssets],
+    [authoring, pluginGate, reportPluginFailure, claimChain, spaceSession, pluginAssets],
   );
-
-  const replaceResourceImage = useMemo(() => {
-    return async (resourceId: ResourceId, replacement: ImageReplacement): Promise<string | null> =>
-      describeImageReplacement(await imageReplacement.replace(resourceId, replacement));
-  }, [imageReplacement]);
 
   const completeResourceTitle = useCallback(
     (resourceIdInput: string, title: string): string | null => {
@@ -556,8 +540,6 @@ export function useCanvasResourceAuthoring({
     bodyEditorResourceId,
     completeResourceBody,
     clearCaret,
-    replaceResourceImage,
-    pickImageFiles: pickImages,
     pluginHost,
     continuation,
     containingSpaceId: working.id,

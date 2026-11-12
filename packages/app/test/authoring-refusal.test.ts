@@ -24,6 +24,7 @@ const EVERY_REFUSAL = {
   'resource-title-required': { code: 'resource-title-required' },
   'map-title-required': { code: 'map-title-required' },
   'image-url-unsupported': { code: 'image-url-unsupported' },
+  'resource-content-invalid': { code: 'resource-content-invalid' },
   'space-title-required': { code: 'space-title-required' },
   'reference-targets-self': { code: 'reference-targets-self', targetId: TARGET_ID },
   'reference-target-missing': { code: 'reference-target-missing', targetId: TARGET_ID },

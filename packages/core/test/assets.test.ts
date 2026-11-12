@@ -10,11 +10,36 @@ import {
   isAssetHash,
   isAssetRef,
 } from '../src/assets';
+import {
+  assetRefSchema as pluginAssetRefSchema,
+  isAssetRef as isPluginAssetRef,
+} from '@project/resource-api/domain';
 
 const A = `/assets/${'A'.repeat(43)}` as const;
 const B = `/assets/${'A'.repeat(42)}E` as const;
 
 describe('an asset reference', () => {
+  it('is the same reference to a plugin as to the host', () => {
+    const BASE64URL = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+    const candidate = fc.oneof(
+      fc
+        .array(fc.constantFrom(...BASE64URL.split('')), { minLength: 41, maxLength: 45 })
+        .map((chars) => `/assets/${chars.join('')}`),
+      fc.string().map((tail) => `/assets/${tail}`),
+      fc.string(),
+    );
+    fc.assert(
+      fc.property(candidate, (value) => {
+        expect(isPluginAssetRef(value)).toBe(isAssetRef(value));
+        expect(pluginAssetRefSchema.safeParse(value).success).toBe(
+          assetRefSchema.safeParse(value).success,
+        );
+      }),
+      { numRuns: 2000 },
+    );
+    expect(isPluginAssetRef(`/assets/${'A'.repeat(42)}B`)).toBe(false);
+  });
+
   it('is /assets/ and a canonical hash, as a whole string', () => {
     expect(isAssetRef(A)).toBe(true);
     expect(isAssetRef(EMPTY_ASSET_REF)).toBe(true);

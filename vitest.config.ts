@@ -26,6 +26,8 @@ export default defineConfig({
         './packages/persistence/test/backend-contract.ts',
       ),
       '@project/persistence': resolve('./packages/persistence/src/index.ts'),
+      '@project/plugin-image/domain': resolve('./packages/plugin-image/src/domain.ts'),
+      '@project/plugin-image/view': resolve('./packages/plugin-image/src/view.tsx'),
       '@project/plugin-ur/domain': resolve('./packages/plugin-ur/src/domain.ts'),
       '@project/plugin-ur/view': resolve('./packages/plugin-ur/src/view.tsx'),
       '@project/react-flow-adapter': resolve('./packages/react-flow-adapter/src/index.ts'),

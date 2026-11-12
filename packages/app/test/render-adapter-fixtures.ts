@@ -75,11 +75,11 @@ function fixtureContent(
     case 'image':
       return {
         kind: 'image',
-        url: 'https://example.com/picture.png',
+        content: { url: 'https://example.com/picture.png' },
         via: 'self',
       };
     case 'ur':
-      return { kind: 'ur', via: 'self' };
+      return { kind: 'ur', content: {}, via: 'self' };
   }
 }
 

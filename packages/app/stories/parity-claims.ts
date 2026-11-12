@@ -268,67 +268,46 @@ export const parityClaims: readonly ParityClaim[] = [
       "An Ur Resource's rail draws its Shape as a control whose face is the Shape it is drawn in, named `Shape: <Shape>`; it opens the four Shapes as an uncaptioned radio list, each row the Shape's glyph and its name with the current one chosen, and choosing one redraws the Resource in it (ADR 0121).",
   },
   {
-    id: 'closed-image-resource-draws-title-and-kind',
+    id: 'image-resource-draws-its-picture-bare',
     storyFile: 'components/resource.stories.tsx',
-    storyExport: 'Closed',
+    storyExport: 'ImageResource',
     claim:
-      'A Closed Image Resource draws its Title and the image kind glyph at the one Closed size, and no picture (ADR 0106).',
+      'An Image Resource is its picture: drawn over its whole rect at any size, fitted whole and never cropped, named by its Title, with no drawn Title and no Open or Close; at rest the canvas strokes no border, and selected it strokes its border and ring (ADR 0106, ADR 0142).',
   },
   {
-    id: 'open-image-resource-draws-its-image',
+    id: 'image-resource-shows-failed-state',
     storyFile: 'components/resource.stories.tsx',
-    storyExport: 'OpenImage',
+    storyExport: 'ImageResource',
     claim:
-      'An Open Image Resource is drawn as an Open Markdown Resource with its picture as the content: the picture fills the content area above the Title footer, contained and never enlarged past its natural size, named by the Resource (ADR 0106).',
-  },
-  {
-    id: 'open-image-resource-shows-failed-state',
-    storyFile: 'components/resource.stories.tsx',
-    storyExport: 'OpenImage',
-    claim:
-      'An Open Image Resource whose picture does not load keeps its Title and draws the failed-image state naming the URL (ADR 0106).',
+      'An Image Resource whose picture does not load draws the failed-image state in its rect, naming the URL (ADR 0106).',
   },
   {
     id: 'open-image-resource-shows-skeleton-while-loading',
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'OpenImageReference',
     claim:
-      "Wherever an Image Resource's picture is drawn — its own content, a Reference Resource's, the Stage — a picture that has not loaded yet draws a skeleton in its place, a status named Loading image, and the picture replaces it on load. The Ladle story draws it through a Reference Resource, the one story whose picture a test can hold back.",
+      "Wherever an Image Resource's picture is drawn — its own rect, a Reference Resource's content, the Stage — a picture that has not loaded yet draws a skeleton in its place, a status named Loading image, and the picture replaces it on load. The Ladle story draws it through a Reference Resource, the one story whose picture a test can hold back.",
   },
   {
-    id: 'image-resource-replace-from-the-upload-target',
+    id: 'image-resource-replace-from-the-rail',
     storyFile: 'space/replace-image.stories.tsx',
     storyExport: 'Default',
     claim:
-      "An Image Resource's toolbar offers Replace where a Markdown Resource offers Edit, opening a Closed one first; the content becomes an upload target — an outline Empty with Upload at its centre and a URL field beneath — Cancel replaces Replace and Close is unavailable, and a new URL or a chosen file replaces the picture in one Edit that keeps the Resource's Title (ADR 0106).",
+      "An Image Resource's rail offers Replace, whose picker opens in the press; the chosen picture is stored and named in one Edit that keeps the Resource's identity, Title, placement and Edges (ADR 0106, ADR 0142).",
   },
   {
     id: 'image-resource-replace-holds-navigation',
     storyFile: 'space/replace-image.stories.tsx',
     storyExport: 'Default',
     claim:
-      'While image replacement is pending, the target remains mounted with its inputs unavailable, Close stays drawn but unavailable, and the Dock’s navigation is drawn unavailable by aria-disabled and stays focusable; its answer releases them.',
+      'While a Replace runs, the Resource says Replacing image… over its picture and the Dock’s navigation is drawn unavailable by aria-disabled and stays focusable; its answer releases them (ADR 0126).',
   },
   {
-    id: 'image-resource-replace-refuses-in-the-target',
+    id: 'image-resource-replace-refuses',
     storyFile: 'space/replace-image.stories.tsx',
     storyExport: 'Default',
     claim:
-      'A refused replacement — a data: URL, a dropped file that is not an image, or more than one dropped image — is said in the upload target in the application’s words, and the target stays up with the picture unchanged (ADR 0106).',
-  },
-  {
-    id: 'image-resource-replace-fits-the-closed-size',
-    storyFile: 'space/replace-image.stories.tsx',
-    storyExport: 'Default',
-    claim:
-      'An Image Resource at the Closed Size draws its upload target compactly: Upload, the URL field and a refusal all lie inside the content area, and a URL still replaces the picture there (ADR 0106).',
-  },
-  {
-    id: 'image-resource-failed-state-offers-replace',
-    storyFile: 'space/replace-image.stories.tsx',
-    storyExport: 'Default',
-    claim:
-      "An Open Image Resource's failed-image state offers Replace even when unselected, showing the same upload target with Cancel visible (ADR 0106).",
+      'A file that is not a picture, or an SVG, is refused before anything is stored: the refusal is said over the picture in the application’s words, and the picture stays as it was (ADR 0106).',
   },
   {
     id: 'canvas-resource-shows-kind-treatment',
@@ -554,7 +533,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Replacing',
     claim:
-      'While an Image Resource’s replacement is held, Open Spaces and the Space, Map and Graph names each report aria-disabled, stay in the Dock’s arrow order and open nothing when pressed.',
+      'While an Image Resource’s Replace runs, Open Spaces and the Space, Map and Graph names each report aria-disabled, stay in the Dock’s arrow order and open nothing when pressed.',
   },
   {
     id: 'command-dock-offers-a-mounted-session-every-edit',

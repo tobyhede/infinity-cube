@@ -35,7 +35,7 @@ const markdownCanvas = (content: MarkdownContent, area: CanvasArea) => {
   if (area.authoring && area.onBeginEdit !== undefined && area.selected) {
     body.onBeginEdit = area.onBeginEdit;
   }
-  if (area.authoring && display.shown === 'editing' && display.kind === markdownKind.id) {
+  if (area.authoring && display.shown === 'editing') {
     body.editor = display.edit.editor;
     body.autoFocus = display.edit.autoFocus;
   }

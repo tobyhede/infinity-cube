@@ -22,9 +22,10 @@ export const mountSpace = (
   opening?: DestinationOpening,
   history: HistoryApi = recordingHistory(),
 ): BrowserLocation => {
-  // One Space and no open set around it, so its own replacement is the hold.
+  // One Space and no open set around it, whose plugin gate is the one that
+  // publishes ADR 0126's hold; a test of the hold opens the Space through it.
   const browserLocation = createBrowserLocation(history, {
-    isNavigationHeld: () => opened.app.imageReplacement.getState(),
+    isNavigationHeld: () => false,
   });
   browserLocation.follow(opened.app);
   mountSpaceApp(opened, browserLocation, render, opening);

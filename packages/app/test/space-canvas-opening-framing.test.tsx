@@ -185,8 +185,6 @@ describe('opening framing on a mounted canvas', () => {
                 projection: { nodes: [resourceNode()], edges: [] },
               })}
               placement={IDLE_PLACEMENT}
-              imageReplacement={app.imageReplacement}
-              pickImages={app.pickImages}
               commandOutcomes={app.commandOutcomes}
               deleteConfirmation={app.deleteConfirmation}
               nameOnCreation={null}
@@ -290,8 +288,6 @@ describe('opening framing on a mounted canvas', () => {
               projection: { nodes: [resourceNode()], edges: [] },
             })}
             placement={IDLE_PLACEMENT}
-            imageReplacement={app.imageReplacement}
-            pickImages={app.pickImages}
             commandOutcomes={app.commandOutcomes}
             deleteConfirmation={app.deleteConfirmation}
             nameOnCreation={null}

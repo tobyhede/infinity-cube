@@ -314,8 +314,6 @@ function DeleteWhenCommitted({ armed }: { readonly armed: boolean }) {
 /** The composition `App` performs, narrowed to what an Edge test needs. */
 function CanvasHarness({
   surface,
-  imageReplacement,
-  pickImages,
   adapter,
   continuation,
   commandOutcomes,
@@ -326,8 +324,6 @@ function CanvasHarness({
 }: Pick<
   ReturnType<typeof compose>,
   | 'surface'
-  | 'imageReplacement'
-  | 'pickImages'
   | 'adapter'
   | 'continuation'
   | 'commandOutcomes'
@@ -369,8 +365,6 @@ function CanvasHarness({
           selectEdge: adapter.getState().selectEdge,
         })}
         placement={IDLE_PLACEMENT}
-        imageReplacement={imageReplacement}
-        pickImages={pickImages}
         commandOutcomes={commandOutcomes}
         deleteConfirmation={deleteConfirmation}
         nameOnCreation={null}

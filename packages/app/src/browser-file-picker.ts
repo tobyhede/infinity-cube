@@ -38,8 +38,9 @@ export const pickFilesInBrowser = (document: Document, accept: string): Promise<
   });
 
 /**
- * The one image picker: Create Image Resource and Replace image both open it,
- * offering the formats the host stores.
+ * The picker Create Image Resource opens, offering the formats the host
+ * stores. An Image Resource's Replace opens `pickFilesInBrowser` through
+ * `browserPluginAssets` (`space.ts`), with the formats the plugin asks for.
  */
 export const pickImagesInBrowser: ImageSources['pick'] = () =>
   pickFilesInBrowser(document, PICKED_IMAGE_TYPES);

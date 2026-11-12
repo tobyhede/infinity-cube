@@ -42,9 +42,11 @@ describe('the build-time plugin list', () => {
 
 describe('an asset reference', () => {
   const ref = `/assets/${'A'.repeat(43)}`;
-  it('is /assets/ and 43 characters of unpadded base64url, as a whole string', () => {
+  it('is /assets/ and a canonical 43-character unpadded base64url SHA-256, as a whole string', () => {
     expect(assetRefSchema.safeParse(ref).success).toBe(true);
-    expect(assetRefSchema.safeParse(`/assets/${'-_'.repeat(21)}a`).success).toBe(true);
+    expect(assetRefSchema.safeParse(`/assets/${'-_'.repeat(21)}g`).success).toBe(true);
+    // The last character carries two zero bits, so `a` spells no SHA-256.
+    expect(assetRefSchema.safeParse(`/assets/${'-_'.repeat(21)}a`).success).toBe(false);
     expect(assetRefSchema.safeParse(`${ref}=`).success).toBe(false);
     expect(assetRefSchema.safeParse(` ${ref}`).success).toBe(false);
     expect(assetRefSchema.safeParse(`/assets/${'A'.repeat(42)}`).success).toBe(false);

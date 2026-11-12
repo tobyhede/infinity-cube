@@ -165,19 +165,34 @@ export const handRolledStyles = [
  */
 export const interactiveDeviations = [
   {
-    subject: 'packages/ui/src/ImageReplaceTarget.tsx — dropping a file on the upload target',
+    subject: 'packages/plugin-image/src/view.tsx — dropping a file on the picture',
     existingInfinityCubeComponentConsidered:
-      '`Empty` (outline treatment) with `InputGroup` and `Button`, which the target is composed of, and the injected file picker its Upload opens. None of them accepts a dropped file.',
+      'The plugin draws inside its own rect with `@project/resource-api` alone (ADR 0142), so no `@project/ui` component is reachable from it; Replace itself is a rail command, which the host draws.',
     shadcnOrBaseUiConsidered:
-      "shadcn's `empty-outline` and `empty-input-group` examples, which the target follows. The registry has no dropzone component and Base UI has no drop primitive.",
+      'The registry has no dropzone component and Base UI has no drop primitive.',
     productRequirement:
-      "Image Resource ticket 05: while an Image Resource's image is being replaced, the whole content area is a drop target that accepts one image file.",
+      "Issue 04 of `.scratch/resource-plugins/`: Replace also works by dropping a file on the picture, through the same Claim and exclusive work as the rail's Replace.",
     whyCompositionIsInsufficient:
       'Accepting a drop is HTML drag-and-drop event handling, which no composed component exposes; a variant cannot add it.',
     customBehaviour:
-      "`dragover` is accepted and `drop` is taken on the `Empty` itself, both stopped so the canvas's own image drop does not also create a Resource; the drop cursor refuses a drop while a replacement is busy; otherwise the dropped files are handed to the same replacement the Upload button starts, and the application refuses anything other than one image in its own words before storing it.",
+      "`dragover` is accepted and `drop` is taken on the plugin's root only where it offers Replace and only for a drag carrying files, both stopped so the canvas's own image drop does not also create a Resource; the drop cursor refuses a drop while a Replace runs; otherwise the dropped files go to the same Replace the rail starts, which refuses anything other than one picture in its own words before storing it.",
     tests:
-      '`packages/ui/test/ImageReplaceTarget.test.tsx` (a dropped file is handed on; the drop does not reach the canvas), `packages/app/ladle-e2e` and `packages/app/e2e/image-resource.spec.ts` (a dropped non-image is refused in the target).',
+      '`packages/plugin-image/test/image-plugin.test.tsx` (a dropped picture replaces it; the drop does not reach the canvas; more than one file is refused) and `packages/app/e2e/image-resource.spec.ts` (a picture dropped on an Image Resource replaces it, creating nothing).',
+  },
+  {
+    subject: 'packages/plugin-image/src/view.tsx — renaming from the rail',
+    existingInfinityCubeComponentConsidered:
+      "The host's Title editor, which the host draws over a plugin that draws no Title while it is renamed from outside it (`drawsTitle: false`); the Resource API gives a plugin no way to open it from its own rail command, and no `@project/ui` component is reachable from a plugin (ADR 0142).",
+    shadcnOrBaseUiConsidered:
+      "shadcn's Textarea is a styled `<textarea>`, which the plugin cannot import; Base UI has no inline editor.",
+    productRequirement:
+      "Issue 04 of `.scratch/resource-plugins/`: Rename is on the Image plugin's rail, and the Title is the picture's text alternative, which no drawn Title shows.",
+    whyCompositionIsInsufficient:
+      'The plugin draws inside its own rect with `@project/resource-api` alone, so composition offers it no text field.',
+    customBehaviour:
+      "A `<textarea>` inside the plugin's Own region takes the caret; Enter or leaving it commits the Title, Shift-Enter breaks a line, Escape abandons it, and a composition in progress is left alone. A refused Title keeps the editor open with the draft and shows the refusal's words (ADR 0057); only a settled one closes it.",
+    tests:
+      '`packages/plugin-image/test/image-plugin.test.tsx` (renames from the rail; Escape abandons; a refused rename keeps its draft) and `packages/app/e2e/image-resource.spec.ts`.',
   },
   {
     subject: 'packages/app/src/browser-file-picker.ts — the browser file picker',
@@ -186,12 +201,12 @@ export const interactiveDeviations = [
     shadcnOrBaseUiConsidered:
       'The registry and Base UI have no file picker; a file input is the browser’s own control, with nothing to compose.',
     productRequirement:
-      'Issue 11 of `.scratch/resource-kind-modules/`: a kind’s Create runs where no component of its own is drawn, and Create Image Resource and Replace image open one picker.',
+      'Issue 11 of `.scratch/resource-kind-modules/`: a kind’s Create runs where no component of its own is drawn, and Create Image Resource and a plugin’s picker (ADR 0142) open one picker.',
     whyCompositionIsInsufficient:
       'The press that opens it may be made where no component is drawn, so the input is attached for as long as the picker is open rather than rendered by React.',
     customBehaviour:
       'A file input kept out of the layout, the tab order and the accessibility tree, attached and clicked inside the press, removed when it answers; `cancel` answers nothing, and the next picker closes one that never settled, answering it nothing.',
     tests:
-      '`packages/app/test/browser-file-picker.test.ts`, `packages/app/ladle-e2e/replace-image.spec.ts` and `packages/app/ladle-e2e/command-dock.spec.ts` (the browser’s file chooser opens from Upload and from Create Image Resource).',
+      '`packages/app/test/browser-file-picker.test.ts`, `packages/app/ladle-e2e/replace-image.spec.ts` and `packages/app/ladle-e2e/command-dock.spec.ts` (the browser’s file chooser opens from Replace and from Create Image Resource).',
   },
 ] as const;
