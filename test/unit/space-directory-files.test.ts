@@ -1,4 +1,10 @@
-import { EMPTY_ASSET_REF, isMissingKindId, uuidSchema, type SpaceSnapshot } from '@project/core';
+import {
+  EMPTY_ASSET_REF,
+  isMissingKindId,
+  uuidSchema,
+  type JsonValue,
+  type SpaceSnapshot,
+} from '@project/core';
 import { describe, expect, it } from 'vitest';
 import { spaceDirectoryFiles } from '../../src/aggregate-directory/write-space-directory';
 
@@ -102,12 +108,12 @@ describe("a Resource file's keys", () => {
 });
 
 /*
- * Export writes the Map content of a Resource whose plugin is missing in one
- * canonical form, since nothing reads it (ADR 0142), and a present plugin's in
- * the key order its store holds. Every present plugin's Map content schema in
+ * Export writes every Map entry's content in one canonical form, whether its
+ * Resource's plugin is present or missing (ADR 0142), since `jsonb` hands keys
+ * back in an order of its own. Every present plugin's Map content schema in
  * this build declares one key at most, so the Markdown entry below holds
  * content its schema would refuse: Export does not parse Map content, and
- * only content of more than one key can show which entries it sorts.
+ * only content of more than one key can show that it is sorted.
  */
 describe("a Map entry's content", () => {
   const NOTE_ID = uuidSchema.parse('50000000-0000-4000-8000-000000000007');
@@ -144,7 +150,7 @@ describe("a Map entry's content", () => {
   const written = (): string | undefined =>
     spaceDirectoryFiles({ snapshot, revision: 0n, exportedRevision: null }).get('space.json');
 
-  it("is sorted only where the Resource's plugin is missing", () => {
+  it("is sorted whether the Resource's plugin is present or missing", () => {
     expect(written()).toContain(
       [
         `      "positions": {`,
@@ -152,11 +158,11 @@ describe("a Map entry's content", () => {
         '          "x": 0,',
         '          "y": 0,',
         '          "content": {',
-        '            "zoom": 2,',
         '            "at": {',
-        '              "y": 1,',
-        '              "x": 0',
-        '            }',
+        '              "x": 0,',
+        '              "y": 1',
+        '            },',
+        '            "zoom": 2',
         '          }',
         '        },',
         `        "${UNPLUGGED_ID}": {`,
@@ -173,5 +179,40 @@ describe("a Map entry's content", () => {
         '      },',
       ].join('\n'),
     );
+  });
+});
+
+/**
+ * A Map entry's content is a plugin's value (ADR 0142), stored as `jsonb`,
+ * which hands its keys back in an order of its own.
+ */
+describe("a Map entry's content, however its store ordered it", () => {
+  const withContent = (content: JsonValue): string | undefined =>
+    spaceDirectoryFiles({
+      snapshot: {
+        id: SPACE_ID,
+        document: {
+          version: 1,
+          title: 'Talk',
+          maps: [
+            {
+              id: MAP_ID,
+              title: 'Map 1',
+              kind: 'positioned',
+              positions: { [PICTURE_ID]: { x: 0, y: 0, open: false, content } },
+              graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
+            },
+          ],
+        },
+        resources: [{ id: PICTURE_ID, document: { title: 'Shape', kind: 'ur', content: {} } }],
+      },
+      revision: 0n,
+      exportedRevision: null,
+    }).get('space.json');
+
+  it('is written in one key order, at every depth, however it was stored', () => {
+    const ordered = withContent({ a: 1, b: { c: [{ d: 1, e: 2 }], f: null } });
+    expect(withContent({ b: { f: null, c: [{ e: 2, d: 1 }] }, a: 1 })).toBe(ordered);
+    expect(ordered).toContain('"content": {\n');
   });
 });

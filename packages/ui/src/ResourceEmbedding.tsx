@@ -64,7 +64,7 @@ export interface Embedding {
   /** Told what an embedded plugin threw while drawing. */
   readonly onFailure?: ((error: Error) => void) | undefined;
   /** The entry of the plugin that draws an embedded Resource of this kind. */
-  readonly entryFor: (kind: PluginKind) => PluginEntry;
+  readonly entryFor: (kind: ResourceKind) => PluginEntry;
 }
 
 const EmbeddingContext = createContext<Embedding | null>(null);

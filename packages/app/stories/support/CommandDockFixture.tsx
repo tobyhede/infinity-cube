@@ -1,6 +1,17 @@
 import { useEffect, useRef } from 'react';
-import { isOfKind, newUuid, uuidSchema, type SpaceSnapshot } from '@project/core';
-import { MemorySpaceBackendTestControl, type SpaceSessionState } from '@project/persistence';
+import {
+  isOfKind,
+  newUuid,
+  spaceKind,
+  uuidSchema,
+  type ResourceDocument,
+  type SpaceSnapshot,
+} from '@project/core';
+import {
+  MemorySpaceBackendTestControl,
+  type ShownSpace,
+  type SpaceSessionState,
+} from '@project/persistence';
 import { Application } from '#components/Application';
 import { snapshotFromSpace } from '#src/snapshot';
 import { storyOpening, storySpaces } from './application';

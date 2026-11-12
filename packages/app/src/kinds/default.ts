@@ -28,7 +28,7 @@ export function defaultSurfaceOperations(
   resourceId: ResourceId,
   context: DefaultResourceDecorationContext,
 ): PluginOperations {
-  const { epoch, claimed, onFailure, withdrawn, commitTitle } = pluginSurfaceOperations(
+  const { epoch, claimHolder, onFailure, withdrawn, commitTitle } = pluginSurfaceOperations(
     kind,
     resourceId,
     {
@@ -37,7 +37,7 @@ export function defaultSurfaceOperations(
     },
     context.pluginHost,
   );
-  return { kind, epoch, claimed, onFailure, withdrawn, commitTitle };
+  return { kind, epoch, claimHolder, onFailure, withdrawn, commitTitle };
 }
 
 /** Whether a node draws a Resource whose kind names no plugin in this build. */

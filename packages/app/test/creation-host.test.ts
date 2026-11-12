@@ -1,6 +1,8 @@
 import { act } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { isMissingKindId, isOfKind, uuidSchema, type JsonValue } from '@project/core';
+import { MemorySpaceBackend } from '@project/persistence';
+import { isStoredAsset } from '@project/resource-api/domain';
 import type { CreationData } from '@project/resource-api/view';
 import {
   NotCreatableContent,
@@ -22,9 +24,10 @@ import {
 } from '../src/plugin-host/creation';
 import { createPluginGate } from '../src/plugin-host/plugin-gate';
 import {
-  derivationSnapshot,
   MAP_ID,
   OTHER_MAP_ID,
+  SPACE_ID,
+  derivationSnapshot,
   openDerivationSpace,
 } from './app-derivation-fixtures';
 import { textAsset } from './markdown-texts';

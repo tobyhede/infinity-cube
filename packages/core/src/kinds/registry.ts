@@ -197,7 +197,7 @@ export const resolvedMapContent = (
 
 /** The Map content a plugin is given on a surface with no Map: its `withoutMap`, else its default. */
 export const mapContentWithoutMap = (kind: ResourceKind): JsonValue =>
-  isPluginKind(kind) ? PLUGIN_MAP_CONTENT[kind].withoutMap : defaultKind.mapContent.withoutMap;
+  isPluginKind(kind) ? REGISTERED[kind].mapContent.withoutMap : defaultKind.mapContent.withoutMap;
 
 /**
  * The outline the canvas strokes a Resource's border and ring on (ADR 0142):
@@ -334,16 +334,6 @@ export const selectSpaceView = (
 ): ResourceDocument | undefined => {
   if (!isPlugged(document)) return undefined;
   const content = reselectedOf(document, (selection, current) => selection.select(current, choice));
-  return content === undefined ? undefined : { ...document, ...content };
-};
-
-/** The document framed as given, or `undefined` when its kind shows no view of another Space. */
-export const frameSpaceView = (
-  document: ResourceDocument,
-  framing: SpaceFraming,
-): ResourceDocument | undefined => {
-  if (!isPlugged(document)) return undefined;
-  const content = reselectedOf(document, (selection, current) => selection.frame(current, framing));
   return content === undefined ? undefined : { ...document, ...content };
 };
 

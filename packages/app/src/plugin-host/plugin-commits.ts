@@ -164,7 +164,6 @@ function commitsFor(
   };
 }
 
-/** Whether two Claim chains name the same surface. */
 /**
  * A plugin kind's operations on the canvas: bare where the surface offers no
  * commits, and otherwise its commits and a Claim, both withdrawn by the host.

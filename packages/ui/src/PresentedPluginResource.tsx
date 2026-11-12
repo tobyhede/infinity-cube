@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { createContext, useContext, useMemo, useState } from 'react';
 import { mapContentWithoutMap, titleName, type ResourceKind, type Resource } from '@project/core';
 import type { Size } from '@project/resource-api/domain';
 import type { OwnProps, TitleProps } from '@project/resource-api/view';

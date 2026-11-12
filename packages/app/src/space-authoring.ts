@@ -637,7 +637,8 @@ interface SpaceAuthoringDependencies {
    * work runs, every Edit that is not that work's own is refused here, at the
    * one door every Edit enters by, whichever control or Space made it.
    */
-  readonly exclusiveWork?: { readonly withdraws: () => boolean } | undefined;
+  readonly exclusiveWork?:
+    { readonly withdraws: () => boolean; readonly exclusiveRunning: () => boolean } | undefined;
   /**
    * The Spaces the aggregate, as read when the application opened, holds
    * because a plugin is missing (ADR 0142). The store refuses a commit that

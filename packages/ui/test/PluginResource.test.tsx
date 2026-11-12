@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { isMissingKindId, uuidSchema, type JsonValue, type ResourceShape } from '@project/core';
-import { definePlugin, type Answer } from '@project/resource-api/domain';
+import { definePlugin, type Answer, type Outline } from '@project/resource-api/domain';
 import { definePluginView, Title, type Assets, type Surface } from '@project/resource-api/view';
 import {
   PluginAssetsProvider,

@@ -4,10 +4,7 @@ import {
   SPACE_FILE_VERSION,
   canonicalJsonValue,
   canonicalResource,
-  isMissingKind,
   type GraphEdge,
-  type JsonObject,
-  type JsonValue,
   type SpaceFile,
 } from '@project/core';
 import { Placement, serializeResource } from '@project/graph';
@@ -68,29 +65,7 @@ const canonicalGraphs = (
     return { ...head, edges: edges.map(canonicalEdge) };
   });
 
-/**
- * A plugin's Map content with every object's keys in ordinal order, at every
- * depth: its keys are the plugin's, so no literal can fix their order, and
- * `jsonb` hands them back in its own. An array keeps its order, which is the
- * value's.
- */
-const isJsonObject = (value: JsonValue): value is JsonObject =>
-  value !== null && typeof value === 'object' && !Array.isArray(value);
-
-const canonicalJson = (value: JsonValue): JsonValue => {
-  if (Array.isArray(value)) return value.map(canonicalJson);
-  if (!isJsonObject(value)) return value;
-  return Object.fromEntries(
-    Object.entries(value)
-      .sort(([left], [right]) => compareOrdinal(left, right))
-      .map(([key, nested]) => [key, canonicalJson(nested)]),
-  );
-};
-
 const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
-  const unread = new Set(
-    snapshot.resources.filter(({ document }) => isMissingKind(document.kind)).map(({ id }) => id),
-  );
   const maps = snapshot.document.maps?.map((m) => {
     const mapBase: Omit<NonNullable<SpaceFile['maps']>[number], 'activeGraph'> = {
       id: m.id,
@@ -99,15 +74,15 @@ const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
       // `Placement.fromMap` rebuilds every entry key by key — state and size
       // included — so a stored `{"y":…,"x":…}` exports in the canonical order
       // rather than the one `jsonb` handed back; the sort fixes the entries'
-      // order. The Map content of a Resource whose plugin is missing is read by
-      // nothing here, so it is written in `canonicalJsonValue`'s one form; a
-      // present plugin's is written in the key order its store holds.
+      // order. Map content keeps its place in the entry, written in
+      // `canonicalJsonValue`'s one form: its keys are the plugin's, so no
+      // literal can fix their order, and `jsonb` hands them back in its own.
       positions: Object.fromEntries(
         [...Placement.fromMap(m)]
           .sort(([left], [right]) => compareOrdinal(left, right))
           .map(([id, entry]) => [
             id,
-            entry.content === undefined || !unread.has(id)
+            entry.content === undefined
               ? entry
               : { ...entry, content: canonicalJsonValue(entry.content) },
           ]),

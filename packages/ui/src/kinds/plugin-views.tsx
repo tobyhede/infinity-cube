@@ -243,7 +243,7 @@ export interface PluginEntry {
 export interface PluginSurfaceEntries {
   readonly entry: PluginEntry;
   /** The entry an embedded Resource of this kind is drawn through; absent, the build's. */
-  readonly entryFor?: ((kind: PluginKind) => PluginEntry) | undefined;
+  readonly entryFor?: ((kind: ResourceKind) => PluginEntry) | undefined;
 }
 
 /** Why a commit was refused before it reached the host: the value was not JSON. */
@@ -444,15 +444,6 @@ const PLUGIN_ENTRIES = {
   [spaceKind.id]: pluginEntry(spacePlugin, spacePluginView),
   [urKind.id]: pluginEntry(urPlugin, urPluginView),
 } satisfies Record<PluginKind, PluginEntry>;
-
-/** What one Resource of each plugin's kind is called. */
-const PLUGIN_NAMES = {
-  [imageKind.id]: imagePlugin.name,
-  [markdownKind.id]: markdownPlugin.name,
-  [referenceKind.id]: referencePlugin.name,
-  [spaceKind.id]: spacePlugin.name,
-  [urKind.id]: urPlugin.name,
-} satisfies Record<PluginKind, string>;
 
 /**
  * The default plugin's entry (ADR 0142): what draws a Resource whose kind

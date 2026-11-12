@@ -406,11 +406,7 @@ test(
     const persistence = page.getByTestId('persistence-status');
     const editingRevision = Number(await persistence.getAttribute('data-revision'));
     await committedSource.press(`${PRIMARY_MODIFIER}+Enter`);
-    // The commit writes the text as an asset before its Edit, so "Persisted"
-    // alone can still be the Open's revision (1) and the reload would beat the
-    // Edit. Wait for the commit's own revision.
-    const persistence = page.getByTestId('persistence-status');
-    await expect(persistence).toHaveAttribute('data-revision', '2');
+    await expect(persistence).toHaveAttribute('data-revision', String(editingRevision + 1));
     await expect(persistence).toHaveText('Persisted');
     await page.reload();
     const persisted = nodeByTitle(page, 'A').first();
