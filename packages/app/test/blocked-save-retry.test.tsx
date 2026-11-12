@@ -1,6 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { EMPTY_ASSET_REF, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import {
+  isOfKind,
+  EMPTY_ASSET_REF,
+  uuidSchema,
+  type SpaceSnapshot,
+  type UUID,
+} from '@project/core';
 import { MemorySpaceBackend, MemorySpaceBackendTestControl } from '@project/persistence';
 import { createOpenSpaces, type OpenSpace, type OpenSpaces } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
@@ -78,7 +84,8 @@ const targetOf = (containing: OpenSpace, resourceId: UUID): UUID => {
   const resource = containing.session
     .getState()
     .working.resources.find(({ id }) => id === resourceId);
-  if (resource?.document.kind !== 'space') throw new Error('No Space Resource was created');
+  if (resource === undefined || !isOfKind(resource.document, 'space'))
+    throw new Error('No Space Resource was created');
   return uuidSchema.parse(resource.document.content.spaceId);
 };
 

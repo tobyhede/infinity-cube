@@ -7,7 +7,7 @@ import {
   mapContentWithoutMap,
   uuidSchema,
   type JsonValue,
-  type PluginKind,
+  type ResourceKind,
   type Resource,
 } from '@project/core';
 import { definePlugin, type Answer } from '@project/resource-api/domain';
@@ -244,7 +244,7 @@ const probeEntry = pluginEntry(
   definePluginView(probePlugin, { View: ProbeView, Glyph: () => null }),
 );
 /** The build's entries, with the probe drawing every embedded Ur Resource. */
-const probingUr = (kind: PluginKind): PluginEntry =>
+const probingUr = (kind: ResourceKind): PluginEntry =>
   kind === 'ur' ? probeEntry : pluginEntryFor(kind);
 const probeTarget = (content: z.output<typeof probeContent> = {}): Resource => ({
   id: TARGET,

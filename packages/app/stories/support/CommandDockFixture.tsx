@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import {
+  isOfKind,
   newUuid,
   spaceKind,
   uuidSchema,
@@ -141,7 +142,8 @@ const blockSave = async (
   const resource = rendering.session
     .getState()
     .working.resources.find(({ id }) => id === created.resourceId);
-  if (resource?.document.kind !== 'space') throw new Error('No Space Resource was created.');
+  if (resource === undefined || !isOfKind(resource.document, 'space'))
+    throw new Error('No Space Resource was created.');
   const { entry: target } = await spaces.hold(uuidSchema.parse(resource.document.content.spaceId));
   const stored = target.session.getState().working;
   const targetMap = stored.document.defaultMap;

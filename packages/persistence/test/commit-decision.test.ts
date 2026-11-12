@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { isMissingKindId, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import { commitRequestRefusal, decideCommit } from '../src/commit-decision';
 import type { LoadedSpace, SpaceCommit } from '../src/backend';
 
@@ -272,5 +272,67 @@ describe('decideCommit', () => {
     // Whatever order `stored` arrived in, the refusal names the same Space at
     // the same position — the one an ascending-by-id read would give it.
     expect(scrambledResult.errors).toEqual(orderedResult.errors);
+  });
+});
+
+/*
+ * While a plugin is missing, a Space nothing refers to is held rather than
+ * refused (ADR 0142), because the Resource with no plugin may be what refers
+ * to it. That holds a Space the stored aggregate already left unrooted, and
+ * only that: a commit that newly leaves a Space unrooted is refused as it is
+ * with every plugin present.
+ */
+describe('decideCommit while a plugin is missing', () => {
+  const META_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000003a1');
+  const TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000003a2');
+  const HELD_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000003a3');
+  const LINK_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000003b1');
+  const UNPLUGGED_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000003b2');
+  const MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000003c1');
+  const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000003c2');
+  const kind = 'vnd.example.diagram';
+  if (!isMissingKindId(kind)) throw new Error(`${kind} is drawn by a plugin in this build`);
+  const unplugged = { id: UNPLUGGED_ID, document: { title: 'Diagram', kind, content: {} } };
+
+  /** Meta: the Space Resource rooting the target, and a Resource whose plugin is missing. */
+  const linked = linkedMeta(META_ID, 'Meta', LINK_ID, TARGET_ID, MAP_ID, GRAPH_ID);
+  const meta: SpaceSnapshot = { ...linked, resources: [...linked.resources, unplugged] };
+  const target = targetSpace(TARGET_ID, 'Target', MAP_ID, GRAPH_ID);
+
+  it('refuses a commit that newly leaves a Space unrooted', () => {
+    const stored: readonly LoadedSpace[] = [
+      { snapshot: meta, revision: 1n, exportedRevision: null },
+      { snapshot: target, revision: 1n, exportedRevision: null },
+    ];
+    // The Space Resource goes and the Space it rooted is kept.
+    const unlinked: SpaceSnapshot = { ...meta, resources: [unplugged] };
+    const decision = decideCommit(
+      {
+        changes: [{ kind: 'update', spaceId: META_ID, snapshot: unlinked, expectedRevision: 1n }],
+      },
+      META_ID,
+      stored,
+    );
+    expect(expectRefusedAggregate(decision).errors).toEqual([
+      { kind: 'ordinary-space-unreferenced', spaceId: TARGET_ID },
+    ]);
+  });
+
+  it('keeps holding a Space the stored aggregate already held', () => {
+    const stored: readonly LoadedSpace[] = [
+      { snapshot: meta, revision: 1n, exportedRevision: null },
+      { snapshot: target, revision: 1n, exportedRevision: null },
+      { snapshot: bareSpace(HELD_ID, 'Held'), revision: 1n, exportedRevision: null },
+    ];
+    const renamed: SpaceSnapshot = { ...meta, document: { ...meta.document, title: 'Meta v2' } };
+    expectWrite(
+      decideCommit(
+        {
+          changes: [{ kind: 'update', spaceId: META_ID, snapshot: renamed, expectedRevision: 1n }],
+        },
+        META_ID,
+        stored,
+      ),
+    );
   });
 });

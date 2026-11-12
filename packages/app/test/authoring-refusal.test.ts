@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { uuidSchema } from '@project/core';
+import { isMissingKindId, uuidSchema } from '@project/core';
 import {
   describeAuthoringRefusal,
   describeConnectChoice,
@@ -12,6 +12,8 @@ import type { AuthoringRefusal } from '../src/space-authoring';
 
 const TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 const MISSING_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
+const MISSING_KIND = 'vnd.example.diagram';
+if (!isMissingKindId(MISSING_KIND)) throw new Error(`${MISSING_KIND} is drawn by a plugin`);
 
 /** One sample of every AuthoringRefusal, keyed by code for exhaustive iteration. */
 const EVERY_REFUSAL = {
@@ -48,6 +50,7 @@ const EVERY_REFUSAL = {
   'edge-already-exists': { code: 'edge-already-exists' },
   'map-active-graph-required': { code: 'map-active-graph-required' },
   'space-resource-deletion-unsupported': { code: 'space-resource-deletion-unsupported' },
+  'missing-plugin-holds-space': { code: 'missing-plugin-holds-space', kind: MISSING_KIND },
   'edge-title-one-line': { code: 'edge-title-one-line' },
   'edge-title-required': { code: 'edge-title-required' },
 } as const satisfies Readonly<Record<AuthoringRefusal['code'], AuthoringRefusal>>;

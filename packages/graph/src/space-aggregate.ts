@@ -1,4 +1,10 @@
-import { spaceReferences, spaceSelectionProblem, type UUID } from '@project/core';
+import {
+  isMissingKind,
+  spaceReferences,
+  spaceSelectionProblem,
+  type ResourceKind,
+  type UUID,
+} from '@project/core';
 import {
   declaredSpaceReferences,
   missingSpaceReferences,
@@ -21,6 +27,12 @@ export interface SpaceAggregate {
   readonly metaSpaceId: UUID;
   readonly spaces: readonly Space[];
   readonly lookup: SpaceAggregateLookup;
+  /**
+   * The Spaces no lifetime reference holds that are held rather than refused,
+   * because a Resource whose plugin is missing may be what refers to each
+   * (ADR 0142). Empty while every plugin is present.
+   */
+  readonly heldSpaceIds: readonly UUID[];
   readonly [SPACE_AGGREGATE_INTAKE]: true;
 }
 
@@ -69,11 +81,18 @@ class LoadedSpaceAggregate implements SpaceAggregate {
   readonly metaSpaceId: UUID;
   readonly spaces: readonly Space[];
   readonly lookup: SpaceAggregateLookup;
+  readonly heldSpaceIds: readonly UUID[];
 
-  constructor(metaSpaceId: UUID, spaces: readonly Space[], lookup: SpaceAggregateLookup) {
+  constructor(
+    metaSpaceId: UUID,
+    spaces: readonly Space[],
+    lookup: SpaceAggregateLookup,
+    heldSpaceIds: readonly UUID[],
+  ) {
     this.metaSpaceId = metaSpaceId;
     this.spaces = spaces;
     this.lookup = lookup;
+    this.heldSpaceIds = heldSpaceIds;
   }
 }
 
@@ -159,14 +178,48 @@ export function loadSpaceAggregate({
   errors.push(...spaceReferenceCycles(declared).map(located('space-reference-cycle')));
   if (errors.length > 0) return { ok: false, errors };
 
-  for (const spaceId of unrootedSpaces(declared, metaSpaceId)) {
+  // While any plugin is missing, a Space nothing else refers to is held rather
+  // than refused (ADR 0142): the Resource with no plugin may be what refers to
+  // it, and nothing can read its content to say.
+  const holding = pluginMissing(spaces);
+  const unrooted = unrootedSpaces(declared, metaSpaceId);
+  for (const spaceId of holding ? [] : unrooted) {
     errors.push({ kind: 'ordinary-space-unreferenced', spaceId });
   }
   if (errors.length > 0) return { ok: false, errors };
   return {
     ok: true,
-    aggregate: new LoadedSpaceAggregate(metaSpaceId, spaces, {
-      space: (id) => byId.get(id),
-    }),
+    aggregate: new LoadedSpaceAggregate(
+      metaSpaceId,
+      spaces,
+      { space: (id) => byId.get(id) },
+      holding ? unrooted : [],
+    ),
   };
 }
+
+/** The Resources the held rule reads: only their kinds. */
+interface KindedSpace {
+  readonly resources: readonly { readonly kind: ResourceKind }[];
+}
+
+/** Whether a Resource of a missing kind is among these Spaces' (ADR 0142). */
+const pluginMissing = (spaces: readonly KindedSpace[]): boolean =>
+  spaces.some((space) => space.resources.some((resource) => isMissingKind(resource.kind)));
+
+/**
+ * The Spaces nothing refers to that ADR 0142's held rule refuses after a
+ * change: a Space is held only while a Resource of a missing kind remains in
+ * `after.spaces`, and only one `held` already names — the Spaces the stored
+ * aggregate holds or already refuses. The store applies it to a commit's
+ * candidate aggregate (`decideCommit`), and Space Authoring to a deletion
+ * before its working state changes.
+ */
+export const refusedUnrootedSpaceIds = (
+  held: Iterable<UUID>,
+  after: { readonly unrooted: readonly UUID[]; readonly spaces: readonly KindedSpace[] },
+): readonly UUID[] => {
+  if (!pluginMissing(after.spaces)) return after.unrooted;
+  const already = new Set(held);
+  return after.unrooted.filter((spaceId) => !already.has(spaceId));
+};

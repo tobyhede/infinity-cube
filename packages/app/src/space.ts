@@ -1,7 +1,7 @@
 import { httpAssetClient, HttpSpaceBackend, productAddress } from '@project/http';
-import { loadSpaceSnapshot, type Space } from '@project/graph';
-import { newUuid, type AssetRef, type UUID } from '@project/core';
-import type { AssetClient, AssetRefusal, SpaceBackend } from '@project/persistence';
+import { loadSpaceAggregate, loadSpaceSnapshot, type Space } from '@project/graph';
+import { isMissingKind, newUuid, type AssetRef, type UUID } from '@project/core';
+import type { AssetClient, AssetRefusal, LoadedSpace, SpaceBackend } from '@project/persistence';
 import type { Assets } from '@project/resource-api/view';
 import type { HistoryApi } from './browser-location';
 import { createBrowserHistory } from './browser-history';
@@ -28,6 +28,27 @@ export interface SpaceStartup {
  * testable without a DOM.
  */
 const browserHistory = (): HistoryApi => createBrowserHistory(window);
+
+/**
+ * The Spaces the loaded aggregate holds because a plugin is missing
+ * (ADR 0142): what Space Authoring reads before deleting a Resource of a
+ * missing kind. A commit that newly leaves a Space unrooted is refused
+ * whatever plugin is missing (`decideCommit`, held by
+ * `packages/persistence/test/commit-decision.test.ts`), so no Space is held
+ * later that was not held when this was read. Without a Resource of a missing
+ * kind none is held, and the aggregate is not read through intake again.
+ */
+const heldSpaceIds = (metaSpaceId: UUID, spaces: readonly LoadedSpace[]): readonly UUID[] => {
+  const pluginMissing = spaces.some(({ snapshot }) =>
+    snapshot.resources.some(({ document }) => isMissingKind(document.kind)),
+  );
+  if (!pluginMissing) return [];
+  const loaded = loadSpaceAggregate({
+    metaSpaceId,
+    snapshots: spaces.map(({ snapshot }) => snapshot),
+  });
+  return loaded.ok ? loaded.aggregate.heldSpaceIds : [];
+};
 
 /** A refusal as a plugin reads it: the store's code put into words. */
 interface WordedRefusal {
@@ -103,6 +124,7 @@ export const createSpaceStartup = (
         fullscreen,
         presentations,
         mounted,
+        heldSpaceIds: heldSpaceIds(metaSpaceId, spaces),
       });
     });
     owner = opening;

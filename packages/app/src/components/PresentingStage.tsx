@@ -1,4 +1,4 @@
-import { isPluginKind, type GraphId, type MapId, type ResourceId } from '@project/core';
+import type { GraphId, MapId, ResourceId } from '@project/core';
 import {
   referencedResources,
   resolveResourceContent,
@@ -67,7 +67,7 @@ export function PresentingStage({
         </>
       }
     >
-      {isPluginKind(resource.kind) && resourceDrawnByPlugin(space, resource) ? (
+      {resourceDrawnByPlugin(space, resource) ? (
         <HostMapProvider draw={drawPresentedMapEmbed}>
           <PresentedPluginResource
             resourceId={resource.id}

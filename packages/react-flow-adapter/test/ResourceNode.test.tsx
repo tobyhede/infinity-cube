@@ -13,7 +13,7 @@ import {
   type ResourceNodeData,
   type ResourceTitleEditor,
 } from '../src/projection';
-import type { ResourceContent } from '@project/core';
+import type { KindId, ResourceContent } from '@project/core';
 import { graphPaint, type PluginOperations } from '@project/ui';
 import { textAsset, WithTexts } from './markdown-texts';
 import { uuid } from './uuid';
@@ -213,7 +213,7 @@ interface Overrides {
   /** What React Flow answers for this node from `nodesConnectable`/`node.connectable`. */
   isConnectable?: boolean;
   title?: string;
-  kind?: ResourceNodeData['kind'];
+  kind?: KindId;
   titleEditor?: ResourceTitleEditor;
   onOpenChange?: (open: boolean) => void;
   onBeginTitleEditing?: () => void;
@@ -246,7 +246,7 @@ interface Overrides {
 }
 
 /** What the projection resolves for a fixture Resource of `kind`. */
-function ownContent(kind: ResourceNodeData['kind'], source: string, url: string): ResourceContent {
+function ownContent(kind: KindId, source: string, url: string): ResourceContent {
   switch (kind) {
     case 'markdown':
       return { kind: 'markdown', content: { url: textAsset(source) }, via: 'self' };

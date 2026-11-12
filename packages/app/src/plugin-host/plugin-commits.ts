@@ -1,4 +1,4 @@
-import type { JsonValue, PluginKind, ResourceDocument, ResourceId } from '@project/core';
+import type { JsonValue, ResourceKind, ResourceDocument, ResourceId } from '@project/core';
 import type { ObserverErrorReporter } from '@project/persistence';
 import type { Answer, Size } from '@project/resource-api/domain';
 import type { Assets } from '@project/resource-api/view';
@@ -164,7 +164,6 @@ function commitsFor(
   };
 }
 
-/** Whether two Claim chains name the same surface. */
 /**
  * A plugin kind's operations on the canvas: bare where the surface offers no
  * commits, and otherwise its commits and a Claim, both withdrawn by the host.
@@ -173,7 +172,7 @@ function commitsFor(
  * a press; the decoration is rebuilt whenever the gate publishes.
  */
 export function pluginSurfaceOperations(
-  kind: PluginKind,
+  kind: ResourceKind,
   resourceId: ResourceId,
   facts: PluginSurfaceFacts,
   host: PluginHost | undefined,

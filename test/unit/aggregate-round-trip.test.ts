@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  isOfKind,
   EMPTY_ASSET_REF,
   newUuid,
   spaceFileSchema,
@@ -300,7 +301,7 @@ describe('a fresh Space and a cube init directory', () => {
   ): Promise<string | undefined> => {
     const [meta] = await storedSnapshots(repository);
     const first = meta?.resources[0]?.document;
-    if (first?.kind !== 'markdown') return undefined;
+    if (first === undefined || !isOfKind(first, 'markdown')) return undefined;
     expect(first.content).toEqual({ url: EMPTY_ASSET_REF });
     const hash = first.content.url.slice('/assets/'.length);
     if (!isAssetHash(hash)) throw new Error(`${first.content.url} does not name an asset`);
@@ -388,7 +389,8 @@ describe('exporting and importing one complete aggregate', () => {
     const meta = (await storedSnapshots(reimported)).find(({ id }) => id === META_SPACE_ID);
     const converging = meta?.resources.filter(
       (resource) =>
-        resource.document.kind === 'space' && resource.document.content.spaceId === TARGET_SPACE_ID,
+        isOfKind(resource.document, 'space') &&
+        resource.document.content.spaceId === TARGET_SPACE_ID,
     );
     expect(converging?.map(({ id }) => id).sort()).toEqual(
       [FIRST_LINK_ID, CONVERGING_LINK_ID].sort(),

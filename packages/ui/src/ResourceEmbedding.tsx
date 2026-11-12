@@ -1,10 +1,10 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
-  isPluginKind,
   mapContentWithoutMap,
+  isMissingKind,
   mayBeTarget,
   titleName,
-  type PluginKind,
+  type ResourceKind,
   type Resource,
 } from '@project/core';
 import type { Answer, Kept, ResourceId, Size, SpaceView } from '@project/resource-api/domain';
@@ -64,7 +64,7 @@ export interface Embedding {
   /** Told what an embedded plugin threw while drawing. */
   readonly onFailure?: ((error: Error) => void) | undefined;
   /** The entry of the plugin that draws an embedded Resource of this kind. */
-  readonly entryFor: (kind: PluginKind) => PluginEntry;
+  readonly entryFor: (kind: ResourceKind) => PluginEntry;
 }
 
 const EmbeddingContext = createContext<Embedding | null>(null);
@@ -189,7 +189,9 @@ export function HostEmbed(props: EmbedProps) {
   if (embedding.nested) return <EmbeddingNote>{NOTES.nested}</EmbeddingNote>;
   const target = embedding.resources.find((resource) => resource.id === id);
   if (target === undefined) return <EmbeddingNote>{NOTES.deleted}</EmbeddingNote>;
-  if (!isPluginKind(target.kind) || !mayBeTarget(target.kind))
+  // A Reference already naming a Resource whose plugin is missing is carried
+  // (issue 09) and embeds the default plugin's surface.
+  if (!mayBeTarget(target.kind) && !isMissingKind(target.kind))
     return <EmbeddingNote>{NOTES.untargetable}</EmbeddingNote>;
   return (
     <EmbeddedSurface
@@ -255,7 +257,7 @@ function EmbeddedSurface({
   embedding,
 }: {
   readonly target: Resource;
-  readonly kind: PluginKind;
+  readonly kind: ResourceKind;
   readonly title: Kept<string>;
   readonly embedding: Embedding;
 }) {

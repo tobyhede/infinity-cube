@@ -3,7 +3,7 @@ import {
   authorsContent,
   embedsMap,
   uuidSchema,
-  type Resource,
+  type KindId,
   type ResourceContent,
   type UUID,
 } from '@project/core';
@@ -46,7 +46,7 @@ const FIXTURE_TARGET_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000
  */
 export function fixtureDisplay(
   open: boolean,
-  kind: Exclude<Resource['kind'], 'image'>,
+  kind: Exclude<KindId, 'image'>,
   source = '',
   space: { readonly spaceId: UUID; readonly map: UUID } = {
     spaceId: FIXTURE_TARGET_SPACE,
@@ -58,7 +58,7 @@ export function fixtureDisplay(
 }
 
 function fixtureContent(
-  kind: Resource['kind'],
+  kind: KindId,
   source: string,
   space: { readonly spaceId: UUID; readonly map: UUID },
 ): ResourceContent {
@@ -86,7 +86,7 @@ function fixtureContent(
 
 /** The projection's answers for the content used by node fixtures. */
 export function fixtureFacts(
-  kind: Resource['kind'],
+  kind: KindId,
 ): Pick<ResourceFlowNode['data'], 'authorsContent' | 'embedsMap' | 'takesOpen'> {
   const content = fixtureContent(kind, '', {
     spaceId: FIXTURE_TARGET_SPACE,

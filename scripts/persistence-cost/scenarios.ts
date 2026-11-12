@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import {
+  isOfKind,
   resourceSize,
   spaceSnapshotSchema,
   uuidSchema,
@@ -266,7 +267,8 @@ export const applyEdit = (
       return {
         ...snapshot,
         resources: snapshot.resources.map((resource) => {
-          if (resource.id !== subject.id || resource.document.kind !== 'markdown') return resource;
+          if (resource.id !== subject.id || !isOfKind(resource.document, 'markdown'))
+            return resource;
           return kind === 'rename'
             ? { ...resource, document: { ...resource.document, title: `Renamed ${sample}` } }
             : {

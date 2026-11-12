@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Resource } from '@project/core';
+import { isMissingKindId, type Resource } from '@project/core';
 import { Placement } from '@project/graph';
 import type { EntityActionGroup, EntityActionOutcome } from '@project/ui';
 import { activeGraphOf } from '../src/dock-chrome';
@@ -369,6 +369,18 @@ describe('resourceRailGroups', () => {
       id: 'create-reference',
       disabled: true,
       description: 'Reference Resources cannot be referenced.',
+    });
+  });
+  it('draws Create Reference unavailable on a Resource whose plugin is missing, naming its kind', () => {
+    const kind = 'vnd.example.chart';
+    if (!isMissingKindId(kind)) throw new Error('A plugin in this build draws the kind');
+    const unplugged: Resource = { id: OUTSIDE, title: 'A chart', kind, content: {} };
+    const row = resourceRailGroups(unplugged, addresses, connect, everything)[0]?.[0];
+    expect(row).toMatchObject({
+      id: 'create-reference',
+      disabled: true,
+      description:
+        '“vnd.example.chart” is not available in this build, so it cannot be referenced.',
     });
   });
 });

@@ -69,8 +69,11 @@ export const derivationSpace = (snapshot: SpaceSnapshot = derivationSnapshot): S
 };
 
 /** The fixture Space opened and composed the way Open Spaces opens one. */
-export const openDerivationSpace = (newId: () => UUID = newUuid): OpenSpace => {
-  const stored = { snapshot: derivationSnapshot, revision: 0n, exportedRevision: null };
+export const openDerivationSpace = (
+  newId: () => UUID = newUuid,
+  snapshot: SpaceSnapshot = derivationSnapshot,
+): OpenSpace => {
+  const stored = { snapshot, revision: 0n, exportedRevision: null };
   const { spaceSession, spaceResources } = openTestSpace(
     new MemorySpaceBackend(SPACE_ID, [stored]),
     stored,

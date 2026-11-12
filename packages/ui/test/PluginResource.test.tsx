@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { useEffect, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { type JsonValue, type ResourceShape } from '@project/core';
+import { isMissingKindId, uuidSchema, type JsonValue, type ResourceShape } from '@project/core';
 import { definePlugin, type Answer, type Outline } from '@project/resource-api/domain';
 import { definePluginView, Title, type Assets, type Surface } from '@project/resource-api/view';
 import {
@@ -940,5 +940,62 @@ describe('the Stage host a plugin draws inside (ADR 0142)', () => {
     );
     error.mockRestore();
     expect(screen.queryByTestId('resource-failure')).toBeNull();
+  });
+});
+
+/**
+ * A Resource whose kind names no plugin in this build is drawn by the default
+ * plugin through the same hosts as any other (ADR 0142): its Title, that its
+ * kind is not available, in a rectangle the canvas strokes.
+ */
+describe('a Resource whose plugin is missing', () => {
+  const MISSING = 'vnd.example.diagram';
+  if (!isMissingKindId(MISSING)) throw new Error('A plugin in this build draws the kind');
+  const TARGET = uuidSchema.parse('00000000-0000-4000-8000-0000000000d1');
+
+  it('is drawn on the Map by the default plugin, given its stored kind', () => {
+    render(
+      <PluginResource
+        {...props('rectangle', {
+          resourceId: 'chart',
+          kind: MISSING,
+          title: { ...title, title: 'Flow' },
+          content: { source: REF, options: { direction: 'TD' } },
+          mapContent: { zoom: 2 },
+          operations: { kind: MISSING },
+        })}
+        state="selected"
+        size={{ width: 320, height: 200 }}
+      />,
+    );
+    const resource = screen.getByRole('article', { name: 'Flow' });
+    expect(resource).toHaveAttribute('data-resource-shape', 'rectangle');
+    expect(resource.querySelector(`[data-missing-kind="${MISSING}"]`)).not.toBeNull();
+    expect(screen.getByText(/is not available in this build/u)).toHaveTextContent(MISSING);
+  });
+
+  it('is drawn on the Stage by the default plugin', () => {
+    render(
+      <PresentedPluginResource
+        resourceId="chart"
+        kind={MISSING}
+        title="Flow"
+        content={{ source: REF }}
+      />,
+    );
+    expect(screen.getByText(/is not available in this build/u)).toHaveTextContent(MISSING);
+  });
+
+  it('is drawn by the default plugin where a Reference embeds it as its Target', () => {
+    render(
+      <PresentedPluginResource
+        resourceId="reference"
+        kind="reference"
+        title="Flow, again"
+        content={{ target: TARGET }}
+        embeddable={[{ id: TARGET, title: 'Flow', kind: MISSING, content: { source: REF } }]}
+      />,
+    );
+    expect(screen.getByText(/is not available in this build/u)).toHaveTextContent(MISSING);
   });
 });

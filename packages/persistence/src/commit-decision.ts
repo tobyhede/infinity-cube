@@ -1,5 +1,5 @@
 import type { UUID } from '@project/core';
-import { loadSpaceAggregate } from '@project/graph';
+import { loadSpaceAggregate, refusedUnrootedSpaceIds } from '@project/graph';
 import type { LoadedSpace, SpaceChange, SpaceCommit, SpaceConflict } from './backend';
 import type { RepositoryCommitResult } from './repository';
 
@@ -201,6 +201,19 @@ export const decideCommit = (
       (error) =>
         error.kind !== 'ordinary-space-unreferenced' || !baselineUnreferenced.has(error.spaceId),
     );
+    if (errors.length > 0) return { kind: 'answer', result: { kind: 'aggregate-refused', errors } };
+  } else {
+    // A missing plugin holds a Space the stored aggregate already left
+    // unrooted (ADR 0142), not one this commit leaves unrooted. An accepted
+    // aggregate's unrooted Spaces are the ones it holds.
+    const held = [
+      ...(baseline?.ok === true ? baseline.aggregate.heldSpaceIds : []),
+      ...baselineUnreferenced,
+    ];
+    const errors = refusedUnrootedSpaceIds(held, {
+      unrooted: aggregate.aggregate.heldSpaceIds,
+      spaces: aggregate.aggregate.spaces,
+    }).map((spaceId) => ({ kind: 'ordinary-space-unreferenced' as const, spaceId }));
     if (errors.length > 0) return { kind: 'answer', result: { kind: 'aggregate-refused', errors } };
   }
   return {

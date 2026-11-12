@@ -5,10 +5,13 @@ import {
   referenceKind,
   spaceKind,
   urKind,
+  isRegisteredKind,
   type KindId,
+  type ResourceKind,
   type ContentUnresolved,
   type ResourceContent,
 } from '@project/core';
+import { defaultView } from './default';
 import { imageView } from './image';
 import type { CanvasArea, KindView } from './kind-view';
 import { markdownView } from './markdown';
@@ -34,6 +37,14 @@ export interface KindOperationsByKind {
  */
 export type KindOperations = KindOperationsByKind[KindId];
 
+/**
+ * What a Resource of this kind offers beyond its shared Title: its kind's
+ * operations, or the default plugin's for a kind no plugin in this build draws.
+ */
+export type KindOperationsOf<K extends ResourceKind> = K extends KindId
+  ? KindOperationsByKind[K]
+  : PluginOperations;
+
 /** Each kind's own resolved content, by its id; a kind that shows another's has none. */
 type OwnContentByKind = { [K in KindId]: Extract<ResourceContent, { readonly kind: K }> };
 
@@ -54,12 +65,24 @@ const KIND_VIEWS: KindViews = {
 /** What a kind's Resources are called and drawn as. */
 export type KindNaming = Pick<KindView<unknown>, 'name' | 'listName' | 'referenceName' | 'Glyph'>;
 
-/** What a kind's Resources are called and drawn as, from its view half. */
-export const kindNaming = (kind: KindId): KindNaming => KIND_VIEWS[kind];
+/**
+ * What a kind's Resources are called and drawn as, from its view half, or the
+ * default plugin's for a kind no plugin in this build draws.
+ */
+export const kindNaming = (kind: ResourceKind): KindNaming =>
+  isRegisteredKind(kind) ? KIND_VIEWS[kind] : defaultView;
+
+/** What every Resource of a kind whose plugin is missing is called and drawn with: the default plugin's. */
+export const missingKindNaming: KindNaming = defaultView;
+
+const registeredBareOperations = <K extends KindId>(kind: K): KindOperationsByKind[K] =>
+  KIND_VIEWS[kind].bareOperations;
 
 /** What a Resource of this kind offers before the composition offers anything. */
-export const bareOperations = <K extends KindId>(kind: K): KindOperationsByKind[K] =>
-  KIND_VIEWS[kind].bareOperations;
+export function bareOperations<K extends ResourceKind>(kind: K): KindOperationsOf<K>;
+export function bareOperations(kind: ResourceKind): PluginOperations {
+  return isRegisteredKind(kind) ? registeredBareOperations(kind) : { kind };
+}
 
 const presentedOf = <K extends KindId>(
   name: string,

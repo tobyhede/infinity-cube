@@ -11,13 +11,15 @@ import { useSyncExternalStore, type ReactElement } from 'react';
 import { z } from 'zod';
 import { ReactFlowProvider } from '@xyflow/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { resourceOpen, spaceSnapshotSchema, uuidSchema, type ResourceId } from '@project/core';
-import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import {
-  bareKindData,
-  type ResourceFlowNode,
-  type ResourceNodeData,
-} from '@project/react-flow-adapter';
+  resourceOpen,
+  spaceSnapshotSchema,
+  uuidSchema,
+  type KindId,
+  type ResourceId,
+} from '@project/core';
+import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
+import { bareKindData, type ResourceFlowNode } from '@project/react-flow-adapter';
 import { RESOURCE_DRAG_TYPE, SPACE_DRAG_TYPE } from '../src/components/ResourcesPopover';
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
 import { composeApp } from '../src/compose-app';
@@ -99,7 +101,7 @@ const resourceNode = (
   title: string,
   id: typeof RESOURCE_ID = RESOURCE_ID,
   selected = false,
-  kind: ResourceNodeData['kind'] = 'markdown',
+  kind: KindId = 'markdown',
 ): ResourceFlowNode => {
   const node = drawnNode(title, id, selected, kind);
   // A Markdown Resource is drawn by its plugin, from its content and Map content (ADR 0142).
@@ -126,7 +128,7 @@ const drawnNode = (
   title: string,
   id: typeof RESOURCE_ID,
   selected: boolean,
-  kind: ResourceNodeData['kind'],
+  kind: KindId,
 ): ResourceFlowNode => ({
   id,
   type: 'resource',

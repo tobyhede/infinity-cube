@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  isOfKind,
   newUuid,
   uuidSchema,
   type GraphId,
@@ -134,7 +135,7 @@ const selectOn =
 
 const storedSelection = (source: OpenSpace) => {
   const stored = source.session.getState().working.resources[0]?.document;
-  return stored?.kind === 'space'
+  return stored !== undefined && isOfKind(stored, 'space')
     ? { map: stored.content.map, graph: stored.content.graph }
     : undefined;
 };

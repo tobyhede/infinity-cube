@@ -1,9 +1,10 @@
 import {
+  isMissingKind,
   lifetimeSpaceReferences,
   mayBeTarget,
   resourceReferences,
   spaceReferences,
-  type KindId,
+  type ResourceKind,
   type KindedResource,
   type UUID,
 } from '@project/core';
@@ -30,13 +31,31 @@ export type ResourceReferenceProblem =
 export const resourceReferenceProblems = (
   resourceId: UUID,
   resource: KindedResource,
-  kindOf: (id: UUID) => KindId | undefined,
+  kindOf: (id: UUID) => ResourceKind | undefined,
 ): ResourceReferenceProblem[] =>
   resourceReferences(resource).flatMap((targetId): ResourceReferenceProblem[] => {
     if (targetId === resourceId) return [{ code: 'reference-targets-self', targetId }];
     const kind = kindOf(targetId);
     if (kind === undefined) return [{ code: 'reference-target-missing', targetId }];
     return mayBeTarget(kind) ? [] : [{ code: 'reference-target-not-targetable', targetId }];
+  });
+
+/**
+ * {@link resourceReferenceProblems} as intake reads a stored Space: a reference
+ * that already names a Resource whose plugin is missing is carried, because
+ * nothing in this build can say whether that plugin lets it be a Target
+ * (issue 09). Creating one stays refused, by {@link resourceReferenceProblems}
+ * itself, since the default plugin declares no Target.
+ */
+export const storedResourceReferenceProblems = (
+  resourceId: UUID,
+  resource: KindedResource,
+  kindOf: (id: UUID) => ResourceKind | undefined,
+): ResourceReferenceProblem[] =>
+  resourceReferenceProblems(resourceId, resource, kindOf).filter((problem) => {
+    if (problem.code !== 'reference-target-not-targetable') return true;
+    const kind = kindOf(problem.targetId);
+    return kind === undefined || !isMissingKind(kind);
   });
 
 /** Whether `resource` declares a Resource reference to `targetId`. */

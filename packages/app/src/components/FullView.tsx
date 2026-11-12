@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { isPluginKind, type ResourceId } from '@project/core';
+import type { ResourceId } from '@project/core';
 import {
   referencedResources,
   resolveResourceContent,
@@ -94,7 +94,7 @@ export function FullView({
           </div>
         }
       >
-        {isPluginKind(resource.kind) && resourceDrawnByPlugin(space, resource) ? (
+        {resourceDrawnByPlugin(space, resource) ? (
           <HostMapProvider draw={drawPresentedMapEmbed}>
             <PresentedPluginResource
               resourceId={resource.id}

@@ -6,6 +6,7 @@ import {
   type MapPosition,
   type ResourceDocument,
   type ResourceId,
+  type ResourceKind,
   type UUID,
 } from '@project/core';
 import type { PlacementMode } from '@project/graph';
@@ -28,6 +29,7 @@ import {
 } from '@project/ui';
 import {
   describeAuthoringRefusal,
+  describeAuthoringRefusalIn,
   describeSpaceResourceBreak,
   describeSpaceResourceCreationBreak,
   describeSpaceResourceRefusal,
@@ -355,14 +357,17 @@ interface Performed {
 }
 
 /** A settled Edit as the plugin reads it, and the Resource it made. */
-const performedEdit = (result: SettledResult): Performed => {
+const performedEdit = (
+  result: SettledResult,
+  kindOf: (id: UUID) => ResourceKind | undefined,
+): Performed => {
   switch (result.kind) {
     case 'completed':
       return { answer: 'completed', createdResourceId: result.createdResourceId };
     case 'unchanged':
       return { answer: 'unchanged' };
     case 'refused':
-      return { answer: { refused: describeAuthoringRefusal(result.refusal) } };
+      return { answer: { refused: describeAuthoringRefusalIn(result.refusal, kindOf) } };
   }
 };
 
@@ -386,6 +391,8 @@ export function createCreationHost(deps: CreationHostDependencies): CreationHost
   const { app, session, spaceResources, gate, assets, reportBreak, flights } = deps;
   const { commandOutcomes, currentSpace, surface } = app;
   const mapOf = (place: CreationPlace): MapId => place.mapId ?? deps.mapId;
+  const kindOf = (id: UUID): ResourceKind | undefined =>
+    session.getState().working.resources.find((resource) => resource.id === id)?.document.kind;
 
   /** An Edit of ordinary Resources, on the Map the gesture was made on, wherever the canvas is now. */
   const edit = (items: readonly NewResource[], place: CreationPlace) =>
@@ -393,7 +400,7 @@ export function createCreationHost(deps: CreationHostDependencies): CreationHost
       const { anchor, placement } = place;
       const mapId = mapOf(place);
       const completion = { kind: 'created-resources', items, anchor, placement } as const;
-      const settle = (result: SettledResult): void => resolve(performedEdit(result));
+      const settle = (result: SettledResult): void => resolve(performedEdit(result, kindOf));
       // Addressed to the Map the gesture was made on, because the anchor is a
       // point on that Map: while the surface still draws it this is the
       // surface's Edit; otherwise it writes the Map it was aimed at without

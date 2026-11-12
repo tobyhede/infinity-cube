@@ -1,6 +1,6 @@
 import { act } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type JsonValue } from '@project/core';
+import { isMissingKindId, isOfKind, uuidSchema, type JsonValue } from '@project/core';
 import { MemorySpaceBackend } from '@project/persistence';
 import { isStoredAsset } from '@project/resource-api/domain';
 import type { CreationData } from '@project/resource-api/view';
@@ -362,6 +362,42 @@ describe('a creation the host carries out', () => {
   });
 });
 
+describe('a creation from a Resource whose plugin is missing', () => {
+  const UNPLUGGED = uuidSchema.parse('00000000-0000-4000-8000-0000000000d1');
+  const kind = 'vnd.example.chart';
+
+  /** The derivation Space with one Resource of a kind no plugin in this build draws. */
+  const withUnplugged = () => {
+    if (!isMissingKindId(kind)) throw new Error('A plugin in this build draws the kind');
+    return openDerivationSpace(mintingIds(CREATED), {
+      ...derivationSnapshot,
+      resources: [
+        ...derivationSnapshot.resources,
+        { id: UNPLUGGED, document: { title: 'Chart', kind, content: { nodes: 3 } } },
+      ],
+    });
+  };
+
+  it('refuses a Reference to it, saying its kind is not available, and creates nothing', async () => {
+    const opened = withUnplugged();
+    const { host } = hosted(opened);
+
+    await host.run(
+      offered(
+        'reference',
+        askFor([{ title: 'Chart', content: { target: UNPLUGGED } }]),
+        'resource',
+      ),
+      gesture(),
+    );
+
+    expect(placedOn(opened)).not.toContain(CREATED);
+    expect(notice(opened)?.message).toBe(
+      '“vnd.example.chart” is not available in this build, so it cannot be referenced.',
+    );
+  });
+});
+
 describe('a creation with a new Space', () => {
   const showing = (space: { spaceId: string; map: string; graph: string }): JsonValue => ({
     ...space,
@@ -465,7 +501,8 @@ describe('a creation from a list of Spaces', () => {
     const first = opened.session
       .getState()
       .working.resources.find(({ document }) => document.kind === 'space');
-    if (first?.document.kind !== 'space') throw new Error('No Space was made.');
+    if (first === undefined || !isOfKind(first.document, 'space'))
+      throw new Error('No Space was made.');
     const space = { spaceId: first.document.content.spaceId, title: 'Space 1' };
     const settle = vi.fn();
 
@@ -496,7 +533,8 @@ describe('a creation the host keeps its word on', () => {
     const [first] = opened.session
       .getState()
       .working.resources.filter(({ document }) => document.kind === 'space');
-    if (first?.document.kind !== 'space') throw new Error('No Space was made.');
+    if (first === undefined || !isOfKind(first.document, 'space'))
+      throw new Error('No Space was made.');
     const space = { spaceId: first.document.content.spaceId, title: 'Space 1' };
     const settle = vi.fn();
 

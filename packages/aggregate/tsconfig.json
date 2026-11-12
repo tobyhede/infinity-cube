@@ -3,6 +3,7 @@
   "compilerOptions": {
     "paths": {
       "@project/core": ["../core/src/index.ts"],
+      "@project/plugin-default/domain": ["../plugin-default/src/domain.ts"],
       "@project/plugin-image/domain": ["../plugin-image/src/domain.ts"],
       "@project/plugin-ur/domain": ["../plugin-ur/src/domain.ts"],
       "@project/plugin-markdown/domain": ["../plugin-markdown/src/domain.ts"],

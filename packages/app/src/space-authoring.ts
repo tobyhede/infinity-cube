@@ -1,4 +1,5 @@
 import {
+  isMissingKind,
   kindFlags,
   newDefaultResourceDocument,
   resourceReferences,
@@ -14,6 +15,7 @@ import {
   type MapPosition,
   type ResourcePlacement,
   type JsonValue,
+  type MissingKind,
   COLLAPSED_RESOURCE_SIZE,
   resourceSize,
   EDGE_TITLE_ONE_LINE,
@@ -30,6 +32,7 @@ import {
   loadSpaceSnapshot,
   newGraph,
   Placement,
+  refusedUnrootedSpaceIds,
   SnapshotEdit,
   type PlacementMode,
   type SnapshotEditOutcome,
@@ -339,6 +342,11 @@ export type AuthoringRefusal =
   | { readonly code: 'reference-target-immutable' }
   | { readonly code: 'space-resource-target-immutable' }
   | { readonly code: 'space-resource-deletion-unsupported' }
+  /**
+   * Deleting the last Resource of a missing kind in this Space while the
+   * aggregate holds a Space only because a plugin is missing (ADR 0142).
+   */
+  | { readonly code: 'missing-plugin-holds-space'; readonly kind: MissingKind }
   // The one code here the domain owns rather than this module: `@project/core`
   // raises it from the Resource schema, so both ends spell it from one constant.
   | { readonly code: typeof RESOURCE_TITLE_REQUIRED }
@@ -631,6 +639,14 @@ interface SpaceAuthoringDependencies {
    */
   readonly exclusiveWork?:
     { readonly withdraws: () => boolean; readonly exclusiveRunning: () => boolean } | undefined;
+  /**
+   * The Spaces the aggregate, as read when the application opened, holds
+   * because a plugin is missing (ADR 0142). The store refuses a commit that
+   * leaves one unrooted and no longer held (`refusedUnrootedSpaceIds`); this
+   * seam asks the same of a deletion before the working state changes, over
+   * the one Space it reads. Absent, none is held.
+   */
+  readonly heldSpaceIds?: readonly UUID[] | undefined;
 }
 
 /**
@@ -780,6 +796,7 @@ export function createSpaceAuthoring({
   reportObserverError = (error) => console.error('SpaceAuthoring observer failed', error),
   newId,
   exclusiveWork,
+  heldSpaceIds = [],
 }: SpaceAuthoringDependencies): SpaceAuthoring {
   let replacementEpoch = 0;
   let installing = 0;
@@ -1354,6 +1371,20 @@ export function createSpaceAuthoring({
       // targets still answers this rather than `resource-has-references`.
       if (kindFlags(deleted.kind).ownsReferencedSpaces) {
         return refuse({ code: 'space-resource-deletion-unsupported' });
+      }
+      // The store would refuse this commit with the Resource already gone from
+      // the working state, so it is refused here first, by the store's own
+      // rule. Deleting leaves every held Space unrooted, and another Space's
+      // Resource of a missing kind is not counted: this seam reads one Space.
+      if (
+        heldSpaceIds.length > 0 &&
+        isMissingKind(deleted.kind) &&
+        refusedUnrootedSpaceIds(heldSpaceIds, {
+          unrooted: heldSpaceIds,
+          spaces: [{ resources: space.resources.filter(({ id }) => id !== deleted.id) }],
+        }).length > 0
+      ) {
+        return refuse({ code: 'missing-plugin-holds-space', kind: deleted.kind });
       }
       // Everything else — a Reference Resource still targeting it, and the
       // cascade through every Map, the one this Edit is drawing included — is

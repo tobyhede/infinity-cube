@@ -15,6 +15,7 @@ import {
   type AgreeingAllOf,
   type KindDecorator,
 } from '../canvas-resource-decoration';
+import { defaultDecorator, type DefaultResourceDecorationContext } from './default';
 import { imageDecoration } from './image';
 import { markdownDecoration } from './markdown';
 import { spaceDecoration } from './space';
@@ -39,12 +40,18 @@ type ContextOf<Decorator> = Decorator extends KindDecorator<infer Context> ? Con
  * What every kind's canvas decoration reads, together. Two kinds that read a
  * field of one name with different types fail to compile where it is supplied.
  */
-export type KindDecorationContext = AgreeingAllOf<ContextOf<(typeof DECORATIONS)[KindId]>>;
+export type KindDecorationContext = AgreeingAllOf<
+  ContextOf<(typeof DECORATIONS)[KindId]> | DefaultResourceDecorationContext
+>;
 
-/** Every kind's decoration, in registry order. */
-const KIND_DECORATORS: readonly KindDecorator<KindDecorationContext>[] = KIND_IDS.map(
-  (kind): KindDecorator<KindDecorationContext> => DECORATIONS[kind],
-);
+/**
+ * Every kind's decoration, in registry order, then the default plugin's, which
+ * decorates the Resources whose kind no plugin in this build draws (ADR 0142).
+ */
+const KIND_DECORATORS: readonly KindDecorator<KindDecorationContext>[] = [
+  ...KIND_IDS.map((kind): KindDecorator<KindDecorationContext> => DECORATIONS[kind]),
+  defaultDecorator,
+];
 
 /**
  * Every Resource node with its kind's operations: the app half of each kind,

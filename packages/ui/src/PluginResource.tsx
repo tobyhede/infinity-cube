@@ -15,7 +15,7 @@ import {
   COLLAPSED_RESOURCE_SIZE,
   titleName,
   type JsonValue,
-  type PluginKind,
+  type ResourceKind,
   type Resource,
   type ResourceShape,
 } from '@project/core';
@@ -141,7 +141,7 @@ type PluginResourceStyle = CSSProperties & {
 
 export interface PluginResourceProps {
   readonly resourceId: string;
-  readonly kind: PluginKind;
+  readonly kind: ResourceKind;
   readonly title: MapTitle;
   /** The Resource's content as stored, which its plugin's schema parses. */
   readonly content: unknown;

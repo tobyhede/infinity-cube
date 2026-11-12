@@ -25,8 +25,8 @@ describe('a Resource failing its envelope and its kind', () => {
     expect(failedPaths(result)).toEqual(expect.arrayContaining(['', 'content']));
   });
 
-  it('reports a stored document whose title is empty and whose kind no module registers', () => {
-    const result = resourceDocumentSchema.safeParse({ title: '', kind: 'nope', content: {} });
+  it('reports a stored document whose title is empty and whose kind is not a kind id', () => {
+    const result = resourceDocumentSchema.safeParse({ title: '', kind: 'no pe', content: {} });
 
     expect(result.success).toBe(false);
     expect(failedPaths(result)).toEqual(expect.arrayContaining(['title', 'kind']));

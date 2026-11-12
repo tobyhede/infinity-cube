@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { EMPTY_ASSET_REF, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
-import { nextGraphColor } from '@project/graph';
+import {
+  EMPTY_ASSET_REF,
+  isMissingKindId,
+  uuidSchema,
+  type SpaceSnapshot,
+  type UUID,
+} from '@project/core';
+import { loadSpaceAggregate, nextGraphColor } from '@project/graph';
 import { MemorySpaceBackend, MemorySpaceBackendTestControl } from '../src/memory';
 import { canRetry, type SpaceSessionState } from '../src/session';
 import { createSpaceSessionRegistry, type SpaceResourceRefusal } from '../src/session-registry';
@@ -3490,5 +3496,69 @@ describe('A coordinated save over the request size limit', () => {
     expect(stored?.revision).toBe(5n);
     expect(stored === undefined ? undefined : metaBody(stored.snapshot)).toBe('x'.repeat(1000));
     expect(stored?.snapshot.resources.some(({ id }) => id === SPACE_RESOURCE_ID)).toBe(true);
+  });
+});
+
+/*
+ * ADR 0142's accepted cost, under ADR 0074's shared ownership: a Resource
+ * whose plugin is missing and a Space Resource both own one Space, and the
+ * host cannot read the first's reference, so deleting the Space Resource
+ * deletes the Space with it. Once the plugin returns and reads its Resource as
+ * a Space reference, the aggregate is refused naming that Resource.
+ */
+describe('a Space a Resource with no plugin may share with a Space Resource', () => {
+  const UNPLUGGED_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000001d');
+  const kind = 'vnd.example.space';
+  if (!isMissingKindId(kind)) throw new Error(`${kind} is drawn by a plugin in this build`);
+  const sharedContent = { spaceId: TARGET_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID };
+  const sharingMeta: SpaceSnapshot = {
+    ...metaSnapshot,
+    resources: [
+      ...metaSnapshot.resources,
+      {
+        id: SPACE_RESOURCE_ID,
+        document: { title: 'Target', kind: 'space', content: sharedContent },
+      },
+      { id: UNPLUGGED_ID, document: { title: 'Also target', kind, content: sharedContent } },
+    ],
+  };
+
+  it('deletes the Space with the Space Resource, and the returning plugin is refused naming its Resource', async () => {
+    const backend = new MemorySpaceBackend(META_ID, [
+      { snapshot: sharingMeta, revision: 3n, exportedRevision: null },
+      { snapshot: targetSnapshot, revision: 7n, exportedRevision: null },
+    ]);
+    const registry = createSpaceSessionRegistry(backend);
+    const meta = registry.open({ snapshot: sharingMeta, revision: 3n, exportedRevision: null });
+    const lifecycle = registry.spaceResources(idSource([]));
+
+    expect(
+      await lifecycle.delete({ containingSpaceId: META_ID, resourceId: SPACE_RESOURCE_ID }),
+    ).toMatchObject({ kind: 'completed' });
+    await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('settled'));
+
+    const stored = await backend.loadAggregate();
+    if (stored.kind !== 'loaded') throw new Error(`The aggregate answered ${stored.kind}`);
+    expect(stored.aggregate.spaces.map(({ snapshot }) => snapshot.id)).toEqual([META_ID]);
+
+    // The plugin returns: the same Resource, read as the Space reference it is.
+    const restored = stored.aggregate.spaces.map(({ snapshot }) => ({
+      ...snapshot,
+      resources: snapshot.resources.map((resource) =>
+        resource.id === UNPLUGGED_ID
+          ? { ...resource, document: { ...resource.document, kind: 'space' } }
+          : resource,
+      ),
+    }));
+    const reread = loadSpaceAggregate({ metaSpaceId: META_ID, snapshots: restored });
+    expect(reread.ok).toBe(false);
+    expect(reread.ok ? [] : reread.errors).toEqual([
+      expect.objectContaining({
+        kind: 'space-reference-missing',
+        spaceId: META_ID,
+        resourceId: UNPLUGGED_ID,
+        targetSpaceId: TARGET_ID,
+      }),
+    ]);
   });
 });

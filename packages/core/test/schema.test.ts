@@ -7,6 +7,7 @@ import {
   RESOURCE_SHAPES,
   graphEdgeSchema,
   graphSchema,
+  isOfKind,
   resourceDocumentSchema,
   resourceFileSchema,
   resourceSchema,
@@ -322,9 +323,20 @@ describe('resource file schema', () => {
     expect(resourceFileSchema.safeParse({ id: A, title: 'A', content: {} }).success).toBe(false);
   });
 
-  it('refuses a kind no module registers', () => {
+  it('refuses a kind that is not a kind id', () => {
     expect(resourceFileSchema.safeParse({ ...MARKDOWN_FILE, kind: 'a.b' }).success).toBe(false);
-    expect(resourceFileSchema.safeParse({ ...MARKDOWN_FILE, kind: 'chart' }).success).toBe(false);
+    expect(resourceFileSchema.safeParse({ ...MARKDOWN_FILE, kind: '' }).success).toBe(false);
+  });
+
+  it('reads a kind no plugin draws whole, its content unread (ADR 0142)', () => {
+    const chart = { ...MARKDOWN_FILE, kind: 'chart', content: { series: [1, 2], legend: null } };
+    expect(resourceFileSchema.parse(chart)).toEqual(chart);
+  });
+
+  it('refuses content a present plugin rejects, though a missing plugin would read it', () => {
+    expect(
+      resourceFileSchema.safeParse({ ...MARKDOWN_FILE, content: { series: [1, 2] } }).success,
+    ).toBe(false);
   });
 
   it('reads a Markdown Resource file as the URL of the asset holding its text (ADR 0142)', () => {
@@ -364,7 +376,7 @@ describe('resource file schema', () => {
       kind: 'reference',
       content: { target: A },
     });
-    expect(reference.kind === 'reference' && reference.content.target).toBe(A);
+    expect(isOfKind(reference, 'reference') && reference.content.target).toBe(A);
   });
 
   it('gives a reference resource no body field at all', () => {
@@ -376,6 +388,7 @@ describe('resource file schema', () => {
     });
 
     expect('body' in reference).toBe(false);
+    if (!isOfKind(reference, 'reference')) throw new Error(`Parsed as ${reference.kind}`);
     expect('body' in reference.content).toBe(false);
   });
 

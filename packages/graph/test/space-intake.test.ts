@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  isOfKind,
   EMPTY_ASSET_REF,
   type JsonValue,
   type Resource,
@@ -54,7 +55,7 @@ const viaFiles: Loader = ({ resources, ...structure }) =>
   loadSpace(
     { version: 1, id: SPACE, title: 'Test space', ...structure },
     resources.flatMap((resource) =>
-      resource.kind === 'markdown'
+      isOfKind(resource, 'markdown')
         ? resourceFile(resource.id, resource.title, resource.content.url)
         : jsonResourceFile(resource.id, resource.title, resource.kind, resource.content),
     ),

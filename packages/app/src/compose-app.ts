@@ -118,6 +118,12 @@ export interface ComposeAppDependencies extends ComposeCoreDependencies {
    */
   readonly pluginGate?: PluginGate | undefined;
   /**
+   * The Spaces the aggregate, as read when the application opened, holds
+   * because a plugin is missing (ADR 0142), which Space Authoring reads before
+   * deleting a Resource of a missing kind. Absent, none is.
+   */
+  readonly heldSpaceIds?: readonly UUID[] | undefined;
+  /**
    * The address a destination opened in a new browsing context is given: the
    * browser location's `href`, which carries the query and a mounted page's
    * `source` (ADR 0130), so a Notes window mounts the revision its presenting
@@ -233,6 +239,7 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     mounted = false,
     addressOf = productDestinationPath,
     pluginGate = createPluginGate(),
+    heldSpaceIds,
   } = dependencies;
   const core = composeCore(dependencies);
   const { currentSpace, navigation } = core;
@@ -248,6 +255,7 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     newId,
     reportObserverError,
     exclusiveWork: pluginGate,
+    heldSpaceIds,
   });
   const deleteConfirmation = createDeleteConfirmation({ authoring, reportObserverError });
   const surface = createMapSurface(

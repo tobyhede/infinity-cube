@@ -2,17 +2,20 @@
 import { z } from 'zod';
 import { COLLAPSED_RESOURCE_SIZE } from './resource-geometry';
 import {
+  KIND_ID_FORM,
   contentParser,
+  isMissingKindId,
   isRegisteredKind,
-  KIND_IDS,
   type KindId,
   type Resource,
   type ResourceDocument,
   type ResourceFileDocument,
+  type Unplugged,
 } from './kinds/registry';
 import { RESOURCE_TITLE_REQUIRED, normalizeTitle } from './title';
 import { uuidSchema } from './uuid';
-import { jsonValueSchema } from './json-value';
+import { jsonValueSchema, type JsonObject } from './json-value';
+
 import { OUTLINES } from '@project/resource-api/domain';
 
 export { newUuid, uuidSchema } from './uuid';
@@ -63,36 +66,52 @@ const resourceTitleSchema = z
 const declaredKindAndContentSchema = z.object({ kind: z.string(), content: z.unknown() });
 
 /**
- * The content a Resource's kind parses, tagged with its kind, or `undefined`
- * with each issue added to `ctx`: a kind no module registers is refused, and
- * the registered kind's module is the one parser of its content.
+ * The content of a Resource whose kind names no plugin in this build: a JSON
+ * object, as the envelope makes every Resource's content (ADR 0128), carried
+ * whole and never read as the JSON value it parses to. Export writes it with
+ * its keys sorted (`canonicalJsonValue`) and each number as JavaScript writes
+ * it, so `1.0` comes back as `1` and an integer beyond 2^53 loses precision.
  */
-/**
- * The `params.code` of the issue refusing a kind no module registers, so a door
- * that knows the declared kind can quote it beside the schema's message.
- */
-export const KIND_UNREGISTERED = 'kind-unregistered';
+const unreadContentSchema: z.ZodType<JsonObject, z.ZodTypeDef, unknown> = jsonValueSchema.refine(
+  (value): value is JsonObject =>
+    typeof value === 'object' && value !== null && !Array.isArray(value),
+  { message: 'must be an object' },
+);
 
+/**
+ * The content a Resource's kind parses, tagged with its kind, or `undefined`
+ * with each issue added to `ctx`. A plugin in this build is the one parser of
+ * its kind's content, and content its schema rejects is refused. A
+ * well-formed kind no plugin draws is carried whole (ADR 0142): its content is
+ * JSON the host never reads, which the default plugin draws and the plugin
+ * that returns reads as it stands. A kind that is not a kind id is refused.
+ */
 const kindedContent = <Kinded>(
   kind: string,
   content: unknown,
   parserOf: (kind: KindId) => z.ZodType<Kinded, z.ZodTypeDef, unknown>,
   ctx: z.RefinementCtx,
-): Kinded | undefined => {
-  if (!isRegisteredKind(kind)) {
+): Kinded | Unplugged | undefined => {
+  if (isRegisteredKind(kind)) {
+    const parsed = parserOf(kind).safeParse(content);
+    if (parsed.success) return parsed.data;
+    for (const issue of parsed.error.issues) {
+      ctx.addIssue({ ...issue, path: ['content', ...issue.path] });
+    }
+    return undefined;
+  }
+  if (!isMissingKindId(kind)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['kind'],
       // Not echoing the kind: a summary that folds case would misquote it.
-      // The registered ids are lower case, so the fold leaves them intact.
-      message: `names no kind this build registers (${KIND_IDS.join(', ')})`,
-      params: { code: KIND_UNREGISTERED },
+      message: `is not a kind id — ${KIND_ID_FORM}`,
     });
     return undefined;
   }
-  const parsed = parserOf(kind).safeParse(content);
-  if (parsed.success) return parsed.data;
-  for (const issue of parsed.error.issues) {
+  const json = unreadContentSchema.safeParse(content);
+  if (json.success) return { kind, content: json.data };
+  for (const issue of json.error.issues) {
     ctx.addIssue({ ...issue, path: ['content', ...issue.path] });
   }
   return undefined;

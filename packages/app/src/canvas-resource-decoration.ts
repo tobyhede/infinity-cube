@@ -5,7 +5,7 @@ import {
   type ResourceFlowNodeOf,
   type ResourceNodeData,
 } from '@project/react-flow-adapter';
-import type { EntityActionGroup, KindOperationsByKind, ResourceDisplay } from '@project/ui';
+import type { EntityActionGroup, KindOperationsOf, ResourceDisplay } from '@project/ui';
 import type { ResourceResize } from './render-adapter';
 import { RESOURCE_SIZE } from './resource';
 
@@ -25,7 +25,7 @@ export type CanvasResourceDataPatch = Partial<
  * display or context notice where it changes them.
  */
 export interface KindDecoration<K extends ResourceFlowNode['data']['kind']> {
-  readonly kindOperations: KindOperationsByKind[K];
+  readonly kindOperations: KindOperationsOf<K>;
   readonly display?: ResourceDisplay;
   readonly contextNotice?: string;
 }

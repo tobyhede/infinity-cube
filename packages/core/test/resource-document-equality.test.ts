@@ -151,9 +151,19 @@ describe("each kind's content is parsed by its module at every door", () => {
     }
   });
 
-  it('refuses a kind no module registers at every door, under its kind', () => {
+  it('carries a kind no plugin draws whole at every door, its content unread (ADR 0142)', () => {
+    const content = { diagram: 'graph TD; A-->B', options: { nested: 1 } };
     for (const { door, parse } of doors) {
-      const parsed = parse({ title: 'A', kind: 'vnd.example.unregistered', content: {} });
+      const parsed = parse({ title: 'A', kind: 'vnd.example.mermaid', content });
+      expect(parsed.success, door).toBe(true);
+      expect(parsed.data?.kind, door).toBe('vnd.example.mermaid');
+      expect(parsed.data?.content, door).toEqual(content);
+    }
+  });
+
+  it('refuses a kind that is not a kind id at every door, under its kind', () => {
+    for (const { door, parse } of doors) {
+      const parsed = parse({ title: 'A', kind: 'not a kind', content: {} });
       expect(parsed.success, door).toBe(false);
       expect(
         parsed.error?.issues.map(({ path }) => path),

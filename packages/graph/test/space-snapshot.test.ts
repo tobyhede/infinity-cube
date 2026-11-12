@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { SpaceSnapshot } from '@project/core';
+import { isOfKind, type SpaceSnapshot } from '@project/core';
 import { loadSpaceSnapshot } from '../src/index';
 import { uuid } from './resource-files';
 import { textRef } from './text-asset';
@@ -139,7 +139,9 @@ describe('loadSpaceSnapshot', () => {
     if (!result.ok) return;
     expect(result.space.id).toBe(SPACE_ID);
     const resource = result.space.lookup.resource(RESOURCE_A);
-    expect(resource?.kind === 'markdown' && resource.content.url).toBe(textRef('Body A'));
+    expect(resource !== undefined && isOfKind(resource, 'markdown') && resource.content.url).toBe(
+      textRef('Body A'),
+    );
     expect(result.space.lookup.graph(GRAPH_ID)?.graph.title).toBe('Main');
   });
 

@@ -33,6 +33,7 @@
     "@project/graph": "workspace:*",
     "@project/http": "workspace:*",
     "@project/persistence": "workspace:*",
+    "@project/plugin-default": "workspace:*",
     "@project/plugin-image": "workspace:*",
     "@project/plugin-markdown": "workspace:*",
     "@project/plugin-reference": "workspace:*",

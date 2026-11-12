@@ -1,6 +1,6 @@
 import { describe, expectTypeOf, it } from 'vitest';
 import type { Resource as ApiResource } from '@project/resource-api/domain';
-import type { KindId, Resource } from '../src/index';
+import type { KindId, MissingKind, Resource } from '../src/index';
 
 /**
  * ADR 0142: the Resource API's `Resource<C>` is the one structure the core,
@@ -14,7 +14,8 @@ describe('the core Resource is the Resource API’s Resource<C>', () => {
     expectTypeOf<Ur>().toExtend<ApiResource<Ur['content']>>();
     expectTypeOf<Resource>().toExtend<ApiResource>();
     expectTypeOf<keyof Resource>().toEqualTypeOf<keyof ApiResource>();
-    expectTypeOf<Resource['kind']>().toEqualTypeOf<KindId>();
+    // A plugin's kind, or one no plugin in this build draws (ADR 0142).
+    expectTypeOf<Resource['kind']>().toEqualTypeOf<KindId | MissingKind>();
   });
 
   it('defaults the API structure’s content to unknown', () => {
