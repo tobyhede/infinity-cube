@@ -155,7 +155,8 @@ export class HttpSpaceBackend implements SpaceBackend {
         if (response.status === 404) return { refused: ASSET_ABSENT };
         if (!response.ok) throw new Error(`Unable to read an asset: HTTP ${response.status}`);
         const stored = normalizeMediaType(response.headers.get(ASSET_MEDIA_TYPE_HEADER) ?? '');
-        return new Blob([await response.arrayBuffer()], { type: stored });
+        const blob = await response.blob();
+        return blob.type === stored ? blob : blob.slice(0, blob.size, stored);
       },
       this.#uploadTimeoutMs,
     );
