@@ -47,19 +47,15 @@ const worded = <T extends Blob | AssetRef>(answer: T | AssetRefusal): T | Worded
  * The asset store as a Resource plugin's surface reaches it (ADR 0142): the
  * client's `url`, `read` and `store`, each refusal worded by
  * `describeAssetRefusal`, the browser's own file picker, and `measure`, the
- * browser loading a picture to size it unless a caller supplies its own
- * (ADR 0109). A host hands on only `url` and `read` where its Resource is not
+ * browser loading a picture to size it (ADR 0109). A host hands on only `url` and `read` where its Resource is not
  * authored.
  */
-export const browserPluginAssets = (
-  assets: AssetClient,
-  measure: NonNullable<Assets['measure']> = measurePictureInBrowser,
-): Assets => ({
+export const browserPluginAssets = (assets: AssetClient): Assets => ({
   url: (ref) => assets.url(ref),
   read: async (ref) => worded(await assets.read(ref)),
   store: async (bytes) => worded(await assets.store(bytes)),
   pick: async (accept) => [...(await pickFilesInBrowser(document, accept))],
-  measure,
+  measure: measurePictureInBrowser,
 });
 
 /**

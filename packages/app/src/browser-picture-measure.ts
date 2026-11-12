@@ -1,11 +1,7 @@
+import type { Size } from '@project/resource-api/domain';
+
 /** How long a picture may take to load before it is taken as one that did not. */
 const MEASURE_TIMEOUT_MS = 10_000;
-
-/** A picture's natural size in pixels. */
-export interface PictureSize {
-  readonly width: number;
-  readonly height: number;
-}
 
 /**
  * The browser loading a picture to learn its natural size (ADR 0106): the one
@@ -17,10 +13,10 @@ export interface PictureSize {
 export const measurePictureInBrowser = (
   src: string,
   timeoutMs: number = MEASURE_TIMEOUT_MS,
-): Promise<PictureSize | undefined> =>
+): Promise<Size | undefined> =>
   new Promise((resolve) => {
     const picture = new Image();
-    const settle = (size: PictureSize | undefined): void => {
+    const settle = (size: Size | undefined): void => {
       clearTimeout(timer);
       picture.onload = null;
       picture.onerror = null;

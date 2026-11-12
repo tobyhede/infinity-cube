@@ -44,9 +44,7 @@ export interface Assets {
    * `undefined` for one that does not load or has no intrinsic size. Absent,
    * the surface measures nothing.
    */
-  readonly measure?:
-    | ((src: string) => Promise<{ readonly width: number; readonly height: number } | undefined>)
-    | undefined;
+  readonly measure?: ((src: string) => Promise<Size | undefined>) | undefined;
 }
 
 /** A Claim: who is interacting (ADR 0142). */
