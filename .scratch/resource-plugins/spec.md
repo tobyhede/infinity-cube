@@ -53,8 +53,12 @@ interface Surface<C, M> {
   claim?(): OwnClaim<C, M> | undefined
   assets: { url(ref): string; read(ref): Promise<Blob | { refused: string }>; pick?(accept): Promise<File[]>; store?(bytes: Blob): Promise<AssetRef | { refused: string }> }
   // One component for the surface's lifetime: unmounting releases, so a new type per render would release every Claim inside it.
-  // The Map embedding draws the selection chooser and the target Space's Map and Graph authoring and links, and writes a choice through `select`.
-  Embed: ComponentType<{ resource: ResourceId; title: Kept<string> } | { map: SpaceView; select?: Kept<SpaceView>; claim?: Claim }>
+  // One Embed: a Resource, drawn by its own plugin, or a Space, drawn as one of its Maps.
+  // No `select`: the Space's defaultMap. `select` with a commit: the host's chooser and framing, writing only through it.
+  // Choosing another Map commits a view with no framing; reframing commits the same Map and Graph with the new framing.
+  // Enter, which navigates into the shown Space, is an embedding command too, offered where navigation is.
+  // `claim`: the shown Space's authoring, its Maps and Graphs included. Commands come from these, never from a kind.
+  Embed: ComponentType<{ resource: ResourceId; title: Kept<string> } | { space: SpaceId; select?: Kept<SpaceView>; claim?: Claim }>
 }
 
 interface Claim { release(): void }   // never refused: while an inner Claim or its own exclusive work runs, the host releases it when that ends
