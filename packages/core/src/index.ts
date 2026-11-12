@@ -21,6 +21,8 @@ export {
   KIND_IDS,
   canonicalResource,
   contentTarget,
+  drawnByPlugin,
+  takesOpen,
   isKindId,
   isRegisteredKind,
   kindFlags,

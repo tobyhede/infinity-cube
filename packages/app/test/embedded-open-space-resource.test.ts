@@ -88,6 +88,7 @@ const openSpaceResource = (
     authorsContent: geometry.kind !== 'reference',
     embedsMap: geometry.kind !== 'markdown',
     open: geometry.open ?? true,
+    takesOpen: geometry.kind !== 'markdown',
     selectedForAuthoring: false,
     display: spaceDisplay(geometry.open ?? true, geometry.kind ?? 'space', target),
     activeGraphId: null,

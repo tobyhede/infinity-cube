@@ -1,5 +1,8 @@
 import {
+  drawnByPlugin,
   resolveContent,
+  resourceReferences,
+  takesOpen,
   type Resource,
   type ResourceContent,
   type ResourceId,
@@ -73,6 +76,36 @@ export interface SpaceLookup {
  */
 export function resolveResourceContent(space: Space, resource: Resource): ResourceContent {
   return resolveContent(resource, (id) => space.lookup.resource(id));
+}
+
+/**
+ * The Resources `resource`'s content references, as the Space holds them now:
+ * what the plugin drawing it may draw inside its rect through the host's
+ * embedding (ADR 0142), as an Open Reference Resource draws its Target. A
+ * reference the Space no longer holds is left out, and the embedding says so.
+ */
+export function referencedResources(space: Space, resource: Resource): readonly Resource[] {
+  return resourceReferences(resource).flatMap((id) => {
+    const referenced = space.lookup.resource(id);
+    return referenced === undefined ? [] : [referenced];
+  });
+}
+
+/**
+ * Whether a plugin draws `resource` in this Space (ADR 0142): its kind's, and
+ * its content Target's where it shows one (`drawnByPlugin`).
+ */
+export function resourceDrawnByPlugin(space: Space, resource: Resource): boolean {
+  return drawnByPlugin(resource, (id) => space.lookup.resource(id));
+}
+
+/**
+ * Whether the application keeps `resource`'s Open in this Space, as a Map
+ * entry's `open` (`takesOpen`): a Resource no plugin draws whose content, its
+ * own or its Target's, declares Open.
+ */
+export function resourceTakesOpen(space: Space, resource: Resource): boolean {
+  return takesOpen(resource, (id) => space.lookup.resource(id));
 }
 
 /**

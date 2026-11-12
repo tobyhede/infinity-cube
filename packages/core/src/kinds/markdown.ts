@@ -8,13 +8,7 @@ import { kindFromPlugin, type PluginContent } from './plugin-kind';
  * that plugin's domain half as a kind module; everything it says is the
  * plugin's.
  */
-export const markdownKind = {
-  ...kindFromPlugin(markdownPlugin),
-  // An Open Reference Resource draws its Target in `CanvasResource`'s content
-  // area, where the Markdown plugin draws its text read-only, until the
-  // Reference plugin embeds it (`.scratch/resource-plugins/issues/06`).
-  facts: { authored: false, embedsMap: false, drawsContentArea: true },
-};
+export const markdownKind = kindFromPlugin(markdownPlugin);
 
 /** The Markdown kind's id. */
 export type MarkdownKindId = typeof markdownKind.id;

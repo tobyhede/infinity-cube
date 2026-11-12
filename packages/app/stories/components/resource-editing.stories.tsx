@@ -91,6 +91,58 @@ function TitleEditingResource({
 }
 
 /**
+ * The same Title editor on an Open Resource, which its plugin draws (ADR
+ * 0142): an Open Markdown Resource's Title is the host's, so its editor is the
+ * one a Closed Resource draws, and the text stays drawn while it runs.
+ */
+function OpenTitleEditingResource({ initialTitle }: { readonly initialTitle: string }) {
+  const [title, setTitle] = useState(initialTitle);
+  const [editing, setEditing] = useState(false);
+  const group = useRef<HTMLDivElement>(null);
+  const [content] = useState<JsonValue>(() => ({ url: storyText('## Open Resource body') }));
+  return (
+    <div style={openFrame}>
+      <div
+        role="group"
+        aria-label={`${titleName(title)} on the canvas`}
+        tabIndex={-1}
+        ref={group}
+        data-testid="resource-group"
+      >
+        <PluginResource
+          resourceId="story-open-title"
+          kind="markdown"
+          title={{
+            title,
+            readOnly: false,
+            onReturnFocus: () => group.current?.focus(),
+            onBeginTitleEdit: editing ? undefined : () => setEditing(true),
+            editor: editing
+              ? {
+                  onComplete: (draft: string) => {
+                    if (draft.trim().length === 0) return 'A Resource title is required.';
+                    setTitle(draft);
+                    setEditing(false);
+                    return null;
+                  },
+                  onCancel: () => setEditing(false),
+                }
+              : undefined,
+          }}
+          content={content}
+          mapContent={{ open: true }}
+          outline="rectangle"
+          state={editing ? 'editing' : 'rest'}
+          graphColor="#ffc53d"
+          readOnly={false}
+          operations={{ kind: 'markdown' }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
  * A third specimen, and the one the heading nesting is proved on.
  *
  * The two above it are titled on one line, which is the shape the in-place
@@ -115,7 +167,7 @@ export const Title: Story = () => (
     </section>
     <section aria-label="Open Resource title editing" className="flex flex-col gap-2">
       <p className="text-xs text-muted-foreground">Open</p>
-      <TitleEditingResource initiallyOpen initialTitle="Draft entry" />
+      <OpenTitleEditingResource initialTitle="Draft entry" />
     </section>
     <section aria-label="Laddered Resource title editing" className="flex flex-col gap-2">
       <p className="text-xs text-muted-foreground">Title Lines</p>

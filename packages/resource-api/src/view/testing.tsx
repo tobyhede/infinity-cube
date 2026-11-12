@@ -13,6 +13,7 @@ import { createRailStore, ResourceHostProvider, type ResourceHost } from './host
 import {
   RAIL_BAND,
   type Assets,
+  type EmbedProps,
   type Exclusive,
   type OwnClaim,
   type OwnProps,
@@ -80,6 +81,8 @@ export interface RenderPluginOptions<C, M> {
    * and `pick` are offered only where granted.
    */
   readonly assets?: Partial<Assets>;
+  /** The band the surface keeps clear for its rail: `RAIL_BAND`, as the Map's, unless given. */
+  readonly railBand?: number;
   /**
    * What a granted store answers in place of storing the bytes: a store whose
    * host cannot be reached rejects.
@@ -109,9 +112,28 @@ const TEST_ASSETS = {
 
 const DEFAULT_SIZE: Size = { width: 200, height: 120 };
 
-/** The embedding a test surface hands its plugin: one component for every render, as a host must. */
-function TestEmbed() {
-  return null;
+/**
+ * The embedding a test surface hands its plugin: one component for every
+ * render, as a host must. A Resource embedding is drawn as what it was asked
+ * for, the Resource's id and the Title passed, with a rename where that Title
+ * carries a commit, so a plugin's test reads what it embedded.
+ */
+function TestEmbed(props: EmbedProps) {
+  if (!('resource' in props)) return null;
+  const { resource, title } = props;
+  const commit = title.commit;
+  return (
+    <div data-testid="embedded-resource" data-resource={resource}>
+      <span data-testid="embedded-title">{title.value}</span>
+      {commit !== undefined && (
+        <button
+          type="button"
+          aria-label={`Rename embedded ${resource}`}
+          onClick={() => void commit(`${title.value}′`)}
+        />
+      )}
+    </div>
+  );
 }
 
 const WITHDRAWN = { refused: 'Exclusive work is running.' } as const;
@@ -345,7 +367,7 @@ export function renderPlugin<C, M>(
         rail,
         RenderedMarkdown: TestRenderedMarkdown,
         SourceEditor: TestSourceEditor,
-        railBand: RAIL_BAND,
+        railBand: options.railBand ?? RAIL_BAND,
       }),
       [rail],
     );

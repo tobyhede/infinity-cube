@@ -5,7 +5,6 @@ import {
   contentParser,
   isRegisteredKind,
   KIND_IDS,
-  kindFlags,
   type KindId,
   type Resource,
   type ResourceDocument,
@@ -262,9 +261,6 @@ const resourceSizeSchema = z
 export const RESOURCE_SHAPES = OUTLINES;
 
 export const resourceShapeSchema = z.enum(RESOURCE_SHAPES);
-
-/** Whether a Resource of this kind may be Open, as its kind declares (ADR 0122). */
-export const takesOpen = (kind: KindId): boolean => kindFlags(kind).canOpen;
 
 /**
  * What a Map stores for one Resource: its origin, and optionally whether it is

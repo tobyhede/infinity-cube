@@ -7,6 +7,7 @@ import {
   resourceOpen,
   resourceSize,
   sameJsonValue,
+  drawnByPlugin,
   takesOpen,
   type Graph,
   type JsonValue,
@@ -304,11 +305,17 @@ const withEntry = (
 ): SnapshotEditOutcome =>
   withPlacement(snapshot, mapId, Placement.place(placement, resourceId, at));
 
+/** Each Resource's document in the snapshot, by id: the lookup the core's drawing rules read. */
+const documentIn =
+  (snapshot: SpaceSnapshot) =>
+  (id: UUID): ResourceDocument | undefined =>
+    snapshot.resources.find((candidate) => candidate.id === id)?.document;
+
 /**
  * Open a Resource in one Map. Only what is drawn inside its rect changes: its
  * size and every position stay as they are. `unchanged` for a Resource already
- * Open, and `open-requires-content` for a Resource of a plugin kind, whose
- * Open is its plugin's Map content rather than the entry's `open`.
+ * Open, and `open-requires-content` for a Resource the application keeps no
+ * Open for: one a plugin draws, which keeps any Open in its Map content.
  */
 function open(snapshot: SpaceSnapshot, mapId: UUID, resourceId: UUID): SnapshotEditOutcome {
   const placed = placedIn(snapshot, mapId);
@@ -317,7 +324,8 @@ function open(snapshot: SpaceSnapshot, mapId: UUID, resourceId: UUID): SnapshotE
   if (at === undefined) return refused({ code: 'resource-not-in-map' });
   const resource = snapshot.resources.find((candidate) => candidate.id === resourceId);
   if (resource === undefined) return refused({ code: 'resource-not-found' });
-  if (!takesOpen(resource.document.kind)) return refused({ code: 'open-requires-content' });
+  if (!takesOpen(resource.document, documentIn(snapshot)))
+    return refused({ code: 'open-requires-content' });
   if (resourceOpen(at)) return UNCHANGED;
   return withEntry(snapshot, mapId, placed.placement, resourceId, { ...at, open: true });
 }
@@ -417,6 +425,10 @@ function changeMapContent(
   if (resource === undefined) return refused({ code: 'resource-not-found' });
   const kind = resource.document.kind;
   if (!keepsMapContent(kind)) return refused({ code: 'map-content-not-kept' });
+  // A Resource no plugin draws here, as a Reference to a Space Resource, keeps none.
+  if (!drawnByPlugin(resource.document, documentIn(snapshot))) {
+    return refused({ code: 'map-content-not-kept' });
+  }
   if (mapContentProblem(kind, content) !== undefined) {
     return refused({ code: 'map-content-invalid' });
   }

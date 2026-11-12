@@ -35,6 +35,7 @@
     "@project/persistence": "workspace:*",
     "@project/plugin-image": "workspace:*",
     "@project/plugin-markdown": "workspace:*",
+    "@project/plugin-reference": "workspace:*",
     "@project/plugin-ur": "workspace:*",
     "@project/react-flow-adapter": "workspace:*",
     "@project/resource-api": "workspace:*",

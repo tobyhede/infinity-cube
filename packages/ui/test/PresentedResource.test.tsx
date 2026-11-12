@@ -2,8 +2,55 @@ import { describe, expect, it } from 'vitest';
 import type { ReactElement } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { uuidSchema } from '@project/core';
-import { PresentedResource } from '../src/index';
+import type { AssetRef } from '@project/resource-api/domain';
+import { PresentedPluginResource, PresentedResource } from '../src/index';
 import { textAsset, WithTexts } from './markdown-texts';
+
+const OWN_ID = '00000000-0000-4000-8000-0000000000a1';
+const TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000a2');
+
+/** A plugin kind's content, as the Stage reaches it: its own, or a Reference's Target's. */
+type PresentedContent =
+  | {
+      readonly kind: 'markdown';
+      readonly content: { readonly url: AssetRef };
+      readonly via: 'self' | 'target';
+    }
+  | {
+      readonly kind: 'image';
+      readonly content: { readonly url: string };
+      readonly via: 'self' | 'target';
+    };
+
+/**
+ * A Resource a plugin draws, presented as the Stage presents it (ADR 0142):
+ * drawn by its own plugin, or, reached `via: 'target'`, a Reference Resource
+ * of that Title embedding the Target through the host's embedding.
+ */
+function Presented({ title, content }: { title: string; content: PresentedContent }) {
+  if (content.via === 'self')
+    return (
+      <PresentedPluginResource
+        resourceId={OWN_ID}
+        kind={content.kind}
+        title={title}
+        content={content.content}
+      />
+    );
+  const target =
+    content.kind === 'markdown'
+      ? { id: TARGET_ID, title: 'Target', kind: 'markdown' as const, content: content.content }
+      : { id: TARGET_ID, title: 'Target', kind: 'image' as const, content: content.content };
+  return (
+    <PresentedPluginResource
+      resourceId={OWN_ID}
+      kind="reference"
+      title={title}
+      content={{ target: TARGET_ID }}
+      embeddable={[target]}
+    />
+  );
+}
 
 /**
  * Draw a presented Markdown Resource and wait for its text, which the
@@ -18,7 +65,7 @@ const presentMarkdown = async (ui: ReactElement) => {
 describe('PresentedResource', () => {
   it('renders the Markdown, parsed', async () => {
     const { container } = await presentMarkdown(
-      <PresentedResource
+      <Presented
         title="Hello"
         content={{
           kind: 'markdown',
@@ -45,7 +92,7 @@ describe('PresentedResource', () => {
     'draws a rule in Markdown reached via %s as an hr inside the body the Stage reads',
     async (via) => {
       const { container } = await presentMarkdown(
-        <PresentedResource
+        <Presented
           title="Long"
           content={{ kind: 'markdown', content: { url: textAsset('Shown.\n\n---\n\nMore.') }, via }}
         />,
@@ -57,7 +104,7 @@ describe('PresentedResource', () => {
 
   it('leaves out a first heading that repeats the name drawn above it', async () => {
     const { container } = await presentMarkdown(
-      <PresentedResource
+      <Presented
         title={'The  Problem\nWhy it matters'}
         content={{
           kind: 'markdown',
@@ -74,7 +121,7 @@ describe('PresentedResource', () => {
 
   it('keeps a first heading that says something other than the name', async () => {
     const { container } = await presentMarkdown(
-      <PresentedResource
+      <Presented
         title="The problem"
         content={{
           kind: 'markdown',
@@ -89,7 +136,7 @@ describe('PresentedResource', () => {
 
   it('draws a setext underline as a heading, with no hr for the Stage to read', async () => {
     const { container } = await presentMarkdown(
-      <PresentedResource
+      <Presented
         title="Short"
         content={{
           kind: 'markdown',
@@ -102,9 +149,9 @@ describe('PresentedResource', () => {
     expect(container.querySelector('.resource__body hr')).toBeNull();
   });
 
-  it('presents an Image Resource as its name and its image, the name as the text alternative', () => {
+  it('presents an Image Resource as its picture alone, the name as the text alternative', () => {
     render(
-      <PresentedResource
+      <Presented
         title={'Harbour\nAt dusk'}
         content={{
           kind: 'image',
@@ -114,7 +161,7 @@ describe('PresentedResource', () => {
       />,
     );
 
-    expect(screen.getByRole('heading', { name: 'Harbour' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading')).toBeNull();
     expect(screen.getByRole('img', { name: 'Harbour' })).toHaveAttribute(
       'src',
       'https://example.com/h.png',
@@ -130,7 +177,7 @@ describe('PresentedResource', () => {
    */
   it('heads a presented Resource with the Resource’s name', async () => {
     await presentMarkdown(
-      <PresentedResource
+      <Presented
         title={'Auth\nHow a session begins'}
         content={{ kind: 'markdown', content: { url: textAsset('Body.') }, via: 'self' }}
       />,
@@ -142,7 +189,7 @@ describe('PresentedResource', () => {
 
   it('presents a Reference Resource to an Image Resource as its Target’s image, with no Replace', () => {
     render(
-      <PresentedResource
+      <Presented
         title="Harbour, again"
         content={{
           kind: 'image',
@@ -153,6 +200,9 @@ describe('PresentedResource', () => {
     );
 
     const picture = screen.getByRole('img', { name: 'Harbour, again' });
+    // The Reference passes its own Title, which the picture is named by, and
+    // draws none of its own (ADR 0070, ADR 0142).
+    expect(screen.queryByRole('heading')).toBeNull();
     expect(picture).toHaveAttribute('src', 'https://example.com/h.png');
     fireEvent.error(picture);
     expect(screen.getByTestId('image-failed')).toBeInTheDocument();
@@ -255,7 +305,7 @@ describe('PresentedResource', () => {
   describe('sanitises the HTML it injects', () => {
     it('strips event-handler attributes', async () => {
       const { container } = await presentMarkdown(
-        <PresentedResource
+        <Presented
           title="T"
           content={{
             kind: 'markdown',
@@ -275,7 +325,7 @@ describe('PresentedResource', () => {
 
     it('strips javascript: hrefs while keeping the link', async () => {
       const { container } = await presentMarkdown(
-        <PresentedResource
+        <Presented
           title="T"
           content={{
             kind: 'markdown',
@@ -297,7 +347,7 @@ describe('PresentedResource', () => {
 
     it('drops script and iframe elements entirely', async () => {
       const { container } = await presentMarkdown(
-        <PresentedResource
+        <Presented
           title="T"
           content={{
             kind: 'markdown',
@@ -319,7 +369,7 @@ describe('PresentedResource', () => {
 
     it('strips inline handlers on anchors', async () => {
       const { container } = await presentMarkdown(
-        <PresentedResource
+        <Presented
           title="T"
           content={{
             kind: 'markdown',
@@ -332,5 +382,49 @@ describe('PresentedResource', () => {
       expect(container.querySelector('a')?.getAttribute('onclick')).toBeNull();
       expect(container.innerHTML).not.toContain('onclick');
     });
+  });
+});
+
+/**
+ * Below a name it draws itself, `PresentedResource` draws a plugin kind's
+ * content read-only, as the Notes window draws a presented note and a
+ * preview of each move (ADR 0129).
+ */
+describe('PresentedResource drawing a plugin kind’s content below its name', () => {
+  it('draws Markdown content, parsed, under the one name it heads with', async () => {
+    const { container } = await presentMarkdown(
+      <PresentedResource
+        title="Demo"
+        content={{
+          kind: 'markdown',
+          content: { url: textAsset('A live walk through checkout.') },
+          via: 'self',
+        }}
+      />,
+    );
+
+    expect(screen.getAllByRole('heading', { name: 'Demo' })).toHaveLength(1);
+    expect(container.querySelector('.resource__body')).toHaveTextContent(
+      'A live walk through checkout.',
+    );
+  });
+
+  it('draws Image content as its picture, the name as the text alternative', () => {
+    render(
+      <PresentedResource
+        title={'Harbour\nAt dusk'}
+        content={{
+          kind: 'image',
+          content: { url: 'https://example.com/h.png' },
+          via: 'self',
+        }}
+      />,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Harbour' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Harbour' })).toHaveAttribute(
+      'src',
+      'https://example.com/h.png',
+    );
   });
 });

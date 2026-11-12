@@ -60,12 +60,13 @@ const CLOSED_KINDS = [
     border: 'solid',
     body: '.canvas-resource__plugin > * > :first-child',
   },
+  // So does a Reference Resource's (ADR 0142).
   {
     label: 'reference',
     kind: 'reference',
     glyph: 'Reference Resource',
     border: 'dotted',
-    body: HOST_BODY,
+    body: '.canvas-resource__plugin > * > :first-child',
   },
   { label: 'space', kind: 'space', glyph: 'Space Resource', border: 'solid', body: HOST_BODY },
   // An Ur Resource's Shape says what it is, so it draws no kind glyph; its
@@ -473,11 +474,12 @@ test(
 
 test('reduced motion removes Resource content transitions', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  // An Open Reference Resource, whose content `CanvasResource` draws and
-  // transitions; a plugin's Resource draws its content with no transition.
-  await page.goto('/?story=components--resource--open-reference-resource&mode=preview');
+  // A Resource `CanvasResource` draws Open, whose content it transitions; a
+  // plugin's Resource draws its content with no transition.
+  await page.goto('/?story=components--resource--actions&mode=preview');
 
-  const resource = page.getByRole('article', { name: 'Strategy overview' });
+  const resource = page.getByRole('article', { name: 'Opening, again' });
+  await page.getByRole('button', { name: 'Open Resource Opening, again' }).click();
   const content = resource.locator('.canvas-resource__content');
 
   await expect(content).toHaveCSS('transition-duration', '0s');

@@ -1,7 +1,5 @@
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -18,6 +16,7 @@ import {
   titleName,
   type JsonValue,
   type PluginKind,
+  type Resource,
   type ResourceShape,
 } from '@project/core';
 import type { Answer } from '@project/resource-api/domain';
@@ -26,29 +25,28 @@ import {
   type Assets,
   type OwnProps,
   type RailCommand,
-  type TitleProps,
 } from '@project/resource-api/view';
 import {
   createRailStore,
   ResourceHostProvider,
   type ResourceHost,
 } from '@project/resource-api/view/host';
-import { Button } from './Button';
 import { CANVAS_RESOURCE_DRAG_TILT_DEGREES, type CanvasResourceState } from './CanvasResource';
-import { Card, CardTitle } from './components/card';
+import { Card } from './components/card';
 import { EntityActions, EntityActionsTrigger, type EntityActionGroup } from './EntityActionsMenu';
 import { graphPaint } from './graph-color';
 import { EntityActionsIcon } from './icons';
-import { InlineTitleEditor } from './InlineTitleEditor';
 import {
-  NoEmbed,
   pluginEntryFor,
-  type PluginEntry,
+  type PluginSurfaceEntries,
   type PluginHostClaim,
   type PluginOperations,
 } from './kinds/plugin-views';
 import { readingAssets, usePluginAssets } from './plugin-assets';
 import { RailChoiceMenu } from './RailChoiceMenu';
+import { MapTitleContext, MapTitleView, type MapTitle } from './MapTitle';
+import { EmbeddingProvider, HostEmbed, type Embedding } from './ResourceEmbedding';
+import { createSurfaceLifetime, type SurfaceLifetime } from './surface-lifetime';
 import { ResourceFailureBoundary } from './ResourceFailureBoundary';
 import { HostRenderedMarkdown, HostSourceEditor } from './ResourceTextHost';
 import {
@@ -58,7 +56,6 @@ import {
 } from './ResourceRailActions';
 import { resourceShapeOutline, type OutlineSize } from './resource-shape-outline';
 import { ResourceShapeOutlineDrawing } from './ResourceShapeOutlineDrawing';
-import { TitleHeading } from './ResourceTitleHeading';
 import './canvas-resource.css';
 
 /**
@@ -103,69 +100,6 @@ function MapOwn({ children, className }: OwnProps) {
   );
 }
 
-/** The Title as the Map draws it, and the rename it offers (ADR 0065, ADR 0083). */
-export interface MapTitle {
-  readonly title: string;
-  readonly readOnly: boolean;
-  readonly onBeginTitleEdit?: (() => void) | undefined;
-  readonly editor?:
-    | {
-        readonly onComplete: (title: string) => string | null;
-        readonly onCancel: () => void;
-      }
-    | undefined;
-  readonly onReturnFocus: () => void;
-}
-
-/**
- * The Title the Map draws, read from context rather than closed over, so the
- * host hands the plugin one Title component for the surface's lifetime and a
- * rename's caret survives every render of the Resource around it.
- */
-const MapTitleContext = createContext<MapTitle | null>(null);
-
-function MapTitleView({ className }: TitleProps) {
-  const props = useContext(MapTitleContext);
-  if (props === null) return null;
-  const name = titleName(props.title);
-  const titleClass = ['canvas-resource__title', className].filter(Boolean).join(' ');
-  if (props.editor !== undefined && !props.readOnly) {
-    return (
-      <InlineTitleEditor
-        title={props.title}
-        label="Resource title"
-        variant="resource"
-        multiline
-        onComplete={props.editor.onComplete}
-        onCancel={props.editor.onCancel}
-        onReturnFocus={props.onReturnFocus}
-      />
-    );
-  }
-  const begin = props.readOnly ? undefined : props.onBeginTitleEdit;
-  return (
-    <CardTitle className={titleClass} data-editable={begin !== undefined}>
-      {begin === undefined ? (
-        <TitleHeading title={props.title} />
-      ) : (
-        <Button
-          variant="ghost"
-          className="canvas-resource__title-control nodrag nopan"
-          aria-label={`Edit Title ${name}`}
-          onClick={(event) => {
-            event.stopPropagation();
-            begin();
-          }}
-          onPointerDown={(event) => event.stopPropagation()}
-          onKeyDown={(event) => event.stopPropagation()}
-        >
-          <TitleHeading title={props.title} />
-        </Button>
-      )}
-    </CardTitle>
-  );
-}
-
 /** A plugin's rail commands, drawn as the rail draws every command. */
 function PluginRailCommands({ commands }: { readonly commands: readonly RailCommand[] }) {
   return (
@@ -206,6 +140,11 @@ export interface PluginResourceProps {
   readonly content: unknown;
   /** The Map content the plugin is given on this Map. */
   readonly mapContent: JsonValue;
+  /**
+   * The Resources this one's content references, as they stand, which its
+   * plugin may draw inside its rect through the embedding (ADR 0142).
+   */
+  readonly embeddable?: readonly Resource[] | undefined;
   /** The outline the plugin declares for that Map content. */
   readonly outline: ResourceShape;
   readonly size?: OutlineSize | undefined;
@@ -226,42 +165,6 @@ export interface PluginResourceProps {
   readonly renderToolbar?: ((toolbar: ReactNode, held: boolean) => ReactNode) | undefined;
   /** Told what a plugin threw while drawing. */
   readonly onFailure?: ((error: Error) => void) | undefined;
-}
-
-/**
- * One mounted surface's lifetime: the key its drawing is known by, whether it
- * is still drawn, and a Claim it was granted, whose `unmount` tells the host
- * this surface is gone, releasing every Claim taken through it. One is kept,
- * the latest, since each says the same of the same surface; keeping every one
- * would grow with each Claim taken and tell the host once per Claim.
- */
-interface SurfaceLifetime {
-  readonly drawing: symbol;
-  readonly drawn: () => boolean;
-  readonly hold: (claim: PluginHostClaim) => void;
-  readonly begin: () => void;
-  readonly end: () => void;
-}
-
-function createSurfaceLifetime(): SurfaceLifetime {
-  let drawn = true;
-  let held: PluginHostClaim | null = null;
-  return {
-    drawing: Symbol('drawing'),
-    drawn: () => drawn,
-    hold: (claim) => {
-      held = claim;
-    },
-    begin: () => {
-      drawn = true;
-    },
-    end: () => {
-      drawn = false;
-      const last = held;
-      held = null;
-      last?.unmount();
-    },
-  };
 }
 
 /**
@@ -341,9 +244,10 @@ export function PluginResource(props: PluginResourceProps) {
 
 /**
  * The Map host around one plugin's entry, whichever plugin it is: what
- * `PluginResource` draws, and what a test draws a plugin of its own through.
+ * `PluginResource` draws, and what a test draws a plugin of its own through,
+ * on its own surface or on the one it embeds.
  */
-export function PluginSurface(props: PluginResourceProps & { readonly entry: PluginEntry }) {
+export function PluginSurface(props: PluginResourceProps & PluginSurfaceEntries) {
   const { kind, title, state } = props;
   // Exclusive work elsewhere withdraws every authoring control the surface
   // draws, not only the plugin's commits (ADR 0142).
@@ -421,9 +325,26 @@ export function PluginSurface(props: PluginResourceProps & { readonly entry: Plu
     operations,
     drawing: lifetime.drawing,
     assets,
-    Embed: NoEmbed,
+    Embed: HostEmbed,
     onClaim: lifetime.hold,
   });
+  const onFailure = props.onFailure ?? props.operations.onFailure;
+  const embeddable = props.embeddable;
+  const entryFor = props.entryFor ?? pluginEntryFor;
+  const embedding: Embedding = useMemo(
+    () => ({
+      resources: embeddable ?? [],
+      drawing: [props.resourceId],
+      nested: false,
+      host,
+      rail: rail.embedded,
+      size,
+      selected: state === 'selected' || state === 'editing',
+      onFailure,
+      entryFor,
+    }),
+    [embeddable, props.resourceId, host, rail, size, state, onFailure, entryFor],
+  );
 
   const entityActions = props.entityActions;
   const actionable = !readOnly && entityActions?.some((group) => group.length > 0) === true;
@@ -506,10 +427,12 @@ export function PluginSurface(props: PluginResourceProps & { readonly entry: Plu
           // its state and its Claims as they are.
           key={`${props.resourceId}:${String(props.operations.epoch ?? 0)}`}
           retryOn={props.mapContent}
-          onFailure={props.onFailure ?? props.operations.onFailure}
+          onFailure={onFailure}
         >
           <MapTitleContext.Provider value={drawnTitle}>
-            <ResourceHostProvider host={host}>{plugin}</ResourceHostProvider>
+            <EmbeddingProvider embedding={embedding}>
+              <ResourceHostProvider host={host}>{plugin}</ResourceHostProvider>
+            </EmbeddingProvider>
             {/* A plugin that draws no Title is renamed in the host's editor, drawn over it. */}
             {!props.entry.drawsTitle && title.editor !== undefined && !readOnly && (
               <div className="canvas-resource__title-over">
@@ -532,3 +455,5 @@ export function PluginSurface(props: PluginResourceProps & { readonly entry: Plu
     resource
   );
 }
+
+export type { MapTitle };

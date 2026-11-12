@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo, useState } from 'react';
-import { mapContentWithoutMap, titleName, type PluginKind } from '@project/core';
+import { mapContentWithoutMap, titleName, type PluginKind, type Resource } from '@project/core';
 import type { Size } from '@project/resource-api/domain';
 import type { OwnProps, TitleProps } from '@project/resource-api/view';
 import {
@@ -7,8 +7,9 @@ import {
   ResourceHostProvider,
   type ResourceHost,
 } from '@project/resource-api/view/host';
-import { NoEmbed, pluginEntryFor, type PluginEntry } from './kinds/plugin-views';
+import { pluginEntryFor, type PluginSurfaceEntries } from './kinds/plugin-views';
 import { readingAssets, usePluginAssets } from './plugin-assets';
+import { EmbeddingProvider, HostEmbed, type Embedding } from './ResourceEmbedding';
 import { ResourceFailureBoundary } from './ResourceFailureBoundary';
 import { HostRenderedMarkdown, HostSourceEditor } from './ResourceTextHost';
 
@@ -45,6 +46,11 @@ export interface PresentedPluginResourceProps {
   readonly title: string;
   /** The Resource's content as stored, which its plugin's schema parses. */
   readonly content: unknown;
+  /**
+   * The Resources this one's content references, as they stand, which its
+   * plugin may draw inside its frame through the embedding (ADR 0142).
+   */
+  readonly embeddable?: readonly Resource[] | undefined;
   /** Told what a plugin threw while drawing. */
   readonly onFailure?: ((error: Error) => void) | undefined;
   /** The Replacement epoch, which the drawing starts again on, as it does for another Resource. */
@@ -60,9 +66,7 @@ export function PresentedPluginResource(props: PresentedPluginResourceProps) {
  * `PresentedPluginResource` draws, and what a test draws a plugin of its own
  * through. The Stage authors nothing, so the plugin reads assets and stores none.
  */
-export function PresentedPluginSurface(
-  props: PresentedPluginResourceProps & { readonly entry: PluginEntry },
-) {
+export function PresentedPluginSurface(props: PresentedPluginResourceProps & PluginSurfaceEntries) {
   const { kind, title } = props;
   const supplied = usePluginAssets();
   const assets = useMemo(() => readingAssets(supplied), [supplied]);
@@ -88,9 +92,26 @@ export function PresentedPluginSurface(
     operations: { kind },
     drawing,
     assets,
-    Embed: NoEmbed,
+    Embed: HostEmbed,
     onClaim: (claim) => claim.unmount(),
   });
+  const { embeddable, onFailure } = props;
+  const entryFor = props.entryFor ?? pluginEntryFor;
+  const embedding: Embedding = useMemo(
+    () => ({
+      resources: embeddable ?? [],
+      drawing: [props.resourceId],
+      nested: false,
+      host,
+      // The Stage draws no rail, so no order among its commands.
+      rail: host.rail,
+      size: STAGE_SIZE,
+      selected: false,
+      onFailure,
+      entryFor,
+    }),
+    [embeddable, props.resourceId, host, onFailure, entryFor],
+  );
   return (
     <article
       className="resource resource--full resource--plugin"
@@ -104,15 +125,17 @@ export function PresentedPluginSurface(
         onFailure={props.onFailure}
       >
         <StageNameContext.Provider value={name}>
-          <ResourceHostProvider host={host}>{plugin}</ResourceHostProvider>
+          <EmbeddingProvider embedding={embedding}>
+            <ResourceHostProvider host={host}>{plugin}</ResourceHostProvider>
+          </EmbeddingProvider>
         </StageNameContext.Provider>
       </ResourceFailureBoundary>
     </article>
   );
 }
 
-/** The room an embedded plugin fills: all of the content area it is drawn in. */
-const EMBEDDED_ROOM = {
+/** The room the plugin fills: all of the space below the name. */
+const CONTENT_ROOM = {
   position: 'relative',
   flex: 1,
   width: '100%',
@@ -121,26 +144,26 @@ const EMBEDDED_ROOM = {
   minHeight: 0,
 } as const;
 
-export interface EmbeddedPluginContentProps {
-  readonly kind: PluginKind;
-  /** The Title the embedding passes, which the plugin is given as its name; the frame draws it. */
-  readonly title: string;
-  /** The embedded Resource's content, which its plugin's schema parses. */
-  readonly content: unknown;
-}
-
-/** The embedded plugin's Title: the frame around it draws the Reference's own, so at most one draws. */
+/** The plugin's Title: `PresentedResource` draws the name above it, so at most one draws. */
 function NoTitle() {
   return null;
 }
 
+export interface PresentedPluginContentProps {
+  readonly kind: PluginKind;
+  /** The name drawn above, which the plugin is given as its Title. */
+  readonly title: string;
+  /** The content, which the plugin's schema parses. */
+  readonly content: unknown;
+}
+
 /**
- * Another Resource's plugin drawn inside a Resource's content area, as an Open
- * Reference Resource draws its Target (ADR 0070, ADR 0142): on a surface
- * offering no authoring of the Target, given the Reference's own Title as its
- * name, drawing no Title of its own, and filling the room it is given.
+ * A plugin kind's content drawn read-only below a name `PresentedResource`
+ * draws, as the Notes window draws a presented note and a preview of each
+ * move (ADR 0129, ADR 0142): no commit, no Claim, no rail drawn anywhere, and
+ * nothing to embed.
  */
-export function EmbeddedPluginContent({ kind, title, content }: EmbeddedPluginContentProps) {
+export function PresentedPluginContent({ kind, title, content }: PresentedPluginContentProps) {
   const supplied = usePluginAssets();
   const assets = useMemo(() => readingAssets(supplied), [supplied]);
   const [drawing] = useState(() => Symbol('drawing'));
@@ -150,9 +173,22 @@ export function EmbeddedPluginContent({ kind, title, content }: EmbeddedPluginCo
     rail: createRailStore(),
     RenderedMarkdown: HostRenderedMarkdown,
     SourceEditor: HostSourceEditor,
-    // The frame around an embedded plugin keeps its own band clear.
+    // `PresentedResource` draws no rail around this content.
     railBand: 0,
   }));
+  const embedding: Embedding = useMemo(
+    () => ({
+      resources: [],
+      drawing: [],
+      nested: false,
+      host,
+      rail: host.rail,
+      size: STAGE_SIZE,
+      selected: false,
+      entryFor: pluginEntryFor,
+    }),
+    [host],
+  );
   const plugin = pluginEntryFor(kind).render({
     resourceId: '',
     drawing,
@@ -164,13 +200,15 @@ export function EmbeddedPluginContent({ kind, title, content }: EmbeddedPluginCo
     selected: false,
     operations: { kind },
     assets,
-    Embed: NoEmbed,
+    Embed: HostEmbed,
     onClaim: (claim) => claim.unmount(),
   });
   return (
-    <div className="resource-embedded-plugin" data-content-kind={kind} style={EMBEDDED_ROOM}>
+    <div className="resource-presented-plugin" data-content-kind={kind} style={CONTENT_ROOM}>
       <ResourceFailureBoundary>
-        <ResourceHostProvider host={host}>{plugin}</ResourceHostProvider>
+        <EmbeddingProvider embedding={embedding}>
+          <ResourceHostProvider host={host}>{plugin}</ResourceHostProvider>
+        </EmbeddingProvider>
       </ResourceFailureBoundary>
     </div>
   );

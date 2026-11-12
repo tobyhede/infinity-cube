@@ -20,6 +20,12 @@ interface CanvasResourceSpecimenCommonProps {
    */
   readonly size?: { readonly width: number; readonly height: number };
   readonly kind?: KindOperations['kind'];
+  /**
+   * The content a Resource its plugin draws is given, for a kind whose plugin
+   * starts no content of its own (a Reference Resource is made from its
+   * Target). Absent, the plugin's new content.
+   */
+  readonly content?: unknown;
 }
 
 /** The two custom properties the stylesheet sizes a Resource from. */
@@ -47,6 +53,7 @@ export function CanvasResourceSpecimen({
   graphColor = '#ffc53d',
   shape: resourceShape = 'rectangle',
   size,
+  content,
 }: CanvasResourceSpecimenProps) {
   const kindOperations: KindOperations = { kind };
   if (isPluginKind(kind)) {
@@ -58,7 +65,7 @@ export function CanvasResourceSpecimen({
         resourceId={`specimen-${kind}`}
         kind={kind}
         title={{ title, readOnly: true, onReturnFocus: () => undefined }}
-        content={plugin?.newContent ?? {}}
+        content={content ?? plugin?.newContent ?? {}}
         mapContent={
           askedMapContent?.success === true
             ? askedMapContent.data

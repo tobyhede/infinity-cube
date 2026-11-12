@@ -173,7 +173,7 @@ const context = (overrides: Partial<DecorationContext> = {}): DecorationContext 
 describe('decorateSharedResourceNode', () => {
   it('offers Open, title editing and entity actions on a Resource of the working Space', () => {
     const patch = decorateSharedResourceNode(
-      projectionNode(RESOURCE_ID, 'reference'),
+      projectionNode(RESOURCE_ID, 'space'),
       context({ resourceEntityActions: () => [] }),
     );
     expect(patch.onOpenChange).toBeTypeOf('function');
@@ -210,7 +210,7 @@ describe('decorateSharedResourceNode', () => {
 
   it('withholds competing title controls while a body caret is live', () => {
     const patch = decorateSharedResourceNode(
-      projectionNode(RESOURCE_ID, 'reference', true),
+      projectionNode(RESOURCE_ID, 'space', true),
       context({ bodyEditing: true }),
     );
     expect(patch.onBeginTitleEditing).toBeUndefined();
@@ -291,7 +291,7 @@ describe('decorateSharedResourceNode', () => {
 
   it('attaches the title editor only to the Resource holding the caret', () => {
     const patch = decorateSharedResourceNode(
-      projectionNode(RESOURCE_ID, 'reference'),
+      projectionNode(RESOURCE_ID, 'space'),
       context({ editingTitleResourceId: RESOURCE_ID }),
     );
     expect(patch.titleEditor).toBeDefined();

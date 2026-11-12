@@ -87,7 +87,7 @@ function fixtureContent(
 /** The projection's answers for the content used by node fixtures. */
 export function fixtureFacts(
   kind: Resource['kind'],
-): Pick<ResourceFlowNode['data'], 'authorsContent' | 'embedsMap'> {
+): Pick<ResourceFlowNode['data'], 'authorsContent' | 'embedsMap' | 'takesOpen'> {
   const content = fixtureContent(kind, '', {
     spaceId: FIXTURE_TARGET_SPACE,
     map: FIXTURE_TARGET_MAP,
@@ -95,6 +95,9 @@ export function fixtureFacts(
   return {
     authorsContent: authorsContent(content),
     embedsMap: embedsMap(content),
+    // The application keeps Open for a Space Resource alone among these: every
+    // other kind here is drawn by its plugin (ADR 0142).
+    takesOpen: kind === 'space',
   };
 }
 

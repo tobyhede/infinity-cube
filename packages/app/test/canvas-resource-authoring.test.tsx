@@ -225,7 +225,12 @@ describe('canvas Resource authoring', () => {
     }
   });
 
-  it('authors Open for a Reference Resource through the same Resource operation', () => {
+  /**
+   * A Reference Resource's Open is its plugin's Map content (ADR 0142): the
+   * host Opens nothing for it and offers its plugin the Map content commit,
+   * through which Open and Close are its rail commands.
+   */
+  it('Opens nothing for a Reference Resource, offering its plugin the Map content commit', () => {
     const { result, rerender, spaceSession } = mountAuthoring(undefined, 'reference');
     rerender({
       open: false,
@@ -234,27 +239,17 @@ describe('canvas Resource authoring', () => {
       nameOnCreation: null,
       resourceId: REFERENCE_ID,
     });
+    const before = spaceSession.getState().working;
 
-    act(() => expect(result.current.openResource(REFERENCE_ID)).toBe('completed'));
-    expect(spaceSession.getState().working.document.maps?.[0]?.positions[REFERENCE_ID]?.open).toBe(
-      true,
-    );
-
-    rerender({
-      open: true,
-      enabled: true,
-      presenting: false,
-      nameOnCreation: null,
-      resourceId: REFERENCE_ID,
-    });
-
-    // Open and read-only are the two halves of ADR 0070, and this Reference Resource is in
-    // the working Space, so nothing else is withholding these. Opening keeps
-    // Close and the shared Title interaction; it never hands the Reference Resource the
-    // caret or the editor that would let it author the Target's content.
+    act(() => expect(result.current.openResource(REFERENCE_ID)).not.toBe('completed'));
+    expect(spaceSession.getState().working).toBe(before);
     const reference = onlyNode(result.current.nodes);
-    expect(reference.data.onOpenChange).toBeDefined();
+    expect(reference.data.onOpenChange).toBeUndefined();
     expect(reference.data.onBeginTitleEditing).toBeDefined();
+    const operations = reference.data.kindOperations;
+    if (operations.kind !== 'reference') throw new Error('Expected Reference operations');
+    expect(operations.commitMap).toBeDefined();
+    expect(operations.commitTitle).toBeDefined();
   });
 
   /**

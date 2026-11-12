@@ -47,14 +47,26 @@ const titleArb = fc
   .string({ minLength: 1, maxLength: 12 })
   .filter((s) => s.trim().length > 0 && !s.includes('\n'));
 
-/** The Ur Resource every openable Reference Resource targets, held by no Map. */
+/**
+ * The Space Resource every openable Reference Resource targets, held by no
+ * Map. A Reference to a Space Resource keeps the application's Open until the
+ * Space plugin (`.scratch/resource-plugins/issues/07`).
+ */
 const TARGET_ID = uuid('00000000-0000-4000-8000-0000000000f0');
-const target = { id: TARGET_ID, document: { title: 'Target', kind: 'ur', content: {} } } as const;
+const TARGET_SPACE = uuid('00000000-0000-4000-8000-0000000000f1');
+const target = {
+  id: TARGET_ID,
+  document: {
+    title: 'Target',
+    kind: 'space',
+    content: { spaceId: TARGET_SPACE, map: TARGET_SPACE, graph: TARGET_SPACE },
+  },
+} as const;
 
 /**
- * A document of a kind the Map stores Open for: a Reference Resource. A
- * Markdown Resource keeps Open in its plugin's Map content, and an Image or Ur
- * Resource is never Open (ADR 0142).
+ * A document of a kind the Map stores Open for: a Reference Resource to a
+ * Space Resource. A Resource a plugin draws keeps any Open in its Map content
+ * (ADR 0142).
  */
 const openableDocument = (title: string): ResourceDocument => ({
   title,
@@ -1150,15 +1162,20 @@ describe('SnapshotEdit.open, close and resize properties', () => {
     );
   });
 
-  it('refuses Map content for a kind no plugin draws, and content its plugin refuses', () => {
+  it('refuses Map content its plugin refuses, whichever plugin it is, and any on a Resource no plugin draws', () => {
     fc.assert(
       fc.property(entriesArb, subjectArb, (generated, subjectIndex) => {
         const subjectId = RESOURCE_IDS[subjectIndex];
         if (subjectId === undefined) return;
-        const image = snapshotOf(openableSubject(generated, subjectIndex));
-        expect(
-          SnapshotEdit.changeMapContent(image, MAP_ID, subjectId, { shape: 'rectangle' }),
-        ).toEqual({ kind: 'refused', refusal: { code: 'map-content-not-kept' } });
+        // A Reference Resource to a Space Resource is drawn by no plugin yet,
+        // so it keeps no Map content at all, its own `{ open }` included.
+        const reference = snapshotOf(openableSubject(generated, subjectIndex));
+        for (const content of [{ open: true }, { shape: 'rectangle' }]) {
+          expect(SnapshotEdit.changeMapContent(reference, MAP_ID, subjectId, content)).toEqual({
+            kind: 'refused',
+            refusal: { code: 'map-content-not-kept' },
+          });
+        }
         const ur = snapshotOf(with_(generated, subjectIndex, { kind: 'ur', open: false }));
         for (const content of [{ shape: 'hexagon' }, 'pill', null, {}]) {
           expect(SnapshotEdit.changeMapContent(ur, MAP_ID, subjectId, content)).toEqual({

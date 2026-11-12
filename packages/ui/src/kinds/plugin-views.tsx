@@ -5,6 +5,7 @@ import {
   isPluginKind,
   jsonValueSchema,
   markdownKind,
+  referenceKind,
   urKind,
   type JsonValue,
   type PluginKind,
@@ -22,6 +23,8 @@ import { imagePlugin } from '@project/plugin-image/domain';
 import { imagePluginView } from '@project/plugin-image/view';
 import { markdownPlugin } from '@project/plugin-markdown/domain';
 import { markdownPluginView } from '@project/plugin-markdown/view';
+import { referencePlugin } from '@project/plugin-reference/domain';
+import { referencePluginView } from '@project/plugin-reference/view';
 import { urPlugin } from '@project/plugin-ur/domain';
 import { urPluginView } from '@project/plugin-ur/view';
 import { ResourceFailureBoundary } from '../ResourceFailureBoundary';
@@ -136,9 +139,11 @@ export interface PluginEntry {
   readonly render: (input: PluginSurfaceInput) => ReactElement;
 }
 
-/** The embedding, before any plugin embeds: one component for every surface's lifetime. */
-export function NoEmbed(_props: EmbedProps) {
-  return null;
+/** The plugin entries a host draws through: its own Resource's, and an embedded one's by kind. */
+export interface PluginSurfaceEntries {
+  readonly entry: PluginEntry;
+  /** The entry an embedded Resource of this kind is drawn through; absent, the build's. */
+  readonly entryFor?: ((kind: PluginKind) => PluginEntry) | undefined;
 }
 
 /** Why a commit was refused before it reached the host: the value was not JSON. */
@@ -258,6 +263,7 @@ export function pluginEntry<C, M>(
 const PLUGIN_ENTRIES = {
   [imageKind.id]: pluginEntry(imagePlugin, imagePluginView),
   [markdownKind.id]: pluginEntry(markdownPlugin, markdownPluginView),
+  [referenceKind.id]: pluginEntry(referencePlugin, referencePluginView),
   [urKind.id]: pluginEntry(urPlugin, urPluginView),
 } satisfies Record<PluginKind, PluginEntry>;
 

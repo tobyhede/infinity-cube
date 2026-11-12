@@ -269,13 +269,13 @@ export function useCanvasResourceAuthoring({
       if (!availability.authorOnCanvas) return 'retained';
       const resourceId = uuidSchema.safeParse(resourceIdInput);
       if (!resourceId.success) return 'retained';
-      const stored = spaceSession
-        .getState()
-        .working.resources.find((resource) => resource.id === resourceId.data);
-      // Every kind with content Opens, as one Map-owned operation (ADR 0064);
-      // an Ur Resource has none to show, so Enter or Space on one asks nothing.
-      // `takesOpen` is the domain's one answer, which intake and the Edit ask too.
-      if (stored === undefined || !takesOpen(stored.document.kind)) return 'retained';
+      const { resources } = spaceSession.getState().working;
+      const documentOf = (id: string) => resources.find((resource) => resource.id === id)?.document;
+      const stored = resources.find((resource) => resource.id === resourceId.data);
+      // The application keeps Open only for a Resource no plugin draws (ADR
+      // 0142); a plugin keeps any in its Map content, so Enter or Space on one
+      // asks nothing here. `takesOpen` is the domain's one answer, which intake and the Edit ask too.
+      if (stored === undefined || !takesOpen(stored.document, documentOf)) return 'retained';
       const result = authoring.complete({ kind: 'opened-resource', resourceId: resourceId.data });
       return result.kind === 'completed' || result.kind === 'unchanged' ? 'completed' : 'retained';
     },

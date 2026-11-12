@@ -1486,12 +1486,13 @@ test('the tracked fixture draws its Image Resource with no network', async ({
 });
 
 /**
- * A Reference Resource targets an Image Resource (ADR 0070, ADR 0106). Created
- * from the Image Resource's own menu, it is named after it with the caret in
- * its Title; Opening it changes no size; it draws that picture read-only, with
- * Close and no Replace, not on its rail and not in its failed-image state; and
- * replacing the Target's image, through the Target's own Replace, changes what
- * it draws.
+ * A Reference Resource targets an Image Resource (ADR 0070, ADR 0106, ADR
+ * 0142). Created from the Image Resource's own menu, it is named after it with
+ * the caret in its Title; Opening it changes no size; it draws that picture
+ * read-only, with Close and no Replace, not on its rail and not in its
+ * failed-image state; replacing the Target's image, through the Target's own
+ * Replace, changes what it draws; and the picture is named by the Reference's
+ * Title, which its rail renames without touching the Target's.
  */
 test(
   "an Open Reference Resource draws its Image Resource Target's picture read-only",
@@ -1535,8 +1536,9 @@ test(
     const reference = page.locator(`.react-flow__node[data-id="${referenceId}"]`);
     await openResource(reference, 'Figure');
     const article = reference.getByRole('article', { name: 'Figure' });
-    await expect(article).toHaveAttribute('data-open', 'true');
     await expect(article).toHaveAttribute('data-kind', 'reference');
+    // Open is the Reference plugin's Map content (ADR 0142), which its view draws.
+    await expect(article.locator('[data-open="true"]')).toHaveCount(1);
     // Opening changes no size: the Reference Resource keeps the Closed Size.
     await expect.poll(() => authoredSize(reference)).toEqual(COLLAPSED_RESOURCE_SIZE);
 
@@ -1552,14 +1554,30 @@ test(
     );
     await expect(controls.getByRole('button', { name: /^Edit Resource/ })).toHaveCount(0);
 
+    // The picture is named by the Reference's Title, renamed from its rail: the
+    // rename is the Reference's, and the Target keeps its own Title.
+    await controls.getByRole('button', { name: 'Rename Resource Figure' }).click();
+    const rename = page.getByRole('textbox', { name: 'Resource title' });
+    await expect(rename).toBeFocused();
+    await rename.fill('Figure, referenced');
+    await rename.press('Enter');
+    const renamedArticle = reference.getByRole('article', { name: 'Figure, referenced' });
+    await expect(renamedArticle).toBeVisible();
+    await settled(page);
+    const renamed = decodeLoadedSpace(
+      await (await page.request.get(`/api/spaces/${spaceId}`)).json(),
+    ).snapshot.resources;
+    expect(renamed.find(({ id }) => id === referenceId)?.document.title).toBe('Figure, referenced');
+    expect(renamed.find(({ id }) => id === IMAGE_ID)?.document.title).toBe('Figure');
+
     // Replacing the Target's image, from the Target's own rail, is what changes
     // the Reference Resource's picture.
     await page.keyboard.press('Escape');
     await replaceFromRail(page, FIRST_FILE);
-    const picture = article.getByRole('img', { name: 'Figure' });
+    const picture = renamedArticle.getByRole('img', { name: 'Figure, referenced' });
     await expect(picture).toHaveAttribute('src', /^\/assets\/[A-Za-z0-9_-]{43}$/u);
     await expectPictureLoaded(picture, FIRST_PICTURE.size.width);
-    await expect(article.getByText('Image did not load')).toHaveCount(0);
+    await expect(renamedArticle.getByText('Image did not load')).toHaveCount(0);
     await settled(page);
     expect((await storedFigure(page, spaceId)).figure).toMatchObject({
       content: { naturalSize: FIRST_PICTURE.size },

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { resourceToolbar, selectResource } from '../e2e/graph';
-import { expectPictureAtOwnSize, expectPictureLoaded, HARBOUR_SIZE } from '../e2e/image';
+import { expectPictureLoaded, HARBOUR_SIZE } from '../e2e/image';
 
 const openCloseStory = '/?story=components--resource--open-and-close&mode=preview';
 const markdownStory = '/?story=components--resource--editing--markdown&mode=preview';
@@ -44,13 +44,19 @@ test(
     await expect(
       toolbar.getByRole('button', { name: 'Close Resource Strategy overview' }),
     ).toBeVisible();
-    // The Target's content is the Open Resource's top passenger and the Reference Resource Title
-    // its bottom one, the same treatment an Open Markdown Resource draws (ADR 0070).
-    const contentBox = await reference.locator('.canvas-resource__content').boundingBox();
-    const titleBox = await reference.locator('.canvas-resource__body').boundingBox();
+    // The Target's plugin draws the Reference's Title, once, as it draws its
+    // own: above the Target's text, as an Open Markdown Resource draws it
+    // (ADR 0070, ADR 0142).
+    await expect(reference.getByRole('heading', { name: 'Strategy overview' })).toHaveCount(1);
+    const titleBox = await reference
+      .getByRole('heading', { name: 'Strategy overview' })
+      .boundingBox();
+    const contentBox = await reference
+      .getByRole('heading', { name: 'Strategies', exact: true })
+      .boundingBox();
     if (contentBox === null || titleBox === null)
       throw new Error('Open Reference Resource drew no content');
-    expect(contentBox.y + contentBox.height).toBeLessThanOrEqual(titleBox.y + 1);
+    expect(titleBox.y + titleBox.height).toBeLessThanOrEqual(contentBox.y + 1);
   },
 );
 
@@ -339,8 +345,11 @@ test('a selected Open Resource offers only Edit and Close, and its body begins t
   await open(page, markdownStory);
   const resource = page.getByRole('article', { name: 'Strategies' });
 
-  const labels = await resource
-    .getByTestId('canvas-resource-actions')
+  const actions = resource.getByTestId('canvas-resource-actions');
+  // Edit joins the rail once the plugin has read its text, so wait for it
+  // before reading the rail once.
+  await expect(actions.getByRole('button', { name: 'Edit Resource Strategies' })).toBeVisible();
+  const labels = await actions
     .getByRole('button')
     .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label')));
   expect(labels).toEqual(['Edit Resource Strategies', 'Close Resource Strategies']);
@@ -753,9 +762,9 @@ const IMAGE_REFERENCE_HARBOUR_URL = 'https://example.com/harbour.png';
 const IMAGE_REFERENCE_MISSING_URL = 'https://missing.invalid/picture.png';
 
 /**
- * A Reference Resource to an Image Resource draws its Target's picture read-only
- * as its own content would be (ADR 0070, ADR 0106): its own Title in the footer, the
- * picture at its own size in a Resource sized to hold it, Close and no
+ * A Reference Resource to an Image Resource is its Target's picture, read-only
+ * (ADR 0070, ADR 0106, ADR 0142): named by its own Title, which its rail
+ * renames, the picture at its own size in a Resource sized to it, Close and no
  * Replace, and no Replace in the failed-image state either. The story's Space
  * holds the Image Resource Targets, and this test serves Harbour's picture.
  */
@@ -773,9 +782,17 @@ test(
     const picture = resource.getByRole('img', { name: 'Harbour, again' });
     await expect(picture).toHaveAttribute('src', IMAGE_REFERENCE_HARBOUR_URL);
     await expectPictureLoaded(picture, HARBOUR_SIZE.width);
-    await expect(resource.locator('.canvas-resource__content img')).toHaveCount(1);
-    await expect(resource.getByRole('heading', { name: 'Harbour, again' })).toBeVisible();
-    await expectPictureAtOwnSize(resource, picture, HARBOUR_SIZE);
+    await expect(resource.locator('img')).toHaveCount(1);
+    // The picture is named by the Reference's Title, so no Title is drawn over it.
+    await expect(resource.getByRole('heading')).toHaveCount(0);
+    // Fitted whole into the room the Reference gives it, never cropped.
+    await expect(picture).toHaveCSS('object-fit', 'contain');
+    const pictureBox = await picture.boundingBox();
+    const resourceBox = await resource.boundingBox();
+    if (pictureBox === null || resourceBox === null) throw new Error('The picture drew no box');
+    expect(pictureBox.width).toBeGreaterThan(resourceBox.width - 16);
+    expect(pictureBox.width).toBeLessThanOrEqual(resourceBox.width);
+    expect(pictureBox.height).toBeLessThanOrEqual(resourceBox.height);
 
     const node = loaded.locator('.react-flow__node');
     await selectResource(node);
@@ -787,13 +804,17 @@ test(
       0,
     );
     await expect(toolbar.getByRole('button', { name: /^Edit Resource/ })).toHaveCount(0);
+    // The rename on the rail is the Reference's own, passed with its Title.
+    await expect(
+      toolbar.getByRole('button', { name: 'Rename Resource Harbour, again' }),
+    ).toBeVisible();
 
     const failed = page
       .getByRole('region', { name: 'Failed image Target' })
       .getByRole('article', { name: 'Missing, again' });
     await expect(failed.getByText('Image did not load')).toBeVisible();
     await expect(failed.getByText(IMAGE_REFERENCE_MISSING_URL)).toBeVisible();
-    await expect(failed.getByRole('heading', { name: 'Missing, again' })).toBeVisible();
+    await expect(failed.getByRole('heading')).toHaveCount(0);
     await expect(failed.getByRole('button', { name: /Replace/ })).toHaveCount(0);
   },
 );

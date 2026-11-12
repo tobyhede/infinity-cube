@@ -10,7 +10,16 @@ import {
   type NodeChange,
   type NodeTypes,
 } from '@xyflow/react';
-import type { ResourceContent, ResourceId, ResourceShape, GraphId, MapId } from '@project/core';
+import type {
+  JsonValue,
+  ResourceContent,
+  ResourceId,
+  ResourceShape,
+  GraphId,
+  MapId,
+} from '@project/core';
+import type { Answer } from '@project/resource-api/domain';
+import { isPluginOperations, type PluginOperations } from '@project/ui';
 import {
   Placement,
   positionedStrategy,
@@ -26,7 +35,6 @@ import {
   ZoomSlider,
   type ResourceFlowNode,
 } from '@project/react-flow-adapter';
-import type { PluginOperations } from '@project/ui';
 import { spaceEntityActions } from '#src/entity-actions';
 import { MAX_ZOOM, OVERVIEW_FIT } from '#src/camera';
 import {
@@ -431,6 +439,14 @@ interface CanvasResourceNodeSpecimenBaseProps {
    * Reference Resource draws its real Target.
    */
   readonly drawn?: DrawnMap;
+  /**
+   * The Map content a Resource its plugin draws is given here, in place of
+   * what the drawn Map stores for it, and the commits its surface offers (ADR
+   * 0142): a Reference Resource's Open is its Map content.
+   */
+  readonly mapContent?: JsonValue | undefined;
+  readonly commitMap?: ((next: JsonValue) => Promise<Answer>) | undefined;
+  readonly commitTitle?: ((next: string) => Promise<Answer>) | undefined;
 }
 
 /**
@@ -467,6 +483,9 @@ export function CanvasResourceNodeSpecimen({
   resourceShape,
   draggable = false,
   drawn = INVENTORY_MAP,
+  mapContent,
+  commitMap,
+  commitTitle,
 }: CanvasResourceNodeSpecimenProps) {
   const drawnSpace = drawn.space;
   const selectedMap = drawnSpace.maps.find((candidate) => candidate.id === drawn.mapId);
@@ -527,6 +546,11 @@ export function CanvasResourceNodeSpecimen({
     const kindOperations: PluginOperations =
       commitMap === undefined ? { kind: 'markdown' } : { kind: 'markdown', commitMap };
     Object.assign(data, { ownContent: own, mapContent: { open: open === true }, kindOperations });
+  }
+  if (mapContent !== undefined && data.mapContent !== undefined) data.mapContent = mapContent;
+  if (isPluginOperations(data.kindOperations)) {
+    if (commitMap !== undefined) data.kindOperations = { ...data.kindOperations, commitMap };
+    if (commitTitle !== undefined) data.kindOperations = { ...data.kindOperations, commitTitle };
   }
   if (open === true) {
     data.display = {

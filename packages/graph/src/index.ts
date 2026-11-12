@@ -58,9 +58,15 @@ export type {
   LayoutStrategy,
 } from './layout';
 
-// Content resolution is the only function here: identity lookup is reached
-// through `space.lookup`, which the Space carries.
-export { resolveResourceContent } from './lookup';
+// Content resolution, the Resources a Resource's content references, and whether
+// a plugin draws it; identity lookup is reached through `space.lookup`, which
+// the Space carries.
+export {
+  referencedResources,
+  resolveResourceContent,
+  resourceDrawnByPlugin,
+  resourceTakesOpen,
+} from './lookup';
 export type { OwnedGraph, ResolvedMap, SpaceLookup } from './lookup';
 
 export { initializeSpace, newGraph, newSpace } from './new-space';

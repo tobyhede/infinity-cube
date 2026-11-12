@@ -24,6 +24,7 @@ export const workspaceAliases = () => {
     '@project/plugin-image/domain': here('../plugin-image/src/domain.ts'),
     '@project/plugin-ur/domain': here('../plugin-ur/src/domain.ts'),
     '@project/plugin-markdown/domain': here('../plugin-markdown/src/domain.ts'),
+    '@project/plugin-reference/domain': here('../plugin-reference/src/domain.ts'),
     '@project/resource-api/domain': here('../resource-api/src/domain/index.ts'),
   } satisfies Record<string, string>;
 };

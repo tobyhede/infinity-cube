@@ -33,13 +33,12 @@ import {
   DEFAULT_KIND,
   COLLAPSED_RESOURCE_SIZE,
   isAcceptedImageUrl,
-  takesOpen,
   titleName,
   uuidSchema,
   type ResourceId,
   type MapId,
 } from '@project/core';
-import { resolveResourceContent } from '@project/graph';
+import { resolveResourceContent, resourceTakesOpen } from '@project/graph';
 import type { SpaceSession } from '@project/persistence';
 import {
   CANVAS_RESOURCE_DRAG_TILT_DEGREES,
@@ -531,7 +530,7 @@ export function SpaceCanvas({
       const resource = view.space.lookup.resource(resourceId);
       const area = canvasRef.current;
       if (node === undefined || resource === undefined || area === null) return 'retained';
-      if (!takesOpen(resource.kind)) return 'retained';
+      if (!resourceTakesOpen(view.space, resource)) return 'retained';
       const zoom = getZoom();
       const content = resolveResourceContent(view.space, resource);
       const size = openAndExpandSize(
@@ -579,7 +578,7 @@ export function SpaceCanvas({
       return (
         availability.authorOnCanvas &&
         resource !== undefined &&
-        takesOpen(resource.kind) &&
+        resourceTakesOpen(view.space, resource) &&
         placedResources.some((placed) => placed.id === resourceId)
       );
     },
@@ -1070,7 +1069,7 @@ export function SpaceCanvas({
                   openResource: occurrence.openResource,
                 },
                 nodeId,
-                takesOpen: takesOpen(node.data.kind),
+                takesOpen: node.data.takesOpen,
               };
             }
             return undefined;

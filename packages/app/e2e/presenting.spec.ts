@@ -785,9 +785,9 @@ test(
 );
 
 /**
- * A Reference to an Ur Resource is drawn by the frame every Reference is, not
- * by Ur's plugin, and presents as the title slide its Target does: its name
- * alone, centred.
+ * A Reference to an Ur Resource is drawn by the Reference plugin, which embeds
+ * its Target's Ur plugin under the Reference's own name, and presents as the
+ * title slide its Target does: its name alone, centred.
  */
 test('a Reference to an Ur Resource presents its name alone, centred', async ({ page }) => {
   const ur = await addTitleSlideAfterC(page);
@@ -824,7 +824,8 @@ test('a Reference to an Ur Resource presents its name alone, centred', async ({ 
 
   const slide = presentedResource(page);
   await expect(presentedName(page)).toHaveText('Title slide, again');
-  await expect(slide).toHaveAttribute('data-content-kind', 'ur');
+  await expect(slide).toHaveAttribute('data-content-kind', 'reference');
+  await expect(slide.locator('[data-content-kind="ur"]')).toHaveCount(1);
   await expect(slide.locator('.resource__body')).toHaveCount(0);
   await expectNameCentred(page);
 });

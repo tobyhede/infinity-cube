@@ -3,10 +3,13 @@ import type { Story } from '@ladle/react';
 import {
   RESOURCE_SHAPES,
   uuidSchema,
+  type JsonValue,
   type Map,
   type Resource,
   type ResourceShape,
 } from '@project/core';
+import { referenceMapContentSchema } from '@project/plugin-reference/domain';
+import type { Answer } from '@project/resource-api/domain';
 import { urMapContentSchema } from '@project/plugin-ur/domain';
 import { productDestinationPath, type ProductDestination } from '@project/http';
 import {
@@ -100,11 +103,16 @@ const WRAPPING_TITLE = 'Why authored placement beats a layout engine that reshuf
  */
 const CLOSED_KINDS = [
   { kind: 'markdown', label: 'markdown' },
-  { kind: 'reference', label: 'reference' },
+  // A Reference Resource is made from its Target, which its content names.
+  { kind: 'reference', label: 'reference', content: { target: resourceIds.strategies } },
   { kind: 'space', label: 'space' },
   { kind: 'ur', label: 'ur' },
   { kind: 'markdown', label: 'creation ghost' },
-] as const satisfies readonly { kind: KindOperations['kind']; label: string }[];
+] as const satisfies readonly {
+  kind: KindOperations['kind'];
+  label: string;
+  content?: unknown;
+}[];
 
 /**
  * The whole of a Closed Resource, at rest, for every kind the component draws.
@@ -132,14 +140,22 @@ export const Closed: Story = () => (
       <div className="inv-row">
         {CLOSED_KINDS.map((entry) => (
           <Specimen key={entry.label} label={`${entry.label} · one line`}>
-            <CanvasResourceSpecimen kind={entry.kind} title={ONE_LINE_TITLE} />
+            <CanvasResourceSpecimen
+              kind={entry.kind}
+              title={ONE_LINE_TITLE}
+              content={'content' in entry ? entry.content : undefined}
+            />
           </Specimen>
         ))}
       </div>
       <div className="inv-row">
         {CLOSED_KINDS.map((entry) => (
           <Specimen key={entry.label} label={`${entry.label} · three lines`}>
-            <CanvasResourceSpecimen kind={entry.kind} title={THREE_LINE_TITLE} />
+            <CanvasResourceSpecimen
+              kind={entry.kind}
+              title={THREE_LINE_TITLE}
+              content={'content' in entry ? entry.content : undefined}
+            />
           </Specimen>
         ))}
       </div>
@@ -481,14 +497,16 @@ function Instance({
   // Every kind Opens and Closes through the one operation (ADR 0070), so the
   // Reference Resource takes it too.
   const kindOperations: KindOperations = { kind };
+  // `CanvasResource` draws a content area for content it still owns: a
+  // Reference's here is a Target it cannot find, since a Reference to a
+  // Resource a plugin draws is drawn by its plugin (ADR 0142).
   const display: ResourceDisplay = open
     ? {
         shown: 'open',
-        content: {
-          kind: 'markdown',
-          content: { url: storyText('Markdown content') },
-          via: kind === 'reference' ? 'target' : 'self',
-        },
+        content:
+          kind === 'reference'
+            ? { kind: 'unresolved', via: 'target' }
+            : { kind: 'markdown', content: { url: storyText('Markdown content') }, via: 'self' },
       }
     : CLOSED_DISPLAY;
   const state: Exclude<CanvasResourceState, 'editing'> = dragging
@@ -605,23 +623,24 @@ export const OpenAndClose: Story = () => {
 };
 OpenAndClose.meta = { iframed: true };
 
+/**
+ * An Open Reference Resource is drawn by its plugin (ADR 0070, ADR 0142): it
+ * embeds its Target, Strategies, through the host's embedding, under its own
+ * Title, and its Open and Close are its Map content, changed from its rail.
+ */
 export const OpenReference: Story = () => {
   const [open, setOpen] = useState(true);
-  const changeOpen = (next: boolean) => {
-    setOpen(next);
-    return 'completed' as const;
+  const commitMap = (next: JsonValue): Promise<Answer> => {
+    setOpen(referenceMapContentSchema.parse(next).open);
+    return Promise.resolve('completed');
   };
   return (
     <div className="p-8">
       <CanvasResourceNodeSpecimen
         resourceId={resourceIds.openingReference}
-        open={open}
-        onOpenChange={changeOpen}
-        content={{
-          kind: 'markdown',
-          content: { url: storyText('## Strategies\n\nNo strategy is privileged.') },
-          via: 'target',
-        }}
+        openOperationEnabled={false}
+        mapContent={{ open }}
+        commitMap={commitMap}
         nodeSize={open ? openFrame : closedFrame}
         stageClassName="inv-resource-node-stage--large"
       />
@@ -726,20 +745,25 @@ const imageReferenceMap: DrawnMap = {
 };
 
 /**
- * A Reference Resource whose Target is an Image Resource draws the Target's
- * picture read-only, as its own content would be (ADR 0070, ADR 0106): its own
- * Title, Close, and no Replace, even where the picture does not load. Both
- * Resources are in a Space that holds their Image Resource Targets, so what
- * each draws is resolved from its Target rather than handed to it. Each is
- * sized to hold the Target's 400×300 picture plus the Resource's chrome.
+ * A Reference Resource whose Target is an Image Resource is that picture,
+ * read-only (ADR 0070, ADR 0106, ADR 0142): named by its own Title, which its
+ * rail renames, with Close and no Replace, even where the picture does not
+ * load. Both Resources are in a Space that holds their Image Resource Targets,
+ * so what each draws is its Target, embedded by the host. Each is sized to the
+ * Target's 400×300 picture.
  */
 export const OpenImageReference: Story = () => {
   const [open, setOpen] = useState(true);
-  const changeOpen = (next: boolean) => {
-    setOpen(next);
-    return 'completed' as const;
+  const commitMap = (next: JsonValue): Promise<Answer> => {
+    setOpen(referenceMapContentSchema.parse(next).open);
+    return Promise.resolve('completed');
   };
-  const sizedToPicture = { width: 408, height: 359 };
+  const [title, setTitle] = useState('Harbour, again');
+  const commitTitle = (next: string): Promise<Answer> => {
+    setTitle(next);
+    return Promise.resolve('completed');
+  };
+  const sizedToPicture = { width: 400, height: 300 };
   return (
     <div className="flex flex-wrap items-start gap-8 p-8">
       <section aria-label="Image Target" className="flex flex-col gap-2">
@@ -747,8 +771,11 @@ export const OpenImageReference: Story = () => {
         <CanvasResourceNodeSpecimen
           drawn={imageReferenceMap}
           resourceId={imageReferenceIds.harbourReference}
-          open={open}
-          onOpenChange={changeOpen}
+          openOperationEnabled={false}
+          mapContent={{ open }}
+          commitMap={commitMap}
+          title={title}
+          commitTitle={commitTitle}
           nodeSize={open ? sizedToPicture : closedFrame}
           zoom={1}
           stageClassName="inv-resource-node-stage--large"
@@ -759,7 +786,8 @@ export const OpenImageReference: Story = () => {
         <CanvasResourceNodeSpecimen
           drawn={imageReferenceMap}
           resourceId={imageReferenceIds.missingReference}
-          open
+          openOperationEnabled={false}
+          mapContent={{ open: true }}
           nodeSize={sizedToPicture}
           zoom={1}
           stageClassName="inv-resource-node-stage--large"

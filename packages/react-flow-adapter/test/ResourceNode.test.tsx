@@ -1,4 +1,4 @@
-import { authorsContent, embedsMap } from '@project/core';
+import { authorsContent, embedsMap, type Resource } from '@project/core';
 import '@testing-library/jest-dom/vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import type * as ReactFlowReact from '@xyflow/react';
@@ -185,6 +185,26 @@ beforeEach(() => {
 
 const graphId = uuid('00000000-0000-4000-8000-000000000010');
 const resourceId = uuid('00000000-0000-4000-8000-000000000001');
+const targetId = uuid('00000000-0000-4000-8000-0000000000f0');
+
+/** A Reference Resource's Target: an Image Resource's picture. */
+const pictureTarget = (url: string): Resource => ({
+  id: targetId,
+  title: 'Harbour',
+  kind: 'image',
+  content: { url },
+});
+
+/** A Reference Resource's Target: a Markdown Resource whose text is `source`. */
+const textTarget = (source: string): Resource => ({
+  id: targetId,
+  title: 'The Target’s own Title',
+  kind: 'markdown',
+  content: { url: textAsset(source) },
+});
+
+/** A Reference plugin's Map content commit, which answers as a host would. */
+const referenceMap = () => ({ commitMap: vi.fn(() => Promise.resolve('completed' as const)) });
 
 interface Overrides {
   selected?: boolean;
@@ -210,6 +230,15 @@ interface Overrides {
   content?: ResourceContent;
   /** What the host offers an Image Resource's plugin. */
   imageOperations?: Omit<PluginOperations, 'kind'>;
+  /**
+   * The Target a Reference Resource's plugin embeds, which makes the fixture a
+   * Reference the Reference plugin draws, as the projection gives one whose
+   * Target a plugin draws (ADR 0142). Absent, a Reference is drawn by the
+   * application's frame, as one to a Space Resource is.
+   */
+  target?: Resource;
+  /** What the host offers a Reference Resource's plugin. */
+  referenceOperations?: Omit<PluginOperations, 'kind'>;
   resize?: ResourceNodeData['resize'];
   readOnly?: boolean;
   connectionAuthoringEnabled?: boolean;
@@ -260,6 +289,8 @@ function props({
   url = 'https://example.com/harbour.png',
   content,
   imageOperations,
+  target,
+  referenceOperations,
   resize,
   readOnly = false,
   connectionAuthoringEnabled,
@@ -277,20 +308,24 @@ function props({
           ? { url }
           : kind === 'markdown'
             ? { url: textAsset(source) }
-            : undefined,
+            : kind === 'reference' && target !== undefined
+              ? { target: target.id }
+              : undefined,
     mapContent:
       kind === 'ur'
         ? { shape: resourceShape }
         : kind === 'image'
           ? {}
-          : kind === 'markdown'
+          : kind === 'markdown' || (kind === 'reference' && target !== undefined)
             ? { open: open === true }
             : undefined,
+    embeddable: target === undefined ? undefined : [target],
     resourceId,
     title,
     ...bareKindData(kind),
     authorsContent: authorsContent(resolved),
     embedsMap: embedsMap(resolved),
+    takesOpen: kind === 'space' || (kind === 'reference' && target === undefined),
     selectedForAuthoring,
     display: open === true ? { shown: 'open', content: resolved } : { shown: 'closed' },
     activeGraphId: graphId,
@@ -309,6 +344,8 @@ function props({
   if (open !== undefined) data.open = open;
   if (imageOperations !== undefined && data.kind === 'image')
     data.kindOperations = { kind: 'image', ...imageOperations };
+  if (referenceOperations !== undefined && data.kind === 'reference')
+    data.kindOperations = { kind: 'reference', ...referenceOperations };
   if (resize !== undefined) data.resize = resize;
   if (connectionAuthoringEnabled !== undefined)
     data.connectionAuthoringEnabled = connectionAuthoringEnabled;
@@ -575,7 +612,7 @@ describe('ResourceNode canvas Resource state adapter', () => {
 describe('ResourceNode draws what the display shows', () => {
   const FIGURE = 'https://example.com/harbour.png';
 
-  it("draws an Open Reference Resource to an Image Resource as its Target's image, with no Replace", () => {
+  it("draws an Open Reference Resource to an Image Resource as its Target's picture, named by the Reference, with no Replace", () => {
     render(
       <ResourceNode
         {...props({
@@ -583,20 +620,21 @@ describe('ResourceNode draws what the display shows', () => {
           title: 'Harbour, again',
           open: true,
           selected: true,
-          content: { kind: 'image', content: { url: FIGURE }, via: 'target' },
-          onOpenChange: vi.fn(),
+          target: pictureTarget(FIGURE),
+          referenceOperations: referenceMap(),
         })}
       />,
     );
 
     const picture = screen.getByRole('img', { name: 'Harbour, again' });
     expect(picture).toHaveAttribute('src', FIGURE);
+    expect(screen.queryByRole('heading')).toBeNull();
     expect(screen.getByRole('button', { name: 'Close Resource Harbour, again' })).toBeVisible();
     expect(screen.queryByRole('button', { name: /^Replace image/u })).toBeNull();
 
     fireEvent.error(picture);
     expect(screen.getByTestId('image-failed')).toBeVisible();
-    expect(screen.queryByRole('button', { name: 'Replace image' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Replace image/u })).toBeNull();
   });
 
   it('draws an unresolved Target as a notice on the Open Resource', () => {
@@ -1275,27 +1313,28 @@ describe('ResourceNode Open Resource', () => {
     );
   });
 
-  it("draws an Open Reference Resource's resolved Markdown read-only under the Reference Resource Title", async () => {
+  it("draws an Open Reference Resource's Target Markdown read-only under the Reference Resource's Title, once", async () => {
     render(
       <ResourceNode
         {...props({
           kind: 'reference',
           title: 'Return',
           open: true,
-          source: SOURCE,
           selected: true,
-          onOpenChange: vi.fn(),
+          target: textTarget(SOURCE),
+          referenceOperations: referenceMap(),
         })}
       />,
       { wrapper: WithTexts },
     );
 
-    expect(screen.getByRole('heading', { name: 'Return' })).toBeVisible();
     expect(await screen.findByText('No strategy is privileged.')).toBeVisible();
+    expect(screen.getAllByRole('heading', { name: 'Return' })).toHaveLength(1);
+    expect(screen.queryByText('The Target’s own Title')).not.toBeInTheDocument();
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Edit Resource/ })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /^(Open|Close) Resource/u })).toHaveLength(1);
     expect(screen.getByRole('button', { name: 'Close Resource Return' })).toBeVisible();
-    expect(screen.getByTestId('resource')).toHaveAttribute('data-open', 'true');
   });
 
   it('keeps Opening and renaming independent, because one is authored and the other a gesture', async () => {
@@ -1485,7 +1524,13 @@ describe('ResourceNode Open Resource', () => {
     };
     render(
       <ResourceNode
-        {...props({ kind: 'reference', open: true, selected: true, source: 'Body', resize })}
+        {...props({
+          kind: 'reference',
+          open: true,
+          selected: true,
+          target: textTarget('Body'),
+          resize,
+        })}
       />,
       { wrapper: WithTexts },
     );

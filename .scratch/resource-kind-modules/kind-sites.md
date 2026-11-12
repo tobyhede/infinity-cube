@@ -12,11 +12,11 @@ Categories: **one-kind** = a feature that exists for that kind alone; **registry
 |---|---|---|---|---|
 | packages/app/src/components/CommandDockSpaces.tsx:459 | `spaceKind.id`: Space glyph | space | display | CommandDockSpaces.tsx |
 | packages/app/src/components/CommandDockSpaces.tsx:564 | `spaceKind.id`: Space glyph | space | display | CommandDockSpaces.tsx |
-| packages/app/src/resource-rail-actions.tsx:93 | `referenceKind.id`: Create Reference glyph | reference | E (display of a creation) | resource-rail-actions.tsx |
-| packages/app/src/resource-rail-actions.tsx:143 | `spaceKind.id`: Space Resource menu | space | one-kind | resource-rail-actions.tsx |
-| packages/app/src/resource-rail-actions.tsx:254 | `spaceKind.id`: Space Resource Enter | space | one-kind | resource-rail-actions.tsx |
+| packages/app/src/resource-rail-actions.tsx:162 | `referenceKind.id`: Create Reference glyph | reference | E (display of a creation, until issue 08) | resource-rail-actions.tsx |
+| packages/app/src/resource-rail-actions.tsx:240 | `spaceKind.id`: Space Resource menu | space | one-kind | resource-rail-actions.tsx |
+| packages/app/src/resource-rail-actions.tsx:373 | `spaceKind.id`: Space Resource Enter | space | one-kind | resource-rail-actions.tsx |
 | packages/app/src/space-authoring.ts:116 | `imageKind.id`: new Image Resource document | image | E | space-authoring.ts |
-| packages/app/src/space-authoring.ts:1364 | `referenceKind.id`: new Reference Resource | reference | E | space-authoring.ts |
+| packages/app/src/space-authoring.ts:1368 | `referenceKind.id`: new Reference Resource | reference | E (until issue 08) | space-authoring.ts |
 | packages/persistence/src/space-resource-planning.ts:328 | `spaceKind.id`: new Space Resource document | space | E (lifecycle) | space-resource-planning.ts |
 
 `packages/app/src/canvas-resource-authoring.ts` no longer reaches a module id: a Markdown Resource's body is its plugin's (ADR 0142, resource-plugins issue 05), so the canvas keeps no Markdown completion.
@@ -29,7 +29,7 @@ Categories: **one-kind** = a feature that exists for that kind alone; **registry
 |---|---|---|---|---|
 | packages/core/src/index.ts:11-15 | `export *` of each kind module | all | package surface | core/src/index.ts |
 | packages/ui/src/index.ts:17-19 | re-exports `beginEditing`, `isSpaceOperations`, `spaceViewOf` | markdown, space | package surface | ui/src/index.ts |
-| packages/ui/src/icons.tsx:263 | `ResourceBaseKind = Exclude<Resource['kind'], ReferenceKindId>` | reference | display (kinds a Reference badge sits on) | icons.tsx |
+| packages/ui/src/icons.tsx:287 | `ResourceBaseKind = Exclude<Resource['kind'], ReferenceKindId>` | reference | display (kinds a Reference badge sits on) | icons.tsx |
 | packages/ui/src/CanvasResource.tsx:301 | `isSpaceOperations`: the Space rail and portal | space | one-kind (portal) | CanvasResource.tsx |
 | packages/react-flow-adapter/src/ResourceNode.tsx:334 | `isSpaceOperations(...).portal.editing` keeps the toolbar | space | one-kind | ResourceNode.tsx |
 | packages/app/src/components/SpaceCanvas.tsx:1015,1660 | `spaceViewOf(...).view.framing` | space | one-kind (the Space kind's embedded Map) | SpaceCanvas.tsx |
@@ -49,6 +49,8 @@ Categories: **one-kind** = a feature that exists for that kind alone; **registry
 - Resource plugins issue 02 (ADR 0142): an Ur Resource is drawn by its plugin, `packages/plugin-ur`, through the plugin hosts, and its Shape is its Map content. `CanvasResource.tsx`'s Ur branch and `isUrOperations` are gone, and `CanvasResource.tsx`'s exemption is the Space portal's alone. The plugin list and its adapters (`kinds/plugins.ts`, `kinds/plugin-kind.ts`, `kinds/plugin-views.tsx`) read every plugin alike and are kind-neutral; a plugin package counts as a kind module in `kind-ids-in-modules.test.ts`.
 
 - Resource plugins issue 04 (ADR 0142): an Image Resource is drawn by its plugin, `packages/plugin-image`, which owns its content schema, picture admission and Replace. `image-replacement.ts` and the `replaced-image` completion are gone: Replace is the plugin's exclusive work, landing an ordinary `changed-content` Edit, so `space-authoring.ts` no longer names `imageKind.id` for it. `ImageNaturalSize` is the plugin's, so `core/src/types.ts` left the exemptions. Image creation keeps its sites until issue 08.
+
+- Resource plugins issue 06 (ADR 0142): a Reference Resource is drawn by its plugin, `packages/plugin-reference`, which embeds its Target through the host-owned embedding (`packages/ui/src/ResourceEmbedding.tsx`) and keeps whether it is Open as its Map content. Whether a Resource is drawn by a plugin, and whether the application keeps its Open, are the registry's (`drawnByPlugin`, `takesOpen` in `core/src/kinds/registry.ts`), read from content and the Target's kind with no kind named; a Reference to a Space keeps the frame and the Map entry's `open` until issue 07. Reference creation keeps its two sites until issue 08, and `icons.tsx`'s badge stays a display of the Reference kind.
 
 ## What is not covered by any mechanism
 

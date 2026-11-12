@@ -63,22 +63,35 @@ export const useResourceHost = (component: string): ResourceHost => {
   return host;
 };
 
-/** A rail outlet a host reads back: the commands published, in the order their sources first published. */
+/**
+ * A rail outlet a host reads back: the commands published, its own sources'
+ * before its embedded outlet's, each in the order their sources first published.
+ */
 export interface RailStore extends RailOutlet {
   readonly commands: () => readonly RailCommand[];
   readonly subscribe: (listener: () => void) => () => void;
+  /**
+   * The outlet for the commands of a Resource drawn inside this one, as an
+   * Open Reference draws its Target: drawn after every command published to
+   * the store itself, however the two mounted.
+   */
+  readonly embedded: RailOutlet;
 }
 
 /** A rail outlet that keeps what is published, for a host to draw. */
 export function createRailStore(): RailStore {
-  const published = new Map<symbol, readonly RailCommand[]>();
+  // A child's layout effect runs before its parent's, so a Resource drawn
+  // inside another publishes first when both mount together: the order of the
+  // two is the store's, not the mount's.
+  const own = new Map<symbol, readonly RailCommand[]>();
+  const inner = new Map<symbol, readonly RailCommand[]>();
   const listeners = new Set<() => void>();
   let snapshot: readonly RailCommand[] = [];
   const changed = () => {
-    snapshot = [...published.values()].flat();
+    snapshot = [...own.values(), ...inner.values()].flat();
     for (const listener of [...listeners]) listener();
   };
-  return {
+  const outlet = (published: Map<symbol, readonly RailCommand[]>): RailOutlet => ({
     publish: (source, commands) => {
       if (published.get(source) === commands) return;
       published.set(source, commands);
@@ -88,6 +101,10 @@ export function createRailStore(): RailStore {
       if (!published.delete(source)) return;
       changed();
     },
+  });
+  return {
+    ...outlet(own),
+    embedded: outlet(inner),
     commands: () => snapshot,
     subscribe: (listener) => {
       listeners.add(listener);
