@@ -34,7 +34,7 @@ import { graphPaint } from './graph-color';
 import { EntityActionsIcon } from './icons';
 import {
   pluginEntryFor,
-  type PluginEntry,
+  type PluginSurfaceEntries,
   type PluginHostClaim,
   type PluginOperations,
 } from './kinds/plugin-views';
@@ -275,9 +275,10 @@ export function PluginResource(props: PluginResourceProps) {
 
 /**
  * The Map host around one plugin's entry, whichever plugin it is: what
- * `PluginResource` draws, and what a test draws a plugin of its own through.
+ * `PluginResource` draws, and what a test draws a plugin of its own through,
+ * on its own surface or on the one it embeds.
  */
-export function PluginSurface(props: PluginResourceProps & { readonly entry: PluginEntry }) {
+export function PluginSurface(props: PluginResourceProps & PluginSurfaceEntries) {
   const { kind, title, state } = props;
   // Exclusive work elsewhere withdraws every authoring control the surface
   // draws, not only the plugin's commits (ADR 0142).
@@ -360,6 +361,7 @@ export function PluginSurface(props: PluginResourceProps & { readonly entry: Plu
   });
   const onFailure = props.onFailure ?? props.operations.onFailure;
   const embeddable = props.embeddable;
+  const entryFor = props.entryFor ?? pluginEntryFor;
   const embedding: Embedding = useMemo(
     () => ({
       resources: embeddable ?? [],
@@ -370,8 +372,9 @@ export function PluginSurface(props: PluginResourceProps & { readonly entry: Plu
       size,
       selected: state === 'selected' || state === 'editing',
       onFailure,
+      entryFor,
     }),
-    [embeddable, props.resourceId, host, rail, size, state, onFailure],
+    [embeddable, props.resourceId, host, rail, size, state, onFailure, entryFor],
   );
 
   const entityActions = props.entityActions;

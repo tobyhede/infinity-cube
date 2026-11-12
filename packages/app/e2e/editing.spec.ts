@@ -1151,12 +1151,6 @@ test(
     await expect(resource).toBeVisible();
     const openedRevision = await openResourcePersisted(resource, 'A');
     const persistence = page.getByTestId('persistence-status');
-    // The Open is one Edit on the fixture's first revision, committed by the
-    // plugin after the click: "Persisted" alone can still be the revision
-    // before it, so the revision read below waits for the Open's own.
-    await expect(persistence).toHaveAttribute('data-revision', '1');
-    await expect(persistence).toHaveText('Persisted');
-    const openedRevision = await persistence.getAttribute('data-revision');
     const beforePosition = await positionOf(resource);
     // Opening grows the Resource through a CSS transition, so its rect is still
     // moving for a moment after the Edit persists. Settling it first is what
@@ -1393,12 +1387,6 @@ test.describe('resizing by touch', () => {
     await expect(resource).toBeVisible();
     const openedRevision = await openResourcePersisted(resource, 'A');
     const persistence = page.getByTestId('persistence-status');
-    // The Open is one Edit on the fixture's first revision, committed by the
-    // plugin after the click: "Persisted" alone can still be the revision
-    // before it, so the revision read below waits for the Open's own.
-    await expect(persistence).toHaveAttribute('data-revision', '1');
-    await expect(persistence).toHaveText('Persisted');
-    const openedRevision = await persistence.getAttribute('data-revision');
     const beforePosition = await positionOf(resource);
     // Opening grows the Resource through a CSS transition, so its rect is still
     // moving for a moment after the Edit persists — settling it first is what
@@ -1520,12 +1508,6 @@ test.describe('resizing by touch', () => {
     await expect(resource).toBeVisible();
     const openedRevision = await openResourcePersisted(resource, 'A');
     const persistence = page.getByTestId('persistence-status');
-    // The Open is one Edit on the fixture's first revision, committed by the
-    // plugin after the click: "Persisted" alone can still be the revision
-    // before it, so the revision read below waits for the Open's own.
-    await expect(persistence).toHaveAttribute('data-revision', '1');
-    await expect(persistence).toHaveText('Persisted');
-    const openedRevision = await persistence.getAttribute('data-revision');
     const beforePosition = await positionOf(resource);
     // Opening grows the Resource through a CSS transition, so its rect is still
     // moving for a moment after the Edit persists — settling it first is what

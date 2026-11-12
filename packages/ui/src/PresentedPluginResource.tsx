@@ -8,7 +8,7 @@ import {
   type ResourceHost,
   type TitleProps,
 } from '@project/resource-api/view';
-import { pluginEntryFor, type PluginEntry } from './kinds/plugin-views';
+import { pluginEntryFor, type PluginSurfaceEntries } from './kinds/plugin-views';
 import { readingAssets, usePluginAssets } from './plugin-assets';
 import { EmbeddingProvider, HostEmbed, type Embedding } from './ResourceEmbedding';
 import { ResourceFailureBoundary } from './ResourceFailureBoundary';
@@ -67,9 +67,7 @@ export function PresentedPluginResource(props: PresentedPluginResourceProps) {
  * `PresentedPluginResource` draws, and what a test draws a plugin of its own
  * through. The Stage authors nothing, so the plugin reads assets and stores none.
  */
-export function PresentedPluginSurface(
-  props: PresentedPluginResourceProps & { readonly entry: PluginEntry },
-) {
+export function PresentedPluginSurface(props: PresentedPluginResourceProps & PluginSurfaceEntries) {
   const { kind, title } = props;
   const supplied = usePluginAssets();
   const assets = useMemo(() => readingAssets(supplied), [supplied]);
@@ -99,6 +97,7 @@ export function PresentedPluginSurface(
     onClaim: (claim) => claim.unmount(),
   });
   const { embeddable, onFailure } = props;
+  const entryFor = props.entryFor ?? pluginEntryFor;
   const embedding: Embedding = useMemo(
     () => ({
       resources: embeddable ?? [],
@@ -110,8 +109,9 @@ export function PresentedPluginSurface(
       size: STAGE_SIZE,
       selected: false,
       onFailure,
+      entryFor,
     }),
-    [embeddable, props.resourceId, host, onFailure],
+    [embeddable, props.resourceId, host, onFailure, entryFor],
   );
   return (
     <article
@@ -184,6 +184,7 @@ export function PresentedPluginContent({ kind, title, content }: PresentedPlugin
       rail: host.rail,
       size: STAGE_SIZE,
       selected: false,
+      entryFor: pluginEntryFor,
     }),
     [host],
   );

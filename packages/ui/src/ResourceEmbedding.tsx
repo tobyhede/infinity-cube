@@ -15,7 +15,7 @@ import {
   type ResourceHost,
   type TitleProps,
 } from '@project/resource-api/view';
-import { pluginEntryFor } from './kinds/plugin-views';
+import type { PluginEntry } from './kinds/plugin-views';
 import { MapTitleContext, MapTitleView } from './MapTitle';
 import { readingAssets, usePluginAssets } from './plugin-assets';
 import { ResourceFailureBoundary } from './ResourceFailureBoundary';
@@ -42,7 +42,8 @@ import { ResourceFailureBoundary } from './ResourceFailureBoundary';
  * draws from context. Do not make `Embed` a new component per render: React
  * would remount the embedded plugin on each render of the surface around it,
  * dropping its state. `PluginResource.test.tsx` holds that every surface a
- * plugin is handed carries the one `Embed`.
+ * plugin is handed carries the one `Embed`, and `resource-embedding.test.tsx`
+ * that a plugin it embeds keeps its state across renders of the surface.
  */
 
 /** What an embedding drawn inside one surface reads. */
@@ -62,6 +63,8 @@ export interface Embedding {
   readonly selected: boolean;
   /** Told what an embedded plugin threw while drawing. */
   readonly onFailure?: ((error: Error) => void) | undefined;
+  /** The entry of the plugin that draws an embedded Resource of this kind. */
+  readonly entryFor: (kind: PluginKind) => PluginEntry;
 }
 
 const EmbeddingContext = createContext<Embedding | null>(null);
@@ -234,7 +237,7 @@ function EmbeddedSurface({
     }),
     [embedding, target.id],
   );
-  const entry = pluginEntryFor(kind);
+  const entry = embedding.entryFor(kind);
   const mapTitle = useContext(MapTitleContext);
   const plugin = entry.render({
     resourceId: target.id,
@@ -252,7 +255,12 @@ function EmbeddedSurface({
   });
   return (
     <div className="resource-embedded-plugin" data-content-kind={kind} style={EMBEDDED_ROOM}>
-      <ResourceFailureBoundary onFailure={embedding.onFailure}>
+      <ResourceFailureBoundary
+        // A failed drawing of the Target is tried again once its content
+        // changes, as the surface around it is on its own Map content.
+        retryOn={JSON.stringify(target.content)}
+        onFailure={embedding.onFailure}
+      >
         <EmbeddedTitleContext.Provider value={kept}>
           <EmbeddingProvider embedding={inner}>
             <ResourceHostProvider host={host}>{plugin}</ResourceHostProvider>

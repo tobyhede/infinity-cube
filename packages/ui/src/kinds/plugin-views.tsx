@@ -139,6 +139,13 @@ export interface PluginEntry {
   readonly render: (input: PluginSurfaceInput) => ReactElement;
 }
 
+/** The plugin entries a host draws through: its own Resource's, and an embedded one's by kind. */
+export interface PluginSurfaceEntries {
+  readonly entry: PluginEntry;
+  /** The entry an embedded Resource of this kind is drawn through; absent, the build's. */
+  readonly entryFor?: ((kind: PluginKind) => PluginEntry) | undefined;
+}
+
 /** Why a commit was refused before it reached the host: the value was not JSON. */
 const NOT_JSON: Answer = { refused: 'This change cannot be kept.' };
 
