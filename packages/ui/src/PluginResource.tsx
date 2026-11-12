@@ -42,6 +42,7 @@ import { readingAssets, usePluginAssets } from './plugin-assets';
 import { RailChoiceMenu } from './RailChoiceMenu';
 import { MapTitleContext, MapTitleView, type MapTitle } from './MapTitle';
 import { EmbeddingProvider, HostEmbed, type Embedding } from './ResourceEmbedding';
+import { createSurfaceLifetime, type SurfaceLifetime } from './surface-lifetime';
 import { ResourceFailureBoundary } from './ResourceFailureBoundary';
 import { HostRenderedMarkdown, HostSourceEditor } from './ResourceTextHost';
 import {
@@ -160,42 +161,6 @@ export interface PluginResourceProps {
   readonly renderToolbar?: ((toolbar: ReactNode, held: boolean) => ReactNode) | undefined;
   /** Told what a plugin threw while drawing. */
   readonly onFailure?: ((error: Error) => void) | undefined;
-}
-
-/**
- * One mounted surface's lifetime: the key its drawing is known by, whether it
- * is still drawn, and a Claim it was granted, whose `unmount` tells the host
- * this surface is gone, releasing every Claim taken through it. One is kept,
- * the latest, since each says the same of the same surface; keeping every one
- * would grow with each Claim taken and tell the host once per Claim.
- */
-interface SurfaceLifetime {
-  readonly drawing: symbol;
-  readonly drawn: () => boolean;
-  readonly hold: (claim: PluginHostClaim) => void;
-  readonly begin: () => void;
-  readonly end: () => void;
-}
-
-function createSurfaceLifetime(): SurfaceLifetime {
-  let drawn = true;
-  let held: PluginHostClaim | null = null;
-  return {
-    drawing: Symbol('drawing'),
-    drawn: () => drawn,
-    hold: (claim) => {
-      held = claim;
-    },
-    begin: () => {
-      drawn = true;
-    },
-    end: () => {
-      drawn = false;
-      const last = held;
-      held = null;
-      last?.unmount();
-    },
-  };
 }
 
 /**

@@ -19,6 +19,7 @@ import type { PluginEntry } from './kinds/plugin-views';
 import { MapTitleContext, MapTitleView } from './MapTitle';
 import { readingAssets, usePluginAssets } from './plugin-assets';
 import { ResourceFailureBoundary } from './ResourceFailureBoundary';
+import { createSurfaceLifetime } from './surface-lifetime';
 
 /**
  * The host-owned Resource embedding (ADR 0142): `<surface.Embed resource
@@ -175,20 +176,6 @@ export const commitWhileDrawn =
   (next: string): Promise<Answer> =>
     drawn() ? commit(next) : Promise.resolve(EMBEDDING_GONE);
 
-/** Whether an embedded surface is still drawn, which a commit it kept asks when called. */
-function createEmbeddedLifetime() {
-  let drawn = true;
-  return {
-    drawn: () => drawn,
-    begin: () => {
-      drawn = true;
-    },
-    end: () => {
-      drawn = false;
-    },
-  };
-}
-
 function EmbeddedSurface({
   target,
   kind,
@@ -203,10 +190,9 @@ function EmbeddedSurface({
   const supplied = usePluginAssets();
   const assets = useMemo(() => readingAssets(supplied), [supplied]);
   // A commit the embedded plugin kept answers refused once this surface is
-  // gone, whatever the surface around it still offers (ADR 0142).
-  const [lifetime] = useState(createEmbeddedLifetime);
-  // The embedded drawing is one of its own, as any surface's is.
-  const [drawing] = useState(() => Symbol('drawing'));
+  // gone, whatever the surface around it still offers (ADR 0142); its drawing
+  // is one of its own, as any surface's is.
+  const [lifetime] = useState(createSurfaceLifetime);
   useEffect(() => {
     lifetime.begin();
     return lifetime.end;
@@ -229,9 +215,6 @@ function EmbeddedSurface({
   const inner: Embedding = useMemo(
     () => ({
       ...embedding,
-      // The embedded Resource's own references are not this surface's to
-      // offer: a Resource embedded here embeds nothing further.
-      resources: [],
       nested: true,
       drawing: [...embedding.drawing, target.id],
     }),
@@ -241,7 +224,7 @@ function EmbeddedSurface({
   const mapTitle = useContext(MapTitleContext);
   const plugin = entry.render({
     resourceId: target.id,
-    drawing,
+    drawing: lifetime.drawing,
     kind,
     title: title.value,
     content: target.content,
@@ -251,7 +234,7 @@ function EmbeddedSurface({
     operations: { kind, commitTitle },
     assets,
     Embed: HostEmbed,
-    onClaim: (claim) => claim.unmount(),
+    onClaim: lifetime.hold,
   });
   return (
     <div className="resource-embedded-plugin" data-content-kind={kind} style={EMBEDDED_ROOM}>
