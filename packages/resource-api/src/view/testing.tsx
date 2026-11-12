@@ -401,7 +401,7 @@ export function renderPlugin<C, M>(
                 ...claim,
                 release: () => {
                   commits.claims.released += 1;
-                  return claim.release();
+                  claim.release();
                 },
               };
             }
