@@ -25,6 +25,18 @@ export const assetFileHash = (name: string): AssetHash | undefined => {
   return isAssetHash(stem) ? stem : undefined;
 };
 
+/**
+ * The hash a path relative to an Aggregate directory is named by, when the
+ * path is a file in `assets/` whose name `assetFileHash` owns; otherwise
+ * `undefined`.
+ */
+export const assetPathHash = (relativePath: string): AssetHash | undefined => {
+  const prefix = `${ASSETS_DIRECTORY_NAME}/`;
+  return relativePath.startsWith(prefix)
+    ? assetFileHash(relativePath.slice(prefix.length))
+    : undefined;
+};
+
 /** The extension of a file name `assetFileHash` owns, without its dot, or `''` when it has none. */
 export const assetFileExtension = (name: string): string => {
   const dot = name.indexOf('.');

@@ -2,8 +2,8 @@ import { join, resolve } from 'node:path';
 import {
   AGGREGATE_FILE_NAME,
   compareOrdinal,
-  assetFileHash,
   assetFileName,
+  assetPathHash,
   ASSETS_DIRECTORY_NAME,
   readAggregateFrom,
   scanAggregateFrom,
@@ -11,7 +11,7 @@ import {
   type AggregateDirectoryContents,
 } from '@project/aggregate';
 import { AGGREGATE_FILE_VERSION, type AggregateFile, type UUID } from '@project/core';
-import type { AssetHash, LoadedAggregate, StoredAsset } from '@project/persistence';
+import type { LoadedAggregate, StoredAsset } from '@project/persistence';
 import { directorySource } from './directory-source';
 import { writeInPlace, type DirectoryFiles } from './write-in-place';
 import { spaceDirectoryFiles } from './write-space-directory';
@@ -32,12 +32,9 @@ const aggregateFile = (metaSpaceId: UUID): AggregateFile => ({
   metaSpaceId,
 });
 
-/** The asset among `paths` named by `hash`, by its name in `assets/`, if there is one. */
-const assetFileNamed = (paths: readonly string[], hash: AssetHash): string | undefined =>
-  paths
-    .filter((path) => path.startsWith(`${ASSETS_DIRECTORY_NAME}/`))
-    .map((path) => path.slice(ASSETS_DIRECTORY_NAME.length + 1))
-    .find((name) => assetFileHash(name) === hash);
+/** The path `assets/<hash>.<ext>` Export gives an asset it has no file to keep the name of. */
+const assetFilePath = (asset: StoredAsset): string =>
+  `${ASSETS_DIRECTORY_NAME}/${assetFileName(asset)}`;
 
 /**
  * Every file an aggregate and the stored assets it references serialise to,
@@ -63,27 +60,29 @@ export const aggregateFiles = (
     }
   }
   for (const asset of assets) {
-    files.set(`${ASSETS_DIRECTORY_NAME}/${assetFileName(asset)}`, asset.bytes);
+    files.set(assetFilePath(asset), asset.bytes);
   }
   return files;
 };
 
 /**
- * `files` with each asset already in the directory, among `existing`, under
- * the name it has there, so Export writes back the extension Import read.
+ * `files`, which `aggregateFiles` serialised with `assets`, with each of those
+ * assets already in the directory, among `existing`, under the name it has
+ * there, so Export writes back the extension Import read.
  */
 export const keepingExistingAssetNames = (
   files: DirectoryFiles,
+  assets: readonly StoredAsset[],
   existing: readonly string[],
-): DirectoryFiles =>
-  new Map(
-    [...files].map(([path, bytes]) => {
-      if (!path.startsWith(`${ASSETS_DIRECTORY_NAME}/`)) return [path, bytes] as const;
-      const hash = assetFileHash(path.slice(ASSETS_DIRECTORY_NAME.length + 1));
-      const kept = hash === undefined ? undefined : assetFileNamed(existing, hash);
-      return [kept === undefined ? path : `${ASSETS_DIRECTORY_NAME}/${kept}`, bytes] as const;
+): DirectoryFiles => {
+  const renamed = new Map(
+    assets.flatMap((asset) => {
+      const kept = existing.find((path) => assetPathHash(path) === asset.hash);
+      return kept === undefined ? [] : [[assetFilePath(asset), kept] as const];
     }),
   );
+  return new Map([...files].map(([path, bytes]) => [renamed.get(path) ?? path, bytes] as const));
+};
 
 /**
  * Every file Import would read in `directory`, by path relative to it: what

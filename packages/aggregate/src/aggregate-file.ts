@@ -8,7 +8,7 @@ import {
 import type { StoredAsset } from '@project/persistence';
 import type { AggregateSource, DirectoryListing, SourceRead } from './aggregate-source';
 import { describeSchemaFailure, identifySpace, SpaceIdentityError } from './identify-space';
-import { admitAssetFile, assetFileHash, ASSETS_DIRECTORY_NAME } from './assets';
+import { admitAssetFile, assetFileHash, assetPathHash, ASSETS_DIRECTORY_NAME } from './assets';
 import { compareOrdinal } from './ordinal';
 import type { AggregateInput } from './space-repository';
 import { AggregateDirectoryError, parseSingleSpace, refuseSpaceDocument } from './space-directory';
@@ -395,7 +395,7 @@ const duplicateAssetFailures = (
 ): readonly AggregateDirectoryError[] => {
   const byHash = new Map<string, string[]>();
   for (const path of paths) {
-    const hash = assetFileHash(path.slice(ASSETS_DIRECTORY_NAME.length + 1));
+    const hash = assetPathHash(path);
     if (hash === undefined) continue;
     byHash.set(hash, [...(byHash.get(hash) ?? []), path]);
   }

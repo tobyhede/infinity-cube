@@ -14,8 +14,7 @@ import {
   type DirectoryFiles,
 } from '../aggregate-directory';
 import {
-  assetFileHash,
-  ASSETS_DIRECTORY_NAME,
+  assetPathHash,
   mapSource,
   readAggregateFrom,
   type SpaceRepository,
@@ -195,7 +194,7 @@ export const exportAggregate = async (
   // An asset already in the directory keeps its name there, so it is renamed
   // once the directory is known to scan, and only a renamed path is checked again.
   const scanned = await scannedAggregateFiles(destination);
-  const files = keepingExistingAssetNames(serialised, scanned);
+  const files = keepingExistingAssetNames(serialised, assets.carried, scanned);
   await rejectSymbolicLinks(
     destination,
     [...files.keys()].filter((path) => !serialised.has(path)),
@@ -206,8 +205,7 @@ export const exportAggregate = async (
   // read back with them: a kept file Import would refuse refuses the Export.
   const kept = new Set<string>(assets.kept);
   const isKept = (path: string): boolean => {
-    if (!path.startsWith(`${ASSETS_DIRECTORY_NAME}/`)) return false;
-    const hash = assetFileHash(path.slice(ASSETS_DIRECTORY_NAME.length + 1));
+    const hash = assetPathHash(path);
     return hash !== undefined && kept.has(hash);
   };
   const keptFiles = await Promise.all(
