@@ -138,10 +138,7 @@ describe('a Markdown Resource drawn by the application', () => {
           setHolder(drawing);
           const end = () => setHolder(null);
           return {
-            release: () => {
-              end();
-              return true;
-            },
+            release: end,
             exclusively: () => Promise.resolve('busy'),
             unmount: end,
           };

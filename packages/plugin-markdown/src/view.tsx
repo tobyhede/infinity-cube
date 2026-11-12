@@ -73,14 +73,14 @@ const UNEDITABLE = 'This text cannot be read, so it cannot be edited.';
  * already knows. Nothing is read until the text is `wanted`: a Closed
  * Resource draws none of it.
  */
-function useText(url: AssetRef, assets: Assets, known: Map<string, string>, wanted: boolean): Text {
+function useText(url: AssetRef, assets: Assets, known: KnownText, wanted: boolean): Text {
   const [read, setRead] = useState<{ readonly url: string; readonly text: Text }>(() => ({
     url,
     text: READING,
   }));
   const readAsset = assets.read;
   useEffect(() => {
-    if (!wanted || known.has(url)) return undefined;
+    if (!wanted || known.text(url) !== undefined) return undefined;
     let live = true;
     const stillLive = (): boolean => live;
     void readAsset(url)
@@ -88,7 +88,7 @@ function useText(url: AssetRef, assets: Assets, known: Map<string, string>, want
         if (!stillLive()) return;
         if (answer instanceof Blob) {
           const text = await textOf(answer);
-          remember(known, url, text);
+          known.remember(url, text);
           if (stillLive()) setRead({ url, text: { state: 'read', text } });
         } else {
           setRead({ url, text: { state: 'refused', refused: answer.refused } });
@@ -103,8 +103,8 @@ function useText(url: AssetRef, assets: Assets, known: Map<string, string>, want
       live = false;
     };
   }, [url, readAsset, known, wanted]);
-  const already = textKnown(known, url);
-  if (already.state === 'read') return already;
+  const already = known.text(url);
+  if (already !== undefined) return { state: 'read', text: already };
   return read.url === url ? read.text : READING;
 }
 
@@ -120,40 +120,52 @@ const textOf = (blob: Blob): Promise<string> =>
     reader.readAsText(blob);
   });
 
-const textKnown = (known: Map<string, string>, url: string): Text => {
-  const text = known.get(url);
-  return text === undefined ? READING : { state: 'read', text };
-};
+/** The one text a view knows, so a view that Saves many times holds one. */
+interface KnownText {
+  /** The text known at `url`, if it is the one known. */
+  readonly text: (url: string) => string | undefined;
+  /** Know `text` at `url`, in place of the text known before. */
+  readonly remember: (url: string, text: string) => void;
+}
 
-/** Keep `text` as the one text known, so a view that Saves many times holds one. */
-const remember = (known: Map<string, string>, url: string, text: string): void => {
-  known.clear();
-  known.set(url, text);
+const createKnownText = (): KnownText => {
+  let known: { readonly url: string; readonly text: string } | null = null;
+  return {
+    text: (url) => (known?.url === url ? known.text : undefined),
+    remember: (url, text) => {
+      known = { url, text };
+    },
+  };
 };
 
 /**
  * Resolve once every image in `element` has loaded or failed, and the fonts
  * it is set in are ready, or after {@link LOAD_WAIT}, whichever is first.
+ * Its listeners and timer go when `signal` aborts, and the timer when it
+ * resolves.
  */
-const laidOut = (element: HTMLElement): Promise<void> => {
+const laidOut = (element: HTMLElement, signal: AbortSignal): Promise<void> => {
   const pending = [...element.querySelectorAll('img')]
     .filter((image) => !image.complete)
     .map(
       (image) =>
         new Promise<void>((resolve) => {
-          image.addEventListener('load', () => resolve(), { once: true });
-          image.addEventListener('error', () => resolve(), { once: true });
+          image.addEventListener('load', () => resolve(), { once: true, signal });
+          image.addEventListener('error', () => resolve(), { once: true, signal });
         }),
     );
   // A document without a font loading interface, as jsdom's, has no fonts to wait for.
   const document: Partial<Pick<Document, 'fonts'>> = element.ownerDocument;
   if (document.fonts !== undefined) pending.push(document.fonts.ready.then(() => undefined));
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const stop = () => clearTimeout(timer);
+  signal.addEventListener('abort', stop, { once: true });
   return Promise.race([
     Promise.all(pending).then(() => undefined),
     new Promise<void>((resolve) => {
-      setTimeout(resolve, LOAD_WAIT);
+      timer = setTimeout(resolve, LOAD_WAIT);
     }),
-  ]);
+  ]).finally(stop);
 };
 
 /**
@@ -185,7 +197,7 @@ const fill: CSSProperties = {
 function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapContent>) {
   const name = titleName(surface.title.value);
   const url = surface.content.value.url;
-  const [known] = useState(() => new Map<string, string>());
+  const [known] = useState(createKnownText);
   const open = surface.map.value.open;
   const [measuring, setMeasuring] = useState(false);
   const text = useText(url, surface.assets, known, open || measuring);
@@ -269,7 +281,7 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
     void store(new Blob([next], { type: MARKDOWN_MEDIA_TYPE }))
       .then((answer) => {
         if (!isStoredAsset(answer)) return answer;
-        remember(known, answer, next);
+        known.remember(answer, next);
         return contentCommit({ url: answer });
       })
       .then(
@@ -314,14 +326,15 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
   const opening = useRef({ commitMap, width, open });
   useEffect(() => {
     opening.current = { commitMap, width, open };
-  });
+  }, [commitMap, width, open]);
   const textState = text.state;
   useEffect(() => {
     if (!measuring || textState === 'reading') return undefined;
     const element = measurer.current;
-    let live = true;
-    void (element === null ? Promise.resolve() : laidOut(element)).then(() => {
-      if (!live) return;
+    const measured = new AbortController();
+    const { signal } = measured;
+    void (element === null ? Promise.resolve() : laidOut(element, signal)).then(() => {
+      if (signal.aborted) return;
       setMeasuring(false);
       const now = opening.current;
       if (textState !== 'read' || element === null) {
@@ -334,9 +347,7 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
       const height = title + element.scrollHeight + 2 * INSET;
       now.commitMap({ open: true }, { width: Math.round(now.width), height: Math.round(height) });
     });
-    return () => {
-      live = false;
-    };
+    return () => measured.abort();
   }, [measuring, textState]);
 
   const commands = useMemo((): readonly RailCommand[] => {

@@ -538,6 +538,50 @@ describe('the Map host a plugin draws inside (ADR 0142)', () => {
     },
   );
 
+  it('hands the host a release the plugin asks for during its exclusive work, which needs no retry', async () => {
+    surfaces.length = 0;
+    const release = vi.fn();
+    let finish: () => void = () => undefined;
+    const held: PluginHostClaim = {
+      release,
+      exclusively: (work) => work({}),
+      unmount: () => undefined,
+    };
+    const toolbarHeld: boolean[] = [];
+    render(
+      <PluginSurface
+        {...probeProps({ operations: { kind: 'ur', claim: () => held } })}
+        renderToolbar={(toolbar, isHeld) => {
+          toolbarHeld.push(isHeld);
+          return toolbar;
+        }}
+        entry={probeEntry}
+      />,
+    );
+    let own: ReturnType<NonNullable<ProbeSurface['claim']>> | undefined;
+    act(() => {
+      own = surfaces.at(-1)?.claim?.();
+    });
+    expect(toolbarHeld.at(-1)).toBe(true);
+    const work = own?.exclusively(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    // Asked once, mid-work: the host completes it when the work ends
+    // (`packages/app/test/plugin-host.test.ts`), so the plugin asks no more.
+    act(() => {
+      own?.release();
+    });
+    // The plugin holds nothing from its ask, so the rail no longer carries the
+    // edit's ends.
+    expect(toolbarHeld.at(-1)).toBe(false);
+    finish();
+    await work;
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
   it('loses only its own Resource when its plugin throws', () => {
     const onFailure = vi.fn();
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
