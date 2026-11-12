@@ -450,6 +450,10 @@ export const newDefaultResourceDocument = (title: string): ResourceDocument =>
 const KIND_ID =
   /^(?:[A-Za-z0-9][A-Za-z0-9-]*|vnd\.[A-Za-z0-9][A-Za-z0-9-]*\.[A-Za-z0-9][A-Za-z0-9-]*)$/u;
 
+/** What a kind id is, in the words a refusal of one that is not uses. */
+export const KIND_ID_FORM =
+  'a bare id or vnd.<owner>.<name>, each part ASCII letters, digits and hyphens';
+
 /** Whether a value is a well-formed kind id, registered or not. */
 export const isKindId = (value: string): boolean => KIND_ID.test(value);
 

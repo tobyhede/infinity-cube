@@ -578,7 +578,12 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
    * a kind no plugin in this build draws: in every other build it would be a
    * permanent zero for something that cannot be made.
    */
-  const holdsMissingKind = [...resources, ...allResources].some(({ kind }) => isMissingKind(kind));
+  const holdsMissingKind = useMemo(
+    () =>
+      resources.some(({ kind }) => isMissingKind(kind)) ||
+      allResources.some(({ kind }) => isMissingKind(kind)),
+    [resources, allResources],
+  );
   const filters = (connecting === null ? FILTERS : RESOURCE_FILTERS).filter(
     (filter) => filter !== 'unavailable' || holdsMissingKind,
   );

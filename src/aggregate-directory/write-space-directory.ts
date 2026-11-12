@@ -101,7 +101,7 @@ const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
       // rather than the one `jsonb` handed back; the sort fixes the entries'
       // order. The Map content of a Resource whose plugin is missing is read by
       // nothing here, so it is written in `canonicalJsonValue`'s one form; a
-      // present plugin's is written as its Resource's plugin keeps it.
+      // present plugin's is written in the key order its store holds.
       positions: Object.fromEntries(
         [...Placement.fromMap(m)]
           .sort(([left], [right]) => compareOrdinal(left, right))

@@ -103,8 +103,11 @@ describe("a Resource file's keys", () => {
 
 /*
  * Export writes the Map content of a Resource whose plugin is missing in one
- * canonical form, since nothing reads it (ADR 0142), and a present plugin's
- * as that plugin keeps it.
+ * canonical form, since nothing reads it (ADR 0142), and a present plugin's in
+ * the key order its store holds. Every present plugin's Map content schema in
+ * this build declares one key at most, so the Markdown entry below holds
+ * content its schema would refuse: Export does not parse Map content, and
+ * only content of more than one key can show which entries it sorts.
  */
 describe("a Map entry's content", () => {
   const NOTE_ID = uuidSchema.parse('50000000-0000-4000-8000-000000000007');
@@ -123,7 +126,7 @@ describe("a Map entry's content", () => {
           title: 'Map',
           kind: 'positioned',
           positions: {
-            [NOTE_ID]: { x: 0, y: 0, content: { open: true } },
+            [NOTE_ID]: { x: 0, y: 0, content: { zoom: 2, at: { y: 1, x: 0 } } },
             [UNPLUGGED_ID]: { x: 0, y: 0, content: { zoom: 2, at: { y: 1, x: 0 } } },
           },
           graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
@@ -149,7 +152,11 @@ describe("a Map entry's content", () => {
         '          "x": 0,',
         '          "y": 0,',
         '          "content": {',
-        '            "open": true',
+        '            "zoom": 2,',
+        '            "at": {',
+        '              "y": 1,',
+        '              "x": 0',
+        '            }',
         '          }',
         '        },',
         `        "${UNPLUGGED_ID}": {`,

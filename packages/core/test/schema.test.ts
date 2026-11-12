@@ -388,7 +388,8 @@ describe('resource file schema', () => {
     });
 
     expect('body' in reference).toBe(false);
-    expect(isOfKind(reference, 'reference') && 'body' in reference.content).toBe(false);
+    if (!isOfKind(reference, 'reference')) throw new Error(`Parsed as ${reference.kind}`);
+    expect('body' in reference.content).toBe(false);
   });
 
   it('parses a Space Resource that names both the Map and the Graph it selects', () => {

@@ -1,4 +1,10 @@
-import { declaredKind, isKindId, resourceFileSchema, type Resource } from '@project/core';
+import {
+  KIND_ID_FORM,
+  declaredKind,
+  isKindId,
+  resourceFileSchema,
+  type Resource,
+} from '@project/core';
 
 /** A file of a Space directory's `resources/`, as read from disk: where it was found, and its text. */
 export interface ResourceFile {
@@ -61,10 +67,7 @@ function decodeFile(file: ResourceFile): FileDecoding {
     return fail('invalid-resource-file', 'kind: a Resource file must declare its kind');
   }
   if (!isKindId(kind)) {
-    return fail(
-      'invalid-resource-file',
-      `kind: "${kind}" is not a kind id — a bare id or vnd.<owner>.<name>, each part ASCII letters, digits and hyphens`,
-    );
+    return fail('invalid-resource-file', `kind: "${kind}" is not a kind id — ${KIND_ID_FORM}`);
   }
 
   const parsed = resourceFileSchema.safeParse(json);

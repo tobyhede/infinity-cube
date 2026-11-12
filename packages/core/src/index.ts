@@ -23,6 +23,7 @@ export {
   contentTarget,
   drawnByPlugin,
   takesOpen,
+  KIND_ID_FORM,
   isKindId,
   isRegisteredKind,
   isMissingKind,

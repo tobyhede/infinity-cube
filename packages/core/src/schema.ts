@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import { COLLAPSED_RESOURCE_SIZE } from './resource-geometry';
 import {
+  KIND_ID_FORM,
   contentParser,
   isMissingKindId,
   isRegisteredKind,
@@ -67,19 +68,15 @@ const declaredKindAndContentSchema = z.object({ kind: z.string(), content: z.unk
 /**
  * The content of a Resource whose kind names no plugin in this build: a JSON
  * object, as the envelope makes every Resource's content (ADR 0128), carried
- * whole and never read, so it encodes back as it was read.
+ * whole and never read as the JSON value it parses to. Export writes it with
+ * its keys sorted (`canonicalJsonValue`) and each number as JavaScript writes
+ * it, so `1.0` comes back as `1` and an integer beyond 2^53 loses precision.
  */
 const unreadContentSchema: z.ZodType<JsonObject, z.ZodTypeDef, unknown> = jsonValueSchema.refine(
   (value): value is JsonObject =>
     typeof value === 'object' && value !== null && !Array.isArray(value),
   { message: 'must be an object' },
 );
-
-/**
- * The `params.code` of the issue refusing a kind that is not a kind id, so a
- * door that knows the declared kind can quote it beside the schema's message.
- */
-export const KIND_MALFORMED = 'kind-malformed';
 
 /**
  * The content a Resource's kind parses, tagged with its kind, or `undefined`
@@ -108,9 +105,7 @@ const kindedContent = <Kinded>(
       code: z.ZodIssueCode.custom,
       path: ['kind'],
       // Not echoing the kind: a summary that folds case would misquote it.
-      message:
-        'is not a kind id — a bare id or vnd.<owner>.<name>, each part ASCII letters, digits and hyphens',
-      params: { code: KIND_MALFORMED },
+      message: `is not a kind id — ${KIND_ID_FORM}`,
     });
     return undefined;
   }
