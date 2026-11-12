@@ -2,7 +2,7 @@
 
 Status: accepted
 Refines: 0100
-Refined by: 0142
+Refined by: 0143
 
 ADR 0100 drew each lane as the lone Edge's curve moved sideways whole: both anchors moved by one vector along the side of the Resource they sit on, and `getBezierPath` over the moved anchors answered the same curve, translated. A lane is now the lone curve **offset along its own normal**: at every point it runs the lane's distance from the Active Graph's Edge, measured square to the curve at that point. The lone curve is still `getBezierPath` over the unmoved anchors, so React Flow remains the one author of its shape, and the offset is computed from the cubic read back from its path.
 
