@@ -2,7 +2,7 @@
 
 Status: accepted
 Refines: 0100, 0103, 0105
-Related: 0087, 0105, 0112
+Related: 0087, 0110, 0112
 
 ADR 0100 gave each Graph sharing a pair of Resources its own lane. The Active Graph took the centre and connected, and every other Graph's Edge stacked on one side of it and stopped short, even where it was alone in its pair. ADR 0103 fixed the side of an offset to the screen, whichever way the Edge travelled. Three things read wrong. A Resource the Active Graph does not reach showed its connections as fragments, so it read as disconnected from the Graph it is in. An Edge and its reverse sat in one stack, on sides chosen by Resource id rather than by the way they travel. And every head was sized in stroke widths (ADR 0105), about twelve units across on a receding 2-unit line and about seventeen on the Active Graph's 3-unit line, wider than the 8-unit lane: each head reached over the lines beside it.
 

@@ -43,7 +43,7 @@ function drawnHeads(edges: readonly Edge[]): DrawnHead[] {
       id: markerEnd,
       headShape: headShape.data,
       color: edge.style?.stroke ?? FALLBACK_GRAPH_COLOR,
-      // Any value but `small` draws the full head, as an Edge naming no size did before.
+      // An Edge naming no size, or any size but `small`, draws the full head.
       size: edge.data?.['headSize'] === 'small' ? 'small' : 'full',
     });
   }

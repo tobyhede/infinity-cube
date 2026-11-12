@@ -10,7 +10,7 @@ The rule was approved against a design canvas that draws every case beside `main
 
 - [x] Each lane says how its offset is read: `screen` for a one-way pair and a loop, `travel` for a two-way pair. `laneBezier` takes it and converts only a `travel` offset.
 - [x] `graphLanes` places a one-way pair and loops at rank r lanes, read on the screen, and a two-way pair at r + ½ lanes, read by travel. Lengths are ranked per direction everywhere.
-- [x] `edge-lanes.test.ts` has one row per case on the design canvas (29), plus properties that each direction has exactly one full-length Edge, the Active Graph's or else the first in Graph order, and that no two Edges of one direction share a lane.
+- [x] `edge-lanes.test.ts` has one row per case on the design canvas (28), plus properties that each direction has exactly one full-length Edge, the Active Graph's or else the first in Graph order, and that no two Edges of one direction share a lane.
 - [x] `laneBezier` tests: a `screen` offset is below or right in all four directions of travel, a `travel` offset is on the left of travel in all four, and `screen` is the default.
 - [x] `edge-attachment.spec.ts`: a one-way pair with each Graph active, a lone Edge, a pair the Active Graph is not in, and the same stacked vertically; a two-way pair with three Edges one way and one then two the other, with each Graph active, stacked vertically and mid-drag; three loops with two Graphs active in turn. No Graph active is reachable only in the unit tests.
 - [x] ADR 0142, the ADR index, `rendering.md` and the spec say a one-way pair keeps its layout.

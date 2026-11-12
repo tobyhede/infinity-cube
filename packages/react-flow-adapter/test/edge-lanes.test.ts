@@ -79,6 +79,18 @@ describe('graphLanes', () => {
     ['one Edge, another Graph active', AB.slice(0, 1), MID, { 'Long A→B': screen(0, 0) }],
     ['one Edge, no Graph active', AB.slice(0, 1), null, { 'Long A→B': screen(0, 0) }],
     [
+      'two Graphs, the second active',
+      AB.slice(0, 2),
+      MID,
+      { 'Mid A→B': screen(0, 0), 'Long A→B': screen(W, 0.1) },
+    ],
+    [
+      'two Graphs, no Graph active',
+      AB.slice(0, 2),
+      null,
+      { 'Long A→B': screen(0, 0), 'Mid A→B': screen(S, 0.1) },
+    ],
+    [
       'three Graphs, the first active',
       AB,
       LONG,
@@ -107,6 +119,17 @@ describe('graphLanes', () => {
       AB,
       null,
       { 'Long A→B': screen(0, 0), 'Mid A→B': screen(S, 0.1), 'Short A→B': screen(2 * S, 0.2) },
+    ],
+    [
+      'four Graphs, the fourth active',
+      [...AB, edge(BACK_1, 'A', 'B')],
+      BACK_1,
+      {
+        'Back 1 A→B': screen(0, 0),
+        'Long A→B': screen(W, 0.1),
+        'Mid A→B': screen(W + S, 0.2),
+        'Short A→B': screen(W + 2 * S, 0.3),
+      },
     ],
     [
       'five Graphs, the trim capped at three tenths',
