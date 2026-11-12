@@ -471,6 +471,8 @@ export function SpaceCanvas({
   const flushPortalFraming = useRef<(nodeId: string) => void>(() => undefined);
   const lastEmbeds = useRef(embeds);
   const lastEmbeddedRequests = useRef(embeddedRequests);
+  /** The placements drawn now, which a Resource whose Edit ended must still be among to be selected. */
+  const drawnNodes = useRef(nodes);
   useLayoutEffect(() => {
     drawnNodes.current = nodes;
   }, [nodes]);
@@ -503,7 +505,7 @@ export function SpaceCanvas({
     for (const nodeId of lastEmbeds.current.keys())
       if (!embeds.has(nodeId)) mapEmbeddings.forget(nodeId);
     lastEmbeds.current = embeds;
-  }, [embeds]);
+  }, [embeds, mapEmbeddings]);
   useLayoutEffect(() => {
     lastEmbeddedRequests.current = embeddedRequests;
   }, [embeddedRequests]);

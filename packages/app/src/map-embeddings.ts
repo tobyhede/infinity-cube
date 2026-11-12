@@ -8,8 +8,12 @@ import type { MapEmbedRequest } from '@project/ui';
  * the placement whose rect it is drawn in. A plugin's `<Embed space>` publishes
  * here while it is drawn, and nothing else does, so a Closed Space Resource
  * requests nothing. The canvas draws each request's Map over its rect, the
- * Resource whose Claim is passed authors it in place, and the host's chooser,
+ * drawing whose Claim is passed authors it in place, and the host's chooser,
  * offered where the request passes a commit, writes a choice through it.
+ *
+ * A placement is one drawing on this canvas: a Resource drawn twice, as two
+ * embeddings of one Map draw it, is two placements, each with its own entry
+ * and its own drawing key, so nothing here is looked up by Resource.
  */
 
 /**

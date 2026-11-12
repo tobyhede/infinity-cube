@@ -1,5 +1,5 @@
 import { uuidSchema, type ResourceId, type UUID } from '@project/core';
-import type { Answer } from '@project/resource-api/domain';
+import { refusalOf } from '@project/resource-api/view';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import { buildSpaceResourceRail } from './build-space-resource-rail';
 import type { CommandOutcomes } from './command-outcomes';
@@ -34,10 +34,6 @@ export interface EmbedCommandsContext {
   readonly onContextReport: (resourceId: ResourceId, message: string | null) => void;
 }
 
-/** What a settled commit was refused with, or `null` where it was not. */
-const refusalOf = (answer: Answer): string | null =>
-  answer === 'completed' || answer === 'unchanged' ? null : answer.refused;
-
 /**
  * `node` with the commands of the Space it embeds, whatever its kind (ADR 0142),
  * each read from what its plugin passed `Embed`. The Map and Graph chooser is
@@ -54,7 +50,7 @@ export function decorateEmbedCommands(
 ): ResourceFlowNode {
   if (node.data.readOnly) return node;
   const resourceId = node.data.resourceId;
-  const embed = ownMapEmbed(context.mapEmbeds, resourceId);
+  const embed = ownMapEmbed(context.mapEmbeds, node.id);
   if (embed === undefined) return node;
   const { space, view, select, claim } = embed.request;
   if (select === undefined) return node;

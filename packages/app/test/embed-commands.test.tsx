@@ -98,6 +98,7 @@ const embedded = (request: Partial<MapEmbedRequest> = {}): ReadonlyMap<string, M
       EMBEDDING_ID,
       {
         resourceId: EMBEDDING_ID,
+        drawing: Symbol('embedding drawing'),
         request: {
           space: TARGET_SPACE_ID,
           view: choosing,

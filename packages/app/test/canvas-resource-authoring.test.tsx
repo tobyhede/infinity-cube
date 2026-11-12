@@ -1,3 +1,4 @@
+import { isValidElement } from 'react';
 import { act, fireEvent, render, renderHook, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { spaceSnapshotSchema, uuidSchema, type ResourceId } from '@project/core';
@@ -13,7 +14,12 @@ import {
   type SpaceResourceTargets,
 } from '../src/space-resource-targets';
 import { fixtureFacts } from './render-adapter-fixtures';
-import { PluginAssetsProvider, ResourceRailActions, type MapEmbedRequest } from '@project/ui';
+import {
+  PluginAssetsProvider,
+  ResourceRailActions,
+  type MapEmbedRequest,
+  type SpaceResourceSelectorsProps,
+} from '@project/ui';
 import type { Claim } from '@project/resource-api/view';
 import { createMapEmbeddings, type MapEmbeddings } from '../src/map-embeddings';
 import { CANVAS } from '../src/space-authoring';

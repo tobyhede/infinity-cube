@@ -40,10 +40,6 @@ const GLYPH: CSSProperties = { position: 'absolute', top: 8, right: 8, lineHeigh
 /** Refused: a choice of another Map that names none of its Graphs. */
 const GRAPH_REQUIRED = { refused: 'Choose a Graph on that Map.' } as const satisfies Answer;
 
-/** Whether a settled commit left nothing to say. */
-const refusalOf = (answer: Answer): string | null =>
-  answer === 'completed' || answer === 'unchanged' ? null : answer.refused;
-
 function SpacePluginView({ surface }: PluginViewProps<SpaceContent, SpaceMapContent>) {
   const name = titleName(surface.title.value);
   const open = surface.map.value.open;

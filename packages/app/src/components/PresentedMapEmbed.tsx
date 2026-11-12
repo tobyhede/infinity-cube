@@ -1,5 +1,5 @@
+import { uuidSchema } from '@project/core';
 import type { MapEmbedRequest } from '@project/ui';
-import { embeddedViewIds } from '../embedded-open-space-resource';
 import { PresentedSpaceMap } from './PresentedSpaceMap';
 
 /**

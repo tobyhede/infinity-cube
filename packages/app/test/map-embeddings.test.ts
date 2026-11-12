@@ -10,11 +10,9 @@ const request = (
   commit?: NonNullable<MapEmbedRequest['select']>['commit'],
   claimed = false,
 ): MapEmbedRequest => ({
-  view: { spaceId: TARGET, map: TARGET, graph: TARGET },
-  select:
-    commit === undefined
-      ? undefined
-      : { value: { spaceId: TARGET, map: TARGET, graph: TARGET }, commit },
+  space: TARGET,
+  view: { map: TARGET, graph: TARGET },
+  select: commit === undefined ? undefined : { value: { map: TARGET, graph: TARGET }, commit },
   claim: claimed ? { release: () => undefined } : undefined,
 });
 
@@ -44,11 +42,11 @@ describe('the Map embeddings drawn on one canvas', () => {
     embeddings.publish('node', SPACE_RESOURCE, null, drawing);
 
     // A framing pending when the embedding was taken down still lands.
-    await stored?.({ spaceId: TARGET, map: TARGET, graph: TARGET });
+    await stored?.({ map: TARGET, graph: TARGET });
     expect(commit).toHaveBeenCalledOnce();
 
     embeddings.forget('node');
-    await expect(stored?.({ spaceId: TARGET, map: TARGET, graph: TARGET })).resolves.toEqual({
+    await expect(stored?.({ map: TARGET, graph: TARGET })).resolves.toEqual({
       refused: 'This choice is no longer offered.',
     });
     expect(commit).toHaveBeenCalledOnce();
@@ -60,7 +58,7 @@ describe('the Map embeddings drawn on one canvas', () => {
     embeddings.publish('node', SPACE_RESOURCE, request(commit), Symbol('drawing'));
     embeddings.forget('node');
     const stored = embeddings.getState().get('node')?.request.select?.commit;
-    await stored?.({ spaceId: TARGET, map: TARGET, graph: TARGET });
+    await stored?.({ map: TARGET, graph: TARGET });
     expect(commit).toHaveBeenCalledOnce();
   });
 
