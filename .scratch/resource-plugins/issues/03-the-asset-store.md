@@ -10,7 +10,7 @@ Any surface resolves and reads an asset; `store` and `pick` are offered where au
 
 The rules:
 
-- **Admission.** Any media type is admitted, because a kind only a missing plugin understands can bring one. `store` takes the type from the Blob and allows zero bytes. The 10 MiB cap stands. A file not named for its bytes refuses the directory, as two files of one hash do.
+- **Admission.** Any media type is admitted, because a kind only a missing plugin understands can bring one. `store` takes the type from the Blob and allows zero bytes. The 10 MiB cap stands. A file named by a valid hash but not for its bytes refuses the directory, as two files of one hash do. A file in `assets/` not named by a valid hash is not Import's, and is preserved as anything else in the directory is.
 - **Naming.** Import owns every file in `assets/` named by a valid hash with any extension. One host table maps extensions and media types both ways, an unlisted extension is `application/octet-stream`. One asset exists per hash: a store that already holds the bytes keeps the media type it first stored them under, whatever extension a later Import reads, and storing them again answers the same URL. Export keeps the name of a file the directory already has for that hash, so the extension Import read is written back; a directory with none gets a name from the stored type through the table.
 - **The asset of zero bytes** always exists, in every store and directory, with no file needed.
 - **Absent bytes** are not an error, as ADR 0118 has it: Import accepts the URL, and Export keeps it, completes and removes no file of that name.

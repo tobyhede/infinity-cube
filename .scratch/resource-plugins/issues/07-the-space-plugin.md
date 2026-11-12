@@ -14,5 +14,8 @@ Status: ready-for-agent
 - Replace on an Image inside the embedding withdraws every composed Space, and the outer Claim holds until it ends.
 - While it runs, a commit the Space plugin retained for changing its selected Map or closing it answers refused and changes nothing, and the replacement still lands.
 - A Reference to a Space shows the Map with no authoring.
+- A Space with no view shows that Space's `defaultMap` (and the Graph the host opens it on).
+- A view chooser is offered by passing a commit: the host's chooser writes only through that commit, so whatever withdraws it withdraws the choice. No commit, no chooser.
+- Embed commands come from the `Embed`, never from a kind check. Authoring the shown Space (its Resources, Edges, Maps and Graphs, and their rename, create, delete, recolour) appears only under a Claim the plugin passes.
 - The plugin imports no `@project/*` package but the Resource API.
 - `CI passed` is green, including the PostgreSQL and SQLite jobs.
