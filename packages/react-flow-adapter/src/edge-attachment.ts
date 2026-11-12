@@ -47,7 +47,7 @@ const ahead = (along: number, across: number): boolean => (along === 0 ? across 
  * shortest route. The direction is then the centre vector's, which is the only
  * fact that can answer it once the axis is fixed. Where the middles
  * are level on that axis, the vector's other component decides, so an Edge and
- * its reverse always face opposite ways (ADR 0142's two-way lanes read their
+ * its reverse always face opposite ways (ADR 0143's two-way lanes read their
  * side from it).
  */
 export function facingSides(source: AnchorRect, target: AnchorRect): FacingSides {
