@@ -115,6 +115,7 @@ const VP8L_SIGNATURE = 0x2f;
 const webpSize = (bytes: Uint8Array): PictureSize | undefined => {
   switch (ascii(bytes, 12, 4)) {
     case 'VP8 ':
+      if (bytes.length < 30) return undefined;
       return sized(littleEndian16(bytes, 26) & 0x3fff, littleEndian16(bytes, 28) & 0x3fff);
     case 'VP8L': {
       // A lossless bitstream opens with its signature byte, then the size.

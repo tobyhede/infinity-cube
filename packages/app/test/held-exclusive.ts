@@ -5,6 +5,8 @@ export interface HeldExclusive {
   /** Settles once the work has ended and its Claim is released. */
   readonly running: Promise<void>;
   readonly release: () => void;
+  /** End the work by rejecting with `cause`, as a Replace whose upload fails ends. */
+  readonly fail: (cause: Error) => void;
 }
 
 /**
@@ -21,8 +23,16 @@ export const holdExclusive = (
   const ended = Promise.withResolvers<undefined>();
   const running = claim
     .exclusively(() => ended.promise)
+    .then(
+      () => undefined,
+      () => undefined,
+    )
     .then(() => {
       claim.release();
     });
-  return { running, release: () => ended.resolve(undefined) };
+  return {
+    running,
+    release: () => ended.resolve(undefined),
+    fail: (cause) => ended.reject(cause),
+  };
 };

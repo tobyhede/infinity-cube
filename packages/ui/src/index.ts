@@ -134,7 +134,7 @@ export {
   GraphHeadShapeGlyph,
 } from './GraphHeadShape';
 export type { GraphHeadMarkerProps, GraphHeadShapeGlyphProps } from './GraphHeadShape';
-export { displayImageAsAuthored, ImageDisplayProvider, useImageDisplay } from './image-display';
+export { displayImageAsAuthored } from './image-display';
 export type { ImageDisplay } from './image-display';
 export { PaletteColorPicker } from './PaletteColorPicker';
 export type { PaletteColorEntry, PaletteColorPickerProps } from './PaletteColorPicker';

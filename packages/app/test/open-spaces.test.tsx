@@ -24,6 +24,7 @@ import { unavailable } from './command-dock';
 import { recordingHistory } from './browser-history';
 import { productDestinationPath } from '@project/http';
 import { mintingIds } from './minting';
+import { NO_CLAIMS } from '../src/plugin-host/claim-chain';
 import { holdExclusive } from './held-exclusive';
 import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
@@ -1499,6 +1500,36 @@ describe('Open Spaces', () => {
     });
     expect(openSpaces.entry(META_ID)).toBe(meta);
   });
+});
+
+it('releases the hold on every composed Space when a replacement fails', async () => {
+  const { openSpaces } = setup(undefined, mintingIds(MINTED_RESOURCE_ID));
+  const meta = await openSpaces.open(META_ID);
+  const drawing = await openSpaces.hold(OTHER_ID);
+  const replacement = holdExclusive(openSpaces.pluginGate, OTHER_IMAGE_ID);
+  expect(openSpaces.getState().replacingImage).toBe(true);
+  expect(
+    meta.app.authoring.complete(CANVAS, {
+      kind: 'created-resource',
+      resourceKind: 'markdown',
+      anchor: { x: 100, y: 100 },
+    }),
+  ).toMatchObject({ kind: 'refused' });
+  await expect(openSpaces.enter(OTHER_ID)).rejects.toThrow(NavigationUnavailableError);
+
+  replacement?.fail(new Error('Unable to store an asset: HTTP 500'));
+  await replacement?.running;
+  expect(openSpaces.getState().replacingImage).toBe(false);
+  expect(openSpaces.pluginGate.getState()).toEqual(NO_CLAIMS);
+  expect(
+    meta.app.authoring.complete(CANVAS, {
+      kind: 'created-resource',
+      resourceKind: 'markdown',
+      anchor: { x: 100, y: 100 },
+    }).kind,
+  ).toBe('completed');
+  await expect(openSpaces.enter(OTHER_ID)).resolves.toBeDefined();
+  await drawing.release();
 });
 
 it('holds Back and Forward while an only-drawn Space replaces an image', async () => {

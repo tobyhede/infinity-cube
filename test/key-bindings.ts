@@ -1,5 +1,5 @@
 export interface KeyBinding {
-  readonly module: `packages/${'app' | 'ui'}/src/${string}`;
+  readonly module: `packages/${'app' | 'ui' | `plugin-${string}`}/src/${string}`;
   readonly sourceKey: string;
   readonly occurrence: number;
   readonly key: string;
@@ -8,8 +8,8 @@ export interface KeyBinding {
 }
 
 /**
- * Every keyboard binding authored by InfinityCube in the app and UI packages that
- * reads `event.key` itself.
+ * Every keyboard binding authored by InfinityCube in the app and UI packages, and
+ * in each Resource plugin package, that reads `event.key` itself.
  *
  * The application's shortcuts are not here: they are declared as data in
  * `packages/app/src/key-bindings.ts` (`CANVAS_KEYS`, `PRESENTING_KEYS`), whose
@@ -225,5 +225,21 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     key: 'Escape',
     surface: 'Edge toolbar and Title',
     behaviour: 'return focus from the Edge chrome to the Edge',
+  },
+  {
+    module: 'packages/plugin-image/src/view.tsx',
+    sourceKey: 'Escape',
+    occurrence: 1,
+    key: 'Escape',
+    surface: "Image Resource's rail Rename field",
+    behaviour: 'abandon the rename, committing nothing',
+  },
+  {
+    module: 'packages/plugin-image/src/view.tsx',
+    sourceKey: 'Enter',
+    occurrence: 1,
+    key: 'Enter',
+    surface: "Image Resource's rail Rename field",
+    behaviour: 'commit the draft Title; Shift+Enter adds a line',
   },
 ];

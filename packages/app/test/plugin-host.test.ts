@@ -240,6 +240,25 @@ describe('the plugin gate', () => {
     expect(gate.claim([B], () => null)).toBeDefined();
   });
 
+  it('ends exclusive work that rejects, handing back its rejection, so a Claim may run again', async () => {
+    const gate = createPluginGate();
+    const held = gate.claim([A], (live) => ({ live }));
+    let liveInside: () => boolean = () => false;
+    const failure = new Error('Unable to store an asset: HTTP 500');
+    const running = held?.exclusively((own) => {
+      liveInside = own.live;
+      return Promise.reject(failure);
+    });
+    expect(gate.exclusiveRunning()).toBe(true);
+    await expect(running).rejects.toBe(failure);
+    expect(liveInside()).toBe(false);
+    expect(gate.exclusiveRunning()).toBe(false);
+    expect(gate.withdraws()).toBe(false);
+    held?.release();
+    expect(gate.getState()).toEqual(NO_CLAIMS);
+    expect(gate.claim([B], () => null)).toBeDefined();
+  });
+
   it('refuses a second chain, and releases on unmount', () => {
     const gate = createPluginGate();
     const listener = vi.fn();

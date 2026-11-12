@@ -304,7 +304,9 @@ function ImageView({ surface }: PluginViewProps<ImageContent, ImageMapContent>) 
 
   // A refused Title keeps the editor open with the draft and says why (ADR
   // 0057); only a settled one closes it. One commit is in flight at a time, and
-  // a different draft committed meanwhile is sent once it settles.
+  // a different draft committed meanwhile is sent once it settles. The editor
+  // stays mounted while the Title commit is withdrawn, so exclusive work
+  // anywhere keeps the draft, and a draft committed then is kept with a notice.
   const renameInFlight = useRef(false);
   const queuedDraft = useRef<string | null>(null);
   const sendTitle = (next: string) => {
@@ -329,8 +331,12 @@ function ImageView({ surface }: PluginViewProps<ImageContent, ImageMapContent>) 
       queuedDraft.current = next;
       return;
     }
-    if (commitTitle === undefined || next === title) {
+    if (next === title) {
       setRenaming(false);
+      return;
+    }
+    if (commitTitle === undefined) {
+      setNotice(BUSY);
       return;
     }
     sendTitle(next);
@@ -375,9 +381,7 @@ function ImageView({ surface }: PluginViewProps<ImageContent, ImageMapContent>) 
           {notice}
         </p>
       )}
-      {renaming && commitTitle !== undefined && (
-        <Rename title={title} onCommit={rename} onCancel={() => setRenaming(false)} />
-      )}
+      {renaming && <Rename title={title} onCommit={rename} onCancel={() => setRenaming(false)} />}
       <Rail commands={commands} />
     </div>
   );

@@ -25,14 +25,11 @@ import {
   type KindCanvasDecoration,
   type KindDecorator,
 } from '../src/canvas-resource-decoration';
-import { decorateImageResourceNode } from '../src/kinds/image';
+import { imageDecoration } from '../src/kinds/image';
 import { decorateMarkdownResourceNode } from '../src/kinds/markdown';
 import { decorateSpaceResourceNode } from '../src/kinds/space';
-import {
-  decorateUrResourceNode,
-  urDecoration,
-  type UrResourceDecorationContext,
-} from '../src/kinds/ur';
+import type { PluginResourceDecorationContext } from '../src/kinds/plugin-decoration';
+import { urDecoration } from '../src/kinds/ur';
 import type { KindDecorationContext } from '../src/kinds/registry';
 import type { PluginHost } from '../src/plugin-host/plugin-commits';
 import { createPluginGate } from '../src/plugin-host/plugin-gate';
@@ -361,7 +358,7 @@ describe('an Ur Resource’s decoration', () => {
     const complete = vi.fn((): AuthoringResult => ({ kind: 'completed' }));
     const pluginHost = testPluginHost(complete);
     const ur = () => ofKind(projectionNode(UR_ID, 'ur'), 'ur');
-    const commit = decorateUrResourceNode(ur(), context({ pluginHost })).kindOperations.commitMap;
+    const commit = urDecoration.decorate(ur(), context({ pluginHost })).kindOperations.commitMap;
     await expect(commit?.({ shape: 'ellipse' })).resolves.toBe('completed');
     expect(complete).toHaveBeenCalledWith(
       { kind: 'changed-map-content', resourceId: UR_ID, content: { shape: 'ellipse' } },
@@ -369,14 +366,14 @@ describe('an Ur Resource’s decoration', () => {
     );
 
     expect(
-      decorateUrResourceNode(ur(), context({ pluginHost, authorOnCanvas: false })).kindOperations
+      urDecoration.decorate(ur(), context({ pluginHost, authorOnCanvas: false })).kindOperations
         .commitMap,
     ).toBeUndefined();
     expect(
-      decorateUrResourceNode(ur(), context({ pluginHost, editableResourceIds: new Set() }))
+      urDecoration.decorate(ur(), context({ pluginHost, editableResourceIds: new Set() }))
         .kindOperations.commitMap,
     ).toBeUndefined();
-    expect(decorateUrResourceNode(ur(), context()).kindOperations.commitMap).toBeUndefined();
+    expect(urDecoration.decorate(ur(), context()).kindOperations.commitMap).toBeUndefined();
   });
 });
 
@@ -422,7 +419,7 @@ describe('decorateMarkdownResourceNode', () => {
   });
 });
 
-describe('decorateImageResourceNode', () => {
+describe('the Image kind’s decoration', () => {
   const imageNode = (): ResourceFlowNodeOf<'image'> => {
     const node = projectionNode(RESOURCE_ID, 'markdown', false);
     return ofKind(
@@ -436,7 +433,7 @@ describe('decorateImageResourceNode', () => {
 
   it('offers the plugin its commits and a Claim where the canvas authors the Resource', async () => {
     const complete = vi.fn((): AuthoringResult => ({ kind: 'completed' }));
-    const operations = decorateImageResourceNode(
+    const operations = imageDecoration.decorate(
       imageNode(),
       context({ pluginHost: testPluginHost(complete) }),
     ).kindOperations;
@@ -457,18 +454,14 @@ describe('decorateImageResourceNode', () => {
   it('offers nothing where the Resource is not editable or there is no host', () => {
     const pluginHost = testPluginHost(vi.fn());
     expect(
-      decorateImageResourceNode(
-        imageNode(),
-        context({ pluginHost, editableResourceIds: new Set() }),
-      ).kindOperations,
-    ).toEqual(expect.objectContaining({ kind: 'image', claimed: false }));
+      imageDecoration.decorate(imageNode(), context({ pluginHost, editableResourceIds: new Set() }))
+        .kindOperations,
+    ).toEqual(expect.objectContaining({ kind: 'image' }));
     expect(
-      decorateImageResourceNode(
-        imageNode(),
-        context({ pluginHost, editableResourceIds: new Set() }),
-      ).kindOperations,
+      imageDecoration.decorate(imageNode(), context({ pluginHost, editableResourceIds: new Set() }))
+        .kindOperations,
     ).not.toHaveProperty('commitContent');
-    expect(decorateImageResourceNode(imageNode(), context()).kindOperations).toEqual({
+    expect(imageDecoration.decorate(imageNode(), context()).kindOperations).toEqual({
       kind: 'image',
     });
   });
@@ -607,11 +600,11 @@ describe('decorating each kind from its own part of the context', () => {
   });
 
   it('names every field of a kind’s context in the part it reads', () => {
-    const dropsOptional: KindCanvasDecoration<UrKindId, UrResourceDecorationContext> = {
+    const dropsOptional: KindCanvasDecoration<UrKindId, PluginResourceDecorationContext> = {
       kind: urKind.id,
       // @ts-expect-error A part read field by field names every field, the optional ones too.
       slice: ({ authorOnCanvas, editableResourceIds }) => ({ authorOnCanvas, editableResourceIds }),
-      decorate: decorateUrResourceNode,
+      decorate: urDecoration.decorate,
     };
     expect(dropsOptional.kind).toBe(urKind.id);
   });

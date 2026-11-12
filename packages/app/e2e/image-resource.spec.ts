@@ -911,6 +911,51 @@ test(
 );
 
 /**
+ * A Replace whose upload fails says so over the picture, changes nothing, and
+ * ends its exclusive work, so navigation is available again; uploads time out
+ * after two minutes, so the wait is bounded (ADR 0126). A later Replace lands.
+ */
+for (const failure of ['HTTP 500', 'network', 'timeout'] as const) {
+  test(`a Replace recovers from an upload failing by ${failure}`, async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await serveFigure(page);
+    const spaceId = await openPictures(page);
+    const before = await storedFigure(page, spaceId);
+    if (failure === 'timeout') await page.clock.install();
+    const uploads = (url: URL) => url.pathname === '/assets';
+    await page.route(uploads, async (route) => {
+      if (failure === 'network') await route.abort('failed');
+      else if (failure === 'HTTP 500') await route.fulfill({ status: 500, body: 'Unavailable' });
+      // A timed-out upload is never answered.
+    });
+
+    const node = await replaceFromRail(page, FIRST_FILE);
+    const notice = node.getByTestId('image-notice');
+    if (failure === 'timeout') {
+      await expect(notice).toHaveText('Replacing image…');
+      await expectWithheld(dockNavigation(page));
+      await page.clock.fastForward(120_000);
+    }
+    await expect(notice).toHaveText('This image was not replaced. Try again.');
+    await expect(notice).toHaveAttribute('role', 'alert');
+    await expectAvailable(dockNavigation(page));
+    await expect(createResourceControl(page)).toBeEnabled();
+    await expect(node.getByRole('img', { name: 'Figure' })).toHaveAttribute('src', FIGURE_URL);
+    expect((await storedFigure(page, spaceId)).revision).toBe(before.revision);
+    expect(errors).toEqual([]);
+
+    await page.unroute(uploads);
+    await replaceFromRail(page, FIRST_FILE);
+    const picture = node.getByRole('img', { name: 'Figure' });
+    await expect(picture).toHaveAttribute('src', /^\/assets\/[A-Za-z0-9_-]{43}$/u);
+    await expectPictureLoaded(picture, FIRST_PICTURE.size.width);
+    await expect(notice).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+}
+
+/**
  * Hold every upload to the host's asset collection until the answer is
  * released, so a Replace stays in flight between its store and its commit.
  */

@@ -1,12 +1,6 @@
 import { StrictMode, type ReactNode } from 'react';
 import type { Assets } from '@project/resource-api/view';
-import {
-  displayImageAsAuthored,
-  ImageDisplayProvider,
-  NO_ASSETS,
-  PluginAssetsProvider,
-  type ImageDisplay,
-} from '@project/ui';
+import { NO_ASSETS, PluginAssetsProvider } from '@project/ui';
 import type { OpenSpace, OpenSpaces } from './open-spaces';
 import { OpenSpacesApplication } from './components/OpenSpacesApplication';
 import type { DestinationOpening } from './destination-opening';
@@ -30,11 +24,6 @@ export interface OpenedApplicationStartup {
    */
   spaces: OpenSpaces;
   opening?: DestinationOpening | undefined;
-  /**
-   * Where a picture is drawn from (ADR 0130). Absent draws every URL as
-   * authored, which is right for any host that serves its own stored images.
-   */
-  displayImage?: ImageDisplay;
   /** The asset store a Resource plugin reaches (ADR 0142). Absent offers none. */
   assets?: Assets;
 }
@@ -46,8 +35,6 @@ export interface NotesApplicationStartup {
   /** The clock the presenting windows read their presentations' start from. */
   now: () => number;
   /** As on {@link OpenedApplicationStartup}: the Notes window draws pictures too. */
-  displayImage?: ImageDisplay;
-  /** As on {@link OpenedApplicationStartup}. */
   assets?: Assets;
 }
 
@@ -71,19 +58,17 @@ export const startApplication = async (
     const startup = await resolveStartup();
     root.render(
       <StrictMode>
-        <ImageDisplayProvider value={startup.displayImage ?? displayImageAsAuthored}>
-          <PluginAssetsProvider value={startup.assets ?? NO_ASSETS}>
-            {startup.kind === 'notes' ? (
-              <NotesWindowApplication notes={startup.notes} now={startup.now} />
-            ) : (
-              <OpenSpacesApplication
-                spaces={startup.spaces}
-                initial={startup.opened}
-                opening={startup.opening}
-              />
-            )}
-          </PluginAssetsProvider>
-        </ImageDisplayProvider>
+        <PluginAssetsProvider value={startup.assets ?? NO_ASSETS}>
+          {startup.kind === 'notes' ? (
+            <NotesWindowApplication notes={startup.notes} now={startup.now} />
+          ) : (
+            <OpenSpacesApplication
+              spaces={startup.spaces}
+              initial={startup.opened}
+              opening={startup.opening}
+            />
+          )}
+        </PluginAssetsProvider>
       </StrictMode>,
     );
   } catch (error) {

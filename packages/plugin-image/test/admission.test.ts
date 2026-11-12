@@ -198,6 +198,16 @@ describe('reading a picture’s size from its header', () => {
     expect(
       pictureSize(riff('VP8L', joined(new Uint8Array(4), bytes(0x00), sizeBytes)), 'image/webp'),
     ).toBeUndefined();
+    // A lossy header cut one byte into its height: 300's low byte alone is 44.
+    expect(
+      pictureSize(
+        riff('VP8 ', joined(new Uint8Array(10), u16le(400), u16le(300).subarray(0, 1))),
+        'image/webp',
+      ),
+    ).toBeUndefined();
+    expect(
+      pictureSize(riff('VP8 ', joined(new Uint8Array(10), u16le(400))), 'image/webp'),
+    ).toBeUndefined();
     expect(pictureSize(riff('VP8X', new Uint8Array(8)), 'image/webp')).toBeUndefined();
     expect(
       pictureSize(

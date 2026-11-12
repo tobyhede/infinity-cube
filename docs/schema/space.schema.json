@@ -64,7 +64,7 @@
       }
     },
     "placement": {
-      "description": "One Resource's place on a Map. Open, size and Map content are the Map's, not the Resource's (ADR 0122, ADR 0142). That an Ur Resource is never Open, and what Map content a Resource's plugin accepts, are intake's checks, because they need the Resource's kind.",
+      "description": "One Resource's place on a Map. Open, size and Map content are the Map's, not the Resource's (ADR 0122, ADR 0142). That an Ur or Image Resource is never Open, and what Map content a Resource's plugin accepts, are intake's checks, because they need the Resource's kind.",
       "type": "object",
       "required": ["x", "y"],
       "additionalProperties": false,

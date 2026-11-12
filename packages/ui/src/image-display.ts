@@ -1,5 +1,3 @@
-import { createContext, useContext } from 'react';
-
 /**
  * Where a picture is drawn from, given the URL its Image Resource owns.
  *
@@ -13,10 +11,3 @@ export type ImageDisplay = (url: string) => string;
 
 /** Every URL drawn as authored: the resolver of a host that serves its stored images. */
 export const displayImageAsAuthored: ImageDisplay = (url) => url;
-
-const ImageDisplayContext = createContext<ImageDisplay>(displayImageAsAuthored);
-
-export const ImageDisplayProvider = ImageDisplayContext.Provider;
-
-/** The resolver the application supplied, or {@link displayImageAsAuthored} outside one. */
-export const useImageDisplay = (): ImageDisplay => useContext(ImageDisplayContext);

@@ -1,56 +1,24 @@
 import { imageKind, type ImageKindId } from '@project/core';
-import type { ResourceFlowNodeOf } from '@project/react-flow-adapter';
-import type {
-  CanvasResourceDecorationContext,
-  KindCanvasDecoration,
-  KindDecoration,
-} from '../canvas-resource-decoration';
+import type { KindCanvasDecoration } from '../canvas-resource-decoration';
 import type { KindCreation } from '../kind-creation';
-import { pluginSurfaceOperations, type PluginHost } from '../plugin-host/plugin-commits';
 import type { ResourcePlacementCommands } from '../resource-placement';
-
-export type ImageResourceDecorationContext = Pick<
-  CanvasResourceDecorationContext,
-  'authorOnCanvas' | 'editableResourceIds'
-> & {
-  /**
-   * Where the plugin's commits go and the gate that withdraws them (ADR 0142).
-   * Absent where this canvas offers a plugin no commit.
-   */
-  readonly pluginHost?: PluginHost | undefined;
-};
+import {
+  pluginDecorationSlice,
+  pluginResourceOperations,
+  type PluginResourceDecorationContext,
+} from './plugin-decoration';
 
 /**
- * An Image Resource's plugin surface (ADR 0142): its Title and content commits,
- * the asset store and picker, and a Claim through which its Replace runs
- * exclusively, where the canvas authors it.
+ * The Image kind's canvas decoration: its plugin surface (ADR 0142), whose
+ * Title and content commits, asset store, picker and Claim carry Rename and a
+ * Replace run exclusively, where the canvas authors it.
  */
-export function decorateImageResourceNode(
-  node: ResourceFlowNodeOf<ImageKindId>,
-  context: ImageResourceDecorationContext,
-): KindDecoration<ImageKindId> {
-  return {
-    kindOperations: pluginSurfaceOperations(
-      imageKind.id,
-      node.data.resourceId,
-      {
-        authorOnCanvas: context.authorOnCanvas,
-        editable: context.editableResourceIds.has(node.data.resourceId),
-      },
-      context.pluginHost,
-    ),
-  };
-}
-
-/** The Image kind's canvas decoration, from its own part of the context. */
-export const imageDecoration: KindCanvasDecoration<ImageKindId, ImageResourceDecorationContext> = {
+export const imageDecoration: KindCanvasDecoration<ImageKindId, PluginResourceDecorationContext> = {
   kind: imageKind.id,
-  slice: ({ authorOnCanvas, editableResourceIds, pluginHost }) => ({
-    authorOnCanvas,
-    editableResourceIds,
-    pluginHost,
+  slice: pluginDecorationSlice,
+  decorate: (node, context) => ({
+    kindOperations: pluginResourceOperations(imageKind.id, node.data.resourceId, context),
   }),
-  decorate: decorateImageResourceNode,
 };
 
 export type ImageCreationContext = Pick<ResourcePlacementCommands, 'createImagesFromFiles'> & {

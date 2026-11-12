@@ -67,6 +67,11 @@ export interface RenderPluginOptions<C, M> {
   readonly picker?: (opening: number) => Promise<readonly File[]>;
   /** Whether a granted `claim()` is refused, as the chain refuses one. */
   readonly claimRefused?: boolean;
+  /**
+   * What a granted store answers in place of storing the bytes: a store whose
+   * host cannot be reached rejects.
+   */
+  readonly storing?: (bytes: Blob) => Promise<AssetRef | { readonly refused: string }>;
 }
 
 export type RenderedPlugin<C, M> = RenderResult & { readonly commits: Commits<C, M> };
@@ -229,6 +234,7 @@ export function renderPlugin<C, M>(
   const gate = createTestGate();
   const files = [...(options.files ?? [])];
   const store = (bytes: Blob): Promise<AssetRef | { readonly refused: string }> => {
+    if (options.storing !== undefined) return options.storing(bytes);
     if (answer !== 'completed' && answer !== 'unchanged') return Promise.resolve(answer);
     commits.stored.push(bytes);
     return Promise.resolve(testAssetRef(commits.stored.length));

@@ -258,6 +258,77 @@ describe('the Image plugin’s view', () => {
     expect(screen.getByRole('img', { name: 'Figure' })).toHaveAttribute('src', FIGURE.url);
   });
 
+  it.each([
+    ['answers HTTP 500', new Error('Unable to store an asset: HTTP 500')],
+    ['cannot be reached', new TypeError('Failed to fetch')],
+    ['times out', new Error('Request timed out')],
+  ])(
+    'says a Replace whose store %s failed, keeps its picture, and ends its work and Claim',
+    async (_, cause) => {
+      let failing = true;
+      const rendered = renderPlugin(imagePluginView.View, {
+        content: FIGURE,
+        map: {},
+        title: 'Figure',
+        grants: AUTHORING,
+        files: [pngFile()],
+        storing: () => (failing ? Promise.reject(cause) : Promise.resolve(testAssetRef(1))),
+      });
+      const replace = () =>
+        screen.getByRole('button', { name: 'Replace image of Resource Figure' });
+      fireEvent.click(replace());
+      expect(await screen.findByRole('alert')).not.toBeEmptyDOMElement();
+      expect(screen.queryByText('Replacing image…')).toBeNull();
+      expect(rendered.commits.content).toEqual([]);
+      expect(screen.getByRole('img', { name: 'Figure' })).toHaveAttribute('src', FIGURE.url);
+      // The exclusive work has ended, so every plain commit is offered again,
+      // and the Claim is released, so a second Replace runs and lands.
+      expect(screen.getByRole('button', { name: 'Rename Resource Figure' })).toBeEnabled();
+      expect(replace()).toBeEnabled();
+      failing = false;
+      fireEvent.click(replace());
+      await waitFor(() => expect(rendered.commits.content).toHaveLength(1));
+      expect(rendered.commits.exclusive).toBe(2);
+      await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+    },
+  );
+
+  it('keeps an open rename and its draft while exclusive work withdraws the Title commit, and commits it after', async () => {
+    const read = Promise.withResolvers<ArrayBuffer>();
+    const slow = Object.assign(new File([pngHeader()], 'harbour.png', { type: 'image/png' }), {
+      arrayBuffer: () => read.promise,
+    });
+    const rendered = renderPlugin(imagePluginView.View, {
+      content: FIGURE,
+      map: {},
+      title: 'Figure',
+      grants: AUTHORING,
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Rename Resource Figure' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Resource title' }), {
+      target: { value: 'Harbour wall' },
+    });
+    // Exclusive work begins, which withdraws every plain commit on the page.
+    fireEvent.drop(screen.getByTestId('image-plugin'), {
+      dataTransfer: { files: [slow], types: ['Files'] },
+    });
+    expect(await screen.findByText('Replacing image…')).toBeInTheDocument();
+    const withdrawn = screen.getByRole('textbox', { name: 'Resource title' });
+    expect(withdrawn).toHaveValue('Harbour wall');
+    // Committed while withdrawn, the draft is kept and nothing is sent.
+    fireEvent.keyDown(withdrawn, { key: 'Enter' });
+    expect(rendered.commits.title).toEqual([]);
+    read.resolve(pngHeader().buffer);
+    await waitFor(() => expect(screen.queryByText('Replacing image…')).toBeNull());
+    const field = screen.getByRole('textbox', { name: 'Resource title' });
+    expect(field).toHaveValue('Harbour wall');
+    fireEvent.keyDown(field, { key: 'Enter' });
+    expect(rendered.commits.title).toEqual(['Harbour wall']);
+    await waitFor(() =>
+      expect(screen.getByRole('img', { name: 'Harbour wall' })).toBeInTheDocument(),
+    );
+  });
+
   it('announces a replacement in progress politely, as a status', async () => {
     const read = Promise.withResolvers<ArrayBuffer>();
     const slow = Object.assign(new File([pngHeader()], 'harbour.png', { type: 'image/png' }), {
