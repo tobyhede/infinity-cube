@@ -1,7 +1,8 @@
 import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { EMPTY_ASSET_REF, uuidSchema, type AssetRef } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type AssetRef, type UUID } from '@project/core';
+import { createSpaceHttpApp, httpAssetClient, HttpSpaceBackend } from '@project/http';
 import type { LoadedSpace, StoredAsset } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { exportAggregate } from '../../src/export/export-aggregate';

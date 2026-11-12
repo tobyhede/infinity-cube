@@ -363,15 +363,22 @@ describe('a plugin surface’s commits on the canvas', () => {
     report: ObserverErrorReporter = () => undefined,
     assets: PluginHost['assets'] = {},
     capSizeHint?: PluginHost['capSizeHint'],
-  ): PluginHost => ({
-    gate: createPluginGate(),
-    replacementEpoch: () => epoch.value,
-    complete,
-    report,
-    document: (resourceId) => (resourceId === RESOURCE ? DOCUMENT : undefined),
-    assets,
-    capSizeHint,
-  });
+  ): PluginHost => {
+    const gate = createPluginGate();
+    return {
+      gate,
+      // As the canvas reads it: the chain the gate last published.
+      get claims() {
+        return gate.getState();
+      },
+      replacementEpoch: () => epoch.value,
+      complete,
+      report,
+      document: (resourceId) => (resourceId === RESOURCE ? DOCUMENT : undefined),
+      assets,
+      capSizeHint,
+    };
+  };
 
   it('answers a settled Edit in the words every refusal is reported in', () => {
     expect(answerOf({ kind: 'completed' })).toBe('completed');
@@ -626,17 +633,21 @@ describe('a plugin surface’s commits on the canvas', () => {
     expect(other.withdrawn).toBe(true);
   });
 
-  it('offers another surface nothing while one holds a Claim, and no second Claim on the Resource held', () => {
+  it('offers another Resource nothing while one holds a Claim, and another drawing of the held Resource no Claim', () => {
     const host = hostWith(() => ({ kind: 'completed' }));
-    const held = pluginSurfaceOperations('markdown', RESOURCE, FACTS, host).claim?.();
+    const drawing = Symbol('drawing');
+    const held = pluginSurfaceOperations('markdown', RESOURCE, FACTS, host).claim?.(drawing);
+    expect(held).toBeDefined();
     const OTHER = uuidSchema.parse('00000000-0000-4000-8000-0000000000a3');
     const other = pluginSurfaceOperations('markdown', OTHER, FACTS, host);
     expect(other.commitMap).toBeUndefined();
     expect(other.claim).toBeUndefined();
-    expect(pluginSurfaceOperations('markdown', RESOURCE, FACTS, host).commitContent).toBeTypeOf(
-      'function',
-    );
-    expect(pluginSurfaceOperations('markdown', RESOURCE, FACTS, host).claim).toBeUndefined();
+    const again = pluginSurfaceOperations('markdown', RESOURCE, FACTS, host);
+    expect(again.commitContent).toBeTypeOf('function');
+    expect(again.claimHolder?.(drawing)).toBe('this-drawing');
+    const second = Symbol('second drawing');
+    expect(again.claimHolder?.(second)).toBe('another-drawing');
+    expect(again.claim?.(second)).toBeUndefined();
     held?.release();
     expect(pluginSurfaceOperations('markdown', OTHER, FACTS, host).commitMap).toBeTypeOf(
       'function',

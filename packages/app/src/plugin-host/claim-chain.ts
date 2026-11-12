@@ -23,7 +23,8 @@
  * - Exclusive work is one at a time, run by a held Claim, and nothing is
  *   claimed while it runs.
  * - While a drawing of a Resource holds a Claim, every other drawing of that
- *   Resource is offered no commit (`heldByAnotherDrawing`).
+ *   Resource is offered no commit (`heldByAnotherDrawing`), and so is every
+ *   Resource no holder's embedding draws (`claimedElsewhere`).
  */
 
 /** What names one drawing for its surface's lifetime: unique to that mount. */
@@ -68,6 +69,15 @@ export const heldByAnotherDrawing = (chain: ClaimChain, drawing: Drawing): boole
     const holder = drawingOf(embedding);
     return holder?.resource === drawing.resource && holder.key !== drawing.key;
   });
+
+/**
+ * Whether a Claim is held and no holder's embedding draws this Resource, held
+ * or embedding a holder: a Resource that takes no part in the claimant's work,
+ * which is offered no commit while it runs (ADR 0064).
+ */
+export const claimedElsewhere = (chain: ClaimChain, resource: string): boolean =>
+  chain.holders.length > 0 &&
+  !chain.holders.some((embedding) => embedding.some((drawing) => drawing.resource === resource));
 
 /** The deepest holder's key, whose commands show and which holds the keyboard. */
 export const deepest = (chain: ClaimChain): DrawingKey | undefined => {

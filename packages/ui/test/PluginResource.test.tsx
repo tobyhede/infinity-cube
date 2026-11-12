@@ -456,43 +456,6 @@ describe('the Map host a plugin draws inside (ADR 0142)', () => {
     expect(claim).toHaveBeenCalledTimes(1);
   });
 
-  it('counts a Claim held while the host answers that releasing it did not release it', () => {
-    surfaces.length = 0;
-    let releases = true;
-    const held: PluginHostClaim = {
-      release: () => releases,
-      exclusively: () => Promise.resolve('busy'),
-      unmount: () => undefined,
-    };
-    const toolbarHeld: boolean[] = [];
-    render(
-      <PluginSurface
-        {...probeProps({ operations: { kind: 'ur', claim: () => held } })}
-        renderToolbar={(toolbar, isHeld) => {
-          toolbarHeld.push(isHeld);
-          return toolbar;
-        }}
-        entry={probeEntry}
-      />,
-    );
-    let taken: ReturnType<NonNullable<ProbeSurface['claim']>> | undefined;
-    act(() => {
-      taken = surfaces.at(-1)?.claim?.();
-    });
-    expect(toolbarHeld.at(-1)).toBe(true);
-    // The host keeps the Claim while exclusive work or an inner Claim runs.
-    releases = false;
-    act(() => {
-      expect(taken?.release()).toBe(false);
-    });
-    expect(toolbarHeld.at(-1)).toBe(true);
-    releases = true;
-    act(() => {
-      expect(taken?.release()).toBe(true);
-    });
-    expect(toolbarHeld.at(-1)).toBe(false);
-  });
-
   it.each([
     ['a modal or presenting withdraws authoring', { withdrawn: true }],
     ['the Resource becomes read-only', { readOnly: true }],
@@ -502,7 +465,7 @@ describe('the Map host a plugin draws inside (ADR 0142)', () => {
       surfaces.length = 0;
       probeMounts = 0;
       claimOnMount = true;
-      const release = vi.fn(() => true);
+      const release = vi.fn();
       const unmountClaim = vi.fn();
       const held: PluginHostClaim = {
         release,
@@ -760,12 +723,24 @@ describe('the Map host a plugin draws inside (ADR 0142)', () => {
     expect(screen.queryByRole('button', { name: 'Actions for Resource Decide' })).toBeNull();
   });
 
-  it('gives the plugin the whole rect to drag in while it holds a Claim, leaving the wheel the canvas’s', () => {
+  it('gives the plugin the whole rect to drag in while this drawing holds a Claim, and not another, leaving the wheel the canvas’s', () => {
     const { rerender } = render(<PluginResource {...props('pill')} />);
     const layer = () =>
       screen.getByRole('article', { name: 'Decide' }).querySelector('.canvas-resource__plugin');
     expect(layer()).not.toHaveClass('nodrag');
-    rerender(<PluginResource {...props('pill')} operations={{ kind: 'ur', claimed: true }} />);
+    rerender(
+      <PluginResource
+        {...props('pill')}
+        operations={{ kind: 'ur', claimHolder: () => 'another-drawing' }}
+      />,
+    );
+    expect(layer()).not.toHaveClass('nodrag');
+    rerender(
+      <PluginResource
+        {...props('pill')}
+        operations={{ kind: 'ur', claimHolder: () => 'this-drawing' }}
+      />,
+    );
     expect(layer()).toHaveClass('nodrag', 'nopan');
     // The canvas still zooms over a claimed Resource (ADR 0064): no `nowheel`.
     expect(layer()).not.toHaveClass('nowheel');

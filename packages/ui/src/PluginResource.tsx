@@ -21,10 +21,15 @@ import {
   type ResourceShape,
 } from '@project/core';
 import type { Answer } from '@project/resource-api/domain';
-import type { Assets, OwnProps, RailCommand, TitleProps } from '@project/resource-api/view';
+import {
+  RAIL_BAND,
+  type Assets,
+  type OwnProps,
+  type RailCommand,
+  type TitleProps,
+} from '@project/resource-api/view';
 import {
   createRailStore,
-  RAIL_BAND,
   ResourceHostProvider,
   type ResourceHost,
 } from '@project/resource-api/view/host';
@@ -296,8 +301,11 @@ function guarded(
     pick:
       pick === undefined
         ? undefined
-        : (accept) => (lifetime.drawn() ? pick(accept) : Promise.resolve([])),
-    claim: claim === undefined ? undefined : () => counted(lifetime.drawn() ? claim() : undefined),
+        : (accept) => (withheld() === null ? pick(accept) : Promise.resolve([])),
+    claim:
+      claim === undefined
+        ? undefined
+        : (drawing) => counted(lifetime.drawn() ? claim(drawing) : undefined),
   };
 
   /** A Claim whose release, however it comes, is counted once. */
@@ -311,12 +319,11 @@ function guarded(
       onHeld(-1);
     };
     return {
-      // A Claim the host did not release, as while exclusive work or an
-      // inner Claim runs, is still held.
+      // The host completes a release asked while exclusive work or an inner
+      // Claim runs once that ends, so the plugin holds nothing from here.
       release: () => {
-        const released = taken.release();
-        if (released) settle();
-        return released;
+        settle();
+        taken.release();
       },
       exclusively: (work) => taken.exclusively(work),
       unmount: () => {
@@ -487,17 +494,18 @@ export function PluginSurface(props: PluginResourceProps & { readonly entry: Plu
           // A Claim gives the plugin the whole rect to point in: the canvas
           // neither drags nor pans from inside it while one is held. The wheel
           // stays the canvas's, so it still zooms over the Resource (ADR 0064).
-          props.operations.claimed === true
+          holder === 'this-drawing'
             ? 'canvas-resource__plugin nodrag nopan'
             : 'canvas-resource__plugin'
         }
       >
         <ResourceFailureBoundary
-          // A throw is this drawing's: the plugin mounts afresh for another
-          // Resource or after a replacement, and a failed one is drawn again
-          // for another Map content value, which leaves a drawing one mounted.
+          // A throw is this drawing's: the boundary mounts afresh for another
+          // Resource or after a replacement, and a failed drawing is tried
+          // again on another Map content value, which leaves a drawn plugin,
+          // its state and its Claims as they are.
           key={`${props.resourceId}:${String(props.operations.epoch ?? 0)}`}
-          retryKey={JSON.stringify(props.mapContent)}
+          retryOn={props.mapContent}
           onFailure={props.onFailure ?? props.operations.onFailure}
         >
           <MapTitleContext.Provider value={drawnTitle}>

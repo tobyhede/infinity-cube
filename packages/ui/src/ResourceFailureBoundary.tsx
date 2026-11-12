@@ -6,16 +6,18 @@ export interface ResourceFailureBoundaryProps {
   /** Told what the plugin threw, so the failure is reported rather than only drawn. */
   readonly onFailure?: ((error: Error) => void) | undefined;
   /**
-   * A value whose change draws a failed plugin again, without remounting one
-   * that is drawing: what it holds, such as an edit asked for while Closed,
-   * survives the change.
+   * A value a failed drawing is tried again on once it changes, compared as
+   * JSON, key order aside. A drawing that has not failed is left as it is.
    */
-  readonly retryKey?: string | undefined;
+  readonly retryOn?: JsonValue | undefined;
+  /** What a failed drawing shows; absent, the short note a failed Resource draws. */
+  readonly fallback?: ReactNode;
 }
 
 interface ResourceFailureBoundaryState {
   readonly failed: boolean;
-  readonly retryKey: string | undefined;
+  /** The `retryOn` value last drawn with, which a failure happened at. */
+  readonly drawnOn: JsonValue | undefined;
 }
 
 const sameRetry = (left: JsonValue | undefined, right: JsonValue | undefined): boolean =>
@@ -34,21 +36,18 @@ export class ResourceFailureBoundary extends Component<
   ResourceFailureBoundaryProps,
   ResourceFailureBoundaryState
 > {
-  override state: ResourceFailureBoundaryState = {
-    failed: false,
-    retryKey: this.props.retryKey,
-  };
-
-  static getDerivedStateFromError(): Partial<ResourceFailureBoundaryState> {
-    return { failed: true };
-  }
+  override state: ResourceFailureBoundaryState = { failed: false, drawnOn: this.props.retryOn };
 
   static getDerivedStateFromProps(
     props: ResourceFailureBoundaryProps,
     state: ResourceFailureBoundaryState,
-  ): ResourceFailureBoundaryState | null {
-    if (props.retryKey === state.retryKey) return null;
-    return { failed: false, retryKey: props.retryKey };
+  ): Partial<ResourceFailureBoundaryState> | null {
+    if (sameRetry(props.retryOn, state.drawnOn)) return null;
+    return { failed: false, drawnOn: props.retryOn };
+  }
+
+  static getDerivedStateFromError(): Partial<ResourceFailureBoundaryState> {
+    return { failed: true };
   }
 
   override componentDidCatch(error: Error, _info: ErrorInfo): void {

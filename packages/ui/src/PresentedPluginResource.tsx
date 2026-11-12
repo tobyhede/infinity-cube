@@ -135,8 +135,8 @@ function NoTitle() {
 }
 
 /**
- * Another Resource's plugin drawn inside the old frame's content area, as an
- * Open Reference Resource draws its Target (ADR 0070, ADR 0142): on a surface
+ * Another Resource's plugin drawn inside a Resource's content area, as an Open
+ * Reference Resource draws its Target (ADR 0070, ADR 0142): on a surface
  * offering no authoring of the Target, given the Reference's own Title as its
  * name, drawing no Title of its own, and filling the room it is given.
  */

@@ -349,6 +349,7 @@ describe('decorateMarkdownResourceNode', () => {
   const markdown = () => ofKind(projectionNode(RESOURCE_ID, 'markdown', true), 'markdown');
   const hostWith = (complete: PluginHost['complete']): PluginHost => ({
     gate: createPluginGate(),
+    claims: NO_CLAIMS,
     replacementEpoch: () => 0,
     complete,
     report: () => undefined,

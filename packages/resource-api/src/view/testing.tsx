@@ -9,17 +9,15 @@ import {
 } from 'react';
 import { act, render, type RenderResult } from '@testing-library/react';
 import type { Answer, AssetRef, Size } from '../domain';
+import { createRailStore, ResourceHostProvider, type ResourceHost } from './host';
 import {
-  createRailStore,
   RAIL_BAND,
-  ResourceHostProvider,
   type Assets,
   type Exclusive,
   type OwnClaim,
   type OwnProps,
   type PluginViewProps,
   type RenderedMarkdownProps,
-  type ResourceHost,
   type SourceEditorProps,
   type Surface,
   type TitleProps,
@@ -82,6 +80,11 @@ export interface RenderPluginOptions<C, M> {
    * and `pick` are offered only where granted.
    */
   readonly assets?: Partial<Assets>;
+  /**
+   * What a granted store answers in place of storing the bytes: a store whose
+   * host cannot be reached rejects.
+   */
+  readonly storing?: (bytes: Blob) => Promise<AssetRef | { readonly refused: string }>;
 }
 
 export type RenderedPlugin<C, M> = RenderResult & {
@@ -183,13 +186,21 @@ function TestSourceEditor({
   );
 }
 
-function TestTitle({ title }: { readonly title: string }) {
-  return function Title({ className }: TitleProps) {
-    return (
-      <h2 className={className} data-testid="plugin-title">
-        {title}
-      </h2>
-    );
+/**
+ * One Claim per surface, as a host's chain holds one per drawing: taking it
+ * again answers the same Claim, and one release ends it, so exclusive work
+ * asked for after that answers busy.
+ */
+function createClaimHold() {
+  let held = false;
+  return {
+    held: () => held,
+    take: () => {
+      held = true;
+    },
+    release: () => {
+      held = false;
+    },
   };
 }
 
@@ -329,62 +340,89 @@ export function renderPlugin<C, M>(
     const running = exclusiveRunning || authoringOff;
     const host: ResourceHost = useMemo(
       () => ({
-        Title: TestTitle({ title }),
+        Title: TestTitle,
         Own: TestOwn,
         rail,
         RenderedMarkdown: TestRenderedMarkdown,
         SourceEditor: TestSourceEditor,
         railBand: RAIL_BAND,
       }),
-      [rail, title],
+      [rail],
     );
-    const settle =
-      <T,>(record: T[], apply: (next: T) => void) =>
-      (next: T) => {
-        record.push(next);
-        if (answer === 'completed') apply(next);
-        return Promise.resolve(answer);
+    // One set of commits while what is offered stays the same, as a host keeps
+    // its own, so a plugin keying work on a commit sees what a host gives it.
+    const offeredNow = useMemo(() => {
+      const settle =
+        <T,>(record: T[], apply: (next: T) => void) =>
+        (next: T) => {
+          record.push(next);
+          if (answer === 'completed') apply(next);
+          return Promise.resolve(answer);
+        };
+      const titleCommit = settle(commits.title, setTitle);
+      const contentCommit = settle(commits.content, setContent);
+      const mapSettle = settle(commits.map, setMapValue);
+      const mapCommit = (next: M, hint?: { readonly sizeHint?: Size }) => {
+        commits.hints.push(hint?.sizeHint);
+        return mapSettle(next);
       };
-    const titleCommit = settle(commits.title, setTitle);
-    const contentCommit = settle(commits.content, setContent);
-    const mapSettle = settle(commits.map, setMapValue);
-    const mapCommit = (next: M, hint?: { readonly sizeHint?: Size }) => {
-      commits.hints.push(hint?.sizeHint);
-      return mapSettle(next);
-    };
-    const granted = {
-      title: grants.title === true ? titleCommit : undefined,
-      content: grants.content === true ? contentCommit : undefined,
-      map: grants.map === true ? mapCommit : undefined,
-      store: grants.store === true ? (options.assets?.store ?? store) : undefined,
-    };
-    const idle = () => !gate.running();
-    const offered = <T,>(commit: T | undefined) => (running ? undefined : commit);
-    const plain = <T, O, A>(commit: ((next: T, options?: O) => Promise<A>) | undefined) =>
-      offered(commit === undefined ? undefined : guarded(commit, idle, WITHDRAWN));
-    const claim: OwnClaim<C, M> = {
-      release: () => true,
-      exclusively: (work) =>
-        gate.exclusively((live) => {
-          exclusiveRuns += 1;
-          const ownCommit = <T, O, A>(
-            commit: ((next: T, options?: O) => Promise<A>) | undefined,
-          ) => (commit === undefined ? undefined : guarded(commit, live, ENDED));
-          const own: Exclusive<C, M> = {
-            title: ownCommit(granted.title),
-            content: ownCommit(granted.content),
-            map: ownCommit(granted.map),
-            store: ownCommit(granted.store),
-          };
-          return work(own);
-        }),
-    };
-    const assets: Assets = {
-      url: options.assets?.url ?? TEST_ASSETS.url,
-      read: options.assets?.read ?? TEST_ASSETS.read,
-      store: plain(granted.store),
-      pick: grants.pick === true ? offered(pick) : undefined,
-    };
+      const granted = {
+        title: grants.title === true ? titleCommit : undefined,
+        content: grants.content === true ? contentCommit : undefined,
+        map: grants.map === true ? mapCommit : undefined,
+        store: grants.store === true ? (options.assets?.store ?? store) : undefined,
+      };
+      const idle = () => !gate.running();
+      const offered = <T,>(commit: T | undefined) => (running ? undefined : commit);
+      const plain = <T, O, A>(commit: ((next: T, options?: O) => Promise<A>) | undefined) =>
+        offered(commit === undefined ? undefined : guarded(commit, idle, WITHDRAWN));
+      const claim: OwnClaim<C, M> = {
+        release: () => hold.release(),
+        exclusively: (work) => {
+          if (!hold.held()) return Promise.resolve('busy' as const);
+          return gate.exclusively((live) => {
+            exclusiveRuns += 1;
+            const ownCommit = <T, O, A>(
+              commit: ((next: T, options?: O) => Promise<A>) | undefined,
+            ) => (commit === undefined ? undefined : guarded(commit, live, ENDED));
+            const own: Exclusive<C, M> = {
+              title: ownCommit(granted.title),
+              content: ownCommit(granted.content),
+              map: ownCommit(granted.map),
+              store: ownCommit(granted.store),
+            };
+            return work(own);
+          });
+        },
+      };
+      const assets: Assets = {
+        url: options.assets?.url ?? TEST_ASSETS.url,
+        read: options.assets?.read ?? TEST_ASSETS.read,
+        store: plain(granted.store),
+        pick: grants.pick === true ? offered(pick) : undefined,
+      };
+      return {
+        title: plain(granted.title),
+        content: plain(granted.content),
+        map: plain(granted.map),
+        claim:
+          grants.claim === true && !running
+            ? () => {
+                if (options.claimRefused === true) return undefined;
+                hold.take();
+                commits.claims.taken += 1;
+                return {
+                  ...claim,
+                  release: () => {
+                    commits.claims.released += 1;
+                    claim.release();
+                  },
+                };
+              }
+            : undefined,
+        assets,
+      };
+    }, [running]);
     const surface: Surface<C, M> = {
       resource: { id: 'resource', title, kind: options.kind ?? 'test', content },
       title: { value: title, commit: offeredNow.title },
@@ -392,21 +430,8 @@ export function renderPlugin<C, M>(
       map: { value: mapValue, commit: offeredNow.map },
       size: options.size ?? DEFAULT_SIZE,
       selected: options.selected ?? false,
-      claim:
-        grants.claim === true && !running
-          ? () => {
-              if (options.claimRefused === true) return undefined;
-              commits.claims.taken += 1;
-              return {
-                ...claim,
-                release: () => {
-                  commits.claims.released += 1;
-                  claim.release();
-                },
-              };
-            }
-          : undefined,
-      assets,
+      claim: offeredNow.claim,
+      assets: offeredNow.assets,
       Embed: TestEmbed,
     };
     return (

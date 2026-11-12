@@ -214,10 +214,11 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
   const measurer = useRef<HTMLDivElement | null>(null);
   const railBand = useRailBand();
 
-  // A Claim the host answers it did not release is kept, so the next end of
-  // an edit, or unmounting, releases it again.
+  // A release is asked once: the host completes one asked during exclusive
+  // work or an inner Claim when that ends.
   const release = useCallback(() => {
-    if (claim.current?.release() === true) claim.current = null;
+    claim.current?.release();
+    claim.current = null;
   }, []);
   // Every way an edit ends releases its Claim, and an unmounted view holds
   // nothing; the host releases its Claims too.
