@@ -490,13 +490,37 @@ describe('Create and Replace admit a picture alike', () => {
     return { content: rendered.commits.content, alert: screen.queryByRole('alert')?.textContent };
   }
 
-  it('records no size for a picture whose header is silent, and loads none to measure it', async () => {
-    const create = await created(silentPng());
-    const replace = await replaced(silentPng());
+  /**
+   * A browser picture that loads at once at 1×1, so a picture sized by loading
+   * it, through `measure` or the browser's own `Image`, would record that size.
+   */
+  class LoadingImage {
+    readonly naturalWidth = 1;
+    readonly naturalHeight = 1;
+    onload: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    private loadedFrom = '';
+    get src(): string {
+      return this.loadedFrom;
+    }
+    set src(value: string) {
+      this.loadedFrom = value;
+      queueMicrotask(() => this.onload?.());
+    }
+  }
 
-    expect(create.items).toEqual([{ url: testAssetRef(1) }]);
-    expect(create.measure).not.toHaveBeenCalled();
-    expect(replace.content).toEqual([{ url: testAssetRef(1) }]);
+  it('records no size for a picture whose header is silent, and loads none to measure it', async () => {
+    vi.stubGlobal('Image', LoadingImage);
+    try {
+      const create = await created(silentPng());
+      const replace = await replaced(silentPng());
+
+      expect(create.items).toEqual([{ url: testAssetRef(1) }]);
+      expect(create.measure).not.toHaveBeenCalled();
+      expect(replace.content).toEqual([{ url: testAssetRef(1) }]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('names a nameless file in the same words', async () => {

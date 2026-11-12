@@ -249,7 +249,7 @@ describe('resourceRailGroups', () => {
   ];
   const everything: ResourceRailCommands = {
     createFrom: [
-      { kind: 'reference', name: 'Reference Resource', run: (): EntityActionOutcome => 'done' },
+      { kind: 'reference', label: 'Create Reference', run: (): EntityActionOutcome => 'done' },
     ],
     removeFromMap: bound('canvas.removeSelection', AVAILABLE),
     deleteFromSpace: () => undefined,

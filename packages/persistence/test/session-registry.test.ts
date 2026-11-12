@@ -3,6 +3,7 @@ import { EMPTY_ASSET_REF, uuidSchema } from '@project/core';
 import { MemorySpaceBackend, MemorySpaceBackendTestControl } from '../src/memory';
 import { createSpaceSessionRegistry } from '../src/session-registry';
 import type { SpaceSession, SpaceSessionState } from '../src/session';
+import { showingSpace } from './showing-space';
 
 /**
  * Wait for a session's state to satisfy `predicate` — used to confirm an Edit
@@ -890,13 +891,15 @@ describe('Space session registry', () => {
     // retires a session the coordination is about to name as a participant.
     const linking = registry
       .spaceResources(() => RESOURCE_ID)
-      .link({
-        containingSpaceId: SPACE_ID,
-        mapId: uuidSchema.parse('00000000-0000-4000-8000-000000000009'),
-        targetSpaceId: SPACE_ID,
-        title: 'Linked',
-        position: { x: 0, y: 0 },
-      });
+      .link(
+        showingSpace({
+          containingSpaceId: SPACE_ID,
+          mapId: uuidSchema.parse('00000000-0000-4000-8000-000000000009'),
+          targetSpaceId: SPACE_ID,
+          title: 'Linked',
+          position: { x: 0, y: 0 },
+        }),
+      );
     expect(registry.release(SPACE_ID)).toBe(false);
 
     await expect(linking).resolves.toBeDefined();
@@ -1580,12 +1583,14 @@ describe('Space session registry', () => {
         return id;
       };
 
-      const result = await registry.spaceResources(newId).create({
-        containingSpaceId: SPACE_ID,
-        mapId: CONTAINING_MAP,
-        title: 'New Space Resource',
-        position: OCCUPIED_ANCHOR,
-      });
+      const result = await registry.spaceResources(newId).create(
+        showingSpace({
+          containingSpaceId: SPACE_ID,
+          mapId: CONTAINING_MAP,
+          title: 'New Space Resource',
+          position: OCCUPIED_ANCHOR,
+        }),
+      );
 
       expect(result).toEqual({ kind: 'completed', resourceId: NEW_SPACE_RESOURCE_ID });
       const stored = await backend.loadSpace(SPACE_ID);
@@ -1676,12 +1681,14 @@ describe('Space session registry', () => {
         return id;
       };
 
-      const creation = registry.spaceResources(newId).create({
-        containingSpaceId: SPACE_ID,
-        mapId: CONTAINING_MAP,
-        title: 'New Space Resource',
-        position: { x: 0, y: 0 },
-      });
+      const creation = registry.spaceResources(newId).create(
+        showingSpace({
+          containingSpaceId: SPACE_ID,
+          mapId: CONTAINING_MAP,
+          title: 'New Space Resource',
+          position: { x: 0, y: 0 },
+        }),
+      );
 
       await expect(creation).resolves.toEqual({
         kind: 'refused',
@@ -1791,13 +1798,15 @@ describe('Space session registry', () => {
 
       const linking = registry
         .spaceResources(() => LINKED_SPACE_RESOURCE_ID)
-        .link({
-          containingSpaceId: SPACE_ID,
-          mapId: CONTAINING_MAP,
-          targetSpaceId: LINK_TARGET_ID,
-          title: 'Linked',
-          position: { x: 0, y: 0 },
-        });
+        .link(
+          showingSpace({
+            containingSpaceId: SPACE_ID,
+            mapId: CONTAINING_MAP,
+            targetSpaceId: LINK_TARGET_ID,
+            title: 'Linked',
+            position: { x: 0, y: 0 },
+          }),
+        );
 
       await expect(linking).resolves.toEqual({
         kind: 'refused',

@@ -101,8 +101,8 @@ describe('declaring how a plugin creates its Resources', () => {
         View: () => null,
         Glyph: () => null,
         creates: [
-          { from: 'resource', run },
-          { from: 'resource', run },
+          { from: 'resource', label: 'Create', run },
+          { from: 'resource', label: 'Create', run },
         ],
       }),
     ).toThrow(/two creations from 'resource'/u);
@@ -112,7 +112,7 @@ describe('declaring how a plugin creates its Resources', () => {
         Glyph: () => null,
         creates: [
           { from: 'dock', run },
-          { from: 'resource', run },
+          { from: 'resource', label: 'Create', run },
         ],
       }),
     ).not.toThrow();

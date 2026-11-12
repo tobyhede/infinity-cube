@@ -113,6 +113,8 @@ function ReferenceGlyph({ size = 14 }: { readonly size?: number | undefined }) {
  */
 const createFromTarget: Creation<ReferenceContent> = {
   from: 'resource',
+  label: 'Create Reference',
+  notCreated: 'Reference Resource not created',
   run: async (host, target) => {
     await host.create([{ title: target.title, content: { target: target.id } }]);
   },

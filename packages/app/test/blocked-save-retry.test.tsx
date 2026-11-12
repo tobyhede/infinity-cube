@@ -8,6 +8,7 @@ import { recordingHistory } from './browser-history';
 import { refusingFullscreen } from './fullscreen';
 import { unlinkedPresentations } from './presentations';
 import { stubResizeObserver } from './resize-observer';
+import { showingSpace } from './showing-space';
 
 /**
  * Through the application: a coordinated save whose
@@ -113,12 +114,14 @@ const blockedSequence = async () => {
 
   control.queueResult({ kind: 'permanent-failure', code: 'forbidden' });
   const c0 = await act(() =>
-    openSpaces.spaceResources.create({
-      containingSpaceId: META_ID,
-      mapId: MAP_ID,
-      title: 'Target',
-      position: { x: 240, y: 0 },
-    }),
+    openSpaces.spaceResources.create(
+      showingSpace({
+        containingSpaceId: META_ID,
+        mapId: MAP_ID,
+        title: 'Target',
+        position: { x: 240, y: 0 },
+      }),
+    ),
   );
   if (c0.kind !== 'completed') throw new Error('C0 did not install');
   await waitFor(() => expect(meta.session.getState().persistence.kind).toBe('rejected'));
@@ -142,12 +145,14 @@ const blockedSequence = async () => {
     ],
   });
   await act(() =>
-    openSpaces.spaceResources.create({
-      containingSpaceId: targetId,
-      mapId: targetMap,
-      title: 'Child',
-      position: { x: 300, y: 0 },
-    }),
+    openSpaces.spaceResources.create(
+      showingSpace({
+        containingSpaceId: targetId,
+        mapId: targetMap,
+        title: 'Child',
+        position: { x: 300, y: 0 },
+      }),
+    ),
   );
   await waitFor(() => expect(target.session.getState().persistence.kind).toBe('conflicted'));
 
@@ -189,12 +194,14 @@ const blockedTarget = async () => {
     const mapId = containing.session.getState().working.document.defaultMap;
     if (mapId === undefined) throw new Error(`${title}'s container has no Map`);
     const created = await act(() =>
-      openSpaces.spaceResources.create({
-        containingSpaceId: containing.id,
-        mapId,
-        title,
-        position: { x: 240, y: 0 },
-      }),
+      openSpaces.spaceResources.create(
+        showingSpace({
+          containingSpaceId: containing.id,
+          mapId,
+          title,
+          position: { x: 240, y: 0 },
+        }),
+      ),
     );
     if (created.kind !== 'completed') throw new Error(`${title} did not install`);
     return targetOf(containing, created.resourceId);

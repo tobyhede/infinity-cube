@@ -33,6 +33,7 @@ import {
   describeSpaceResourceRefusal,
 } from '../authoring-refusal';
 import type { CreationOutcome } from '../command-outcomes';
+import type { PendingContinuation } from '../continuation';
 import { failureMessage } from '../failure-message';
 import type { ComposedApp } from '../compose-app';
 import { resolveMap } from '../map-resolution';
@@ -62,6 +63,8 @@ export interface OfferedCreation<Run> {
   /** Where it is offered from: only a Dock press is single flight. */
   readonly from: HostCreation['from'];
   readonly name: string;
+  /** The title its refusal is shown under as the standing notice; absent, its refusals are not shown. */
+  readonly notCreated?: string | undefined;
   readonly run: Run;
 }
 
@@ -72,18 +75,29 @@ export const dockCreations = (
   entries: readonly PluginCreationEntry[],
 ): readonly OfferedCreation<RunOf<'dock'>>[] =>
   entries.flatMap(({ kind, name, creation }) =>
-    creation.from === 'dock' ? [{ kind, from: creation.from, name, run: creation.run }] : [],
+    creation.from === 'dock'
+      ? [{ kind, from: creation.from, name, notCreated: creation.notCreated, run: creation.run }]
+      : [],
   );
 
 /** Every creation offered on a Resource, given that Resource, in the order given. */
 export const resourceCreations = (
   entries: readonly PluginCreationEntry[],
-): readonly (OfferedCreation<RunOf<'resource'>> & {
-  readonly accepts: Extract<HostCreation, { from: 'resource' }>['accepts'];
-})[] =>
+): readonly (OfferedCreation<RunOf<'resource'>> &
+  Pick<Extract<HostCreation, { from: 'resource' }>, 'label' | 'accepts'>)[] =>
   entries.flatMap(({ kind, name, creation }) =>
     creation.from === 'resource'
-      ? [{ kind, from: creation.from, name, run: creation.run, accepts: creation.accepts }]
+      ? [
+          {
+            kind,
+            from: creation.from,
+            name,
+            notCreated: creation.notCreated,
+            run: creation.run,
+            label: creation.label,
+            accepts: creation.accepts,
+          },
+        ]
       : [],
   );
 
@@ -130,12 +144,21 @@ export function dataCreation(
       ),
     );
     if (score > 0 && (best === null || score > best.score)) {
-      best = { score, offered: { kind, from: creation.from, name, run: creation.run } };
+      best = {
+        score,
+        offered: {
+          kind,
+          from: creation.from,
+          name,
+          notCreated: creation.notCreated,
+          run: creation.run,
+        },
+      };
     }
   }
   if (best === null) return undefined;
-  const { kind, from, name, run } = best.offered;
-  return { kind, from, name, run: (host) => run(host, data) };
+  const { kind, from, name, notCreated, run } = best.offered;
+  return { kind, from, name, notCreated, run: (host) => run(host, data) };
 }
 
 /** Why the host refused a `create` before trying it. */
@@ -289,7 +312,8 @@ export interface CreationGesture {
   /**
    * Where the answer goes when the surface that asked keeps it, as the
    * Resources list keeps its sentence; absent, a refusal is the standing
-   * notice.
+   * notice under the creation's `notCreated`, or is not shown when it declares
+   * none.
    */
   readonly settle?: ((refusal: string | null) => void) | undefined;
   /**
@@ -329,8 +353,6 @@ interface Performed {
   readonly answer: Answer;
   readonly createdResourceId?: ResourceId | undefined;
 }
-
-const COMPLETED: Performed = { answer: 'completed' };
 
 /** A settled Edit as the plugin reads it, and the Resource it made. */
 const performedEdit = (result: SettledResult): Performed => {
@@ -451,71 +473,93 @@ export function createCreationHost(deps: CreationHostDependencies): CreationHost
           then: 'rename',
         } as const);
 
-  /** Tell the author how a creation settled: on the surface that asked, or as the standing notice. */
-  const tell = (
-    name: string,
-    gesture: CreationGesture,
-    performed: Performed,
-    mapId: MapId = deps.mapId,
-  ): void => {
-    const { answer } = performed;
-    const refused = refusalOf(answer);
-    if (gesture.settle !== undefined) {
-      gesture.settle(refused);
-    } else {
-      const outcome: CreationOutcome =
-        refused === null
-          ? { kind: 'completed', createdResourceId: performed.createdResourceId }
-          : { kind: 'refused', report: { title: `${name} not created`, message: refused } };
-      commandOutcomes.run('resource-create', () => outcome);
-    }
-    // Requested on this surface's own continuation rather than through command
-    // outcomes, which continue on the application's canvas: a Map drawn inside
-    // a Space Resource continues in its own drawing.
-    if (refused !== null || gesture.continues === false) return;
-    const pending = continueAt(performed.createdResourceId, mapId);
-    if (pending !== null) surface.continuation.request(pending);
-  };
-
-  const create = async (
-    offered: OfferedCreation<unknown>,
-    gesture: CreationGesture,
-    items: readonly HostNew[],
-  ): Promise<Answer> => {
-    const plan = decideCreate(items, {
-      kind: offered.kind,
-      available: gesture.available?.() ?? true,
-      exclusive: gate.withdraws(),
-      offered: gesture.offered,
-    });
-    if (plan.kind === 'unchanged') return 'unchanged';
-    if (plan.kind === 'refused') {
-      const { words, reported } = HOST_REFUSALS[plan.refusal];
-      const answer = { refused: words };
-      if (reported) tell(offered.name, gesture, { answer });
-      return answer;
-    }
-    const place = gesture.place();
-    const performed =
-      plan.kind === 'edit'
-        ? await edit(plan.items, place)
-        : await lifecycle(plan, offered.kind, place);
-    tell(
-      offered.name,
-      gesture,
-      performed.answer === 'unchanged' ? COMPLETED : performed,
-      mapOf(place),
-    );
-    return performed.answer;
-  };
-
   /** Run `offered` for one gesture, answering once its `run` has settled. */
   const runOnce = (
     offered: OfferedCreation<(host: HostCreationHost) => void | Promise<void>>,
     gesture: CreationGesture,
   ): Promise<void> => {
     const available = (): boolean => gesture.available?.() ?? true;
-    const { store } = assets;
+    // The title this gesture's answer is the standing notice under, if it is.
+    const title = gesture.settle === undefined ? offered.notCreated : undefined;
+
+    // A gesture told on the standing notice is pressed there when its work
+    // starts, as the first store, measure, create or report, rather than when
+    // its `run` is called: a picker that answers nothing is no gesture, so it
+    // neither clears the notice nor supersedes a gesture still settling. The
+    // press is what command outcomes hold the answer to, so an answer that
+    // settles after a later press, or after the Space was replaced, is
+    // discarded unsaid, and no Title continuation follows it.
+    let answer: ((outcome: CreationOutcome, owed: PendingContinuation | null) => void) | null =
+      null;
+    const press = (): void => {
+      if (title === undefined || answer !== null) return;
+      const settled = Promise.withResolvers<CreationOutcome>();
+      let continuing: PendingContinuation | null = null;
+      answer = (outcome, owed) => {
+        continuing = owed;
+        answer = null;
+        settled.resolve(outcome);
+      };
+      void commandOutcomes
+        .run('resource-create', () => settled.promise)
+        .then((result) => {
+          if (result.kind === 'completed' && continuing !== null) {
+            surface.continuation.request(continuing);
+          }
+        });
+    };
+
+    /** Tell the author how a creation settled: on the surface that asked, or as the standing notice. */
+    const tell = (performed: Performed, mapId: MapId = deps.mapId): void => {
+      const refused = refusalOf(performed.answer);
+      // Requested on this surface's own continuation rather than through
+      // command outcomes, which continue on the application's canvas: a Map
+      // drawn inside a Space Resource continues in its own drawing.
+      const owed =
+        refused !== null || gesture.continues === false
+          ? null
+          : continueAt(performed.createdResourceId, mapId);
+      if (title === undefined) {
+        gesture.settle?.(refused);
+        if (owed !== null) surface.continuation.request(owed);
+        return;
+      }
+      press();
+      answer?.(
+        refused !== null
+          ? { kind: 'refused', report: { title, message: refused } }
+          : performed.answer === 'unchanged'
+            ? { kind: 'unchanged' }
+            : { kind: 'completed', createdResourceId: performed.createdResourceId },
+        owed,
+      );
+    };
+
+    const create = async (items: readonly HostNew[]): Promise<Answer> => {
+      const plan = decideCreate(items, {
+        kind: offered.kind,
+        available: available(),
+        exclusive: gate.withdraws(),
+        offered: gesture.offered,
+      });
+      if (plan.kind === 'unchanged') return 'unchanged';
+      if (plan.kind === 'refused') {
+        const { words, reported } = HOST_REFUSALS[plan.refusal];
+        const refusal = { refused: words };
+        if (reported) tell({ answer: refusal });
+        return refusal;
+      }
+      press();
+      const place = gesture.place();
+      const performed =
+        plan.kind === 'edit'
+          ? await edit(plan.items, place)
+          : await lifecycle(plan, offered.kind, place);
+      tell(performed, mapOf(place));
+      return performed.answer;
+    };
+
+    const { store, measure } = assets;
     const host: HostCreationHost = {
       // A store is asked whether the creation is still available first, so
       // bytes gathered after the Dock that offered it has gone are never sent.
@@ -524,14 +568,23 @@ export function createCreationHost(deps: CreationHostDependencies): CreationHost
         store:
           store === undefined
             ? undefined
-            : (bytes) =>
-                available()
-                  ? store(bytes)
-                  : Promise.resolve({ refused: HOST_REFUSALS.unavailable.words }),
+            : (bytes) => {
+                if (!available())
+                  return Promise.resolve({ refused: HOST_REFUSALS.unavailable.words });
+                press();
+                return store(bytes);
+              },
+        measure:
+          measure === undefined
+            ? undefined
+            : (src) => {
+                press();
+                return measure(src);
+              },
       },
-      create: (items) => create(offered, gesture, items),
+      create,
       report: (words) => {
-        if (available()) tell(offered.name, gesture, { answer: { refused: words } });
+        if (available()) tell({ answer: { refused: words } });
       },
     };
     // A creation that breaks is told as the channel tells every break: the
@@ -539,13 +592,19 @@ export function createCreationHost(deps: CreationHostDependencies): CreationHost
     // operational channel.
     const broke: ObserverErrorReporter = (failure) => {
       reportBreak(failure);
-      tell(offered.name, gesture, { answer: { refused: failureMessage(failure) } });
+      tell({ answer: { refused: failureMessage(failure) } });
     };
+    // A press its `run` left unanswered settles as nothing, leaving the notice
+    // it cleared clear.
+    const done = (): void => answer?.({ kind: 'unchanged' }, null);
     try {
       const ran = offered.run(host);
-      return ran instanceof Promise ? ran.catch(broke) : Promise.resolve();
+      if (ran instanceof Promise) return ran.catch(broke).finally(done);
+      done();
+      return Promise.resolve();
     } catch (failure) {
       broke(failure);
+      done();
       return Promise.resolve();
     }
   };

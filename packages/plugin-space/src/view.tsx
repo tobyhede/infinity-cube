@@ -204,6 +204,11 @@ const showing = (space: NewSpace): SpaceContent => ({
  */
 const createWithNewSpace: Creation<SpaceContent> = {
   from: 'dock',
+  // It names what died. A Space Resource's placement is optimistic (ADR
+  // 0089), so the author may be typing into the Resource when the lifecycle
+  // answers, and this title makes a Resource vanishing from under the caret
+  // legible.
+  notCreated: 'Space not created',
   run: async (host) => {
     await host.create([{ newSpace: true, contentFor: showing }]);
   },

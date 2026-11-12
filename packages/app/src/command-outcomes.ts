@@ -194,26 +194,13 @@ export interface CommandSubject {
 }
 
 /**
- * Where the author continues after a completed result.
- *
- * A function of the result because the continuation names what the operation
- * minted — the id the lifecycle made, not the Resource that appeared. It
- * answers `null` where the completion names nothing to continue at: Space
- * Authoring's completed result carries `createdResourceId` optionally.
- */
-export interface CommandContinuation<Completed> {
-  readonly continueAt?: (completed: Completed) => PendingContinuation | null;
-}
-
-type Completed<Result> = Extract<Result, { readonly kind: 'completed' }>;
-
-/**
  * How a creation through the Resource API settled, as the host words it: the
- * Resource it continues at, or the whole notice of its refusal, titled by the
- * kind that was not created.
+ * Resource it made, nothing, or the whole notice of its refusal, titled as
+ * its creation declares.
  */
 export type CreationOutcome =
   | { readonly kind: 'completed'; readonly createdResourceId?: ResourceId | undefined }
+  | { readonly kind: 'unchanged' }
   | { readonly kind: 'refused'; readonly report: CommandNotice };
 
 /**
@@ -273,10 +260,7 @@ interface CommandSignatures {
     readonly options: [];
   };
   readonly 'resource-remove': { readonly result: AuthoringResult; readonly options: [] };
-  readonly 'resource-create': {
-    readonly result: CreationOutcome;
-    readonly options: [options?: CommandContinuation<Completed<CreationOutcome>>];
-  };
+  readonly 'resource-create': { readonly result: CreationOutcome; readonly options: [] };
   readonly 'space-enter': {
     readonly result: OpenSpace;
     readonly options: [options: CommandSubject];
@@ -385,12 +369,11 @@ const COMMANDS: CommandDefinitions = {
     broke: brokeOn('resource-delete'),
   },
   'resource-remove': authoringCommand('resource-remove'),
+  // Where the caret goes after a creation is the creation host's, which
+  // continues on the surface the gesture was made on.
   'resource-create': {
     channel: 'resource-create',
-    settle: (result, options) =>
-      result.kind === 'refused'
-        ? notice(result.report)
-        : { kind: 'clear', continuation: options?.continueAt?.(result) ?? null },
+    settle: (result) => (result.kind === 'refused' ? notice(result.report) : CLEAR),
     broke: brokeOn('resource-create'),
   },
   'space-enter': {

@@ -32,6 +32,7 @@ import { unlinkedPresentations } from './presentations';
 import { stubResizeObserver } from './resize-observer';
 import { publishedEmbeds } from './published-embeds';
 import { createdEmpty } from './created-resources';
+import { showingSpace } from './showing-space';
 
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const OTHER_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -702,12 +703,14 @@ describe('Open Spaces', () => {
     const other = await openSpaces.open(OTHER_ID);
 
     const release = control.deferNextCommit();
-    const creating = openSpaces.spaceResources.create({
-      containingSpaceId: META_ID,
-      mapId: META_MAP_ID,
-      title: 'Child',
-      position: { x: 10, y: 10 },
-    });
+    const creating = openSpaces.spaceResources.create(
+      showingSpace({
+        containingSpaceId: META_ID,
+        mapId: META_MAP_ID,
+        title: 'Child',
+        position: { x: 10, y: 10 },
+      }),
+    );
     await vi.waitFor(() => expect(control.requests).toHaveLength(1));
 
     // The coordination has paused persistence on every session, so this edit is
@@ -737,12 +740,14 @@ describe('Open Spaces', () => {
     await openSpaces.open(OTHER_ID);
 
     const releaseFirst = control.deferNextCommit();
-    const first = openSpaces.spaceResources.create({
-      containingSpaceId: META_ID,
-      mapId: META_MAP_ID,
-      title: 'First child',
-      position: { x: 10, y: 10 },
-    });
+    const first = openSpaces.spaceResources.create(
+      showingSpace({
+        containingSpaceId: META_ID,
+        mapId: META_MAP_ID,
+        title: 'First child',
+        position: { x: 10, y: 10 },
+      }),
+    );
     await vi.waitFor(() => expect(control.requests).toHaveLength(1));
 
     // Exiting waits behind the running coordination, and a second coordination
@@ -750,12 +755,14 @@ describe('Open Spaces', () => {
     // wait reports a retirable Space, and the second raises the barrier again
     // before the exit gets to retire it. Retiring has to survive that window.
     const exiting = openSpaces.exit(OTHER_ID);
-    const second = openSpaces.spaceResources.create({
-      containingSpaceId: META_ID,
-      mapId: META_MAP_ID,
-      title: 'Second child',
-      position: { x: 20, y: 20 },
-    });
+    const second = openSpaces.spaceResources.create(
+      showingSpace({
+        containingSpaceId: META_ID,
+        mapId: META_MAP_ID,
+        title: 'Second child',
+        position: { x: 20, y: 20 },
+      }),
+    );
 
     releaseFirst();
     await expect(exiting).resolves.toEqual({ kind: 'exited' });

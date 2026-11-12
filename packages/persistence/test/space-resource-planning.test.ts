@@ -16,6 +16,7 @@ import {
   type SpaceResourcePlanningView,
   type SpaceResourceRecovery,
 } from '../src/space-resource-planning';
+import { showingSpace } from './showing-space';
 
 const uuid = (n: number): UUID =>
   uuidSchema.parse(`00000000-0000-4000-8000-${n.toString(16).padStart(12, '0')}`);
@@ -109,7 +110,12 @@ const view = (
   };
 };
 
-const input = { containingSpaceId: META, mapId: mapOf(0), title: 'New', position: { x: 0, y: 0 } };
+const input = showingSpace({
+  containingSpaceId: META,
+  mapId: mapOf(0),
+  title: 'New',
+  position: { x: 0, y: 0 },
+});
 
 describe('targetSelectionOf', () => {
   it('reads the Map a Space opens on and its Active Graph', () => {

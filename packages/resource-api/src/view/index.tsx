@@ -158,12 +158,13 @@ export type New<C> =
 export interface CreationHost<C> {
   /**
    * Create these Resources, or refuse: when creation is no longer available,
-   * when another creation runs, or when the Edit refuses. The host reports a
-   * refusal itself, so a plugin need not.
+   * when another creation runs, or when the Edit refuses. The host shows a
+   * refusal itself, under the creation's {@link NotCreated} title, so a plugin
+   * need not.
    */
   create(items: readonly New<C>[]): Promise<Answer>;
   readonly assets: Assets;
-  /** Say why nothing was created, in words the plugin worded; the host shows them. */
+  /** Say why nothing was created, in words the plugin worded; the host shows them as it shows a refusal. */
   report(words: string): void;
 }
 
@@ -182,17 +183,27 @@ export interface OfferedSpace {
 }
 
 /**
+ * The title a creation's refusal is shown under, as the standing notice;
+ * absent, its refusals are not shown. A creation that takes no input cannot
+ * refuse against a choice the author made and leaves nothing standing that a
+ * sentence could correct, so it declares none.
+ */
+export interface NotCreated {
+  readonly notCreated?: string | undefined;
+}
+
+/**
  * How a plugin's Resources are created (ADR 0142): where the creation is
  * offered, and what it runs when pressed, in the press, so a picker opened
  * from it keeps the gesture. An `await` before `pick` loses the press.
  */
 export type Creation<C> =
-  | {
+  | ({
       /** A press on the Command Dock. */
       readonly from: 'dock';
       readonly run: (host: CreationHost<C>) => void | Promise<void>;
-    }
-  | {
+    } & NotCreated)
+  | ({
       /**
        * Data arriving on the canvas. `types` are media types, each exact or a
        * wildcard (`image/*`, or `*` then `/*` for any type): among plugins
@@ -204,8 +215,8 @@ export type Creation<C> =
       /** Whether this data is the plugin's at all, beyond its media type. */
       readonly accepts?: ((data: CreationData) => boolean) | undefined;
       readonly run: (host: CreationHost<C>, data: CreationData) => void | Promise<void>;
-    }
-  | {
+    } & NotCreated)
+  | ({
       /**
        * A command on another Resource, given that Resource, which what it
        * creates references: on a Resource that may not be a Target the host
@@ -213,9 +224,11 @@ export type Creation<C> =
        * Resource it is not offered on at all.
        */
       readonly from: 'resource';
+      /** What the command offered on that Resource is called. */
+      readonly label: string;
       readonly accepts?: ((resource: Resource) => boolean) | undefined;
       readonly run: (host: CreationHost<C>, resource: Resource) => void | Promise<void>;
-    }
+    } & NotCreated)
   | {
       /** A Space chosen from a list of Spaces, given that Space. */
       readonly from: 'spaces';

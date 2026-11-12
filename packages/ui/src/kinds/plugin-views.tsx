@@ -28,6 +28,7 @@ import type {
   Exclusive,
   New,
   NewSpace,
+  NotCreated,
   OfferedSpace,
   OwnClaim,
   PluginView,
@@ -187,18 +188,22 @@ export interface HostCreationHost {
 
 /** A plugin's creation as the host runs it (ADR 0142), each `from` with the input it is given. */
 export type HostCreation =
-  | { readonly from: 'dock'; readonly run: (host: HostCreationHost) => void | Promise<void> }
-  | {
+  | ({
+      readonly from: 'dock';
+      readonly run: (host: HostCreationHost) => void | Promise<void>;
+    } & NotCreated)
+  | ({
       readonly from: 'data';
       readonly types: readonly string[];
       readonly accepts?: ((data: CreationData) => boolean) | undefined;
       readonly run: (host: HostCreationHost, data: CreationData) => void | Promise<void>;
-    }
-  | {
+    } & NotCreated)
+  | ({
       readonly from: 'resource';
+      readonly label: string;
       readonly accepts?: ((resource: ApiResource) => boolean) | undefined;
       readonly run: (host: HostCreationHost, resource: ApiResource) => void | Promise<void>;
-    }
+    } & NotCreated)
   | {
       readonly from: 'spaces';
       readonly run: (host: HostCreationHost, space: OfferedSpace) => void | Promise<void>;
@@ -284,10 +289,15 @@ export function hostCreation<C>(
   });
   switch (creation.from) {
     case 'dock':
-      return { from: 'dock', run: (host) => creation.run(typed(host)) };
+      return {
+        from: 'dock',
+        notCreated: creation.notCreated,
+        run: (host) => creation.run(typed(host)),
+      };
     case 'data':
       return {
         from: 'data',
+        notCreated: creation.notCreated,
         types: creation.types,
         accepts: creation.accepts,
         run: (host, data) => creation.run(typed(host), data),
@@ -295,6 +305,8 @@ export function hostCreation<C>(
     case 'resource':
       return {
         from: 'resource',
+        label: creation.label,
+        notCreated: creation.notCreated,
         accepts: creation.accepts,
         run: (host, resource) => creation.run(typed(host), resource),
       };

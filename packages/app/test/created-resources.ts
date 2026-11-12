@@ -1,11 +1,4 @@
-import {
-  jsonValueSchema,
-  newResourceDocument,
-  type EmptyCreatableKindId,
-  type JsonValue,
-  type MapPosition,
-  type ResourceId,
-} from '@project/core';
+import { EMPTY_ASSET_REF, type JsonValue, type MapPosition, type ResourceId } from '@project/core';
 import type { PlacementMode } from '@project/graph';
 import type { AuthoringCompletion } from '../src/space-authoring';
 
@@ -17,10 +10,15 @@ import type { AuthoringCompletion } from '../src/space-authoring';
 
 type Created = Extract<AuthoringCompletion, { kind: 'created-resources' }>;
 
+/** The content each kind that starts empty starts with, as its plugin's Dock creation asks for it. */
+const EMPTY_CONTENT = { markdown: { url: EMPTY_ASSET_REF }, ur: {} } as const satisfies Readonly<
+  Record<string, JsonValue>
+>;
+
 /** One Resource of a kind that starts empty, as its plugin's Dock creation asks for it. */
-export const createdEmpty = (kind: EmptyCreatableKindId, anchor: MapPosition): Created => ({
+export const createdEmpty = (kind: keyof typeof EMPTY_CONTENT, anchor: MapPosition): Created => ({
   kind: 'created-resources',
-  items: [{ kind, content: jsonValueSchema.parse(newResourceDocument(kind, 'unused').content) }],
+  items: [{ kind, content: EMPTY_CONTENT[kind] }],
   anchor,
   placement: 'avoidingOverlap',
 });

@@ -10,7 +10,6 @@
  * plan out (`session-registry.ts`).
  */
 import {
-  spaceKind,
   SPACE_FILE_VERSION,
   selectSpaceView,
   spaceSelection,
@@ -95,8 +94,8 @@ export interface CreateSpaceResourceInput {
   readonly mapId: UUID;
   readonly title: string;
   readonly position: MapPosition;
-  /** The Resource made; absent, a Space Resource titled `title` showing the Space unframed. */
-  readonly document?: SpaceResourceDocument;
+  /** The Resource made, from the Space it shows. */
+  readonly document: SpaceResourceDocument;
 }
 /**
  * Reference an existing Space. The selection is **not** a parameter (ADR 0079):
@@ -341,10 +340,7 @@ const createSpaceResource = (
   selection: SpaceViewChoice,
 ): SpaceResourceRefused | { readonly kind: 'completed'; readonly snapshot: SpaceSnapshot } => {
   const shown: ShownSpace = { spaceId: targetSpaceId, map: selection.map, graph: selection.graph };
-  const document: ResourceDocument =
-    input.document === undefined
-      ? { title: input.title, kind: spaceKind.id, content: shown }
-      : input.document(shown);
+  const document = input.document(shown);
   // The Space this coordination makes or links is the only one the Resource
   // may name, and it must hold that Space's lifetime (ADR 0074): anything else
   // is a defect in what supplied the document, never an author's state.

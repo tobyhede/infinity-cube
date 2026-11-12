@@ -167,11 +167,6 @@ const ONE_KIND_FEATURES = new Map<string, readonly string[]>([
       'icon={<ResourceKindIcon kind={spaceKind.id} decorative />}',
     ],
   ],
-  // The Space Resource lifecycle (ADR 0074): the document its create writes when its caller gives none.
-  [
-    'packages/persistence/src/space-resource-planning.ts',
-    ['? { title: input.title, kind: spaceKind.id, content: shown }'],
-  ],
 ]);
 
 const KIND_MODULE_IDS = new RegExp(`\\b(?:${KINDS.join('|')})Kind\\.id\\b`, 'gu');

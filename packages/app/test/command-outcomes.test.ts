@@ -111,18 +111,9 @@ const refusedDeletion: SpaceResourceDeletionResult = {
   refusal: { code: 'space-resource-not-found', resourceId: RESOURCE_A },
 };
 const MAP_GONE = 'This Map is no longer part of the Space.';
-const creationReport: CommandNotice = { title: 'Space Resource not created', message: MAP_GONE };
+const creationReport: CommandNotice = { title: 'Space not created', message: MAP_GONE };
 const refusedCreation: CreationOutcome = { kind: 'refused', report: creationReport };
 const createdResource: CreationOutcome = { kind: 'completed', createdResourceId: CREATED };
-/** The creation host's continuation: into the created Resource's Title. */
-const inTheTitle = ({ createdResourceId }: { readonly createdResourceId?: string | undefined }) =>
-  createdResourceId === undefined
-    ? null
-    : ({
-        target: { kind: 'resource', resourceId: uuidSchema.parse(createdResourceId) },
-        select: true,
-        then: 'rename',
-      } as const);
 const mapReport: CommandNotice = { title: 'Map not created', message: 'Try a different name.' };
 const refusedMap = { kind: 'refused', report: mapReport } as const;
 const createdMap = { kind: 'completed', mapId: MAP_B, graphId: GRAPH_B } as const;
@@ -224,19 +215,13 @@ describe('titles and sentences', () => {
     expect(notice(outcomes, 'resource-create')).toBe(creationReport);
   });
 
-  it('continues a created Resource at the first Resource the Edit made', async () => {
+  it('clears a creation’s channel on completion and leaves its continuation to the creation host', async () => {
     const { outcomes, continuation } = open();
 
-    await outcomes.run('resource-create', () => Promise.resolve(createdResource), {
-      continueAt: inTheTitle,
-    });
+    await outcomes.run('resource-create', () => Promise.resolve(createdResource));
 
     expect(notice(outcomes, 'resource-create')).toBeNull();
-    expect(continuation.getState().pending).toEqual({
-      target: { kind: 'resource', resourceId: CREATED },
-      select: true,
-      then: 'rename',
-    });
+    expect(continuation.getState().pending).toBeNull();
   });
 
   it('publishes a Map report whole, without describing it', () => {
@@ -300,48 +285,6 @@ describe('the Map-change reset', () => {
     navigation.activateGraph(GRAPH_A);
 
     expect(outcomes.getState()).toBe(before);
-  });
-});
-
-describe('continueAt', () => {
-  it('requests the continuation at the id the creation minted', async () => {
-    const { outcomes, continuation } = open();
-
-    await outcomes.run('resource-create', () => Promise.resolve(createdResource), {
-      continueAt: inTheTitle,
-    });
-
-    expect(continuation.getState().pending).toEqual({
-      target: { kind: 'resource', resourceId: CREATED },
-      select: true,
-      then: 'rename',
-    });
-  });
-
-  it('requests nothing where the completion names nothing to continue at', () => {
-    const { outcomes, continuation } = open();
-
-    outcomes.run('resource-create', () => ({ kind: 'completed' }) as const, {
-      continueAt: inTheTitle,
-    });
-
-    expect(continuation.getState().pending).toBeNull();
-    expect(notice(outcomes, 'resource-create')).toBeNull();
-  });
-
-  it('requests nothing on a refusal', async () => {
-    const { outcomes, continuation } = open();
-    const continueAt = vi.fn(
-      () => ({ target: { kind: 'canvas' }, select: false, then: 'focus' }) as const,
-    );
-
-    await outcomes.run('resource-create', () => Promise.resolve(refusedCreation), {
-      continueAt,
-    });
-
-    expect(continueAt).not.toHaveBeenCalled();
-    expect(continuation.getState().pending).toBeNull();
-    expect(notice(outcomes, 'resource-create')).toBe(creationReport);
   });
 });
 

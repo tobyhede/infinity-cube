@@ -37,7 +37,6 @@ export {
   DEFAULT_KIND,
   UNRESOLVED_CONTENT,
   newDefaultResourceDocument,
-  newResourceDocument,
   resolveContent,
   resourceReferences,
   spaceReferences,
@@ -46,5 +45,4 @@ export {
   spaceSelectionProblem,
   type KindId,
   type KindedResource,
-  type EmptyCreatableKindId,
 } from './kinds/registry';

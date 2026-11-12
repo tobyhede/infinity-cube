@@ -19,6 +19,9 @@ export { PICKED_IMAGE_TYPES } from './picture';
  * one gesture and one Edit answers it.
  */
 
+/** The title every Image Resource creation's refusal is shown under. */
+const NOT_CREATED = 'Image not created';
+
 /** What is said where this surface offers no asset store to keep a picture in. */
 const NOT_STORABLE = 'Images cannot be stored here.';
 
@@ -80,6 +83,7 @@ async function createFromUrl(host: CreationHost<ImageContent>, url: string): Pro
  */
 const createFromDock: Creation<ImageContent> = {
   from: 'dock',
+  notCreated: NOT_CREATED,
   run: async (host) => {
     const pick = host.assets.pick;
     if (pick === undefined) return;
@@ -98,6 +102,7 @@ const acceptsData = (data: CreationData): boolean =>
  */
 const createFromData: Creation<ImageContent> = {
   from: 'data',
+  notCreated: NOT_CREATED,
   types: [...IMAGE_MEDIA_TYPES, URL_MEDIA_TYPE, '*/*'],
   accepts: acceptsData,
   run: (host, data) =>

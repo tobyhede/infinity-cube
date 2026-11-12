@@ -46,8 +46,8 @@ export const referenceTerminal = (kind: KindId): string =>
 /** A creation a Resource's rail offers on it, as a plugin declares one from a Resource (ADR 0142). */
 export interface RailCreation {
   readonly kind: PluginKind;
-  /** What one Resource it creates is called. */
-  readonly name: string;
+  /** What the command is called, as its plugin declares it. */
+  readonly label: string;
   readonly run: () => EntityActionOutcome;
 }
 
@@ -154,11 +154,9 @@ export function resourceRailGroups(
     createFrom === null || createFrom.length === 0
       ? []
       : [
-          createFrom.map(({ kind, name, run }) => ({
+          createFrom.map(({ kind, label, run }) => ({
             id: `create-${kind}`,
-            // Named for the vocabulary the other creations use, less the
-            // `Resource` the menu is already named for.
-            label: `Create ${name.replace(/ Resource$/u, '')}`,
+            label,
             disabled: terminal !== null,
             description: terminal ?? undefined,
             icon: <ResourceKindIcon kind={kind} decorative />,
@@ -361,10 +359,10 @@ export function useResourceRailActions(
         connect,
         {
           createFrom: addResource
-            ? RESOURCE_CREATIONS.flatMap(({ kind, name, accepts }) =>
+            ? RESOURCE_CREATIONS.flatMap(({ kind, label, accepts }) =>
                 accepts?.(resource) === false
                   ? []
-                  : [{ kind, name, run: () => createFromResource(kind, resource) }],
+                  : [{ kind, label, run: () => createFromResource(kind, resource) }],
               )
             : null,
           removeFromMap: bindCommand(REMOVE_SELECTION, {

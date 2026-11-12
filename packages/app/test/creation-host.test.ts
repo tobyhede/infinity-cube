@@ -1,6 +1,7 @@
 import { act } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type JsonValue } from '@project/core';
+import { MemorySpaceBackend } from '@project/persistence';
 import { isStoredAsset } from '@project/resource-api/domain';
 import type { CreationData } from '@project/resource-api/view';
 import {
@@ -9,6 +10,7 @@ import {
   type HostNew,
   type PluginCreationEntry,
 } from '@project/ui';
+import { composeApp } from '../src/compose-app';
 import type { OpenSpace } from '../src/open-spaces';
 import {
   createCreationFlights,
@@ -21,9 +23,16 @@ import {
   type OfferedCreation,
 } from '../src/plugin-host/creation';
 import { createPluginGate } from '../src/plugin-host/plugin-gate';
-import { MAP_ID, OTHER_MAP_ID, openDerivationSpace } from './app-derivation-fixtures';
+import {
+  MAP_ID,
+  OTHER_MAP_ID,
+  SPACE_ID,
+  derivationSnapshot,
+  openDerivationSpace,
+} from './app-derivation-fixtures';
 import { textAsset } from './markdown-texts';
 import { mintingIds } from './minting';
+import { openTestSpace } from './opened-space';
 
 /**
  * The creation host (ADR 0142): which plugin arriving data goes to, what one
@@ -183,6 +192,7 @@ const offered = (
   kind,
   from,
   name: `${kind === 'markdown' ? 'Markdown' : 'Space'} Resource`,
+  notCreated: `${kind === 'markdown' ? 'Markdown' : 'Space'} Resource not created`,
   run,
 });
 
@@ -205,7 +215,11 @@ function hosted(
     session: opened.session,
     spaceResources: opened.spaceResources,
     gate,
-    assets: { url: (ref) => ref, read: () => Promise.resolve({ refused: 'none' }) },
+    assets: {
+      url: (ref) => ref,
+      read: () => Promise.resolve({ refused: 'none' }),
+      measure: () => Promise.resolve(undefined),
+    },
     mapId,
     reportBreak,
     flights,
@@ -635,5 +649,136 @@ describe('a Dock creation whose picker is open', () => {
     await Promise.all([first, second]);
 
     expect(placedOn(opened)).toEqual(expect.arrayContaining([CREATED, SECOND]));
+  });
+});
+
+describe('a creation told on the standing notice', () => {
+  const deferred = () => {
+    let resolve: () => void = ignore;
+    const promise = new Promise<void>((settle) => {
+      resolve = settle;
+    });
+    return { promise, resolve };
+  };
+  const slowly =
+    (waited: Promise<void>, items: readonly HostNew[]): Run =>
+    async (creation) => {
+      await creation.assets.measure?.('picture');
+      await waited;
+      await creation.create(items);
+    };
+
+  it('drops an earlier gesture that settles after a later one, keeping the later one’s refusal', async () => {
+    const opened = openDerivationSpace(mintingIds(CREATED, SECOND));
+    const { host } = hosted(opened);
+    const slow = deferred();
+
+    const first = host.run(
+      offered('markdown', slowly(slow.promise, [{ content: EMPTY_TEXT }]), 'data'),
+      gesture(),
+    );
+    await host.run(
+      offered('markdown', (creation) => creation.report('Later gesture refused.'), 'data'),
+      gesture(),
+    );
+    slow.resolve();
+    await first;
+
+    expect(notice(opened)?.message).toBe('Later gesture refused.');
+    expect(opened.app.continuation.getState().pending).toBeNull();
+  });
+
+  it('clears the previous refusal when a new gesture starts its work', async () => {
+    const opened = openDerivationSpace(mintingIds(CREATED));
+    const { host } = hosted(opened);
+    await host.run(
+      offered('markdown', (creation) => creation.report('Old refusal.')),
+      gesture(),
+    );
+    const slow = deferred();
+
+    const running = host.run(
+      offered('markdown', async (creation) => {
+        await creation.assets.measure?.('picture');
+        await slow.promise;
+        await creation.create([{ content: EMPTY_TEXT }]);
+      }),
+      gesture(),
+    );
+    await Promise.resolve();
+
+    expect(notice(opened)).toBeNull();
+    slow.resolve();
+    await running;
+  });
+
+  it('keeps the standing refusal through a picker that answers nothing', async () => {
+    const opened = openDerivationSpace();
+    const { host } = hosted(opened);
+    await host.run(
+      offered('markdown', (creation) => creation.report('Old refusal.')),
+      gesture(),
+    );
+
+    await host.run(
+      offered('markdown', async () => {
+        await Promise.resolve([]);
+      }),
+      gesture(),
+    );
+
+    expect(notice(opened)?.message).toBe('Old refusal.');
+  });
+
+  it('draws no refusal pressed before a Space replacement over the replacement', async () => {
+    const stored = { snapshot: derivationSnapshot, revision: 0n, exportedRevision: null };
+    const backend = MemorySpaceBackend.asMeta({ ...stored, revision: 1n });
+    const { spaceSession, spaceResources } = openTestSpace(backend, stored, mintingIds(CREATED));
+    const opened: OpenSpace = {
+      id: SPACE_ID,
+      session: spaceSession,
+      app: composeApp({ spaceSession, spaceResources, newId: mintingIds(SECOND) }),
+      spaceResources,
+    };
+    const { host } = hosted(opened);
+    // A first creation makes the session conflict with the stored revision.
+    await host.run(offered('markdown', askFor([{ content: EMPTY_TEXT }])), gesture());
+    await vi.waitFor(() => expect(spaceSession.getState().persistence.kind).toBe('conflicted'));
+    const slow = deferred();
+
+    const running = host.run(
+      offered('markdown', async (creation) => {
+        await creation.assets.measure?.('picture');
+        await slow.promise;
+        creation.report('Refused about the replaced Space.');
+      }),
+      gesture(),
+    );
+    await Promise.resolve();
+    expect(opened.app.authoring.acceptStoredSpace()).toBeNull();
+    slow.resolve();
+    await running;
+
+    expect(notice(opened)).toBeNull();
+  });
+
+  it('says nothing for a creation that declares no notice, and leaves the standing one', async () => {
+    const opened = openDerivationSpace(mintingIds(CREATED));
+    let exclusive = false;
+    const { host } = hosted(opened, { ...createPluginGate(), withdraws: () => exclusive });
+    await host.run(
+      offered('markdown', (creation) => creation.report('Old refusal.')),
+      gesture(),
+    );
+    const silent = {
+      ...offered('markdown', askFor([{ content: EMPTY_TEXT }])),
+      notCreated: undefined,
+    };
+
+    exclusive = true;
+    await host.run(silent, gesture());
+
+    expect(placedOn(opened)).not.toContain(CREATED);
+    expect(notice(opened)?.message).toBe('Old refusal.');
   });
 });
