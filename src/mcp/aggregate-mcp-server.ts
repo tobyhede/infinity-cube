@@ -2,8 +2,13 @@ import { lstat, mkdir, readFile, readdir, rm } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { AGGREGATE_FILE_NAME } from '@project/aggregate';
-import { assetHashOf } from '@project/persistence';
+import { AGGREGATE_FILE_NAME, assetFileHash, ASSETS_DIRECTORY_NAME } from '@project/aggregate';
+import {
+  admitAsset,
+  EMPTY_ASSET,
+  MAX_ASSET_BYTES,
+  mediaTypeForExtension,
+} from '@project/persistence';
 import { lineFeedText } from '@project/resource-api/domain';
 import type { UUID } from '@project/core';
 import { z } from 'zod';
@@ -22,6 +27,9 @@ const answer = (text: string, isError = false): CallToolResult => ({
 
 class PathRefusal extends Error {}
 
+/** UTF-8 that refuses bytes it cannot decode rather than replacing them. */
+const STRICT_UTF8 = new TextDecoder('utf-8', { fatal: true });
+
 /**
  * Markdown text as the Markdown plugin stores what it saves: UTF-8 with `\n`
  * line endings, so the same text is one asset. Bytes that are not UTF-8 are
@@ -30,7 +38,7 @@ class PathRefusal extends Error {}
 const markdownBytes = (given: Uint8Array<ArrayBuffer>): Uint8Array<ArrayBuffer> => {
   let text: string;
   try {
-    text = new TextDecoder('utf-8', { fatal: true }).decode(given);
+    text = STRICT_UTF8.decode(given);
   } catch {
     throw new PathRefusal('Markdown is UTF-8 text, and these bytes are not.');
   }
@@ -130,7 +138,7 @@ export const createAggregateMcpServer = (given: string, newId: () => UUID): McpS
         const bytes = await readFile(await fileInside(directory, file));
         if (carried === 'base64') return answer(bytes.toString('base64'));
         try {
-          return answer(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+          return answer(STRICT_UTF8.decode(bytes));
         } catch {
           throw new PathRefusal(`${file} is not UTF-8 text; read it with encoding base64.`);
         }
@@ -191,22 +199,34 @@ export const createAggregateMcpServer = (given: string, newId: () => UUID): McpS
         const given = new Uint8Array(
           carried === 'base64' ? Buffer.from(content, 'base64') : new TextEncoder().encode(content),
         );
-        const bytes = extension.toLowerCase() === 'md' ? markdownBytes(given) : given;
-        const hash = await assetHashOf(bytes);
+        // Admitted as Import admits an asset file: typed by its extension,
+        // and refused over the host's size cap.
+        const admission = await admitAsset(
+          extension.toLowerCase() === 'md' ? markdownBytes(given) : given,
+          mediaTypeForExtension(extension),
+        );
+        if (admission.kind === 'refused') {
+          throw new PathRefusal(
+            `An asset is at most ${MAX_ASSET_BYTES / (1024 * 1024)} MiB, and these bytes are more.`,
+          );
+        }
+        const { hash, bytes } = admission.asset;
         // The empty asset always exists, so no file is written for it.
-        if (bytes.length === 0) return answer(`Name it as /assets/${hash}; it needs no file.`);
-        const file = `assets/${hash}.${extension}`;
+        if (hash === EMPTY_ASSET.hash) {
+          return answer(`Name it as /assets/${hash}; it needs no file.`);
+        }
+        const name = `${hash}.${extension}`;
+        const file = `${ASSETS_DIRECTORY_NAME}/${name}`;
         const target = await fileInside(directory, file);
         await mkdir(dirname(target), { recursive: true });
         // One hash names one file: a file of another extension, or of none,
         // holding these bytes is the asset already, and Import refuses a second.
         const held = (await readdir(dirname(target))).find(
-          (name) =>
-            (name === hash || name.startsWith(`${hash}.`)) && name !== `${hash}.${extension}`,
+          (other) => other !== name && assetFileHash(other) === hash,
         );
         if (held !== undefined) {
           throw new PathRefusal(
-            `assets/${held} already holds these bytes; name them as /assets/${hash}, or delete assets/${held} first.`,
+            `${ASSETS_DIRECTORY_NAME}/${held} already holds these bytes; name them as /assets/${hash}, or delete ${ASSETS_DIRECTORY_NAME}/${held} first.`,
           );
         }
         await replaceFile(target, bytes);

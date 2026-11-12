@@ -6,6 +6,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { EMPTY_ASSET_REF, newUuid, uuidSchema } from '@project/core';
 import { AGGREGATE_FILE_NAME } from '@project/aggregate';
+import { MAX_ASSET_BYTES } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { serveMcpOverStdio } from '../../src/cli/mcp-stdio';
 import { describeRunRefusal } from '../../src/cli/run-refusal';
@@ -329,6 +330,24 @@ describe('the Aggregate directory MCP server', () => {
 
     expect(refused.isError).toBe(true);
     expect(refused.text).toContain('UTF-8');
+    expect(await readdir(assets)).toEqual(before);
+  });
+
+  it('refuses an asset over the host’s 10 MiB cap, writing nothing', async () => {
+    const directory = await writeTalk();
+    const client = await connect(directory);
+    const assets = join(directory, 'assets');
+    const before = await readdir(assets);
+    const tooLarge = Buffer.alloc(MAX_ASSET_BYTES + 1).toString('base64');
+
+    const refused = await callTool(client, 'write_asset', {
+      content: tooLarge,
+      encoding: 'base64',
+      extension: 'bin',
+    });
+
+    expect(refused.isError).toBe(true);
+    expect(refused.text).toContain('10 MiB');
     expect(await readdir(assets)).toEqual(before);
   });
 
