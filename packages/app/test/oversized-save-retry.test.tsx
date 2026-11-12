@@ -11,11 +11,11 @@ import {
 import { createOpenSpaces, type OpenSpace } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { recordingHistory } from './browser-history';
-import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
 import { refusingFullscreen } from './fullscreen';
 import { unlinkedPresentations } from './presentations';
 import { stubResizeObserver } from './resize-observer';
+import { showingSpace } from './showing-space';
 
 /**
  * Through the application: a save over the request size limit is explained by the Dock's notice rather than a dialog, keeps every
@@ -130,7 +130,6 @@ const opened = async (stored: SpaceSnapshot) => {
   const openSpaces = createOpenSpaces({
     fullscreen: refusingFullscreen,
     presentations: unlinkedPresentations,
-    images: unusedImageSources,
     backend,
     metaSpaceId: META_ID,
     metaSpaceTitle: 'Meta',
@@ -197,12 +196,14 @@ describe('A save over the request size limit', () => {
     );
 
     const created = await act(() =>
-      openSpaces.spaceResources.create({
-        containingSpaceId: META_ID,
-        mapId: MAP_ID,
-        title: 'Target',
-        position: { x: 240, y: 0 },
-      }),
+      openSpaces.spaceResources.create(
+        showingSpace({
+          containingSpaceId: META_ID,
+          mapId: MAP_ID,
+          title: 'Target',
+          position: { x: 240, y: 0 },
+        }),
+      ),
     );
     if (created.kind !== 'completed') throw new Error('The Space Resource was not created');
     await waitFor(() => expect(persistenceOf(meta).kind).toBe('rejected'));

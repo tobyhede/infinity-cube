@@ -23,8 +23,8 @@ import {
 } from '../src/space-authoring';
 import { createPluginGate, type PluginGate } from '../src/plugin-host/plugin-gate';
 import { mintingIds } from './minting';
-import { unusedImageSources } from './image-sources';
 import { textAsset } from './markdown-texts';
+import { createdEmpty, createdReference, createdImages } from './created-resources';
 
 /**
  * The semantic operations Space Authoring offers for Resource and Graph
@@ -128,7 +128,6 @@ function open(
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
   const { navigation, authoring } = composeApp({
-    images: unusedImageSources,
     spaceSession: session,
     selection: mapId,
     newId,
@@ -190,13 +189,7 @@ describe('Add Resource', () => {
   it('creates one neutrally titled detached Resource at the anchor it was given', () => {
     const { authoring, session } = openPositioned();
 
-    expect(
-      authoring.complete(CANVAS, {
-        kind: 'created-resource',
-        resourceKind: 'markdown',
-        anchor: CENTRE,
-      }),
-    ).toEqual({
+    expect(authoring.complete(CANVAS, createdEmpty('markdown', CENTRE))).toEqual({
       kind: 'completed',
       createdResourceId: MINTED,
     });
@@ -220,16 +213,8 @@ describe('Add Resource', () => {
     // real one.
     const { authoring, session } = openPositioned(mintingIds(MINTED, SECOND_MINTED));
 
-    authoring.complete(CANVAS, {
-      kind: 'created-resource',
-      resourceKind: 'markdown',
-      anchor: CENTRE,
-    });
-    authoring.complete(CANVAS, {
-      kind: 'created-resource',
-      resourceKind: 'markdown',
-      anchor: CENTRE,
-    });
+    authoring.complete(CANVAS, createdEmpty('markdown', CENTRE));
+    authoring.complete(CANVAS, createdEmpty('markdown', CENTRE));
 
     const positions = mapOf(session.getState().working, MAP_ID)?.positions ?? {};
     const stacked = Object.values(positions).filter(
@@ -264,11 +249,7 @@ describe('Add Resource', () => {
     };
     const { authoring, session } = open(openedSnapshot);
 
-    authoring.complete(CANVAS, {
-      kind: 'created-resource',
-      resourceKind: 'markdown',
-      anchor: { x: 500, y: 400 },
-    });
+    authoring.complete(CANVAS, createdEmpty('markdown', { x: 500, y: 400 }));
 
     // A canvas coordinate is an authored one: A being Open moved its neighbours
     // when the Edit that opened it ran, and nothing converts a drop point on the
@@ -287,9 +268,7 @@ describe('Create Ur Resource', () => {
     const edits: number[] = [];
     session.subscribe(() => edits.push(session.getState().working.resources.length));
 
-    expect(
-      authoring.complete(CANVAS, { kind: 'created-resource', resourceKind: 'ur', anchor: CENTRE }),
-    ).toEqual({
+    expect(authoring.complete(CANVAS, createdEmpty('ur', CENTRE))).toEqual({
       kind: 'completed',
       createdResourceId: MINTED,
     });
@@ -309,18 +288,16 @@ describe('Create Ur Resource', () => {
     const backend = MemorySpaceBackend.asMeta(loaded);
     const session = openSpaceSession(backend, loaded);
     const { authoring } = composeApp({
-      images: unusedImageSources,
       spaceSession: session,
       selection: MAP_ID,
       newId: mintingIds(MINTED),
     });
 
-    authoring.complete(CANVAS, { kind: 'created-resource', resourceKind: 'ur', anchor: CENTRE });
+    authoring.complete(CANVAS, createdEmpty('ur', CENTRE));
     await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('settled'));
 
     const stored = await backend.loadSpace(SPACE_ID);
     const reopened = composeApp({
-      images: unusedImageSources,
       spaceSession: openSpaceSession(backend, stored!),
       selection: MAP_ID,
       newId: mintingIds(MINTED),
@@ -341,12 +318,14 @@ describe('Create Image Resources', () => {
     const { authoring, session } = openPositioned();
 
     expect(
-      authoring.complete(CANVAS, {
-        kind: 'created-images',
-        images: [{ url: STORED, naturalSize: { width: 640, height: 480 } }],
-        anchor: CENTRE,
-        placement: 'avoidingOverlap',
-      }),
+      authoring.complete(
+        CANVAS,
+        createdImages(
+          [{ url: STORED, naturalSize: { width: 640, height: 480 } }],
+          CENTRE,
+          'avoidingOverlap',
+        ),
+      ),
     ).toEqual({ kind: 'completed', createdResourceId: MINTED });
 
     expect(session.getState().working.resources[2]).toEqual({
@@ -363,12 +342,10 @@ describe('Create Image Resources', () => {
   it('records no natural size for an image that did not load', () => {
     const { authoring, session } = openPositioned();
 
-    authoring.complete(CANVAS, {
-      kind: 'created-images',
-      images: [{ url: 'https://example.com/a.png' }],
-      anchor: CENTRE,
-      placement: 'exact',
-    });
+    authoring.complete(
+      CANVAS,
+      createdImages([{ url: 'https://example.com/a.png' }], CENTRE, 'exact'),
+    );
 
     expect(session.getState().working.resources[2]?.document).toEqual({
       title: 'Resource 1',
@@ -383,16 +360,18 @@ describe('Create Image Resources', () => {
     session.subscribe(() => commits.push(session.getState().working.resources.length));
 
     expect(
-      authoring.complete(CANVAS, {
-        kind: 'created-images',
-        images: [
-          { url: 'https://example.com/1.png' },
-          { url: 'https://example.com/2.png' },
-          { url: 'https://example.com/3.png' },
-        ],
-        anchor: { x: 100, y: 200 },
-        placement: 'exact',
-      }),
+      authoring.complete(
+        CANVAS,
+        createdImages(
+          [
+            { url: 'https://example.com/1.png' },
+            { url: 'https://example.com/2.png' },
+            { url: 'https://example.com/3.png' },
+          ],
+          { x: 100, y: 200 },
+          'exact',
+        ),
+      ),
     ).toEqual({ kind: 'completed', createdResourceId: MINTED });
 
     const { resources } = session.getState().working;
@@ -417,13 +396,36 @@ describe('Create Image Resources', () => {
     const before = session.getState().working;
 
     expect(
+      authoring.complete(
+        CANVAS,
+        createdImages([{ url: 'data:image/png;base64,AAAA' }], CENTRE, 'exact'),
+      ),
+    ).toEqual({ kind: 'refused', refusal: { code: 'resource-content-invalid' } });
+    expect(session.getState().working).toBe(before);
+  });
+
+  it('refuses a created Resource naming a Space, which only the coordinated lifecycle makes', () => {
+    const { authoring, session } = openPositioned();
+    const before = session.getState().working;
+
+    expect(
       authoring.complete(CANVAS, {
-        kind: 'created-images',
-        images: [{ url: 'data:image/png;base64,AAAA' }],
+        kind: 'created-resources',
+        items: [{ kind: 'space', content: { spaceId: SPACE_ID, map: MAP_ID, graph: MAP_ID } }],
         anchor: CENTRE,
         placement: 'exact',
       }),
-    ).toEqual({ kind: 'refused', refusal: { code: 'image-url-unsupported' } });
+    ).toEqual({ kind: 'refused', refusal: { code: 'space-reference-creation-unsupported' } });
+    expect(session.getState().working).toBe(before);
+  });
+
+  it('answers unchanged when asked for no Resources', () => {
+    const { authoring, session } = openPositioned();
+    const before = session.getState().working;
+
+    expect(authoring.complete(CANVAS, createdImages([], CENTRE, 'exact'))).toEqual({
+      kind: 'unchanged',
+    });
     expect(session.getState().working).toBe(before);
   });
 });
@@ -695,7 +697,6 @@ describe('Exclusive work withdraws every Edit (ADR 0142)', () => {
     const loaded = { snapshot: positionedSnapshot, revision: 0n, exportedRevision: null };
     const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
     return composeApp({
-      images: unusedImageSources,
       spaceSession: session,
       selection: MAP_ID,
       newId: mintingIds(MINTED),
@@ -741,7 +742,6 @@ describe('Exclusive work begun while Edits are queued (ADR 0142)', () => {
     const loaded = { snapshot: positionedSnapshot, revision: 0n, exportedRevision: null };
     const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
     const { authoring } = composeApp({
-      images: unusedImageSources,
       spaceSession: session,
       selection: MAP_ID,
       newId: mintingIds(MINTED),
@@ -1227,9 +1227,7 @@ describe('Add Reference Resource', () => {
   it('creates and places a Reference Resource on its Target, minting a neutral title when none was typed', () => {
     const { authoring, session } = openPositioned();
 
-    expect(
-      authoring.complete(CANVAS, { kind: 'created-reference', target: RESOURCE_A, anchor: CENTRE }),
-    ).toEqual({
+    expect(authoring.complete(CANVAS, createdReference(RESOURCE_A, CENTRE))).toEqual({
       kind: 'completed',
       createdResourceId: MINTED,
     });
@@ -1255,12 +1253,7 @@ describe('Add Reference Resource', () => {
   it('keeps a title the author already entered, normalized the way a rename is', () => {
     const { authoring, session } = openPositioned();
 
-    authoring.complete(CANVAS, {
-      kind: 'created-reference',
-      target: RESOURCE_A,
-      title: '  Recap  \n  the week  ',
-      anchor: CENTRE,
-    });
+    authoring.complete(CANVAS, createdReference(RESOURCE_A, CENTRE, '  Recap  \n  the week  '));
 
     expect(session.getState().working.resources[2]?.document).toEqual({
       title: '  Recap\n  the week',
@@ -1283,9 +1276,7 @@ describe('Add Reference Resource', () => {
     const { authoring, session } = open(referenced);
     const before = session.getState().working;
 
-    expect(
-      authoring.complete(CANVAS, { kind: 'created-reference', target: RESOURCE_B, anchor: CENTRE }),
-    ).toEqual({
+    expect(authoring.complete(CANVAS, createdReference(RESOURCE_B, CENTRE))).toEqual({
       kind: 'refused',
       refusal: { code: 'reference-target-not-targetable', targetId: RESOURCE_B },
     });
@@ -1295,13 +1286,7 @@ describe('Add Reference Resource', () => {
   it('refuses a Target the Space no longer holds', () => {
     const { authoring } = openPositioned();
 
-    expect(
-      authoring.complete(CANVAS, {
-        kind: 'created-reference',
-        target: UNKNOWN_RESOURCE,
-        anchor: CENTRE,
-      }),
-    ).toEqual({
+    expect(authoring.complete(CANVAS, createdReference(UNKNOWN_RESOURCE, CENTRE))).toEqual({
       kind: 'refused',
       refusal: { code: 'reference-target-missing', targetId: UNKNOWN_RESOURCE },
     });
@@ -1724,7 +1709,6 @@ describe('Rename Space', () => {
     const backend = MemorySpaceBackend.asMeta(loaded);
     const session = openSpaceSession(backend, loaded);
     const { authoring } = composeApp({
-      images: unusedImageSources,
       spaceSession: session,
       selection: MAP_ID,
       newId: mintingIds(MINTED),
@@ -1740,7 +1724,6 @@ describe('Rename Space', () => {
 
     // Reload: a fresh session and composition over exactly what was stored.
     const reopened = composeApp({
-      images: unusedImageSources,
       spaceSession: openSpaceSession(backend, stored!),
       selection: MAP_ID,
       newId: mintingIds(MINTED),
@@ -2451,7 +2434,6 @@ describe('Keep local', () => {
     const local = { snapshot: positionedSnapshot, revision: 3n, exportedRevision: null };
     const session = openSpaceSession(backend, local);
     const { authoring } = composeApp({
-      images: unusedImageSources,
       spaceSession: session,
       selection: MAP_ID,
     });

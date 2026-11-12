@@ -12,10 +12,6 @@ Categories: **one-kind** = a feature that exists for that kind alone; **registry
 |---|---|---|---|---|
 | packages/app/src/components/CommandDockSpaces.tsx:459 | `spaceKind.id`: Space glyph | space | display | CommandDockSpaces.tsx |
 | packages/app/src/components/CommandDockSpaces.tsx:564 | `spaceKind.id`: Space glyph | space | display | CommandDockSpaces.tsx |
-| packages/app/src/resource-rail-actions.tsx:162 | `referenceKind.id`: Create Reference glyph | reference | E (display of a creation, until issue 08) | resource-rail-actions.tsx |
-| packages/app/src/space-authoring.ts:116 | `imageKind.id`: new Image Resource document | image | E | space-authoring.ts |
-| packages/app/src/space-authoring.ts:1368 | `referenceKind.id`: new Reference Resource | reference | E (until issue 08) | space-authoring.ts |
-| packages/persistence/src/space-resource-planning.ts:328 | `spaceKind.id`: new Space Resource document | space | E (lifecycle) | space-resource-planning.ts |
 
 `packages/app/src/canvas-resource-authoring.ts` no longer reaches a module id: a Markdown Resource's body is its plugin's (ADR 0142, resource-plugins issue 05), so the canvas keeps no Markdown completion.
 
@@ -27,11 +23,6 @@ Categories: **one-kind** = a feature that exists for that kind alone; **registry
 |---|---|---|---|---|
 | packages/core/src/index.ts:11-15 | `export *` of each kind module | all | package surface | core/src/index.ts |
 | packages/ui/src/icons.tsx:287 | `ResourceBaseKind = Exclude<Resource['kind'], ReferenceKindId>` | reference | display (kinds a Reference badge sits on) | icons.tsx |
-| packages/app/src/components/SpaceCanvas.tsx:1780 | `isAcceptedImageUrl`: paste creates an Image Resource | image | E (image-URL rule) | SpaceCanvas.tsx |
-| packages/app/src/space-authoring.ts:114 | `Extract<ResourceDocument, { kind: ImageKindId }>` | image | E | space-authoring.ts |
-| packages/app/src/space-authoring.ts:376,1340 | refusal `IMAGE_URL_UNSUPPORTED`, the Image plugin's code read through core | image | E (image-URL rule) | space-authoring.ts |
-| packages/app/src/space-authoring.ts:1339 | `isAcceptedImageUrl` on Create | image | E (image-URL rule) | space-authoring.ts |
-| packages/app/src/picture-admission.ts:10-25 | `admitImage`, `pictureSize` and its refusals from `@project/plugin-image/domain`: creation admits a picture by the plugin's rule | image | one-kind (Image creation, until issue 08) | picture-admission.ts |
 
 ## Sites now off the list
 
@@ -46,6 +37,8 @@ Categories: **one-kind** = a feature that exists for that kind alone; **registry
 - Resource plugins issue 06 (ADR 0142): a Reference Resource is drawn by its plugin, `packages/plugin-reference`, which embeds its Target through the host-owned embedding (`packages/ui/src/ResourceEmbedding.tsx`) and keeps whether it is Open as its Map content. Whether a Resource is drawn by a plugin, and whether the application keeps its Open, are the registry's (`drawnByPlugin`, `takesOpen` in `core/src/kinds/registry.ts`), read from content and the Target's kind with no kind named; a Reference to a Space keeps the frame and the Map entry's `open` until issue 07. Reference creation keeps its two sites until issue 08, and `icons.tsx`'s badge stays a display of the Reference kind.
 
 - Resource plugins issue 07 (ADR 0142): a Space Resource is drawn by its plugin, `packages/plugin-space`, which embeds the Map it selects through the host-owned Map embedding (`<Embed map={view} select={…} claim={…} />`) and keeps whether it is Open as its Map content. The embedding publishes what the plugin asks for, by placement, into a store the canvas reads (`packages/app/src/map-embeddings.ts`), so `embedded-open-space-resource.ts` and `SpaceCanvas.tsx` read the request rather than `spaceViewOf`, and the portal is a Claim the plugin passes: `CanvasResource.tsx`'s Space branch, `ResourceNode.tsx`'s portal toolbar, `isSpaceOperations`, `spaceViewOf` and `ui/src/index.ts`'s re-exports of them are gone. The Space menu and Enter in `resource-rail-actions.tsx` route by the kind-neutral `spaceSelection`, which a plugin declaring `selection` answers. `ui/src/index.ts`, `CanvasResource.tsx`, `ResourceNode.tsx` and `embedded-open-space-resource.ts` left the exemptions; `SpaceCanvas.tsx` keeps one for Image paste and `resource-rail-actions.tsx` for Create Reference's glyph. The Space glyph rows in `CommandDockSpaces.tsx` and the Space lifecycle's create stay (display, and creation until issue 08).
+
+- Resource plugins issue 08 (ADR 0142): each plugin view declares how its Resources are created (`creates`), and the host does the creating (`packages/app/src/plugin-host/creation.ts`): placement from the gesture, the Title continuation, single flight per kind, the availability re-check after a wait, and a new Space through the coordinated lifecycle. Space Authoring's one creation completion, `created-resources`, takes any kind's content, so `space-authoring.ts` names no kind; picture admission, its refusals and the image-URL rule run inside `packages/plugin-image` (`src/creation.ts`), so `picture-admission.ts` is gone and `SpaceCanvas.tsx` asks the host whether a pasted URL is any plugin's; and the rail's Create rows are drawn from the plugins that create from a Resource, each with its own glyph, so `resource-rail-actions.tsx` names no kind. All four left the exemptions. The lifecycle's create and link take the plugin's document and have no default of their own, so `space-resource-planning.ts` left the exemptions too.
 
 ## What is not covered by any mechanism
 

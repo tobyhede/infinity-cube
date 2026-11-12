@@ -64,8 +64,7 @@ Guards above are omitted below.
 | --- | --- |
 | `edited-resource` | `resource-not-found` → `resource-kind-immutable` → `reference-target-immutable` → `space-resource-target-immutable` → `resource-title-required` → (identical to current ⇒ `unchanged`) → `reference-target-missing` → `reference-target-not-targetable` → completed |
 | `changed-content` | `resource-not-found` → `resource-content-invalid` (the kind's content schema refuses it) → then `edited-resource`'s checks from `resource-kind-immutable` on, over the document with that content |
-| `created-resource` | none → completed |
-| `created-reference` | `reference-targets-self` → `reference-target-missing` → `reference-target-not-targetable` → completed |
+| `created-resources` | (no items ⇒ `unchanged`) → for each item in order: `resource-content-invalid` (its kind's content schema refuses it) → `space-reference-creation-unsupported` (its content names a Space, which only the coordinated lifecycle creates) → `reference-targets-self` → `reference-target-missing` → `reference-target-not-targetable` → completed |
 | `opened-resource` | `resource-not-in-map` → `resource-not-found` → `open-requires-content` → (already Open ⇒ `unchanged`) → completed |
 | `closed-resource` | `resource-not-in-map` → (already Closed ⇒ `unchanged`) → completed |
 | `resized-resource` | `resource-not-in-map` → (same size as `resourceSize` resolves it ⇒ `unchanged`) → completed |
@@ -145,11 +144,10 @@ Edit that holds no Map say it needed one.
 ## The 31 codes
 
 1 contextual (`map-not-found`) plus 30 action-specific —
-none is produced anywhere else. 25 of those 30 are tabulated above, and
+none is produced anywhere else. 26 of those 30 are tabulated above, and
 `exclusive-work-running` is the gate's, asked of every action before its row;
 `map-required` is declared and presented but currently raised nowhere, so it
-appears in no row, and `image-url-unsupported`, raised by Image Resource
-creation, has no row yet. `space-replaced` and `edit-abandoned` are no action's:
+appears in no row. `space-replaced` and `edit-abandoned` are no action's:
 they are how a `queued` Edit settles when the drain discards it — a
 replacement Space opened before it drained, or the Edit draining the queue
 failed before reaching it — and reach only the `settle` callback its caller

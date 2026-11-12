@@ -8,6 +8,8 @@ import {
   Title,
   useRailBand,
   type Claim,
+  type Creation,
+  type NewSpace,
   type PluginViewProps,
   type RailCommand,
 } from '@project/resource-api/view';
@@ -188,7 +190,44 @@ function SpaceGlyph({ size = 14 }: { readonly size?: number | undefined }) {
   return <Box size={size} />;
 }
 
+/** The content showing a Space on the Map and Graph it opens on, unframed. */
+const showing = (space: NewSpace): SpaceContent => ({
+  spaceId: space.spaceId,
+  map: space.map,
+  graph: space.graph,
+});
+
+/**
+ * Create Space Resource (ADR 0074): one press on the Command Dock, one
+ * Resource and the new Space it shows, which it asks the host for and names in
+ * its content. The host names both alike.
+ */
+const createWithNewSpace: Creation<SpaceContent> = {
+  from: 'dock',
+  // It names what died. A Space Resource's placement is optimistic (ADR
+  // 0089), so the author may be typing into the Resource when the lifecycle
+  // answers, and this title makes a Resource vanishing from under the caret
+  // legible.
+  notCreated: 'Space not created',
+  run: async (host) => {
+    await host.create([{ newSpace: true, contentFor: showing }]);
+  },
+};
+
+/**
+ * A Space chosen from the Resources list, pressed or dragged: a Space Resource
+ * showing it, titled as the Space is, on the Map and Graph it opens on when the
+ * Resource is made (ADR 0079).
+ */
+const createFromSpace: Creation<SpaceContent> = {
+  from: 'spaces',
+  run: async (host, space) => {
+    await host.create([{ title: space.title, contentFor: showing }]);
+  },
+};
+
 export const spacePluginView = definePluginView(spacePlugin, {
   View: SpacePluginView,
   Glyph: SpaceGlyph,
+  creates: [createWithNewSpace, createFromSpace],
 });

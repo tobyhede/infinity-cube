@@ -7,8 +7,8 @@ import { composeApp } from '../src/compose-app';
 import { createMapSurface } from '../src/map-surface';
 import { CANVAS } from '../src/space-authoring';
 import { useMapSurface } from '../src/use-map-surface';
+import { createdEmpty } from './created-resources';
 import { holdExclusive } from './held-exclusive';
-import { unusedImageSources } from './image-sources';
 
 const id = (tail: string) => uuidSchema.parse(`00000000-0000-4000-8000-${tail.padStart(12, '0')}`);
 const SPACE = id('1');
@@ -42,7 +42,7 @@ function composition() {
   };
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-  return composeApp({ spaceSession, images: unusedImageSources });
+  return composeApp({ spaceSession });
 }
 
 const strict = ({ children }: { readonly children: ReactNode }) => (
@@ -61,11 +61,7 @@ describe('useMapSurface', () => {
     }));
     // The Space gains `Resource 2` after the drawing's snapshot was taken and
     // before anything observes it, as a drawn Map's first render can see.
-    const created = app.authoring.complete(CANVAS, {
-      kind: 'created-resource',
-      resourceKind: 'markdown',
-      anchor: { x: 0, y: 0 },
-    });
+    const created = app.authoring.complete(CANVAS, createdEmpty('markdown', { x: 0, y: 0 }));
     expect(created.kind).toBe('completed');
     await vi.waitFor(() =>
       expect(app.authoring.getState().session.persistence.kind).toBe('settled'),
@@ -99,11 +95,7 @@ describe('useMapSurface', () => {
     // The Space gains `Resource 2` between the surface's creation and its
     // `observe()`, as `EmbeddedMapAuthoring` creates in `useState` and observes
     // in an effect.
-    app.authoring.complete(CANVAS, {
-      kind: 'created-resource',
-      resourceKind: 'markdown',
-      anchor: { x: 0, y: 0 },
-    });
+    app.authoring.complete(CANVAS, createdEmpty('markdown', { x: 0, y: 0 }));
     await vi.waitFor(() =>
       expect(app.authoring.getState().session.persistence.kind).toBe('settled'),
     );

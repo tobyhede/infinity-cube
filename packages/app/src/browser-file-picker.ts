@@ -1,5 +1,3 @@
-import { PICKED_IMAGE_TYPES, type ImageSources } from './image-creation';
-
 /** The open picker in each document, settled with nothing when the next one opens. */
 const openPickers = new WeakMap<Document, (files: readonly File[]) => void>();
 
@@ -36,11 +34,3 @@ export const pickFilesInBrowser = (document: Document, accept: string): Promise<
     document.body.append(input);
     input.click();
   });
-
-/**
- * The picker Create Image Resource opens, offering the formats the host
- * stores. An Image Resource's Replace opens `pickFilesInBrowser` through
- * `browserPluginAssets` (`space.ts`), with the formats the plugin asks for.
- */
-export const pickImagesInBrowser: ImageSources['pick'] = () =>
-  pickFilesInBrowser(document, PICKED_IMAGE_TYPES);

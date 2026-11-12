@@ -140,7 +140,7 @@ export function EmbeddedMapAuthoring({
     entityActions,
     availability,
     editingResourceBody,
-    createReferenceFrom: placement.createReferenceFrom,
+    createFromResource: placement.createFromResource,
     spaces,
   });
   const selectResource = state.selectResource;

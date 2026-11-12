@@ -44,6 +44,7 @@ import { mintingIds } from './minting';
  */
 
 const CREATED = uuidSchema.parse('00000000-0000-4000-8000-0000000000c1');
+const CREATED_NEXT = uuidSchema.parse('00000000-0000-4000-8000-0000000000c2');
 const TARGET_SPACE = uuidSchema.parse('00000000-0000-4000-8000-0000000000d1');
 
 /** An observable value, as the stores these hooks subscribe to publish one. */
@@ -297,12 +298,15 @@ describe('useResourcePlacement', () => {
       { initialProps: { presenting: false } },
     );
 
-  it('adds a Resource at the visible centre and continues in its Title', () => {
+  it('adds a Resource at the visible centre and continues in its Title', async () => {
     const opened = openDerivationSpace(mintingIds(CREATED));
     const { result } = place(opened);
     act(() => result.current.reportVisibleCentre(() => ({ x: 70, y: 80 })));
 
-    act(() => result.current.createResource('markdown'));
+    await act(async () => {
+      result.current.createFromDock('markdown');
+      await Promise.resolve();
+    });
 
     expect(placedIds(opened)).toContain(CREATED);
     expect(opened.app.continuation.getState().pending).toEqual({
@@ -312,12 +316,44 @@ describe('useResourcePlacement', () => {
     });
   });
 
-  it('creates an Ur Resource at the visible centre and continues in its Title', () => {
+  it('runs a second quick canvas Add Resource, which is not a Dock press and so not single flight', async () => {
+    const opened = openDerivationSpace(mintingIds(CREATED, CREATED_NEXT));
+    const { result } = place(opened);
+    act(() => result.current.reportVisibleCentre(() => ({ x: 70, y: 80 })));
+
+    await act(async () => {
+      result.current.createOnCanvas('markdown');
+      result.current.createOnCanvas('markdown');
+      await Promise.resolve();
+    });
+
+    expect(placedIds(opened)).toEqual(expect.arrayContaining([CREATED, CREATED_NEXT]));
+  });
+
+  it('ignores a second quick Dock press of the same kind', async () => {
+    const opened = openDerivationSpace(mintingIds(CREATED, CREATED_NEXT));
+    const { result } = place(opened);
+    act(() => result.current.reportVisibleCentre(() => ({ x: 70, y: 80 })));
+
+    await act(async () => {
+      result.current.createFromDock('markdown');
+      result.current.createFromDock('markdown');
+      await Promise.resolve();
+    });
+
+    expect(placedIds(opened)).toContain(CREATED);
+    expect(placedIds(opened)).not.toContain(CREATED_NEXT);
+  });
+
+  it('creates an Ur Resource at the visible centre and continues in its Title', async () => {
     const opened = openDerivationSpace(mintingIds(CREATED));
     const { result } = place(opened);
     act(() => result.current.reportVisibleCentre(() => ({ x: 70, y: 80 })));
 
-    act(() => result.current.createResource('ur'));
+    await act(async () => {
+      result.current.createFromDock('ur');
+      await Promise.resolve();
+    });
 
     expect(opened.app.currentSpace().lookup.resource(CREATED)?.kind).toBe('ur');
     expect(placedIds(opened)).toContain(CREATED);
@@ -517,7 +553,7 @@ describe('useResourceRailActions', () => {
           navigate: available,
         },
         editingResourceBody: false,
-        createReferenceFrom: () => 'done',
+        createFromResource: () => 'done',
         spaces: null,
       }),
     );
@@ -711,10 +747,13 @@ describe('useDockChrome', () => {
     expect(opened.session.getState().working.document.title).toBe('Renamed');
   });
 
-  it("creates a markdown Resource on the drawing Map from the Create cluster's press", () => {
+  it("creates a markdown Resource on the drawing Map from the Create cluster's press", async () => {
     const opened = openDerivationSpace(mintingIds(CREATED));
     const chrome = chromeFor(opened, GRAPH_ID).result.current.chrome;
-    act(() => chrome?.resources.create.find(({ kind }) => kind === 'markdown')?.create());
+    await act(async () => {
+      chrome?.resources.create.find(({ kind }) => kind === 'markdown')?.create();
+      await Promise.resolve();
+    });
     expect(placedIds(opened)).toContain(CREATED);
   });
 

@@ -5,9 +5,7 @@ import type {
   KindCanvasDecoration,
   KindDecoration,
 } from '../canvas-resource-decoration';
-import type { KindCreation } from '../kind-creation';
 import { pluginSurfaceOperations, type PluginHost } from '../plugin-host/plugin-commits';
-import type { ResourcePlacementCommands } from '../resource-placement';
 
 export type MarkdownResourceDecorationContext = Pick<
   CanvasResourceDecorationContext,
@@ -54,11 +52,4 @@ export const markdownDecoration: KindCanvasDecoration<
     pluginHost,
   }),
   decorate: decorateMarkdownResourceNode,
-};
-
-export type MarkdownCreationContext = Pick<ResourcePlacementCommands, 'createResource'>;
-
-/** Create Markdown Resource: one press, the empty text, continuing in its Title. */
-export const markdownCreation: KindCreation<MarkdownCreationContext> = {
-  create: ({ createResource }) => createResource(markdownKind.id),
 };

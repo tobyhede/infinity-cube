@@ -21,7 +21,6 @@ import {
 } from '@project/ui';
 import type { Claim } from '@project/resource-api/view';
 import { createMapEmbeddings, type MapEmbeddings } from '../src/map-embeddings';
-import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
 import { canvasAuthoring } from './canvas-authoring';
 import { textAsset } from './markdown-texts';
@@ -147,7 +146,6 @@ const mountAuthoring = (
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
   const { authoring, adapter, commandOutcomes, continuation, pluginGate } = composeApp({
-    images: unusedImageSources,
     spaceSession,
   });
   const initialProps: HookProps = {
@@ -531,7 +529,6 @@ describe('canvas Resource authoring Space rail', () => {
     const loaded = { snapshot, revision: 0n, exportedRevision: null };
     const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
     const { authoring, adapter, continuation } = composeApp({
-      images: unusedImageSources,
       spaceSession,
     });
     return renderHook(() =>
@@ -651,7 +648,6 @@ describe('canvas Resource authoring decoration identity', () => {
     const loaded = { snapshot, revision: 0n, exportedRevision: null };
     const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
     const { authoring, adapter, continuation } = composeApp({
-      images: unusedImageSources,
       spaceSession,
     });
     const surfaceAuthoring = canvasAuthoring(authoring);
@@ -898,7 +894,6 @@ describe('canvas Resource authoring, an Image Resource’s plugin surface', () =
     const loaded = { snapshot: withImage, revision: 0n, exportedRevision: null };
     const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
     const { authoring, adapter, continuation } = composeApp({
-      images: unusedImageSources,
       spaceSession,
       reportObserverError: vi.fn(),
     });

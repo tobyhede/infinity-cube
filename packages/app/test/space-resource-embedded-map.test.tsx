@@ -23,7 +23,6 @@ import { recordingHistory } from './browser-history';
 import { mountSettled } from './settled-mount';
 import { newUuid } from '@project/core';
 import { anyPresentControl, beginRename, openSpaceMenu, unavailable } from './command-dock';
-import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
 import { refusingFullscreen } from './fullscreen';
 import { unlinkedPresentations } from './presentations';
@@ -236,7 +235,6 @@ async function mountOpenSpaces(
   const spaces = createOpenSpaces({
     fullscreen: refusingFullscreen,
     presentations: unlinkedPresentations,
-    images: unusedImageSources,
     backend,
     metaSpaceId: META_ID,
     metaSpaceTitle: meta.document.title,
@@ -417,7 +415,6 @@ async function mountNested(): Promise<OpenSpaces> {
   const spaces = createOpenSpaces({
     fullscreen: refusingFullscreen,
     presentations: unlinkedPresentations,
-    images: unusedImageSources,
     backend,
     metaSpaceId: META_ID,
     metaSpaceTitle: meta.document.title,
@@ -461,7 +458,6 @@ describe('the Map an Open Space Resource draws', () => {
       const spaces = createOpenSpaces({
         fullscreen: refusingFullscreen,
         presentations: unlinkedPresentations,
-        images: unusedImageSources,
         backend,
         metaSpaceId: META_ID,
         metaSpaceTitle: meta.document.title,
@@ -1097,7 +1093,6 @@ describe('the Map an Open Space Resource draws', () => {
     const spaces = createOpenSpaces({
       fullscreen: refusingFullscreen,
       presentations: unlinkedPresentations,
-      images: unusedImageSources,
       backend,
       metaSpaceId: META_ID,
       metaSpaceTitle: meta.document.title,
@@ -1346,7 +1341,6 @@ describe('the Map an Open Space Resource draws', () => {
     const spaces = createOpenSpaces({
       fullscreen: refusingFullscreen,
       presentations: unlinkedPresentations,
-      images: unusedImageSources,
       backend,
       metaSpaceId: META_ID,
       metaSpaceTitle: meta.document.title,
@@ -1388,7 +1382,6 @@ describe('the Map an Open Space Resource draws', () => {
     const spaces = createOpenSpaces({
       fullscreen: refusingFullscreen,
       presentations: unlinkedPresentations,
-      images: unusedImageSources,
       backend,
       metaSpaceId: META_ID,
       metaSpaceTitle: meta.document.title,
@@ -1647,7 +1640,6 @@ describe('the Map an Open Space Resource draws', () => {
     const spaces = createOpenSpaces({
       fullscreen: refusingFullscreen,
       presentations: unlinkedPresentations,
-      images: unusedImageSources,
       backend,
       metaSpaceId: META_ID,
       metaSpaceTitle: meta.document.title,
@@ -1757,7 +1749,6 @@ describe('the Map an Open Space Resource draws', () => {
     const spaces = createOpenSpaces({
       fullscreen: refusingFullscreen,
       presentations: unlinkedPresentations,
-      images: unusedImageSources,
       backend,
       metaSpaceId: META_ID,
       metaSpaceTitle: meta.document.title,
@@ -1795,7 +1786,6 @@ describe('the Map an Open Space Resource draws', () => {
     const spaces = createOpenSpaces({
       fullscreen: refusingFullscreen,
       presentations: unlinkedPresentations,
-      images: unusedImageSources,
       backend,
       metaSpaceId: META_ID,
       metaSpaceTitle: meta.document.title,
@@ -2094,7 +2084,6 @@ describe('the Map an Open Space Resource draws', () => {
     const spaces = createOpenSpaces({
       fullscreen: refusingFullscreen,
       presentations: unlinkedPresentations,
-      images: unusedImageSources,
       backend,
       metaSpaceId: META_ID,
       metaSpaceTitle: meta.document.title,
@@ -2142,7 +2131,6 @@ describe('the Map an Open Space Resource draws', () => {
     const spaces = createOpenSpaces({
       fullscreen: refusingFullscreen,
       presentations: unlinkedPresentations,
-      images: unusedImageSources,
       backend,
       metaSpaceId: META_ID,
       metaSpaceTitle: meta.document.title,

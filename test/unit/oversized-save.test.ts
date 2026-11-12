@@ -11,6 +11,7 @@ import {
 } from '@project/persistence';
 import { createSpaceHttpApp, HttpSpaceBackend, MAX_COMMIT_BODY_BYTES } from '@project/http';
 import { MemorySpaceRepository } from '@project/aggregate';
+import { showingSpace } from '../../packages/app/test/showing-space';
 
 /** A request that initializes no Space mints nothing, so any mint is a failure here. */
 const mintsNothing = (): UUID => {
@@ -190,12 +191,14 @@ describe('A save over the request size limit, across the HTTP boundary', () => {
       if (id === undefined) throw new Error('test identity source was exhausted');
       return id;
     });
-    await lifecycle.create({
-      containingSpaceId: META_ID,
-      mapId: MAP_ID,
-      title: 'Architecture',
-      position: { x: 240, y: 0 },
-    });
+    await lifecycle.create(
+      showingSpace({
+        containingSpaceId: META_ID,
+        mapId: MAP_ID,
+        title: 'Architecture',
+        position: { x: 240, y: 0 },
+      }),
+    );
     await settles(meta, 'rejected');
     const target = registry.session(TARGET_ID);
     const tooLarge = {

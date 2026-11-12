@@ -17,7 +17,6 @@ import {
 import { RESOURCE_SIZE } from '../src/resource';
 import { mintingIds } from './minting';
 import { node } from './render-adapter-fixtures';
-import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
 import { textAsset } from './markdown-texts';
 
@@ -112,7 +111,7 @@ function open(
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
   const { navigation, authoring, adapter, continuation, edgeAuthoring, deleteConfirmation } =
-    composeApp({ images: unusedImageSources, spaceSession: session, selection: mapId, newId });
+    composeApp({ spaceSession: session, selection: mapId, newId });
   adapter.getState().syncProjection(PROJECTED, []);
   return {
     session,
@@ -469,7 +468,6 @@ describe('draft invalidation', () => {
     });
     const session = openSpaceSession(backend, loaded);
     const { authoring, edgeAuthoring: edges } = composeApp({
-      images: unusedImageSources,
       spaceSession: session,
       selection: MAP_ID,
     });

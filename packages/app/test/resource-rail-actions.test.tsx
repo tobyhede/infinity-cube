@@ -23,7 +23,6 @@ import { expectMenuGroups } from './menu-assertions';
 import { openTestSpace } from './opened-space';
 import { mountSpace } from './space-mounting';
 import { RESOURCE_HEIGHT, RESOURCE_WIDTH } from '../src/resource';
-import { unusedImageSources } from './image-sources';
 import { stubResizeObserver } from './resize-observer';
 import { textAsset } from './markdown-texts';
 
@@ -269,7 +268,7 @@ function mount(
     stored,
   );
   let view: RenderResult | undefined;
-  const app = composeApp({ images: unusedImageSources, spaceSession: session, spaceResources });
+  const app = composeApp({ spaceSession: session, spaceResources });
   prepare?.(app);
   mountSpace(
     { id: runtime(mounted).id, session, app, spaceResources },
@@ -489,7 +488,7 @@ describe('a Resource’s commands on the canvas rail', () => {
 
   /**
    * A refused Graph creation and a refused Reference Resource creation are
-   * drawn from command outcomes' `graph-create` and `reference-create`
+   * drawn from command outcomes' `graph-create` and `resource-create`
    * channels, each under its own title, and each dismissal puts away only its
    * own notice.
    */
@@ -500,7 +499,7 @@ describe('a Resource’s commands on the canvas rail', () => {
         if (completion.kind === 'added-graph') {
           return { kind: 'refused', refusal: { code: 'map-not-found' } };
         }
-        if (completion.kind === 'created-reference') {
+        if (completion.kind === 'created-resources') {
           return { kind: 'refused', refusal: { code: 'resource-not-found' } };
         }
         return complete(target, completion);

@@ -3,7 +3,6 @@ import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
 import { chromeControlStaysOwed, staysOwed, type PendingContinuation } from '../src/continuation';
-import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
 import { textAsset } from './markdown-texts';
 
@@ -61,7 +60,6 @@ function open(stored: SpaceSnapshot = snapshot, revision = 0n) {
   const backend = MemorySpaceBackend.asMeta({ snapshot: stored, revision, exportedRevision: null });
   const session = openSpaceSession(backend, loaded);
   const { authoring, navigation, continuation } = composeApp({
-    images: unusedImageSources,
     spaceSession: session,
     selection: MAP_ID,
   });

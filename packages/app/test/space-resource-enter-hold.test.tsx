@@ -7,7 +7,6 @@ import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { unavailable } from './command-dock';
 import { recordingHistory } from './browser-history';
 import { holdExclusive, type HeldExclusive } from './held-exclusive';
-import { unusedImageSources } from './image-sources';
 import { refusingFullscreen } from './fullscreen';
 import { unlinkedPresentations } from './presentations';
 import { selectResource } from './resource-selection';
@@ -120,7 +119,6 @@ it('withdraws a Space Resource’s rail, Enter with it, while an only-drawn Spac
   const spaces = createOpenSpaces({
     fullscreen: refusingFullscreen,
     presentations: unlinkedPresentations,
-    images: unusedImageSources,
     backend,
     metaSpaceId: META_ID,
     metaSpaceTitle: 'Meta',

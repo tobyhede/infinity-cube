@@ -29,7 +29,6 @@ import { mintingIds } from './minting';
 import { openTestSpace } from './opened-space';
 import type { SpaceResourceAuthoring } from '../src/space-resource-lifecycle';
 import { createResource, createResourceControl, unavailable } from './command-dock';
-import { unusedImageSources } from './image-sources';
 import { stubResizeObserver } from './resize-observer';
 
 /**
@@ -327,7 +326,6 @@ function mount(
   );
   const spaceResources: SpaceResourceAuthoring = { ...authoring, ...broken };
   const app = composeApp({
-    images: unusedImageSources,
     spaceSession: session,
     reportObserverError,
   });

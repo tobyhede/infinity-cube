@@ -15,39 +15,11 @@ import {
   type AgreeingAllOf,
   type KindDecorator,
 } from '../canvas-resource-decoration';
-import type { KindCreation } from '../kind-creation';
-import { imageCreation, imageDecoration, type ImageCreationContext } from './image';
-import { markdownCreation, markdownDecoration, type MarkdownCreationContext } from './markdown';
-import { spaceCreation, spaceDecoration, type SpaceCreationContext } from './space';
+import { imageDecoration } from './image';
+import { markdownDecoration } from './markdown';
+import { spaceDecoration } from './space';
 import { referenceDecoration } from './reference';
-import { urCreation, urDecoration, type UrCreationContext } from './ur';
-
-/** What every kind's Create reads, together. */
-export type KindCreationContext = MarkdownCreationContext &
-  SpaceCreationContext &
-  ImageCreationContext &
-  UrCreationContext;
-
-/**
- * How each kind is created from the Command Dock, or `null` for a kind it does
- * not create. A Reference Resource is always created *from* the Resource it
- * points at, which supplies the Target (ADR 0089), so its Create is a row in
- * that Resource's own command menu.
- */
-const CREATIONS = {
-  [markdownKind.id]: markdownCreation,
-  [spaceKind.id]: spaceCreation,
-  [imageKind.id]: imageCreation,
-  [urKind.id]: urCreation,
-  [referenceKind.id]: null,
-} satisfies Readonly<Record<KindId, KindCreation<KindCreationContext> | null>>;
-
-/** Every kind the Command Dock creates, with its Create, in registry order. */
-export const KIND_CREATIONS: readonly (readonly [KindId, KindCreation<KindCreationContext>])[] =
-  KIND_IDS.flatMap((kind): (readonly [KindId, KindCreation<KindCreationContext>])[] => {
-    const creation = CREATIONS[kind];
-    return creation === null ? [] : [[kind, creation]];
-  });
+import { urDecoration } from './ur';
 
 /**
  * How each kind decorates its Resources on the canvas.

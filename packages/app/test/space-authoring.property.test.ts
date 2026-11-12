@@ -16,8 +16,8 @@ import { GRAPH_PALETTE, loadSpaceSnapshot } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
 import { CANVAS, type AuthoringCompletion, type AuthoringResult } from '../src/space-authoring';
-import { unusedImageSources } from './image-sources';
 import { textAsset } from './markdown-texts';
+import { createdEmpty, createdReference } from './created-resources';
 
 /**
  * What every semantic operation owes, whatever order they arrive in.
@@ -211,7 +211,6 @@ it('keeps an existing Reference Resource Target immutable while accepting Title 
         const loaded = { snapshot, revision: 0n, exportedRevision: null };
         const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
         const { authoring } = composeApp({
-          images: unusedImageSources,
           spaceSession: session,
           selection: OTHER_MAP_ID,
         });
@@ -264,7 +263,6 @@ it('keeps the working Space loadable through any sequence of semantic operations
         const loaded = { snapshot: start, revision: 0n, exportedRevision: null };
         const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
         const { currentSpace, navigation, authoring } = composeApp({
-          images: unusedImageSources,
           spaceSession: session,
           selection: mapId,
         });
@@ -344,11 +342,11 @@ function resolve(
       };
     }
     case 'created-resource':
-      return { kind: 'created-resource', resourceKind: 'markdown', anchor: generated.anchor };
+      return createdEmpty('markdown', generated.anchor);
     case 'created-ur-resource':
-      return { kind: 'created-resource', resourceKind: 'ur', anchor: generated.anchor };
+      return createdEmpty('ur', generated.anchor);
     case 'created-reference':
-      return { kind: 'created-reference', target: resourceId, anchor: generated.anchor };
+      return createdReference(resourceId, generated.anchor);
     case 'added-resource-to-map':
       return { kind: 'added-resource-to-map', resourceId, anchor: generated.anchor };
     case 'removed-resource-from-map':

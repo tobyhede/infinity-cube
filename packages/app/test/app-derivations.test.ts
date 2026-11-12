@@ -248,7 +248,9 @@ describe('resourceRailGroups', () => {
     { id: 'connect-resource', label: 'Connect to Resource', onSelect: () => 'done' },
   ];
   const everything: ResourceRailCommands = {
-    createReference: (): EntityActionOutcome => 'done',
+    createFrom: [
+      { kind: 'reference', label: 'Create Reference', run: (): EntityActionOutcome => 'done' },
+    ],
     removeFromMap: bound('canvas.removeSelection', AVAILABLE),
     deleteFromSpace: () => undefined,
     enter: { run: () => undefined, available: true },
@@ -323,7 +325,7 @@ describe('resourceRailGroups', () => {
     expect(
       ids(
         resourceRailGroups(resource(PLACED_A), addresses, connect, {
-          createReference: null,
+          createFrom: null,
           removeFromMap: bound('canvas.removeSelection', ABSENT),
           deleteFromSpace: null,
           enter: null,

@@ -8,7 +8,6 @@ import { createConnectionCompletion } from '../src/connection-completion';
 import type { PresentationLinks } from '../src/presentation-link';
 import type { Fullscreen } from '../src/presenting-fullscreen';
 import { channelHub } from './presentation-channels';
-import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
 import { textAsset } from './markdown-texts';
 
@@ -79,7 +78,7 @@ describe('the composed working Space', () => {
    */
   it('answers a new Space once an Edit has been taken', () => {
     const spaceSession = openSession();
-    const { currentSpace, authoring } = composeApp({ images: unusedImageSources, spaceSession });
+    const { currentSpace, authoring } = composeApp({ spaceSession });
     const before = currentSpace();
 
     expect(
@@ -103,7 +102,7 @@ describe('what the composition opens on', () => {
   });
 
   it('opens a selected Map on the placement that Map already authored', () => {
-    const { authoring } = composeApp({ images: unusedImageSources, spaceSession: openSession() });
+    const { authoring } = composeApp({ spaceSession: openSession() });
 
     expect(authoring.mapPlacement()).toEqual(
       Placement.fromEntries([
@@ -124,7 +123,6 @@ describe('the connection completion Edge Authoring is given', () => {
   it('builds a supplied completion over the collaborators this composition made', () => {
     const seen: { adapter: unknown; authoring: unknown }[] = [];
     const composed = composeApp({
-      images: unusedImageSources,
       spaceSession: openSession(),
       connections: (collaborators) => {
         seen.push(collaborators);
@@ -185,7 +183,6 @@ describe('tearing the composition down', () => {
     const { fullscreen, following } = recordingFullscreen();
     const { presentations, opened, open } = recordingPresentations();
     const composed = composeApp({
-      images: unusedImageSources,
       spaceSession: openSession(),
       fullscreen,
       presentations,

@@ -18,9 +18,7 @@ import type {
 import type { CommandOutcomes } from '../command-outcomes';
 import type { Continuation } from '../continuation';
 import type { DeleteConfirmation } from '../delete-confirmation';
-import type { KindCreation } from '../kind-creation';
 import { ownMapEmbed, type MapEmbedEntry } from '../map-embeddings';
-import type { ResourcePlacementCommands } from '../resource-placement';
 import type { OpenSpaces } from '../open-spaces';
 import { pluginSurfaceOperations, type PluginHost } from '../plugin-host/plugin-commits';
 import type { SpaceResourceRailContext } from '../space-resource-context-commands';
@@ -166,19 +164,4 @@ export const spaceDecoration: KindCanvasDecoration<SpaceKindId, SpaceResourceDec
     onContextReport,
   }),
   decorate: decorateSpaceResourceNode,
-};
-
-export type SpaceCreationContext = Pick<
-  ResourcePlacementCommands,
-  'createSpaceResource' | 'creatingSpaceResource'
->;
-
-/**
- * Create Space Resource: one press, one Resource, one new Space (ADR 0074).
- * Its coordinated Edit lands one await after the press, so it is withheld
- * for that window rather than swallowing a second press silently.
- */
-export const spaceCreation: KindCreation<SpaceCreationContext> = {
-  withheld: ({ creatingSpaceResource }) => creatingSpaceResource,
-  create: ({ createSpaceResource }) => createSpaceResource(),
 };

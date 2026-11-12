@@ -14,7 +14,6 @@ import type {
   SpaceResourceTargetUnavailableReason,
 } from './space-resource-lifecycle';
 import { failureMessage } from './failure-message';
-import { describeImageRefusal, type ImageRefusal } from './picture-admission';
 
 /**
  * Why a coordinated Space Resource lifecycle operation refused (ADR 0076).
@@ -39,16 +38,6 @@ type PresentedAuthoringRefusal =
  * differently would be a difference nothing could explain.
  */
 const MAP_NO_LONGER_IN_SPACE = 'This Map is no longer part of the Space.';
-
-/** A file refused for storing, named so the sentence can say which. */
-export interface RefusedFile {
-  readonly code: ImageRefusal;
-  readonly name: string;
-}
-
-/** A sentence for each refused file, in the order the gesture brought them. */
-export const describeImageRefusals = (refusals: readonly RefusedFile[]): string =>
-  refusals.map(({ code, name }) => describeImageRefusal(code, name)).join(' ');
 
 /** Application-owned copy for a stable Authoring refusal identity. */
 export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): string => {
@@ -85,8 +74,8 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
       return 'A Resource title is required.';
     case 'map-title-required':
       return 'A Map title is required.';
-    case 'image-url-unsupported':
-      return 'An image URL must start with https: or http:.';
+    case 'space-reference-creation-unsupported':
+      return 'A Resource showing a Space is created with that Space, which this control cannot do.';
     case 'space-title-required':
       return 'A Space title is required.';
     case 'reference-targets-self':

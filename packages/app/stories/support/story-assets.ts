@@ -1,5 +1,6 @@
 import { EMPTY_ASSET, type AssetRef } from '@project/resource-api/domain';
 import type { Assets } from '@project/resource-api/view';
+import { pickFilesInBrowser } from '#src/browser-file-picker';
 
 /**
  * The catalogue's asset store: the texts its stories' Markdown Resources name
@@ -43,11 +44,13 @@ export const storeStoryText = async (bytes: Blob): Promise<AssetRef> =>
 /**
  * Reads each text {@link storyText} named, and the empty asset; any other
  * reference is refused. A story that authors stores its Save's text here,
- * named as {@link storyText} names it.
+ * named as {@link storyText} names it. Its picker is the browser's own, as a
+ * running application's is, so a Create that picks files opens it.
  */
 export const STORY_ASSETS: Assets = {
   url: (ref) => ref,
   store: storeStoryText,
+  pick: async (accept) => [...(await pickFilesInBrowser(document, accept))],
   read: (ref) => {
     const text = TEXTS.get(ref);
     return Promise.resolve(

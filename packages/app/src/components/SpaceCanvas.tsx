@@ -32,7 +32,6 @@ import {
 import {
   DEFAULT_KIND,
   COLLAPSED_RESOURCE_SIZE,
-  isAcceptedImageUrl,
   titleName,
   uuidSchema,
   type ResourceId,
@@ -64,7 +63,7 @@ import { describeCanvasGestureRefusal, type CanvasGestureRefusal } from '../auth
 import { CANVAS_OCCURRENCE, observeMapSurfaces, type MapSurface } from '../map-surface';
 import { useCanvasResourceAuthoring, type CanvasPlugins } from '../canvas-resource-authoring';
 import type { SpaceResourceTargets } from '../space-resource-targets';
-import type { ResourcePlacementCommands } from '../resource-placement';
+import { createsFromData, type ResourcePlacementCommands } from '../resource-placement';
 import type { MapSurfaceReading } from '../use-map-surface';
 import { useEdgeAuthoring } from '../edge-authoring-react';
 import { edgeSelectionOf, sameSelection } from '../render-adapter';
@@ -209,7 +208,7 @@ export interface SpaceCanvasProps {
   /** Every way a Resource arrives on this canvas: created, dropped or pasted. */
   readonly placement: Pick<
     ResourcePlacementCommands,
-    'createResource' | 'dropExistingResource' | 'dropSpace' | 'dropImages' | 'pasteImageUrl'
+    'createOnCanvas' | 'dropExistingResource' | 'dropSpace' | 'createFromData'
   >;
   readonly onDrawnClipboardFailuresChange?: (failures: readonly DrawnClipboardFailure[]) => void;
   readonly onDrawnSpacesChange?: (entries: readonly OpenSpace[]) => void;
@@ -407,8 +406,8 @@ export function SpaceCanvas({
   const presenting = context.kind === 'canvas' && context.presentingResourceId !== null;
   const placedResources = view.placedResources;
   const { visibleGraphs: graphs, colors: colorByGraphId } = view.projection;
-  const { createResource, dropExistingResource, dropSpace, dropImages, pasteImageUrl } = placement;
-  const addCanvasResource = useCallback(() => createResource(DEFAULT_KIND), [createResource]);
+  const { createOnCanvas, dropExistingResource, dropSpace, createFromData } = placement;
+  const addCanvasResource = useCallback(() => createOnCanvas(DEFAULT_KIND), [createOnCanvas]);
   const { screenToFlowPosition, getZoom, setCenter } = useReactFlow();
 
   const spaces = useOpenSpaces();
@@ -934,7 +933,7 @@ export function SpaceCanvas({
       },
       ...liveEmbeddings.map((value) => ({
         id: value.surface.occurrence(),
-        addResource: () => value.placement.createResource(DEFAULT_KIND),
+        addResource: () => value.placement.createOnCanvas(DEFAULT_KIND),
         nodes: value.nodes,
         authoring: value.surface.authoring,
         availability: value.availability,
@@ -1792,16 +1791,17 @@ export function SpaceCanvas({
   }, []);
 
   /**
-   * A pasted image URL creates an Image Resource at the pointer (ADR 0106).
-   * Text pasted into a field is the field's, so only a paste the canvas or a
-   * Resource on it received is read, and only text an Image Resource may hold.
+   * A pasted URL creates a Resource at the pointer, by the plugin that takes
+   * it (ADR 0106, ADR 0142). Text pasted into a field is the field's, so only a
+   * paste the canvas or a Resource on it received is read, and only a URL a
+   * plugin accepts.
    */
   const onPaste = useCallback(
     (event: ReactClipboardEvent<HTMLDivElement>) => {
       if (!availability.authorOnCanvas || !(event.target instanceof Element)) return;
       if (event.target.closest(NOT_A_CANVAS_COMMAND) !== null) return;
       const url = event.clipboardData.getData('text/plain').trim();
-      if (!isAcceptedImageUrl(url)) return;
+      if (!createsFromData({ kind: 'url', url })) return;
       event.preventDefault();
       const rect = event.currentTarget.getBoundingClientRect();
       const at = pointer.current ?? {
@@ -1821,15 +1821,18 @@ export function SpaceCanvas({
           setCommandRefusal(describeCanvasGestureRefusal(refusal ?? UNAVAILABLE_DRAWING));
           return;
         }
-        drawing.placement.pasteImageUrl(url, centredAnchor(drawing.toAuthored(point)));
+        drawing.placement.createFromData(
+          { kind: 'url', url },
+          centredAnchor(drawing.toAuthored(point)),
+        );
         setCommandRefusal(null);
         return;
       }
-      pasteImageUrl(url, anchorAt(at.x, at.y));
+      createFromData({ kind: 'url', url }, anchorAt(at.x, at.y));
     },
     [
       availability.authorOnCanvas,
-      pasteImageUrl,
+      createFromData,
       anchorAt,
       screenToFlowPosition,
       embeddingAt,
@@ -1890,7 +1893,10 @@ export function SpaceCanvas({
         }
         const anchor = centredAnchor(drawing.toAuthored(point));
         if (event.dataTransfer.types.includes('Files')) {
-          drawing.placement.dropImages([...event.dataTransfer.files], anchor);
+          drawing.placement.createFromData(
+            { kind: 'files', files: [...event.dataTransfer.files] },
+            anchor,
+          );
           setCommandRefusal(null);
         } else {
           const resourceId = uuidSchema.safeParse(event.dataTransfer.getData(RESOURCE_DRAG_TYPE));
@@ -1924,7 +1930,10 @@ export function SpaceCanvas({
       if (files !== null) {
         event.preventDefault();
         if (files === 'place')
-          dropImages([...event.dataTransfer.files], anchorAt(event.clientX, event.clientY));
+          createFromData(
+            { kind: 'files', files: [...event.dataTransfer.files] },
+            anchorAt(event.clientX, event.clientY),
+          );
         return;
       }
       if (!availability.authorOnCanvas || !(event.target instanceof Element)) return;
@@ -1947,7 +1956,7 @@ export function SpaceCanvas({
       availability.authorOnCanvas,
       dropExistingResource,
       dropSpace,
-      dropImages,
+      createFromData,
       anchorAt,
       screenToFlowPosition,
       embeddingAt,

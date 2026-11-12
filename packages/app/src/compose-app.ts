@@ -24,13 +24,6 @@ import {
   type SpaceAuthoring,
   type SurfaceAuthoring,
 } from './space-authoring';
-import {
-  createImageResources,
-  type ImageEditResult,
-  type ImageOrigin,
-  type ImageSources,
-  type ImageTarget,
-} from './image-creation';
 
 /**
  * What an opened Space is composed of.
@@ -70,16 +63,6 @@ export interface ComposeCoreDependencies {
 }
 
 export interface ComposeAppDependencies extends ComposeCoreDependencies {
-  /**
-   * Where this Space's created and replaced images are stored and measured
-   * (ADR 0106).
-   *
-   * Required with no default: both reach outside the process, so the caller
-   * that composes the Space names them, and a test supplies answers of its own.
-   * The composition is the only holder, so creating and replacing an image in
-   * this Space always use the same sources.
-   */
-  readonly images: ImageSources;
   /**
    * Mints the identity of every Resource, Map and Graph a completed Edit creates
    * (ADR 0109).
@@ -176,16 +159,6 @@ export interface ComposedApp extends AppCore {
    * rehearsal notes, the Notes window, fullscreen and the link (ADR 0129).
    */
   readonly presenting: PresentingWindow;
-  /**
-   * Create Image Resources from one gesture's files or URL, over this Space's
-   * image sources and Authoring.
-   */
-  readonly createImageResources: (
-    origin: ImageOrigin,
-    target: ImageTarget,
-  ) => Promise<ImageEditResult>;
-  /** This Space's image picker, {@link ImageSources.pick}, which Create Image Resource opens. */
-  readonly pickImages: ImageSources['pick'];
   readonly authoring: SpaceAuthoring;
   /** The gate this Space's Authoring asks at `complete`, which its plugin surfaces claim on. */
   readonly pluginGate: PluginGate;
@@ -251,7 +224,6 @@ export function composeCore({ spaceSession, selection }: ComposeCoreDependencies
 export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
   const {
     spaceSession,
-    images,
     newId = newUuid,
     reportObserverError,
     connections,
@@ -330,9 +302,6 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
   return {
     ...core,
     presenting,
-    createImageResources: (origin, target) =>
-      createImageResources({ images, authoring }, origin, target),
-    pickImages: images.pick,
     authoring,
     pluginGate,
     adapter,

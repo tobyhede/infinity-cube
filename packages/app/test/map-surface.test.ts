@@ -4,7 +4,6 @@ import { positionedStrategy } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
 import { createMapSurface, observeMapSurfaces, type DrawnSurfaceContext } from '../src/map-surface';
-import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
 
 const id = (tail: string) => uuidSchema.parse(`00000000-0000-4000-8000-${tail.padStart(12, '0')}`);
@@ -53,7 +52,7 @@ function composition() {
   };
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-  return composeApp({ spaceSession, images: unusedImageSources });
+  return composeApp({ spaceSession });
 }
 
 function drawing(

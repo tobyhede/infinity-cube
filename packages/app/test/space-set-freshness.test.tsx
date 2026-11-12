@@ -12,7 +12,6 @@ import { createOpenSpaces } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { recordingHistory } from './browser-history';
 import { createResource, unavailable } from './command-dock';
-import { unusedImageSources } from './image-sources';
 import { refusingFullscreen } from './fullscreen';
 import { unlinkedPresentations } from './presentations';
 import { stubResizeObserver } from './resize-observer';
@@ -185,7 +184,6 @@ describe('the Spaces a Resources list offers', () => {
     const spaces = createOpenSpaces({
       fullscreen: refusingFullscreen,
       presentations: unlinkedPresentations,
-      images: unusedImageSources,
       backend,
       metaSpaceId: META_ID,
       metaSpaceTitle: meta.document.title,

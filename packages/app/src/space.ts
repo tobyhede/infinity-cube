@@ -3,13 +3,11 @@ import { loadSpaceSnapshot, type Space } from '@project/graph';
 import { newUuid, type AssetRef, type UUID } from '@project/core';
 import type { AssetClient, AssetRefusal, SpaceBackend } from '@project/persistence';
 import type { Assets } from '@project/resource-api/view';
-import { displayImageAsAuthored, type ImageDisplay } from '@project/ui';
 import type { HistoryApi } from './browser-location';
 import { createBrowserHistory } from './browser-history';
 import { describeAssetRefusal } from './authoring-refusal';
-import { pickFilesInBrowser, pickImagesInBrowser } from './browser-file-picker';
-import type { ImageSize, ImageSources } from './image-creation';
-import { storePicture } from './picture-admission';
+import { pickFilesInBrowser } from './browser-file-picker';
+import { measurePictureInBrowser } from './browser-picture-measure';
 import type { Fullscreen } from './presenting-fullscreen';
 import type { PresentationLinks } from './presentation-link';
 import type { ApplicationStartupResult } from './startup';
@@ -31,47 +29,6 @@ export interface SpaceStartup {
  */
 const browserHistory = (): HistoryApi => createBrowserHistory(window);
 
-/** How long a picture may take to load before it is taken as one that did not. */
-const MEASURE_TIMEOUT_MS = 10_000;
-
-/**
- * The browser loading a picture to learn its natural size (ADR 0106): the one
- * place the application builds an `Image`. A picture that errors, never
- * answers, or has no intrinsic size answers `undefined`.
- */
-const measureInBrowser = (url: string): Promise<ImageSize | undefined> =>
-  new Promise((resolve) => {
-    const picture = new Image();
-    const settle = (size: ImageSize | undefined): void => {
-      clearTimeout(timer);
-      picture.onload = null;
-      picture.onerror = null;
-      resolve(size);
-    };
-    const timer = setTimeout(() => settle(undefined), MEASURE_TIMEOUT_MS);
-    picture.onload = () => {
-      const { naturalWidth: width, naturalHeight: height } = picture;
-      settle(width > 0 && height > 0 ? { width, height } : undefined);
-    };
-    picture.onerror = () => settle(undefined);
-    picture.src = url;
-  });
-
-/**
- * The host's asset store, and the browser measuring what it loads and choosing
- * files. A picture is admitted as one before it is stored as an asset. It is
- * measured where `displayImage` draws it from, so a measurement loads what the
- * Resource will show.
- */
-export const browserImageSources = (
-  assets: AssetClient = httpAssetClient(new HttpSpaceBackend()),
-  displayImage: ImageDisplay = displayImageAsAuthored,
-): ImageSources => ({
-  store: (image) => storePicture(assets, image),
-  measure: (url) => measureInBrowser(displayImage(url)),
-  pick: pickImagesInBrowser,
-});
-
 /** A refusal as a plugin reads it: the store's code put into words. */
 interface WordedRefusal {
   readonly refused: string;
@@ -87,14 +44,16 @@ const worded = <T extends Blob | AssetRef>(answer: T | AssetRefusal): T | Worded
 /**
  * The asset store as a Resource plugin's surface reaches it (ADR 0142): the
  * client's `url`, `read` and `store`, each refusal worded by
- * `describeAssetRefusal`, and the browser's own file picker. A host
- * hands on only `url` and `read` where its Resource is not authored.
+ * `describeAssetRefusal`, the browser's own file picker, and `measure`, the
+ * browser loading a picture to size it (ADR 0109). A host hands on only `url` and `read` where its Resource is not
+ * authored.
  */
 export const browserPluginAssets = (assets: AssetClient): Assets => ({
   url: (ref) => assets.url(ref),
   read: async (ref) => worded(await assets.read(ref)),
   store: async (bytes) => worded(await assets.store(bytes)),
   pick: async (accept) => [...(await pickFilesInBrowser(document, accept))],
+  measure: measurePictureInBrowser,
 });
 
 /**
@@ -106,7 +65,7 @@ export const browserPluginAssets = (assets: AssetClient): Assets => ({
  *
  * The other four seams default together and for one reason: this is the composition
  * root, and it is where the ambient browser, the ambient generator and the real
- * transport — for Spaces and for images — are named. Everything below takes each of them required.
+ * transport — for Spaces and for assets — are named. Everything below takes each of them required.
  *
  * `session.mounted` says the session is Mounting an aggregate (ADR 0130), so
  * every Space it opens marks its Edits as lost on reload (ADR 0131). It is
@@ -120,7 +79,6 @@ export const createSpaceStartup = (
   backend: SpaceBackend = new HttpSpaceBackend(),
   newId: () => UUID = newUuid,
   history: HistoryApi = browserHistory(),
-  images: ImageSources = browserImageSources(),
   {
     mounted = false,
     assets = httpAssetClient(new HttpSpaceBackend()),
@@ -142,7 +100,6 @@ export const createSpaceStartup = (
         metaSpaceTitle: meta.snapshot.document.title,
         newId,
         history,
-        images,
         fullscreen,
         presentations,
         mounted,

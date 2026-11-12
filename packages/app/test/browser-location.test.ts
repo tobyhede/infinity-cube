@@ -14,9 +14,7 @@ import { composeApp } from '../src/compose-app';
 import { pinSource } from '../src/mount/mount-source';
 import { carriedAddress, sourceParameter } from '../src/source-parameter';
 import { recordingHistory, standInBrowser } from './browser-history';
-import type { ImageSources } from '../src/image-creation';
 import { holdExclusive, type HeldExclusive } from './held-exclusive';
-import { unusedImageSources } from './image-sources';
 import { createPluginGate } from '../src/plugin-host/plugin-gate';
 import { textAsset } from './markdown-texts';
 
@@ -108,10 +106,9 @@ const selfEdge: SpaceSnapshot = {
   ],
 };
 
-const compose = (opened: SpaceSnapshot = snapshot, images: ImageSources = unusedImageSources) => {
+const compose = (opened: SpaceSnapshot = snapshot) => {
   const loaded = { snapshot: opened, revision: 0n, exportedRevision: null };
   return composeApp({
-    images,
     spaceSession: openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded),
   });
 };

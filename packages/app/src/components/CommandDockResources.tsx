@@ -10,9 +10,8 @@ import { bindingOf } from '../key-bindings';
 import type { MenuSide } from '../dock-placement';
 import { RESOURCES_TRIGGER } from './command-dock-triggers';
 import { DockDisclosureContext, RESOURCES_DISCLOSURE_ID } from './command-dock-shared';
-import type { DockResources, DockResourcesList } from './command-dock-chrome';
+import type { DockCreate, DockResources, DockResourcesList } from './command-dock-chrome';
 import { SetTrigger } from './CommandDockParts';
-import type { DockCreate } from '../kind-creation';
 import { ResourcesPopover } from './ResourcesPopover';
 
 /**

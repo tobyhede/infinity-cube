@@ -23,7 +23,6 @@ import {
 import { createOpenSpaces, type OpenSpace } from '../src/open-spaces';
 import { CANVAS, type AuthoringResult } from '../src/space-authoring';
 import { recordingHistory } from './browser-history';
-import { unusedImageSources } from './image-sources';
 import { refusingFullscreen } from './fullscreen';
 import { unlinkedPresentations } from './presentations';
 
@@ -110,7 +109,6 @@ const openSpaces = (
   createOpenSpaces({
     fullscreen: refusingFullscreen,
     presentations: unlinkedPresentations,
-    images: unusedImageSources,
     backend: new MemorySpaceBackend(
       META,
       [meta, target].map((snapshot) => ({ snapshot, revision: 0n, exportedRevision: null })),

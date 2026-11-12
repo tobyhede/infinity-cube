@@ -10,12 +10,12 @@
  * plan out (`session-registry.ts`).
  */
 import {
-  spaceKind,
   SPACE_FILE_VERSION,
   selectSpaceView,
   spaceSelection,
   kindFlags,
   lifetimeSpaceReferences,
+  spaceReferences,
   type Map,
   type MapPosition,
   type ResourceDocument,
@@ -75,11 +75,27 @@ export type TargetSelection =
   | { readonly kind: 'selected'; readonly selection: SpaceViewChoice }
   | { readonly kind: 'unavailable'; readonly reason: SpaceResourceTargetUnavailableReason };
 
+/** The Space a Space Resource shows, and the Map and Graph it opens on. */
+export interface ShownSpace {
+  readonly spaceId: UUID;
+  readonly map: UUID;
+  readonly graph: UUID;
+}
+
+/**
+ * The Resource a create or link makes, from the Space it shows as the
+ * coordination reads it: a plugin's (ADR 0142), whose content must name that
+ * Space and no other.
+ */
+export type SpaceResourceDocument = (shown: ShownSpace) => ResourceDocument;
+
 export interface CreateSpaceResourceInput {
   readonly containingSpaceId: UUID;
   readonly mapId: UUID;
   readonly title: string;
   readonly position: MapPosition;
+  /** The Resource made, from the Space it shows. */
+  readonly document: SpaceResourceDocument;
 }
 /**
  * Reference an existing Space. The selection is **not** a parameter (ADR 0079):
@@ -323,11 +339,19 @@ const createSpaceResource = (
   targetSpaceId: UUID,
   selection: SpaceViewChoice,
 ): SpaceResourceRefused | { readonly kind: 'completed'; readonly snapshot: SpaceSnapshot } => {
-  const document: ResourceDocument = {
-    title: input.title,
-    kind: spaceKind.id,
-    content: { spaceId: targetSpaceId, map: selection.map, graph: selection.graph },
-  };
+  const shown: ShownSpace = { spaceId: targetSpaceId, map: selection.map, graph: selection.graph };
+  const document = input.document(shown);
+  // The Space this coordination makes or links is the only one the Resource
+  // may name, and it must hold that Space's lifetime (ADR 0074): anything else
+  // is a defect in what supplied the document, never an author's state.
+  const named = spaceReferences(document);
+  if (
+    named.length !== 1 ||
+    named[0] !== targetSpaceId ||
+    lifetimeSpaceReferences(document)[0] !== targetSpaceId
+  ) {
+    throw new Error(`A Space Resource made for Space ${targetSpaceId} must name it alone`);
+  }
   const created = SnapshotEdit.createInMap(
     source,
     input.mapId,

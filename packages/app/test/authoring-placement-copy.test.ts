@@ -8,7 +8,6 @@ import { createOpenSpaces } from '../src/open-spaces';
 import { recordingHistory } from './browser-history';
 import { openTestSpace } from './opened-space';
 import { node, settled } from './render-adapter-fixtures';
-import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
 import { refusingFullscreen } from './fullscreen';
 import { unlinkedPresentations } from './presentations';
@@ -73,7 +72,7 @@ describe('Map delete draws the right geometry', () => {
       revision: 0n,
       exportedRevision: null,
     });
-    const app = composeApp({ images: unusedImageSources, spaceSession: session });
+    const app = composeApp({ spaceSession: session });
     expect(app.navigation.getState().selectedMapId).toBe(DELETED_MAP_ID);
 
     // What the Dock's Delete does (`dock-chrome.ts`): Map authoring deletes the Map and
@@ -188,7 +187,6 @@ describe('Entering draws the entered Map’s geometry', () => {
     const spaces = createOpenSpaces({
       fullscreen: refusingFullscreen,
       presentations: unlinkedPresentations,
-      images: unusedImageSources,
       backend,
       metaSpaceId: META_ID,
       metaSpaceTitle: metaSnapshot.document.title,
@@ -272,7 +270,7 @@ describe('An embedded Edit in an unselected Map leaves no stale member', () => {
   it('produces a snapshot intake accepts after a later top-level Edit', () => {
     const backend = MemorySpaceBackend.asMeta({ snapshot, revision: 0n, exportedRevision: null });
     const session = openSpaceSession(backend, { snapshot, revision: 0n, exportedRevision: null });
-    const app = composeApp({ images: unusedImageSources, spaceSession: session });
+    const app = composeApp({ spaceSession: session });
     expect(app.navigation.getState().selectedMapId).toBe(TOP_MAP_ID);
 
     // An embedded Edit against a Map other than the one selected at the
@@ -361,7 +359,6 @@ describe('A queued drag holds its drop point', () => {
     const backend = MemorySpaceBackend.asMeta({ snapshot, revision: 0n, exportedRevision: null });
     const session = openSpaceSession(backend, { snapshot, revision: 0n, exportedRevision: null });
     const { authoring, adapter } = composeApp({
-      images: unusedImageSources,
       spaceSession: session,
       selection: MAP_ID,
     });

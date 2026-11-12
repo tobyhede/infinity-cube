@@ -7,7 +7,7 @@ import {
   pluginList,
   pluginListProblem,
 } from '@project/resource-api/domain';
-import type { RailCommand } from '@project/resource-api/view';
+import { definePluginView, type RailCommand } from '@project/resource-api/view';
 import { createRailStore } from '@project/resource-api/view/host';
 
 const plugin = <const V extends number, const K extends string>(apiVersion: V, kind: K) =>
@@ -92,6 +92,34 @@ describe('a rail store', () => {
   });
 });
 
+describe('declaring how a plugin creates its Resources', () => {
+  it('refuses two creations offered from the same place, which the host could not tell apart', () => {
+    const declared = plugin(API_VERSION, 'one');
+    const run = (): void => undefined;
+
+    expect(() =>
+      definePluginView(declared, {
+        View: () => null,
+        Glyph: () => null,
+        creates: [
+          { from: 'resource', label: 'Create', run },
+          { from: 'resource', label: 'Create', run },
+        ],
+      }),
+    ).toThrow(/two creations from 'resource'/u);
+    expect(() =>
+      definePluginView(declared, {
+        View: () => null,
+        Glyph: () => null,
+        creates: [
+          { from: 'dock', run },
+          { from: 'resource', label: 'Create', run },
+        ],
+      }),
+    ).not.toThrow();
+  });
+});
+
 describe('the view entry a plugin draws with', () => {
   it('exports none of the host’s machinery, which only /view/host does', async () => {
     const view = Object.keys(await import('@project/resource-api/view'));
@@ -103,6 +131,7 @@ describe('the view entry a plugin draws with', () => {
       'RenderedMarkdown',
       'SourceEditor',
       'Title',
+      'URL_MEDIA_TYPE',
       'definePluginView',
       'refusalOf',
       'useRailBand',

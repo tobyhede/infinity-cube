@@ -5,6 +5,7 @@ import {
   definePluginView,
   Rail,
   Title,
+  type Creation,
   type PluginViewProps,
   type RailCommand,
 } from '@project/resource-api/view';
@@ -143,4 +144,19 @@ function UrGlyph({ size = 14 }: { readonly size?: number | undefined }) {
   return <Circle size={size} />;
 }
 
-export const urPluginView = definePluginView(urPlugin, { View: UrView, Glyph: UrGlyph });
+/**
+ * Create Ur Resource (ADR 0113): one press on the Command Dock, a Title and
+ * nothing else; the host places it and continues into its Title.
+ */
+const createFromDock: Creation<UrContent> = {
+  from: 'dock',
+  run: async (host) => {
+    await host.create([{ content: urPlugin.newContent }]);
+  },
+};
+
+export const urPluginView = definePluginView(urPlugin, {
+  View: UrView,
+  Glyph: UrGlyph,
+  creates: [createFromDock],
+});

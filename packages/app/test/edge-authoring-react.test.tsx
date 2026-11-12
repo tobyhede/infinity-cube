@@ -18,7 +18,6 @@ import { ArmedDeleteConfirmation } from '../src/components/DeleteConfirmation';
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
 import { RESOURCE_SIZE } from '../src/resource';
 import { mountSettled } from './settled-mount';
-import { unusedImageSources } from './image-sources';
 import { stubResizeObserver } from './resize-observer';
 import { canvasReading, IDLE_PLACEMENT } from './map-surfaces';
 import { textAsset } from './markdown-texts';
@@ -222,7 +221,6 @@ function compose({
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
   const composed = composeApp({
-    images: unusedImageSources,
     spaceSession: session,
     selection,
     connections,

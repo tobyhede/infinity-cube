@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type {
-  EmptyCreatableKindId,
   Map as SpaceMap,
   MapId,
   MapPosition,
@@ -10,17 +9,20 @@ import type {
   UUID,
 } from '@project/core';
 import { resourceSize } from '@project/core';
-import type { PlacementMode } from '@project/graph';
 import type { ObserverErrorReporter } from '@project/persistence';
-import type { EntityActionOutcome } from '@project/ui';
-import {
-  describeAuthoringRefusal,
-  describeSpaceResourceBreak,
-  describeSpaceResourceRefusal,
-} from './authoring-refusal';
-import type { ImageOrigin } from './image-creation';
-import { resolveMap } from './map-resolution';
+import type { CreationData } from '@project/resource-api/view';
+import { pluginCreations, usePluginAssets, type EntityActionOutcome } from '@project/ui';
+import { describeAuthoringRefusal } from './authoring-refusal';
 import type { OpenSpace } from './open-spaces';
+import {
+  createCreationFlights,
+  createCreationHost,
+  dataCreation,
+  dockCreations,
+  resourceCreations,
+  spaceCreation,
+} from './plugin-host/creation';
+import { usePluginGate } from './plugin-host/plugin-gate-context';
 import { RESOURCE_HEIGHT, RESOURCE_WIDTH } from './resource';
 import {
   completedResourceDrag,
@@ -30,8 +32,26 @@ import {
   type SettlePlacement,
   type SettleResource,
 } from './resources-drag';
-import { nextSpaceTitle } from './titles';
 import { useVisibleCentre, type VisibleCentreReporting } from './visible-centre';
+
+/** Every plugin's creations, in build order: the same list for every surface. */
+const CREATIONS = pluginCreations();
+
+/** Every creation the Command Dock offers. */
+export const DOCK_CREATIONS = dockCreations(CREATIONS);
+
+/** Every creation offered on a Resource, given that Resource. */
+export const RESOURCE_CREATIONS = resourceCreations(CREATIONS);
+
+/** Whether arriving data is something a plugin creates a Resource from. */
+export const createsFromData = (data: CreationData): boolean =>
+  dataCreation(CREATIONS, data) !== undefined;
+
+/** What is said where no plugin offers a Space a Resource. */
+const NO_SPACE_CREATION = 'A Space cannot be shown here.';
+
+/** No creation runs. */
+export const NOTHING_CREATING: ReadonlySet<string> = new Set();
 
 /**
  * How far a new Reference Resource steps past the Resource it was created from:
@@ -79,31 +99,35 @@ export interface ResourcePlacementInput {
 }
 
 export interface ResourcePlacementCommands extends VisibleCentreReporting {
-  /** Create a Resource of a kind that starts empty: one completed Edit, then the naming continuation. */
-  readonly createResource: (kind: EmptyCreatableKindId) => void;
+  /**
+   * Run the Command Dock creation of `kind`, placed at the visible centre as
+   * it stands when the Resources are asked for; `available` is asked again
+   * then, and a creation no longer available creates nothing.
+   */
+  readonly createFromDock: (kind: string, available?: () => boolean) => void;
+  /**
+   * Run the Dock's creation of `kind` from the canvas's own Add Resource,
+   * placed as a Dock press is. It is not a Dock press, so it is not single
+   * flight: a quick second Add runs too.
+   */
+  readonly createOnCanvas: (kind: string) => void;
+  /** The kinds whose creation is between its `create` and its installed Edit. */
+  readonly creating: ReadonlySet<string>;
   /** Place a Resource this Map leaves out, answering a refusal's sentence or `null`. */
   readonly addExistingResource: (
     resourceId: ResourceId,
     anchor: MapPosition,
     focus: boolean,
   ) => string | null;
-  /** Frame an existing Space with a Space Resource, answering a refusal's sentence or `null`. */
+  /** Show an existing Space in a Resource, answering a refusal's sentence or `null`. */
   readonly addSpaceResourceFor: (
     space: ResourcesPopoverSpace,
     anchor: MapPosition,
   ) => Promise<string | null>;
-  /** Create Space Resource: one press, one Resource, one new Space. */
-  readonly createSpaceResource: () => void;
-  /** Whether a Create Space Resource is between its press and its installed Edit. */
-  readonly creatingSpaceResource: boolean;
-  /** Create Image Resources from chosen files, at the visible centre. */
-  readonly createImagesFromFiles: (files: readonly File[]) => void;
-  /** Image files dropped on the canvas: one Image Resource each, in a row from the drop point. */
-  readonly dropImages: (files: readonly File[], anchor: MapPosition) => void;
-  /** An image URL pasted on the canvas: one Image Resource at the pointer. */
-  readonly pasteImageUrl: (url: string, anchor: MapPosition) => void;
-  /** Create Reference, from the Resource it points at. */
-  readonly createReferenceFrom: (resource: Resource) => EntityActionOutcome;
+  /** Data dropped or pasted on the canvas: the plugin that takes it creates from it at `anchor`. */
+  readonly createFromData: (data: CreationData, anchor: MapPosition) => void;
+  /** Run a creation offered on `resource`, of the kind given, from that Resource. */
+  readonly createFromResource: (kind: string, resource: Resource) => EntityActionOutcome;
   /** A drag from the Resources list began over a Resource row. */
   readonly startResourceDrag: (resourceId: ResourceId, settle: SettleResource) => void;
   /** A drag from the Resources list began over a Space row. */
@@ -126,141 +150,138 @@ export interface ResourcePlacementCommands extends VisibleCentreReporting {
  * or the Space under it changes.
  */
 export function useResourcePlacement(
-  { app, session: spaceSession, spaceResources }: OpenSpace,
+  { app, session, spaceResources }: OpenSpace,
   { map: selectedMap, presenting, replacementEpoch, reportBreak }: ResourcePlacementInput,
 ): ResourcePlacementCommands {
   const { reportVisibleCentre, centreAnchor } = useVisibleCentre();
-  const { commandOutcomes, currentSpace, createImageResources, surface } = app;
+  const { surface } = app;
   const { authoring, adapter, continuation } = surface;
   const mapId: MapId = selectedMap.id;
+  const gate = usePluginGate();
+  const assets = usePluginAssets();
+  const [creating, setCreating] = useState<ReadonlySet<string>>(NOTHING_CREATING);
+  // Kept across the host each Map builds, so a Dock creation stays single
+  // flight while the author moves to another Map.
+  const [flights] = useState(() => createCreationFlights(setCreating));
+  // The Map drawn now, which a Dock press reads when its Resources are asked
+  // for, after a picker that may outlast the Map it was pressed on.
+  const drawnMapId = useRef(mapId);
+  // Updated in the commit that draws another Map, before any later task, a
+  // picker's answer among them, can read it.
+  useLayoutEffect(() => {
+    drawnMapId.current = mapId;
+  }, [mapId]);
 
-  /**
-   * Framing a Space from the surface that offers it, so a reader who found it in
-   * the list never meets a picker. The Title defaults to the Space's own;
-   * renaming it afterwards is the ordinary inline Title edit. The
-   * anchor is the caller's: a press passes the visible centre and a drop the
-   * point it landed on.
-   */
-  const addSpaceResourceFor = useCallback(
-    async (space: ResourcesPopoverSpace, anchor: MapPosition): Promise<string | null> => {
-      // Answers rather than rejects: the list spends this on a press or a drop
-      // of one of its rows, so a rejection left to travel is a row that visibly
-      // does nothing. `resolveMap` is inside the `try` because it is the
-      // likeliest break on this path — the list has been open across renders
-      // and the Map it resolves is the one drawing now.
-      try {
-        const resolved = resolveMap(currentSpace(), mapId);
-        const result = await spaceResources.link({
-          containingSpaceId: currentSpace().id,
-          mapId: resolved.map.id,
-          title: space.title,
-          position: anchor,
-          targetSpaceId: space.id,
-        });
-        return result.kind === 'refused' ? describeSpaceResourceRefusal(result.refusal) : null;
-      } catch (failure) {
-        // Both: the reader gets the sentence on the list that asked, and the
-        // diagnostic still reaches the operational channel.
-        reportBreak(failure);
-        return describeSpaceResourceBreak(failure);
-      }
-    },
-    [currentSpace, mapId, spaceResources, reportBreak],
+  const host = useMemo(
+    () =>
+      createCreationHost({
+        app,
+        session,
+        spaceResources,
+        gate,
+        assets,
+        mapId,
+        reportBreak,
+        flights,
+      }),
+    [app, session, spaceResources, gate, assets, mapId, reportBreak, flights],
   );
 
-  const [creatingSpaceResource, setCreatingSpaceResource] = useState(false);
-
   /**
-   * **Optimistic, in the one sense the lifecycle leaves open.** The coordination
-   * installs its local Edit and *then* commits two snapshots, and the promise
-   * here resolves at the installation — so the Resource is drawn and its Title
-   * editor takes the caret while the durable commit is still in flight. A
-   * refusal is delivered on that same resolution, before any Resource is
-   * installed, so there is no half-made Resource to take away; the "Space not
-   * created" notice is the half the author can see.
-   *
-   * `Space N` is minted from this Space's own Resource titles and handed to both
-   * the Space and the Resource that names it, so the two agree at creation
-   * (`titles.ts`). Referencing an *existing* Space is the Resources list's
-   * add-Space row, not this command.
+   * A Dock creation: one press, placed at the visible centre of the Map drawn
+   * when its Resources are asked for, which is after a picker answers for one
+   * that opens one, so a picture picked after moving to another Map lands
+   * there. The toolbar stays available for an empty authored Map: it is
+   * the zero-Resource Space's way to create the first Resource.
    */
-  const createSpaceResource = useCallback((): void => {
-    setCreatingSpaceResource(true);
-    // An `async` thunk so a throw from the title minting or `resolveMap`
-    // arrives at `run` as a rejection, as the lifecycle's own does.
-    void commandOutcomes
-      .run('space-resource-create', async () => {
-        const title = nextSpaceTitle(spaceSession.getState().working);
-        const resolved = resolveMap(currentSpace(), mapId);
-        return spaceResources.create({
-          containingSpaceId: currentSpace().id,
-          mapId: resolved.map.id,
-          title,
-          position: centreAnchor(),
-        });
-      })
-      .then((result) => {
-        if (result.kind === 'completed' && surface.context().mapId === mapId)
-          continuation.request({
-            target: { kind: 'resource', resourceId: result.resourceId },
-            select: true,
-            then: 'rename',
-          });
-      })
-      .finally(() => setCreatingSpaceResource(false));
-  }, [
-    commandOutcomes,
-    spaceSession,
-    currentSpace,
-    mapId,
-    spaceResources,
-    centreAnchor,
-    continuation,
-    surface,
-  ]);
-
-  /**
-   * **The gesture supplies the Target, so nothing is chosen first**, and the
-   * Title is the Target's, copied once and independent thereafter — ADR 0083
-   * keeps the Target's name off the drawn Resource, so this is the author's
-   * on-canvas indication of what the Reference Resource points at.
-   */
-  const createReferenceFrom = useCallback(
-    (resource: Resource): EntityActionOutcome => {
-      const anchor = referenceAnchor(selectedMap.positions[resource.id], centreAnchor);
-      // A refusal takes the standing notice rather than the menu it was pressed
-      // in: this command closes its menu, because it moves the caret onto the
-      // canvas, so by the time an answer exists there is no row left to swap a
-      // word on. The rows that *can* refuse are drawn unavailable, so what
-      // reaches here is a Target that went between the draw and the press.
-      const created = commandOutcomes.run('reference-create', () =>
-        authoring.complete({
-          kind: 'created-reference',
-          target: resource.id,
-          title: resource.title,
-          anchor,
+  const runAtCentre = useCallback(
+    (kind: string, flight: boolean, available?: () => boolean): void => {
+      const offered = DOCK_CREATIONS.find((creation) => creation.kind === kind);
+      if (offered === undefined) return;
+      void host.run(offered, {
+        place: () => ({
+          anchor: centreAnchor(),
+          placement: 'avoidingOverlap',
+          mapId: drawnMapId.current,
         }),
-      );
-      if (created.kind === 'completed' && created.createdResourceId !== undefined) {
-        continuation.request({
-          target: { kind: 'resource', resourceId: created.createdResourceId },
-          select: true,
-          then: 'rename',
-        });
-      }
-      switch (created.kind) {
-        case 'refused':
-        case 'broke':
-          return 'failed';
-        // A discarded creation has nothing to say.
-        case 'completed':
-        case 'unchanged':
-        case 'queued':
-        case 'discarded':
-          return 'done';
-      }
+        available,
+        flight,
+      });
     },
-    [selectedMap, centreAnchor, commandOutcomes, authoring, continuation],
+    [host, centreAnchor],
+  );
+  const createFromDock = useCallback(
+    (kind: string, available?: () => boolean): void => runAtCentre(kind, true, available),
+    [runAtCentre],
+  );
+  const createOnCanvas = useCallback(
+    (kind: string): void => runAtCentre(kind, false),
+    [runAtCentre],
+  );
+
+  /** Data aimed at a point keeps it exactly. Data no plugin takes creates nothing. */
+  const createFromData = useCallback(
+    (data: CreationData, anchor: MapPosition): void => {
+      const offered = dataCreation(CREATIONS, data);
+      if (offered === undefined) return;
+      void host.run(offered, { place: () => ({ anchor, placement: 'exact' }) });
+    },
+    [host],
+  );
+
+  /**
+   * **The gesture supplies the Resource, so nothing is chosen first**, and
+   * what is created lands a fixed step past it (`referenceAnchor`). A refusal
+   * takes the standing notice rather than the menu it was pressed in: this
+   * command closes its menu, because it moves the caret onto the canvas.
+   */
+  const createFromResource = useCallback(
+    (kind: string, resource: Resource): EntityActionOutcome => {
+      const offered = RESOURCE_CREATIONS.find((creation) => creation.kind === kind);
+      if (offered === undefined) return 'failed';
+      void host.run(
+        { ...offered, run: (creationHost) => offered.run(creationHost, resource) },
+        {
+          place: () => ({
+            anchor: referenceAnchor(selectedMap.positions[resource.id], centreAnchor),
+            placement: 'avoidingOverlap',
+          }),
+        },
+      );
+      return 'done';
+    },
+    [host, selectedMap, centreAnchor],
+  );
+
+  /**
+   * Showing an existing Space from the surface that offers it, so a reader who
+   * found it in the list never meets a picker. The anchor is the caller's: a
+   * press passes the visible centre and a drop the point it landed on. Answers
+   * rather than rejects: the list spends this on a press or a drop of one of
+   * its rows, and keeps the sentence.
+   */
+  const addSpaceResourceFor = useCallback(
+    (space: ResourcesPopoverSpace, anchor: MapPosition): Promise<string | null> => {
+      const offered = spaceCreation(CREATIONS);
+      if (offered === undefined) return Promise.resolve(NO_SPACE_CREATION);
+      return new Promise((resolve) => {
+        const offeredSpace = { spaceId: space.id, title: space.title };
+        void host
+          .run(
+            { ...offered, run: (creationHost) => offered.run(creationHost, offeredSpace) },
+            {
+              place: () => ({ anchor, placement: 'avoidingOverlap' }),
+              offered: offeredSpace,
+              settle: resolve,
+              // The list keeps the reader, as it does after adding a Resource.
+              continues: false,
+            },
+          )
+          // A creation that asked for nothing has nothing to say.
+          .then(() => resolve(null));
+      });
+    },
+    [host],
   );
 
   /**
@@ -289,108 +310,6 @@ export function useResourcePlacement(
       return null;
     },
     [authoring, adapter, continuation],
-  );
-
-  /**
-   * Create Resource, for a kind that starts empty: one Edit at the visible
-   * centre, continuing in the new Resource's Title.
-   *
-   * **The creations whose refusal no surface shows, and that is a decision.**
-   * A refusal carries a sentence for the author, worth showing where
-   * the author can act on it. These creations take no input at all, cannot
-   * refuse against a choice the author made, and leave nothing standing that a
-   * sentence could correct. A kind that takes input creates through a command
-   * of its own, which shows its refusal where the input was given.
-   *
-   * The toolbar stays available for an empty authored Map: it is the
-   * zero-Resource Space's way to create the first Resource.
-   */
-  const createResource = useCallback(
-    (resourceKind: EmptyCreatableKindId) => {
-      const created = authoring.complete({
-        kind: 'created-resource',
-        resourceKind,
-        anchor: centreAnchor(),
-      });
-      // Each outcome named rather than caught. `queued` is an Edit that will still
-      // be performed, whose projection draws the Resource without help from here.
-      // `unchanged` this operation cannot answer — it mints unconditionally — but
-      // the shared completion union carries it, so it is narrowed rather than
-      // asserted away.
-      if (created.kind === 'refused') return;
-      if (created.kind === 'queued') return;
-      if (created.kind === 'unchanged') return;
-      if (created.createdResourceId === undefined) return;
-      // Selected as well as named, so continued authoring — a connection, a second
-      // Resource — carries on from it. Both are the one continuation, spent when
-      // the projection that draws the Resource arrives.
-      continuation.request({
-        target: { kind: 'resource', resourceId: created.createdResourceId },
-        select: true,
-        then: 'rename',
-      });
-    },
-    [authoring, centreAnchor, continuation],
-  );
-
-  /**
-   * Every Image Resource gesture: store and measure what it brought, then one
-   * Edit on the Map the gesture was made on, continuing in the first created
-   * Resource's Title (ADR 0106). A refusal to store a file is said on the Image
-   * notice and creates nothing.
-   *
-   * The Title is owed only while that Map is still drawn: a continuation to a
-   * Resource on another Map would wait until the author went back there, and
-   * would replace whatever the Map they moved to is owed.
-   */
-  const createImages = useCallback(
-    (origin: ImageOrigin, anchor: MapPosition, placementMode: PlacementMode) => {
-      const target = { mapId, drawing: surface.target().kind, anchor, placement: placementMode };
-      void commandOutcomes
-        .run('image-create', () => createImageResources(origin, target))
-        .then((result) => {
-          if (
-            result.kind === 'completed' &&
-            result.createdResourceId !== undefined &&
-            surface.context().mapId === mapId
-          ) {
-            continuation.request({
-              target: { kind: 'resource', resourceId: result.createdResourceId },
-              select: true,
-              then: 'rename',
-            });
-          }
-        });
-    },
-    [commandOutcomes, createImageResources, mapId, continuation, surface],
-  );
-
-  /**
-   * Files chosen or dropped. No files is no gesture: a run clears the Image
-   * notice and supersedes a run still in flight, so an empty choice must not
-   * start one.
-   */
-  const createImagesFrom = useCallback(
-    (files: readonly File[], anchor: MapPosition, placementMode: PlacementMode) => {
-      if (files.length === 0) return;
-      createImages({ kind: 'files', files }, anchor, placementMode);
-    },
-    [createImages],
-  );
-
-  const createImagesFromFiles = useCallback(
-    (files: readonly File[]) => createImagesFrom(files, centreAnchor(), 'avoidingOverlap'),
-    [createImagesFrom, centreAnchor],
-  );
-
-  const dropImages = useCallback(
-    (files: readonly File[], anchor: MapPosition) => createImagesFrom(files, anchor, 'exact'),
-    [createImagesFrom],
-  );
-
-  const pasteImageUrl = useCallback(
-    (url: string, anchor: MapPosition) => createImages({ kind: 'url', url }, anchor, 'exact'),
-    [createImages],
   );
 
   const resourcesDrag = useRef<ResourcesDrag | null>(null);
@@ -443,15 +362,13 @@ export function useResourcePlacement(
     () => ({
       reportVisibleCentre,
       centreAnchor,
-      createResource,
+      createFromDock,
+      createOnCanvas,
+      creating,
       addExistingResource,
       addSpaceResourceFor,
-      createSpaceResource,
-      creatingSpaceResource,
-      createReferenceFrom,
-      createImagesFromFiles,
-      dropImages,
-      pasteImageUrl,
+      createFromData,
+      createFromResource,
       startResourceDrag,
       startSpaceDrag,
       endDrag,
@@ -461,15 +378,13 @@ export function useResourcePlacement(
     [
       reportVisibleCentre,
       centreAnchor,
-      createResource,
+      createFromDock,
+      createOnCanvas,
+      creating,
       addExistingResource,
       addSpaceResourceFor,
-      createSpaceResource,
-      creatingSpaceResource,
-      createReferenceFrom,
-      createImagesFromFiles,
-      dropImages,
-      pasteImageUrl,
+      createFromData,
+      createFromResource,
       startResourceDrag,
       startSpaceDrag,
       endDrag,

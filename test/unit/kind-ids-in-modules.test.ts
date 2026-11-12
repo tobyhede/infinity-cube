@@ -167,18 +167,6 @@ const ONE_KIND_FEATURES = new Map<string, readonly string[]>([
       'icon={<ResourceKindIcon kind={spaceKind.id} decorative />}',
     ],
   ],
-  // Create Reference's glyph.
-  [
-    'packages/app/src/resource-rail-actions.tsx',
-    ['icon: <ResourceKindIcon kind={referenceKind.id} decorative />,'],
-  ],
-  // Creating an Image or a Reference Resource.
-  [
-    'packages/app/src/space-authoring.ts',
-    ['return { title, kind: imageKind.id, content };', 'kind: referenceKind.id,'],
-  ],
-  // The Space Resource lifecycle (ADR 0074): its create.
-  ['packages/persistence/src/space-resource-planning.ts', ['kind: spaceKind.id,']],
 ]);
 
 const KIND_MODULE_IDS = new RegExp(`\\b(?:${KINDS.join('|')})Kind\\.id\\b`, 'gu');

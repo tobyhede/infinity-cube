@@ -7,6 +7,7 @@ import {
   refusalOf,
   Title,
   useRailBand,
+  type Creation,
   type PluginViewProps,
   type RailCommand,
 } from '@project/resource-api/view';
@@ -106,7 +107,22 @@ function ReferenceGlyph({ size = 14 }: { readonly size?: number | undefined }) {
   return <Link size={size} />;
 }
 
+/**
+ * Create Reference (ADR 0089): a command on its Target, which the gesture
+ * supplies, so nothing is chosen first. Its Title is the Target's, copied once
+ * and independent thereafter.
+ */
+const createFromTarget: Creation<ReferenceContent> = {
+  from: 'resource',
+  label: 'Create Reference',
+  notCreated: 'Reference Resource not created',
+  run: async (host, target) => {
+    await host.create([{ title: target.title, content: { target: target.id } }]);
+  },
+};
+
 export const referencePluginView = definePluginView(referencePlugin, {
   View: ReferenceView,
   Glyph: ReferenceGlyph,
+  creates: [createFromTarget],
 });
