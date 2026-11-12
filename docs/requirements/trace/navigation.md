@@ -6,7 +6,7 @@ For audit only. Every source rule appears exactly once in §1 to §3, with one o
 - **dropped**: with the reason.
 - **sent → DOC**: it belongs to another doc.
 
-§3 lists the items other traces sent here. §4 groups the sends by receiving doc. §5 lists the code-only rules. §6 holds code notes. Conflict ids (C1–C3) are those of `../conflicts/navigation.md`, not the DECISIONS rulings.
+§3 lists the items other traces sent here. §4 groups the sends by receiving doc. §5 lists the code-only rules. §6 holds code notes. Conflict ids (C1–C3) are those of `../conflicts/navigation.md`, not the DECISIONS rulings C1 to C7; all three are closed by the rulings "Navigation C1" to "Navigation C3" in `../DECISIONS.md` (Checkpoint 3 rulings, 12 November 2026).
 
 Abbreviations: "rN" is the Nth rule of an ADR as numbered in the mapping tables; "s" after an ADR number marks a superseded ADR; "DEC n" is ruling n in `../DECISIONS.md`. Docs: SR space-and-resources.md, MG maps-and-graphs.md, ED editing.md, ST storage.md, RD rendering.md, UI ui.md, GL `CONTEXT.md`, PROC process docs.
 
@@ -97,7 +97,7 @@ The rule ids in `../navigation.md` are append-only from this version on.
 | 0031s r2 `Map N` | sent → MG (MG-10) |
 | 0035 r4 navigation side: Navigation holds no second copy of the Space | → NV-2. Rest of r4 sent → ED |
 | 0035 r9 navigation side: Accept stored reopens Navigation at `defaultMap`, no traversal or selection | → NV-4. Replacement itself sent → ED |
-| 0041 r3 Graph navigation transient; Traversal history = Resources visited; "walk" retired | Graph navigation → NV-13 (C2). Traversal history → NV-16. Vocabulary sent → GL |
+| 0041 r3 Graph navigation transient; Traversal history = Resources visited; "walk" retired | Graph navigation → NV-13. Traversal history → NV-16, presenting only. 0041:144-147 ("Presenting and working Graph navigation each own the transient history needed to retreat through the path actually taken") is overruled for the canvas by ruling Navigation C2 (12 November 2026, closing C2): Graph navigation moves to the neighbour the arrow points at, along an Edge either way, and keeps no history (NV-13). Vocabulary sent → GL |
 | 0041 r4 Traversal history transient, never persisted or inferred from incoming Edges | → NV-19 |
 | 0041 r10 activation is navigation; a connection authors in the Active Graph | activation struck by DEC 1. Connection sent → MG (MG-62) |
 | 0042 r8 navigation side: selection and Traversal history clear on replacement | folded → NV-4. Drafts, surfaces and focus sent → ED, UI |
@@ -107,14 +107,14 @@ The rule ids in `../navigation.md` are append-only from this version on.
 | 0068 r9 an opened Space Resource embeds its Map; may be Entered or opened in a new tab with no containing state | embed sent → SR. Enter → NV-40. New tab → NV-41 |
 | 0068 r10 editing inside authors that Space; moving the Space Resource authors the containing Map | sent → SR |
 | 0068 r11 Entering seeds a live selection; changing Map inside writes nothing; switching away keeps it; Exit closes the entry | → NV-40, NV-42, NV-48, NV-87. "Changing the Graph inside writes nothing" struck by DEC 1 (an entered Space is its own canvas; MG-45). "Reload resets to the stored selection" dropped: reload restores the address (0069, later, and the code: NV-27, `space-routing.spec.ts` › "choosing a Map pushes history and Back, Forward and reload restore it without authoring") |
-| 0068 r12 Open Spaces: entries stay until Exit; one per Space; selecting switches and closes nothing; Exit explicit in that Space's surface; root never closable | → NV-42, NV-48. Root → NV-49 (Meta) and NV-82 (C1). "Drawn only when more than one is open; width from the sidebar" dropped: placement is treatment (0082, later; `CONTEXT.md` "Open Spaces") |
+| 0068 r12 Open Spaces: entries stay until Exit; one per Space; selecting switches and closes nothing; Exit explicit in that Space's surface; root never closable | → NV-42, NV-48. Root → NV-49 (Meta) and NV-82: ruling Navigation C1 (12 November 2026, closing C1) reads it as Meta, the only permanent Space, and exiting the last open Space opens Meta (not built). "Drawn only when more than one is open; width from the sidebar" dropped: placement is treatment (0082, later; `CONTEXT.md` "Open Spaces") |
 | 0068 r12 "an entry names a Space and remembers nothing else, not the chain" | dropped under drafting rule 1: 0112 (later) speaks of a Space "without an Opener", and the code records the Opener (NV-43, NV-44). Its reason, that closing one Space never closes another, is kept by NV-44 |
 | 0068 r13 entering an open Space focuses its entry | → NV-40 |
-| 0068 r14 status mark only for conflicted, failed, rejected | → NV-46. The code also marks `refused`: C3, NV-84 |
+| 0068 r14 status mark only for conflicted, failed, rejected | → NV-46. `refused`, split from `rejected` after 0068, counts as rejected by ruling Navigation C3 (12 November 2026, closing C3) → NV-84 |
 | 0068 r15 Escape never closes a Space; Back is browser history | → NV-48 |
 | 0068 r16 switching awaits the in-flight commit on the Space left | → NV-47 |
 | 0068 r17 conflict dialog opens only when its Space is active | → NV-88 |
-| 0068 r18 Exit waits; refuses on failed/conflicted with a stable code naming the recovery; warns and allows on rejected | → NV-85, NV-86 (warning on `refused`: C3, NV-84). Statuses sent → ED |
+| 0068 r18 Exit waits; refuses on failed/conflicted with a stable code naming the recovery; warns and allows on rejected | → NV-85, NV-86. Warning on `refused` → NV-84 (ruling Navigation C3, closing C3). Statuses sent → ED |
 | 0068 r19 entered Space has its own React Flow instance and camera | sent → RD |
 | 0068 cross-Space Edges and crossings | dropped here: deferred (0111, DEC 6); Open questions |
 | 0069 r1 durable URL from the id; titles not identity | → NV-20 |
@@ -210,7 +210,7 @@ The rule ids in `../navigation.md` are append-only from this version on.
 | 0042 r8 selection and Traversal history clear on replacement | → NV-4 |
 | EP 46 presenting continues only while the adopted Graph holds the presented Resource | → NV-56 |
 | 0068 r16 switching waits for an in-flight commit | → NV-47 |
-| 0068 r18, EP 39 Exit refuses on `failed`/`conflicted`, a size rejection or blocked recovery; warns on `rejected` and `refused` | → NV-85, NV-86, NV-84 (C3) |
+| 0068 r18, EP 39 Exit refuses on `failed`/`conflicted`, a size rejection or blocked recovery; warns on `rejected` and `refused` | → NV-85, NV-86, NV-84 (ruling Navigation C3) |
 | EP 39 opening a Space with a live session uses that session | → NV-81 |
 
 ### From `trace/rendering.md`
@@ -292,7 +292,7 @@ The rule ids in `../navigation.md` are append-only from this version on.
 
 **CONTEXT.md (GL):**
 - 0041 r3 vocabulary (Graph navigation, Traversal history, "walk" retired).
-- Correction if C2 goes to (a): "Graph navigation" and "Traversal history" stop claiming traversal rules and history for the canvas.
+- Correction by ruling Navigation C2: "Graph navigation" stops claiming presenting's fork, merge, cycle and backtracking rules (it moves to the Active Graph neighbour the arrow points at, along an Edge either way); "Traversal history" exists only while presenting; "Active Resource" is reached only while presenting, so its "outgoing Edges" are presenting's moves (NV-13, NV-15).
 - "Active Graph": "Activating is not itself an edit" contradicts DEC 1.
 
 ## 5. Code only (drafting rule 5)
@@ -305,7 +305,8 @@ NV-7, NV-9, NV-10, NV-11 (no source names the shared selection beyond 0112's sen
 - **History mechanics.** The adapter numbers entries in `history.state` (`hyperHistoryIndex`), numbers a fragment entry on arrival, and returns a held traversal by key through `navigation.traverseTo` where available, else `history.go`. A foreign same-document `pushState` goes uncounted.
 - **`moves()`** is called at render, not memoised and not in a store selector; effects key on the changed value, never on the array.
 - **Fullscreen** is requested synchronously in the Present gesture on `document.documentElement`, so portalled dialogs stay visible.
-- **`refused` at Exit and in the mark** is C3 (NV-84).
+- **`refused` at Exit and in the mark.** `dock-model.ts` `UNWELL_STATUS` maps `refused` to the rejected word, and `open-spaces.ts` `retireOpenSpace` warns on both (NV-84).
+- **Exiting the last open Space (NV-82, not built).** `open-spaces.ts` `exit` refuses only Meta, and `followActiveSpace` leaves nothing on the canvas and writes no location. Opening Meta through `activate` writes Meta's address; `browser-location.ts` `follow()` would leave the location naming the exited Space. Exiting the active Space while others stay open shows the first entry.
 - **Presenting chrome primitives.** `PresentingChrome` draws its moves, Back, `Kbd` key hints and Overview from `@project/ui` and keeps its styling in its own module.
 - **Map resolution.** `map-resolution.ts` exports `requireDefaultMap`, `resolveMap`, `mapResources`, `resourcesOutsideMap` and `MapNotFoundError`.
 - **History decisions are synchronous.** `browser-location.ts` `settle` runs `sync()` on each authoring notification; repeat decisions are no-ops.

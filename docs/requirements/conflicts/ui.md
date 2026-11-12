@@ -2,7 +2,15 @@
 
 These are conflicts for [../ui.md](../ui.md) that drafting rules 1–5 and [../DECISIONS.md](../DECISIONS.md) do not settle. Conflict ids are never reused. Paths are relative to `packages/`.
 
-## C1. What a connection released across drawings tells the author
+No conflict is open.
+
+## Closed
+
+Closed by the rulings of 12 November 2026 (DECISIONS, Checkpoint 3 rulings). The code changes they call for are listed under "Bugs" in [../ui.md](../ui.md). The text below each heading is the conflict as it was raised.
+
+### C1. What a connection released across drawings tells the author
+
+**Closed with no ruling (12 November 2026).** The code already refuses the release with the sentence "An Edge can connect Resources only within the same drawn Map.", and two end-to-end tests assert it; the ADR and the code agree. See UI-77 and MG-59 (built). The conflict below misread the code.
 
 **Rules affected:** UI-77; MG-59 (maps-and-graphs.md), which should carry the same status or point here.
 
@@ -20,7 +28,9 @@ These are conflicts for [../ui.md](../ui.md) that drafting rules 1–5 and [../D
 
 **Evidence.** `docs/adr/0112-a-map-behaves-the-same-wherever-it-is-drawn.md:33`; `app/src/edge-authoring-react.tsx` (`mayOfferConnectionEnd`, `isValidConnection`, the gesture-refusal span); `app/test/edge-authoring-react.test.tsx` › "shows the reason a finished pointer gesture ran into". No test covers a cross-drawing release.
 
-## C2. Whether Remove from Map asks first
+### C2. Whether Remove from Map asks first
+
+**Closed by ruling UI C2 (12 November 2026).** Remove from Map asks first only when it would delete Edges, naming the Graphs that lose them, from the menu and the Delete key, drawn Maps included; otherwise it removes at once (option (a)). This overrules the ticket that said Remove from Map is not a deletion. See UI-85 (bug: code differs) and MG-19.
 
 **Rules affected:** UI-85; UI-83.
 
@@ -35,7 +45,9 @@ These are conflicts for [../ui.md](../ui.md) that drafting rules 1–5 and [../D
 
 **Evidence.** `docs/adr/0074-space-card-references-own-the-target-space.md:59-62`; `app/test/resource-rail-actions.test.tsx` › "removes the Resource from this Map and leaves it in the Space, without asking"; `app/e2e/editing.spec.ts` › "${key} with a Resource selected removes it and its Edges from this Map"; `app/src/components/DeleteConfirmation.tsx` (asks for the other deletions).
 
-## C3. How a question or notice names a Resource, Map or Graph
+### C3. How a question or notice names a Resource, Map or Graph
+
+**Closed by ruling UI C3 (12 November 2026).** Wherever a sentence quotes a Title it uses the short Title; controls, list rows and chrome use the first line alone (option (a)). Notices that quote the bare name are bugs. See UI-99 (bug: code differs) and Effects "Names".
 
 **Rules affected:** UI-99; UI-83; Effects "Names".
 

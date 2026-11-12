@@ -73,7 +73,7 @@ The rule ids in `../rendering.md` are append-only from this version on.
 | 0064 r2 Open is authored per entry | sent → MG |
 | 0064 r3, r4, r6, r7 Open/Edit/Save/Cancel controls, exits, one content edit | sent → UI |
 | 0064 r5 Open Markdown via the shared sanitised renderer; editing swaps in the editor | renderer → RD-6. Editor sent → UI |
-| 0064 r8 no `nowheel`, no 16:9, the camera does not follow | → RD-67; no aspect constraint folded → RD-2; camera → RD-65 (RD-3 points to it) |
+| 0064 r8 no `nowheel`, no 16:9, the camera does not follow | → RD-67 (its Edit exception is RD-61's wheel, DEC Rendering C1); no aspect constraint folded → RD-2; camera → RD-65 (RD-3 points to it) |
 | 0064 r9 one Resource component, no second one for Open; kinds fill the content region | → RD-2 |
 | 0064 derived displacement on Open | dropped: superseded by 0122 (only Resize displaces, MG-26) |
 | 0065 Title one-activation control, F2, focus | sent → UI |
@@ -182,7 +182,7 @@ The rule ids in `../rendering.md` are append-only from this version on.
 | 0121 Shape choice on the rail (`ChoiceMenu`) | sent → UI |
 | 0121 embedded Map draws Shapes | → RD-19 |
 | 0122 entry shape, Resize only, one floor, `open` optional, only Resize displaces | sent → MG |
-| 0122 content adapts: document scrolls, picture scales down, embedded Map fits | picture → RD-4. Document and embedded Map: conflict C1 → RD-5 (the unframed drawn-Map placement moved there from RD-60) |
+| 0122 content adapts: document scrolls, picture scales down, embedded Map fits | picture → RD-4. Document and embedded Map → RD-5: DEC Rendering C1 clips both on the canvas and places an unframed drawn Map at authored scale instead of fitting it (the placement moved there from RD-60) |
 | 0122 resize control on the selected Resource; one control; no keyboard resize | sent → UI |
 | 0122 a selected non-rectangle Shape draws a thin frame at its rect | → RD-18 |
 | 0123 Stage, canvas inert while presenting, no presenting camera | sent → NV |
@@ -236,7 +236,7 @@ The rule ids in `../rendering.md` are append-only from this version on.
 | G§RF b1 pinned to 12.11.2 | → RD-70 |
 | G§RF b2 React Flow's docs as reference (`llms-full.txt`) | sent → PROC: tooling guidance, not product |
 | G§RF b3 every drawn Map uses `createMapSurface`; holds; root canvas reads its surface | one drawing → RD-59; policy and holds sent → SR, NV; prop set is a code note §5 |
-| G§RF b4 an invariant from a canvas gesture is reported, not thrown | sent → ED (ED-79, undecided under `conflicts/editing.md` C3) |
+| G§RF b4 an invariant from a canvas gesture is reported, not thrown | sent → ED (ED-79, bug: code differs, ruling Editing C3) |
 | G§RF b5 React Flow's interaction model is the default; arrow-key deviation | principle → RD-76; arrow keys sent → UI |
 | G§RF b6 head markers once per canvas | → RD-44 |
 | G§Overlay activation is emphasis, not filtering | → RD-29 |
@@ -255,7 +255,7 @@ The rule ids in `../rendering.md` are append-only from this version on.
 
 **space-and-resources.md (SR):** 0018 r1; 0070 Target immutability and Space Resource Target; 0083 Title Lines as data and normalization; 0106 kind, URL, recorded natural size (no reader) and load failure validity; 0112 policy, occurrences and "never contains its own Map"; 0114 content actions; G§b7 content resolution.
 
-**editing.md (ED):** 0035 r2; 0042 r1, r8 (epoch), r11; 0057 r3 (outcome side); G§b2 lifecycle; G§b4 refusals; G§b5 epoch; G§RF b4 invariants reported (ED-79, undecided, C3).
+**editing.md (ED):** 0035 r2; 0042 r1, r8 (epoch), r11; 0057 r3 (outcome side); G§b2 lifecycle; G§b4 refusals; G§b5 epoch; G§RF b4 invariants reported (ED-79, bug: code differs, ruling Editing C3).
 
 **storage.md (ST):** 0018 r3; G§Overlay Space-level `graphs` rejection.
 
@@ -296,7 +296,7 @@ Every item another trace sends to rendering, with where it landed.
 | 0068 r19 and the compound canvas (one camera) | → RD-59, RD-69 |
 | 0070 r6 renderer reuse | → RD-11 |
 | 0083 r6, r9, r10 ladder, clamp, no resize | → RD-12–RD-15 |
-| A Space Resource with no framing fits its Map | conflict C1 → RD-5 (the code places it, unfitted, at its Resources' top-left) |
+| A Space Resource with no framing is placed in its window | → RD-5: at authored scale from its Resources' top-left, not fitted (DEC Rendering C1) |
 
 **From `trace/navigation.md`:**
 
@@ -348,7 +348,8 @@ Kept under drafting rule 5 (code plus a test, contradicted by nothing):
 - RD-48 the Graph key.
 - RD-56 the Edge gesture's cancel triggers.
 - RD-60 drawn-Map zoom scales positions, not Resources.
-- RD-61 wheel in an edited drawn Map writes framing.
+- RD-61 dragging pans and the wheel zooms a drawn Map in Edit, writing framing; the extent is DEC Rendering C1.
+- RD-67's exception: the wheel over a drawn Map in Edit stops at that drawn Map (untested, `SpaceCanvas.tsx` `onWheel`).
 - RD-63 an entered Space opens at its framing.
 - RD-65 fitting a Resource reached by URL.
 - RD-51 the first palette colour for handles with no Active Graph.
@@ -361,6 +362,7 @@ Kept under drafting rule 5 (code plus a test, contradicted by nothing):
 - Receding Edges: `OTHER_GRAPH_OPACITY = 0.35`, stroke 3 for the Active Graph and 2 for the rest (`projection.ts`).
 - Head markers: `graphHeadMarkerId` is `graph-head-<graphId>`, unprefixed because a page draws Graph Edges in one `<ReactFlow>`; a second flow drawing Graph Edges would need ids namespaced per flow.
 - Camera numbers: `OVERVIEW_FIT = { padding: 0.2, maxZoom: 1 }`, `MAX_ZOOM = 16`, `minZoom={0.2}` (untested) in `app/src/camera.ts` and `SpaceCanvas.tsx`. `fitView` runs only when the canvas has no opening framing.
+- Framing gestures on a drawn Map in Edit are the portal handlers in `SpaceCanvas.tsx`: pointer drag pans and persists on release; the wheel listener runs in capture, stops propagation and persists after a 160 ms debounce.
 - Camera command sites: `components/cameras.tsx`, `components/CanvasContinuation.tsx`, `react-flow-adapter/src/ZoomSlider.tsx`, and `SpaceCanvas`'s `fitView` prop. `fitView` before `panZoom` exists hangs; nothing calls it that early.
 - Handle geometry: `declaredHandles` and `anchorPoint` both read `AUTHORING_HANDLE_DIAMETER` (24), so an Edge lands on the rim React Flow resolves. An embedded Resource's clip leaves half a handle diameter of slack.
 - React Flow's `connectionRadius` is 20 at the pinned release; `dropTarget` and `newResourceDrop` in `app/src/edge-authoring.ts` compose the connection target with the DOM element.
@@ -368,7 +370,7 @@ Kept under drafting rule 5 (code plus a test, contradicted by nothing):
 - `canvasProjection` is pure and tested in Node; the render adapter (Zustand) holds the published projection and the canvas selection.
 - `ResourceNodeData` carries operations, never capability flags (`projection-types.test.ts`).
 - The kind glyph is `CanvasResource`'s `kindMark`: null when Open or when the kind takes a Shape.
-- 0122's "embedded Map fits" and Markdown "scrolls": see conflict C1. An unframed drawn Map's origin is the least `x` and `y` of its Resources, read once in `EmbeddedMapAuthoring.tsx` (`useState`).
+- 0122's "embedded Map fits" and Markdown "scrolls" are overruled by DEC Rendering C1 (RD-5). An unframed drawn Map's origin is the least `x` and `y` of its Resources, read once in `EmbeddedMapAuthoring.tsx` (`useState`).
 - Title ladder ceilings (`--canvas-resource-title-ladder-lines` in `ui/src/canvas-resource.css`): 4 in the rectangle, 3 in an ellipse or pill, 2 in a diamond. Only the base token is tested.
 - Lane span (`laneBezier`): the widest stretch around the curve's midpoint that bends no tighter than twice the pair's reach (how far out its outermost lane runs) and at whose ends the offsets at the reach lie ahead of the anchors along the facing axis; outside it, one cubic bridge per end. Each lane carries its pair's reach (`laneReach`).
 - A Reference Resource's border turns solid while hovered, selected or dragged (`ui/src/kinds/reference-canvas.css`); untested, so not a rule.

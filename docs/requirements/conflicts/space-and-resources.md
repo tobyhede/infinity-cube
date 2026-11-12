@@ -2,7 +2,15 @@
 
 These are places where the sources and the code disagree, or a source's reason has lapsed, and [../DECISIONS.md](../DECISIONS.md) does not settle the question. Every rule an open conflict touches has the status **undecided (Cn)** in [../space-and-resources.md](../space-and-resources.md). Conflict ids are never reused. Paths that start with `test/` are at the repo root; all others are under `packages/`.
 
-## C1. Does an Image Resource keep recording its natural size?
+## Open
+
+None.
+
+## Closed
+
+### C1. Does an Image Resource keep recording its natural size?
+
+Closed by ruling Space and Resources C1 (DECISIONS, Checkpoint 3 rulings, ruled 12 November 2026): option (b) in part: measuring stops, but `naturalSize` stays optional and unread in the format until the next deliberate format change. SR-26 is **bug: code differs**.
 
 - **Rules.** SR-26 (undecided) and the Data model's `naturalSize` row. Related: SR-22, SR-23 and SR-39, which point to SR-26 rather than state the measurement.
 - **Disagreement.** 0106 measures a picture when its URL is set and records its natural size, for one reader: the first Open, which sized the Resource from it. 0122 removed first-Open sizes, so nothing reads the field any more. The code still measures at creation and Replace and writes `naturalSize` (`app/src/image-creation.ts`, `app/src/image-replacement.ts`, `app/src/space-authoring.ts`), and Replace still bounds the measurement at 10 seconds (0126). Drafting rule 1 does not remove the rule, because no later ADR says to stop recording; the reason alone has lapsed.

@@ -168,7 +168,7 @@ The rule ids in `../editing.md` are append-only from this version on.
 | 0099 r4 a `rejected` Space does not refuse | folded → ED-61 |
 | 0126 r1 while any composed Space replaces an image, every Space withdraws authoring and navigation until the Edit applies | → ED-68 |
 | 0126 r2 target stays mounted; pan and zoom stay | target → ED-69. Pan and zoom sent → NV (NV-50 states them; ED-68 points there) |
-| 0126 r3 upload times out at 2 min, measurement at 10 s | → ED-72 |
+| 0126 r3 upload times out at 2 min, measurement at 10 s | Upload → ED-72. The measurement bound is dropped: ruling Space and Resources C1 (12 November 2026) stops measuring (SR-26) |
 | 0013s r3 no edit mode | → ED-36 |
 | 0030 r2 every completed Edit persists automatically and atomically; no Save | → ED-7 |
 | 0030 other rules (store, ids, import, export, HTTP only, Prisma, memory adapter) | sent → ST; Prisma pin and CI job → PROC |
@@ -204,6 +204,9 @@ The rule ids in `../editing.md` are append-only from this version on.
 | 0010 (except r4), 0020, 0034, 0054, 0056, 0077, 0078, 0094, 0095, 0096, 0098, 0106 (store), 0117, 0118, 0119, 0124, 0127, 0130, 0133, 0134 (EP-only rows) | sent → ST whole, except 0010 r4 and 0098 r2, r6 above (audit-split: storage half of EP). 0098's `CommitOutcome` is defined in ST; ED states only how a session reacts (statuses table) |
 | DEC 4 mounted edits kept across reload (not built) | sent → ST, UI |
 | DEC 5 Undo kept, not built; whole Edit; selected occurrence's Space; until then reversed only by another Edit | → ED-74 |
+| Checkpoint 3 ruling Editing C1 (12 November 2026) | → ED-32 (bug). Closes `../conflicts/editing.md` C1. Settles 0042 r8 against 0076 r8 for the Spaces a coordinated Accept stored restores |
+| Checkpoint 3 ruling Editing C2 (12 November 2026) | → ED-78 (bug); ED-9 and ED-17 point to it. Closes C2. Extends 0042 r5 (refused returns to the initiating surface) to a queued attempt, with no draft kept |
+| Checkpoint 3 ruling Editing C3 (12 November 2026) | → ED-79 (bug), with its *Why:* corrected. Closes C3 |
 
 ## 4. Items received from other traces
 
@@ -238,10 +241,10 @@ The rule ids in `../editing.md` are append-only from this version on.
 | 0042 r8 epoch | → ED-30 |
 | 0042 r11 replacement in every target-bound interaction | folded → ED-30; checklist item sent → PROC |
 | 0057 r3 outcome side (an accepted Edit closes its surface without waiting) | → ED-13 |
-| G§b2 lifecycle: render adapter authority; `queued` at the React Flow seam is an invariant | → ED-3, ED-9 |
+| G§b2 lifecycle: render adapter authority; `queued` at the React Flow seam is an invariant | → ED-3. The `queued` clause → ED-9, ED-78: ruling Editing C2 has every caller treat `queued` the same way, so the seam's invariant report is part of ED-78's bug |
 | G§b4 structured refusal across Edge Authoring | folded → ED-17, ED-22 |
 | G§b5 the epoch side of draft invalidation | folded → ED-30 |
-| G§RF b4 an invariant from a canvas gesture is reported, not thrown | → ED-79 (undecided, C3: the code throws for a failed derivation) |
+| G§RF b4 an invariant from a canvas gesture is reported, not thrown | → ED-79 (bug: the code throws for a failed derivation). Its reason, that a throw unmounts the canvas, dropped: no error boundary or global handler exists, and a boundary does not catch event-handler throws; ruling Editing C3 gives the half-finished gesture instead |
 
 ### From `trace/space-and-resources.md`
 
@@ -324,7 +327,7 @@ The rule ids in `../editing.md` are append-only from this version on.
 - 0035 r8: the adapter owns pointer attempts, transient node state, measurements and visual selection.
 
 **CONTEXT.md (GL):**
-- EP 27 `manifest`; EP 35 "Aggregate". CONTEXT.md's "Activating is not itself an edit" and "replacement epoch" entries should be checked against DEC 1 and C1.
+- EP 27 `manifest`; EP 35 "Aggregate". CONTEXT.md's "Activating is not itself an edit" and "replacement epoch" entries should be checked against DEC 1 and ruling Editing C1 (ED-32: a coordinated Accept stored advances the epoch of every Space it restores).
 
 **PROC:**
 - EP 9 rename process; EP 10 Prisma workaround; EP 45 test-level split (domain tests assert codes, presentation tests prose); EP 49 `returnValue` lint; 0042 r11 acceptance-case checklist item; 0109.

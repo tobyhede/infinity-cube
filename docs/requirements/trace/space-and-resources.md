@@ -127,7 +127,7 @@ The rule ids in `../space-and-resources.md` are append-only from this version on
 | 0106 no stored image deleted singly | sent → ST |
 | 0106 Replace is one Edit keeping identity, Title, placement, Edges; same URL unchanged | → SR-22 |
 | 0106 Title is the text alternative | → SR-25 |
-| 0106 natural size measured when the URL is set | → SR-26 (C1); SR-22, SR-23 and SR-39 point to SR-26 rather than state it. First-Open sizing dropped: retired by 0122 |
+| 0106 natural size measured when the URL is set | measuring dropped by DEC Space and Resources C1 → SR-26 (bug: code differs; the field stays optional and unread until the next format change). SR-22, SR-23 and SR-39 point to SR-26. First-Open sizing dropped: retired by 0122 |
 | 0106 an image that will not load is not a refusal | → SR-27 |
 | 0106 a Reference may target an Image Resource | folded → SR-30 |
 | 0106 creation on activation; several pictures one Edit; `Resource N` | → SR-39 |
@@ -209,7 +209,7 @@ The rule ids in `../space-and-resources.md` are append-only from this version on
 | ARC `image-url-unsupported` has no row | folded → SR-24 |
 | ARC universal guard, other rows | sent → ED (guard), MG (Map, Graph, Edge rows) |
 | `CONTEXT.md` "Replacing it — planned, not yet built" | sent → GL: wrong, Replace is built (SR-22) |
-| `CONTEXT.md` short Title | sent → UI, flagged: 0083 says listing surfaces show the name only; the code and `CONTEXT.md` use `shortTitle` (name plus ellipsis). UI must raise it |
+| `CONTEXT.md` short Title | sent → UI, flagged: 0083 says listing surfaces show the name only; the code and `CONTEXT.md` use `shortTitle` (name plus ellipsis). Settled by ruling UI C3 (12 November 2026) → UI-99 |
 
 ## 3. Code only (no source)
 
@@ -264,7 +264,7 @@ See §6.
 | 0018 r1 new Space | SR-40 |
 | 0070 Target immutability; Space Resource as Target | SR-31, SR-30 |
 | 0083 Title Lines as data; normalization | SR-11, SR-12, SR-13 |
-| 0106 kind, URL, recorded natural size, load failure | SR-23, SR-24, SR-26 (C1), SR-27 |
+| 0106 kind, URL, recorded natural size, load failure | SR-23, SR-24, SR-26 (DEC Space and Resources C1), SR-27 |
 | 0112 policy, occurrences, never contains its own Map | SR-51, SR-54 |
 | 0114 content actions | SR-18, SR-33, SR-34 |
 | G§b7 content resolution | SR-29 |
@@ -298,11 +298,11 @@ See §6.
 
 **maps-and-graphs.md (MG):** 0004 r1, r3, r4; 0051 r4 (MG-22); 0068 r20; 0079 Map parts; 0122 Open rule; E&P framing on relocation.
 
-**editing.md (ED):** 0074 and DEC 5 Undo; 0112 Undo per occurrence; 0112 and 0126 navigation and authoring held during image replacement, with its 2-minute upload and 10-second measurement bounds; 0113 availability; E&P line 37 coordination, barrier and recovery refusals; ARC universal guard; 0068 r16–r18 statuses.
+**editing.md (ED):** 0074 and DEC 5 Undo; 0112 Undo per occurrence; 0112 and 0126 navigation and authoring held during image replacement, with its 2-minute upload and 10-second measurement bounds (measuring stops under DEC Space and Resources C1, SR-26); 0113 availability; E&P line 37 coordination, barrier and recovery refusals; ARC universal guard; 0068 r16–r18 statuses.
 
-**storage.md (ST):** 0020 r1, r2, r5, r6; 0063 Export line endings; 0074 Meta identity; 0106 image store, deletion, Export, fixtures; 0128 file, locator, sidecar, strictness, JSON Schema; E&P line 25 file format; E&P line 38 forgiveness (ST-104), round trip and fixtures; where an unframed drawn Map is placed and fits (RD-5, undecided under conflicts/rendering.md C1); `newSpace`'s default title `New space` (§7).
+**storage.md (ST):** 0020 r1, r2, r5, r6; 0063 Export line endings; 0074 Meta identity; 0106 image store, deletion, Export, fixtures; 0128 file, locator, sidecar, strictness, JSON Schema; E&P line 25 file format; E&P line 38 forgiveness (ST-104), round trip and fixtures; where an unframed drawn Map is placed (RD-5, DEC Rendering C1); `newSpace`'s default title `New space` (§7).
 
-**rendering.md (RD):** 0009 signal and 0114 glyph; 0051 r4 drawing; 0068 r19 and compound canvas (one camera); 0070 r6 renderer reuse; 0083 r6, r9, r10 ladder, clamp, no resize; a Space Resource with no framing fits its Map.
+**rendering.md (RD):** 0009 signal and 0114 glyph; 0051 r4 drawing; 0068 r19 and compound canvas (one camera); 0070 r6 renderer reuse; 0083 r6, r9, r10 ladder, clamp, no resize; a Space Resource with no framing is placed at authored scale from its Resources' top-left, not fitted (RD-5, DEC Rendering C1).
 
 **ui.md (UI):** 0039 r4; 0046 r3; 0063 r2–r5; 0070 r4 "no source editor", r9; 0074 r7 confirmation (including "its Space may go with it"); 0083 r2 surfaces, r7, r8, r15; 0089 r1 select and caret, r3 list row and drag, r5 refusal channel, r7 disabled Create Reference; 0112 continuation (UI-87), notice area, cross-drawing wording; E&P line 37 `target` read; 0113 Dock creation cluster; E&P "no surface offers a Target"; the short Title question (§2).
 
@@ -326,7 +326,7 @@ Behaviour the code implements and a test asserts, with no source against it (dra
 
 - **Resolution** lives in the kind registry (`core/src/kinds/registry.ts` `resolveContent`), wrapped by `graph/src/lookup.ts`. 0009 placed it in `graph`.
 - **Reading a Title** goes through `titleLines`, `titleName` and `shortTitle` in `core/src/title.ts`.
-- **`naturalSize`** is written by `image-creation.ts`, `image-replacement.ts` and `space-authoring.ts` and read nowhere (C1).
+- **`naturalSize`** is written by `image-creation.ts`, `image-replacement.ts` and `space-authoring.ts` and read nowhere (SR-26, DEC Space and Resources C1). Measuring is `measureInBrowser` in `app/src/space.ts`, with a 10-second limit.
 - **`newSpace`** titles the Space `New space`; Create Space Resource passes `Space N` to `initializeSpace` (`graph/src/new-space.ts`).
 - **Residue name.** `SpaceView`, `selectSpaceView` and `frameSpaceView` in `core` keep the retired Space View term for a Space Resource's selection.
 - **Resource order tie-break.** `graph/src/space.ts` sorts by Title, then id; no test has two equal Titles, so SR-10 states only the Title order.

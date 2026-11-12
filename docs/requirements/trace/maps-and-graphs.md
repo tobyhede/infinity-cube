@@ -226,7 +226,7 @@ The rule ids in `../maps-and-graphs.md` are append-only from this version on.
 | 0105 markers, legend, connection preview, menu, vocabulary | sent → RD, UI, GL |
 | 0108 Graph id unique in Space; ids repeat across Spaces | → MG-35 |
 | 0112 a drawn Map offers every command the canvas Map does | sent → SR |
-| 0112 an Edge joins Resources in one Space; refused across drawings | → MG-59. "Refused with wording" sent → UI (UI-77, undecided under `conflicts/ui.md` C1) |
+| 0112 an Edge joins Resources in one Space; refused across drawings | → MG-59. "Refused with wording" sent → UI (UI-77, built; `conflicts/ui.md` C1 closed with no ruling, 12 November 2026) |
 | 0112 occurrences, policy, composition lifetime, notices, Undo per occurrence | sent → SR, NV, ED |
 | 0116 canvas Edit writes `defaultMap`/`activeGraph` | → MG-79 |
 | 0116 drawn Edit leaves them | → MG-80 |
@@ -312,7 +312,7 @@ The rule ids in `../maps-and-graphs.md` are append-only from this version on.
 - The connection modifier key (MG-63).
 - 0105 and 0121 menus.
 - 0104 Edge toolbar.
-- 0112 wording for a refused cross-drawing connection: received as UI-77, undecided under `conflicts/ui.md` C1. MG-59 points there.
+- 0112 wording for a refused cross-drawing connection: received as UI-77 (built). MG-59 points there.
 - 0033 target selected after a connection.
 
 **navigation.md (NV):**
@@ -354,7 +354,7 @@ The rule ids in `../maps-and-graphs.md` are append-only from this version on.
 | Cross-doc audit N1 | Switch Graph's unchanged case | MG-84 |
 | Cross-doc audit N2 | Add Graph from an Open Space Resource repoints the selection | MG-85 |
 | Cross-doc audit N3 | the first working read is a commit, not an Edit | MG-74 wording; operations index |
-| Cross-doc audit N8 | MG-22's *Why* asserted "content adapts" | now points to RD-5, which is undecided in rendering.md |
+| Cross-doc audit N8 | MG-22's *Why* asserted "content adapts" | now points to RD-5 (clipped, by ruling Rendering C1) |
 | Cross-doc audit, duplicates | MG-47 against SR-46; MG-82 against UI-68 | MG-47 now points to SR-46; MG-82 keeps only the domain half and points to UI-68 |
 | Cross-doc audit B4 | MG-61's *Why* named a ui.md sentence that the drag path never shows | narrowed: the reason shows on the Connect list (UI-72); a drag marks the target ineligible |
 | Cross-doc audit N7 | RD rules on "no Active Graph" against MG-34/43/44 | not changed here: every Map has a Graph and resolves one Active Graph; RD owns the fix |

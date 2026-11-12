@@ -51,9 +51,9 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 | 0041 r5 version 1; Graphs nest under Maps; `graphs` required non-empty; `edges` required, may be empty; `activeGraph`, `color` optional | → ST-28. Non-empty `graphs`, `activeGraph` and `color` semantics are MG-34, MG-44, MG-48. "A completed Map Edit writes `activeGraph`" is MG-79 |
 | 0041 r6 Import may omit ids and mints them; Export writes complete ids | → ST-44, ST-52 |
 | 0041 r7 no compatibility parser, migration or `route` alias | folded → ST-36 |
-| 0054 r1 format changes roll forward with no versioned readers or migrations | → ST-36. Its reason is conflict S2 |
+| 0054 r1 format changes roll forward with no versioned readers or migrations | → ST-36. Its reason is restated by DEC Storage S2 (unreleased, no compatibility promise outside the repository) |
 | 0054 r2 relational schema changes only through `migrations/app/` and the Prisma contract | sent → PROC (build-tooling.md) |
-| 0056 r1 every database and directory is derived | sent → PROC (workflow.md). Premise questioned in S2 |
+| 0056 r1 every database and directory is derived | sent → PROC (workflow.md). No longer ST-36's reason: DEC Storage S2 replaces it, since a directory or a browser's stored copy may be the author's only copy |
 | 0056 r2 generated state that disagrees is a bug at the source | sent → PROC |
 | 0056 r3 no compatibility path for state a previous build wrote | → ST-36, ST-37 |
 | 0056 r4 `SPACE_FILE_VERSION` and `documentRefusal` stay | → ST-37. Migrations and Prisma contract sent → PROC |

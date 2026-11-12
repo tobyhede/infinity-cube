@@ -121,7 +121,7 @@ The rule ids in `../ui.md` are append-only from this version on.
 | 0073 Escape and commit stay surface-decided | folded → UI-48, UI-56 |
 | 0073 Tab traverses Resources, arrows one Resource's commands | dropped as written by 0102; the reach it promised → UI-18 (not built, DEC 6) |
 | 0073 Alias metadata modal; Space Card kind commands | dropped: the Alias pane is gone (0070); Space Resource commands → UI-20, UI-25, UI-61 |
-| 0074 r7 a destructive action names its scope and asks first where authored work would be lost; its Space may go with it | → UI-83 (including the Space Resource cascade sentence). Remove from Map → UI-85 (C2) |
+| 0074 r7 a destructive action names its scope and asks first where authored work would be lost; its Space may go with it | → UI-83 (including the Space Resource cascade sentence). Remove from Map → UI-85 (bug; ruling UI C2 of 12 November 2026 closed C2: asks only when Edges would go) |
 | 0074 other rules | sent → SR |
 | 0082 one exclusive Map choice, no second control, no empty value | → UI-34 |
 | 0082 activating a Graph is not that choice | → UI-35 |
@@ -137,7 +137,7 @@ The rule ids in `../ui.md` are append-only from this version on.
 | 0082 do not persist its position | → UI-39 |
 | 0082 the shape freedom does not lift story evidence | sent → PROC |
 | 0083 Enter completes, Escape cancels, Shift+Enter inserts a line; field grows, uniform size | → UI-49, UI-48; uniform size → removed (drafting rule 6) |
-| 0083 lists, references and accessible names show the name | controls and rows → Effects "Names". Questions and notices → UI-99, conflict C3 (0083 says name only; the code and `CONTEXT.md` add an ellipsis; rule 1 does not settle it because the agreeing source is the glossary) |
+| 0083 lists, references and accessible names show the name | controls and rows → Effects "Names". Sentences that quote a Title (questions, notices, Edge labels and their names) → UI-99, the short Title (bug; ruling UI C3 of 12 November 2026 closed C3) |
 | 0083 the Title control wraps the heading | → UI-44 |
 | 0083 data, normalization, ladder, clamp | sent → SR (data), RD (ladder) |
 | 0089 one activation places, selects, caret in the Title | caret → UI-86. Creation sent → SR |
@@ -159,7 +159,7 @@ The rule ids in `../ui.md` are append-only from this version on.
 | 0105 swatch keyboard (arrows, Enter/Space, ArrowLeft, type-ahead) | → UI-24 |
 | 0105 legend mark in the Dock's and an Open Space Resource's Graph choices | sent → RD (the mark); the lists that carry it are UI-22, UI-25 |
 | 0105 markers, connection preview, vocabulary | sent → RD, GL |
-| 0112 a cross-drawing connection is refused with wording | → UI-77 (C1). No wording exists in code (checked; see C1) |
+| 0112 a cross-drawing connection is refused with wording | → UI-77 (built; C1 closed with no ruling, 12 November 2026: the code words it) |
 | 0112 Connect to Resource offers only the same drawn Map | → UI-72 ("this drawing's Map") |
 | 0112 continuation spent only in its occurrence; dropped if that occurrence stops being drawn | → UI-87 |
 | 0112 one notice area for every drawn Space; a drawn Space's notice names it | → UI-94 |
@@ -184,11 +184,15 @@ The rule ids in `../ui.md` are append-only from this version on.
 | E&P "no surface offers a Target" | → UI-19 (widened to every surface) |
 | 0066 resize control rules | dropped: superseded; carried by 0122 (UI-66–UI-69) |
 | 0037, 0053 | dropped: superseded (0064; 0082 carries 0053's negatives) |
-| 0068 r12–r15, r17 Open Spaces, Escape never closes a Space, conflict dialog only for the active Space | sent → NV. r14's status words → UI-98 (NV-46 points there); a refused save's word → UI-100, undecided with NV-84 (`conflicts/navigation.md` C3) |
-| DECISIONS ruling C3 drawing an existing Edge is refused with its message | → UI-101 (Connect list row; the drag shows the ineligible mark, RD-53); `conflicts/ui.md` C1 notes the consistency |
+| 0068 r12–r15, r17 Open Spaces, Escape never closes a Space, conflict dialog only for the active Space | sent → NV. r14's status words → UI-98 (NV-46 points there); a refused save counts as rejected → UI-100 (built; ruling Navigation C3 of 12 November 2026), with NV-84 |
+| DECISIONS ruling C3 drawing an existing Edge is refused with its message | → UI-101 (Connect list row; the drag shows the ineligible mark, RD-53) |
 | DEC 6 keyboard access to a Resource's toolbar kept, not built | → UI-18 |
 | DEC 4 mounted edits in browser storage, not built | → UI-43 |
 | DEC 5 Undo | sent → ED |
+| Checkpoint 3 ruling UI C1 (closed with no ruling) | → UI-77 (built); MG-59 agrees |
+| Checkpoint 3 ruling UI C2 | → UI-85 (bug); what is discarded → MG-19 |
+| Checkpoint 3 ruling UI C3 | → UI-99 (bug), Effects "Names" |
+| Checkpoint 3 ruling Navigation C3 | → UI-100 (built); NV-84 holds the rest |
 
 ## 3. Items received from other traces
 
@@ -204,7 +208,7 @@ The rule ids in `../ui.md` are append-only from this version on.
 | The connection modifier key (MG-63) | UI-71 (Option/Alt) |
 | 0105 and 0121 menus | UI-22–UI-26 |
 | 0104 Edge toolbar | UI-78–UI-82 |
-| 0112 wording for a refused cross-drawing connection | UI-77, conflict C1. Checked: no wording exists. Another drawing's Resources are never offered as ends and the release completes nothing silently |
+| 0112 wording for a refused cross-drawing connection | UI-77 (built; C1 closed with no ruling). Another drawing's Resources are not offered as ends during the drag; the release is refused with a sentence on the canvas |
 | 0033 target selected after a connection | UI-76 |
 
 ### From trace/editing.md
@@ -243,7 +247,7 @@ The rule ids in `../ui.md` are append-only from this version on.
 | 0083 names, search, keys | Effects "Names", UI-99, UI-41, UI-49 |
 | 0102 toolbar, keyboard reach, `renderToolbar` | UI-15, UI-16, UI-18, UI-5 |
 | 0105 Graph menu | UI-22–UI-25 |
-| 0112 refusal wording | UI-77 (C1) |
+| 0112 refusal wording | UI-77 (built) |
 | 0114 content actions | UI-28 |
 | 0121, 0122 resize control and Shape choice | UI-66–UI-70, UI-26 |
 | G§b1 Connect to Resource and key commands | UI-72–UI-75, UI-10 |
@@ -268,7 +272,7 @@ The rule ids in `../ui.md` are append-only from this version on.
 | E&P line 37 `target` read (a target's Maps and Graphs, live where open) | UI-25 (where the selection menus' choices come from); moved from UI-83 after the cross-doc audit |
 | 0113 Dock creation cluster | UI-40 |
 | E&P "no surface offers a Target" | UI-19 |
-| The short Title question | UI-99, conflict C3 |
+| The short Title question | UI-99 (bug; ruling UI C3) |
 | (SR sent 0112's "which Space a command acts on" here; it is drawn-Map policy and SR-60 now holds it) | pointer in UI's header |
 
 ### From trace/storage.md

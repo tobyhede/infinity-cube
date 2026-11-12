@@ -114,7 +114,7 @@ Every object in `hyper.json`, `space.json` and a Resource file's envelope reject
 
 ## Rolling forward
 
-- **ST-36** A format change rolls schema, fixtures, examples and tests forward in one change. There is no versioned reader, transitional key, alias, document migration or compatibility parser. *Why:* undecided (S2). **built**: `test/unit/import-aggregate.test.ts` › "refuses a version 2 space directory rather than migrating it".
+- **ST-36** A format change rolls schema, fixtures, examples and tests forward in one change. There is no versioned reader, transitional key, alias, document migration or compatibility parser. *Why:* Hyper is unreleased and makes no compatibility promise for any copy outside the repository. An Aggregate directory is recovered from git or read with the build that wrote it, and a browser's stored copy of a mounted talk (ST-95, not built) may be unreadable after a deploy. **built**: `test/unit/import-aggregate.test.ts` › "refuses a version 2 space directory rather than migrating it".
 - **ST-37** A file whose `version` this build does not read gets one refusal naming the version, not one per key. A Space-level `graphs` key gets its own refusal, because authors still write it by mistake. No other refusal names a key this build does not declare. *Why:* one clear sentence beats a refusal per key, and a refusal is for something someone can write now. **built**: `test/unit/read-single-space.test.ts` › "answers a version it cannot read once, ahead of every key that moved", "refuses a retired space-level graphs key rather than stripping it".
 - **ST-38**: removed, see ST-24 (view or canvas keys and ids are undeclared keys).
 
