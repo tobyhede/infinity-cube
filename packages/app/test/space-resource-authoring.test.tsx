@@ -463,7 +463,7 @@ describe('Create Space Resource', () => {
     const created = spaceResourcesOf(session);
     expect(created[0]?.document.title).toBe('Space 1');
 
-    const targetId = created[0]!.document.content.spaceId;
+    const targetId = uuidSchema.parse(created[0]!.document.content.spaceId);
     const target = await backend.loadSpace(targetId);
     expect(target?.snapshot.document.title).toBe('Space 1');
     expect(target?.snapshot.resources.map((resource) => resource.document)).toEqual([
@@ -573,7 +573,7 @@ describe('Create Space Resource', () => {
     const { backend, session } = mount();
     await createSpaceResource();
     await waitFor(() => expect(spaceResourcesOf(session)).toHaveLength(1));
-    const targetId = spaceResourcesOf(session)[0]!.document.content.spaceId;
+    const targetId = uuidSchema.parse(spaceResourcesOf(session)[0]!.document.content.spaceId);
 
     const editor = await screen.findByRole('textbox', { name: 'Resource title' });
     fireEvent.change(editor, { target: { value: 'The architecture' } });

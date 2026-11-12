@@ -6,7 +6,14 @@ import {
   resourceDrawnByPlugin,
   type Space,
 } from '@project/graph';
-import { Button, PresentedPluginResource, PresentedResource, Stage } from '@project/ui';
+import {
+  Button,
+  HostMapProvider,
+  PresentedPluginResource,
+  PresentedResource,
+  Stage,
+} from '@project/ui';
+import { drawPresentedMapEmbed } from './map-embed-draws';
 import { FULL_VIEW_KEYS } from '../key-bindings';
 
 export interface FullViewProps {
@@ -88,15 +95,17 @@ export function FullView({
         }
       >
         {isPluginKind(resource.kind) && resourceDrawnByPlugin(space, resource) ? (
-          <PresentedPluginResource
-            resourceId={resource.id}
-            kind={resource.kind}
-            title={resource.title}
-            content={resource.content}
-            embeddable={referencedResources(space, resource)}
-            onFailure={onPluginFailure}
-            replacementEpoch={replacementEpoch}
-          />
+          <HostMapProvider draw={drawPresentedMapEmbed}>
+            <PresentedPluginResource
+              resourceId={resource.id}
+              kind={resource.kind}
+              title={resource.title}
+              content={resource.content}
+              embeddable={referencedResources(space, resource)}
+              onFailure={onPluginFailure}
+              replacementEpoch={replacementEpoch}
+            />
+          </HostMapProvider>
         ) : (
           <PresentedResource
             title={resource.title}

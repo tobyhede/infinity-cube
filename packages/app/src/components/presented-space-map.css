@@ -1,6 +1,9 @@
 /* A Space Resource's Map on the Stage is drawn on the slide's own paper, and
-   takes no pointer: the audience watches it, nobody works it. */
+   takes no pointer: the audience watches it, nobody works it. It fills the
+   room its plugin gave the Map embedding, which React Flow needs a size for. */
 .presented-map {
+  position: absolute;
+  inset: 0;
   pointer-events: none;
 }
 

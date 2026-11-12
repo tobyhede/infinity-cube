@@ -220,11 +220,10 @@ describe('PresentedResource', () => {
         title="Roadmap"
         content={{
           kind: 'space',
-          view: {
+          content: {
             spaceId: uuidSchema.parse('00000000-0000-4000-8000-000000000001'),
             map: uuidSchema.parse('00000000-0000-4000-8000-000000000002'),
             graph: uuidSchema.parse('00000000-0000-4000-8000-000000000003'),
-            framing: undefined,
           },
           via: 'self',
         }}
@@ -244,11 +243,10 @@ describe('PresentedResource', () => {
         title="Roadmap"
         content={{
           kind: 'space',
-          view: {
+          content: {
             spaceId: uuidSchema.parse('00000000-0000-4000-8000-000000000001'),
             map: uuidSchema.parse('00000000-0000-4000-8000-000000000002'),
             graph: uuidSchema.parse('00000000-0000-4000-8000-000000000003'),
-            framing: undefined,
           },
           via: 'self',
         }}

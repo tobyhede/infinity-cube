@@ -33,7 +33,7 @@ You reach the directory one of three ways, and each step says what differs:
    - Every ordinary Space is reached by a Space Resource elsewhere in the aggregate (`"kind": "space"`, `content` holding `spaceId`, `map` and `graph`, and an optional `framing` of `centreX`, `centreY` and `zoom` that Export writes for a framed one; keep it when you rewrite the file), so it needs a Map and a Graph for that Resource to name. Only the Meta Space may have no Maps.
    - Every object, `content` included, is strict: spell keys exactly as the reference does.
    - A stored picture is an asset, `assets/<hash>.<ext>`: the hash is the SHA-256 of its bytes as unpadded base64url, not hex, and the extension gives its media type (`png`, `jpg`, `webp`, `gif` for a picture); the reference shows the command. The Resource's `content.url` is `/assets/<hash>`. Without a shell, write a picture only when the person gives its bytes and hash (MCP: `write_file` with `encoding: "base64"`); otherwise use an `https:` URL.
-   - A Markdown Resource, or a Reference Resource whose Target is not a Space Resource, is Closed on every Map unless that Map's placement says `"content": { "open": true }`; an `"open": true` key on its placement is refused.
+   - A Markdown, Space or Reference Resource is Closed on every Map unless that Map's placement says `"content": { "open": true }`; an `"open": true` key on its placement is refused.
    - `check` accepts a URL whose asset is missing from `assets/`, and says which file it needs: write that file, or the Resource draws a note in place of its text.
 
    Done when every file you meant to add or change is written.

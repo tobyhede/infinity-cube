@@ -112,7 +112,7 @@ async function setup(available = true) {
       containingSpaceId: META,
       deleteConfirmation: source.app.deleteConfirmation,
     },
-    { ...document.content, framing: document.content.framing },
+    { spaceId: TARGET, map: SECOND_MAP, graph: SECOND_GRAPH, framing: undefined },
     (m, graph) => {
       const result = source.app.authoring.complete(CANVAS, {
         kind: 'edited-resource',

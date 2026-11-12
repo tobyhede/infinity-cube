@@ -377,7 +377,7 @@ const lifecycleAggregates = fc.integer({ min: 2, max: 7 }).chain((count) =>
 
 const spaceResourceTargets = (snapshot: SpaceSnapshot): UUID[] =>
   snapshot.resources.flatMap(({ document }) =>
-    document.kind === 'space' ? [document.content.spaceId] : [],
+    document.kind === 'space' ? [uuidSchema.parse(document.content.spaceId)] : [],
   );
 
 describe('planDelete over any lifecycle-built aggregate', () => {

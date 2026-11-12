@@ -13,11 +13,10 @@ import { WithTexts } from './markdown-texts';
 
 const SPACE_CONTENT: ResourceContent = {
   kind: 'space',
-  view: {
+  content: {
     spaceId: uuidSchema.parse('00000000-0000-4000-8000-0000000000aa'),
     map: uuidSchema.parse('00000000-0000-4000-8000-0000000000ab'),
     graph: uuidSchema.parse('00000000-0000-4000-8000-0000000000ac'),
-    framing: undefined,
   },
   via: 'self',
 };
@@ -522,12 +521,9 @@ describe('CanvasResource Title ladder', () => {
     const title = 'Strategies\nNo strategy is privileged\nADR 0014';
     const resource = (open: boolean) => (
       <CanvasResource
-        kindOperations={{
-          kind: 'space',
-          portal: { editing: false, onEditingChange: () => undefined },
-        }}
+        kindOperations={{ kind: 'reference' }}
         onOpenChange={() => 'completed' as const}
-        display={open ? opened(SPACE_CONTENT) : CLOSED_DISPLAY}
+        display={open ? opened({ kind: 'ur', content: {}, via: 'target' }) : CLOSED_DISPLAY}
         state="selected"
         title={title}
         graphColor="#ffc53d"
@@ -558,10 +554,9 @@ describe('CanvasResource Title ladder', () => {
     expect(screen.queryByLabelText(/No strategy is privileged/u)).toBeNull();
     unmount();
 
-    // Opening changes Open to Close and offers the portal's Edit, neither of
-    // which grows a Title Line.
+    // Opening changes Open to Close, which grows no Title Line.
     render(resource(true));
-    for (const name of ['Close Resource Strategies', 'Edit Resource Strategies']) {
+    for (const name of ['Close Resource Strategies']) {
       expect(screen.getAllByLabelText(name), name).not.toHaveLength(0);
     }
   });
@@ -850,210 +845,6 @@ describe('CanvasResource Open Reference Resource', () => {
     // two are independent rather than exclusive (ADR 0064).
     expect(screen.getByRole('textbox', { name: 'Resource title' })).toBeVisible();
     expect(screen.getByText('Target not found')).toBeVisible();
-  });
-});
-
-describe('CanvasResource Space Resource', () => {
-  const spaceRail = (
-    <>
-      <button type="button" data-testid="space-resource-map">
-        Map 1
-      </button>
-      <button type="button" data-testid="space-resource-graph">
-        Long
-      </button>
-    </>
-  );
-
-  it('inserts a provided spaceRail into the Resource rail', () => {
-    render(
-      <CanvasResource
-        kindOperations={{ kind: 'space', spaceRail }}
-        display={{ shown: 'open', content: SPACE_CONTENT }}
-        state="rest"
-        title="Elsewhere"
-        graphColor="#35d6c3"
-      />,
-    );
-
-    const rail = screen.getByTestId('canvas-resource-actions');
-    expect(screen.getByRole('toolbar')).toContainElement(rail);
-    for (const id of ['space-resource-map', 'space-resource-graph']) {
-      expect(rail).toContainElement(screen.getByTestId(id));
-      expect(screen.getByTestId(id).closest('.canvas-resource__body')).toBeNull();
-    }
-  });
-
-  it('draws a context notice supplied by decoration', () => {
-    render(
-      <CanvasResource
-        kindOperations={{ kind: 'space', spaceRail }}
-        display={{ shown: 'open', content: SPACE_CONTENT }}
-        contextNotice="Link copied."
-        state="rest"
-        title="Elsewhere"
-        graphColor="#35d6c3"
-      />,
-    );
-
-    expect(screen.getByRole('status')).toHaveTextContent('Link copied.');
-  });
-
-  /**
-   * A Closed Space Resource draws neither selector even when the rail fragment is
-   * available to it: those are what Opening it is for, and authoring omits the
-   * fragment. CanvasResource still withholds a supplied fragment while closed.
-   */
-  it('withholds a supplied spaceRail while closed', () => {
-    render(
-      <CanvasResource
-        kindOperations={{ kind: 'space', spaceRail }}
-        display={CLOSED_DISPLAY}
-        state="rest"
-        title="Strategy elsewhere"
-        graphColor="#35d6c3"
-      />,
-    );
-
-    const resource = screen.getByRole('article', { name: 'Strategy elsewhere' });
-    expect(resource).toHaveAttribute('data-kind', 'space');
-    expect(screen.queryByTestId('space-resource-map')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('space-resource-graph')).not.toBeInTheDocument();
-  });
-
-  /**
-   * Opening is the shared Resource operation, not a Space-Resource-specific one, so it
-   * is the same rail control a Reference Resource uses and it names the same two states. A
-   * Space Resource has no Markdown of its own, so there is no content Edit, Save or
-   * Cancel for the rail to draw unless the portal Read/Edit boundary is composed
-   * onto the kind's operations — Enter is the kind command that sits beside them.
-   */
-  it('opens and closes through the shared rail control, and offers no content edit', () => {
-    const onOpenChange = vi.fn(() => 'completed' as const);
-    const { rerender } = render(
-      <CanvasResource
-        kindOperations={{ kind: 'space' }}
-        onOpenChange={onOpenChange}
-        display={CLOSED_DISPLAY}
-        state="selected"
-        title="Elsewhere"
-        graphColor="#35d6c3"
-      />,
-    );
-
-    screen.getByRole('button', { name: 'Open Resource Elsewhere' }).click();
-    expect(onOpenChange).toHaveBeenCalledWith(true);
-    expect(
-      screen.queryByRole('button', { name: 'Edit Resource Elsewhere' }),
-    ).not.toBeInTheDocument();
-
-    rerender(
-      <CanvasResource
-        kindOperations={{ kind: 'space' }}
-        onOpenChange={onOpenChange}
-        display={{ shown: 'open', content: SPACE_CONTENT }}
-        state="selected"
-        title="Elsewhere"
-        graphColor="#35d6c3"
-      />,
-    );
-
-    screen.getByRole('button', { name: 'Close Resource Elsewhere' }).click();
-    expect(onOpenChange).toHaveBeenCalledWith(false);
-  });
-
-  /**
-   * An Open Space Resource's kind command is the Read/Edit boundary for the
-   * embedded target canvas, not Markdown content edit. Map and Graph stay
-   * on the same dock in both modes; Done replaces Edit and Close stays.
-   */
-  it('offers Edit on the floating dock, and Done once the portal is being edited', () => {
-    const onEditingChange = vi.fn();
-    const { rerender } = render(
-      <CanvasResource
-        kindOperations={{ kind: 'space', spaceRail, portal: { editing: false, onEditingChange } }}
-        onOpenChange={() => 'completed'}
-        display={{ shown: 'open', content: SPACE_CONTENT }}
-        state="selected"
-        title="Elsewhere"
-        graphColor="#35d6c3"
-      />,
-    );
-
-    expect(screen.getByTestId('space-resource-map')).toBeEnabled();
-    expect(screen.getByTestId('space-resource-map')).not.toHaveAttribute('aria-disabled', 'true');
-    expect(screen.getByTestId('space-resource-graph')).toBeEnabled();
-    expect(screen.getByTestId('space-resource-graph')).not.toHaveAttribute('aria-disabled', 'true');
-    screen.getByRole('button', { name: 'Edit Resource Elsewhere' }).click();
-    expect(onEditingChange).toHaveBeenCalledWith(true);
-
-    rerender(
-      <CanvasResource
-        kindOperations={{ kind: 'space', spaceRail, portal: { editing: true, onEditingChange } }}
-        onOpenChange={() => 'completed'}
-        display={{ shown: 'open', content: SPACE_CONTENT }}
-        state="selected"
-        title="Elsewhere"
-        graphColor="#35d6c3"
-      />,
-    );
-
-    expect(
-      screen.queryByRole('button', { name: 'Edit Resource Elsewhere' }),
-    ).not.toBeInTheDocument();
-    expect(screen.getByTestId('space-resource-map')).toBeEnabled();
-    expect(screen.getByTestId('space-resource-map')).not.toHaveAttribute('aria-disabled', 'true');
-    expect(screen.getByRole('button', { name: 'Close Resource Elsewhere' })).toBeEnabled();
-    screen.getByRole('button', { name: 'Done Resource Elsewhere' }).click();
-    expect(onEditingChange).toHaveBeenCalledWith(false);
-  });
-
-  it('stands a plain note in for the selectors while the Space is unread', () => {
-    render(
-      <CanvasResource
-        kindOperations={{ kind: 'space' }}
-        display={{ shown: 'open', content: SPACE_CONTENT }}
-        state="rest"
-        title="Elsewhere"
-        graphColor="#35d6c3"
-      />,
-    );
-
-    expect(screen.getByText('Reading the referenced Space…')).toBeVisible();
-    expect(screen.queryByTestId('space-resource-map')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('space-resource-graph')).not.toBeInTheDocument();
-    // One note, not a live region: a canvas of Space Resources resolving would
-    // otherwise announce each one, for a wait nobody asked for.
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
-  });
-
-  it('withholds a supplied spaceRail from a read-only Resource', () => {
-    render(
-      <CanvasResource
-        readOnly
-        kindOperations={{ kind: 'space', spaceRail }}
-        display={{ shown: 'open', content: SPACE_CONTENT }}
-        state="rest"
-        title="Elsewhere"
-        graphColor="#35d6c3"
-      />,
-    );
-
-    expect(screen.queryByTestId('space-resource-map')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('space-resource-graph')).not.toBeInTheDocument();
-  });
-
-  it('keeps Enter off the rail', () => {
-    render(
-      <CanvasResource
-        kindOperations={{ kind: 'space' }}
-        display={CLOSED_DISPLAY}
-        state="selected"
-        title="Architecture"
-        graphColor="#35d6c3"
-      />,
-    );
-    expect(screen.queryByRole('button', { name: /Enter/ })).not.toBeInTheDocument();
   });
 });
 

@@ -75,17 +75,11 @@ Guards above are omitted below.
 | `removed-resource-from-map` | `resource-not-in-map` → completed |
 | `deleted-resource` | `resource-not-found` → `space-resource-deletion-unsupported` → `resource-has-references` → completed |
 
-`open-requires-content` is the code `opened-resource` and `opened-resource-to-fit` raise for an Ur or an Image Resource,
-which is never Open, for a Markdown Resource, whose plugin keeps its Open
-as Map content (ADR 0142), and for a Reference Resource whose Target a plugin
-draws or whose Target is missing, since its plugin keeps its Open as Map
-content too (`takesOpen` in `packages/core/src/kinds/registry.ts`); intake
-raises the same code for a Map entry storing one Open. A Reference Resource to
-a Space Resource is the one Reference the application still Opens.
-`map-content-not-kept` is raised for a kind no plugin draws and for a Resource
-no plugin draws on this Map, which is a Reference Resource to a Space Resource
-(`drawnByPlugin`); intake refuses Map content stored for one as
-`map-content-invalid`. Every code string here is quoted exactly as `AuthoringRefusal['code']`
+`open-requires-content` is the code `opened-resource` and `opened-resource-to-fit` raise
+for every Resource: each kind's plugin keeps its Open, if it has one, as Map content (ADR 0142,
+resource-plugins issue 07); intake raises the same code for a Map entry storing one Open.
+`map-content-not-kept` is raised for a kind no plugin draws, and no kind is one now;
+intake refuses Map content stored for one as `map-content-invalid`. Every code string here is quoted exactly as `AuthoringRefusal['code']`
 declares it. A refusal code is a stable identity across the seam (ADR 0057), so
 renaming one is a change to the domain surface rather than a wording fix, made in
 source and quoted here afterwards.

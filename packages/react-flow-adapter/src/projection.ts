@@ -1,7 +1,12 @@
 import type { Node, NodeHandle } from '@xyflow/react';
 import { Position } from '@xyflow/react';
 import { CLOSED_DISPLAY, FALLBACK_GRAPH_COLOR, bareOperations, graphPaint } from '@project/ui';
-import type { EntityActionGroup, KindOperationsByKind, ResourceDisplay } from '@project/ui';
+import type {
+  EntityActionGroup,
+  KindOperationsByKind,
+  MapEmbedRequest,
+  ResourceDisplay,
+} from '@project/ui';
 import {
   DEFAULT_GRAPH_HEAD_SHAPE,
   DEFAULT_RESOURCE_SHAPE,
@@ -33,6 +38,9 @@ import { graphLanes } from './edge-lanes';
 import { graphHeadMarkerId } from './GraphHeadMarkers';
 
 const FALLBACK_COLOR = FALLBACK_GRAPH_COLOR;
+
+/** The z-index an Open Resource is drawn at, over its Closed neighbours. */
+export const OPEN_RESOURCE_Z_INDEX = 10;
 
 /**
  * Opacity of the Graphs that are not the active one, while one is. With no
@@ -89,6 +97,18 @@ type ResourceNodeCommonData = {
   embedsMap: boolean;
   /** Reports rendered title geometry by placement, including embedded placements. */
   onBodyHeightChange?: (id: string, height: number | null) => void;
+  /**
+   * Told, by placement, what a Map embedding drawn in this Resource's rect asks
+   * for, and `null` once it is gone, so the canvas draws that Map over the
+   * rect (ADR 0142), with the key of the drawing it is drawn in. Supplied by
+   * the canvas to every node, nested ones too.
+   */
+  onMapEmbed?: (
+    id: string,
+    resourceId: ResourceId,
+    request: MapEmbedRequest | null,
+    drawing: symbol,
+  ) => void;
   resourceId: ResourceId;
   title: string;
   /** Whether the Resource's reusable component must withhold authoring affordances. */
@@ -412,7 +432,7 @@ export function projectResourceNodes(
     }
     if (open) {
       node.data.open = true;
-      node.zIndex = 10;
+      node.zIndex = OPEN_RESOURCE_Z_INDEX;
     }
     return node;
   });

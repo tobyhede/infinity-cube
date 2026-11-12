@@ -1,4 +1,4 @@
-import { useMemo, type ComponentType, type ReactElement } from 'react';
+import { useMemo, type ComponentType, type ReactElement, type ReactNode } from 'react';
 import {
   declaredOutline,
   imageKind,
@@ -6,6 +6,7 @@ import {
   jsonValueSchema,
   markdownKind,
   referenceKind,
+  spaceKind,
   urKind,
   type JsonValue,
   type PluginKind,
@@ -25,6 +26,8 @@ import { markdownPlugin } from '@project/plugin-markdown/domain';
 import { markdownPluginView } from '@project/plugin-markdown/view';
 import { referencePlugin } from '@project/plugin-reference/domain';
 import { referencePluginView } from '@project/plugin-reference/view';
+import { spacePlugin } from '@project/plugin-space/domain';
+import { spacePluginView } from '@project/plugin-space/view';
 import { urPlugin } from '@project/plugin-ur/domain';
 import { urPluginView } from '@project/plugin-ur/view';
 import { ResourceFailureBoundary } from '../ResourceFailureBoundary';
@@ -102,6 +105,15 @@ export interface PluginOperations {
   readonly epoch?: number | undefined;
   /** Told what the plugin threw while drawing. */
   readonly onFailure?: ((error: Error) => void) | undefined;
+  /**
+   * The Map embedding's own commands, which the host draws on this Resource's
+   * rail while the plugin embeds a Map it may choose for (ADR 0142): the Map
+   * and Graph chooser, the shown Space's Map and Graph authoring and its links.
+   * Never the plugin's: it is the host's, and the plugin is not told of it.
+   */
+  readonly mapRail?: ReactNode;
+  /** What the Map embedding says in place of the Map, as while the Space it shows is read. */
+  readonly mapNote?: string | undefined;
 }
 
 /** Whether a kind's operations are a plugin kind's, which `PluginResource` draws. */
@@ -264,6 +276,7 @@ const PLUGIN_ENTRIES = {
   [imageKind.id]: pluginEntry(imagePlugin, imagePluginView),
   [markdownKind.id]: pluginEntry(markdownPlugin, markdownPluginView),
   [referenceKind.id]: pluginEntry(referencePlugin, referencePluginView),
+  [spaceKind.id]: pluginEntry(spacePlugin, spacePluginView),
   [urKind.id]: pluginEntry(urPlugin, urPluginView),
 } satisfies Record<PluginKind, PluginEntry>;
 

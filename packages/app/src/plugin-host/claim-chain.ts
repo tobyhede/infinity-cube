@@ -79,6 +79,24 @@ export const claimedElsewhere = (chain: ClaimChain, resource: string): boolean =
   chain.holders.length > 0 &&
   !chain.holders.some((embedding) => embedding.some((drawing) => drawing.resource === resource));
 
+/** Whether two embeddings are the same drawings, outermost first. */
+export const sameEmbedding = (a: Embedding, b: Embedding): boolean =>
+  a.length === b.length && a.every((drawing, index) => b[index]?.key === drawing.key);
+
+/**
+ * Whether a drawing embedded in `embeddedIn` would nest under the deepest
+ * holder: that holder's embedding is `embeddedIn` or a run of its outermost
+ * drawings, so a Claim there is one `claim` grants.
+ */
+export const nestsUnderDeepest = (chain: ClaimChain, embeddedIn: Embedding): boolean => {
+  const last = chain.holders.at(-1);
+  return (
+    last !== undefined &&
+    last.length <= embeddedIn.length &&
+    last.every((drawing, index) => embeddedIn[index]?.key === drawing.key)
+  );
+};
+
 /** The deepest holder's key, whose commands show and which holds the keyboard. */
 export const deepest = (chain: ClaimChain): DrawingKey | undefined => {
   const last = chain.holders.at(-1);

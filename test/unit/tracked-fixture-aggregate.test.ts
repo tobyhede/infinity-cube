@@ -13,7 +13,9 @@ import { MemorySpaceRepository } from '@project/aggregate';
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
 
 const spaceResourceTargets = (resources: readonly Resource[]): readonly UUID[] =>
-  resources.flatMap((resource) => (resource.kind === 'space' ? [resource.content.spaceId] : []));
+  resources.flatMap((resource) =>
+    resource.kind === 'space' ? [uuidSchema.parse(resource.content.spaceId)] : [],
+  );
 
 /**
  * Longest Space-Resource path from Meta, and every ordinary Space that path reaches.

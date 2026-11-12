@@ -100,6 +100,8 @@ export type RenderedPlugin<C, M> = RenderResult & {
   readonly withdraw: (withdrawn: boolean) => void;
   /** Change the content from outside the plugin, as another author's Edit or a replacement does. */
   readonly changeContent: (next: C) => void;
+  /** Change the Map content from outside the plugin, as another author's Close or a replacement does. */
+  readonly changeMap: (next: M) => void;
 };
 
 /** Where a test surface draws an asset from: a URL that names the reference, so a test can see it. */
@@ -116,10 +118,32 @@ const DEFAULT_SIZE: Size = { width: 200, height: 120 };
  * The embedding a test surface hands its plugin: one component for every
  * render, as a host must. A Resource embedding is drawn as what it was asked
  * for, the Resource's id and the Title passed, with a rename where that Title
- * carries a commit, so a plugin's test reads what it embedded.
+ * carries a commit, so a plugin's test reads what it embedded. A Map embedding
+ * is drawn as the view asked for and whether a Claim was passed, with a choice
+ * of another Map where `select` carries a commit.
  */
 function TestEmbed(props: EmbedProps) {
-  if (!('resource' in props)) return null;
+  if (!('resource' in props)) {
+    const { map: view, select, claim } = props;
+    const choose = select?.commit;
+    return (
+      <div
+        data-testid="embedded-map"
+        data-space={view.spaceId}
+        data-map={view.map}
+        data-graph={view.graph}
+        data-claimed={claim !== undefined}
+      >
+        {choose !== undefined && (
+          <button
+            type="button"
+            aria-label={`Choose another Map than ${view.map}`}
+            onClick={() => void choose({ ...view, map: `${view.map}′` })}
+          />
+        )}
+      </div>
+    );
+  }
   const { resource, title } = props;
   const commit = title.commit;
   return (
@@ -336,6 +360,7 @@ export function renderPlugin<C, M>(
   };
   const hold = createClaimHold();
   const contentChanges = new Set<(next: C) => void>();
+  const mapChanges = new Set<(next: M) => void>();
   /** A commit answering refused when `live` says it is not, as the host's withdrawn and ended commits do. */
   const guarded =
     <T, O, A>(
@@ -356,6 +381,12 @@ export function renderPlugin<C, M>(
       };
     }, []);
     const [mapValue, setMapValue] = useState(options.map);
+    useEffect(() => {
+      mapChanges.add(setMapValue);
+      return () => {
+        mapChanges.delete(setMapValue);
+      };
+    }, []);
     const rail = useMemo(() => createRailStore(), []);
     const exclusiveRunning = useSyncExternalStore(gate.subscribe, gate.running);
     const authoringOff = useSyncExternalStore(subscribeAuthoring, withdrawn);
@@ -478,5 +509,10 @@ export function renderPlugin<C, M>(
       for (const change of contentChanges) change(next);
     });
   };
-  return Object.assign(rendered, { commits, withdraw, changeContent });
+  const changeMap = (next: M): void => {
+    act(() => {
+      for (const change of mapChanges) change(next);
+    });
+  };
+  return Object.assign(rendered, { commits, withdraw, changeContent, changeMap });
 }

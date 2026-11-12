@@ -18,7 +18,6 @@ export {
   canvasResourceContentOverflow,
 } from './CanvasResource';
 export { CLOSED_DISPLAY } from './resource-display';
-export { isSpaceOperations, spaceViewOf } from './kinds/space';
 export type { ResourceDisplay } from './resource-display';
 export { InlineTitleEditor } from './InlineTitleEditor';
 export type { InlineTitleEditorProps, InlineTitleEditorVariant } from './InlineTitleEditor';
@@ -27,6 +26,14 @@ export { SpaceResourceSelectors } from './SpaceResourceSelectors';
 export { RailChoiceMenu } from './RailChoiceMenu';
 export type { RailChoiceMenuProps } from './RailChoiceMenu';
 export { PluginResource } from './PluginResource';
+export {
+  HostMapProvider,
+  MapEmbedSlotProvider,
+  useMapEmbedSlot,
+  type MapEmbedDraw,
+  type MapEmbedRequest,
+  type MapEmbedSlot,
+} from './ResourceEmbedding';
 export type { MapTitle, PluginResourceProps } from './PluginResource';
 export { PresentedPluginResource } from './PresentedPluginResource';
 export { NO_ASSETS, PluginAssetsProvider, usePluginAssets } from './plugin-assets';

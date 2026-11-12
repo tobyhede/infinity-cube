@@ -16,17 +16,18 @@ import {
 
 describe('a Resource plugin read as a kind (ADR 0142)', () => {
   it('lists every plugin this build draws, and only those keep Map content', () => {
-    expect(PLUGIN_KINDS).toEqual(['image', 'markdown', 'reference', 'ur']);
+    expect(PLUGIN_KINDS).toEqual(['image', 'markdown', 'reference', 'space', 'ur']);
     expect(isPluginKind('ur')).toBe(true);
     expect(isPluginKind('image')).toBe(true);
     expect(isPluginKind('markdown')).toBe(true);
     expect(isPluginKind('reference')).toBe(true);
-    expect(isPluginKind('space')).toBe(false);
+    expect(isPluginKind('space')).toBe(true);
     expect(keepsMapContent('image')).toBe(true);
     expect(keepsMapContent('ur')).toBe(true);
     expect(keepsMapContent('markdown')).toBe(true);
     expect(keepsMapContent('reference')).toBe(true);
-    expect(keepsMapContent('space')).toBe(false);
+    expect(keepsMapContent('space')).toBe(true);
+    expect(isPluginKind('chart')).toBe(false);
   });
 
   it("answers Map content with the plugin's own schema", () => {
@@ -36,7 +37,8 @@ describe('a Resource plugin read as a kind (ADR 0142)', () => {
     expect(mapContentProblem('markdown', { shape: 'rectangle' })).toMatch(/\S/u);
     expect(mapContentProblem('reference', { open: true })).toBeUndefined();
     expect(mapContentProblem('reference', { shape: 'pill' })).toMatch(/\S/u);
-    expect(mapContentProblem('space', { open: true })).toMatch(/keeps no Map content/u);
+    expect(mapContentProblem('space', { open: true })).toBeUndefined();
+    expect(mapContentProblem('space', { shape: 'pill' })).toMatch(/\S/u);
   });
 
   it('gives the plugin its default where the entry stores none, and its value with no Map', () => {
@@ -48,7 +50,9 @@ describe('a Resource plugin read as a kind (ADR 0142)', () => {
     // So is a Reference Resource, which shows its Target where there is no Map.
     expect(resolvedMapContent('reference', undefined)).toEqual({ open: false });
     expect(mapContentWithoutMap('reference')).toEqual({ open: true });
-    expect(resolvedMapContent('space', undefined)).toBeUndefined();
+    // And a Space Resource, which shows its Map where there is no Map.
+    expect(resolvedMapContent('space', undefined)).toEqual({ open: false });
+    expect(mapContentWithoutMap('space')).toEqual({ open: true });
     expect(mapContentWithoutMap('ur')).toEqual({ shape: 'rectangle' });
   });
 

@@ -241,8 +241,8 @@ const contexts: readonly {
         addressSelected: () => undefined,
         authored,
         outcomes: source.app.commandOutcomes,
-        mapId: document.content.map,
-        graphId: document.content.graph,
+        mapId: SECOND_MAP,
+        graphId: SECOND_GRAPH,
         commands: embeddedGraphAuthoringCommands({
           target: authored,
           spaces,

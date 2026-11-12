@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  frameSpaceView,
   lifetimeSpaceReferences,
   selectSpaceView,
   spaceReferences,
@@ -10,7 +9,8 @@ import {
 } from '../src/kinds/registry';
 import { EMPTY_ASSET_REF } from '../src/assets';
 import { referenceKind } from '../src/kinds/reference';
-import { spaceKind, type SpaceSelectionTarget } from '../src/kinds/space';
+import { spaceKind } from '../src/kinds/space';
+import type { SpaceSelectionTarget } from '../src/kinds/kind-module';
 import { uuidSchema } from '../src/schema';
 
 const uuid = (n: number) =>
@@ -149,16 +149,11 @@ describe("a Resource's view of another Space, through its kind's own selection",
     });
   });
 
-  it('frames a Space Resource as given', () => {
-    expect(frameSpaceView(SPACE_RESOURCE, FRAMING)).toEqual(FRAMED);
-  });
-
   it.each([MARKDOWN, REFERENCE])(
     'shows no view of another Space for a $kind Resource',
     (document) => {
       expect(spaceSelection(document)).toBeUndefined();
       expect(selectSpaceView(document, { map: MAP, graph: GRAPH })).toBeUndefined();
-      expect(frameSpaceView(document, FRAMING)).toBeUndefined();
     },
   );
 });

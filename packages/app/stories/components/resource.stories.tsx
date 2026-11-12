@@ -105,7 +105,16 @@ const CLOSED_KINDS = [
   { kind: 'markdown', label: 'markdown' },
   // A Reference Resource is made from its Target, which its content names.
   { kind: 'reference', label: 'reference', content: { target: resourceIds.strategies } },
-  { kind: 'space', label: 'space' },
+  // A Space Resource is created with the Space it shows, which its content names.
+  {
+    kind: 'space',
+    label: 'space',
+    content: {
+      spaceId: '00000000-0000-4000-8000-000000000020',
+      map: '00000000-0000-4000-8000-000000000021',
+      graph: '00000000-0000-4000-8000-000000000022',
+    },
+  },
   { kind: 'ur', label: 'ur' },
   { kind: 'markdown', label: 'creation ghost' },
 ] as const satisfies readonly {

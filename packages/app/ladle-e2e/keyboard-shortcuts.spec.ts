@@ -28,7 +28,9 @@ test(
     await expect(sheet.getByRole('region', { name: 'On the canvas' })).toBeVisible();
     await expect(sheet.getByRole('region', { name: 'In Full View' })).toBeVisible();
     await expect(sheet.locator('kbd', { hasText: 'Shift' }).first()).toBeVisible();
-    await expect(sheet).toContainText('Open the focused Resource and expand it to fit its content');
+    await expect(sheet).toContainText('Read the focused Resource in Full View');
+    // Enter opens no Resource on the canvas: a plugin keeps every kind's Open (ADR 0142).
+    await expect(sheet).not.toContainText('Open the focused Resource');
     await expect(sheet).toContainText('Show the keyboard shortcuts');
 
     await page.keyboard.press('Escape');

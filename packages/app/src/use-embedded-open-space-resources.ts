@@ -16,11 +16,11 @@ import {
   type EmbeddedRoot,
 } from './embedded-open-space-resource';
 import type { EmbeddedPublication } from './embedded-publication';
+import { editingMapEmbeds, type MapEmbedEntry } from './map-embeddings';
 import type { OpenSpace, SpaceHold } from './open-spaces';
 import type { SpaceResourceFraming } from './space-resource-framing';
 
 const EMPTY_ENTRIES = [] as const;
-const EMPTY_PORTALS: ReadonlySet<ResourceId> = new Set();
 const emptySubscription = () => () => undefined;
 
 /**
@@ -45,10 +45,12 @@ export interface EmbeddedOpenSpaceResources {
   readonly resumeEmbedded: (spaceId: ResourceId) => Promise<void>;
   readonly publishEmbedded: (id: string, value: EmbeddedPublication | null) => void;
   readonly reportBodyHeight: (id: string, height: number | null) => void;
-  readonly editingPortals: ReadonlySet<ResourceId>;
-  readonly onPortalEditingChange: (resourceId: ResourceId, editing: boolean) => void;
-  readonly portalDraft: ReadonlyMap<ResourceId, SpaceResourceFraming>;
-  readonly setPortalDraft: Dispatch<SetStateAction<ReadonlyMap<ResourceId, SpaceResourceFraming>>>;
+  /** The Resources whose embedded Map is authored in place: each passed its Claim to the embedding. */
+  /** The placements whose embedded Map is authored in place, by node id. */
+  readonly editingPortals: ReadonlySet<string>;
+  /** The framing being drawn on each placement's embedded Map, by node id. */
+  readonly portalDraft: ReadonlyMap<string, SpaceResourceFraming>;
+  readonly setPortalDraft: Dispatch<SetStateAction<ReadonlyMap<string, SpaceResourceFraming>>>;
 }
 
 /**
@@ -57,6 +59,7 @@ export interface EmbeddedOpenSpaceResources {
  */
 export function useEmbeddedOpenSpaceResources(
   nodes: readonly ResourceFlowNode[],
+  embeds: ReadonlyMap<string, MapEmbedEntry>,
   spaces: EmbeddedTargetReader | null,
   draggingIds: ReadonlySet<string>,
   root: EmbeddedRoot,
@@ -81,20 +84,12 @@ export function useEmbeddedOpenSpaceResources(
     new Map(),
   );
   const [bodyHeights, setBodyHeights] = useState<ReadonlyMap<string, number>>(new Map());
-  const [editingPortals, setEditingPortals] = useState<ReadonlySet<ResourceId>>(EMPTY_PORTALS);
-  const [portalDraft, setPortalDraft] = useState<ReadonlyMap<ResourceId, SpaceResourceFraming>>(
+  const editingKey = [...editingMapEmbeds(embeds)].sort().join();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- membership key, not snapshot identity
+  const editingPortals = useMemo(() => editingMapEmbeds(embeds), [editingKey]);
+  const [portalDraft, setPortalDraft] = useState<ReadonlyMap<string, SpaceResourceFraming>>(
     () => new Map(),
   );
-  const onPortalEditingChange = useCallback((resourceId: ResourceId, editing: boolean) => {
-    setEditingPortals((previous) => {
-      const has = previous.has(resourceId);
-      if (editing === has) return previous;
-      const next = new Set(previous);
-      if (editing) next.add(resourceId);
-      else next.delete(resourceId);
-      return next;
-    });
-  }, []);
   const reportBodyHeight = useCallback((id: string, height: number | null) => {
     setBodyHeights((previous) => {
       // A non-positive height is not a measured footer.
@@ -110,7 +105,8 @@ export function useEmbeddedOpenSpaceResources(
     () =>
       discoverEmbeddedOpenSpaceResources({
         root,
-        editingResources: editingPortals,
+        editingPortals,
+        embeds,
         staleSpaces: new Set(embeddedFailures.keys()),
         nodes,
         entries,
@@ -120,6 +116,7 @@ export function useEmbeddedOpenSpaceResources(
       }),
     [
       nodes,
+      embeds,
       entries,
       embeddedPublications,
       bodyHeights,
@@ -246,7 +243,6 @@ export function useEmbeddedOpenSpaceResources(
     publishEmbedded,
     reportBodyHeight,
     editingPortals,
-    onPortalEditingChange,
     portalDraft,
     setPortalDraft,
   };

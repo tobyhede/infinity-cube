@@ -9,8 +9,10 @@ import {
   claimedElsewhere,
   heldByAnotherDrawing,
   holds,
+  nestsUnderDeepest,
   type ClaimChain,
   type Drawing,
+  type Embedding,
 } from './claim-chain';
 import type { PluginGate } from './plugin-gate';
 
@@ -99,6 +101,12 @@ export interface PluginHost {
    * a canvas fact; absent, or answering `undefined`, the hint is ignored.
    */
   readonly capSizeHint?: ((hint: Size) => Size | undefined) | undefined;
+  /**
+   * The drawings whose Map embedding this canvas draws inside, outermost
+   * first: a drawing here is embedded in each, so its Claim nests under one
+   * they hold (ADR 0142). Empty, or absent, on a canvas drawn in no embedding.
+   */
+  readonly embeddedIn?: Embedding | undefined;
 }
 
 /** Who holds a Claim on a drawing's Resource, as that drawing reads it. */
@@ -156,6 +164,7 @@ function commitsFor(
   };
 }
 
+/** Whether two Claim chains name the same surface. */
 /**
  * A plugin kind's operations on the canvas: bare where the surface offers no
  * commits, and otherwise its commits and a Claim, both withdrawn by the host.
@@ -185,8 +194,12 @@ export function pluginSurfaceOperations(
   // While a Claim is held by drawings that draw some other Resource, this one
   // offers nothing to compete with it (ADR 0064, ADR 0142): its commands come
   // back when that Claim ends. Another drawing of a held Resource is withheld
-  // per drawing, by `claimHolder`.
-  if (claimedElsewhere(host.claims, resourceId)) return drawn;
+  // per drawing, by `claimHolder`. A drawing inside a Map embedding whose
+  // drawing holds the deepest Claim may nest its own under it, as an Image
+  // inside an entered Space may (ADR 0142).
+  const embeddedIn = host.embeddedIn ?? [];
+  if (claimedElsewhere(host.claims, resourceId) && !nestsUnderDeepest(host.claims, embeddedIn))
+    return drawn;
   const replaced = (): Refusal | null => (host.replacementEpoch() === builtIn ? null : GONE);
   const plain = commitsFor(
     host,
@@ -199,8 +212,10 @@ export function pluginSurfaceOperations(
   const admitted: PluginHost['complete'] = (completion, settle) =>
     host.gate.admit(() => host.complete(completion, settle));
   const claim = (drawing: symbol): PluginHostClaim | undefined => {
-    const held = host.gate.claim([{ resource: resourceId, key: drawing }], (running) =>
-      commitsFor(host, resourceId, () => replaced() ?? (running() ? null : BUSY), admitted),
+    const held = host.gate.claim(
+      [...embeddedIn, { resource: resourceId, key: drawing }],
+      (running) =>
+        commitsFor(host, resourceId, () => replaced() ?? (running() ? null : BUSY), admitted),
     );
     if (held === undefined) return undefined;
     return {

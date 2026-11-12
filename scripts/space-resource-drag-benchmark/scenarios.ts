@@ -97,7 +97,7 @@ export function benchmarkScenario(
   targetPositions[nestedParentId] = {
     x: 0,
     y: Math.ceil(scale / 10) * 180,
-    open: true,
+    content: { open: true },
     size: { width: 640, height: 360 },
   };
   const metaPositions: Record<UUID, ResourcePlacement> = {};
@@ -106,7 +106,7 @@ export function benchmarkScenario(
     metaPositions[resourceId] = {
       x: 380 + index * 760,
       y: 20,
-      open: true,
+      content: { open: true },
       size: { width: 700, height: 620 },
     };
   });

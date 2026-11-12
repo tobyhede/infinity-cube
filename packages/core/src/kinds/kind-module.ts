@@ -1,14 +1,8 @@
 /* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import type { z } from 'zod';
 import type { ContentFacts } from '../resource-content';
-import type {
-  SpaceSelectionTarget,
-  SpaceSelectionProblem,
-  spaceResourceContentSchema,
-  spaceResourceFramingSchema,
-} from './space';
 import type { UUID } from '../types';
-import type { Outline } from '@project/resource-api/domain';
+import type { Outline, SpaceFraming as ApiSpaceFraming } from '@project/resource-api/domain';
 import type { JsonValue } from '../json-value';
 
 /**
@@ -40,10 +34,8 @@ export interface KindMapContent {
   readonly outline: (value: JsonValue) => Outline;
 }
 
-type SpaceResourceContent = z.infer<typeof spaceResourceContentSchema>;
-
 /** The Map-coordinate centre and scale one window onto another Space is framed at. */
-export type SpaceFraming = Readonly<z.infer<typeof spaceResourceFramingSchema>>;
+export type SpaceFraming = ApiSpaceFraming;
 
 /**
  * The view of another Space a Resource shows: the Space, a Map of it, a Graph
@@ -53,11 +45,51 @@ export type SpaceFraming = Readonly<z.infer<typeof spaceResourceFramingSchema>>;
  * by a conditional spread.
  */
 export interface SpaceView {
-  readonly spaceId: SpaceResourceContent['spaceId'];
-  readonly map: SpaceResourceContent['map'];
-  readonly graph: SpaceResourceContent['graph'];
+  readonly spaceId: UUID;
+  readonly map: UUID;
+  readonly graph: UUID;
   readonly framing: SpaceFraming | undefined;
 }
+
+/** What a selection is checked against: the Space it shows, as the core reads it. */
+export interface SpaceSelectionTarget {
+  /** The ids of the Graphs a Map of the target owns, or `undefined` when it has no such Map. */
+  readonly mapGraphIds: (mapId: UUID) => readonly UUID[] | undefined;
+  /** Whether the target has a Graph with this id. */
+  readonly hasGraph: (graphId: UUID) => boolean;
+}
+
+/** Why a selection does not resolve in the Space it shows. */
+export type SpaceSelectionProblem =
+  | { readonly kind: 'space-resource-map-missing'; readonly mapId: UUID }
+  | { readonly kind: 'space-resource-graph-missing'; readonly graphId: UUID }
+  | {
+      readonly kind: 'space-resource-graph-outside-map';
+      readonly mapId: UUID;
+      readonly graphId: UUID;
+    };
+
+/**
+ * The core's check of a selection (ADR 0079, ADR 0128): its Map and Graph
+ * resolve in the Space it shows, and the Graph is the Map's. The selection's
+ * own Map, with no fallback to that Space's `defaultMap`: a selection names a
+ * Map from the moment it exists, so one that resolves to nothing is a dangling
+ * reference to a deleted Map rather than an unmade choice.
+ */
+export const selectionProblem = (
+  view: Pick<SpaceView, 'map' | 'graph'>,
+  target: SpaceSelectionTarget,
+): SpaceSelectionProblem | undefined => {
+  const graphIds = target.mapGraphIds(view.map);
+  if (graphIds === undefined) return { kind: 'space-resource-map-missing', mapId: view.map };
+  if (!target.hasGraph(view.graph)) {
+    return { kind: 'space-resource-graph-missing', graphId: view.graph };
+  }
+  if (!graphIds.includes(view.graph)) {
+    return { kind: 'space-resource-graph-outside-map', mapId: view.map, graphId: view.graph };
+  }
+  return undefined;
+};
 
 /** A Map and one of its Graphs, chosen in the Space a selection shows. */
 export type SpaceViewChoice = Pick<SpaceView, 'map' | 'graph'>;
@@ -72,8 +104,6 @@ export interface SpaceSelection<Content> {
   readonly of: (content: Content) => SpaceView;
   /** The content showing `choice` in the same Space. A framing is the old Map's, so a different Map drops it. */
   readonly select: (content: Content, choice: SpaceViewChoice) => Content;
-  /** The content framed as given. */
-  readonly frame: (content: Content, framing: SpaceFraming) => Content;
   /** The kind's own check of this content's selection in a target Space it alone understands. */
   readonly problem: (
     content: Content,
@@ -135,14 +165,22 @@ export interface StartsEmpty<Content> {
   readonly newContent: Content;
 }
 
+/** The rules every kind declares, since each is a plugin and the plugin answers them (ADR 0142). */
+type DeclaredRule =
+  | 'id'
+  | 'contentSchema'
+  | 'flags'
+  | 'resolveContent'
+  | 'resourceReferences'
+  | 'contentTarget'
+  | 'spaceReferences';
+
 /** What a kind must declare; the rest takes {@link defineKind}'s answer. */
 type KindDeclaration<K extends string, Content, Resolved extends KindResolvedContent> = Pick<
   KindModule<K, Content, Resolved>,
-  'id' | 'contentSchema' | 'flags' | 'resolveContent'
+  DeclaredRule
 > &
-  Partial<
-    Omit<KindModule<K, Content, Resolved>, 'id' | 'contentSchema' | 'flags' | 'resolveContent'>
-  >;
+  Partial<Omit<KindModule<K, Content, Resolved>, DeclaredRule>>;
 
 /** The content in its schema's key order, or as given when the schema refuses it, so this never throws. */
 const inSchemaOrder =
@@ -154,8 +192,8 @@ const inSchemaOrder =
 
 /**
  * A kind module with every rule it does not declare answered as a kind that
- * references nothing, has no content of its own to author, and puts its
- * content in its schema's key order on Export. A module that declares the
+ * has no content of its own to author and puts its content in its schema's
+ * key order on Export. A module that declares the
  * content a new Resource starts with keeps it in its type.
  */
 export function defineKind<const K extends string, Content, Resolved extends KindResolvedContent>(
@@ -168,9 +206,6 @@ export function defineKind<K extends string, Content, Resolved extends KindResol
   declaration: KindDeclaration<K, Content, Resolved>,
 ): KindModule<K, Content, Resolved> {
   return {
-    resourceReferences: () => [],
-    contentTarget: () => undefined,
-    spaceReferences: () => [],
     canonicalContent: inSchemaOrder(declaration.contentSchema),
     ...declaration,
   };

@@ -167,14 +167,10 @@ const ONE_KIND_FEATURES = new Map<string, readonly string[]>([
       'icon={<ResourceKindIcon kind={spaceKind.id} decorative />}',
     ],
   ],
-  // Create Reference's glyph, and a Space Resource's Enter and menu.
+  // Create Reference's glyph.
   [
     'packages/app/src/resource-rail-actions.tsx',
-    [
-      'icon: <ResourceKindIcon kind={referenceKind.id} decorative />,',
-      'if (resource.kind === spaceKind.id) {',
-      'spaces === null || resource.kind !== spaceKind.id',
-    ],
+    ['icon: <ResourceKindIcon kind={referenceKind.id} decorative />,'],
   ],
   // Creating an Image or a Reference Resource.
   [

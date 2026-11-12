@@ -4,13 +4,23 @@ import {
   type MapContentDeclaration,
   type Outline,
   type ResourcePlugin,
+  type SelectionDeclaration,
+  type SpaceView as ApiSpaceView,
 } from '@project/resource-api/domain';
 import { z } from 'zod';
 import { jsonValueSchema, type JsonValue } from '../json-value';
 import type { ContentFacts } from '../resource-content';
 import type { UUID } from '../types';
 import { uuidSchema } from '../uuid';
-import { defineKind, type KindModule, type KindMapContent, type StartsEmpty } from './kind-module';
+import {
+  defineKind,
+  selectionProblem,
+  type KindModule,
+  type KindMapContent,
+  type SpaceSelection,
+  type SpaceView,
+  type StartsEmpty,
+} from './kind-module';
 
 /**
  * A Resource plugin's domain half read as the core reads every kind (ADR
@@ -24,6 +34,16 @@ import { defineKind, type KindModule, type KindMapContent, type StartsEmpty } fr
 const PLUGIN_CONTENT_FACTS: ContentFacts = {
   authored: false,
   embedsMap: false,
+  drawsContentArea: false,
+};
+
+/**
+ * What content showing another Space's Map says (ADR 0068): it embeds a Map,
+ * which it authors where it is its own.
+ */
+const SELECTING_CONTENT_FACTS: ContentFacts = {
+  authored: true,
+  embedsMap: true,
   drawsContentArea: false,
 };
 
@@ -130,6 +150,28 @@ function contentSchemaOf<C, M>(plugin: ResourcePlugin<C, M>): z.ZodType<C, z.Zod
 /** The ids a plugin declares, as the core's UUIDs: content its schema accepted names only UUIDs. */
 const uuids = (ids: readonly string[]): readonly UUID[] => ids.map((id) => uuidSchema.parse(id));
 
+/** A view a plugin declares, with its ids as the core's UUIDs; its content schema holds them to UUIDs. */
+const coreView = (view: ApiSpaceView): SpaceView => ({
+  spaceId: uuidSchema.parse(view.spaceId),
+  map: uuidSchema.parse(view.map),
+  graph: uuidSchema.parse(view.graph),
+  framing: view.framing,
+});
+
+/**
+ * A plugin's selection read as the core reads every selection (ADR 0079): its
+ * view, the content showing a choice, and the core's own check that the
+ * selection resolves in the Space it shows (ADR 0128).
+ */
+function selectionOf<C>(declared: SelectionDeclaration<C>): SpaceSelection<C> {
+  const of = (content: C): SpaceView => coreView(declared.of(content));
+  return {
+    of,
+    select: (content, choice) => declared.select(content, { ...of(content), ...choice }),
+    problem: (content, target) => selectionProblem(of(content), target),
+  };
+}
+
 /**
  * What every plugin kind resolves its content to: its kind, which its own view
  * draws, and its content as its plugin's schema parsed it, which a surface
@@ -162,7 +204,7 @@ export function kindFromPlugin<const K extends string, C, M>(
   plugin: ResourcePlugin<C, M> & { readonly kind: K },
 ): KindModule<K, C, PluginContent<K, C>> & PluginMapContent {
   const kind = plugin.kind;
-  const module = defineKind({
+  const declaration = {
     id: kind,
     contentSchema: contentSchemaOf(plugin),
     flags: {
@@ -170,15 +212,20 @@ export function kindFromPlugin<const K extends string, C, M>(
       mayBeTarget: plugin.mayBeTarget === true,
       ownsReferencedSpaces: plugin.ownsReferencedSpaces === true,
     },
-    facts: PLUGIN_CONTENT_FACTS,
-    resolveContent: (content): PluginContent<K, C> => ({ kind, content }),
-    resourceReferences: (content) => uuids(plugin.resourceReferences?.(content) ?? []),
-    contentTarget: (content) => {
+    facts: plugin.selection === undefined ? PLUGIN_CONTENT_FACTS : SELECTING_CONTENT_FACTS,
+    resolveContent: (content: C): PluginContent<K, C> => ({ kind, content }),
+    resourceReferences: (content: C) => uuids(plugin.resourceReferences?.(content) ?? []),
+    contentTarget: (content: C) => {
       const target = plugin.contentTarget?.(content);
       return target === undefined ? undefined : uuids([target])[0];
     },
-    spaceReferences: (content) => uuids(plugin.spaceReferences?.(content) ?? []),
-  });
+    spaceReferences: (content: C) => uuids(plugin.spaceReferences?.(content) ?? []),
+  };
+  // A plugin that declares its selection has the core check it (ADR 0079).
+  const module =
+    plugin.selection === undefined
+      ? defineKind(declaration)
+      : defineKind({ ...declaration, selection: selectionOf(plugin.selection) });
   const mapContent = mapContentOf(plugin, plugin.mapContent);
   return plugin.newContent === undefined
     ? { ...module, mapContent }

@@ -654,6 +654,84 @@ describe('a plugin surface’s commits on the canvas', () => {
     );
   });
 
+  /**
+   * The Space plugin passes its Claim to the Map embedding, and a Resource
+   * drawn inside it nests its own under that one (ADR 0142): an Image's Replace there runs as exclusive work under the inner
+   * Claim, so every composed Space is withdrawn while it runs, a commit the
+   * Space Resource kept from before answers refused and changes nothing, the
+   * replacement lands, and the outer Claim holds until the inner one ends.
+   */
+  it('nests an Image’s Replace inside a Space Resource’s Claim, withdrawing the Space’s kept commits until it ends', async () => {
+    const SPACE_RESOURCE = uuidSchema.parse('00000000-0000-4000-8000-0000000000b1');
+    const OTHER_SPACE_RESOURCE = uuidSchema.parse('00000000-0000-4000-8000-0000000000b2');
+    const complete = vi.fn((): AuthoringResult => ({ kind: 'completed' }));
+    const host = hostWith(complete);
+    const space = pluginSurfaceOperations('space', SPACE_RESOURCE, FACTS, host);
+    // Kept by the Space plugin before the Claim: the chooser's select and Close.
+    const keptSelect = space.commitContent;
+    const keptClose = space.commitMap;
+    const spaceDrawing = { resource: SPACE_RESOURCE, key: Symbol('space drawing') };
+    const outer = space.claim?.(spaceDrawing.key);
+    expect(outer).toBeDefined();
+
+    // The Image inside the embedding is drawn on a host embedded in the Space Resource's drawing.
+    const inside: PluginHost = {
+      ...host,
+      get claims() {
+        return host.gate.getState();
+      },
+      embeddedIn: [spaceDrawing],
+    };
+    const image = pluginSurfaceOperations('image', RESOURCE, FACTS, inside);
+    expect(image.claim).toBeTypeOf('function');
+    const imageDrawing = { resource: RESOURCE, key: Symbol('image drawing') };
+    const inner = image.claim?.(imageDrawing.key);
+    expect(inner).toBeDefined();
+    expect(host.gate.getState().holders).toEqual([[spaceDrawing], [spaceDrawing, imageDrawing]]);
+
+    let replace: ((next: { url: string }) => Promise<Answer>) | undefined;
+    let finish: () => void = () => undefined;
+    const work = inner?.exclusively(
+      (own) =>
+        new Promise<void>((resolve) => {
+          replace = own.content;
+          finish = resolve;
+        }),
+    );
+    // Every composed Space is withdrawn while the Replace runs.
+    for (const resourceId of [SPACE_RESOURCE, OTHER_SPACE_RESOURCE]) {
+      const drawn = pluginSurfaceOperations('space', resourceId, FACTS, host);
+      expect(drawn.withdrawn).toBe(true);
+      expect(drawn.commitContent).toBeUndefined();
+    }
+    const other = '00000000-0000-4000-8000-0000000000c2';
+    expect(reasonOf(await keptSelect?.({ spaceId: other, map: other, graph: other }))).toMatch(
+      /\S/u,
+    );
+    expect(reasonOf(await keptClose?.({ open: false }))).toMatch(/\S/u);
+    expect(complete).not.toHaveBeenCalled();
+    // Asked to release while the inner one runs, the outer Claim holds until
+    // the inner one ends: the host completes the release then.
+    outer?.release();
+    expect(host.gate.getState().releasing).toEqual([spaceDrawing.key]);
+    expect(host.gate.getState().holders).toEqual([[spaceDrawing], [spaceDrawing, imageDrawing]]);
+
+    await expect(replace?.({ url: 'https://example.com/b.png' })).resolves.toBe('completed');
+    expect(complete).toHaveBeenCalledTimes(1);
+    expect(complete).toHaveBeenCalledWith(
+      {
+        kind: 'changed-content',
+        resourceId: RESOURCE,
+        content: { url: 'https://example.com/b.png' },
+      },
+      expect.any(Function),
+    );
+    finish();
+    await work;
+    inner?.release();
+    expect(host.gate.getState()).toEqual(NO_CLAIMS);
+  });
+
   /** An asset store recording what it stored, and a picker answering one file. */
   const recordingAssets = () => {
     const stored: Blob[] = [];

@@ -797,14 +797,15 @@ describe.each([
     );
 
     it.each(everyKind.filter(([kind]) => kind === 'space'))(
-      'refuses Map content on a %s Resource that no plugin keeps',
+      'refuses Map content its plugin refuses on a %s Resource, naming the plugin',
       (_kind, resources) => {
         for (const content of [{ shape: 'rectangle' }, { shape: 'pill' }, null]) {
           const errors = refused(placedIn(resources, content));
           expect(errors).toEqual([
             expect.objectContaining({ kind: 'map-content-invalid', ref: A }),
           ]);
-          expect(errors[0]?.message).not.toContain('its plugin refuses');
+          // The Space plugin keeps `{ open }` (resource-plugins issue 07), so it refused this.
+          expect(errors[0]?.message).toContain('its plugin refuses');
         }
       },
     );
@@ -834,13 +835,6 @@ describe.each([
       expect(space.maps[0]?.positions[A]).toEqual({ x: 0, y: 0 });
     });
 
-    it.each(everyKind.filter(([kind]) => kind === 'space'))(
-      'loads a %s Resource Open',
-      (_kind, resources) => {
-        expect(loaded(openIn(resources, true)).resources).toHaveLength(resources.length);
-      },
-    );
-
     it('loads a Reference Resource Open or Closed by its Map content, and refuses the Map storing Open', () => {
       const recap = [referenceTo(A, B), markdown(B, 'B')];
       for (const open of [true, false])
@@ -853,21 +847,30 @@ describe.each([
       ]);
     });
 
-    it('loads a Reference to a Space Resource stored Open, as the application keeps it until the Space plugin', () => {
-      expect(
-        loaded(openIn([referenceTo(A, B), spaceResource(B, ABSENT)], true)).resources,
-      ).toHaveLength(2);
+    it('loads a Space Resource Open or Closed by its Map content, and refuses the Map storing Open', () => {
+      const inner = [spaceResource(A, ABSENT)];
+      for (const open of [true, false])
+        expect(loaded(placedIn(inner, { open })).maps[0]?.positions[A]?.content).toEqual({ open });
+      expect(refused(placedIn(inner, { shape: 'pill' }))).toEqual([
+        expect.objectContaining({ kind: 'map-content-invalid', ref: A }),
+      ]);
+      expect(refused(openIn(inner, true))).toEqual([
+        expect.objectContaining({ kind: 'open-requires-content', ref: A }),
+      ]);
     });
 
-    it('refuses Map content on a Reference to a Space Resource, which no plugin draws yet', () => {
-      for (const open of [true, false]) {
-        const errors = refused(placedIn([referenceTo(A, B), spaceResource(B, ABSENT)], { open }));
-        expect(errors).toEqual([expect.objectContaining({ kind: 'map-content-invalid', ref: A })]);
-        // No plugin draws it, so no plugin refused the content.
-        expect(errors[0]?.message).toBe(
-          `Map "${WORKING}" keeps Map content for reference resource "${A}", which no plugin draws here, so it keeps none`,
-        );
-      }
+    it('refuses a Reference to a Space Resource stored Open: the Reference plugin keeps its Open', () => {
+      expect(refused(openIn([referenceTo(A, B), spaceResource(B, ABSENT)], true))).toEqual([
+        expect.objectContaining({ kind: 'open-requires-content', ref: A }),
+      ]);
+    });
+
+    it('loads a Reference to a Space Resource Open or Closed by its Map content, as its plugin draws it', () => {
+      for (const open of [true, false])
+        expect(
+          loaded(placedIn([referenceTo(A, B), spaceResource(B, ABSENT)], { open })).maps[0]
+            ?.positions[A]?.content,
+        ).toEqual({ open });
     });
 
     it('refuses an Image Resource stored Open, which its plugin draws with no Open (ADR 0142)', () => {

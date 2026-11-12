@@ -183,6 +183,10 @@ test(
     await expect(selectedCanvas(page)).toContainText('Collection 1');
     await expect(await mapChoices(page)).toHaveCount(3);
     await page.keyboard.press('Escape');
+    // Gone, not just closing: a press on the next disclosure while this menu
+    // still runs its exit is lost, and under load that exit outlasts the
+    // assertions in between.
+    await expect(page.getByRole('menu')).toHaveCount(0);
 
     // Collection 1 owns Long, Mid and Short over the shared spine: 4 + 3 + 2.
     await selectCanvas(page, 'Collection 1');
@@ -192,6 +196,7 @@ test(
     await expect(owned).toHaveCount(3);
     await expect(owned.filter({ hasText: 'Echo' })).toHaveCount(0);
     await page.keyboard.press('Escape');
+    await expect(page.getByRole('menu')).toHaveCount(0);
 
     // Collection 2 owns Echo alone.
     await selectCanvas(page, 'Collection 2');

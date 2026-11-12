@@ -41,7 +41,6 @@ export {
   resolveContent,
   resourceReferences,
   spaceReferences,
-  frameSpaceView,
   selectSpaceView,
   spaceSelection,
   spaceSelectionProblem,

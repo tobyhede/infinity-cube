@@ -49,6 +49,15 @@ export interface PluginGate {
   ) => HostClaim<Own> | undefined;
   /** The drawing is gone: its Claim and every Claim inside it are released. */
   readonly unmount: (drawing: DrawingKey) => void;
+  /**
+   * The drawings whose Claim is passed to a Map embedding, which authors that
+   * Map in place under it. Such a Claim is held for the Map's authoring, not
+   * for running work in the plugin's own rect, so it withdraws nothing a
+   * plugin's edit does (`canvas-resource-authoring.ts`).
+   */
+  readonly lent: () => ReadonlySet<DrawingKey>;
+  /** This drawing's Claim is passed to a Map embedding until the answer is called. */
+  readonly lend: (drawing: DrawingKey) => () => void;
 }
 
 export function createPluginGate(): PluginGate {
@@ -61,7 +70,19 @@ export function createPluginGate(): PluginGate {
    */
   let liveRun: object | null = null;
   let admitting = 0;
+  const lentCounts = new Map<DrawingKey, number>();
+  let lentDrawings: ReadonlySet<DrawingKey> = new Set();
   const listeners = new Set<() => void>();
+  const changeLent = (drawing: DrawingKey, by: 1 | -1): void => {
+    const count = (lentCounts.get(drawing) ?? 0) + by;
+    if (count > 0) lentCounts.set(drawing, count);
+    else lentCounts.delete(drawing);
+    const next = new Set(lentCounts.keys());
+    if (next.size === lentDrawings.size && [...next].every((each) => lentDrawings.has(each)))
+      return;
+    lentDrawings = next;
+    for (const listener of [...listeners]) listener();
+  };
   const install = (next: ClaimChain): void => {
     if (next === chain) return;
     chain = next;
@@ -114,5 +135,15 @@ export function createPluginGate(): PluginGate {
     },
     claim,
     unmount: (drawing) => install(unmountIn(chain, drawing)),
+    lent: () => lentDrawings,
+    lend: (drawing) => {
+      changeLent(drawing, 1);
+      let returned = false;
+      return () => {
+        if (returned) return;
+        returned = true;
+        changeLent(drawing, -1);
+      };
+    },
   };
 }
