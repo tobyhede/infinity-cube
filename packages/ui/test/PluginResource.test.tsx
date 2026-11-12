@@ -538,6 +538,26 @@ describe('the Map host a plugin draws inside (ADR 0142)', () => {
     },
   );
 
+  it('tells the host once that it is gone, however many Claims it took and released', () => {
+    surfaces.length = 0;
+    const unmountClaim = vi.fn();
+    const claim = vi.fn((): PluginHostClaim => ({
+      release: () => undefined,
+      exclusively: () => Promise.resolve('busy'),
+      unmount: unmountClaim,
+    }));
+    const { unmount } = render(
+      <PluginSurface {...probeProps({ operations: { kind: 'ur', claim } })} entry={probeEntry} />,
+    );
+    const take = surfaces.at(-1)?.claim;
+    act(() => {
+      for (let taken = 0; taken < 3; taken += 1) take?.()?.release();
+    });
+    expect(claim).toHaveBeenCalledTimes(3);
+    unmount();
+    expect(unmountClaim).toHaveBeenCalledTimes(1);
+  });
+
   it('hands the host a release the plugin asks for during its exclusive work, which needs no retry', async () => {
     surfaces.length = 0;
     const release = vi.fn();

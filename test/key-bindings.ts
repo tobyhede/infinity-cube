@@ -139,22 +139,6 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     behaviour: 'withhold the Resource surface commit chord from CodeMirror',
   },
   {
-    module: 'packages/plugin-image/src/view.tsx',
-    sourceKey: 'Escape',
-    occurrence: 1,
-    key: 'Escape',
-    surface: 'Image Resource title editor',
-    behaviour: 'abandon renaming an Image Resource',
-  },
-  {
-    module: 'packages/plugin-image/src/view.tsx',
-    sourceKey: 'Enter',
-    occurrence: 1,
-    key: 'Enter',
-    surface: 'Image Resource title editor',
-    behaviour: 'commit renaming an Image Resource; Shift-Enter breaks a line',
-  },
-  {
     module: 'packages/ui/src/ResourceTextHost.tsx',
     sourceKey: 'Escape',
     occurrence: 1,

@@ -96,7 +96,17 @@ describe('the view entry a plugin draws with', () => {
   it('exports none of the host’s machinery, which only /view/host does', async () => {
     const view = Object.keys(await import('@project/resource-api/view'));
     const host = Object.keys(await import('@project/resource-api/view/host'));
-    expect(view.sort()).toEqual(['Own', 'Rail', 'Title', 'definePluginView']);
+    expect(view.sort()).toEqual([
+      'Own',
+      'RAIL_BAND',
+      'Rail',
+      'RenderedMarkdown',
+      'SourceEditor',
+      'Title',
+      'definePluginView',
+      'refusalOf',
+      'useRailBand',
+    ]);
     expect(host).toEqual(
       expect.arrayContaining(['ResourceHostProvider', 'createRailStore', 'useResourceHost']),
     );
