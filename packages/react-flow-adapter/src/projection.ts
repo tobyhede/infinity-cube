@@ -7,6 +7,8 @@ import {
   DEFAULT_RESOURCE_SHAPE,
   authorsContent,
   embedsMap,
+  resolvedMapContent,
+  type JsonValue,
   type Resource,
   type ResourceId,
   type ResourceShape,
@@ -182,6 +184,13 @@ type ResourceNodeCommonData = {
    * its entry stores none — and drawn Open and Closed alike (ADR 0121).
    */
   shape: ResourceShape;
+  /** The Resource's content as stored, which a plugin drawing it parses itself (ADR 0142). */
+  ownContent?: Resource['content'] | undefined;
+  /**
+   * The Map content the plugin drawing this Resource is given on this Map: its
+   * entry's, else the plugin's default. `undefined` for a kind no plugin draws.
+   */
+  mapContent?: JsonValue | undefined;
   /** Ordinary renderer selection, kept outside the authored Space. */
   selectedForAuthoring: boolean;
   /** The graph being emphasised, if any. Drives handle dimming. */
@@ -263,6 +272,8 @@ export interface ProjectResourceNodesOptions {
   openResourceIds?: ReadonlySet<ResourceId>;
   /** The Shape the Map draws each projected Resource in; absent, every one is the rectangle. */
   resourceShape?: (resourceId: ResourceId) => ResourceShape;
+  /** The Map content each projected Resource's entry stores; absent, none stores any. */
+  mapContent?: (resourceId: ResourceId) => JsonValue | undefined;
   /** How each projected Resource is drawn for its Graphs; absent, every one is ink at full strength. */
   resourceEmphasis?: (resourceId: ResourceId) => ResourceEmphasis;
 }
@@ -347,6 +358,8 @@ export function projectResourceNodes(
         selectedForAuthoring: resource.id === (options.selectedResourceId ?? null),
         display,
         shape: options.resourceShape?.(resource.id) ?? DEFAULT_RESOURCE_SHAPE,
+        ownContent: resource.content,
+        mapContent: resolvedMapContent(resource.kind, options.mapContent?.(resource.id)),
         activeGraphId,
         activeGraphColor: options.activeGraphColor ?? FALLBACK_COLOR,
         borderColor: emphasis.borderColor,

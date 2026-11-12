@@ -48,16 +48,38 @@ test(
  * The table is the point: one loop over every kind the component declares, so
  * a new kind cannot be added with its own story slice and reviewed on its own.
  */
+/** Where a Closed Resource draws its Title: the host's body, or its plugin's own root. */
+const HOST_BODY = '.canvas-resource__body';
+
 const CLOSED_KINDS = [
-  { label: 'markdown', kind: 'markdown', glyph: 'Markdown Resource', border: 'solid' },
-  { label: 'reference', kind: 'reference', glyph: 'Reference Resource', border: 'dotted' },
-  { label: 'space', kind: 'space', glyph: 'Space Resource', border: 'solid' },
-  { label: 'image', kind: 'image', glyph: 'Image Resource', border: 'solid' },
-  // An Ur Resource's Shape says what it is, so it draws no kind glyph.
-  { label: 'ur', kind: 'ur', glyph: null, border: 'solid' },
+  {
+    label: 'markdown',
+    kind: 'markdown',
+    glyph: 'Markdown Resource',
+    border: 'solid',
+    body: HOST_BODY,
+  },
+  {
+    label: 'reference',
+    kind: 'reference',
+    glyph: 'Reference Resource',
+    border: 'dotted',
+    body: HOST_BODY,
+  },
+  { label: 'space', kind: 'space', glyph: 'Space Resource', border: 'solid', body: HOST_BODY },
+  { label: 'image', kind: 'image', glyph: 'Image Resource', border: 'solid', body: HOST_BODY },
+  // An Ur Resource's Shape says what it is, so it draws no kind glyph; its
+  // plugin draws its Title inside the outline (ADR 0142).
+  { label: 'ur', kind: 'ur', glyph: null, border: 'solid', body: '.canvas-resource__plugin > *' },
   // The creation ghost is not a Resource and takes the Markdown treatment, which is
   // why it is checked against the Markdown kind and glyph rather than its own.
-  { label: 'creation ghost', kind: 'markdown', glyph: 'Markdown Resource', border: 'solid' },
+  {
+    label: 'creation ghost',
+    kind: 'markdown',
+    glyph: 'Markdown Resource',
+    border: 'solid',
+    body: HOST_BODY,
+  },
 ] as const;
 
 const ONE_LINE = ['Strategies'];
@@ -121,10 +143,8 @@ test(
         // no content surface is mounted on a closed Resource, and the Resource's own
         // text is the Title Lines and nothing else — which is what the two
         // undecided reference lines would fail.
-        await expect(resource.locator('.canvas-resource__body > *')).toHaveCount(1);
-        await expect(
-          resource.locator('.canvas-resource__body > .canvas-resource__title'),
-        ).toHaveCount(1);
+        await expect(resource.locator(`${entry.body} > *`)).toHaveCount(1);
+        await expect(resource.locator(`${entry.body} > .canvas-resource__title`)).toHaveCount(1);
         await expect(resource.locator('.canvas-resource__content')).toHaveCount(0);
         const text = (await resource.innerText())
           .split('\n')

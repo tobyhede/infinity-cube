@@ -98,7 +98,6 @@ export function openHeight(
           readOnly
           kindOperations={node.data.kindOperations}
           display={{ shown: 'open', content }}
-          shape={node.data.shape}
           size={size}
           title={node.data.title}
           graphColor={node.data.activeGraphColor}

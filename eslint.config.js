@@ -60,6 +60,49 @@ const REACT_DOM_PATTERN = {
   message: 'Domain logic stays out of React (AGENTS.md).',
 };
 
+/** Any package of ours, refused to the Resource API itself (ADR 0142). */
+const RESOURCE_API_OWN_PATTERN = {
+  group: ['@project/*'],
+  message:
+    'The Resource API reaches no package of ours: it is the one door a plugin may reach (ADR 0142).',
+};
+
+/**
+ * Any package of ours but the Resource API's two halves, refused to a Resource
+ * plugin's source (ADR 0142). A bundled plugin has no private door, and the
+ * test host is for its tests.
+ */
+const PLUGIN_PATTERN = {
+  regex: '^@project/(?!resource-api/(?:domain|view)$)',
+  message:
+    "A Resource plugin imports no @project/* package but @project/resource-api/domain and /view; /view/host is the host's and /view/testing is for its tests (ADR 0142).",
+};
+
+/**
+ * A file outside a plugin's domain half, refused to its domain entry: a
+ * sibling such as `./shapes` falls under the plugin-wide zone, which allows
+ * React, so the domain half keeps its files under `domain/` (ADR 0142).
+ */
+const DOMAIN_ENTRY_STAYS_IN_DOMAIN_PATTERN = {
+  // A climb out of the package is ESCAPE_PATTERN's to report.
+  regex: '^(?:\\./(?!domain/)|\\.\\./(?!\\.\\./))',
+  message:
+    'A plugin’s domain entry imports only files under its own domain/, which the domain zone covers (ADR 0142).',
+};
+
+/** The same, for a file under a plugin's `domain/`: it climbs out only back into `domain/`. */
+const DOMAIN_FILE_STAYS_IN_DOMAIN_PATTERN = {
+  regex: '^\\.\\./(?!domain/|\\.\\./)',
+  message:
+    'A file of a plugin’s domain half imports only files under its own domain/, which the domain zone covers (ADR 0142).',
+};
+
+/** A view, refused to a domain half, which the server and the CLI load (ADR 0142). */
+const DOMAIN_NAMES_NO_VIEW_PATTERN = {
+  regex: '(?:^|/)view(?:/|$)',
+  message: 'The domain half names no view (ADR 0142).',
+};
+
 const UI_IMPLEMENTATION_MESSAGE =
   'Application and adapter UI must use the public @project/ui surface. Add or compose the capability there rather than importing its implementation dependency directly.';
 
@@ -182,10 +225,19 @@ const packageInternalsPattern = (exemptApp) => ({
 
 /**
  * The kind-neutral modules under a `kinds/` directory: the interface every kind
- * implements and the registry each choice among kinds goes through. Every other
- * module there is one kind's, and what it exports names that kind.
+ * implements, the registry each choice among kinds goes through, and the
+ * plugin list and its adapters, which read every Resource plugin alike (ADR
+ * 0142). Every other module there is one kind's, and what it exports names
+ * that kind.
  */
-const KIND_NEUTRAL_MODULES = new Set(['registry', 'kind-module', 'kind-view']);
+const KIND_NEUTRAL_MODULES = new Set([
+  'registry',
+  'kind-module',
+  'kind-view',
+  'plugins',
+  'plugin-kind',
+  'plugin-views',
+]);
 
 /** Each name a module's source exports, by declaration or by an `export { … }` list. */
 const exportedNames = (source) => [
@@ -264,7 +316,7 @@ const KIND_FEATURE_FILES = [
   'packages/ui/src/index.ts',
   // The kinds a Reference badge sits on are every kind but Reference; the flag saying so is a runtime boolean, so no type reads it.
   'packages/ui/src/icons.tsx',
-  // A Space Resource's portal and an Ur Resource's Shape menu.
+  // A Space Resource's portal.
   'packages/ui/src/CanvasResource.tsx',
   // A Space Resource's portal editing keeps its toolbar drawn.
   'packages/react-flow-adapter/src/ResourceNode.tsx',
@@ -602,6 +654,72 @@ export default tseslint.config(
       ],
     },
   },
+  // The Resource API is the one door a plugin may reach (ADR 0142), so it
+  // reaches none of ours, and its domain half names no view: the server and the
+  // CLI load it.
+  {
+    files: ['packages/resource-api/src/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: RENDER_ONLY,
+          patterns: [ESCAPE_PATTERN, RENDER_ONLY_PATTERN, RESOURCE_API_OWN_PATTERN],
+        },
+      ],
+    },
+  },
+  {
+    files: ['packages/resource-api/src/domain/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [...RENDER_ONLY, ...REACT],
+          patterns: [
+            ESCAPE_PATTERN,
+            RENDER_ONLY_PATTERN,
+            REACT_DOM_PATTERN,
+            RESOURCE_API_OWN_PATTERN,
+            DOMAIN_NAMES_NO_VIEW_PATTERN,
+          ],
+        },
+      ],
+    },
+  },
+  // A Resource plugin imports no package of ours but the Resource API (ADR
+  // 0142). React and its own third-party dependencies are its business.
+  {
+    files: ['packages/plugin-*/src/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { paths: RENDER_ONLY, patterns: [ESCAPE_PATTERN, RENDER_ONLY_PATTERN, PLUGIN_PATTERN] },
+      ],
+    },
+  },
+  ...[
+    ['packages/plugin-*/src/domain.ts', DOMAIN_ENTRY_STAYS_IN_DOMAIN_PATTERN],
+    ['packages/plugin-*/src/domain/**/*.{ts,tsx}', DOMAIN_FILE_STAYS_IN_DOMAIN_PATTERN],
+  ].map(([files, staysInDomain]) => ({
+    files: [files],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [...RENDER_ONLY, ...REACT],
+          patterns: [
+            ESCAPE_PATTERN,
+            RENDER_ONLY_PATTERN,
+            REACT_DOM_PATTERN,
+            PLUGIN_PATTERN,
+            DOMAIN_NAMES_NO_VIEW_PATTERN,
+            staysInDomain,
+          ],
+        },
+      ],
+    },
+  })),
   {
     files: ['packages/aggregate/**/*.{ts,tsx}'],
     rules: {

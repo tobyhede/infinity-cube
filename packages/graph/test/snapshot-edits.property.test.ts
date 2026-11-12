@@ -667,7 +667,7 @@ describe('SnapshotEdit.open, close and resize properties', () => {
   const placementOf = (entry: GeneratedEntry): ResourcePlacement => {
     let placement: ResourcePlacement = { x: entry.x, y: entry.y, open: entry.open };
     if (entry.size !== undefined) placement = { ...placement, size: entry.size };
-    if (entry.shape !== undefined) placement = { ...placement, shape: entry.shape };
+    if (entry.shape !== undefined) placement = { ...placement, content: { shape: entry.shape } };
     return placement;
   };
 
@@ -954,15 +954,15 @@ describe('SnapshotEdit.open, close and resize properties', () => {
     );
   });
 
-  /** Every Shape the Map records, so a whole Map can be compared at once. */
+  /** Every entry's Map content, so a whole Map can be compared at once. */
   const resourceShapesOf = (snapshot: SpaceSnapshot) =>
     Object.fromEntries(
-      Object.entries(positionsOf(snapshot)).map(([resourceId, at]) => [resourceId, at?.shape]),
+      Object.entries(positionsOf(snapshot)).map(([resourceId, at]) => [resourceId, at?.content]),
     );
 
-  it('keeps every Shape through any number of Resizes, Open and Close', () => {
-    // A Shape changes no rect, so the Edits that move and resize Resources carry
-    // every entry's Shape through untouched (ADR 0121).
+  it('keeps every Map content through any number of Resizes, Open and Close', () => {
+    // Map content changes no rect, so the Edits that move and resize Resources
+    // carry every entry's Map content through untouched (ADR 0142).
     fc.assert(
       fc.property(
         entriesArb,
@@ -991,7 +991,7 @@ describe('SnapshotEdit.open, close and resize properties', () => {
     );
   });
 
-  it("changes one Resource's Shape and nothing else, and the Shape it has is unchanged", () => {
+  it("changes one Resource's Map content and nothing else, and the content it has is unchanged", () => {
     fc.assert(
       fc.property(
         entriesArb,
@@ -1004,12 +1004,9 @@ describe('SnapshotEdit.open, close and resize properties', () => {
           if (subjectId === undefined || subject === undefined) return;
           const snapshot = snapshotOf(entries);
 
-          const outcome = SnapshotEdit.changeResourceShape(
-            snapshot,
-            MAP_ID,
-            subjectId,
-            resourceShape,
-          );
+          const outcome = SnapshotEdit.changeMapContent(snapshot, MAP_ID, subjectId, {
+            shape: resourceShape,
+          });
 
           const drawn = subject.shape ?? 'rectangle';
           if (resourceShape === drawn) {
@@ -1019,7 +1016,7 @@ describe('SnapshotEdit.open, close and resize properties', () => {
           const changed = completed(outcome);
           expect(positionsOf(changed)).toEqual({
             ...positionsOf(snapshot),
-            [subjectId]: { ...positionsOf(snapshot)[subjectId], shape: resourceShape },
+            [subjectId]: { ...positionsOf(snapshot)[subjectId], content: { shape: resourceShape } },
           });
           expect({ ...changed, document: { ...changed.document, maps: [] } }).toEqual({
             ...snapshot,
@@ -1027,10 +1024,10 @@ describe('SnapshotEdit.open, close and resize properties', () => {
           });
           expect(changed.document.maps?.[0]?.graphs).toEqual(snapshot.document.maps?.[0]?.graphs);
           // Undone by changing it back: the Edit's inverse is the same Edit, which
-          // writes the Shape chosen, so an entry that stored none now stores the
-          // rectangle it drew as.
+          // writes the content chosen, so an entry that stored none now stores the
+          // default it was given.
           expect(
-            completed(SnapshotEdit.changeResourceShape(changed, MAP_ID, subjectId, drawn)),
+            completed(SnapshotEdit.changeMapContent(changed, MAP_ID, subjectId, { shape: drawn })),
           ).toEqual(
             subject.shape === undefined
               ? snapshotOf(with_(entries, subjectIndex, { shape: 'rectangle' }))
@@ -1042,22 +1039,44 @@ describe('SnapshotEdit.open, close and resize properties', () => {
     );
   });
 
-  it('refuses a Shape for a Map the snapshot does not name or a Resource the Map does not hold', () => {
+  it('refuses Map content for a Map the snapshot does not name or a Resource the Map does not hold', () => {
     fc.assert(
       fc.property(entriesArb, fc.uuid().map(uuid), (entries, stranger) => {
         fc.pre(!RESOURCE_IDS.some((id) => id === stranger) && stranger !== MAP_ID);
         const snapshot = snapshotOf(entries);
         const subjectId = RESOURCE_IDS[0];
 
-        expect(SnapshotEdit.changeResourceShape(snapshot, stranger, subjectId, 'diamond')).toEqual({
+        const diamond = { shape: 'diamond' };
+        expect(SnapshotEdit.changeMapContent(snapshot, stranger, subjectId, diamond)).toEqual({
           kind: 'refused',
           refusal: { code: 'map-not-found' },
         });
-        expect(SnapshotEdit.changeResourceShape(snapshot, MAP_ID, stranger, 'diamond')).toEqual({
+        expect(SnapshotEdit.changeMapContent(snapshot, MAP_ID, stranger, diamond)).toEqual({
           kind: 'refused',
           refusal: { code: 'resource-not-in-map' },
         });
       }),
+    );
+  });
+
+  it('refuses Map content for a kind no plugin draws, and content its plugin refuses', () => {
+    fc.assert(
+      fc.property(entriesArb, subjectArb, (generated, subjectIndex) => {
+        const subjectId = RESOURCE_IDS[subjectIndex];
+        if (subjectId === undefined) return;
+        const markdown = snapshotOf(markdownSubject(generated, subjectIndex));
+        expect(
+          SnapshotEdit.changeMapContent(markdown, MAP_ID, subjectId, { shape: 'rectangle' }),
+        ).toEqual({ kind: 'refused', refusal: { code: 'map-content-not-kept' } });
+        const ur = snapshotOf(with_(generated, subjectIndex, { kind: 'ur', open: false }));
+        for (const content of [{ shape: 'hexagon' }, 'pill', null, {}]) {
+          expect(SnapshotEdit.changeMapContent(ur, MAP_ID, subjectId, content)).toEqual({
+            kind: 'refused',
+            refusal: { code: 'map-content-invalid' },
+          });
+        }
+      }),
+      { seed: SEED, numRuns: RUNS },
     );
   });
 });

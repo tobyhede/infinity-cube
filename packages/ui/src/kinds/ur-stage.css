@@ -1,15 +1,17 @@
-/* The Ur kind's frame when presented (ADR 0120), imported by `Stage` after `stage.css`,
-   an order `test/unit/kind-stylesheet-order.test.ts` holds. */
+/* The Ur kind's frame when a Reference presents it, imported by `Stage` after
+   `stage.css`, an order `test/unit/kind-stylesheet-order.test.ts` holds. An Ur
+   Resource of its own is drawn by its plugin (`.resource--plugin`), which lays
+   out its Title itself; a Reference to one is drawn by `PresentedResource`. */
 
-/* A Resource with no content below its name — an Ur Resource — is a title
-   slide: the name alone, centred in the frame. */
-.stage__body .resource--full[data-content-kind='ur'] {
+/* A Resource with no content below its name — a Reference to an Ur Resource —
+   is a title slide: the name alone, centred in the frame. */
+.stage__body .resource--full[data-content-kind='ur']:not(.resource--plugin) {
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
 }
 
-.stage__body .resource--full[data-content-kind='ur'] .resource__title {
+.stage__body .resource--full[data-content-kind='ur']:not(.resource--plugin) .resource__title {
   margin: 0;
 }

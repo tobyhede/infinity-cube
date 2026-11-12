@@ -1,4 +1,11 @@
-import { type ResourceId, type ResourcePlacement, type Map, type MapPosition } from '@project/core';
+import {
+  sameJsonValue,
+  type JsonValue,
+  type ResourceId,
+  type ResourcePlacement,
+  type Map,
+  type MapPosition,
+} from '@project/core';
 import type { LayoutStrategyGraph } from './layout';
 
 /** The brand's carrier. See `Placement` below for what the type means. */
@@ -66,15 +73,15 @@ const brand = (positions: ReadonlyMap<ResourceId, Readonly<ResourcePlacement>>):
 
 /**
  * A copy of an entry, keeping exactly the optional fields it stores: an absent
- * `open`, `size` or `shape` stays absent, so the application's default is read
- * for it (`resourceOpen`, `resourceSize`, `resourceShape`) rather than written.
+ * `open`, `size` or `content` stays absent, so the default is read for it
+ * (`resourceOpen`, `resourceSize`, `resolvedMapContent`) rather than written.
  */
 const point = (at: ResourcePlacement): ResourcePlacement => {
   let entry: ResourcePlacement = { x: at.x, y: at.y };
   if (at.open !== undefined) entry = { ...entry, open: at.open };
   if (at.size !== undefined)
     entry = { ...entry, size: { width: at.size.width, height: at.size.height } };
-  if (at.shape !== undefined) entry = { ...entry, shape: at.shape };
+  if (at.content !== undefined) entry = { ...entry, content: at.content };
   return entry;
 };
 
@@ -125,7 +132,11 @@ function fromEntries(entries: Iterable<readonly [ResourceId, ResourcePlacement]>
   return brand(positions);
 }
 
-/** Value equality: the same resources, each with the same coordinates and the same stored state, size and Shape. */
+/** Whether two entries store the same Map content, both storing none included. */
+const sameStoredContent = (a: JsonValue | undefined, b: JsonValue | undefined): boolean =>
+  a === undefined || b === undefined ? a === b : sameJsonValue(a, b);
+
+/** Value equality: the same resources, each with the same coordinates and the same stored state, size and Map content. */
 function equals(a: Placement | null, b: Placement | null): boolean {
   if (a === b) return true;
   if (a === null || b === null) return false;
@@ -137,7 +148,7 @@ function equals(a: Placement | null, b: Placement | null): boolean {
     if (other.open !== at.open) return false;
     if (other.size?.width !== at.size?.width) return false;
     if (other.size?.height !== at.size?.height) return false;
-    if (other.shape !== at.shape) return false;
+    if (!sameStoredContent(other.content, at.content)) return false;
   }
   return true;
 }

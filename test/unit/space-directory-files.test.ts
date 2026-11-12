@@ -1,4 +1,4 @@
-import { uuidSchema, type SpaceSnapshot } from '@project/core';
+import { uuidSchema, type JsonValue, type SpaceSnapshot } from '@project/core';
 import { describe, expect, it } from 'vitest';
 import { spaceDirectoryFiles } from '../../src/aggregate-directory/write-space-directory';
 
@@ -98,5 +98,40 @@ describe("a Resource file's keys", () => {
       expect(resourceFile(ordered, id), id).toBeDefined();
       expect(resourceFile(shuffled, id), id).toBe(resourceFile(ordered, id));
     }
+  });
+});
+
+/**
+ * A Map entry's content is a plugin's value (ADR 0142), stored as `jsonb`,
+ * which hands its keys back in an order of its own.
+ */
+describe("a Map entry's content", () => {
+  const withContent = (content: JsonValue): string | undefined =>
+    spaceDirectoryFiles({
+      snapshot: {
+        id: SPACE_ID,
+        document: {
+          version: 1,
+          title: 'Talk',
+          maps: [
+            {
+              id: MAP_ID,
+              title: 'Map 1',
+              kind: 'positioned',
+              positions: { [PICTURE_ID]: { x: 0, y: 0, open: false, content } },
+              graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
+            },
+          ],
+        },
+        resources: [{ id: PICTURE_ID, document: { title: 'Shape', kind: 'ur', content: {} } }],
+      },
+      revision: 0n,
+      exportedRevision: null,
+    }).get('space.json');
+
+  it('is written in one key order, at every depth, however it was stored', () => {
+    const ordered = withContent({ a: 1, b: { c: [{ d: 1, e: 2 }], f: null } });
+    expect(withContent({ b: { f: null, c: [{ e: 2, d: 1 }] }, a: 1 })).toBe(ordered);
+    expect(ordered).toContain('"content": {\n');
   });
 });

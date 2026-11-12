@@ -12,10 +12,9 @@ import {
   uuidSchema,
   type ResourceDocument,
   type ResourceId,
-  type ResourceShape,
   type GraphId,
 } from '@project/core';
-import type { SpaceSession } from '@project/persistence';
+import type { ObserverErrorReporter, SpaceSession } from '@project/persistence';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import type { EntityActionGroup, ImageReplacement } from '@project/ui';
 import { describeImageReplacement, type ImageReplacements } from './image-replacement';
@@ -31,6 +30,9 @@ import { NO_SPACE_RESOURCE_TARGETS, type SpaceResourceTargets } from './space-re
 import type { SpaceResourceFraming } from './space-resource-framing';
 import { applyResourceDataPatch, decorateSharedResourceNode } from './canvas-resource-decoration';
 import { useKindDecoratedNodes } from './kinds/registry';
+import type { PluginHost } from './plugin-host/plugin-commits';
+import type { PluginGate } from './plugin-host/plugin-gate';
+import { usePluginGate } from './plugin-host/plugin-gate-context';
 
 type Caret =
   | { readonly resourceId: string; readonly field: 'title' }
@@ -91,8 +93,23 @@ const completeEditedSpaceView = (
   return result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
 };
 
+/** What this canvas's plugin surfaces claim on, and where what they throw is reported. */
+export interface CanvasPlugins {
+  /** The composition's gate, which its Authoring asks at `complete` (ADR 0142). */
+  readonly gate: PluginGate;
+  readonly report: ObserverErrorReporter;
+}
+
+const reportPluginFailureToConsole: ObserverErrorReporter = (error) =>
+  console.error('A Resource plugin failed', error);
+
 export interface CanvasResourceAuthoringInput {
   readonly continuation: Continuation;
+  /**
+   * The composition's gate and reporter. Absent, the page's gate (or one of
+   * this canvas's own, as in a story) and the console.
+   */
+  readonly plugins?: CanvasPlugins | undefined;
   /** This canvas Space's outcomes; target rails resolve their target's composition. */
   readonly commandOutcomes?: CommandOutcomes | undefined;
   /** This canvas Space's confirmation; target rails use the target's confirmation. */
@@ -195,6 +212,7 @@ export function useCanvasResourceAuthoring({
   portalEditing,
   onPortalEditingChange,
   openToFit,
+  plugins,
 }: CanvasResourceAuthoringInput): CanvasResourceAuthoring {
   const spaces = useOpenSpaces();
   const [contextEditingIds, setContextEditingIds] = useState<ReadonlySet<ResourceId>>(
@@ -332,24 +350,28 @@ export function useCanvasResourceAuthoring({
   );
 
   /**
-   * One Edit per choice, its refusal reported as the Actions menu's commands
-   * are. Without command outcomes there is nowhere to say a refusal, so the
-   * choice is not offered.
+   * Where a plugin surface's commits go (ADR 0142): this canvas's Edits, each
+   * answering how it settled, withdrawn by the application's one gate and by
+   * the Space being replaced.
    */
-  const changeResourceShape = useMemo(
-    () =>
-      commandOutcomes === undefined
-        ? undefined
-        : (resourceId: ResourceId, resourceShape: ResourceShape): void => {
-            commandOutcomes.run('resource-shape', () =>
-              authoring.complete({
-                kind: 'changed-resource-shape',
-                resourceId,
-                shape: resourceShape,
-              }),
-            );
-          },
-    [authoring, commandOutcomes],
+  const pageGate = usePluginGate();
+  const pluginGate = plugins?.gate ?? pageGate;
+  const reportPluginFailure = plugins?.report ?? reportPluginFailureToConsole;
+  // Read so every plugin surface is decorated again when a Claim is taken or
+  // exclusive work begins or ends, and offers only what is not withdrawn.
+  const claimChain = useSyncExternalStore(pluginGate.subscribe, pluginGate.getState);
+  const pluginHost = useMemo(
+    (): PluginHost => ({
+      gate: pluginGate,
+      claims: claimChain,
+      replacementEpoch: () => authoring.getState().replacementEpoch,
+      document: (resourceId) =>
+        spaceSession.getState().working.resources.find((resource) => resource.id === resourceId)
+          ?.document,
+      complete: (completion, settle) => authoring.complete(completion, settle),
+      report: reportPluginFailure,
+    }),
+    [authoring, spaceSession, pluginGate, reportPluginFailure, claimChain],
   );
 
   const replaceResourceImage = useMemo(() => {
@@ -532,7 +554,7 @@ export function useCanvasResourceAuthoring({
     clearCaret,
     replaceResourceImage,
     pickImageFiles: pickImages,
-    changeResourceShape,
+    pluginHost,
     continuation,
     containingSpaceId: working.id,
     spaceSelections,

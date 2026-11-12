@@ -95,8 +95,8 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
         return 'Select a Map to add an existing Resource to it.';
       if (refusal.operation === 'removed-resource-from-map')
         return 'Select a Map to remove a Resource from it.';
-      if (refusal.operation === 'changed-resource-shape')
-        return 'Select a Map to change the Shape a Resource is drawn in.';
+      if (refusal.operation === 'changed-map-content')
+        return 'Select a Map to change how a Resource is drawn on it.';
       if (
         refusal.operation === 'renamed-graph' ||
         refusal.operation === 'recolored-graph' ||
@@ -134,8 +134,16 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
       return 'This Resource is not in this Map.';
     case 'open-requires-content':
       return 'An Ur Resource has no content to open.';
-    case 'shape-not-taken':
-      return 'Only an Ur Resource can be drawn in a Shape other than the rectangle.';
+    case 'map-content-not-kept':
+      return 'This Resource keeps nothing of its own on a Map.';
+    case 'map-content-invalid':
+      return 'This Resource cannot be drawn that way on a Map.';
+    case 'exclusive-work-running':
+      return 'Wait for the change in progress to finish.';
+    case 'space-replaced':
+      return 'The Space was replaced before this change could be made.';
+    case 'edit-abandoned':
+      return 'This change was not made, because an earlier one failed.';
     case 'resource-has-references':
       return `Delete the Reference Resources of this Resource first: ${refusal.referenceTitles.join(', ')}.`;
     case 'graph-title-required':

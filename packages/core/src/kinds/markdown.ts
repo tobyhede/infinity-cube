@@ -90,7 +90,6 @@ export const markdownKind = defineKind({
   id: MARKDOWN_KIND_ID,
   contentSchema: markdownResourceContentSchema,
   flags: {
-    takesResourceShape: false,
     canOpen: true,
     opensToFit: true,
     mayBeTarget: true,

@@ -5,6 +5,7 @@ import type { UUID } from '../types';
 import type {
   FileContentDecoding,
   KindFlags,
+  KindMapContent,
   KindModule,
   KindSidecar,
   SpaceFraming,
@@ -19,6 +20,13 @@ import { referenceKind } from './reference';
 import type { SpaceSelectionTarget, SpaceSelectionProblem } from './space';
 import { spaceKind } from './space';
 import { urKind } from './ur';
+import { PLUGIN_KINDS, type PluginKind } from './plugins';
+import {
+  RECTANGLE,
+  type Outline,
+  type Resource as ApiResource,
+} from '@project/resource-api/domain';
+import type { JsonValue } from '../json-value';
 
 /**
  * The kinds, every one a module, registered with every build: the one place each
@@ -94,12 +102,14 @@ export const fileContentParser = (kind: KindId): KindedParser<KindedFile<KindId>
   parsersFor(kind).file;
 
 /**
- * A Resource: the core's envelope, `id`, `title` and `kind`, and
- * the content its kind's module parses. Typed from the registry, so a kind is
- * declared in its module and listed in this file, and nowhere else.
+ * A Resource: the Resource API's one structure (ADR 0142), its envelope `id`,
+ * `title` and `kind`, and the content its kind's module parses. Typed from the
+ * registry, so a kind is declared in its module and listed in this file, and
+ * nowhere else; and instantiated from `Resource<C>`, so the core, the stores,
+ * HTTP and a plugin take the same structure.
  */
 export type Resource = {
-  [K in KindId]: { id: UUID; title: string; kind: K; content: ContentByKind[K] };
+  [K in KindId]: ApiResource<ContentByKind[K]> & { readonly id: UUID; readonly kind: K };
 }[KindId];
 
 /** A stored Resource document: a Resource less its id, which is stored beside it. */
@@ -133,6 +143,53 @@ export const isRegisteredKind = (kind: string): kind is KindId =>
 
 /** The rules a kind declares for every Resource of it. */
 export const kindFlags = (kind: KindId): KindFlags => KIND_MODULES[kind].flags;
+
+/** Whether a plugin in this build draws this kind (ADR 0142). */
+export const isPluginKind = (kind: string): kind is PluginKind =>
+  PLUGIN_KINDS.some((pluginKind) => pluginKind === kind);
+
+const mapContentOf = (kind: KindId): KindMapContent | undefined => KIND_MODULES[kind].mapContent;
+
+/** Whether a Resource of this kind keeps Map content: whether a plugin draws it (ADR 0142). */
+export const keepsMapContent = (kind: KindId): boolean => mapContentOf(kind) !== undefined;
+
+/**
+ * Why a Map entry may not hold this Map content for a Resource of this kind,
+ * or `undefined` when it may: the kind's plugin's own schema answers, and a
+ * kind no plugin draws keeps none.
+ */
+export const mapContentProblem = (kind: KindId, value: JsonValue): string | undefined => {
+  const declared = mapContentOf(kind);
+  if (declared === undefined) return `a ${kind} Resource keeps no Map content`;
+  return declared.problem(value);
+};
+
+/**
+ * The Map content a plugin is given for its Resource on a Map: what the entry
+ * stores, else the plugin's default. `undefined` for a kind no plugin draws.
+ */
+export const resolvedMapContent = (
+  kind: KindId,
+  stored: JsonValue | undefined,
+): JsonValue | undefined => {
+  const declared = mapContentOf(kind);
+  if (declared === undefined) return undefined;
+  return stored ?? declared.default;
+};
+
+/** The Map content a plugin is given on a surface with no Map: its `withoutMap`, else its default. */
+export const mapContentWithoutMap = (kind: PluginKind): JsonValue =>
+  REGISTERED[kind].mapContent.withoutMap;
+
+/**
+ * The outline the canvas strokes a Resource's border and ring on (ADR 0142):
+ * its plugin's, from the Map content the entry stores, else a rectangle.
+ */
+export const resourceOutline = (kind: KindId, stored: JsonValue | undefined): Outline => {
+  const declared = mapContentOf(kind);
+  if (declared === undefined) return RECTANGLE;
+  return declared.outline(stored ?? declared.default);
+};
 
 /** A Resource, stored or not: what its kind's declarations are read from. */
 export type KindedResource = Kinded<KindId>;

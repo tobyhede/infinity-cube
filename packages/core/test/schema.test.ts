@@ -12,7 +12,6 @@ import {
   resourceFileSchema,
   resourceSchema,
   resourceOpen,
-  resourceShape,
   resourceSize,
   spaceFileSchema,
   uuidSchema,
@@ -571,7 +570,7 @@ describe('space file maps', () => {
                 y: 1e300,
                 open: true,
                 size: { width: 260, height: 146 },
-                shape: 'diamond',
+                content: { shape: 'diamond' },
               },
             },
           },
@@ -582,15 +581,16 @@ describe('space file maps', () => {
     });
   });
 
-  describe('a Shape on each entry (ADR 0121)', () => {
+  describe('Map content on each entry (ADR 0142)', () => {
     const A = '00000000-0000-4000-8000-000000000002';
-    /** An entry as a hand or a stale writer might put it on disk, Shape and all. */
+    /** An entry as a hand or a stale writer might put it on disk. */
     interface StoredEntry {
       readonly x: number;
       readonly y: number;
       readonly open?: boolean;
       readonly size?: { readonly width: number; readonly height: number };
-      readonly shape?: string | number | null;
+      readonly content?: unknown;
+      readonly shape?: string;
     }
     const parseEntry = (entry: StoredEntry) =>
       spaceFileSchema.safeParse({
@@ -598,59 +598,34 @@ describe('space file maps', () => {
         maps: [{ ...working, positions: { ...working.positions, [A]: entry } }],
       });
 
-    it('accepts each of the four Shapes, Closed and Open', () => {
-      expect(RESOURCE_SHAPES).toEqual(['rectangle', 'pill', 'ellipse', 'diamond']);
-      for (const resourceShape of RESOURCE_SHAPES) {
-        const closed = parseEntry({ x: 0, y: 0, open: false, shape: resourceShape });
-        expect(closed.success, resourceShape).toBe(true);
-        expect(closed.data?.maps?.[0]?.positions).toMatchObject({ [A]: { shape: resourceShape } });
+    it('keeps any JSON value as Map content, Closed and Open, leaving its meaning to the plugin', () => {
+      for (const content of [{ shape: 'pill' }, 'x', 3, true, null, [1, { a: [] }]]) {
+        const closed = parseEntry({ x: 0, y: 0, open: false, content });
+        expect(closed.success, JSON.stringify(content)).toBe(true);
+        expect(closed.data?.maps?.[0]?.positions[uuidSchema.parse(A)]?.content).toEqual(content);
         const opened = parseEntry({
           x: 0,
           y: 0,
           open: true,
           size: { width: 400, height: 300 },
-          shape: resourceShape,
+          content,
         });
-        expect(opened.data?.maps?.[0]?.positions).toMatchObject({ [A]: { shape: resourceShape } });
+        expect(opened.success, JSON.stringify(content)).toBe(true);
       }
     });
 
-    it('accepts an entry with no Shape, Closed and Open, which draws as the rectangle', () => {
-      for (const entry of [
-        { x: 0, y: 0, open: false },
-        { x: 0, y: 0, open: true, size: { width: 400, height: 300 } },
-      ]) {
-        const parsed = parseEntry(entry);
-        expect(parsed.success).toBe(true);
-        const placed = parsed.data?.maps?.[0]?.positions[uuidSchema.parse(A)];
-        expect(placed).not.toHaveProperty('shape');
-        expect(placed === undefined ? undefined : resourceShape(placed)).toBe('rectangle');
-      }
-    });
-
-    it('answers a stored Shape as the one drawn, the rectangle included', () => {
-      for (const stored of RESOURCE_SHAPES) {
-        expect(resourceShape({ shape: stored })).toBe(stored);
-      }
+    it('leaves an entry with no Map content without one', () => {
+      const parsed = parseEntry({ x: 0, y: 0, open: false });
+      expect(parsed.success).toBe(true);
+      expect(parsed.data?.maps?.[0]?.positions[uuidSchema.parse(A)]).not.toHaveProperty('content');
       expect(DEFAULT_RESOURCE_SHAPE).toBe('rectangle');
+      expect(RESOURCE_SHAPES).toEqual(['rectangle', 'pill', 'ellipse', 'diamond']);
     });
 
-    it('refuses a Shape outside the four, the hexagon among them', () => {
-      for (const resourceShape of [
-        'hexagon',
-        'triangle',
-        'cloud',
-        'Rectangle',
-        'square',
-        '',
-        1,
-        null,
-      ]) {
-        expect(
-          parseEntry({ x: 0, y: 0, open: false, shape: resourceShape }).success,
-          String(resourceShape),
-        ).toBe(false);
-      }
+    it('refuses a value JSON cannot carry, and the retired shape key', () => {
+      expect(parseEntry({ x: 0, y: 0, content: Number.POSITIVE_INFINITY }).success).toBe(false);
+      expect(parseEntry({ x: 0, y: 0, content: { at: Number.NaN } }).success).toBe(false);
+      expect(parseEntry({ x: 0, y: 0, shape: 'pill' }).success).toBe(false);
     });
   });
 

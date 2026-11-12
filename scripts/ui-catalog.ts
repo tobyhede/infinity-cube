@@ -569,12 +569,27 @@ const PRODUCTION_UI_ROOTS = [
   'packages/ui/src',
   'packages/app/src',
   'packages/react-flow-adapter/src',
+  'packages/resource-api/src/view',
 ];
 
+/**
+ * The production roots and every Resource plugin's source (ADR 0142): a plugin
+ * draws the pixels inside its rect, so its components are production UI.
+ */
+const productionUiRoots = (repositoryRoot: string): readonly string[] => {
+  const packages = join(repositoryRoot, 'packages');
+  const plugins = existsSync(packages)
+    ? readdirSync(packages)
+        .filter((name) => name.startsWith('plugin-'))
+        .map((name) => `packages/${name}/src`)
+    : [];
+  return [...PRODUCTION_UI_ROOTS, ...plugins];
+};
+
 const productionComponents = (repositoryRoot: string): readonly string[] =>
-  PRODUCTION_UI_ROOTS.flatMap((root) => filesBelow(join(repositoryRoot, root), '.tsx')).filter(
-    (path) => !path.includes(`${sep}test${sep}`) && !path.includes('.test.'),
-  );
+  productionUiRoots(repositoryRoot)
+    .flatMap((root) => filesBelow(join(repositoryRoot, root), '.tsx'))
+    .filter((path) => !path.includes(`${sep}test${sep}`) && !path.includes('.test.'));
 
 /**
  * The selector text of every rule in a stylesheet: whatever precedes each `{`,
@@ -858,7 +873,7 @@ export const buildUiCatalog = (repositoryRoot = process.cwd()): UiCatalog => {
   // a moved stylesheet would leave the guardrail passing with nothing checked.
   const supportRoot = join(storiesRoot, 'support');
   for (const root of [
-    ...PRODUCTION_UI_ROOTS,
+    ...productionUiRoots(repositoryRoot),
     'packages/app/stories',
     'packages/app/stories/support',
   ])
@@ -917,10 +932,11 @@ export const buildUiCatalog = (repositoryRoot = process.cwd()): UiCatalog => {
   const applicationClasses = declaredClasses(stylesheetSource);
   const recordedBlocks = recorded('handRolledStyles', 'block');
   const production = namedClasses(
-    PRODUCTION_UI_ROOTS.flatMap((root) => [
-      ...filesBelow(join(repositoryRoot, root), '.ts'),
-      ...filesBelow(join(repositoryRoot, root), '.tsx'),
-    ])
+    productionUiRoots(repositoryRoot)
+      .flatMap((root) => [
+        ...filesBelow(join(repositoryRoot, root), '.ts'),
+        ...filesBelow(join(repositoryRoot, root), '.tsx'),
+      ])
       .filter((path) => !path.includes(`${sep}test${sep}`) && !path.includes('.test.'))
       .map(sourceFile),
   );

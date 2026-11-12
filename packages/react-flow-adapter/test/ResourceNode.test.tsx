@@ -285,6 +285,10 @@ function props({
   const resolved = content ?? ownContent(kind, source, url);
   const data: ResourceFlowNode['data'] = {
     shape: resourceShape,
+    // A kind a plugin draws carries its stored content and Map content, as the
+    // projection gives it (ADR 0142).
+    ownContent: kind === 'ur' ? {} : undefined,
+    mapContent: kind === 'ur' ? { shape: resourceShape } : undefined,
     resourceId,
     title,
     ...bareKindData(kind),
@@ -445,8 +449,8 @@ describe('ResourceNode canvas Resource state adapter', () => {
     expect(onEditingChange).toHaveBeenCalledWith(true);
   });
 
-  it("passes an Ur Resource's Shape choice through its own kind operations", () => {
-    const onResourceShapeChange = vi.fn();
+  it('draws an Ur Resource through its plugin host, its Shape choice committing Map content', () => {
+    const commitMap = vi.fn(() => Promise.resolve<'completed'>('completed'));
     const node = props({ kind: 'ur', title: 'Gateway', selected: true });
     render(
       <ResourceNode
@@ -454,13 +458,41 @@ describe('ResourceNode canvas Resource state adapter', () => {
         data={{
           ...node.data,
           kind: 'ur',
-          kindOperations: { kind: 'ur', onResourceShapeChange },
+          kindOperations: { kind: 'ur', commitMap },
           shape: 'diamond',
+          ownContent: {},
+          mapContent: { shape: 'diamond' },
         }}
       />,
     );
 
+    const resource = screen.getByRole('article', { name: 'Gateway' });
+    expect(resource).toHaveClass('canvas-resource--plugin');
+    expect(resource).toHaveAttribute('data-resource-shape', 'diamond');
     expect(screen.getByRole('button', { name: 'Shape: Diamond' })).toBeVisible();
+  });
+
+  it('draws an Ur Resource read-only with no Shape choice', () => {
+    const node = props({ kind: 'ur', title: 'Gateway', selected: true, readOnly: true });
+    render(
+      <ResourceNode
+        {...node}
+        data={{
+          ...node.data,
+          kind: 'ur',
+          kindOperations: { kind: 'ur', commitMap: () => Promise.resolve('completed') },
+          ownContent: {},
+          mapContent: { shape: 'pill' },
+          shape: 'pill',
+        }}
+      />,
+    );
+
+    expect(screen.getByRole('article', { name: 'Gateway' })).toHaveAttribute(
+      'data-resource-shape',
+      'pill',
+    );
+    expect(screen.queryByRole('button', { name: /^Shape/u })).toBeNull();
   });
 
   it('draws a Markdown Resource kind glyph like any other kind', () => {
@@ -594,23 +626,18 @@ describe('ResourceNode draws what the display shows', () => {
     expect(screen.getByTestId('unresolved-content')).toHaveTextContent('Target not found');
   });
 
-  it("draws an Ur Resource's Shape Open and Closed alike", () => {
-    for (const open of [false, true]) {
-      const node = props({ kind: 'ur', title: 'Gateway', open });
-      const { unmount } = render(
-        <ResourceNode {...node} data={{ ...node.data, shape: 'diamond' }} />,
-      );
-      const resource = screen.getByRole('article', { name: 'Gateway' });
-      expect(resource).toHaveAttribute('data-open', String(open));
-      expect(resource).toHaveAttribute('data-resource-shape', 'diamond');
-      unmount();
-    }
+  it("draws an Ur Resource's Shape, which its plugin declares", () => {
+    render(<ResourceNode {...props({ kind: 'ur', title: 'Gateway', resourceShape: 'diamond' })} />);
+    const resource = screen.getByRole('article', { name: 'Gateway' });
+    expect(resource).toHaveAttribute('data-open', 'false');
+    expect(resource).toHaveAttribute('data-resource-shape', 'diamond');
   });
 });
 
 /**
- * An Ur Resource has no content (ADR 0113): it Opens, Closes and resizes as any
- * Resource does, and offers no Edit even when an edit operation reaches it.
+ * An Ur Resource is drawn by its plugin (ADR 0142): Open is not a rule the
+ * application offers it, so it draws no Open, Close or Edit, and it resizes as
+ * any Resource does.
  */
 describe('ResourceNode Ur Resource', () => {
   const resize = {
@@ -622,50 +649,24 @@ describe('ResourceNode Ur Resource', () => {
     onResizeCancel: () => undefined,
   };
 
-  it('opens through the shared operation and offers no Edit, even when one is supplied', () => {
-    const onOpenChange = vi.fn();
+  it('offers no Open or Edit, even when one is supplied, and the resize control', () => {
     render(
       <ResourceNode
         {...props({
           kind: 'ur',
           title: 'Gateway',
           selected: true,
-          onOpenChange,
-          onBeginEdit: vi.fn(),
-        })}
-      />,
-    );
-
-    expect(screen.getByRole('article', { name: 'Gateway' })).toHaveAttribute('data-kind', 'ur');
-    expect(screen.queryByRole('img', { name: 'Ur Resource' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Edit Resource Gateway' })).toBeNull();
-    screen.getByRole('button', { name: 'Open Resource Gateway' }).click();
-    expect(onOpenChange).toHaveBeenCalledWith(true);
-  });
-
-  it('draws only its Title while Open, and offers Close and the resize control', () => {
-    const onOpenChange = vi.fn();
-    render(
-      <ResourceNode
-        {...props({
-          kind: 'ur',
-          title: 'Gateway',
-          open: true,
-          selected: true,
-          onOpenChange,
+          onOpenChange: vi.fn(),
           onBeginEdit: vi.fn(),
           resize,
         })}
       />,
     );
 
-    const resource = screen.getByRole('article', { name: 'Gateway' });
-    expect(resource).toHaveAttribute('data-open', 'true');
-    expect(resource.querySelector('.canvas-resource__content')).toBeNull();
-    expect(screen.getByTestId('resize-control')).toBeInTheDocument();
+    expect(screen.getByRole('article', { name: 'Gateway' })).toHaveAttribute('data-kind', 'ur');
     expect(screen.queryByRole('button', { name: 'Edit Resource Gateway' })).toBeNull();
-    screen.getByRole('button', { name: 'Close Resource Gateway' }).click();
-    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(screen.queryByRole('button', { name: 'Open Resource Gateway' })).toBeNull();
+    expect(screen.getByTestId('resize-control')).toBeInTheDocument();
   });
 
   it('draws an Open Reference Resource to an Ur Resource as its Title alone, read-only', () => {

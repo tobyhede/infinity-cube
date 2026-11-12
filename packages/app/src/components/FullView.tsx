@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import type { ResourceId } from '@project/core';
+import { isPluginKind, type ResourceId } from '@project/core';
 import { resolveResourceContent, type Space } from '@project/graph';
-import { Button, PresentedResource, Stage } from '@project/ui';
+import { Button, PresentedPluginResource, PresentedResource, Stage } from '@project/ui';
 import { FULL_VIEW_KEYS } from '../key-bindings';
 
 export interface FullViewProps {
@@ -19,6 +19,10 @@ export interface FullViewProps {
    * than on one of the view's own controls.
    */
   readonly onKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>, fromContent: boolean) => void;
+  /** Told what a Resource plugin threw while drawing (ADR 0142). */
+  readonly onPluginFailure?: ((error: Error) => void) | undefined;
+  /** The Replacement epoch, on which a plugin's drawing starts again. */
+  readonly replacementEpoch?: number | undefined;
 }
 
 /**
@@ -31,7 +35,15 @@ export interface FullViewProps {
  * audience sees. The Stage's body takes focus when the view appears and each
  * time it moves to another Resource, so the keys reach the view at once.
  */
-export function FullView({ space, resourceId, onLeave, onOpen, onKeyDown }: FullViewProps) {
+export function FullView({
+  space,
+  resourceId,
+  onLeave,
+  onOpen,
+  onKeyDown,
+  onPluginFailure,
+  replacementEpoch,
+}: FullViewProps) {
   const body = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
@@ -70,10 +82,21 @@ export function FullView({ space, resourceId, onLeave, onOpen, onKeyDown }: Full
           </div>
         }
       >
-        <PresentedResource
-          title={resource.title}
-          content={resolveResourceContent(space, resource)}
-        />
+        {isPluginKind(resource.kind) ? (
+          <PresentedPluginResource
+            resourceId={resource.id}
+            kind={resource.kind}
+            title={resource.title}
+            content={resource.content}
+            onFailure={onPluginFailure}
+            replacementEpoch={replacementEpoch}
+          />
+        ) : (
+          <PresentedResource
+            title={resource.title}
+            content={resolveResourceContent(space, resource)}
+          />
+        )}
       </Stage>
     </div>
   );

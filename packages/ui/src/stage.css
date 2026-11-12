@@ -133,3 +133,15 @@
   border-radius: var(--canvas-resource-radius);
   background: color-mix(in srgb, currentcolor 8%, transparent);
 }
+
+/* A Resource a plugin draws fills the frame, which is its rect (ADR 0142): the
+   plugin lays out everything inside it, its Title included. */
+.stage__body .resource--full.resource--plugin {
+  position: relative;
+  height: 100%;
+  padding: 0;
+}
+
+.stage__body .resource--plugin .resource__title {
+  margin: 0;
+}

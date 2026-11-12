@@ -2116,13 +2116,13 @@ it('chooses a Shape inside a drawn Map, writing that Space’s Map and drawing i
         ?.session.getState()
         .working.document.maps?.find((candidate) => candidate.id === SELECTED_MAP_ID)?.positions[
         DRAWN_A
-      ]?.shape,
-    ).toBe('diamond'),
+      ]?.content,
+    ).toEqual({ shape: 'diamond' }),
   );
   expect(
     Object.values(
       spaces.entry(HOME_ID)?.session.getState().working.document.maps?.[0]?.positions ?? {},
-    ).map((entry) => entry?.shape),
+    ).map((entry) => entry?.content),
   ).toEqual([undefined, undefined]);
   await waitFor(() =>
     expect(embeddedNode(DRAWN_A).querySelector('.canvas-resource')).toHaveAttribute(

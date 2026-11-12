@@ -98,7 +98,7 @@ const target: SpaceSnapshot = {
       },
     ],
   },
-  // Ur Resources, so a generated `reshape` may give any of them a Shape (ADR 0121).
+  // Ur Resources, so a generated `reshape` may give any of them Map content (ADR 0142).
   resources: T_RESOURCES.map((id, index) => ur(id, `Resource ${index}`)),
 };
 
@@ -358,7 +358,10 @@ const applyOps = (snapshot: SpaceSnapshot, ops: readonly Op[]): SpaceSnapshot =>
           if (resource === undefined || placed === undefined) return undefined;
           return {
             ...m,
-            positions: { ...m.positions, [resource]: { ...placed, shape: current.shape } },
+            positions: {
+              ...m.positions,
+              [resource]: { ...placed, content: { shape: current.shape } },
+            },
           };
         });
         break;

@@ -34,6 +34,10 @@ import {
   type UrResourceDecorationContext,
 } from '../src/kinds/ur';
 import type { KindDecorationContext } from '../src/kinds/registry';
+import type { PluginHost } from '../src/plugin-host/plugin-commits';
+import { createPluginGate } from '../src/plugin-host/plugin-gate';
+import { NO_CLAIMS } from '../src/plugin-host/claim-chain';
+import type { AuthoringResult } from '../src/space-authoring';
 import { RESOURCE_SIZE } from '../src/resource';
 import { NO_SPACE_RESOURCE_TARGETS } from '../src/space-resource-targets';
 import type { SpaceResourceTarget } from '../src/space-resource-lifecycle';
@@ -344,32 +348,34 @@ describe('an Ur Resource’s decoration', () => {
     expect(patch.entityActions).toEqual([]);
   });
 
-  /** An Ur Resource takes a Shape (ADR 0121), whatever its projected state. */
-  it('offers the Shape choice where the Map may be authored', () => {
-    const changeResourceShape = vi.fn();
-    const ur = (open = false) => ofKind(projectionNode(UR_ID, 'ur', open), 'ur');
-    for (const open of [false, true]) {
-      decorateUrResourceNode(
-        ur(open),
-        context({ changeResourceShape }),
-      ).kindOperations.onResourceShapeChange?.('ellipse');
-    }
-    expect(changeResourceShape.mock.calls).toEqual([
-      [UR_ID, 'ellipse'],
-      [UR_ID, 'ellipse'],
-    ]);
+  /** An Ur Resource's plugin surface commits its Map content where the Map may be authored (ADR 0142). */
+  it('offers the plugin its Map content commit where the Map may be authored', async () => {
+    const complete = vi.fn((): AuthoringResult => ({ kind: 'completed' }));
+    const pluginHost: PluginHost = {
+      gate: createPluginGate(),
+      claims: NO_CLAIMS,
+      replacementEpoch: () => 0,
+      document: () => undefined,
+      complete,
+      report: () => undefined,
+    };
+    const ur = () => ofKind(projectionNode(UR_ID, 'ur'), 'ur');
+    const commit = decorateUrResourceNode(ur(), context({ pluginHost })).kindOperations.commitMap;
+    await expect(commit?.({ shape: 'ellipse' })).resolves.toBe('completed');
+    expect(complete).toHaveBeenCalledWith(
+      { kind: 'changed-map-content', resourceId: UR_ID, content: { shape: 'ellipse' } },
+      expect.any(Function),
+    );
 
     expect(
-      decorateUrResourceNode(ur(), context({ changeResourceShape, authorOnCanvas: false }))
-        .kindOperations.onResourceShapeChange,
+      decorateUrResourceNode(ur(), context({ pluginHost, authorOnCanvas: false })).kindOperations
+        .commitMap,
     ).toBeUndefined();
     expect(
-      decorateUrResourceNode(ur(), context({ changeResourceShape, editableResourceIds: new Set() }))
-        .kindOperations.onResourceShapeChange,
+      decorateUrResourceNode(ur(), context({ pluginHost, editableResourceIds: new Set() }))
+        .kindOperations.commitMap,
     ).toBeUndefined();
-    expect(
-      decorateUrResourceNode(ur(), context()).kindOperations.onResourceShapeChange,
-    ).toBeUndefined();
+    expect(decorateUrResourceNode(ur(), context()).kindOperations.commitMap).toBeUndefined();
   });
 });
 
@@ -576,17 +582,25 @@ describe('decorating each kind from its own part of the context', () => {
     expect(reads).toHaveBeenCalledTimes(4);
   });
 
-  it('decorates an Ur Resource again when only its optional Shape change is replaced', () => {
+  it('decorates an Ur Resource again when only its optional plugin host is replaced', async () => {
     const decorate = kindDecorationMemo([kindDecorator(urDecoration)]);
     const urNodes = [projectionNode(UR_ID, 'ur')];
-    const first = vi.fn();
-    const second = vi.fn();
-    decorate(urNodes, context({ changeResourceShape: first }));
-    const [node] = decorate(urNodes, context({ changeResourceShape: second }));
+    const host = (complete: PluginHost['complete']): PluginHost => ({
+      gate: createPluginGate(),
+      claims: NO_CLAIMS,
+      replacementEpoch: () => 0,
+      document: () => undefined,
+      complete,
+      report: () => undefined,
+    });
+    const first = vi.fn((): AuthoringResult => ({ kind: 'completed' }));
+    const second = vi.fn((): AuthoringResult => ({ kind: 'completed' }));
+    decorate(urNodes, context({ pluginHost: host(first) }));
+    const [node] = decorate(urNodes, context({ pluginHost: host(second) }));
     if (node === undefined || !isResourceNodeOf(node, 'ur')) throw new Error('no Ur Resource');
-    node.data.kindOperations.onResourceShapeChange?.('ellipse');
+    await node.data.kindOperations.commitMap?.({ shape: 'ellipse' });
     expect(first).not.toHaveBeenCalled();
-    expect(second).toHaveBeenCalledWith(UR_ID, 'ellipse');
+    expect(second).toHaveBeenCalledTimes(1);
   });
 
   it('names every field of a kind’s context in the part it reads', () => {

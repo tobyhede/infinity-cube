@@ -131,11 +131,17 @@ describe('Placement.next', () => {
     expect(Placement.next(authored, rendered, [RESOURCE_A, RESOURCE_B])).toBe(authored);
   });
 
-  it('preserves a Resource state, size and Shape when the renderer reports only its moved position', () => {
+  it('preserves a Resource state, size and Map content when the renderer reports only its moved position', () => {
     const authored = Placement.fromEntries([
       [
         RESOURCE_A,
-        { x: 10, y: 20, open: true, size: { width: 560, height: 420 }, shape: 'diamond' },
+        {
+          x: 10,
+          y: 20,
+          open: true,
+          size: { width: 560, height: 420 },
+          content: { shape: 'diamond' },
+        },
       ],
     ]);
     const rendered = Placement.fromEntries([[RESOURCE_A, { x: 90, y: 80 }]]);
@@ -146,7 +152,7 @@ describe('Placement.next', () => {
         y: 80,
         open: true,
         size: { width: 560, height: 420 },
-        shape: 'diamond',
+        content: { shape: 'diamond' },
       },
     });
   });
@@ -267,18 +273,23 @@ describe('Placement.place', () => {
     );
   });
 
-  it('writes an entry as given, storing no state, size or Shape it was not given', () => {
+  it('writes an entry as given, storing no state, size or Map content it was not given', () => {
     expect(asObject(Placement.place(Placement.empty(), RESOURCE_B, { x: 640, y: 80 }))).toEqual({
       [RESOURCE_B]: { x: 640, y: 80 },
     });
   });
 
-  it('keeps the Shape of a whole entry it is given', () => {
+  it('keeps the Map content of a whole entry it is given', () => {
     expect(
       asObject(
-        Placement.place(Placement.empty(), RESOURCE_B, { x: 0, y: 0, open: false, shape: 'pill' }),
+        Placement.place(Placement.empty(), RESOURCE_B, {
+          x: 0,
+          y: 0,
+          open: false,
+          content: { shape: 'pill' },
+        }),
       ),
-    ).toEqual({ [RESOURCE_B]: { x: 0, y: 0, open: false, shape: 'pill' } });
+    ).toEqual({ [RESOURCE_B]: { x: 0, y: 0, open: false, content: { shape: 'pill' } } });
   });
 });
 
@@ -434,32 +445,41 @@ describe('Placement.displace', () => {
     expect(restored.get(RESOURCE_B)).toEqual({ x: 540, y: 0, open: false });
   });
 
-  it('carries Open/Closed state, size and Shape through untouched', () => {
+  it('carries Open/Closed state, size and Map content through untouched', () => {
     // Only `x` and `y` move (ADR 0121).
     const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 0, y: 0, open: true, shape: 'diamond' }],
+      [RESOURCE_A, { x: 0, y: 0, open: true, content: { shape: 'diamond' } }],
       [
         RESOURCE_B,
-        { x: 400, y: 400, open: true, size: { width: 800, height: 600 }, shape: 'pill' },
+        {
+          x: 400,
+          y: 400,
+          open: true,
+          size: { width: 800, height: 600 },
+          content: { shape: 'pill' },
+        },
       ],
-      [RESOURCE_C, { x: 400, y: 400, size: { width: 700, height: 500 }, shape: 'ellipse' }],
+      [
+        RESOURCE_C,
+        { x: 400, y: 400, size: { width: 700, height: 500 }, content: { shape: 'ellipse' } },
+      ],
     ]);
 
     expect(asObject(Placement.displace(authored, RESOURCE_A, before, after))).toEqual({
-      [RESOURCE_A]: { x: 0, y: 0, open: true, shape: 'diamond' },
+      [RESOURCE_A]: { x: 0, y: 0, open: true, content: { shape: 'diamond' } },
       [RESOURCE_B]: {
         x: 700,
         y: 400,
         open: true,
         size: { width: 800, height: 600 },
-        shape: 'pill',
+        content: { shape: 'pill' },
       },
       [RESOURCE_C]: {
         x: 700,
         y: 400,
         open: false,
         size: { width: 700, height: 500 },
-        shape: 'ellipse',
+        content: { shape: 'ellipse' },
       },
     });
   });
@@ -575,9 +595,11 @@ describe('Placement.equals', () => {
     expect(Placement.equals(base, Placement.empty())).toBe(false);
   });
 
-  it('notices a Resource drawn in another Shape', () => {
-    const withResourceShape = (resourceShape: ResourcePlacement['shape']) =>
-      Placement.fromEntries([[RESOURCE_A, { x: 10, y: 20, open: false, shape: resourceShape }]]);
+  it('notices a Resource given other Map content', () => {
+    const withResourceShape = (resourceShape: string) =>
+      Placement.fromEntries([
+        [RESOURCE_A, { x: 10, y: 20, open: false, content: { shape: resourceShape } }],
+      ]);
 
     expect(Placement.equals(withResourceShape('rectangle'), withResourceShape('rectangle'))).toBe(
       true,

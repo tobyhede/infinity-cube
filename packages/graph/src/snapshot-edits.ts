@@ -1,16 +1,18 @@
 import {
   COLLAPSED_RESOURCE_SIZE,
   titleName,
+  keepsMapContent,
+  mapContentProblem,
+  resolvedMapContent,
   resourceOpen,
-  resourceShape,
   resourceSize,
+  sameJsonValue,
   takesOpen,
-  takesResourceShape,
   type Graph,
+  type JsonValue,
   type Map,
   type MapPosition,
   type ResourcePlacement,
-  type ResourceShape,
   type SpaceSnapshot,
   type ResourceDocument,
   type UUID,
@@ -20,8 +22,8 @@ import { Placement } from './placement';
 
 /**
  * The Resource membership rules that turn a Space snapshot into the next one when
- * a Resource joins, Opens, Closes, is resized, changes Shape or leaves a Map —
- * Add, Open, Close, Resize, change Shape, Remove from Map, Delete from Space.
+ * a Resource joins, Opens, Closes, is resized, changes Map content or leaves a Map —
+ * Add, Open, Close, Resize, change Map content, Remove from Map, Delete from Space.
  *
  * `SnapshotEdit` operates on `SpaceSnapshot` — the one representation both
  * Space Authoring and the session registry already hold — rather than the
@@ -37,7 +39,7 @@ import { Placement } from './placement';
  *
  * Operations arrive with their first real caller rather than ahead of one.
  * Both callers create and delete through `createInMap` and `deleteFromSpace`;
- * `open`, `close`, `resize`, `openAndExpand`, `changeResourceShape`, `addToMap` and
+ * `open`, `close`, `resize`, `openAndExpand`, `changeMapContent`, `addToMap` and
  * `removeFromMap` are Space Authoring's alone.
  */
 
@@ -55,8 +57,10 @@ export type SnapshotEditRefusal =
   | { readonly code: 'reference-target-not-targetable'; readonly targetId: UUID }
   /** An Open of a Resource with no content to show: an Ur Resource is always Closed. */
   | { readonly code: 'open-requires-content' }
-  /** A Shape Edit on a Resource whose kind takes no Shape: it is the rectangle. */
-  | { readonly code: 'shape-not-taken' }
+  /** A Map content Edit on a Resource whose kind no plugin draws, so it keeps none (ADR 0142). */
+  | { readonly code: 'map-content-not-kept' }
+  /** Map content the Resource's plugin's schema refuses. */
+  | { readonly code: 'map-content-invalid' }
   | {
       readonly code: 'resource-has-references';
       /** The referencing Resources by **name**, which is what a sentence listing Resources says (ADR 0083). */
@@ -386,20 +390,20 @@ function openAndExpand(
 }
 
 /**
- * Draw an Ur Resource in another Shape in one Map (ADR 0121). Every other
- * kind is the rectangle, so a Shape Edit on one is refused whatever it asks for.
+ * Write a Resource's Map content in one Map (ADR 0142): what its plugin keeps
+ * for it there, as an Ur Resource keeps its Shape (ADR 0121). The plugin's own
+ * schema decides what is accepted, and a kind no plugin draws keeps none.
  *
- * The Shape is drawn at the Resource's rect and changes none, so no neighbour
- * moves and the Resource's Open/Closed state and size are kept. The chosen
- * Shape is written, the rectangle included; `unchanged` for the Shape the
- * Resource already draws as, so the rectangle is `unchanged` on an entry that
- * stores none.
+ * It changes no rect, so no neighbour moves and the Resource's Open/Closed
+ * state and size are kept. `unchanged` for the value the plugin is already
+ * given there, so the plugin's default is `unchanged` on an entry that stores
+ * none.
  */
-function changeResourceShape(
+function changeMapContent(
   snapshot: SpaceSnapshot,
   mapId: UUID,
   resourceId: UUID,
-  chosen: ResourceShape,
+  content: JsonValue,
 ): SnapshotEditOutcome {
   const placed = placedIn(snapshot, mapId);
   if ('code' in placed) return refused(placed);
@@ -407,12 +411,17 @@ function changeResourceShape(
   if (at === undefined) return refused({ code: 'resource-not-in-map' });
   const resource = snapshot.resources.find((candidate) => candidate.id === resourceId);
   if (resource === undefined) return refused({ code: 'resource-not-found' });
-  if (!takesResourceShape(resource.document.kind)) return refused({ code: 'shape-not-taken' });
-  if (resourceShape(at) === chosen) return UNCHANGED;
+  const kind = resource.document.kind;
+  if (!keepsMapContent(kind)) return refused({ code: 'map-content-not-kept' });
+  if (mapContentProblem(kind, content) !== undefined) {
+    return refused({ code: 'map-content-invalid' });
+  }
+  const current = resolvedMapContent(kind, at.content);
+  if (current !== undefined && sameJsonValue(current, content)) return UNCHANGED;
   return withPlacement(
     snapshot,
     mapId,
-    Placement.place(placed.placement, resourceId, { ...at, shape: chosen }),
+    Placement.place(placed.placement, resourceId, { ...at, content }),
   );
 }
 
@@ -421,7 +430,7 @@ function changeResourceShape(
  *
  * Membership and a position, and nothing else: a Resource added back to a Map
  * is detached, and neither the Edges nor the Shape it once had there are
- * inferred back, so it draws as the rectangle (ADR 0121). The position is an authored one
+ * inferred back, so its plugin is given its default Map content (ADR 0142). The position is an authored one
  * (ADR 0084); `avoidingOverlap` steps off a point another Resource already
  * occupies exactly, as a creation from a menu does ({@link freeAnchor}), and
  * `exact` keeps it.
@@ -490,7 +499,7 @@ export const SnapshotEdit = {
   close,
   resize,
   openAndExpand,
-  changeResourceShape,
+  changeMapContent,
   addToMap,
   removeFromMap,
 } as const;

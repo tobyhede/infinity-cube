@@ -31,9 +31,21 @@ export type {
   CanvasResourceState,
 } from './CanvasResource';
 export { SpaceResourceSelectors } from './SpaceResourceSelectors';
-export { ResourceShapeMenu } from './ResourceShapeMenu';
-export { RESOURCE_SHAPE_LABELS, ResourceShapeIcon } from './ResourceShape';
-export type { ResourceShapeMenuProps } from './ResourceShapeMenu';
+export { RailChoiceMenu } from './RailChoiceMenu';
+export type { RailChoiceMenuProps } from './RailChoiceMenu';
+export { PluginResource } from './PluginResource';
+export type { MapTitle, PluginResourceProps } from './PluginResource';
+export { PresentedPluginResource } from './PresentedPluginResource';
+export type { PresentedPluginResourceProps } from './PresentedPluginResource';
+export { ResourceFailureBoundary } from './ResourceFailureBoundary';
+export type { ResourceFailureBoundaryProps } from './ResourceFailureBoundary';
+export { isPluginOperations } from './kinds/plugin-views';
+export type {
+  ClaimHolder,
+  PluginCommits,
+  PluginHostClaim,
+  PluginOperations,
+} from './kinds/plugin-views';
 export type {
   CanvasSpaceResourceChoice,
   CanvasSpaceResourceGraphChoice,

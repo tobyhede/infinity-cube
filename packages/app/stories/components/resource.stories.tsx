@@ -7,10 +7,12 @@ import {
   type Resource,
   type ResourceShape,
 } from '@project/core';
+import { urMapContentSchema } from '@project/plugin-ur/domain';
 import { productDestinationPath, type ProductDestination } from '@project/http';
 import {
   CanvasResource,
   CLOSED_DISPLAY,
+  PluginResource,
   type KindOperations,
   type CanvasResourceState,
   type ResourceDisplay,
@@ -262,13 +264,25 @@ export const ResourceShapeChoice: Story = () => {
   const [resourceShape, setResourceShape] = useState<ResourceShape>('rectangle');
   return (
     <div className="p-8" style={resourceSizeVars}>
-      <CanvasResource
-        kindOperations={{ kind: 'ur', onResourceShapeChange: setResourceShape }}
-        display={CLOSED_DISPLAY}
-        shape={resourceShape}
-        title="Decide"
+      <PluginResource
+        resourceId="decide"
+        kind="ur"
+        title={{ title: 'Decide', readOnly: false, onReturnFocus: () => undefined }}
+        content={{}}
+        mapContent={{ shape: resourceShape }}
+        outline={resourceShape}
         state="selected"
         graphColor="#ffc53d"
+        readOnly={false}
+        operations={{
+          kind: 'ur',
+          commitMap: (next) => {
+            const parsed = urMapContentSchema.safeParse(next);
+            if (!parsed.success) return Promise.resolve({ refused: 'Not a Shape.' });
+            setResourceShape(parsed.data.shape);
+            return Promise.resolve('completed');
+          },
+        }}
       />
     </div>
   );

@@ -18,6 +18,7 @@ import {
   type Space,
 } from '@project/graph';
 import {
+  bareKindData,
   nodeTypes,
   edgeTypes,
   GraphHeadMarkers,
@@ -498,8 +499,12 @@ export function CanvasResourceNodeSpecimen({
   if (title !== undefined) data.title = title;
   if (kind === 'image') data.kind = kind;
   if (resourceShape !== undefined) {
-    data.kind = 'ur';
-    data.shape = resourceShape;
+    // An Ur Resource, drawn by its plugin from its Map content (ADR 0142).
+    Object.assign(data, bareKindData('ur'), {
+      shape: resourceShape,
+      ownContent: {},
+      mapContent: { shape: resourceShape },
+    });
   }
   if (open === true) {
     data.display = {

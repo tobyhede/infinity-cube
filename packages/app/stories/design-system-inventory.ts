@@ -50,6 +50,11 @@ export const uncataloguedComponents = [
       'The mount entry point (ADR 0130): one `createRoot` call and the mount composition, rendering `GitHubLocationForm` when the page has no location to mount.',
   },
   {
+    module: 'packages/resource-api/src/view/testing.tsx',
+    reason:
+      "The Resource API's test host (ADR 0142): `renderPlugin` draws a plugin's view in a plugin's own tests, and the lint zone keeps it out of every plugin's source, so no production surface or story renders it.",
+  },
+  {
     module: 'packages/react-flow-adapter/src/ResourceNode.tsx',
     reason:
       "A limit of the walk, not a property of the component — the one entry here that is a defect rather than a design fact, and `.scratch/architecture-review/issues/09` owns removing it. A stable story does render this: `canvas-resource-hover-reveals-handles-and-selection-draws-commands` mounts the real `ResourceNode` in a real `ReactFlow`. The checker cannot see it because the story reaches it through `nodeTypes`, which the adapter's index declares as a local `const` rather than re-exporting, so resolving the barrel by the names taken through it finds nothing.",

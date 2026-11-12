@@ -64,7 +64,7 @@
       }
     },
     "placement": {
-      "description": "One Resource's place on a Map. Open, size and Shape are the Map's, not the Resource's (ADR 0121, ADR 0122). That an Ur Resource is never Open and that only an Ur Resource takes a Shape other than the rectangle are intake's checks, because they need the Resource's kind.",
+      "description": "One Resource's place on a Map. Open, size and Map content are the Map's, not the Resource's (ADR 0122, ADR 0142). That an Ur Resource is never Open, and what Map content a Resource's plugin accepts, are intake's checks, because they need the Resource's kind.",
       "type": "object",
       "required": ["x", "y"],
       "additionalProperties": false,
@@ -82,9 +82,8 @@
             "height": { "type": "number", "minimum": 146 }
           }
         },
-        "shape": {
-          "description": "Absent means rectangle.",
-          "enum": ["rectangle", "pill", "ellipse", "diamond"]
+        "content": {
+          "description": "The Map content the plugin drawing this Resource keeps on this Map, any JSON value: an Ur Resource's is {\"shape\": \"rectangle\" | \"pill\" | \"ellipse\" | \"diamond\"} (ADR 0142). Absent means the plugin's default. Whether the plugin's own schema accepts it, and that a kind no plugin draws keeps none, are intake's checks, because they need the Resource's kind."
         }
       }
     },

@@ -1,8 +1,9 @@
 import type { CSSProperties } from 'react';
-import type { ResourceShape } from '@project/core';
+import { isPluginKind, type ResourceShape } from '@project/core';
 import {
   CanvasResource,
   CLOSED_DISPLAY,
+  PluginResource,
   type KindOperations,
   type CanvasResourceState,
 } from '@project/ui';
@@ -11,7 +12,7 @@ interface CanvasResourceSpecimenCommonProps {
   readonly title: string;
   readonly state?: Exclude<CanvasResourceState, 'editing'>;
   readonly graphColor?: string;
-  /** The Shape a Map records for the Resource, which it is drawn in at any size. */
+  /** The Shape a Map records for an Ur Resource, which it is drawn in at any size. */
   readonly shape?: ResourceShape;
   /**
    * Draws the Resource Closed at this size, as a canvas adapter draws one
@@ -48,6 +49,29 @@ export function CanvasResourceSpecimen({
   size,
 }: CanvasResourceSpecimenProps) {
   const kindOperations: KindOperations = { kind };
+  if (isPluginKind(kind)) {
+    const drawn = (
+      <PluginResource
+        resourceId={`specimen-${kind}`}
+        kind={kind}
+        title={{ title, readOnly: true, onReturnFocus: () => undefined }}
+        content={{}}
+        mapContent={{ shape: resourceShape }}
+        outline={resourceShape}
+        size={size}
+        state={state}
+        graphColor={graphColor}
+        readOnly
+        operations={{ kind }}
+      />
+    );
+    if (size === undefined) return drawn;
+    const pluginSized: ResourceFrameStyle = {
+      '--resource-width': `${size.width}px`,
+      '--resource-height': `${size.height}px`,
+    };
+    return <div style={pluginSized}>{drawn}</div>;
+  }
   if (size === undefined) {
     return (
       <CanvasResource
@@ -56,7 +80,6 @@ export function CanvasResourceSpecimen({
         title={title}
         state={state}
         graphColor={graphColor}
-        shape={resourceShape}
       />
     );
   }
@@ -72,7 +95,6 @@ export function CanvasResourceSpecimen({
         title={title}
         state={state}
         graphColor={graphColor}
-        shape={resourceShape}
         size={size}
       />
     </div>

@@ -549,3 +549,27 @@
   min-width: 0;
   max-width: 100%;
 }
+
+/* A Resource a plugin draws (ADR 0142): the plugin's region fills the rect, and
+   everything inside it is the plugin's. The canvas keeps the border, the ring
+   and the rail, which are drawn outside the region. */
+.canvas-resource__plugin {
+  position: absolute;
+  inset: 0;
+  color: var(--canvas-resource-title);
+  opacity: var(--canvas-resource-strength, 1);
+}
+
+/* A rail drawn in the rect stands over the plugin's pixels, which fill it. */
+.canvas-resource--plugin > .canvas-resource__actions {
+  position: relative;
+  z-index: 1;
+}
+
+/* What a Resource whose plugin threw draws in its rect instead (ADR 0142). */
+.resource-failure {
+  margin: 0;
+  padding: 8px 12px;
+  color: var(--canvas-resource-error, currentColor);
+  font-size: 12px;
+}

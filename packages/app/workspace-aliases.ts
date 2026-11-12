@@ -21,6 +21,8 @@ export const workspaceAliases = () => {
     '@project/graph': here('../graph/src/index.ts'),
     '@project/http': here('../http/src/index.ts'),
     '@project/persistence': here('../persistence/src/index.ts'),
+    '@project/plugin-ur/domain': here('../plugin-ur/src/domain.ts'),
+    '@project/resource-api/domain': here('../resource-api/src/domain/index.ts'),
   } satisfies Record<string, string>;
 };
 
