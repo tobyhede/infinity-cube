@@ -37,11 +37,11 @@ model Resource {
   @@map("resources")
 }
 
-model Image {
-  id        String   @id
+model Asset {
+  hash      String   @id
   mediaType String   @map("media_type")
   bytes     Bytes
   createdAt DateTime @default(now()) @map("created_at")
 
-  @@map("images")
+  @@map("assets")
 }

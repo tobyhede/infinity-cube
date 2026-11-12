@@ -2,14 +2,15 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { uuidSchema, type UUID } from '@project/core';
-import type {
-  AggregateLoadResult,
-  ImageId,
-  LoadedSpace,
-  RepositoryCommitResult,
-  SpaceCommit,
-  SpaceSummary,
-  StoredImage,
+import {
+  EMPTY_ASSET,
+  type AggregateLoadResult,
+  type AssetHash,
+  type LoadedSpace,
+  type RepositoryCommitResult,
+  type SpaceCommit,
+  type SpaceSummary,
+  type StoredAsset,
 } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { importAggregate } from '../../src/import/import-aggregate';
@@ -28,7 +29,7 @@ import {
 } from '../support/aggregate-directory';
 import { MemorySpaceRepository } from '@project/aggregate';
 import { captureError } from '../support/capture-error';
-import { admitted, jpegBytes, pngBytes } from '../support/stored-images';
+import { admitted, jpegBytes, pngBytes } from '../support/stored-assets';
 
 const META_SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const OTHER_META_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
@@ -50,7 +51,7 @@ const PICTURE_ID = uuidSchema.parse('77777777-7777-4777-8777-777777777777');
  * would pass just as well for an import that wrote and rolled back.
  */
 type SeamCall =
-  'loadAggregate' | 'loadMetaSpaceId' | 'initializeAggregate' | 'replaceAggregate' | 'storeImage';
+  'loadAggregate' | 'loadMetaSpaceId' | 'initializeAggregate' | 'replaceAggregate' | 'storeAsset';
 
 class RecordingRepository implements SpaceRepository {
   readonly calls: SeamCall[] = [];
@@ -76,13 +77,13 @@ class RecordingRepository implements SpaceRepository {
     return this.#stored.commit(request);
   }
 
-  storeImage(image: StoredImage): Promise<'stored' | 'existing'> {
-    this.calls.push('storeImage');
-    return this.#stored.storeImage(image);
+  storeAsset(asset: StoredAsset): Promise<'stored' | 'existing'> {
+    this.calls.push('storeAsset');
+    return this.#stored.storeAsset(asset);
   }
 
-  loadImage(id: ImageId): Promise<StoredImage | undefined> {
-    return this.#stored.loadImage(id);
+  loadAsset(hash: AssetHash): Promise<StoredAsset | undefined> {
+    return this.#stored.loadAsset(hash);
   }
 
   loadAggregate(): Promise<AggregateLoadResult> {
@@ -466,8 +467,8 @@ describe('importAggregate', () => {
   });
 });
 
-describe('importing the images an Aggregate directory carries', () => {
-  /** A Meta-only aggregate whose one Resource shows `url`, plus these files in `images/`. */
+describe('importing the assets an Aggregate directory carries', () => {
+  /** A Meta-only aggregate whose one Resource shows `url`, plus these files in `assets/`. */
   const writePicturedAggregate = async (
     url: string,
     files: Readonly<Record<string, Uint8Array | string>>,
@@ -484,76 +485,120 @@ describe('importing the images an Aggregate directory carries', () => {
         }),
       },
     ]);
-    await mkdir(join(root, 'images'));
+    await mkdir(join(root, 'assets'));
     for (const [name, bytes] of Object.entries(files)) {
-      await writeFile(join(root, 'images', name), bytes);
+      await writeFile(join(root, 'assets', name), bytes);
     }
     return root;
   };
 
-  it('admits every image in images/ before the aggregate is stored', async () => {
+  it('admits every asset in assets/ before the aggregate is stored, referenced or not', async () => {
     const shown = await admitted(pngBytes(1));
     const unshown = await admitted(jpegBytes(2));
-    const root = await writePicturedAggregate(`/images/${shown.id}`, {
-      [`${shown.id}.png`]: pngBytes(1),
-      [`${unshown.id}.jpg`]: jpegBytes(2),
+    const root = await writePicturedAggregate(`/assets/${shown.hash}`, {
+      [`${shown.hash}.png`]: pngBytes(1),
+      [`${unshown.hash}.jpg`]: jpegBytes(2),
     });
     const repository = new RecordingRepository();
 
     await expect(importFrom(root, repository)).resolves.toMatchObject({ kind: 'imported' });
 
-    expect(repository.calls).toEqual(['storeImage', 'storeImage', 'initializeAggregate']);
-    await expect(repository.loadImage(shown.id)).resolves.toEqual(shown);
-    await expect(repository.loadImage(unshown.id)).resolves.toEqual(unshown);
+    expect(repository.calls).toEqual(['storeAsset', 'storeAsset', 'initializeAggregate']);
+    await expect(repository.loadAsset(shown.hash)).resolves.toEqual(shown);
+    await expect(repository.loadAsset(unshown.hash)).resolves.toEqual(unshown);
   });
 
-  it('admits the images before replacing the stored aggregate under replace', async () => {
-    const image = await admitted(pngBytes(1));
+  it.each([
+    ['md', 'text/markdown'],
+    ['MD', 'text/markdown'],
+    ['jpeg', 'image/jpeg'],
+    ['svg', 'image/svg+xml'],
+    ['mermaid', 'application/octet-stream'],
+    ['tar.gz', 'application/octet-stream'],
+  ])('types a .%s file by the host table as %s', async (extension, mediaType) => {
+    const bytes = new TextEncoder().encode(`bytes of a .${extension} file`);
+    const asset = await admitted(bytes, mediaType);
+    const root = await writePicturedAggregate(`/assets/${asset.hash}`, {
+      [`${asset.hash}.${extension}`]: bytes,
+    });
+    const repository = new RecordingRepository();
+
+    await expect(importFrom(root, repository)).resolves.toMatchObject({ kind: 'imported' });
+    await expect(repository.loadAsset(asset.hash)).resolves.toEqual(asset);
+  });
+
+  it('admits a file named by its hash alone as application/octet-stream', async () => {
+    const asset = await admitted(pngBytes(3), 'application/octet-stream');
+    const root = await writePicturedAggregate(`/assets/${asset.hash}`, {
+      [asset.hash]: pngBytes(3),
+    });
+    const repository = new RecordingRepository();
+
+    await expect(importFrom(root, repository)).resolves.toMatchObject({ kind: 'imported' });
+    await expect(repository.loadAsset(asset.hash)).resolves.toEqual(asset);
+  });
+
+  it('admits the assets before replacing the stored aggregate under replace', async () => {
+    const asset = await admitted(pngBytes(1));
     const stored = new MemorySpaceRepository();
     await importFrom(await writeMetaOnlyAggregate(OTHER_META_ID, 'Before'), stored);
-    const root = await writePicturedAggregate(`/images/${image.id}`, {
-      [`${image.id}.png`]: pngBytes(1),
+    const root = await writePicturedAggregate(`/assets/${asset.hash}`, {
+      [`${asset.hash}.png`]: pngBytes(1),
     });
     const repository = new RecordingRepository(stored);
 
     await expect(importFrom(root, repository, true)).resolves.toMatchObject({ kind: 'imported' });
 
-    expect(repository.calls).toEqual(['storeImage', 'loadMetaSpaceId', 'replaceAggregate']);
-    await expect(repository.loadImage(image.id)).resolves.toEqual(image);
+    expect(repository.calls).toEqual(['storeAsset', 'loadMetaSpaceId', 'replaceAggregate']);
+    await expect(repository.loadAsset(asset.hash)).resolves.toEqual(asset);
   });
 
   /*
-   * A stored image's URL whose bytes are not in the directory draws as a
-   * picture that will not load, which ADR 0106 already allows. So a directory
-   * an Export wrote while one picture's bytes were missing still Imports.
+   * Absent bytes are not an error (ADR 0118, ADR 0142): a directory an Export
+   * wrote while one asset's bytes were missing still Imports.
    */
-  it('does not refuse a stored-image URL whose bytes the directory does not carry', async () => {
+  it('does not refuse an asset URL whose bytes the directory does not carry', async () => {
     const absent = await admitted(pngBytes(9));
-    const root = await writePicturedAggregate(`/images/${absent.id}`, {});
+    const root = await writePicturedAggregate(`/assets/${absent.hash}`, {});
     const repository = new RecordingRepository();
 
     await expect(importFrom(root, repository)).resolves.toMatchObject({ kind: 'imported' });
-    await expect(repository.loadImage(absent.id)).resolves.toBeUndefined();
+    await expect(repository.loadAsset(absent.hash)).resolves.toBeUndefined();
   });
 
-  it('ignores the dotfiles and directories inside images/', async () => {
-    const image = await admitted(pngBytes(1));
-    const root = await writePicturedAggregate(`/images/${image.id}`, {
-      '.DS_Store': 'Bud1 not an image',
+  it('holds the asset of zero bytes with no file for it', async () => {
+    const root = await writePicturedAggregate(`/assets/${EMPTY_ASSET.hash}`, {});
+    const repository = new RecordingRepository();
+
+    await expect(importFrom(root, repository)).resolves.toMatchObject({ kind: 'imported' });
+    await expect(repository.loadAsset(EMPTY_ASSET.hash)).resolves.toEqual(EMPTY_ASSET);
+  });
+
+  it('leaves alone what in assets/ is not named by a hash', async () => {
+    const asset = await admitted(pngBytes(1));
+    const root = await writePicturedAggregate(`/assets/${asset.hash}`, {
+      '.DS_Store': 'Bud1 not an asset',
+      'notes.txt': 'not an asset',
+      'harbour.png': pngBytes(1),
     });
-    await mkdir(join(root, 'images', 'drafts'));
-    await writeFile(join(root, 'images', 'drafts', 'notes.txt'), 'not an image');
+    await mkdir(join(root, 'assets', 'drafts'));
+    await writeFile(join(root, 'assets', 'drafts', 'notes.txt'), 'not an asset');
     const repository = new RecordingRepository();
 
     await expect(importFrom(root, repository)).resolves.toMatchObject({ kind: 'imported' });
     expect(repository.calls).toEqual(['initializeAggregate']);
   });
 
-  it('refuses a file in images/ that is not an image the host stores, before storing anything', async () => {
-    const image = await admitted(pngBytes(1));
-    const root = await writePicturedAggregate(`/images/${image.id}`, {
-      [`${image.id}.png`]: pngBytes(1),
-      'notes.txt': 'not an image',
+  /*
+   * An asset's file name is the hash its URL names, so a file whose bytes are
+   * another hash would be stored under a URL no Resource references while the
+   * one it does reference stays missing. Import says so rather than guessing.
+   */
+  it('refuses an asset file not named for its content, before storing anything', async () => {
+    const asset = await admitted(pngBytes(1));
+    const other = await admitted(pngBytes(2));
+    const root = await writePicturedAggregate(`/assets/${asset.hash}`, {
+      [`${other.hash}.png`]: pngBytes(1),
     });
     const repository = new RecordingRepository();
 
@@ -562,20 +607,18 @@ describe('importing the images an Aggregate directory carries', () => {
     expect(error).toBeInstanceOf(AggregateDirectoryError);
     if (!(error instanceof AggregateDirectoryError)) return;
     expect(error.kind).toBe('parsing');
-    expect(error.diagnostics).toEqual([expect.stringContaining(join(root, 'images', 'notes.txt'))]);
-    expect(error.diagnostics[0]).toContain('image-format-unsupported');
+    expect(error.diagnostics).toEqual([
+      expect.stringContaining(join(root, 'assets', `${other.hash}.png`)),
+    ]);
+    expect(error.diagnostics[0]).toContain(asset.hash);
     expect(repository.calls).toEqual([]);
   });
 
-  /*
-   * A picture's file name is the id its URL names, so a renamed file would be
-   * stored under a URL no Resource shows while the one it does show stays
-   * missing. Import says so rather than guessing which the author meant.
-   */
-  it('refuses an image file not named for its content', async () => {
-    const image = await admitted(pngBytes(1));
-    const root = await writePicturedAggregate(`/images/${image.id}`, {
-      'harbour.png': pngBytes(1),
+  it('refuses two files of one hash, naming both, before storing anything', async () => {
+    const asset = await admitted(pngBytes(1));
+    const root = await writePicturedAggregate(`/assets/${asset.hash}`, {
+      [`${asset.hash}.png`]: pngBytes(1),
+      [`${asset.hash}.bin`]: pngBytes(1),
     });
     const repository = new RecordingRepository();
 
@@ -584,9 +627,9 @@ describe('importing the images an Aggregate directory carries', () => {
     expect(error).toBeInstanceOf(AggregateDirectoryError);
     if (!(error instanceof AggregateDirectoryError)) return;
     expect(error.diagnostics).toEqual([
-      expect.stringContaining(join(root, 'images', 'harbour.png')),
+      expect.stringContaining(join(root, 'assets', `${asset.hash}.bin`)),
     ]);
-    expect(error.diagnostics[0]).toContain(`${image.id}.png`);
+    expect(error.diagnostics[0]).toContain(join(root, 'assets', `${asset.hash}.png`));
     expect(repository.calls).toEqual([]);
   });
 });

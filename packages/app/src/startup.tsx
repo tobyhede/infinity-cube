@@ -1,5 +1,12 @@
 import { StrictMode, type ReactNode } from 'react';
-import { displayImageAsAuthored, ImageDisplayProvider, type ImageDisplay } from '@project/ui';
+import type { Assets } from '@project/resource-api/view';
+import {
+  displayImageAsAuthored,
+  ImageDisplayProvider,
+  NO_ASSETS,
+  PluginAssetsProvider,
+  type ImageDisplay,
+} from '@project/ui';
 import type { OpenSpace, OpenSpaces } from './open-spaces';
 import { OpenSpacesApplication } from './components/OpenSpacesApplication';
 import type { DestinationOpening } from './destination-opening';
@@ -28,6 +35,8 @@ export interface OpenedApplicationStartup {
    * authored, which is right for any host that serves its own stored images.
    */
   displayImage?: ImageDisplay;
+  /** The asset store a Resource plugin reaches (ADR 0142). Absent offers none. */
+  assets?: Assets;
 }
 
 /** A Notes window, which opens no Space composition: it follows another window's (ADR 0129). */
@@ -38,6 +47,8 @@ export interface NotesApplicationStartup {
   now: () => number;
   /** As on {@link OpenedApplicationStartup}: the Notes window draws pictures too. */
   displayImage?: ImageDisplay;
+  /** As on {@link OpenedApplicationStartup}. */
+  assets?: Assets;
 }
 
 export type ApplicationStartupResult = OpenedApplicationStartup | NotesApplicationStartup;
@@ -61,15 +72,17 @@ export const startApplication = async (
     root.render(
       <StrictMode>
         <ImageDisplayProvider value={startup.displayImage ?? displayImageAsAuthored}>
-          {startup.kind === 'notes' ? (
-            <NotesWindowApplication notes={startup.notes} now={startup.now} />
-          ) : (
-            <OpenSpacesApplication
-              spaces={startup.spaces}
-              initial={startup.opened}
-              opening={startup.opening}
-            />
-          )}
+          <PluginAssetsProvider value={startup.assets ?? NO_ASSETS}>
+            {startup.kind === 'notes' ? (
+              <NotesWindowApplication notes={startup.notes} now={startup.now} />
+            ) : (
+              <OpenSpacesApplication
+                spaces={startup.spaces}
+                initial={startup.opened}
+                opening={startup.opening}
+              />
+            )}
+          </PluginAssetsProvider>
         </ImageDisplayProvider>
       </StrictMode>,
     );

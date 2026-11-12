@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useMemo, useState } from 'react';
 import { mapContentWithoutMap, titleName, type PluginKind } from '@project/core';
 import type { Size } from '@project/resource-api/domain';
 import type { OwnProps, TitleProps } from '@project/resource-api/view';
@@ -7,7 +7,8 @@ import {
   ResourceHostProvider,
   type ResourceHost,
 } from '@project/resource-api/view/host';
-import { NO_ASSETS, NoEmbed, pluginEntryFor } from './kinds/plugin-views';
+import { NoEmbed, pluginEntryFor, type PluginEntry } from './kinds/plugin-views';
+import { readingAssets, usePluginAssets } from './plugin-assets';
 import { ResourceFailureBoundary } from './ResourceFailureBoundary';
 
 /**
@@ -50,7 +51,20 @@ export interface PresentedPluginResourceProps {
 }
 
 export function PresentedPluginResource(props: PresentedPluginResourceProps) {
+  return <PresentedPluginSurface {...props} entry={pluginEntryFor(props.kind)} />;
+}
+
+/**
+ * The Stage host around one plugin's entry, whichever plugin it is: what
+ * `PresentedPluginResource` draws, and what a test draws a plugin of its own
+ * through. The Stage authors nothing, so the plugin reads assets and stores none.
+ */
+export function PresentedPluginSurface(
+  props: PresentedPluginResourceProps & { readonly entry: PluginEntry },
+) {
   const { kind, title } = props;
+  const supplied = usePluginAssets();
+  const assets = useMemo(() => readingAssets(supplied), [supplied]);
   const name = titleName(title);
   const [host] = useState((): ResourceHost => ({
     Title: StageTitle,
@@ -58,7 +72,7 @@ export function PresentedPluginResource(props: PresentedPluginResourceProps) {
     rail: createRailStore(),
   }));
   const [drawing] = useState(() => Symbol('drawing'));
-  const plugin = pluginEntryFor(kind).render({
+  const plugin = props.entry.render({
     resourceId: props.resourceId,
     kind,
     title,
@@ -68,7 +82,7 @@ export function PresentedPluginResource(props: PresentedPluginResourceProps) {
     selected: false,
     operations: { kind },
     drawing,
-    assets: NO_ASSETS,
+    assets,
     Embed: NoEmbed,
     onClaim: (claim) => claim.unmount(),
   });

@@ -16,7 +16,7 @@ import type { LoadedSpace } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { exportAggregate } from '../../src/export/export-aggregate';
 import { MemorySpaceRepository } from '@project/aggregate';
-import { directoryTree } from '../support/stored-images';
+import { directoryTree } from '../support/stored-assets';
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const RESOURCE_A = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
@@ -173,7 +173,7 @@ describe('Export writes in place', () => {
   /*
    * InfinityCube owns what Import reads and nothing else. A `.git` tree, a README
    * beside `aggregate.json`, a notes directory and whatever an author keeps in
-   * `images/` that Import does not scan are neither read, copied nor touched.
+   * `assets/` that Import does not own are neither read, copied nor touched.
    */
   it('never touches what Import does not read', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
@@ -184,9 +184,9 @@ describe('Export writes in place', () => {
     await writeFile(join(destination, 'README.md'), '# My talk\n');
     await mkdir(join(destination, 'notes'));
     await writeFile(join(destination, 'notes', 'ideas.md'), 'ideas\n');
-    await mkdir(join(destination, 'images', 'drafts'), { recursive: true });
-    await writeFile(join(destination, 'images', '.gitkeep'), '');
-    await writeFile(join(destination, 'images', 'drafts', 'sketch.txt'), 'sketch\n');
+    await mkdir(join(destination, 'assets', 'drafts'), { recursive: true });
+    await writeFile(join(destination, 'assets', '.gitkeep'), '');
+    await writeFile(join(destination, 'assets', 'drafts', 'sketch.txt'), 'sketch\n');
     await writeFile(join(destination, SPACE_ID, 'notes.txt'), 'space note\n');
     const authored = [
       '.git',
@@ -194,8 +194,8 @@ describe('Export writes in place', () => {
       join('.git', 'objects', 'ab', 'cdef'),
       'README.md',
       join('notes', 'ideas.md'),
-      join('images', '.gitkeep'),
-      join('images', 'drafts', 'sketch.txt'),
+      join('assets', '.gitkeep'),
+      join('assets', 'drafts', 'sketch.txt'),
       join(SPACE_ID, 'notes.txt'),
     ];
     const before = await Promise.all(authored.map((path) => identity(join(destination, path))));
@@ -272,14 +272,14 @@ describe('Export writes in place', () => {
     expect(await directoryTree(destination)).toEqual(tree);
   });
 
-  it('refuses to remove pictures through a linked images directory', async () => {
+  it('refuses to remove assets through a linked assets directory', async () => {
     const parent = await makeTemporaryDirectory();
     const destination = join(parent, 'exported');
     await exportTo(holding(storedSpace()), destination);
     const outside = join(parent, 'outside');
     await mkdir(outside);
     await writeFile(join(outside, 'picture.png'), "not infinity-cube's\n");
-    await symlink(outside, join(destination, 'images'));
+    await symlink(outside, join(destination, 'assets'));
 
     await expect(exportAggregate(holding(storedSpace()), destination)).rejects.toThrow(
       /symbolic link/,

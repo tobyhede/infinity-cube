@@ -2,22 +2,23 @@ import { join, resolve } from 'node:path';
 import {
   AGGREGATE_FILE_NAME,
   compareOrdinal,
-  IMAGES_DIRECTORY_NAME,
-  imageFileName,
+  assetFileName,
+  assetPathHash,
+  ASSETS_DIRECTORY_NAME,
   readAggregateFrom,
   scanAggregateFrom,
   spaceDirectoryId,
   type AggregateDirectoryContents,
 } from '@project/aggregate';
 import { AGGREGATE_FILE_VERSION, type AggregateFile, type UUID } from '@project/core';
-import type { LoadedAggregate, StoredImage } from '@project/persistence';
+import type { LoadedAggregate, StoredAsset } from '@project/persistence';
 import { directorySource } from './directory-source';
 import { writeInPlace, type DirectoryFiles } from './write-in-place';
 import { spaceDirectoryFiles } from './write-space-directory';
 
 /**
  * Read a canonical aggregate directory from disk into the complete Meta-rooted
- * input the persistence lifecycle takes, beside every image `images/` carries:
+ * input the persistence lifecycle takes, beside every asset `assets/` carries:
  * `readAggregateFrom` over the directory as a `directorySource`.
  */
 export const readAggregate = (
@@ -31,14 +32,19 @@ const aggregateFile = (metaSpaceId: UUID): AggregateFile => ({
   metaSpaceId,
 });
 
+/** The path `assets/<hash>.<ext>` Export gives an asset it has no file to keep the name of. */
+const assetFilePath = (asset: StoredAsset): string =>
+  `${ASSETS_DIRECTORY_NAME}/${assetFileName(asset)}`;
+
 /**
- * Every file an aggregate and the stored images it shows serialise to, by path
- * relative to the Aggregate directory: `aggregate.json`, each Space's directory
- * named for its id, and `images/<content-id>.<ext>` (ADR 0118).
+ * Every file an aggregate and the stored assets it references serialise to,
+ * by path relative to the Aggregate directory: `aggregate.json`, each Space's
+ * directory named for its id, and `assets/<hash>.<ext>` (ADR 0142, ADR 0118),
+ * each asset named by the host table from its media type.
  */
 export const aggregateFiles = (
   aggregate: LoadedAggregate,
-  images: readonly StoredImage[],
+  assets: readonly StoredAsset[],
 ): DirectoryFiles => {
   const files = new Map<string, Uint8Array>([
     [
@@ -53,17 +59,37 @@ export const aggregateFiles = (
       files.set(`${space.snapshot.id}/${path}`, Buffer.from(text));
     }
   }
-  for (const image of images) {
-    files.set(`${IMAGES_DIRECTORY_NAME}/${imageFileName(image)}`, image.bytes);
+  for (const asset of assets) {
+    files.set(assetFilePath(asset), asset.bytes);
   }
   return files;
+};
+
+/**
+ * `files`, which `aggregateFiles` serialised with `assets`, with each of those
+ * assets already in the directory, among `existing`, under the name it has
+ * there, so Export writes back the extension Import read.
+ */
+export const keepingExistingAssetNames = (
+  files: DirectoryFiles,
+  assets: readonly StoredAsset[],
+  existing: readonly string[],
+): DirectoryFiles => {
+  const renamed = new Map(
+    assets.flatMap((asset) => {
+      const kept = existing.find((path) => assetPathHash(path) === asset.hash);
+      return kept === undefined ? [] : [[assetFilePath(asset), kept] as const];
+    }),
+  );
+  return new Map([...files].map(([path, bytes]) => [renamed.get(path) ?? path, bytes] as const));
 };
 
 /**
  * Every file Import would read in `directory`, by path relative to it: what
  * Export owns there, and so what it removes when the aggregate no longer
  * serialises to it. `aggregate.json`, each discovered Space directory's
- * `space.json` and Resource files, and the visible files in `images/` — and
+ * `space.json` and Resource files, and the files in `assets/` named by a valid
+ * hash — and
  * nothing else, so a file Import does not read is never Export's to remove.
  * They are the files `scanAggregateFrom` finds there, in its order, and a
  * directory that does not exist holds none.
@@ -110,7 +136,7 @@ export const writeAggregateDirectory = async (
   directory: string,
 ): Promise<void> => {
   const owned = (await scannedAggregateFiles(directory)).filter(
-    (path) => !path.startsWith(`${IMAGES_DIRECTORY_NAME}/`),
+    (path) => !path.startsWith(`${ASSETS_DIRECTORY_NAME}/`),
   );
   const files = aggregateFiles(aggregate, []);
   await writeInPlace(directory, files, owned);

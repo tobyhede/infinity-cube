@@ -8,6 +8,7 @@ import {
 } from '@project/core';
 import type { ObserverErrorReporter } from '@project/persistence';
 import type { Answer } from '@project/resource-api/domain';
+import type { Assets } from '@project/resource-api/view';
 import type { ClaimHolder, PluginCommits, PluginHostClaim, PluginOperations } from '@project/ui';
 import { describeAuthoringRefusal } from '../authoring-refusal';
 import type { AuthoringResult, DrawnCompletion, Settle, SettledResult } from '../space-authoring';
@@ -35,8 +36,11 @@ export interface PluginSurfaceFacts {
 export const offersCommits = (facts: PluginSurfaceFacts): boolean =>
   facts.authorOnCanvas && facts.editable;
 
-const GONE: Answer = { refused: 'This Resource has changed since it was drawn. Try again.' };
-const BUSY: Answer = { refused: 'Another change is still being made. Try again when it ends.' };
+/** An answer that refuses, which a commit and a store each answer alike. */
+type Refusal = { readonly refused: string };
+
+const GONE: Refusal = { refused: 'This Resource has changed since it was drawn. Try again.' };
+const BUSY: Refusal = { refused: 'Another change is still being made. Try again when it ends.' };
 const BROKE: Answer = { refused: 'This change could not be made.' };
 const INVALID: Answer = { refused: 'This change cannot be kept.' };
 
@@ -89,6 +93,8 @@ export interface PluginHost {
   readonly complete: (completion: DrawnCompletion, settle: Settle) => AuthoringResult;
   /** Where an Edit that threw, or a plugin that threw while drawing, is reported. */
   readonly report: ObserverErrorReporter;
+  /** The asset store and file picker a surface offers where it offers commits; absent, neither. */
+  readonly assets?: Pick<Assets, 'store' | 'pick'> | undefined;
 }
 
 /** Who holds a Claim on a drawing's Resource, as that drawing reads it. */
@@ -104,7 +110,7 @@ export const claimHolderOf = (chain: ClaimChain, drawing: Drawing): ClaimHolder 
 function commitsFor(
   host: PluginHost,
   resourceId: ResourceId,
-  live: () => Answer | null,
+  live: () => Refusal | null,
   complete: PluginHost['complete'],
 ): PluginCommits {
   const changeMapContent = (content: JsonValue): Promise<Answer> => {
@@ -141,12 +147,20 @@ function commitsFor(
       host.report,
     );
   };
+  const store = host.assets?.store;
   // A size hint is ignored: Ur, the one plugin drawn here, commits none, and
   // the canvas applies none yet (`docs/agents/maps-and-graphs.md`, R38, R40).
   return {
     title: (next) => editDocument({ title: next }),
     content: (next) => editDocument({ content: next }),
     map: (next) => changeMapContent(next),
+    store:
+      store === undefined
+        ? undefined
+        : (bytes) => {
+            const withdrawn = live();
+            return withdrawn === null ? store(bytes) : Promise.resolve(withdrawn);
+          },
   };
 }
 
@@ -176,7 +190,7 @@ export function pluginSurfaceOperations(
   };
   if (!offersCommits(facts)) return drawn;
   if (host.claims.exclusive !== null) return { ...drawn, withdrawn: true };
-  const replaced = (): Answer | null => (host.replacementEpoch() === builtIn ? null : GONE);
+  const replaced = (): Refusal | null => (host.replacementEpoch() === builtIn ? null : GONE);
   const plain = commitsFor(
     host,
     resourceId,
@@ -198,11 +212,21 @@ export function pluginSurfaceOperations(
       unmount: () => host.gate.unmount(drawing),
     };
   };
+  const pickFiles = host.assets?.pick;
+  const pick =
+    pickFiles === undefined
+      ? undefined
+      : (accept: string): Promise<File[]> =>
+          host.gate.exclusiveRunning() || host.replacementEpoch() !== builtIn
+            ? Promise.resolve([])
+            : pickFiles(accept);
   return {
     ...drawn,
     commitTitle: plain.title,
     commitContent: plain.content,
     commitMap: plain.map,
+    commitStore: plain.store,
+    pick,
     claim,
   };
 }

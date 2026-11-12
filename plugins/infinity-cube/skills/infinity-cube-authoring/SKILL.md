@@ -1,11 +1,11 @@
 ---
 name: infinity-cube-authoring
-description: Write or change an InfinityCube Aggregate directory's files — a talk or design's `aggregate.json`, `space.json` Maps, Graphs and Edges, Resource files and their Markdown, `images/` — on disk or through a `pnpm cube mcp` server's tools. Use to add, change, connect or remove Resources, Maps, Graphs or Edges by hand, or to fix what `pnpm cube check` or a refused `pnpm cube run` reports. Setting InfinityCube up or starting a run is `infinity-cube-getting-started`.
+description: Write or change an InfinityCube Aggregate directory's files — a talk or design's `aggregate.json`, `space.json` Maps, Graphs and Edges, Resource files and their Markdown, `assets/` — on disk or through a `pnpm cube mcp` server's tools. Use to add, change, connect or remove Resources, Maps, Graphs or Edges by hand, or to fix what `pnpm cube check` or a refused `pnpm cube run` reports. Setting InfinityCube up or starting a run is `infinity-cube-getting-started`.
 ---
 
 # Authoring an Aggregate directory
 
-An **Aggregate directory** is InfinityCube's on-disk form: `aggregate.json` naming the Meta Space, one directory per Space named for its Id, each holding `space.json` and a `resources/` directory of JSON Resource files (with a Markdown Resource's source in its `<id>.md` sidecar), and `images/` holding stored pictures. The reference is [`docs/aggregate-directory.md`](https://github.com/tobyhede/infinity-cube/blob/main/docs/aggregate-directory.md): the authority on every key and rule. Read it before writing: the copy in your InfinityCube clone when you have one, since the format moves with the code and `main` may be ahead of that clone, otherwise the link. This skill is the order to work in and the traps.
+An **Aggregate directory** is InfinityCube's on-disk form: `aggregate.json` naming the Meta Space, one directory per Space named for its Id, each holding `space.json` and a `resources/` directory of JSON Resource files (with a Markdown Resource's source in its `<id>.md` sidecar), and `assets/` holding the stored files Resources reference, such as pictures. The reference is [`docs/aggregate-directory.md`](https://github.com/tobyhede/infinity-cube/blob/main/docs/aggregate-directory.md): the authority on every key and rule. Read it before writing: the copy in your InfinityCube clone when you have one, since the format moves with the code and `main` may be ahead of that clone, otherwise the link. This skill is the order to work in and the traps.
 
 You reach the directory one of three ways, and each step says what differs:
 
@@ -32,7 +32,7 @@ You reach the directory one of three ways, and each step says what differs:
    - An Edge joins only Resources its Map positions, and every Map owns at least one Graph.
    - Every ordinary Space is reached by a Space Resource elsewhere in the aggregate (`"kind": "space"`, `content` holding `spaceId`, `map` and `graph`, and an optional `framing` of `centreX`, `centreY` and `zoom` that Export writes for a framed one; keep it when you rewrite the file), so it needs a Map and a Graph for that Resource to name. Only the Meta Space may have no Maps.
    - Every object, `content` included, is strict: spell keys exactly as the reference does.
-   - A stored picture is `images/<content-id>.<ext>`: the content id is the SHA-256 of its bytes as unpadded base64url, not hex, and the extension is the format the bytes are (`png`, `jpg`, `webp`, `gif`); the reference shows the command. The Resource's `content.url` is `/images/<content-id>`. Without a shell, write a picture only when the person gives its bytes and content id (MCP: `write_file` with `encoding: "base64"`); otherwise use an `https:` URL.
+   - A stored picture is an asset, `assets/<hash>.<ext>`: the hash is the SHA-256 of its bytes as unpadded base64url, not hex, and the extension gives its media type (`png`, `jpg`, `webp`, `gif` for a picture); the reference shows the command. The Resource's `content.url` is `/assets/<hash>`. Without a shell, write a picture only when the person gives its bytes and hash (MCP: `write_file` with `encoding: "base64"`); otherwise use an `https:` URL.
    - Keep notes outside Space directories: a `*.md` there that is not a Markdown Resource's sidecar is refused.
 
    Done when every file you meant to add or change is written.

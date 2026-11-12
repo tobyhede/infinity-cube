@@ -513,6 +513,74 @@ describe('a plugin surface’s commits on the canvas', () => {
     expect(other.withdrawn).toBe(true);
   });
 
+  /** An asset store recording what it stored, and a picker answering one file. */
+  const recordingAssets = () => {
+    const stored: Blob[] = [];
+    const picked = [new File(['x'], 'x.txt')];
+    const assets: NonNullable<PluginHost['assets']> = {
+      store: (bytes) => {
+        stored.push(bytes);
+        return Promise.resolve(`/assets/${'A'.repeat(43)}` as const);
+      },
+      pick: () => Promise.resolve(picked),
+    };
+    return { assets, stored, picked };
+  };
+
+  it('offers the asset store and the picker where it offers commits, and neither elsewhere', async () => {
+    const { assets, stored, picked } = recordingAssets();
+    const host = Object.assign(
+      hostWith(() => ({ kind: 'completed' })),
+      { assets },
+    );
+    const operations = pluginSurfaceOperations('ur', RESOURCE, FACTS, host);
+
+    await expect(operations.commitStore?.(new Blob(['a']))).resolves.toBe(
+      `/assets/${'A'.repeat(43)}`,
+    );
+    await expect(operations.pick?.('*/*')).resolves.toEqual(picked);
+    expect(stored).toHaveLength(1);
+    const bare = pluginSurfaceOperations('ur', RESOURCE, { ...FACTS, editable: false }, host);
+    expect([bare.commitStore, bare.pick]).toEqual([undefined, undefined]);
+  });
+
+  it('withdraws storing and picking while exclusive work runs, and keeps that work’s own store live', async () => {
+    const { assets, stored } = recordingAssets();
+    const host = Object.assign(
+      hostWith(() => ({ kind: 'completed' })),
+      { assets },
+    );
+    const operations = pluginSurfaceOperations('ur', RESOURCE, FACTS, host);
+    const kept = pluginSurfaceOperations(
+      'ur',
+      uuidSchema.parse('00000000-0000-4000-8000-0000000000a2'),
+      FACTS,
+      host,
+    );
+    const held = operations.claim?.(Symbol('drawing'));
+    let ownStore: PluginOperations['commitStore'];
+    let finish: () => void = () => undefined;
+    const work = held?.exclusively(
+      (own) =>
+        new Promise<void>((resolve) => {
+          ownStore = own.store;
+          finish = resolve;
+        }),
+    );
+
+    const during = pluginSurfaceOperations('ur', RESOURCE, FACTS, host);
+    expect([during.commitStore, during.pick]).toEqual([undefined, undefined]);
+    await expect(kept.commitStore?.(new Blob(['kept']))).resolves.toHaveProperty('refused');
+    await expect(kept.pick?.('*/*')).resolves.toEqual([]);
+    await expect(ownStore?.(new Blob(['own']))).resolves.toBe(`/assets/${'A'.repeat(43)}`);
+    expect(stored).toHaveLength(1);
+
+    finish();
+    await work;
+    await expect(ownStore?.(new Blob(['late']))).resolves.toHaveProperty('refused');
+    expect(stored).toHaveLength(1);
+  });
+
   it('says which drawing holds a Claim, and reports what its plugin throws while drawing', () => {
     const report = vi.fn();
     const host = hostWith(() => ({ kind: 'completed' }), { value: 2 }, report);

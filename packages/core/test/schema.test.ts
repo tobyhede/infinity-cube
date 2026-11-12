@@ -938,7 +938,7 @@ describe('an Image Resource', () => {
   it.each([
     'https://example.com/figure.png',
     'http://example.com/figure.png',
-    `/images/${STORED_ID}`,
+    `/assets/${STORED_ID}`,
   ])('parses an image URL it accepts: %s', (url) => {
     expect(resourceSchema.parse({ ...IMAGE, content: { url } })).toEqual({
       ...IMAGE,
@@ -959,10 +959,10 @@ describe('an Image Resource', () => {
     '../images/figure.png',
     '//example.com/figure.png',
     '/files/figure.png',
-    '/images/',
-    `/images/${STORED_ID}.png`,
-    `/images/${STORED_ID.slice(1)}`,
-    `/images/${STORED_ID}=`,
+    '/assets/',
+    `/assets/${STORED_ID}.png`,
+    `/assets/${STORED_ID.slice(1)}`,
+    `/assets/${STORED_ID}=`,
     '',
   ])('refuses an image URL it does not accept, naming the rule: %j', (url) => {
     const result = resourceSchema.safeParse({ ...IMAGE, content: { url } });

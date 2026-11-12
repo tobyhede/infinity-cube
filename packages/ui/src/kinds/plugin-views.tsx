@@ -7,7 +7,7 @@ import {
   type JsonValue,
   type PluginKind,
 } from '@project/core';
-import type { Answer, ResourcePlugin, Size } from '@project/resource-api/domain';
+import type { Answer, AssetRef, ResourcePlugin, Size } from '@project/resource-api/domain';
 import type {
   Assets,
   EmbedProps,
@@ -29,12 +29,16 @@ import { ResourceFailureBoundary } from '../ResourceFailureBoundary';
  * before the host takes it, so a plugin's types are its own end to end.
  */
 
-/** A commit as the host takes it: JSON in, an answer out. */
+/** Store bytes as an asset, answering their reference or why not. */
+export type PluginStore = (bytes: Blob) => Promise<AssetRef | { readonly refused: string }>;
+
+/** A commit as the host takes it: JSON in, an answer out; and the asset store, withdrawn as they are. */
 export interface PluginCommits {
   readonly title?: ((next: string) => Promise<Answer>) | undefined;
   readonly content?: ((next: JsonValue) => Promise<Answer>) | undefined;
   readonly map?:
     ((next: JsonValue, options?: { readonly sizeHint?: Size }) => Promise<Answer>) | undefined;
+  readonly store?: PluginStore | undefined;
 }
 
 /** A Claim as the host hands it out, before the plugin's types are put on it. */
@@ -62,6 +66,13 @@ export interface PluginOperations {
   readonly commitTitle?: PluginCommits['title'];
   readonly commitContent?: PluginCommits['content'];
   readonly commitMap?: PluginCommits['map'];
+  /**
+   * The asset store and the author's file picker, offered where commits are
+   * and withdrawn as they are: a kept store answers refused, and a kept pick
+   * answers no files, while exclusive work runs (ADR 0142).
+   */
+  readonly commitStore?: PluginStore | undefined;
+  readonly pick?: ((accept: string) => Promise<File[]>) | undefined;
   /**
    * A Claim for the drawing keyed `drawing`: a key the surface mints for its
    * own lifetime, so two drawings of one Resource never share a Claim.
@@ -115,12 +126,6 @@ export interface PluginEntry {
   readonly render: (input: PluginSurfaceInput) => ReactElement;
 }
 
-/** No asset store yet: issue 03 fills this. A reference is drawn from its own URL. */
-export const NO_ASSETS: Assets = {
-  url: (ref) => ref,
-  read: () => Promise.resolve({ refused: 'Assets are not available here yet.' }),
-};
-
 /** The embedding, before any plugin embeds: one component for every surface's lifetime. */
 export function NoEmbed(_props: EmbedProps) {
   return null;
@@ -141,9 +146,10 @@ export function pluginEntry<C, M>(
       return parsed.success ? commit(parsed.data) : Promise.resolve(NOT_JSON);
     };
   const exclusiveOf = (own: PluginCommits): Exclusive<C, M> => {
-    const { title, content, map: ownMap } = own;
+    const { title, content, map: ownMap, store } = own;
     return {
       title,
+      store,
       content: content === undefined ? undefined : asJson(content),
       map:
         ownMap === undefined

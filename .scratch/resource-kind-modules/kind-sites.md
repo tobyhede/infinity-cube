@@ -21,7 +21,6 @@ Categories: **one-kind** = a feature that exists for that kind alone; **registry
 | packages/app/src/space-authoring.ts:1244 | `imageKind.id`: Replace refuses another kind | image | C | space-authoring.ts |
 | packages/app/src/space-authoring.ts:1318 | `referenceKind.id`: new Reference Resource | reference | E | space-authoring.ts |
 | packages/persistence/src/space-resource-planning.ts:328 | `spaceKind.id`: new Space Resource document | space | E (lifecycle) | space-resource-planning.ts |
-| src/aggregate-directory/images.ts:58 | `imageKind.id`: stored image travels with its Resource | image | one-kind | src/aggregate-directory/images.ts |
 
 `packages/app/src/resource-deletion.ts` no longer reaches a module id: Delete routes by `kindFlags(kind).ownsReferencedSpaces` (G02).
 
@@ -35,8 +34,6 @@ Categories: **one-kind** = a feature that exists for that kind alone; **registry
 | packages/ui/src/icons.tsx:263 | `ResourceBaseKind = Exclude<Resource['kind'], ReferenceKindId>` | reference | display (kinds a Reference badge sits on) | icons.tsx |
 | packages/ui/src/CanvasResource.tsx:301 | `isSpaceOperations`: the Space rail and portal | space | one-kind (portal) | CanvasResource.tsx |
 | packages/react-flow-adapter/src/ResourceNode.tsx:334 | `isSpaceOperations(...).portal.editing` keeps the toolbar | space | one-kind | ResourceNode.tsx |
-| packages/persistence/src/http-protocol.ts:759 | `isAcceptedImageUrl`: stored image URL | image | one-kind (image-URL rule) | http-protocol.ts |
-| packages/persistence/src/images.ts:28,31 | `isStoredImageId`, `STORED_IMAGE_COLLECTION_PATH` | image | one-kind | persistence/src/images.ts |
 | packages/app/src/components/SpaceCanvas.tsx:1015,1660 | `spaceViewOf(...).view.framing` | space | one-kind (the Space kind's embedded Map) | SpaceCanvas.tsx |
 | packages/app/src/components/SpaceCanvas.tsx:1372 | `isAcceptedImageUrl`: paste creates an Image Resource | image | E (image-URL rule) | SpaceCanvas.tsx |
 | packages/app/src/embedded-open-space-resource.ts:214 | `spaceViewOf` | space | one-kind (the Space kind's embedded Map) | embedded-open-space-resource.ts |

@@ -1,5 +1,5 @@
 import type { SpaceSnapshot, UUID } from '@project/core';
-import type { ImageStore, LoadedAggregate, StoredSpaceRepository } from '@project/persistence';
+import type { AssetStore, LoadedAggregate, StoredSpaceRepository } from '@project/persistence';
 import type { SpaceAggregateError } from '@project/graph';
 
 export interface AggregateInput {
@@ -39,11 +39,12 @@ export type ReplaceAggregateResult =
  * named operations exist to prevent. Seeds, fixtures and tests go through
  * these same two.
  *
- * It is also the store of images the host keeps beside Spaces (ADR 0106),
- * which neither lifecycle door reads or writes: a stored image is outside the
- * aggregate, so replacing the aggregate leaves every image where it was.
+ * It is also the one asset store the host keeps beside Spaces (ADR 0142,
+ * ADR 0106), which neither lifecycle door reads or writes: a stored asset is
+ * outside the aggregate, so replacing the aggregate leaves every asset where
+ * it was.
  */
-export interface SpaceRepository extends StoredSpaceRepository, ImageStore {
+export interface SpaceRepository extends StoredSpaceRepository, AssetStore {
   initializeAggregate(input: AggregateInput): Promise<InitializeAggregateResult>;
   /**
    * The stored Meta identity, read without validating the aggregate around it,

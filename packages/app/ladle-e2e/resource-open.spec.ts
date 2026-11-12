@@ -7,7 +7,7 @@ const openCloseStory = '/?story=components--resource--open-and-close&mode=previe
 const markdownStory = '/?story=components--resource--editing--markdown&mode=preview';
 const resizeControlStory = '/?story=components--resource--resize-control&mode=preview';
 const HARBOUR = readFileSync(
-  new URL('../fixture/images/fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs.png', import.meta.url),
+  new URL('../fixture/assets/fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs.png', import.meta.url),
 );
 const openReferenceStory = '/?story=components--resource--open-reference-resource&mode=preview';
 
@@ -801,7 +801,7 @@ test(
       .getByRole('region', { name: 'Failed image' })
       .getByRole('article', { name: 'Missing' });
     await expect(resource.getByText('Image did not load')).toBeVisible();
-    await expect(resource.getByText('/images/missing-picture.png')).toBeVisible();
+    await expect(resource.getByText('/assets/missing-picture.png')).toBeVisible();
     await expect(resource.getByRole('img', { name: 'Missing' })).toHaveCount(0);
     await expect(resource.getByRole('heading', { name: 'Missing' })).toBeVisible();
   },

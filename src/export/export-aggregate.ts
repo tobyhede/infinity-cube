@@ -1,17 +1,24 @@
-import { resolve } from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 import { type SpaceSnapshot, type UUID } from '@project/core';
 import { loadSpaceAggregate, type SpaceAggregateError } from '@project/graph';
 import type { LoadedAggregate } from '@project/persistence';
 import {
   aggregateFiles,
   assertExportableDestination,
-  loadReferencedImages,
+  keepingExistingAssetNames,
+  loadReferencedAssets,
   rejectSymbolicLinks,
   scannedAggregateFiles,
   writeInPlace,
   type DirectoryFiles,
 } from '../aggregate-directory';
-import { mapSource, readAggregateFrom, type SpaceRepository } from '@project/aggregate';
+import {
+  assetPathHash,
+  mapSource,
+  readAggregateFrom,
+  type SpaceRepository,
+} from '@project/aggregate';
 
 /** One Space whose bytes landed but whose projected revision was not recorded. */
 export interface UnrecordedExport {
@@ -151,14 +158,20 @@ const markAggregateExported = async (
  *
  * One `loadAggregate()` read is the whole of what gets exported, so every Space
  * in the directory comes from one consistent view rather than from a series of
- * reads a concurrent commit could fall between. The bytes of every stored image
- * the aggregate shows are written to `images/` (ADR 0118); images are read after
- * the aggregate and outside its revision, and an image's id is its content, so
- * no commit can change one between the two reads.
+ * reads a concurrent commit could fall between. The bytes of every stored asset
+ * the aggregate references are written to `assets/` (ADR 0142, ADR 0118), found
+ * by walking each Resource's `content` and each Map entry's content without
+ * naming a kind; assets are read after the aggregate and outside its revision,
+ * and an asset's hash is its content, so no commit can change one between the
+ * two reads. An asset no Resource's content or Map entry's content references
+ * is left out, and its file removed. A referenced asset whose bytes the store
+ * does not hold is not an error: the URL stays, the Export completes, and a
+ * file of that name in the directory is kept.
  *
- * The files are checked to read back before any is written, and a refusal
- * writes nothing. Then each file whose bytes differ is replaced, and each file
- * Import would read that the aggregate no longer serialises to is removed. The
+ * The files are checked to read back before any is written, with the asset
+ * files kept for absent bytes, and a refusal writes nothing. Then each file
+ * whose bytes differ is replaced, and each file Import would read that the
+ * aggregate no longer serialises to is removed. The
  * destination and its Space directories are never renamed or recreated, and
  * nothing Import does not read is touched. A failure part-way leaves some files
  * written and some not; git, not InfinityCube, restores the directory.
@@ -170,17 +183,45 @@ export const exportAggregate = async (
   const loaded = await repository.loadAggregate();
   if (loaded.kind === 'uninitialized') return { kind: 'uninitialized' };
   const aggregate = loaded.aggregate;
-  const images = await loadReferencedImages(
+  const assets = await loadReferencedAssets(
     repository,
     aggregate.spaces.map(({ snapshot }) => snapshot),
   );
 
   const destination = resolve(destinationPath);
-  const files = aggregateFiles(aggregate, images);
-  await rejectSymbolicLinks(destination, files.keys());
+  const serialised = aggregateFiles(aggregate, assets.carried);
+  await rejectSymbolicLinks(destination, serialised.keys());
   await assertExportableDestination(destination);
+  // An asset already in the directory keeps its name there, so it is renamed
+  // once the directory is known to scan, and only a renamed path is checked again.
+  const scanned = await scannedAggregateFiles(destination);
+  const files = keepingExistingAssetNames(serialised, assets.carried, scanned);
+  await rejectSymbolicLinks(
+    destination,
+    [...files.keys()].filter((path) => !serialised.has(path)),
+  );
 
-  const checked = await checkReadsBack(destination, files, aggregate.metaSpaceId);
+  // A file of a referenced asset the store holds no bytes for is kept rather
+  // than written, and the next Import reads it as it reads the rest, so it is
+  // read back with them: a kept file Import would refuse refuses the Export.
+  const kept = new Set<string>(assets.kept);
+  const isKept = (path: string): boolean => {
+    const hash = assetPathHash(path);
+    return hash !== undefined && kept.has(hash);
+  };
+  const keptFiles = await Promise.all(
+    scanned
+      .filter(isKept)
+      .map(
+        async (path) => [path, new Uint8Array(await readFile(join(destination, path)))] as const,
+      ),
+  );
+
+  const checked = await checkReadsBack(
+    destination,
+    new Map([...files, ...keptFiles]),
+    aggregate.metaSpaceId,
+  );
   if (!checked.ok) {
     return {
       kind: 'would-not-read-back',
@@ -189,7 +230,11 @@ export const exportAggregate = async (
       errors: checked.errors,
     };
   }
-  await writeInPlace(destination, files, await scannedAggregateFiles(destination));
+  await writeInPlace(
+    destination,
+    files,
+    scanned.filter((path) => !isKept(path)),
+  );
   const unrecorded = await markAggregateExported(repository, aggregate);
   return { kind: 'exported', aggregate, unrecorded };
 };

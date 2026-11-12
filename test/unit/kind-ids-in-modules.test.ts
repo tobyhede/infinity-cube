@@ -197,13 +197,6 @@ const ONE_KIND_FEATURES = new Map<string, readonly string[]>([
   ],
   // The Space Resource lifecycle (ADR 0074): its create.
   ['packages/persistence/src/space-resource-planning.ts', ['kind: spaceKind.id,']],
-  // A stored image's bytes travel with the Image Resource that references it (ADR 0118).
-  [
-    'src/aggregate-directory/images.ts',
-    [
-      'const id = document.kind === imageKind.id ? storedImageId(document.content.url) : undefined;',
-    ],
-  ],
 ]);
 
 const KIND_MODULE_IDS = new RegExp(`\\b(?:${KINDS.join('|')})Kind\\.id\\b`, 'gu');

@@ -20,7 +20,7 @@ import {
   decodeLoadedSpace,
   decodeProblemDetails,
   encodeCommitRequest,
-  type ImageStore,
+  type AssetStore,
   type StoredSpaceRepository,
 } from '@project/persistence';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -69,9 +69,9 @@ interface RunningHost {
 
 const hosts: RunningHost[] = [];
 
-const repository = (): StoredSpaceRepository & ImageStore => ({
-  storeImage: () => Promise.reject(new Error('This repository stores no images')),
-  loadImage: () => Promise.resolve(undefined),
+const repository = (): StoredSpaceRepository & AssetStore => ({
+  storeAsset: () => Promise.reject(new Error('This repository stores no assets')),
+  loadAsset: () => Promise.resolve(undefined),
   listSpaces: () => Promise.resolve([]),
   loadSpace: () => Promise.resolve(undefined),
   loadAggregate: () =>
@@ -227,7 +227,7 @@ describe('Vite Hono host', () => {
   });
 
   it.each(['development', 'preview'] as const)(
-    'stores and serves an image through the %s host rather than Vite',
+    'stores and serves an asset through the %s host rather than Vite',
     async (hook) => {
       const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x2a]);
       const { host } = await startHost(
@@ -238,19 +238,49 @@ describe('Vite Hono host', () => {
         hook,
       );
 
-      const stored = await fetch(`${host.url}/images`, { method: 'POST', body: png });
+      const stored = await fetch(`${host.url}/assets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'image/png' },
+        body: png,
+      });
       expect(stored.status).toBe(201);
       const url = stored.headers.get('location');
-      expect(url).toMatch(/^\/images\/[\w-]{43}$/u);
+      expect(url).toMatch(/^\/assets\/[\w-]{43}$/u);
       const served = await fetch(`${host.url}${url ?? ''}`);
 
       expect(served.status).toBe(200);
       expect(served.headers.get('content-type')).toBe('image/png');
       expect(new Uint8Array(await served.arrayBuffer())).toEqual(png);
-      expect((await fetch(`${host.url}/images/not-an-id`)).status).toBe(400);
       await expect(
-        fetch(`${host.url}/images-gallery.html`).then((response) => response.text()),
+        fetch(`${host.url}/assets-gallery.html`).then((response) => response.text()),
       ).resolves.toBe('<main>Vite fallback</main>');
+    },
+  );
+
+  it.each(['development', 'preview'] as const)(
+    'leaves the built application its own scripts under /assets/ through the %s host',
+    async (hook) => {
+      const { host } = await startHost(
+        createSpaceHost(new MemorySpaceRepository(), newUuid),
+        (request, response) => {
+          response.setHeader('Content-Type', 'text/javascript');
+          response.end(`/* Vite served ${request.url ?? ''} */`);
+        },
+        hook,
+      );
+
+      for (const script of [
+        '/assets/index-Bq3xY1aZ.js',
+        '/assets/mount-main-DkT0.css',
+        `/assets/${'A'.repeat(43)}.js`,
+        `/assets/${'A'.repeat(42)}B`,
+        '/assets/nested/chunk.js',
+      ]) {
+        const response = await fetch(`${host.url}${script}`);
+        expect(response.status).toBe(200);
+        expect(response.headers.get('content-type')).toBe('text/javascript');
+        await expect(response.text()).resolves.toBe(`/* Vite served ${script} */`);
+      }
     },
   );
 

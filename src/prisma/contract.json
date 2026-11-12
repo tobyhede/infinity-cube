@@ -4,8 +4,8 @@
   "target": "postgres",
   "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
   "roots": {
-    "images": {
-      "model": "Image",
+    "assets": {
+      "model": "Asset",
       "namespace": "public"
     },
     "repository_state": {
@@ -25,7 +25,7 @@
     "namespaces": {
       "public": {
         "models": {
-          "Image": {
+          "Asset": {
             "fields": {
               "bytes": {
                 "nullable": false,
@@ -41,7 +41,7 @@
                   "kind": "scalar"
                 }
               },
-              "id": {
+              "hash": {
                 "nullable": false,
                 "type": {
                   "codecId": "pg/text@1",
@@ -65,15 +65,15 @@
                 "createdAt": {
                   "column": "created_at"
                 },
-                "id": {
-                  "column": "id"
+                "hash": {
+                  "column": "hash"
                 },
                 "mediaType": {
                   "column": "media_type"
                 }
               },
               "namespaceId": "public",
-              "table": "images"
+              "table": "assets"
             }
           },
           "RepositoryState": {
@@ -311,7 +311,7 @@
       "public": {
         "entries": {
           "table": {
-            "images": {
+            "assets": {
               "columns": {
                 "bytes": {
                   "codecId": "pg/bytea@1",
@@ -327,7 +327,7 @@
                   "nativeType": "timestamptz",
                   "nullable": false
                 },
-                "id": {
+                "hash": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
                   "nullable": false
@@ -342,7 +342,7 @@
               "indexes": [],
               "primaryKey": {
                 "columns": [
-                  "id"
+                  "hash"
                 ]
               },
               "uniques": []
@@ -531,7 +531,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:d4a0693a3c0aa69bb8e801dc1c840c9703fc5e6200b70d78ead42496a89737ce",
+    "storageHash": "sha256:e655537afe49c0de3d59bfba9eee79693d3760ef21fcd4872411e39587115e04",
     "types": {
       "Uuid": {
         "codecId": "pg/uuid@1",

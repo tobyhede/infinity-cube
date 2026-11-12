@@ -18,7 +18,7 @@ import {
   type ResourceShape,
 } from '@project/core';
 import type { Answer } from '@project/resource-api/domain';
-import type { OwnProps, RailCommand, TitleProps } from '@project/resource-api/view';
+import type { Assets, OwnProps, RailCommand, TitleProps } from '@project/resource-api/view';
 import {
   createRailStore,
   ResourceHostProvider,
@@ -32,13 +32,13 @@ import { graphPaint } from './graph-color';
 import { EntityActionsIcon } from './icons';
 import { InlineTitleEditor } from './InlineTitleEditor';
 import {
-  NO_ASSETS,
   NoEmbed,
   pluginEntryFor,
   type PluginEntry,
   type PluginHostClaim,
   type PluginOperations,
 } from './kinds/plugin-views';
+import { readingAssets, usePluginAssets } from './plugin-assets';
 import { RailChoiceMenu } from './RailChoiceMenu';
 import { ResourceFailureBoundary } from './ResourceFailureBoundary';
 import {
@@ -66,10 +66,10 @@ import './canvas-resource.css';
  * earlier render answers refused once this surface has unmounted.
  */
 
-const SURFACE_GONE: Answer = { refused: 'This Resource is no longer drawn here.' };
-const HELD_ELSEWHERE: Answer = {
+const SURFACE_GONE = { refused: 'This Resource is no longer drawn here.' } as const;
+const HELD_ELSEWHERE = {
   refused: 'This Resource is being changed where it is drawn elsewhere. Try again when that ends.',
-};
+} as const;
 
 /** Stop the canvas reading a press or key meant for the plugin's own region. */
 const stop = (event: PointerEvent | KeyboardEvent): void => {
@@ -256,7 +256,7 @@ function guarded(
   readOnly: boolean,
 ): PluginOperations {
   if (readOnly) return { kind: operations.kind };
-  const withheld = (): Answer | null => {
+  const withheld = (): { readonly refused: string } | null => {
     if (!lifetime.drawn()) return SURFACE_GONE;
     return operations.claimHolder?.(lifetime.drawing) === 'another-drawing' ? HELD_ELSEWHERE : null;
   };
@@ -266,12 +266,23 @@ function guarded(
       const refusal = withheld();
       return refusal === null ? commit(...args) : Promise.resolve(refusal);
     };
-  const { commitTitle, commitContent, commitMap, claim } = operations;
+  const { commitTitle, commitContent, commitMap, commitStore, pick, claim } = operations;
   return {
     kind: operations.kind,
     commitTitle: commitTitle === undefined ? undefined : whileMounted(commitTitle),
     commitContent: commitContent === undefined ? undefined : whileMounted(commitContent),
     commitMap: commitMap === undefined ? undefined : whileMounted(commitMap),
+    commitStore:
+      commitStore === undefined
+        ? undefined
+        : (bytes) => {
+            const refusal = withheld();
+            return refusal === null ? commitStore(bytes) : Promise.resolve(refusal);
+          },
+    pick:
+      pick === undefined
+        ? undefined
+        : (accept) => (withheld() === null ? pick(accept) : Promise.resolve([])),
     claim:
       claim === undefined
         ? undefined
@@ -314,6 +325,17 @@ export function PluginSurface(props: PluginResourceProps & { readonly entry: Plu
     () => guarded(props.operations, lifetime, readOnly),
     [props.operations, lifetime, readOnly],
   );
+  // Assets are drawn and read from the application's store; storing and
+  // picking are what the host offers with its commits, withdrawn as they are.
+  const supplied = usePluginAssets();
+  const assets = useMemo(
+    (): Assets => ({
+      ...readingAssets(supplied),
+      store: operations.commitStore,
+      pick: operations.pick,
+    }),
+    [supplied, operations],
+  );
   const plugin = props.entry.render({
     resourceId: props.resourceId,
     kind,
@@ -324,7 +346,7 @@ export function PluginSurface(props: PluginResourceProps & { readonly entry: Plu
     selected: state === 'selected' || state === 'editing',
     operations,
     drawing: lifetime.drawing,
-    assets: NO_ASSETS,
+    assets,
     Embed: NoEmbed,
     onClaim: lifetime.hold,
   });

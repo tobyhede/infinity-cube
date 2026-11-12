@@ -35,7 +35,7 @@ export const REPLACE_FIGURE_URL = 'https://example.com/figure.png';
 /** A picture under a name that never resolves, so the Open Resource draws its failed state. */
 export const REPLACE_MISSING_URL = 'https://missing.invalid/picture.png';
 /** The URL the catalogue's image store answers every chosen file with. */
-export const REPLACE_STORED_URL = '/images/LXEWQrcmsEQBYnyp-6wy9chTD7GQPMTbAiWHF5IaSIE';
+export const REPLACE_STORED_URL = '/assets/LXEWQrcmsEQBYnyp-6wy9chTD7GQPMTbAiWHF5IaSIE';
 
 /** A small picture's URL, on a Resource at the Closed Size, the smallest any Resource is. */
 export const REPLACE_THUMBNAIL_URL = 'https://example.com/thumbnail.png';

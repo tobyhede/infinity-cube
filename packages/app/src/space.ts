@@ -1,12 +1,15 @@
-import { HttpSpaceBackend, productAddress } from '@project/http';
+import { httpAssetClient, HttpSpaceBackend, productAddress } from '@project/http';
 import { loadSpaceSnapshot, type Space } from '@project/graph';
-import { newUuid, type ImageNaturalSize, type UUID } from '@project/core';
-import type { SpaceBackend } from '@project/persistence';
+import { newUuid, type AssetRef, type ImageNaturalSize, type UUID } from '@project/core';
+import type { AssetClient, AssetRefusal, SpaceBackend } from '@project/persistence';
+import type { Assets } from '@project/resource-api/view';
 import { displayImageAsAuthored, type ImageDisplay } from '@project/ui';
 import type { HistoryApi } from './browser-location';
 import { createBrowserHistory } from './browser-history';
-import { pickImagesInBrowser } from './browser-file-picker';
+import { describeAssetRefusal } from './authoring-refusal';
+import { pickFilesInBrowser, pickImagesInBrowser } from './browser-file-picker';
 import type { ImageSources } from './image-creation';
+import { storePicture } from './picture-admission';
 import type { Fullscreen } from './presenting-fullscreen';
 import type { PresentationLinks } from './presentation-link';
 import type { ApplicationStartupResult } from './startup';
@@ -55,17 +58,43 @@ const measureInBrowser = (url: string): Promise<ImageNaturalSize | undefined> =>
   });
 
 /**
- * The host's image store over HTTP, and the browser measuring what it loads and
- * choosing files. A picture is measured where `displayImage` draws it from, so
- * a measurement loads what the Resource will show.
+ * The host's asset store, and the browser measuring what it loads and choosing
+ * files. A picture is admitted as one before it is stored as an asset. It is
+ * measured where `displayImage` draws it from, so a measurement loads what the
+ * Resource will show.
  */
 export const browserImageSources = (
-  host: HttpSpaceBackend = new HttpSpaceBackend(),
+  assets: AssetClient = httpAssetClient(new HttpSpaceBackend()),
   displayImage: ImageDisplay = displayImageAsAuthored,
 ): ImageSources => ({
-  store: (image) => host.storeImage(image),
+  store: (image) => storePicture(assets, image),
   measure: (url) => measureInBrowser(displayImage(url)),
   pick: pickImagesInBrowser,
+});
+
+/** A refusal as a plugin reads it: the store's code put into words. */
+interface WordedRefusal {
+  readonly refused: string;
+}
+
+const isRefusal = (answer: Blob | AssetRef | AssetRefusal): answer is AssetRefusal =>
+  typeof answer === 'object' && 'refused' in answer;
+
+/** A store's answer with its refusal worded, as every refusal a plugin reads is (ADR 0057). */
+const worded = <T extends Blob | AssetRef>(answer: T | AssetRefusal): T | WordedRefusal =>
+  isRefusal(answer) ? { refused: describeAssetRefusal(answer.refused) } : answer;
+
+/**
+ * The asset store as a Resource plugin's surface reaches it (ADR 0142): the
+ * client's `url`, `read` and `store`, each refusal worded by
+ * `describeAssetRefusal`, and the browser's own file picker. A host
+ * hands on only `url` and `read` where its Resource is not authored.
+ */
+export const browserPluginAssets = (assets: AssetClient): Assets => ({
+  url: (ref) => assets.url(ref),
+  read: async (ref) => worded(await assets.read(ref)),
+  store: async (bytes) => worded(await assets.store(bytes)),
+  pick: async (accept) => [...(await pickFilesInBrowser(document, accept))],
 });
 
 /**
@@ -86,7 +115,8 @@ export const browserImageSources = (
  * `session.mounted` says the session is Mounting an aggregate (ADR 0130), so
  * every Space it opens marks its Edits as lost on reload (ADR 0131). It is
  * named rather than positional, and defaults to `false`: only a mount
- * composition sets it.
+ * composition sets it. `session.assets` is the asset store a Resource plugin
+ * reaches, the host's by default and the in-page store in a mount.
  */
 export const createSpaceStartup = (
   fullscreen: Fullscreen,
@@ -96,8 +126,12 @@ export const createSpaceStartup = (
   history: HistoryApi = browserHistory(),
   images: ImageSources = browserImageSources(),
   displayImage: ImageDisplay = displayImageAsAuthored,
-  { mounted = false }: { readonly mounted?: boolean } = {},
+  {
+    mounted = false,
+    assets = httpAssetClient(new HttpSpaceBackend()),
+  }: { readonly mounted?: boolean; readonly assets?: AssetClient } = {},
 ): SpaceStartup => {
+  const pluginAssets = browserPluginAssets(assets);
   let owner: Promise<OpenSpaces> | undefined;
   const openSpaces = (): Promise<OpenSpaces> => {
     if (owner !== undefined) return owner;
@@ -153,6 +187,7 @@ export const createSpaceStartup = (
           }),
           now: presentations.now,
           displayImage,
+          assets: pluginAssets,
         };
       }
       const spaces = await openSpaces();
@@ -163,6 +198,7 @@ export const createSpaceStartup = (
         spaces,
         opening,
         displayImage,
+        assets: pluginAssets,
       };
     },
   };

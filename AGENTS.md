@@ -18,7 +18,7 @@ These are the rules most often broken. Each links to its explanation.
 
 ## State
 
-**The repo is the only source of state.** Development and CI are the only environments — no production, no release, no users, and no document or byte that outlives a reset. Every database and generated artifact is **derived**: the codebase mints it from tracked seeds, fixtures, migrations and scripts. So a format change rolls schema, fixtures and tests forward in one change, and generated state that disagrees with the code generating it is a bug fixed at the source rather than a shape intake keeps reading (ADR 0054, ADR 0056). The one exception is an Image Resource's picture (ADR 0106, ADR 0118): an external image URL's bytes are not the repository's, and a stored image is outside the aggregate, so Export carries its bytes in the Aggregate directory's `images/` only while a Resource references it.
+**The repo is the only source of state.** Development and CI are the only environments — no production, no release, no users, and no document or byte that outlives a reset. Every database and generated artifact is **derived**: the codebase mints it from tracked seeds, fixtures, migrations and scripts. So a format change rolls schema, fixtures and tests forward in one change, and generated state that disagrees with the code generating it is a bug fixed at the source rather than a shape intake keeps reading (ADR 0054, ADR 0056). The one exception is a stored asset (ADR 0142, ADR 0118): an external URL's bytes are not the repository's, and an asset is outside the aggregate, so Export carries its bytes in the Aggregate directory's `assets/` only while a Resource references it.
 
 ## Decided — read these before the code
 

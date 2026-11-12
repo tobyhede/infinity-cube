@@ -21,7 +21,10 @@ import { readGitHubLocation } from '../../packages/app/src/mount/github-source';
 import { COMMIT, fakeGitHub, OWNER, REPO } from '../../packages/app/test/fake-github';
 import { markdownResourceFiles, resourceFiles } from '../support/aggregate-directory';
 import { captureError } from '../support/capture-error';
-import { admitted, pngBytes } from '../support/stored-images';
+import { admitted, pngBytes } from '../support/stored-assets';
+
+/** A well-formed hash, which Importing owns a file in `assets/` named by. */
+const OWNED_HASH = 'A'.repeat(43);
 
 const META_SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const OTHER_SPACE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
@@ -490,19 +493,16 @@ describe.each(READERS)('$name', ({ read }) => {
     expect(thrown.diagnostics.join('\n')).toContain(second);
   });
 
-  it('names an image directory holding a space.json once, as an image, never as a Space', async () => {
+  it('never reads assets/ as a Space, even when it holds a space.json', async () => {
     const root = await makeTemporaryDirectory();
     await writeAggregateFile(root, META_SPACE_ID);
     await writeSpace(root, META_SPACE_ID, JSON.stringify({ version: 1, title: 'Meta' }));
-    await writeSpace(root, 'images', JSON.stringify({ version: 1, title: 'Not a Space' }));
+    await writeSpace(root, 'assets', JSON.stringify({ version: 1, title: 'Not a Space' }));
 
-    const thrown = await captureError(() => read(root, countingIds()));
+    const aggregate = await read(root, countingIds());
 
-    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
-    if (!(thrown instanceof AggregateDirectoryError)) return;
-    expect(thrown.diagnostics).toHaveLength(1);
-    expect(thrown.diagnostics[0]).toContain(join(root, 'images', 'space.json'));
-    expect(thrown.diagnostics[0]).not.toContain('Space UUID');
+    expect(aggregate.spaces.map(({ id }) => id)).toEqual([META_SPACE_ID]);
+    expect(aggregate.assets).toEqual([]);
   });
 
   /*
@@ -598,27 +598,32 @@ describe.each(READERS)('$name', ({ read }) => {
     });
   });
 
-  it('admits each visible image file in images/, ignoring dotfiles and subdirectories', async () => {
+  it('admits each file in assets/ named by a hash, leaving dotfiles, subdirectories and other names', async () => {
     const root = await makeTemporaryDirectory();
     await writeAggregateFile(root, META_SPACE_ID);
     await writeSpace(root, META_SPACE_ID, JSON.stringify({ version: 1, title: 'Meta' }));
     const image = await admitted(pngBytes(7));
-    await mkdir(join(root, 'images', 'drafts'), { recursive: true });
-    await writeFile(join(root, 'images', `${image.id}.png`), image.bytes);
-    await writeFile(join(root, 'images', '.DS_Store'), 'not an image');
-    await writeFile(join(root, 'images', 'drafts', 'notes.txt'), 'not an image');
+    const notes = await admitted(new TextEncoder().encode('# Notes\n'), 'text/markdown');
+    await mkdir(join(root, 'assets', 'drafts'), { recursive: true });
+    await writeFile(join(root, 'assets', `${image.hash}.png`), image.bytes);
+    await writeFile(join(root, 'assets', `${notes.hash}.md`), notes.bytes);
+    await writeFile(join(root, 'assets', '.DS_Store'), 'not an asset');
+    await writeFile(join(root, 'assets', 'harbour.png'), pngBytes(7));
+    await writeFile(join(root, 'assets', 'drafts', 'notes.txt'), 'not an asset');
 
     const aggregate = await read(root, countingIds());
 
-    expect(aggregate.images).toEqual([image]);
+    expect([...aggregate.assets].sort((a, b) => a.hash.localeCompare(b.hash))).toEqual(
+      [image, notes].sort((a, b) => a.hash.localeCompare(b.hash)),
+    );
   });
 
-  it('refuses an image file not named for its content, naming it', async () => {
+  it('refuses an asset file not named for its content, naming it', async () => {
     const root = await makeTemporaryDirectory();
     await writeAggregateFile(root, META_SPACE_ID);
     await writeSpace(root, META_SPACE_ID, JSON.stringify({ version: 1, title: 'Meta' }));
-    await mkdir(join(root, 'images'));
-    await writeFile(join(root, 'images', 'harbour.png'), pngBytes(7));
+    await mkdir(join(root, 'assets'));
+    await writeFile(join(root, 'assets', `${OWNED_HASH}.png`), pngBytes(7));
 
     const thrown = await captureError(() => read(root, countingIds()));
 
@@ -627,7 +632,7 @@ describe.each(READERS)('$name', ({ read }) => {
     expect(thrown.kind).toBe('parsing');
     expect(thrown.diagnostics).toEqual([
       expect.stringContaining(
-        `${join(root, 'images', 'harbour.png')}: an image file must be named for its content`,
+        `${join(root, 'assets', `${OWNED_HASH}.png`)}: an asset file must be named for its content`,
       ),
     ]);
   });
@@ -701,9 +706,9 @@ describe('a file that could not be read', () => {
     expect(thrown.diagnostics).toEqual([`/talk/${META_SPACE_ID}/a.md: EACCES: permission denied`]);
   });
 
-  it('names an image that could not be read as a discovery failure', async () => {
+  it('names an asset that could not be read as a discovery failure', async () => {
     const image = await admitted(pngBytes(7));
-    const path = `images/${image.id}.png`;
+    const path = `assets/${image.hash}.png`;
     const thrown = await captureError(() =>
       readAggregateFrom(
         withUnreadable(
@@ -776,17 +781,18 @@ describe('scanAggregateFrom', () => {
     'notes/resources/x.json',
     `sibling/${AGGREGATE_FILE_NAME}`,
     `sibling/${OTHER_SPACE_ID}/space.json`,
-    'images/a.png',
-    'images/.hidden.png',
-    'images/drafts/b.png',
-    'images/space.json',
+    `assets/${OWNED_HASH}.png`,
+    'assets/a.png',
+    'assets/.hidden.png',
+    'assets/drafts/b.png',
+    'assets/space.json',
   ];
 
   /** A source over `paths` with no bytes, which is all a listing needs. */
   const listed = (paths: readonly string[]): AggregateSource =>
     mapSource('/talk', new Map(paths.map((path) => [path, new Uint8Array()])));
 
-  it("finds aggregate.json, each Space directory's files and the visible images, in read order", async () => {
+  it("finds aggregate.json, each Space directory's files and the assets named by a hash, in read order", async () => {
     expect(await scanAggregateFrom(listed([...MIXED_DIRECTORY].reverse()))).toEqual({
       files: [
         AGGREGATE_FILE_NAME,
@@ -795,8 +801,7 @@ describe('scanAggregateFrom', () => {
         `${META_SPACE_ID}/resources/${RESOURCE_ID}.json`,
         `${META_SPACE_ID}/resources/${RESOURCE_ID}.md`,
         `${OTHER_SPACE_ID}/space.json`,
-        'images/a.png',
-        'images/space.json',
+        `assets/${OWNED_HASH}.png`,
       ],
       spaceDirectories: [META_SPACE_ID, OTHER_SPACE_ID],
     });
@@ -814,11 +819,13 @@ describe('scanAggregateFrom', () => {
     ).toEqual({ files: [], spaceDirectories: [] });
   });
 
-  it('reads images/ as images only, even when it holds a space.json', async () => {
+  it('reads assets/ as assets only, even when it holds a space.json', async () => {
     expect(
-      await scanAggregateFrom(listed([AGGREGATE_FILE_NAME, 'images/space.json', 'images/a.png'])),
+      await scanAggregateFrom(
+        listed([AGGREGATE_FILE_NAME, 'assets/space.json', `assets/${OWNED_HASH}.md`]),
+      ),
     ).toEqual({
-      files: [AGGREGATE_FILE_NAME, 'images/a.png', 'images/space.json'],
+      files: [AGGREGATE_FILE_NAME, `assets/${OWNED_HASH}.md`],
       spaceDirectories: [],
     });
   });
@@ -860,7 +867,7 @@ describe('reading from a source', () => {
         new Map([
           [AGGREGATE_FILE_NAME, encode('{ malformed')],
           [`${META_SPACE_ID}/space.json`, encode(metaSpaceFile)],
-          ['images/a.png', pngBytes(7)],
+          [`assets/${OWNED_HASH}.png`, pngBytes(7)],
         ]),
       ),
     );
@@ -885,7 +892,7 @@ describe('reading from a source', () => {
           encode(text),
         ],
       ),
-      [`images/${image.id}.png`, image.bytes],
+      [`assets/${image.hash}.png`, image.bytes],
       ['README.md', encode('# Notes\n')],
     ]);
     const { source, reads } = recordingReads(mapSource('/talk', files));
@@ -897,7 +904,7 @@ describe('reading from a source', () => {
       `${META_SPACE_ID}/space.json`,
       `${META_SPACE_ID}/resources/${RESOURCE_ID}.json`,
       `${META_SPACE_ID}/resources/${RESOURCE_ID}.md`,
-      `images/${image.id}.png`,
+      `assets/${image.hash}.png`,
     ]);
     expect(reads).toEqual((await scanAggregateFrom(mapSource('/talk', files))).files);
   });
@@ -1013,10 +1020,10 @@ describe('reading from a source', () => {
         [AGGREGATE_FILE_NAME, encode(aggregateText)],
         [`${META_SPACE_ID}/space.json`, encode(metaSpaceFile)],
         [`${OTHER_SPACE_ID}/space.json`, encode(metaSpaceFile)],
-        ['images/a.png', pngBytes(7)],
+        [`assets/${OWNED_HASH}.png`, pngBytes(7)],
       ]),
     );
-    const unlisted = new Set([OTHER_SPACE_ID, META_SPACE_ID, 'images']);
+    const unlisted = new Set([OTHER_SPACE_ID, META_SPACE_ID, 'assets']);
     const source: AggregateSource = {
       ...base,
       list: (directory) =>
@@ -1033,7 +1040,7 @@ describe('reading from a source', () => {
     expect(thrown.diagnostics).toEqual([
       `/talk/${META_SPACE_ID}: EACCES: permission denied`,
       `/talk/${OTHER_SPACE_ID}: EACCES: permission denied`,
-      '/talk/images: EACCES: permission denied',
+      '/talk/assets: EACCES: permission denied',
     ]);
   });
 
@@ -1136,20 +1143,20 @@ describe('a symbolic link, on disk', () => {
     }
     await linkTo(root, `${META_SPACE_ID}/notes.md`, 'beside space.json\n');
     const image = await admitted(pngBytes(7));
-    await mkdir(join(root, 'images'));
+    await mkdir(join(root, 'assets'));
     const picture = join(await makeTemporaryDirectory(), 'picture.png');
     await writeFile(picture, image.bytes);
-    await symlink(picture, join(root, 'images', `${image.id}.png`));
+    await symlink(picture, join(root, 'assets', `${image.hash}.png`));
 
     expect(await discoveryDiagnostics(() => readAggregate(root, countingIds()))).toEqual([
       `${root}/${META_SPACE_ID}/notes.md: ${LINK_REASON}`,
       `${root}/${META_SPACE_ID}/resources/${RESOURCE_ID}.json: ${LINK_REASON}`,
       `${root}/${META_SPACE_ID}/resources/${RESOURCE_ID}.md: ${LINK_REASON}`,
-      `${root}/images/${image.id}.png: ${LINK_REASON}`,
+      `${root}/assets/${image.hash}.png: ${LINK_REASON}`,
     ]);
   });
 
-  it.each(['resources', 'images'])(
+  it.each(['resources', 'assets'])(
     'refuses a %s/ that is a link, whether or not it names anything',
     async (linked) => {
       for (const target of ['elsewhere', 'nowhere']) {
@@ -1161,7 +1168,7 @@ describe('a symbolic link, on disk', () => {
           JSON.stringify({ version: 1, title: 'Meta' }),
         );
         if (target === 'elsewhere') await mkdir(join(root, target));
-        const at = linked === 'resources' ? join(meta, 'resources') : join(root, 'images');
+        const at = linked === 'resources' ? join(meta, 'resources') : join(root, 'assets');
         await symlink(join(root, target), at);
 
         expect(await discoveryDiagnostics(() => readAggregate(root, countingIds()))).toEqual([
@@ -1189,10 +1196,10 @@ describe('a symbolic link, on disk', () => {
     await linkTo(root, 'README', 'about this talk\n');
     await linkTo(root, `${META_SPACE_ID}/notes.txt`, 'not a Resource\n');
     await linkTo(root, `${META_SPACE_ID}/resources/draft.txt`, 'not a Resource\n');
-    await linkTo(root, 'images/.hidden.png', 'not a picture\n');
-    await linkTo(root, 'images/notes', 'not a picture\n');
+    await linkTo(root, 'assets/.hidden.png', 'not an asset\n');
+    await linkTo(root, 'assets/notes', 'not an asset\n');
     await mkdir(join(root, 'pictures'));
-    await symlink(join(root, 'pictures'), join(root, 'images', 'shared'));
+    await symlink(join(root, 'pictures'), join(root, 'assets', 'shared'));
     await mkdir(join(root, 'elsewhere'));
     await symlink(join(root, 'elsewhere'), join(root, 'shared'));
 

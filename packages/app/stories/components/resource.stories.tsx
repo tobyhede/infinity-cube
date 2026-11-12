@@ -25,7 +25,7 @@ import { requireDefaultMap } from '#src/map-resolution';
 import { CanvasResourceNodeSpecimen, type DrawnMap } from '../support/ReactFlowCanvas';
 import { resourceIds, GRAPH_PALETTE } from '../support/fixture';
 import { authoredSpace, imageReferenceIds, imageReferenceSpace } from '../support/spaces';
-import harbour from '#fixture-images/fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs.png';
+import harbour from '#fixture-assets/fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs.png';
 import '../support/inventory.css';
 
 export default { title: 'Components/Resource' };
@@ -680,7 +680,7 @@ export const OpenImage: Story = () => {
           kind="image"
           content={{
             kind: 'image',
-            url: '/images/missing-picture.png',
+            url: '/assets/missing-picture.png',
             via: 'self',
           }}
           open

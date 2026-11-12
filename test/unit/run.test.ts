@@ -13,7 +13,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { newUuid, uuidSchema, type SpaceSnapshot } from '@project/core';
+import { isAssetRef, newUuid, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { HttpSpaceBackend } from '@project/http';
 import { afterEach, describe, expect, it } from 'vitest';
 import { AGGREGATE_FILE_NAME } from '@project/aggregate';
@@ -26,7 +26,7 @@ import {
   type RunEvent,
   type RunStart,
 } from '../../src/run/run';
-import { admitted, pngBytes } from '../support/stored-images';
+import { admitted, pngBytes } from '../support/stored-assets';
 
 const FIXTURE = fileURLToPath(new URL('../../packages/app/fixture', import.meta.url));
 const META_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
@@ -316,17 +316,17 @@ describe('Running an Aggregate directory', () => {
     },
   );
 
-  it('writes a picture uploaded during the run to images/', async () => {
+  it('writes a picture uploaded during the run to assets/', async () => {
     const directory = await fixtureCopy();
     const { clock, start, nextEvent } = await started(directory);
     const run = running(start);
     const backend = backendFor(run);
     const bytes = pngBytes(42);
-    const id = (await admitted(bytes)).id;
+    const id = (await admitted(bytes)).hash;
 
-    const stored = await backend.storeImage(new Blob([bytes], { type: 'image/png' }));
-    expect(stored).toEqual({ kind: 'stored', url: `/images/${id}` });
-    if (stored.kind !== 'stored') return;
+    const stored = await backend.storeAsset(new Blob([bytes], { type: 'image/png' }));
+    expect(stored).toBe(`/assets/${id}`);
+    if (!isAssetRef(stored)) return;
     const loaded = await backend.loadSpace(META_SPACE_ID);
     if (loaded === undefined) throw new Error('Expected the Meta Space');
     const resourceId = newUuid();
@@ -341,7 +341,7 @@ describe('Running an Aggregate directory', () => {
               ...loaded.snapshot.resources,
               {
                 id: resourceId,
-                document: { title: 'Uploaded', kind: 'image', content: { url: stored.url } },
+                document: { title: 'Uploaded', kind: 'image', content: { url: stored } },
               },
             ],
           },
@@ -355,10 +355,10 @@ describe('Running an Aggregate directory', () => {
     clock.advance(RUN_QUIET_MILLISECONDS);
     await written;
 
-    expect(new Uint8Array(await readFile(join(directory, 'images', `${id}.png`)))).toEqual(bytes);
+    expect(new Uint8Array(await readFile(join(directory, 'assets', `${id}.png`)))).toEqual(bytes);
     await expect(
       readFile(join(directory, META_SPACE_ID, 'resources', `${resourceId}.json`), 'utf8'),
-    ).resolves.toContain(`"url": "/images/${id}"`);
+    ).resolves.toContain(`"url": "/assets/${id}"`);
     await run.stop();
   });
 

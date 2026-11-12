@@ -171,8 +171,8 @@ describe('readGitHubAggregate', () => {
       [`${SELECTED}/notes/resources/draft.json`, text('{}')],
       [`${SELECTED}/${space}/assets/figure.png`, text('png')],
       [`${SELECTED}/${space}/resources/old/legacy.json`, text('{}')],
-      [`${SELECTED}/images/.DS_Store`, text('')],
-      [`${SELECTED}/images/originals/photo.png`, text('png')],
+      [`${SELECTED}/assets/.DS_Store`, text('')],
+      [`${SELECTED}/assets/originals/photo.png`, text('png')],
     ]);
 
     it("fetches only the selected aggregate's scanned files, relative to it", async () => {

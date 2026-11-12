@@ -16,7 +16,7 @@ my-talk/
   7e4f0d2a-3c1b-4a6e-8f9d-0a1b2c3d4e5f/          an ordinary Space
     space.json
     resources/…
-  images/
+  assets/
     fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs.png
 ```
 
@@ -133,28 +133,30 @@ Every Resource has `id`, `title`, `kind` and `content`, and none may be left out
 | --- | --- |
 | `markdown` | `path`: the Resource's own `<id>.md`, which must exist beside its Resource file. `mediaType`: `text/markdown`. |
 | `ur` | `{}`. An Ur Resource is its Title alone. |
-| `image` | `url`: `https:` or `http:`, or `/images/<content-id>` for a picture in `images/`. Optional `naturalSize: { width, height }` in pixels. The Title is the image's text alternative. |
+| `image` | `url`: `https:` or `http:`, or `/assets/<hash>` for a picture in `assets/`. Optional `naturalSize: { width, height }` in pixels. The Title is the image's text alternative. |
 | `reference` | `target`: the Id of another Resource **in the same Space**, not itself and not another Reference Resource. It shows its Target's content, read-only. |
 | `space` | `spaceId`, `map`, `graph`: the target Space and the Map and Graph it shows. Optional `framing: { centreX, centreY, zoom }`. |
 
 **A `.md` no Resource file names is refused**, naming it, whether it sits in `resources/` or beside `space.json`.
 
-## `images/`
+## `assets/`
 
-The bytes of every stored picture the aggregate's Image Resources show ([ADR 0118](adr/0118-an-aggregate-directory-carries-stored-image-bytes.md)).
+The bytes of every stored asset the aggregate's Resources reference ([ADR 0142](adr/0142-a-resource-plugin-owns-everything-inside-its-rect.md), [ADR 0118](adr/0118-an-aggregate-directory-carries-stored-image-bytes.md)). An asset is any file a Resource uses, of any media type; today an Image Resource's picture is the one a Resource kind writes.
 
-- Each file is `images/<content-id>.<ext>`. The content id is the SHA-256 of the file's bytes as unpadded base64url, and it is also the last segment of the Resource's `/images/<content-id>` URL. The extension is the format the bytes are: `png`, `jpg`, `webp` or `gif`. The same picture always has the same name, so it is stored once however many Resources show it.
-- To add a picture by hand, compute its name and copy it in:
+- Each file is `assets/<hash>.<ext>`. The hash is the SHA-256 of the file's bytes as 43 characters of unpadded base64url, and it is also the last segment of the asset's URL, `/assets/<hash>`. The same bytes always have the same name, so they are stored once however many Resources reference them.
+- The extension gives the asset's media type, through one table: `png`, `jpg` and `jpeg`, `webp`, `gif`, `avif`, `svg`, `md`, `txt`, `csv`, `html`, `css`, `js`, `json`, `pdf`, `mp4`, `webm`, `mp3` and `woff2`. Any other extension, or none, is `application/octet-stream`. Exporting keeps the name of a file already there, so the extension you chose is written back; a new file gets the table's extension for its media type, or `.bin` for one the table does not list.
+- To add an asset by hand, compute its name and copy it in:
 
   ```sh
-  id=$(openssl dgst -sha256 -binary picture.png | base64 | tr '+/' '-_' | tr -d '=')
-  cp picture.png "my-talk/images/$id.png"   # then use  url: /images/<id>  in the Resource
+  hash=$(openssl dgst -sha256 -binary picture.png | base64 | tr '+/' '-_' | tr -d '=')
+  cp picture.png "my-talk/assets/$hash.png"   # then use  url: /assets/<hash>  in the Resource
   ```
 
-- Importing admits every visible regular file in `images/` by the rule an upload uses: the format is read from the bytes, and a file is at most 10 MiB. A file that is not such an image, or is **not named for its own content**, refuses the whole directory.
-- A Resource whose `/images/<content-id>` has no file in `images/` is allowed. It draws as a picture that will not load.
-- An `https:` or `http:` URL stays a URL. InfinityCube does not download it, and nothing is written to `images/` for it.
-- Exporting owns the image files in `images/`: a picture no Resource shows any more is removed, and an `images/` left empty is removed. Dotfiles, subdirectories and links inside `images/` are left alone.
+- Importing reads every file directly in `assets/` named by a hash, alone or followed by a dot and any extension, and admits it whatever its type, up to 10 MiB. A file over that, one **not named for its own content**, or two files named by the same hash refuse the whole directory. A file whose name is not a hash is not read, and is left alone.
+- An asset reference is a whole string value of exactly `/assets/<hash>`, anywhere in a Resource's `content` or a Map entry's `content`. A reference whose file is not in `assets/` is allowed: the reference stays, and a picture draws as one that will not load.
+- The asset of zero bytes always exists, so no file is needed for it.
+- An `https:` or `http:` URL stays a URL. InfinityCube does not download it, and nothing is written to `assets/` for it.
+- Exporting owns the hash-named files in `assets/`: an asset no Resource references any more is removed, and an `assets/` left empty is removed. A file of a referenced asset whose bytes the store does not hold is kept. Other files, dotfiles, subdirectories and links inside `assets/` are left alone.
 
 ## Which Ids may be left out
 
@@ -173,7 +175,7 @@ The next Export writes every minted Id into the files.
 
 Exporting writes the directory **in place** ([ADR 0119](adr/0119-export-writes-in-place-and-git-answers-for-a-partial-write.md)). It owns exactly what Importing reads, and never reads, copies or touches anything else:
 
-- **Owned:** `aggregate.json`; each Space directory's `space.json`, every `*.md` beside it, and every `resources/*.json` and `resources/*.md`; the image files in `images/`.
+- **Owned:** `aggregate.json`; each Space directory's `space.json`, every `*.md` beside it, and every `resources/*.json` and `resources/*.md`; the hash-named files in `assets/`.
 - **Kept:** any other file or directory, at the root or inside a Space directory, such as `.git`, a `README.md` at the root, notes in a `notes/` directory or a `.gitignore`.
 
 One write goes like this:
@@ -199,7 +201,7 @@ Two layers:
 
 ## Editing over MCP
 
-`pnpm cube mcp <dir>` serves a local [MCP](https://modelcontextprotocol.io) server over standard input and output, for a client that calls MCP tools but has no shell or filesystem of its own. Its tools are `list_files`, `read_file`, `write_file` and `delete_file` over the files of `<dir>`, and `check`, which answers what `pnpm cube check` prints. A path is relative to `<dir>`; one that leaves it, names a dot-entry such as `.git`, or passes through a symbolic link is refused, and `list_files` follows no link either. A refused `check` and a refused path answer as tool errors. `read_file` and `write_file` carry a file as UTF-8 text unless `encoding` is `base64`, which carries a binary file such as a picture under `images/` byte for byte; reading a file that is not UTF-8 as text is refused, naming `base64`. `write_file` replaces a file by renaming a written temporary file over it. A missing `<dir>` is refused, naming `pnpm cube init`; an empty one is served, so a client can write a new aggregate into it, and `check` there says to write `aggregate.json` and the Meta Space's directory rather than naming a command the client cannot run.
+`pnpm cube mcp <dir>` serves a local [MCP](https://modelcontextprotocol.io) server over standard input and output, for a client that calls MCP tools but has no shell or filesystem of its own. Its tools are `list_files`, `read_file`, `write_file` and `delete_file` over the files of `<dir>`, and `check`, which answers what `pnpm cube check` prints. A path is relative to `<dir>`; one that leaves it, names a dot-entry such as `.git`, or passes through a symbolic link is refused, and `list_files` follows no link either. A refused `check` and a refused path answer as tool errors. `read_file` and `write_file` carry a file as UTF-8 text unless `encoding` is `base64`, which carries a binary file such as a picture under `assets/` byte for byte; reading a file that is not UTF-8 as text is refused, naming `base64`. `write_file` replaces a file by renaming a written temporary file over it. A missing `<dir>` is refused, naming `pnpm cube init`; an empty one is served, so a client can write a new aggregate into it, and `check` there says to write `aggregate.json` and the Meta Space's directory rather than naming a command the client cannot run.
 
 Standard output carries the protocol alone, so start it with pnpm's `--silent`, which drops the line pnpm prints before running a script, from the InfinityCube clone and with an absolute `<dir>`. A client whose configuration names a command but no working directory can start it through a shell:
 
@@ -240,7 +242,7 @@ The JSON API is smaller and keeps UUIDs in canonical spelling:
 | `POST /api/spaces` | Commit a change set: each change names a Space, its complete next snapshot and the revision it was made against |
 | `GET /api/spaces/:uuid` | Load one Space snapshot and its revision |
 | `GET /api/aggregate` | Load the complete aggregate |
-| `POST /images` | Store a picture; the body is the image's bytes |
-| `GET /images/:contentId` | Read a stored picture |
+| `POST /assets` | Store an asset; the body is its bytes and `Content-Type` its media type |
+| `GET /assets/:hash` | Read a stored asset |
 
 Resources, Maps and Graphs are parts of a Space, so they have product URLs but no persistence endpoints of their own. API failures use RFC 9457 Problem Details (`application/problem+json`).

@@ -3,11 +3,13 @@ import { loadSpaceAggregate } from '@project/graph';
 import {
   AggregateInvariantError,
   ascendingById,
+  EMPTY_ASSET,
+  withEmptyAsset,
   decideCommit,
   readInIdOrder as read,
   type AggregateLoadResult,
-  type ImageId,
-  type StoredImage,
+  type AssetHash,
+  type StoredAsset,
   type LoadedAggregate,
   type LoadedSpace,
   type RepositoryCommitResult,
@@ -43,8 +45,8 @@ const loadedAggregate = (metaSpaceId: UUID, spaces: Iterable<LoadedSpace>): Load
 export class MemorySpaceRepository implements SpaceRepository {
   readonly #spaces = new Map<UUID, LoadedSpace>();
   #metaSpaceId: UUID | undefined;
-  /** Stored images, beside the Spaces and untouched by either lifecycle door (ADR 0106). */
-  readonly #images = new Map<ImageId, StoredImage>();
+  /** Stored assets, beside the Spaces and untouched by either lifecycle door (ADR 0142). */
+  readonly #assets = new Map<AssetHash, StoredAsset>();
 
   /**
    * Either an uninitialized repository — no Spaces and no Meta identity — or
@@ -176,24 +178,30 @@ export class MemorySpaceRepository implements SpaceRepository {
     return Promise.resolve();
   }
 
-  storeImage(image: StoredImage): Promise<'stored' | 'existing'> {
-    if (this.#images.has(image.id)) return Promise.resolve('existing');
-    this.#images.set(image.id, { ...image, bytes: image.bytes.slice() });
+  /** The asset of zero bytes is held already, so storing it writes nothing. */
+  storeAsset(asset: StoredAsset): Promise<'stored' | 'existing'> {
+    if (asset.hash === EMPTY_ASSET.hash || this.#assets.has(asset.hash)) {
+      return Promise.resolve('existing');
+    }
+    this.#assets.set(asset.hash, { ...asset, bytes: asset.bytes.slice() });
     return Promise.resolve('stored');
   }
 
   /**
-   * The stored image `id` names, read in place rather than copied, for a
+   * The stored asset `hash` names, read in place rather than copied, for a
    * caller in the same page that draws it (`packages/app/src/mount/mount.ts`).
    */
-  heldImage(id: ImageId): StoredImage | undefined {
-    return this.#images.get(id);
+  heldAsset(hash: AssetHash): StoredAsset | undefined {
+    return withEmptyAsset(hash, this.#assets.get(hash));
   }
 
-  loadImage(id: ImageId): Promise<StoredImage | undefined> {
-    const image = this.#images.get(id);
+  loadAsset(hash: AssetHash): Promise<StoredAsset | undefined> {
+    const asset = this.#assets.get(hash);
     return Promise.resolve(
-      image === undefined ? undefined : { ...image, bytes: image.bytes.slice() },
+      withEmptyAsset(
+        hash,
+        asset === undefined ? undefined : { ...asset, bytes: asset.bytes.slice() },
+      ),
     );
   }
 
