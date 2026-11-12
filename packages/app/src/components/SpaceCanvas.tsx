@@ -363,10 +363,6 @@ export function SpaceCanvas({
     reportEmbeddedMapEditing,
   } = canvasRendering;
   const nodes = useMemo(() => liveProjection?.nodes ?? [], [liveProjection]);
-  const latestNodes = useRef(nodes);
-  useLayoutEffect(() => {
-    latestNodes.current = nodes;
-  }, [nodes]);
   const edges = useMemo(() => liveProjection?.edges ?? [], [liveProjection]);
   // Null while a replacement placement resolves. The canvas keeps drawing the
   // Resources on screen through that window, so a connection is reachable with

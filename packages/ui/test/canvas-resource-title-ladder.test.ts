@@ -1,8 +1,5 @@
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { COLLAPSED_RESOURCE_SIZE } from '@project/core';
-import { RAIL_BAND } from '@project/resource-api/view';
+import { block, declared, stylesheet, token } from './canvas-resource-stylesheet';
 
 /**
  * The Title ladder's typography, read off the stylesheet that declares it.
@@ -25,59 +22,6 @@ import { RAIL_BAND } from '@project/resource-api/view';
  * the source is what is left, and `canvas-resource-embedded-map.test.ts` already
  * does it for the one other number this stylesheet shares with the domain.
  */
-
-const stylesheet = readFileSync(
-  fileURLToPath(new URL('../src/canvas-resource.css', import.meta.url)),
-  'utf8',
-);
-
-/**
- * The Resource's own structural scale is declared centrally in
- * `tailwind.css`, beside its colour tokens, rather than on `.canvas-resource`
- * itself — the same place `--canvas-resource-ink-color` and its neighbours are.
- * The ladder's ceiling test below needs the border's numeric width, which
- * lives there rather than inline in `canvas-resource.css`'s own `border`
- * declaration.
- */
-const themeStylesheet = readFileSync(
-  fileURLToPath(new URL('../../app/src/tailwind.css', import.meta.url)),
-  'utf8',
-);
-
-/** The declaration block of the rule whose selector is exactly `selector`. */
-const block = (selector: string): string => {
-  const escaped = selector.replaceAll(/[.[\]^$*+?()|{}\\]/gu, String.raw`\$&`);
-  // Anchored to the start of a line, so `.canvas-resource` finds the Resource's own
-  // rule rather than the first rule that happens to mention it.
-  const found = new RegExp(String.raw`^${escaped}\s*\{([^}]*)\}`, 'mu').exec(stylesheet);
-  expect(found, `no rule for ${selector}`).not.toBeNull();
-  return found?.[1] ?? '';
-};
-
-/** The value of `property` in `declarations`, with its whitespace collapsed. */
-const declared = (declarations: string, property: string): string | undefined => {
-  // A lookbehind rather than a start anchor: a declaration may follow a
-  // comment, and `color` must not be found inside `background-color`.
-  const found = new RegExp(String.raw`(?<![\w-])${property}:\s*([^;]+)`, 'u').exec(declarations);
-  return found?.[1]?.replaceAll(/\s+/gu, ' ').trim();
-};
-
-/** A custom property declared on the Resource, as a number of `unit`. */
-const token = (name: string, unit = ''): number => {
-  const value = declared(block('.canvas-resource'), name);
-  expect(value, `no ${name} on .canvas-resource`).toBeDefined();
-  expect(value?.endsWith(unit)).toBe(true);
-  return Number.parseFloat(value ?? '');
-};
-
-/** A custom property declared anywhere in `tailwind.css`, as a number of `unit`. */
-const themeToken = (name: string, unit = ''): number => {
-  const found = new RegExp(String.raw`(?<![\w-])${name}:\s*([^;]+)`, 'u').exec(themeStylesheet);
-  expect(found, `no ${name} in tailwind.css`).not.toBeNull();
-  const value = found?.[1]?.trim();
-  expect(value?.endsWith(unit)).toBe(true);
-  return Number.parseFloat(value ?? '');
-};
 
 const rung = (role: string): string => block(`.canvas-resource__title-line[data-role='${role}']`);
 
@@ -185,41 +129,9 @@ describe('the rungs below the name', () => {
 
 describe('the ladder ceiling', () => {
   /**
-   * Placement is authored, so the Title is clamped to the room available and
-   * the Resource is never resized to fit one (ADR 0014, ADR 0083).
-   *
-   * The ceiling is a count of `title`-role lines rather than the room the Resource
-   * happens to have, so that the ladder draws the same Open and Closed. What
-   * makes that count safe is this: it fits inside the room a plugin leaves a
-   * **Closed** Resource's Title, which is the smaller of the two and the
-   * authored default. Nothing in the type system connects these pixels to
-   * `COLLAPSED_RESOURCE_SIZE`, so this is what does — a border, a band or a
-   * padding change that stole the room would otherwise show up as a Title
-   * quietly overrunning its Resource.
+   * The heading clips at the ceiling rather than growing past it; that the
+   * ceiling fits a Closed Resource is held by `canvas-resource-title-room.test.tsx`.
    */
-  it('fits inside the room a Closed Resource leaves its Title', () => {
-    // The Resource's own border width is `--canvas-resource-border-width`,
-    // declared in `tailwind.css` beside the Resource's colour tokens rather than
-    // stated inline in this stylesheet's own `border` shorthand.
-    const border = themeToken('--canvas-resource-border-width', 'px');
-    // A Closed Resource's Title is laid out by its plugin (ADR 0142), below the
-    // band the host's rail floats over, which each plugin reads as `useRailBand()`.
-    const band = RAIL_BAND;
-    // The plugin pads the Title's foot by 8px while Closed.
-    const foot = 8;
-    expect(band).toBeGreaterThan(0);
-
-    const room = COLLAPSED_RESOURCE_SIZE.height - 2 * border - band - foot;
-    const ceiling =
-      token('--canvas-resource-title-size', 'px') *
-      token('--canvas-resource-title-leading') *
-      token('--canvas-resource-title-ladder-lines');
-
-    expect(ceiling).toBeGreaterThan(0);
-    expect(ceiling).toBeLessThanOrEqual(room);
-  });
-
-  /** And the heading clips at that ceiling rather than growing past it. */
   it('is a clip on the heading, not a size the Resource grows to', () => {
     const heading = block('.canvas-resource__title');
     const ceiling = declared(heading, 'max-height') ?? '';

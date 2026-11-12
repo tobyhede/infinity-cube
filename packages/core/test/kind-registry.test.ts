@@ -3,7 +3,9 @@ import {
   KIND_IDS,
   contentTarget,
   isKindId,
+  isMissingKindId,
   isRegisteredKind,
+  mapContentProblem,
   newResourceDocument,
   resolveContent,
   startsEmpty,
@@ -33,6 +35,13 @@ describe('the kind registry', () => {
       expect(isRegisteredKind(kind)).toBe(false);
     },
   );
+
+  it('lets a Resource whose kind no plugin draws keep whatever Map content is stored', () => {
+    const missing = 'vnd.example.chart';
+    if (!isMissingKindId(missing)) throw new Error('A plugin in this build draws the kind');
+    expect(mapContentProblem(missing, { zoom: 2, open: true })).toBeUndefined();
+    expect(mapContentProblem(urKind.id, { open: true })).toBeDefined();
+  });
 });
 
 const TARGET = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
