@@ -375,9 +375,7 @@ export function useCanvasResourceAuthoring({
       report: reportPluginFailure,
       assets: { store: pluginAssets.store, pick: pluginAssets.pick },
     }),
-    // `claimChain` is read by the operations built from this host, not here.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [authoring, pluginGate, reportPluginFailure, claimChain, pluginAssets],
+    [authoring, spaceSession, pluginGate, reportPluginFailure, claimChain, pluginAssets],
   );
 
   const replaceResourceImage = useMemo(() => {

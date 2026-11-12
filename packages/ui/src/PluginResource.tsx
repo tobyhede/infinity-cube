@@ -18,13 +18,10 @@ import {
   type ResourceShape,
 } from '@project/core';
 import type { Answer } from '@project/resource-api/domain';
-import type { OwnProps, RailCommand, TitleProps } from '@project/resource-api/view';
+import type { Assets, OwnProps, RailCommand, TitleProps } from '@project/resource-api/view';
 import {
   createRailStore,
   ResourceHostProvider,
-  type Assets,
-  type OwnProps,
-  type RailCommand,
   type ResourceHost,
 } from '@project/resource-api/view/host';
 import { Button } from './Button';
@@ -69,9 +66,10 @@ import './canvas-resource.css';
  * earlier render answers refused once this surface has unmounted.
  */
 
-const SURFACE_GONE = {
-  refused: 'This Resource is no longer drawn here.',
-} as const satisfies Answer;
+const SURFACE_GONE = { refused: 'This Resource is no longer drawn here.' } as const;
+const HELD_ELSEWHERE = {
+  refused: 'This Resource is being changed where it is drawn elsewhere. Try again when that ends.',
+} as const;
 
 /** Stop the canvas reading a press or key meant for the plugin's own region. */
 const stop = (event: PointerEvent | KeyboardEvent): void => {
@@ -258,14 +256,16 @@ function guarded(
   readOnly: boolean,
 ): PluginOperations {
   if (readOnly) return { kind: operations.kind };
-  const withheld = (): Answer | null => {
+  const withheld = (): { readonly refused: string } | null => {
     if (!lifetime.drawn()) return SURFACE_GONE;
     return operations.claimHolder?.(lifetime.drawing) === 'another-drawing' ? HELD_ELSEWHERE : null;
   };
   const whileMounted =
     <A extends readonly unknown[]>(commit: (...args: A) => Promise<Answer>) =>
-    (...args: A): Promise<Answer> =>
-      lifetime.drawn() ? commit(...args) : Promise.resolve(SURFACE_GONE);
+    (...args: A): Promise<Answer> => {
+      const refusal = withheld();
+      return refusal === null ? commit(...args) : Promise.resolve(refusal);
+    };
   const { commitTitle, commitContent, commitMap, commitStore, pick, claim } = operations;
   return {
     kind: operations.kind,
@@ -275,12 +275,18 @@ function guarded(
     commitStore:
       commitStore === undefined
         ? undefined
-        : (bytes) => (lifetime.drawn() ? commitStore(bytes) : Promise.resolve(SURFACE_GONE)),
+        : (bytes) => {
+            const refusal = withheld();
+            return refusal === null ? commitStore(bytes) : Promise.resolve(refusal);
+          },
     pick:
       pick === undefined
         ? undefined
-        : (accept) => (lifetime.drawn() ? pick(accept) : Promise.resolve([])),
-    claim: claim === undefined ? undefined : () => (lifetime.drawn() ? claim() : undefined),
+        : (accept) => (withheld() === null ? pick(accept) : Promise.resolve([])),
+    claim:
+      claim === undefined
+        ? undefined
+        : (drawing) => (lifetime.drawn() ? claim(drawing) : undefined),
   };
 }
 
@@ -339,6 +345,7 @@ export function PluginSurface(props: PluginResourceProps & { readonly entry: Plu
     size,
     selected: state === 'selected' || state === 'editing',
     operations,
+    drawing: lifetime.drawing,
     assets,
     Embed: NoEmbed,
     onClaim: lifetime.hold,

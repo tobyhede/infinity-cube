@@ -9,7 +9,7 @@ import {
 import type { ObserverErrorReporter } from '@project/persistence';
 import type { Answer } from '@project/resource-api/domain';
 import type { Assets } from '@project/resource-api/view';
-import type { PluginCommits, PluginHostClaim, PluginOperations } from '@project/ui';
+import type { ClaimHolder, PluginCommits, PluginHostClaim, PluginOperations } from '@project/ui';
 import { describeAuthoringRefusal } from '../authoring-refusal';
 import type { AuthoringResult, DrawnCompletion, Settle, SettledResult } from '../space-authoring';
 import { heldByAnotherDrawing, holds, type ClaimChain, type Drawing } from './claim-chain';
@@ -111,7 +111,7 @@ function commitsFor(
   host: PluginHost,
   resourceId: ResourceId,
   live: () => Refusal | null,
-  own: boolean,
+  complete: PluginHost['complete'],
 ): PluginCommits {
   const changeMapContent = (content: JsonValue): Promise<Answer> => {
     const withdrawn = live();
@@ -121,8 +121,38 @@ function commitsFor(
       host.report,
     );
   };
+  /** One Edit of the Resource's document, its kind's schema answering for the next one. */
+  const editDocument = (
+    change: { readonly title: string } | { readonly content: JsonValue },
+  ): Promise<Answer> => {
+    const withdrawn = live();
+    if (withdrawn !== null) return Promise.resolve(withdrawn);
+    const stored = host.document(resourceId);
+    if (stored === undefined) {
+      return Promise.resolve({ refused: describeAuthoringRefusal({ code: 'resource-not-found' }) });
+    }
+    const parsed = resourceDocumentSchema.safeParse({ ...stored, ...change });
+    if (!parsed.success) {
+      const titleRequired = parsed.error.issues.some(
+        (issue) => issue.code === 'custom' && issue.params?.['code'] === RESOURCE_TITLE_REQUIRED,
+      );
+      return Promise.resolve(
+        titleRequired
+          ? { refused: describeAuthoringRefusal({ code: RESOURCE_TITLE_REQUIRED }) }
+          : INVALID,
+      );
+    }
+    return completeAsAnswer(
+      (settle) => complete({ kind: 'edited-resource', resourceId, document: parsed.data }, settle),
+      host.report,
+    );
+  };
   const store = host.assets?.store;
+  // A size hint is ignored: Ur, the one plugin drawn here, commits none, and
+  // the canvas applies none yet (`docs/agents/maps-and-graphs.md`, R38, R40).
   return {
+    title: (next) => editDocument({ title: next }),
+    content: (next) => editDocument({ content: next }),
     map: (next) => changeMapContent(next),
     store:
       store === undefined
@@ -160,7 +190,7 @@ export function pluginSurfaceOperations(
   };
   if (!offersCommits(facts)) return drawn;
   if (host.claims.exclusive !== null) return { ...drawn, withdrawn: true };
-  const replaced = (): Answer | null => (host.replacementEpoch() === builtIn ? null : GONE);
+  const replaced = (): Refusal | null => (host.replacementEpoch() === builtIn ? null : GONE);
   const plain = commitsFor(
     host,
     resourceId,
@@ -190,5 +220,13 @@ export function pluginSurfaceOperations(
           host.gate.exclusiveRunning() || host.replacementEpoch() !== builtIn
             ? Promise.resolve([])
             : pickFiles(accept);
-  return { ...drawn, commitMap: plain.map, commitStore: plain.store, pick, claim };
+  return {
+    ...drawn,
+    commitTitle: plain.title,
+    commitContent: plain.content,
+    commitMap: plain.map,
+    commitStore: plain.store,
+    pick,
+    claim,
+  };
 }

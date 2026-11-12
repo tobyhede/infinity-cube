@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useMemo, useState } from 'react';
 import { mapContentWithoutMap, titleName, type PluginKind } from '@project/core';
 import type { Size } from '@project/resource-api/domain';
 import type { OwnProps, TitleProps } from '@project/resource-api/view';
@@ -6,8 +6,7 @@ import {
   createRailStore,
   ResourceHostProvider,
   type ResourceHost,
-  type TitleProps,
-} from '@project/resource-api/view';
+} from '@project/resource-api/view/host';
 import { NoEmbed, pluginEntryFor, type PluginEntry } from './kinds/plugin-views';
 import { readingAssets, usePluginAssets } from './plugin-assets';
 import { ResourceFailureBoundary } from './ResourceFailureBoundary';
@@ -67,12 +66,12 @@ export function PresentedPluginSurface(
   const supplied = usePluginAssets();
   const assets = useMemo(() => readingAssets(supplied), [supplied]);
   const name = titleName(title);
-  const host: ResourceHost = useMemo(() => {
-    function StageTitle({ className }: TitleProps) {
-      return <h2 className={['resource__title', className].filter(Boolean).join(' ')}>{name}</h2>;
-    }
-    return { Title: StageTitle, Own: StageOwn, rail: createRailStore() };
-  }, [name]);
+  const [host] = useState((): ResourceHost => ({
+    Title: StageTitle,
+    Own: StageOwn,
+    rail: createRailStore(),
+  }));
+  const [drawing] = useState(() => Symbol('drawing'));
   const plugin = props.entry.render({
     resourceId: props.resourceId,
     kind,
@@ -82,6 +81,7 @@ export function PresentedPluginSurface(
     size: STAGE_SIZE,
     selected: false,
     operations: { kind },
+    drawing,
     assets,
     Embed: NoEmbed,
     onClaim: (claim) => claim.unmount(),

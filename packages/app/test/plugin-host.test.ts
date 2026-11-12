@@ -529,7 +529,10 @@ describe('a plugin surface’s commits on the canvas', () => {
 
   it('offers the asset store and the picker where it offers commits, and neither elsewhere', async () => {
     const { assets, stored, picked } = recordingAssets();
-    const host = { ...hostWith(() => ({ kind: 'completed' })), assets };
+    const host = Object.assign(
+      hostWith(() => ({ kind: 'completed' })),
+      { assets },
+    );
     const operations = pluginSurfaceOperations('ur', RESOURCE, FACTS, host);
 
     await expect(operations.commitStore?.(new Blob(['a']))).resolves.toBe(
@@ -543,7 +546,10 @@ describe('a plugin surface’s commits on the canvas', () => {
 
   it('withdraws storing and picking while exclusive work runs, and keeps that work’s own store live', async () => {
     const { assets, stored } = recordingAssets();
-    const host = { ...hostWith(() => ({ kind: 'completed' })), assets };
+    const host = Object.assign(
+      hostWith(() => ({ kind: 'completed' })),
+      { assets },
+    );
     const operations = pluginSurfaceOperations('ur', RESOURCE, FACTS, host);
     const kept = pluginSurfaceOperations(
       'ur',
@@ -551,7 +557,7 @@ describe('a plugin surface’s commits on the canvas', () => {
       FACTS,
       host,
     );
-    const held = operations.claim?.();
+    const held = operations.claim?.(Symbol('drawing'));
     let ownStore: PluginOperations['commitStore'];
     let finish: () => void = () => undefined;
     const work = held?.exclusively(
@@ -575,7 +581,7 @@ describe('a plugin surface’s commits on the canvas', () => {
     expect(stored).toHaveLength(1);
   });
 
-  it('says whether the surface holds a Claim, and reports what its plugin throws while drawing', () => {
+  it('says which drawing holds a Claim, and reports what its plugin throws while drawing', () => {
     const report = vi.fn();
     const host = hostWith(() => ({ kind: 'completed' }), { value: 2 }, report);
     const drawing = Symbol('drawing');

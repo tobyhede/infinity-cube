@@ -73,7 +73,17 @@ export interface PluginOperations {
    */
   readonly commitStore?: PluginStore | undefined;
   readonly pick?: ((accept: string) => Promise<File[]>) | undefined;
-  readonly claim?: (() => PluginHostClaim | undefined) | undefined;
+  /**
+   * A Claim for the drawing keyed `drawing`: a key the surface mints for its
+   * own lifetime, so two drawings of one Resource never share a Claim.
+   */
+  readonly claim?: ((drawing: symbol) => PluginHostClaim | undefined) | undefined;
+  /**
+   * Who holds a Claim on this Resource, as the drawing keyed `drawing` reads it
+   * when asked. A drawing whose Resource another drawing holds is offered no
+   * commit, and a commit it kept answers refused.
+   */
+  readonly claimHolder?: ((drawing: symbol) => ClaimHolder) | undefined;
   /**
    * Exclusive work runs elsewhere: the surface offers no authoring, its
    * host-drawn Title and Actions included, until it ends (ADR 0142).
