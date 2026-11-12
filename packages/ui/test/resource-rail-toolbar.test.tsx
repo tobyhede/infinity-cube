@@ -31,7 +31,7 @@ const tabStops = () => railButtons().filter((button) => button.tabIndex === 0);
 
 /** A host Claim that is always granted and always released. */
 const grantedClaim = (): PluginHostClaim => ({
-  release: () => true,
+  release: () => undefined,
   exclusively: (work) => work({}),
   unmount: () => undefined,
 });

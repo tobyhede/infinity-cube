@@ -15,7 +15,7 @@ const request = (
     commit === undefined
       ? undefined
       : { value: { spaceId: TARGET, map: TARGET, graph: TARGET }, commit },
-  claim: claimed ? { release: () => true } : undefined,
+  claim: claimed ? { release: () => undefined } : undefined,
 });
 
 describe('the Map embeddings drawn on one canvas', () => {

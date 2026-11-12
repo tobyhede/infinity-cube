@@ -23,7 +23,7 @@ export const publishedEmbeds = (
             request: {
               view: display.content.content,
               select: undefined,
-              claim: claimed.has(node.data.resourceId) ? { release: () => true } : undefined,
+              claim: claimed.has(node.data.resourceId) ? { release: () => undefined } : undefined,
             },
           },
         ],

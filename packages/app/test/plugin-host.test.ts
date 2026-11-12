@@ -706,8 +706,11 @@ describe('a plugin surface’s commits on the canvas', () => {
     );
     expect(reasonOf(await keptClose?.({ open: false }))).toMatch(/\S/u);
     expect(complete).not.toHaveBeenCalled();
-    // The outer Claim holds while the inner one runs.
-    expect(outer?.release()).toBe(false);
+    // Asked to release while the inner one runs, the outer Claim holds until
+    // the inner one ends: the host completes the release then.
+    outer?.release();
+    expect(host.gate.getState().releasing).toEqual([spaceDrawing.key]);
+    expect(host.gate.getState().holders).toEqual([[spaceDrawing], [spaceDrawing, imageDrawing]]);
 
     await expect(replace?.({ url: 'https://example.com/b.png' })).resolves.toBe('completed');
     expect(complete).toHaveBeenCalledTimes(1);
@@ -721,8 +724,7 @@ describe('a plugin surface’s commits on the canvas', () => {
     );
     finish();
     await work;
-    expect(inner?.release()).toBe(true);
-    expect(outer?.release()).toBe(true);
+    inner?.release();
     expect(host.gate.getState()).toEqual(NO_CLAIMS);
   });
 
