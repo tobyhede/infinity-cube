@@ -507,6 +507,12 @@ test('Opening an unresized Markdown Resource grows it to its content, and Closin
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   const resource = nodeByTitle(page, 'A').first();
+  // The node's width is a placement transition, so a size is read once it ends.
+  const restingWidth = () =>
+    resource.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+      return element.getBoundingClientRect().width;
+    });
   await expect(resource).toBeVisible();
   await settled(page);
   const before = await allPositions(page);
@@ -518,8 +524,8 @@ test('Opening an unresized Markdown Resource grows it to its content, and Closin
   await expect(resource.locator('.canvas-resource[data-open="true"]')).toHaveCount(1);
   await settled(page);
   const opened = await allPositions(page);
-  const openBox = await resource.boundingBox();
-  expect(openBox?.width ?? 0).toBeGreaterThan(closedBox?.width ?? 0);
+  const openWidth = await restingWidth();
+  expect(openWidth).toBeGreaterThan(closedBox?.width ?? 0);
   // It grows from its own top-left corner; what its growth passes moves.
   expect(opened[openedId ?? '']).toEqual(before[openedId ?? '']);
   expect(opened).not.toEqual(before);
@@ -535,7 +541,7 @@ test('Opening an unresized Markdown Resource grows it to its content, and Closin
   await (await controls(resource)).getByRole('button', { name: 'Close Resource A' }).click();
   await expect(resource.locator('.canvas-resource[data-open="true"]')).toHaveCount(0);
   expect(await allPositions(page)).toEqual(opened);
-  expect((await resource.boundingBox())?.width).toBeCloseTo(openBox?.width ?? 0, 0);
+  expect(await restingWidth()).toBeCloseTo(openWidth, 0);
 
   // Sized now, so Opening again changes what it draws and no rect.
   await openResource(resource, 'A');
