@@ -39,8 +39,12 @@ export interface Assets {
 
 /** A Claim: who is interacting (ADR 0142). */
 export interface Claim {
-  /** Release it, answering whether it was released; an outer Claim is not released while an inner one runs. */
-  release(): boolean;
+  /**
+   * Let it go. Never refused, and releasing again changes nothing: while a
+   * Claim inside it or its own exclusive work runs, the host keeps it until
+   * that ends and then releases it, so a plugin never retries a release.
+   */
+  release(): void;
 }
 
 /**

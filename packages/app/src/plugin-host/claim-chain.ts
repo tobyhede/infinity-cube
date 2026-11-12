@@ -14,8 +14,11 @@
  *   drawing embedded in the deepest holder; a sibling, an outer drawing, another
  *   drawing of a held Resource or another chain is answered `undefined`. Asking
  *   again from the deepest holder answers the Claim it holds.
- * - Only the deepest Claim releases: an outer Claim is not released while an
- *   inner one runs, and an inner release returns to the outer.
+ * - Releasing is idempotent and never refused. The deepest Claim, with no
+ *   exclusive work of its own running, is released at once and returns to the
+ *   one outside it. Any other holder's release is pending: it completes as
+ *   soon as nothing runs inside it — when the Claims inside it are released or
+ *   unmounted, or its exclusive work ends — so no plugin ever retries one.
  * - Unmounting a drawing releases its Claim and every Claim inside it.
  * - Exclusive work is one at a time, run by a held Claim, and nothing is
  *   claimed while it runs.
@@ -40,9 +43,11 @@ export interface ClaimChain {
   readonly holders: readonly Embedding[];
   /** The holder whose exclusive work runs, by its key, or `null`. */
   readonly exclusive: DrawingKey | null;
+  /** The holders whose release waits on a Claim inside them or their exclusive work. */
+  readonly releasing: readonly DrawingKey[];
 }
 
-export const NO_CLAIMS: ClaimChain = { holders: [], exclusive: null };
+export const NO_CLAIMS: ClaimChain = { holders: [], exclusive: null, releasing: [] };
 
 const drawingOf = (embedding: Embedding): Drawing | undefined => embedding.at(-1);
 
@@ -81,10 +86,35 @@ export function claim(chain: ClaimChain, embedding: Embedding): ClaimChain | und
   return { ...chain, holders: [...chain.holders, embedding] };
 }
 
-/** The chain with this drawing's Claim released, or `undefined` when it may not be. */
-export function release(chain: ClaimChain, key: DrawingKey): ClaimChain | undefined {
-  if (deepest(chain) !== key || chain.exclusive === key) return undefined;
-  return { ...chain, holders: chain.holders.slice(0, -1) };
+/** Whether this holder's release is pending. */
+const releasing = (chain: ClaimChain, key: DrawingKey): boolean => chain.releasing.includes(key);
+
+/**
+ * The chain with every pending release that nothing now runs inside completed:
+ * the deepest holder is released while its release is pending and no
+ * exclusive work of its own runs, which may leave the next one deepest.
+ */
+function settle(chain: ClaimChain): ClaimChain {
+  let { holders } = chain;
+  for (;;) {
+    const last = holders.at(-1);
+    const key = last === undefined ? undefined : drawingOf(last)?.key;
+    if (key === undefined || chain.exclusive === key || !releasing(chain, key)) break;
+    holders = holders.slice(0, -1);
+  }
+  if (holders === chain.holders) return chain;
+  const left = new Set(holders.map((embedding) => drawingOf(embedding)?.key));
+  return { ...chain, holders, releasing: chain.releasing.filter((key) => left.has(key)) };
+}
+
+/**
+ * The chain with this drawing's Claim released, or its release pending until
+ * nothing runs inside it. A drawing that holds nothing, or whose release is
+ * already pending, leaves the chain as it is.
+ */
+export function release(chain: ClaimChain, key: DrawingKey): ClaimChain {
+  if (!holds(chain, key) || releasing(chain, key)) return chain;
+  return settle({ ...chain, releasing: [...chain.releasing, key] });
 }
 
 /**
@@ -95,25 +125,29 @@ export function unmount(chain: ClaimChain, key: DrawingKey): ClaimChain {
   const at = chain.holders.findIndex((embedding) => drawingOf(embedding)?.key === key);
   if (at < 0) return chain;
   const holders = chain.holders.slice(0, at);
-  const exclusive =
-    chain.exclusive !== null &&
-    holders.some((embedding) => drawingOf(embedding)?.key === chain.exclusive)
-      ? chain.exclusive
-      : null;
-  return { holders, exclusive };
+  const left = new Set(holders.map((embedding) => drawingOf(embedding)?.key));
+  const exclusive = chain.exclusive !== null && left.has(chain.exclusive) ? chain.exclusive : null;
+  return settle({
+    holders,
+    exclusive,
+    releasing: chain.releasing.filter((pending) => left.has(pending)),
+  });
 }
 
-/** Why exclusive work cannot start, or the chain with it running. */
+/**
+ * Why exclusive work cannot start, or the chain with it running. A holder
+ * whose release is pending has let its Claim go and runs nothing.
+ */
 export function beginExclusive(
   chain: ClaimChain,
   key: DrawingKey,
 ): ClaimChain | 'busy' | 'not-held' {
   if (chain.exclusive !== null) return 'busy';
-  if (!holds(chain, key)) return 'not-held';
+  if (!holds(chain, key) || releasing(chain, key)) return 'not-held';
   return { ...chain, exclusive: key };
 }
 
-/** The chain with this drawing's exclusive work ended. */
+/** The chain with this drawing's exclusive work ended, and its pending release completed. */
 export function endExclusive(chain: ClaimChain, key: DrawingKey): ClaimChain {
-  return chain.exclusive === key ? { ...chain, exclusive: null } : chain;
+  return chain.exclusive === key ? settle({ ...chain, exclusive: null }) : chain;
 }

@@ -223,7 +223,7 @@ export function renderPlugin<C, M>(
     const plain = <T, A>(commit: ((next: T) => Promise<A>) | undefined) =>
       offered(commit === undefined ? undefined : guarded(commit, idle, WITHDRAWN));
     const claim: OwnClaim<C, M> = {
-      release: () => true,
+      release: () => undefined,
       exclusively: (work) =>
         gate.exclusively((live) => {
           const ownCommit = <T, A>(commit: ((next: T) => Promise<A>) | undefined) =>

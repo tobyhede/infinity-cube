@@ -37,7 +37,8 @@ export interface PluginCommits {
 
 /** A Claim as the host hands it out, before the plugin's types are put on it. */
 export interface PluginHostClaim {
-  release(): boolean;
+  /** Let the Claim go: at once, or as soon as nothing runs inside it. */
+  release(): void;
   exclusively<T>(work: (own: PluginCommits) => Promise<T>): Promise<T | 'busy'>;
   /** The surface that took it is gone: it and every Claim inside it are released. */
   unmount(): void;

@@ -44,7 +44,7 @@ const C = drawingOf('c');
 describe('the Claim chain (ADR 0142)', () => {
   it('grants a first Claim to any drawing, and a later one only inside the deepest', () => {
     const outer = claim(NO_CLAIMS, [A]);
-    expect(outer).toEqual({ holders: [[A]], exclusive: null });
+    expect(outer).toEqual({ holders: [[A]], exclusive: null, releasing: [] });
     if (outer === undefined) return;
     expect(claim(outer, [B])).toBeUndefined();
     expect(claim(outer, [A])).toBe(outer);
@@ -55,27 +55,59 @@ describe('the Claim chain (ADR 0142)', () => {
     expect(claim(inner, [A, C])).toBeUndefined();
   });
 
-  it('releases only the deepest Claim, returning to the one outside it', () => {
-    const chain: ClaimChain = { holders: [[A], [A, B]], exclusive: null };
-    expect(release(chain, A.key)).toBeUndefined();
-    expect(release(chain, B.key)).toEqual({ holders: [[A]], exclusive: null });
+  it('releases the deepest Claim at once, returning to the one outside it', () => {
+    const chain: ClaimChain = { holders: [[A], [A, B]], exclusive: null, releasing: [] };
+    expect(release(chain, B.key)).toEqual({ holders: [[A]], exclusive: null, releasing: [] });
+    expect(release(NO_CLAIMS, A.key)).toBe(NO_CLAIMS);
+  });
+
+  it('keeps an outer Claim released while an inner one runs, and completes it when that one is released', () => {
+    const chain: ClaimChain = { holders: [[A], [A, B]], exclusive: null, releasing: [] };
+    const pending = release(chain, A.key);
+    expect(pending).toEqual({ ...chain, releasing: [A.key] });
+    expect(holds(pending, A.key)).toBe(true);
+    expect(release(pending, A.key)).toBe(pending);
+    expect(beginExclusive(pending, A.key)).toBe('not-held');
+    expect(release(pending, B.key)).toEqual(NO_CLAIMS);
+  });
+
+  it('completes an outer release when the Claim inside it unmounts', () => {
+    const chain: ClaimChain = { holders: [[A], [A, B]], exclusive: null, releasing: [A.key] };
+    expect(unmount(chain, B.key)).toEqual(NO_CLAIMS);
+  });
+
+  it('keeps a Claim released during its exclusive work until that work ends', () => {
+    const held: ClaimChain = { holders: [[A], [A, B]], exclusive: B.key, releasing: [] };
+    const pending = release(held, B.key);
+    expect(pending).toEqual({ ...held, releasing: [B.key] });
+    expect(deepest(pending)).toBe(B.key);
+    expect(endExclusive(pending, B.key)).toEqual({
+      holders: [[A]],
+      exclusive: null,
+      releasing: [],
+    });
+    // An outer release pending behind it completes with it.
+    expect(endExclusive(release(pending, A.key), B.key)).toEqual(NO_CLAIMS);
   });
 
   it('releases a drawing and every Claim inside it when it unmounts, ending their work', () => {
-    const chain: ClaimChain = { holders: [[A], [A, B], [A, B, C]], exclusive: C.key };
-    expect(unmount(chain, B.key)).toEqual({ holders: [[A]], exclusive: null });
+    const chain: ClaimChain = {
+      holders: [[A], [A, B], [A, B, C]],
+      exclusive: C.key,
+      releasing: [C.key],
+    };
+    expect(unmount(chain, B.key)).toEqual({ holders: [[A]], exclusive: null, releasing: [] });
     expect(unmount(chain, Symbol('z'))).toBe(chain);
   });
 
   it('runs exclusive work one at a time, for a holder, and grants nothing while it runs', () => {
-    const held: ClaimChain = { holders: [[A], [A, B]], exclusive: null };
+    const held: ClaimChain = { holders: [[A], [A, B]], exclusive: null, releasing: [] };
     expect(beginExclusive(NO_CLAIMS, A.key)).toBe('not-held');
     const running = beginExclusive(held, B.key);
     expect(running).toEqual({ ...held, exclusive: B.key });
     if (running === 'busy' || running === 'not-held') return;
     expect(beginExclusive(running, A.key)).toBe('busy');
     expect(claim(running, [A, B, C])).toBeUndefined();
-    expect(release(running, B.key)).toBeUndefined();
     expect(endExclusive(running, B.key)).toEqual(held);
   });
 
@@ -89,7 +121,7 @@ describe('the Claim chain (ADR 0142)', () => {
     expect(holds(held, first.key)).toBe(true);
     expect(holds(held, second.key)).toBe(false);
     expect(unmount(held, second.key)).toBe(held);
-    expect(release(held, second.key)).toBeUndefined();
+    expect(release(held, second.key)).toBe(held);
   });
 
   it('says another drawing holds the Resource only to a drawing of it that does not hold', () => {
@@ -117,14 +149,21 @@ describe('the Claim chain (ADR 0142)', () => {
       }),
       fc.record({ kind: fc.constant('release' as const), drawing: fc.constantFrom(...drawings) }),
       fc.record({ kind: fc.constant('unmount' as const), drawing: fc.constantFrom(...drawings) }),
+      fc.record({ kind: fc.constant('begin' as const), drawing: fc.constantFrom(...drawings) }),
+      fc.record({ kind: fc.constant('end' as const), drawing: fc.constantFrom(...drawings) }),
     );
     fc.assert(
       fc.property(fc.array(step, { maxLength: 20 }), (steps) => {
         let chain = NO_CLAIMS;
         for (const next of steps) {
           if (next.kind === 'claim') chain = claim(chain, next.embedding) ?? chain;
-          else if (next.kind === 'release') chain = release(chain, next.drawing.key) ?? chain;
-          else chain = unmount(chain, next.drawing.key);
+          else if (next.kind === 'release') chain = release(chain, next.drawing.key);
+          else if (next.kind === 'unmount') chain = unmount(chain, next.drawing.key);
+          else if (next.kind === 'end') chain = endExclusive(chain, next.drawing.key);
+          else {
+            const begun = beginExclusive(chain, next.drawing.key);
+            if (begun !== 'busy' && begun !== 'not-held') chain = begun;
+          }
           chain.holders.forEach((embedding, index) => {
             const outer = chain.holders[index - 1];
             if (outer === undefined) return;
@@ -132,6 +171,13 @@ describe('the Claim chain (ADR 0142)', () => {
             expect(embedding.length).toBeGreaterThan(outer.length);
           });
           if (chain.exclusive !== null) expect(holds(chain, chain.exclusive)).toBe(true);
+          // A release is pending only for a holder, and only while something
+          // runs inside it: a Claim inside it, or its own exclusive work.
+          const top = deepest(chain);
+          for (const pending of chain.releasing) expect(holds(chain, pending)).toBe(true);
+          if (top !== undefined && chain.releasing.includes(top)) {
+            expect(chain.exclusive).toBe(top);
+          }
           // At most one drawing of a Resource holds a Claim.
           const held = chain.holders.map((embedding) => embedding.at(-1));
           for (const drawing of held) {
@@ -168,6 +214,25 @@ describe('the plugin gate', () => {
     await expect(running).resolves.toBe('done');
     expect(liveInside()).toBe(false);
     expect(gate.exclusiveRunning()).toBe(false);
+  });
+
+  it('completes a release asked for during exclusive work once that work settles', async () => {
+    const gate = createPluginGate();
+    const held = gate.claim([A], () => null);
+    let finish: () => void = () => undefined;
+    const running = held?.exclusively(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    held?.release();
+    expect(holds(gate.getState(), A.key)).toBe(true);
+    await expect(held?.exclusively(() => Promise.resolve('again'))).resolves.toBe('busy');
+    finish();
+    await running;
+    expect(gate.getState()).toEqual(NO_CLAIMS);
+    expect(gate.claim([B], () => null)).toBeDefined();
   });
 
   it('refuses a second chain, and releases on unmount', () => {
@@ -362,6 +427,26 @@ describe('a plugin surface’s commits on the canvas', () => {
     expect(reasonOf(await ownMap?.({ shape: 'diamond' }))).toMatch(/\S/u);
     expect(complete).toHaveBeenCalledTimes(1);
     held?.unmount();
+    expect(host.gate.getState()).toEqual(NO_CLAIMS);
+  });
+
+  it('completes a surface’s release asked for during its exclusive work once the work settles', async () => {
+    const host = hostWith(() => ({ kind: 'completed' }));
+    const operations = pluginSurfaceOperations('ur', RESOURCE, FACTS, host);
+    const drawing = Symbol('drawing');
+    const held = operations.claim?.(drawing);
+    let finish: () => void = () => undefined;
+    const work = held?.exclusively(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    held?.release();
+    expect(operations.claimHolder?.(drawing)).toBe('this-drawing');
+    finish();
+    await work;
+    expect(operations.claimHolder?.(drawing)).toBe('none');
     expect(host.gate.getState()).toEqual(NO_CLAIMS);
   });
 

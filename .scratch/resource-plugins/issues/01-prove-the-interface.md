@@ -75,6 +75,7 @@ Two parts are fake, and neither hides a question:
    - The plugin must **pick before `exclusively`**: `Exclusive` carries no `pick`, `exclusively` withdraws `pick`, and the picker needs the press.
    - So Replace runs: pick in the press, then claim, `exclusively`, `own.store`, `own.content`. `spec.md` now says this.
 3. **Does an outer Claim hold while an inner one runs? Yes.** `release()` answers `false` while a child Claim is held, and the outer Claim was still held when the work settled.
+   - **Changed in issue 02:** `release()` answers nothing. The outer release is kept pending and completes when the inner Claim ends, so no plugin retries it.
    - **A trap the harness hit:** unmounting releases a Claim. If `Embed` is a new component type on every render, React remounts everything inside it, and every inner Claim is released on the next re-render. The first run lost the outer Claim this way.
    - So `Embed` must keep the same identity for its surface's lifetime. `spec.md` now says so.
 4. **Can `queued` settle a commit honestly? Not with `complete` as it is. Yes with a small change.**

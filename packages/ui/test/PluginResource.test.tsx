@@ -279,7 +279,7 @@ describe('the Map host a plugin draws inside (ADR 0142)', () => {
     claimOnMount = true;
     const unmountClaim = vi.fn();
     const held: PluginHostClaim = {
-      release: () => true,
+      release: () => undefined,
       exclusively: () => Promise.resolve('busy'),
       unmount: unmountClaim,
     };
@@ -295,6 +295,36 @@ describe('the Map host a plugin draws inside (ADR 0142)', () => {
     expect(unmountClaim).toHaveBeenCalledTimes(1);
     expect(kept?.()).toBeUndefined();
     expect(claim).toHaveBeenCalledTimes(1);
+  });
+
+  it('hands the host a release the plugin asks for during its exclusive work, which needs no retry', async () => {
+    surfaces.length = 0;
+    const release = vi.fn();
+    let finish: () => void = () => undefined;
+    const held: PluginHostClaim = {
+      release,
+      exclusively: (work) => work({}),
+      unmount: () => undefined,
+    };
+    render(
+      <PluginSurface
+        {...probeProps({ operations: { kind: 'ur', claim: () => held } })}
+        entry={probeEntry}
+      />,
+    );
+    const own = surfaces.at(-1)?.claim?.();
+    const work = own?.exclusively(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    // Asked once, mid-work: the host completes it when the work ends
+    // (`packages/app/test/plugin-host.test.ts`), so the plugin asks no more.
+    expect(own?.release()).toBeUndefined();
+    finish();
+    await work;
+    expect(release).toHaveBeenCalledTimes(1);
   });
 
   it('loses only its own Resource when its plugin throws', () => {
@@ -420,7 +450,7 @@ describe('the Map host a plugin draws inside (ADR 0142)', () => {
     claimOnMount = true;
     const unmountClaim = vi.fn();
     const claim = vi.fn((): PluginHostClaim => ({
-      release: () => true,
+      release: () => undefined,
       exclusively: () => Promise.resolve('busy'),
       unmount: unmountClaim,
     }));
@@ -449,7 +479,7 @@ describe('the Map host a plugin draws inside (ADR 0142)', () => {
         if (holder !== undefined && holder !== drawing) return undefined;
         holder = drawing;
         return {
-          release: () => true,
+          release: () => undefined,
           exclusively: () => Promise.resolve('busy'),
           unmount: () => {
             holder = undefined;

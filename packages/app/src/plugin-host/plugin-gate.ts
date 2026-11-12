@@ -20,7 +20,8 @@ import {
 
 /** A Claim a surface holds, as the host hands it out; `own` is built per run. */
 export interface HostClaim<Own> {
-  release(): boolean;
+  /** Let the Claim go: at once, or as soon as nothing runs inside it (`claim-chain.ts`). */
+  release(): void;
   exclusively<T>(work: (own: Own) => Promise<T>): Promise<T | 'busy'>;
 }
 
@@ -77,12 +78,7 @@ export function createPluginGate(): PluginGate {
     if (drawing === undefined || next === undefined) return undefined;
     install(next);
     return {
-      release: () => {
-        const released = releaseIn(chain, drawing);
-        if (released === undefined) return false;
-        install(released);
-        return true;
-      },
+      release: () => install(releaseIn(chain, drawing)),
       exclusively: async <T>(work: (own: Own) => Promise<T>): Promise<T | 'busy'> => {
         const begun = beginExclusive(chain, drawing);
         if (begun === 'busy' || begun === 'not-held') return 'busy';

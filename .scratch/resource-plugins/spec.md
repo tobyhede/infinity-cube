@@ -57,7 +57,7 @@ interface Surface<C, M> {
   Embed: ComponentType<{ resource: ResourceId; title: Kept<string> } | { map: SpaceView; select?: Kept<SpaceView>; claim?: Claim }>
 }
 
-interface Claim { release(): boolean }
+interface Claim { release(): void }   // never refused: while an inner Claim or its own exclusive work runs, the host releases it when that ends
 interface OwnClaim<C, M> extends Claim {
   exclusively<T>(work: (own: Exclusive<C, M>) => Promise<T>): Promise<T | 'busy'>
 }

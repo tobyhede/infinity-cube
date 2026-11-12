@@ -74,7 +74,7 @@ What hosts a Resource plugin's drawing: a Map, the **Stage**, or another Resourc
 _Avoid_: read-only as a mode of a plugin (a surface that offers no authoring offers no commit), Resource canvas (the canvas is a Map's).
 
 **Claim**:
-A Resource plugin's hold on the interaction while an author works in it. Claims nest through what a plugin embeds, and the deepest holds the keyboard and shows its commands. An outer Claim is not released while an inner one runs. A Claim may run work **exclusively**, withdrawing authoring and navigation from every composed Space until that work settles.
+A Resource plugin's hold on the interaction while an author works in it. Claims nest through what a plugin embeds, and the deepest holds the keyboard and shows its commands. An outer Claim is not released while an inner one runs: releasing it then takes effect when the inner one ends, so a release is never refused. A Claim may run work **exclusively**, withdrawing authoring and navigation from every composed Space until that work settles.
 _Avoid_: lock, focus (the browser's), edit mode (a mode is the plugin's own).
 
 **Default plugin**:
