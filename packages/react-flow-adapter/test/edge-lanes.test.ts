@@ -28,7 +28,7 @@ const numbers = (path: string): number[] =>
  * are listed in the Map's Graph order: Long, Mid, Short, then Back 1 to 3. An
  * offset is in flow units: on the screen, below a horizontal pair and right of
  * a vertical one, where a pair runs one way, and on the Edge's left as it
- * travels where it runs both ways (ADR 0142).
+ * travels where it runs both ways (ADR 0143).
  */
 describe('graphLanes', () => {
   const LONG = uuid('00000000-0000-4000-8000-000000000201');
@@ -613,7 +613,7 @@ describe('laneBezier', () => {
 
   /**
    * Where a pair runs both ways, a positive offset is the Edge's left as it
-   * travels (ADR 0142): above a rightward Edge, below a leftward one, right of
+   * travels (ADR 0143): above a rightward Edge, below a leftward one, right of
    * a downward one and left of an upward one.
    */
   it.each([

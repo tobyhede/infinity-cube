@@ -80,7 +80,7 @@ const near = (actual: Point, expected: Point, what: string): void => {
 /** The fixture's Long Graph, and the Edge it draws from A to B. An Edge is
  *  identified by its Graph and its two endpoints (`graphRenderEdgeId`). Long is
  *  the fixture's Active Graph, so its Edge takes the centre lane and runs
- *  anchor to anchor (ADR 0142). */
+ *  anchor to anchor (ADR 0143). */
 const LONG = '00000000-0000-4000-8000-000000000023';
 const MID = '00000000-0000-4000-8000-000000000024';
 const SHORT = '00000000-0000-4000-8000-000000000025';
