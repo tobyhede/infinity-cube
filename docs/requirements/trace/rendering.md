@@ -11,7 +11,7 @@ Where an ADR feeds RD only in part, only the parts the mapping tables send to RD
 
 Abbreviations:
 - "rN" is the Nth rule of an ADR as numbered in the mapping tables (`map-*.md`); where a table gives no numbers, rules are named by their first words.
-- "R" ids are the old contract `docs/agents/maps-and-graphs.md`. "G§" is the old guide `docs/agents/rendering.md`, by section and bullet.
+- "R" ids are the old contract `docs/adr/archive/agent-guides/maps-and-graphs.md`. "G§" is the old guide `docs/adr/archive/agent-guides/rendering.md`, by section and bullet.
 - "DEC n" is a ruling in `../DECISIONS.md`.
 - Docs: SR space-and-resources.md, MG maps-and-graphs.md, ED editing.md, ST storage.md, UI ui.md, NV navigation.md, GL `CONTEXT.md`, PROC process docs (AGENTS.md, workflow.md, anti-slop.md, build-tooling.md).
 

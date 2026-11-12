@@ -11,7 +11,7 @@ For audit only. Every source rule appears exactly once in §1 or §2, with one o
 Abbreviations:
 - "rN" is the Nth rule of an ADR as numbered in the mapping tables (`map-*.md`).
 - "DR n" is drafting rule n and "DEC n" ruling n in `../DECISIONS.md`.
-- "R" ids are the old contract `docs/agents/maps-and-graphs.md`, received through `trace/maps-and-graphs.md` §3.
+- "R" ids are the old contract `docs/adr/archive/agent-guides/maps-and-graphs.md`, received through `trace/maps-and-graphs.md` §3.
 - Docs: SR space-and-resources.md, MG maps-and-graphs.md, ED editing.md, RD rendering.md, UI ui.md, NV navigation.md, GL `CONTEXT.md`, PROC process docs (AGENTS.md, workflow.md, anti-slop.md, build-tooling.md).
 
 The rule ids in `../storage.md` are append-only from this version on. ST-99 was added after ST-11 to keep one behaviour per id. The revision after the CODE and SCOPE audits added ST-100–ST-108 and removed ST-26 (see SR-10), ST-38 (see ST-24) and ST-93 (see NV-39). The reconciliation pass removed ST-100 (see ED-1).
@@ -220,7 +220,7 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 |---|---|
 | Commands › Run: port 4173 or the next free one; opens the browser unless `--no-open` | → ST-108 |
 
-**`docs/agents/editing-and-persistence.md`** (by section and bullet)
+**`docs/adr/archive/agent-guides/editing-and-persistence.md`** (by section and bullet)
 
 | Source | Disposition |
 |---|---|
@@ -381,7 +381,7 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 ## 5. Code notes
 
 - **ST-65 (bug).** `startRun` wraps the memory store in `ObservedRepository`, which marks the directory changed and schedules a write on every `committed` commit while serving. The single-Space route's loader commits a first working read's initialization to that store, so opening a mapless Space under Running Exports. `test/unit/aggregate-round-trip.test.ts` › "exports the Map and Graph a later initialization gave it" shows that an initialization, once Exported, is written. No test opens a mapless Space under Running. The fix must not drop the initialization: it stays in the store, and the next Export an Edit triggers writes it.
-- **Two doors, one intake.** 0010 says `loadSpace` is the only intake. `loadSpaceSnapshot` (`graph/src/space.ts`) builds a Space from a stored snapshot; both go through `buildSpace` and `documentRefusal`, so ST-22 states one intake and names no function. `docs/agents/editing-and-persistence.md` repeats "the one intake" for `loadSpace` alone.
+- **Two doors, one intake.** 0010 says `loadSpace` is the only intake. `loadSpaceSnapshot` (`graph/src/space.ts`) builds a Space from a stored snapshot; both go through `buildSpace` and `documentRefusal`, so ST-22 states one intake and names no function. `docs/adr/archive/agent-guides/editing-and-persistence.md` repeats "the one intake" for `loadSpace` alone.
 - **Strictness split.** `spaceFileObjectSchema` is a `strictObject`, and `.omit()`/`.extend()` carry it to the stored document, snapshot and import variants. Only the Resource envelope differs: `resourceFileSchema` is `.strict()`, `resourceDocumentSchema` is not. Each kind's content schema is strict at every door (`core/test/resource-document-equality.test.ts`). This answers audit-split §3 item 10.
 - **Stale comment.** `core/src/schema.ts` says of `maps` that "a Space with no Maps … is what a new Space is"; a new Space has a Map (see SR).
 - **Space directory names.** A Space directory's name is its identity (ST-27, ST-44), unlike a Resource file's (ST-29). No ADR states the Space half; `docs/aggregate-directory.md` does, and the reader enforces it.

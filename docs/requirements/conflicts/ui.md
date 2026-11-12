@@ -26,7 +26,7 @@ Closed by the rulings of 12 November 2026 (DECISIONS, Checkpoint 3 rulings). The
 
 **Recommendation: (b).** It is what every other ineligible end does, it needs no new identity, and 0112's own comparison ("like any other connection refusal") is met by it. Add a test that a release on another drawing's Resource completes nothing.
 
-**Evidence.** `docs/adr/0112-a-map-behaves-the-same-wherever-it-is-drawn.md:33`; `app/src/edge-authoring-react.tsx` (`mayOfferConnectionEnd`, `isValidConnection`, the gesture-refusal span); `app/test/edge-authoring-react.test.tsx` › "shows the reason a finished pointer gesture ran into". No test covers a cross-drawing release.
+**Evidence.** `docs/adr/archive/0112-a-map-behaves-the-same-wherever-it-is-drawn.md:33`; `app/src/edge-authoring-react.tsx` (`mayOfferConnectionEnd`, `isValidConnection`, the gesture-refusal span); `app/test/edge-authoring-react.test.tsx` › "shows the reason a finished pointer gesture ran into". No test covers a cross-drawing release.
 
 ### C2. Whether Remove from Map asks first
 
@@ -34,7 +34,7 @@ Closed by the rulings of 12 November 2026 (DECISIONS, Checkpoint 3 rulings). The
 
 **Rules affected:** UI-85; UI-83.
 
-**The disagreement.** 0074: "a destructive Card action states whether it affects one Layout or the whole Space, and asks first wherever authored work would be lost." Remove from Map removes every Edge touching the Resource in that Map's Graphs and forgets its size, Shape and Open state; re-adding restores none of them (MG-16, MG-19). The code never asks: neither the actions menu row nor Delete/Backspace on the canvas raises a question, while Delete from Space, Delete Map, Delete Graph and Delete Edge all do. The old guide itself says "removing a Resource from a Map or deleting an Edge cannot be undone" (`docs/agents/ui.md`, key-bindings bullet), and Undo is not built (DECISIONS 5).
+**The disagreement.** 0074: "a destructive Card action states whether it affects one Layout or the whole Space, and asks first wherever authored work would be lost." Remove from Map removes every Edge touching the Resource in that Map's Graphs and forgets its size, Shape and Open state; re-adding restores none of them (MG-16, MG-19). The code never asks: neither the actions menu row nor Delete/Backspace on the canvas raises a question, while Delete from Space, Delete Map, Delete Graph and Delete Edge all do. The old guide itself says "removing a Resource from a Map or deleting an Edge cannot be undone" (`docs/adr/archive/agent-guides/ui.md`, key-bindings bullet), and Undo is not built (DECISIONS 5).
 
 **Options.**
 - **(a) Ask when Edges would go.** Remove from Map asks first, naming the Map and the Edges it removes, whenever the Resource is an endpoint of an Edge in that Map; otherwise it runs at once. The common case stays one press.
@@ -43,7 +43,7 @@ Closed by the rulings of 12 November 2026 (DECISIONS, Checkpoint 3 rulings). The
 
 **Recommendation: (a).** Edges are the authored narrative and the one thing a re-add cannot bring back, which is exactly 0074's test; asking only then keeps the frequent tidy-up removal at one press. If the maintainer prefers (c), UI-85 becomes built as "Remove from Map asks nothing" with the Undo dependency noted.
 
-**Evidence.** `docs/adr/0074-space-card-references-own-the-target-space.md:59-62`; `app/test/resource-rail-actions.test.tsx` › "removes the Resource from this Map and leaves it in the Space, without asking"; `app/e2e/editing.spec.ts` › "${key} with a Resource selected removes it and its Edges from this Map"; `app/src/components/DeleteConfirmation.tsx` (asks for the other deletions).
+**Evidence.** `docs/adr/archive/0074-space-card-references-own-the-target-space.md:59-62`; `app/test/resource-rail-actions.test.tsx` › "removes the Resource from this Map and leaves it in the Space, without asking"; `app/e2e/editing.spec.ts` › "${key} with a Resource selected removes it and its Edges from this Map"; `app/src/components/DeleteConfirmation.tsx` (asks for the other deletions).
 
 ### C3. How a question or notice names a Resource, Map or Graph
 
@@ -59,4 +59,4 @@ Closed by the rulings of 12 November 2026 (DECISIONS, Checkpoint 3 rulings). The
 
 **Recommendation: (a).** The ellipsis keeps the name 0083 asks for and only adds the signal that more follows, which is 0083's own concern (part of a Title must not read as the whole). It is built and tested.
 
-**Evidence.** `docs/adr/0083-a-card-title-is-title-lines.md:27`; `CONTEXT.md:47`; `app/test/DeleteResourceConfirmation.test.tsx` › "names a Resource whose Title spans several lines by its first line and an ellipsis"; `app/test/resource-rail-actions.test.tsx` › "names the Resource in the question by its short Title and not by its whole Title".
+**Evidence.** `docs/adr/archive/0083-a-card-title-is-title-lines.md:27`; `CONTEXT.md:47`; `app/test/DeleteResourceConfirmation.test.tsx` › "names a Resource whose Title spans several lines by its first line and an ellipsis"; `app/test/resource-rail-actions.test.tsx` › "names the Resource in the question by its short Title and not by its whole Title".

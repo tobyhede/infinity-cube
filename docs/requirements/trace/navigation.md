@@ -14,7 +14,7 @@ The rule ids in `../navigation.md` are append-only from this version on.
 
 ## 1. Old guides
 
-### `docs/agents/navigation.md`
+### `docs/adr/archive/agent-guides/navigation.md`
 
 | Source | Disposition |
 |---|---|
@@ -47,7 +47,7 @@ The rule ids in `../navigation.md` are append-only from this version on.
 | A promise answers later; late `false` holds while no later traversal kept | folded → NV-35 |
 | Entry numbering (`hyperHistoryIndex`), fragment entries, uncounted foreign `pushState` | §6 code note |
 
-### `docs/agents/rendering.md` (Stage and presenting parts only; the rest is RD's)
+### `docs/adr/archive/agent-guides/rendering.md` (Stage and presenting parts only; the rest is RD's)
 
 | Source | Disposition |
 |---|---|

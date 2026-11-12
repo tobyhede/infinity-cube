@@ -9,7 +9,7 @@ For audit only. Every source rule appears exactly once in §1 or §2, with one o
 §3 groups the sends by receiving doc, so each doc can check them off. §4 holds code notes.
 
 Abbreviations:
-- "R" and "A" are ids in the old contract `docs/agents/maps-and-graphs.md`.
+- "R" and "A" are ids in the old contract `docs/adr/archive/agent-guides/maps-and-graphs.md`.
 - "rN" is the Nth rule of an ADR as numbered in the mapping tables.
 - "DEC n" is ruling n in `../DECISIONS.md`.
 - Docs: SR is space-and-resources.md, ED editing.md, ST storage.md, RD rendering.md, UI ui.md, NV navigation.md, GL `CONTEXT.md`, PROC is process docs (AGENTS.md, workflow.md, anti-slop.md).

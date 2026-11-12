@@ -10,14 +10,14 @@ For audit only. Every source rule appears exactly once in §1 or §2, with one o
 §3 checks off what maps-and-graphs sent here. §4 groups this doc's sends by receiving doc. §5 lists code-only rules. §6 holds code notes.
 
 Abbreviations:
-- "G n" is the bullet of the old guide `docs/agents/ui.md` that starts on line n.
+- "G n" is the bullet of the old guide `docs/adr/archive/agent-guides/ui.md` that starts on line n.
 - "rN" is the Nth rule of an ADR as numbered in the mapping tables.
 - "DEC n" is ruling n in `../DECISIONS.md`.
 - Docs: SR is space-and-resources.md, MG maps-and-graphs.md, ED editing.md, ST storage.md, RD rendering.md, NV navigation.md, GL `CONTEXT.md`, PROC is process docs (AGENTS.md, workflow.md, anti-slop.md, build-tooling.md).
 
 The rule ids in `../ui.md` are append-only from this version on.
 
-## 1. Old guide (`docs/agents/ui.md`)
+## 1. Old guide (`docs/adr/archive/agent-guides/ui.md`)
 
 | Source | Disposition |
 |---|---|
@@ -309,7 +309,7 @@ The rule ids in `../ui.md` are append-only from this version on.
 - 0102 kind glyph placement; G18 Shape glyph geometry and no glyph on Ur.
 - 0105 legend mark, markers, connection preview.
 - 0036 handle reveal on selection; 0033 gesture.
-- `docs/agents/rendering.md`'s Edge-chrome bullet is RD's source; RD should point here for the Edge controls (UI-78–UI-82).
+- `docs/adr/archive/agent-guides/rendering.md`'s Edge-chrome bullet is RD's source; RD should point here for the Edge controls (UI-78–UI-82).
 
 **navigation.md (NV):**
 - Presenting chrome accessibility, received from NV and returned (NV-89–NV-91).
@@ -340,7 +340,7 @@ Rules no source states, kept under drafting rule 5 (code plus a test, contradict
 - UI-40: Image's press opens a file picker (the four peers are G21's).
 - UI-41: search over every Title Line, kind and Spaces filters.
 - UI-62: the image-replacement running shape.
-- UI-78, UI-80: Edge focus and the Enter/Escape reach (stated only in `docs/agents/rendering.md`, RD's source).
+- UI-78, UI-80: Edge focus and the Enter/Escape reach (stated only in `docs/adr/archive/agent-guides/rendering.md`, RD's source).
 - UI-86: a keyboard Add from the Resources list keeps the caret there.
 - UI-94: the notice area's placement above the Dock and its dismissal (0112 states one notice area only).
 - UI-96: the zoom control (RD sent it; no ADR states it).

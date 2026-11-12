@@ -183,7 +183,7 @@ export const formatVerdict = (verdict: ToolchainVerdict): string =>
         'TypeScript toolchain is not the one ADR 0061 describes:',
         ...verdict.failures.map(indent),
         '',
-        'See docs/adr/0061-typescript-7-is-the-compiler-and-typescript-6-is-a-bridge.md.',
+        'See docs/agents/build-tooling.md.',
       ].join('\n');
 
 const indent = (line: string): string => `  ${line}`;

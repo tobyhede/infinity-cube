@@ -8,7 +8,7 @@ For audit only. Every source rule appears exactly once in §1–§3, with one of
 
 §4 checks off the items every other trace sent here. §5 groups this doc's sends by receiving doc. §6 lists code-only rules. §7 holds code notes.
 
-Abbreviations: "rN" is the Nth rule of an ADR as numbered in the mapping tables (`map-*.md`). "DEC n" is ruling n in `../DECISIONS.md`. Docs: MG maps-and-graphs.md, ED editing.md, ST storage.md, RD rendering.md, UI ui.md, NV navigation.md, GL `CONTEXT.md`, PROC process docs. "E&P" is `docs/agents/editing-and-persistence.md`; "ARC" is `docs/agents/authoring-refusal-cascade.md`.
+Abbreviations: "rN" is the Nth rule of an ADR as numbered in the mapping tables (`map-*.md`). "DEC n" is ruling n in `../DECISIONS.md`. Docs: MG maps-and-graphs.md, ED editing.md, ST storage.md, RD rendering.md, UI ui.md, NV navigation.md, GL `CONTEXT.md`, PROC process docs. "E&P" is `docs/adr/archive/agent-guides/editing-and-persistence.md`; "ARC" is `docs/adr/archive/agent-guides/authoring-refusal-cascade.md`.
 
 The rule ids in `../space-and-resources.md` are append-only from this version on.
 

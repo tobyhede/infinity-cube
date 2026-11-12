@@ -20,7 +20,7 @@ For the record, the conflict as it stood:
   - (a) Restate the reason as "Hyper is unreleased and makes no compatibility promise: an author recovers an old directory from git, or reads it with the build that wrote it".
   - (b) Leave the reason as 0056 states it.
 - **Recommendation.** (a). It matches the code and 0117's accepted cost ("git answers for history"). (b) states a premise that no longer holds. Adding an upgrade path for directories would change the rule, which is a new decision, not this conflict.
-- **Evidence.** `docs/adr/0054`, `0056`, `0117`, `0118`, `0132`; AGENTS.md "State" already names the image exception. `test/unit/import-aggregate.test.ts` › "refuses a version 2 space directory rather than migrating it"; `test/unit/run.test.ts` › "serves the directory it was started on".
+- **Evidence.** `docs/adr/archive/0054`, `0056`, `0117`, `0118`, `0132`; AGENTS.md "State" already names the image exception. `test/unit/import-aggregate.test.ts` › "refuses a version 2 space directory rather than migrating it"; `test/unit/run.test.ts` › "serves the directory it was started on".
 
 ### S1. Closed by ruling S1
 

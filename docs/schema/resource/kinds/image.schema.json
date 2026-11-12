@@ -21,7 +21,7 @@
       ]
     },
     "naturalSize": {
-      "description": "The picture's size in pixels, measured when the URL was set; absent when it did not load.",
+      "description": "An optional picture size in pixels retained in the file format; nothing reads or measures it. The field remains until the next deliberate format change.",
       "type": "object",
       "required": ["width", "height"],
       "additionalProperties": false,

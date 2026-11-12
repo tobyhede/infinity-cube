@@ -2,229 +2,113 @@
 
 How work moves from a question to committed code in this repo.
 
-The repository's skills are **tracked** (see _Skills_ below), so a fresh clone or worktree has them. None of them carries this loop, so the process is written down here.
-
 ## The loop
 
-1. **Survey** — read `CONTEXT.md`, the ADRs and the code, and propose candidate changes. Pick one.
-2. **Grill** — walk the decision tree on that candidate: one question at a time, each carrying a recommendation, until shared understanding is explicitly confirmed. **No code until it is.**
-3. **Record** — decisions that firm up language go into `CONTEXT.md`; decisions that lock a trade-off become an ADR, and the topic's current contract is updated in the same change (see _Current contracts_). This is not a phase. It fires mid-conversation, the moment something settles.
-4. **Implement** — code and tests together.
-5. **Verify** — see the bar below.
-6. **Capture** — resolve the ticket with an `## Answer`, and fix any doc that described the old state. AGENTS.md went on calling the ADR 0122 resize control unbuilt after its ticket resolved, because the change that built it left that entry alone.
+1. **Survey** — read `CONTEXT.md`, the requirements doc for the area and the code. Propose candidate changes and pick one.
+2. **Grill** — walk the decision tree on that candidate: one question at a time, each carrying a recommendation, until shared understanding is explicitly confirmed. No code until it is.
+3. **Record** — put settled names in `CONTEXT.md` and behaviour in the owning requirements doc as the decision settles.
+4. **Implement** — code and tests together. A behaviour change updates its requirements doc in the same commit.
+5. **Verify** — meet the bar in `AGENTS.md` and the checks below.
+6. **Capture** — resolve the ticket with an `## Answer`, update the requirement's status and evidence, and fix docs that described the old state.
 
-Anything not being worked on right now is parked in the tracker (`docs/agents/issue-tracker.md`), never left in conversation. A session ends; the tracker doesn't.
+Park work outside the current task in the [issue tracker](issue-tracker.md), under `.scratch/<feature>/`.
 
-## When to write an ADR
+## Requirements are binding
 
-Only when the decision is all three:
-
-- **Hard to reverse** — undoing it means reworking code or authored content.
-- **Surprising** — someone who knows the domain would not guess it.
-- **A real trade-off** — a credible alternative was rejected, for a reason.
-
-Record the rejected alternative and the cost accepted, not just the decision. Update the topic's current contract in the same change, where one exists.
-
-The most valuable ADRs capture a **negative** — the proposal a future review will otherwise re-suggest. ADR 0005 exists mainly to say *don't introduce an Arrangement type*; ADR 0004 to say *don't reintroduce a placement layer*. Both are proposals that look like improvements until you know why they were rejected.
-
-Skip ADRs for ephemeral reasons ("not worth it right now"), self-evident choices, and anything the glossary already implies.
-
-UI treatment is normally ephemeral. ADRs may record durable state ownership,
-module boundaries, persistence semantics or accessibility obligations, but not
-visual treatment, layout, control placement, gestures, shortcuts, responsive
-geometry, component choice, animation or canvas-composition technique. Those
-belong in issues, prototypes, stories and behavior tests where UX iteration can
-replace them directly.
-
-When an accepted ADR describes UI that has since changed, determine whether the
-durable boundary changed. If it did, write a refining or superseding ADR. If
-only the treatment changed, update the live issue/story/tests and leave the ADR
-as historical context; do not force the UI back into agreement.
-
-Format: a title that states the decision as a sentence, a status block, then a few paragraphs. Numbered `docs/adr/NNNN-<slug>.md`.
-
-## ADRs are append-only
-
-An ADR becomes a historical record when it merges to `main`. Until then it is a draft on its branch, whatever its status line says: when it is wrong, fix it in place, and fix the contract and `CONTEXT.md` with it.
-
-A merged, accepted ADR is **immutable**. It records why a decision looked right *at the time, with what was known then* — not what the design is now. That is why the log is worth keeping: the wrong turns are the most instructive part of it. The "overlaying routes turns to spaghetti" rule was believed and acted on for a while before measurement disproved it; a tidied document would show only the correction.
-
-So: **never merge, rewrite or consolidate ADRs.** When a decision changes, write a new one and amend the old one's status line — that line is the only edit an accepted ADR ever receives. The current statement of a topic lives in its current contract (below), never in a rewritten ADR.
-
-```
-Status: accepted | superseded | proposed
-Supersedes: 0004          # this decision replaces that one
-Superseded by: 0009       # added to the old ADR when it is replaced
-Refines: 0002             # narrows or fixes a boundary without replacing
-Refined by: 0005, 0006    # the reverse link, so a reader sees it from either end
-```
-
-Relationships are recorded from both ends. A reader landing on ADR 0002 must be able to tell it has been refined without having read 0005.
-
-There is no periodic re-review. The review point is `proposed → accepted`; after that an ADR changes only by being superseded.
-
-## Current contracts
-
-ADR 0115 decides this section. A **current contract** states one topic's accepted design in current words: each rule with its reason, the rejected alternatives and their costs, links to the source ADRs, and what is accepted but not built. It decides nothing; it restates. The responsibilities are:
+Read `AGENTS.md`'s task-to-doc table, then `CONTEXT.md` for terms and the owning doc in `docs/requirements/`. The seven requirements docs state the current rules. `docs/adr/archive/` is history, not binding; open it only for historical reasoning. An archived status line does not confer current authority.
 
 | Document | Owns |
 | --- | --- |
-| `AGENTS.md` | Pointers to each contract, with the tasks that call for it, plus the project summary and universal constraints. It does not restate a contract. |
-| `CONTEXT.md` | Definitions and distinctions between terms. Not behaviour, formats or build status. |
-| A current contract in `docs/agents/` | The topic's architectural rules. One owner per cross-package rule; other guides link to it and keep only their own operational gotchas. |
-| `docs/adr/README.md` | Discovering decisions, and pointing current-design work at the owning contract. |
-| ADR bodies | The reasoning, rejected alternatives and history, unchanged once accepted. |
-| `.scratch/` delivery issues | Build status, implementation gaps and completed-work narratives. |
+| `AGENTS.md` | Task-to-doc pointers, project summary and universal constraints |
+| `CONTEXT.md` | Names, definitions and distinctions between terms |
+| `docs/requirements/*.md` | Behaviour, its reason, build status and evidence; one owner per rule |
+| `docs/agents/` | Engineering process and tooling guidance |
+| Requirements `trace/`, `conflicts/` and `DECISIONS.md` | Source mappings and the rulings that produced the requirements |
+| `docs/adr/archive/` | Historical decisions and retired guides |
+| `.scratch/` delivery issues | Implementation work, investigations and completed-work narratives |
 
-Topics with a contract so far (this is the one list; add to it when a topic migrates):
+**Code is evidence of what is built.** It does not retire a requirement. Surface a disagreement with a requirement and resolve it explicitly before changing the rule. Preserve the distinction between `not built` and `bug: code differs`; update status only with evidence.
 
-- **Maps and Graphs:** [`maps-and-graphs.md`](maps-and-graphs.md).
+**Maintain the owner.** Update a behaviour's doc in the same commit as its change, including the rule's reason and evidence. Link from other topics rather than duplicating the rule. Rule ids are append-only: leave a removed rule as a tombstone and never renumber its neighbours. Check references whenever a rule is added, removed or redirected.
 
-Every other topic is read through `AGENTS.md`'s "Decided" pointers, the scoped guide for the area, and the ADR catalogue.
+**Keep treatment in code and tests.** Durations, easing, colours, sizes, spacing, typography, shadows and animation choreography alone are not requirements. Requirements retain what is drawn and what it means, what is reachable, what is focused or announced, and what is stored.
 
-**Reading order.** `AGENTS.md`, then `CONTEXT.md` for terms, then the owning contract. Open a source ADR for the full argument, a rejected alternative or the history.
+Record the reason for a changed requirement beside it. Put the history of the change and rejected alternatives in the commit or delivery issue; do not create a second binding record in the ADR archive.
 
-**Authority.** A contract cannot silently override an accepted ADR, and neither the latest prose nor the current code wins a disagreement by default. When a contract and an ADR disagree, or two ADRs do, surface it and get it resolved. A resolution that changes what an ADR decides, or one an ADR requires to be recorded, is a new ADR. A resolution that only settles which accepted source holds, or that records treatment no ADR states, goes into the contract with its date and into the topic's source inventory.
+## Domain vocabulary
 
-**Built is not decided.** Code shows what is built; it never retires an accepted rule. A contract lists accepted-but-unbuilt behaviour apart from its rules, links each gap to its delivery issue, and drops the note in the change that verifies the implementation.
+Update `CONTEXT.md` when a term is coined, sharpened or retired, in the same conversation. It is a glossary: names and definitions, without implementation details, file formats or build status. Use its terms in issue titles, hypotheses, tests and proposals. `_Avoid_` distinguishes terms that would otherwise be confused. Resolve a missing concept during domain review rather than introducing a casual synonym.
 
-**Same-change maintenance.** Accepting an ADR updates the owning contract in the same change. A wording fix or faithful restatement in a contract needs no ADR.
+Code follows these naming conventions:
 
-**Migrating a topic.** One topic per change. Inventory its live rules, important rejected alternatives, sources and gaps, and classify with a reason any historical claim left out. Fix reader questions and expected answers against the sources before drafting, and resolve open disagreements before scoring. Write the contract in current vocabulary, replace the topic's duplicate live accounts in `AGENTS.md` and the scoped guides with pointers in the same change, and add the topic to the list above. Then check fresh readers' answers through the adopted reading path and run the existing navigation, status and vocabulary checks. Those checks show that links resolve and vocabulary holds, not that the contract is faithful; the inventory review and the reader check are for that. The Map and Graph migration is the worked example: `.scratch/adr-consolidation/pilot/` and `.scratch/adr-consolidation/adoption/`.
+- A domain Map is never a local named `map`: use `(m)` for a short callback or a descriptive longer-lived name. A `…Map` suffix means the entity; lookup tables use `…ById` or `…ByKind`. Foreign names such as `.map(`, `.flatMap(`, `ReadonlyMap`, `WeakMap`, `MiniMap`, Prisma's `@@map` and Zod's `optionsMap` keep their spelling.
+- `Graph` and `GraphEdge` name the domain. A strategy's intermediate is `LayoutStrategyGraph`, a renderer's is `GraphRenderEdge`, and the canvas is `SpaceCanvas`. Use `LayoutStrategy*` for layout behaviour; authored data is a Map. Do not add aliases in retired domain vocabulary.
+- `path` is not a domain Graph: use `graphs` and `activeGraph`. Filesystem paths, HTTP and product URL paths, and React Flow's SVG `edge-path` retain their technical names.
+- “Arrangement” is prose, not a domain entity. `CanvasContent`'s `'resources'` means Resources are mounted on the canvas, not that Placement is settled.
+- Use core's `titleLines` and `titleName` helpers rather than splitting Titles ad hoc.
 
-## When to update CONTEXT.md
+`test/unit/current-domain-vocabulary.test.ts` guards authored source under `packages/`, `src/`, `test/`, `scripts/` and root TypeScript configuration. It does not scan Markdown or root tool configuration. Review prose vocabulary explicitly.
 
-Whenever a term is coined, sharpened or retired — in the same conversation, not later.
+Before changing a guard, read its shapes and exemption assertions. A retired word with an English suffix can evade compound and word-boundary patterns; kebab-case needs its own arms. Cited foreign paths use `CITED_PATH` masking. The dependency protocol is exempted by line, not by file. Keep an exemption only while its asserted occurrence still needs it; a foreign tool's word is not a reason to exempt unrelated domain uses. The bare word “workspace” is guarded for the loaded Space and the app chrome; say Space, Dock or canvas. pnpm's technical sense remains allowed at the guarded sites.
 
-`CONTEXT.md` is a **glossary, not a design doc**. No file formats, storage, or rendering libraries. If a definition mentions JSON, ELK or React Flow, it belongs somewhere else.
+## Renames and format changes
 
-Use `_Avoid_` actively — it carries as much weight as the definition, because it is what stops the next session reintroducing a term that was deliberately rejected.
+Keep a rename separate from structural changes, in separate commits. Run a repo-wide rename alone and early, before parallel work adds more surface in the old vocabulary.
 
-## Renames
+Write a tracked codemod that can be replayed by branches in flight. Read the headers of `.scratch/thing-and-diagram/rename-layout-to-diagram.mjs` and `rename-card-to-thing.mjs` for the mask–rewrite–unmask pattern. Specify both spellings not to change and files not to open, including foreign package names and lockfiles. List edits a replay must take from the merge rather than the codemod.
 
-Code should speak the glossary's vocabulary. Where it doesn't yet, AGENTS.md records the divergence as a gotcha and the tracker carries a ticket to close it.
+Diff a replay against the merged result; a clean dry run proves only that the mask table and tree agree. Use `-M20%` when merging large renames so heavily rewritten moved files remain recognisable. Finish by extending `test/unit/current-domain-vocabulary.test.ts` to reject retired identifier shapes, including kebab-case and any English suffixes actually used.
 
-Never let a rename ride along with a structural change. Separate commits — otherwise the diff is unreadable and, when something breaks, you cannot tell which change did it. Retiring the authored Node and the pending `path` → `Route` rename were split for exactly this reason.
-
-A repo-wide rename conflicts with everything, so it should run alone, and early. Every ticket completed before it adds new surface in the old vocabulary.
-
-**Write it as a tracked codemod, not a `sed` one-liner.** Two live under `.scratch/thing-and-diagram/` — `.scratch/thing-and-diagram/rename-layout-to-diagram.mjs` and `.scratch/thing-and-diagram/rename-card-to-thing.mjs` — and they are tracked so a branch that was in flight rebases onto the commit before one and replays it rather than hand-merging several hundred files. Read a header before writing the next one: each records the mask-then-rewrite-then-unmask design, the spellings it must not change and, separately, **the files it must not open at all**, which is the distinction both scripts learned the hard way — the first version of one renamed a real npm package out of the lockfile, invisible locally because `node_modules` already held the right name and fatal only on CI's clean install. Each also lists what it deliberately does **not** produce, because those are the edits a replaying branch has to take from the merge.
-
-**Check the replay rather than trusting it.** Diff the result against the merge and expect a handful of comment-only differences: that is how change one's review found six sites where a masked spelling had frozen a verb sense or an unmasked one had swept it, and how the second replay found two `.scratch/` efforts cited without their directory prefix, which no citation mask could see. A `--dry` that reports no change says the mask table and the tree agree — not that a replay needs no reading.
-
-**Merge with `-M20%`.** A rename that rewrites most of a file's lines falls under git's default 50% similarity and git stops reporting it as a rename at all: `layout-resolution.ts` → `map-resolution.ts` did, and a reviewer then reads a deletion and an unrelated addition instead of a move.
-
-**And the rename is not finished until `test/unit/current-domain-vocabulary.test.ts` can prove it.** Every completed rename here has a block there reporting the retired word in the identifier shapes it was written in, because a manual sweep misses sites and the scan is what found them. Write the **kebab-case** arms: a hyphen is not a word character, so `\b` lands either side of the retired word and every PascalCase and camelCase arm reads straight past `resource-not-found`, `map-title-required` and `.canvas-resource` — which is the shape a rename mostly carries. That instrument also decides whether a candidate name is affordable at all: ADR 0085 rejected *Object* because the same scan would need 287 exceptions, which is no guard.
+For a format change, roll schema, fixtures, examples and tests forward together under [Storage and hosts](../requirements/storage.md#rolling-forward). Fix generated state at its source; keep bootstrap and reset practical. Do not assume an author's Aggregate directory or browser copy is reproducible from this repository.
 
 ## Verification bar
 
-The bar is AGENTS.md "Before claiming done". Two rules sit beside it:
+The bar is `AGENTS.md`'s “Before claiming done”. In addition:
 
-- A behaviour-preserving refactor should leave e2e green **and unchanged**. That is the guard that proves it was behaviour-preserving.
-- Prove a bug fix against the defect, not only against a test written afterwards to pass. A test you wrote to match your fix will pass whether or not the fix addresses the real problem — reproduce the broken behaviour first, then show it gone.
+- A behaviour-preserving refactor leaves e2e green and unchanged.
+- Reproduce a defect before fixing it, then show the regression case pass.
+- Domain tests assert refusal codes and typed context; presentation tests assert wording and accessibility. Non-Edits retain the working snapshot's identity.
+- Every new interaction tied to a Resource, Map, Graph or Edge has an acceptance case for replacement of its Space while the interaction is live. Verify that its draft and pending continuation are discarded.
+- An unavailable control uses `aria-disabled`; test that attribute and that activation does nothing, rather than using `toBeDisabled`.
+- Base UI dispatches a `PointerEvent` for keyboard-activated menu items; jsdom needs that subclass supplied. Let a dismissed menu's focus-restoring microtask settle before the next gesture under test.
+
+### Fixture data
+
+`packages/app/fixture/` is the purpose-shaped tracked aggregate used by the fixture host and Playwright. Its positions are authored test data; do not regenerate them from a layout strategy. Preserve the disconnected Maps, overlapping Graph spines, unconnected member, multiline Title and Reference returns that exercise the application. Read `packages/app/README.md` before changing its shape. The narrative content under `packages/app/example/` is separate from test fixtures. Keep fixture documentation outside a Space directory, where Markdown is read as a Resource.
+
+### Stories are production evidence
+
+Start a story from `packages/app/stories/story-template.tsx`; its header owns section placement and the `StoryCanvas`/`StoryCanvasFrame` pattern. Stable stories render unchanged exported production components through the smallest production boundary owning the claimed behaviour. Harnesses supply fixtures, public inputs, providers, context and layout constraints; production owns state translation, lifecycle, focus, interaction and geometry. Keep unreachable proposals in `stories/review`.
+
+Every meaningful stable-story claim links two behavioural proofs: the rendered Ladle story and the real application composition. Compilation, screenshots, class or element counts, and application-only tests do not prove parity. Maintain `packages/app/stories/parity-claims.ts` and the design-system inventory when the surface changes.
+
+Full-application stories mount `components/Application.tsx`. `stories/support/application.ts` supplies fixture snapshots and isolated memory/history adapters; setup opens and enters through Open Spaces and creates failures through backend outcomes. Reach transient states through production operations or controls. Do not build a second Dock, session map or snapshot-edit implementation in the fixture. Account for inactive Spaces remaining mounted in browser assertions.
+
+Exercise refusals through production gestures. If a refusal cannot be reached through a browser gesture, hand the story its structured refusal and declare the claim's `applicationEvidence` exemption; do not inject display prose through a callback. `stories/support` is catalogue furniture: use `inv-*` styling and mount the production surface rather than imitating its classes.
 
 ## What a comment may assert
 
-A comment may only assert what its writer has checked. Ticket 14 shipped three that had not been, and every one was verifiable in the minute it would have taken to open the file named in it.
+Assert only what the writer has checked. A subagent summary is a report to verify against the file before turning it into source prose.
 
-**A negative result belongs in a ticket, never in source.** "X was tried and reverted because it broke Y" forecloses the work, reads as settled because it is in the source, and is never re-run. `App.tsx`'s `entityActions` carried one — six embedded-Map tests said to fail under `useMemo` — copied from a handoff bullet into a ticket into the source, and it did not reproduce. Put the finding in `.scratch/<feature>/`, dated and attributed, where a reader can see it is a report.
+- Put a negative result in a dated, attributed ticket with its method, not in source as a permanent conclusion.
+- Put measurements in a ticket with their method, or commit the instrumentation.
+- A claim about another module names the test that holds it.
+- A decision described as load-bearing needs a check that fails when it is reversed.
 
-**No measurement in source.** Commit the instrumentation or put the number in the ticket with the method that produced it. A count whose bench is gone cannot be refreshed or falsified.
-
-**A claim about another module names the test that holds it.** That family of test already exists for exactly this: `test/unit/command-surface-sharing.test.ts`, `codemirror-encapsulation.test.ts`, `graph-package-surface.test.ts`, `current-domain-vocabulary.test.ts`. "`EmbeddedMapAuthoring` calls `useCanvasResourceAuthoring` without `resourceEntityActions`" is one line of test; written as prose instead, its second clause was false. A subagent's summary is a report, not a fact — read the file before it becomes a sentence in the source.
-
-**A decision called load-bearing needs something that fails when it is reversed.** This ticket documented its reconciliation order that way; swapping the two calls broke none of the five cases, because they all read Navigation, which the repair fixes either way.
-
-None of these is lintable. They hold in review, so a review of this repo should ask of any comment in the diff whether the code supports what it says.
+Review these claims against the code; lint cannot establish them.
 
 ## What a comment may carry
 
-A comment states what the code does, why, and the invariant it keeps, in the present tense and about the code as it stands. It does not narrate lineage. An ADR or ticket citation stays only where the constraint it names cannot be seen in the code itself. This covers every comment in a tracked code file (`.ts`, `.tsx`, `.css`, `.prisma`), tests and stories included. Apply it one sentence at a time, in this order:
+Comments state what the code does, why, and the invariant it keeps, in the present tense. Apply this to every tracked source file, tests and stories included:
 
-1. **Is the sentence lineage?** Ask: _would it still be true, and still worth saying, if the code had been written this way from the start?_ If not, it is lineage. Lineage covers what the code replaced, what was retired, deleted or renamed, what this code or another module "used to" do or "was once", what a surface that has gone did, which ticket or ADR introduced it, and an alternative that was tried or considered and then rejected. The usual signal words are _replaces/replaced, retired, no longer, used to, was once, previously, formerly, the old, went with, is gone, now_ (when it contrasts with a before). **The words alone decide nothing.** They are lineage when their subject is the source code or the design. They are behaviour when their subject is runtime state. "An outcome about a replaced Space is discarded" describes Space replacement, which happens while the program runs, so it stays. "`SpaceCanvas` used to pass only `minZoom`" describes an earlier version of the file, so it goes.
-2. **Remove lineage, but keep the invariant it was protecting.** If the history was there to stop someone undoing something, rewrite it as a present-tense constraint that says what breaks: "Do not X: X causes Y." A rejected alternative may appear only as the thing the constraint forbids, never as the story of how it came to be rejected. If no invariant is left once the history is gone, delete the sentence.
-3. **Keep a citation (`ADR NNNN`, `.scratch/…`, a ticket number) only if both of these hold:** the sentence states a constraint a reader could not recover from the code in front of them, and the cited document is where the reasoning for that constraint lives. Most often this is a decision forbidding a change that looks obvious: adding memory, deriving something that is stored, collapsing two things that are separate on purpose. Remove the citation when it only records which ADR or ticket produced the code, when the code already shows the rule it names, or when it points at a resolved ticket as provenance. A `.scratch/` citation stays only while that ticket is open **and** the comment states the limitation the ticket tracks. Once the ticket resolves, the citation goes, and so does the limitation if it has been fixed.
-4. **The four rules above still apply** to whatever is left: no negative result, no measurement, a cross-module claim names its test, and anything called load-bearing has something that fails when it is reversed.
+1. Ask whether the sentence would still be true and useful if the code had been written this way from the start. If not, it is history. Runtime replacement of a Space is behaviour; a story about the module it replaced is history.
+2. Remove history while preserving any current constraint and what breaks if it is violated. If no invariant remains, remove the sentence.
+3. Keep a requirements or ticket citation only when it explains a constraint the code alone cannot show. A ticket citation earns its place while the ticket is open and the comment states its limitation. Archived ADR citations are historical pointers, never current authority; cite the owning requirement for a live rule.
+4. Apply the evidence rules above to the remaining prose.
 
-**Where lineage goes instead.** What changed and why belongs in the **commit message**, which is the default home and is always one `git log -L` or `git blame` away. A decision and the alternatives it rejected belong in an **ADR**: [When to write an ADR](#when-to-write-an-adr) already asks for the rejected alternative and the cost accepted. A negative result, a measurement, or an open follow-up belongs in a **ticket** under `.scratch/<feature>/`. None of these goes stale in the source, because none of them is in the source.
+Put change history and rejected alternatives in the commit or delivery issue. Keep comments about current constraints with their code.
 
-**What the rule does not touch.** Tool directives (`eslint-disable…`, `@ts-expect-error`, `prettier-ignore`) keep their syntax, and only their free-text reason is held to the rule. Two kinds of comment are **required** by a gate, so shortening one must leave what the gate reads. A `SAFETY:` comment before a type assertion is enforced by oxlint's `anti-slop/require-safety-comment-for-type-assertion`. The comment inside an intentionally empty block is what satisfies ESLint's `no-empty`. Finally, a few comments are text that a repository-scanning test asserts is still present, such as the retirement notice on `core`'s space-file schema. Those are listed in `.scratch/code-quality/issues/01-write-the-source-comment-rule.md`, and changing one means changing its test in the same commit.
-
-### Lineage: before and after
-
-`packages/app/src/components/CommandDock.tsx`, closing the module's doc comment:
-
-```ts
-// Before
- * It replaces `SpaceSidebar` and `OpenSpaceSidebars`, which ADR 0082 retired
- * along with the gutter they stood in
- * (`.scratch/command-dock/issues/07-promote-the-dock-and-retire-the-space-sidebar.md`).
- */
-
-// After: the paragraph is deleted. It is pure lineage, and the ticket it cites
-// is resolved. What the Dock *is* is already stated by the paragraphs above it.
- */
-```
-
-`packages/app/src/camera.ts`, on `PRESENTING_DURATION`:
-
-```ts
-// Before
-/**
- * How long the move onto the presented resource takes.
- *
- * One duration, because there is one move (ADR 0044). It replaced a 400ms pan
- * plus a 300ms close-in and was set to sit between the two totals.
- */
-
-// After: the replaced pan and close-in are history. "One move" is the
-// constraint, and it can be seen in the single constant, so the citation goes too.
-/** How long the move onto the presented resource takes: one duration, because there is one move. */
-```
-
-`packages/app/src/components/ChromeContinuation.tsx`, on `elementOf`. The before text is the paragraph that begins "It used to own a `sidebar-row` kind beside this one". It explains a lookup that no longer exists and a surface that has gone. The after text is nothing: once that story is removed, the sentence has no invariant left to keep.
-
-### Lineage reduced to its invariant
-
-`packages/graph/src/placement.ts`, on `roomAxis`:
-
-```ts
-// Before
- * **One axis, and `x` first**, because the half-plane rule ADR 0084 stated —
- * any Resource strictly past the subject's origin on an axis takes that axis's
- * growth — moved a Resource beside the subject by the whole height growth for
- * being one unit lower than it. …
-
-// After: the story of the earlier rule goes. The trap it guarded stays, as a constraint.
- * **One axis, and `x` first.** A Resource clear on `x` is clear of the grown
- * rect after taking the width alone. Do not also move it on `y`: a Resource
- * beside the subject and one unit lower would take the whole height growth.
-```
-
-### A citation that stays, and one that goes
-
-This one stays. In `displace` in `packages/graph/src/placement.ts`:
-
-```ts
- * repaired — clamping it, or remembering which Resources a particular Open pushed,
- * is the per-Resource history ADR 0084 rejected for making two identical Maps
- * behave differently.
-```
-
-The constraint is that Open and Close are memoryless and must not record who was pushed. That is something the code cannot show, because absence of state is invisible, and the obvious "fix" for the stated asymmetry is exactly the thing forbidden. ADR 0084 is where the reasoning lives. Keep it. (The sentence would read better as the constraint first — "Do not remember which Resources an Open pushed: two identical Maps would then behave differently (ADR 0084)" — but the citation earns its place either way.)
-
-This one goes. In `packages/graph/src/snapshot-edits.ts`, the module summary:
-
-```ts
-// Before
- * a Resource joins, grows, shrinks or leaves a Map — Add, Open, Close, Resize,
- * Remove from Map, Delete from Space (ADR 0084, ADR 0086).
-
-// After: the list of Edits is the code's own exports, and the ADRs only record
-// where those Edits were decided.
- * a Resource joins, grows, shrinks or leaves a Map — Add, Open, Close, Resize,
- * Remove from Map, Delete from Space.
-```
+Tool directives (`eslint-disable`, `@ts-expect-error`, `prettier-ignore`) retain their syntax; their free-text reasons follow these rules. Preserve required `SAFETY:` assertion comments and comments satisfying `no-empty`. When a repository-scanning test requires specific text, change that test in the same commit if the text must change; `.scratch/code-quality/issues/01-write-the-source-comment-rule.md` lists such cases.
 
 ## Skills
 

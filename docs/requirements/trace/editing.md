@@ -9,8 +9,8 @@ For audit only. Every source rule appears exactly once in §1–§4, with one of
 §5 groups the sends by receiving doc. §6 lists the code-only rules, §7 holds code notes.
 
 Abbreviations:
-- "EP n" is a bullet of the old guide `docs/agents/editing-and-persistence.md`, by line number.
-- "CAS" is the old guide `docs/agents/authoring-refusal-cascade.md`.
+- "EP n" is a bullet of the old guide `docs/adr/archive/agent-guides/editing-and-persistence.md`, by line number.
+- "CAS" is the old guide `docs/adr/archive/agent-guides/authoring-refusal-cascade.md`.
 - "rN" is the Nth rule of an ADR as numbered in the mapping tables; "s" after an ADR number marks a superseded ADR.
 - "DEC n" is ruling n in `../DECISIONS.md`.
 - Docs: SR is space-and-resources.md, MG maps-and-graphs.md, ST storage.md, RD rendering.md, UI ui.md, NV navigation.md, GL `CONTEXT.md`, PROC is process docs (AGENTS.md, workflow.md, anti-slop.md, build-tooling.md).
