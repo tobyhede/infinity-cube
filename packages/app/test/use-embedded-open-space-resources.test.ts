@@ -162,16 +162,23 @@ describe('useEmbeddedOpenSpaceResources', () => {
         },
       ),
     );
-    await waitFor(() => expect(result.current.embeddedFailures.get(TARGET)).toBe('Target missing'));
+    await waitFor(() =>
+      expect(result.current.failedEmbeddings).toEqual([
+        { id: HOST, title: 'Elsewhere', message: 'Target missing' },
+      ]),
+    );
     fail = false;
     await act(async () => {
       await result.current.resumeEmbedded(TARGET);
     });
-    expect(result.current.embeddedFailures.has(TARGET)).toBe(false);
+    expect(result.current.failedEmbeddings).toEqual([]);
   });
 
   it('drops a failure whose embedding is no longer standing', async () => {
-    const spaces = reader(() => Promise.reject(new Error('Target missing')));
+    let fail = true;
+    const spaces = reader(() =>
+      fail ? Promise.reject(new Error('Target missing')) : Promise.resolve(undefined),
+    );
     const { result, rerender } = renderHook(
       ({ nodes }) =>
         useEmbeddedOpenSpaceResources(nodes, publishedEmbeds(nodes), spaces, NO_DRAG, {
@@ -181,9 +188,14 @@ describe('useEmbeddedOpenSpaceResources', () => {
         }),
       { initialProps: { nodes: [spaceResource(HOST, MAP)] } },
     );
-    await waitFor(() => expect(result.current.embeddedFailures.get(TARGET)).toBe('Target missing'));
+    await waitFor(() => expect(result.current.failedEmbeddings).toHaveLength(1));
     rerender({ nodes: [] });
-    expect(result.current.embeddedFailures.has(TARGET)).toBe(false);
+    expect(result.current.failedEmbeddings).toEqual([]);
+    // Drawn again, the placement does not inherit the failure it was pruned of
+    // while its new read is in flight.
+    fail = false;
+    rerender({ nodes: [spaceResource(HOST, MAP)] });
+    expect(result.current.failedEmbeddings).toEqual([]);
   });
 
   it('measures the title footer into embed bounds', async () => {
@@ -270,7 +282,6 @@ describe('useEmbeddedOpenSpaceResources', () => {
     });
     // Nothing is drawn while the Space is unread, so the failure is said on the placement.
     expect(result.current.embeddedRequests).toHaveLength(0);
-    expect(result.current.embeddedFailures.get(TARGET)).toBe('Target missing');
     expect(result.current.failedEmbeddings).toEqual([
       { id: HOST, title: 'Elsewhere', message: 'Target missing' },
     ]);
@@ -279,7 +290,6 @@ describe('useEmbeddedOpenSpaceResources', () => {
       await result.current.resumeEmbedded(TARGET);
     });
     expect(asked).toBe(2);
-    expect(result.current.embeddedFailures.has(TARGET)).toBe(false);
     expect(result.current.failedEmbeddings).toEqual([]);
   });
 
