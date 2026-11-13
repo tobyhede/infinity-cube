@@ -4,7 +4,7 @@
 
 **Blocked by:** 02 — `pnpm dev` over PostgreSQL through a standalone host.
 
-**Status:** ready-for-agent
+**Status:** wontfix — dropped with standalone-http-host/01 (2026-11-13)
 
 - [ ] The built host starts from the bundle alone, without the workspace TypeScript sources, and closes its database when it stops.
 - [ ] Preview answers the root address, an unknown entity address and the API the same way dev does, covered by a test against the built output.
