@@ -5,7 +5,7 @@
 **Blocked by:** nothing. `07` and `08` are `resolved`. This is the deferred
 cross-Space Edges / traversal cut `08` left in its tail.
 
-**Status:** needs-info — waits on a decision on cross-Space Edges (ADR 0111)
+**Status:** needs-triage — waits on Toby's decision on cross-Space Edges (ADR 0111)
 
 - [ ] Entry and exit Edge authoring use the accepted canvas interaction and store symmetric qualified endpoints owned by the containing Graph.
 - [ ] Intake resolves every endpoint, rejects cycles or dangling references, and deletion refuses externally targeted entities rather than silently editing other Spaces.

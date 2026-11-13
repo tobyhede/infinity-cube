@@ -1,6 +1,6 @@
 # Keyboard shortcut best practices: a review checklist for React and React Flow apps
 
-The review checklist for Hyper's keyboard work: proposed ADR 0138 (a shortcut is a key bound to a named command), this directory's configurable-shortcuts tickets and the Canvas commands tickets in `.scratch/canvas-commands/`. Each practice has an ID (`BP-*`) that a review can cite.
+The review checklist for Hyper's keyboard work: ADR 0138 (a shortcut is a key bound to a named command), this directory's configurable-shortcuts tickets and the Canvas commands tickets in `.scratch/canvas-commands/`. Each practice has an ID (`BP-*`) that a review can cite.
 
 Researched 2026-10-28. This is a checklist for reviewing a keyboard shortcut implementation in a React app built on `@xyflow/react` v12. The React Flow claims were checked against the published source of `@xyflow/react` 12.12.0 (with `@xyflow/system` 0.0.83) and 12.11.2 (with `@xyflow/system` 0.0.79), the version this repo pins. Claims about tldraw 5.5.2, Excalidraw (`master`), tinykeys 4.0.1, react-hotkeys-hook 5.3.3, Mousetrap 1.6.5 and kbar 1.0.0 come from their source code. **[DISAGREE]** marks a point where the sources contradict each other. **[INFERENCE]** marks a recommendation that I derived and that no source states. A claim about a library's code links to the file in the published package at the version read, on unpkg, so it can be re-checked.
 
