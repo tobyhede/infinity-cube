@@ -4,7 +4,7 @@
 
 **Blocked by:** 02 — `pnpm dev` over PostgreSQL through a standalone host.
 
-**Status:** ready-for-agent
+**Status:** wontfix — dropped with standalone-http-host/01 (2026-11-13)
 
 - [ ] `dev:sqlite` keeps port 5177, migrates before serving, and takes its file only from the SQLite target's `SQLITE_PATH` rules.
 - [ ] Stopping the SQLite host closes its database. The SQLite restart proof asserts that the first host's database is closed before the second host opens the file, instead of relying on no request being in flight, and the comment saying no close hook exists is gone.

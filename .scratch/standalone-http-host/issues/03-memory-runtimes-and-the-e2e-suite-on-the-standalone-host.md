@@ -4,7 +4,7 @@
 
 **Blocked by:** 02 — `pnpm dev` over PostgreSQL through a standalone host.
 
-**Status:** ready-for-agent
+**Status:** wontfix — dropped with standalone-http-host/01 (2026-11-13)
 
 - [ ] Each memory command keeps its port, catalog and startup behaviour: `dev:new` creates the one-thing new space once, `dev:fixture` serves the tracked fixture, `dev:roadmap` serves the generated roadmap Space, and edits survive a browser reload for the host's lifetime.
 - [ ] Every E2E test still owns a fresh host, memory repository and catalog; reloads and extra pages inside a test share them, and no revision leaks to another test.
