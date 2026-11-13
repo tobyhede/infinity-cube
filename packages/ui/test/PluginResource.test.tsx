@@ -13,7 +13,7 @@ import {
   type PluginHostClaim,
   type PluginResourceProps,
 } from '../src';
-import { pluginEntry } from '../src/kinds/plugin-views';
+import { pluginEntry } from '../src/plugin-catalog';
 import { PluginSurface } from '../src/PluginResource';
 import { PresentedPluginSurface } from '../src/PresentedPluginResource';
 

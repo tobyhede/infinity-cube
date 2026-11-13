@@ -1,7 +1,7 @@
 import type { Node, NodeHandle } from '@xyflow/react';
 import { Position } from '@xyflow/react';
-import { FALLBACK_GRAPH_COLOR, bareOperations, graphPaint } from '@project/ui';
-import type { EntityActionGroup, KindOperationsOf, MapEmbedRequest } from '@project/ui';
+import { FALLBACK_GRAPH_COLOR, graphPaint } from '@project/ui';
+import type { EntityActionGroup, MapEmbedRequest, PluginOperations } from '@project/ui';
 import {
   DEFAULT_GRAPH_HEAD_SHAPE,
   DEFAULT_RESOURCE_SHAPE,
@@ -56,15 +56,11 @@ export type ResourceTitleEditor = {
 };
 
 /**
- * A Resource's own kind beside that kind's operations, one arm per kind, so the
- * two cannot disagree. The kind is drawn as a persistent glyph on the Resource.
- * A Reference Resource is `reference` whatever its Target is; what it draws is
- * its plugin's.
+ * A Resource's kind beside what its plugin is offered on the surface. The kind
+ * is drawn as a persistent glyph on the Resource; what it draws is its
+ * plugin's, found in the catalogue by its kind.
  */
-type KindDataOf<K extends Resource['kind']> = {
-  [P in K]: { kind: P; kindOperations: KindOperationsOf<P> };
-}[K];
-type ResourceKindData = KindDataOf<Resource['kind']>;
+type ResourceKindData = { kind: Resource['kind']; kindOperations: PluginOperations };
 
 /** Data carried by each custom resource node. Kept as a type alias so it satisfies
  *  React Flow's `Record<string, unknown>` data constraint. */
@@ -77,9 +73,6 @@ export type ResourceNodeData = ResourceKindData & ResourceNodeCommonData;
 export const authorsEmbeddedMap = (
   data: Pick<ResourceNodeData, 'authorsContent' | 'embedsMap'>,
 ): boolean => data.authorsContent && data.embedsMap;
-
-/** A Resource node's data for one kind. */
-export type ResourceNodeDataOf<K extends Resource['kind']> = Extract<ResourceNodeData, { kind: K }>;
 
 type ResourceNodeCommonData = {
   /**
@@ -213,23 +206,9 @@ type ResourceNodeCommonData = {
 
 export type ResourceFlowNode = Node<ResourceNodeData, 'resource'>;
 
-/** A Resource node of one kind. */
-export type ResourceFlowNodeOf<K extends Resource['kind']> = Node<
-  ResourceNodeDataOf<K>,
-  'resource'
->;
-
-/** Whether `node` is a Resource of `kind`, narrowing its data to that kind's. */
-export function isResourceNodeOf<K extends Resource['kind']>(
-  node: ResourceFlowNode,
-  kind: K,
-): node is ResourceFlowNodeOf<K> {
-  return node.data.kind === kind;
-}
-
 /** A Resource kind with none of its operations offered yet. */
-export function bareKindData<K extends Resource['kind']>(kind: K): KindDataOf<K> {
-  return { kind, kindOperations: bareOperations(kind) };
+export function bareKindData(kind: Resource['kind']): ResourceKindData {
+  return { kind, kindOperations: { kind } };
 }
 
 export type ColorByGraphId = Readonly<Partial<Record<GraphId, string>>>;

@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
-import { newDefaultResourceDocument, resolvedMapContent, resourceOutline } from '@project/core';
+import { newEmptyResourceDocument, resolvedMapContent, resourceOutline } from '@project/core';
 import { ViewportPortal, useConnection } from '@xyflow/react';
-import { PluginResource, bareOperations } from '@project/ui';
+import { PluginResource } from '@project/ui';
 import { RESOURCE_SIZE } from '../resource';
 import { dropTarget, newResourceDrop, type ElementDropTarget } from '../edge-authoring';
 
@@ -45,7 +45,7 @@ export function NewResourcePreview({
     connection.inProgress ? connection.fromNode.id : null,
   );
   // Built once per title rather than on every pointer frame the preview draws.
-  const ghost = useMemo(() => newDefaultResourceDocument(title), [title]);
+  const ghost = useMemo(() => newEmptyResourceDocument(title), [title]);
   const drop = newResourceDrop(
     endpoint === null || sourceId === null
       ? { kind: 'idle' }
@@ -88,7 +88,7 @@ export function NewResourcePreview({
           state="rest"
           graphColor="var(--accent)"
           readOnly
-          operations={bareOperations(ghost.kind)}
+          operations={{ kind: ghost.kind }}
         />
       </div>
     </ViewportPortal>

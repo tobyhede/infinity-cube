@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { isOfKind, EMPTY_ASSET_REF, newUuid, spaceFileSchema, uuidSchema } from '@project/core';
+import { EMPTY_ASSET_REF, newUuid, spaceFileSchema, uuidSchema } from '@project/core';
+import { isOfKind } from '@project/plugins/testing';
 import { initializeSpace, loadSpace, newSpace, nextGraphColor } from '../src/index';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');

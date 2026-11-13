@@ -1,18 +1,12 @@
-import { useMemo, type ComponentType, type ReactElement, type ReactNode } from 'react';
 import {
-  declaredOutline,
-  imageKind,
-  isPluginKind,
-  PLUGIN_KINDS,
-  jsonValueSchema,
-  markdownKind,
-  referenceKind,
-  spaceKind,
-  urKind,
-  type JsonValue,
-  type PluginKind,
-  type ResourceKind,
-} from '@project/core';
+  createContext,
+  useContext,
+  useMemo,
+  type ComponentType,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
+import { declaredOutline, jsonValueSchema, type JsonValue, type ResourceKind } from '@project/core';
 import type {
   Answer,
   AssetRef,
@@ -35,27 +29,18 @@ import type {
   PluginView,
   Surface,
 } from '@project/resource-api/view';
-import { defaultPlugin } from '@project/plugin-default/domain';
-import { defaultPluginView } from '@project/plugin-default/view';
-import { imagePlugin } from '@project/plugin-image/domain';
-import { imagePluginView } from '@project/plugin-image/view';
-import { markdownPlugin } from '@project/plugin-markdown/domain';
-import { markdownPluginView } from '@project/plugin-markdown/view';
-import { referencePlugin } from '@project/plugin-reference/domain';
-import { referencePluginView } from '@project/plugin-reference/view';
-import { spacePlugin } from '@project/plugin-space/domain';
-import { spacePluginView } from '@project/plugin-space/view';
-import { urPlugin } from '@project/plugin-ur/domain';
-import { urPluginView } from '@project/plugin-ur/view';
-import { ResourceFailureBoundary } from '../ResourceFailureBoundary';
+import { DEFAULT_PLUGIN_VIEW, PLUGIN_VIEWS, type PluginHalves } from '@project/plugins/view';
+import { ResourceFailureBoundary } from './ResourceFailureBoundary';
 
 /**
- * Each plugin's view half, keyed to the build-time plugin list
- * (`packages/core/src/kinds/plugins.ts`) by its kind, and the one place in this
- * package a plugin is named (ADR 0142). The host holds Resource content and Map
- * content as it stores them; an entry parses each through its own plugin's
- * schemas before the plugin sees it, and checks what a plugin commits is JSON
- * before the host takes it, so a plugin's types are its own end to end.
+ * The plugin catalogue (ADR 0142): each plugin's two halves, from the build's
+ * list (`@project/plugins/view`), behind one door that takes the host's
+ * values, and the one lookup every surface draws through, falling back to the
+ * default plugin. No plugin is named here. The host holds Resource content and
+ * Map content as it stores them; an entry parses each through its own
+ * plugin's schemas before the plugin sees it, and checks what a plugin
+ * commits is JSON before the host takes it, so a plugin's types are its own
+ * end to end.
  */
 
 /** Store bytes as an asset, answering their reference or why not. */
@@ -211,15 +196,28 @@ export type HostCreation =
 
 /** One plugin's creation, with the kind it creates and what one of its Resources is called. */
 export interface PluginCreationEntry {
-  readonly kind: PluginKind;
+  readonly kind: string;
   readonly name: string;
   readonly creation: HostCreation;
 }
 
 /** One plugin, both halves, behind a door that takes the host's values. */
 export interface PluginEntry {
-  /** What one of its Resources is called. */
+  /** The kind it draws. */
+  readonly kind: string;
+  /** What one Resource of it is called. */
   readonly name: string;
+  /** What the Resources list calls its Resources. */
+  readonly listName: string;
+  /** What a Reference Resource to one of it is called, or `null` when one may not be a Target. */
+  readonly referenceName: string | null;
+  /**
+   * Whether its Resources show another's content, as a Reference Resource
+   * does (ADR 0070): the host draws such a Resource's glyph as its Target's
+   * with a badge on it, and its border dotted at rest, keyed on this
+   * declaration and never on a kind.
+   */
+  readonly showsTarget: boolean;
   /** How its Resources are created, in the order it declares them. */
   readonly creations: readonly HostCreation[];
   readonly Glyph: ComponentType<{ readonly size?: number | undefined }>;
@@ -228,13 +226,6 @@ export interface PluginEntry {
   /** Whether the plugin draws its Title; the host draws the Title editor over one that does not. */
   readonly drawsTitle: boolean;
   readonly render: (input: PluginSurfaceInput) => ReactElement;
-}
-
-/** The plugin entries a host draws through: its own Resource's, and an embedded one's by kind. */
-export interface PluginSurfaceEntries {
-  readonly entry: PluginEntry;
-  /** The entry an embedded Resource of this kind is drawn through; absent, the build's. */
-  readonly entryFor?: ((kind: ResourceKind) => PluginEntry) | undefined;
 }
 
 /** Why a commit was refused before it reached the host: the value was not JSON. */
@@ -418,7 +409,11 @@ export function pluginEntry<C, M>(
     );
   }
   return {
+    kind: plugin.kind,
     name: plugin.name,
+    listName: plugin.listName,
+    referenceName: plugin.referenceName,
+    showsTarget: plugin.contentTarget !== undefined,
     creations: (view.creates ?? []).map((creation) => hostCreation(plugin, creation)),
     Glyph,
     bareAtRest: plugin.bareAtRest === true,
@@ -427,38 +422,73 @@ export function pluginEntry<C, M>(
   };
 }
 
-/** Every plugin's entry, typed so a plugin the list names and this file omits fails to compile. */
-const PLUGIN_ENTRIES = {
-  [imageKind.id]: pluginEntry(imagePlugin, imagePluginView),
-  [markdownKind.id]: pluginEntry(markdownPlugin, markdownPluginView),
-  [referenceKind.id]: pluginEntry(referencePlugin, referencePluginView),
-  [spaceKind.id]: pluginEntry(spacePlugin, spacePluginView),
-  [urKind.id]: pluginEntry(urPlugin, urPluginView),
-} satisfies Record<PluginKind, PluginEntry>;
+/** A plugin's two halves as an entry the host draws through. */
+const entryOf = (halves: PluginHalves): PluginEntry => halves.use(pluginEntry);
 
 /**
- * The default plugin's entry (ADR 0142): what draws a Resource whose kind
- * names no plugin in this build. It is in no list, so no kind selects it; the
- * host takes it when nothing else matches.
+ * The plugins a surface draws with: each listed plugin's entry, in list order,
+ * and the default plugin's, which draws a Resource whose kind names none of
+ * them. A test hands a surface a catalogue with a probe plugin in it.
  */
-const DEFAULT_ENTRY = pluginEntry(defaultPlugin, defaultPluginView);
+export interface PluginCatalog {
+  /** The listed plugins' entries, in list order. */
+  readonly entries: readonly PluginEntry[];
+  /** What draws a Resource whose kind names no listed plugin (ADR 0142). */
+  readonly fallback: PluginEntry;
+}
 
-/** The entry of the plugin that draws this kind: its own, or the default plugin where it has none. */
+/** A catalogue of these plugins' halves, with this default. */
+export const pluginCatalog = (
+  listed: readonly PluginHalves[],
+  fallback: PluginHalves = DEFAULT_PLUGIN_VIEW,
+): PluginCatalog => ({ entries: listed.map(entryOf), fallback: entryOf(fallback) });
+
+/** The build's catalogue: every plugin in the build's list, and the default plugin. */
+export const BUILD_CATALOG: PluginCatalog = pluginCatalog(PLUGIN_VIEWS);
+
+/** The entry of the plugin in this catalogue that draws this kind: its own, or the default plugin's. */
+export const catalogEntry = (catalog: PluginCatalog, kind: ResourceKind): PluginEntry =>
+  catalog.entries.find((entry) => entry.kind === kind) ?? catalog.fallback;
+
+/** The entry of the plugin that draws this kind in this build. */
 export const pluginEntryFor = (kind: ResourceKind): PluginEntry =>
-  isPluginKind(kind) ? PLUGIN_ENTRIES[kind] : DEFAULT_ENTRY;
+  catalogEntry(BUILD_CATALOG, kind);
 
 /** The glyph of the plugin that draws this kind. */
 export const pluginGlyph = (kind: ResourceKind): PluginEntry['Glyph'] => pluginEntryFor(kind).Glyph;
 
 /**
- * Every plugin's creations, in build order (the plugin list's), each with the
- * kind it creates: where the host finds what a gesture may create.
+ * Every plugin's creations, in list order, each with the kind it creates:
+ * where the host finds what a gesture may create.
  */
-export const pluginCreations = (): readonly PluginCreationEntry[] =>
-  PLUGIN_KINDS.flatMap((kind) =>
-    PLUGIN_ENTRIES[kind].creations.map((creation) => ({
-      kind,
-      name: PLUGIN_ENTRIES[kind].name,
-      creation,
-    })),
+export const catalogCreations = (catalog: PluginCatalog): readonly PluginCreationEntry[] =>
+  catalog.entries.flatMap((entry) =>
+    entry.creations.map((creation) => ({ kind: entry.kind, name: entry.name, creation })),
   );
+
+/** Every plugin's creations in this build, in list order. */
+export const pluginCreations = (): readonly PluginCreationEntry[] =>
+  catalogCreations(BUILD_CATALOG);
+
+const PluginCatalogContext = createContext<PluginCatalog>(BUILD_CATALOG);
+
+/**
+ * Hand the surfaces inside the plugins they draw with (ADR 0142). Without one,
+ * a surface draws with the build's catalogue.
+ */
+export function PluginCatalogProvider({
+  catalog,
+  children,
+}: {
+  readonly catalog: PluginCatalog;
+  readonly children?: ReactNode;
+}) {
+  return <PluginCatalogContext.Provider value={catalog}>{children}</PluginCatalogContext.Provider>;
+}
+
+/** The catalogue the surface being drawn draws with. */
+export const usePluginCatalog = (): PluginCatalog => useContext(PluginCatalogContext);
+
+/** The entry of the plugin that draws this kind, on the surface being drawn. */
+export const usePluginEntry = (kind: ResourceKind): PluginEntry =>
+  catalogEntry(usePluginCatalog(), kind);

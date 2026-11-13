@@ -8,6 +8,9 @@
     // libraries, which belong to the adapter. (No `rootDir` — see `graph`.)
     "paths": {
       "@project/core": ["../core/src/index.ts"],
+      "@project/plugins/view": ["../plugins/src/view.ts"],
+      // Resolved for the list package's own imports; the lint zone allows only
+      // `packages/plugins` to import a plugin.
       "@project/plugin-default/domain": ["../plugin-default/src/domain.ts"],
       "@project/plugin-image/domain": ["../plugin-image/src/domain.ts"],
       "@project/plugin-ur/domain": ["../plugin-ur/src/domain.ts"],

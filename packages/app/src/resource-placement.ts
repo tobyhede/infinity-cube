@@ -11,7 +11,13 @@ import type {
 import { resourceSize } from '@project/core';
 import type { ObserverErrorReporter } from '@project/persistence';
 import type { CreationData } from '@project/resource-api/view';
-import { pluginCreations, usePluginAssets, type EntityActionOutcome } from '@project/ui';
+import {
+  catalogCreations,
+  pluginCreations,
+  usePluginAssets,
+  usePluginCatalog,
+  type EntityActionOutcome,
+} from '@project/ui';
 import { describeAuthoringRefusal } from './authoring-refusal';
 import type { OpenSpace } from './open-spaces';
 import {
@@ -34,7 +40,7 @@ import {
 } from './resources-drag';
 import { useVisibleCentre, type VisibleCentreReporting } from './visible-centre';
 
-/** Every plugin's creations, in build order: the same list for every surface. */
+/** Every plugin's creations in this build, in list order: what the Command Dock offers. */
 const CREATIONS = pluginCreations();
 
 /** Every creation the Command Dock offers. */
@@ -159,6 +165,12 @@ export function useResourcePlacement(
   const mapId: MapId = selectedMap.id;
   const gate = usePluginGate();
   const assets = usePluginAssets();
+  // Run from the catalogue this surface is handed (ADR 0142), as it draws with it.
+  const catalog = usePluginCatalog();
+  const creations = useMemo(() => {
+    const all = catalogCreations(catalog);
+    return { all, dock: dockCreations(all), resource: resourceCreations(all) };
+  }, [catalog]);
   const [creating, setCreating] = useState<ReadonlySet<string>>(NOTHING_CREATING);
   // Kept across the host each Map builds, so a Dock creation stays single
   // flight while the author moves to another Map.
@@ -196,7 +208,7 @@ export function useResourcePlacement(
    */
   const runAtCentre = useCallback(
     (kind: string, flight: boolean, available?: () => boolean): void => {
-      const offered = DOCK_CREATIONS.find((creation) => creation.kind === kind);
+      const offered = creations.dock.find((creation) => creation.kind === kind);
       if (offered === undefined) return;
       void host.run(offered, {
         place: () => ({
@@ -208,7 +220,7 @@ export function useResourcePlacement(
         flight,
       });
     },
-    [host, centreAnchor],
+    [host, centreAnchor, creations],
   );
   const createFromDock = useCallback(
     (kind: string, available?: () => boolean): void => runAtCentre(kind, true, available),
@@ -222,11 +234,11 @@ export function useResourcePlacement(
   /** Data aimed at a point keeps it exactly. Data no plugin takes creates nothing. */
   const createFromData = useCallback(
     (data: CreationData, anchor: MapPosition): void => {
-      const offered = dataCreation(CREATIONS, data);
+      const offered = dataCreation(creations.all, data);
       if (offered === undefined) return;
       void host.run(offered, { place: () => ({ anchor, placement: 'exact' }) });
     },
-    [host],
+    [host, creations],
   );
 
   /**
@@ -237,7 +249,7 @@ export function useResourcePlacement(
    */
   const createFromResource = useCallback(
     (kind: string, resource: Resource): EntityActionOutcome => {
-      const offered = RESOURCE_CREATIONS.find((creation) => creation.kind === kind);
+      const offered = creations.resource.find((creation) => creation.kind === kind);
       if (offered === undefined) return 'failed';
       void host.run(
         { ...offered, run: (creationHost) => offered.run(creationHost, resource) },
@@ -250,7 +262,7 @@ export function useResourcePlacement(
       );
       return 'done';
     },
-    [host, selectedMap, centreAnchor],
+    [host, selectedMap, centreAnchor, creations],
   );
 
   /**
@@ -262,7 +274,7 @@ export function useResourcePlacement(
    */
   const addSpaceResourceFor = useCallback(
     (space: ResourcesPopoverSpace, anchor: MapPosition): Promise<string | null> => {
-      const offered = spaceCreation(CREATIONS);
+      const offered = spaceCreation(creations.all);
       if (offered === undefined) return Promise.resolve(NO_SPACE_CREATION);
       return new Promise((resolve) => {
         const offeredSpace = { spaceId: space.id, title: space.title };
@@ -281,7 +293,7 @@ export function useResourcePlacement(
           .then(() => resolve(null));
       });
     },
-    [host],
+    [host, creations],
   );
 
   /**

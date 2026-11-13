@@ -308,7 +308,7 @@ describe('resourceRailGroups', () => {
       id: OUTSIDE,
       title: 'Elsewhere',
       kind: 'space',
-      content: { spaceId: SPACE_ID, map: MAP_ID, graph: GRAPH_ID, framing: undefined },
+      content: { spaceId: SPACE_ID, map: MAP_ID, graph: GRAPH_ID },
     },
     { id: OUTSIDE, title: 'A reference', kind: 'reference', content: { target: PLACED_A } },
   ])('offers no Shape choice in the menu of a $kind Resource', (subject) => {
@@ -339,7 +339,7 @@ describe('resourceRailGroups', () => {
       id: OUTSIDE,
       title: 'Elsewhere',
       kind: 'space',
-      content: { spaceId: SPACE_ID, map: MAP_ID, graph: GRAPH_ID, framing: undefined },
+      content: { spaceId: SPACE_ID, map: MAP_ID, graph: GRAPH_ID },
     };
     const held = resourceRailGroups(target, addresses, connect, {
       ...everything,

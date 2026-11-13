@@ -13,12 +13,7 @@ import { referenceMapContentSchema } from '@project/plugin-reference/domain';
 import type { Answer } from '@project/resource-api/domain';
 import { urMapContentSchema } from '@project/plugin-ur/domain';
 import { productDestinationPath, type ProductDestination } from '@project/http';
-import {
-  PluginAssetsProvider,
-  PluginResource,
-  type CanvasResourceState,
-  type KindOperations,
-} from '@project/ui';
+import { PluginAssetsProvider, PluginResource, type CanvasResourceState } from '@project/ui';
 import { spaceEntityActions } from '#src/entity-actions';
 import { resourceSizeVars } from '#src/resource';
 import { CanvasResourceSpecimen } from '../support/CanvasResourceSpecimen';
@@ -116,7 +111,7 @@ const CLOSED_KINDS = [
   { kind: 'ur', label: 'ur' },
   { kind: 'markdown', label: 'creation ghost' },
 ] as const satisfies readonly {
-  kind: KindOperations['kind'];
+  kind: string;
   label: string;
   content?: unknown;
 }[];

@@ -7,7 +7,6 @@ import {
   RESOURCE_SHAPES,
   graphEdgeSchema,
   graphSchema,
-  isOfKind,
   resourceDocumentSchema,
   resourceFileSchema,
   resourceSchema,
@@ -15,6 +14,7 @@ import {
   spaceFileSchema,
   uuidSchema,
 } from '../src/index';
+import { isOfKind } from '@project/plugins/testing';
 
 const MAIN = {
   id: '00000000-0000-4000-8000-000000000004',

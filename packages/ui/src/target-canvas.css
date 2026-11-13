@@ -1,16 +1,17 @@
-/* The Reference kind's border on a Map (ADR 0070, ADR 0120): dotted at rest,
-   solid while active. `PluginResource` imports it after
+/* The border on a Map of a Resource whose plugin shows another's content, as
+   a Reference Resource does (ADR 0070, ADR 0142): dotted at rest, solid while
+   active. Keyed on that declaration (`data-shows-target`), never on a kind. `PluginResource` imports it after
    `canvas-resource.css`, whose solid border it overrides.
    The order is held by `test/unit/kind-stylesheet-order.test.ts`.
-   The kind is matched inside `:where()` so the dotted rule is only as specific
+   The declaration is matched inside `:where()` so the dotted rule is only as specific
    as `.canvas-resource` itself: it overrides that rule's solid border by
    loading after it, and every more specific rule in `canvas-resource.css`
    that sets the border still overrides it. */
-.canvas-resource:where([data-kind='reference']) {
+.canvas-resource:where([data-shows-target]) {
   border-style: dotted;
 }
 
-.canvas-resource[data-kind='reference']:is(
+.canvas-resource[data-shows-target]:is(
     :hover,
     :has(~ .rf-resource-node__authoring-handle:hover),
     :not([data-state='rest'])

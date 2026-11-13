@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { PluginHostClaim } from '../src/kinds/plugin-views';
+import type { PluginHostClaim } from '../src/plugin-catalog';
 import { createSurfaceLifetime } from '../src/surface-lifetime';
 
 /**

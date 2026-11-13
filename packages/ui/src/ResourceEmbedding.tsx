@@ -14,7 +14,7 @@ import {
   type RailOutlet,
   type ResourceHost,
 } from '@project/resource-api/view/host';
-import type { PluginEntry } from './kinds/plugin-views';
+import { usePluginEntry } from './plugin-catalog';
 import { MapTitleContext, MapTitleView } from './MapTitle';
 import { readingAssets, usePluginAssets } from './plugin-assets';
 import { ResourceFailureBoundary } from './ResourceFailureBoundary';
@@ -63,8 +63,6 @@ export interface Embedding {
   readonly selected: boolean;
   /** Told what an embedded plugin threw while drawing. */
   readonly onFailure?: ((error: Error) => void) | undefined;
-  /** The entry of the plugin that draws an embedded Resource of this kind. */
-  readonly entryFor: (kind: ResourceKind) => PluginEntry;
 }
 
 const EmbeddingContext = createContext<Embedding | null>(null);
@@ -297,7 +295,7 @@ function EmbeddedSurface({
     }),
     [embedding, target.id],
   );
-  const entry = embedding.entryFor(kind);
+  const entry = usePluginEntry(kind);
   const mapTitle = useContext(MapTitleContext);
   const plugin = entry.render({
     resourceId: target.id,

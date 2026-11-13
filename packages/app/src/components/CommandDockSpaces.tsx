@@ -3,7 +3,6 @@
  * Space you are in with its menu, and the report of an Exit that did not
  * happen. `CommandDock` mounts {@link SpacesControl}.
  */
-import { spaceKind } from '@project/core';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,7 +30,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   ParentIcon,
-  ResourceKindIcon,
+  SpaceIcon,
   ToolbarButton,
   ToolbarGroup,
 } from '@project/ui';
@@ -456,7 +455,12 @@ function OpenerAndOpenSpaces({
                       {row.spaceId === metaId ? (
                         <ParentIcon />
                       ) : (
-                        <ResourceKindIcon kind={spaceKind.id} decorative />
+                        <span
+                          className="inline-flex flex-none items-center text-muted-foreground"
+                          aria-hidden="true"
+                        >
+                          <SpaceIcon />
+                        </span>
                       )}
                       {row.title}
                       {/* **An unwell open Space is marked.** A list that says
@@ -561,7 +565,14 @@ export function SpacesControl({
       <Divider orientation={vertical ? 'horizontal' : 'vertical'} />
       <ToolbarGroup aria-label="Space" className="command-dock__cluster">
         <IdentitySurface
-          icon={<ResourceKindIcon kind={spaceKind.id} decorative />}
+          icon={
+            <span
+              className="inline-flex flex-none items-center text-muted-foreground"
+              aria-hidden="true"
+            >
+              <SpaceIcon />
+            </span>
+          }
           kind="Space"
           testId="space-title"
           title={space.title}

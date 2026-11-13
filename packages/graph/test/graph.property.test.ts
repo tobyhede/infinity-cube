@@ -1,9 +1,11 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { isOfKind, EMPTY_ASSET_REF, type KindId, type Resource, type UUID } from '@project/core';
+import { EMPTY_ASSET_REF, type Resource, type UUID } from '@project/core';
+import { isOfKind } from '@project/plugins/testing';
 import { loadSpace, resolveResourceContent, serializeResource, type Space } from '../src/index';
 import { resourceFile, uuid } from './resource-files';
 import { textRef } from './text-asset';
+import { type PluginKind } from '@project/plugins/testing';
 
 /**
  * The aggregate properties of intake, stated over generated documents and
@@ -256,7 +258,7 @@ describe('what intake refuses, over generated documents', () => {
   });
 });
 
-type ContentKind = KindId;
+type ContentKind = PluginKind;
 
 /** A Resource of the chosen kind that owns its content. */
 function contentOwner(id: UUID, index: number, kind: Exclude<ContentKind, 'reference'>): Resource {

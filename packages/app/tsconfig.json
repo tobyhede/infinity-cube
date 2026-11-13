@@ -12,6 +12,9 @@
     "paths": {
       "@project/aggregate": ["../aggregate/src/index.ts"],
       "@project/core": ["../core/src/index.ts"],
+      "@project/plugins/domain": ["../plugins/src/domain.ts"],
+      "@project/plugins/view": ["../plugins/src/view.ts"],
+      "@project/plugins/testing": ["../plugins/src/testing.ts"],
       "@project/plugin-default/domain": ["../plugin-default/src/domain.ts"],
       "@project/plugin-image/domain": ["../plugin-image/src/domain.ts"],
       "@project/plugin-ur/domain": ["../plugin-ur/src/domain.ts"],

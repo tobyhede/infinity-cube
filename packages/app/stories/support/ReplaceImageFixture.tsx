@@ -1,4 +1,5 @@
-import { isOfKind, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { isOfKind } from '@project/plugins/testing';
 import type { SpaceSession } from '@project/persistence';
 import { useCallback, useState, useSyncExternalStore } from 'react';
 import { Application } from '#components/Application';

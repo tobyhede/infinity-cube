@@ -29,7 +29,8 @@ import {
   useStore,
   useStoreApi,
 } from '@xyflow/react';
-import { DEFAULT_KIND, uuidSchema, type ResourceId, type MapId } from '@project/core';
+import { uuidSchema, type ResourceId, type MapId } from '@project/core';
+import { ADD_KIND } from '../add-kind';
 import type { SpaceSession } from '@project/persistence';
 import {
   CANVAS_RESOURCE_DRAG_TILT_DEGREES,
@@ -388,7 +389,7 @@ export function SpaceCanvas({
   const placedResources = view.placedResources;
   const { visibleGraphs: graphs, colors: colorByGraphId } = view.projection;
   const { createOnCanvas, dropExistingResource, dropSpace, createFromData } = placement;
-  const addCanvasResource = useCallback(() => createOnCanvas(DEFAULT_KIND), [createOnCanvas]);
+  const addCanvasResource = useCallback(() => createOnCanvas(ADD_KIND), [createOnCanvas]);
   const { screenToFlowPosition, getZoom } = useReactFlow();
 
   const spaces = useOpenSpaces();
@@ -861,7 +862,7 @@ export function SpaceCanvas({
       },
       ...liveEmbeddings.map((value) => ({
         id: value.surface.occurrence(),
-        addResource: () => value.placement.createOnCanvas(DEFAULT_KIND),
+        addResource: () => value.placement.createOnCanvas(ADD_KIND),
         nodes: value.nodes,
         authoring: value.surface.authoring,
         availability: value.availability,

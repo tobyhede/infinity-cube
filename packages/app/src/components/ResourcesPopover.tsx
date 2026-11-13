@@ -12,11 +12,10 @@ import {
 import {
   contentTarget,
   isMissingKind,
-  KIND_IDS,
+  PLUGIN_KINDS,
   lifetimeSpaceReferences,
   spaceReferences,
   titleName,
-  type KindId,
   type Resource,
   type ResourceId,
   type ResourceKind,
@@ -34,7 +33,6 @@ import {
   type MapMemberships,
 } from '../map-memberships';
 import {
-  BADGED_TARGET_GLYPH,
   Button,
   Alert,
   Badge,
@@ -83,26 +81,28 @@ type Activation = 'keyboard' | 'pointer';
  * OPEN mark for the collection; Space Resources and individual Space rows keep
  * their cube glyph.
  */
-export type ResourcesFilter = KindId | 'unavailable' | 'spaces';
+/**
+ * A filter of the Resources list: a plugin's kind, every kind no plugin in
+ * this build draws (`unavailable`), or the Meta Space's Spaces (`spaces`).
+ */
+export type ResourcesFilter = string;
 
 /**
  * The filter a Resource is listed under: its kind's, or, for every kind no
  * plugin in this build draws, the one `unavailable` filter.
  */
-const filterOfKind = (kind: ResourceKind): KindId | 'unavailable' =>
+const filterOfKind = (kind: ResourceKind): ResourcesFilter =>
   isMissingKind(kind) ? 'unavailable' : kind;
 
 /**
- * Every filter exactly once, in the order they are drawn: each kind's, in the
- * order the kinds are registered, then `spaces`. The ui registry types a view
- * half for every kind, so a kind added to `Resource` has a filter, a name and a
- * glyph here before the application compiles. Every kind no plugin in this
- * build draws shares the one `unavailable` filter.
+ * Every filter exactly once, in the order they are drawn: each plugin's, in
+ * the build's list order (ADR 0142), then `spaces`. Every kind no plugin in
+ * this build draws shares the one `unavailable` filter.
  */
-const FILTERS: readonly ResourcesFilter[] = [...KIND_IDS, 'unavailable', 'spaces'];
+const FILTERS: readonly ResourcesFilter[] = [...PLUGIN_KINDS, 'unavailable', 'spaces'];
 
 /** The Connect list's filters: an Edge never ends at an unplaced Space. */
-const RESOURCE_FILTERS: readonly ResourcesFilter[] = [...KIND_IDS, 'unavailable'];
+const RESOURCE_FILTERS: readonly ResourcesFilter[] = [...PLUGIN_KINDS, 'unavailable'];
 
 /**
  * Everything on, because the list's job is to show what is *not* on the canvas
@@ -121,14 +121,14 @@ const filterName = (filter: ResourcesFilter): string =>
       : kindNaming(filter).listName;
 
 /**
- * A filter's glyph: its kind's own, or, for a kind that draws its Target's
- * with a badge, the badge over the default base; the Meta Space's Spaces draw
- * the Opener mark.
+ * A filter's glyph: its plugin's own, or, for a plugin whose Resources show
+ * another's, the badge over the default base; the Meta Space's Spaces draw the
+ * Opener mark, and `unavailable` the default plugin's glyph.
  */
 const FilterGlyph = ({ filter }: { readonly filter: ResourcesFilter }) => {
   if (filter === 'spaces') return <ParentIcon />;
-  const { Glyph } = filter === 'unavailable' ? missingKindNaming : kindNaming(filter);
-  return Glyph === BADGED_TARGET_GLYPH ? <ReferenceIcon /> : <Glyph />;
+  const { Glyph, showsTarget } = filter === 'unavailable' ? missingKindNaming : kindNaming(filter);
+  return showsTarget ? <ReferenceIcon /> : <Glyph />;
 };
 
 /**

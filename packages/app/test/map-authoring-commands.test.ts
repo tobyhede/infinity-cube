@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  isOfKind,
   newUuid,
   uuidSchema,
   type GraphId,
   type MapId,
-  type SpaceResourceDocument,
+  type ResourceDocument,
   type SpaceSnapshot,
 } from '@project/core';
+import { contentOf } from '@project/plugins/testing';
 import { MemorySpaceBackend, MemorySpaceBackendTestControl } from '@project/persistence';
 import type {
   CommandOutcomes,
@@ -47,11 +47,11 @@ const META_GRAPH = id('7');
 const FIRST_GRAPH = id('8');
 const SECOND_GRAPH = id('9');
 
-const document: SpaceResourceDocument = {
+const document = {
   kind: 'space',
   title: 'Target',
   content: { spaceId: TARGET, map: SECOND_MAP, graph: SECOND_GRAPH },
-};
+} satisfies ResourceDocument;
 const meta: SpaceSnapshot = {
   id: META,
   document: {
@@ -130,9 +130,8 @@ const selectOn =
 
 const storedSelection = (source: OpenSpace) => {
   const stored = source.session.getState().working.resources[0]?.document;
-  return stored !== undefined && isOfKind(stored, 'space')
-    ? { map: stored.content.map, graph: stored.content.graph }
-    : undefined;
+  const content = stored === undefined ? undefined : contentOf(stored, 'space');
+  return content === undefined ? undefined : { map: content.map, graph: content.graph };
 };
 
 /** One context, as far as the contract needs to drive it. */

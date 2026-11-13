@@ -9,43 +9,36 @@ export * from './resource-shape';
 export * from './resource-size';
 export * from './resource-content';
 export * from './json-value';
-export * from './kinds/plugin-module';
-export { PLUGINS, PLUGIN_KINDS, type PluginKind } from './kinds/plugins';
-export { declaredOutline, type PluginContent } from './kinds/plugin-kind';
-export * from './kinds/ur';
-export * from './kinds/image';
-export * from './kinds/markdown';
-export * from './kinds/reference';
-export * from './kinds/space';
+export * from './plugin-module';
+export { declaredOutline } from './plugin-modules';
 export {
-  KIND_IDS,
+  PLUGIN_KINDS,
   canonicalResource,
   contentTarget,
   KIND_ID_FORM,
   isKindId,
-  isRegisteredKind,
   isMissingKind,
-  isOfKind,
   isMissingKindId,
-  kindFlags,
   isPluginKind,
+  kindFlags,
   mapContentProblem,
   mapContentWithoutMap,
   resolvedMapContent,
   resourceOutline,
   lifetimeSpaceReferences,
   mayBeTarget,
-  DEFAULT_KIND,
+  showsTarget,
   UNRESOLVED_CONTENT,
-  newDefaultResourceDocument,
+  isResolvedContent,
+  newEmptyResourceDocument,
+  newResourceDocument,
+  startsEmpty,
   resolveContent,
   resourceReferences,
   spaceReferences,
   selectSpaceView,
   spaceSelection,
   spaceSelectionProblem,
-  type KindId,
-  type MissingKind,
   type ResourceKind,
   type KindedResource,
-} from './kinds/registry';
+} from './plugin-modules';

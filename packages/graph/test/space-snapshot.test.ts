@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { isOfKind, type SpaceSnapshot } from '@project/core';
+import { type SpaceSnapshot } from '@project/core';
+import { isOfKind } from '@project/plugins/testing';
 import { loadSpaceSnapshot } from '../src/index';
 import { uuid } from './resource-files';
 import { textRef } from './text-asset';

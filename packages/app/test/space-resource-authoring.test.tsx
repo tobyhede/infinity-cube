@@ -9,7 +9,6 @@ import {
 } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
-  isOfKind,
   EMPTY_ASSET_REF,
   newUuid,
   spaceSnapshotSchema,
@@ -17,6 +16,7 @@ import {
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
+import { contentOf, isOfKind } from '@project/plugins/testing';
 import { loadSpaceSnapshot, nextGraphColor } from '@project/graph';
 import {
   MemorySpaceBackend,
@@ -343,9 +343,12 @@ const nodeFor = (id: UUID): HTMLElement | null =>
 
 /** The Space Resources `Home` holds, in authored order. */
 const spaceResourcesOf = (session: SpaceSession) =>
-  resourcesOf(session).flatMap((resource) =>
-    isOfKind(resource.document, 'space') ? [{ id: resource.id, document: resource.document }] : [],
-  );
+  resourcesOf(session).flatMap((resource) => {
+    const content = contentOf(resource.document, 'space');
+    return content === undefined
+      ? []
+      : [{ id: resource.id, document: { ...resource.document, content } }];
+  });
 
 /**
  * Persistence is asynchronous and a coordinated Edit writes several Spaces, so

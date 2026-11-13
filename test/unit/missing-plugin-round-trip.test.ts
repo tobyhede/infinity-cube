@@ -6,7 +6,6 @@ import {
   isMissingKindId,
   newUuid,
   uuidSchema,
-  type MissingKind,
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
@@ -35,7 +34,7 @@ const HELD_NOTE = uuidSchema.parse('88888888-8888-4888-8888-888888888888');
 const SECOND_UNPLUGGED = uuidSchema.parse('99999999-9999-4999-8999-999999999999');
 
 /** A kind id no plugin in this build draws. */
-const missing = (kind: string): MissingKind => {
+const missing = (kind: string): string => {
   if (!isMissingKindId(kind)) throw new Error(`${kind} is not a missing kind`);
   return kind;
 };

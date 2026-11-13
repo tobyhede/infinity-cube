@@ -1,5 +1,5 @@
 import {
-  newDefaultResourceDocument,
+  newEmptyResourceDocument,
   DEFAULT_GRAPH_HEAD_SHAPE,
   SPACE_FILE_VERSION,
   type Graph,
@@ -87,7 +87,7 @@ export function initializeSpace({ title, newId }: InitializeSpaceOptions): NewSp
   const graphId = newId();
   const resource: Resource = {
     id: resourceId,
-    ...newDefaultResourceDocument(FIRST_RESOURCE_TITLE),
+    ...newEmptyResourceDocument(FIRST_RESOURCE_TITLE),
   };
 
   return {

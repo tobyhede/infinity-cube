@@ -33,7 +33,6 @@ import {
   X,
 } from 'lucide-react';
 import { useId, type ComponentProps, type ComponentType } from 'react';
-import type { ReferenceKindId, Resource } from '@project/core';
 
 type ResourceActionIconProps = ComponentProps<typeof Pencil>;
 type CanvasControlIconProps = ComponentProps<typeof Minus>;
@@ -258,15 +257,11 @@ export const SpaceIcon = ({ size = 14 }: { size?: number | undefined }) => (
   <CubeGlyph size={size} />
 );
 
-/** Space Resources share the Space cube, including when used as a Reference Resource base. */
-export const SpaceResourceIcon = SpaceIcon;
-
 /**
- * The Resource kinds that may be a Reference Resource's Target, and so draw a
- * glyph of their own a badge can sit on. Subtracted from the domain union
- * rather than restated, so a kind added to the domain lands here.
+ * The kind of the Resource a Reference Resource shows, whose glyph its badge
+ * sits on: one whose plugin does not itself show another's.
  */
-export type ResourceBaseKind = Exclude<Resource['kind'], ReferenceKindId>;
+export type ResourceBaseKind = string;
 
 /** What every base glyph accepts. */
 interface BaseGlyphProps {

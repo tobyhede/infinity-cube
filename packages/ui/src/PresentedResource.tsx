@@ -1,4 +1,4 @@
-import { embedsMap, titleName, UNRESOLVED_CONTENT, type ResourceContent } from '@project/core';
+import { embedsMap, isResolvedContent, titleName, type ResourceContent } from '@project/core';
 import { PresentedPluginContent } from './PresentedPluginResource';
 import { UnresolvedContent } from './UnresolvedContent';
 
@@ -30,7 +30,7 @@ export function PresentedResource({ title, content }: PresentedResourceProps) {
       data-content-kind={content.kind}
     >
       <h2 className="resource__title">{name}</h2>
-      {content.kind === UNRESOLVED_CONTENT.kind ? (
+      {!isResolvedContent(content) ? (
         <UnresolvedContent />
       ) : embedsMap(content) ? null : (
         <PresentedPluginContent kind={content.kind} title={name} content={content.content} />

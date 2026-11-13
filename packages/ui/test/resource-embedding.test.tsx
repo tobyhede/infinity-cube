@@ -3,17 +3,17 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useEffect, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import {
-  mapContentWithoutMap,
-  uuidSchema,
-  type JsonValue,
-  type ResourceKind,
-  type Resource,
-} from '@project/core';
+import { mapContentWithoutMap, uuidSchema, type JsonValue, type Resource } from '@project/core';
 import { definePlugin, type Answer } from '@project/resource-api/domain';
 import { definePluginView, Title, type Surface } from '@project/resource-api/view';
 import { PluginResource, PresentedPluginResource, type PluginResourceProps } from '../src';
-import { pluginEntry, pluginEntryFor, type PluginEntry } from '../src/kinds/plugin-views';
+import {
+  BUILD_CATALOG,
+  PluginCatalogProvider,
+  pluginEntry,
+  pluginEntryFor,
+  type PluginCatalog,
+} from '../src/plugin-catalog';
 import { PluginSurface } from '../src/PluginResource';
 import { commitWhileDrawn } from '../src/ResourceEmbedding';
 import { textAsset, WithTexts } from './markdown-texts';
@@ -243,17 +243,23 @@ const probeEntry = pluginEntry(
   probePlugin,
   definePluginView(probePlugin, { View: ProbeView, Glyph: () => null }),
 );
-/** The build's entries, with the probe drawing every embedded Ur Resource. */
-const probingUr = (kind: ResourceKind): PluginEntry =>
-  kind === 'ur' ? probeEntry : pluginEntryFor(kind);
-const probeTarget = (content: z.output<typeof probeContent> = {}): Resource => ({
+/** The build's catalogue, with the probe drawing every embedded Ur Resource. */
+const PROBING_UR: PluginCatalog = {
+  entries: BUILD_CATALOG.entries.map((entry) =>
+    entry.kind === 'ur' ? { ...probeEntry, kind: 'ur' } : entry,
+  ),
+  fallback: BUILD_CATALOG.fallback,
+};
+const probeTarget = ({ embeds }: z.output<typeof probeContent> = {}): Resource => ({
   id: TARGET,
   title: 'Decide',
   kind: 'ur',
-  content,
+  content: embeds === undefined ? {} : { embeds },
 });
 const probedReference = (props: PluginResourceProps) => (
-  <PluginSurface {...props} entry={pluginEntryFor('reference')} entryFor={probingUr} />
+  <PluginCatalogProvider catalog={PROBING_UR}>
+    <PluginSurface {...props} entry={pluginEntryFor('reference')} />
+  </PluginCatalogProvider>
 );
 const lastProbed = (): ProbeSurface => {
   const surface = probed.surfaces.at(-1);

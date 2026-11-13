@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { KIND_IDS } from '@project/core';
+import { PLUGIN_KINDS } from '@project/core';
 import { boxOf } from '../e2e/graph';
 
 const STORY = '/?story=surfaces--resources-popover--available-resources&mode=preview';
@@ -263,7 +263,7 @@ test('every filter toggle sits inside the popover on one line, its count still d
   await expect(popup).toBeVisible();
 
   const toggles = popup.getByRole('group', { name: 'Filter the list by kind' }).getByRole('button');
-  await expect(toggles).toHaveCount(KIND_IDS.length + 1);
+  await expect(toggles).toHaveCount(PLUGIN_KINDS.length + 1);
   const panel = await boxOf(popup, 'the Resources popover');
   expect(panel.width).toBe(288);
   const tops = new Set<number>();

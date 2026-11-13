@@ -1,6 +1,6 @@
 # 11 — List the plugins once
 
-Status: ready-for-agent
+Status: built, in review
 
 **Blocked by:** none. The shown Space's chooser, links and authoring come from the `Embed` (`packages/app/src/embed-commands.ts`), so `packages/app/src/kinds/space.ts` builds no rail.
 
@@ -33,3 +33,21 @@ Decided with Toby, 2026-11-11, from the architecture review of the #460 stack.
 - A test mounts a probe plugin, not in the build list, on the Map, the Stage and an embedding.
 - A Reference Resource's dotted border and badge are drawn by a declared Target, shown by a probe plugin that declares one.
 - `CI passed` is green with every required job, including the PostgreSQL and SQLite restart proofs.
+
+## Built
+
+Built 2026-11-11 on the branch stacked on the Embed amendment's PR. Where the build departs from a decision above, it says so here.
+
+- **Decision 2: content is a `JsonValue`, not `unknown`.** With `unknown`, Hono's inferred response type reads every Resource's `content` as `never`, and `packages/http/test/space-http-app-types.test.ts` (the HTTP contract equals the declared wire types) fails. The core now checks a plugin's parsed or built content is JSON as it takes it (`moduleOf` in `packages/core/src/plugin-modules.ts`), which Map content already did. The host still names no kind and reads content only through declarations.
+- **Decision 3: the Dock and the rail still offer the build's creations.** `useResourcePlacement` runs a creation from the catalogue its surface is handed, and every surface draws from it; the Dock's buttons and the rail's Create entries read the build's list (`DOCK_CREATIONS`, `RESOURCE_CREATIONS`), so a probe plugin in a test's catalogue is drawn and run but not offered there.
+- **Decision 9: the acceptance `rg` also matches files that are not imports.** Each package's narrowed tsconfig still maps the `plugin-*` paths so `tsc` can resolve the list package's own imports, `packages/app/workspace-aliases.ts` and the app's manifest name them for Vite, and tests and stories import a plugin directly. No package's `src/` imports one: the lint zone (`PLUGIN_LIST_IMPORTS`) refuses it, and `test/unit/plugin-list-imports.test.ts` holds both the rule and the tracked source.
+- **Tests read kinds through `@project/plugins/testing`** (`isOfKind`, `contentOf`, `LISTED_KINDS`, `spaceResourceMaker`), which the same lint zone keeps out of every package's `src/`.
+- **Retired with the kind sites:** `test/unit/kind-ids-in-modules.test.ts`, `kind-module-imports.test.ts`, `kind-css-selectors.test.ts`, `kind-stylesheet-order.test.ts` and `.scratch/resource-kind-modules/kind-sites.md`; `test/unit/target-stylesheet.test.ts` holds that no host stylesheet selects a kind.
+
+Rebased 2026-11-13 onto `main` after the #472 stack's review fixes merged under it. What those fixes changed here:
+
+- **Decision 3: an embedded probe is handed by the catalogue, not a per-surface override.** The Reference review fixes had added an `entryFor` override to `PluginSurface`, `PresentedPluginSurface` and the embedding, so a test could draw a probe plugin inside a Reference. The catalogue context does the same for every surface, so the override is gone and `packages/ui/test/resource-embedding.test.tsx` hands the probe through `PluginCatalogProvider`.
+- **Decision 7: the `unavailable` filter's glyph is the default plugin's entry.** The default plugin review fixes drew it from `missingKindNaming`; that name now answers the catalogue's fallback (`packages/ui/src/ResourceKindIcon.tsx`).
+- **Decision 8: the lifecycle's document was already required.** The creation review fixes had removed the lifecycle's default Space-kind document, so nothing was left to remove there; the tests keep their `showingSpace` helpers (`packages/persistence/test/showing-space.ts`, `packages/app/test/showing-space.ts`), which build the document with `spaceResourceMaker`.
+- **The core's reading of a plugin keeps the review fixes' rules:** content declaring a non-UUID id is refused by the plugin's content schema, an outline that throws or answers no outline is stroked as a rectangle (`declaredOutline`, which the view's host reports), a selection has no `frame`, and `KIND_ID_FORM` words a malformed kind; all live in `packages/core/src/plugin-modules.ts`.
+- **`pnpm lint` runs ESLint with a 6 GiB heap.** `projectService` holds one TypeScript program per tsconfig, and `packages/plugins/tsconfig.json` is one more. Measured 2026-11-13 on Node 24: `main` before this change already OOMs at `--max-old-space-size=3500` and passes at 4100; with this change it fails at 4100, passes at 4100 when `packages/plugins/**` is ignored, and CI's `static-checks` hit the default heap limit. The script calls `node --max-old-space-size=6144 node_modules/eslint/bin/eslint.js` rather than shrinking the program set.

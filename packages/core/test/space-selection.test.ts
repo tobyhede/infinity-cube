@@ -5,12 +5,11 @@ import {
   spaceReferences,
   spaceSelection,
   spaceSelectionProblem,
+  kindFlags,
   type ResourceDocument,
-} from '../src/kinds/registry';
+} from '../src/plugin-modules';
 import { EMPTY_ASSET_REF } from '../src/assets';
-import { referenceKind } from '../src/kinds/reference';
-import { spaceKind } from '../src/kinds/space';
-import type { SpaceSelectionTarget } from '../src/kinds/plugin-module';
+import type { SpaceSelectionTarget } from '../src/plugin-module';
 import { uuidSchema } from '../src/schema';
 
 const uuid = (n: number) =>
@@ -38,7 +37,7 @@ const TARGET: SpaceSelectionTarget = {
 
 const SPACE_RESOURCE: ResourceDocument = {
   title: 'Inner',
-  kind: spaceKind.id,
+  kind: 'space',
   content: selecting(MAP, GRAPH),
 };
 const MARKDOWN: ResourceDocument = {
@@ -48,7 +47,7 @@ const MARKDOWN: ResourceDocument = {
 };
 const REFERENCE: ResourceDocument = {
   title: 'Recap',
-  kind: referenceKind.id,
+  kind: 'reference',
   content: { target: uuid(6) },
 };
 
@@ -98,7 +97,7 @@ describe("a Resource's Space references", () => {
   });
 
   it("hold the target Space's lifetime for a Space Resource, whose kind owns what it references", () => {
-    expect(spaceKind.flags.ownsReferencedSpaces).toBe(true);
+    expect(kindFlags('space').ownsReferencedSpaces).toBe(true);
     expect(lifetimeSpaceReferences(SPACE_RESOURCE)).toEqual([TARGET_SPACE]);
   });
 

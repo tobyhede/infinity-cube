@@ -18,9 +18,13 @@ import { useOpenSpaces } from './open-spaces-context';
 import type { CommandOutcomes } from './command-outcomes';
 import type { DeleteConfirmation } from './delete-confirmation';
 import { NO_SPACE_RESOURCE_TARGETS, type SpaceResourceTargets } from './space-resource-targets';
-import { applyResourceDataPatch, decorateSharedResourceNode } from './canvas-resource-decoration';
+import {
+  applyResourceDataPatch,
+  decoratePluginSurface,
+  decorateSharedResourceNode,
+  type PluginSurfaceDecorationContext,
+} from './canvas-resource-decoration';
 import { decorateEmbedCommands, type EmbedCommandsContext } from './embed-commands';
-import { useKindDecoratedNodes } from './kinds/registry';
 import type { Embedding } from './plugin-host/claim-chain';
 import type { PluginHost } from './plugin-host/plugin-commits';
 import type { PluginGate } from './plugin-host/plugin-gate';
@@ -388,12 +392,19 @@ export function useCanvasResourceAuthoring({
       ),
     [nodes, sharedContext],
   );
-  const kindDecorated = useKindDecoratedNodes(withShared, {
-    authorOnCanvas: availability.authorOnCanvas,
-    embeddedMapEdit: availability.embeddedMapEdit,
-    editableResourceIds,
-    pluginHost,
-  });
+  const surfaceContext = useMemo(
+    (): PluginSurfaceDecorationContext => ({
+      authorOnCanvas: availability.authorOnCanvas,
+      embeddedMapEdit: availability.embeddedMapEdit,
+      editableResourceIds,
+      pluginHost,
+    }),
+    [availability.authorOnCanvas, availability.embeddedMapEdit, editableResourceIds, pluginHost],
+  );
+  const kindDecorated = useMemo(
+    () => withShared.map((node) => decoratePluginSurface(node, surfaceContext)),
+    [withShared, surfaceContext],
+  );
   // The commands of each Space a Resource embeds, read from what its plugin
   // passed `Embed`, whatever the kind (ADR 0142).
   const embedContext = useMemo(

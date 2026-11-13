@@ -11,7 +11,7 @@ import { useSyncExternalStore, type ReactElement } from 'react';
 import { z } from 'zod';
 import { ReactFlowProvider } from '@xyflow/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { spaceSnapshotSchema, uuidSchema, type KindId, type ResourceId } from '@project/core';
+import { spaceSnapshotSchema, uuidSchema, type ResourceId } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { bareKindData, type ResourceFlowNode } from '@project/react-flow-adapter';
 import { RESOURCE_DRAG_TYPE, SPACE_DRAG_TYPE } from '../src/components/ResourcesPopover';
@@ -25,6 +25,7 @@ import { stubResizeObserver } from './resize-observer';
 import { canvasReading, holdCanvasPolicy, IDLE_PLACEMENT } from './map-surfaces';
 import type { MapSurfacePolicy } from '../src/map-surface-policy';
 import { textAsset } from './markdown-texts';
+import { type PluginKind } from '@project/plugins/testing';
 
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const OTHER_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
@@ -94,7 +95,7 @@ const resourceNode = (
   title: string,
   id: typeof RESOURCE_ID = RESOURCE_ID,
   selected = false,
-  kind: KindId = 'markdown',
+  kind: PluginKind = 'markdown',
 ): ResourceFlowNode => {
   const node = drawnNode(title, id, selected, kind);
   // A Markdown Resource is drawn by its plugin, from its content and Map content (ADR 0142).
@@ -121,7 +122,7 @@ const drawnNode = (
   title: string,
   id: typeof RESOURCE_ID,
   selected: boolean,
-  kind: KindId,
+  kind: PluginKind,
 ): ResourceFlowNode => ({
   id,
   type: 'resource',

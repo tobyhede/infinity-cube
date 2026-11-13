@@ -1,14 +1,9 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import {
-  EMPTY_ASSET_REF,
-  normalizeTitle,
-  titleLines,
-  type KindId,
-  type Resource,
-} from '@project/core';
+import { EMPTY_ASSET_REF, normalizeTitle, titleLines, type Resource } from '@project/core';
 import { parseResourceFiles, serializeResource } from '../src/index';
 import { uuid } from './resource-files';
+import { type PluginKind } from '@project/plugins/testing';
 
 /**
  * A multiline Title survives a Resource file round trip (ADR 0083).
@@ -31,7 +26,7 @@ const SPACE_ID = uuid('00000000-0000-4000-8000-000000000103');
 const MAP_ID = uuid('00000000-0000-4000-8000-000000000104');
 const GRAPH_ID = uuid('00000000-0000-4000-8000-000000000105');
 
-type ResourceKind = KindId;
+type ResourceKind = PluginKind;
 
 const EVERY_KIND: readonly ResourceKind[] = ['markdown', 'reference', 'space', 'image', 'ur'];
 

@@ -1,6 +1,11 @@
 import type { Resource } from '@project/core';
-import { kindNaming } from './kinds/registry';
-import { BADGED_TARGET_GLYPH } from './kinds/plugin-listing';
+import {
+  BUILD_CATALOG,
+  catalogEntry,
+  pluginEntryFor,
+  usePluginCatalog,
+  type PluginEntry,
+} from './plugin-catalog';
 import { ReferenceIcon, type ResourceBaseKind } from './icons';
 
 /**
@@ -11,10 +16,22 @@ import { ReferenceIcon, type ResourceBaseKind } from './icons';
  * hunt for. It is the same glyph wherever a Resource appears — on the drawn Resource, and in
  * the Resources list — so recognising one teaches the other.
  *
- * Each kind's view half (`kinds/`) gives its glyph and its names, and the
- * registry types every kind's view half, so a new kind fails to build until
- * it has a name rather than silently drawing as nothing.
+ * Each plugin gives its glyph and its names (`plugin-catalog.tsx`); a plugin
+ * whose Resources show another's draws its Target's glyph with a badge on it,
+ * keyed on that declaration and never on a kind.
  */
+
+/** What a kind's Resources are called and drawn as: its plugin's, or the default plugin's. */
+export type KindNaming = Pick<
+  PluginEntry,
+  'name' | 'listName' | 'referenceName' | 'Glyph' | 'showsTarget'
+>;
+
+/** What a kind's Resources are called and drawn as in this build. */
+export const kindNaming = (kind: Resource['kind']): KindNaming => pluginEntryFor(kind);
+
+/** What every Resource of a kind whose plugin is missing is called and drawn with: the default plugin's. */
+export const missingKindNaming: KindNaming = BUILD_CATALOG.fallback;
 
 /**
  * What this kind of Resource is called, for a surface that names one in words
@@ -70,10 +87,16 @@ function KindGlyph({ kind, referenceOf, size }: ResourceKindIconProps) {
   // default by destructuring, and a destructuring default is what `undefined`
   // selects — so passing it through preserves omission rather than overriding
   // it, and no conditional spread is needed to say so.
-  const { Glyph } = kindNaming(kind);
-  if (Glyph !== BADGED_TARGET_GLYPH) return <Glyph size={size} />;
-  const Base = referenceOf === undefined ? undefined : kindNaming(referenceOf).Glyph;
-  return <ReferenceIcon Base={Base === BADGED_TARGET_GLYPH ? undefined : Base} size={size} />;
+  const catalog = usePluginCatalog();
+  const { Glyph, showsTarget } = catalogEntry(catalog, kind);
+  if (!showsTarget) return <Glyph size={size} />;
+  const base = referenceOf === undefined ? undefined : catalogEntry(catalog, referenceOf);
+  return (
+    <ReferenceIcon
+      Base={base === undefined || base.showsTarget ? undefined : base.Glyph}
+      size={size}
+    />
+  );
 }
 
 /**
@@ -97,8 +120,9 @@ export function ResourceKindIcon({
   size,
   decorative = false,
 }: ResourceKindIconProps) {
-  const naming = kindNaming(kind);
-  const badged = naming.Glyph === BADGED_TARGET_GLYPH;
+  const catalog = usePluginCatalog();
+  const naming = catalogEntry(catalog, kind);
+  const badged = naming.showsTarget;
   // Named only where a name is drawn: the decorative arm announces nothing and
   // shows the pointer nothing, so deriving one for it would be a value that
   // exists to be discarded.
@@ -115,7 +139,7 @@ export function ResourceKindIcon({
     );
   const name =
     badged && referenceOf !== undefined
-      ? (kindNaming(referenceOf).referenceName ?? naming.name)
+      ? (catalogEntry(catalog, referenceOf).referenceName ?? naming.name)
       : naming.name;
   return (
     <span

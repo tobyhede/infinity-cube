@@ -19,9 +19,9 @@ import type {
 
 /** Domain types are derived from the Zod schemas so they can never drift apart. */
 
-import type { Resource } from './kinds/registry';
+import type { Resource } from './plugin-modules';
 
-export type { Resource, ResourceDocument, ResourceFileDocument } from './kinds/registry';
+export type { Resource, ResourceDocument, ResourceFileDocument } from './plugin-modules';
 export type UUID = z.infer<typeof uuidSchema>;
 export type SpaceDocument = z.infer<typeof spaceDocumentSchema>;
 export type SpaceSnapshot = z.infer<typeof spaceSnapshotSchema>;

@@ -7,7 +7,7 @@ import {
   ResourceHostProvider,
   type ResourceHost,
 } from '@project/resource-api/view/host';
-import { pluginEntryFor, type PluginSurfaceEntries } from './kinds/plugin-views';
+import { usePluginEntry, type PluginEntry } from './plugin-catalog';
 import { readingAssets, usePluginAssets } from './plugin-assets';
 import { EmbeddingProvider, HostEmbed, type Embedding } from './ResourceEmbedding';
 import { ResourceFailureBoundary } from './ResourceFailureBoundary';
@@ -58,7 +58,7 @@ export interface PresentedPluginResourceProps {
 }
 
 export function PresentedPluginResource(props: PresentedPluginResourceProps) {
-  return <PresentedPluginSurface {...props} entry={pluginEntryFor(props.kind)} />;
+  return <PresentedPluginSurface {...props} entry={usePluginEntry(props.kind)} />;
 }
 
 /**
@@ -66,7 +66,9 @@ export function PresentedPluginResource(props: PresentedPluginResourceProps) {
  * `PresentedPluginResource` draws, and what a test draws a plugin of its own
  * through. The Stage authors nothing, so the plugin reads assets and stores none.
  */
-export function PresentedPluginSurface(props: PresentedPluginResourceProps & PluginSurfaceEntries) {
+export function PresentedPluginSurface(
+  props: PresentedPluginResourceProps & { readonly entry: PluginEntry },
+) {
   const { kind, title } = props;
   const supplied = usePluginAssets();
   const assets = useMemo(() => readingAssets(supplied), [supplied]);
@@ -96,7 +98,6 @@ export function PresentedPluginSurface(props: PresentedPluginResourceProps & Plu
     onClaim: (claim) => claim.unmount(),
   });
   const { embeddable, onFailure } = props;
-  const entryFor = props.entryFor ?? pluginEntryFor;
   const embedding: Embedding = useMemo(
     () => ({
       resources: embeddable ?? [],
@@ -108,9 +109,8 @@ export function PresentedPluginSurface(props: PresentedPluginResourceProps & Plu
       size: STAGE_SIZE,
       selected: false,
       onFailure,
-      entryFor,
     }),
-    [embeddable, props.resourceId, host, onFailure, entryFor],
+    [embeddable, props.resourceId, host, onFailure],
   );
   return (
     <article
@@ -164,6 +164,7 @@ export interface PresentedPluginContentProps {
  * nothing to embed.
  */
 export function PresentedPluginContent({ kind, title, content }: PresentedPluginContentProps) {
+  const entry = usePluginEntry(kind);
   const supplied = usePluginAssets();
   const assets = useMemo(() => readingAssets(supplied), [supplied]);
   const [drawing] = useState(() => Symbol('drawing'));
@@ -185,11 +186,10 @@ export function PresentedPluginContent({ kind, title, content }: PresentedPlugin
       rail: host.rail,
       size: STAGE_SIZE,
       selected: false,
-      entryFor: pluginEntryFor,
     }),
     [host],
   );
-  const plugin = pluginEntryFor(kind).render({
+  const plugin = entry.render({
     resourceId: '',
     drawing,
     kind,

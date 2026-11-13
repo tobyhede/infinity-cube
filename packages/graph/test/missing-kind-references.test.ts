@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isMissingKindId, uuidSchema, type MissingKind, type SpaceSnapshot } from '@project/core';
+import { isMissingKindId, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { loadSpaceSnapshot, SnapshotEdit } from '../src/index';
 
 /**
@@ -16,7 +16,7 @@ const GRAPH = uuidSchema.parse('d0000000-0000-4000-8000-000000000003');
 const UNPLUGGED = uuidSchema.parse('d0000000-0000-4000-8000-000000000010');
 const REFERENCE = uuidSchema.parse('d0000000-0000-4000-8000-000000000011');
 
-const missing = (kind: string): MissingKind => {
+const missing = (kind: string): string => {
   if (!isMissingKindId(kind)) throw new Error(`${kind} is not a missing kind`);
   return kind;
 };

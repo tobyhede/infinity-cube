@@ -2,12 +2,12 @@ import { fireEvent, render, screen, waitFor, type RenderResult } from '@testing-
 import { beforeAll, afterAll, describe, expect, it, vi } from 'vitest';
 
 import {
-  isOfKind,
   encodeCompactUuid,
   spaceSnapshotSchema,
   uuidSchema,
   type SpaceSnapshot,
 } from '@project/core';
+import { isOfKind } from '@project/plugins/testing';
 import { loadSpaceSnapshot } from '@project/graph';
 import { MemorySpaceBackend, type SpaceSession } from '@project/persistence';
 import type { HistoryApi } from '../src/browser-location';

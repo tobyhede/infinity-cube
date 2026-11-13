@@ -21,6 +21,7 @@ export const workspaceAliases = () => {
     '@project/graph': here('../graph/src/index.ts'),
     '@project/http': here('../http/src/index.ts'),
     '@project/persistence': here('../persistence/src/index.ts'),
+    '@project/plugins/domain': here('../plugins/src/domain.ts'),
     '@project/plugin-default/domain': here('../plugin-default/src/domain.ts'),
     '@project/plugin-image/domain': here('../plugin-image/src/domain.ts'),
     '@project/plugin-ur/domain': here('../plugin-ur/src/domain.ts'),

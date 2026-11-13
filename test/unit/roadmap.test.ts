@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
-import { isOfKind, spaceFileSchema, spaceSnapshotSchema } from '@project/core';
+import { spaceFileSchema, spaceSnapshotSchema } from '@project/core';
+import { isOfKind } from '@project/plugins/testing';
 import { loadSpaceSnapshot } from '@project/graph';
 import { readSingleSpace } from '../../src/aggregate-directory';
 import {

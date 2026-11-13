@@ -240,24 +240,9 @@ importers:
 
   packages/core:
     dependencies:
-      '@project/plugin-default':
+      '@project/plugins':
         specifier: workspace:*
-        version: link:../plugin-default
-      '@project/plugin-image':
-        specifier: workspace:*
-        version: link:../plugin-image
-      '@project/plugin-markdown':
-        specifier: workspace:*
-        version: link:../plugin-markdown
-      '@project/plugin-reference':
-        specifier: workspace:*
-        version: link:../plugin-reference
-      '@project/plugin-space':
-        specifier: workspace:*
-        version: link:../plugin-space
-      '@project/plugin-ur':
-        specifier: workspace:*
-        version: link:../plugin-ur
+        version: link:../plugins
       '@project/resource-api':
         specifier: workspace:*
         version: link:../resource-api
@@ -407,6 +392,36 @@ importers:
         specifier: ^3.23.8
         version: 3.25.76
 
+  packages/plugins:
+    dependencies:
+      '@project/plugin-default':
+        specifier: workspace:*
+        version: link:../plugin-default
+      '@project/plugin-image':
+        specifier: workspace:*
+        version: link:../plugin-image
+      '@project/plugin-markdown':
+        specifier: workspace:*
+        version: link:../plugin-markdown
+      '@project/plugin-reference':
+        specifier: workspace:*
+        version: link:../plugin-reference
+      '@project/plugin-space':
+        specifier: workspace:*
+        version: link:../plugin-space
+      '@project/plugin-ur':
+        specifier: workspace:*
+        version: link:../plugin-ur
+      '@project/resource-api':
+        specifier: workspace:*
+        version: link:../resource-api
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.3.1
+        version: 18.3.1(react@18.3.1)
+
   packages/react-flow-adapter:
     dependencies:
       '@project/core':
@@ -472,24 +487,9 @@ importers:
       '@project/core':
         specifier: workspace:*
         version: link:../core
-      '@project/plugin-default':
+      '@project/plugins':
         specifier: workspace:*
-        version: link:../plugin-default
-      '@project/plugin-image':
-        specifier: workspace:*
-        version: link:../plugin-image
-      '@project/plugin-markdown':
-        specifier: workspace:*
-        version: link:../plugin-markdown
-      '@project/plugin-reference':
-        specifier: workspace:*
-        version: link:../plugin-reference
-      '@project/plugin-space':
-        specifier: workspace:*
-        version: link:../plugin-space
-      '@project/plugin-ur':
-        specifier: workspace:*
-        version: link:../plugin-ur
+        version: link:../plugins
       '@project/resource-api':
         specifier: workspace:*
         version: link:../resource-api
