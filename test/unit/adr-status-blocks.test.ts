@@ -28,7 +28,7 @@ import { describe, expect, it } from 'vitest';
  */
 
 const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
-const adrDir = join(repoRoot, 'docs/adr');
+const adrDir = join(repoRoot, 'docs/adr/archive');
 
 /** A status-block field: `Refines: 0003, 0007`. The value may be empty. */
 const FIELD = /^([A-Z][A-Za-z ]*): ?(.*)$/;

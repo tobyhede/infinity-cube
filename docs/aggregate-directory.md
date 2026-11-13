@@ -1,6 +1,6 @@
 # The Aggregate directory
 
-An **Aggregate directory** is the on-disk form of everything InfinityCube holds: every Space, rooted at the Meta Space, plus the assets its Resources use: a Markdown Resource's text and the pictures its Image Resources show. `pnpm cube init <dir>` creates one, `pnpm cube run <dir>` runs one ([ADR 0117](adr/0117-running-serves-an-aggregate-directory-as-the-durable-copy.md)), `pnpm cube check <dir>` reads one as a run would without serving or writing it, `pnpm cube mcp <dir>` serves a local MCP server that edits one's files, and `pnpm cube import` and `pnpm cube export` Import one into a database and Export one back out ([ADR 0124](adr/0124-one-hyper-cli.md)). Exporting writes the same format whichever store it reads from.
+An **Aggregate directory** is the on-disk form of everything InfinityCube holds: every Space, rooted at the Meta Space, plus the assets its Resources use: a Markdown Resource's text and the pictures its Image Resources show. `pnpm cube init <dir>` creates one, `pnpm cube run <dir>` runs one ([Storage: Running](requirements/storage.md#running)), `pnpm cube check <dir>` reads one as a run would without serving or writing it, `pnpm cube mcp <dir>` serves a local MCP server that edits one's files, and `pnpm cube import` and `pnpm cube export` Import one into a database and Export one back out ([Storage: CLI](requirements/storage.md#cli)). Exporting writes the same format whichever store it reads from.
 
 The directory is plain files meant for git: JSON in a fixed key order, one JSON Resource file per Resource, and assets (a Markdown Resource's text, a picture) named by their content. Exporting the same content twice writes the same bytes, so a diff shows only what changed.
 
@@ -28,7 +28,7 @@ The bundled example is [`packages/app/fixture`](../packages/app/fixture).
 { "version": 1, "metaSpaceId": "2b1c9a40-0f0e-4c55-9d3a-6f1d2e3a4b5c" }
 ```
 
-It carries the one fact the directory cannot say for itself: **which Space is Meta**. Nothing infers that from ordering or naming ([ADR 0078](adr/0078-the-server-side-repository-owns-meta-lifecycle.md)), so a directory without `aggregate.json` is not an Aggregate directory. A single Space's directory on its own, with `space.json` and no `aggregate.json`, is refused. Both keys are required and no others are allowed.
+It carries the one fact the directory cannot say for itself: **which Space is Meta**. Nothing infers that from ordering or naming ([Storage: Meta lifecycle](requirements/storage.md#meta-lifecycle)), so a directory without `aggregate.json` is not an Aggregate directory. A single Space's directory on its own, with `space.json` and no `aggregate.json`, is refused. Both keys are required and no others are allowed.
 
 There is no list of Spaces. A Space is in the aggregate because its directory is there.
 
@@ -40,7 +40,7 @@ A child directory without a `space.json` is not a Space and is left alone.
 
 ### The rules that make Spaces an aggregate
 
-- The Meta Space is the root. Every **ordinary** Space must be reached by some Space Resource in another Space; one that nothing reaches is refused: `Space <id> is not the Meta Space and no Space Resource points at it`. While any Resource's kind is one this version of InfinityCube has no plugin for, a Space nothing reaches is held instead ([ADR 0142](adr/0142-a-resource-plugin-owns-everything-inside-its-rect.md)): that Resource may be what reaches it, and nothing can read it to say. Deleting the last such Resource while a Space is held only this way is refused, naming the Space.
+- The Meta Space is the root. Every **ordinary** Space must be reached by some Space Resource in another Space; one that nothing reaches is refused: `Space <id> is not the Meta Space and no Space Resource points at it`. While any Resource's kind is one this version of InfinityCube has no plugin for, a Space nothing reaches is held instead ([Space and Resources](requirements/space-and-resources.md#space-lifetime-the-meta-space-and-deletion)): that Resource may be what reaches it, and nothing can read it to say. Deleting the last such Resource while a Space is held only this way is refused, naming the Space.
 - A Space Resource's `map` and `graph` must name a Map of its target Space and a Graph that Map owns.
 - Space Resources may converge on one Space but may not form a cycle, and a Space Resource may not target its own Space.
 - Resource Ids are unique across the whole aggregate, not just within a Space.
@@ -92,14 +92,14 @@ Every object here is **strict**: a key the format does not declare is refused ra
 
 | Key | Meaning |
 | --- | --- |
-| `version` | Always `1`. Any other version is refused by name rather than migrated ([ADR 0040](adr/0040-layouts-own-card-membership-and-routes.md)). |
+| `version` | Always `1`. Any other version is refused by name rather than migrated ([Storage: Rolling forward](requirements/storage.md#rolling-forward)). |
 | `id` | The Space's Id. Optional here, because the directory name already carries it; if present it must match. |
 | `title` | The Space's name. Non-empty. |
-| `maps` | Optional. The Space's Maps, in order. A Space with none is given one the first time it is opened ([ADR 0079](adr/0079-v1-exposes-only-layouts-and-first-open-initializes-one.md)). Only the Meta Space can be written without Maps, because a Space Resource must name a Map of the ordinary Space it targets. |
+| `maps` | Optional. The Space's Maps, in order. A Space with none is given one the first time it is opened ([Maps and Graphs](requirements/maps-and-graphs.md)). Only the Meta Space can be written without Maps, because a Space Resource must name a Map of the ordinary Space it targets. |
 | `maps[].id`, `.title` | The Map's Id and name. Map Ids are unique within the Space. |
 | `maps[].kind` | `"positioned"`, the only kind. May be omitted. |
-| `maps[].positions` | Resource Id → placement. **The keys are the Map's membership**: a Map may leave Resources out, and may not name one the Space does not hold. A placement is `{ "x", "y" }`, with an optional `size` and `content`, and no other key. `size` is `{ "width", "height" }`, no smaller than the Closed Size (260×146) on either axis; absent means the Closed Size, Open or Closed. `content` is the Resource's Map content (ADR 0142): any JSON value, which the Resource's plugin's schema accepts or refuses, and absent means that plugin's default; a Resource whose kind names no plugin in this build keeps whatever is stored, unread. An Ur Resource's is its Shape, `{ "shape": … }` with one of `rectangle`, `pill`, `ellipse` or `diamond`, absent meaning `rectangle`, and a Markdown, Space or Reference Resource's is `{ "open": true }` or `{ "open": false }`, absent meaning Closed, so one Map may draw it Open and another Closed. |
-| `maps[].graphs` | The Graphs this Map owns, in order, **at least one**. A Graph Id is unique across the whole Space, not just the Map ([ADR 0108](adr/0108-graph-identity-is-unique-within-the-space.md)). `color` is a non-empty string used as the Graph's CSS colour, which is not checked as a colour, and `headShape` is one of `arrow`, `vee`, `dot`, `diamond`; both are optional. |
+| `maps[].positions` | Resource Id → placement. **The keys are the Map's membership**: a Map may leave Resources out, and may not name one the Space does not hold. A placement is `{ "x", "y" }`, with an optional `size` and `content`, and no other key. `size` is `{ "width", "height" }`, no smaller than the Closed Size (260×146) on either axis; absent means the Closed Size, Open or Closed. `content` is the Resource's Map content: any JSON value, which the Resource's plugin's schema accepts or refuses, and absent means that plugin's default; a Resource whose kind names no plugin in this build keeps whatever is stored, unread. An Ur Resource's is its Shape, `{ "shape": … }` with one of `rectangle`, `pill`, `ellipse` or `diamond`, absent meaning `rectangle`, and a Markdown, Space or Reference Resource's is `{ "open": true }` or `{ "open": false }`, absent meaning Closed, so one Map may draw it Open and another Closed. |
+| `maps[].graphs` | The Graphs this Map owns, in order, **at least one**. A Graph Id is unique across the whole Space, not just the Map ([Maps and Graphs](requirements/maps-and-graphs.md)). `color` is a non-empty string used as the Graph's CSS colour, which is not checked as a colour, and `headShape` is one of `arrow`, `vee`, `dot`, `diamond`; both are optional. |
 | `maps[].graphs[].edges` | Directed `{ "from", "to" }` Edges between Resources **this Map places**. Forks, merges, cycles and self-edges are allowed; an exact duplicate in one Graph is not. An Edge may carry a `title` that is one line with no leading or trailing whitespace, and `"titleHidden": true` beside it. The list may be empty. |
 | `maps[].activeGraph` | Which Graph is active when the Map opens. Absent means the first. |
 | `defaultMap` | The Map the Space opens on. If absent, opening the Space records its first Map here. |
@@ -108,7 +108,7 @@ There is no Space-level list of Resources or Graphs. Resources are the Resource 
 
 ## Resource files
 
-A Resource is **one JSON Resource file**, `resources/<id>.json`, holding `{ id, title, kind, content }` ([ADR 0128](adr/0128-every-resource-kind-is-a-module-and-a-resource-file-is-json.md)). Resource files are found in `resources/` of a Space directory, **not recursively**. The format is published as JSON Schema in [`docs/schema/resource/`](schema/resource/README.md), with one example per kind.
+A Resource is **one JSON Resource file**, `resources/<id>.json`, holding `{ id, title, kind, content }` ([Storage: File format](requirements/storage.md#file-format)). Resource files are found in `resources/` of a Space directory, **not recursively**. The format is published as JSON Schema in [`docs/schema/resource/`](schema/resource/README.md), with one example per kind.
 
 ```json
 {
@@ -119,7 +119,7 @@ A Resource is **one JSON Resource file**, `resources/<id>.json`, holding `{ id, 
 }
 ```
 
-A Markdown Resource's text is an **asset** ([ADR 0142](adr/0142-a-resource-plugin-owns-everything-inside-its-rect.md)), as a picture is: a plain Markdown file with no frontmatter and `\n` line endings, in [`assets/`](#assets) under the hash of its bytes, here `assets/rcWY21QI-7ex4GKEZMhDprdPTIkEFjNXTGe9e9omKy4.md`. Nothing is written beside the Resource file. A new Markdown Resource names the asset of zero bytes, `/assets/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU`, which needs no file.
+A Markdown Resource's text is an **asset** ([Storage: File format](requirements/storage.md#file-format)), as a picture is: a plain Markdown file with no frontmatter and `\n` line endings, in [`assets/`](#assets) under the hash of its bytes, here `assets/rcWY21QI-7ex4GKEZMhDprdPTIkEFjNXTGe9e9omKy4.md`. Nothing is written beside the Resource file. A new Markdown Resource names the asset of zero bytes, `/assets/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU`, which needs no file.
 
 A Resource's identity is its `id`, never its file name. Exporting writes every Resource as `resources/<id>.json`, whatever it was called before.
 
@@ -133,13 +133,13 @@ Every Resource has `id`, `title`, `kind` and `content`, and none may be left out
 | `reference` | `target`: the Id of another Resource **in the same Space**, not itself and not another Reference Resource. It shows its Target's content, read-only. |
 | `space` | `spaceId`, `map`, `graph`: the target Space and the Map and Graph it shows. Optional `framing: { centreX, centreY, zoom }`. |
 
-A `kind` this version of InfinityCube has no plugin for is not refused ([ADR 0142](adr/0142-a-resource-plugin-owns-everything-inside-its-rect.md)): its `content` may be any JSON object, which is carried and never read, and the Resource is drawn as its Title and a note that its kind is not available. It can be placed, resized, connected, renamed, presented and deleted as any Resource, its Map entries' `content` is kept, and the assets its `content` names travel with it. It cannot become a Reference Resource's Target, since nothing can say whether its plugin allows that; a Reference that already names it is kept. Its `content`, and the `content` of its Map entries, are written with their keys sorted at every depth, integer-like keys first, and each number as JavaScript writes it: `1.0` comes back as `1`, and an integer beyond 2^53 loses precision. A version that has the plugin reads it as it stands. A misspelt kind is such a kind, so check the `kind` of a Resource drawn this way.
+A `kind` this version of InfinityCube has no plugin for is not refused ([Space and Resources](requirements/space-and-resources.md#kinds)): its `content` may be any JSON object, which is carried and never read, and the Resource is drawn as its Title and a note that its kind is not available. It can be placed, resized, connected, renamed, presented and deleted as any Resource, its Map entries' `content` is kept, and the assets its `content` names travel with it. It cannot become a Reference Resource's Target, since nothing can say whether its plugin allows that; a Reference that already names it is kept. Its `content`, and the `content` of its Map entries, are written with their keys sorted at every depth, integer-like keys first, and each number as JavaScript writes it: `1.0` comes back as `1`, and an integer beyond 2^53 loses precision. A version that has the plugin reads it as it stands. A misspelt kind is such a kind, so check the `kind` of a Resource drawn this way.
 
 Only `resources/*.json` is read: a `.md` in `resources/` or beside `space.json` is not a Resource and is left alone.
 
 ## `assets/`
 
-The bytes of every stored asset the aggregate's Resources reference ([ADR 0142](adr/0142-a-resource-plugin-owns-everything-inside-its-rect.md), [ADR 0118](adr/0118-an-aggregate-directory-carries-stored-image-bytes.md)). An asset is any file a Resource uses, of any media type: a Markdown Resource's text and an Image Resource's picture are the ones a Resource kind writes today.
+The bytes of every stored asset the aggregate's Resources reference ([Storage: File format](requirements/storage.md#file-format)). An asset is any file a Resource uses, of any media type: a Markdown Resource's text and an Image Resource's picture are the ones a Resource kind writes today.
 
 - Each file is `assets/<hash>.<ext>`. The hash is the SHA-256 of the file's bytes as 43 characters of unpadded base64url, and it is also the last segment of the asset's URL, `/assets/<hash>`. The same bytes always have the same name, so they are stored once however many Resources reference them.
 - The extension gives the asset's media type, through one table: `png`, `jpg` and `jpeg`, `webp`, `gif`, `avif`, `svg`, `md`, `txt`, `csv`, `html`, `css`, `js`, `json`, `pdf`, `mp4`, `webm`, `mp3` and `woff2`. Any other extension, or none, is `application/octet-stream`. Exporting keeps the name of a file already there, so the extension you chose is written back; a new file gets the table's extension for its media type, or `.bin` for one the table does not list.
@@ -173,7 +173,7 @@ The next Export writes every minted Id into the files.
 
 ## What Exporting replaces, and what it keeps
 
-Exporting writes the directory **in place** ([ADR 0119](adr/0119-export-writes-in-place-and-git-answers-for-a-partial-write.md)). It owns exactly what Importing reads, and never reads, copies or touches anything else:
+Exporting writes the directory **in place** ([Storage: Export](requirements/storage.md#export)). It owns exactly what Importing reads, and never reads, copies or touches anything else:
 
 - **Owned:** `aggregate.json`; each Space directory's `space.json` and every `resources/*.json`; the hash-named files in `assets/`.
 - **Kept:** any other file or directory, at the root or inside a Space directory, such as `.git`, a `README.md` at the root or in a Space directory, notes in a `notes/` directory or a `.gitignore`.
@@ -230,7 +230,7 @@ Every addressable entity has a durable product URL built from its UUID. Product 
 | `/spaces/:spaceId/maps/:mapId/graphs/:graphId` | Graph in an explicit Map |
 | `/spaces/:spaceId/maps/:mapId/graphs/:graphId/present/:resourceId` | Presenting at its Active Resource |
 
-These are navigation addresses, not persistence resources: resolving one never edits a Map, Active Graph or Resource. The browser and the Node host share one destination contract, so a malformed address receives `400`, an unresolved entity `404`, and a direct request returns the same application destination client-side navigation opens ([ADR 0069](adr/0069-entities-have-durable-web-addresses.md)).
+These are navigation addresses, not persistence resources: resolving one never edits a Map, Active Graph or Resource. The browser and the Node host share one destination contract, so a malformed address receives `400`, an unresolved entity `404`, and a direct request returns the same application destination client-side navigation opens ([Navigation](requirements/navigation.md)).
 
 The JSON API is smaller and keeps UUIDs in canonical spelling:
 

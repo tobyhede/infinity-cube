@@ -328,8 +328,8 @@ describe('the message a run leaves behind', () => {
     );
   });
 
-  it('points at the ADR on failure', () => {
+  it('points at the tooling guide on failure', () => {
     const verdict = judgeToolchain({ compilers: everyWorkspaceOn('6.0.3'), bridge: workingBridge });
-    expect(formatVerdict(verdict)).toContain('docs/adr/0061-');
+    expect(formatVerdict(verdict)).toContain('docs/agents/build-tooling.md');
   });
 });
