@@ -1,6 +1,6 @@
 # 07 — Prove the V1 release
 
-Status: ready-for-agent
+Status: needs-info — waits on V1/06, V1/16, V1/19, database-persistence/40 and /41
 Tags: release/v1
 Blocked by: 03, 05, 06, 08, 16, 17, 19; `entity-url-addressability/08`; `interaction-draft-invalidation/04`; `space-cards/10`;
   `command-dock/28`; `database-persistence/26`; `database-persistence/31`;

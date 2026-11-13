@@ -1,6 +1,6 @@
 # 11 — Keep a mounted talk's edits in the browser
 
-Status: needs-triage
+Status: ready-for-agent
 
 **What to build:** ADR 0132. A mounted talk's in-page store keeps its state in IndexedDB, scoped by resolved repository, directory and commit, so edits survive a reload and are shared by tabs of the same scope.
 

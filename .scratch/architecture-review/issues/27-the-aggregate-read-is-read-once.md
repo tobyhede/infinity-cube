@@ -1,6 +1,6 @@
 # The aggregate is read once
 
-Status: ready-for-agent
+Status: resolved
 Tags: Improvement
 Held: until after the talk on 30 October 2026; do not start before 31 October 2026 (decided 24 October 2026).
 Blocked by: the talk named on the line above, not a ticket.

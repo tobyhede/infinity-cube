@@ -1,6 +1,6 @@
 # 19 — Prove the clean-clone End-to-end rehearsal
 
-Status: ready-for-agent
+Status: needs-info — waits on V1/16 and a restated V1 journey
 Tags: release/v1
 Blocked by: 03, 08, 16, 17; `entity-url-addressability/08`; `space-cards/10`
 

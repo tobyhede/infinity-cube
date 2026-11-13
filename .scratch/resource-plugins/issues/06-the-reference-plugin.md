@@ -1,6 +1,6 @@
 # 06 — The Reference plugin
 
-Status: ready-for-agent
+Status: done
 
 **Blocked by:** 04 — The Image plugin; 05 — The Markdown plugin.
 

@@ -1,6 +1,6 @@
 # Bring persistence onto the refusal pattern
 
-Status: built — the original scope landed 2026-09-10 and the follow-up below on 2026-09-23
+Status: resolved — the original scope landed 2026-09-10 and the follow-up on 2026-09-23
 
 Surfaced by: investigating whether persistence error handling should be extracted as the application-wide error pattern. It should not — see `spec.md`, which also keeps the original findings in the present tense they were written in.
 

@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 — The database verbs.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] `init` on a missing or empty directory (dot-entries do not count) writes a valid Aggregate directory whose Meta Space is a new space, prints the `run` command, and exits 0 without serving
 - [x] `init` on a directory that is not empty is refused non-zero and writes nothing

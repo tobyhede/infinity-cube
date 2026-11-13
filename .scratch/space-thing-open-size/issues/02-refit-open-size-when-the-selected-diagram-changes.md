@@ -7,7 +7,7 @@ Open Size Edit on the containing Diagram, not a live layout of the embed.
 
 **Blocked by:** 01 — Open a Space Thing to the selected Diagram’s bounds.
 
-**Status:** ready-for-agent
+**Status:** wontfix — superseded by ADR 0122 (size independent of Open) and ADR 0142
 
 - [ ] Changing the Diagram choice on an Open Space Thing sets Open Size from that
       Diagram’s Thing bounds plus the embed inset, floored at the Space Thing

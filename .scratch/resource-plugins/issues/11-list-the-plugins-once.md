@@ -1,6 +1,6 @@
 # 11 — List the plugins once
 
-Status: built, in review
+Status: done
 
 **Blocked by:** none. The shown Space's chooser, links and authoring come from the `Embed` (`packages/app/src/embed-commands.ts`), so `packages/app/src/kinds/space.ts` builds no rail.
 

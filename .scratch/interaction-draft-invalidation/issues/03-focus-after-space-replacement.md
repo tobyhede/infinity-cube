@@ -1,6 +1,6 @@
 # App focus restoration cannot distinguish Card close from Space replacement
 
-Status: ready-for-human
+Status: wontfix — the opened-Card focus effect it describes was removed; replacement now invalidates the continuation (continuation.ts)
 
 Surfaced by: resolving `02-interaction-draft-invalidation-is-mostly-already-covered.md`
 

@@ -1,6 +1,6 @@
 # 01: Command ids and one dispatcher
 
-Status: ready-for-agent
+Status: resolved — built by `.scratch/canvas-commands/` 02–07 (PR #443)
 
 ADR 0138. Depends on the keyboard-shortcuts stack (#426–#430), merged into `main` on 2026-10-28: the bindings, listeners, guards and tests named here are `main`'s, not this branch's. No behaviour changes: every key does what it does today.
 
