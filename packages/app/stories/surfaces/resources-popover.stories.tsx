@@ -63,13 +63,16 @@ const SPACES = [
   { id: id('000000000021'), title: 'Yardstick' },
 ];
 
+/** No Resource placed on another Map. */
+const PLACED_NOWHERE_ELSE: MapMemberships = new Map();
+
 function ResourcesPopoverFixture({
   resources = RESOURCES,
   allResources = resources,
   disabled = false,
   notice,
   spaces,
-  memberships,
+  memberships = PLACED_NOWHERE_ELSE,
   spaceTitleById,
   spaceSelectionNameById,
 }: {
@@ -167,6 +170,8 @@ function RefusedAdd() {
   const space = composed.currentSpace();
   const selectedMap = space.lookup.map(composed.navigation.getState().selectedMapId)?.map;
   const resources = selectedMap === undefined ? [] : resourcesOutsideMap(space, selectedMap);
+  const memberships =
+    selectedMap === undefined ? PLACED_NOWHERE_ELSE : otherMapMemberships(space, selectedMap.id);
   const [open, setOpen] = useState(false);
 
   return (
@@ -186,6 +191,7 @@ function RefusedAdd() {
         }}
         onDelete={composed.resourceDeletion.askToDelete}
         onDragStart={() => undefined}
+        memberships={memberships}
       />
     </div>
   );
@@ -308,9 +314,11 @@ const ROADMAP_RESOURCES: readonly Resource[] = [
 
 /**
  * One Space under three rows that share its name: two Space Resources showing
- * it differently, one of them also on another Map, and the Space itself. Each
- * Space Resource row names the Map and Graph it shows, read from the target the
- * way the application reads it, and the Space row says it makes a new Space Resource.
+ * it differently, both also on another Map, and the Space itself. Each Space
+ * Resource row names the Map and Graph it shows, read from the target the way
+ * the application reads it, and the Space row says it makes a new Space
+ * Resource. A Space Resource placed on no Map would withhold the Space row
+ * (ADR 0144), so neither is.
  */
 export const SpaceSelections: Story = () => (
   <ResourcesPopoverFixture
@@ -320,6 +328,7 @@ export const SpaceSelections: Story = () => (
     spaceSelectionNameById={spaceSelectionNamesById(ROADMAP_TARGETS, ROADMAP_RESOURCES)}
     memberships={
       new Map([
+        [id('000000000045'), [{ mapId: id('000000000048'), mapTitle: 'Deep dive', graphs: [] }]],
         [id('000000000046'), [{ mapId: id('000000000048'), mapTitle: 'Deep dive', graphs: [] }]],
       ])
     }

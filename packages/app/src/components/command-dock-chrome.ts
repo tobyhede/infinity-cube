@@ -397,8 +397,11 @@ export interface DockResourcesList {
   readonly spaces?: readonly ResourcesPopoverSpace[] | undefined;
   /** Place a Space by authoring the Space Resource that frames it, or answer with a refusal. */
   readonly onAddSpace?: ((space: ResourcesPopoverSpace) => Promise<string | null>) | undefined;
-  /** Where each listed Resource is placed outside this Map, drawn as a capsule per Map. */
-  readonly memberships?: MapMemberships | undefined;
+  /**
+   * Where each listed Resource is placed outside this Map, drawn as a capsule
+   * per Map. Required: a Resource it does not name is read as placed on no Map.
+   */
+  readonly memberships: MapMemberships;
   /** Returns a refusal that stays on the list, or null after a completed Add. */
   readonly onAdd: (resource: Resource, activation: 'keyboard' | 'pointer') => string | null;
   /**

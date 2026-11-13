@@ -10,7 +10,7 @@ The Dock's Resources list draws two sources: the Resources the selected Map does
 
 **The list withholds a Space's row while it lists a Space Resource that frames that Space and is placed on no Map.** That Resource's own row is the way back: after Remove from Map the author places the same Resource, with its selection, and no orphan is made. Placing it takes it out of the list, and the Space row returns, so a second view stays one press away.
 
-**A Space Resource placed on another Map does not withhold the row.** Placing it here too shares one Resource, and its selection, across both Maps, and a Space row is how an author gets a view of their own instead. Both rows stay offered, and the Space Resource's row names the Maps that place it, which tells the two apart.
+**A Space Resource placed on another Map does not withhold the row.** Placing it here too shares one Resource, and its selection, across both Maps, and a Space row is how an author gets a view of their own instead. Both rows stay offered, and the Space Resource's row names the Maps that place it, which tells the two apart. A Space Resource already placed on this Map is not in the list at all, so it withholds nothing either: the Space row is offered while that Resource is on the canvas, and pressing it authors a second view.
 
 The withholding is decided over the list's source, not over what the kind filter and search leave drawn. Switching the Space Resource kind off hides both rows rather than bringing back the Space row that would author a second Space Resource. The Spaces count and the empty-list sentence read the same withheld set.
 

@@ -15,7 +15,7 @@
 
 ## Answer
 
-Recorded as ADR 0143, which refines ADR 0068 and ADR 0074. It refines 0068 (a Space Resource's selection is its own) rather than 0079 because that is where the reason lives; 0079 is Related.
+Recorded as ADR 0144, which refines ADR 0068 and ADR 0074. It refines 0068 (a Space Resource's selection is its own) rather than 0079 because that is where the reason lives; 0079 is Related.
 
 - A press or drop of a Space row always authors a new Space Resource. None is ever brought back, so the "which of several" question does not arise.
 - The row is withheld while the list holds a Space Resource framing that Space that no Map places. That Resource's own row is how the author re-adds it after Remove from Map, so the cycle makes no orphan.

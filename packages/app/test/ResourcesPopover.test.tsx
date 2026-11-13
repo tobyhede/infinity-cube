@@ -17,6 +17,7 @@ import {
 import { DeleteConfirmation } from '../src/components/DeleteConfirmation';
 import type { SettlePlacement, SettleResource } from '../src/resources-drag';
 import type { FocusFallback } from '../src/delete-confirmation';
+import type { MapMemberships } from '../src/map-memberships';
 import { resourceDeletionWords } from '../src/resource-deletion';
 
 const id = (suffix: string) => uuidSchema.parse(`00000000-0000-4000-8000-${suffix}`);
@@ -42,6 +43,9 @@ type SpaceDragStart = (
   space: { readonly id: UUID; readonly title: string },
   settle: SettlePlacement,
 ) => void;
+
+/** No listed Resource placed on another Map. */
+const PLACED_NOWHERE_ELSE: MapMemberships = new Map();
 
 /** No target Space read yet, which is what a Space Resource meets on the first render. */
 const NO_SPACE_TITLES: ReadonlyMap<UUID, string> = new Map();
@@ -88,6 +92,7 @@ function Fixture({
     <>
       <button type="button">The canvas behind it</button>
       <ResourcesPopover
+        memberships={PLACED_NOWHERE_ELSE}
         resources={resources}
         allResources={allResources}
         open={open}
@@ -133,6 +138,7 @@ function ControlledFixture({
 }) {
   return (
     <ResourcesPopover
+      memberships={PLACED_NOWHERE_ELSE}
       resources={RESOURCES}
       allResources={RESOURCES}
       open={open}
@@ -164,6 +170,7 @@ function PlacingFixture({ refusal = null }: { readonly refusal?: string | null }
     <>
       <button type="button">The canvas behind it</button>
       <ResourcesPopover
+        memberships={PLACED_NOWHERE_ELSE}
         resources={outside}
         allResources={RESOURCES}
         open={open}
@@ -195,6 +202,7 @@ function DeletingFixture() {
     <>
       <button type="button">The canvas behind it</button>
       <ResourcesPopover
+        memberships={PLACED_NOWHERE_ELSE}
         resources={outside}
         allResources={outside}
         open={open}
@@ -808,27 +816,58 @@ describe('ResourcesPopover', () => {
   });
 
   /**
-   * Pressing the Space row authors a new Space Resource, so while an unplaced
-   * one framing that Space is listed, the row would offer a second orphan and
-   * the reader would meet one name twice.
+   * Pressing the Space row authors a new Space Resource, so while a listed
+   * Space Resource placed on no Map frames that Space, the row would author a
+   * second one and leave the first in the Space, placed nowhere, and the
+   * reader would meet one name twice.
    */
   describe('a Space framed by a listed Space Resource', () => {
     const ROADMAP = { id: id('000000000012'), title: 'Roadmap' };
+    const ROADMAP_ROW = 'Add Roadmap as a new Space Resource to Map';
+    const BLUEPRINT_ROW = 'Add Blueprint as a new Space Resource to Map';
     const titles = new Map([[ROADMAP.id, ROADMAP.title]]);
+    const ON_OVERVIEW = [{ mapId: id('000000000030'), mapTitle: 'Overview', graphs: [] }];
+    /** A second Space Resource framing Roadmap, beside the fixture's Alpha. */
+    const ALSO_ROADMAP: Resource = {
+      id: id('000000000005'),
+      title: 'Beta',
+      kind: 'space',
+      content: { spaceId: ROADMAP.id, map: id('000000000013'), graph: id('000000000014') },
+    };
     const search = (value: string) =>
       fireEvent.change(screen.getByRole('textbox', { name: 'Search resources' }), {
         target: { value },
       });
+    const list = (
+      memberships: MapMemberships,
+      resources: readonly Resource[] = RESOURCES,
+      spaces: readonly { readonly id: UUID; readonly title: string }[] = [ROADMAP, BLUEPRINT],
+    ) => (
+      <ResourcesPopover
+        resources={resources}
+        allResources={resources}
+        open
+        onOpenChange={vi.fn()}
+        onAdd={vi.fn()}
+        onDragStart={vi.fn()}
+        spaceTitleById={titles}
+        spaces={spaces}
+        onAddSpace={() => Promise.resolve(null)}
+        memberships={memberships}
+      />
+    );
+    const show = async (
+      memberships: MapMemberships,
+      resources?: readonly Resource[],
+      spaces?: readonly { readonly id: UUID; readonly title: string }[],
+    ) => {
+      const view = render(list(memberships, resources, spaces));
+      await screen.findByRole('dialog', { name: 'Resources' });
+      return view;
+    };
 
     it('is offered once, as that Space Resource, while it is placed on no Map', async () => {
-      render(
-        <Fixture
-          spaceTitleById={titles}
-          spaces={[ROADMAP, BLUEPRINT]}
-          onAddSpace={() => Promise.resolve(null)}
-        />,
-      );
-      await openList();
+      await show(PLACED_NOWHERE_ELSE);
       search('Roadmap');
 
       expect(resourceButtons().map((button) => button.getAttribute('aria-label'))).toEqual([
@@ -842,41 +881,76 @@ describe('ResourcesPopover', () => {
       ).toBeInTheDocument();
 
       search('');
-      expect(screen.getByRole('button', { name: 'Add Blueprint to Map' })).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Add Roadmap to Map' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: BLUEPRINT_ROW })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: ROADMAP_ROW })).not.toBeInTheDocument();
     });
 
     it('stays offered beside it while it is placed on another Map', async () => {
-      const elsewhere = new Map([
-        [id('000000000002'), [{ mapId: id('000000000030'), mapTitle: 'Overview', graphs: [] }]],
-      ]);
-      render(
-        <ResourcesPopover
-          resources={RESOURCES}
-          allResources={RESOURCES}
-          open
-          onOpenChange={vi.fn()}
-          onAdd={vi.fn()}
-          onDragStart={vi.fn()}
-          spaceTitleById={titles}
-          spaces={[ROADMAP, BLUEPRINT]}
-          onAddSpace={() => Promise.resolve(null)}
-          memberships={elsewhere}
-        />,
-      );
-      await screen.findByRole('dialog', { name: 'Resources' });
+      await show(new Map([[id('000000000002'), ON_OVERVIEW]]));
       search('Roadmap');
 
       expect(resourceButtons().map((button) => button.getAttribute('aria-label'))).toEqual([
         'Add Alpha to Map',
-        'Add Roadmap to Map',
+        ROADMAP_ROW,
       ]);
+      expect(
+        screen.getByRole('button', { name: 'Space Resources in this Space, 1' }),
+      ).toBeInTheDocument();
       expect(
         screen.getByRole('button', { name: 'Spaces in this Meta Space, 1' }),
       ).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Add Alpha to Map' })).toHaveAccessibleDescription(
         /Overview/,
       );
+    });
+
+    it('comes back once that Space Resource is placed on a Map', async () => {
+      const view = await show(PLACED_NOWHERE_ELSE);
+      expect(screen.queryByRole('button', { name: ROADMAP_ROW })).not.toBeInTheDocument();
+
+      view.rerender(list(new Map([[id('000000000002'), ON_OVERVIEW]])));
+
+      expect(screen.getByRole('button', { name: ROADMAP_ROW })).toBeInTheDocument();
+    });
+
+    it('is withheld over the list’s source, not over the rows the filters leave drawn', async () => {
+      await show(PLACED_NOWHERE_ELSE);
+      fireEvent.click(screen.getByRole('button', { name: 'Space Resources in this Space, 1' }));
+
+      // Only the Markdown Alpha is left drawn: the framing Space Resource is
+      // filtered out, and still withholds the Space it frames.
+      expect(screen.getAllByRole('button', { name: 'Add Alpha to Map' })).toHaveLength(1);
+      expect(screen.queryByRole('button', { name: ROADMAP_ROW })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: BLUEPRINT_ROW })).toBeInTheDocument();
+    });
+
+    it('stays withheld while several unplaced Space Resources frame it', async () => {
+      await show(PLACED_NOWHERE_ELSE, [...RESOURCES, ALSO_ROADMAP]);
+      search('Roadmap');
+
+      expect(resourceButtons().map((button) => button.getAttribute('aria-label'))).toEqual([
+        'Add Alpha to Map',
+        'Add Beta to Map',
+      ]);
+    });
+
+    it('stays withheld while one framer is placed elsewhere and another is placed nowhere', async () => {
+      await show(new Map([[ALSO_ROADMAP.id, ON_OVERVIEW]]), [...RESOURCES, ALSO_ROADMAP]);
+      search('Roadmap');
+
+      expect(resourceButtons().map((button) => button.getAttribute('aria-label'))).toEqual([
+        'Add Alpha to Map',
+        'Add Beta to Map',
+      ]);
+    });
+
+    it('says the list is empty when the withheld Space is all the filters would leave', async () => {
+      const framer = RESOURCES.filter((resource) => resource.id === id('000000000002'));
+      await show(PLACED_NOWHERE_ELSE, framer, [ROADMAP]);
+      fireEvent.click(screen.getByRole('button', { name: 'Space Resources in this Space, 1' }));
+
+      expect(screen.queryByRole('button', { name: ROADMAP_ROW })).not.toBeInTheDocument();
+      expect(screen.getByText('No matching Resources.')).toBeInTheDocument();
     });
   });
 

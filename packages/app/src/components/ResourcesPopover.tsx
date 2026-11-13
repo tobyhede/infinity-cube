@@ -13,6 +13,7 @@ import {
   contentTarget,
   isMissingKind,
   KIND_IDS,
+  lifetimeSpaceReferences,
   spaceReferences,
   titleName,
   type KindId,
@@ -241,9 +242,11 @@ export interface ResourcesPlacingProps extends ResourcesPopoverSurfaceProps {
     ((space: ResourcesPopoverSpace, settle: SettlePlacement) => void) | undefined;
   /**
    * Where each Resource is placed outside this Map (`otherMapMemberships`).
-   * Absent, every row draws as placed nowhere else.
+   * Required because a Resource it does not name is read as placed on no Map,
+   * which draws its row as placed nowhere else and lets a Space Resource
+   * withhold the row of the Space it frames (`unframedSpaces`).
    */
-  readonly memberships?: MapMemberships | undefined;
+  readonly memberships: MapMemberships;
   /**
    * Arm Delete from Space for a Resource row, naming the filter as where the
    * caret goes if a completed deletion takes the row away. Absent while
@@ -428,16 +431,6 @@ const searchableText = (
 };
 
 /**
- * Why the list is empty, over **both** sources.
- *
- * The two standing sentences are claims about the Resources — that the Space has
- * none, and that the Map already holds them all — and either is false as an
- * account of an empty list while the Spaces source is switched on with
- * something to give. So both are withheld the moment it is: what the reader is
- * looking at then is a search that matched nothing, which is what the third
- * sentence says.
- */
-/**
  * The Spaces a Space row may be offered for: those no listed Space Resource
  * placed on no Map frames.
  *
@@ -447,7 +440,7 @@ const searchableText = (
  * Placing that Space Resource brings the row back. A Space Resource placed on
  * another Map does not withhold the row: re-adding it would share one
  * Resource, and its selection, across both Maps, and a new view of the Space
- * stays one press away (ADR 0143).
+ * stays one press away (ADR 0144).
  */
 const unframedSpaces = (
   spaces: readonly ResourcesPopoverSpace[],
@@ -457,11 +450,21 @@ const unframedSpaces = (
   const framed = new Set(
     resources
       .filter((resource) => membershipsOf(memberships, resource.id).length === 0)
-      .flatMap(spaceReferences),
+      .flatMap(lifetimeSpaceReferences),
   );
   return framed.size === 0 ? spaces : spaces.filter((space) => !framed.has(space.id));
 };
 
+/**
+ * Why the list is empty, over **both** sources.
+ *
+ * The two standing sentences are claims about the Resources — that the Space has
+ * none, and that the Map already holds them all — and either is false as an
+ * account of an empty list while the Spaces source is switched on with
+ * something to give. So both are withheld the moment it is: what the reader is
+ * looking at then is a search that matched nothing, which is what the third
+ * sentence says.
+ */
 const emptyMessage = (available: number, inSpace: number, offeredSpaces: number): string =>
   offeredSpaces > 0
     ? 'No matching Resources.'

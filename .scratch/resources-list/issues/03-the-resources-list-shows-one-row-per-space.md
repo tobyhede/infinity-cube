@@ -1,6 +1,6 @@
 # 03: The Resources list shows one row per Space
 
-**What to build:** Searching the Resources list for a Space shows it once while an unplaced Space Resource frames it. Following ticket 01's answer (ADR 0143), a Space row is withheld while the list's source holds a Space Resource framing that Space that no Map places, so the reader picks that Resource rather than meeting the same name twice. A Space Resource placed on another Map withholds nothing. The per-filter counts keep matching the rows drawn, and the empty-list sentences stay true over both sources.
+**What to build:** Searching the Resources list for a Space shows it once while an unplaced Space Resource frames it. Following ticket 01's answer (ADR 0144), a Space row is withheld while the list's source holds a Space Resource framing that Space that no Map places, so the reader picks that Resource rather than meeting the same name twice. A Space Resource placed on another Map withholds nothing. The per-filter counts keep matching the rows drawn, and the empty-list sentences stay true over both sources.
 
 **Why:** Today the list draws every unplaced Space Resource and, independently, every Space in the Meta Space bar the containing one, so one Space appears as a Space Resource row and a Space row at the same time (see ticket 01).
 
