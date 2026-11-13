@@ -1,5 +1,4 @@
 import { expect, type Locator } from '@playwright/test';
-import { boxOf } from './graph';
 
 /**
  * Reading an Image Resource's picture, shared by the application proofs in
@@ -22,23 +21,4 @@ export async function expectPictureLoaded(picture: Locator, naturalWidth: number
       ),
     )
     .toBe(naturalWidth);
-}
-
-/**
- * The picture fills an Open Resource's content area at its own size, above the
- * Title footer. `zoom` is screen pixels per canvas unit; the height allows the
- * subpixel rounding of the content area's layout.
- */
-export async function expectPictureAtOwnSize(
-  resource: Locator,
-  picture: Locator,
-  natural: { readonly width: number; readonly height: number },
-  zoom = 1,
-): Promise<void> {
-  const pictureBox = await boxOf(picture, 'the picture');
-  const titleBox = await boxOf(resource.locator('.canvas-resource__body'), 'the Title footer');
-  expect(pictureBox.width / zoom).toBeCloseTo(natural.width, 0);
-  expect(pictureBox.height / zoom).toBeGreaterThanOrEqual(natural.height - 0.5);
-  expect(pictureBox.height / zoom).toBeLessThanOrEqual(natural.height + 1);
-  expect(pictureBox.y + pictureBox.height).toBeLessThanOrEqual(titleBox.y + 1);
 }

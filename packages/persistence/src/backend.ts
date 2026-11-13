@@ -95,10 +95,8 @@ export type ProtocolFault =
         | 'invalid-space-id'
         | 'unsupported-media-type'
         | 'method-not-allowed'
-        | 'invalid-image-id'
-        | 'image-too-large'
-        | 'image-format-unsupported'
-        | 'image-svg-unsupported';
+        | 'invalid-asset-hash'
+        | 'asset-too-large';
     };
 
 export type CommitResult =

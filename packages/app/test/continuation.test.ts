@@ -3,8 +3,8 @@ import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
 import { chromeControlStaysOwed, staysOwed, type PendingContinuation } from '../src/continuation';
-import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
+import { textAsset } from './markdown-texts';
 
 /**
  * Where an Edit continues, as transitions rather than as a tree.
@@ -35,8 +35,8 @@ const snapshot: SpaceSnapshot = {
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [RESOURCE_A]: { x: 10, y: 20, open: false },
-          [RESOURCE_B]: { x: 300, y: 40, open: false },
+          [RESOURCE_A]: { x: 10, y: 20 },
+          [RESOURCE_B]: { x: 300, y: 40 },
         },
         graphs: [{ id: GRAPH_ID, title: 'Main', edges: [EDGE] }],
       },
@@ -44,8 +44,14 @@ const snapshot: SpaceSnapshot = {
     defaultMap: MAP_ID,
   },
   resources: [
-    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
-    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', content: { source: 'B' } } },
+    {
+      id: RESOURCE_A,
+      document: { title: 'A', kind: 'markdown', content: { url: textAsset('A') } },
+    },
+    {
+      id: RESOURCE_B,
+      document: { title: 'B', kind: 'markdown', content: { url: textAsset('B') } },
+    },
   ],
 };
 
@@ -54,7 +60,6 @@ function open(stored: SpaceSnapshot = snapshot, revision = 0n) {
   const backend = MemorySpaceBackend.asMeta({ snapshot: stored, revision, exportedRevision: null });
   const session = openSpaceSession(backend, loaded);
   const { authoring, navigation, continuation } = composeApp({
-    images: unusedImageSources,
     spaceSession: session,
     selection: MAP_ID,
   });

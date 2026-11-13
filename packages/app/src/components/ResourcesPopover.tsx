@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useId,
   useMemo,
   useRef,
@@ -10,11 +11,14 @@ import {
 } from 'react';
 import {
   contentTarget,
+  isMissingKind,
   KIND_IDS,
   spaceReferences,
   titleName,
+  type KindId,
   type Resource,
   type ResourceId,
+  type ResourceKind,
   type UUID,
 } from '@project/core';
 import { describeSpaceResourceBreak, type SpaceResourceBreak } from '../authoring-refusal';
@@ -55,6 +59,7 @@ import {
   TooltipTrigger,
   graphPaint,
   kindNaming,
+  missingKindNaming,
 } from '@project/ui';
 import './resources-popover.css';
 
@@ -77,18 +82,26 @@ type Activation = 'keyboard' | 'pointer';
  * OPEN mark for the collection; Space Resources and individual Space rows keep
  * their cube glyph.
  */
-export type ResourcesFilter = Resource['kind'] | 'spaces';
+export type ResourcesFilter = KindId | 'unavailable' | 'spaces';
+
+/**
+ * The filter a Resource is listed under: its kind's, or, for every kind no
+ * plugin in this build draws, the one `unavailable` filter.
+ */
+const filterOfKind = (kind: ResourceKind): KindId | 'unavailable' =>
+  isMissingKind(kind) ? 'unavailable' : kind;
 
 /**
  * Every filter exactly once, in the order they are drawn: each kind's, in the
  * order the kinds are registered, then `spaces`. The ui registry types a view
  * half for every kind, so a kind added to `Resource` has a filter, a name and a
- * glyph here before the application compiles.
+ * glyph here before the application compiles. Every kind no plugin in this
+ * build draws shares the one `unavailable` filter.
  */
-const FILTERS: readonly ResourcesFilter[] = [...KIND_IDS, 'spaces'];
+const FILTERS: readonly ResourcesFilter[] = [...KIND_IDS, 'unavailable', 'spaces'];
 
 /** The Connect list's filters: an Edge never ends at an unplaced Space. */
-const RESOURCE_FILTERS = KIND_IDS;
+const RESOURCE_FILTERS: readonly ResourcesFilter[] = [...KIND_IDS, 'unavailable'];
 
 /**
  * Everything on, because the list's job is to show what is *not* on the canvas
@@ -100,7 +113,11 @@ const ALL_FILTERS: readonly ResourcesFilter[] = FILTERS;
 
 /** What a filter's toggle is called: its kind's Resources, or the Meta Space's Spaces. */
 const filterName = (filter: ResourcesFilter): string =>
-  filter === 'spaces' ? 'Spaces in this Meta Space' : kindNaming(filter).listName;
+  filter === 'spaces'
+    ? 'Spaces in this Meta Space'
+    : filter === 'unavailable'
+      ? 'Resources of a kind not in this build'
+      : kindNaming(filter).listName;
 
 /**
  * A filter's glyph: its kind's own, or, for a kind that draws its Target's
@@ -109,7 +126,7 @@ const filterName = (filter: ResourcesFilter): string =>
  */
 const FilterGlyph = ({ filter }: { readonly filter: ResourcesFilter }) => {
   if (filter === 'spaces') return <ParentIcon />;
-  const { Glyph } = kindNaming(filter);
+  const { Glyph } = filter === 'unavailable' ? missingKindNaming : kindNaming(filter);
   return Glyph === BADGED_TARGET_GLYPH ? <ReferenceIcon /> : <Glyph />;
 };
 
@@ -195,6 +212,14 @@ export interface ResourcesPlacingProps extends ResourcesPopoverSurfaceProps {
    */
   readonly spaces?: readonly ResourcesPopoverSpace[] | undefined;
   /**
+   * The Map and Graph each Space Resource row selects, as its target Map's and Graph's
+   * titles. A Space Resource and the Space it shows can carry one name, and two
+   * Space Resources showing one Space usually do, so the selections are drawn under the
+   * name and joins the row's description. Absent for a row whose target has not
+   * been read.
+   */
+  readonly spaceSelectionNameById?: ReadonlyMap<ResourceId, string> | undefined;
+  /**
    * Place a Space by authoring the Space Resource that frames it.
    *
    * Answers a promise where {@link onAdd} answers at once, because this one is
@@ -267,6 +292,9 @@ const NO_SPACE_TITLES: ReadonlyMap<UUID, string> = new Map();
 const NO_SPACES: readonly ResourcesPopoverSpace[] = [];
 const NO_MEMBERSHIPS: MapMemberships = new Map();
 
+/** What a Space row's press makes, drawn under the Space's name. */
+const NEW_SPACE_RESOURCE = 'New Space Resource';
+
 /** Long enough that scanning down the list does not flash a tooltip per row. */
 const ROW_TOOLTIP_DELAY_MS = 500;
 
@@ -304,7 +332,10 @@ function MembershipCapsules({ memberships }: { readonly memberships: readonly Ma
   if (memberships.length === 0) return null;
   const hidden = memberships.length - MAX_MARKS;
   return (
-    <span className="ml-auto flex shrink-0 items-center gap-1" aria-hidden="true">
+    <span
+      className="resources-popover__capsules ml-auto flex shrink-0 items-center gap-1"
+      aria-hidden="true"
+    >
       {memberships.slice(0, MAX_MARKS).map((membership) => (
         <Badge
           key={membership.mapId}
@@ -568,7 +599,20 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
   const connecting = props.purpose === 'connect' ? props : null;
   const placing = props.purpose === 'connect' ? null : props;
   const offered = placing?.spaces ?? NO_SPACES;
-  const filters: readonly ResourcesFilter[] = connecting === null ? FILTERS : RESOURCE_FILTERS;
+  /**
+   * The `unavailable` toggle is drawn only while the Space holds a Resource of
+   * a kind no plugin in this build draws: in every other build it would be a
+   * permanent zero for something that cannot be made.
+   */
+  const holdsMissingKind = useMemo(
+    () =>
+      resources.some(({ kind }) => isMissingKind(kind)) ||
+      allResources.some(({ kind }) => isMissingKind(kind)),
+    [resources, allResources],
+  );
+  const filters = (connecting === null ? FILTERS : RESOURCE_FILTERS).filter(
+    (filter) => filter !== 'unavailable' || holdsMissingKind,
+  );
   const surfaceName = connecting === null ? 'Resources' : `Connect ${connecting.from}`;
   /**
    * Whether the Connect list's close owes its anchor no caret: a drawn Edge
@@ -673,7 +717,8 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
         ? spaces.filter((space) => matched(space.title)).length
         : resources.filter(
             (resource) =>
-              resource.kind === filter && matched(searchableText(resource, titleById, spaceTitles)),
+              filterOfKind(resource.kind) === filter &&
+              matched(searchableText(resource, titleById, spaceTitles)),
           ).length;
   }, [resources, spaces, titleById, spaceTitles, needle]);
 
@@ -692,7 +737,7 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
       .map((resource, index) => ({ resource, index }))
       .filter(
         ({ resource }) =>
-          shown.includes(resource.kind) &&
+          shown.includes(filterOfKind(resource.kind)) &&
           matched(searchableText(resource, titleById, spaceTitles)),
       )
       .map(({ resource, index }) => ({
@@ -752,7 +797,30 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
       void answer.then(showSettlement(asked), showBreak(asked));
     };
 
+  /**
+   * Whether a drag this list started is under way, which hides every row's
+   * Delete (`resources-popover.css`).
+   *
+   * **Ended from the window, not from the row.** A drop that places the
+   * Resource takes its row out of the list, and `dragend` fired on a row that
+   * is no longer in the document reaches no listener; the `drop` that placed it
+   * still crosses the window first. A drop nothing takes fires no `drop`, and
+   * then its row is still there for `dragend` to cross the window from.
+   */
+  const [dragging, setDragging] = useState(false);
+  useEffect(() => {
+    if (!dragging) return;
+    const end = () => setDragging(false);
+    window.addEventListener('drop', end, true);
+    window.addEventListener('dragend', end, true);
+    return () => {
+      window.removeEventListener('drop', end, true);
+      window.removeEventListener('dragend', end, true);
+    };
+  }, [dragging]);
+
   const beginDrag = (event: DragEvent<HTMLButtonElement>, resourceId: ResourceId): void => {
+    setDragging(true);
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData(RESOURCE_DRAG_TYPE, resourceId);
     placing?.onDragStart(resourceId, showSettlement(standing.opening));
@@ -763,6 +831,7 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
     space: ResourcesPopoverSpace,
     started: (space: ResourcesPopoverSpace, settle: SettlePlacement) => void,
   ): void => {
+    setDragging(true);
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData(SPACE_DRAG_TYPE, space.id);
     started(space, settlementFor(standing.opening));
@@ -943,7 +1012,7 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
               )}
             </ul>
           ) : (
-            <ul className="resources-popover__list">
+            <ul className="resources-popover__list" data-dragging={dragging ? '' : undefined}>
               {visible.map(({ key, name, row }) => {
                 // Whether this row drags is decided once, here: a Resource row
                 // always does, a Space row only when something takes its drag.
@@ -958,10 +1027,23 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
                           beginSpaceDrag(event, row.space, onSpaceDragStart);
                 const placed =
                   row.kind === 'resource' ? membershipsOf(memberships, row.resource.id) : [];
+                // What the row adds, under its name: the Map and Graph a Space Resource
+                // selects, or, for a Space row, the new Space Resource a press makes.
+                const selection =
+                  row.kind === 'resource'
+                    ? placing?.spaceSelectionNameById?.get(row.resource.id)
+                    : undefined;
+                const detail = row.kind === 'resource' ? selection : NEW_SPACE_RESOURCE;
+                const describing = [
+                  ...(selection === undefined ? [] : [`Shows ${selection}`]),
+                  ...(placed.length === 0
+                    ? []
+                    : [`Also in ${placed.map(describeMembership).join('; ')}`]),
+                ].join('. ');
                 const description = `${describedBy}-${key}`;
                 const onDelete = placing?.onDelete;
                 return (
-                  <li key={key} className="flex items-center gap-1">
+                  <li key={key} className="resources-popover__entry">
                     {/* **A row is a button, and the drag is the shortcut.** ADR 0082
                         binds that everything the surface offers is operable from the
                         keyboard alone, and names this case: a drag may be *a* way to
@@ -1000,8 +1082,12 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
                                 : undefined
                             }
                             className="resources-popover__row min-w-0 flex-1 justify-start"
-                            aria-label={`Add ${name} to Map`}
-                            aria-describedby={placed.length === 0 ? undefined : description}
+                            aria-label={
+                              row.kind === 'resource'
+                                ? `Add ${name} to Map`
+                                : `Add ${name} as a new Space Resource to Map`
+                            }
+                            aria-describedby={describing === '' ? undefined : description}
                             onDragStart={startDrag}
                             onDragEnd={startDrag === undefined ? undefined : placing?.onDragEnd}
                             onClick={(event) => {
@@ -1061,7 +1147,12 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
                             drawn Resource rather than on every surface that names one. A
                             Space's own title is one line under that ADR, so there the
                             Title and the name are the same string. */}
-                        <span className="resources-popover__row-title">{name}</span>
+                        <span className="resources-popover__row-text">
+                          <span className="resources-popover__row-title">{name}</span>
+                          {detail === undefined ? null : (
+                            <span className="resources-popover__row-detail">{detail}</span>
+                          )}
+                        </span>
                         <MembershipCapsules memberships={placed} />
                       </TooltipTrigger>
                       <TooltipContent side="right" className="flex-col items-start">
@@ -1078,18 +1169,23 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
                       <Button
                         variant="ghost"
                         size="icon"
+                        className="resources-popover__delete"
                         aria-label={`Delete ${name} from Space`}
                         onClick={() => onDelete(row.resource, () => filterField.current)}
                       >
                         <DeleteIcon />
                       </Button>
                     ) : (
-                      // A Space row keeps the slot empty, so every row ends on one edge.
-                      <span aria-hidden="true" className="size-7 shrink-0" />
+                      // Where Delete has its own column, a Space row keeps the slot
+                      // empty, so every row ends on one edge.
+                      <span
+                        aria-hidden="true"
+                        className="resources-popover__delete-slot size-7 shrink-0"
+                      />
                     )}
-                    {placed.length === 0 ? null : (
+                    {describing === '' ? null : (
                       <span id={description} className="sr-only">
-                        {`Also in ${placed.map(describeMembership).join('; ')}`}
+                        {describing}
                       </span>
                     )}
                   </li>

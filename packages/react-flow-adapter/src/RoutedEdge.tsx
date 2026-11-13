@@ -8,6 +8,7 @@ import {
   type Node,
 } from '@xyflow/react';
 import type { GraphHeadShape, GraphId } from '@project/core';
+import type { GraphHeadSize } from '@project/ui';
 
 import {
   edgeAttachment,
@@ -15,7 +16,7 @@ import {
   type AnchorRect,
   type EdgeAttachment,
 } from './edge-attachment';
-import { laneBezier } from './edge-lanes';
+import { laneBezier, type LaneSide } from './edge-lanes';
 
 /**
  * React Flow custom edge that draws a bezier between the two handles.
@@ -28,12 +29,17 @@ import { laneBezier } from './edge-lanes';
 export type RoutedEdgeData = {
   graphId: GraphId;
   /**
-   * How far below (or right of) where its two anchors put it this Edge is
-   * drawn — above (or left) when negative — so the Edges of several
-   * Graphs joining the same two Resources run as parallel lines rather than over
-   * each other. Zero for a lone Edge.
+   * How far beside where its two anchors put it this Edge is drawn, read by
+   * `laneSide`, so the Edges of several Graphs joining the same two Resources
+   * run as parallel lines rather than over each other. Zero for a lone Edge.
    */
   laneOffset: number;
+  /**
+   * How `laneOffset` is read: a side of the screen, or the Edge's left as it
+   * travels, which `laneBezier` turns into a side of the screen as it draws,
+   * so it holds while a Resource is dragged (`graphLanes`).
+   */
+  laneSide: LaneSide;
   /**
    * How far from the centre line the outermost lane of this Edge's pair runs.
    * Every lane of the pair is drawn the same way at that distance, so they
@@ -42,16 +48,21 @@ export type RoutedEdgeData = {
   laneReach: number;
   /**
    * What fraction of its length the Edge leaves undrawn at each end. Zero for
-   * an Edge that connects; a Graph other than the Active one runs beside it and
-   * stops short.
+   * the first Edge in its direction between two Resources; each further one
+   * stops one trim increment shorter (`graphLanes`).
    */
   endTrim: number;
   /**
    * Its Graph's head shape (ADR 0105), which the canvas's one marker for the
-   * Graph draws (`GraphHeadMarkers`) at the end of the line as drawn, whether or
-   * not it connects.
+   * Graph draws (`GraphHeadMarkers`) at the end of the line as drawn, however
+   * short.
    */
   headShape: GraphHeadShape;
+  /**
+   * How large that head is drawn: `small` on an Edge outside the Active Graph
+   * while one is active, drawn as a hairline, and `full` otherwise.
+   */
+  headSize: GraphHeadSize;
   /** The Edge's Title and whether it is hidden at rest; drawn by the application, not here. */
   title?: string;
   titleHidden?: true;
@@ -90,9 +101,14 @@ export interface RoutedEdgeGeometry {
  */
 function routedEdgeGeometry(
   attachment: EdgeAttachment,
-  { laneOffset, laneReach, endTrim }: Pick<RoutedEdgeData, 'laneOffset' | 'laneReach' | 'endTrim'>,
+  {
+    laneOffset,
+    laneSide,
+    laneReach,
+    endTrim,
+  }: Pick<RoutedEdgeData, 'laneOffset' | 'laneSide' | 'laneReach' | 'endTrim'>,
 ): RoutedEdgeGeometry {
-  return laneBezier(attachment, laneOffset, endTrim, laneReach);
+  return laneBezier(attachment, laneOffset, endTrim, laneReach, laneSide);
 }
 
 /**
@@ -107,7 +123,7 @@ function routedEdgeGeometry(
 export function useRoutedEdgeGeometry(props: EdgeProps<RoutedFlowEdge>): RoutedEdgeGeometry {
   return routedEdgeGeometry(
     useEdgeAttachment(props),
-    props.data ?? { laneOffset: 0, laneReach: 0, endTrim: 0 },
+    props.data ?? { laneOffset: 0, laneSide: 'screen', laneReach: 0, endTrim: 0 },
   );
 }
 
@@ -122,7 +138,7 @@ export function useRoutedEdgeGeometry(props: EdgeProps<RoutedFlowEdge>): RoutedE
  * The head is the Edge object's `markerEnd` — its Graph's marker, drawn once
  * for the canvas by `GraphHeadMarkers` — which React Flow resolves to a
  * `url('#…')` and this forwards. A marker sits at the end of the line as drawn:
- * the anchor for an Edge that connects, the trimmed end for one that stops
+ * the anchor for an Edge drawn full length, the trimmed end for one that stops
  * short (ADR 0105).
  */
 export function RoutedEdgePath({

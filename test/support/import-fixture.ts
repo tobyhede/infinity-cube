@@ -1,9 +1,21 @@
+import { readdir, readFile } from 'node:fs/promises';
+import { extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { newUuid, type SpaceSnapshot } from '@project/core';
-import { readAggregate, readSingleSpace, storedImageId } from '../../src/aggregate-directory';
+import {
+  readAggregate,
+  readSingleSpace,
+  referencedAssetHashes,
+} from '../../src/aggregate-directory';
 import { importAggregateContents } from '../../src/import/import-aggregate';
 import { type SpaceRepository, identifySpace } from '@project/aggregate';
-import type { ImageId, LoadedSpace } from '@project/persistence';
+import {
+  admitAsset,
+  EMPTY_ASSET,
+  mediaTypeForExtension,
+  type AssetHash,
+  type LoadedSpace,
+} from '@project/persistence';
 
 const fixtureDirectory = fileURLToPath(new URL('../../packages/app/fixture', import.meta.url));
 
@@ -46,6 +58,7 @@ export const importSpaceDirectory = async (
   repository: SpaceRepository,
   directory: string,
 ): Promise<LoadedSpace> => {
+  await storeSpaceDirectoryAssets(repository, directory);
   const input = await readSingleSpace(directory);
   const snapshot = identifySpace(input, newUuid);
   const initialized = await repository.initializeAggregate({
@@ -56,33 +69,48 @@ export const importSpaceDirectory = async (
 };
 
 /**
- * Every stored image URL the Spaces name that the fixture's `images/` does not
- * carry, read by the same rule Export uses to decide which images to carry.
+ * Store every file in a single Space directory's own `assets/`, as Import
+ * stores an aggregate's (ADR 0142), so a generated Space directory's Markdown
+ * text is there to read. A missing `assets/` stores nothing.
  */
-const uncarriedImageUrls = (
+const storeSpaceDirectoryAssets = async (
+  repository: SpaceRepository,
+  directory: string,
+): Promise<void> => {
+  const assets = join(directory, 'assets');
+  const names = await readdir(assets).catch(() => []);
+  for (const name of names.sort()) {
+    const bytes = new Uint8Array(await readFile(join(assets, name)));
+    const admitted = await admitAsset(bytes, mediaTypeForExtension(extname(name).slice(1)));
+    if (admitted.kind === 'admitted') await repository.storeAsset(admitted.asset);
+  }
+};
+
+/**
+ * Every asset URL the Spaces reference that the fixture's `assets/` does not
+ * carry, found by the same walk Export uses to decide which assets to carry.
+ * The asset of zero bytes needs no file.
+ */
+const uncarriedAssetUrls = (
   spaces: readonly SpaceSnapshot[],
-  carried: ReadonlySet<ImageId>,
+  carried: ReadonlySet<AssetHash>,
 ): readonly string[] =>
-  spaces.flatMap(({ resources }) =>
-    resources.flatMap(({ document }) => {
-      if (document.kind !== 'image') return [];
-      const id = storedImageId(document.content.url);
-      return id === undefined || carried.has(id) ? [] : [document.content.url];
-    }),
-  );
+  referencedAssetHashes(spaces)
+    .filter((hash) => hash !== EMPTY_ASSET.hash && !carried.has(hash))
+    .map((hash) => `/assets/${hash}`);
 
 /**
  * Import the tracked fixture as a complete Meta-rooted aggregate, through the
- * same `readAggregate` and import path public import uses, its `images/`
+ * same `readAggregate` and import path public import uses, its `assets/`
  * included (ADR 0118).
  *
  * Returns the Meta Space so callers that open the fixture still receive the
  * Map fixture they address.
  *
- * Stricter than public import in one way: a fixture naming an `/images/<id>`
- * its own `images/` does not carry is refused before anything is stored, so the
- * fixture and its files cannot drift apart (ADR 0054). Public import draws such
- * a picture as one that will not load.
+ * Stricter than public import in one way: a fixture naming an `/assets/<hash>`
+ * its own `assets/` does not carry is refused before anything is stored, so the
+ * fixture and its files cannot drift apart (ADR 0054). Public import accepts
+ * such a reference as absent bytes.
  *
  * `directory` defaults to the tracked fixture; a test names a copy to seed an
  * altered fixture without touching tracked files.
@@ -92,11 +120,11 @@ export const importFixture = async (
   { directory = fixtureDirectory }: { readonly directory?: string } = {},
 ): Promise<LoadedSpace> => {
   const source = await readAggregate(directory, newUuid);
-  const carried = new Set(source.images.map(({ id }) => id));
-  const uncarried = uncarriedImageUrls(source.spaces, carried);
+  const carried = new Set(source.assets.map(({ hash }) => hash));
+  const uncarried = uncarriedAssetUrls(source.spaces, carried);
   if (uncarried.length > 0) {
     throw new Error(
-      `Fixture ${directory} names stored images its images/ does not carry: ${uncarried.join(', ')}`,
+      `Fixture ${directory} names assets its assets/ does not carry: ${uncarried.join(', ')}`,
     );
   }
   const imported = await importAggregateContents(source, repository, { replace: false });

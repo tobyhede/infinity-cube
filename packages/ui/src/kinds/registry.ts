@@ -1,99 +1,82 @@
-import type { ReactNode } from 'react';
 import {
   imageKind,
   markdownKind,
   referenceKind,
   spaceKind,
   urKind,
+  isRegisteredKind,
   type KindId,
-  type ContentUnresolved,
-  type ResourceContent,
+  type ResourceKind,
 } from '@project/core';
-import { imageView, type ImageOperations, type ImageReplaceEditor } from './image';
-import type { CanvasArea, ContentCommand, KindView } from './kind-view';
-import { markdownView, type MarkdownEdit, type MarkdownOperations } from './markdown';
-import { referenceView, type ReferenceOperations } from './reference';
-import { spaceView, type SpaceOperations } from './space';
-import { urView, type UrOperations } from './ur';
+import { defaultListing } from './default';
+import { imageListing } from './image';
+import type { PluginListing } from './plugin-listing';
+import { markdownListing } from './markdown';
+import { referenceListing } from './reference';
+import { spaceListing } from './space';
+import type { PluginOperations } from './plugin-views';
+import { urListing } from './ur';
 
 /** What each kind offers beyond its shared Title, by its id. */
 export interface KindOperationsByKind {
-  [markdownKind.id]: MarkdownOperations;
-  [referenceKind.id]: ReferenceOperations;
-  [imageKind.id]: ImageOperations;
-  [urKind.id]: UrOperations;
-  [spaceKind.id]: SpaceOperations;
-}
-
-/**
- * What an edit running in a Resource's content area holds, by the id of each
- * kind whose own content is edited there; the display carries it while the
- * edit runs.
- */
-export interface KindEditByKind {
-  [markdownKind.id]: MarkdownEdit;
-  [imageKind.id]: ImageReplaceEditor;
+  [markdownKind.id]: PluginOperations;
+  [referenceKind.id]: PluginOperations;
+  [imageKind.id]: PluginOperations;
+  [urKind.id]: PluginOperations;
+  [spaceKind.id]: PluginOperations;
 }
 
 /**
  * What a Resource's kind offers beyond its shared Title (ADR 0051): a kind-owned
  * choice of operations, not a kind tag plus an optional field every other kind
- * ignores. Opening and Closing are every Resource's and are not here; what it
- * draws, and whether it is Open, is the display's.
+ * ignores. Whether it has an Open state at all, and what it draws, is its
+ * plugin's (ADR 0142).
  */
 export type KindOperations = KindOperationsByKind[KindId];
 
-/** Each kind's own resolved content, by its id; a kind that shows another's has none. */
-type OwnContentByKind = { [K in KindId]: Extract<ResourceContent, { readonly kind: K }> };
+/**
+ * What a Resource of this kind offers beyond its shared Title: its kind's
+ * operations, or the default plugin's for a kind no plugin in this build draws.
+ */
+export type KindOperationsOf<K extends ResourceKind> = K extends KindId
+  ? KindOperationsByKind[K]
+  : PluginOperations;
 
-/** Each kind's view half, typed so a surface over a kinded value calls its own kind's view. */
-type KindViews = {
-  readonly [K in KindId]: KindView<KindOperationsByKind[K], OwnContentByKind[K]>;
+/** Each kind's listing, its view half, typed so a surface over a kinded value reads its own kind's. */
+type PluginListings = {
+  readonly [K in KindId]: PluginListing<KindOperationsByKind[K]>;
 };
 
-/** The kinds' view halves: the one place in this package each kind is named (ADR 0128). */
-const KIND_VIEWS: KindViews = {
-  [markdownKind.id]: markdownView,
-  [imageKind.id]: imageView,
-  [urKind.id]: urView,
-  [referenceKind.id]: referenceView,
-  [spaceKind.id]: spaceView,
+/** The kinds' listings: the one place in this package each kind is named (ADR 0128). */
+const PLUGIN_LISTINGS: PluginListings = {
+  [markdownKind.id]: markdownListing,
+  [imageKind.id]: imageListing,
+  [urKind.id]: urListing,
+  [referenceKind.id]: referenceListing,
+  [spaceKind.id]: spaceListing,
 };
 
 /** What a kind's Resources are called and drawn as. */
-export type KindNaming = Pick<KindView<unknown>, 'name' | 'listName' | 'referenceName' | 'Glyph'>;
+export type KindNaming = Pick<
+  PluginListing<unknown>,
+  'name' | 'listName' | 'referenceName' | 'Glyph'
+>;
 
-/** What a kind's Resources are called and drawn as, from its view half. */
-export const kindNaming = (kind: KindId): KindNaming => KIND_VIEWS[kind];
+/**
+ * What a kind's Resources are called and drawn as, from its view half, or the
+ * default plugin's for a kind no plugin in this build draws.
+ */
+export const kindNaming = (kind: ResourceKind): KindNaming =>
+  isRegisteredKind(kind) ? PLUGIN_LISTINGS[kind] : defaultListing;
 
-/** What the command beginning an edit of a Resource's own content is called and drawn as, for its kind. */
-export const contentCommand = (kind: KindId): ContentCommand | undefined =>
-  KIND_VIEWS[kind].contentCommand;
+/** What every Resource of a kind whose plugin is missing is called and drawn with: the default plugin's. */
+export const missingKindNaming: KindNaming = defaultListing;
+
+const registeredBareOperations = <K extends KindId>(kind: K): KindOperationsByKind[K] =>
+  PLUGIN_LISTINGS[kind].bareOperations;
 
 /** What a Resource of this kind offers before the composition offers anything. */
-export const bareOperations = <K extends KindId>(kind: K): KindOperationsByKind[K] =>
-  KIND_VIEWS[kind].bareOperations;
-
-const presentedOf = <K extends KindId>(
-  name: string,
-  kind: K,
-  content: OwnContentByKind[K],
-): ReactNode => KIND_VIEWS[kind].presented?.(name, content) ?? null;
-
-/** What a presented Resource draws below its name, as its content's kind draws it. */
-export const presentedContent = (
-  name: string,
-  content: Exclude<ResourceContent, ContentUnresolved>,
-): ReactNode => presentedOf(name, content.kind, content);
-
-const canvasOf = <K extends KindId>(
-  kind: K,
-  content: OwnContentByKind[K],
-  area: CanvasArea,
-): ReactNode => KIND_VIEWS[kind].canvas?.(content, area) ?? null;
-
-/** What an Open Resource draws in its content area on a Map, as its content's kind draws it. */
-export const canvasContent = (
-  content: Exclude<ResourceContent, ContentUnresolved>,
-  area: CanvasArea,
-): ReactNode => canvasOf(content.kind, content, area);
+export function bareOperations<K extends ResourceKind>(kind: K): KindOperationsOf<K>;
+export function bareOperations(kind: ResourceKind): PluginOperations {
+  return isRegisteredKind(kind) ? registeredBareOperations(kind) : { kind };
+}

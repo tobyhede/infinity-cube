@@ -1,5 +1,11 @@
 import type { Story } from '@ladle/react';
-import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import {
+  EMPTY_ASSET_REF,
+  spaceSnapshotSchema,
+  uuidSchema,
+  type SpaceSnapshot,
+  type UUID,
+} from '@project/core';
 import { Application } from '#components/Application';
 import { storyOpening, storySpaces } from '../support/application';
 
@@ -55,8 +61,8 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Collection 1',
         kind: 'positioned',
         positions: {
-          [INTAKE_ID]: { x: 0, y: 0, open: false },
-          [STORAGE_ID]: { x: 300, y: 0, open: false },
+          [INTAKE_ID]: { x: 0, y: 0 },
+          [STORAGE_ID]: { x: 300, y: 0 },
         },
         graphs: [
           {
@@ -73,7 +79,7 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Collection 2',
         kind: 'positioned',
         positions: {
-          [REVIEW_ID]: { x: 0, y: 0, open: false },
+          [REVIEW_ID]: { x: 0, y: 0 },
         },
         graphs: [{ id: TARGET_SECOND_GRAPH_ID, title: 'Detail', edges: [] }],
       },
@@ -81,9 +87,18 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
     defaultMap: TARGET_MAP_ID,
   },
   resources: [
-    { id: INTAKE_ID, document: { title: 'Intake', kind: 'markdown', content: { source: '' } } },
-    { id: STORAGE_ID, document: { title: 'Storage', kind: 'markdown', content: { source: '' } } },
-    { id: REVIEW_ID, document: { title: 'Review', kind: 'markdown', content: { source: '' } } },
+    {
+      id: INTAKE_ID,
+      document: { title: 'Intake', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+    },
+    {
+      id: STORAGE_ID,
+      document: { title: 'Storage', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+    },
+    {
+      id: REVIEW_ID,
+      document: { title: 'Review', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+    },
   ],
 });
 
@@ -109,11 +124,11 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [HOME_RESOURCE_ID]: { x: 0, y: 0, open: false },
+          [HOME_RESOURCE_ID]: { x: 0, y: 0 },
           [SPACE_RESOURCE_ID]: {
             x: 340,
             y: 0,
-            open: true,
+            content: { open: true },
             size: { width: 640, height: 420 },
           },
         },
@@ -131,7 +146,7 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
   resources: [
     {
       id: HOME_RESOURCE_ID,
-      document: { title: 'Start here', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Start here', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
     {
       id: SPACE_RESOURCE_ID,
@@ -207,8 +222,8 @@ const pairTarget: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Overview',
         kind: 'positioned',
         positions: {
-          [PAIR_INTAKE_ID]: { x: 0, y: 0, open: false },
-          [PAIR_STORAGE_ID]: { x: 220, y: 0, open: false },
+          [PAIR_INTAKE_ID]: { x: 0, y: 0 },
+          [PAIR_STORAGE_ID]: { x: 220, y: 0 },
         },
         graphs: [
           {
@@ -223,8 +238,8 @@ const pairTarget: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Detail',
         kind: 'positioned',
         positions: {
-          [PAIR_STORAGE_ID]: { x: 0, y: 0, open: false },
-          [PAIR_INDEX_ID]: { x: 220, y: 0, open: false },
+          [PAIR_STORAGE_ID]: { x: 0, y: 0 },
+          [PAIR_INDEX_ID]: { x: 220, y: 0 },
         },
         graphs: [
           {
@@ -240,13 +255,16 @@ const pairTarget: SpaceSnapshot = spaceSnapshotSchema.parse({
   resources: [
     {
       id: PAIR_INTAKE_ID,
-      document: { title: 'Intake', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Intake', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
     {
       id: PAIR_STORAGE_ID,
-      document: { title: 'Storage', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Storage', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
-    { id: PAIR_INDEX_ID, document: { title: 'Index', kind: 'markdown', content: { source: '' } } },
+    {
+      id: PAIR_INDEX_ID,
+      document: { title: 'Index', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+    },
   ],
 });
 
@@ -278,13 +296,13 @@ const pairHome: SpaceSnapshot = spaceSnapshotSchema.parse({
           [PAIR_OVERVIEW_RESOURCE_ID]: {
             x: 0,
             y: 0,
-            open: true,
+            content: { open: true },
             size: { width: 460, height: 320 },
           },
           [PAIR_DETAIL_RESOURCE_ID]: {
             x: 500,
             y: 0,
-            open: true,
+            content: { open: true },
             size: { width: 460, height: 320 },
           },
         },

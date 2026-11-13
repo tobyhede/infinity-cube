@@ -103,7 +103,9 @@ test(
     await expect(source).toBeVisible();
     await expect(controls.getByRole('button', { name: 'Close Resource A' })).toBeDisabled();
     await source.press('Escape');
-    await expect(controls.getByRole('button', { name: 'Edit Resource A' })).toBeFocused();
+    // An ended edit returns focus to the Resource (resource-plugins issue 05).
+    await expect(markdown).toBeFocused();
+    await expect(controls.getByRole('button', { name: 'Edit Resource A' })).toBeVisible();
   },
 );
 
@@ -126,12 +128,6 @@ test(
 
     const resource = nodeByTitle(page, 'A').first();
     const controls = await resourceControls(page, resource);
-
-    // No band, even with a Graph active and the Resource selected.
-    await expect(resource.locator('.canvas-resource__rail')).toHaveCSS(
-      'background-color',
-      'rgba(0, 0, 0, 0)',
-    );
 
     // One surface, drawn twice. Read off both elements in the page, so a change
     // to either that the other did not follow fails here.
@@ -183,6 +179,10 @@ test(
     await expect(selectedCanvas(page)).toContainText('Collection 1');
     await expect(await mapChoices(page)).toHaveCount(3);
     await page.keyboard.press('Escape');
+    // Gone, not just closing: a press on the next disclosure while this menu
+    // still runs its exit is lost, and under load that exit outlasts the
+    // assertions in between.
+    await expect(page.getByRole('menu')).toHaveCount(0);
 
     // Collection 1 owns Long, Mid and Short over the shared spine: 4 + 3 + 2.
     await selectCanvas(page, 'Collection 1');
@@ -192,6 +192,7 @@ test(
     await expect(owned).toHaveCount(3);
     await expect(owned.filter({ hasText: 'Echo' })).toHaveCount(0);
     await page.keyboard.press('Escape');
+    await expect(page.getByRole('menu')).toHaveCount(0);
 
     // Collection 2 owns Echo alone.
     await selectCanvas(page, 'Collection 2');
@@ -410,8 +411,7 @@ test(
     );
     expect(sizes[0]! > sizes[1]!).toBe(true);
     expect(sizes[1]! > sizes[2]!).toBe(true);
-    await expect(resource.locator('.canvas-resource__body > *')).toHaveCount(1);
-    await expect(resource.locator('.canvas-resource__content')).toHaveCount(0);
+    await expect(resource.locator('.markdown-resource-body__rendered')).toHaveCount(0);
 
     // A Title never resizes a Resource (ADR 0014, ADR 0083): three rungs draw in
     // the same box every other Resource on this Map has.
@@ -488,7 +488,8 @@ test('a Resource is drawn in its Graph colour, and recedes off the Active Graph 
   const long = await graphLegendLineStroke(page, 'Long');
   const short = await graphLegendLineStroke(page, 'Short');
 
-  const strength = (title: string) => nodeByTitle(page, title).locator('.canvas-resource__body');
+  // A plugin's region is what recedes (`.canvas-resource__plugin`).
+  const strength = (title: string) => nodeByTitle(page, title).locator('.canvas-resource__plugin');
   const border = (title: string) => nodeByTitle(page, title).getByTestId('resource');
   // The border is a `color-mix`, which the browser reports as `color(srgb …)`
   // rather than `rgb(…)`, so both are read as 0–255 channels.
@@ -544,75 +545,23 @@ test('a resource shows its title in the graph, and opens to show rendered Markdo
   await expect(controls.getByRole('button', { name: 'Open Resource A' })).toBeVisible();
 });
 
-/** A Resource's content as one commit left it: its two attributes and its text. */
-interface PresenceCommit {
-  readonly presence: string | null;
-  readonly inert: string | null;
-  readonly text: string;
-}
-
+/**
+ * Close on an Open Reference Resource: its plugin draws what its Map content
+ * says, so its Target's content goes in the commit that Closes it (ADR 0142).
+ * Nothing fades on Close: the plugin draws its Closed state at once.
+ */
 test('the Close action closes an opened resource', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
-  const resource = nodeByTitle(page, 'A').first();
-  await openResource(resource, 'A');
+  const resource = nodeByTitle(page, 'A′').first();
+  await openResource(resource, 'A′');
   const controls = await resourceControls(page, resource);
-  await expect(resource.locator('.canvas-resource__content')).toHaveAttribute(
-    'data-presence',
-    'present',
-  );
+  await expect(resource.getByText('entry point')).toBeVisible();
 
-  // Installed ahead of the Close click, because leaving is over before anything
-  // out here can ask about it. `usePresence` keeps the leaving content mounted
-  // for the duration the element itself declares — `--resource-placement-duration
-  // * 0.4`, 80ms — and then unmounts it, so an `expect.poll` from the test
-  // process is spending a CDP round trip on a window that is already closing;
-  // on a loaded runner the first sample lands after the unmount and sees an
-  // empty list. Shortening the intervals only narrows the odds, and widening
-  // the timeout or accepting `[]` would pin nothing. Recording inside the page
-  // has no round trip to lose: the observer runs on the commit itself, and the
-  // record is read back afterwards at leisure.
-  //
-  // Both attributes are read together in the one callback, which is what makes
-  // this one observation of one commit — `CanvasResource`'s `inert` layout effect
-  // runs in the commit that writes `data-presence`, and a MutationObserver is
-  // delivered after that whole commit rather than between its two writes. The
-  // observer then stops, so `inert` arriving a commit later would be recorded
-  // here as the `null` it was when `leaving` appeared, and fail. An empty
-  // record is a failure too, and a different one: the content never entered
-  // `leaving` at all. The text is read in that same callback, so it is what the
-  // leaving commit drew: a Closed display carries no content, and the fade has to
-  // draw the Markdown the Open one last drew rather than an empty body.
-  const leaving = await resource.evaluateHandle((node) => {
-    const commits: PresenceCommit[] = [];
-    new MutationObserver((_mutations, observer) => {
-      const content = node.querySelector('.canvas-resource__content');
-      if (content === null) return;
-      const presence = content.getAttribute('data-presence');
-      if (presence !== 'leaving') return;
-      commits.push({
-        presence,
-        inert: content.getAttribute('inert'),
-        text: content.textContent,
-      });
-      observer.disconnect();
-    }).observe(node, {
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['data-presence', 'inert'],
-    });
-    return commits;
-  });
-
-  await controls.getByRole('button', { name: 'Close Resource A' }).click();
-  // The unmount is a fact worth asserting on its own and also the proof that
-  // the leaving window has closed, so what the observer caught is read once
-  // after it rather than polled for.
-  await expect(resource.locator('.canvas-resource__content')).toHaveCount(0);
-  expect(await leaving.jsonValue()).toEqual([
-    { presence: 'leaving', inert: '', text: expect.stringMatching(/\S/) },
-  ]);
-  await expect(controls.getByRole('button', { name: 'Open Resource A' })).toBeVisible();
+  await controls.getByRole('button', { name: 'Close Resource A′' }).click();
+  await expect(resource.getByText('entry point')).toHaveCount(0);
+  await expect(resource.locator('[data-open="true"]')).toHaveCount(0);
+  await expect(controls.getByRole('button', { name: 'Open Resource A′' })).toBeVisible();
 });
 
 test('resources are drawn at exactly the size the strategy placed them at', async ({ page }) => {
@@ -646,7 +595,7 @@ test('resources are drawn at exactly the size the strategy placed them at', asyn
 });
 
 test(
-  'a Reference Resource Opens on its Target Markdown read-only with click, Enter and Space',
+  'a Reference Resource Opens on its Target Markdown read-only from its rail, under its own Title',
   { tag: '@parity:open-reference-shows-target-markdown-read-only' },
   async ({ page }) => {
     await page.goto('/');
@@ -658,19 +607,19 @@ test(
     await openResource(recap, 'A′');
     const controls = await resourceControls(page, recap);
     await expect(recap.getByText('entry point')).toBeVisible();
-    await expect(recap.getByRole('heading', { name: 'A′', exact: true })).toBeVisible();
+    // Its own Title draws once, in place of the Target's.
+    await expect(recap.getByRole('heading', { name: 'A′', exact: true })).toHaveCount(1);
     await expect(recap.getByRole('textbox')).toHaveCount(0);
     await expect(controls.getByRole('button', { name: /Edit Resource/ })).toHaveCount(0);
     await expect(page.getByRole('combobox', { name: 'Target' })).toHaveCount(0);
     await controls.getByRole('button', { name: 'Close Resource A′' }).click();
 
+    // Its Open is its plugin's Map content (ADR 0142), so the canvas's Enter
+    // leaves it alone and its rail Opens it.
     await recap.focus();
     await page.keyboard.press('Enter');
-    await expect(controls.getByRole('button', { name: 'Close Resource A′' })).toBeVisible();
-    await controls.getByRole('button', { name: 'Close Resource A′' }).click();
-
-    await recap.focus();
-    await page.keyboard.press('Enter');
+    await expect(controls.getByRole('button', { name: 'Open Resource A′' })).toBeVisible();
+    await openResource(recap, 'A′');
     await expect(recap.getByText('entry point')).toBeVisible();
     await recap.click({ position: { x: 8, y: 8 } });
     const resizeControl = recap.locator('.react-flow__resize-control.handle.bottom.right');

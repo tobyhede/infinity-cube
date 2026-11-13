@@ -5,8 +5,9 @@ import { parseResourceFiles, serializeResource } from '../src/index';
 
 /**
  * `serializeResource` and `parseResourceFiles` are inverses: every
- * kind's Resource written as its files reads back as the same Resource, a
- * Markdown Resource's source byte for byte through its sidecar.
+ * kind's Resource written as its file reads back as the same Resource, a
+ * Markdown Resource naming its text by the URL of the asset holding it (ADR
+ * 0142) and writing no other file.
  */
 
 const uuidArb = fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value));
@@ -30,40 +31,23 @@ const titleArb = fc
   .map((lines) => normalizeTitle(lines.join('\n')))
   .filter((title) => title.length > 0);
 
-/**
- * Markdown sources built from arbitrary characters and the lines a frontmatter
- * or line-ending reader would get wrong: a `---` rule, YAML that reads as
- * frontmatter, a carriage return, a blank line. The sidecar holds them all
- * verbatim.
- */
-const sourceArb = fc
-  .array(
-    fc.oneof(
-      fc.constant('---'),
-      fc.constant('title: not frontmatter'),
-      fc.constant(''),
-      fc.constant('\r'),
-      fc.constant('# A heading'),
-      fc.string({ unit: 'binary', maxLength: 30 }),
-    ),
-    { maxLength: 8 },
-  )
-  .chain((lines) => fc.constantFrom('', '\n', '\r\n').map((end) => lines.join('\n') + end));
-
 const BASE64URL = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 
 /**
  * The URLs an Image Resource may hold (ADR 0106): a web URL, or the
- * `/images/<id>` of a stored image, whose last character carries two zero bits.
+ * `/assets/<id>` of a stored image, whose last character carries two zero bits.
  */
+/** The `/assets/<id>` of a stored asset, whose last character carries two zero bits. */
+const assetUrlArb = fc
+  .tuple(
+    fc.string({ unit: fc.constantFrom(...Array.from(BASE64URL)), minLength: 42, maxLength: 42 }),
+    fc.constantFrom(...Array.from('AEIMQUYcgkosw048')),
+  )
+  .map(([head, last]): `/assets/${string}` => `/assets/${head}${last}`);
+
 const imageUrlArb = fc.oneof(
   fc.webUrl({ validSchemes: ['https', 'http'], withQueryParameters: true, withFragments: true }),
-  fc
-    .tuple(
-      fc.string({ unit: fc.constantFrom(...Array.from(BASE64URL)), minLength: 42, maxLength: 42 }),
-      fc.constantFrom(...Array.from('AEIMQUYcgkosw048')),
-    )
-    .map(([head, last]) => `/images/${head}${last}`),
+  assetUrlArb,
 );
 
 const dimensionArb = fc.double({ min: 1e-6, max: 1e6, noNaN: true });
@@ -76,7 +60,7 @@ const resourceArb: fc.Arbitrary<Resource> = fc.oneof(
     id: uuidArb,
     title: titleArb,
     kind: fc.constant('markdown' as const),
-    content: fc.record({ source: sourceArb }),
+    content: fc.record({ url: assetUrlArb }),
   }),
   fc.record({
     id: uuidArb,
@@ -131,11 +115,12 @@ describe('resource file round-trip', () => {
     );
   });
 
-  it("writes a Markdown Resource's source to its sidecar verbatim", () => {
+  it('writes every Resource as its one Resource file, a Markdown Resource too', () => {
     fc.assert(
-      fc.property(uuidArb, sourceArb, (id, source) => {
-        const files = serializeResource({ id, title: 'A', kind: 'markdown', content: { source } });
-        expect(files.find(({ path }) => path === `resources/${id}.md`)?.text).toBe(source);
+      fc.property(resourceArb, (resource) => {
+        expect(serializeResource(resource).map(({ path }) => path)).toEqual([
+          `resources/${resource.id}.json`,
+        ]);
       }),
     );
   });

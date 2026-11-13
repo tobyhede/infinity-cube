@@ -33,23 +33,20 @@ export const isMissingFile = (error: unknown): boolean =>
 
 /**
  * The files Import reads in a Space directory, in ordinal order of their
- * relative paths: `resources/*.json`, the Resource files, and every
- * `.md` in `resources/` or beside `space.json`. A `.md` is read so that one no
- * Resource file names as its sidecar is refused, naming it, rather than
- * ignored: a Resource written in an older format is never silently dropped.
- * Export removes exactly these when a Resource leaves, so the two cannot drift.
+ * relative paths: `resources/*.json`, the Resource files. No other file is
+ * read: a Resource's bytes are assets (ADR 0142). Export removes exactly these
+ * when a Resource leaves, so the two cannot drift.
  */
 export const discoverResourceFiles = async (spaceDirectory: string): Promise<string[]> => {
-  const rootFiles = await filesIn(spaceDirectory, ['.md']);
   let nestedFiles: string[];
   try {
-    nestedFiles = await filesIn(join(spaceDirectory, 'resources'), ['.json', '.md']);
+    nestedFiles = await filesIn(join(spaceDirectory, 'resources'), ['.json']);
   } catch (error) {
     if (!isMissingFile(error)) throw error;
     nestedFiles = [];
   }
 
-  return [...rootFiles, ...nestedFiles].sort((left, right) =>
+  return nestedFiles.sort((left, right) =>
     compareOrdinal(relative(spaceDirectory, left), relative(spaceDirectory, right)),
   );
 };

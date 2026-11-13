@@ -15,51 +15,23 @@ import {
   type AgreeingAllOf,
   type KindDecorator,
 } from '../canvas-resource-decoration';
-import type { KindCreation } from '../kind-creation';
-import { imageCreation, imageDecoration, type ImageCreationContext } from './image';
-import { markdownCreation, markdownDecoration, type MarkdownCreationContext } from './markdown';
-import { spaceCreation, spaceDecoration, type SpaceCreationContext } from './space';
-import { urCreation, urDecoration, type UrCreationContext } from './ur';
-
-/** What every kind's Create reads, together. */
-export type KindCreationContext = MarkdownCreationContext &
-  SpaceCreationContext &
-  ImageCreationContext &
-  UrCreationContext;
+import { defaultDecorator, type DefaultResourceDecorationContext } from './default';
+import { imageDecoration } from './image';
+import { markdownDecoration } from './markdown';
+import { spaceDecoration } from './space';
+import { referenceDecoration } from './reference';
+import { urDecoration } from './ur';
 
 /**
- * How each kind is created from the Command Dock, or `null` for a kind it does
- * not create. A Reference Resource is always created *from* the Resource it
- * points at, which supplies the Target (ADR 0089), so its Create is a row in
- * that Resource's own command menu.
- */
-const CREATIONS = {
-  [markdownKind.id]: markdownCreation,
-  [spaceKind.id]: spaceCreation,
-  [imageKind.id]: imageCreation,
-  [urKind.id]: urCreation,
-  [referenceKind.id]: null,
-} satisfies Readonly<Record<KindId, KindCreation<KindCreationContext> | null>>;
-
-/** Every kind the Command Dock creates, with its Create, in registry order. */
-export const KIND_CREATIONS: readonly (readonly [KindId, KindCreation<KindCreationContext>])[] =
-  KIND_IDS.flatMap((kind): (readonly [KindId, KindCreation<KindCreationContext>])[] => {
-    const creation = CREATIONS[kind];
-    return creation === null ? [] : [[kind, creation]];
-  });
-
-/**
- * How each kind decorates its Resources on the canvas, or `null` for a kind
- * whose Resources take only the shared decoration. A Reference Resource offers
- * nothing of its own: its Target's content is shown read-only (ADR 0070).
+ * How each kind decorates its Resources on the canvas.
  */
 const DECORATIONS = {
   [markdownKind.id]: kindDecorator(markdownDecoration),
   [imageKind.id]: kindDecorator(imageDecoration),
   [urKind.id]: kindDecorator(urDecoration),
   [spaceKind.id]: kindDecorator(spaceDecoration),
-  [referenceKind.id]: null,
-} satisfies Readonly<Record<KindId, KindDecorator<never> | null>>;
+  [referenceKind.id]: kindDecorator(referenceDecoration),
+} satisfies Readonly<Record<KindId, KindDecorator<never>>>;
 
 /** The context one kind's decoration reads. */
 type ContextOf<Decorator> = Decorator extends KindDecorator<infer Context> ? Context : never;
@@ -68,15 +40,18 @@ type ContextOf<Decorator> = Decorator extends KindDecorator<infer Context> ? Con
  * What every kind's canvas decoration reads, together. Two kinds that read a
  * field of one name with different types fail to compile where it is supplied.
  */
-export type KindDecorationContext = AgreeingAllOf<ContextOf<(typeof DECORATIONS)[KindId]>>;
+export type KindDecorationContext = AgreeingAllOf<
+  ContextOf<(typeof DECORATIONS)[KindId]> | DefaultResourceDecorationContext
+>;
 
-/** Every kind's decoration, in registry order. */
-const KIND_DECORATORS: readonly KindDecorator<KindDecorationContext>[] = KIND_IDS.flatMap(
-  (kind): KindDecorator<KindDecorationContext>[] => {
-    const decorator = DECORATIONS[kind];
-    return decorator === null ? [] : [decorator];
-  },
-);
+/**
+ * Every kind's decoration, in registry order, then the default plugin's, which
+ * decorates the Resources whose kind no plugin in this build draws (ADR 0142).
+ */
+const KIND_DECORATORS: readonly KindDecorator<KindDecorationContext>[] = [
+  ...KIND_IDS.map((kind): KindDecorator<KindDecorationContext> => DECORATIONS[kind]),
+  defaultDecorator,
+];
 
 /**
  * Every Resource node with its kind's operations: the app half of each kind,

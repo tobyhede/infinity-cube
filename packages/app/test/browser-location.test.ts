@@ -14,8 +14,9 @@ import { composeApp } from '../src/compose-app';
 import { pinSource } from '../src/mount/mount-source';
 import { carriedAddress, sourceParameter } from '../src/source-parameter';
 import { recordingHistory, standInBrowser } from './browser-history';
-import type { ImageSources } from '../src/image-creation';
-import { heldImageSources, unusedImageSources } from './image-sources';
+import { holdExclusive, type HeldExclusive } from './held-exclusive';
+import { createPluginGate } from '../src/plugin-host/plugin-gate';
+import { textAsset } from './markdown-texts';
 
 /**
  * The rules that decide a browser history entry, proved without a DOM.
@@ -50,8 +51,8 @@ const snapshot: SpaceSnapshot = {
         title: 'Map',
         kind: 'positioned',
         positions: {
-          [RESOURCE_A]: { x: 10, y: 20, open: false },
-          [RESOURCE_B]: { x: 300, y: 20, open: false },
+          [RESOURCE_A]: { x: 10, y: 20 },
+          [RESOURCE_B]: { x: 300, y: 20 },
         },
         graphs: [
           { id: GRAPH_ID, title: 'Graph', edges: [{ from: RESOURCE_A, to: RESOURCE_B }] },
@@ -62,15 +63,21 @@ const snapshot: SpaceSnapshot = {
         id: OTHER_MAP_ID,
         title: 'Other Map',
         kind: 'positioned',
-        positions: { [RESOURCE_A]: { x: 0, y: 0, open: false } },
+        positions: { [RESOURCE_A]: { x: 0, y: 0 } },
         graphs: [{ id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] }],
       },
     ],
     defaultMap: MAP_ID,
   },
   resources: [
-    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
-    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', content: { source: 'B' } } },
+    {
+      id: RESOURCE_A,
+      document: { title: 'A', kind: 'markdown', content: { url: textAsset('A') } },
+    },
+    {
+      id: RESOURCE_B,
+      document: { title: 'B', kind: 'markdown', content: { url: textAsset('B') } },
+    },
   ],
 };
 
@@ -85,21 +92,23 @@ const selfEdge: SpaceSnapshot = {
         id: MAP_ID,
         title: 'Map',
         kind: 'positioned',
-        positions: { [RESOURCE_A]: { x: 10, y: 20, open: false } },
+        positions: { [RESOURCE_A]: { x: 10, y: 20 } },
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [{ from: RESOURCE_A, to: RESOURCE_A }] }],
       },
     ],
     defaultMap: MAP_ID,
   },
   resources: [
-    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
+    {
+      id: RESOURCE_A,
+      document: { title: 'A', kind: 'markdown', content: { url: textAsset('A') } },
+    },
   ],
 };
 
-const compose = (opened: SpaceSnapshot = snapshot, images: ImageSources = unusedImageSources) => {
+const compose = (opened: SpaceSnapshot = snapshot) => {
   const loaded = { snapshot: opened, revision: 0n, exportedRevision: null };
   return composeApp({
-    images,
     spaceSession: openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded),
   });
 };
@@ -111,34 +120,18 @@ const nothingHeld = (): boolean => false;
 const IMAGE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 
 /**
- * The Space composed with a replacement of its Image Resource held while it
- * measures, and the release that lets it finish.
+ * The Space composed beside a plugin gate whose exclusive work, a Replace of its
+ * Image Resource, runs until it is released.
  */
 const composeReplacing = () => {
-  const held = heldImageSources();
-  const app = compose(
-    {
-      ...snapshot,
-      resources: [
-        ...snapshot.resources,
-        {
-          id: IMAGE_ID,
-          document: {
-            title: 'Figure',
-            kind: 'image',
-            content: { url: 'https://example.com/figure.png' },
-          },
-        },
-      ],
-    },
-    held.images,
-  );
-  const replace = () =>
-    app.imageReplacement.replace(IMAGE_ID, {
-      kind: 'url',
-      url: 'https://example.com/replacement.png',
-    });
-  return { app, replace, release: held.release };
+  const app = compose();
+  const gate = createPluginGate();
+  let held: HeldExclusive | undefined;
+  const replace = (): Promise<void> => {
+    held = holdExclusive(gate, IMAGE_ID);
+    return held?.running ?? Promise.resolve();
+  };
+  return { app, gate, replace, release: () => held?.release() };
 };
 
 const mapPath = (mapId: MapId): string =>
@@ -161,10 +154,10 @@ const resourcePath = (mapId: MapId, resourceId: ResourceId): string =>
 const deadPath = mapPath(MISSING_MAP_ID);
 
 it('holds Maps, Graphs and browser traversal during replacement, then permits navigation', async () => {
-  const { app, replace, release } = composeReplacing();
+  const { app, gate, replace, release } = composeReplacing();
   const history = recordingHistory(mapPath(MAP_ID));
   const location = createBrowserLocation(history, {
-    isNavigationHeld: () => app.imageReplacement.getState(),
+    isNavigationHeld: () => gate.exclusiveRunning(),
   });
   location.follow(app);
   const pending = replace();
@@ -188,7 +181,7 @@ it('holds Back, Forward and deliberate navigation when another composed Space re
   const other = composeReplacing();
   const history = recordingHistory(mapPath(MAP_ID));
   const location = createBrowserLocation(history, {
-    isNavigationHeld: () => other.app.imageReplacement.getState(),
+    isNavigationHeld: () => other.gate.exclusiveRunning(),
   });
   location.follow(app);
   const pending = other.replace();
@@ -211,7 +204,7 @@ it('holds Back, Forward and deliberate navigation when another composed Space re
 });
 
 it('holds a Back refused by a replacement while a later held Back is still returning', async () => {
-  const { app, replace, release } = composeReplacing();
+  const { app, gate, replace, release } = composeReplacing();
   const stand = standInBrowser({ path: mapPath(MAP_ID) });
   const history = createBrowserHistory(stand.browser);
   history.push(mapGraphPath(MAP_ID, SECOND_GRAPH_ID));
@@ -226,7 +219,7 @@ it('holds a Back refused by a replacement while a later held Back is still retur
       openings.push(opening);
       return opening.promise;
     },
-    isNavigationHeld: () => app.imageReplacement.getState(),
+    isNavigationHeld: () => gate.exclusiveRunning(),
   });
   location.follow(app);
   stand.back();

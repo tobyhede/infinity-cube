@@ -1,13 +1,19 @@
 import { readFileSync } from 'node:fs';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { resourceToolbar, selectResource } from '../e2e/graph';
-import { expectPictureAtOwnSize, expectPictureLoaded, HARBOUR_SIZE } from '../e2e/image';
+import { expectPictureLoaded, HARBOUR_SIZE } from '../e2e/image';
 
 const openCloseStory = '/?story=components--resource--open-and-close&mode=preview';
 const markdownStory = '/?story=components--resource--editing--markdown&mode=preview';
+
+/**
+ * Where an ended edit returns focus: the Resource the plugin is drawn in, which
+ * the host is told to focus when the plugin's last Claim goes (ADR 0064, ADR 0142).
+ */
+const returnedTo = (page: Page) => page.getByRole('group', { name: 'Strategies on the canvas' });
 const resizeControlStory = '/?story=components--resource--resize-control&mode=preview';
 const HARBOUR = readFileSync(
-  new URL('../fixture/images/fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs.png', import.meta.url),
+  new URL('../fixture/assets/fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs.png', import.meta.url),
 );
 const openReferenceStory = '/?story=components--resource--open-reference-resource&mode=preview';
 
@@ -38,13 +44,19 @@ test(
     await expect(
       toolbar.getByRole('button', { name: 'Close Resource Strategy overview' }),
     ).toBeVisible();
-    // The Target's content is the Open Resource's top passenger and the Reference Resource Title
-    // its bottom one, the same treatment an Open Markdown Resource draws (ADR 0070).
-    const contentBox = await reference.locator('.canvas-resource__content').boundingBox();
-    const titleBox = await reference.locator('.canvas-resource__body').boundingBox();
+    // The Target's plugin draws the Reference's Title, once, as it draws its
+    // own: above the Target's text, as an Open Markdown Resource draws it
+    // (ADR 0070, ADR 0142).
+    await expect(reference.getByRole('heading', { name: 'Strategy overview' })).toHaveCount(1);
+    const titleBox = await reference
+      .getByRole('heading', { name: 'Strategy overview' })
+      .boundingBox();
+    const contentBox = await reference
+      .getByRole('heading', { name: 'Strategies', exact: true })
+      .boundingBox();
     if (contentBox === null || titleBox === null)
       throw new Error('Open Reference Resource drew no content');
-    expect(contentBox.y + contentBox.height).toBeLessThanOrEqual(titleBox.y + 1);
+    expect(titleBox.y + titleBox.height).toBeLessThanOrEqual(contentBox.y + 1);
   },
 );
 
@@ -98,10 +110,14 @@ test(
     await expect(title).toHaveAttribute('class', closedClass ?? '');
     expect(await title.evaluate(titleStyle)).toEqual(closedStyle);
     expect(await titleLeftInset()).toBeCloseTo(closedInset, 0);
-    const openContent = resource.locator('.canvas-resource__content');
-    await expect(openContent).toHaveAttribute('data-presence', 'present');
-    await expect(openContent).toHaveCSS('opacity', '1');
-    const openBottomInset = await titleBottomInset();
+    // Its plugin draws the text as soon as its Map content says Open, and none
+    // of it once Closed, with the Title where it was Closed (ADR 0142).
+    await expect(resource.locator('.canvas-resource__plugin [data-open="true"]')).toHaveCount(1);
+    await toolbar.getByRole('button', { name: 'Close Resource Strategies' }).click();
+    await expect(resource.getByRole('heading', { name: 'Placement is authored' })).toHaveCount(0);
+    await expect(resource.locator('.canvas-resource__plugin [data-open="false"]')).toHaveCount(1);
+    expect(await titleLeftInset()).toBeCloseTo(closedInset, 0);
+    expect(await titleBottomInset()).toBeCloseTo(closedBottomInset, 0);
 
     const transitionDuration = (element: Element, property: string) => {
       const style = getComputedStyle(element);
@@ -114,79 +130,6 @@ test(
         ? Number.parseFloat(duration)
         : Number.parseFloat(duration) * 1000;
     };
-    const closingSnapshot = await toolbar
-      .getByRole('button', { name: 'Close Resource Strategies' })
-      .evaluate((button, duration) => {
-        const startedAt = performance.now();
-        // The toolbar floats outside the Resource (ADR 0102), so the Resource is
-        // found from the placement the toolbar names rather than as an ancestor.
-        const placement = button
-          .closest<HTMLElement>('[data-resource-rail-for]')
-          ?.getAttribute('data-resource-rail-for');
-        const element =
-          placement === null || placement === undefined
-            ? null
-            : document.querySelector<HTMLElement>(
-                `.react-flow__node[data-id="${placement}"] .canvas-resource`,
-              );
-        button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-        if (element === null) throw new Error('Closing Resource is unavailable');
-        const content = element.querySelector<HTMLElement>('.canvas-resource__content');
-        const titleElement = element.querySelector<HTMLElement>('.canvas-resource__title');
-        if (content === null || titleElement === null)
-          throw new Error('Closing Resource content or Title is unavailable');
-        return new Promise<{
-          contentDuration: number | string | CSSNumericValue | null;
-          contentInert: boolean;
-          contentPresence: string | undefined;
-          contentTransitionRunning: boolean;
-          open: string | undefined;
-          titleBottomInsets: number[];
-        }>((resolve) => {
-          const titleBottomInsets: number[] = [];
-          let firstFrame:
-            | {
-                contentDuration: number | string | CSSNumericValue | null;
-                contentInert: boolean;
-                contentPresence: string | undefined;
-                contentTransitionRunning: boolean;
-                open: string | undefined;
-              }
-            | undefined;
-          const sample = (now: number) => {
-            const resourceBox = element.getBoundingClientRect();
-            const titleBox = titleElement.getBoundingClientRect();
-            titleBottomInsets.push(resourceBox.bottom - titleBox.bottom);
-            if (firstFrame === undefined) {
-              const opacityTransition = content.getAnimations().find((animation) => {
-                if (!(animation.effect instanceof KeyframeEffect)) return false;
-                return animation.effect
-                  .getKeyframes()
-                  .some((frame) => frame['opacity'] !== undefined);
-              });
-              firstFrame = {
-                contentDuration: opacityTransition?.effect?.getTiming().duration ?? null,
-                contentInert: content.hasAttribute('inert'),
-                contentPresence: content.dataset['presence'],
-                contentTransitionRunning: opacityTransition?.playState === 'running',
-                open: element.dataset['open'],
-              };
-            }
-            if (now - startedAt < duration) requestAnimationFrame(sample);
-            else resolve({ ...firstFrame, titleBottomInsets });
-          };
-          requestAnimationFrame(sample);
-        });
-      }, 220);
-    expect(closingSnapshot.contentDuration).toBeCloseTo(80, 5);
-    expect(closingSnapshot.contentInert).toBe(true);
-    expect(closingSnapshot.contentPresence).toBe('leaving');
-    expect(closingSnapshot.contentTransitionRunning).toBe(true);
-    expect(closingSnapshot.open).toBe('false');
-    for (const inset of closingSnapshot.titleBottomInsets) {
-      expect(inset).toBeGreaterThan(0);
-      expect(inset).toBeLessThanOrEqual(Math.max(openBottomInset, closedBottomInset) + 1);
-    }
 
     // Deselected, the Resource's Edge handles quiet once the pointer leaves it.
     await specimen.locator('.react-flow__pane').click({ position: { x: 2, y: 2 } });
@@ -196,9 +139,7 @@ test(
     await expect(sourceHandle).toHaveCSS('opacity', '0');
     expect(await sourceHandle.evaluate(transitionDuration, 'opacity')).toBe(120);
 
-    const leavingContent = resource.locator('.canvas-resource__content');
-    await expect(leavingContent).toHaveCount(0);
-    await expect(resource).toHaveAttribute('data-open', 'false');
+    await expect(resource.locator('.canvas-resource__plugin [data-open="false"]')).toHaveCount(1);
     await selectResource(node);
     await expect(toolbar.getByRole('button', { name: 'Open Resource Strategies' })).toBeVisible();
     const longResource = page.getByRole('region', { name: 'Long Markdown Resource' });
@@ -229,7 +170,7 @@ test(
     const boxes = await node.evaluate((element) => {
       const resourceElement = element.querySelector('.canvas-resource');
       if (resourceElement === null)
-        throw new Error('The React Flow node contains no CanvasResource');
+        throw new Error('The React Flow node contains no drawn Resource');
       const nodeBox = element.getBoundingClientRect();
       const resourceBox = resourceElement.getBoundingClientRect();
       return {
@@ -402,12 +343,15 @@ test('a selected Open Resource offers only Edit and Close, and its body begins t
   await open(page, markdownStory);
   const resource = page.getByRole('article', { name: 'Strategies' });
 
-  const labels = await resource
-    .getByTestId('canvas-resource-actions')
+  const actions = resource.getByTestId('canvas-resource-actions');
+  // Edit joins the rail once the plugin has read its text, so wait for it
+  // before reading the rail once.
+  await expect(actions.getByRole('button', { name: 'Edit Resource Strategies' })).toBeVisible();
+  const labels = await actions
     .getByRole('button')
     .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label')));
   expect(labels).toEqual(['Edit Resource Strategies', 'Close Resource Strategies']);
-  const bodyTarget = resource.getByTestId('markdown-resource-body-edit-target');
+  const bodyTarget = resource.getByRole('button', { name: 'Edit Markdown source of Strategies' });
   await expect(bodyTarget).toHaveCSS('opacity', '0');
   await expect(bodyTarget.locator('svg')).toHaveCount(0);
   await bodyTarget.click();
@@ -418,7 +362,7 @@ test('the rail replaces its Edit action with the two ends of a running edit', as
   await open(page, markdownStory);
   const resource = page.getByRole('article', { name: 'Strategies' });
   const actions = resource.getByTestId('canvas-resource-actions');
-  await page.getByRole('button', { name: 'Focused edit', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit Resource Strategies' }).click();
   await expect(page.getByRole('textbox', { name: 'Markdown source of Strategies' })).toBeFocused();
 
   expect(
@@ -479,7 +423,7 @@ test('the rail is one toolbar: one tab stop, and its commands under the arrows',
 test('an unavailable rail command keeps its place under the arrows', async ({ page }) => {
   await open(page, markdownStory);
   const resource = page.getByRole('article', { name: 'Strategies' });
-  await page.getByRole('button', { name: 'Focused edit', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit Resource Strategies' }).click();
   await expect(page.getByRole('textbox', { name: 'Markdown source of Strategies' })).toBeFocused();
 
   const save = resource.getByRole('button', { name: 'Save Resource Strategies' });
@@ -520,7 +464,7 @@ test('an unavailable rail command keeps its place under the arrows', async ({ pa
 
 /**
  * An Open Resource hides its redundant kind glyph while its commands stay live
- * during an Edit. This story mounts `CanvasResource` without React Flow, so its
+ * during an Edit. This story mounts `PluginResource` without React Flow, so its
  * toolbar is drawn inline in the rail band rather than in a `NodeToolbar`, and is
  * drawn whether or not the pointer is on the Resource.
  */
@@ -532,10 +476,10 @@ test('an Open Resource running an edit keeps its commands drawn, however it is l
   const commands = resource.getByTestId('canvas-resource-actions');
 
   await page.mouse.move(0, 0);
-  await expect(resource.locator('.resource-rail__kind')).toHaveCount(0);
+  await expect(resource.getByRole('img', { name: 'Markdown Resource' })).toHaveCount(0);
   await expect(commands).toBeVisible();
 
-  await page.getByRole('button', { name: 'Focused edit', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit Resource Strategies' }).click();
   await expect(page.getByRole('textbox', { name: 'Markdown source of Strategies' })).toBeFocused();
   // Nothing is hovering the Resource and the caret is in its body, so the Edit
   // itself must keep Save, Cancel and Close visible.
@@ -550,7 +494,7 @@ test('an Open Resource running an edit keeps its commands drawn, however it is l
 
   await resource.getByRole('button', { name: 'Cancel editing Resource Strategies' }).click();
   await page.mouse.move(0, 0);
-  await expect(resource.getByRole('button', { name: 'Edit Resource Strategies' })).toBeFocused();
+  await expect(returnedTo(page)).toBeFocused();
   await expect(commands).toBeVisible();
 });
 
@@ -564,7 +508,7 @@ test(
     const resource = page.getByRole('article', { name: 'Strategies' });
     const editor = page.getByRole('textbox', { name: 'Markdown source of Strategies' });
 
-    await page.getByRole('button', { name: 'Focused edit', exact: true }).click();
+    await page.getByRole('button', { name: 'Edit Resource Strategies' }).click();
     await editor.pressSequentially('Abandoned. ');
     // Clicking away is not an exit: the draft is still there and the editor is
     // still up. Four exits and no more — two keys and the two controls.
@@ -575,28 +519,28 @@ test(
     await resource.getByRole('button', { name: 'Cancel editing Resource Strategies' }).click();
     await expect(editor).toHaveCount(0);
     await expect(resource).not.toContainText('Abandoned.');
-    await expect(resource.getByRole('button', { name: 'Edit Resource Strategies' })).toBeFocused();
+    await expect(returnedTo(page)).toBeFocused();
 
     await resource.getByRole('button', { name: 'Edit Resource Strategies' }).click();
     await editor.pressSequentially('Kept. ');
     await resource.getByRole('button', { name: 'Save Resource Strategies' }).click();
     await expect(editor).toHaveCount(0);
     await expect(resource).toContainText('Kept.');
-    await expect(resource.getByRole('button', { name: 'Edit Resource Strategies' })).toBeFocused();
+    await expect(returnedTo(page)).toBeFocused();
 
     await resource.getByRole('button', { name: 'Edit Resource Strategies' }).click();
     await editor.press('Escape');
-    await expect(resource.getByRole('button', { name: 'Edit Resource Strategies' })).toBeFocused();
+    await expect(returnedTo(page)).toBeFocused();
 
     await resource.getByRole('button', { name: 'Edit Resource Strategies' }).click();
     await editor.press(process.platform === 'darwin' ? 'Meta+Enter' : 'Control+Enter');
-    await expect(resource.getByRole('button', { name: 'Edit Resource Strategies' })).toBeFocused();
+    await expect(returnedTo(page)).toBeFocused();
   },
 );
 
 test('the body editor shows its shortcut hint only with actual focus', async ({ page }) => {
   await open(page, markdownStory);
-  await page.getByRole('button', { name: 'Focused edit', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit Resource Strategies' }).click();
   const editor = page.getByRole('textbox', { name: 'Markdown source of Strategies' });
   // Located by its own element, not its copy: the keys are drawn by the shared
   // `Kbd` primitive, so the hint is several nodes and the text between them is
@@ -608,6 +552,11 @@ test('the body editor shows its shortcut hint only with actual focus', async ({ 
   await expect(pairs.last()).toContainText('Cancel');
   await expect(editor).toBeFocused();
   await expect(hint).toHaveCSS('opacity', '1');
+  // A row of its own under the editor, never over the author's first line.
+  const firstLine = await editor.locator('.cm-line').first().boundingBox();
+  const hintBox = await hint.boundingBox();
+  if (firstLine === null || hintBox === null) throw new Error('missing line or hint');
+  expect(hintBox.y).toBeGreaterThanOrEqual(firstLine.y + firstLine.height);
   const caps = hint.locator('[data-slot="kbd"]');
   await expect(caps).toHaveCount(3);
   // A cap is an object, not set-back type: it is outlined, and outlined only —
@@ -640,12 +589,12 @@ test('the body editor shows its shortcut hint only with actual focus', async ({ 
   });
   expect(Number.parseFloat(gaps.betweenPairs)).toBeGreaterThan(Number.parseFloat(gaps.withinPair));
 
-  await editor.press('Escape');
-  await expect(page.getByRole('heading', { name: 'Placement is authored' })).toBeVisible();
-  const unfocused = page.getByRole('button', { name: 'Unfocused edit' });
-  await unfocused.click();
-  await expect(unfocused).toBeFocused();
+  // The edit is still running with the caret elsewhere: the hint goes.
+  const cancel = page.getByRole('button', { name: 'Cancel editing Resource Strategies' });
+  await cancel.focus();
   await expect(hint).toHaveCSS('opacity', '0');
+  await cancel.click();
+  await expect(page.getByRole('heading', { name: 'Placement is authored' })).toBeVisible();
 });
 
 test('rendered and source modes keep one content column', async ({ page }) => {
@@ -653,7 +602,7 @@ test('rendered and source modes keep one content column', async ({ page }) => {
   const renderedBox = await page
     .getByRole('heading', { name: 'Placement is authored' })
     .boundingBox();
-  await page.getByRole('button', { name: 'Focused edit', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit Resource Strategies' }).click();
   const firstLine = page.locator('.cm-line').first();
   await expect(firstLine).toBeVisible();
   const sourceBox = await firstLine.boundingBox();
@@ -738,67 +687,70 @@ test(
   },
 );
 
-const openImageStory = '/?story=components--resource--open-image-resource&mode=preview';
+const imageStory = '/?story=components--resource--image-resource&mode=preview';
+
+/** The picture's box and the region the host gives its plugin, in screen pixels. */
+const boxesOf = async (section: Locator, title: string) => {
+  const node = section.locator('.canvas-resource__plugin');
+  const picture = section.getByRole('img', { name: title });
+  await expectPictureLoaded(picture, HARBOUR_SIZE.width);
+  return {
+    node: await node.boundingBox(),
+    picture: await picture.boundingBox(),
+    pictureElement: picture,
+  };
+};
 
 /**
- * An Open Image Resource is drawn as an Open Markdown Resource with its picture as the
- * content. Drawn at one canvas unit per pixel in a Resource sized to hold it,
- * the picture is drawn at its own size; in a Resource resized larger the
- * picture keeps its natural size rather than being enlarged.
+ * An Image Resource is its picture (ADR 0142): drawn over the whole region its
+ * host gives it inside its rect, fitted
+ * whole by `object-fit: contain` and never cropped, at any size, named by its
+ * Title and with no drawn Title. At rest the canvas strokes no border; selected,
+ * it strokes its border and ring.
  */
 test(
-  'an Open Image Resource draws its picture at its own size where Markdown content is drawn',
-  { tag: '@parity:open-image-resource-draws-its-image' },
+  'an Image Resource draws its picture whole into its rect, bare at rest and bordered when selected',
+  { tag: '@parity:image-resource-draws-its-picture-bare' },
   async ({ page }) => {
-    await page.goto(openImageStory);
-    const first = page.getByRole('region', { name: 'Sized to its picture' });
-    const resource = first.getByRole('article', { name: 'Harbour' });
-    const picture = resource.getByRole('img', { name: 'Harbour' });
-    await expect(picture).toBeVisible();
-    await expectPictureLoaded(picture, HARBOUR_SIZE.width);
-    await expect(resource.locator('.canvas-resource__content img')).toHaveCount(1);
-    await expect(resource.getByRole('heading', { name: 'Harbour' })).toBeVisible();
-    await expectPictureAtOwnSize(resource, picture, HARBOUR_SIZE);
+    await page.goto(imageStory);
+    for (const [region, title] of [
+      ['At rest', 'Harbour'],
+      ['Selected', 'Harbour, selected'],
+      ['Wider', 'Harbour, wider'],
+    ] as const) {
+      const section = page.getByRole('region', { name: region, exact: true });
+      const { node, picture, pictureElement } = await boxesOf(section, title);
+      await expect(pictureElement).toHaveCSS('object-fit', 'contain');
+      expect(picture?.width).toBeCloseTo(node?.width ?? 0, 0);
+      expect(picture?.height).toBeCloseTo(node?.height ?? 0, 0);
+      await expect(section.getByRole('heading')).toHaveCount(0);
+    }
 
-    // Larger than the picture, the content area draws it at its natural size.
-    const larger = page
-      .getByRole('region', { name: 'Resized larger' })
-      .getByRole('img', { name: 'Harbour, larger' });
-    await expect(larger).toBeVisible();
-    const drawn = await larger.evaluate((image) => {
-      if (!(image instanceof HTMLImageElement)) return null;
-      const box = image.getBoundingClientRect();
-      const scale = Math.min(box.width / image.naturalWidth, box.height / image.naturalHeight, 1);
-      return {
-        fit: getComputedStyle(image).objectFit,
-        scale,
-        roomy: box.width > image.naturalWidth,
-      };
-    });
-    expect(drawn).toEqual({ fit: 'scale-down', scale: 1, roomy: true });
-
-    // Close and Title editing are an Open Markdown Resource's, and there is no content Edit.
-    const node = first.locator('.react-flow__node');
-    await selectResource(node);
-    const toolbar = await resourceToolbar(page, node);
-    await expect(toolbar.getByRole('button', { name: 'Close Resource Harbour' })).toBeVisible();
-    await expect(toolbar.getByRole('button', { name: /Edit Resource/ })).toHaveCount(0);
+    const rest = page.getByRole('region', { name: 'At rest', exact: true }).getByRole('article');
+    await expect(rest).toHaveAttribute('data-bare', 'true');
+    await expect(rest).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+    const selected = page
+      .getByRole('region', { name: 'Selected', exact: true })
+      .getByRole('article');
+    await expect(selected).toHaveAttribute('data-bare', 'false');
+    await expect(selected).not.toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
   },
 );
 
-/** A picture that will not load keeps the Title and names its URL (ADR 0106). */
+/** A picture that will not load names its URL in the Resource's rect (ADR 0106). */
 test(
-  'an Open Image Resource whose picture does not load names its URL and keeps its Title',
-  { tag: '@parity:open-image-resource-shows-failed-state' },
+  'an Image Resource whose picture does not load names its URL',
+  { tag: '@parity:image-resource-shows-failed-state' },
   async ({ page }) => {
-    await page.goto(openImageStory);
+    await page.goto(imageStory);
     const resource = page
       .getByRole('region', { name: 'Failed image' })
       .getByRole('article', { name: 'Missing' });
     await expect(resource.getByText('Image did not load')).toBeVisible();
-    await expect(resource.getByText('/images/missing-picture.png')).toBeVisible();
+    await expect(
+      resource.getByText('/assets/MISSINGpictureMISSINGpictureMISSINGpicture0'),
+    ).toBeVisible();
     await expect(resource.getByRole('img', { name: 'Missing' })).toHaveCount(0);
-    await expect(resource.getByRole('heading', { name: 'Missing' })).toBeVisible();
   },
 );
 
@@ -808,9 +760,9 @@ const IMAGE_REFERENCE_HARBOUR_URL = 'https://example.com/harbour.png';
 const IMAGE_REFERENCE_MISSING_URL = 'https://missing.invalid/picture.png';
 
 /**
- * A Reference Resource to an Image Resource draws its Target's picture read-only
- * as its own content would be (ADR 0070, ADR 0106): its own Title in the footer, the
- * picture at its own size in a Resource sized to hold it, Close and no
+ * A Reference Resource to an Image Resource is its Target's picture, read-only
+ * (ADR 0070, ADR 0106, ADR 0142): named by its own Title, which its rail
+ * renames, the picture at its own size in a Resource sized to it, Close and no
  * Replace, and no Replace in the failed-image state either. The story's Space
  * holds the Image Resource Targets, and this test serves Harbour's picture.
  */
@@ -828,9 +780,17 @@ test(
     const picture = resource.getByRole('img', { name: 'Harbour, again' });
     await expect(picture).toHaveAttribute('src', IMAGE_REFERENCE_HARBOUR_URL);
     await expectPictureLoaded(picture, HARBOUR_SIZE.width);
-    await expect(resource.locator('.canvas-resource__content img')).toHaveCount(1);
-    await expect(resource.getByRole('heading', { name: 'Harbour, again' })).toBeVisible();
-    await expectPictureAtOwnSize(resource, picture, HARBOUR_SIZE);
+    await expect(resource.locator('img')).toHaveCount(1);
+    // The picture is named by the Reference's Title, so no Title is drawn over it.
+    await expect(resource.getByRole('heading')).toHaveCount(0);
+    // Fitted whole into the room the Reference gives it, never cropped.
+    await expect(picture).toHaveCSS('object-fit', 'contain');
+    const pictureBox = await picture.boundingBox();
+    const resourceBox = await resource.boundingBox();
+    if (pictureBox === null || resourceBox === null) throw new Error('The picture drew no box');
+    expect(pictureBox.width).toBeGreaterThan(resourceBox.width - 16);
+    expect(pictureBox.width).toBeLessThanOrEqual(resourceBox.width);
+    expect(pictureBox.height).toBeLessThanOrEqual(resourceBox.height);
 
     const node = loaded.locator('.react-flow__node');
     await selectResource(node);
@@ -842,13 +802,17 @@ test(
       0,
     );
     await expect(toolbar.getByRole('button', { name: /^Edit Resource/ })).toHaveCount(0);
+    // The rename on the rail is the Reference's own, passed with its Title.
+    await expect(
+      toolbar.getByRole('button', { name: 'Rename Resource Harbour, again' }),
+    ).toBeVisible();
 
     const failed = page
       .getByRole('region', { name: 'Failed image Target' })
       .getByRole('article', { name: 'Missing, again' });
     await expect(failed.getByText('Image did not load')).toBeVisible();
     await expect(failed.getByText(IMAGE_REFERENCE_MISSING_URL)).toBeVisible();
-    await expect(failed.getByRole('heading', { name: 'Missing, again' })).toBeVisible();
+    await expect(failed.getByRole('heading')).toHaveCount(0);
     await expect(failed.getByRole('button', { name: /Replace/ })).toHaveCount(0);
   },
 );
@@ -874,7 +838,8 @@ test(
       .getByRole('article', { name: 'Harbour, again' });
     const skeleton = resource.getByRole('status', { name: 'Loading image' });
     await expect(skeleton).toBeVisible();
-    await expect(resource.getByRole('img', { name: 'Harbour, again' })).toHaveCount(0);
+    // The picture is laid out but drawn transparent until it loads.
+    await expect(resource.getByRole('img', { name: 'Harbour, again' })).toHaveCSS('opacity', '0');
 
     release(null);
     await expectPictureLoaded(

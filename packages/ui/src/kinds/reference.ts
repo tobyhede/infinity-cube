@@ -1,22 +1,20 @@
 import { referenceKind } from '@project/core';
-import { BADGED_TARGET_GLYPH, type KindView } from './kind-view';
-
-/** What a Reference Resource offers beyond its Title: nothing. */
-export interface ReferenceOperations {
-  readonly kind: typeof referenceKind.id;
-}
+import { referencePlugin } from '@project/plugin-reference/domain';
+import { BADGED_TARGET_GLYPH, type PluginListing } from './plugin-listing';
+import type { PluginOperations } from './plugin-views';
 
 /**
- * The view half of the Reference kind (ADR 0070): what a Reference
- * Resource is called. It shows its Target's content read-only, so it offers
- * nothing beyond the shared Title, and it draws no silhouette of its own but
- * its Target's with a badge. Its frame is `reference-canvas.css`, which
- * `CanvasResource` imports.
+ * The Reference kind's place in this package's kind registry, taken from its
+ * plugin (ADR 0070, ADR 0142): its names are the plugin's, and its Resources
+ * are drawn by `PluginResource` and `PresentedPluginResource`, which embed its
+ * Target. It draws no silhouette of its own but its Target's with a badge.
+ * The canvas strokes its border dotted at rest (`reference-canvas.css`, which
+ * `PluginResource` imports).
  */
-export const referenceView: KindView<ReferenceOperations> = {
-  name: 'Reference Resource',
-  listName: 'Reference Resources',
-  referenceName: null,
+export const referenceListing: PluginListing<PluginOperations> = {
+  name: referencePlugin.name,
+  listName: referencePlugin.listName,
+  referenceName: referencePlugin.referenceName,
   Glyph: BADGED_TARGET_GLYPH,
   bareOperations: { kind: referenceKind.id },
 };

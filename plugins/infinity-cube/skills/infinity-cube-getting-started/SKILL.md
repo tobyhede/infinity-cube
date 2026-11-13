@@ -23,7 +23,7 @@ Work from the root of the InfinityCube clone. With no clone at hand, as when thi
 
    Done when you know the absolute path and `<dir>/aggregate.json` exists.
 
-4. **Git.** Make the directory a git repository if it is not in one: `git -C <dir> init`; it can also be done before `init`. Then commit what is there before the first run: `git -C <dir> add -A && git -C <dir> commit -m "Before InfinityCube"`. A repository with no commit has nothing to restore, and the first write rewrites existing files into InfinityCube's own form (every Resource becomes `resources/<id>.json`, with a Markdown Resource's source in `resources/<id>.md`), so the commit is what makes git the undo for that first edit. If `git -C <dir> status --porcelain` already prints nothing, there is nothing to commit.
+4. **Git.** Make the directory a git repository if it is not in one: `git -C <dir> init`; it can also be done before `init`. Then commit what is there before the first run: `git -C <dir> add -A && git -C <dir> commit -m "Before InfinityCube"`. A repository with no commit has nothing to restore, and the first write rewrites existing files into InfinityCube's own form (every Resource becomes `resources/<id>.json`, with a Markdown Resource's text in `assets/<hash>.md`), so the commit is what makes git the undo for that first edit. If `git -C <dir> status --porcelain` already prints nothing, there is nothing to commit.
    Done when `git -C <dir> rev-parse --show-toplevel` succeeds and `git -C <dir> status --porcelain` prints nothing.
 
 5. **Start.** For the person, in their terminal: `pnpm cube run <dir>`. It prints the address it serves (port 4173, or the next free port) and opens their browser. Add `--port <port>` to choose the port, which fails if that port is taken rather than moving on, and `--no-open` to leave the browser alone.
@@ -36,7 +36,7 @@ Work from the root of the InfinityCube clone. With no clone at hand, as when thi
    - Killing InfinityCube outright within that second, or a second Ctrl-C, loses the edits not yet written. A write can also fail, for example on a full disk: InfinityCube prints `Could not write the directory:` and tries again, but if the write on stopping fails it prints `Stopped, but the last edits were not written:`, exits 1, and those edits are lost. Check that stopping ends with `Stopped; <dir> holds every edit.` before treating the directory as complete.
    - InfinityCube writes only its own files, in place, and changes only the ones whose content changed. Anything else in the directory (`.git`, a README at the top, a `notes/` directory) is left alone. A crash in the middle of a write can leave some files new and some old; git restores them.
    - A `*.md` file beside `space.json` is refused by the run, naming it, and removed by the next Export, so notes belong in another directory.
-   - Uploaded pictures are written to `images/` and committed with everything else.
+   - Uploaded pictures are written to `assets/` and committed with everything else.
    - Commit from the content directory: `git -C <dir> add -A && git -C <dir> commit`.
 
    Done when the person has the address and has been told each point above.

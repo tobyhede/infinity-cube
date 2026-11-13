@@ -1,4 +1,4 @@
-import { newUuid, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { EMPTY_ASSET_REF, newUuid, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import { createSpaceHttpApp, HttpSpaceBackend, productDestinationPath } from '@project/http';
 import { MemorySpaceBackend, type SpaceBackend } from '@project/persistence';
 import { describe, expect, it } from 'vitest';
@@ -69,7 +69,7 @@ const snapshot = (
   resources: [
     {
       id: resourceId,
-      document: { title: 'Start here', kind: 'markdown', content: { source: 'Stored body' } },
+      document: { title: 'Start here', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
   ],
 });
@@ -110,7 +110,7 @@ const otherSnapshot = (): SpaceSnapshot => {
           id: OTHER_MAP_ID,
           title: 'Map 1',
           kind: 'positioned',
-          positions: { [OTHER_RESOURCE_ID]: { x: 0, y: 0, open: false } },
+          positions: { [OTHER_RESOURCE_ID]: { x: 0, y: 0 } },
           graphs: [{ id: OTHER_GRAPH_ID, title: 'Graph 1', edges: [] }],
           activeGraph: OTHER_GRAPH_ID,
         },
@@ -258,7 +258,7 @@ describe('HTTP space startup composition', () => {
               id: MAP_ID,
               title: 'Map 1',
               kind: 'positioned' as const,
-              positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false as const } },
+              positions: { [RESOURCE_ID]: { x: 0, y: 0 } },
               graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
             },
           ],
@@ -313,7 +313,7 @@ describe('HTTP space startup composition', () => {
               id: MAP_ID,
               title: 'Map',
               kind: 'positioned' as const,
-              positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false as const } },
+              positions: { [RESOURCE_ID]: { x: 0, y: 0 } },
               graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
             },
           ],
@@ -340,7 +340,11 @@ describe('HTTP space startup composition', () => {
           ...snapshot().resources,
           {
             id: OTHER_RESOURCE_ID,
-            document: { title: 'Next', kind: 'markdown' as const, content: { source: '' } },
+            document: {
+              title: 'Next',
+              kind: 'markdown' as const,
+              content: { url: EMPTY_ASSET_REF },
+            },
           },
         ],
         document: {
@@ -352,8 +356,8 @@ describe('HTTP space startup composition', () => {
               title: 'Map',
               kind: 'positioned' as const,
               positions: {
-                [RESOURCE_ID]: { x: 0, y: 0, open: false as const },
-                [OTHER_RESOURCE_ID]: { x: 320, y: 0, open: false as const },
+                [RESOURCE_ID]: { x: 0, y: 0 },
+                [OTHER_RESOURCE_ID]: { x: 320, y: 0 },
               },
               graphs: [
                 {
@@ -399,7 +403,7 @@ describe('HTTP space startup composition', () => {
               id: mapId,
               title: 'Map',
               kind: 'positioned' as const,
-              positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false as const } },
+              positions: { [RESOURCE_ID]: { x: 0, y: 0 } },
               graphs: [
                 {
                   id: uuidSchema.parse('00000000-0000-4000-8000-000000000006'),
@@ -427,9 +431,10 @@ describe('HTTP space startup composition', () => {
 
     expect(result.opening?.selection).toBe(mapId);
     expect(result.opening?.resourceId).toBe(RESOURCE_ID);
-    expect(
-      result.opened.app.currentSpace().lookup.map(mapId)?.map.positions[RESOURCE_ID]?.open,
-    ).toBe(false);
+    expect(result.opened.app.currentSpace().lookup.map(mapId)?.map.positions[RESOURCE_ID]).toEqual({
+      x: 0,
+      y: 0,
+    });
   });
 
   it('reveals a canonical Resource omitted by the default Map in the Resources collection', async () => {
@@ -447,7 +452,7 @@ describe('HTTP space startup composition', () => {
               id: mapId,
               title: 'Map',
               kind: 'positioned' as const,
-              positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false as const } },
+              positions: { [RESOURCE_ID]: { x: 0, y: 0 } },
               graphs: [
                 {
                   id: uuidSchema.parse('00000000-0000-4000-8000-000000000006'),
@@ -462,7 +467,11 @@ describe('HTTP space startup composition', () => {
           ...snapshot().resources,
           {
             id: omittedId,
-            document: { title: 'Omitted', kind: 'markdown' as const, content: { source: '' } },
+            document: {
+              title: 'Omitted',
+              kind: 'markdown' as const,
+              content: { url: EMPTY_ASSET_REF },
+            },
           },
         ],
       },

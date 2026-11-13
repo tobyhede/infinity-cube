@@ -17,8 +17,8 @@ import type {
   SurfaceAuthoring,
 } from '../src/space-authoring';
 
-import { completeDrag, fixtureDisplay, moving, node, settled } from './render-adapter-fixtures';
-import { unusedImageSources } from './image-sources';
+import { completeDrag, moving, node, settled } from './render-adapter-fixtures';
+import { textAsset } from './markdown-texts';
 
 const RESOURCE_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const RESOURCE_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
@@ -115,7 +115,6 @@ function sessionBackedAdapter(
   );
   const session = openSpaceSession(backend, loaded);
   const { authoring, surface } = composeApp({
-    images: unusedImageSources,
     spaceSession: session,
     selection: mapId,
     newId,
@@ -142,8 +141,8 @@ function sparsePositionedAdapter(newId?: () => UUID) {
           title: 'Map 1',
           kind: 'positioned',
           positions: {
-            [uuidSchema.parse(RESOURCE_A)]: { x: 10, y: 20, open: false },
-            [uuidSchema.parse(RESOURCE_B)]: { x: 300, y: 20, open: false },
+            [uuidSchema.parse(RESOURCE_A)]: { x: 10, y: 20 },
+            [uuidSchema.parse(RESOURCE_B)]: { x: 300, y: 20 },
           },
           graphs: [
             {
@@ -159,15 +158,15 @@ function sparsePositionedAdapter(newId?: () => UUID) {
     resources: [
       {
         id: uuidSchema.parse(RESOURCE_A),
-        document: { title: 'A', kind: 'markdown', content: { source: 'A' } },
+        document: { title: 'A', kind: 'markdown', content: { url: textAsset('A') } },
       },
       {
         id: uuidSchema.parse(RESOURCE_B),
-        document: { title: 'B', kind: 'markdown', content: { source: 'B' } },
+        document: { title: 'B', kind: 'markdown', content: { url: textAsset('B') } },
       },
       {
         id: uuidSchema.parse(RESOURCE_C),
-        document: { title: 'C', kind: 'markdown', content: { source: 'C' } },
+        document: { title: 'C', kind: 'markdown', content: { url: textAsset('C') } },
       },
     ],
   };
@@ -187,8 +186,8 @@ function storedSpaceAdapter() {
           title: 'Map 1',
           kind: 'positioned',
           positions: {
-            [uuidSchema.parse(RESOURCE_A)]: { x: 10, y: 20, open: false },
-            [uuidSchema.parse(RESOURCE_B)]: { x: 300, y: 20, open: false },
+            [uuidSchema.parse(RESOURCE_A)]: { x: 10, y: 20 },
+            [uuidSchema.parse(RESOURCE_B)]: { x: 300, y: 20 },
           },
           graphs: [
             {
@@ -204,11 +203,11 @@ function storedSpaceAdapter() {
     resources: [
       {
         id: uuidSchema.parse(RESOURCE_A),
-        document: { title: 'A', kind: 'markdown', content: { source: 'A' } },
+        document: { title: 'A', kind: 'markdown', content: { url: textAsset('A') } },
       },
       {
         id: uuidSchema.parse(RESOURCE_B),
-        document: { title: 'B', kind: 'markdown', content: { source: 'B' } },
+        document: { title: 'B', kind: 'markdown', content: { url: textAsset('B') } },
       },
     ],
   };
@@ -265,6 +264,67 @@ describe('render adapter', () => {
 
     store.getState().changeNodes([{ type: 'select', id: RESOURCE_A, selected: false }]);
     expect(store.getState().selection).toEqual({ kind: 'none' });
+  });
+
+  /*
+   * A modifier click or a selection box adds to React Flow's selection without
+   * deselecting what it held: the latest Resource is the subject, and the rest
+   * stay selected beside it so a drag moves them all.
+   */
+  describe('Resources selected together', () => {
+    const selectedIds = (store: RenderAdapter) =>
+      store
+        .getState()
+        .projection?.nodes.filter((each) => each.selected === true)
+        .map((each) => each.id);
+
+    it('keeps the Resources React Flow holds selected, with the latest as the subject', () => {
+      const store = adapter();
+      store.getState().syncProjection(PROJECTED, [EDGE]);
+
+      store.getState().changeNodes([{ type: 'select', id: RESOURCE_A, selected: true }]);
+      store.getState().changeNodes([{ type: 'select', id: RESOURCE_B, selected: true }]);
+
+      expect(store.getState().selection).toEqual({ kind: 'resource', resourceId: RESOURCE_B });
+      expect(selectedIds(store)).toEqual([RESOURCE_A, RESOURCE_B]);
+    });
+
+    it('makes another of them the subject when the subject is taken off the selection', () => {
+      const store = adapter();
+      store.getState().syncProjection(PROJECTED, [EDGE]);
+      store.getState().changeNodes([{ type: 'select', id: RESOURCE_A, selected: true }]);
+      store.getState().changeNodes([{ type: 'select', id: RESOURCE_B, selected: true }]);
+
+      store.getState().changeNodes([{ type: 'select', id: RESOURCE_B, selected: false }]);
+
+      expect(store.getState().selection).toEqual({ kind: 'resource', resourceId: RESOURCE_A });
+      expect(selectedIds(store)).toEqual([RESOURCE_A]);
+    });
+
+    it('keeps them selected through a reprojection', () => {
+      const store = adapter();
+      store.getState().syncProjection(PROJECTED, [EDGE]);
+      store.getState().changeNodes([{ type: 'select', id: RESOURCE_A, selected: true }]);
+      store.getState().changeNodes([{ type: 'select', id: RESOURCE_B, selected: true }]);
+
+      store.getState().syncProjection(PROJECTED, [EDGE]);
+
+      expect(selectedIds(store)).toEqual([RESOURCE_A, RESOURCE_B]);
+    });
+
+    it('drops them all when an Edge or a Resource is selected from outside React Flow', () => {
+      const store = adapter();
+      store.getState().syncProjection(PROJECTED, [EDGE]);
+      store.getState().changeNodes([{ type: 'select', id: RESOURCE_A, selected: true }]);
+      store.getState().changeNodes([{ type: 'select', id: RESOURCE_B, selected: true }]);
+
+      store.getState().selectResource(RESOURCE_A);
+      expect(selectedIds(store)).toEqual([RESOURCE_A]);
+
+      store.getState().changeNodes([{ type: 'select', id: RESOURCE_B, selected: true }]);
+      store.getState().changeEdges([{ type: 'select', id: EDGE.id, selected: true }]);
+      expect(selectedIds(store)).toEqual([]);
+    });
   });
 
   /*
@@ -513,8 +573,8 @@ describe('render adapter', () => {
 
     expect(authoring.mapPlacement()).toEqual(
       Placement.fromEntries([
-        [RESOURCE_A, { x: 10, y: 20, open: false }],
-        [RESOURCE_B, { x: 300, y: 20, open: false }],
+        [RESOURCE_A, { x: 10, y: 20 }],
+        [RESOURCE_B, { x: 300, y: 20 }],
       ]),
     );
   });
@@ -532,9 +592,9 @@ describe('render adapter', () => {
     ).toEqual({ kind: 'completed', resourceId: CREATED_RESOURCE_ID });
 
     expect(session.getState().working.document.maps?.[0]?.positions).toEqual({
-      [RESOURCE_A]: { x: 10, y: 20, open: false },
-      [RESOURCE_B]: { x: 300, y: 20, open: false },
-      [CREATED_RESOURCE_ID]: { x: 420, y: 360, open: false },
+      [RESOURCE_A]: { x: 10, y: 20 },
+      [RESOURCE_B]: { x: 300, y: 20 },
+      [CREATED_RESOURCE_ID]: { x: 420, y: 360 },
     });
   });
 
@@ -593,8 +653,7 @@ describe('render adapter', () => {
     opened.width = 560;
     opened.height = 420;
     opened.zIndex = 10;
-    opened.data.open = true;
-    opened.data.display = fixtureDisplay(true, 'markdown');
+    opened.data.mapContent = { open: true };
     store.getState().syncProjection([opened], []);
 
     expect(store.getState().projection?.nodes[0]).toMatchObject({
@@ -602,7 +661,7 @@ describe('render adapter', () => {
       width: 560,
       height: 420,
       zIndex: 10,
-      data: { open: true },
+      data: { mapContent: { open: true } },
     });
   });
 
@@ -617,7 +676,7 @@ describe('render adapter', () => {
   it('answers one resize capability across writes resize knows nothing about', () => {
     const spy = authoringSpy({
       mapPlacement: Placement.fromEntries([
-        [RESOURCE_A, { x: 10, y: 20, open: true, size: { width: 500, height: 360 } }],
+        [RESOURCE_A, { x: 10, y: 20, size: { width: 500, height: 360 } }],
       ]),
     });
     const store = createRenderAdapter(spy.authoring);
@@ -642,8 +701,8 @@ describe('render adapter', () => {
     // This is why the render adapter holds no `move` draft: a dragged Resource
     // displaces nobody either.
     const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 10, y: 20, open: true, size: { width: 500, height: 360 } }],
-      [RESOURCE_B, { x: 300, y: 200, open: false }],
+      [RESOURCE_A, { x: 10, y: 20, size: { width: 500, height: 360 } }],
+      [RESOURCE_B, { x: 300, y: 200 }],
     ]);
     const spy = authoringSpy({ mapPlacement: authored });
     const store = createRenderAdapter(spy.authoring);
@@ -655,8 +714,8 @@ describe('render adapter', () => {
       resourceId: RESOURCE_A,
       size: { width: 620, height: 440 },
       placement: Placement.fromEntries([
-        [RESOURCE_A, { x: 10, y: 20, open: true, size: { width: 620, height: 440 } }],
-        [RESOURCE_B, { x: 300, y: 200, open: false }],
+        [RESOURCE_A, { x: 10, y: 20, size: { width: 620, height: 440 } }],
+        [RESOURCE_B, { x: 300, y: 200 }],
       ]),
     });
     expect(spy.completions).toEqual([]);
@@ -670,7 +729,7 @@ describe('render adapter', () => {
   });
 
   it('previews and completes a resize of a Closed Resource, keeping it Closed', () => {
-    const authored = Placement.fromEntries([[RESOURCE_A, { x: 10, y: 20, open: false }]]);
+    const authored = Placement.fromEntries([[RESOURCE_A, { x: 10, y: 20 }]]);
     const spy = authoringSpy({ mapPlacement: authored });
     const store = createRenderAdapter(spy.authoring);
 
@@ -681,7 +740,6 @@ describe('render adapter', () => {
     expect(store.getState().resizeDraft?.placement.get(RESOURCE_A)).toEqual({
       x: 10,
       y: 20,
-      open: false,
       size: { width: 280, height: 166 },
     });
 
@@ -703,8 +761,8 @@ describe('render adapter', () => {
    */
   it('leaves the published projection alone while the resize draft grows', () => {
     const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 10, y: 20, open: true, size: { width: 500, height: 360 } }],
-      [RESOURCE_B, { x: 300, y: 200, open: false }],
+      [RESOURCE_A, { x: 10, y: 20, size: { width: 500, height: 360 } }],
+      [RESOURCE_B, { x: 300, y: 200 }],
     ]);
     const store = createRenderAdapter(authoringSpy({ mapPlacement: authored }).authoring);
     const open = node(RESOURCE_A, 10, 20);
@@ -723,7 +781,7 @@ describe('render adapter', () => {
   it('discards the complete resize draft without an Edit when the gesture is cancelled', () => {
     const spy = authoringSpy({
       mapPlacement: Placement.fromEntries([
-        [RESOURCE_A, { x: 10, y: 20, open: true, size: { width: 500, height: 360 } }],
+        [RESOURCE_A, { x: 10, y: 20, size: { width: 500, height: 360 } }],
       ]),
     });
     const store = createRenderAdapter(spy.authoring);
@@ -747,8 +805,7 @@ describe('render adapter', () => {
     opened.width = 560;
     opened.height = 420;
     opened.zIndex = 10;
-    opened.data.open = true;
-    opened.data.display = fixtureDisplay(true, 'markdown');
+    opened.data.mapContent = { open: true };
     store.getState().syncProjection([opened], []);
 
     expect(store.getState().projection?.nodes[0]).toMatchObject({
@@ -756,7 +813,7 @@ describe('render adapter', () => {
       width: 560,
       height: 420,
       zIndex: 10,
-      data: { open: true },
+      data: { mapContent: { open: true } },
     });
   });
 
@@ -985,9 +1042,13 @@ describe('render adapter', () => {
     store.getState().syncProjection(PROJECTED, [EDGE]);
     completeDrag(store, RESOURCE_A, 500, 400);
     await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));
-    expect(authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A }).kind).toBe(
-      'completed',
-    );
+    expect(
+      authoring.complete({
+        kind: 'changed-map-content',
+        resourceId: RESOURCE_A,
+        content: { open: true },
+      }).kind,
+    ).toBe('completed');
     store.getState().resourceResize.beginResize(RESOURCE_A);
     store.getState().resourceResize.previewResize(RESOURCE_A, { width: 620, height: 440 });
     expect(store.getState().projection).not.toBeNull();

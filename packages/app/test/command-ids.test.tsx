@@ -8,8 +8,6 @@ import {
 } from '../src/key-bindings';
 import {
   ADD_RESOURCE,
-  OPEN_AND_EXPAND,
-  OPEN_RESOURCE,
   presentFromHereCommand,
   REMOVE_SELECTION,
   RENAME_RESOURCE,
@@ -25,8 +23,6 @@ const commands = [
   REMOVE_SELECTION,
   ADD_RESOURCE,
   RENAME_RESOURCE,
-  OPEN_RESOURCE,
-  OPEN_AND_EXPAND,
   showFullViewCommand({ show: undefined, selectNodes: false }),
   ...presentingCommands({
     advance: nothing,

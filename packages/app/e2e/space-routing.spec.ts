@@ -182,12 +182,14 @@ test('canonical and contextual Resource links reveal a Closed Resource without a
   expect((await page.goto(canonical))?.status()).toBe(200);
   const canonicalResource = page.locator(`.react-flow__node[data-id="${RESOURCE_A_ID}"]`);
   await expect(canonicalResource).toBeFocused();
-  await expect(canonicalResource.getByTestId('resource')).toHaveAttribute('data-open', 'false');
+  await expect(
+    canonicalResource.locator('.canvas-resource__plugin [data-open="false"]'),
+  ).toHaveCount(1);
 
   expect((await page.goto(contextual))?.status()).toBe(200);
   const resourceA = page.locator(`.react-flow__node[data-id="${RESOURCE_A_ID}"]`);
   await expect(resourceA).toBeFocused();
-  await expect(resourceA.getByTestId('resource')).toHaveAttribute('data-open', 'false');
+  await expect(resourceA.locator('.canvas-resource__plugin [data-open="false"]')).toHaveCount(1);
   await page.reload();
   await expect(resourceA).toBeFocused();
   await page.goBack();
@@ -219,7 +221,7 @@ test('a canonical Resource omitted by the default Map is revealed only in the Re
   const seeded = await seedPositionedMap(page, 'Sparse Map', (snapshot) => {
     const included = snapshot.resources[0];
     expect(included).toBeDefined();
-    return included === undefined ? {} : { [included.id]: { x: 0, y: 0, open: false as const } };
+    return included === undefined ? {} : { [included.id]: { x: 0, y: 0 } };
   });
   const omitted = seeded.snapshot.resources[1];
   expect(omitted).toBeDefined();
@@ -247,7 +249,7 @@ test('returning to a canonical Resource address reveals it again', async ({ page
   const seeded = await seedPositionedMap(page, 'Sparse Map', (snapshot) => {
     const included = snapshot.resources[0];
     expect(included).toBeDefined();
-    return included === undefined ? {} : { [included.id]: { x: 0, y: 0, open: false as const } };
+    return included === undefined ? {} : { [included.id]: { x: 0, y: 0 } };
   });
   const omitted = seeded.snapshot.resources[1];
   expect(omitted).toBeDefined();
@@ -540,7 +542,7 @@ test('entering, advancing and retreating each append presentation history', asyn
  */
 test('a self-Edge presentation move takes no browser entry', async ({ page }) => {
   const seeded = await seedPositionedMap(page, 'Self Edge', () => ({
-    [RESOURCE_A_ID]: { x: 20, y: 20, open: false },
+    [RESOURCE_A_ID]: { x: 20, y: 20 },
   }));
   const snapshot = {
     ...seeded.snapshot,

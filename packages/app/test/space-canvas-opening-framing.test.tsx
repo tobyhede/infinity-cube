@@ -14,10 +14,10 @@ import type { OpenSpace, OpenSpaces, OpenSpacesState } from '../src/open-spaces'
 import type { SpaceResourceFraming } from '../src/space-resource-framing';
 import { RESOURCE_SIZE } from '../src/resource';
 import { mountSettled } from './settled-mount';
-import { unusedImageSources } from './image-sources';
-import { CLOSED_DISPLAY } from '@project/ui';
 import { stubResizeObserver } from './resize-observer';
 import { canvasReading, IDLE_PLACEMENT } from './map-surfaces';
+import { createPluginGate } from '../src/plugin-host/plugin-gate';
+import { textAsset } from './markdown-texts';
 
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -38,14 +38,17 @@ const snapshot = spaceSnapshotSchema.parse({
         id: MAP_ID,
         title: 'Map',
         kind: 'positioned',
-        positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
+        positions: { [RESOURCE_ID]: { x: 0, y: 0 } },
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
       },
     ],
     defaultMap: MAP_ID,
   },
   resources: [
-    { id: RESOURCE_ID, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
+    {
+      id: RESOURCE_ID,
+      document: { title: 'A', kind: 'markdown', content: { url: textAsset('A') } },
+    },
   ],
 });
 
@@ -69,7 +72,6 @@ function resourceNode(): ResourceFlowNode {
       ...bareKindData('markdown'),
       ...fixtureFacts('markdown'),
       selectedForAuthoring: false,
-      display: CLOSED_DISPLAY,
       activeGraphId: null,
       activeGraphColor: '#8a94a6',
       borderColor: null,
@@ -102,7 +104,7 @@ describe('opening framing on a mounted canvas', () => {
   it('ignores the host seed while hidden and reads this canvas when it first becomes active', async () => {
     const stored = { snapshot, revision: 0n, exportedRevision: null };
     const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(stored), stored);
-    const app = composeApp({ images: unusedImageSources, spaceSession });
+    const app = composeApp({ spaceSession });
     const spaceResources: OpenSpace['spaceResources'] = {
       create: unused,
       link: unused,
@@ -129,6 +131,7 @@ describe('opening framing on a mounted canvas', () => {
     };
     const spaces: OpenSpaces = {
       metaSpaceId: HOST_ID,
+      pluginGate: createPluginGate(),
       mountedEdits: createMountedEdits(() => undefined),
       listing: unused,
       opener: unused,
@@ -183,8 +186,6 @@ describe('opening framing on a mounted canvas', () => {
                 projection: { nodes: [resourceNode()], edges: [] },
               })}
               placement={IDLE_PLACEMENT}
-              imageReplacement={app.imageReplacement}
-              pickImages={app.pickImages}
               commandOutcomes={app.commandOutcomes}
               deleteConfirmation={app.deleteConfirmation}
               nameOnCreation={null}
@@ -223,7 +224,7 @@ describe('opening framing on a mounted canvas', () => {
   it('reads this canvas seed on the first paint when it is already the active Space', async () => {
     const stored = { snapshot, revision: 0n, exportedRevision: null };
     const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(stored), stored);
-    const app = composeApp({ images: unusedImageSources, spaceSession });
+    const app = composeApp({ spaceSession });
     const spaceResources: OpenSpace['spaceResources'] = {
       create: unused,
       link: unused,
@@ -245,6 +246,7 @@ describe('opening framing on a mounted canvas', () => {
     };
     const spaces: OpenSpaces = {
       metaSpaceId: TARGET_ID,
+      pluginGate: createPluginGate(),
       mountedEdits: createMountedEdits(() => undefined),
       listing: unused,
       opener: unused,
@@ -287,8 +289,6 @@ describe('opening framing on a mounted canvas', () => {
               projection: { nodes: [resourceNode()], edges: [] },
             })}
             placement={IDLE_PLACEMENT}
-            imageReplacement={app.imageReplacement}
-            pickImages={app.pickImages}
             commandOutcomes={app.commandOutcomes}
             deleteConfirmation={app.deleteConfirmation}
             nameOnCreation={null}

@@ -1,4 +1,4 @@
-import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import {
   AggregateInvariantError,
   PersistenceUnavailableError,
@@ -7,7 +7,7 @@ import {
   problemCatalogue,
   type InfinityCubeProblemCode,
   type SpaceCommit,
-  type ImageStore,
+  type AssetStore,
   type StoredSpaceRepository,
 } from '@project/persistence';
 import { describe, expect, it, vi } from 'vitest';
@@ -37,7 +37,10 @@ const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: { version: 1, title: 'One' },
   resources: [
-    { id: RESOURCE_ID, document: { title: 'A', kind: 'markdown', content: { source: '' } } },
+    {
+      id: RESOURCE_ID,
+      document: { title: 'A', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+    },
   ],
 };
 const loaded = { snapshot, revision: 0n, exportedRevision: null };
@@ -47,10 +50,10 @@ const updateCommit = (next = snapshot): SpaceCommit => ({
 });
 
 const repository = (
-  overrides: Partial<StoredSpaceRepository & ImageStore> = {},
-): StoredSpaceRepository & ImageStore => ({
-  storeImage: () => Promise.reject(new Error('This repository stores no images')),
-  loadImage: () => Promise.resolve(undefined),
+  overrides: Partial<StoredSpaceRepository & AssetStore> = {},
+): StoredSpaceRepository & AssetStore => ({
+  storeAsset: () => Promise.reject(new Error('This repository stores no assets')),
+  loadAsset: () => Promise.resolve(undefined),
   listSpaces: () => Promise.resolve([{ id: SPACE_ID, title: 'One' }]),
   loadSpace: () => Promise.resolve(loaded),
   loadAggregate: () =>
@@ -99,7 +102,12 @@ const oversizedSnapshot: SpaceSnapshot = {
   resources: [
     {
       id: RESOURCE_ID,
-      document: { title: 'A', kind: 'markdown', content: { source: 'x'.repeat(1_048_576) } },
+      // The bulk rides in the Title: a Markdown Resource's text is an asset (ADR 0142).
+      document: {
+        title: `A${'x'.repeat(1_048_576)}`,
+        kind: 'markdown',
+        content: { url: EMPTY_ASSET_REF },
+      },
     },
   ],
 };
@@ -347,7 +355,12 @@ describe('commit wire policy', () => {
       resources: [
         {
           id: RESOURCE_ID,
-          document: { title: 'A', kind: 'markdown', content: { source: 'x'.repeat(length) } },
+          // The bulk rides in the Title: a Markdown Resource's text is an asset (ADR 0142).
+          document: {
+            title: `A${'x'.repeat(length)}`,
+            kind: 'markdown',
+            content: { url: EMPTY_ASSET_REF },
+          },
         },
       ],
     });
@@ -923,7 +936,7 @@ describe('Space HTTP commit request policy', () => {
             id: MAP_ID,
             title: 'Map 1',
             kind: 'positioned',
-            positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
+            positions: { [RESOURCE_ID]: { x: 0, y: 0 } },
             graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
             activeGraph: GRAPH_ID,
           },

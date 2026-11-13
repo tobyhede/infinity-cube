@@ -1,10 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  EMPTY_ASSET_REF,
   EDGE_TITLE_ONE_LINE,
   graphHeadShape,
+  isMissingKindId,
   uuidSchema,
   type Graph,
+  type JsonValue,
   type MapId,
   type SpaceSnapshot,
   type UUID,
@@ -13,9 +16,16 @@ import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { GRAPH_PALETTE, nextGraphColor } from '@project/graph';
 import { composeApp } from '../src/compose-app';
 
-import { CANVAS } from '../src/space-authoring';
+import {
+  CANVAS,
+  type AuthoringResult,
+  type Settle,
+  type SettledResult,
+} from '../src/space-authoring';
+import { createPluginGate, type PluginGate } from '../src/plugin-host/plugin-gate';
 import { mintingIds } from './minting';
-import { unusedImageSources } from './image-sources';
+import { textAsset } from './markdown-texts';
+import { createdEmpty, createdReference, createdImages } from './created-resources';
 
 /**
  * The semantic operations Space Authoring offers for Resource and Graph
@@ -56,7 +66,7 @@ const UNKNOWN_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000098');
 const UNLOADED_MAP = uuidSchema.parse('00000000-0000-4000-8000-000000000097');
 const UNLOADED_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000096');
 
-const CENTRE = { x: 400, y: 300, open: false };
+const CENTRE = { x: 400, y: 300 };
 
 const BLUE = GRAPH_PALETTE[0];
 
@@ -71,8 +81,14 @@ const automaticSnapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: { version: 1, title: 'Space' },
   resources: [
-    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
-    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', content: { source: 'B' } } },
+    {
+      id: RESOURCE_A,
+      document: { title: 'A', kind: 'markdown', content: { url: textAsset('A') } },
+    },
+    {
+      id: RESOURCE_B,
+      document: { title: 'B', kind: 'markdown', content: { url: textAsset('B') } },
+    },
   ],
 };
 
@@ -87,8 +103,8 @@ const positionedSnapshot: SpaceSnapshot = {
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [RESOURCE_A]: { x: 10, y: 20, open: false },
-          [RESOURCE_B]: { x: 300, y: 40, open: false },
+          [RESOURCE_A]: { x: 10, y: 20 },
+          [RESOURCE_B]: { x: 300, y: 40 },
         },
         graphs: [MAIN_GRAPH],
       },
@@ -113,7 +129,6 @@ function open(
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
   const { navigation, authoring } = composeApp({
-    images: unusedImageSources,
     spaceSession: session,
     selection: mapId,
     newId,
@@ -175,24 +190,18 @@ describe('Add Resource', () => {
   it('creates one neutrally titled detached Resource at the anchor it was given', () => {
     const { authoring, session } = openPositioned();
 
-    expect(
-      authoring.complete(CANVAS, {
-        kind: 'created-resource',
-        resourceKind: 'markdown',
-        anchor: CENTRE,
-      }),
-    ).toEqual({
+    expect(authoring.complete(CANVAS, createdEmpty('markdown', CENTRE))).toEqual({
       kind: 'completed',
       createdResourceId: MINTED,
     });
 
     expect(session.getState().working.resources[2]).toEqual({
       id: MINTED,
-      document: { title: 'Resource 1', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Resource 1', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     });
     expect(mapOf(session.getState().working, MAP_ID)?.positions).toEqual({
-      [RESOURCE_A]: { x: 10, y: 20, open: false },
-      [RESOURCE_B]: { x: 300, y: 40, open: false },
+      [RESOURCE_A]: { x: 10, y: 20 },
+      [RESOURCE_B]: { x: 300, y: 40 },
       [MINTED]: CENTRE,
     });
     // No Edge, and no second Graph: Add Resource adds neither (ADR 0040).
@@ -205,16 +214,8 @@ describe('Add Resource', () => {
     // real one.
     const { authoring, session } = openPositioned(mintingIds(MINTED, SECOND_MINTED));
 
-    authoring.complete(CANVAS, {
-      kind: 'created-resource',
-      resourceKind: 'markdown',
-      anchor: CENTRE,
-    });
-    authoring.complete(CANVAS, {
-      kind: 'created-resource',
-      resourceKind: 'markdown',
-      anchor: CENTRE,
-    });
+    authoring.complete(CANVAS, createdEmpty('markdown', CENTRE));
+    authoring.complete(CANVAS, createdEmpty('markdown', CENTRE));
 
     const positions = mapOf(session.getState().working, MAP_ID)?.positions ?? {};
     const stacked = Object.values(positions).filter(
@@ -222,7 +223,7 @@ describe('Add Resource', () => {
     );
     // A visible stack, not collision avoidance: the first Resource never moves, and
     // the second takes one small diagonal step off it.
-    expect(stacked).toEqual([CENTRE, { x: CENTRE.x + 24, y: CENTRE.y + 24, open: false }]);
+    expect(stacked).toEqual([CENTRE, { x: CENTRE.x + 24, y: CENTRE.y + 24 }]);
   });
 
   it('stores the canvas anchor as authored, whatever else is Open', () => {
@@ -234,8 +235,13 @@ describe('Add Resource', () => {
           {
             ...positionedSnapshot.document.maps![0]!,
             positions: {
-              [RESOURCE_A]: { x: 10, y: 20, open: true, size: { width: 560, height: 420 } },
-              [RESOURCE_B]: { x: 300, y: 40, open: false },
+              [RESOURCE_A]: {
+                x: 10,
+                y: 20,
+                content: { open: true },
+                size: { width: 560, height: 420 },
+              },
+              [RESOURCE_B]: { x: 300, y: 40 },
             },
           },
         ],
@@ -243,11 +249,7 @@ describe('Add Resource', () => {
     };
     const { authoring, session } = open(openedSnapshot);
 
-    authoring.complete(CANVAS, {
-      kind: 'created-resource',
-      resourceKind: 'markdown',
-      anchor: { x: 500, y: 400 },
-    });
+    authoring.complete(CANVAS, createdEmpty('markdown', { x: 500, y: 400 }));
 
     // A canvas coordinate is an authored one: A being Open moved its neighbours
     // when the Edit that opened it ran, and nothing converts a drop point on the
@@ -255,7 +257,6 @@ describe('Add Resource', () => {
     expect(mapOf(session.getState().working, MAP_ID)?.positions[MINTED]).toEqual({
       x: 500,
       y: 400,
-      open: false,
     });
   });
 });
@@ -266,9 +267,7 @@ describe('Create Ur Resource', () => {
     const edits: number[] = [];
     session.subscribe(() => edits.push(session.getState().working.resources.length));
 
-    expect(
-      authoring.complete(CANVAS, { kind: 'created-resource', resourceKind: 'ur', anchor: CENTRE }),
-    ).toEqual({
+    expect(authoring.complete(CANVAS, createdEmpty('ur', CENTRE))).toEqual({
       kind: 'completed',
       createdResourceId: MINTED,
     });
@@ -288,18 +287,16 @@ describe('Create Ur Resource', () => {
     const backend = MemorySpaceBackend.asMeta(loaded);
     const session = openSpaceSession(backend, loaded);
     const { authoring } = composeApp({
-      images: unusedImageSources,
       spaceSession: session,
       selection: MAP_ID,
       newId: mintingIds(MINTED),
     });
 
-    authoring.complete(CANVAS, { kind: 'created-resource', resourceKind: 'ur', anchor: CENTRE });
+    authoring.complete(CANVAS, createdEmpty('ur', CENTRE));
     await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('settled'));
 
     const stored = await backend.loadSpace(SPACE_ID);
     const reopened = composeApp({
-      images: unusedImageSources,
       spaceSession: openSpaceSession(backend, stored!),
       selection: MAP_ID,
       newId: mintingIds(MINTED),
@@ -313,19 +310,21 @@ describe('Create Ur Resource', () => {
 });
 
 describe('Create Image Resources', () => {
-  const STORED = '/images/LXEWQrcmsEQBYnyp-6wy9chTD7GQPMTbAiWHF5IaSIE';
+  const STORED = '/assets/LXEWQrcmsEQBYnyp-6wy9chTD7GQPMTbAiWHF5IaSIE';
   const THIRD_MINTED = uuidSchema.parse('00000000-0000-4000-8000-000000000033');
 
   it('creates one Image Resource titled Resource N, recording its URL and natural size', () => {
     const { authoring, session } = openPositioned();
 
     expect(
-      authoring.complete(CANVAS, {
-        kind: 'created-images',
-        images: [{ url: STORED, naturalSize: { width: 640, height: 480 } }],
-        anchor: CENTRE,
-        placement: 'avoidingOverlap',
-      }),
+      authoring.complete(
+        CANVAS,
+        createdImages(
+          [{ url: STORED, naturalSize: { width: 640, height: 480 } }],
+          CENTRE,
+          'avoidingOverlap',
+        ),
+      ),
     ).toEqual({ kind: 'completed', createdResourceId: MINTED });
 
     expect(session.getState().working.resources[2]).toEqual({
@@ -342,12 +341,10 @@ describe('Create Image Resources', () => {
   it('records no natural size for an image that did not load', () => {
     const { authoring, session } = openPositioned();
 
-    authoring.complete(CANVAS, {
-      kind: 'created-images',
-      images: [{ url: 'https://example.com/a.png' }],
-      anchor: CENTRE,
-      placement: 'exact',
-    });
+    authoring.complete(
+      CANVAS,
+      createdImages([{ url: 'https://example.com/a.png' }], CENTRE, 'exact'),
+    );
 
     expect(session.getState().working.resources[2]?.document).toEqual({
       title: 'Resource 1',
@@ -362,16 +359,18 @@ describe('Create Image Resources', () => {
     session.subscribe(() => commits.push(session.getState().working.resources.length));
 
     expect(
-      authoring.complete(CANVAS, {
-        kind: 'created-images',
-        images: [
-          { url: 'https://example.com/1.png' },
-          { url: 'https://example.com/2.png' },
-          { url: 'https://example.com/3.png' },
-        ],
-        anchor: { x: 100, y: 200 },
-        placement: 'exact',
-      }),
+      authoring.complete(
+        CANVAS,
+        createdImages(
+          [
+            { url: 'https://example.com/1.png' },
+            { url: 'https://example.com/2.png' },
+            { url: 'https://example.com/3.png' },
+          ],
+          { x: 100, y: 200 },
+          'exact',
+        ),
+      ),
     ).toEqual({ kind: 'completed', createdResourceId: MINTED });
 
     const { resources } = session.getState().working;
@@ -383,9 +382,9 @@ describe('Create Image Resources', () => {
     const positions = mapOf(session.getState().working, MAP_ID)?.positions ?? {};
     // Side by side, one collapsed width and a gap apart, all on the anchor's row.
     expect([MINTED, SECOND_MINTED, THIRD_MINTED].map((id) => positions[id])).toEqual([
-      { x: 100, y: 200, open: false },
-      { x: 400, y: 200, open: false },
-      { x: 700, y: 200, open: false },
+      { x: 100, y: 200 },
+      { x: 400, y: 200 },
+      { x: 700, y: 200 },
     ]);
     // One Edit: the working Space moved once, from two Resources to five.
     expect(new Set(commits.filter((count) => count !== 2))).toEqual(new Set([5]));
@@ -396,13 +395,36 @@ describe('Create Image Resources', () => {
     const before = session.getState().working;
 
     expect(
+      authoring.complete(
+        CANVAS,
+        createdImages([{ url: 'data:image/png;base64,AAAA' }], CENTRE, 'exact'),
+      ),
+    ).toEqual({ kind: 'refused', refusal: { code: 'resource-content-invalid' } });
+    expect(session.getState().working).toBe(before);
+  });
+
+  it('refuses a created Resource naming a Space, which only the coordinated lifecycle makes', () => {
+    const { authoring, session } = openPositioned();
+    const before = session.getState().working;
+
+    expect(
       authoring.complete(CANVAS, {
-        kind: 'created-images',
-        images: [{ url: 'data:image/png;base64,AAAA' }],
+        kind: 'created-resources',
+        items: [{ kind: 'space', content: { spaceId: SPACE_ID, map: MAP_ID, graph: MAP_ID } }],
         anchor: CENTRE,
         placement: 'exact',
       }),
-    ).toEqual({ kind: 'refused', refusal: { code: 'image-url-unsupported' } });
+    ).toEqual({ kind: 'refused', refusal: { code: 'space-reference-creation-unsupported' } });
+    expect(session.getState().working).toBe(before);
+  });
+
+  it('answers unchanged when asked for no Resources', () => {
+    const { authoring, session } = openPositioned();
+    const before = session.getState().working;
+
+    expect(authoring.complete(CANVAS, createdImages([], CENTRE, 'exact'))).toEqual({
+      kind: 'unchanged',
+    });
     expect(session.getState().working).toBe(before);
   });
 });
@@ -422,7 +444,7 @@ describe('Edit Resource', () => {
       authoring.complete(CANVAS, {
         kind: 'edited-resource',
         resourceId: RESOURCE_A,
-        document: { title: '', kind: 'markdown', content: { source: 'A' } },
+        document: { title: '', kind: 'markdown', content: { url: textAsset('A') } },
       }),
     ).toEqual({ kind: 'refused', refusal: { code: 'resource-title-required' } });
     expect(session.getState().working).toBe(before);
@@ -438,7 +460,7 @@ describe('Edit Resource', () => {
       authoring.complete(CANVAS, {
         kind: 'edited-resource',
         resourceId: RESOURCE_A,
-        document: { title: '   ', kind: 'markdown', content: { source: 'A' } },
+        document: { title: '   ', kind: 'markdown', content: { url: textAsset('A') } },
       }),
     ).toEqual({ kind: 'refused', refusal: { code: 'resource-title-required' } });
     expect(session.getState().working).toBe(before);
@@ -454,7 +476,11 @@ describe('Edit Resource', () => {
       authoring.complete(CANVAS, {
         kind: 'edited-resource',
         resourceId: RESOURCE_A,
-        document: { title: 'Renamed  \nA subtitle   ', kind: 'markdown', content: { source: 'A' } },
+        document: {
+          title: 'Renamed  \nA subtitle   ',
+          kind: 'markdown',
+          content: { url: textAsset('A') },
+        },
       }),
     ).toEqual({ kind: 'completed' });
     expect(session.getState().working.resources[0]?.document.title).toBe('Renamed\nA subtitle');
@@ -465,32 +491,95 @@ describe('Edit Resource', () => {
       authoring.complete(CANVAS, {
         kind: 'edited-resource',
         resourceId: RESOURCE_A,
-        document: { title: 'Renamed\nA subtitle\n', kind: 'markdown', content: { source: 'A' } },
+        document: {
+          title: 'Renamed\nA subtitle\n',
+          kind: 'markdown',
+          content: { url: textAsset('A') },
+        },
       }),
     ).toEqual({ kind: 'unchanged' });
   });
 });
 
 describe('Resource size and Open', () => {
-  it('Opens and Closes changing nothing but open', () => {
-    const { authoring, session } = openPositioned();
+  /** `positionedSnapshot` with Resource A a Space Resource. */
+  const spaceSnapshot = {
+    ...positionedSnapshot,
+    resources: positionedSnapshot.resources.map((resource) =>
+      resource.id === RESOURCE_A
+        ? {
+            id: RESOURCE_A,
+            document: {
+              title: 'A',
+              kind: 'space' as const,
+              content: {
+                spaceId: uuidSchema.parse('00000000-0000-4000-8000-000000000095'),
+                map: UNLOADED_MAP,
+                graph: UNLOADED_GRAPH,
+              },
+            },
+          }
+        : resource,
+    ),
+  };
+  /** Open or Close Resource A as its plugin does, through its Map content (ADR 0142). */
+  const setOpen = (authoring: ReturnType<typeof open>['authoring'], next: boolean) =>
+    authoring.complete(CANVAS, {
+      kind: 'changed-map-content',
+      resourceId: RESOURCE_A,
+      content: { open: next },
+    });
+
+  it.each([
+    ['Markdown', positionedSnapshot],
+    [
+      'Reference',
+      {
+        ...positionedSnapshot,
+        resources: positionedSnapshot.resources.map((resource) =>
+          resource.id === RESOURCE_A
+            ? {
+                id: RESOURCE_A,
+                document: {
+                  title: 'A',
+                  kind: 'reference' as const,
+                  content: { target: RESOURCE_B },
+                },
+              }
+            : resource,
+        ),
+      },
+    ],
+    ['Space', spaceSnapshot],
+  ])('Opens a %s Resource through the Map content its plugin keeps', (_kind, snapshot) => {
+    const { authoring, session } = open(snapshot);
+
+    expect(setOpen(authoring, true)).toEqual({ kind: 'completed' });
+    expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toEqual({
+      x: 10,
+      y: 20,
+      content: { open: true },
+    });
+  });
+
+  it('Opens and Closes a Space Resource changing nothing but its Map content', () => {
+    const { authoring, session } = open(spaceSnapshot);
     const positionsBefore = mapOf(session.getState().working, MAP_ID)?.positions;
 
-    expect(authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: RESOURCE_A })).toEqual(
-      { kind: 'completed' },
-    );
+    expect(setOpen(authoring, true)).toEqual({ kind: 'completed' });
     expect(mapOf(session.getState().working, MAP_ID)?.positions).toEqual({
       ...positionsBefore,
-      [RESOURCE_A]: { x: 10, y: 20, open: true },
+      [RESOURCE_A]: { x: 10, y: 20, content: { open: true } },
     });
-    expect(authoring.complete(CANVAS, { kind: 'closed-resource', resourceId: RESOURCE_A })).toEqual(
-      { kind: 'completed' },
-    );
-    expect(mapOf(session.getState().working, MAP_ID)?.positions).toEqual(positionsBefore);
+    expect(setOpen(authoring, false)).toEqual({ kind: 'completed' });
+    expect(mapOf(session.getState().working, MAP_ID)?.positions).toEqual({
+      ...positionsBefore,
+      [RESOURCE_A]: { x: 10, y: 20, content: { open: false } },
+    });
   });
 
   it('resizes a Closed Resource, which stays Closed, and Opening it keeps the size', () => {
-    const { authoring, session } = openPositioned();
+    const { authoring, session } = open(spaceSnapshot);
 
     expect(
       authoring.complete(CANVAS, {
@@ -502,22 +591,21 @@ describe('Resource size and Open', () => {
     expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toEqual({
       x: 10,
       y: 20,
-      open: false,
       size: { width: 640, height: 480 },
     });
 
-    authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: RESOURCE_A });
+    setOpen(authoring, true);
     expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toEqual({
       x: 10,
       y: 20,
-      open: true,
+      content: { open: true },
       size: { width: 640, height: 480 },
     });
   });
 
   it('stays Open when resized back to the Closed Size', () => {
-    const { authoring, session } = openPositioned();
-    authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: RESOURCE_A });
+    const { authoring, session } = open(spaceSnapshot);
+    setOpen(authoring, true);
     authoring.complete(CANVAS, {
       kind: 'resized-resource',
       resourceId: RESOURCE_A,
@@ -534,12 +622,12 @@ describe('Resource size and Open', () => {
     expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toEqual({
       x: 10,
       y: 20,
-      open: true,
+      content: { open: true },
       size: { width: 260, height: 146 },
     });
   });
 
-  it('refuses to Open an Ur Resource, which has no content to show', () => {
+  it('refuses Open as an Ur Resource’s Map content, which its plugin does not take', () => {
     const { authoring, session } = open({
       ...positionedSnapshot,
       resources: positionedSnapshot.resources.map((resource) =>
@@ -550,9 +638,10 @@ describe('Resource size and Open', () => {
     });
     const before = session.getState().working;
 
-    expect(authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: RESOURCE_A })).toEqual(
-      { kind: 'refused', refusal: { code: 'open-requires-content' } },
-    );
+    expect(setOpen(authoring, true)).toEqual({
+      kind: 'refused',
+      refusal: { code: 'map-content-invalid' },
+    });
     expect(session.getState().working).toBe(before);
   });
 
@@ -561,13 +650,11 @@ describe('Resource size and Open', () => {
     const before = session.getState().working;
 
     expect(
-      authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: UNKNOWN_RESOURCE }),
-    ).toEqual({
-      kind: 'refused',
-      refusal: { code: 'resource-not-in-map' },
-    });
-    expect(
-      authoring.complete(CANVAS, { kind: 'closed-resource', resourceId: UNKNOWN_RESOURCE }),
+      authoring.complete(CANVAS, {
+        kind: 'changed-map-content',
+        resourceId: UNKNOWN_RESOURCE,
+        content: { open: true },
+      }),
     ).toEqual({
       kind: 'refused',
       refusal: { code: 'resource-not-in-map' },
@@ -590,7 +677,101 @@ describe('Resource size and Open', () => {
   });
 });
 
-describe('Change Shape', () => {
+describe('Exclusive work withdraws every Edit (ADR 0142)', () => {
+  /** A Space composed over the shared gate, as Open Spaces composes each one. */
+  const openOn = (pluginGate: PluginGate) => {
+    const loaded = { snapshot: positionedSnapshot, revision: 0n, exportedRevision: null };
+    const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
+    return composeApp({
+      spaceSession: session,
+      selection: MAP_ID,
+      newId: mintingIds(MINTED),
+      pluginGate,
+    });
+  };
+  const rename = (title: string) => ({ kind: 'renamed-map' as const, mapId: MAP_ID, title });
+
+  it('refuses every Edit in every composed Space while exclusive work runs, and admits the work’s own', async () => {
+    const pluginGate = createPluginGate();
+    const one = openOn(pluginGate);
+    const other = openOn(pluginGate);
+    let finish: () => void = () => undefined;
+    const work = pluginGate
+      .claim([{ resource: 'resource', key: Symbol('drawing') }], () => null)
+      ?.exclusively(
+        () =>
+          new Promise<void>((resolve) => {
+            finish = resolve;
+          }),
+      );
+
+    expect(one.authoring.complete(CANVAS, rename('Renamed'))).toEqual({
+      kind: 'refused',
+      refusal: { code: 'exclusive-work-running' },
+    });
+    expect(other.authoring.complete(CANVAS, rename('Renamed'))).toEqual({
+      kind: 'refused',
+      refusal: { code: 'exclusive-work-running' },
+    });
+    const ownResult = pluginGate.admit(() => one.authoring.complete(CANVAS, rename('By the work')));
+    expect(ownResult).toEqual({ kind: 'completed' });
+
+    finish();
+    await work;
+    expect(other.authoring.complete(CANVAS, rename('After'))).toEqual({ kind: 'completed' });
+  });
+});
+
+describe('Exclusive work begun while Edits are queued (ADR 0142)', () => {
+  it('refuses a queued Edit that is not the work’s own when it drains, and drains the work’s own', async () => {
+    const pluginGate = createPluginGate();
+    const loaded = { snapshot: positionedSnapshot, revision: 0n, exportedRevision: null };
+    const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
+    const { authoring } = composeApp({
+      spaceSession: session,
+      selection: MAP_ID,
+      newId: mintingIds(MINTED),
+      pluginGate,
+    });
+    const rename = (title: string) => ({ kind: 'renamed-map' as const, mapId: MAP_ID, title });
+    const settled = new Map<string, SettledResult>();
+    let finish: () => void = () => undefined;
+    let work: Promise<unknown> | undefined;
+    // An observer of the first Edit's publication queues a plain Edit, then
+    // begins exclusive work, then queues that work's own Edit.
+    const stop = session.subscribe(() => {
+      if (work !== undefined) return;
+      authoring.complete(CANVAS, rename('Plain'), (result) => {
+        settled.set('plain', result);
+      });
+      work = pluginGate
+        .claim([{ resource: 'resource', key: Symbol('drawing') }], () => null)
+        ?.exclusively(
+          () =>
+            new Promise<void>((resolve) => {
+              finish = resolve;
+            }),
+        );
+      pluginGate.admit(() =>
+        authoring.complete(CANVAS, rename('By the work'), (result) => {
+          settled.set('own', result);
+        }),
+      );
+    });
+
+    expect(authoring.complete(CANVAS, rename('First'))).toEqual({ kind: 'completed' });
+    stop();
+    expect(Object.fromEntries(settled)).toEqual({
+      plain: { kind: 'refused', refusal: { code: 'exclusive-work-running' } },
+      own: { kind: 'completed' },
+    });
+    expect(mapOf(session.getState().working, MAP_ID)?.title).toBe('By the work');
+    finish();
+    await work;
+  });
+});
+
+describe('Change Map content (ADR 0142)', () => {
   /** `positionedSnapshot` with Resource A as `document`, every other entry as it was. */
   const withA = (document: SpaceSnapshot['resources'][number]['document']): SpaceSnapshot => ({
     ...positionedSnapshot,
@@ -598,7 +779,7 @@ describe('Change Shape', () => {
       resource.id === RESOURCE_A ? { id: RESOURCE_A, document } : resource,
     ),
   });
-  /** Only an Ur Resource takes a Shape (ADR 0121), so A is one here. */
+  /** Only a kind a plugin draws keeps Map content, so A is an Ur Resource here. */
   const urSnapshot = withA({ title: 'A', kind: 'ur', content: {} });
   it('draws one Resource in another Shape on this Map, as one Edit that moves nothing else', () => {
     const { authoring, session } = open(urSnapshot);
@@ -606,16 +787,16 @@ describe('Change Shape', () => {
 
     expect(
       authoring.complete(CANVAS, {
-        kind: 'changed-resource-shape',
+        kind: 'changed-map-content',
         resourceId: RESOURCE_A,
-        shape: 'diamond',
+        content: { shape: 'diamond' },
       }),
     ).toEqual({ kind: 'completed' });
 
     const after = session.getState().working;
     expect(mapOf(after, MAP_ID)?.positions).toEqual({
-      [RESOURCE_A]: { x: 10, y: 20, open: false, shape: 'diamond' },
-      [RESOURCE_B]: { x: 300, y: 40, open: false },
+      [RESOURCE_A]: { x: 10, y: 20, content: { shape: 'diamond' } },
+      [RESOURCE_B]: { x: 300, y: 40 },
     });
     expect(after.resources).toEqual(before.resources);
     expect(graphsOf(after)).toEqual(graphsOf(before));
@@ -624,32 +805,32 @@ describe('Change Shape', () => {
   it('is unchanged for the Shape the Resource already has', () => {
     const { authoring, session } = open(urSnapshot);
     authoring.complete(CANVAS, {
-      kind: 'changed-resource-shape',
+      kind: 'changed-map-content',
       resourceId: RESOURCE_A,
-      shape: 'diamond',
+      content: { shape: 'diamond' },
     });
     const before = session.getState().working;
 
     expect(
       authoring.complete(CANVAS, {
-        kind: 'changed-resource-shape',
+        kind: 'changed-map-content',
         resourceId: RESOURCE_A,
-        shape: 'diamond',
+        content: { shape: 'diamond' },
       }),
     ).toEqual({ kind: 'unchanged' });
     expect(session.getState().working).toBe(before);
   });
 
-  it('is unchanged for the rectangle on an entry that stores no Shape, which draws as one', () => {
+  it("is unchanged for the plugin's default on an entry that stores none", () => {
     const { authoring, session } = open(urSnapshot);
     const before = session.getState().working;
-    expect(mapOf(before, MAP_ID)?.positions[RESOURCE_A]).not.toHaveProperty('shape');
+    expect(mapOf(before, MAP_ID)?.positions[RESOURCE_A]).not.toHaveProperty('content');
 
     expect(
       authoring.complete(CANVAS, {
-        kind: 'changed-resource-shape',
+        kind: 'changed-map-content',
         resourceId: RESOURCE_A,
-        shape: 'rectangle',
+        content: { shape: 'rectangle' },
       }),
     ).toEqual({ kind: 'unchanged' });
     expect(session.getState().working).toBe(before);
@@ -659,22 +840,21 @@ describe('Change Shape', () => {
     const { authoring, session } = open(urSnapshot);
 
     authoring.complete(CANVAS, {
-      kind: 'changed-resource-shape',
+      kind: 'changed-map-content',
       resourceId: RESOURCE_A,
-      shape: 'ellipse',
+      content: { shape: 'ellipse' },
     });
     expect(
       authoring.complete(CANVAS, {
-        kind: 'changed-resource-shape',
+        kind: 'changed-map-content',
         resourceId: RESOURCE_A,
-        shape: 'rectangle',
+        content: { shape: 'rectangle' },
       }),
     ).toEqual({ kind: 'completed' });
     expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toEqual({
       x: 10,
       y: 20,
-      open: false,
-      shape: 'rectangle',
+      content: { shape: 'rectangle' },
     });
   });
 
@@ -688,9 +868,9 @@ describe('Change Shape', () => {
 
     expect(
       authoring.complete(CANVAS, {
-        kind: 'changed-resource-shape',
+        kind: 'changed-map-content',
         resourceId: RESOURCE_A,
-        shape: 'pill',
+        content: { shape: 'pill' },
       }),
     ).toEqual({ kind: 'completed' });
     authoring.complete(CANVAS, {
@@ -701,18 +881,17 @@ describe('Change Shape', () => {
     expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toEqual({
       x: 10,
       y: 20,
-      open: false,
       size: { width: 700, height: 500 },
-      shape: 'pill',
+      content: { shape: 'pill' },
     });
   });
 
   it('keeps the Shape through a settled drag', () => {
     const { authoring, session } = open(urSnapshot);
     authoring.complete(CANVAS, {
-      kind: 'changed-resource-shape',
+      kind: 'changed-map-content',
       resourceId: RESOURCE_A,
-      shape: 'ellipse',
+      content: { shape: 'ellipse' },
     });
 
     authoring.complete(CANVAS, {
@@ -723,17 +902,16 @@ describe('Change Shape', () => {
     expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toEqual({
       x: 90,
       y: 120,
-      open: false,
-      shape: 'ellipse',
+      content: { shape: 'ellipse' },
     });
   });
 
   it('forgets the Shape with the rest of the entry, so Add to Map stores none again', () => {
     const { authoring, session } = open(urSnapshot);
     authoring.complete(CANVAS, {
-      kind: 'changed-resource-shape',
+      kind: 'changed-map-content',
       resourceId: RESOURCE_A,
-      shape: 'diamond',
+      content: { shape: 'diamond' },
     });
     authoring.complete(CANVAS, { kind: 'removed-resource-from-map', resourceId: RESOURCE_A });
 
@@ -746,7 +924,6 @@ describe('Change Shape', () => {
     expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toEqual({
       x: 10,
       y: 20,
-      open: false,
     });
   });
 
@@ -756,9 +933,9 @@ describe('Change Shape', () => {
 
     expect(
       authoring.complete(CANVAS, {
-        kind: 'changed-resource-shape',
+        kind: 'changed-map-content',
         resourceId: UNKNOWN_RESOURCE,
-        shape: 'diamond',
+        content: { shape: 'diamond' },
       }),
     ).toEqual({ kind: 'refused', refusal: { code: 'resource-not-in-map' } });
     expect(session.getState().working).toBe(before);
@@ -775,7 +952,7 @@ describe('Change Shape', () => {
             id: OTHER_MAP_ID,
             title: 'Map 2',
             kind: 'positioned',
-            positions: { [RESOURCE_A]: { x: 0, y: 0, open: false } },
+            positions: { [RESOURCE_A]: { x: 0, y: 0 } },
             graphs: [{ id: OTHER_GRAPH_ID, title: 'Other', edges: [] }],
           },
         ],
@@ -784,31 +961,135 @@ describe('Change Shape', () => {
     const { authoring, session } = open(twoMaps);
 
     authoring.complete(CANVAS, {
-      kind: 'changed-resource-shape',
+      kind: 'changed-map-content',
       resourceId: RESOURCE_A,
-      shape: 'diamond',
+      content: { shape: 'diamond' },
     });
 
     const after = session.getState().working;
-    expect(mapOf(after, MAP_ID)?.positions[RESOURCE_A]?.shape).toBe('diamond');
+    expect(mapOf(after, MAP_ID)?.positions[RESOURCE_A]?.content).toEqual({ shape: 'diamond' });
     expect(mapOf(after, OTHER_MAP_ID)).toEqual(mapOf(twoMaps, OTHER_MAP_ID));
   });
 
-  it.each([
-    ['Markdown', withA({ title: 'A', kind: 'markdown', content: { source: 'A' } })],
-    [
-      'Image',
+  /** A plugin's content commit is one ordinary Edit of its Resource's content (ADR 0142). */
+  describe('changed content', () => {
+    const OLD_URL = 'https://example.com/old.png';
+    const NEW_URL = '/assets/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU';
+    const imageSnapshot = withA({ title: 'Figure', kind: 'image', content: { url: OLD_URL } });
+
+    it('replaces the content, keeping the Resource’s identity, Title, placement and Edges', () => {
+      const { authoring, session } = open(imageSnapshot);
+      const before = session.getState().working;
+      expect(
+        authoring.complete(CANVAS, {
+          kind: 'changed-content',
+          resourceId: RESOURCE_A,
+          content: { url: NEW_URL, naturalSize: { width: 4, height: 3 } },
+        }),
+      ).toEqual({ kind: 'completed' });
+      const after = session.getState().working;
+      expect(after.resources.find(({ id }) => id === RESOURCE_A)?.document).toEqual({
+        title: 'Figure',
+        kind: 'image',
+        content: { url: NEW_URL, naturalSize: { width: 4, height: 3 } },
+      });
+      expect(after.resources.map(({ id }) => id)).toEqual(before.resources.map(({ id }) => id));
+      expect(after.document.maps?.map(({ positions, graphs }) => ({ positions, graphs }))).toEqual(
+        before.document.maps?.map(({ positions, graphs }) => ({ positions, graphs })),
+      );
+    });
+
+    it('answers unchanged for the content the Resource already holds', () => {
+      const { authoring } = open(imageSnapshot);
+      expect(
+        authoring.complete(CANVAS, {
+          kind: 'changed-content',
+          resourceId: RESOURCE_A,
+          content: { url: OLD_URL },
+        }),
+      ).toEqual({ kind: 'unchanged' });
+    });
+
+    it('replaces a Markdown Resource’s text by its URL, and refuses text kept inline', () => {
+      const { authoring, session } = open(
+        withA({ title: 'Notes', kind: 'markdown', content: { url: textAsset('Old') } }),
+      );
+      expect(
+        authoring.complete(CANVAS, {
+          kind: 'changed-content',
+          resourceId: RESOURCE_A,
+          content: { url: textAsset('Old'), source: '# Text kept inline' },
+        }),
+      ).toEqual({ kind: 'refused', refusal: { code: 'resource-content-invalid' } });
+      expect(
+        authoring.complete(CANVAS, {
+          kind: 'changed-content',
+          resourceId: RESOURCE_A,
+          content: { url: textAsset('New') },
+        }),
+      ).toEqual({ kind: 'completed' });
+      expect(
+        session.getState().working.resources.find(({ id }) => id === RESOURCE_A)?.document,
+      ).toEqual({ title: 'Notes', kind: 'markdown', content: { url: textAsset('New') } });
+    });
+
+    it('refuses content its kind’s schema refuses, and a Resource that is gone', () => {
+      const { authoring, session } = open(imageSnapshot);
+      const before = session.getState().working;
+      expect(
+        authoring.complete(CANVAS, {
+          kind: 'changed-content',
+          resourceId: RESOURCE_A,
+          content: { url: 'data:image/png;base64,AAAA' },
+        }),
+      ).toEqual({ kind: 'refused', refusal: { code: 'resource-content-invalid' } });
+      expect(
+        authoring.complete(CANVAS, {
+          kind: 'changed-content',
+          resourceId: UNKNOWN_RESOURCE,
+          content: { url: NEW_URL },
+        }),
+      ).toEqual({ kind: 'refused', refusal: { code: 'resource-not-found' } });
+      expect(session.getState().working).toBe(before);
+    });
+
+    it('refuses a content commit that would change what the Resource references', () => {
+      const { authoring } = open(
+        withA({ title: 'A', kind: 'reference', content: { target: RESOURCE_B } }),
+      );
+      expect(
+        authoring.complete(CANVAS, {
+          kind: 'changed-content',
+          resourceId: RESOURCE_A,
+          content: { target: RESOURCE_C },
+        }),
+      ).toEqual({ kind: 'refused', refusal: { code: 'reference-target-immutable' } });
+    });
+  });
+
+  /** An Image Resource's plugin keeps nothing per Map, so any Map content is refused by its schema. */
+  it('refuses Map content an Image Resource’s plugin does not keep', () => {
+    const { authoring, session } = open(
       withA({
         title: 'A',
         kind: 'image',
-        content: {
-          url: '/images/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU',
-          naturalSize: { width: 640, height: 480 },
-        },
+        content: { url: '/assets/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU' },
       }),
-    ],
-    [
-      'Space',
+    );
+    const before = session.getState().working;
+    expect(
+      authoring.complete(CANVAS, {
+        kind: 'changed-map-content',
+        resourceId: RESOURCE_A,
+        content: { shape: 'diamond' },
+      }),
+    ).toEqual({ kind: 'refused', refusal: { code: 'map-content-invalid' } });
+    expect(session.getState().working).toBe(before);
+  });
+
+  /** A Space Resource's plugin keeps whether it is Open on each Map, and nothing else (ADR 0142). */
+  it('keeps the Open a Space Resource’s plugin keeps per Map, and refuses any other Map content', () => {
+    const { authoring, session } = open(
       withA({
         title: 'A',
         kind: 'space',
@@ -818,44 +1099,108 @@ describe('Change Shape', () => {
           graph: UNLOADED_GRAPH,
         },
       }),
-    ],
-    ['Reference', withA({ title: 'A', kind: 'reference', content: { target: RESOURCE_B } })],
-  ])('refuses any Shape on a %s Resource, Open or Closed, changing nothing', (_kind, snapshot) => {
-    const { authoring, session } = open(snapshot);
-    const refusal = { kind: 'refused', refusal: { code: 'shape-not-taken' } };
-
-    expect(
-      authoring.complete(CANVAS, {
-        kind: 'changed-resource-shape',
-        resourceId: RESOURCE_A,
-        shape: 'diamond',
-      }),
-    ).toEqual(refusal);
-
-    authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: RESOURCE_A });
+    );
     const before = session.getState().working;
     expect(
       authoring.complete(CANVAS, {
-        kind: 'changed-resource-shape',
+        kind: 'changed-map-content',
         resourceId: RESOURCE_A,
-        shape: 'pill',
+        content: { shape: 'diamond' },
       }),
-    ).toEqual(refusal);
+    ).toEqual({ kind: 'refused', refusal: { code: 'map-content-invalid' } });
     expect(session.getState().working).toBe(before);
+    expect(
+      authoring.complete(CANVAS, {
+        kind: 'changed-map-content',
+        resourceId: RESOURCE_A,
+        content: { open: true },
+      }),
+    ).toEqual({ kind: 'completed' });
+    expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]?.content).toEqual({
+      open: true,
+    });
   });
 
-  it('is unchanged for the Shape an Open Ur Resource already has', () => {
-    const { authoring, session } = open(urSnapshot);
-    authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: RESOURCE_A });
-    const before = session.getState().working;
+  /**
+   * An Edit made while another installs answers `queued` (ADR 0042); the
+   * settle callback is how its caller learns how it settled once the drain
+   * reaches it (ADR 0142).
+   */
+  const queuedBehindRename = (
+    authoring: ReturnType<typeof open>['authoring'],
+    session: ReturnType<typeof open>['session'],
+    content: JsonValue,
+    settle: Settle,
+  ): AuthoringResult | undefined => {
+    let queued: AuthoringResult | undefined;
+    let first = true;
+    const unsubscribe = session.subscribe(() => {
+      if (!first) return;
+      first = false;
+      queued = authoring.complete(
+        CANVAS,
+        { kind: 'changed-map-content', resourceId: RESOURCE_A, content },
+        settle,
+      );
+    });
+    try {
+      authoring.complete(CANVAS, { kind: 'renamed-map', mapId: MAP_ID, title: 'Renamed' });
+    } finally {
+      unsubscribe();
+    }
+    return queued;
+  };
 
+  it('settles a queued Edit through its settle callback once the drain reaches it', () => {
+    const { authoring, session } = open(urSnapshot);
+    const settle = vi.fn();
+
+    expect(queuedBehindRename(authoring, session, { shape: 'pill' }, settle)).toEqual({
+      kind: 'queued',
+    });
+
+    expect(settle.mock.calls).toEqual([[{ kind: 'completed' }]]);
+    expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]?.content).toEqual({
+      shape: 'pill',
+    });
+  });
+
+  it('settles a queued Edit refused when the drain refuses it', () => {
+    const { authoring, session } = open(urSnapshot);
+    const settle = vi.fn();
+
+    queuedBehindRename(authoring, session, { shape: 'hexagon' }, settle);
+
+    expect(settle.mock.calls).toEqual([
+      [{ kind: 'refused', refusal: { code: 'map-content-invalid' } }],
+    ]);
+  });
+
+  it('answers at once, and never calls settle, for an Edit that is not queued', () => {
+    const { authoring } = open(urSnapshot);
+    const settle = vi.fn();
     expect(
-      authoring.complete(CANVAS, {
-        kind: 'changed-resource-shape',
-        resourceId: RESOURCE_A,
-        shape: 'rectangle',
-      }),
-    ).toEqual({ kind: 'unchanged' });
+      authoring.complete(
+        CANVAS,
+        { kind: 'changed-map-content', resourceId: RESOURCE_A, content: { shape: 'pill' } },
+        settle,
+      ),
+    ).toEqual({ kind: 'completed' });
+    expect(settle).not.toHaveBeenCalled();
+  });
+
+  it('refuses Map content the plugin refuses, changing nothing', () => {
+    const { authoring, session } = open(urSnapshot);
+    const before = session.getState().working;
+    for (const content of [{ shape: 'hexagon' }, 'diamond', null]) {
+      expect(
+        authoring.complete(CANVAS, {
+          kind: 'changed-map-content',
+          resourceId: RESOURCE_A,
+          content,
+        }),
+      ).toEqual({ kind: 'refused', refusal: { code: 'map-content-invalid' } });
+    }
     expect(session.getState().working).toBe(before);
   });
 });
@@ -864,9 +1209,7 @@ describe('Add Reference Resource', () => {
   it('creates and places a Reference Resource on its Target, minting a neutral title when none was typed', () => {
     const { authoring, session } = openPositioned();
 
-    expect(
-      authoring.complete(CANVAS, { kind: 'created-reference', target: RESOURCE_A, anchor: CENTRE }),
-    ).toEqual({
+    expect(authoring.complete(CANVAS, createdReference(RESOURCE_A, CENTRE))).toEqual({
       kind: 'completed',
       createdResourceId: MINTED,
     });
@@ -892,12 +1235,7 @@ describe('Add Reference Resource', () => {
   it('keeps a title the author already entered, normalized the way a rename is', () => {
     const { authoring, session } = openPositioned();
 
-    authoring.complete(CANVAS, {
-      kind: 'created-reference',
-      target: RESOURCE_A,
-      title: '  Recap  \n  the week  ',
-      anchor: CENTRE,
-    });
+    authoring.complete(CANVAS, createdReference(RESOURCE_A, CENTRE, '  Recap  \n  the week  '));
 
     expect(session.getState().working.resources[2]?.document).toEqual({
       title: '  Recap\n  the week',
@@ -920,9 +1258,7 @@ describe('Add Reference Resource', () => {
     const { authoring, session } = open(referenced);
     const before = session.getState().working;
 
-    expect(
-      authoring.complete(CANVAS, { kind: 'created-reference', target: RESOURCE_B, anchor: CENTRE }),
-    ).toEqual({
+    expect(authoring.complete(CANVAS, createdReference(RESOURCE_B, CENTRE))).toEqual({
       kind: 'refused',
       refusal: { code: 'reference-target-not-targetable', targetId: RESOURCE_B },
     });
@@ -932,13 +1268,7 @@ describe('Add Reference Resource', () => {
   it('refuses a Target the Space no longer holds', () => {
     const { authoring } = openPositioned();
 
-    expect(
-      authoring.complete(CANVAS, {
-        kind: 'created-reference',
-        target: UNKNOWN_RESOURCE,
-        anchor: CENTRE,
-      }),
-    ).toEqual({
+    expect(authoring.complete(CANVAS, createdReference(UNKNOWN_RESOURCE, CENTRE))).toEqual({
       kind: 'refused',
       refusal: { code: 'reference-target-missing', targetId: UNKNOWN_RESOURCE },
     });
@@ -958,8 +1288,8 @@ describe('Add Graph', () => {
             title: 'Map 2',
             kind: 'positioned',
             positions: {
-              [RESOURCE_A]: { x: 20, y: 30, open: false },
-              [RESOURCE_B]: { x: 310, y: 50, open: false },
+              [RESOURCE_A]: { x: 20, y: 30 },
+              [RESOURCE_B]: { x: 310, y: 50 },
             },
             // The colour this Map's Graphs alone would choose, carried by
             // another Map, so counting it would choose something else.
@@ -1329,8 +1659,13 @@ describe('Rename Space', () => {
           {
             ...positionedSnapshot.document.maps![0]!,
             positions: {
-              [RESOURCE_A]: { x: 10, y: 20, open: false, size: { width: 500, height: 300 } },
-              [RESOURCE_B]: { x: 300, y: 40, open: true, size: { width: 640, height: 360 } },
+              [RESOURCE_A]: { x: 10, y: 20, size: { width: 500, height: 300 } },
+              [RESOURCE_B]: {
+                x: 300,
+                y: 40,
+                content: { open: true },
+                size: { width: 640, height: 360 },
+              },
             },
           },
         ],
@@ -1355,7 +1690,6 @@ describe('Rename Space', () => {
     const backend = MemorySpaceBackend.asMeta(loaded);
     const session = openSpaceSession(backend, loaded);
     const { authoring } = composeApp({
-      images: unusedImageSources,
       spaceSession: session,
       selection: MAP_ID,
       newId: mintingIds(MINTED),
@@ -1371,7 +1705,6 @@ describe('Rename Space', () => {
 
     // Reload: a fresh session and composition over exactly what was stored.
     const reopened = composeApp({
-      images: unusedImageSources,
       spaceSession: openSpaceSession(backend, stored!),
       selection: MAP_ID,
       newId: mintingIds(MINTED),
@@ -1392,7 +1725,7 @@ describe('Graph ownership', () => {
             id: OTHER_MAP_ID,
             title: 'Map 2',
             kind: 'positioned',
-            positions: { [RESOURCE_A]: { x: 0, y: 400, open: false } },
+            positions: { [RESOURCE_A]: { x: 0, y: 400 } },
             graphs: [{ id: OTHER_GRAPH_ID, title: 'Aside', edges: [] }],
           },
         ],
@@ -1454,7 +1787,10 @@ describe('Edge Title', () => {
     ...positionedSnapshot,
     resources: [
       ...positionedSnapshot.resources,
-      { id: RESOURCE_C, document: { title: 'C', kind: 'markdown', content: { source: 'C' } } },
+      {
+        id: RESOURCE_C,
+        document: { title: 'C', kind: 'markdown', content: { url: textAsset('C') } },
+      },
     ],
     document: {
       ...positionedSnapshot.document,
@@ -1462,9 +1798,9 @@ describe('Edge Title', () => {
         {
           ...positionedSnapshot.document.maps![0]!,
           positions: {
-            [RESOURCE_A]: { x: 10, y: 20, open: false },
-            [RESOURCE_B]: { x: 300, y: 40, open: false },
-            [RESOURCE_C]: { x: 600, y: 40, open: false },
+            [RESOURCE_A]: { x: 10, y: 20 },
+            [RESOURCE_B]: { x: 300, y: 40 },
+            [RESOURCE_C]: { x: 600, y: 40 },
           },
           graphs: [{ id: GRAPH_ID, title: 'Main', edges }],
         },
@@ -1802,7 +2138,10 @@ describe('Edge eligibility', () => {
       ...positionedSnapshot,
       resources: [
         ...positionedSnapshot.resources,
-        { id: RESOURCE_C, document: { title: 'C', kind: 'markdown', content: { source: 'C' } } },
+        {
+          id: RESOURCE_C,
+          document: { title: 'C', kind: 'markdown', content: { url: textAsset('C') } },
+        },
       ],
     };
     const { authoring } = open(sparse);
@@ -1846,7 +2185,10 @@ describe('Map membership', () => {
     ...positionedSnapshot,
     resources: [
       ...positionedSnapshot.resources,
-      { id: RESOURCE_C, document: { title: 'C', kind: 'markdown', content: { source: 'C' } } },
+      {
+        id: RESOURCE_C,
+        document: { title: 'C', kind: 'markdown', content: { url: textAsset('C') } },
+      },
     ],
   };
 
@@ -1862,8 +2204,8 @@ describe('Map membership', () => {
     ).toEqual({ kind: 'completed' });
 
     expect(mapOf(session.getState().working, MAP_ID)?.positions).toEqual({
-      [RESOURCE_A]: { x: 10, y: 20, open: false },
-      [RESOURCE_B]: { x: 300, y: 40, open: false },
+      [RESOURCE_A]: { x: 10, y: 20 },
+      [RESOURCE_B]: { x: 300, y: 40 },
       [RESOURCE_C]: CENTRE,
     });
     expect(graphsOf(session.getState().working)).toEqual([MAIN_GRAPH]);
@@ -1965,6 +2307,61 @@ describe('Delete Resource from Space', () => {
       refusal: { code: 'space-resource-deletion-unsupported' },
     });
     expect(session.getState().working).toBe(before);
+  });
+
+  /*
+   * While the aggregate holds a Space only because a plugin is missing, the
+   * store refuses a commit deleting the last Resource of a missing kind
+   * (ADR 0142). Refused here, the deletion never reaches the working state, so
+   * the Space's later Edits still commit.
+   */
+  describe('of a missing kind while a missing plugin holds a Space', () => {
+    const kind = 'vnd.example.diagram';
+    if (!isMissingKindId(kind)) throw new Error(`${kind} is drawn by a plugin in this build`);
+    const unplugged = (id: UUID) => ({ id, document: { title: 'Diagram', kind, content: {} } });
+    const heldSpace = uuidSchema.parse('00000000-0000-4000-8000-0000000000e1');
+    const openHolding = (snapshot: SpaceSnapshot, holdsSpace: boolean) => {
+      const loaded = { snapshot, revision: 0n, exportedRevision: null };
+      const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
+      const { authoring } = composeApp({
+        spaceSession: session,
+        selection: MAP_ID,
+        newId: mintingIds(MINTED),
+        heldSpaceIds: holdsSpace ? [heldSpace] : [],
+      });
+      return { authoring, session };
+    };
+    const holding = (...ids: UUID[]): SpaceSnapshot => ({
+      ...positionedSnapshot,
+      resources: [...positionedSnapshot.resources, ...ids.map(unplugged)],
+    });
+
+    it('refuses deleting the last one, naming its kind, and leaves the working state', () => {
+      const { authoring, session } = openHolding(holding(RESOURCE_C), true);
+      const before = session.getState().working;
+
+      expect(
+        authoring.complete(CANVAS, { kind: 'deleted-resource', resourceId: RESOURCE_C }),
+      ).toEqual({ kind: 'refused', refusal: { code: 'missing-plugin-holds-space', kind } });
+      expect(session.getState().working).toBe(before);
+    });
+
+    it('deletes one while another of a missing kind remains in the Space', () => {
+      const { authoring, session } = openHolding(holding(RESOURCE_C, MINTED), true);
+
+      expect(
+        authoring.complete(CANVAS, { kind: 'deleted-resource', resourceId: RESOURCE_C }),
+      ).toEqual({ kind: 'completed' });
+      expect(session.getState().working.resources.map(({ id }) => id)).not.toContain(RESOURCE_C);
+    });
+
+    it('deletes the last one where no Space is held', () => {
+      const { authoring } = openHolding(holding(RESOURCE_C), false);
+
+      expect(
+        authoring.complete(CANVAS, { kind: 'deleted-resource', resourceId: RESOURCE_C }),
+      ).toEqual({ kind: 'completed' });
+    });
   });
 
   it('refuses deleting a Space Resource a Reference Resource targets as a Space Resource deletion', () => {
@@ -2073,7 +2470,6 @@ describe('Keep local', () => {
     const local = { snapshot: positionedSnapshot, revision: 3n, exportedRevision: null };
     const session = openSpaceSession(backend, local);
     const { authoring } = composeApp({
-      images: unusedImageSources,
       spaceSession: session,
       selection: MAP_ID,
     });
@@ -2131,8 +2527,8 @@ describe('connecting Resources on an embedded Map', () => {
     title: 'Other Map',
     kind: 'positioned' as const,
     positions: {
-      [RESOURCE_A]: { x: 500, y: 600, open: false as const },
-      [RESOURCE_C]: { x: 800, y: 600, open: false as const },
+      [RESOURCE_A]: { x: 500, y: 600 },
+      [RESOURCE_C]: { x: 800, y: 600 },
     },
     graphs: [
       { id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] },
@@ -2150,7 +2546,7 @@ describe('connecting Resources on an embedded Map', () => {
       ...positionedSnapshot.resources,
       {
         id: RESOURCE_C,
-        document: { title: 'C', kind: 'markdown' as const, content: { source: 'C' } },
+        document: { title: 'C', kind: 'markdown' as const, content: { url: textAsset('C') } },
       },
     ],
   };
@@ -2160,7 +2556,7 @@ describe('connecting Resources on an embedded Map', () => {
     expect(
       authoring.complete(
         { kind: 'drawn', mapId: OTHER_MAP_ID, graphId: UNKNOWN_GRAPH },
-        { kind: 'opened-resource', resourceId: RESOURCE_A },
+        { kind: 'changed-map-content', resourceId: RESOURCE_A, content: { open: true } },
       ),
     ).toEqual({ kind: 'refused', refusal: { code: 'graph-not-owned' } });
     expect(session.getState().working).toBe(before);
@@ -2185,7 +2581,6 @@ describe('connecting Resources on an embedded Map', () => {
     expect(mapOf(session.getState().working, OTHER_MAP_ID)?.positions[MINTED]).toEqual({
       x: 950,
       y: 650,
-      open: false,
     });
     expect(mapOf(session.getState().working, OTHER_MAP_ID)?.graphs[1]?.edges).toEqual([
       { from: RESOURCE_A, to: MINTED },
@@ -2280,7 +2675,7 @@ describe('context commands on an embedded Map', () => {
       id: OTHER_MAP_ID,
       title: 'Other Map',
       kind: 'positioned' as const,
-      positions: { [RESOURCE_A]: { x: 500, y: 600, open: false as const } },
+      positions: { [RESOURCE_A]: { x: 500, y: 600 } },
       graphs: [{ id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] }],
       activeGraph: OTHER_GRAPH_ID,
     };

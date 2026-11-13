@@ -30,16 +30,20 @@ const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
 /**
  * Where a Title's later lines may be read.
  *
- * Two files, and nothing wider. The drawn Resource draws the ladder and is the only
+ * Three files, and nothing wider. The drawn Resource draws the ladder and is the only
  * surface that does (ADR 0083); `@project/core`'s own module is where the rule
- * lives and is what every other reader goes through. The render adapter mounts
- * that Resource on the canvas but needs no permission: it hands `CanvasResource` a
- * Title and reads no line of one. Every entry here is asserted below to still
+ * lives and is what every other reader goes through. The drawn Resource's
+ * ladder is `ResourceTitleHeading`, which the plugin
+ * host's Title draws. The render adapter mounts that Resource on the
+ * canvas but needs no permission: it hands it a Title and reads no line of one. Every entry here is asserted below to still
  * be reading a Title's lines, which is what a tree could not be held to file by file.
  */
 const LADDER_READERS: readonly string[] = [
   'packages/core/src/title.ts',
-  'packages/ui/src/CanvasResource.tsx',
+  // `titleName` itself, published where a plugin can reach it (ADR 0142) and
+  // re-exported by `packages/core/src/title.ts`.
+  'packages/resource-api/src/domain/title.ts',
+  'packages/ui/src/ResourceTitleHeading.tsx',
 ];
 
 /**
@@ -152,7 +156,9 @@ describe('only the drawn Resource reads a Title’s later lines', () => {
    */
   it('keeps the drawn Resource drawing the ladder', () => {
     expect(
-      LADDER_CALL.test(readFileSync(join(repoRoot, 'packages/ui/src/CanvasResource.tsx'), 'utf8')),
+      LADDER_CALL.test(
+        readFileSync(join(repoRoot, 'packages/ui/src/ResourceTitleHeading.tsx'), 'utf8'),
+      ),
     ).toBe(true);
   });
 });

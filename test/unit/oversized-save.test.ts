@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import {
   canRetry,
   createSpaceSessionRegistry,
@@ -11,6 +11,7 @@ import {
 } from '@project/persistence';
 import { createSpaceHttpApp, HttpSpaceBackend, MAX_COMMIT_BODY_BYTES } from '@project/http';
 import { MemorySpaceRepository } from '@project/aggregate';
+import { showingSpace } from '../../packages/app/test/showing-space';
 
 /** A request that initializes no Space mints nothing, so any mint is a failure here. */
 const mintsNothing = (): UUID => {
@@ -42,14 +43,17 @@ const withBody = (body: string): SpaceSnapshot => ({
         id: MAP_ID,
         title: 'Map 1',
         kind: 'positioned',
-        positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
+        positions: { [RESOURCE_ID]: { x: 0, y: 0 } },
         graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
         activeGraph: GRAPH_ID,
       },
     ],
   },
   resources: [
-    { id: RESOURCE_ID, document: { title: 'Notes', kind: 'markdown', content: { source: body } } },
+    {
+      id: RESOURCE_ID,
+      document: { title: `Notes${body}`, kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+    },
   ],
 });
 
@@ -57,14 +61,17 @@ const reduced = (space: SpaceSnapshot, body: string): SpaceSnapshot => ({
   ...space,
   resources: space.resources.map((resource) =>
     resource.id === RESOURCE_ID
-      ? { ...resource, document: { title: 'Notes', kind: 'markdown', content: { source: body } } }
+      ? {
+          ...resource,
+          document: { title: `Notes${body}`, kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+        }
       : resource,
   ),
 });
 
 const bodyOf = (space: SpaceSnapshot): string | undefined => {
   const document = space.resources.find(({ id }) => id === RESOURCE_ID)?.document;
-  return document?.kind === 'markdown' ? document.content.source : undefined;
+  return document?.title.slice('Notes'.length);
 };
 
 const requestBytes = (request: SpaceCommit): number =>
@@ -74,7 +81,10 @@ const update = (snapshot: SpaceSnapshot, expectedRevision: bigint): SpaceCommit 
   changes: [{ kind: 'update', spaceId: snapshot.id, snapshot, expectedRevision }],
 });
 
-/** A body that makes Meta's own update request exactly `bytes` long. */
+/**
+ * A Title that makes Meta's own update request exactly `bytes` long. The Title
+ * carries the bulk because a Markdown Resource's text is an asset (ADR 0142).
+ */
 const bodyForRequestOf = (bytes: number): string =>
   'x'.repeat(bytes - requestBytes(update(withBody(''), 3n)));
 
@@ -181,12 +191,14 @@ describe('A save over the request size limit, across the HTTP boundary', () => {
       if (id === undefined) throw new Error('test identity source was exhausted');
       return id;
     });
-    await lifecycle.create({
-      containingSpaceId: META_ID,
-      mapId: MAP_ID,
-      title: 'Architecture',
-      position: { x: 240, y: 0 },
-    });
+    await lifecycle.create(
+      showingSpace({
+        containingSpaceId: META_ID,
+        mapId: MAP_ID,
+        title: 'Architecture',
+        position: { x: 240, y: 0 },
+      }),
+    );
     await settles(meta, 'rejected');
     const target = registry.session(TARGET_ID);
     const tooLarge = {

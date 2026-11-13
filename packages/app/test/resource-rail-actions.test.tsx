@@ -23,8 +23,8 @@ import { expectMenuGroups } from './menu-assertions';
 import { openTestSpace } from './opened-space';
 import { mountSpace } from './space-mounting';
 import { RESOURCE_HEIGHT, RESOURCE_WIDTH } from '../src/resource';
-import { unusedImageSources } from './image-sources';
 import { stubResizeObserver } from './resize-observer';
+import { textAsset } from './markdown-texts';
 
 /**
  * A Resource's own commands belong to the Resource (ADR 0073, ADR 0082).
@@ -67,8 +67,8 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Map',
         kind: 'positioned',
         positions: {
-          [RESOURCE_ID]: { x: 0, y: 0, open: false },
-          [OTHER_RESOURCE_ID]: { x: 400, y: 0, open: false },
+          [RESOURCE_ID]: { x: 0, y: 0 },
+          [OTHER_RESOURCE_ID]: { x: 400, y: 0 },
         },
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
       },
@@ -78,11 +78,11 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
   resources: [
     {
       id: RESOURCE_ID,
-      document: { title: 'A', kind: 'markdown', content: { source: 'A source' } },
+      document: { title: 'A', kind: 'markdown', content: { url: textAsset('A source') } },
     },
     {
       id: OTHER_RESOURCE_ID,
-      document: { title: 'B', kind: 'markdown', content: { source: 'B source' } },
+      document: { title: 'B', kind: 'markdown', content: { url: textAsset('B source') } },
     },
   ],
 });
@@ -97,7 +97,7 @@ const withReference: SpaceSnapshot = spaceSnapshotSchema.parse({
         ...snapshot.document.maps?.[0],
         positions: {
           ...snapshot.document.maps?.[0]?.positions,
-          [REFERENCE_ID]: { x: 0, y: 400, open: false },
+          [REFERENCE_ID]: { x: 0, y: 400 },
         },
       },
     ],
@@ -121,7 +121,7 @@ const withImage: SpaceSnapshot = spaceSnapshotSchema.parse({
         ...snapshot.document.maps?.[0],
         positions: {
           ...snapshot.document.maps?.[0]?.positions,
-          [IMAGE_ID]: { x: 0, y: 400, open: false },
+          [IMAGE_ID]: { x: 0, y: 400 },
         },
       },
     ],
@@ -155,7 +155,6 @@ const withUr: SpaceSnapshot = spaceSnapshotSchema.parse({
           [UR_ID]: {
             x: 0,
             y: 400,
-            open: false,
             size: { width: RESOURCE_WIDTH * 2, height: RESOURCE_HEIGHT * 2 },
           },
         },
@@ -178,7 +177,7 @@ const withSpaceResource: SpaceSnapshot = spaceSnapshotSchema.parse({
         ...snapshot.document.maps?.[0],
         positions: {
           ...snapshot.document.maps?.[0]?.positions,
-          [SPACE_RESOURCE_ID]: { x: 0, y: 400, open: false },
+          [SPACE_RESOURCE_ID]: { x: 0, y: 400 },
         },
       },
     ],
@@ -216,7 +215,7 @@ const openedA = () =>
             [RESOURCE_ID]: {
               x: 0,
               y: 0,
-              open: true,
+              content: { open: true },
               size: { width: RESOURCE_WIDTH, height: RESOURCE_HEIGHT },
             },
           },
@@ -267,7 +266,7 @@ function mount(
     stored,
   );
   let view: RenderResult | undefined;
-  const app = composeApp({ images: unusedImageSources, spaceSession: session, spaceResources });
+  const app = composeApp({ spaceSession: session, spaceResources });
   prepare?.(app);
   mountSpace(
     { id: runtime(mounted).id, session, app, spaceResources },
@@ -344,7 +343,8 @@ describe('a Resource’s commands on the canvas rail', () => {
     expectMenuGroups(menu, [
       ['Create Reference'],
       ['Connect to Resource'],
-      ['Open and Expand', 'Read in Full View', 'Present from Here'],
+      // No Open and Expand: a Markdown Resource's Open is its plugin's (ADR 0142).
+      ['Read in Full View', 'Present from Here'],
       ['Copy link to Resource in Map', 'Copy link to Resource'],
       ['Remove from Map', 'Delete from Space'],
     ]);
@@ -368,7 +368,7 @@ describe('a Resource’s commands on the canvas rail', () => {
     expectMenuGroups(menu, [
       ['Create Reference'],
       ['Connect to Resource'],
-      ['Open and Expand', 'Read in Full View', 'Present from Here'],
+      ['Read in Full View', 'Present from Here'],
       ['Copy link to Resource in Map', 'Copy link to Resource', 'Copy link to Target'],
       ['Remove from Map', 'Delete from Space'],
     ]);
@@ -486,7 +486,7 @@ describe('a Resource’s commands on the canvas rail', () => {
 
   /**
    * A refused Graph creation and a refused Reference Resource creation are
-   * drawn from command outcomes' `graph-create` and `reference-create`
+   * drawn from command outcomes' `graph-create` and `resource-create`
    * channels, each under its own title, and each dismissal puts away only its
    * own notice.
    */
@@ -497,7 +497,7 @@ describe('a Resource’s commands on the canvas rail', () => {
         if (completion.kind === 'added-graph') {
           return { kind: 'refused', refusal: { code: 'map-not-found' } };
         }
-        if (completion.kind === 'created-reference') {
+        if (completion.kind === 'created-resources') {
           return { kind: 'refused', refusal: { code: 'resource-not-found' } };
         }
         return complete(target, completion);
@@ -557,21 +557,21 @@ describe('a Resource’s commands on the canvas rail', () => {
    * A body edit holds Shift+Enter and Space, not the commands they run: the
    * rail still offers Open and Expand and Read in Full View while one is open.
    */
-  it('keeps Open and Expand and Read in Full View while the Resource’s body is edited', async () => {
+  it('keeps Read in Full View while the Resource’s body is edited, offering no Open and Expand for a Markdown Resource', async () => {
     const session = mount(undefined, undefined, openedA());
 
     await selectResource('A');
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
     expect(await screen.findByRole('menuitem', { name: 'Read in Full View' })).toBeVisible();
-    expect(screen.getByRole('menuitem', { name: 'Open and Expand' })).toBeVisible();
+    // A Markdown Resource's Open is its plugin's, so the host offers no Open of its own (ADR 0142).
+    expect(screen.queryByRole('menuitem', { name: 'Open and Expand' })).toBeNull();
     fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
 
-    fireEvent.click(await screen.findByRole('button', { name: /^Edit .* of A$/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Markdown source of A' }));
     await screen.findByRole('textbox', { name: /of A$/ });
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
 
     expect(await screen.findByRole('menuitem', { name: 'Read in Full View' })).toBeVisible();
-    expect(screen.getByRole('menuitem', { name: 'Open and Expand' })).toBeVisible();
     await settled(session);
   });
 
@@ -685,7 +685,12 @@ describe('a Resource’s commands on the canvas rail', () => {
             ...snapshot.document.maps?.[0],
             positions: {
               ...snapshot.document.maps?.[0]?.positions,
-              [RESOURCE_ID]: { x: 0, y: 0, open: true, size: { width, height } },
+              [RESOURCE_ID]: {
+                x: 0,
+                y: 0,
+                content: { open: true },
+                size: { width, height },
+              },
             },
           },
         ],
@@ -711,7 +716,7 @@ describe('a Resource’s commands on the canvas rail', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Close Resource A' }));
     await waitFor(() => {
       const positions = session.getState().working.document.maps?.[0]?.positions;
-      expect(positions?.[RESOURCE_ID]?.open).toBe(false);
+      expect(positions?.[RESOURCE_ID]?.content).toEqual({ open: false });
       expect(positions?.[reference]).toMatchObject(placed);
     });
     await settled(session);
@@ -832,7 +837,7 @@ describe('a Resource’s commands on the canvas rail', () => {
     expectMenuGroups(menu, [
       ['Create Reference'],
       ['Connect to Resource'],
-      ['Open and Expand', 'Read in Full View', 'Present from Here'],
+      ['Read in Full View', 'Present from Here'],
       ['Open in New Tab'],
       ['Copy link to Resource in Map', 'Copy link to Resource', 'Copy link to Space'],
       ['Remove from Map', 'Delete from Space'],
@@ -989,7 +994,7 @@ describe('a Resource’s commands on the canvas rail', () => {
             ...withUr.document.maps?.[0],
             positions: {
               ...withUr.document.maps?.[0]?.positions,
-              [UR_ID]: { x: 0, y: 400, open: false, shape: 'diamond' },
+              [UR_ID]: { x: 0, y: 400, content: { shape: 'diamond' } },
             },
           },
         ],
@@ -1001,9 +1006,9 @@ describe('a Resource’s commands on the canvas rail', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Shape: Diamond' }));
     fireEvent.click(await screen.findByRole('menuitemradio', { name: 'Ellipse' }));
     await waitFor(() =>
-      expect(session.getState().working.document.maps?.[0]?.positions[UR_ID]?.shape).toBe(
-        'ellipse',
-      ),
+      expect(session.getState().working.document.maps?.[0]?.positions[UR_ID]?.content).toEqual({
+        shape: 'ellipse',
+      }),
     );
     expect(await screen.findByRole('button', { name: 'Shape: Ellipse' })).toBeVisible();
     await settled(session);
@@ -1193,7 +1198,7 @@ describe('Connect to Resource in a Resource’s Actions menu', () => {
       ...snapshot.resources,
       {
         id: REFERENCE_ID,
-        document: { title: 'C', kind: 'markdown', content: { source: 'C source' } },
+        document: { title: 'C', kind: 'markdown', content: { url: textAsset('C source') } },
       },
     ],
   });
@@ -1311,8 +1316,8 @@ describe('Connect to Resource in a Resource’s Actions menu', () => {
             title: 'Other Map',
             kind: 'positioned',
             positions: {
-              [RESOURCE_ID]: { x: 0, y: 0, open: false },
-              [OTHER_RESOURCE_ID]: { x: 400, y: 0, open: false },
+              [RESOURCE_ID]: { x: 0, y: 0 },
+              [OTHER_RESOURCE_ID]: { x: 400, y: 0 },
             },
             graphs: [{ id: GRAPH_ID_2, title: 'Graph', edges: [] }],
           },

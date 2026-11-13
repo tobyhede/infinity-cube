@@ -1,4 +1,6 @@
+import { createHash } from 'node:crypto';
 import {
+  isOfKind,
   resourceSize,
   spaceSnapshotSchema,
   uuidSchema,
@@ -23,7 +25,11 @@ export interface Workload {
   readonly editedResources: number;
   readonly unrelatedSpaces: number;
   readonly unrelatedResources: number;
-  /** Characters in each Markdown Resource body. */
+  /**
+   * Characters in each Markdown Resource's text. The text is an asset its
+   * content names by URL (ADR 0142), so it changes which URL is stored and not
+   * the size of the stored document.
+   */
   readonly bodyLength: number;
 }
 
@@ -48,6 +54,10 @@ const body = (title: string, length: number): string => {
   return `${heading}${text}`.slice(0, Math.max(length, heading.length));
 };
 
+/** The URL of the asset a text is, named by its SHA-256 as the asset store names it. */
+const textUrl = (text: string): `/assets/${string}` =>
+  `/assets/${createHash('sha256').update(text).digest('base64url')}`;
+
 const COLUMNS = 10;
 
 /** One ordinary Space: `count` Markdown Resources in a grid, chained by one Graph. */
@@ -66,7 +76,6 @@ const ordinarySpace = (
     positions[resourceId] = {
       x: (index % COLUMNS) * 340,
       y: Math.floor(index / COLUMNS) * 220,
-      open: false,
     };
   });
   const edges = resourceIds.flatMap((from, index) => {
@@ -95,7 +104,7 @@ const ordinarySpace = (
       document: {
         title: `Resource ${index + 1}`,
         kind: 'markdown',
-        content: { source: body(`Resource ${index + 1}`, bodyLength) },
+        content: { url: textUrl(body(`Resource ${index + 1}`, bodyLength)) },
       },
     })),
   });
@@ -126,7 +135,7 @@ export const scenario = (workload: Workload): Scenario => {
   const spaceResourceIds = referenced.map((_, index) => id(100 + index));
   const positions: Record<UUID, ResourcePlacement> = {};
   spaceResourceIds.forEach((resourceId, index) => {
-    positions[resourceId] = { x: index * 340, y: 0, open: false };
+    positions[resourceId] = { x: index * 340, y: 0 };
   });
   const meta = spaceSnapshotSchema.parse({
     id: id(1),
@@ -257,14 +266,15 @@ export const applyEdit = (
       return {
         ...snapshot,
         resources: snapshot.resources.map((resource) => {
-          if (resource.id !== subject.id || resource.document.kind !== 'markdown') return resource;
+          if (resource.id !== subject.id || !isOfKind(resource.document, 'markdown'))
+            return resource;
           return kind === 'rename'
             ? { ...resource, document: { ...resource.document, title: `Renamed ${sample}` } }
             : {
                 ...resource,
                 document: {
                   ...resource.document,
-                  content: { source: `${resource.document.content.source}\n\nEdit ${sample}.` },
+                  content: { url: textUrl(`${resource.document.content.url}\n\nEdit ${sample}.`) },
                 },
               };
         }),
@@ -280,7 +290,8 @@ export const applyEdit = (
       return withPositions(snapshot, (positions) => {
         const placement = positions[subject.id];
         if (placement === undefined) throw new Error(`Resource ${subject.id} is not placed`);
-        positions[subject.id] = { ...placement, open: true };
+        // A Markdown Resource keeps Open in its plugin's Map content (ADR 0142).
+        positions[subject.id] = { ...placement, content: { open: true } };
         return positions;
       });
     case 'resize':
@@ -326,7 +337,7 @@ export const applyEdit = (
       );
       const withResource = withPositions(snapshot, (positions) => ({
         ...positions,
-        [added]: { x: -400, y: sample * 220, open: false },
+        [added]: { x: -400, y: sample * 220 },
       }));
       return {
         ...withResource,
@@ -337,7 +348,7 @@ export const applyEdit = (
             document: {
               title: `Added ${sample}`,
               kind: 'markdown',
-              content: { source: `# Added ${sample}` },
+              content: { url: textUrl(`# Added ${sample}`) },
             },
           },
         ],

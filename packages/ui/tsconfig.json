@@ -7,7 +7,22 @@
     // `graph`, which would put domain logic behind a component; not the render
     // libraries, which belong to the adapter. (No `rootDir` — see `graph`.)
     "paths": {
-      "@project/core": ["../core/src/index.ts"]
+      "@project/core": ["../core/src/index.ts"],
+      "@project/plugin-default/domain": ["../plugin-default/src/domain.ts"],
+      "@project/plugin-image/domain": ["../plugin-image/src/domain.ts"],
+      "@project/plugin-ur/domain": ["../plugin-ur/src/domain.ts"],
+      "@project/plugin-markdown/domain": ["../plugin-markdown/src/domain.ts"],
+      "@project/plugin-reference/domain": ["../plugin-reference/src/domain.ts"],
+      "@project/plugin-space/domain": ["../plugin-space/src/domain.ts"],
+      "@project/resource-api/domain": ["../resource-api/src/domain/index.ts"],
+      "@project/plugin-default/view": ["../plugin-default/src/view.tsx"],
+      "@project/plugin-image/view": ["../plugin-image/src/view.tsx"],
+      "@project/plugin-ur/view": ["../plugin-ur/src/view.tsx"],
+      "@project/plugin-markdown/view": ["../plugin-markdown/src/view.tsx"],
+      "@project/plugin-reference/view": ["../plugin-reference/src/view.tsx"],
+      "@project/plugin-space/view": ["../plugin-space/src/view.tsx"],
+      "@project/resource-api/view": ["../resource-api/src/view/index.tsx"],
+      "@project/resource-api/view/host": ["../resource-api/src/view/host.tsx"]
     }
   },
   "include": ["src"]

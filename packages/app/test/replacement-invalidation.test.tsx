@@ -17,8 +17,8 @@ import { composeApp } from '../src/compose-app';
 import { openTestSpace } from './opened-space';
 import { beginRename } from './command-dock';
 import { selectResource } from './resource-selection';
-import { unusedImageSources } from './image-sources';
 import { stubResizeObserver } from './resize-observer';
+import { textAsset } from './markdown-texts';
 
 /**
  * ADR 0042's "one shared contract test": an Interaction draft open when a stored
@@ -85,8 +85,8 @@ const snapshot = (
           kind: 'positioned',
           positions: {
             [RESOURCE_ID]: open
-              ? { x, y, open: true, size: { width: 560, height: 420 } }
-              : { x, y, open: false },
+              ? { x, y, content: { open: true }, size: { width: 560, height: 420 } }
+              : { x, y },
           },
           graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
         },
@@ -96,7 +96,7 @@ const snapshot = (
     resources: [
       {
         id: RESOURCE_ID,
-        document: { title: resourceTitle, kind: 'markdown', content: { source: body } },
+        document: { title: resourceTitle, kind: 'markdown', content: { url: textAsset(body) } },
       },
     ],
   });
@@ -151,7 +151,7 @@ async function mountedSpaceApp(local: SpaceSnapshot = LOCAL): Promise<SpaceSessi
     {
       id: runtime(local).id,
       session,
-      app: composeApp({ images: unusedImageSources, spaceSession: session, spaceResources }),
+      app: composeApp({ spaceSession: session, spaceResources }),
       spaceResources,
     },
     (app) => {

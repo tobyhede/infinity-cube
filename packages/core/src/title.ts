@@ -13,6 +13,8 @@
  * module.
  */
 
+import { titleName } from '@project/resource-api/domain';
+
 /**
  * What a Title Line is for, in the order the lines are written.
  *
@@ -95,10 +97,7 @@ export const titleLines = (title: string): readonly TitleLine[] =>
  * expression that is both a positional convention restated and, under
  * `noUncheckedIndexedAccess`, a possibly-undefined value at every call site.
  */
-export const titleName = (title: string): string => {
-  const firstBreak = title.indexOf('\n');
-  return firstBreak === -1 ? title : title.slice(0, firstBreak);
-};
+export { titleName };
 
 /**
  * The short Title: the Title on one line, its name with an ellipsis when lines

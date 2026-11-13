@@ -13,6 +13,7 @@ import {
   titleLines,
   titleName,
 } from '../src/index';
+import { EMPTY_ASSET_REF } from '../src/assets';
 
 const RESOURCE_ID = '00000000-0000-4000-8000-000000000001';
 const TARGET_ID = '00000000-0000-4000-8000-000000000002';
@@ -42,12 +43,7 @@ const markdownResource = (title: string): ResourceDraft => ({
   id: RESOURCE_ID,
   title,
   kind: 'markdown',
-  content: { source: '' },
-});
-/** The same Markdown Resource as its file holds it: a locator naming its sidecar. */
-const markdownFile = (title: string): ResourceDraft => ({
-  ...markdownResource(title),
-  content: { path: `${RESOURCE_ID}.md`, mediaType: 'text/markdown' },
+  content: { url: EMPTY_ASSET_REF },
 });
 const referenceResource = (title: string): ResourceDraft => ({
   id: RESOURCE_ID,
@@ -71,8 +67,8 @@ const withoutId =
 
 /**
  * Every schema a Resource's Title arrives through, beside the drafts it reads:
- * the Resource, the stored document and the Resource file, which holds a
- * Markdown Resource's content as a locator.
+ * the Resource, the stored document and the Resource file, which holds each
+ * kind's content as the Resource does.
  */
 const doors: readonly {
   readonly label: string;
@@ -92,7 +88,7 @@ const doors: readonly {
   {
     label: 'resource file',
     schema: resourceFileSchema,
-    drafts: [markdownFile, referenceResource, spaceResource],
+    drafts: [markdownResource, referenceResource, spaceResource],
   },
 ];
 

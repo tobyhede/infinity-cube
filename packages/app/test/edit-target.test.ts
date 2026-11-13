@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { uuidSchema, type SpaceSnapshot } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
 import { createMapSurface } from '../src/map-surface';
 import { mintingIds } from './minting';
-import { unusedImageSources } from './image-sources';
 
 const id = (tail: string) => uuidSchema.parse(`00000000-0000-4000-8000-${tail.padStart(12, '0')}`);
 const SPACE = id('1');
@@ -29,14 +28,14 @@ function composition(newId?: () => ReturnType<typeof id>) {
           id: OPENING_MAP,
           title: 'Opening',
           kind: 'positioned',
-          positions: { [RESOURCE]: { x: 0, y: 0, open: false } },
+          positions: { [RESOURCE]: { x: 0, y: 0 } },
           graphs: [{ id: OPENING_GRAPH, title: 'Opening Graph', edges: [] }],
         },
         {
           id: OTHER_MAP,
           title: 'Other',
           kind: 'positioned',
-          positions: { [RESOURCE]: { x: 40, y: 40, open: false } },
+          positions: { [RESOURCE]: { x: 40, y: 40 } },
           graphs: [
             { id: STORED_GRAPH, title: 'Stored Graph', edges: [] },
             { id: SHOWN_GRAPH, title: 'Shown Graph', edges: [] },
@@ -46,12 +45,15 @@ function composition(newId?: () => ReturnType<typeof id>) {
       ],
     },
     resources: [
-      { id: RESOURCE, document: { title: 'Resource', kind: 'markdown', content: { source: '' } } },
+      {
+        id: RESOURCE,
+        document: { title: 'Resource', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+      },
     ],
   };
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-  const app = composeApp({ spaceSession, images: unusedImageSources, newId });
+  const app = composeApp({ spaceSession, newId });
   return { app, spaceSession };
 }
 
@@ -64,7 +66,11 @@ describe('the canvas surface', () => {
     app.navigation.selectMap(OTHER_MAP);
 
     expect(
-      app.surface.authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE }),
+      app.surface.authoring.complete({
+        kind: 'changed-map-content',
+        resourceId: RESOURCE,
+        content: { open: true },
+      }),
     ).toMatchObject({ kind: 'completed' });
 
     expect(spaceSession.getState().working.document.defaultMap).toBe(OTHER_MAP);
@@ -95,12 +101,16 @@ describe('a drawn surface', () => {
     drawing.observe();
 
     expect(
-      drawing.authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE }),
+      drawing.authoring.complete({
+        kind: 'changed-map-content',
+        resourceId: RESOURCE,
+        content: { open: true },
+      }),
     ).toMatchObject({ kind: 'completed' });
 
     const working = spaceSession.getState().working;
     expect(mapOf(working, OTHER_MAP)?.activeGraph).toBe(STORED_GRAPH);
-    expect(mapOf(working, OTHER_MAP)?.positions[RESOURCE]?.open).toBe(true);
+    expect(mapOf(working, OTHER_MAP)?.positions[RESOURCE]?.content).toEqual({ open: true });
     expect(working.document.defaultMap).toBe(OPENING_MAP);
     expect(app.navigation.getState()).toMatchObject({
       selectedMapId: OPENING_MAP,

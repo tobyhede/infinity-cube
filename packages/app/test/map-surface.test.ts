@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { uuidSchema, type SpaceSnapshot } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { positionedStrategy } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
 import { createMapSurface, observeMapSurfaces, type DrawnSurfaceContext } from '../src/map-surface';
-import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
 
 const id = (tail: string) => uuidSchema.parse(`00000000-0000-4000-8000-${tail.padStart(12, '0')}`);
@@ -28,14 +27,14 @@ function composition() {
           id: MAP,
           title: 'Canvas',
           kind: 'positioned',
-          positions: { [RESOURCE]: { x: 10, y: 20, open: false } },
+          positions: { [RESOURCE]: { x: 10, y: 20 } },
           graphs: [{ id: GRAPH, title: 'Canvas Graph', edges: [] }],
         },
         {
           id: OTHER_MAP,
           title: 'Drawn',
           kind: 'positioned',
-          positions: { [OTHER_RESOURCE]: { x: 350, y: 240, open: false } },
+          positions: { [OTHER_RESOURCE]: { x: 350, y: 240 } },
           graphs: [{ id: OTHER_GRAPH, title: 'Drawn Graph', edges: [] }],
         },
       ],
@@ -43,17 +42,17 @@ function composition() {
     resources: [
       {
         id: RESOURCE,
-        document: { title: 'Canvas Resource', kind: 'markdown', content: { source: '' } },
+        document: { title: 'Canvas Resource', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       },
       {
         id: OTHER_RESOURCE,
-        document: { title: 'Drawn Resource', kind: 'markdown', content: { source: '' } },
+        document: { title: 'Drawn Resource', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       },
     ],
   };
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-  return composeApp({ spaceSession, images: unusedImageSources });
+  return composeApp({ spaceSession });
 }
 
 function drawing(
@@ -84,7 +83,11 @@ describe("the canvas's Map surface", () => {
     expect(app.surface.view()).toBe(other);
 
     expect(
-      app.authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: OTHER_RESOURCE }),
+      app.authoring.complete(CANVAS, {
+        kind: 'changed-map-content',
+        resourceId: OTHER_RESOURCE,
+        content: { open: true },
+      }),
     ).toMatchObject({ kind: 'completed' });
     const edited = app.surface.view();
     expect(edited).not.toBe(other);
@@ -120,9 +123,13 @@ describe('a drawn Map', () => {
       policy: 'authoring',
     });
     expect(
-      surface.authoring.complete({ kind: 'opened-resource', resourceId: OTHER_RESOURCE }),
+      surface.authoring.complete({
+        kind: 'changed-map-content',
+        resourceId: OTHER_RESOURCE,
+        content: { open: true },
+      }),
     ).toMatchObject({ kind: 'completed' });
-    expect(surface.view().mapPlacement.get(OTHER_RESOURCE)?.open).toBe(true);
+    expect(surface.view().mapPlacement.get(OTHER_RESOURCE)?.content).toEqual({ open: true });
     const view = surface.view();
     const placed = await positionedStrategy(view.mapPlacement)(view.projection.strategyGraph);
     const projection = surface.project(placed);

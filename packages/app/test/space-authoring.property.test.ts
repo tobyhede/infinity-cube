@@ -2,6 +2,8 @@ import fc from 'fast-check';
 import { expect, it } from 'vitest';
 
 import {
+  isOfKind,
+  EMPTY_ASSET_REF,
   GRAPH_HEAD_SHAPES,
   normalizeTitle,
   uuidSchema,
@@ -15,7 +17,8 @@ import { GRAPH_PALETTE, loadSpaceSnapshot } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
 import { CANVAS, type AuthoringCompletion, type AuthoringResult } from '../src/space-authoring';
-import { unusedImageSources } from './image-sources';
+import { textAsset } from './markdown-texts';
+import { createdEmpty, createdReference } from './created-resources';
 
 /**
  * What every semantic operation owes, whatever order they arrive in.
@@ -67,8 +70,8 @@ const start: SpaceSnapshot = {
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [RESOURCE_A]: { x: 10, y: 20, open: false },
-          [RESOURCE_B]: { x: 300, y: 40, open: false },
+          [RESOURCE_A]: { x: 10, y: 20 },
+          [RESOURCE_B]: { x: 300, y: 40 },
         },
         graphs: [
           { id: GRAPH_ID, title: 'Main', edges: [{ from: RESOURCE_A, to: RESOURCE_B }] },
@@ -80,8 +83,8 @@ const start: SpaceSnapshot = {
         title: 'Map 2',
         kind: 'positioned',
         positions: {
-          [RESOURCE_A]: { x: 0, y: 400, open: false },
-          [RESOURCE_C]: { x: 0, y: 600, open: false },
+          [RESOURCE_A]: { x: 0, y: 400 },
+          [RESOURCE_C]: { x: 0, y: 600 },
         },
         graphs: [
           {
@@ -95,8 +98,14 @@ const start: SpaceSnapshot = {
     defaultMap: MAP_ID,
   },
   resources: [
-    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
-    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', content: { source: 'B' } } },
+    {
+      id: RESOURCE_A,
+      document: { title: 'A', kind: 'markdown', content: { url: textAsset('A') } },
+    },
+    {
+      id: RESOURCE_B,
+      document: { title: 'B', kind: 'markdown', content: { url: textAsset('B') } },
+    },
     {
       id: RESOURCE_C,
       document: { title: 'A again', kind: 'reference', content: { target: RESOURCE_A } },
@@ -203,7 +212,6 @@ it('keeps an existing Reference Resource Target immutable while accepting Title 
         const loaded = { snapshot, revision: 0n, exportedRevision: null };
         const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
         const { authoring } = composeApp({
-          images: unusedImageSources,
           spaceSession: session,
           selection: OTHER_MAP_ID,
         });
@@ -256,7 +264,6 @@ it('keeps the working Space loadable through any sequence of semantic operations
         const loaded = { snapshot: start, revision: 0n, exportedRevision: null };
         const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
         const { currentSpace, navigation, authoring } = composeApp({
-          images: unusedImageSources,
           spaceSession: session,
           selection: mapId,
         });
@@ -311,7 +318,7 @@ function resolve(
         return {
           kind: 'edited-resource',
           resourceId,
-          document: { title: generated.title, kind: 'markdown', content: { source: '' } },
+          document: { title: generated.title, kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         };
       }
       const { id: _id, ...document } = resource;
@@ -322,25 +329,24 @@ function resolve(
       return {
         kind: 'edited-resource',
         resourceId: resource.id,
-        document:
-          document.kind === 'reference'
-            ? {
-                ...document,
-                title: generated.title,
-                content: {
-                  ...document.content,
-                  target: uuidSchema.parse(proposedTarget?.id ?? document.content.target),
-                },
-              }
-            : { ...document, title: generated.title },
+        document: isOfKind(document, 'reference')
+          ? {
+              ...document,
+              title: generated.title,
+              content: {
+                ...document.content,
+                target: uuidSchema.parse(proposedTarget?.id ?? document.content.target),
+              },
+            }
+          : { ...document, title: generated.title },
       };
     }
     case 'created-resource':
-      return { kind: 'created-resource', resourceKind: 'markdown', anchor: generated.anchor };
+      return createdEmpty('markdown', generated.anchor);
     case 'created-ur-resource':
-      return { kind: 'created-resource', resourceKind: 'ur', anchor: generated.anchor };
+      return createdEmpty('ur', generated.anchor);
     case 'created-reference':
-      return { kind: 'created-reference', target: resourceId, anchor: generated.anchor };
+      return createdReference(resourceId, generated.anchor);
     case 'added-resource-to-map':
       return { kind: 'added-resource-to-map', resourceId, anchor: generated.anchor };
     case 'removed-resource-from-map':

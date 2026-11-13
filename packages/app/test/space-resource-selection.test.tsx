@@ -9,6 +9,7 @@ import {
 } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
+  EMPTY_ASSET_REF,
   spaceSnapshotSchema,
   uuidSchema,
   type SpaceResourceDocument,
@@ -20,7 +21,6 @@ import { mountSpace } from './space-mounting';
 import { composeApp } from '../src/compose-app';
 import { openTestSpace } from './opened-space';
 import { selectResource } from './resource-selection';
-import { unusedImageSources } from './image-sources';
 import { stubResizeObserver } from './resize-observer';
 
 /**
@@ -82,7 +82,7 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
         id: FIRST_MAP_ID,
         title: 'Collection 1',
         kind: 'positioned',
-        positions: { [TARGET_RESOURCE_ID]: { x: 0, y: 0, open: false } },
+        positions: { [TARGET_RESOURCE_ID]: { x: 0, y: 0 } },
         graphs: [
           { id: FIRST_GRAPH_ID, title: 'Overview', edges: [] },
           { id: SECOND_GRAPH_ID, title: 'Detail', edges: [] },
@@ -92,7 +92,7 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
         id: SECOND_MAP_ID,
         title: 'Collection 2',
         kind: 'positioned',
-        positions: { [TARGET_RESOURCE_ID]: { x: 200, y: 0, open: false } },
+        positions: { [TARGET_RESOURCE_ID]: { x: 200, y: 0 } },
         graphs: [{ id: THIRD_GRAPH_ID, title: 'Second pass', edges: [] }],
       },
       // The one Map that has authored an Active Graph, and deliberately not
@@ -103,7 +103,7 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
         id: THIRD_MAP_ID,
         title: 'Collection 3',
         kind: 'positioned',
-        positions: { [TARGET_RESOURCE_ID]: { x: 400, y: 0, open: false } },
+        positions: { [TARGET_RESOURCE_ID]: { x: 400, y: 0 } },
         graphs: [
           { id: FOURTH_GRAPH_ID, title: 'Draft', edges: [] },
           { id: FIFTH_GRAPH_ID, title: 'Current', edges: [] },
@@ -116,7 +116,7 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
   resources: [
     {
       id: TARGET_RESOURCE_ID,
-      document: { title: 'Resource 1', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Resource 1', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
   ],
 });
@@ -141,8 +141,8 @@ const home = (spaceResource: SpaceResourceDocument): SpaceSnapshot =>
           title: 'Map 1',
           kind: 'positioned',
           positions: {
-            [HOME_RESOURCE_ID]: { x: 10, y: 20, open: false },
-            [SPACE_RESOURCE_ID]: { x: 600, y: 20, open: false },
+            [HOME_RESOURCE_ID]: { x: 10, y: 20 },
+            [SPACE_RESOURCE_ID]: { x: 600, y: 20 },
           },
           graphs: [{ id: HOME_GRAPH_ID, title: 'Graph 1', edges: [] }],
         },
@@ -152,7 +152,7 @@ const home = (spaceResource: SpaceResourceDocument): SpaceSnapshot =>
     resources: [
       {
         id: HOME_RESOURCE_ID,
-        document: { title: 'Start here', kind: 'markdown', content: { source: '' } },
+        document: { title: 'Start here', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       },
       { id: SPACE_RESOURCE_ID, document: spaceResource },
     ],
@@ -188,9 +188,9 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [META_RESOURCE_ID]: { x: 0, y: 0, open: false },
-          [META_TO_HOME_ID]: { x: 300, y: 0, open: false },
-          [META_TO_TARGET_ID]: { x: 600, y: 0, open: false },
+          [META_RESOURCE_ID]: { x: 0, y: 0 },
+          [META_TO_HOME_ID]: { x: 300, y: 0 },
+          [META_TO_TARGET_ID]: { x: 600, y: 0 },
         },
         graphs: [{ id: META_GRAPH_ID, title: 'Graph 1', edges: [] }],
       },
@@ -200,7 +200,7 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
   resources: [
     {
       id: META_RESOURCE_ID,
-      document: { title: 'Meta', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Meta', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
     {
       id: META_TO_HOME_ID,
@@ -241,7 +241,7 @@ function mount(value: SpaceSnapshot = created): SpaceSession {
     {
       id: runtime(value).id,
       session,
-      app: composeApp({ images: unusedImageSources, spaceSession: session }),
+      app: composeApp({ spaceSession: session }),
       spaceResources,
     },
     (app) => {

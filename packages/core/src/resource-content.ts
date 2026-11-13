@@ -9,10 +9,13 @@ export type { ResourceContent } from './kinds/registry';
  */
 export type ContentVia = 'self' | 'target';
 
-/** No content: what a Resource shows when its content Target is missing or may not be one. */
+/**
+ * No content: what a Resource shows when its content Target is missing or may
+ * not be one, or when no plugin in this build reads the content it reaches.
+ */
 export interface ContentUnresolved {
   readonly kind: 'unresolved';
-  readonly via: 'target';
+  readonly via: ContentVia;
 }
 
 /** What a kind's content lets an author do and how it is laid out (ADR 0114). */

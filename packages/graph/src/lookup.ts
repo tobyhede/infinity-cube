@@ -1,5 +1,6 @@
 import {
   resolveContent,
+  resourceReferences,
   type Resource,
   type ResourceContent,
   type ResourceId,
@@ -73,6 +74,19 @@ export interface SpaceLookup {
  */
 export function resolveResourceContent(space: Space, resource: Resource): ResourceContent {
   return resolveContent(resource, (id) => space.lookup.resource(id));
+}
+
+/**
+ * The Resources `resource`'s content references, as the Space holds them now:
+ * what the plugin drawing it may draw inside its rect through the host's
+ * embedding (ADR 0142), as an Open Reference Resource draws its Target. A
+ * reference the Space no longer holds is left out, and the embedding says so.
+ */
+export function referencedResources(space: Space, resource: Resource): readonly Resource[] {
+  return resourceReferences(resource).flatMap((id) => {
+    const referenced = space.lookup.resource(id);
+    return referenced === undefined ? [] : [referenced];
+  });
 }
 
 /**

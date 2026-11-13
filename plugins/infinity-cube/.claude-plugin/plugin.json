@@ -1,6 +1,6 @@
 {
   "name": "infinity-cube",
-  "version": "0.1.1",
+  "version": "0.1.7",
   "description": "Set up and run InfinityCube, and write an Aggregate directory's files.",
   "author": {
     "name": "InfinityCube contributors"

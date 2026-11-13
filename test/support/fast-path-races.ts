@@ -1,4 +1,4 @@
-import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import { describe, expect, it } from 'vitest';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import type { SqlStore } from '../../src/persistence/sql-store';
@@ -120,7 +120,7 @@ const B_FIRST = idAt(60);
 
 const markdown = (id: UUID, title: string) => ({
   id,
-  document: { title, kind: 'markdown' as const, content: { source: title } },
+  document: { title, kind: 'markdown' as const, content: { url: EMPTY_ASSET_REF } },
 });
 
 const link = (id: UUID, spaceId: UUID, mapId: UUID, graph: UUID) => ({
@@ -163,8 +163,8 @@ const spaceA = (
         title: 'Map',
         kind: 'positioned',
         positions: {
-          [A_FIRST]: { x: 0, y: 0, open: false },
-          [A_SECOND]: { x: secondX, y: 0, open: false },
+          [A_FIRST]: { x: 0, y: 0 },
+          [A_SECOND]: { x: secondX, y: 0 },
         },
         graphs: [
           { id: ids.graph, title: 'Graph', edges: [{ from: A_FIRST, to: A_SECOND }] },
@@ -188,7 +188,7 @@ const spaceB = (x: number): SpaceSnapshot => ({
         id: B_MAP,
         title: 'Map',
         kind: 'positioned',
-        positions: { [B_FIRST]: { x, y: 0, open: false } },
+        positions: { [B_FIRST]: { x, y: 0 } },
         graphs: [{ id: B_GRAPH, title: 'Graph', color: 'teal', edges: [] }],
       },
     ],

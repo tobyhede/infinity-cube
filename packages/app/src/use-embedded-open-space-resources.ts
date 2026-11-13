@@ -8,19 +8,21 @@ import {
   type Dispatch,
   type SetStateAction,
 } from 'react';
-import type { ResourceId } from '@project/core';
+import { titleName, type ResourceId } from '@project/core';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import {
   discoverEmbeddedOpenSpaceResources,
+  embedSpacesToRead,
   type EmbeddedOpenSpaceResourceRequest,
   type EmbeddedRoot,
 } from './embedded-open-space-resource';
 import type { EmbeddedPublication } from './embedded-publication';
+import { editingMapEmbeds, type MapEmbedEntry } from './map-embeddings';
 import type { OpenSpace, SpaceHold } from './open-spaces';
+import { spaceResourceTarget } from './space-resource-lifecycle';
 import type { SpaceResourceFraming } from './space-resource-framing';
 
 const EMPTY_ENTRIES = [] as const;
-const EMPTY_PORTALS: ReadonlySet<ResourceId> = new Set();
 const emptySubscription = () => () => undefined;
 
 /**
@@ -38,17 +40,28 @@ interface EmbeddedHoldRequest {
   hold?: Pick<SpaceHold, 'release'>;
 }
 
+/** A placement whose Space could not be read: its node id, its Title's name, and why. */
+export interface EmbeddedFailure {
+  readonly id: string;
+  readonly title: string;
+  readonly message: string;
+}
+
+const NO_FAILURES: readonly EmbeddedFailure[] = [];
+
 export interface EmbeddedOpenSpaceResources {
   readonly embeddedRequests: readonly EmbeddedOpenSpaceResourceRequest<OpenSpace>[];
   readonly embeddedPublications: ReadonlyMap<string, EmbeddedPublication>;
-  readonly embeddedFailures: ReadonlyMap<ResourceId, string>;
+  /** What to announce for each placement whose Space could not be read. */
+  readonly failedEmbeddings: readonly EmbeddedFailure[];
   readonly resumeEmbedded: (spaceId: ResourceId) => Promise<void>;
   readonly publishEmbedded: (id: string, value: EmbeddedPublication | null) => void;
   readonly reportBodyHeight: (id: string, height: number | null) => void;
-  readonly editingPortals: ReadonlySet<ResourceId>;
-  readonly onPortalEditingChange: (resourceId: ResourceId, editing: boolean) => void;
-  readonly portalDraft: ReadonlyMap<ResourceId, SpaceResourceFraming>;
-  readonly setPortalDraft: Dispatch<SetStateAction<ReadonlyMap<ResourceId, SpaceResourceFraming>>>;
+  /** The placements whose embedded Map is authored in place, by node id: each passed its Claim to the embedding. */
+  readonly editingPortals: ReadonlySet<string>;
+  /** The framing being drawn on each placement's embedded Map, by node id. */
+  readonly portalDraft: ReadonlyMap<string, SpaceResourceFraming>;
+  readonly setPortalDraft: Dispatch<SetStateAction<ReadonlyMap<string, SpaceResourceFraming>>>;
 }
 
 /**
@@ -57,6 +70,7 @@ export interface EmbeddedOpenSpaceResources {
  */
 export function useEmbeddedOpenSpaceResources(
   nodes: readonly ResourceFlowNode[],
+  embeds: ReadonlyMap<string, MapEmbedEntry>,
   spaces: EmbeddedTargetReader | null,
   draggingIds: ReadonlySet<string>,
   root: EmbeddedRoot,
@@ -81,20 +95,12 @@ export function useEmbeddedOpenSpaceResources(
     new Map(),
   );
   const [bodyHeights, setBodyHeights] = useState<ReadonlyMap<string, number>>(new Map());
-  const [editingPortals, setEditingPortals] = useState<ReadonlySet<ResourceId>>(EMPTY_PORTALS);
-  const [portalDraft, setPortalDraft] = useState<ReadonlyMap<ResourceId, SpaceResourceFraming>>(
+  const editingKey = [...editingMapEmbeds(embeds)].sort().join();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- membership key, not snapshot identity
+  const editingPortals = useMemo(() => editingMapEmbeds(embeds), [editingKey]);
+  const [portalDraft, setPortalDraft] = useState<ReadonlyMap<string, SpaceResourceFraming>>(
     () => new Map(),
   );
-  const onPortalEditingChange = useCallback((resourceId: ResourceId, editing: boolean) => {
-    setEditingPortals((previous) => {
-      const has = previous.has(resourceId);
-      if (editing === has) return previous;
-      const next = new Set(previous);
-      if (editing) next.add(resourceId);
-      else next.delete(resourceId);
-      return next;
-    });
-  }, []);
   const reportBodyHeight = useCallback((id: string, height: number | null) => {
     setBodyHeights((previous) => {
       // A non-positive height is not a measured footer.
@@ -106,11 +112,26 @@ export function useEmbeddedOpenSpaceResources(
       return next;
     });
   }, []);
+  // What an embedding given no view, or no Graph, is resolved against: its
+  // Space once it is composed here (ADR 0142). Open Spaces publishes a new
+  // `composed` on every commit of a composed Space, so this is rebuilt when
+  // the Space it reads changes ("draws an embedding given no view on its
+  // Space's defaultMap as it is now").
+  const targetOf = useCallback(
+    (space: string) => {
+      const entry = entries.find((candidate) => candidate.id === space);
+      return entry === undefined ? undefined : spaceResourceTarget(entry.app.currentSpace());
+    },
+    [entries],
+  );
+  const toRead = useMemo(() => embedSpacesToRead(embeds), [embeds]);
   const embeddedRequests = useMemo(
     () =>
       discoverEmbeddedOpenSpaceResources({
+        targetOf,
         root,
-        editingResources: editingPortals,
+        editingPortals,
+        embeds,
         staleSpaces: new Set(embeddedFailures.keys()),
         nodes,
         entries,
@@ -120,6 +141,7 @@ export function useEmbeddedOpenSpaceResources(
       }),
     [
       nodes,
+      embeds,
       entries,
       embeddedPublications,
       bodyHeights,
@@ -127,6 +149,7 @@ export function useEmbeddedOpenSpaceResources(
       root,
       editingPortals,
       embeddedFailures,
+      targetOf,
     ],
   );
   /**
@@ -152,16 +175,41 @@ export function useEmbeddedOpenSpaceResources(
       );
     }
   }
-  // A refusal belongs to the embedding that asked for the read, so it goes the
-  // same way: no standing request means nothing left to announce it on.
+  /**
+   * The Space each placement asks to read, by node id: one drawn from a
+   * standing request, or one given no view, or no Graph, whose Map waits on
+   * that read and so asks for it before it has a request.
+   */
+  const placements = useMemo(() => {
+    const placed = new Map(
+      embeddedRequests.map(({ parent, spaceId }): [string, ResourceId] => [parent.id, spaceId]),
+    );
+    for (const [nodeId, spaceId] of toRead) if (!placed.has(nodeId)) placed.set(nodeId, spaceId);
+    return placed;
+  }, [embeddedRequests, toRead]);
+  // A refusal belongs to the placement that asked for the read, so it goes the
+  // same way: no placement asking means nothing left to announce it on.
   // `use-embedded-open-space-resources.test.ts` ('drops a failure whose embedding
   // is no longer standing') holds that prune.
   if (embeddedFailures.size > 0) {
-    const asked = new Set(embeddedRequests.map((request) => request.spaceId));
+    const asked = new Set(placements.values());
     if ([...embeddedFailures.keys()].some((spaceId) => !asked.has(spaceId))) {
       setEmbeddedFailures(new Map([...embeddedFailures].filter(([id]) => asked.has(id))));
     }
   }
+  /** Each placement whose Space could not be read, named by the Title its author gave it. */
+  const failedEmbeddings = useMemo((): readonly EmbeddedFailure[] => {
+    if (embeddedFailures.size === 0) return NO_FAILURES;
+    const titles = new Map(nodes.map((node) => [node.id, node.data.title]));
+    for (const { parent } of embeddedRequests) titles.set(parent.id, parent.data.title);
+    return [...placements].flatMap(([id, spaceId]) => {
+      const message = embeddedFailures.get(spaceId);
+      const title = titles.get(id);
+      return message === undefined || title === undefined
+        ? []
+        : [{ id, title: titleName(title), message }];
+    });
+  }, [embeddedFailures, embeddedRequests, placements, nodes]);
   const requested = useRef(new Map<string, EmbeddedHoldRequest>());
   const acquire = useCallback(
     async (id: string, spaceId: ResourceId) => {
@@ -214,21 +262,26 @@ export function useEmbeddedOpenSpaceResources(
   }, [spaces]);
   useEffect(() => {
     if (!projectionReady) return;
-    const visible = new Map(
-      embeddedRequests.map((request) => [
+    const visible = new Map<string, ResourceId>([
+      ...embeddedRequests.map((request): [string, ResourceId] => [
         `${request.parent.id}:${request.spaceId}:${request.mapId}:${request.graphId}`,
-        request,
+        request.spaceId,
       ]),
-    );
+      // A Space an embedding draws from what is read of it is held as well.
+      ...[...toRead].map(([nodeId, spaceId]): [string, ResourceId] => [
+        `${nodeId}:${spaceId}:read`,
+        spaceId,
+      ]),
+    ]);
     for (const [id, request] of requested.current) {
       if (visible.has(id)) continue;
       void request.hold?.release();
       requested.current.delete(id);
     }
-    for (const [id, request] of visible) {
-      if (!requested.current.has(id)) void acquire(id, request.spaceId);
+    for (const [id, spaceId] of visible) {
+      if (!requested.current.has(id)) void acquire(id, spaceId);
     }
-  }, [embeddedRequests, acquire, projectionReady]);
+  }, [embeddedRequests, toRead, acquire, projectionReady]);
   const publishEmbedded = useCallback((id: string, value: EmbeddedPublication | null) => {
     setEmbeddedPublications((previous) => {
       if (previous.get(id) === value || (value === null && !previous.has(id))) return previous;
@@ -241,12 +294,11 @@ export function useEmbeddedOpenSpaceResources(
   return {
     embeddedRequests,
     embeddedPublications,
-    embeddedFailures,
+    failedEmbeddings,
     resumeEmbedded,
     publishEmbedded,
     reportBodyHeight,
     editingPortals,
-    onPortalEditingChange,
     portalDraft,
     setPortalDraft,
   };

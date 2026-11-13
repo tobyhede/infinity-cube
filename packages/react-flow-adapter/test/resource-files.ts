@@ -1,9 +1,10 @@
 import type { ResourceFile } from '@project/graph';
+import { textAsset } from './markdown-texts';
 
 /**
  * A Resource's files as an author writes them: its Resource file
- * `resources/<id>.json`, and for a Markdown Resource the `<id>.md` sidecar its
- * locator names. Tests build these rather than resource objects, because that
+ * `resources/<id>.json`, a Markdown Resource naming its text by the asset URL
+ * {@link textAsset} stores it under (ADR 0142). Tests build these rather than resource objects, because that
  * is what `loadSpace` takes. Each helper returns every file of one Resource, so
  * a list of Resources is spread into one list of files.
  *
@@ -26,12 +27,9 @@ function file(id: string, title: string, kind: string, content: Json): ResourceF
 export function resourceFile(
   id: string,
   title = defaultTitle(id),
-  body = '',
+  text = '',
 ): readonly ResourceFile[] {
-  return [
-    file(id, title, 'markdown', { path: `${id}.md`, mediaType: 'text/markdown' }),
-    { path: `resources/${id}.md`, text: body },
-  ];
+  return [file(id, title, 'markdown', { url: textAsset(text) })];
 }
 
 /** Any kind's Resource file, its content written as given. */

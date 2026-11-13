@@ -7,8 +7,8 @@ import type { ResourceNodeData, ResourceTitleEditor } from '../src/projection';
  *
  * Split, the editing state could be asked for with either operation missing,
  * and `ResourceNode` would have to invent total functions to satisfy
- * `CanvasResourceProps` — an absent completion answering `null`, which
- * `CanvasResource` reads as *accepted*, would close the editor on a rename
+ * its Title's `editor` — an absent completion answering `null`, which
+ * the editor reads as *accepted*, would close the editor on a rename
  * that never happened. Pairing them is what
  * makes that state unrepresentable rather than merely unreached.
  *

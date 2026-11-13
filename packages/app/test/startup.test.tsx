@@ -8,10 +8,10 @@ import { MemorySpaceBackend } from '@project/persistence';
 import { createOpenSpaces } from '../src/open-spaces';
 import { recordingHistory } from './browser-history';
 import { startApplication } from '../src/startup';
-import { unusedImageSources } from './image-sources';
 import { refusingFullscreen } from './fullscreen';
 import { unlinkedPresentations } from './presentations';
 import { stubResizeObserver } from './resize-observer';
+import { textAsset } from './markdown-texts';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -22,7 +22,11 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
   resources: [
     {
       id: RESOURCE_ID,
-      document: { title: 'Start here', kind: 'markdown', content: { source: 'Stored body' } },
+      document: {
+        title: 'Start here',
+        kind: 'markdown',
+        content: { url: textAsset('Stored body') },
+      },
     },
   ],
 });
@@ -42,7 +46,6 @@ it('opens once under StrictMode and mounts without interpreting the browser path
   const spaces = createOpenSpaces({
     fullscreen: refusingFullscreen,
     presentations: unlinkedPresentations,
-    images: unusedImageSources,
     backend,
     metaSpaceId: SPACE_ID,
     metaSpaceTitle: snapshot.document.title,
@@ -92,7 +95,6 @@ it('draws the starting view until the opening settles, then the opened Space', a
   const spaces = createOpenSpaces({
     fullscreen: refusingFullscreen,
     presentations: unlinkedPresentations,
-    images: unusedImageSources,
     backend,
     metaSpaceId: SPACE_ID,
     metaSpaceTitle: snapshot.document.title,

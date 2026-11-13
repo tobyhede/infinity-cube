@@ -2,9 +2,16 @@ import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/pr
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { titleName, uuidSchema, type Resource, type UUID } from '@project/core';
+import {
+  isOfKind,
+  assetHashOfPath,
+  titleName,
+  uuidSchema,
+  type Resource,
+  type UUID,
+} from '@project/core';
 import { loadSpaceAggregate } from '@project/graph';
-import { isImageId } from '@project/persistence';
+import { isAssetHash } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { importFixture } from '../support/import-fixture';
 import { exportAggregate } from '../../src/export/export-aggregate';
@@ -13,7 +20,9 @@ import { MemorySpaceRepository } from '@project/aggregate';
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
 
 const spaceResourceTargets = (resources: readonly Resource[]): readonly UUID[] =>
-  resources.flatMap((resource) => (resource.kind === 'space' ? [resource.content.spaceId] : []));
+  resources.flatMap((resource) =>
+    isOfKind(resource, 'space') ? [uuidSchema.parse(resource.content.spaceId)] : [],
+  );
 
 /**
  * Longest Space-Resource path from Meta, and every ordinary Space that path reaches.
@@ -98,15 +107,19 @@ describe('tracked fixture aggregate', () => {
 
     for (const space of ordinary) {
       for (const resource of space.resources) {
-        if (resource.kind !== 'markdown') continue;
+        if (!isOfKind(resource, 'markdown')) continue;
         expect(titleName(resource.title).length).toBeGreaterThan(1);
-        expect(resource.content.source.trim().length).toBeGreaterThan(0);
+        // Its text is an asset the fixture carries, and says something (ADR 0142).
+        const hash = assetHashOfPath(resource.content.url);
+        if (hash === undefined || !isAssetHash(hash)) throw new Error('expected an asset URL');
+        const text = await repository.loadAsset(hash);
+        expect(new TextDecoder().decode(text?.bytes).trim().length).toBeGreaterThan(0);
       }
     }
   });
 });
 
-const STORED_IMAGE_PREFIX = '/images/';
+const STORED_IMAGE_PREFIX = '/assets/';
 const trackedFixture = fileURLToPath(new URL('../../packages/app/fixture', import.meta.url));
 const temporaryDirectories: string[] = [];
 
@@ -126,8 +139,8 @@ const copyOf = async (tracked: string): Promise<string> => {
 };
 const copyOfTrackedFixture = (): Promise<string> => copyOf(trackedFixture);
 
-describe('tracked fixture images', () => {
-  it('seeds an Open Image Resource whose stored image loads from the repository', async () => {
+describe('tracked fixture assets', () => {
+  it('seeds a placed Image Resource whose stored image loads from the repository', async () => {
     const repository = new MemorySpaceRepository();
     await importFixture(repository);
     const loaded = await repository.loadAggregate();
@@ -135,9 +148,9 @@ describe('tracked fixture images', () => {
 
     const opened = loaded.aggregate.spaces.flatMap(({ snapshot }) =>
       snapshot.resources.flatMap(({ id, document }) =>
-        document.kind === 'image' &&
+        isOfKind(document, 'image') &&
         document.content.url.startsWith(STORED_IMAGE_PREFIX) &&
-        (snapshot.document.maps ?? []).some((m) => m.positions[id]?.open === true)
+        (snapshot.document.maps ?? []).some((m) => m.positions[id] !== undefined)
           ? [document.content.url]
           : [],
       ),
@@ -146,8 +159,8 @@ describe('tracked fixture images', () => {
 
     for (const url of opened) {
       const id = url.slice(STORED_IMAGE_PREFIX.length);
-      if (!isImageId(id)) throw new Error(`${url} does not name a stored image`);
-      const image = await repository.loadImage(id);
+      if (!isAssetHash(id)) throw new Error(`${url} does not name a stored asset`);
+      const image = await repository.loadAsset(id);
       expect(image?.mediaType).toBe('image/png');
     }
   });
@@ -166,22 +179,23 @@ describe('tracked fixture images', () => {
     await expect(repository.listSpaces()).resolves.toEqual([]);
   });
 
-  it('ignores the dotfiles and subdirectories a checkout can leave among the tracked images', async () => {
+  it('ignores the dotfiles and subdirectories a checkout can leave among the tracked assets', async () => {
     const copy = await copyOfTrackedFixture();
-    await writeFile(join(copy, 'images', '.DS_Store'), 'Bud1 not an image');
-    await mkdir(join(copy, 'images', 'nested'));
+    await writeFile(join(copy, 'assets', '.DS_Store'), 'Bud1 not an asset');
+    await mkdir(join(copy, 'assets', 'nested'));
 
     const repository = new MemorySpaceRepository();
     await importFixture(repository, { directory: copy });
     await expect(repository.listSpaces()).resolves.not.toEqual([]);
   });
 
-  it('refuses to seed when a tracked image file is not an image', async () => {
+  it('refuses to seed when a tracked asset file is not named for its bytes', async () => {
     const copy = await copyOfTrackedFixture();
-    await writeFile(join(copy, 'images', 'notes.txt'), 'not an image');
+    const misnamed = `${'A'.repeat(43)}.txt`;
+    await writeFile(join(copy, 'assets', misnamed), 'not these bytes');
 
     const repository = new MemorySpaceRepository();
-    await expect(importFixture(repository, { directory: copy })).rejects.toThrow('notes.txt');
+    await expect(importFixture(repository, { directory: copy })).rejects.toThrow(misnamed);
     await expect(repository.listSpaces()).resolves.toEqual([]);
   });
 });
@@ -211,7 +225,7 @@ describe('tracked fixture export', () => {
 
     const first = await exportOf(trackedFixture, join(root, 'first'));
     const second = await exportOf(join(root, 'first'), join(root, 'second'));
-    // Both Resource files and Markdown sidecars are among what round-trips.
+    // Both Resource files and Markdown text assets are among what round-trips.
     expect(Object.keys(first).filter((path) => path.endsWith('.json')).length).toBeGreaterThan(0);
     expect(Object.keys(first).filter((path) => path.endsWith('.md')).length).toBeGreaterThan(0);
     expect(second).toEqual(first);

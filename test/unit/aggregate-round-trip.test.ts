@@ -1,13 +1,23 @@
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { newUuid, spaceFileSchema, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
-import { createWorkingSpaceLoader, type LoadedSpace } from '@project/persistence';
+import {
+  isOfKind,
+  EMPTY_ASSET_REF,
+  newUuid,
+  spaceFileSchema,
+  uuidSchema,
+  type SpaceSnapshot,
+  type UUID,
+} from '@project/core';
+import { createWorkingSpaceLoader, isAssetHash, type LoadedSpace } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { exportAggregate } from '../../src/export/export-aggregate';
 import { importAggregate } from '../../src/import/import-aggregate';
+import { initAggregate } from '../../src/run/run';
+import { defaultContentAggregate } from '../../src/startup/default-content';
 import { MemorySpaceRepository, AGGREGATE_FILE_NAME } from '@project/aggregate';
-import { admitted, directoryTree, jpegBytes, pngBytes, showing } from '../support/stored-images';
+import { admitted, directoryTree, jpegBytes, pngBytes, showing } from '../support/stored-assets';
 
 const META_SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const TARGET_SPACE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
@@ -63,7 +73,7 @@ const targetSpace = (
         id: mapId,
         title: 'Map 1',
         kind: 'positioned',
-        positions: { [resourceId]: { x: 0, y: 0, open: false } },
+        positions: { [resourceId]: { x: 0, y: 0 } },
         graphs: [{ id: graphId, title: 'Graph 1', edges: [] }],
         activeGraph: graphId,
       },
@@ -73,7 +83,7 @@ const targetSpace = (
   resources: [
     {
       id: resourceId,
-      document: { title: `${title} resource`, kind: 'markdown', content: { source: 'Body.' } },
+      document: { title: `${title} resource`, kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
   ],
 });
@@ -94,10 +104,15 @@ const metaSpace = (): SpaceSnapshot => ({
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [MARKDOWN_RESOURCE_ID]: { x: 0, y: 0, open: false },
-          [FIRST_LINK_ID]: { x: 340, y: 0, open: false },
-          [SECOND_LINK_ID]: { x: 680, y: 0, open: true, size: { width: 480, height: 270 } },
-          [CONVERGING_LINK_ID]: { x: 1020, y: 0, open: false },
+          [MARKDOWN_RESOURCE_ID]: { x: 0, y: 0 },
+          [FIRST_LINK_ID]: { x: 340, y: 0 },
+          [SECOND_LINK_ID]: {
+            x: 680,
+            y: 0,
+            content: { open: true },
+            size: { width: 480, height: 270 },
+          },
+          [CONVERGING_LINK_ID]: { x: 1020, y: 0 },
         },
         graphs: [
           {
@@ -118,7 +133,7 @@ const metaSpace = (): SpaceSnapshot => ({
       document: {
         title: 'Opening',
         kind: 'markdown',
-        content: { source: '# Opening\n\nHello.\n' },
+        content: { url: EMPTY_ASSET_REF },
       },
     },
     {
@@ -194,6 +209,135 @@ afterEach(async () => {
   );
 });
 
+/**
+ * A Markdown Resource's Open is its plugin's Map content (ADR 0142), so one Map
+ * may draw it Open and another Closed, and both are kept through a reload of
+ * the store and an Export and re-Import, as is the text its URL names.
+ */
+describe('a Markdown Resource Open on one Map and Closed on another', () => {
+  const OTHER_MAP_ID = uuidSchema.parse('14141414-1414-4141-8141-141414141414');
+  const OTHER_GRAPH_ID = uuidSchema.parse('15151515-1515-4151-8151-151515151515');
+  const TEXT = '# Notes\n\nOpen here, Closed there.\n';
+
+  const twoMaps = async (): Promise<{
+    snapshot: SpaceSnapshot;
+    repository: MemorySpaceRepository;
+  }> => {
+    const stored = await admitted(new TextEncoder().encode(TEXT), 'text/markdown');
+    const snapshot: SpaceSnapshot = {
+      id: META_SPACE_ID,
+      document: {
+        version: 1,
+        title: 'Talk',
+        maps: [
+          {
+            id: META_MAP_ID,
+            title: 'Open here',
+            kind: 'positioned',
+            positions: { [MARKDOWN_RESOURCE_ID]: { x: 0, y: 0, content: { open: true } } },
+            graphs: [{ id: META_GRAPH_ID, title: 'Graph', edges: [] }],
+          },
+          {
+            id: OTHER_MAP_ID,
+            title: 'Closed there',
+            kind: 'positioned',
+            positions: { [MARKDOWN_RESOURCE_ID]: { x: 40, y: 40 } },
+            graphs: [{ id: OTHER_GRAPH_ID, title: 'Graph', edges: [] }],
+          },
+        ],
+      },
+      resources: [
+        {
+          id: MARKDOWN_RESOURCE_ID,
+          document: {
+            title: 'Notes',
+            kind: 'markdown',
+            content: { url: `/assets/${stored.hash}` },
+          },
+        },
+      ],
+    };
+    const repository = repositoryHolding([snapshot]);
+    await repository.storeAsset(stored);
+    return { snapshot, repository };
+  };
+
+  it('keeps each Map’s Open through a reload of the store', async () => {
+    const { snapshot, repository } = await twoMaps();
+
+    expect(await storedSnapshots(repository)).toEqual([snapshot]);
+  });
+
+  it('keeps each Map’s Open, and the text, through an Export and a re-Import', async () => {
+    const { snapshot, repository } = await twoMaps();
+    const destination = join(await makeTemporaryDirectory(), 'aggregate');
+
+    await exportTo(repository, destination);
+    const reimported = await importFrom(destination);
+
+    expect(await storedSnapshots(reimported)).toEqual([snapshot]);
+    const hash = (await admitted(new TextEncoder().encode(TEXT), 'text/markdown')).hash;
+    await expect(readFile(join(destination, 'assets', `${hash}.md`), 'utf8')).resolves.toBe(TEXT);
+    const text = await reimported.loadAsset(hash);
+    expect(text === undefined ? undefined : new TextDecoder().decode(text.bytes)).toBe(TEXT);
+  });
+});
+
+/**
+ * A fresh Space's first Resource is a Markdown Resource naming the asset of
+ * zero bytes (ADR 0142), which exists in every store and needs no file, so a
+ * fresh Space and a `cube init` directory each Export and re-Import with that
+ * text present and no `.md` written anywhere.
+ */
+describe('a fresh Space and a cube init directory', () => {
+  /** Every file under `directory`, by relative path. */
+  const filesIn = async (directory: string): Promise<readonly string[]> =>
+    (await readdir(directory, { recursive: true, withFileTypes: true }))
+      .filter((entry) => entry.isFile())
+      .map((entry) => join(entry.parentPath, entry.name).slice(directory.length + 1));
+
+  const firstResourceText = async (
+    repository: MemorySpaceRepository,
+  ): Promise<string | undefined> => {
+    const [meta] = await storedSnapshots(repository);
+    const first = meta?.resources[0]?.document;
+    if (first === undefined || !isOfKind(first, 'markdown')) return undefined;
+    expect(first.content).toEqual({ url: EMPTY_ASSET_REF });
+    const hash = first.content.url.slice('/assets/'.length);
+    if (!isAssetHash(hash)) throw new Error(`${first.content.url} does not name an asset`);
+    const text = await repository.loadAsset(hash);
+    return text === undefined ? undefined : new TextDecoder().decode(text.bytes);
+  };
+
+  it('Exports and re-Imports a fresh Space with its first Resource’s text present', async () => {
+    const repository = new MemorySpaceRepository();
+    await repository.initializeAggregate(defaultContentAggregate(newUuid));
+    const destination = join(await makeTemporaryDirectory(), 'aggregate');
+
+    await exportTo(repository, destination);
+    const reimported = await importFrom(destination);
+
+    expect(await storedSnapshots(reimported)).toEqual(await storedSnapshots(repository));
+    await expect(firstResourceText(reimported)).resolves.toBe('');
+    expect((await filesIn(destination)).filter((path) => path.endsWith('.md'))).toEqual([]);
+  });
+
+  it('Exports and re-Imports a cube init directory with its first Resource’s text present', async () => {
+    const directory = join(await makeTemporaryDirectory(), 'talk');
+    await expect(initAggregate(directory, newUuid)).resolves.toEqual({ kind: 'initialized' });
+
+    const imported = await importFrom(directory);
+    await expect(firstResourceText(imported)).resolves.toBe('');
+    const destination = join(await makeTemporaryDirectory(), 'exported');
+    await exportTo(imported, destination);
+    const reimported = await importFrom(destination);
+
+    expect(await storedSnapshots(reimported)).toEqual(await storedSnapshots(imported));
+    await expect(firstResourceText(reimported)).resolves.toBe('');
+    expect((await filesIn(directory)).filter((path) => path.endsWith('.md'))).toEqual([]);
+  });
+});
+
 describe('exporting and importing one complete aggregate', () => {
   it('returns the same authored aggregate through normal intake', async () => {
     const destination = join(await makeTemporaryDirectory(), 'aggregate');
@@ -224,9 +368,9 @@ describe('exporting and importing one complete aggregate', () => {
         .sort(),
     ).toEqual([META_SPACE_ID, TARGET_SPACE_ID, SECOND_TARGET_ID].sort());
     // A Resource is named by its own id, never by its title (ADR 0020).
+    // Its text is an asset (ADR 0142), so no `.md` is written beside it.
     expect((await readdir(join(destination, TARGET_SPACE_ID, 'resources'))).sort()).toEqual([
       `${TARGET_RESOURCE_ID}.json`,
-      `${TARGET_RESOURCE_ID}.md`,
     ]);
   });
 
@@ -245,7 +389,8 @@ describe('exporting and importing one complete aggregate', () => {
     const meta = (await storedSnapshots(reimported)).find(({ id }) => id === META_SPACE_ID);
     const converging = meta?.resources.filter(
       (resource) =>
-        resource.document.kind === 'space' && resource.document.content.spaceId === TARGET_SPACE_ID,
+        isOfKind(resource.document, 'space') &&
+        resource.document.content.spaceId === TARGET_SPACE_ID,
     );
     expect(converging?.map(({ id }) => id).sort()).toEqual(
       [FIRST_LINK_ID, CONVERGING_LINK_ID].sort(),
@@ -333,12 +478,13 @@ describe('exporting and importing one complete aggregate', () => {
     }
   });
 
-  it("preserves every Resource's Shape, size and Open/Closed state on its Map, and their absence", async () => {
+  it("preserves every Resource's Map content, size and Open/Closed state on its Map, and their absence", async () => {
     const destination = join(await makeTemporaryDirectory(), 'aggregate');
     const [meta, ...targets] = completeAggregate();
     if (meta === undefined) throw new Error('The aggregate names no Meta Space');
-    // Only an Ur Resource takes a Shape (ADR 0121): one in a diamond storing
-    // neither `open` nor `size`, and one resized in an ellipse.
+    // Only a kind a plugin draws keeps Map content (ADR 0142): an Ur Resource
+    // in a diamond storing neither `open` nor `size`, and one resized in an
+    // ellipse.
     const withResourceShapes: SpaceSnapshot = {
       ...meta,
       document: {
@@ -347,15 +493,13 @@ describe('exporting and importing one complete aggregate', () => {
           ...m,
           positions: {
             ...m.positions,
-            // A stored rectangle is legal on any kind, and kept as stored.
-            [FIRST_LINK_ID]: { x: 340, y: 0, open: false, shape: 'rectangle' },
-            [CLOSED_UR_ID]: { x: 0, y: 400, shape: 'diamond' },
+            [FIRST_LINK_ID]: { x: 340, y: 0 },
+            [CLOSED_UR_ID]: { x: 0, y: 400, content: { shape: 'diamond' } },
             [RESIZED_UR_ID]: {
               x: 340,
               y: 400,
-              open: false,
               size: { width: 480, height: 270 },
-              shape: 'ellipse',
+              content: { shape: 'ellipse' },
             },
           },
         })),
@@ -370,22 +514,21 @@ describe('exporting and importing one complete aggregate', () => {
     await exportTo(repositoryHolding([withResourceShapes, ...targets]), destination);
     const written = await readFile(join(destination, META_SPACE_ID, 'space.json'), 'utf8');
     // Written last on the entry, after its size.
-    expect(written).toMatch(/"size": \{[^}]*\},\s*"shape": "ellipse"/);
+    expect(written).toMatch(/"size": \{[^}]*\},\s*"content": \{\s*"shape": "ellipse"\s*\}/);
     const reimported = await importFrom(destination);
 
     const positions = (await storedSnapshots(reimported)).find(({ id }) => id === META_SPACE_ID)
       ?.document.maps?.[0]?.positions;
-    expect(positions?.[CLOSED_UR_ID]).toEqual({ x: 0, y: 400, shape: 'diamond' });
+    expect(positions?.[CLOSED_UR_ID]).toEqual({ x: 0, y: 400, content: { shape: 'diamond' } });
     expect(positions?.[RESIZED_UR_ID]).toEqual({
       x: 340,
       y: 400,
-      open: false,
       size: { width: 480, height: 270 },
-      shape: 'ellipse',
+      content: { shape: 'ellipse' },
     });
-    expect(positions?.[FIRST_LINK_ID]).toEqual({ x: 340, y: 0, open: false, shape: 'rectangle' });
-    // An entry with no Shape or size stored is written and read back without one.
-    expect(positions?.[MARKDOWN_RESOURCE_ID]).toEqual({ x: 0, y: 0, open: false });
+    expect(positions?.[FIRST_LINK_ID]).toEqual({ x: 340, y: 0 });
+    // An entry with no Map content or size stored is written and read back without one.
+    expect(positions?.[MARKDOWN_RESOURCE_ID]).toEqual({ x: 0, y: 0 });
   });
 
   /*
@@ -415,7 +558,7 @@ describe('exporting and importing one complete aggregate', () => {
         document: {
           title: 'Stored',
           kind: 'image' as const,
-          content: { url: '/images/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU' },
+          content: { url: EMPTY_ASSET_REF },
         },
       },
     ];
@@ -435,19 +578,19 @@ describe('exporting and importing one complete aggregate', () => {
   "title": "Stored",
   "kind": "image",
   "content": {
-    "url": "/images/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+    "url": "/assets/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
   }
 }
 `);
     expect(await readdir(join(destination, META_SPACE_ID, 'resources'))).not.toContain(
       `${STORED_ID}.md`,
     );
-    await expect(readdir(destination)).resolves.not.toContain('images');
+    await expect(readdir(destination)).resolves.not.toContain('assets');
   });
 
   /*
    * An Ur Resource is its Title and its kind (ADR 0113): its Resource file's
-   * content is empty and it has no sidecar, and a Reference Resource to it comes
+   * content is empty and names no asset, and a Reference Resource to it comes
    * back still pointing at it.
    */
   it('round-trips an Ur Resource and a Reference Resource to it', async () => {
@@ -499,17 +642,19 @@ describe('exporting and importing one complete aggregate', () => {
   });
 });
 
-describe('stored image bytes', () => {
+describe('stored asset bytes', () => {
   const PICTURE_ID = uuidSchema.parse('16161616-1616-4616-8616-161616161616');
   const PHOTO_ID = uuidSchema.parse('17171717-1717-4717-8717-171717171717');
 
   /** The complete aggregate, with Meta also holding one Image Resource per image. */
   const picturing = async (
-    ...images: readonly { id: UUID; bytes: Uint8Array<ArrayBuffer> }[]
+    ...images: readonly { id: UUID; bytes: Uint8Array<ArrayBuffer>; mediaType?: string }[]
   ): Promise<MemorySpaceRepository> => {
     const [meta, ...targets] = completeAggregate();
     if (meta === undefined) throw new Error('The aggregate names no Meta Space');
-    const stored = await Promise.all(images.map(({ bytes }) => admitted(bytes)));
+    const stored = await Promise.all(
+      images.map(({ bytes, mediaType }) => admitted(bytes, mediaType)),
+    );
     const pictured: SpaceSnapshot = {
       ...meta,
       resources: [
@@ -522,7 +667,7 @@ describe('stored image bytes', () => {
       ],
     };
     const repository = repositoryHolding([pictured, ...targets]);
-    for (const image of stored) await repository.storeImage(image);
+    for (const image of stored) await repository.storeAsset(image);
     return repository;
   };
 
@@ -537,15 +682,15 @@ describe('stored image bytes', () => {
 
     await exportTo(source, destination);
 
-    expect((await readdir(join(destination, 'images'))).sort()).toEqual(
-      [`${png.id}.png`, `${jpeg.id}.jpg`].sort(),
+    expect((await readdir(join(destination, 'assets'))).sort()).toEqual(
+      [`${png.hash}.png`, `${jpeg.hash}.jpg`].sort(),
     );
-    expect(new Uint8Array(await readFile(join(destination, 'images', `${png.id}.png`)))).toEqual(
+    expect(new Uint8Array(await readFile(join(destination, 'assets', `${png.hash}.png`)))).toEqual(
       pngBytes(1),
     );
     const reimported = await importFrom(destination);
-    await expect(reimported.loadImage(png.id)).resolves.toEqual(png);
-    await expect(reimported.loadImage(jpeg.id)).resolves.toEqual(jpeg);
+    await expect(reimported.loadAsset(png.hash)).resolves.toEqual(png);
+    await expect(reimported.loadAsset(jpeg.hash)).resolves.toEqual(jpeg);
     expect(await storedSnapshots(reimported)).toEqual(await storedSnapshots(source));
   });
 
@@ -553,7 +698,7 @@ describe('stored image bytes', () => {
    * What an author commits is what InfinityCube reads back and writes again, so a run
    * that changes nothing changes no byte of the directory, pictures included.
    */
-  it('round-trips a directory with images byte-for-byte through Import then Export', async () => {
+  it('round-trips a directory with assets byte-for-byte through Import then Export', async () => {
     const root = await makeTemporaryDirectory();
     const first = join(root, 'first');
     const second = join(root, 'second');
@@ -570,6 +715,119 @@ describe('stored image bytes', () => {
     expect(await directoryTree(second)).toEqual(await directoryTree(first));
   });
 
+  /*
+   * Import types a file by its extension through the host table and Export
+   * writes back the name it read, so an asset's file name and media type
+   * survive a round trip, an extension the table does not list included.
+   */
+  it('keeps each asset file name and media type through Import then Export', async () => {
+    const root = await makeTemporaryDirectory();
+    const directory = join(root, 'aggregate');
+    await exportTo(await picturing({ id: PICTURE_ID, bytes: pngBytes(1) }), directory);
+    const files = [
+      { bytes: jpegBytes(3), extension: 'jpeg', mediaType: 'image/jpeg' },
+      { bytes: new TextEncoder().encode('# Notes\n'), extension: 'md', mediaType: 'text/markdown' },
+      {
+        bytes: new TextEncoder().encode('graph TD; A-->B\n'),
+        extension: 'mermaid',
+        mediaType: 'application/octet-stream',
+      },
+    ];
+    const assets = await Promise.all(
+      files.map(({ bytes, mediaType }) => admitted(bytes, mediaType)),
+    );
+    await mkdir(join(directory, 'assets'), { recursive: true });
+    const names: string[] = [];
+    for (const [index, { bytes, extension }] of files.entries()) {
+      const asset = assets[index];
+      if (asset === undefined) throw new Error('An asset was not admitted');
+      names.push(`${asset.hash}.${extension}`);
+      await writeFile(join(directory, 'assets', `${asset.hash}.${extension}`), bytes);
+    }
+    const resourcesDirectory = join(directory, META_SPACE_ID, 'resources');
+    for (const [index, asset] of assets.entries()) {
+      const id = `18181818-1818-4818-8818-${String(index).padStart(12, '0')}`;
+      await writeFile(
+        join(resourcesDirectory, `${id}.json`),
+        `${JSON.stringify({ id, title: `Asset ${index}`, kind: 'image', content: { url: `/assets/${asset.hash}` } }, null, 2)}\n`,
+      );
+    }
+    const before = await readdir(join(directory, 'assets'));
+
+    const reimported = await importFrom(directory);
+    for (const [index, asset] of assets.entries()) {
+      await expect(reimported.loadAsset(asset.hash)).resolves.toEqual({
+        hash: asset.hash,
+        mediaType: files[index]?.mediaType,
+        bytes: files[index]?.bytes,
+      });
+    }
+    await exportTo(reimported, directory);
+
+    expect((await readdir(join(directory, 'assets'))).sort()).toEqual(before.sort());
+    expect(before).toEqual(expect.arrayContaining(names));
+  });
+
+  /*
+   * The table is what carries a media type through a directory, so a type
+   * stored from the browser that it does not list is written as `.bin` and
+   * reads back as `application/octet-stream`, while a listed one survives.
+   */
+  it('carries a listed media type through Export then Import, and an unlisted one as octet-stream', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'aggregate');
+    const notes = new TextEncoder().encode('# Notes\n');
+    const archive = Uint8Array.from([0x50, 0x4b, 0x03, 0x04]);
+    const markdown = await admitted(notes, 'text/markdown');
+    const zip = await admitted(archive, 'application/zip');
+
+    await exportTo(
+      await picturing(
+        { id: PICTURE_ID, bytes: notes, mediaType: 'text/markdown' },
+        { id: PHOTO_ID, bytes: archive, mediaType: 'application/zip' },
+      ),
+      destination,
+    );
+
+    expect((await readdir(join(destination, 'assets'))).sort()).toEqual(
+      [`${markdown.hash}.md`, `${zip.hash}.bin`].sort(),
+    );
+    const reimported = await importFrom(destination);
+    await expect(reimported.loadAsset(markdown.hash)).resolves.toEqual(markdown);
+    await expect(reimported.loadAsset(zip.hash)).resolves.toEqual({
+      ...zip,
+      mediaType: 'application/octet-stream',
+    });
+  });
+
+  /*
+   * One asset exists per hash, so a store that already holds the bytes keeps
+   * the type it first stored them under; Export keeps the file the directory
+   * has, and names a file in a directory without one from the kept type.
+   */
+  it('keeps the first stored type on Import into a store that holds the bytes, and the file name on Export', async () => {
+    const root = await makeTemporaryDirectory();
+    const directory = join(root, 'aggregate');
+    const notes = new TextEncoder().encode('# Notes\n');
+    const markdown = await admitted(notes, 'text/markdown');
+    const plain = await admitted(notes, 'text/plain');
+    await exportTo(
+      await picturing({ id: PICTURE_ID, bytes: notes, mediaType: 'text/markdown' }),
+      directory,
+    );
+    const target = new MemorySpaceRepository();
+    await target.storeAsset(plain);
+
+    const result = await importAggregate(directory, target, { replace: false, newId: newUuid });
+    expect(result.kind).toBe('imported');
+    await expect(target.loadAsset(markdown.hash)).resolves.toEqual(plain);
+
+    await exportTo(target, directory);
+    await expect(readdir(join(directory, 'assets'))).resolves.toEqual([`${markdown.hash}.md`]);
+    const fresh = join(root, 'fresh');
+    await exportTo(target, fresh);
+    await expect(readdir(join(fresh, 'assets'))).resolves.toEqual([`${markdown.hash}.txt`]);
+  });
+
   it('stores one file for two Resources showing the same picture', async () => {
     const destination = join(await makeTemporaryDirectory(), 'aggregate');
     const png = await admitted(pngBytes(1));
@@ -579,7 +837,7 @@ describe('stored image bytes', () => {
       destination,
     );
 
-    await expect(readdir(join(destination, 'images'))).resolves.toEqual([`${png.id}.png`]);
+    await expect(readdir(join(destination, 'assets'))).resolves.toEqual([`${png.hash}.png`]);
   });
 });
 
@@ -591,7 +849,7 @@ describe('a mapless Space', () => {
     resources: [
       {
         id: MARKDOWN_RESOURCE_ID,
-        document: { title: 'Opening', kind: 'markdown', content: { source: 'Hello.\n' } },
+        document: { title: 'Opening', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       },
     ],
   };
@@ -692,17 +950,12 @@ describe('re-exporting over an earlier export', () => {
   });
 
   /*
-   * The format reads a root aggregate file and `<space-uuid>/` children, and
-   * inside a Space directory it reads `space.json`, `*.md`, `resources/*.json`
-   * and `resources/*.md`.
-   * Everything else is the author's — notes, assets — and re-export has to carry
-   * it across rather than tidy it away.
-   *
-   * A `README.md` inside a Space directory is **not** one of those, and does not
-   * survive as one and must not: root `*.md` is what the reader scans
-   * so that one no Resource file names is refused, and a README left there would
-   * refuse the import as an unclaimed sidecar. Asserted alongside, so the boundary is
-   * the tested one rather than the plausible one.
+   * The format reads a root aggregate file, `assets/` and `<space-uuid>/`
+   * children, and inside a Space directory it reads `space.json` and
+   * `resources/*`. Everything else is the author's — notes, a README — and
+   * re-export has to carry it across rather than tidy it away. A Markdown
+   * Resource's text is an asset (ADR 0142), so a `README.md` in a Space
+   * directory is not read and survives with the rest.
    */
   it('preserves root files it ignores and undiscovered contents of a Space it keeps', async () => {
     const destination = join(await makeTemporaryDirectory(), 'aggregate');
@@ -718,10 +971,10 @@ describe('re-exporting over an earlier export', () => {
     expect(await readFile(join(destination, META_SPACE_ID, 'assets.json'), 'utf8')).toBe(
       '{"kept":true}\n',
     );
-    expect(await readdir(join(destination, META_SPACE_ID))).not.toContain('README.md');
+    expect(await readFile(join(destination, META_SPACE_ID, 'README.md'), 'utf8')).toBe('# Notes\n');
   });
 
-  it('removes the Resource file and sidecar of a Resource the Space no longer holds', async () => {
+  it('removes the Resource file of a Resource the Space no longer holds', async () => {
     const destination = join(await makeTemporaryDirectory(), 'aggregate');
     const complete = completeAggregate();
 
@@ -748,7 +1001,6 @@ describe('re-exporting over an earlier export', () => {
 
     const remaining = await readdir(join(destination, META_SPACE_ID, 'resources'));
     expect(remaining).not.toContain(`${MARKDOWN_RESOURCE_ID}.json`);
-    expect(remaining).not.toContain(`${MARKDOWN_RESOURCE_ID}.md`);
     expect(remaining).toContain(`${FIRST_LINK_ID}.json`);
   });
 });

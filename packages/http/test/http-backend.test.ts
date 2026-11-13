@@ -1,4 +1,4 @@
-import { uuidSchema, type SpaceSnapshot } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type SpaceSnapshot } from '@project/core';
 import {
   encodeCommitConflict,
   encodeCommitRefusal,
@@ -18,7 +18,10 @@ const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: { version: 1, title: 'One' },
   resources: [
-    { id: RESOURCE_ID, document: { title: 'A', kind: 'markdown', content: { source: '' } } },
+    {
+      id: RESOURCE_ID,
+      document: { title: 'A', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+    },
   ],
 };
 const loaded = { snapshot, revision: 4n, exportedRevision: 2n };

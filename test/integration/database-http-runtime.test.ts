@@ -32,8 +32,8 @@ const repositoryWithAggregateReads = (
   replaceAggregate: (input, expectedMetaSpaceId) =>
     repository.replaceAggregate(input, expectedMetaSpaceId),
   markExported: (id, revision) => repository.markExported(id, revision),
-  storeImage: (image) => repository.storeImage(image),
-  loadImage: (id) => repository.loadImage(id),
+  storeAsset: (asset) => repository.storeAsset(asset),
+  loadAsset: (hash) => repository.loadAsset(hash),
 });
 
 interface HttpTargetCase {

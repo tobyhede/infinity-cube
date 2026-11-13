@@ -6,8 +6,8 @@ import { MemorySpaceBackend } from '@project/persistence';
 import { mountSpace } from './space-mounting';
 import { composeApp } from '../src/compose-app';
 import { openTestSpace } from './opened-space';
-import { unusedImageSources } from './image-sources';
 import { stubResizeObserver } from './resize-observer';
+import { textAsset } from './markdown-texts';
 
 /**
  * React Flow positions the whole graph with one viewport transform, and derives
@@ -40,7 +40,7 @@ const snapshot = (title: string, resourceTitle: string, x: number, y: number): S
           id: MAP_ID,
           title: 'Map',
           kind: 'positioned',
-          positions: { [RESOURCE_ID]: { x, y, open: false } },
+          positions: { [RESOURCE_ID]: { x, y } },
           // A Map owns at least one Graph (ADR 0040); this one holds no
           // Edges, which is all a single-Resource Space has to connect.
           graphs: [{ id: GRAPH_ID, title: 'Main', edges: [] }],
@@ -51,7 +51,11 @@ const snapshot = (title: string, resourceTitle: string, x: number, y: number): S
     resources: [
       {
         id: RESOURCE_ID,
-        document: { title: resourceTitle, kind: 'markdown', content: { source: resourceTitle } },
+        document: {
+          title: resourceTitle,
+          kind: 'markdown',
+          content: { url: textAsset(resourceTitle) },
+        },
       },
     ],
   });
@@ -102,7 +106,7 @@ describe('graph viewport', () => {
       {
         id: runtime(local).id,
         session,
-        app: composeApp({ images: unusedImageSources, spaceSession: session }),
+        app: composeApp({ spaceSession: session }),
         spaceResources,
       },
       (app) => {

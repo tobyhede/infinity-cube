@@ -1,16 +1,14 @@
 import {
   COLLAPSED_RESOURCE_SIZE,
   titleName,
-  resourceOpen,
-  resourceShape,
+  mapContentProblem,
+  resolvedMapContent,
   resourceSize,
-  takesOpen,
-  takesResourceShape,
+  sameJsonValue,
   type Graph,
+  type JsonValue,
   type Map,
   type MapPosition,
-  type ResourcePlacement,
-  type ResourceShape,
   type SpaceSnapshot,
   type ResourceDocument,
   type UUID,
@@ -20,8 +18,8 @@ import { Placement } from './placement';
 
 /**
  * The Resource membership rules that turn a Space snapshot into the next one when
- * a Resource joins, Opens, Closes, is resized, changes Shape or leaves a Map —
- * Add, Open, Close, Resize, change Shape, Remove from Map, Delete from Space.
+ * a Resource joins, is resized, changes Map content or leaves a Map — Add,
+ * Resize, change Map content, Remove from Map, Delete from Space.
  *
  * `SnapshotEdit` operates on `SpaceSnapshot` — the one representation both
  * Space Authoring and the session registry already hold — rather than the
@@ -37,8 +35,8 @@ import { Placement } from './placement';
  *
  * Operations arrive with their first real caller rather than ahead of one.
  * Both callers create and delete through `createInMap` and `deleteFromSpace`;
- * `open`, `close`, `resize`, `openAndExpand`, `changeResourceShape`, `addToMap` and
- * `removeFromMap` are Space Authoring's alone.
+ * `resize`, `changeMapContent`, `addToMap` and `removeFromMap` are Space
+ * Authoring's alone.
  */
 
 /** Why a `SnapshotEdit` operation refused, with the typed context a sentence needs. */
@@ -53,10 +51,8 @@ export type SnapshotEditRefusal =
   | { readonly code: 'reference-target-missing'; readonly targetId: UUID }
   /** A Resource created referencing a Resource whose kind may not be a Target. */
   | { readonly code: 'reference-target-not-targetable'; readonly targetId: UUID }
-  /** An Open of a Resource with no content to show: an Ur Resource is always Closed. */
-  | { readonly code: 'open-requires-content' }
-  /** A Shape Edit on a Resource whose kind takes no Shape: it is the rectangle. */
-  | { readonly code: 'shape-not-taken' }
+  /** Map content the Resource's plugin's schema refuses. */
+  | { readonly code: 'map-content-invalid' }
   | {
       readonly code: 'resource-has-references';
       /** The referencing Resources by **name**, which is what a sentence listing Resources says (ADR 0083). */
@@ -152,7 +148,7 @@ function createInMap(
   return withPlacement(
     { ...snapshot, resources: [...snapshot.resources, { id: resourceId, document }] },
     mapId,
-    Placement.place(placement, resourceId, { x: at.x, y: at.y, open: false }),
+    Placement.place(placement, resourceId, { x: at.x, y: at.y }),
   );
 }
 
@@ -290,52 +286,10 @@ const refused = (refusal: SnapshotEditRefusal): SnapshotEditOutcome => ({
 
 const UNCHANGED: SnapshotEditOutcome = { kind: 'unchanged' };
 
-/** The snapshot with one Resource's entry in one Map rewritten, and no other Resource moved. */
-const withEntry = (
-  snapshot: SpaceSnapshot,
-  mapId: UUID,
-  placement: Placement,
-  resourceId: UUID,
-  at: ResourcePlacement,
-): SnapshotEditOutcome =>
-  withPlacement(snapshot, mapId, Placement.place(placement, resourceId, at));
-
 /**
- * Open a Resource in one Map. Only what is drawn inside its rect changes: its
- * size and every position stay as they are. `unchanged` for a Resource already
- * Open, and `open-requires-content` for an Ur Resource, which has no content to
- * show.
- */
-function open(snapshot: SpaceSnapshot, mapId: UUID, resourceId: UUID): SnapshotEditOutcome {
-  const placed = placedIn(snapshot, mapId);
-  if ('code' in placed) return refused(placed);
-  const at = placed.placement.get(resourceId);
-  if (at === undefined) return refused({ code: 'resource-not-in-map' });
-  const resource = snapshot.resources.find((candidate) => candidate.id === resourceId);
-  if (resource === undefined) return refused({ code: 'resource-not-found' });
-  if (!takesOpen(resource.document.kind)) return refused({ code: 'open-requires-content' });
-  if (resourceOpen(at)) return UNCHANGED;
-  return withEntry(snapshot, mapId, placed.placement, resourceId, { ...at, open: true });
-}
-
-/**
- * Close a Resource in one Map. Only what is drawn inside its rect changes: its
- * size and every position stay as they are. `unchanged` for a Resource already
- * Closed.
- */
-function close(snapshot: SpaceSnapshot, mapId: UUID, resourceId: UUID): SnapshotEditOutcome {
-  const placed = placedIn(snapshot, mapId);
-  if ('code' in placed) return refused(placed);
-  const at = placed.placement.get(resourceId);
-  if (at === undefined) return refused({ code: 'resource-not-in-map' });
-  if (!resourceOpen(at)) return UNCHANGED;
-  return withEntry(snapshot, mapId, placed.placement, resourceId, { ...at, open: false });
-}
-
-/**
- * Resize a Resource in one Map, Open or Closed, moving the Resources clear of it
- * by the change from the size it had (ADR 0084, ADR 0093). The size is written
- * even when it is the Closed Size, and Open/Closed is kept. `unchanged` at the
+ * Resize a Resource in one Map, moving the Resources clear of it by the change
+ * from the size it had (ADR 0084, ADR 0093). The size is written even when it
+ * is the Closed Size, and its Map content is kept. `unchanged` at the
  * size it already draws at. The floor is the schema's: no size below the
  * Closed Size reaches here from a gesture, and intake refuses one.
  */
@@ -359,47 +313,24 @@ function resize(
 }
 
 /**
- * Open a Resource in one Map and Resize it to the size given, as one Edit
- * (ADR 0137): {@link open} and then {@link resize} on what it answers, so it
- * refuses what Open refuses and moves what Resize moves. The size is floored at
- * the Closed Size on each axis. `unchanged` only for a Resource already Open at
- * that size.
- */
-function openAndExpand(
-  snapshot: SpaceSnapshot,
-  mapId: UUID,
-  resourceId: UUID,
-  size: Extent,
-): SnapshotEditOutcome {
-  const opened = open(snapshot, mapId, resourceId);
-  if (opened.kind === 'refused') return opened;
-  const resized = resize(
-    opened.kind === 'completed' ? opened.snapshot : snapshot,
-    mapId,
-    resourceId,
-    {
-      width: Math.max(size.width, COLLAPSED_RESOURCE_SIZE.width),
-      height: Math.max(size.height, COLLAPSED_RESOURCE_SIZE.height),
-    },
-  );
-  return resized.kind === 'unchanged' ? opened : resized;
-}
-
-/**
- * Draw an Ur Resource in another Shape in one Map (ADR 0121). Every other
- * kind is the rectangle, so a Shape Edit on one is refused whatever it asks for.
+ * Write a Resource's Map content in one Map (ADR 0142): what its plugin keeps
+ * for it there, as an Ur Resource keeps its Shape (ADR 0121). The plugin's own
+ * schema decides what is accepted.
  *
- * The Shape is drawn at the Resource's rect and changes none, so no neighbour
- * moves and the Resource's Open/Closed state and size are kept. The chosen
- * Shape is written, the rectangle included; `unchanged` for the Shape the
- * Resource already draws as, so the rectangle is `unchanged` on an entry that
- * stores none.
+ * Alone it changes no rect, so no neighbour moves and the Resource's size is
+ * kept. A size hint, which a plugin's gesture may carry (ADR 0142), is applied
+ * in this same Edit only on an entry with no stored size: floored at the Closed
+ * Size and applied as a Resize is, moving the Resources its growth passes. An
+ * entry with a stored size ignores it. `unchanged` for the value the plugin is
+ * already given there, whatever the hint, so the plugin's default is
+ * `unchanged` on an entry that stores none.
  */
-function changeResourceShape(
+function changeMapContent(
   snapshot: SpaceSnapshot,
   mapId: UUID,
   resourceId: UUID,
-  chosen: ResourceShape,
+  content: JsonValue,
+  sizeHint?: Extent,
 ): SnapshotEditOutcome {
   const placed = placedIn(snapshot, mapId);
   if ('code' in placed) return refused(placed);
@@ -407,21 +338,32 @@ function changeResourceShape(
   if (at === undefined) return refused({ code: 'resource-not-in-map' });
   const resource = snapshot.resources.find((candidate) => candidate.id === resourceId);
   if (resource === undefined) return refused({ code: 'resource-not-found' });
-  if (!takesResourceShape(resource.document.kind)) return refused({ code: 'shape-not-taken' });
-  if (resourceShape(at) === chosen) return UNCHANGED;
-  return withPlacement(
+  const kind = resource.document.kind;
+  if (mapContentProblem(kind, content) !== undefined) {
+    return refused({ code: 'map-content-invalid' });
+  }
+  if (sameJsonValue(resolvedMapContent(kind, at.content), content)) return UNCHANGED;
+  const written = withPlacement(
     snapshot,
     mapId,
-    Placement.place(placed.placement, resourceId, { ...at, shape: chosen }),
+    Placement.place(placed.placement, resourceId, { ...at, content }),
   );
+  if (sizeHint === undefined || at.size !== undefined || written.kind !== 'completed') {
+    return written;
+  }
+  const resized = resize(written.snapshot, mapId, resourceId, {
+    width: Math.max(Math.round(sizeHint.width), COLLAPSED_RESOURCE_SIZE.width),
+    height: Math.max(Math.round(sizeHint.height), COLLAPSED_RESOURCE_SIZE.height),
+  });
+  return resized.kind === 'completed' ? resized : written;
 }
 
 /**
- * Add a Resource the Space already holds to one Map, Closed, with no Edge.
+ * Add a Resource the Space already holds to one Map, with no Edge.
  *
  * Membership and a position, and nothing else: a Resource added back to a Map
  * is detached, and neither the Edges nor the Shape it once had there are
- * inferred back, so it draws as the rectangle (ADR 0121). The position is an authored one
+ * inferred back, so its plugin is given its default Map content (ADR 0142). The position is an authored one
  * (ADR 0084); `avoidingOverlap` steps off a point another Resource already
  * occupies exactly, as a creation from a menu does ({@link freeAnchor}), and
  * `exact` keeps it.
@@ -443,7 +385,7 @@ function addToMap(
   return withPlacement(
     snapshot,
     mapId,
-    Placement.place(placed.placement, resourceId, { x: at.x, y: at.y, open: false }),
+    Placement.place(placed.placement, resourceId, { x: at.x, y: at.y }),
   );
 }
 
@@ -486,11 +428,8 @@ function removeFromMap(
 export const SnapshotEdit = {
   createInMap,
   deleteFromSpace,
-  open,
-  close,
   resize,
-  openAndExpand,
-  changeResourceShape,
+  changeMapContent,
   addToMap,
   removeFromMap,
 } as const;

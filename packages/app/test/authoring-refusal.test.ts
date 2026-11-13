@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { uuidSchema } from '@project/core';
+import { isMissingKindId, uuidSchema } from '@project/core';
 import {
   describeAuthoringRefusal,
   describeConnectChoice,
@@ -12,6 +12,8 @@ import type { AuthoringRefusal } from '../src/space-authoring';
 
 const TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 const MISSING_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
+const MISSING_KIND = 'vnd.example.diagram';
+if (!isMissingKindId(MISSING_KIND)) throw new Error(`${MISSING_KIND} is drawn by a plugin`);
 
 /** One sample of every AuthoringRefusal, keyed by code for exhaustive iteration. */
 const EVERY_REFUSAL = {
@@ -23,7 +25,8 @@ const EVERY_REFUSAL = {
   'space-resource-target-immutable': { code: 'space-resource-target-immutable' },
   'resource-title-required': { code: 'resource-title-required' },
   'map-title-required': { code: 'map-title-required' },
-  'image-url-unsupported': { code: 'image-url-unsupported' },
+  'space-reference-creation-unsupported': { code: 'space-reference-creation-unsupported' },
+  'resource-content-invalid': { code: 'resource-content-invalid' },
   'space-title-required': { code: 'space-title-required' },
   'reference-targets-self': { code: 'reference-targets-self', targetId: TARGET_ID },
   'reference-target-missing': { code: 'reference-target-missing', targetId: TARGET_ID },
@@ -33,8 +36,10 @@ const EVERY_REFUSAL = {
   },
   'resource-already-in-map': { code: 'resource-already-in-map' },
   'resource-not-in-map': { code: 'resource-not-in-map' },
-  'open-requires-content': { code: 'open-requires-content' },
-  'shape-not-taken': { code: 'shape-not-taken' },
+  'map-content-invalid': { code: 'map-content-invalid' },
+  'exclusive-work-running': { code: 'exclusive-work-running' },
+  'space-replaced': { code: 'space-replaced' },
+  'edit-abandoned': { code: 'edit-abandoned' },
   'resource-has-references': { code: 'resource-has-references', referenceTitles: ['Recap'] },
   'graph-title-required': { code: 'graph-title-required' },
   'graph-not-owned': { code: 'graph-not-owned' },
@@ -43,6 +48,7 @@ const EVERY_REFUSAL = {
   'edge-already-exists': { code: 'edge-already-exists' },
   'map-active-graph-required': { code: 'map-active-graph-required' },
   'space-resource-deletion-unsupported': { code: 'space-resource-deletion-unsupported' },
+  'missing-plugin-holds-space': { code: 'missing-plugin-holds-space', kind: MISSING_KIND },
   'edge-title-one-line': { code: 'edge-title-one-line' },
   'edge-title-required': { code: 'edge-title-required' },
 } as const satisfies Readonly<Record<AuthoringRefusal['code'], AuthoringRefusal>>;

@@ -1,4 +1,5 @@
 import {
+  EMPTY_ASSET_REF,
   spaceSnapshotSchema,
   uuidSchema,
   type SpaceSnapshot,
@@ -37,7 +38,7 @@ const markdown = (resourceId: UUID, title: string) => ({
   document: {
     title,
     kind: 'markdown' as const,
-    content: { source: `# ${title}\n\nBenchmark content.` },
+    content: { url: EMPTY_ASSET_REF },
   },
 });
 
@@ -91,22 +92,21 @@ export function benchmarkScenario(
     targetPositions[resourceId] = {
       x: (index % 10) * 340,
       y: Math.floor(index / 10) * 180,
-      open: false,
     };
   });
   targetPositions[nestedParentId] = {
     x: 0,
     y: Math.ceil(scale / 10) * 180,
-    open: true,
+    content: { open: true },
     size: { width: 640, height: 360 },
   };
   const metaPositions: Record<UUID, ResourcePlacement> = {};
-  metaPositions[ordinaryId] = { x: 20, y: 20, open: false };
+  metaPositions[ordinaryId] = { x: 20, y: 20 };
   parentIds.forEach((resourceId, index) => {
     metaPositions[resourceId] = {
       x: 380 + index * 760,
       y: 20,
-      open: true,
+      content: { open: true },
       size: { width: 700, height: 620 },
     };
   });
@@ -122,7 +122,7 @@ export function benchmarkScenario(
           id: leafMap,
           title: 'Leaf',
           kind: 'positioned',
-          positions: { [leafResourceId]: { x: 24, y: 24, open: false } },
+          positions: { [leafResourceId]: { x: 24, y: 24 } },
           graphs: [{ id: leafGraph, title: 'Leaf graph', edges: [] }],
           activeGraph: leafGraph,
         },

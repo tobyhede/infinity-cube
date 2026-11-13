@@ -1,12 +1,17 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { newUuid, spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
+import {
+  EMPTY_ASSET_REF,
+  newUuid,
+  spaceSnapshotSchema,
+  uuidSchema,
+  type SpaceSnapshot,
+} from '@project/core';
 import { MemorySpaceBackend } from '@project/persistence';
 import { createOpenSpaces } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { recordingHistory } from './browser-history';
 import { createResource, unavailable } from './command-dock';
-import { unusedImageSources } from './image-sources';
 import { refusingFullscreen } from './fullscreen';
 import { unlinkedPresentations } from './presentations';
 import { stubResizeObserver } from './resize-observer';
@@ -51,9 +56,9 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [META_RESOURCE_ID]: { x: 0, y: 0, open: false },
-          [META_TO_HOME_ID]: { x: 300, y: 0, open: false },
-          [META_TO_OTHER_ID]: { x: 600, y: 0, open: false },
+          [META_RESOURCE_ID]: { x: 0, y: 0 },
+          [META_TO_HOME_ID]: { x: 300, y: 0 },
+          [META_TO_OTHER_ID]: { x: 600, y: 0 },
         },
         graphs: [{ id: META_GRAPH_ID, title: 'Graph 1', edges: [] }],
       },
@@ -63,7 +68,7 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
   resources: [
     {
       id: META_RESOURCE_ID,
-      document: { title: 'Meta', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Meta', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
     {
       id: META_TO_HOME_ID,
@@ -94,7 +99,7 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
         id: HOME_MAP_ID,
         title: 'Map 1',
         kind: 'positioned',
-        positions: { [HOME_RESOURCE_ID]: { x: 10, y: 20, open: false } },
+        positions: { [HOME_RESOURCE_ID]: { x: 10, y: 20 } },
         graphs: [{ id: HOME_GRAPH_ID, title: 'Graph 1', edges: [] }],
       },
     ],
@@ -103,7 +108,7 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
   resources: [
     {
       id: HOME_RESOURCE_ID,
-      document: { title: 'Start here', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Start here', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
   ],
 });
@@ -118,7 +123,7 @@ const other: SpaceSnapshot = spaceSnapshotSchema.parse({
         id: OTHER_MAP_ID,
         title: 'Map 1',
         kind: 'positioned',
-        positions: { [OTHER_RESOURCE_ID]: { x: 10, y: 20, open: false } },
+        positions: { [OTHER_RESOURCE_ID]: { x: 10, y: 20 } },
         graphs: [{ id: OTHER_GRAPH_ID, title: 'Graph 1', edges: [] }],
       },
     ],
@@ -127,7 +132,7 @@ const other: SpaceSnapshot = spaceSnapshotSchema.parse({
   resources: [
     {
       id: OTHER_RESOURCE_ID,
-      document: { title: 'Resource 1', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Resource 1', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
   ],
 });
@@ -179,7 +184,6 @@ describe('the Spaces a Resources list offers', () => {
     const spaces = createOpenSpaces({
       fullscreen: refusingFullscreen,
       presentations: unlinkedPresentations,
-      images: unusedImageSources,
       backend,
       metaSpaceId: META_ID,
       metaSpaceTitle: meta.document.title,
@@ -221,6 +225,8 @@ describe('the Spaces a Resources list offers', () => {
     await waitFor(() =>
       expect(offeredSpaces()).toHaveAccessibleName('Spaces in this Meta Space, 3'),
     );
-    expect(screen.getByRole('button', { name: 'Add Space 1 to Map' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Add Space 1 as a new Space Resource to Map' }),
+    ).toBeInTheDocument();
   }, 15_000);
 });

@@ -55,12 +55,96 @@
 
 .resources-popover__row {
   display: flex;
-  align-items: center;
+  /* Marks sit on the name's line, not centred on a row that has a second line
+     under the name. Each mark is 16px against the 20px line, so 2px down. */
+  align-items: flex-start;
   gap: 8px;
   padding: 8px;
   border: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
   border-radius: var(--radius-chrome-md);
   font-size: 13px;
+  line-height: 20px;
+}
+
+.resources-popover__row > :not(.resources-popover__row-text) {
+  margin-block-start: 2px;
+}
+
+/* The grip is 14px. */
+.resources-popover__row > .resources-popover__row-grip {
+  margin-block-start: 3px;
+}
+
+/* A placing row and its Delete share one box, so Delete reads as the row's and
+   not as a control floating beside the list. The box is the entry's; the row
+   inside it keeps its own geometry and gives up only its border. */
+.resources-popover__entry {
+  display: flex;
+  align-items: flex-start;
+  border: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+  border-radius: var(--radius-chrome-md);
+}
+
+.resources-popover__entry > .resources-popover__row,
+.resources-popover__entry > .resources-popover__row:hover,
+.resources-popover__entry > .resources-popover__row:focus-visible {
+  border-color: transparent;
+}
+
+/* Delete on the name's line: the row's 1px border and 8px padding put the
+   line's middle 19px down, and Delete is 28px tall. */
+.resources-popover__delete,
+.resources-popover__delete-slot {
+  margin-block-start: 5px;
+  margin-inline-end: 4px;
+}
+
+/* **Where a pointer can hover, Delete takes the place of the row's capsules,
+   and only while it is wanted.** A trash can on every row reads as the list's
+   main business; this list's is adding to the Map. So Delete is laid over the
+   end of its row, on the name's line, and drawn only while the entry is hovered
+   or holds keyboard focus. While it is drawn the membership capsules under it
+   are hidden, not moved, so nothing in the list shifts under the pointer.
+
+   Keyboard focus is `:focus-visible`, not `:focus-within`: a row a pointer
+   pressed or began a drag from keeps focus, and Delete is then the pointer's to
+   draw. Tab from a row still lands on its Delete and draws it, as a receding
+   canvas Resource comes back on focus (`styles.css`).
+
+   While a drag from the list is under way (`data-dragging`, which
+   `ResourcesPopover` sets) no Delete is drawn and every row shows its capsules:
+   the dragged row is still under the pointer, and a drag is not a request to
+   delete it.
+
+   Without hover — a touch screen — no gesture would reveal it, so it keeps its
+   own column, always drawn, and a Space row keeps the empty slot beside it. */
+@media (hover: hover) {
+  .resources-popover__entry {
+    position: relative;
+  }
+
+  .resources-popover__delete {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-end: 0;
+    opacity: 0;
+  }
+
+  .resources-popover__delete-slot {
+    display: none;
+  }
+
+  .resources-popover__list:not([data-dragging])
+    > .resources-popover__entry:is(:hover, :has(:focus-visible))
+    > .resources-popover__delete {
+    opacity: 1;
+  }
+
+  .resources-popover__list:not([data-dragging])
+    > .resources-popover__entry:is(:hover, :has(:focus-visible)):has(> .resources-popover__delete)
+    .resources-popover__capsules {
+    visibility: hidden;
+  }
 }
 
 /* Bound to the attribute that decides it rather than to the row, so the cursor
@@ -70,7 +154,11 @@
   cursor: grab;
 }
 
+/* Bounded by its column, as the detail under it is: the column aligns its
+   children to the start, so without a bound a long name takes its full width
+   and runs under the marks at the row's end instead of ellipsing. */
 .resources-popover__row-title {
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -84,6 +172,19 @@
   flex-direction: column;
   align-items: flex-start;
   text-align: start;
+}
+
+/* What a placing row adds, under its name: the Map and Graph a Space Resource
+   selects, or "New Space Resource" for a Space row. One line, ellipsed like
+   the name above it. */
+.resources-popover__row-detail {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .resources-popover__row-reason {
@@ -116,20 +217,38 @@
   background: var(--accent);
 }
 
+/* Inside an entry the box that answers is the entry's, which holds Delete. */
+.resources-popover__entry:has(> .resources-popover__row:hover),
+.resources-popover__entry:has(> .resources-popover__row:focus-visible) {
+  border-color: var(--border);
+  background: var(--accent);
+}
+
 /* --------------------------------------------- the Resources list's filter */
 
 /* **The box is what makes it read as a control.** Bare glyph toggles, with no
    border and no ground, read as decoration on the popover's paper. A control
    that can be pressed says so before it is pressed, which leaves the fill free
    to mean only "on" rather than carrying the affordance as well as the state. */
+/* One line at the popover's width however many kinds are registered: each
+   toggle is about glyph-wide, with its count on the glyph's corner rather than
+   beside it, and the row spreads them across its width. The top padding is the
+   room the badges rise into. `resources-popover.spec.ts` measures the fit
+   against the kind registry. */
 .resources-popover__filter {
   display: flex;
+  justify-content: space-between;
   gap: 4px;
+  padding-top: 6px;
 }
 
 .resources-popover__toggle {
-  gap: 5px;
-  padding: 5px 8px;
+  position: relative;
+  /* One box for every glyph, so a larger mark does not make its toggle taller
+     than its neighbours. */
+  width: 32px;
+  height: 28px;
+  padding: 0;
   border-color: var(--border);
   background: var(--card);
   /* A hairline in the theme's ink, as every other hairline is, rather than
@@ -154,17 +273,25 @@
   opacity: 0.72;
 }
 
-/* How many rows this switch is contributing under the current search. Tabular
-   figures so the row does not shuffle as the reader types. */
+/* How many rows this switch is contributing under the current search, as a
+   badge over the toggle's top-right corner. Tabular figures so the badge does
+   not shuffle as the reader types; its own border keeps it legible where it
+   overlaps the toggle's. */
 .resources-popover__count {
-  min-width: 16px;
-  padding: 0 4px;
+  position: absolute;
+  top: -6px;
+  right: -5px;
+  min-width: 14px;
+  padding: 0 3px;
+  border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--secondary);
-  font-size: 11px;
+  color: var(--foreground);
+  font-size: 10px;
   font-variant-numeric: tabular-nums;
-  line-height: 16px;
+  line-height: 13px;
   text-align: center;
+  pointer-events: none;
 }
 
 .resources-popover__toggle[data-pressed] .resources-popover__count {

@@ -1,7 +1,12 @@
 import { readdir } from 'node:fs/promises';
 import type { UUID } from '@project/core';
-import type { RepositoryCommitResult, SpaceCommit } from '@project/persistence';
-import { isMissingFile } from '../aggregate-directory';
+import {
+  EMPTY_ASSET,
+  type AssetHash,
+  type RepositoryCommitResult,
+  type SpaceCommit,
+} from '@project/persistence';
+import { isMissingFile, loadReferencedAssets } from '../aggregate-directory';
 import { exportAggregate } from '../export/export-aggregate';
 import {
   createSpaceHost,
@@ -204,14 +209,36 @@ const readInto = async (
   return undefined;
 };
 
-export type CheckResult = { readonly kind: 'valid' } | RunRefusal;
+export type CheckResult =
+  | {
+      readonly kind: 'valid';
+      /**
+       * The asset URLs a Resource names whose bytes `assets/` does not carry.
+       * Absent bytes are not a refusal (ADR 0118, ADR 0142): a run serves the
+       * Resource and its plugin reports what it cannot read. A check names them
+       * so an author knows which file to write.
+       */
+      readonly absentAssets: readonly AssetHash[];
+    }
+  | RunRefusal;
 
 /**
  * Read an Aggregate directory as a run would, into a store that is then
  * discarded, so nothing is served and nothing is written.
  */
-export const checkAggregate = async (directory: string, newId: () => UUID): Promise<CheckResult> =>
-  (await readInto(directory, new MemorySpaceRepository(), newId)) ?? { kind: 'valid' };
+export const checkAggregate = async (
+  directory: string,
+  newId: () => UUID,
+): Promise<CheckResult> => {
+  const repository = new MemorySpaceRepository();
+  const refused = await readInto(directory, repository, newId);
+  if (refused !== undefined) return refused;
+  const loaded = await repository.loadAggregate();
+  const spaces =
+    loaded.kind === 'loaded' ? loaded.aggregate.spaces.map(({ snapshot }) => snapshot) : [];
+  const { kept } = await loadReferencedAssets(repository, spaces);
+  return { kind: 'valid', absentAssets: kept.filter((hash) => hash !== EMPTY_ASSET.hash) };
+};
 
 /**
  * Run an Aggregate directory (ADR 0117): Import it into a fresh memory store,

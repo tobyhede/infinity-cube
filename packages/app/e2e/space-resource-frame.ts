@@ -25,6 +25,31 @@ export async function beginPortalEdit(page: Page, resource: Locator): Promise<vo
   ).toBeVisible();
 }
 
+/**
+ * Open a Resource from its rail: a Space Resource's Open is its plugin's Map
+ * content, committed by its rail command, and no canvas key Opens it (ADR 0142).
+ */
+export async function openFromRail(page: Page, resource: Locator): Promise<void> {
+  // By the keyboard, as a floating toolbar near the canvas edge can sit under the minimap.
+  const open = (await resourceControls(page, resource)).getByRole('button', {
+    name: /^Open Resource/,
+  });
+  await open.focus();
+  await open.press('Enter');
+}
+
+/** End portal Edit, releasing the Space Resource's Claim so another may take one (ADR 0142). */
+export async function endPortalEdit(page: Page, resource: Locator): Promise<void> {
+  await (
+    await resourceToolbar(page, resource)
+  )
+    .getByRole('button', { name: /^Done Resource/ })
+    .click({ delay: 120 });
+  await expect(
+    (await resourceToolbar(page, resource)).getByRole('button', { name: /^Done Resource/ }),
+  ).toHaveCount(0);
+}
+
 /** Wheel the portal camera from the containing Resource's left inset. */
 export async function zoomPortal(
   page: Page,
@@ -166,7 +191,7 @@ export async function exerciseSpaceResourcePadding(page: Page, parent: Locator, 
 export async function exerciseSpaceResourceFooter(page: Page, placement: Locator, child: Locator) {
   const id = await placement.getAttribute('data-id');
   const parent = page.locator(`.react-flow__node[data-id="${id}"]`);
-  const footer = parent.locator('.canvas-resource__body');
+  const footer = parent.getByTestId('space-resource-footer');
   const zoom = await parent.evaluate((node) =>
     node instanceof HTMLElement ? node.getBoundingClientRect().width / node.offsetWidth : 1,
   );

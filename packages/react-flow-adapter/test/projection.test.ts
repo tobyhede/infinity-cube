@@ -8,10 +8,11 @@ import {
   projectResourceNodes,
   projectGraphEdges,
   OTHER_GRAPH_OPACITY,
+  RECEDING_STROKE_WIDTH,
   ROUTED_EDGE_TYPE,
 } from '../src/index';
 import { imageFile, jsonResourceFile, referenceFile, resourceFile } from './resource-files';
-import { DETACHED_END_TRIM, GRAPH_LANE_SPACING } from '../src/edge-lanes';
+import { ACTIVE_LANE_SPACING, GRAPH_LANE_SPACING } from '../src/edge-lanes';
 import { uuid } from './uuid';
 
 function load(
@@ -54,7 +55,7 @@ function spaceFile(
         title: 'Only map',
         kind: 'positioned',
         positions: Object.fromEntries(
-          members.map((id, index) => [uuid(id), { x: index * 300, y: 0, open: false }]),
+          members.map((id, index) => [uuid(id), { x: index * 300, y: 0 }]),
         ),
         graphs: graphs.map(({ id, title, edges }) => ({
           id: uuid(id),
@@ -119,25 +120,36 @@ describe('projectResourceNodes', () => {
         ]),
         [...target, ...referenceFile(referenceId, 'Reference', targetId)],
       );
-      for (const open of [false, true]) {
-        const nodes = projectResourceNodes(loaded, {
-          openResourceIds: new Set(open ? [referenceId] : []),
-        });
-        expect(nodes.find((node) => node.id === referenceId)?.data).toMatchObject({
-          authorsContent: false,
-          embedsMap: kind === 'space',
-        });
-        if (!open)
-          expect(nodes.find((node) => node.id === referenceId)?.data.display).toEqual({
-            shown: 'closed',
-          });
-        expect(nodes.find((node) => node.id === targetId)?.data).toMatchObject({
-          authorsContent: true,
-          embedsMap: kind === 'space',
-        });
-      }
+      const nodes = projectResourceNodes(loaded);
+      expect(nodes.find((node) => node.id === referenceId)?.data).toMatchObject({
+        authorsContent: false,
+        embedsMap: kind === 'space',
+      });
+      // A Markdown Resource's plugin edits its own content (ADR 0142).
+      expect(nodes.find((node) => node.id === targetId)?.data).toMatchObject({
+        authorsContent: kind === 'space',
+        embedsMap: kind === 'space',
+      });
     },
   );
+
+  /**
+   * Open is the Markdown plugin's Map content (ADR 0142): an entry that stores
+   * none is drawn with the plugin's default, Closed, whoever draws the Map and
+   * whether or not it may be authored, and one Map's Open is not another's.
+   */
+  it('draws a fresh Markdown Resource Closed, and each Map with its own Open', () => {
+    const a = uuid('00000000-0000-4000-8000-000000000002');
+    const nodes = projectResourceNodes(space);
+    expect(nodes.find((n) => n.id === a)?.data.mapContent).toEqual({ open: false });
+    const opened = projectResourceNodes(space, {
+      mapContent: (id) => (id === a ? { open: true } : undefined),
+    });
+    expect(opened.find((n) => n.id === a)?.data.mapContent).toEqual({ open: true });
+    expect(opened.filter((n) => n.id !== a).map((n) => n.data.mapContent)).not.toContainEqual({
+      open: true,
+    });
+  });
 
   it('maps resources to resource nodes carrying the title, not the content', () => {
     const nodes = projectResourceNodes(space);
@@ -154,16 +166,6 @@ describe('projectResourceNodes', () => {
     const nodes = projectResourceNodes(space, { resourceShape });
     expect(nodes.find((n) => n.id === a)?.data.shape).toBe('diamond');
     expect(nodes.filter((n) => n.id !== a).map((n) => n.data.shape)).not.toContain('diamond');
-    // The Shape travels whatever the display, Open included: `CanvasResource` decides
-    // what it draws from the two together.
-    const opened = projectResourceNodes(space, {
-      resourceShape,
-      openResourceIds: new Set([a]),
-    });
-    expect(opened.find((n) => n.id === a)?.data).toMatchObject({
-      shape: 'diamond',
-      display: { shown: 'open' },
-    });
   });
 
   it('uses the positions a map put on the resources', () => {
@@ -284,7 +286,7 @@ describe('projectResourceNodes', () => {
     expect('measured' in b).toBe(false);
   });
 
-  it("resolves an Open Reference Resource's Target Markdown under the Reference Resource identity", () => {
+  it("carries a Reference Resource's Target for its plugin to embed, under the Reference Resource identity", () => {
     const referenceId = uuid('00000000-0000-4000-8000-000000000007');
     const withReference = load(
       spaceFile([
@@ -305,21 +307,19 @@ describe('projectResourceNodes', () => {
       ],
     );
 
-    const nodes = projectResourceNodes(withReference, {
-      openResourceIds: new Set([referenceId]),
-    });
+    const nodes = projectResourceNodes(withReference);
+    const target = withReference.resources.find(
+      ({ id }) => id === '00000000-0000-4000-8000-000000000002',
+    );
     expect(nodes.find((node) => node.id === referenceId)?.data).toMatchObject({
       title: 'Return',
       kind: 'reference',
-      open: true,
-      display: {
-        shown: 'open',
-        content: { kind: 'markdown', source: '## Authored once', via: 'target' },
-      },
+      ownContent: { target: '00000000-0000-4000-8000-000000000002' },
+      embeddable: [target],
     });
   });
 
-  it('carries an Image Resource’s own kind whether it is Closed or Open', () => {
+  it('carries an Image Resource’s own kind, stored content and Map content to its plugin', () => {
     const imageId = uuid('00000000-0000-4000-8000-000000000008');
     const url = 'https://example.com/harbour.png';
     const withImage = load(
@@ -338,17 +338,15 @@ describe('projectResourceNodes', () => {
     const imageNode = (options: Parameters<typeof projectResourceNodes>[1]) =>
       projectResourceNodes(withImage, options).find((node) => node.id === imageId)?.data;
 
-    const picture = { kind: 'image', url, via: 'self' };
-    expect(imageNode({})).toMatchObject({ kind: 'image', display: { shown: 'closed' } });
-    expect(imageNode({ openResourceIds: new Set([imageId]) })).toMatchObject({
+    expect(imageNode({})).toMatchObject({
       kind: 'image',
-      open: true,
-      display: { shown: 'open', content: picture },
+      ownContent: { url },
+      mapContent: {},
     });
   });
 });
 
-describe('projectResourceNodes display', () => {
+describe('projectResourceNodes embeddable', () => {
   const imageId = uuid('00000000-0000-4000-8000-000000000008');
   const referenceId = uuid('00000000-0000-4000-8000-000000000009');
   const markdownId = uuid('00000000-0000-4000-8000-000000000002');
@@ -370,29 +368,15 @@ describe('projectResourceNodes display', () => {
       ...referenceFile(referenceId, 'Harbour, again', imageId),
     ],
   );
-  const display = (id: string, options: Parameters<typeof projectResourceNodes>[1]) =>
-    projectResourceNodes(withKinds, options).find((node) => node.id === id)?.data.display;
+  const embeddable = (id: string) =>
+    projectResourceNodes(withKinds).find((node) => node.id === id)?.data.embeddable;
 
-  it('carries no content on a Closed Resource', () => {
-    for (const id of [markdownId, imageId, referenceId]) {
-      expect(display(id, {})).toStrictEqual({ shown: 'closed' });
-    }
-  });
-
-  it('carries the resolved content on an Open Resource, its own or its Target’s', () => {
-    const openResourceIds = new Set([markdownId, imageId, referenceId]);
-    expect(display(markdownId, { openResourceIds })).toStrictEqual({
-      shown: 'open',
-      content: { kind: 'markdown', source: '## Authored once', via: 'self' },
-    });
-    expect(display(imageId, { openResourceIds })).toStrictEqual({
-      shown: 'open',
-      content: { kind: 'image', url, via: 'self' },
-    });
-    expect(display(referenceId, { openResourceIds })).toStrictEqual({
-      shown: 'open',
-      content: { kind: 'image', url, via: 'target' },
-    });
+  it('carries what a Resource references for its plugin to embed, and nothing else', () => {
+    expect(embeddable(markdownId)).toStrictEqual([]);
+    expect(embeddable(imageId)).toStrictEqual([]);
+    expect(embeddable(referenceId)).toStrictEqual(
+      withKinds.resources.filter(({ id }) => id === imageId),
+    );
   });
 });
 
@@ -427,26 +411,30 @@ describe('projectGraphEdges', () => {
   it('carries the Graph it belongs to and no geometry of its own', () => {
     const edges = projectGraphEdges(graphRenderEdges, colors);
 
-    // The Edge data is the Graph id, its lane, how far out its pair's lanes
-    // reach, and its end trim, and no geometry
+    // The Edge data is the Graph id, its lane and how that lane is read, how
+    // far out its pair's lanes reach, and its end trim, and no geometry
     // (ADR 0086). Both fixture Graphs join the same two Resources, Alt in the other
-    // direction: with nothing active the first keeps the centre and Alt takes
-    // the lane below it. Nothing is active, so both connect. A Map has nowhere
+    // direction, so each stacks on its own left from half a lane out and each, first
+    // in its direction, runs full length (ADR 0143). A Map has nowhere
     // to store waypoints, so the bezier the Edge draws between the two anchors
     // it attaches to is the only Edge geometry.
     expect(edges.find((e) => e.id === MAIN_EDGE_ID)!.data).toEqual({
       graphId: uuid('00000000-0000-4000-8000-000000000004'),
-      laneOffset: 0,
-      laneReach: GRAPH_LANE_SPACING,
+      laneOffset: GRAPH_LANE_SPACING / 2,
+      laneSide: 'travel',
+      laneReach: GRAPH_LANE_SPACING / 2,
       endTrim: 0,
       headShape: 'arrow',
+      headSize: 'full',
     });
     expect(edges.find((e) => e.id === ALT_EDGE_ID)!.data).toEqual({
       graphId: uuid('00000000-0000-4000-8000-000000000030'),
-      laneOffset: GRAPH_LANE_SPACING,
-      laneReach: GRAPH_LANE_SPACING,
+      laneOffset: GRAPH_LANE_SPACING / 2,
+      laneSide: 'travel',
+      laneReach: GRAPH_LANE_SPACING / 2,
       endTrim: 0,
       headShape: 'arrow',
+      headSize: 'full',
     });
   });
 
@@ -471,6 +459,9 @@ describe('projectGraphEdges', () => {
   it('draws every graph the same when nothing is emphasised', () => {
     const edges = projectGraphEdges(graphRenderEdges, colors, {});
     expect(edges.every((e) => e.style?.opacity === 1)).toBe(true);
+    expect(edges.every((e) => e.style?.strokeWidth === 2 && e.data?.headSize === 'full')).toBe(
+      true,
+    );
     expect(edges.some((e) => e.animated)).toBe(false);
   });
 
@@ -488,9 +479,12 @@ describe('projectGraphEdges', () => {
     // Drawn wider; `EDGE_TITLE_BOX_CHROME` in `@project/ui` reckons with this
     // 3, since a Title's border is its Edge's stroke.
     expect(main.style?.strokeWidth).toBe(3);
-    expect(alt.style?.strokeWidth).toBe(2);
+    expect(main.data?.headSize).toBe('full');
 
-    // The others recede but are still drawn, and none are dropped.
+    // The others recede to hairlines with small heads but are still drawn,
+    // and none are dropped.
+    expect(alt.style?.strokeWidth).toBe(RECEDING_STROKE_WIDTH);
+    expect(alt.data?.headSize).toBe('small');
     expect(alt.style?.opacity).toBe(OTHER_GRAPH_OPACITY);
     expect(OTHER_GRAPH_OPACITY).toBeGreaterThan(0);
     expect(alt.animated).toBe(false);
@@ -515,39 +509,27 @@ describe('projectGraphEdges', () => {
     const dataOf = (edges: ReturnType<typeof projectGraphEdges>, graphId: string) =>
       edges.find((e) => e.id.startsWith(graphId))!.data!;
 
-    it('puts the Active Graph on the centre, connecting, with the others below it', () => {
+    it('carries the lane its Edge is given: the Active Graph centred, the rest beside it and shorter', () => {
       const edges = projectGraphEdges(shared, colors, {
         activeGraphId: uuid(BLUE!),
       });
 
-      expect(dataOf(edges, BLUE!)).toMatchObject({ laneOffset: 0, endTrim: 0 });
+      expect(dataOf(edges, BLUE!)).toMatchObject({
+        laneOffset: 0,
+        laneSide: 'screen',
+        laneReach: ACTIVE_LANE_SPACING,
+        endTrim: 0,
+      });
+      // Beside the Active Graph's Edge the lane opens to clear its full-size head.
       expect(dataOf(edges, RED!)).toMatchObject({
-        laneOffset: GRAPH_LANE_SPACING,
-        endTrim: DETACHED_END_TRIM,
+        laneOffset: ACTIVE_LANE_SPACING,
+        laneSide: 'screen',
+        laneReach: ACTIVE_LANE_SPACING,
+        endTrim: 0.1,
       });
-      // Green joins a different pair, so it is alone in its lane — and still
-      // stops short, being another Graph's.
-      expect(dataOf(edges, GREEN!)).toMatchObject({ laneOffset: 0, endTrim: DETACHED_END_TRIM });
-    });
-
-    it('splits the centre between both directions of a pair the Active Graph holds', () => {
-      const edges = projectGraphEdges(
-        [edge(RED!, A!, B!), edge(BLUE!, A!, B!), edge(BLUE!, B!, A!)],
-        colors,
-        { activeGraphId: uuid(BLUE!) },
-      );
-      const byId = (source: string, target: string, graphId: string) =>
-        edges.find((e) => e.id === `${graphId}::${source}::${target}`)!;
-      const forward = byId(A!, B!, BLUE!);
-      const back = byId(B!, A!, BLUE!);
-
-      // A sorts before B, so A → B takes the negative side.
-      expect(forward.data).toMatchObject({ laneOffset: -GRAPH_LANE_SPACING / 2, endTrim: 0 });
-      expect(back.data).toMatchObject({ laneOffset: GRAPH_LANE_SPACING / 2, endTrim: 0 });
-      expect(byId(A!, B!, RED!).data).toMatchObject({
-        laneOffset: (3 * GRAPH_LANE_SPACING) / 2,
-        endTrim: DETACHED_END_TRIM,
-      });
+      // Green is alone on its pair, so it runs anchor to anchor although it is
+      // not the Active Graph.
+      expect(dataOf(edges, GREEN!)).toMatchObject({ laneOffset: 0, laneReach: 0, endTrim: 0 });
     });
 
     it("ends every Edge in its Graph's head shape, the ones that stop short included", () => {
@@ -556,18 +538,12 @@ describe('projectGraphEdges', () => {
         headShapes: { [uuid(BLUE!)]: 'dot', [uuid(RED!)]: 'diamond' },
       });
 
-      // Blue connects; Red stops short beside it and Green stops short alone.
-      // Each still ends in its own Graph's head shape (ADR 0105), and Green,
-      // storing none, ends in an arrow.
+      // Blue runs full length; Red stops short beside it and Green, alone,
+      // runs full length. Each ends in its own Graph's head shape (ADR 0105),
+      // and Green, storing none, ends in an arrow.
       expect(dataOf(edges, BLUE!)).toMatchObject({ endTrim: 0, headShape: 'dot' });
-      expect(dataOf(edges, RED!)).toMatchObject({
-        endTrim: DETACHED_END_TRIM,
-        headShape: 'diamond',
-      });
-      expect(dataOf(edges, GREEN!)).toMatchObject({
-        endTrim: DETACHED_END_TRIM,
-        headShape: 'arrow',
-      });
+      expect(dataOf(edges, RED!)).toMatchObject({ endTrim: 0.1, headShape: 'diamond' });
+      expect(dataOf(edges, GREEN!)).toMatchObject({ endTrim: 0, headShape: 'arrow' });
     });
 
     it("names its Graph's one head marker as the Edge's end marker", () => {
@@ -576,11 +552,12 @@ describe('projectGraphEdges', () => {
         headShapes: { [uuid(BLUE!)]: 'dot' },
       });
 
-      // One marker per Graph, whichever Edge of it this is and whether or not
-      // it connects; Green stores no head shape and still names its own.
+      // One marker per Graph and size, whichever Edge of it this is and however
+      // short; Green stores no head shape and still names its own. The Graphs
+      // that recede name their small head.
       expect(edges.map((e) => [e.data!.graphId, e.markerEnd])).toEqual([
-        [RED, 'graph-head-00000000-0000-4000-8000-000000000201'],
-        [GREEN, 'graph-head-00000000-0000-4000-8000-000000000203'],
+        [RED, 'graph-head-00000000-0000-4000-8000-000000000201-small'],
+        [GREEN, 'graph-head-00000000-0000-4000-8000-000000000203-small'],
         [BLUE, 'graph-head-00000000-0000-4000-8000-000000000202'],
       ]);
     });
@@ -595,11 +572,6 @@ describe('projectGraphEdges', () => {
 
       expect(centred(RED!)).toEqual([RED]);
       expect(centred(BLUE!)).toEqual([BLUE]);
-    });
-
-    it('connects every Edge while no Graph is active', () => {
-      const edges = projectGraphEdges(shared, colors, {});
-      expect(edges.map((e) => e.data!.endTrim)).toEqual([0, 0, 0]);
     });
 
     it('draws the Active Graph last, over the lanes it converges with', () => {

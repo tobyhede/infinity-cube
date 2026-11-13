@@ -1,14 +1,20 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import {
+  isOfKind,
+  EMPTY_ASSET_REF,
+  uuidSchema,
+  type SpaceSnapshot,
+  type UUID,
+} from '@project/core';
 import { MemorySpaceBackend, MemorySpaceBackendTestControl } from '@project/persistence';
 import { createOpenSpaces, type OpenSpace, type OpenSpaces } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { recordingHistory } from './browser-history';
-import { unusedImageSources } from './image-sources';
 import { refusingFullscreen } from './fullscreen';
 import { unlinkedPresentations } from './presentations';
 import { stubResizeObserver } from './resize-observer';
+import { showingSpace } from './showing-space';
 
 /**
  * Through the application: a coordinated save whose
@@ -32,14 +38,17 @@ const metaSnapshot: SpaceSnapshot = {
         id: MAP_ID,
         title: 'Map',
         kind: 'positioned',
-        positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
+        positions: { [RESOURCE_ID]: { x: 0, y: 0 } },
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
         activeGraph: GRAPH_ID,
       },
     ],
   },
   resources: [
-    { id: RESOURCE_ID, document: { title: 'Notes', kind: 'markdown', content: { source: '' } } },
+    {
+      id: RESOURCE_ID,
+      document: { title: 'Notes', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+    },
   ],
 };
 
@@ -50,7 +59,7 @@ const countingIds = (): (() => UUID) => {
 };
 
 const EDITED = 'Notes edited while blocked';
-const notes = { title: 'Notes', kind: 'markdown', content: { source: '' } } as const;
+const notes = { title: 'Notes', kind: 'markdown', content: { url: EMPTY_ASSET_REF } } as const;
 
 /** Meta with its one Resource retitled: the Edit a blocked save keeps. */
 const withNotesTitled = (space: SpaceSnapshot, title: string): SpaceSnapshot => ({
@@ -75,8 +84,9 @@ const targetOf = (containing: OpenSpace, resourceId: UUID): UUID => {
   const resource = containing.session
     .getState()
     .working.resources.find(({ id }) => id === resourceId);
-  if (resource?.document.kind !== 'space') throw new Error('No Space Resource was created');
-  return resource.document.content.spaceId;
+  if (resource === undefined || !isOfKind(resource.document, 'space'))
+    throw new Error('No Space Resource was created');
+  return uuidSchema.parse(resource.document.content.spaceId);
 };
 
 const liveSession = (openSpaces: OpenSpaces, spaceId: UUID): OpenSpace['session'] => {
@@ -100,7 +110,6 @@ const blockedSequence = async () => {
   const openSpaces = createOpenSpaces({
     fullscreen: refusingFullscreen,
     presentations: unlinkedPresentations,
-    images: unusedImageSources,
     backend,
     metaSpaceId: META_ID,
     metaSpaceTitle: 'Meta',
@@ -112,12 +121,14 @@ const blockedSequence = async () => {
 
   control.queueResult({ kind: 'permanent-failure', code: 'forbidden' });
   const c0 = await act(() =>
-    openSpaces.spaceResources.create({
-      containingSpaceId: META_ID,
-      mapId: MAP_ID,
-      title: 'Target',
-      position: { x: 240, y: 0 },
-    }),
+    openSpaces.spaceResources.create(
+      showingSpace({
+        containingSpaceId: META_ID,
+        mapId: MAP_ID,
+        title: 'Target',
+        position: { x: 240, y: 0 },
+      }),
+    ),
   );
   if (c0.kind !== 'completed') throw new Error('C0 did not install');
   await waitFor(() => expect(meta.session.getState().persistence.kind).toBe('rejected'));
@@ -141,12 +152,14 @@ const blockedSequence = async () => {
     ],
   });
   await act(() =>
-    openSpaces.spaceResources.create({
-      containingSpaceId: targetId,
-      mapId: targetMap,
-      title: 'Child',
-      position: { x: 300, y: 0 },
-    }),
+    openSpaces.spaceResources.create(
+      showingSpace({
+        containingSpaceId: targetId,
+        mapId: targetMap,
+        title: 'Child',
+        position: { x: 300, y: 0 },
+      }),
+    ),
   );
   await waitFor(() => expect(target.session.getState().persistence.kind).toBe('conflicted'));
 
@@ -175,7 +188,6 @@ const blockedTarget = async () => {
   const openSpaces = createOpenSpaces({
     fullscreen: refusingFullscreen,
     presentations: unlinkedPresentations,
-    images: unusedImageSources,
     backend,
     metaSpaceId: META_ID,
     metaSpaceTitle: 'Meta',
@@ -189,12 +201,14 @@ const blockedTarget = async () => {
     const mapId = containing.session.getState().working.document.defaultMap;
     if (mapId === undefined) throw new Error(`${title}'s container has no Map`);
     const created = await act(() =>
-      openSpaces.spaceResources.create({
-        containingSpaceId: containing.id,
-        mapId,
-        title,
-        position: { x: 240, y: 0 },
-      }),
+      openSpaces.spaceResources.create(
+        showingSpace({
+          containingSpaceId: containing.id,
+          mapId,
+          title,
+          position: { x: 240, y: 0 },
+        }),
+      ),
     );
     if (created.kind !== 'completed') throw new Error(`${title} did not install`);
     return targetOf(containing, created.resourceId);

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import {
   createSpaceSessionRegistry,
   MemorySpaceBackend,
@@ -50,7 +50,7 @@ const metaSnapshot: SpaceSnapshot = {
         id: META_MAP_ID,
         title: 'Map 1',
         kind: 'positioned',
-        positions: { [META_RESOURCE_ID]: { x: 0, y: 0, open: false } },
+        positions: { [META_RESOURCE_ID]: { x: 0, y: 0 } },
         graphs: [{ id: META_GRAPH_ID, title: 'Graph 1', edges: [] }],
         activeGraph: META_GRAPH_ID,
       },
@@ -59,7 +59,7 @@ const metaSnapshot: SpaceSnapshot = {
   resources: [
     {
       id: META_RESOURCE_ID,
-      document: { title: 'Meta', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Meta', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
   ],
 };
@@ -75,7 +75,7 @@ const targetSnapshot: SpaceSnapshot = {
         id: TARGET_MAP_ID,
         title: 'Map 1',
         kind: 'positioned',
-        positions: { [TARGET_RESOURCE_ID]: { x: 0, y: 0, open: false } },
+        positions: { [TARGET_RESOURCE_ID]: { x: 0, y: 0 } },
         graphs: [{ id: TARGET_GRAPH_ID, title: 'Graph 1', edges: [] }],
         activeGraph: TARGET_GRAPH_ID,
       },
@@ -84,7 +84,7 @@ const targetSnapshot: SpaceSnapshot = {
   resources: [
     {
       id: TARGET_RESOURCE_ID,
-      document: { title: 'Architecture', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Architecture', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
   ],
 };
@@ -146,7 +146,7 @@ describe('what a Space Resource may reference', () => {
             id: SECOND_MAP_ID,
             title: 'Map 2',
             kind: 'positioned',
-            positions: { [TARGET_RESOURCE_ID]: { x: 200, y: 0, open: false } },
+            positions: { [TARGET_RESOURCE_ID]: { x: 200, y: 0 } },
             graphs: [
               {
                 id: SECOND_GRAPH_ID,
@@ -176,6 +176,7 @@ describe('what a Space Resource may reference', () => {
     await expect(lifecycle.target(TARGET_ID)).resolves.toEqual({
       id: TARGET_ID,
       title: 'Architecture',
+      defaultMap: TARGET_MAP_ID,
       maps: [
         {
           id: TARGET_MAP_ID,

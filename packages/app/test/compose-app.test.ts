@@ -8,8 +8,8 @@ import { createConnectionCompletion } from '../src/connection-completion';
 import type { PresentationLinks } from '../src/presentation-link';
 import type { Fullscreen } from '../src/presenting-fullscreen';
 import { channelHub } from './presentation-channels';
-import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
+import { textAsset } from './markdown-texts';
 
 /**
  * What an opened Space is composed of, asserted at the composition.
@@ -38,8 +38,8 @@ const snapshot: SpaceSnapshot = {
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [RESOURCE_A]: { x: 10, y: 20, open: false },
-          [RESOURCE_B]: { x: 300, y: 40, open: false },
+          [RESOURCE_A]: { x: 10, y: 20 },
+          [RESOURCE_B]: { x: 300, y: 40 },
         },
         graphs: [{ id: GRAPH_ID, title: 'Main', edges: [{ from: RESOURCE_A, to: RESOURCE_B }] }],
       },
@@ -47,8 +47,14 @@ const snapshot: SpaceSnapshot = {
     defaultMap: MAP_ID,
   },
   resources: [
-    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
-    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', content: { source: 'B' } } },
+    {
+      id: RESOURCE_A,
+      document: { title: 'A', kind: 'markdown', content: { url: textAsset('A') } },
+    },
+    {
+      id: RESOURCE_B,
+      document: { title: 'B', kind: 'markdown', content: { url: textAsset('B') } },
+    },
   ],
 };
 
@@ -72,14 +78,14 @@ describe('the composed working Space', () => {
    */
   it('answers a new Space once an Edit has been taken', () => {
     const spaceSession = openSession();
-    const { currentSpace, authoring } = composeApp({ images: unusedImageSources, spaceSession });
+    const { currentSpace, authoring } = composeApp({ spaceSession });
     const before = currentSpace();
 
     expect(
       authoring.complete(CANVAS, {
         kind: 'edited-resource',
         resourceId: RESOURCE_A,
-        document: { title: 'Renamed', kind: 'markdown', content: { source: 'A' } },
+        document: { title: 'Renamed', kind: 'markdown', content: { url: textAsset('A') } },
       }),
     ).toMatchObject({ kind: 'completed' });
 
@@ -96,12 +102,12 @@ describe('what the composition opens on', () => {
   });
 
   it('opens a selected Map on the placement that Map already authored', () => {
-    const { authoring } = composeApp({ images: unusedImageSources, spaceSession: openSession() });
+    const { authoring } = composeApp({ spaceSession: openSession() });
 
     expect(authoring.mapPlacement()).toEqual(
       Placement.fromEntries([
-        [RESOURCE_A, { x: 10, y: 20, open: false }],
-        [RESOURCE_B, { x: 300, y: 40, open: false }],
+        [RESOURCE_A, { x: 10, y: 20 }],
+        [RESOURCE_B, { x: 300, y: 40 }],
       ]),
     );
   });
@@ -117,7 +123,6 @@ describe('the connection completion Edge Authoring is given', () => {
   it('builds a supplied completion over the collaborators this composition made', () => {
     const seen: { adapter: unknown; authoring: unknown }[] = [];
     const composed = composeApp({
-      images: unusedImageSources,
       spaceSession: openSession(),
       connections: (collaborators) => {
         seen.push(collaborators);
@@ -178,7 +183,6 @@ describe('tearing the composition down', () => {
     const { fullscreen, following } = recordingFullscreen();
     const { presentations, opened, open } = recordingPresentations();
     const composed = composeApp({
-      images: unusedImageSources,
       spaceSession: openSession(),
       fullscreen,
       presentations,

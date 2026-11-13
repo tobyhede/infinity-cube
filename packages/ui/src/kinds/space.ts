@@ -1,68 +1,20 @@
-import type { ReactNode } from 'react';
-import { spaceKind, type ContentVia, type SpaceContent, type SpaceView } from '@project/core';
-import type { ResourceDisplay } from '../resource-display';
-import { EditIcon, SpaceResourceIcon } from '../icons';
-import type { KindView } from './kind-view';
-
-/** What a Space Resource offers beyond its Title. */
-export interface SpaceOperations {
-  readonly kind: typeof spaceKind.id;
-  /**
-   * Map and Graph clusters, assembled by the application and inserted
-   * at the head of this Resource's rail. Absent while the Resource is closed, the
-   * surface is read-only, or the target Space has not been read yet.
-   */
-  readonly spaceRail?: ReactNode;
-  /**
-   * The Read/Edit boundary for the embedded target canvas.
-   *
-   * Absent means this surface does not offer one — a Closed Resource, an unread
-   * target, or a composition that has not wired the portal. Present on an Open
-   * Space Resource: Read leaves the embedding inert so dragging moves this Resource;
-   * Edit activates the target canvas and replaces the control with Done.
-   */
-  readonly portal?: {
-    readonly editing: boolean;
-    readonly onEditingChange: (editing: boolean) => void;
-  };
-}
+import { spaceKind } from '@project/core';
+import { spacePlugin } from '@project/plugin-space/domain';
+import { SpaceResourceIcon } from '../icons';
+import type { PluginListing } from './plugin-listing';
+import type { PluginOperations } from './plugin-views';
 
 /**
- * The view half of the Space kind (ADR 0068): what a Space Resource
- * is called and drawn as, and what it offers beyond the shared Title. Its
- * content view is the embedded Map the application draws, its content command
- * is the portal's Edit, which authors that Map, and its frame is
- * `space-canvas.css`, which `CanvasResource` imports.
+ * The Space kind's place in this package's kind registry, taken from its
+ * plugin (ADR 0068, ADR 0142): its names are the plugin's, and its Resources
+ * are drawn by `PluginResource` and `PresentedPluginResource`, whose Map
+ * embedding draws the Map it selects. Its silhouette is the Space cube every
+ * list draws a Space with.
  */
-export const spaceView: KindView<SpaceOperations, SpaceContent> = {
-  name: 'Space Resource',
-  listName: 'Space Resources in this Space',
-  referenceName: 'Reference to a Space Resource',
+export const spaceListing: PluginListing<PluginOperations> = {
+  name: spacePlugin.name,
+  listName: spacePlugin.listName,
+  referenceName: spacePlugin.referenceName,
   Glyph: SpaceResourceIcon,
   bareOperations: { kind: spaceKind.id },
-  contentCommand: { label: (name) => `Edit Resource ${name}`, Icon: EditIcon },
 };
-
-/** Whether these operations are a Space Resource's. */
-export const isSpaceOperations = (operations: {
-  readonly kind: string;
-}): operations is SpaceOperations => operations.kind === spaceKind.id;
-
-/**
- * The Space view an Open Resource shows, and whether it is the
- * Resource's own or its content Target's. A Space reached through a content
- * Target is drawn read-only (ADR 0070). A Closed display shows no Space.
- */
-export function spaceViewOf(
-  display: ResourceDisplay,
-): { readonly view: SpaceView; readonly via: ContentVia } | undefined {
-  switch (display.shown) {
-    case 'open':
-      return display.content.kind === spaceKind.id
-        ? { view: display.content.view, via: display.content.via }
-        : undefined;
-    case 'closed':
-    case 'editing':
-      return undefined;
-  }
-}

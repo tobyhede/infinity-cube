@@ -1,109 +1,73 @@
 import type { Continuation } from './continuation';
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
-  frameSpaceView,
-  markdownKind,
-  selectSpaceView,
-  spaceSelection,
-  type SpaceView,
   RESOURCE_TITLE_REQUIRED,
   resourceDocumentSchema,
-  takesOpen,
   uuidSchema,
-  type ResourceDocument,
   type ResourceId,
-  type ResourceShape,
-  type GraphId,
 } from '@project/core';
-import type { SpaceSession } from '@project/persistence';
+import type { Size } from '@project/resource-api/domain';
+import type { ObserverErrorReporter, SpaceSession } from '@project/persistence';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
-import type { EntityActionGroup, ImageReplacement } from '@project/ui';
-import { describeImageReplacement, type ImageReplacements } from './image-replacement';
+import { usePluginAssets, type EntityActionGroup } from '@project/ui';
 import type { AuthoringAvailability } from './authoring-availability';
 import { describeAuthoringRefusal } from './authoring-refusal';
 import type { ResourceResize } from './render-adapter';
 import type { SurfaceAuthoring } from './space-authoring';
-import type { SpaceResourceTargetMap } from './space-resource-lifecycle';
 import { useOpenSpaces } from './open-spaces-context';
 import type { CommandOutcomes } from './command-outcomes';
 import type { DeleteConfirmation } from './delete-confirmation';
 import { NO_SPACE_RESOURCE_TARGETS, type SpaceResourceTargets } from './space-resource-targets';
-import type { SpaceResourceFraming } from './space-resource-framing';
 import { applyResourceDataPatch, decorateSharedResourceNode } from './canvas-resource-decoration';
+import { decorateEmbedCommands, type EmbedCommandsContext } from './embed-commands';
 import { useKindDecoratedNodes } from './kinds/registry';
+import type { Embedding } from './plugin-host/claim-chain';
+import type { PluginHost } from './plugin-host/plugin-commits';
+import type { PluginGate } from './plugin-host/plugin-gate';
+import { usePluginGate } from './plugin-host/plugin-gate-context';
+import { useMapEmbeddings, type MapEmbedEntry, type MapEmbeddings } from './map-embeddings';
 
-type Caret =
-  | { readonly resourceId: string; readonly field: 'title' }
-  | { readonly resourceId: string; readonly field: 'body'; readonly openObserved: boolean }
-  | null;
+const NO_SUBSCRIPTION = () => () => undefined;
+const NONE_EMBEDDED: ReadonlyMap<string, MapEmbedEntry> = new Map();
+const NO_MAP_EMBEDS = () => NONE_EMBEDDED;
 
-const spaceViewIdentity = (view: SpaceView): string => {
-  const framing = view.framing;
-  const framingKey =
-    framing === undefined ? '' : `${framing.centreX}:${framing.centreY}:${framing.zoom}`;
-  return `${view.spaceId}:${view.map}:${view.graph}:${framingKey}`;
-};
+/** The Resources a Map embedding is drawn for on this canvas, in any of their placements. */
+const embeddedResourceIds = (embeds: ReadonlyMap<string, MapEmbedEntry>): ReadonlySet<ResourceId> =>
+  new Set([...embeds.values()].map((entry) => entry.resourceId));
 
-/** The view of another Space each Resource shows, for the kinds that show one. */
-const spaceSelectionsOf = (
-  resources: readonly { readonly id: ResourceId; readonly document: ResourceDocument }[],
-): ReadonlyMap<ResourceId, SpaceView> => {
-  const next = new Map<ResourceId, SpaceView>();
-  for (const resource of resources) {
-    const view = spaceSelection(resource.document);
-    if (view !== undefined) next.set(resource.id, view);
-  }
-  return next;
-};
+type Caret = { readonly resourceId: string; readonly field: 'title' } | null;
 
-const spaceSelectionsKeyOf = (
-  resources: readonly { readonly id: ResourceId; readonly document: ResourceDocument }[],
-): string =>
-  resources
-    .flatMap((resource) => {
-      const view = spaceSelection(resource.document);
-      return view === undefined ? [] : [`${resource.id}:${spaceViewIdentity(view)}`];
-    })
-    .join();
+/** What this canvas's plugin surfaces claim on, and where what they throw is reported. */
+export interface CanvasPlugins {
+  /** The composition's gate, which its Authoring asks at `complete` (ADR 0142). */
+  readonly gate: PluginGate;
+  readonly report: ObserverErrorReporter;
+  /**
+   * The drawings whose Map embedding this canvas is drawn inside, outermost
+   * first, so a Claim here nests under one they hold. Absent on a canvas drawn
+   * in no embedding.
+   */
+  readonly embeddedIn?: Embedding | undefined;
+}
 
-/**
- * Load a Resource that shows a view of another Space, parse the next document,
- * persist it as `edited-resource`.
- *
- * Selection and framing both write that one Edit; they differ only in how the
- * kind changes its view and the sentence a failed parse returns.
- */
-const completeEditedSpaceView = (
-  authoring: Pick<SurfaceAuthoring, 'complete'>,
-  spaceSession: SpaceSession,
-  resourceId: ResourceId,
-  nextDocument: (document: ResourceDocument) => ResourceDocument | undefined,
-  invalidMessage: string,
-): string | null => {
-  const stored = spaceSession
-    .getState()
-    .working.resources.find((resource) => resource.id === resourceId);
-  const next = stored === undefined ? undefined : nextDocument(stored.document);
-  if (next === undefined) return describeAuthoringRefusal({ code: 'resource-not-found' });
-  const parsed = resourceDocumentSchema.safeParse(next);
-  if (!parsed.success) return invalidMessage;
-  const result = authoring.complete({ kind: 'edited-resource', resourceId, document: parsed.data });
-  return result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
-};
+const reportPluginFailureToConsole: ObserverErrorReporter = (error) =>
+  console.error('A Resource plugin failed', error);
 
 export interface CanvasResourceAuthoringInput {
   readonly continuation: Continuation;
+  /**
+   * The composition's gate and reporter. Absent, the page's gate (or one of
+   * this canvas's own, as in a story) and the console.
+   */
+  readonly plugins?: CanvasPlugins | undefined;
   /** This canvas Space's outcomes; target rails resolve their target's composition. */
   readonly commandOutcomes?: CommandOutcomes | undefined;
   /** This canvas Space's confirmation; target rails use the target's confirmation. */
   readonly deleteConfirmation?: DeleteConfirmation;
   readonly nodes: readonly ResourceFlowNode[];
   /**
-   * What may be authored right now, answered once for the whole application.
-   *
-   * Two answers are read here, and they are deliberately different: every
-   * control drawn on a Resource is `authorOnCanvas`, while a *live* content editor
-   * is `editResourceBody`, which a modal dialog does not withdraw.
+   * What may be authored right now, answered once for the whole application:
+   * every control drawn on a Resource is `authorOnCanvas`.
    */
   readonly availability: AuthoringAvailability;
   readonly nameOnCreation: string | null;
@@ -113,13 +77,6 @@ export interface CanvasResourceAuthoringInput {
   readonly onSelectResource: (resourceId: ResourceId) => void;
   readonly onBodyEditingChange?: ((editing: boolean) => void) | undefined;
   readonly onTitleEditingChange?: ((editing: boolean) => void) | undefined;
-  /**
-   * The Space's image replacements (ADR 0106), which own the whole attempt;
-   * this hook keeps only the caret on the target and says the answer.
-   */
-  readonly imageReplacement: Pick<ImageReplacements, 'replace'>;
-  /** The Space's image picker, which Replace's Upload opens. */
-  readonly pickImages: () => Promise<readonly File[]>;
   /**
    * What each referenced Space offers a Space Resource to select, keyed by target.
    *
@@ -142,26 +99,23 @@ export interface CanvasResourceAuthoringInput {
   readonly resourceEntityActions?:
     ((resourceId: ResourceId) => readonly EntityActionGroup[]) | undefined;
   /**
-   * Which Open Space Resources currently have their embedded canvas in Edit.
-   *
-   * Absent leaves every Space Resource in Read: the embedding stays inert and the
-   * dock offers no Edit/Done. The containing canvas owns the set because the
-   * embedding is sibling nodes, not markup inside the Resource.
+   * The Map embeddings drawn on the canvas this composition draws on; absent,
+   * the ones the canvas around it provides.
    */
-  readonly portalEditing?: ReadonlySet<ResourceId>;
-  readonly onPortalEditingChange?: ((resourceId: ResourceId, editing: boolean) => void) | undefined;
+  readonly mapEmbeddings?: MapEmbeddings | undefined;
+  /**
+   * A plugin's size hint capped at what this canvas shows. Only the canvas's
+   * own Map offers it, because it knows its viewport; absent, a hint is
+   * ignored.
+   */
+  readonly capSizeHint?: ((hint: Size) => Size | undefined) | undefined;
 }
 
 export interface CanvasResourceAuthoring {
   readonly nodes: ResourceFlowNode[];
   readonly bodyEditing: boolean;
   readonly titleEditing: boolean;
-  readonly openResource: (resourceId: string) => 'completed' | 'retained';
   readonly beginTitleEditing: (resourceId: string) => void;
-  readonly completeSpaceResourceFraming: (
-    resourceId: ResourceId,
-    framing: SpaceResourceFraming,
-  ) => string | null;
 }
 
 /**
@@ -182,12 +136,11 @@ export function useCanvasResourceAuthoring({
   onSelectResource,
   onBodyEditingChange,
   onTitleEditingChange,
-  imageReplacement,
-  pickImages,
   spaceResourceTargets = NO_SPACE_RESOURCE_TARGETS,
   resourceEntityActions,
-  portalEditing,
-  onPortalEditingChange,
+  plugins,
+  capSizeHint,
+  mapEmbeddings: ownMapEmbeddings,
 }: CanvasResourceAuthoringInput): CanvasResourceAuthoring {
   const spaces = useOpenSpaces();
   const [contextEditingIds, setContextEditingIds] = useState<ReadonlySet<ResourceId>>(
@@ -199,33 +152,73 @@ export function useCanvasResourceAuthoring({
   const [caret, setCaret] = useState<Caret>(null);
   const editingTitleResourceId = caret?.field === 'title' ? caret.resourceId : null;
   /**
-   * The body caret is on content that can be edited in place: an Open
-   * Resource's own authored content that does not embed a Map, which is
-   * authored in that Map instead.
+   * Where a plugin surface's commits go (ADR 0142): this canvas's Edits, each
+   * answering how it settled, withdrawn by the application's one gate and by
+   * the Space being replaced. A Claim held on the gate is a plugin's running
+   * work, as a Markdown Resource's edit is: it holds the keyboard and withdraws
+   * what a body edit does, while the canvas keeps no editing state of its own
+   * for it.
    */
-  const bodyCaretNamesOpenContent =
-    caret?.field === 'body' &&
-    nodes.some(
-      (node) =>
-        node.id === caret.resourceId &&
-        node.data.open === true &&
-        node.data.authorsContent &&
-        !node.data.embedsMap,
+  const pageGate = usePluginGate();
+  const pluginGate = plugins?.gate ?? pageGate;
+  const reportPluginFailure = plugins?.report ?? reportPluginFailureToConsole;
+  // Read so every plugin surface is decorated again when a Claim is taken or
+  // exclusive work begins or ends, and offers only what is not withdrawn.
+  const claimChain = useSyncExternalStore(pluginGate.subscribe, pluginGate.getState);
+  // The application's asset store, which a surface stores and picks through
+  // only where it offers commits, and only while they are not withdrawn.
+  const pluginAssets = usePluginAssets();
+  // A Claim passed to a Map embedding authors that Map, not the plugin's own
+  // rect, so it withdraws nothing a plugin's edit does.
+  const lent = useSyncExternalStore(pluginGate.subscribe, pluginGate.lent);
+  const bodyEditing = claimChain.holders.some((held) => {
+    const drawing = held.at(-1);
+    return drawing !== undefined && !lent.has(drawing.key);
+  });
+  // The Map embeddings drawn on this canvas, which a Space Resource's host
+  // chooser writes a choice through (ADR 0142).
+  const providedMapEmbeddings = useMapEmbeddings();
+  const mapEmbeddings = ownMapEmbeddings ?? providedMapEmbeddings;
+  const mapEmbeds = useSyncExternalStore(
+    mapEmbeddings?.subscribe ?? NO_SUBSCRIPTION,
+    mapEmbeddings?.getState ?? NO_MAP_EMBEDS,
+  );
+  // What the canvas says about a Map embedding, and its rail editing, go with
+  // the embedding. Every Close takes it down, whoever makes it: the canvas, the
+  // plugin's own Map content commit, another author's Edit or a replacement.
+  // So neither outlives the chooser it belongs to, and a Resource Opened again
+  // starts afresh.
+  const [embedsWere, setEmbedsWere] = useState(mapEmbeds);
+  if (embedsWere !== mapEmbeds) {
+    setEmbedsWere(mapEmbeds);
+    const embedded = embeddedResourceIds(mapEmbeds);
+    setContextNotices((previous) =>
+      [...previous.keys()].every((id) => embedded.has(id))
+        ? previous
+        : new Map([...previous].filter(([id]) => embedded.has(id))),
     );
-
-  if (caret?.field === 'body') {
-    if (bodyCaretNamesOpenContent && !caret.openObserved) {
-      setCaret({ ...caret, openObserved: true });
-    } else if (!bodyCaretNamesOpenContent && caret.openObserved) {
-      setCaret(null);
-    }
+    setContextEditingIds((previous) =>
+      [...previous].every((id) => embedded.has(id))
+        ? previous
+        : new Set([...previous].filter((id) => embedded.has(id))),
+    );
   }
 
-  const bodyEditorResourceId =
-    caret?.field === 'body' && availability.editResourceBody && bodyCaretNamesOpenContent
-      ? caret.resourceId
-      : null;
-  const bodyEditing = bodyEditorResourceId !== null;
+  // What the canvas says about an embedding, and its rail's editing, last
+  // only while the Resource's drawing here embeds a Space: once its plugin
+  // stops embedding, as a Closed Space Resource does, both go, whatever the
+  // kind, so embedding again starts afresh (ADR 0142).
+  const embeddingKey = nodes
+    .flatMap((node) => (mapEmbeds.has(node.id) ? [node.data.resourceId] : []))
+    .sort()
+    .join(' ');
+  const [embeddingWas, setEmbeddingWas] = useState(embeddingKey);
+  if (embeddingWas !== embeddingKey) {
+    setEmbeddingWas(embeddingKey);
+    const embedding = new Set(embeddingKey.split(' '));
+    setContextNotices((prev) => noticesOf(prev, embedding));
+    setContextEditingIds((prev) => editingOf(prev, embedding));
+  }
 
   useEffect(() => {
     onBodyEditingChange?.(bodyEditing);
@@ -262,91 +255,30 @@ export function useCanvasResourceAuthoring({
     }
   }
 
-  const openResource = useCallback(
-    (resourceIdInput: string): 'completed' | 'retained' => {
-      if (!availability.authorOnCanvas) return 'retained';
-      const resourceId = uuidSchema.safeParse(resourceIdInput);
-      if (!resourceId.success) return 'retained';
-      const stored = spaceSession
-        .getState()
-        .working.resources.find((resource) => resource.id === resourceId.data);
-      // Every kind with content Opens, as one Map-owned operation (ADR 0064);
-      // an Ur Resource has none to show, so Enter or Space on one asks nothing.
-      // `takesOpen` is the domain's one answer, which intake and the Edit ask too.
-      if (stored === undefined || !takesOpen(stored.document.kind)) return 'retained';
-      const result = authoring.complete({ kind: 'opened-resource', resourceId: resourceId.data });
-      return result.kind === 'completed' || result.kind === 'unchanged' ? 'completed' : 'retained';
-    },
-    [authoring, availability.authorOnCanvas, spaceSession],
+  const pluginHost = useMemo(
+    (): PluginHost => ({
+      gate: pluginGate,
+      claims: claimChain,
+      replacementEpoch: () => authoring.getState().replacementEpoch,
+      complete: (completion, settle) => authoring.complete(completion, settle),
+      report: reportPluginFailure,
+      document: (resourceId) =>
+        spaceSession.getState().working.resources.find(({ id }) => id === resourceId)?.document,
+      assets: { store: pluginAssets.store, pick: pluginAssets.pick },
+      capSizeHint,
+      embeddedIn: plugins?.embeddedIn,
+    }),
+    [
+      authoring,
+      pluginGate,
+      reportPluginFailure,
+      claimChain,
+      spaceSession,
+      pluginAssets,
+      capSizeHint,
+      plugins?.embeddedIn,
+    ],
   );
-
-  const closeResource = useCallback(
-    (resourceId: ResourceId): 'completed' | 'retained' => {
-      onPortalEditingChange?.(resourceId, false);
-      setContextNotices((previous) => {
-        if (!previous.has(resourceId)) return previous;
-        const next = new Map(previous);
-        next.delete(resourceId);
-        return next;
-      });
-      setContextEditingIds((previous) => {
-        if (!previous.has(resourceId)) return previous;
-        const next = new Set(previous);
-        next.delete(resourceId);
-        return next;
-      });
-      const result = authoring.complete({ kind: 'closed-resource', resourceId });
-      return result.kind === 'completed' || result.kind === 'unchanged' ? 'completed' : 'retained';
-    },
-    [authoring, onPortalEditingChange],
-  );
-
-  const completeResourceBody = useCallback(
-    (resourceId: ResourceId, body: string): 'completed' | 'retained' => {
-      const stored = spaceSession
-        .getState()
-        .working.resources.find((resource) => resource.id === resourceId);
-      if (stored?.document.kind !== markdownKind.id) return 'retained';
-      const parsed = resourceDocumentSchema.safeParse({
-        ...stored.document,
-        content: { ...stored.document.content, source: body },
-      });
-      if (!parsed.success) return 'retained';
-      const result = authoring.complete({
-        kind: 'edited-resource',
-        resourceId,
-        document: parsed.data,
-      });
-      return result.kind === 'completed' || result.kind === 'unchanged' ? 'completed' : 'retained';
-    },
-    [authoring, spaceSession],
-  );
-
-  /**
-   * One Edit per choice, its refusal reported as the Actions menu's commands
-   * are. Without command outcomes there is nowhere to say a refusal, so the
-   * choice is not offered.
-   */
-  const changeResourceShape = useMemo(
-    () =>
-      commandOutcomes === undefined
-        ? undefined
-        : (resourceId: ResourceId, resourceShape: ResourceShape): void => {
-            commandOutcomes.run('resource-shape', () =>
-              authoring.complete({
-                kind: 'changed-resource-shape',
-                resourceId,
-                shape: resourceShape,
-              }),
-            );
-          },
-    [authoring, commandOutcomes],
-  );
-
-  const replaceResourceImage = useMemo(() => {
-    return async (resourceId: ResourceId, replacement: ImageReplacement): Promise<string | null> =>
-      describeImageReplacement(await imageReplacement.replace(resourceId, replacement));
-  }, [imageReplacement]);
 
   const completeResourceTitle = useCallback(
     (resourceIdInput: string, title: string): string | null => {
@@ -382,53 +314,6 @@ export function useCanvasResourceAuthoring({
     [authoring, spaceSession],
   );
 
-  /**
-   * Authoring a Space Resource's Map or Graph selection.
-   *
-   * One operation for both, because they are not independent: a Graph is owned
-   * by the Map that holds it (ADR 0040), and the aggregate refuses a Resource
-   * naming a Graph its Map does not own. So choosing a Map re-seeds
-   * the Graph from that Map rather than leaving the previous one to be
-   * refused at intake.
-   *
-   * There is no arm for a Map that owns no Graph. A Map owns at least
-   * one — `spaceFileSchema` says so — and a Space Resource stores a Graph as well
-   * as a Map (ADR 0079), so writing the pair half-made is not a state this
-   * surface may reach. `graphId` is required here for that reason, and the
-   * schema parse is what still stands between a resolved pair and a stored one.
-   *
-   * The target Space reference is untouched here and cannot be reached from the
-   * surface at all: it is chosen once, at creation (ADR 0068), and Space
-   * Authoring refuses a changed one on its own account.
-   */
-  const completeSpaceResourceSelection = useCallback(
-    (
-      resourceId: ResourceId,
-      targetMap: Pick<SpaceResourceTargetMap, 'id'>,
-      graphId: GraphId,
-    ): string | null =>
-      completeEditedSpaceView(
-        authoring,
-        spaceSession,
-        resourceId,
-        (document) => selectSpaceView(document, { map: targetMap.id, graph: graphId }),
-        'The selection is invalid.',
-      ),
-    [authoring, spaceSession],
-  );
-
-  const completeSpaceResourceFraming = useCallback(
-    (resourceId: ResourceId, framing: SpaceResourceFraming): string | null =>
-      completeEditedSpaceView(
-        authoring,
-        spaceSession,
-        resourceId,
-        (document) => frameSpaceView(document, framing),
-        'The framing is invalid.',
-      ),
-    [authoring, spaceSession],
-  );
-
   const beginTitleEditing = useCallback((resourceId: string) => {
     setCaret({ resourceId, field: 'title' });
   }, []);
@@ -440,18 +325,9 @@ export function useCanvasResourceAuthoring({
     () => new Set(working.resources.map((resource) => resource.id)),
     [editableResourceIdsKey],
   );
-  const spaceSelectionsKey = spaceSelectionsKeyOf(working.resources);
-  const spaceSelections = useMemo(() => spaceSelectionsOf(working.resources), [spaceSelectionsKey]);
   /* eslint-enable react-hooks/exhaustive-deps */
   const clearCaret = useCallback(() => {
     setCaret(null);
-  }, []);
-  const beginBodyEditing = useCallback((node: ResourceFlowNode) => {
-    setCaret({
-      resourceId: node.id,
-      field: 'body',
-      openObserved: node.data.open === true,
-    });
   }, []);
   const onContextEditingChange = useCallback((resourceId: ResourceId, editing: boolean) => {
     setContextEditingIds((prev) => {
@@ -463,25 +339,27 @@ export function useCanvasResourceAuthoring({
       return next;
     });
   }, []);
-  const onContextReport = useCallback((resourceId: ResourceId, message: string | null) => {
-    setContextNotices((prev) => {
-      const current = prev.get(resourceId) ?? null;
-      if (current === message) return prev;
-      const next = new Map(prev);
-      if (message === null) next.delete(resourceId);
-      else next.set(resourceId, message);
-      return next;
-    });
-  }, []);
+  const onContextReport = useCallback(
+    (resourceId: ResourceId, message: string | null) => {
+      // A choice whose answer lands after its embedding is gone says nothing.
+      if (message !== null && !embeds(mapEmbeddings, resourceId)) return;
+      setContextNotices((prev) => {
+        const current = prev.get(resourceId) ?? null;
+        if (current === message) return prev;
+        const next = new Map(prev);
+        if (message === null) next.delete(resourceId);
+        else next.set(resourceId, message);
+        return next;
+      });
+    },
+    [mapEmbeddings],
+  );
 
   const sharedContext = useMemo(
     () => ({
       authorOnCanvas: availability.authorOnCanvas,
       bodyEditing,
-      bodyEditorResourceId,
       editableResourceIds,
-      openResource,
-      closeResource,
       beginTitleEditing,
       onSelectResource,
       resourceResize,
@@ -493,10 +371,7 @@ export function useCanvasResourceAuthoring({
     [
       availability.authorOnCanvas,
       bodyEditing,
-      bodyEditorResourceId,
       editableResourceIds,
-      openResource,
-      closeResource,
       beginTitleEditing,
       onSelectResource,
       resourceResize,
@@ -513,39 +388,76 @@ export function useCanvasResourceAuthoring({
       ),
     [nodes, sharedContext],
   );
-  const decoratedNodes = useKindDecoratedNodes(withShared, {
+  const kindDecorated = useKindDecoratedNodes(withShared, {
     authorOnCanvas: availability.authorOnCanvas,
-    bodyEditing,
+    embeddedMapEdit: availability.embeddedMapEdit,
     editableResourceIds,
-    beginBodyEditing,
-    bodyEditorResourceId,
-    completeResourceBody,
-    clearCaret,
-    replaceResourceImage,
-    pickImageFiles: pickImages,
-    changeResourceShape,
-    continuation,
-    containingSpaceId: working.id,
-    spaceSelections,
-    spaceResourceTargets,
-    spaces,
-    commandOutcomes,
-    deleteConfirmation,
-    completeSpaceResourceSelection,
-    portalEditing,
-    // An Open Space Resource offers its Edit only where one may begin.
-    onPortalEditingChange: availability.embeddedMapEdit ? onPortalEditingChange : undefined,
-    contextNotices,
-    onContextEditingChange,
-    onContextReport,
+    pluginHost,
   });
+  // The commands of each Space a Resource embeds, read from what its plugin
+  // passed `Embed`, whatever the kind (ADR 0142).
+  const embedContext = useMemo(
+    (): EmbedCommandsContext => ({
+      authorOnCanvas: availability.authorOnCanvas,
+      editableResourceIds,
+      continuation,
+      containingSpaceId: working.id,
+      spaceResourceTargets,
+      spaces,
+      commandOutcomes,
+      deleteConfirmation,
+      mapEmbeds,
+      contextNotices,
+      onContextEditingChange,
+      onContextReport,
+    }),
+    [
+      availability.authorOnCanvas,
+      editableResourceIds,
+      continuation,
+      working.id,
+      spaceResourceTargets,
+      spaces,
+      commandOutcomes,
+      deleteConfirmation,
+      mapEmbeds,
+      contextNotices,
+      onContextEditingChange,
+      onContextReport,
+    ],
+  );
+  const decoratedNodes = useMemo(
+    () => kindDecorated.map((node) => decorateEmbedCommands(node, embedContext)),
+    [kindDecorated, embedContext],
+  );
 
   return {
     nodes: decoratedNodes,
     bodyEditing,
     titleEditing: editingTitleResourceId !== null || contextEditingIds.size > 0,
-    openResource,
     beginTitleEditing,
-    completeSpaceResourceFraming,
   };
+}
+
+/** Whether some drawing on this canvas embeds a Space in a rect of `resourceId`'s. */
+const embeds = (mapEmbeddings: MapEmbeddings | null, resourceId: ResourceId): boolean =>
+  mapEmbeddings !== null &&
+  [...mapEmbeddings.getState().values()].some((entry) => entry.resourceId === resourceId);
+
+/** The notices of the Resources in `embedding`, or `notices` itself where it has no other. */
+function noticesOf(
+  notices: ReadonlyMap<ResourceId, string>,
+  embedding: ReadonlySet<string>,
+): ReadonlyMap<ResourceId, string> {
+  const kept = [...notices].filter(([resourceId]) => embedding.has(resourceId));
+  return kept.length === notices.size ? notices : new Map(kept);
+}
+
+/** The Resources of `editing` in `embedding`, or `editing` itself where it has no other. */
+function editingOf(
+  editing: ReadonlySet<ResourceId>,
+  embedding: ReadonlySet<string>,
+): ReadonlySet<ResourceId> {
+  const kept = [...editing].filter((resourceId) => embedding.has(resourceId));
+  return kept.length === editing.size ? editing : new Set(kept);
 }

@@ -27,29 +27,22 @@ import {
   type OnNodesChange,
   useReactFlow,
   useStore,
+  useStoreApi,
 } from '@xyflow/react';
-import {
-  DEFAULT_KIND,
-  COLLAPSED_RESOURCE_SIZE,
-  isAcceptedImageUrl,
-  takesOpen,
-  titleName,
-  uuidSchema,
-  type ResourceId,
-  type MapId,
-} from '@project/core';
-import { resolveResourceContent } from '@project/graph';
+import { DEFAULT_KIND, uuidSchema, type ResourceId, type MapId } from '@project/core';
 import type { SpaceSession } from '@project/persistence';
 import {
   CANVAS_RESOURCE_DRAG_TILT_DEGREES,
   GraphIcon,
   graphPaint,
-  spaceViewOf,
+  HostMapProvider,
   type EntityActionGroup,
+  type MapEmbedRequest,
 } from '@project/ui';
 import {
   authorsEmbeddedMap,
   nodeTypes,
+  EMBEDDING_RESOURCE_Z_INDEX,
   GraphConnectionLine,
   GraphHeadMarkers,
   GraphConnectionLineHeadShape,
@@ -60,9 +53,9 @@ import {
 import { connectionAppearance } from '../colors';
 import { describeCanvasGestureRefusal, type CanvasGestureRefusal } from '../authoring-refusal';
 import { CANVAS_OCCURRENCE, observeMapSurfaces, type MapSurface } from '../map-surface';
-import { useCanvasResourceAuthoring } from '../canvas-resource-authoring';
+import { useCanvasResourceAuthoring, type CanvasPlugins } from '../canvas-resource-authoring';
 import type { SpaceResourceTargets } from '../space-resource-targets';
-import type { ResourcePlacementCommands } from '../resource-placement';
+import { createsFromData, type ResourcePlacementCommands } from '../resource-placement';
 import type { MapSurfaceReading } from '../use-map-surface';
 import { useEdgeAuthoring } from '../edge-authoring-react';
 import { edgeSelectionOf, sameSelection } from '../render-adapter';
@@ -79,10 +72,20 @@ import {
   withEmbeddedEdgeTypes,
 } from '../embedded-map';
 import { editingPortalAncestor, reportsBodyHeight } from '../embedded-open-space-resource';
+import { framedView } from '../embed-view';
 import { useEmbeddedOpenSpaceResources } from '../use-embedded-open-space-resources';
 import { useOpenSpaces } from '../open-spaces-context';
 import type { OpenSpace } from '../open-spaces';
 import { EmbeddedMapAuthoring } from './EmbeddedMapAuthoring';
+import { drawCanvasMapEmbed } from './map-embed-draws';
+import {
+  createMapEmbeddings,
+  MapEmbeddingsProvider,
+  ownMapEmbed,
+  type MapEmbedEntry,
+} from '../map-embeddings';
+import type { Drawing, Embedding } from '../plugin-host/claim-chain';
+import { usePluginGate } from '../plugin-host/plugin-gate-context';
 import { CANVAS_KEYS, FULL_VIEW_KEYS, keyBelongsElsewhere, pressesBinding } from '../key-bindings';
 import {
   ADD_RESOURCE,
@@ -90,15 +93,12 @@ import {
   bindCommand,
   keyAnswerOf,
   NOT_A_CANVAS_COMMAND,
-  OPEN_AND_EXPAND,
-  OPEN_RESOURCE,
   presentFromHereCommand,
   REMOVE_SELECTION,
   removeFromMapReportedBy,
   RENAME_RESOURCE,
   showFullViewCommand,
   type AuthoringOccurrence,
-  type OpenTarget,
   type OwnResourceTarget,
   type RemovalTarget,
   type PresentFrom,
@@ -112,10 +112,9 @@ import {
   type NavigationDirection,
 } from '../graph-navigation';
 import { FullView } from './FullView';
-import { openAndExpandSize, openHeight, visibleCanvasCap } from '../open-and-expand';
+import { capSizeHint as capHintAt, visibleCanvasCap } from '../visible-canvas-cap';
 import type { CommandOutcomes } from '../command-outcomes';
 import type { DeleteConfirmation } from '../delete-confirmation';
-import type { ImageReplacements } from '../image-replacement';
 import {
   framingFromFit,
   panFraming,
@@ -134,9 +133,12 @@ import {
  * Both node keys are set because React Flow picks between them on
  * `disableKeyboardA11y`, and the one it names `keyboardDisabled` is the one an
  * ordinary keyboard-enabled graph gets.
+ *
+ * Enter and Shift+Enter are not named: a plugin keeps every kind's Open (ADR
+ * 0142), so on the canvas they open no Resource.
  */
 const RESOURCE_KEYS_DESCRIPTION =
-  'Press enter to open a Resource, shift enter to open and expand it, space to read it in Full View, backspace or delete to remove it from this Map, and escape to cancel a move or unselect it. From a selected Resource, press the arrow keys to go along the Active Graph, or shift and the arrow keys to move it.';
+  'Press space to read a Resource in Full View, backspace or delete to remove it from this Map, and escape to cancel a move or unselect it. From a selected Resource, press the arrow keys to go along the Active Graph, or shift and the arrow keys to move it.';
 
 const ARIA_LABEL_CONFIG = {
   'node.a11yDescription.default': RESOURCE_KEYS_DESCRIPTION,
@@ -191,7 +193,7 @@ export interface SpaceCanvasProps {
   /** Every way a Resource arrives on this canvas: created, dropped or pasted. */
   readonly placement: Pick<
     ResourcePlacementCommands,
-    'createResource' | 'dropExistingResource' | 'dropSpace' | 'dropImages' | 'pasteImageUrl'
+    'createOnCanvas' | 'dropExistingResource' | 'dropSpace' | 'createFromData'
   >;
   readonly onDrawnClipboardFailuresChange?: (failures: readonly DrawnClipboardFailure[]) => void;
   readonly onDrawnSpacesChange?: (entries: readonly OpenSpace[]) => void;
@@ -199,13 +201,8 @@ export interface SpaceCanvasProps {
   readonly commandOutcomes: CommandOutcomes;
   /** Where a Space Resource rail's Delete Map and Delete Graph ask first. */
   readonly deleteConfirmation: DeleteConfirmation;
-  /**
-   * The Space's image replacements (ADR 0106), which own the whole attempt.
-   * The one way Replace reaches an Image Resource on this canvas that offers it.
-   */
-  readonly imageReplacement: Pick<ImageReplacements, 'replace'>;
-  /** The Space's image picker, which Replace's Upload opens. */
-  readonly pickImages: () => Promise<readonly File[]>;
+  /** The composition's plugin gate and reporter (ADR 0142). */
+  readonly plugins?: CanvasPlugins | undefined;
   /**
    * The Resource a completed creation asks to be named, or `null`.
    *
@@ -292,6 +289,29 @@ const neighbourOnScreen = (
   return neighbourToward(centreOf(origin), candidates, direction);
 };
 
+/**
+ * The Resources a placement is drawn inside, through their Map embeddings,
+ * outermost first, then its own: the chain its embedded Map's Claims nest
+ * under (ADR 0142).
+ */
+const embeddingChainOf = (
+  node: ResourceFlowNode,
+  nodesById: ReadonlyMap<string, ResourceFlowNode>,
+  embeds: ReadonlyMap<string, MapEmbedEntry>,
+): Embedding => {
+  const chain: Drawing[] = [];
+  let current: ResourceFlowNode | undefined = node;
+  while (current !== undefined) {
+    // Each placement in the chain draws a Map embedding, so it has published
+    // the key of its drawing; one that has not yet is left out, and a Claim
+    // under it is refused until it has.
+    const key = embeds.get(current.id)?.drawing;
+    if (key !== undefined) chain.unshift({ resource: current.data.resourceId, key });
+    current = current.parentId === undefined ? undefined : nodesById.get(current.parentId);
+  }
+  return chain;
+};
+
 /** The Resource a drawn node shows, by the node's id in one drawing. */
 const resourceOfNode = (nodes: readonly ResourceFlowNode[], id: string): ResourceId | undefined =>
   nodes.find((node) => node.id === id)?.data.resourceId;
@@ -316,8 +336,7 @@ export function SpaceCanvas({
   onDrawnSpacesChange,
   commandOutcomes,
   deleteConfirmation,
-  imageReplacement,
-  pickImages,
+  plugins,
   nameOnCreation,
   spaceSession,
   spaceResourceTargets,
@@ -345,10 +364,6 @@ export function SpaceCanvas({
     reportEmbeddedMapEditing,
   } = canvasRendering;
   const nodes = useMemo(() => liveProjection?.nodes ?? [], [liveProjection]);
-  const latestNodes = useRef(nodes);
-  useLayoutEffect(() => {
-    latestNodes.current = nodes;
-  }, [nodes]);
   const edges = useMemo(() => liveProjection?.edges ?? [], [liveProjection]);
   // Null while a replacement placement resolves. The canvas keeps drawing the
   // Resources on screen through that window, so a connection is reachable with
@@ -372,9 +387,9 @@ export function SpaceCanvas({
   const presenting = context.kind === 'canvas' && context.presentingResourceId !== null;
   const placedResources = view.placedResources;
   const { visibleGraphs: graphs, colors: colorByGraphId } = view.projection;
-  const { createResource, dropExistingResource, dropSpace, dropImages, pasteImageUrl } = placement;
-  const addCanvasResource = useCallback(() => createResource(DEFAULT_KIND), [createResource]);
-  const { screenToFlowPosition, getZoom, setCenter } = useReactFlow();
+  const { createOnCanvas, dropExistingResource, dropSpace, createFromData } = placement;
+  const addCanvasResource = useCallback(() => createOnCanvas(DEFAULT_KIND), [createOnCanvas]);
+  const { screenToFlowPosition, getZoom } = useReactFlow();
 
   const spaces = useOpenSpaces();
   const thisSpaceId = spaceSession.getState().working.id;
@@ -419,26 +434,81 @@ export function SpaceCanvas({
     () => ({ spaceId: thisSpaceId, mapId, policy: rootPolicy }),
     [thisSpaceId, mapId, rootPolicy],
   );
+  // The Map embeddings drawn on this canvas, nested ones too: a plugin's
+  // `<Embed space>` publishes what it asks for while it is drawn (ADR 0142).
+  const [mapEmbeddings] = useState(createMapEmbeddings);
+  const embeds = useSyncExternalStore(mapEmbeddings.subscribe, mapEmbeddings.getState);
+  const publishMapEmbed = useCallback(
+    (nodeId: string, resourceId: ResourceId, request: MapEmbedRequest | null, drawing: symbol) =>
+      mapEmbeddings.publish(nodeId, resourceId, request, drawing),
+    [mapEmbeddings],
+  );
   const {
     embeddedRequests,
     embeddedPublications,
-    embeddedFailures,
+    failedEmbeddings,
     resumeEmbedded,
     publishEmbedded,
     reportBodyHeight,
     editingPortals,
-    onPortalEditingChange: setPortalEditing,
     portalDraft,
     setPortalDraft,
-  } = useEmbeddedOpenSpaceResources(nodes, spaces, draggingIds, embeddedRoot, hasResourcesOnCanvas);
-
-  const onPortalEditingChange = useCallback(
-    (resourceId: ResourceId, editing: boolean) => {
-      setPortalEditing(resourceId, editing);
-      if (!editing) selectResource(resourceId);
-    },
-    [setPortalEditing, selectResource],
+  } = useEmbeddedOpenSpaceResources(
+    nodes,
+    embeds,
+    spaces,
+    draggingIds,
+    embeddedRoot,
+    hasResourcesOnCanvas,
   );
+  // A Claim passed to a Map embedding is held for that Map's authoring, and
+  // withdraws nothing a plugin's own edit does; when it ends, the Resource
+  // whose Map it authored is selected.
+  const pageGate = usePluginGate();
+  const gate = plugins?.gate ?? pageGate;
+  const editedBefore = useRef<ReadonlySet<string>>(editingPortals);
+  /** Lands a framing still pending for a placement whose Map is no longer authored in place. */
+  const flushPortalFraming = useRef<(nodeId: string) => void>(() => undefined);
+  const lastEmbeds = useRef(embeds);
+  const lastEmbeddedRequests = useRef(embeddedRequests);
+  /** The placements drawn now, which a Resource whose Edit ended must still be among to be selected. */
+  const drawnNodes = useRef(nodes);
+  useLayoutEffect(() => {
+    drawnNodes.current = nodes;
+  }, [nodes]);
+  useLayoutEffect(() => {
+    const returns = [...editingPortals].flatMap((nodeId) => {
+      const drawing = mapEmbeddings.getState().get(nodeId)?.drawing;
+      return drawing === undefined ? [] : [gate.lend(drawing)];
+    });
+    for (const nodeId of editedBefore.current) {
+      if (editingPortals.has(nodeId)) continue;
+      const left = lastEmbeds.current.get(nodeId);
+      // Done lands what the author framed before the commit is withdrawn by
+      // another Claim (ADR 0142).
+      flushPortalFraming.current(nodeId);
+      // Done and Close leave the Resource drawn, and it is selected; an Edit
+      // that ended because the placement went, as when the Map is switched or
+      // the Resource is deleted or unplaced, selects nothing.
+      if (left !== undefined && drawnNodes.current.some((node) => node.id === nodeId))
+        selectResource(left.resourceId);
+    }
+    editedBefore.current = editingPortals;
+    return () => {
+      for (const give of returns) give();
+    };
+  }, [editingPortals, gate, selectResource, mapEmbeddings]);
+  // After the flush above, so a flush in the commit that drops an embedding
+  // still finds the request the embedding last made; once it has landed, a
+  // withdrawn embedding's commit is no longer kept.
+  useLayoutEffect(() => {
+    for (const nodeId of lastEmbeds.current.keys())
+      if (!embeds.has(nodeId)) mapEmbeddings.forget(nodeId);
+    lastEmbeds.current = embeds;
+  }, [embeds, mapEmbeddings]);
+  useLayoutEffect(() => {
+    lastEmbeddedRequests.current = embeddedRequests;
+  }, [embeddedRequests]);
 
   const drawnSpaces = useMemo(
     () => [
@@ -519,58 +589,22 @@ export function SpaceCanvas({
       ? null
       : { from: connectingFrom, anchor: connecting.anchor };
   /**
-   * Open and expand (ADR 0137): one Edit Opening the Resource at the size its
-   * content needs, capped at what this canvas shows at the current zoom, after
-   * which the camera centres it at that zoom. The camera is the canvas's own,
-   * so only its own Map's Resources are given it.
+   * A plugin's size hint capped at what this canvas shows at the current zoom
+   * (ADR 0142): the most a gesture may grow a Resource to, a canvas fact. Read
+   * when a commit is made, so nothing is rebuilt on every zoom.
    */
-  const openAndExpand = useCallback(
-    (resourceId: ResourceId): void => {
-      // Read when pressed, so the action factory below is not rebuilt on every
-      // projection a drag or a selection publishes.
-      const node = latestNodes.current.find((each) => each.data.resourceId === resourceId);
-      const resource = view.space.lookup.resource(resourceId);
+  const capSizeHint = useCallback(
+    (hint: { readonly width: number; readonly height: number }) => {
       const area = canvasRef.current;
-      if (node === undefined || resource === undefined || area === null) return;
-      if (!takesOpen(resource.kind)) return;
-      const zoom = getZoom();
-      const content = resolveResourceContent(view.space, resource);
-      const size = openAndExpandSize(
-        {
-          width: node.width ?? COLLAPSED_RESOURCE_SIZE.width,
-          height: node.height ?? COLLAPSED_RESOURCE_SIZE.height,
-        },
-        visibleCanvasCap(area.getBoundingClientRect(), zoom),
-        (at) => openHeight(area, node, content, at),
-      );
-      const result = authoring.complete({ kind: 'opened-resource-to-fit', resourceId, size });
-      if (result.kind === 'refused') return;
-      // Issued, never awaited (ADR 0043). The Resource's top-left stays where
-      // it is, so its new rect is known before the projection draws it.
-      void setCenter(node.position.x + size.width / 2, node.position.y + size.height / 2, {
-        zoom,
-        duration: 0,
-      });
+      if (area === null) return undefined;
+      return capHintAt(hint, visibleCanvasCap(area.getBoundingClientRect(), getZoom()));
     },
-    [view.space, getZoom, setCenter, authoring],
+    [getZoom],
   );
   /** Present from Here, on the canvas's own Map: what `P` and the rail item both run. */
   const presentFromHere = useMemo(
     () => presentFromHereCommand({ presentFrom, mayPresent: availability.present }),
     [presentFrom, availability.present],
-  );
-  /** Whether Open and expand is offered on a Resource of the canvas's own Map. */
-  const expandable = useCallback(
-    (resourceId: ResourceId): boolean => {
-      const resource = view.space.lookup.resource(resourceId);
-      return (
-        availability.authorOnCanvas &&
-        resource !== undefined &&
-        takesOpen(resource.kind) &&
-        placedResources.some((placed) => placed.id === resourceId)
-      );
-    },
-    [availability.authorOnCanvas, view.space, placedResources],
   );
   /** Read in Full View, on the canvas's own Map: what Space and the rail item both run. */
   const showFullViewHere = useMemo(
@@ -610,10 +644,6 @@ export function SpaceCanvas({
                   ]
                 : [],
               {
-                openAndExpand: bindCommand(OPEN_AND_EXPAND, {
-                  resourceId,
-                  canvas: { expandable, openAndExpand },
-                }),
                 fullView: bindCommand(showFullViewHere, { resourceId }),
                 present: bindCommand(presentFromHere, resourceId),
               },
@@ -624,8 +654,6 @@ export function SpaceCanvas({
       placedResources,
       selectResource,
       mapId,
-      expandable,
-      openAndExpand,
       showFullViewHere,
       presentFromHere,
     ],
@@ -634,6 +662,7 @@ export function SpaceCanvas({
     continuation: surface.continuation,
     commandOutcomes,
     deleteConfirmation,
+    plugins,
     nodes,
     availability,
     nameOnCreation,
@@ -641,19 +670,32 @@ export function SpaceCanvas({
     spaceSession,
     resourceResize,
     onSelectResource: selectResource,
-    imageReplacement,
-    pickImages,
     spaceResourceTargets,
     resourceEntityActions: resourceActions,
-    portalEditing: editingPortals,
-    onPortalEditingChange,
+    capSizeHint,
+    mapEmbeddings,
   });
-  const {
-    bodyEditing,
-    openResource: onOpenResource,
-    beginTitleEditing,
-    completeSpaceResourceFraming,
-  } = resourceAuthoring;
+  const { bodyEditing, beginTitleEditing } = resourceAuthoring;
+  /**
+   * The framing an author gave a Map authored in place, written through the
+   * embedding's `select`, the plugin's own commit, so withdrawal covers it.
+   */
+  const completeSpaceResourceFraming = useCallback(
+    (nodeId: string, framing: SpaceResourceFraming) => {
+      // Unmounting, the embedding is gone before the canvas flushes what was
+      // pending: the last one drawn still names the commit.
+      const entry =
+        ownMapEmbed(mapEmbeddings.getState(), nodeId) ?? ownMapEmbed(lastEmbeds.current, nodeId);
+      const commit = entry?.request.select?.commit;
+      if (entry === undefined || commit === undefined) return;
+      // This placement's drawing, which says what its Space resolved a view
+      // that left the Map or Graph open to.
+      const drawn = lastEmbeddedRequests.current.find((request) => request.parent.id === nodeId);
+      const next = framedView(entry.request.view, drawn, framing);
+      if (next !== undefined) void commit(next);
+    },
+    [mapEmbeddings],
+  );
 
   const embeddedBodyEditing = embeddedRequests.some(
     (request) =>
@@ -690,7 +732,7 @@ export function SpaceCanvas({
               focusable: false,
               deletable: false,
             })),
-            // The three Resource commands aimed at a retained read answer it the
+            // The two Resource commands aimed at a retained read answer it the
             // same way: reopen the target's session so the next press acts.
             // The canvas still announces that delete removes the focused Resource
             // from its Map, and this drawing is still focusable, so an
@@ -709,10 +751,6 @@ export function SpaceCanvas({
                 ...stamped,
                 data: {
                   ...stamped.data,
-                  onOpenChange: () => {
-                    void resumeEmbedded(request.spaceId);
-                    return 'retained';
-                  },
                   onBeginTitleEditing: () => {
                     void resumeEmbedded(request.spaceId);
                   },
@@ -814,7 +852,6 @@ export function SpaceCanvas({
         authoring,
         availability,
         bodyEditing: resourceAuthoring.bodyEditing,
-        openResource: onOpenResource,
         beginTitleEditing,
         selection,
         removeFromMap: removeFromMapReportedBy(commandOutcomes, authoring),
@@ -824,16 +861,12 @@ export function SpaceCanvas({
       },
       ...liveEmbeddings.map((value) => ({
         id: value.surface.occurrence(),
-        addResource: () => value.placement.createResource(DEFAULT_KIND),
+        addResource: () => value.placement.createOnCanvas(DEFAULT_KIND),
         nodes: value.nodes,
         authoring: value.surface.authoring,
         availability: value.availability,
         bodyEditing: value.bodyEditing,
         selection: value.surface.adapter.getState().selection,
-        openResource: (id: string) => {
-          const resourceId = resourceOfNode(value.nodes, id);
-          if (resourceId !== undefined) value.openResource(resourceId);
-        },
         beginTitleEditing: (id: string) => {
           const resourceId = resourceOfNode(value.nodes, id);
           if (resourceId !== undefined) value.beginTitleEditing(resourceId);
@@ -863,7 +896,6 @@ export function SpaceCanvas({
       commandOutcomes,
       availability,
       resourceAuthoring.bodyEditing,
-      onOpenResource,
       beginTitleEditing,
       selection,
       edgeAuthoring,
@@ -960,12 +992,7 @@ export function SpaceCanvas({
     if (keyBelongsElsewhere(event.nativeEvent)) return;
     if (pressesBinding(FULL_VIEW_KEYS.leave, event.nativeEvent)) {
       event.preventDefault();
-      leaveFullView(false);
-      return;
-    }
-    if (pressesBinding(FULL_VIEW_KEYS.openOnCanvas, event.nativeEvent)) {
-      event.preventDefault();
-      leaveFullView(true);
+      leaveFullView();
       return;
     }
     // The walk is the content's: an arrow on the view's own buttons is theirs.
@@ -983,8 +1010,8 @@ export function SpaceCanvas({
     }
   };
 
-  /** Back to the canvas, on the Resource last read, Opening it there when asked and allowed. */
-  const leaveFullView = (open: boolean): void => {
+  /** Back to the canvas, on the Resource last read. */
+  const leaveFullView = (): void => {
     if (fullView === undefined || fullViewOf === null) return;
     fullView.show(null);
     const node = nodes.find((each) => each.data.resourceId === fullViewOf);
@@ -995,7 +1022,6 @@ export function SpaceCanvas({
     canvasRef.current
       ?.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(node.id)}"]`)
       ?.focus();
-    if (open && availability.authorOnCanvas && !bodyEditing) onOpenResource(node.id);
   };
 
   // Full View lasts while its Resource is drawn here and the canvas may be
@@ -1018,21 +1044,20 @@ export function SpaceCanvas({
   }, [fullViewShown]);
   useKeyCover('full-view', fullViewShown);
 
-  // Enter, Shift+Enter and Space are aimed at the focused Resource: the node the
-  // press landed on, inside this canvas, and never one of its own controls,
-  // content or editor. The narrow guard is load-bearing rather than defensive:
-  // an Open Resource draws its editor *inside* the node, so a Space typed into
-  // it would otherwise be taken before the document ever received the
-  // character. Enter Opens on whichever drawn Map holds the node; Shift+Enter
-  // and Space act on the canvas's own Map, whose camera and Full View they use.
+  // Space is aimed at the focused Resource: the node the press landed on,
+  // inside this canvas, and never one of its own controls, content or editor.
+  // The narrow guard is load-bearing rather than defensive: a plugin draws its
+  // editor *inside* the node, so a Space typed into it would otherwise be taken
+  // before the document ever received the character. Space acts on the
+  // canvas's own Map, whose Full View it uses.
   const focusedNodeOf = useCallback((event: KeyboardEvent): string | undefined => {
     if (!(event.target instanceof Element)) return undefined;
     const node = event.target.closest<HTMLElement>('.react-flow__node[data-id]');
     if (node === null || canvasRef.current?.contains(node) !== true) return undefined;
     return node.dataset['id'];
   }, []);
-  // A body edit holds the canvas's Enter and Space keys though not its rail, so
-  // a press while one is open finds no Resource to aim at.
+  // A body edit holds the canvas's Space key though not its rail, so a press
+  // while one is open finds no Resource to aim at.
   const ownResourceOf = (event: KeyboardEvent): OwnResourceTarget | undefined => {
     const nodeId = bodyEditing ? undefined : focusedNodeOf(event);
     const resourceId = nodeId === undefined ? undefined : resourceOfNode(nodes, nodeId);
@@ -1040,39 +1065,6 @@ export function SpaceCanvas({
   };
   useKeyAnswers(
     [
-      {
-        id: OPEN_RESOURCE.id,
-        answer: (event: KeyboardEvent) =>
-          answerCommand(OPEN_RESOURCE, event, (): OpenTarget | undefined => {
-            const nodeId = focusedNodeOf(event);
-            if (nodeId === undefined) return undefined;
-            for (const occurrence of occurrences) {
-              const node = occurrence.nodes.find((each) => each.id === nodeId);
-              if (node === undefined) continue;
-              return {
-                occurrence: {
-                  authorOnCanvas: occurrence.availability.authorOnCanvas,
-                  // The canvas's own body edit holds the keyboard on every Map it draws.
-                  bodyEditing: bodyEditing || occurrence.bodyEditing,
-                  openResource: occurrence.openResource,
-                },
-                nodeId,
-                takesOpen: takesOpen(node.data.kind),
-              };
-            }
-            return undefined;
-          }),
-      },
-      {
-        id: OPEN_AND_EXPAND.id,
-        answer: (event: KeyboardEvent) =>
-          answerCommand(OPEN_AND_EXPAND, event, () => {
-            const own = ownResourceOf(event);
-            return own === undefined
-              ? undefined
-              : { ...own, canvas: { expandable, openAndExpand } };
-          }),
-      },
       {
         id: showFullViewHere.id,
         answer: (event: KeyboardEvent) =>
@@ -1150,16 +1142,20 @@ export function SpaceCanvas({
   const canvasNodes = useMemo(
     () =>
       [...editableNodes, ...liveEmbeddings.flatMap((value) => value.nodes)].map((node) => {
+        // A Resource drawing a Map embedding is drawn over its neighbours, so the
+        // Map drawn over its rect is reachable; no other Resource is raised.
+        const raised =
+          node.zIndex === undefined && embeds.has(node.id)
+            ? { ...node, zIndex: EMBEDDING_RESOURCE_Z_INDEX }
+            : node;
+        const withEmbed = { ...raised, data: { ...raised.data, onMapEmbed: publishMapEmbed } };
         const withHeight = reportsBodyHeight(node)
           ? {
-              ...node,
-              data: { ...node.data, onBodyHeightChange: reportBodyHeight },
+              ...withEmbed,
+              data: { ...withEmbed.data, onBodyHeightChange: reportBodyHeight },
             }
-          : node;
-        if (
-          !editingPortals.has(withHeight.data.resourceId) ||
-          !authorsEmbeddedMap(withHeight.data)
-        ) {
+          : withEmbed;
+        if (!editingPortals.has(withHeight.id) || !authorsEmbeddedMap(withHeight.data)) {
           return withHeight;
         }
         // `nopan` only: an Open Resource does not take `nowheel` (ADR 0064).
@@ -1176,7 +1172,7 @@ export function SpaceCanvas({
           className: classes.join(' '),
         };
       }),
-    [editableNodes, liveEmbeddings, reportBodyHeight, editingPortals],
+    [editableNodes, liveEmbeddings, reportBodyHeight, editingPortals, publishMapEmbed, embeds],
   );
   const portalNodesById = useMemo(() => {
     const byId = new Map<string, ResourceFlowNode>();
@@ -1190,9 +1186,15 @@ export function SpaceCanvas({
     () => [...edgeSurface.edges, ...liveEmbeddings.flatMap((value) => value.edges)],
     [edgeSurface.edges, liveEmbeddings],
   );
+  const flowStore = useStoreApi();
   const changeCanvasEdges = useCallback<OnEdgesChange>(
     (changes) => {
+      // A selection box selects the Edges between the Resources it takes as
+      // well. An Edge is selected alone, so the box leaves them out and selects
+      // only the Resources.
+      const boxing = flowStore.getState().userSelectionActive;
       const rootChanges = changes.filter((change) => {
+        if (boxing && change.type === 'select' && change.selected) return false;
         if (change.type === 'add') return true;
         const owner = liveEmbeddings.find((value) =>
           value.edges.some((edge) => edge.id === change.id),
@@ -1209,7 +1211,7 @@ export function SpaceCanvas({
       });
       changeEdges(rootChanges);
     },
-    [liveEmbeddings, changeEdges],
+    [liveEmbeddings, changeEdges, flowStore],
   );
   // A stable identity, or React Flow warns of a fresh `edgeTypes` object (#002).
   const canvasEdgeTypes = useMemo(
@@ -1225,6 +1227,7 @@ export function SpaceCanvas({
   );
   const canvasRef = useRef<HTMLDivElement>(null);
   const portalGestureSnapshot = useRef({
+    embeds,
     editingPortals,
     portalNodesById,
     portalDraft,
@@ -1239,6 +1242,7 @@ export function SpaceCanvas({
   // listener cannot pan or zoom from the previous gesture-session snapshot.
   useLayoutEffect(() => {
     portalGestureSnapshot.current = {
+      embeds,
       editingPortals,
       portalNodesById,
       portalDraft,
@@ -1249,6 +1253,7 @@ export function SpaceCanvas({
       authorOnCanvas: availability.authorOnCanvas,
     };
   }, [
+    embeds,
     editingPortals,
     portalNodesById,
     portalDraft,
@@ -1265,44 +1270,39 @@ export function SpaceCanvas({
 
     let pan: {
       pointerId: number;
-      resourceId: ResourceId;
+      portalId: string;
       lastX: number;
       lastY: number;
       framing: SpaceResourceFraming;
     } | null = null;
-    const zoomPending = new Map<ResourceId, SpaceResourceFraming>();
-    const zoomTimers = new Map<ResourceId, ReturnType<typeof setTimeout>>();
+    const zoomPending = new Map<string, SpaceResourceFraming>();
+    const zoomTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
-    const persist = (resourceId: ResourceId, framing: SpaceResourceFraming, dropDraft = true) => {
+    const persist = (portalId: string, framing: SpaceResourceFraming, dropDraft = true) => {
       if (dropDraft) {
         setPortalDraft((previous) => {
           const next = new Map(previous);
-          next.delete(resourceId);
+          next.delete(portalId);
           return next;
         });
       }
-      portalGestureSnapshot.current.completeSpaceResourceFraming(resourceId, framing);
+      portalGestureSnapshot.current.completeSpaceResourceFraming(portalId, framing);
     };
 
-    const flushPendingZoom = (resourceId: ResourceId, dropDraft = true) => {
-      const pending = zoomPending.get(resourceId);
-      const timer = zoomTimers.get(resourceId);
+    const flushPendingZoom = (portalId: string, dropDraft = true) => {
+      const pending = zoomPending.get(portalId);
+      const timer = zoomTimers.get(portalId);
       if (timer !== undefined) clearTimeout(timer);
-      zoomPending.delete(resourceId);
-      zoomTimers.delete(resourceId);
-      if (pending !== undefined) persist(resourceId, pending, dropDraft);
+      zoomPending.delete(portalId);
+      zoomTimers.delete(portalId);
+      if (pending !== undefined) persist(portalId, pending, dropDraft);
     };
 
-    const framingOf = (
-      resourceId: ResourceId,
-      parentId: string,
-    ): SpaceResourceFraming | undefined => {
+    const framingOf = (parentId: string): SpaceResourceFraming | undefined => {
       const session = portalGestureSnapshot.current;
-      const drafted = session.portalDraft.get(resourceId);
+      const drafted = session.portalDraft.get(parentId);
       if (drafted !== undefined) return drafted;
-      const parent = session.portalNodesById.get(parentId);
-      const stored =
-        parent === undefined ? undefined : spaceViewOf(parent.data.display)?.view.framing;
+      const stored = session.embeds.get(parentId)?.request.view?.framing;
       if (stored !== undefined) return stored;
       const published = session.embeddedPublications.get(parentId);
       const request = session.embeddedRequests.find(
@@ -1326,7 +1326,7 @@ export function SpaceCanvas({
       const node = portalGestureSnapshot.current.portalNodesById.get(id);
       if (node === undefined || node.parentId !== undefined) return undefined;
       if (!authorsEmbeddedMap(node.data)) return undefined;
-      if (!portalGestureSnapshot.current.editingPortals.has(node.data.resourceId)) return undefined;
+      if (!portalGestureSnapshot.current.editingPortals.has(node.id)) return undefined;
       return node;
     };
 
@@ -1349,18 +1349,18 @@ export function SpaceCanvas({
       if (!portalGestureSnapshot.current.authorOnCanvas) return;
       const parent = portalParent(event.target);
       if (parent === undefined) return;
-      const resourceId = parent.data.resourceId;
-      const existingTimer = zoomTimers.get(resourceId);
+      const portalId = parent.id;
+      const existingTimer = zoomTimers.get(portalId);
       if (existingTimer !== undefined) clearTimeout(existingTimer);
-      zoomTimers.delete(resourceId);
-      const pendingZoom = zoomPending.get(resourceId);
-      if (pendingZoom !== undefined) zoomPending.delete(resourceId);
-      const framing = pendingZoom ?? framingOf(resourceId, parent.id);
+      zoomTimers.delete(portalId);
+      const pendingZoom = zoomPending.get(portalId);
+      if (pendingZoom !== undefined) zoomPending.delete(portalId);
+      const framing = pendingZoom ?? framingOf(portalId);
       if (framing === undefined) return;
       event.preventDefault();
       pan = {
         pointerId: event.pointerId,
-        resourceId,
+        portalId,
         lastX: event.clientX,
         lastY: event.clientY,
         framing,
@@ -1379,19 +1379,19 @@ export function SpaceCanvas({
         y: event.clientY,
       });
       const next = panFraming(pan.framing, { x: to.x - from.x, y: to.y - from.y });
-      const resourceId = pan.resourceId;
+      const portalId = pan.portalId;
       pan = { ...pan, lastX: event.clientX, lastY: event.clientY, framing: next };
       setPortalDraft((previous) => {
-        if (previous.get(resourceId) === next) return previous;
+        if (previous.get(portalId) === next) return previous;
         const drafted = new Map(previous);
-        drafted.set(resourceId, next);
+        drafted.set(portalId, next);
         return drafted;
       });
     };
 
     const onPointerUp = (event: PointerEvent) => {
       if (pan?.pointerId !== event.pointerId) return;
-      persist(pan.resourceId, pan.framing);
+      persist(pan.portalId, pan.framing);
       pan = null;
     };
 
@@ -1401,22 +1401,22 @@ export function SpaceCanvas({
       if (parent === undefined) return;
       event.preventDefault();
       event.stopPropagation();
-      const resourceId = parent.data.resourceId;
-      const current = zoomPending.get(resourceId) ?? framingOf(resourceId, parent.id);
+      const portalId = parent.id;
+      const current = zoomPending.get(portalId) ?? framingOf(portalId);
       if (current === undefined) return;
       const next = zoomFraming(current, event.deltaY < 0 ? 1.1 : 1 / 1.1);
-      zoomPending.set(resourceId, next);
+      zoomPending.set(portalId, next);
       setPortalDraft((previous) => {
         const drafted = new Map(previous);
-        drafted.set(resourceId, next);
+        drafted.set(portalId, next);
         return drafted;
       });
-      const existing = zoomTimers.get(resourceId);
+      const existing = zoomTimers.get(portalId);
       if (existing !== undefined) clearTimeout(existing);
       zoomTimers.set(
-        resourceId,
+        portalId,
         setTimeout(() => {
-          flushPendingZoom(resourceId);
+          flushPendingZoom(portalId);
         }, 160),
       );
     };
@@ -1426,13 +1426,15 @@ export function SpaceCanvas({
     root.addEventListener('pointerup', onPointerUp);
     root.addEventListener('pointercancel', onPointerUp);
     root.addEventListener('wheel', onWheel, { capture: true, passive: false });
+    flushPortalFraming.current = (portalId) => flushPendingZoom(portalId);
     return () => {
+      flushPortalFraming.current = () => undefined;
       root.removeEventListener('pointerdown', onPointerDown);
       root.removeEventListener('pointermove', onPointerMove);
       root.removeEventListener('pointerup', onPointerUp);
       root.removeEventListener('pointercancel', onPointerUp);
       root.removeEventListener('wheel', onWheel, { capture: true });
-      for (const resourceId of [...zoomPending.keys()]) flushPendingZoom(resourceId, false);
+      for (const portalId of [...zoomPending.keys()]) flushPendingZoom(portalId, false);
     };
   }, [setPortalDraft]);
 
@@ -1484,7 +1486,17 @@ export function SpaceCanvas({
       if (node !== undefined)
         return {
           occurrence: removal,
-          subject: { kind: 'resource' as const, resourceId: node.data.resourceId },
+          subject: {
+            kind: 'resource' as const,
+            resourceId: node.data.resourceId,
+            // The Resources selected with it go too, when the key lands on one
+            // of the selection rather than on a Resource outside it.
+            alongside: node.selected
+              ? occurrence.nodes.flatMap((each) =>
+                  each.selected && each.id !== node.id ? [each.data.resourceId] : [],
+                )
+              : [],
+          },
         };
       return occurrence.selection.kind === 'edge'
         ? { occurrence: removal, subject: { kind: 'edge' as const } }
@@ -1662,16 +1674,17 @@ export function SpaceCanvas({
   }, []);
 
   /**
-   * A pasted image URL creates an Image Resource at the pointer (ADR 0106).
-   * Text pasted into a field is the field's, so only a paste the canvas or a
-   * Resource on it received is read, and only text an Image Resource may hold.
+   * A pasted URL creates a Resource at the pointer, by the plugin that takes
+   * it (ADR 0106, ADR 0142). Text pasted into a field is the field's, so only a
+   * paste the canvas or a Resource on it received is read, and only a URL a
+   * plugin accepts.
    */
   const onPaste = useCallback(
     (event: ReactClipboardEvent<HTMLDivElement>) => {
       if (!availability.authorOnCanvas || !(event.target instanceof Element)) return;
       if (event.target.closest(NOT_A_CANVAS_COMMAND) !== null) return;
       const url = event.clipboardData.getData('text/plain').trim();
-      if (!isAcceptedImageUrl(url)) return;
+      if (!createsFromData({ kind: 'url', url })) return;
       event.preventDefault();
       const rect = event.currentTarget.getBoundingClientRect();
       const at = pointer.current ?? {
@@ -1691,15 +1704,18 @@ export function SpaceCanvas({
           setCommandRefusal(describeCanvasGestureRefusal(refusal ?? UNAVAILABLE_DRAWING));
           return;
         }
-        drawing.placement.pasteImageUrl(url, centredAnchor(drawing.toAuthored(point)));
+        drawing.placement.createFromData(
+          { kind: 'url', url },
+          centredAnchor(drawing.toAuthored(point)),
+        );
         setCommandRefusal(null);
         return;
       }
-      pasteImageUrl(url, anchorAt(at.x, at.y));
+      createFromData({ kind: 'url', url }, anchorAt(at.x, at.y));
     },
     [
       availability.authorOnCanvas,
-      pasteImageUrl,
+      createFromData,
       anchorAt,
       screenToFlowPosition,
       embeddingAt,
@@ -1760,7 +1776,10 @@ export function SpaceCanvas({
         }
         const anchor = centredAnchor(drawing.toAuthored(point));
         if (event.dataTransfer.types.includes('Files')) {
-          drawing.placement.dropImages([...event.dataTransfer.files], anchor);
+          drawing.placement.createFromData(
+            { kind: 'files', files: [...event.dataTransfer.files] },
+            anchor,
+          );
           setCommandRefusal(null);
         } else {
           const resourceId = uuidSchema.safeParse(event.dataTransfer.getData(RESOURCE_DRAG_TYPE));
@@ -1794,7 +1813,10 @@ export function SpaceCanvas({
       if (files !== null) {
         event.preventDefault();
         if (files === 'place')
-          dropImages([...event.dataTransfer.files], anchorAt(event.clientX, event.clientY));
+          createFromData(
+            { kind: 'files', files: [...event.dataTransfer.files] },
+            anchorAt(event.clientX, event.clientY),
+          );
         return;
       }
       if (!availability.authorOnCanvas || !(event.target instanceof Element)) return;
@@ -1817,7 +1839,7 @@ export function SpaceCanvas({
       availability.authorOnCanvas,
       dropExistingResource,
       dropSpace,
-      dropImages,
+      createFromData,
       anchorAt,
       screenToFlowPosition,
       embeddingAt,
@@ -1962,10 +1984,8 @@ export function SpaceCanvas({
                 availability.authorInEmbeddedMap &&
                 (!embeddedEditing || editingEmbeddingIds.has(request.parent.id))
               }
-              framing={
-                portalDraft.get(request.parent.data.resourceId) ??
-                spaceViewOf(request.parent.data.display)?.view.framing
-              }
+              framing={portalDraft.get(request.parent.id) ?? request.framing}
+              embeddedIn={embeddingChainOf(request.parent, portalNodesById, embeds)}
               bounds={request.bounds}
               absolute={request.absolute}
               drawnAbsolute={request.drawnAbsolute}
@@ -1978,19 +1998,14 @@ export function SpaceCanvas({
         A failed read is announced on the Space Resource that asked for it, named by
         the Title the author gave that Resource: the canvas can hold several
         embeddings, and a sentence naming none of them says nothing about which
-        one is empty. Drawn from the standing requests, so a Resource that is Closed
+        one is empty. Drawn from the standing embeddings, so a Resource that is Closed
         takes its announcement with it.
       */}
-        {embeddedRequests.flatMap(({ parent, spaceId }) => {
-          const message = embeddedFailures.get(spaceId);
-          return message === undefined
-            ? []
-            : [
-                <span key={parent.id} role="alert" className="canvas-refusal">
-                  {`${titleName(parent.data.title)}: ${message}`}
-                </span>,
-              ];
-        })}
+        {failedEmbeddings.map(({ id, title, message }) => (
+          <span key={id} role="alert" className="canvas-refusal">
+            {`${title}: ${message}`}
+          </span>
+        ))}
         {/*
         The sentence a refused canvas command leaves behind. Placed and styled
         exactly like Edge Authoring's `gesture` refusal, because it is the same
@@ -2019,16 +2034,18 @@ export function SpaceCanvas({
         <FullView
           space={view.space}
           resourceId={fullViewOf}
-          onLeave={() => leaveFullView(false)}
-          onOpen={availability.authorOnCanvas ? () => leaveFullView(true) : null}
+          onLeave={leaveFullView}
           onKeyDown={fullViewKeyDown}
+          onPluginFailure={plugins?.report}
         />
       ) : null}
     </>
   );
   return edgeSurface.provide(
     <GraphConnectionLineHeadShape headShape={preview.headShape}>
-      {canvas}
+      <MapEmbeddingsProvider value={mapEmbeddings}>
+        <HostMapProvider draw={drawCanvasMapEmbed}>{canvas}</HostMapProvider>
+      </MapEmbeddingsProvider>
     </GraphConnectionLineHeadShape>,
   );
 }

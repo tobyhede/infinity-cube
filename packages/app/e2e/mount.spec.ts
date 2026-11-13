@@ -13,7 +13,6 @@ import {
   createResource,
   dock,
   nodeByTitle,
-  openResource,
   presentControl,
   presentedName,
   resourceControls,
@@ -238,9 +237,8 @@ test('an image uploaded in the page is drawn from an object URL over its bytes',
   const created = await title.inputValue();
   await title.press('Escape');
 
-  const resource = nodeByTitle(page, created).first();
-  await openResource(resource, created);
-  const picture = resource.locator('img');
+  // An Image Resource is its picture, named by its Title, with no Open (ADR 0142).
+  const picture = page.locator('.react-flow__node').getByRole('img', { name: created });
   await expect(picture).toHaveAttribute('src', /^blob:/u);
   await expectPictureLoaded(picture, 3);
 });

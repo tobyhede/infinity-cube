@@ -1,5 +1,5 @@
-import { titleName, UNRESOLVED_CONTENT, type ResourceContent } from '@project/core';
-import { presentedContent } from './kinds/registry';
+import { embedsMap, titleName, UNRESOLVED_CONTENT, type ResourceContent } from '@project/core';
+import { PresentedPluginContent } from './PresentedPluginResource';
 import { UnresolvedContent } from './UnresolvedContent';
 
 export interface PresentedResourceProps {
@@ -15,9 +15,11 @@ export interface PresentedResourceProps {
 }
 
 /**
- * Renders a resource's title and its content for presenting, its content as
- * its kind's view half draws it: a Markdown Resource's **parsed**, through
- * `RenderedMarkdown`.
+ * Renders a resource's title and its content for presenting, as the Notes
+ * window draws a note and a preview of each move: its name, and below it its
+ * content drawn read-only by the plugin of the content's kind (ADR 0142).
+ * Content that embeds a Map is drawn as its name alone, because this surface
+ * draws no Map for its plugin to show.
  */
 export function PresentedResource({ title, content }: PresentedResourceProps) {
   const name = titleName(title);
@@ -28,30 +30,11 @@ export function PresentedResource({ title, content }: PresentedResourceProps) {
       data-content-kind={content.kind}
     >
       <h2 className="resource__title">{name}</h2>
-      <PresentedContent name={name} content={content} />
+      {content.kind === UNRESOLVED_CONTENT.kind ? (
+        <UnresolvedContent />
+      ) : embedsMap(content) ? null : (
+        <PresentedPluginContent kind={content.kind} title={name} content={content.content} />
+      )}
     </article>
-  );
-}
-
-/**
- * The content below a presented Resource's name, drawn by its kind's view half
- * (`kinds/registry.ts`). A presented image is never replaced, its own or a
- * Target's, so no view offers Replace. A Space Resource draws its name alone:
- * what presenting one should draw is `resource-content/07`'s open question. An
- * Ur Resource has no content (ADR 0113), so it draws its name alone. The
- * article carries the kind as `data-content-kind` so a stylesheet can address
- * each kind's frame.
- */
-function PresentedContent({
-  name,
-  content,
-}: {
-  readonly name: string;
-  readonly content: ResourceContent;
-}) {
-  return content.kind === UNRESOLVED_CONTENT.kind ? (
-    <UnresolvedContent />
-  ) : (
-    presentedContent(name, content)
   );
 }

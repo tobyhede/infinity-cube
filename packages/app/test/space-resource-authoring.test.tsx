@@ -9,6 +9,8 @@ import {
 } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
+  isOfKind,
+  EMPTY_ASSET_REF,
   newUuid,
   spaceSnapshotSchema,
   uuidSchema,
@@ -28,7 +30,6 @@ import { mintingIds } from './minting';
 import { openTestSpace } from './opened-space';
 import type { SpaceResourceAuthoring } from '../src/space-resource-lifecycle';
 import { createResource, createResourceControl, unavailable } from './command-dock';
-import { unusedImageSources } from './image-sources';
 import { stubResizeObserver } from './resize-observer';
 
 /**
@@ -119,7 +120,7 @@ const meta = (target: SpaceSnapshot): SpaceSnapshot => {
   const resources = [
     {
       id: META_RESOURCE_ID,
-      document: { title: 'Meta', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Meta', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
     {
       id: META_TO_HOME_ID,
@@ -142,10 +143,7 @@ const meta = (target: SpaceSnapshot): SpaceSnapshot => {
           title: 'Map 1',
           kind: 'positioned',
           positions: Object.fromEntries(
-            resources.map((resource, index) => [
-              resource.id,
-              { x: index * 300, y: 0, open: false },
-            ]),
+            resources.map((resource, index) => [resource.id, { x: index * 300, y: 0 }]),
           ),
           graphs: [{ id: META_GRAPH_ID, title: 'Graph 1', edges: [] }],
         },
@@ -168,8 +166,8 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [HOME_RESOURCE_ID]: { x: 10, y: 20, open: false },
-          [HOME_NEXT_RESOURCE_ID]: { x: 310, y: 20, open: false },
+          [HOME_RESOURCE_ID]: { x: 10, y: 20 },
+          [HOME_NEXT_RESOURCE_ID]: { x: 310, y: 20 },
         },
         // An Edge, so this Space can be presented: a Graph with no Edge
         // declines to start (ADR 0032).
@@ -187,11 +185,11 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
   resources: [
     {
       id: HOME_RESOURCE_ID,
-      document: { title: 'Start here', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Start here', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
     {
       id: HOME_NEXT_RESOURCE_ID,
-      document: { title: 'And then', kind: 'markdown', content: { source: '' } },
+      document: { title: 'And then', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
   ],
 });
@@ -210,7 +208,7 @@ const other: SpaceSnapshot = spaceSnapshotSchema.parse({
         id: OTHER_MAP_ID,
         title: 'Collection 1',
         kind: 'positioned',
-        positions: { [OTHER_RESOURCE_ID]: { x: 0, y: 0, open: false } },
+        positions: { [OTHER_RESOURCE_ID]: { x: 0, y: 0 } },
         graphs: [
           { id: OTHER_DRAFT_GRAPH_ID, title: 'Draft', edges: [] },
           { id: OTHER_GRAPH_ID, title: 'Current', edges: [] },
@@ -230,7 +228,7 @@ const other: SpaceSnapshot = spaceSnapshotSchema.parse({
   resources: [
     {
       id: OTHER_RESOURCE_ID,
-      document: { title: 'Resource 1', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Resource 1', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
   ],
 });
@@ -245,7 +243,7 @@ const maplessOther: SpaceSnapshot = spaceSnapshotSchema.parse({
   resources: [
     {
       id: OTHER_RESOURCE_ID,
-      document: { title: 'Resource 1', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Resource 1', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
   ],
 });
@@ -326,7 +324,6 @@ function mount(
   );
   const spaceResources: SpaceResourceAuthoring = { ...authoring, ...broken };
   const app = composeApp({
-    images: unusedImageSources,
     spaceSession: session,
     reportObserverError,
   });
@@ -347,7 +344,7 @@ const nodeFor = (id: UUID): HTMLElement | null =>
 /** The Space Resources `Home` holds, in authored order. */
 const spaceResourcesOf = (session: SpaceSession) =>
   resourcesOf(session).flatMap((resource) =>
-    resource.document.kind === 'space' ? [{ id: resource.id, document: resource.document }] : [],
+    isOfKind(resource.document, 'space') ? [{ id: resource.id, document: resource.document }] : [],
   );
 
 /**
@@ -405,7 +402,9 @@ async function openResourcesList(): Promise<HTMLElement> {
 async function addExistingSpace(title: string): Promise<void> {
   await readyToAuthor();
   await openResourcesList();
-  const row = await screen.findByRole('button', { name: `Add ${title} to Map` });
+  const row = await screen.findByRole('button', {
+    name: `Add ${title} as a new Space Resource to Map`,
+  });
   await act(async () => {
     fireEvent.click(row);
     await Promise.resolve();
@@ -460,11 +459,11 @@ describe('Create Space Resource', () => {
     const created = spaceResourcesOf(session);
     expect(created[0]?.document.title).toBe('Space 1');
 
-    const targetId = created[0]!.document.content.spaceId;
+    const targetId = uuidSchema.parse(created[0]!.document.content.spaceId);
     const target = await backend.loadSpace(targetId);
     expect(target?.snapshot.document.title).toBe('Space 1');
     expect(target?.snapshot.resources.map((resource) => resource.document)).toEqual([
-      { title: 'Resource 1', kind: 'markdown', content: { source: '' } },
+      { title: 'Resource 1', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     ]);
     await settled(session);
   });
@@ -570,7 +569,7 @@ describe('Create Space Resource', () => {
     const { backend, session } = mount();
     await createSpaceResource();
     await waitFor(() => expect(spaceResourcesOf(session)).toHaveLength(1));
-    const targetId = spaceResourcesOf(session)[0]!.document.content.spaceId;
+    const targetId = uuidSchema.parse(spaceResourcesOf(session)[0]!.document.content.spaceId);
 
     const editor = await screen.findByRole('textbox', { name: 'Resource title' });
     fireEvent.change(editor, { target: { value: 'The architecture' } });
@@ -840,7 +839,9 @@ describe('referencing an existing Space', () => {
     // Found before the `act` rather than inside it: a query that waits turns the
     // act environment off while it polls, so an update landing meanwhile inside
     // the enclosing `act` is reported as act in an unconfigured environment.
-    const add = await screen.findByRole('button', { name: 'Add Other Space to Map' });
+    const add = await screen.findByRole('button', {
+      name: 'Add Other Space as a new Space Resource to Map',
+    });
     await act(async () => {
       fireEvent.click(add);
       await Promise.resolve();
@@ -961,7 +962,9 @@ describe('referencing an existing Space', () => {
 
     const stored = await backend.loadSpace(HOME_ID);
     const storedSpaceResources = (stored?.snapshot.resources ?? []).flatMap((resource) =>
-      resource.document.kind === 'space' ? [{ id: resource.id, document: resource.document }] : [],
+      isOfKind(resource.document, 'space')
+        ? [{ id: resource.id, document: resource.document }]
+        : [],
     );
     // The backend answers Resources in ascending id order, which need
     // not match Space Authoring's own authored order, so the two sides are
@@ -1020,9 +1023,12 @@ describe('dropping an existing Space onto the canvas', () => {
       getData: (type: string) => carried.get(type) ?? '',
     };
 
-    fireEvent.dragStart(within(list).getByRole('button', { name: 'Add Other Space to Map' }), {
-      dataTransfer,
-    });
+    fireEvent.dragStart(
+      within(list).getByRole('button', { name: 'Add Other Space as a new Space Resource to Map' }),
+      {
+        dataTransfer,
+      },
+    );
     const pane = document.querySelector<HTMLElement>('.react-flow__pane');
     if (pane === null) throw new Error('No pane is drawn.');
     await act(async () => {

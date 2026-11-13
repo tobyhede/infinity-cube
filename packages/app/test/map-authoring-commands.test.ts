@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  isOfKind,
   newUuid,
   uuidSchema,
   type GraphId,
@@ -21,7 +22,6 @@ import {
 } from '../src/map-authoring-commands';
 import { createOpenSpaces, type OpenSpace } from '../src/open-spaces';
 import { recordingHistory } from './browser-history';
-import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
 import { refusingFullscreen } from './fullscreen';
 import { unlinkedPresentations } from './presentations';
@@ -63,7 +63,7 @@ const meta: SpaceSnapshot = {
         id: META_MAP,
         title: 'Meta Map',
         kind: 'positioned',
-        positions: { [RESOURCE]: { x: 0, y: 0, open: false } },
+        positions: { [RESOURCE]: { x: 0, y: 0 } },
         graphs: [{ id: META_GRAPH, title: 'Meta Graph', edges: [] }],
       },
     ],
@@ -100,7 +100,6 @@ const openSpaces = (control?: MemorySpaceBackendTestControl) =>
   createOpenSpaces({
     fullscreen: refusingFullscreen,
     presentations: unlinkedPresentations,
-    images: unusedImageSources,
     backend: new MemorySpaceBackend(
       META,
       [meta, target].map((snapshot) => ({ snapshot, revision: 0n, exportedRevision: null })),
@@ -131,7 +130,7 @@ const selectOn =
 
 const storedSelection = (source: OpenSpace) => {
   const stored = source.session.getState().working.resources[0]?.document;
-  return stored?.kind === 'space'
+  return stored !== undefined && isOfKind(stored, 'space')
     ? { map: stored.content.map, graph: stored.content.graph }
     : undefined;
 };
@@ -209,7 +208,7 @@ const contexts: readonly {
         control,
         authored,
         outcomes: source.app.commandOutcomes,
-        mapId: document.content.map,
+        mapId: SECOND_MAP,
         claim: { completionMovesMap: false },
         commands: embeddedMapAuthoringCommands({
           target: authored,

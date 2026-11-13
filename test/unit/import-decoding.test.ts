@@ -1,6 +1,6 @@
 import {
+  EMPTY_ASSET_REF,
   importSpaceSchema,
-  KIND_IDS,
   spaceSnapshotSchema,
   uuidSchema,
   type ImportSpace,
@@ -104,7 +104,7 @@ describe('import decoding', () => {
             id: MAP_ID,
             title: title(2, 'Map 1'),
             kind: 'positioned',
-            positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
+            positions: { [RESOURCE_ID]: { x: 0, y: 0 } },
             graphs: [{ id: GRAPH_ID, title: title(3, 'Graph 1'), edges: [] }],
             activeGraph: GRAPH_ID,
           },
@@ -113,11 +113,11 @@ describe('import decoding', () => {
       resources: [
         {
           id: RESOURCE_ID,
-          document: { title: title(4, 'One'), kind: 'markdown', content: { source: '' } },
+          document: { title: title(4, 'One'), kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
         {
           id: SECOND_RESOURCE_ID,
-          document: { title: title(5, 'Two'), kind: 'markdown', content: { source: '' } },
+          document: { title: title(5, 'Two'), kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
       ],
     };
@@ -207,7 +207,10 @@ describe('import decoding', () => {
       id: SPACE_ID,
       document: { version: 1, title: 'Space' },
       resources: [
-        { id: RESOURCE_ID, document: { title: '   ', kind: 'markdown', content: { source: '' } } },
+        {
+          id: RESOURCE_ID,
+          document: { title: '   ', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+        },
       ],
     };
 
@@ -243,7 +246,10 @@ describe('import decoding', () => {
         id: SPACE_ID,
         document: { version: 1, title: 'T' },
         resources: [
-          { id: 'nope', document: { title: 'C', kind: 'markdown', content: { source: '' } } },
+          {
+            id: 'nope',
+            document: { title: 'C', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+          },
         ],
       },
       {
@@ -275,7 +281,10 @@ describe('import decoding', () => {
         id: SPACE_ID,
         document: { version: 1, title: 'T' },
         resources: [
-          { id: RESOURCE_ID, document: { title: 'C', kind: 'Nope', content: { source: '' } } },
+          {
+            id: RESOURCE_ID,
+            document: { title: 'C', kind: 'Nope', content: { url: EMPTY_ASSET_REF } },
+          },
         ],
       },
       {
@@ -321,45 +330,52 @@ describe('import decoding', () => {
   });
 
   /**
-   * The same conclusion at the level a reader meets it: a kind no module
-   * registers is named by its path, and the summary does not quote it back,
+   * The same conclusion at the level a reader meets it: a kind that is not a
+   * kind id is named by its path, and the summary does not quote it back,
    * since the fold would misquote a kind whose case is information.
    *
    * Off the pair the door composes — `spaceSnapshotSchema` and
    * `describeSchemaFailure` — rather than through `identifySpace` itself,
-   * because a `kind` outside the union is not a value an `ImportSpace` can
-   * carry, and the tests above are what tie that pair to the door.
+   * because a malformed `kind` is not a value an `ImportSpace` can carry, and
+   * the tests above are what tie that pair to the door.
    */
-  it('names the unregistered resource kind by its path in the summary it prints', () => {
+  it('names a malformed resource kind by its path in the summary it prints', () => {
     const parsed = spaceSnapshotSchema.safeParse({
       id: SPACE_ID,
       document: { version: 1, title: 'T' },
       resources: [
-        { id: RESOURCE_ID, document: { title: 'C', kind: 'Nope', content: { source: '' } } },
+        {
+          id: RESOURCE_ID,
+          document: { title: 'C', kind: 'No pe', content: { url: EMPTY_ASSET_REF } },
+        },
       ],
     });
-    if (parsed.success) throw new Error('Expected an unknown resource kind to be refused');
+    if (parsed.success) throw new Error('Expected a malformed resource kind to be refused');
     const summary = describeSchemaFailure(parsed.error.issues, 'identified space');
 
-    expect(summary).toContain('resources.0.document.kind names no kind this build registers');
+    expect(summary).toContain('resources.0.document.kind is not a kind id');
   });
 
   /**
-   * A client that sent a kind this build does not register learns which kinds
-   * it does, so a miscased `Markdown` points at `markdown`. The registered ids
-   * are lower case, so the summary's fold quotes them intact.
+   * A well-formed kind no plugin in this build draws is carried whole, so a
+   * client sending one is not refused: the default plugin draws it (ADR 0142).
    */
-  it('names every registered kind when it refuses an unregistered one', () => {
+  it('carries a well-formed kind no plugin draws, with its content unread', () => {
     const parsed = spaceSnapshotSchema.safeParse({
       id: SPACE_ID,
       document: { version: 1, title: 'T' },
       resources: [
-        { id: RESOURCE_ID, document: { title: 'C', kind: 'Markdown', content: { source: '' } } },
+        {
+          id: RESOURCE_ID,
+          document: { title: 'C', kind: 'Markdown', content: { url: EMPTY_ASSET_REF } },
+        },
       ],
     });
-    if (parsed.success) throw new Error('Expected an unregistered resource kind to be refused');
-    const summary = describeSchemaFailure(parsed.error.issues, 'identified space');
-
-    expect(summary).toContain(`names no kind this build registers (${KIND_IDS.join(', ')})`);
+    expect(parsed.success).toBe(true);
+    expect(parsed.data?.resources[0]?.document).toEqual({
+      title: 'C',
+      kind: 'Markdown',
+      content: { url: EMPTY_ASSET_REF },
+    });
   });
 });

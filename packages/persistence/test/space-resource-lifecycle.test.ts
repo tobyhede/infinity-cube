@@ -1,10 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
-import { nextGraphColor } from '@project/graph';
+import {
+  EMPTY_ASSET_REF,
+  isMissingKindId,
+  uuidSchema,
+  type SpaceSnapshot,
+  type UUID,
+} from '@project/core';
+import { loadSpaceAggregate, nextGraphColor } from '@project/graph';
 import { MemorySpaceBackend, MemorySpaceBackendTestControl } from '../src/memory';
 import { canRetry, type SpaceSessionState } from '../src/session';
 import { createSpaceSessionRegistry, type SpaceResourceRefusal } from '../src/session-registry';
 import { commitRequestBytes, SizeLimitedBackend } from './size-limited-backend';
+import { showingSpace } from './showing-space';
 
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const META_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -48,7 +55,7 @@ const metaSnapshot: SpaceSnapshot = {
         id: META_MAP_ID,
         title: 'Map 1',
         kind: 'positioned',
-        positions: { [META_RESOURCE_ID]: { x: 0, y: 0, open: false } },
+        positions: { [META_RESOURCE_ID]: { x: 0, y: 0 } },
         graphs: [{ id: META_GRAPH_ID, title: 'Graph 1', edges: [] }],
         activeGraph: META_GRAPH_ID,
       },
@@ -57,7 +64,7 @@ const metaSnapshot: SpaceSnapshot = {
   resources: [
     {
       id: META_RESOURCE_ID,
-      document: { title: 'Meta', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Meta', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
   ],
 };
@@ -94,7 +101,7 @@ const targetSnapshot: SpaceSnapshot = {
         id: TARGET_MAP_ID,
         title: 'Map 1',
         kind: 'positioned',
-        positions: { [TARGET_RESOURCE_ID]: { x: 0, y: 0, open: false } },
+        positions: { [TARGET_RESOURCE_ID]: { x: 0, y: 0 } },
         graphs: [{ id: TARGET_GRAPH_ID, title: 'Graph 1', edges: [] }],
         activeGraph: TARGET_GRAPH_ID,
       },
@@ -103,7 +110,7 @@ const targetSnapshot: SpaceSnapshot = {
   resources: [
     {
       id: TARGET_RESOURCE_ID,
-      document: { title: 'Architecture', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Architecture', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
   ],
 };
@@ -155,19 +162,23 @@ describe('Space Resource lifecycle', () => {
 
       const result =
         operation === 'create'
-          ? await lifecycle.create({
-              containingSpaceId: META_ID,
-              mapId: META_MAP_ID,
-              title: 'Architecture',
-              position: { x: 240, y: 80 },
-            })
-          : await lifecycle.link({
-              containingSpaceId: META_ID,
-              mapId: META_MAP_ID,
-              targetSpaceId: TARGET_ID,
-              title: 'Architecture',
-              position: { x: 240, y: 80 },
-            });
+          ? await lifecycle.create(
+              showingSpace({
+                containingSpaceId: META_ID,
+                mapId: META_MAP_ID,
+                title: 'Architecture',
+                position: { x: 240, y: 80 },
+              }),
+            )
+          : await lifecycle.link(
+              showingSpace({
+                containingSpaceId: META_ID,
+                mapId: META_MAP_ID,
+                targetSpaceId: TARGET_ID,
+                title: 'Architecture',
+                position: { x: 240, y: 80 },
+              }),
+            );
 
       expect(result).toEqual({
         kind: 'refused',
@@ -217,7 +228,7 @@ describe('Space Resource lifecycle', () => {
           ...m,
           positions: {
             ...m.positions,
-            [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false },
+            [SPACE_RESOURCE_ID]: { x: 240, y: 80 },
           },
         })),
       },
@@ -281,20 +292,24 @@ describe('Space Resource lifecycle', () => {
       idSource([SPACE_RESOURCE_ID, SECOND_SPACE_RESOURCE_ID]),
     );
 
-    await lifecycle.link({
-      containingSpaceId: META_ID,
-      mapId: META_MAP_ID,
-      targetSpaceId: TARGET_ID,
-      title: 'First',
-      position: { x: 240, y: 80 },
-    });
-    const second = lifecycle.link({
-      containingSpaceId: META_ID,
-      mapId: META_MAP_ID,
-      targetSpaceId: TARGET_ID,
-      title: 'Second',
-      position: { x: 480, y: 80 },
-    });
+    await lifecycle.link(
+      showingSpace({
+        containingSpaceId: META_ID,
+        mapId: META_MAP_ID,
+        targetSpaceId: TARGET_ID,
+        title: 'First',
+        position: { x: 240, y: 80 },
+      }),
+    );
+    const second = lifecycle.link(
+      showingSpace({
+        containingSpaceId: META_ID,
+        mapId: META_MAP_ID,
+        targetSpaceId: TARGET_ID,
+        title: 'Second',
+        position: { x: 480, y: 80 },
+      }),
+    );
 
     expect(meta.getState().working.resources).toHaveLength(2);
     expect(control.requests).toHaveLength(1);
@@ -316,7 +331,7 @@ describe('Space Resource lifecycle', () => {
             id: CHILD_MAP_ID,
             title: 'Map 1',
             kind: 'positioned',
-            positions: { [CHILD_RESOURCE_ID]: { x: 0, y: 0, open: false } },
+            positions: { [CHILD_RESOURCE_ID]: { x: 0, y: 0 } },
             graphs: [{ id: CHILD_GRAPH_ID, title: 'Graph 1', edges: [] }],
             activeGraph: CHILD_GRAPH_ID,
           },
@@ -325,7 +340,7 @@ describe('Space Resource lifecycle', () => {
       resources: [
         {
           id: CHILD_RESOURCE_ID,
-          document: { title: 'Child', kind: 'markdown', content: { source: '' } },
+          document: { title: 'Child', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
       ],
     };
@@ -365,13 +380,15 @@ describe('Space Resource lifecycle', () => {
     const lifecycle = registry.spaceResources(idSource([SPACE_RESOURCE_ID]));
 
     await expect(
-      lifecycle.link({
-        containingSpaceId: META_ID,
-        mapId: META_MAP_ID,
-        targetSpaceId: TARGET_ID,
-        title: 'Link',
-        position: { x: 240, y: 80 },
-      }),
+      lifecycle.link(
+        showingSpace({
+          containingSpaceId: META_ID,
+          mapId: META_MAP_ID,
+          targetSpaceId: TARGET_ID,
+          title: 'Link',
+          position: { x: 240, y: 80 },
+        }),
+      ),
     ).resolves.toEqual({ kind: 'completed', resourceId: SPACE_RESOURCE_ID });
     expect(meta.getState().working.resources).toHaveLength(2);
     // Child's refused local work is neither consulted nor disturbed by an
@@ -397,13 +414,15 @@ describe('Space Resource lifecycle', () => {
     registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
     const lifecycle = registry.spaceResources(idSource([SPACE_RESOURCE_ID]));
 
-    await lifecycle.link({
-      containingSpaceId: META_ID,
-      mapId: META_MAP_ID,
-      targetSpaceId: TARGET_ID,
-      title: 'Link',
-      position: { x: 240, y: 80 },
-    });
+    await lifecycle.link(
+      showingSpace({
+        containingSpaceId: META_ID,
+        mapId: META_MAP_ID,
+        targetSpaceId: TARGET_ID,
+        title: 'Link',
+        position: { x: 240, y: 80 },
+      }),
+    );
     const target = registry.open({
       snapshot: targetSnapshot,
       revision: 7n,
@@ -462,13 +481,15 @@ describe('Space Resource lifecycle', () => {
       const lifecycle = registry.spaceResources(idSource([SPACE_RESOURCE_ID]));
 
       await expect(
-        lifecycle.link({
-          containingSpaceId: META_ID,
-          mapId: META_MAP_ID,
-          targetSpaceId: TARGET_ID,
-          title: 'Blocked link',
-          position: { x: 240, y: 80 },
-        }),
+        lifecycle.link(
+          showingSpace({
+            containingSpaceId: META_ID,
+            mapId: META_MAP_ID,
+            targetSpaceId: TARGET_ID,
+            title: 'Blocked link',
+            position: { x: 240, y: 80 },
+          }),
+        ),
       ).resolves.toEqual({
         kind: 'refused',
         refusal: { code: 'persistence-recovery-required', spaceId: META_ID, recovery },
@@ -498,7 +519,7 @@ describe('Space Resource lifecycle', () => {
           ...m,
           positions: {
             ...m.positions,
-            [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false },
+            [SPACE_RESOURCE_ID]: { x: 240, y: 80 },
           },
         })),
       },
@@ -569,7 +590,7 @@ describe('Space Resource lifecycle', () => {
           ...m,
           positions: {
             ...m.positions,
-            [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false },
+            [SPACE_RESOURCE_ID]: { x: 240, y: 80 },
           },
         })),
       },
@@ -648,12 +669,14 @@ describe('Space Resource lifecycle', () => {
       idSource([TARGET_ID, TARGET_RESOURCE_ID, TARGET_MAP_ID, TARGET_GRAPH_ID, SPACE_RESOURCE_ID]),
     );
 
-    await lifecycle.create({
-      containingSpaceId: META_ID,
-      mapId: META_MAP_ID,
-      title: 'Architecture',
-      position: { x: 240, y: 80 },
-    });
+    await lifecycle.create(
+      showingSpace({
+        containingSpaceId: META_ID,
+        mapId: META_MAP_ID,
+        title: 'Architecture',
+        position: { x: 240, y: 80 },
+      }),
+    );
     await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe(state));
 
     expect(registry.session(TARGET_ID)?.getState().persistence.kind).toBe(state);
@@ -675,12 +698,14 @@ describe('Space Resource lifecycle', () => {
       idSource([TARGET_ID, TARGET_RESOURCE_ID, TARGET_MAP_ID, TARGET_GRAPH_ID, SPACE_RESOURCE_ID]),
     );
 
-    await lifecycle.create({
-      containingSpaceId: META_ID,
-      mapId: META_MAP_ID,
-      title: 'Architecture',
-      position: { x: 240, y: 80 },
-    });
+    await lifecycle.create(
+      showingSpace({
+        containingSpaceId: META_ID,
+        mapId: META_MAP_ID,
+        title: 'Architecture',
+        position: { x: 240, y: 80 },
+      }),
+    );
     await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('rejected'));
 
     // The thrown value itself is the diagnostic, carried as typed context.
@@ -716,12 +741,14 @@ describe('Space Resource lifecycle', () => {
       idSource([TARGET_ID, TARGET_RESOURCE_ID, TARGET_MAP_ID, TARGET_GRAPH_ID, SPACE_RESOURCE_ID]),
     );
 
-    await lifecycle.create({
-      containingSpaceId: META_ID,
-      mapId: META_MAP_ID,
-      title: 'Architecture',
-      position: { x: 240, y: 80 },
-    });
+    await lifecycle.create(
+      showingSpace({
+        containingSpaceId: META_ID,
+        mapId: META_MAP_ID,
+        title: 'Architecture',
+        position: { x: 240, y: 80 },
+      }),
+    );
     await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('rejected'));
 
     const rejected = {
@@ -758,12 +785,14 @@ describe('Space Resource lifecycle', () => {
       idSource([TARGET_ID, TARGET_RESOURCE_ID, TARGET_MAP_ID, TARGET_GRAPH_ID, SPACE_RESOURCE_ID]),
     );
 
-    await lifecycle.create({
-      containingSpaceId: META_ID,
-      mapId: META_MAP_ID,
-      title: 'Architecture',
-      position: { x: 240, y: 80 },
-    });
+    await lifecycle.create(
+      showingSpace({
+        containingSpaceId: META_ID,
+        mapId: META_MAP_ID,
+        title: 'Architecture',
+        position: { x: 240, y: 80 },
+      }),
+    );
     await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('conflicted'));
     registry.session(TARGET_ID)?.acceptRemote();
 
@@ -796,12 +825,14 @@ describe('Space Resource lifecycle', () => {
     const lifecycle = registry.spaceResources(
       idSource([TARGET_ID, TARGET_RESOURCE_ID, TARGET_MAP_ID, TARGET_GRAPH_ID, SPACE_RESOURCE_ID]),
     );
-    await lifecycle.create({
-      containingSpaceId: META_ID,
-      mapId: META_MAP_ID,
-      title: 'Architecture',
-      position: { x: 240, y: 80 },
-    });
+    await lifecycle.create(
+      showingSpace({
+        containingSpaceId: META_ID,
+        mapId: META_MAP_ID,
+        title: 'Architecture',
+        position: { x: 240, y: 80 },
+      }),
+    );
     await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('conflicted'));
     control.queueResult({
       kind: 'committed',
@@ -835,12 +866,14 @@ describe('Space Resource lifecycle', () => {
     const lifecycle = registry.spaceResources(
       idSource([TARGET_ID, TARGET_RESOURCE_ID, TARGET_MAP_ID, TARGET_GRAPH_ID, SPACE_RESOURCE_ID]),
     );
-    await lifecycle.create({
-      containingSpaceId: META_ID,
-      mapId: META_MAP_ID,
-      title: 'Replacement',
-      position: { x: 240, y: 80 },
-    });
+    await lifecycle.create(
+      showingSpace({
+        containingSpaceId: META_ID,
+        mapId: META_MAP_ID,
+        title: 'Replacement',
+        position: { x: 240, y: 80 },
+      }),
+    );
     await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('conflicted'));
     control.queueResult({
       kind: 'committed',
@@ -879,12 +912,14 @@ describe('Space Resource lifecycle', () => {
     const lifecycle = registry.spaceResources(
       idSource([TARGET_ID, TARGET_RESOURCE_ID, TARGET_MAP_ID, TARGET_GRAPH_ID, SPACE_RESOURCE_ID]),
     );
-    await lifecycle.create({
-      containingSpaceId: META_ID,
-      mapId: META_MAP_ID,
-      title: 'Replacement',
-      position: { x: 240, y: 80 },
-    });
+    await lifecycle.create(
+      showingSpace({
+        containingSpaceId: META_ID,
+        mapId: META_MAP_ID,
+        title: 'Replacement',
+        position: { x: 240, y: 80 },
+      }),
+    );
     await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('conflicted'));
     // The replay of the kept Space conflicts on Meta alone.
     control.queueResult({
@@ -933,13 +968,15 @@ describe('Space Resource lifecycle', () => {
     const registry = createSpaceSessionRegistry(backend);
     const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
     const lifecycle = registry.spaceResources(idSource([SPACE_RESOURCE_ID]));
-    await lifecycle.link({
-      containingSpaceId: META_ID,
-      mapId: META_MAP_ID,
-      targetSpaceId: TARGET_ID,
-      title: 'Target',
-      position: { x: 240, y: 80 },
-    });
+    await lifecycle.link(
+      showingSpace({
+        containingSpaceId: META_ID,
+        mapId: META_MAP_ID,
+        targetSpaceId: TARGET_ID,
+        title: 'Target',
+        position: { x: 240, y: 80 },
+      }),
+    );
     await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('conflicted'));
     control.queueResult({
       kind: 'committed',
@@ -970,13 +1007,15 @@ describe('Space Resource lifecycle', () => {
     const registry = createSpaceSessionRegistry(backend);
     const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
     const lifecycle = registry.spaceResources(idSource([SPACE_RESOURCE_ID]));
-    await lifecycle.link({
-      containingSpaceId: META_ID,
-      mapId: META_MAP_ID,
-      targetSpaceId: TARGET_ID,
-      title: 'Target',
-      position: { x: 240, y: 80 },
-    });
+    await lifecycle.link(
+      showingSpace({
+        containingSpaceId: META_ID,
+        mapId: META_MAP_ID,
+        targetSpaceId: TARGET_ID,
+        title: 'Target',
+        position: { x: 240, y: 80 },
+      }),
+    );
     await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('conflicted'));
 
     meta.acceptRemote();
@@ -998,12 +1037,14 @@ describe('Space Resource lifecycle', () => {
       idSource([TARGET_ID, TARGET_RESOURCE_ID, TARGET_MAP_ID, TARGET_GRAPH_ID, SPACE_RESOURCE_ID]),
     );
 
-    await lifecycle.create({
-      containingSpaceId: META_ID,
-      mapId: META_MAP_ID,
-      title: 'Architecture',
-      position: { x: 240, y: 80 },
-    });
+    await lifecycle.create(
+      showingSpace({
+        containingSpaceId: META_ID,
+        mapId: META_MAP_ID,
+        title: 'Architecture',
+        position: { x: 240, y: 80 },
+      }),
+    );
     await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('failed'));
     const target = registry.session(TARGET_ID);
     expect(target?.getState().persistence.kind).toBe('failed');
@@ -1044,12 +1085,14 @@ describe('Space Resource lifecycle', () => {
     const lifecycle = registry.spaceResources(
       idSource([TARGET_ID, TARGET_RESOURCE_ID, TARGET_MAP_ID, TARGET_GRAPH_ID, SPACE_RESOURCE_ID]),
     );
-    await lifecycle.create({
-      containingSpaceId: META_ID,
-      mapId: META_MAP_ID,
-      title: 'Architecture',
-      position: { x: 240, y: 80 },
-    });
+    await lifecycle.create(
+      showingSpace({
+        containingSpaceId: META_ID,
+        mapId: META_MAP_ID,
+        title: 'Architecture',
+        position: { x: 240, y: 80 },
+      }),
+    );
     await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('rejected'));
     control.queueResult({
       kind: 'committed',
@@ -1105,12 +1148,14 @@ describe('Space Resource lifecycle', () => {
       idSource([TARGET_ID, TARGET_RESOURCE_ID, TARGET_MAP_ID, TARGET_GRAPH_ID, SPACE_RESOURCE_ID]),
     );
 
-    await lifecycle.create({
-      containingSpaceId: META_ID,
-      mapId: META_MAP_ID,
-      title: 'Architecture',
-      position: { x: 240, y: 80 },
-    });
+    await lifecycle.create(
+      showingSpace({
+        containingSpaceId: META_ID,
+        mapId: META_MAP_ID,
+        title: 'Architecture',
+        position: { x: 240, y: 80 },
+      }),
+    );
     await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('refused'));
     const target = registry.session(TARGET_ID);
     expect(target?.getState().persistence.kind).toBe('refused');
@@ -1161,12 +1206,14 @@ describe('Space Resource lifecycle', () => {
     );
 
     await expect(
-      lifecycle.create({
-        containingSpaceId: META_ID,
-        mapId: META_MAP_ID,
-        title: 'Architecture',
-        position: { x: 240, y: 80 },
-      }),
+      lifecycle.create(
+        showingSpace({
+          containingSpaceId: META_ID,
+          mapId: META_MAP_ID,
+          title: 'Architecture',
+          position: { x: 240, y: 80 },
+        }),
+      ),
     ).resolves.toEqual({ kind: 'completed', resourceId: SPACE_RESOURCE_ID });
 
     const result = await backend.loadAggregate();
@@ -1186,7 +1233,6 @@ describe('Space Resource lifecycle', () => {
     expect(storedMeta?.snapshot.document.maps?.[0]?.positions[SPACE_RESOURCE_ID]).toEqual({
       x: 240,
       y: 80,
-      open: false,
     });
     expect(await backend.loadSpace(TARGET_ID)).toEqual({
       revision: 0n,
@@ -1202,7 +1248,7 @@ describe('Space Resource lifecycle', () => {
               id: TARGET_MAP_ID,
               title: 'Map 1',
               kind: 'positioned',
-              positions: { [TARGET_RESOURCE_ID]: { x: 0, y: 0, open: false } },
+              positions: { [TARGET_RESOURCE_ID]: { x: 0, y: 0 } },
               graphs: [
                 {
                   id: TARGET_GRAPH_ID,
@@ -1222,7 +1268,7 @@ describe('Space Resource lifecycle', () => {
             // neutral `Resource 1` every new Space's first Resource takes, because the
             // two are independent from the moment they exist (ADR 0068).
             id: TARGET_RESOURCE_ID,
-            document: { title: 'Resource 1', kind: 'markdown', content: { source: '' } },
+            document: { title: 'Resource 1', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
           },
         ],
       },
@@ -1249,7 +1295,7 @@ describe('Space Resource lifecycle', () => {
           ...m,
           positions: {
             ...m.positions,
-            [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false },
+            [SPACE_RESOURCE_ID]: { x: 240, y: 80 },
           },
         })),
       },
@@ -1279,7 +1325,7 @@ describe('Space Resource lifecycle', () => {
             id: CHILD_MAP_ID,
             title: 'Map 1',
             kind: 'positioned',
-            positions: { [CHILD_RESOURCE_ID]: { x: 0, y: 0, open: false } },
+            positions: { [CHILD_RESOURCE_ID]: { x: 0, y: 0 } },
             graphs: [{ id: CHILD_GRAPH_ID, title: 'Graph 1', edges: [] }],
             activeGraph: CHILD_GRAPH_ID,
           },
@@ -1288,7 +1334,7 @@ describe('Space Resource lifecycle', () => {
       resources: [
         {
           id: CHILD_RESOURCE_ID,
-          document: { title: 'Child', kind: 'markdown', content: { source: '' } },
+          document: { title: 'Child', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
       ],
     };
@@ -1302,13 +1348,15 @@ describe('Space Resource lifecycle', () => {
     const lifecycle = registry.spaceResources(idSource([SECOND_SPACE_RESOURCE_ID]));
 
     await expect(
-      lifecycle.link({
-        containingSpaceId: META_ID,
-        mapId: META_MAP_ID,
-        targetSpaceId: TARGET_ID,
-        title: 'Second link',
-        position: { x: 480, y: 80 },
-      }),
+      lifecycle.link(
+        showingSpace({
+          containingSpaceId: META_ID,
+          mapId: META_MAP_ID,
+          targetSpaceId: TARGET_ID,
+          title: 'Second link',
+          position: { x: 480, y: 80 },
+        }),
+      ),
     ).resolves.toEqual({ kind: 'completed', resourceId: SECOND_SPACE_RESOURCE_ID });
 
     await expect(
@@ -1342,13 +1390,15 @@ describe('Space Resource lifecycle', () => {
     const lifecycle = registry.spaceResources(idSource([SPACE_RESOURCE_ID]));
 
     await expect(
-      lifecycle.link({
-        containingSpaceId: META_ID,
-        mapId: META_MAP_ID,
-        targetSpaceId: TARGET_ID,
-        title: 'Architecture',
-        position: { x: 240, y: 80 },
-      }),
+      lifecycle.link(
+        showingSpace({
+          containingSpaceId: META_ID,
+          mapId: META_MAP_ID,
+          targetSpaceId: TARGET_ID,
+          title: 'Architecture',
+          position: { x: 240, y: 80 },
+        }),
+      ),
     ).resolves.toEqual({ kind: 'completed', resourceId: SPACE_RESOURCE_ID });
 
     const storedMeta = await backend.loadSpace(META_ID);
@@ -1377,7 +1427,7 @@ describe('Space Resource lifecycle', () => {
       resources: [
         {
           id: TARGET_RESOURCE_ID,
-          document: { title: 'Architecture', kind: 'markdown', content: { source: '' } },
+          document: { title: 'Architecture', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
       ],
     };
@@ -1401,13 +1451,15 @@ describe('Space Resource lifecycle', () => {
     );
 
     await expect(
-      lifecycle.link({
-        containingSpaceId: META_ID,
-        mapId: META_MAP_ID,
-        targetSpaceId: TARGET_ID,
-        title: 'Architecture',
-        position: { x: 240, y: 80 },
-      }),
+      lifecycle.link(
+        showingSpace({
+          containingSpaceId: META_ID,
+          mapId: META_MAP_ID,
+          targetSpaceId: TARGET_ID,
+          title: 'Architecture',
+          position: { x: 240, y: 80 },
+        }),
+      ),
     ).resolves.toEqual({ kind: 'completed', resourceId: SPACE_RESOURCE_ID });
 
     // Durable by the time the lifecycle answers, in its own commit: the target
@@ -1464,7 +1516,7 @@ describe('Space Resource lifecycle', () => {
             id: TARGET_MAP_ID,
             title: 'Map 1',
             kind: 'positioned',
-            positions: { [TARGET_RESOURCE_ID]: { x: 0, y: 0, open: false } },
+            positions: { [TARGET_RESOURCE_ID]: { x: 0, y: 0 } },
             graphs: [
               { id: TARGET_GRAPH_ID, title: 'Graph 1', edges: [] },
               { id: SECOND_TARGET_GRAPH_ID, title: 'Graph 2', edges: [] },
@@ -1483,13 +1535,15 @@ describe('Space Resource lifecycle', () => {
     const lifecycle = registry.spaceResources(idSource([SPACE_RESOURCE_ID]));
 
     await expect(
-      lifecycle.link({
-        containingSpaceId: META_ID,
-        mapId: META_MAP_ID,
-        targetSpaceId: TARGET_ID,
-        title: 'Architecture',
-        position: { x: 240, y: 80 },
-      }),
+      lifecycle.link(
+        showingSpace({
+          containingSpaceId: META_ID,
+          mapId: META_MAP_ID,
+          targetSpaceId: TARGET_ID,
+          title: 'Architecture',
+          position: { x: 240, y: 80 },
+        }),
+      ),
     ).resolves.toEqual({ kind: 'completed', resourceId: SPACE_RESOURCE_ID });
 
     // The head of `graphs` is what an *unauthored* `activeGraph` falls back to,
@@ -1513,7 +1567,7 @@ describe('Space Resource lifecycle', () => {
       resources: [
         {
           id: TARGET_RESOURCE_ID,
-          document: { title: 'Architecture', kind: 'markdown', content: { source: '' } },
+          document: { title: 'Architecture', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
       ],
     };
@@ -1533,13 +1587,15 @@ describe('Space Resource lifecycle', () => {
     const lifecycle = registry.spaceResources(idSource([TARGET_MAP_ID, TARGET_GRAPH_ID]));
 
     await expect(
-      lifecycle.link({
-        containingSpaceId: META_ID,
-        mapId: META_MAP_ID,
-        targetSpaceId: TARGET_ID,
-        title: 'Architecture',
-        position: { x: 240, y: 80 },
-      }),
+      lifecycle.link(
+        showingSpace({
+          containingSpaceId: META_ID,
+          mapId: META_MAP_ID,
+          targetSpaceId: TARGET_ID,
+          title: 'Architecture',
+          position: { x: 240, y: 80 },
+        }),
+      ),
     ).resolves.toEqual({
       kind: 'refused',
       refusal: {
@@ -1618,13 +1674,15 @@ describe('Space Resource lifecycle', () => {
       idSource([TARGET_MAP_ID, TARGET_GRAPH_ID, SPACE_RESOURCE_ID, SECOND_SPACE_RESOURCE_ID]),
     );
     const link = () =>
-      lifecycle.link({
-        containingSpaceId: META_ID,
-        mapId: META_MAP_ID,
-        targetSpaceId: TARGET_ID,
-        title: 'Architecture',
-        position: { x: 240, y: 80 },
-      });
+      lifecycle.link(
+        showingSpace({
+          containingSpaceId: META_ID,
+          mapId: META_MAP_ID,
+          targetSpaceId: TARGET_ID,
+          title: 'Architecture',
+          position: { x: 240, y: 80 },
+        }),
+      );
 
     const first = await link();
     expect(first).toEqual({
@@ -1680,13 +1738,15 @@ describe('Space Resource lifecycle', () => {
     // A target that has gone is an ordinary answer rather than a throw, because
     // nothing holds the listing and the Edit together.
     await expect(
-      lifecycle.link({
-        containingSpaceId: META_ID,
-        mapId: META_MAP_ID,
-        targetSpaceId: TARGET_ID,
-        title: 'Architecture',
-        position: { x: 240, y: 80 },
-      }),
+      lifecycle.link(
+        showingSpace({
+          containingSpaceId: META_ID,
+          mapId: META_MAP_ID,
+          targetSpaceId: TARGET_ID,
+          title: 'Architecture',
+          position: { x: 240, y: 80 },
+        }),
+      ),
     ).resolves.toEqual({
       kind: 'refused',
       refusal: { code: 'space-resource-target-unavailable', spaceId: TARGET_ID, reason: 'missing' },
@@ -1718,7 +1778,7 @@ describe('Space Resource lifecycle', () => {
             id: TARGET_MAP_ID,
             title: 'Map 1',
             kind: 'positioned',
-            positions: { [TARGET_RESOURCE_ID]: { x: 0, y: 0, open: false } },
+            positions: { [TARGET_RESOURCE_ID]: { x: 0, y: 0 } },
             // Names a Resource this Space does not hold, which is what single-Space
             // intake refuses and what no repair here would mend.
             graphs: [
@@ -1735,7 +1795,7 @@ describe('Space Resource lifecycle', () => {
       resources: [
         {
           id: TARGET_RESOURCE_ID,
-          document: { title: 'Architecture', kind: 'markdown', content: { source: '' } },
+          document: { title: 'Architecture', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
       ],
     };
@@ -1753,13 +1813,15 @@ describe('Space Resource lifecycle', () => {
     const lifecycle = registry.spaceResources(idSource([]));
 
     await expect(
-      lifecycle.link({
-        containingSpaceId: META_ID,
-        mapId: META_MAP_ID,
-        targetSpaceId: TARGET_ID,
-        title: 'Architecture',
-        position: { x: 240, y: 80 },
-      }),
+      lifecycle.link(
+        showingSpace({
+          containingSpaceId: META_ID,
+          mapId: META_MAP_ID,
+          targetSpaceId: TARGET_ID,
+          title: 'Architecture',
+          position: { x: 240, y: 80 },
+        }),
+      ),
     ).resolves.toEqual({
       kind: 'refused',
       refusal: {
@@ -1820,7 +1882,7 @@ describe('Space Resource lifecycle', () => {
             id: CHILD_MAP_ID,
             title: 'Map 1',
             kind: 'positioned',
-            positions: { [CHILD_RESOURCE_ID]: { x: 0, y: 0, open: false } },
+            positions: { [CHILD_RESOURCE_ID]: { x: 0, y: 0 } },
             graphs: [{ id: CHILD_GRAPH_ID, title: 'Graph 1', edges: [] }],
             activeGraph: CHILD_GRAPH_ID,
           },
@@ -1829,7 +1891,7 @@ describe('Space Resource lifecycle', () => {
       resources: [
         {
           id: CHILD_RESOURCE_ID,
-          document: { title: 'Sibling', kind: 'markdown', content: { source: '' } },
+          document: { title: 'Sibling', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
       ],
     };
@@ -1908,19 +1970,23 @@ describe('Space Resource lifecycle', () => {
 
       const result =
         operation === 'link'
-          ? await lifecycle.link({
-              containingSpaceId: META_ID,
-              mapId: TARGET_MAP_ID,
-              targetSpaceId: TARGET_ID,
-              title: 'Missing map',
-              position: { x: 240, y: 80 },
-            })
-          : await lifecycle.create({
-              containingSpaceId: META_ID,
-              mapId: TARGET_MAP_ID,
-              title: 'Missing map',
-              position: { x: 240, y: 80 },
-            });
+          ? await lifecycle.link(
+              showingSpace({
+                containingSpaceId: META_ID,
+                mapId: TARGET_MAP_ID,
+                targetSpaceId: TARGET_ID,
+                title: 'Missing map',
+                position: { x: 240, y: 80 },
+              }),
+            )
+          : await lifecycle.create(
+              showingSpace({
+                containingSpaceId: META_ID,
+                mapId: TARGET_MAP_ID,
+                title: 'Missing map',
+                position: { x: 240, y: 80 },
+              }),
+            );
 
       expect(result).toEqual({
         kind: 'refused',
@@ -1988,13 +2054,15 @@ describe('Space Resource lifecycle', () => {
 
     // The barrier's one wait is for this in-flight commit, and only it —
     // releasing it is what lets the turn proceed.
-    const link = lifecycle.link({
-      containingSpaceId: META_ID,
-      mapId: META_MAP_ID,
-      targetSpaceId: TARGET_ID,
-      title: 'Link',
-      position: { x: 240, y: 80 },
-    });
+    const link = lifecycle.link(
+      showingSpace({
+        containingSpaceId: META_ID,
+        mapId: META_MAP_ID,
+        targetSpaceId: TARGET_ID,
+        title: 'Link',
+        position: { x: 240, y: 80 },
+      }),
+    );
     release();
 
     await expect(link).resolves.toEqual({ kind: 'completed', resourceId: SPACE_RESOURCE_ID });
@@ -2058,13 +2126,15 @@ describe('Space Resource lifecycle', () => {
       const lifecycle = registry.spaceResources(idSource([]));
 
       await expect(
-        lifecycle.link({
-          containingSpaceId: META_ID,
-          mapId: META_MAP_ID,
-          targetSpaceId: TARGET_ID,
-          title: 'Blocked link',
-          position: { x: 240, y: 80 },
-        }),
+        lifecycle.link(
+          showingSpace({
+            containingSpaceId: META_ID,
+            mapId: META_MAP_ID,
+            targetSpaceId: TARGET_ID,
+            title: 'Blocked link',
+            position: { x: 240, y: 80 },
+          }),
+        ),
       ).resolves.toEqual({
         kind: 'refused',
         refusal: { code: 'persistence-recovery-required', spaceId: TARGET_ID, recovery },
@@ -2094,7 +2164,7 @@ describe('Space Resource lifecycle', () => {
           ...m,
           positions: {
             ...m.positions,
-            [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false },
+            [SPACE_RESOURCE_ID]: { x: 240, y: 80 },
           },
         })),
       },
@@ -2111,8 +2181,8 @@ describe('Space Resource lifecycle', () => {
             title: 'Map 1',
             kind: 'positioned',
             positions: {
-              [CHILD_RESOURCE_ID]: { x: 0, y: 0, open: false },
-              [CHILD_LINK_ID]: { x: 240, y: 80, open: false },
+              [CHILD_RESOURCE_ID]: { x: 0, y: 0 },
+              [CHILD_LINK_ID]: { x: 240, y: 80 },
             },
             graphs: [{ id: CHILD_GRAPH_ID, title: 'Graph 1', edges: [] }],
             activeGraph: CHILD_GRAPH_ID,
@@ -2122,7 +2192,7 @@ describe('Space Resource lifecycle', () => {
       resources: [
         {
           id: CHILD_RESOURCE_ID,
-          document: { title: 'Sibling', kind: 'markdown', content: { source: '' } },
+          document: { title: 'Sibling', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
         {
           id: CHILD_LINK_ID,
@@ -2202,7 +2272,7 @@ describe('Space Resource lifecycle', () => {
           ...m,
           positions: {
             ...m.positions,
-            [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false },
+            [SPACE_RESOURCE_ID]: { x: 240, y: 80 },
           },
         })),
       },
@@ -2213,7 +2283,7 @@ describe('Space Resource lifecycle', () => {
       resources: [
         {
           id: CHILD_RESOURCE_ID,
-          document: { title: 'Unrelated', kind: 'markdown', content: { source: '' } },
+          document: { title: 'Unrelated', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
       ],
     };
@@ -2261,7 +2331,7 @@ describe('Space Resource lifecycle', () => {
             id: CHILD_MAP_ID,
             title: 'Map 1',
             kind: 'positioned',
-            positions: { [CHILD_RESOURCE_ID]: { x: 0, y: 0, open: false } },
+            positions: { [CHILD_RESOURCE_ID]: { x: 0, y: 0 } },
             graphs: [{ id: CHILD_GRAPH_ID, title: 'Graph 1', edges: [] }],
             activeGraph: CHILD_GRAPH_ID,
           },
@@ -2270,7 +2340,7 @@ describe('Space Resource lifecycle', () => {
       resources: [
         {
           id: CHILD_RESOURCE_ID,
-          document: { title: 'Orphan', kind: 'markdown', content: { source: '' } },
+          document: { title: 'Orphan', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
       ],
     };
@@ -2286,13 +2356,15 @@ describe('Space Resource lifecycle', () => {
     // Storage already holds an ordinary Space nothing references — a baseline
     // `decideCommit` forgives (ADR 0095) — and this link never touches it.
     await expect(
-      lifecycle.link({
-        containingSpaceId: META_ID,
-        mapId: META_MAP_ID,
-        targetSpaceId: TARGET_ID,
-        title: 'Architecture',
-        position: { x: 240, y: 80 },
-      }),
+      lifecycle.link(
+        showingSpace({
+          containingSpaceId: META_ID,
+          mapId: META_MAP_ID,
+          targetSpaceId: TARGET_ID,
+          title: 'Architecture',
+          position: { x: 240, y: 80 },
+        }),
+      ),
     ).resolves.toEqual({ kind: 'completed', resourceId: SPACE_RESOURCE_ID });
   });
 
@@ -2323,7 +2395,7 @@ describe('Space Resource lifecycle', () => {
           ...m,
           positions: {
             ...m.positions,
-            [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false },
+            [SPACE_RESOURCE_ID]: { x: 240, y: 80 },
           },
         })),
       },
@@ -2366,18 +2438,18 @@ describe('Space Resource coordination paths', () => {
       ...metaSnapshot.document,
       maps: metaSnapshot.document.maps?.map((m) => ({
         ...m,
-        positions: { ...m.positions, [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false } },
+        positions: { ...m.positions, [SPACE_RESOURCE_ID]: { x: 240, y: 80 } },
       })),
     },
   };
   const createIds = () =>
     idSource([TARGET_ID, TARGET_RESOURCE_ID, TARGET_MAP_ID, TARGET_GRAPH_ID, SPACE_RESOURCE_ID]);
-  const createInput = {
+  const createInput = showingSpace({
     containingSpaceId: META_ID,
     mapId: META_MAP_ID,
     title: 'Architecture',
     position: { x: 240, y: 80 },
-  };
+  });
 
   it('barrier: holds retirement until the coordination turn and its queued work are done', async () => {
     const control = new MemorySpaceBackendTestControl();
@@ -2394,13 +2466,15 @@ describe('Space Resource coordination paths', () => {
     const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
     const lifecycle = registry.spaceResources(idSource([SPACE_RESOURCE_ID]));
 
-    await lifecycle.link({
-      containingSpaceId: META_ID,
-      mapId: META_MAP_ID,
-      targetSpaceId: TARGET_ID,
-      title: 'Link',
-      position: { x: 240, y: 80 },
-    });
+    await lifecycle.link(
+      showingSpace({
+        containingSpaceId: META_ID,
+        mapId: META_MAP_ID,
+        targetSpaceId: TARGET_ID,
+        title: 'Link',
+        position: { x: 240, y: 80 },
+      }),
+    );
     meta.submit({
       ...meta.getState().working,
       document: { ...meta.getState().working.document, title: 'Queued behind the turn' },
@@ -2439,13 +2513,15 @@ describe('Space Resource coordination paths', () => {
       ),
     );
     const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
-    const linking = registry.spaceResources(idSource([SPACE_RESOURCE_ID])).link({
-      containingSpaceId: META_ID,
-      mapId: META_MAP_ID,
-      targetSpaceId: TARGET_ID,
-      title: 'Link',
-      position: { x: 240, y: 80 },
-    });
+    const linking = registry.spaceResources(idSource([SPACE_RESOURCE_ID])).link(
+      showingSpace({
+        containingSpaceId: META_ID,
+        mapId: META_MAP_ID,
+        targetSpaceId: TARGET_ID,
+        title: 'Link',
+        position: { x: 240, y: 80 },
+      }),
+    );
     let retirable = false;
     const waiting = registry.waitUntilRetirable(META_ID).then(() => {
       retirable = true;
@@ -2568,13 +2644,15 @@ describe('Space Resource coordination paths', () => {
 
     // Meta has no live session, so the Edit cannot read its containing Space.
     await expect(
-      registry.spaceResources(idSource([SPACE_RESOURCE_ID])).link({
-        containingSpaceId: META_ID,
-        mapId: META_MAP_ID,
-        targetSpaceId: TARGET_ID,
-        title: 'Link',
-        position: { x: 240, y: 80 },
-      }),
+      registry.spaceResources(idSource([SPACE_RESOURCE_ID])).link(
+        showingSpace({
+          containingSpaceId: META_ID,
+          mapId: META_MAP_ID,
+          targetSpaceId: TARGET_ID,
+          title: 'Link',
+          position: { x: 240, y: 80 },
+        }),
+      ),
     ).rejects.toThrow(`Space ${META_ID} has no live session`);
 
     expect(control.requests).toHaveLength(0);
@@ -2765,12 +2843,12 @@ class ScriptedAggregateBackend extends MemorySpaceBackend {
 }
 
 describe('Space Resource recovery after a replay that never installed', () => {
-  const createInput = {
+  const createInput = showingSpace({
     containingSpaceId: META_ID,
     mapId: META_MAP_ID,
     title: 'Architecture',
     position: { x: 240, y: 80 },
-  };
+  });
   const committedBoth = {
     kind: 'committed',
     revisions: [
@@ -2996,12 +3074,14 @@ describe('Space Resource recovery another coordination holds', () => {
     );
 
     control.queueResult({ kind: 'permanent-failure', code: 'forbidden' });
-    await lifecycle.create({
-      containingSpaceId: META_ID,
-      mapId: META_MAP_ID,
-      title: 'Target',
-      position: { x: 0, y: 0 },
-    });
+    await lifecycle.create(
+      showingSpace({
+        containingSpaceId: META_ID,
+        mapId: META_MAP_ID,
+        title: 'Target',
+        position: { x: 0, y: 0 },
+      }),
+    );
     await registry.waitUntilRetirable(META_ID);
     expect(meta.getState().persistence.kind).toBe('rejected');
     const target = registry.session(TARGET_ID);
@@ -3020,12 +3100,14 @@ describe('Space Resource recovery another coordination holds', () => {
         },
       ],
     });
-    await lifecycle.create({
-      containingSpaceId: TARGET_ID,
-      mapId: TARGET_MAP_ID,
-      title: 'Child',
-      position: { x: 300, y: 0 },
-    });
+    await lifecycle.create(
+      showingSpace({
+        containingSpaceId: TARGET_ID,
+        mapId: TARGET_MAP_ID,
+        title: 'Child',
+        position: { x: 300, y: 0 },
+      }),
+    );
     await registry.waitUntilRetirable(TARGET_ID);
     expect(target.getState().persistence.kind).toBe('conflicted');
     const child = registry.session(CHILD_ID);
@@ -3266,23 +3348,27 @@ describe('Space Resource recovery another coordination holds', () => {
 
     // C1, a link, is rejected: Meta holds its recovery.
     control.queueResult({ kind: 'permanent-failure', code: 'forbidden' });
-    await lifecycle.link({
-      containingSpaceId: META_ID,
-      mapId: META_MAP_ID,
-      targetSpaceId: TARGET_ID,
-      title: 'Architecture',
-      position: { x: 240, y: 80 },
-    });
+    await lifecycle.link(
+      showingSpace({
+        containingSpaceId: META_ID,
+        mapId: META_MAP_ID,
+        targetSpaceId: TARGET_ID,
+        title: 'Architecture',
+        position: { x: 240, y: 80 },
+      }),
+    );
     await registry.waitUntilRetirable(META_ID);
     expect(meta.getState().persistence.kind).toBe('rejected');
 
     // C2 takes the rejected Meta and lands, carrying C1's link with it.
-    await lifecycle.create({
-      containingSpaceId: META_ID,
-      mapId: META_MAP_ID,
-      title: 'Child',
-      position: { x: 300, y: 0 },
-    });
+    await lifecycle.create(
+      showingSpace({
+        containingSpaceId: META_ID,
+        mapId: META_MAP_ID,
+        title: 'Child',
+        position: { x: 300, y: 0 },
+      }),
+    );
     await registry.waitUntilRetirable(META_ID);
     expect(meta.getState()).toMatchObject({
       acknowledgedRevision: 4n,
@@ -3320,17 +3406,21 @@ describe('Space Resource recovery another coordination holds', () => {
  * brings it under.
  */
 describe('A coordinated save over the request size limit', () => {
+  // The Title carries the bulk, because a Markdown Resource's text is an asset (ADR 0142).
   const metaWithBody = (space: SpaceSnapshot, body: string): SpaceSnapshot => ({
     ...space,
     resources: space.resources.map((resource) =>
       resource.id === META_RESOURCE_ID
-        ? { ...resource, document: { title: 'Meta', kind: 'markdown', content: { source: body } } }
+        ? {
+            ...resource,
+            document: { title: `Meta${body}`, kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+          }
         : resource,
     ),
   });
   const metaBody = (space: SpaceSnapshot): string | undefined => {
     const document = space.resources.find(({ id }) => id === META_RESOURCE_ID)?.document;
-    return document?.kind === 'markdown' ? document.content.source : undefined;
+    return document?.title.slice('Meta'.length);
   };
 
   it('refuses the total request, keeps every Edit, and saves once a reduction fits', async () => {
@@ -3354,12 +3444,14 @@ describe('A coordinated save over the request size limit', () => {
     const lifecycle = registry.spaceResources(
       idSource([TARGET_ID, TARGET_RESOURCE_ID, TARGET_MAP_ID, TARGET_GRAPH_ID, SPACE_RESOURCE_ID]),
     );
-    await lifecycle.create({
-      containingSpaceId: META_ID,
-      mapId: META_MAP_ID,
-      title: 'Architecture',
-      position: { x: 240, y: 80 },
-    });
+    await lifecycle.create(
+      showingSpace({
+        containingSpaceId: META_ID,
+        mapId: META_MAP_ID,
+        title: 'Architecture',
+        position: { x: 240, y: 80 },
+      }),
+    );
     await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('rejected'));
     const target = registry.session(TARGET_ID);
     const tooLarge = { kind: 'permanent-failure', code: 'payload-too-large' } as const;
@@ -3403,5 +3495,69 @@ describe('A coordinated save over the request size limit', () => {
     expect(stored?.revision).toBe(5n);
     expect(stored === undefined ? undefined : metaBody(stored.snapshot)).toBe('x'.repeat(1000));
     expect(stored?.snapshot.resources.some(({ id }) => id === SPACE_RESOURCE_ID)).toBe(true);
+  });
+});
+
+/*
+ * ADR 0142's accepted cost, under ADR 0074's shared ownership: a Resource
+ * whose plugin is missing and a Space Resource both own one Space, and the
+ * host cannot read the first's reference, so deleting the Space Resource
+ * deletes the Space with it. Once the plugin returns and reads its Resource as
+ * a Space reference, the aggregate is refused naming that Resource.
+ */
+describe('a Space a Resource with no plugin may share with a Space Resource', () => {
+  const UNPLUGGED_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000001d');
+  const kind = 'vnd.example.space';
+  if (!isMissingKindId(kind)) throw new Error(`${kind} is drawn by a plugin in this build`);
+  const sharedContent = { spaceId: TARGET_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID };
+  const sharingMeta: SpaceSnapshot = {
+    ...metaSnapshot,
+    resources: [
+      ...metaSnapshot.resources,
+      {
+        id: SPACE_RESOURCE_ID,
+        document: { title: 'Target', kind: 'space', content: sharedContent },
+      },
+      { id: UNPLUGGED_ID, document: { title: 'Also target', kind, content: sharedContent } },
+    ],
+  };
+
+  it('deletes the Space with the Space Resource, and the returning plugin is refused naming its Resource', async () => {
+    const backend = new MemorySpaceBackend(META_ID, [
+      { snapshot: sharingMeta, revision: 3n, exportedRevision: null },
+      { snapshot: targetSnapshot, revision: 7n, exportedRevision: null },
+    ]);
+    const registry = createSpaceSessionRegistry(backend);
+    const meta = registry.open({ snapshot: sharingMeta, revision: 3n, exportedRevision: null });
+    const lifecycle = registry.spaceResources(idSource([]));
+
+    expect(
+      await lifecycle.delete({ containingSpaceId: META_ID, resourceId: SPACE_RESOURCE_ID }),
+    ).toMatchObject({ kind: 'completed' });
+    await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('settled'));
+
+    const stored = await backend.loadAggregate();
+    if (stored.kind !== 'loaded') throw new Error(`The aggregate answered ${stored.kind}`);
+    expect(stored.aggregate.spaces.map(({ snapshot }) => snapshot.id)).toEqual([META_ID]);
+
+    // The plugin returns: the same Resource, read as the Space reference it is.
+    const restored = stored.aggregate.spaces.map(({ snapshot }) => ({
+      ...snapshot,
+      resources: snapshot.resources.map((resource) =>
+        resource.id === UNPLUGGED_ID
+          ? { ...resource, document: { ...resource.document, kind: 'space' } }
+          : resource,
+      ),
+    }));
+    const reread = loadSpaceAggregate({ metaSpaceId: META_ID, snapshots: restored });
+    expect(reread.ok).toBe(false);
+    expect(reread.ok ? [] : reread.errors).toEqual([
+      expect.objectContaining({
+        kind: 'space-reference-missing',
+        spaceId: META_ID,
+        resourceId: UNPLUGGED_ID,
+        targetSpaceId: TARGET_ID,
+      }),
+    ]);
   });
 });

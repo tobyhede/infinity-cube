@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import { spaceSnapshotSchema, uuidSchema, type Graph } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
 import { snapshotFromSpace, updatePositionedMap } from '../src/snapshot';
+import { textAsset } from './markdown-texts';
 
 const RESOURCE_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const RESOURCE_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
@@ -24,8 +25,8 @@ const snapshot = spaceSnapshotSchema.parse({
         title: 'Map',
         kind: 'positioned',
         positions: {
-          [RESOURCE_A]: { x: 0, y: 0, open: false },
-          [RESOURCE_B]: { x: 200, y: 0, open: false },
+          [RESOURCE_A]: { x: 0, y: 0 },
+          [RESOURCE_B]: { x: 200, y: 0 },
         },
         graphs: [MAIN],
       },
@@ -35,10 +36,13 @@ const snapshot = spaceSnapshotSchema.parse({
   // asserted to round-trip this array exactly, and `Next` sorts ahead of
   // `Resource`.
   resources: [
-    { id: RESOURCE_B, document: { title: 'Next', kind: 'markdown', content: { source: 'More' } } },
+    {
+      id: RESOURCE_B,
+      document: { title: 'Next', kind: 'markdown', content: { url: textAsset('More') } },
+    },
     {
       id: RESOURCE_A,
-      document: { title: 'Resource', kind: 'markdown', content: { source: 'Body' } },
+      document: { title: 'Resource', kind: 'markdown', content: { url: textAsset('Body') } },
     },
   ],
 });
@@ -64,8 +68,8 @@ it("writes a Map's identity and opening selection, preserving its positions and 
       title: 'Renamed',
       kind: 'positioned',
       positions: {
-        [RESOURCE_A]: { x: 0, y: 0, open: false },
-        [RESOURCE_B]: { x: 200, y: 0, open: false },
+        [RESOURCE_A]: { x: 0, y: 0 },
+        [RESOURCE_B]: { x: 200, y: 0 },
       },
       graphs: [MAIN],
       activeGraph: GRAPH_ID,
@@ -106,7 +110,7 @@ it('leaves unrelated maps standing while writing one', () => {
           id: OTHER_MAP_ID,
           title: 'Other',
           kind: 'positioned',
-          positions: { [RESOURCE_A]: { x: 0, y: 400, open: false } },
+          positions: { [RESOURCE_A]: { x: 0, y: 400 } },
           graphs: [
             { id: OTHER_GRAPH_ID, title: 'Aside', edges: [{ from: RESOURCE_A, to: RESOURCE_A }] },
           ],

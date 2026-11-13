@@ -1,4 +1,4 @@
-import { encodeCompactUuid, spaceSnapshotSchema, uuidSchema } from '@project/core';
+import { EMPTY_ASSET_REF, encodeCompactUuid, spaceSnapshotSchema, uuidSchema } from '@project/core';
 import type { LoadedSpace, SpaceBackend } from '@project/persistence';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -24,7 +24,7 @@ const loaded: LoadedSpace = {
           id: MAP_ID,
           title: 'Map',
           kind: 'positioned',
-          positions: { [RESOURCE_ID]: { x: 10, y: 20, open: false } },
+          positions: { [RESOURCE_ID]: { x: 10, y: 20 } },
           graphs: [
             { id: GRAPH_ID, title: 'Graph', edges: [{ from: RESOURCE_ID, to: OTHER_RESOURCE_ID }] },
           ],
@@ -34,11 +34,11 @@ const loaded: LoadedSpace = {
     resources: [
       {
         id: RESOURCE_ID,
-        document: { title: 'Resource', kind: 'markdown', content: { source: '' } },
+        document: { title: 'Resource', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       },
       {
         id: OTHER_RESOURCE_ID,
-        document: { title: 'Other', kind: 'markdown', content: { source: '' } },
+        document: { title: 'Other', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       },
     ],
   }),
@@ -222,7 +222,11 @@ describe('product destinations', () => {
                 ...loaded.snapshot.resources,
                 {
                   id: resourceId,
-                  document: { title: 'Outside', kind: 'markdown', content: { source: '' } },
+                  document: {
+                    title: 'Outside',
+                    kind: 'markdown',
+                    content: { url: EMPTY_ASSET_REF },
+                  },
                 },
               ]
             : loaded.snapshot.resources,
@@ -260,7 +264,7 @@ describe('product destinations', () => {
               id: otherMap,
               title: 'Other Map',
               kind: 'positioned',
-              positions: { [RESOURCE_ID]: { x: 30, y: 40, open: false } },
+              positions: { [RESOURCE_ID]: { x: 30, y: 40 } },
               graphs: [],
             },
           ],
@@ -292,7 +296,7 @@ describe('product destinations', () => {
           ...loaded.snapshot.resources,
           {
             id: omitted,
-            document: { title: 'Omitted', kind: 'markdown', content: { source: '' } },
+            document: { title: 'Omitted', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
           },
         ],
       },
@@ -412,10 +416,10 @@ describe('product destinations', () => {
   });
 });
 
-describe('a stored image address', () => {
-  // Stored images are served by the application, not opened as a destination
-  // in it (ADR 0106), so an image URL is not the product's to resolve.
-  it.each(['/images', `/images/${'A'.repeat(43)}`, '/images/not-an-id'])(
+describe('a stored asset address', () => {
+  // Stored assets are served by the application, not opened as a destination
+  // in it (ADR 0142), so an asset URL is not the product's to resolve.
+  it.each(['/assets', `/assets/${'A'.repeat(43)}`, '/assets/not-an-id'])(
     'classifies %s as outside product addressing',
     (path) => {
       expect(productAddress(path)).toEqual({ kind: 'outside' });

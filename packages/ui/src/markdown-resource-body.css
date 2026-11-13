@@ -1,9 +1,9 @@
 /* The Markdown kind's Open content, beside the component that draws it.
 
    Custom composite record (shadcn-first-ui):
-   - Existing InfinityCube component considered: CanvasResource, Button, RenderedMarkdown
+   - Existing InfinityCube component considered: PluginResource, Button, RenderedMarkdown
      and MarkdownSourceEditor are composed here rather than duplicated.
-   - shadcn/Base UI component considered: CanvasResource's existing Button supplies
+   - shadcn/Base UI component considered: PluginResource's rail Button supplies
      the rail Edit action; no registry primitive owns rendered/source Markdown
      geometry.
    - Product requirement that cannot be expressed: read and edit modes reserve
@@ -11,13 +11,14 @@
    - Why composition or a variant is insufficient: the gutter, paper inset and
      focus disclosure are the Markdown kind's visual contract, not a reusable
      control variant.
-   - Custom behavior being introduced: none; Button and MarkdownSourceEditor
-     retain activation, keyboard and focus behavior. The two ends of a running
-     edit are published to the surrounding `CanvasResource`, whose existing rail
-     actions draw them. This surface keeps only a transparent pointer target;
-     the rail remains its sole visible control.
-   - Tests proving the deviation: MarkdownResourceBody.test.tsx and
-     packages/app/ladle-e2e/resource-open.spec.ts.
+   - Custom behavior being introduced: none; MarkdownSourceEditor retains
+     activation, keyboard and focus behavior. The two ends of a running edit
+     are the Markdown plugin's rail commands, drawn by the plugin host's rail,
+     and the source editor's Escape and Mod-Enter, which the host's editor
+     hands to them. A press on the rendered text begins an edit through a
+     ghost Button drawn over it.
+   - Tests proving the deviation: packages/plugin-markdown/test/markdown-plugin.test.tsx
+     and packages/app/ladle-e2e/resource-open.spec.ts.
 
    Geometry and the editor's two published contracts only. Everything about how
    the source *looks* — type, gutter, line numbers, wrapping, highlighting — is
@@ -115,12 +116,11 @@
 }
 
 /* Pointer activation for the rendered body, with no second visible affordance.
-   Keyboard authors use the rail's Edit Button; this sibling only preserves the
-   established click-to-edit gesture without drawing another pencil or button. */
+   Keyboard authors use the rail's Edit; this only keeps the click-to-edit
+   gesture without drawing another pencil or button. */
 .markdown-resource-body__edit-target {
   position: absolute;
   inset: 0;
-  z-index: 2;
   width: 100%;
   height: 100%;
   padding: 0;
@@ -128,9 +128,14 @@
   border-radius: var(--canvas-resource-radius);
   background: transparent;
   opacity: 0;
+  cursor: text;
 }
 
 .markdown-resource-body--editing {
+  /* A press here places the caret and a drag selects text: it never moves the
+     Resource, so the pointer says text rather than the grab hand the rest of
+     the Resource shows. */
+  cursor: text;
   --markdown-source-content-inset: var(--markdown-resource-content-gap);
   --markdown-source-content-padding-top: var(--markdown-resource-content-top);
   --markdown-source-focus-outline: none;
@@ -171,19 +176,17 @@
 
    No panel behind it: the Resource's face is a shade darker than the editor's own
    surface, so a filled backing reads as a grey box floated over the document.
-   It sits in the reserved band above the first line instead.
+   It is a row of its own under the editor instead, so it never sits on the
+   author's text, however small the Resource is drawn.
 
    Grouping is the second rule: one gap holds a cap to its word, a wider one
    separates the pairs, so the eye takes `⌘+↵ Save` and `Esc Cancel` as two
    resources rather than one run. */
 .markdown-resource-body__shortcut-hint {
-  position: absolute;
-  inset-block-start: 0;
-  inset-inline-end: 10px;
-  /* Sits in the band the body's own top inset opens, so tightening that inset
-     brings the hint up with the text rather than leaving it stranded. */
-  height: calc(var(--markdown-resource-content-top) * 2 + 10px);
-  z-index: 2;
+  flex: none;
+  align-self: flex-end;
+  height: 22px;
+  padding-inline-end: 10px;
   display: flex;
   align-items: center;
   gap: 14px;

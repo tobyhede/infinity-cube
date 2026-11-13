@@ -25,6 +25,11 @@ describe('shortcutSections', () => {
     ]);
   });
 
+  it('lists no Enter on the canvas, which opens no Resource', () => {
+    const canvas = shortcutSections('authoring').find(({ title }) => title === 'On the canvas');
+    expect(canvas?.shortcuts.filter(({ shortcut }) => shortcut.aria.includes('Enter'))).toEqual([]);
+  });
+
   it('lists every presenting key while presenting, and the sheet’s own', () => {
     const sections = shortcutSections('presenting');
 
@@ -37,9 +42,9 @@ describe('shortcutSections', () => {
 
 describe('shortcutOf', () => {
   it('announces the binding’s own aria-keyshortcuts', () => {
-    expect(shortcutOf(CANVAS_KEYS.openAndExpand)).toEqual({
-      aria: 'Shift+Enter',
-      presses: [['Shift', 'Enter']],
+    expect(shortcutOf(CANVAS_KEYS.renameResource)).toEqual({
+      aria: 'F2',
+      presses: [['F2']],
     });
   });
 

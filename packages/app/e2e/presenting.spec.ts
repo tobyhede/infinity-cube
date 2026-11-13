@@ -15,6 +15,7 @@ import {
   presentControl,
   presentedName,
   presentedResource,
+  resourceActions,
   resourceControls,
   selectCanvas,
   settled,
@@ -292,8 +293,11 @@ test('a Reference Resource shows its own name over its Target’s content', asyn
   await expect(presentedResource(page).locator('strong')).toHaveText('A');
 });
 
-/** A Space Resource draws its name alone on the Stage, and no Map. */
-test('a Space Resource shows its name only', async ({ page }) => {
+/**
+ * A Space Resource draws the Map it selects on the Stage, whole and taking no
+ * pointer, so a talk can present a diagram kept in a Space of its own.
+ */
+test('a Space Resource shows the Map it selects', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('.react-flow__node').first()).toBeVisible();
   await selectCanvas(page, 'Linked Spaces');
@@ -302,11 +306,17 @@ test('a Space Resource shows its name only', async ({ page }) => {
   await presentControl(page).click();
   await expect(presentedName(page)).toHaveText('Presentation');
   await expect(presentedResource(page)).toHaveAttribute('data-content-kind', 'space');
-  await expect(presentedResource(page).locator('.resource__body')).toHaveCount(0);
-  await expect(stage(page).locator('.react-flow')).toHaveCount(0);
+  const drawing = presentedResource(page).getByTestId('presented-map');
+  for (const name of ['Opening remarks', 'The problem', 'Closing'])
+    await expect(drawing.locator('.react-flow__node', { hasText: name })).toBeVisible();
+  await expect(drawing.locator('.react-flow__edge').first()).toBeAttached();
+  await expect(drawing).toHaveCSS('pointer-events', 'none');
+  await expect(drawing).toHaveAttribute('role', 'img');
+  await expect(drawing).toHaveAttribute('aria-description', /Opening remarks/);
 
   await page.keyboard.press('ArrowRight');
   await expect(presentedName(page)).toHaveText('Deep dive');
+  await expect(presentedResource(page).getByTestId('presented-map')).toBeVisible();
 });
 
 /**
@@ -323,6 +333,12 @@ test(
     for (const _ of [0, 1, 2]) await page.keyboard.press('ArrowRight');
     await expect(presentedName(page)).toHaveText('D');
     await expect(presentedResource(page).locator('hr')).toHaveCount(1);
+    // A list keeps its markers on the Stage: the reset that strips them is
+    // undone for presented content.
+    await expect(presentedResource(page).locator('ul').first()).toHaveCSS(
+      'list-style-type',
+      'disc',
+    );
 
     const body = stageBody(page);
     const scrollTop = () => body.evaluate((element) => element.scrollTop);
@@ -680,6 +696,59 @@ async function textBox(heading: Locator) {
 }
 
 /**
+ * Make an Ur Resource titled `Title slide` the fourth stop on `Short`, which
+ * runs A → B → C, by an Edge from C.
+ */
+async function addTitleSlideAfterC(page: Page): Promise<Locator> {
+  await page.goto('/');
+  await expect(page.locator('.react-flow__node').first()).toBeVisible();
+  await settled(page);
+
+  await selectCanvas(page, 'Collection 1');
+  await activateGraph(page, 'Short');
+  await settled(page);
+
+  await createResource(page, 'Ur Resource');
+  const title = page.getByRole('textbox', { name: 'Resource title' });
+  await expect(title).toBeFocused();
+  await title.fill('Title slide');
+  await title.press('Enter');
+  const ur = nodeByTitle(page, 'Title slide').first();
+  await expect(ur.locator('.canvas-resource')).toHaveAttribute('data-kind', 'ur');
+  await settled(page);
+
+  // A new Resource lands at the centre of the view, which on this Map is over
+  // C; moved clear of the row, each end's handles are reachable.
+  await dragBy(page, ur, 0, 250);
+  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+
+  const c = nodeByTitle(page, 'C').first();
+  await c.hover();
+  await connectHandles(
+    page,
+    authoringHandle(c, 'source', 'right'),
+    authoringHandle(ur, 'target', 'top'),
+  );
+  await expect(page.getByLabel(/^Edge from C to Title slide in Short$/)).toBeAttached();
+  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+  await settled(page);
+  return ur;
+}
+
+/** The presented name is centred on both axes in the frame, as a title slide is. */
+async function expectNameCentred(page: Page): Promise<void> {
+  const frame = await boxOf(stageFrame(page), 'the Stage frame');
+  const name = await textBox(presentedName(page));
+  const tolerance = Math.max(2, frame.height / 100);
+  expect(Math.abs(name.x + name.width / 2 - (frame.x + frame.width / 2))).toBeLessThanOrEqual(
+    tolerance,
+  );
+  expect(Math.abs(name.y + name.height / 2 - (frame.y + frame.height / 2))).toBeLessThanOrEqual(
+    tolerance,
+  );
+}
+
+/**
  * An Ur Resource on the canvas and then presented (ADR 0113).
  *
  * It has no content, so it offers no Open and draws its Title and nothing
@@ -690,48 +759,13 @@ test(
   'an Ur Resource offers no Open, draws its Title alone and presents its name only, centred',
   { tag: '@parity:stage-centres-a-title-slide' },
   async ({ page }) => {
-    await page.goto('/');
-    await expect(page.locator('.react-flow__node').first()).toBeVisible();
-    await settled(page);
-
-    // `Short` runs A → B → C, so an Edge from C makes the Ur Resource the
-    // fourth stop.
-    await selectCanvas(page, 'Collection 1');
-    await activateGraph(page, 'Short');
-    await settled(page);
-
-    await createResource(page, 'Ur Resource');
-    const title = page.getByRole('textbox', { name: 'Resource title' });
-    await expect(title).toBeFocused();
-    await title.fill('Title slide');
-    await title.press('Enter');
-    const ur = nodeByTitle(page, 'Title slide').first();
-    await expect(ur.locator('.canvas-resource')).toHaveAttribute('data-kind', 'ur');
-    await settled(page);
-
-    // A new Resource lands at the centre of the view, which on this Map is over
-    // C; moved clear of the row, each end's handles are reachable.
-    await dragBy(page, ur, 0, 250);
-    await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
-
-    const c = nodeByTitle(page, 'C').first();
-    await c.hover();
-    await connectHandles(
-      page,
-      authoringHandle(c, 'source', 'right'),
-      authoringHandle(ur, 'target', 'top'),
-    );
-    await expect(page.getByLabel(/^Edge from C to Title slide in Short$/)).toBeAttached();
-    await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
-    await settled(page);
+    const ur = await addTitleSlideAfterC(page);
 
     const controls = await resourceControls(page, ur);
     await expect(controls.getByRole('button', { name: /^Actions for Resource/ })).toBeVisible();
     await expect(controls.getByRole('button', { name: 'Open Resource Title slide' })).toHaveCount(
       0,
     );
-    await expect(ur.locator('.canvas-resource')).toHaveAttribute('data-open', 'false');
-    await expect(ur.locator('.canvas-resource__content')).toHaveCount(0);
     await expect(controls.getByRole('button', { name: 'Edit Resource Title slide' })).toHaveCount(
       0,
     );
@@ -744,19 +778,55 @@ test(
     await expect(slide).toHaveAttribute('data-content-kind', 'ur');
     await expect(presentedName(page)).toHaveText('Title slide');
     await expect(slide.locator('.resource__body')).toHaveCount(0);
-
-    // Centred on both axes in the frame.
-    const frame = await boxOf(stageFrame(page), 'the Stage frame');
-    const name = await textBox(presentedName(page));
-    const tolerance = Math.max(2, frame.height / 100);
-    expect(Math.abs(name.x + name.width / 2 - (frame.x + frame.width / 2))).toBeLessThanOrEqual(
-      tolerance,
-    );
-    expect(Math.abs(name.y + name.height / 2 - (frame.y + frame.height / 2))).toBeLessThanOrEqual(
-      tolerance,
-    );
+    await expectNameCentred(page);
   },
 );
+
+/**
+ * A Reference to an Ur Resource is drawn by the Reference plugin, which embeds
+ * its Target's Ur plugin under the Reference's own name, and presents as the
+ * title slide its Target does: its name alone, centred.
+ */
+test('a Reference to an Ur Resource presents its name alone, centred', async ({ page }) => {
+  const ur = await addTitleSlideAfterC(page);
+
+  const menu = await resourceActions(page, 'Title slide');
+  await menu.getByRole('menuitem', { name: 'Create Reference' }).click();
+  const title = page.getByRole('textbox', { name: 'Resource title' });
+  await expect(title).toBeFocused();
+  await title.fill('Title slide, again');
+  await title.press('Enter');
+  await expect(title).toHaveCount(0);
+  await settled(page);
+  const reference = nodeByTitle(page, 'Title slide, again').first();
+  await expect(reference.locator('.canvas-resource')).toHaveAttribute('data-kind', 'reference');
+  await dragBy(page, reference, 0, 250);
+  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+  await settled(page);
+
+  await ur.hover();
+  await connectHandles(
+    page,
+    authoringHandle(ur, 'source', 'bottom'),
+    authoringHandle(reference, 'target', 'top'),
+  );
+  await expect(
+    page.getByLabel(/^Edge from Title slide to Title slide, again in Short$/),
+  ).toBeAttached();
+  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+  await settled(page);
+
+  await presentControl(page).click();
+  await expect(stage(page)).toBeVisible();
+  for (const _ of [0, 1, 2, 3]) await page.keyboard.press('ArrowRight');
+
+  const slide = presentedResource(page);
+  await expect(presentedName(page)).toHaveText('Title slide, again');
+  await expect(slide).toHaveAttribute('data-content-kind', 'reference');
+  await expect(slide.locator('[data-content-kind="ur"]')).toHaveCount(1);
+  await expect(slide.locator('.resource__body')).toHaveCount(0);
+  await expectNameCentred(page);
+});
 
 /**
  * The presenting chrome at a phone width, where it has the whole viewport.

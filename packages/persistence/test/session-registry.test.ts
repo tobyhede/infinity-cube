@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { uuidSchema } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema } from '@project/core';
 import { MemorySpaceBackend, MemorySpaceBackendTestControl } from '../src/memory';
 import { createSpaceSessionRegistry } from '../src/session-registry';
 import type { SpaceSession, SpaceSessionState } from '../src/session';
+import { showingSpace } from './showing-space';
 
 /**
  * Wait for a session's state to satisfy `predicate` — used to confirm an Edit
@@ -51,7 +52,11 @@ const loaded = {
     resources: [
       {
         id: RESOURCE_ID,
-        document: { title: 'Resource', kind: 'markdown' as const, content: { source: '' } },
+        document: {
+          title: 'Resource',
+          kind: 'markdown' as const,
+          content: { url: EMPTY_ASSET_REF },
+        },
       },
     ],
   },
@@ -669,7 +674,11 @@ describe('Space session registry', () => {
         resources: [
           {
             id: SIBLING_RESOURCE_ID,
-            document: { title: 'Sibling', kind: 'markdown' as const, content: { source: '' } },
+            document: {
+              title: 'Sibling',
+              kind: 'markdown' as const,
+              content: { url: EMPTY_ASSET_REF },
+            },
           },
         ],
         document: { version: 1 as const, title: 'Sibling' },
@@ -777,7 +786,11 @@ describe('Space session registry', () => {
         resources: [
           {
             id: SIBLING_RESOURCE_ID,
-            document: { title: 'Sibling', kind: 'markdown' as const, content: { source: '' } },
+            document: {
+              title: 'Sibling',
+              kind: 'markdown' as const,
+              content: { url: EMPTY_ASSET_REF },
+            },
           },
           {
             id: SIBLING_LINK_ID,
@@ -808,7 +821,11 @@ describe('Space session registry', () => {
       resources: [
         {
           id: SIBLING_RESOURCE_ID,
-          document: { title: 'Sibling', kind: 'markdown' as const, content: { source: '' } },
+          document: {
+            title: 'Sibling',
+            kind: 'markdown' as const,
+            content: { url: EMPTY_ASSET_REF },
+          },
         },
         {
           id: SIBLING_LINK_ID,
@@ -874,13 +891,15 @@ describe('Space session registry', () => {
     // retires a session the coordination is about to name as a participant.
     const linking = registry
       .spaceResources(() => RESOURCE_ID)
-      .link({
-        containingSpaceId: SPACE_ID,
-        mapId: uuidSchema.parse('00000000-0000-4000-8000-000000000009'),
-        targetSpaceId: SPACE_ID,
-        title: 'Linked',
-        position: { x: 0, y: 0 },
-      });
+      .link(
+        showingSpace({
+          containingSpaceId: SPACE_ID,
+          mapId: uuidSchema.parse('00000000-0000-4000-8000-000000000009'),
+          targetSpaceId: SPACE_ID,
+          title: 'Linked',
+          position: { x: 0, y: 0 },
+        }),
+      );
     expect(registry.release(SPACE_ID)).toBe(false);
 
     await expect(linking).resolves.toBeDefined();
@@ -938,10 +957,9 @@ describe('Space session registry', () => {
                   [OPEN_SPACE_RESOURCE_ID]: {
                     x: 0,
                     y: 0,
-                    open: true as const,
                     size: { width: 400, height: 300 },
                   },
-                  [DISPLACED_RESOURCE_ID]: { x: 400, y: 0, open: false as const },
+                  [DISPLACED_RESOURCE_ID]: { x: 400, y: 0 },
                 },
                 graphs: [{ id: CONTAINING_GRAPH, title: 'Graph 1', edges: [] }],
               },
@@ -962,7 +980,11 @@ describe('Space session registry', () => {
             },
             {
               id: DISPLACED_RESOURCE_ID,
-              document: { title: 'Displaced', kind: 'markdown' as const, content: { source: '' } },
+              document: {
+                title: 'Displaced',
+                kind: 'markdown' as const,
+                content: { url: EMPTY_ASSET_REF },
+              },
             },
           ],
         },
@@ -1003,7 +1025,7 @@ describe('Space session registry', () => {
       expect(result).toEqual({ kind: 'completed' });
       const stored = await backend.loadSpace(SPACE_ID);
       expect(stored?.snapshot.document.maps?.[0]?.positions).toEqual({
-        [DISPLACED_RESOURCE_ID]: { x: 400, y: 0, open: false },
+        [DISPLACED_RESOURCE_ID]: { x: 400, y: 0 },
       });
     });
 
@@ -1029,8 +1051,8 @@ describe('Space session registry', () => {
                 title: 'Map 1',
                 kind: 'positioned' as const,
                 positions: {
-                  [REFERENCED_SPACE_RESOURCE_ID]: { x: 0, y: 0, open: false as const },
-                  [REFERENCE_ID]: { x: 300, y: 0, open: false as const },
+                  [REFERENCED_SPACE_RESOURCE_ID]: { x: 0, y: 0 },
+                  [REFERENCE_ID]: { x: 300, y: 0 },
                 },
                 graphs: [{ id: CONTAINING_GRAPH, title: 'Graph 1', edges: [] }],
               },
@@ -1140,7 +1162,7 @@ describe('Space session registry', () => {
                   title: 'Map 1',
                   kind: 'positioned' as const,
                   positions: {
-                    [REFERENCED_SPACE_RESOURCE_ID]: { x: 0, y: 0, open: false as const },
+                    [REFERENCED_SPACE_RESOURCE_ID]: { x: 0, y: 0 },
                   },
                   graphs: [{ id: CONTAINING_GRAPH, title: 'Graph 1', edges: [] }],
                 },
@@ -1206,7 +1228,7 @@ describe('Space session registry', () => {
               ...m,
               positions: {
                 ...m.positions,
-                [LATE_REFERENCE_ID]: { x: 300, y: 0, open: false as const },
+                [LATE_REFERENCE_ID]: { x: 300, y: 0 },
               },
             }));
             containingSession.submit({
@@ -1320,11 +1342,11 @@ describe('Space session registry', () => {
                   title: 'Map 1',
                   kind: 'positioned' as const,
                   positions: {
-                    [REFERENCING_RESOURCE_ID]: { x: 0, y: 0, open: false as const },
+                    [REFERENCING_RESOURCE_ID]: { x: 0, y: 0 },
                     // Keeps Other reachable from Meta independently of the
                     // deletion below, so the scenario isolates what happens to
                     // Target rather than also depending on Other's own reachability.
-                    [OTHER_REFERENCE_RESOURCE_ID]: { x: 240, y: 0, open: false as const },
+                    [OTHER_REFERENCE_RESOURCE_ID]: { x: 240, y: 0 },
                   },
                   graphs: [{ id: CONTAINING_GRAPH, title: 'Graph 1', edges: [] }],
                 },
@@ -1417,7 +1439,7 @@ describe('Space session registry', () => {
               ...m,
               positions: {
                 ...m.positions,
-                [LATE_REFERENCE_RESOURCE_ID]: { x: 0, y: 0, open: false as const },
+                [LATE_REFERENCE_RESOURCE_ID]: { x: 0, y: 0 },
               },
             }));
             const committed = await commit({
@@ -1522,7 +1544,7 @@ describe('Space session registry', () => {
                 title: 'Map 1',
                 kind: 'positioned' as const,
                 positions: {
-                  [OCCUPYING_RESOURCE_ID]: { ...OCCUPIED_ANCHOR, open: false as const },
+                  [OCCUPYING_RESOURCE_ID]: { ...OCCUPIED_ANCHOR },
                 },
                 graphs: [{ id: CONTAINING_GRAPH, title: 'Graph 1', edges: [] }],
               },
@@ -1531,7 +1553,11 @@ describe('Space session registry', () => {
           resources: [
             {
               id: OCCUPYING_RESOURCE_ID,
-              document: { title: 'Occupying', kind: 'markdown' as const, content: { source: '' } },
+              document: {
+                title: 'Occupying',
+                kind: 'markdown' as const,
+                content: { url: EMPTY_ASSET_REF },
+              },
             },
           ],
         },
@@ -1556,19 +1582,20 @@ describe('Space session registry', () => {
         return id;
       };
 
-      const result = await registry.spaceResources(newId).create({
-        containingSpaceId: SPACE_ID,
-        mapId: CONTAINING_MAP,
-        title: 'New Space Resource',
-        position: OCCUPIED_ANCHOR,
-      });
+      const result = await registry.spaceResources(newId).create(
+        showingSpace({
+          containingSpaceId: SPACE_ID,
+          mapId: CONTAINING_MAP,
+          title: 'New Space Resource',
+          position: OCCUPIED_ANCHOR,
+        }),
+      );
 
       expect(result).toEqual({ kind: 'completed', resourceId: NEW_SPACE_RESOURCE_ID });
       const stored = await backend.loadSpace(SPACE_ID);
       expect(stored?.snapshot.document.maps?.[0]?.positions[NEW_SPACE_RESOURCE_ID]).toEqual({
         x: OCCUPIED_ANCHOR.x + 24,
         y: OCCUPIED_ANCHOR.y + 24,
-        open: false,
       });
     });
 
@@ -1652,12 +1679,14 @@ describe('Space session registry', () => {
         return id;
       };
 
-      const creation = registry.spaceResources(newId).create({
-        containingSpaceId: SPACE_ID,
-        mapId: CONTAINING_MAP,
-        title: 'New Space Resource',
-        position: { x: 0, y: 0 },
-      });
+      const creation = registry.spaceResources(newId).create(
+        showingSpace({
+          containingSpaceId: SPACE_ID,
+          mapId: CONTAINING_MAP,
+          title: 'New Space Resource',
+          position: { x: 0, y: 0 },
+        }),
+      );
 
       await expect(creation).resolves.toEqual({
         kind: 'refused',
@@ -1767,13 +1796,15 @@ describe('Space session registry', () => {
 
       const linking = registry
         .spaceResources(() => LINKED_SPACE_RESOURCE_ID)
-        .link({
-          containingSpaceId: SPACE_ID,
-          mapId: CONTAINING_MAP,
-          targetSpaceId: LINK_TARGET_ID,
-          title: 'Linked',
-          position: { x: 0, y: 0 },
-        });
+        .link(
+          showingSpace({
+            containingSpaceId: SPACE_ID,
+            mapId: CONTAINING_MAP,
+            targetSpaceId: LINK_TARGET_ID,
+            title: 'Linked',
+            position: { x: 0, y: 0 },
+          }),
+        );
 
       await expect(linking).resolves.toEqual({
         kind: 'refused',

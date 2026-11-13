@@ -3,7 +3,7 @@
 import { encodeCompactUuid, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import { expect, test, type Locator, type Page } from './fixtures';
 import { presentControl, presentedName, stage } from './graph';
-import { SEEDED_GRAPH_ID, SEEDED_MAP_ID, seedPositionedMap } from './seed';
+import { SEEDED_GRAPH_ID, SEEDED_MAP_ID, seedPositionedMap, storeText } from './seed';
 
 // The Notes window (ADR 0129) is a second window of the same browser, joined
 // to the presenting window over `BroadcastChannel`. Each test opens both as
@@ -27,8 +27,8 @@ const ids = {
   backup: id(0x22),
 } as const;
 
-const markdown = (resource: UUID, title: string, source: string) =>
-  ({ id: resource, document: { title, kind: 'markdown', content: { source } } }) as const;
+const markdown = (resource: UUID, title: string, url: `/assets/${string}`) =>
+  ({ id: resource, document: { title, kind: 'markdown', content: { url } } }) as const;
 
 /**
  * Give the opened Space a Map with a talk that forks after its welcome, and a
@@ -44,22 +44,34 @@ async function seedTalk(page: Page): Promise<UUID> {
     page,
     'Launch',
     () => ({
-      [ids.welcome]: { x: 0, y: 0, open: false },
-      [ids.demo]: { x: 420, y: -200, open: false },
-      [ids.architecture]: { x: 420, y: 200, open: false },
-      [ids.questions]: { x: 840, y: 0, open: false },
-      [ids.outage]: { x: 0, y: 400, open: false },
-      [ids.thanks]: { x: 0, y: 700, open: false },
-      [ids.backup]: { x: 420, y: 400, open: false },
+      [ids.welcome]: { x: 0, y: 0 },
+      [ids.demo]: { x: 420, y: -200 },
+      [ids.architecture]: { x: 420, y: 200 },
+      [ids.questions]: { x: 840, y: 0 },
+      [ids.outage]: { x: 0, y: 400 },
+      [ids.thanks]: { x: 0, y: 700 },
+      [ids.backup]: { x: 420, y: 400 },
     }),
     [
-      markdown(ids.welcome, 'Welcome', 'Launching the new store.'),
-      markdown(ids.demo, 'Demo', 'A live walk through checkout.'),
-      markdown(ids.architecture, 'Architecture', 'How a write reaches every replica.'),
-      markdown(ids.questions, 'Questions', 'Ask anything.'),
-      markdown(ids.outage, 'Open with the outage', 'Tell the March outage story first.'),
-      markdown(ids.thanks, 'Thank the team', 'Name the on-call rota.'),
-      markdown(ids.backup, 'Backup video', 'If the demo fails, play the recording.'),
+      markdown(ids.welcome, 'Welcome', await storeText(page, 'Launching the new store.')),
+      markdown(ids.demo, 'Demo', await storeText(page, 'A live walk through checkout.')),
+      markdown(
+        ids.architecture,
+        'Architecture',
+        await storeText(page, 'How a write reaches every replica.'),
+      ),
+      markdown(ids.questions, 'Questions', await storeText(page, 'Ask anything.')),
+      markdown(
+        ids.outage,
+        'Open with the outage',
+        await storeText(page, 'Tell the March outage story first.'),
+      ),
+      markdown(ids.thanks, 'Thank the team', await storeText(page, 'Name the on-call rota.')),
+      markdown(
+        ids.backup,
+        'Backup video',
+        await storeText(page, 'If the demo fails, play the recording.'),
+      ),
     ],
     [
       { from: ids.welcome, to: ids.demo },

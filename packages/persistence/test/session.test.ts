@@ -1,6 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it, vi } from 'vitest';
-import { uuidSchema } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema } from '@project/core';
 import type { LoadedSpace, SpaceBackend, SpaceSession, SpaceSessionState } from '../src/index';
 import { MemorySpaceBackend, openSpaceSession } from '../src/index';
 import { canRetry, openManagedSpaceSession } from '../src/session';
@@ -17,7 +17,7 @@ const loaded: LoadedSpace = {
     resources: [
       {
         id: RESOURCE_ID,
-        document: { title: 'A', kind: 'markdown', content: { source: 'Original' } },
+        document: { title: 'A', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       },
     ],
   },
@@ -1150,16 +1150,17 @@ describe('openSpaceSession', () => {
  * under it saves.
  */
 describe('a save over the request size limit', () => {
+  // The Title carries the bulk, because a Markdown Resource's text is an asset (ADR 0142).
   const withBody = (body: string): LoadedSpace['snapshot'] => ({
     ...loaded.snapshot,
     resources: loaded.snapshot.resources.map((resource) => ({
       ...resource,
-      document: { title: 'A', kind: 'markdown', content: { source: body } },
+      document: { title: `A${body}`, kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     })),
   });
   const bodyOf = (snapshot: LoadedSpace['snapshot']) => {
     const document = snapshot.resources[0]?.document;
-    return document?.kind === 'markdown' ? document.content.source : undefined;
+    return document?.title.slice('A'.length);
   };
   const sizeLimited = () => {
     const backend = new SizeLimitedBackend(SPACE_ID, [loaded]);
@@ -1209,7 +1210,7 @@ describe('a save over the request size limit', () => {
     expect(bodyOf(stillOver.working)).toBe('x'.repeat(300));
     await expect(backend.loadSpace(SPACE_ID)).resolves.toMatchObject({
       revision: 3n,
-      snapshot: { resources: [{ document: { content: { source: 'Original' } } }] },
+      snapshot: { resources: [{ document: { content: { url: EMPTY_ASSET_REF } } }] },
     });
 
     session.submit(withBody('x'.repeat(80)));
@@ -1217,7 +1218,7 @@ describe('a save over the request size limit', () => {
     expect(settled.acknowledgedRevision).toBe(4n);
     await expect(backend.loadSpace(SPACE_ID)).resolves.toMatchObject({
       revision: 4n,
-      snapshot: { resources: [{ document: { content: { source: 'x'.repeat(80) } } }] },
+      snapshot: { resources: [{ document: { content: { url: EMPTY_ASSET_REF } } }] },
     });
   });
 

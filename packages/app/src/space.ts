@@ -1,12 +1,13 @@
-import { HttpSpaceBackend, productAddress } from '@project/http';
-import { loadSpaceSnapshot, type Space } from '@project/graph';
-import { newUuid, type ImageNaturalSize, type UUID } from '@project/core';
-import type { SpaceBackend } from '@project/persistence';
-import { displayImageAsAuthored, type ImageDisplay } from '@project/ui';
+import { httpAssetClient, HttpSpaceBackend, productAddress } from '@project/http';
+import { loadSpaceAggregate, loadSpaceSnapshot, type Space } from '@project/graph';
+import { isMissingKind, newUuid, type AssetRef, type UUID } from '@project/core';
+import type { AssetClient, AssetRefusal, LoadedSpace, SpaceBackend } from '@project/persistence';
+import type { Assets } from '@project/resource-api/view';
 import type { HistoryApi } from './browser-location';
 import { createBrowserHistory } from './browser-history';
-import { pickImagesInBrowser } from './browser-file-picker';
-import type { ImageSources } from './image-creation';
+import { describeAssetRefusal } from './authoring-refusal';
+import { pickFilesInBrowser } from './browser-file-picker';
+import { measurePictureInBrowser } from './browser-picture-measure';
 import type { Fullscreen } from './presenting-fullscreen';
 import type { PresentationLinks } from './presentation-link';
 import type { ApplicationStartupResult } from './startup';
@@ -28,44 +29,52 @@ export interface SpaceStartup {
  */
 const browserHistory = (): HistoryApi => createBrowserHistory(window);
 
-/** How long a picture may take to load before it is taken as one that did not. */
-const MEASURE_TIMEOUT_MS = 10_000;
-
 /**
- * The browser loading a picture to learn its natural size (ADR 0106): the one
- * place the application builds an `Image`. A picture that errors, never
- * answers, or has no intrinsic size answers `undefined`.
+ * The Spaces the loaded aggregate holds because a plugin is missing
+ * (ADR 0142): what Space Authoring reads before deleting a Resource of a
+ * missing kind. A commit that newly leaves a Space unrooted is refused
+ * whatever plugin is missing (`decideCommit`, held by
+ * `packages/persistence/test/commit-decision.test.ts`), so no Space is held
+ * later that was not held when this was read. Without a Resource of a missing
+ * kind none is held, and the aggregate is not read through intake again.
  */
-const measureInBrowser = (url: string): Promise<ImageNaturalSize | undefined> =>
-  new Promise((resolve) => {
-    const picture = new Image();
-    const settle = (size: ImageNaturalSize | undefined): void => {
-      clearTimeout(timer);
-      picture.onload = null;
-      picture.onerror = null;
-      resolve(size);
-    };
-    const timer = setTimeout(() => settle(undefined), MEASURE_TIMEOUT_MS);
-    picture.onload = () => {
-      const { naturalWidth: width, naturalHeight: height } = picture;
-      settle(width > 0 && height > 0 ? { width, height } : undefined);
-    };
-    picture.onerror = () => settle(undefined);
-    picture.src = url;
+const heldSpaceIds = (metaSpaceId: UUID, spaces: readonly LoadedSpace[]): readonly UUID[] => {
+  const pluginMissing = spaces.some(({ snapshot }) =>
+    snapshot.resources.some(({ document }) => isMissingKind(document.kind)),
+  );
+  if (!pluginMissing) return [];
+  const loaded = loadSpaceAggregate({
+    metaSpaceId,
+    snapshots: spaces.map(({ snapshot }) => snapshot),
   });
+  return loaded.ok ? loaded.aggregate.heldSpaceIds : [];
+};
+
+/** A refusal as a plugin reads it: the store's code put into words. */
+interface WordedRefusal {
+  readonly refused: string;
+}
+
+const isRefusal = (answer: Blob | AssetRef | AssetRefusal): answer is AssetRefusal =>
+  typeof answer === 'object' && 'refused' in answer;
+
+/** A store's answer with its refusal worded, as every refusal a plugin reads is (ADR 0057). */
+const worded = <T extends Blob | AssetRef>(answer: T | AssetRefusal): T | WordedRefusal =>
+  isRefusal(answer) ? { refused: describeAssetRefusal(answer.refused) } : answer;
 
 /**
- * The host's image store over HTTP, and the browser measuring what it loads and
- * choosing files. A picture is measured where `displayImage` draws it from, so
- * a measurement loads what the Resource will show.
+ * The asset store as a Resource plugin's surface reaches it (ADR 0142): the
+ * client's `url`, `read` and `store`, each refusal worded by
+ * `describeAssetRefusal`, the browser's own file picker, and `measure`, the
+ * browser loading a picture to size it (ADR 0109). A host hands on only `url` and `read` where its Resource is not
+ * authored.
  */
-export const browserImageSources = (
-  host: HttpSpaceBackend = new HttpSpaceBackend(),
-  displayImage: ImageDisplay = displayImageAsAuthored,
-): ImageSources => ({
-  store: (image) => host.storeImage(image),
-  measure: (url) => measureInBrowser(displayImage(url)),
-  pick: pickImagesInBrowser,
+export const browserPluginAssets = (assets: AssetClient): Assets => ({
+  url: (ref) => assets.url(ref),
+  read: async (ref) => worded(await assets.read(ref)),
+  store: async (bytes) => worded(await assets.store(bytes)),
+  pick: async (accept) => [...(await pickFilesInBrowser(document, accept))],
+  measure: measurePictureInBrowser,
 });
 
 /**
@@ -75,18 +84,15 @@ export const browserImageSources = (
  * names `document`, `window` and `BroadcastChannel` and hands each to its one
  * adapter, and a test supplies hosts of its own.
  *
- * The other five seams default together and for one reason: this is the composition
+ * The other four seams default together and for one reason: this is the composition
  * root, and it is where the ambient browser, the ambient generator and the real
- * transport — for Spaces and for images — are named. Everything below takes each of them required.
- *
- * `displayImage` is where a picture is drawn from; a host serves its own stored
- * images, so the default draws every URL as authored, and a mounted aggregate
- * supplies its own (ADR 0130, `mount/mounted-startup.ts`).
+ * transport — for Spaces and for assets — are named. Everything below takes each of them required.
  *
  * `session.mounted` says the session is Mounting an aggregate (ADR 0130), so
  * every Space it opens marks its Edits as lost on reload (ADR 0131). It is
  * named rather than positional, and defaults to `false`: only a mount
- * composition sets it.
+ * composition sets it. `session.assets` is the asset store a Resource plugin
+ * reaches, the host's by default and the in-page store in a mount.
  */
 export const createSpaceStartup = (
   fullscreen: Fullscreen,
@@ -94,10 +100,12 @@ export const createSpaceStartup = (
   backend: SpaceBackend = new HttpSpaceBackend(),
   newId: () => UUID = newUuid,
   history: HistoryApi = browserHistory(),
-  images: ImageSources = browserImageSources(),
-  displayImage: ImageDisplay = displayImageAsAuthored,
-  { mounted = false }: { readonly mounted?: boolean } = {},
+  {
+    mounted = false,
+    assets = httpAssetClient(new HttpSpaceBackend()),
+  }: { readonly mounted?: boolean; readonly assets?: AssetClient } = {},
 ): SpaceStartup => {
+  const pluginAssets = browserPluginAssets(assets);
   let owner: Promise<OpenSpaces> | undefined;
   const openSpaces = (): Promise<OpenSpaces> => {
     if (owner !== undefined) return owner;
@@ -113,10 +121,10 @@ export const createSpaceStartup = (
         metaSpaceTitle: meta.snapshot.document.title,
         newId,
         history,
-        images,
         fullscreen,
         presentations,
         mounted,
+        heldSpaceIds: heldSpaceIds(metaSpaceId, spaces),
       });
     });
     owner = opening;
@@ -152,7 +160,7 @@ export const createSpaceStartup = (
             reportObserverError: (error) => console.error('Notes window observer failed', error),
           }),
           now: presentations.now,
-          displayImage,
+          assets: pluginAssets,
         };
       }
       const spaces = await openSpaces();
@@ -162,7 +170,7 @@ export const createSpaceStartup = (
         opened,
         spaces,
         opening,
-        displayImage,
+        assets: pluginAssets,
       };
     },
   };

@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import { spaceSnapshotSchema, type SpaceSnapshot } from '@project/core';
 import { createWorkingSpaceReader } from '../src/snapshot';
+import { textAsset } from './markdown-texts';
 
 const snapshot = (title: string): SpaceSnapshot =>
   spaceSnapshotSchema.parse({
@@ -17,8 +18,8 @@ const snapshot = (title: string): SpaceSnapshot =>
           title: 'Working',
           kind: 'positioned',
           positions: {
-            '00000000-0000-4000-8000-000000000002': { x: 0, y: 0, open: false },
-            '00000000-0000-4000-8000-000000000003': { x: 400, y: 0, open: false },
+            '00000000-0000-4000-8000-000000000002': { x: 0, y: 0 },
+            '00000000-0000-4000-8000-000000000003': { x: 400, y: 0 },
           },
           graphs: [
             {
@@ -38,11 +39,11 @@ const snapshot = (title: string): SpaceSnapshot =>
     resources: [
       {
         id: '00000000-0000-4000-8000-000000000002',
-        document: { title: 'Resource', kind: 'markdown', content: { source: 'Body' } },
+        document: { title: 'Resource', kind: 'markdown', content: { url: textAsset('Body') } },
       },
       {
         id: '00000000-0000-4000-8000-000000000003',
-        document: { title: 'Next', kind: 'markdown', content: { source: 'More' } },
+        document: { title: 'Next', kind: 'markdown', content: { url: textAsset('More') } },
       },
     ],
   });

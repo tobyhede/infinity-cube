@@ -3,7 +3,9 @@ import {
   KIND_IDS,
   contentTarget,
   isKindId,
+  isMissingKindId,
   isRegisteredKind,
+  mapContentProblem,
   newResourceDocument,
   resolveContent,
   startsEmpty,
@@ -13,6 +15,7 @@ import {
   type ResourceDocument,
 } from '../src/kinds/registry';
 import { uuidSchema } from '../src/schema';
+import { EMPTY_ASSET_REF } from '../src/assets';
 import { imageKind } from '../src/kinds/image';
 import { markdownKind } from '../src/kinds/markdown';
 import { referenceKind } from '../src/kinds/reference';
@@ -32,6 +35,13 @@ describe('the kind registry', () => {
       expect(isRegisteredKind(kind)).toBe(false);
     },
   );
+
+  it('lets a Resource whose kind no plugin draws keep whatever Map content is stored', () => {
+    const missing = 'vnd.example.chart';
+    if (!isMissingKindId(missing)) throw new Error('A plugin in this build draws the kind');
+    expect(mapContentProblem(missing, { zoom: 2, open: true })).toBeUndefined();
+    expect(mapContentProblem(urKind.id, { open: true })).toBeDefined();
+  });
 });
 
 const TARGET = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -63,7 +73,7 @@ describe("a kind's content Target", () => {
 
 describe('where resolved content came from', () => {
   const OWN = REPRESENTATIVE.filter((doc) => contentTarget(doc) === undefined);
-  const NOTES = { kind: markdownKind.id, content: { source: 'Notes' } } as const;
+  const NOTES = { kind: markdownKind.id, content: { url: EMPTY_ASSET_REF } } as const;
   const RECAP = { kind: referenceKind.id, content: { target: TARGET } } as const;
 
   it.each(OWN)('is the Resource itself when its kind names no Target: $kind $title', (doc) => {
@@ -73,7 +83,7 @@ describe('where resolved content came from', () => {
   it('is the Target when its kind names one', () => {
     expect(resolveContent(RECAP, () => NOTES)).toEqual({
       kind: markdownKind.id,
-      source: 'Notes',
+      content: NOTES.content,
       via: 'target',
     });
   });
@@ -89,13 +99,9 @@ describe('where resolved content came from', () => {
     expectTypeOf<ReturnType<typeof imageKind.resolveContent>>().not.toHaveProperty('via');
     expectTypeOf<ReturnType<typeof spaceKind.resolveContent>>().not.toHaveProperty('via');
     expectTypeOf<ReturnType<typeof urKind.resolveContent>>().not.toHaveProperty('via');
-    expectTypeOf<ReturnType<typeof referenceKind.resolveContent>>().toEqualTypeOf<never>();
+    expectTypeOf<ReturnType<typeof referenceKind.resolveContent>>().not.toHaveProperty('via');
     for (const doc of OWN)
       expect(resolveContent(doc, () => undefined)).toHaveProperty('via', 'self');
-  });
-
-  it('never asks the Reference kind to resolve content, which it has none of', () => {
-    expect(() => referenceKind.resolveContent({ target: TARGET })).toThrow();
   });
 });
 

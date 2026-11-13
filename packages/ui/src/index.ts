@@ -12,28 +12,37 @@ export { PresentedResource } from './PresentedResource';
 export type { PresentedResourceProps } from './PresentedResource';
 export { Stage } from './Stage';
 export type { StageProps } from './Stage';
-export {
-  CanvasResource,
-  CANVAS_RESOURCE_DRAG_TILT_DEGREES,
-  canvasResourceContentOverflow,
-} from './CanvasResource';
-export { atRest, CLOSED_DISPLAY } from './resource-display';
-export { beginEditing } from './kinds/markdown';
-export { beginReplacing } from './kinds/image';
-export { isSpaceOperations, spaceViewOf } from './kinds/space';
-export type { OwnContent, ResourceDisplay } from './resource-display';
 export { InlineTitleEditor } from './InlineTitleEditor';
 export type { InlineTitleEditorProps, InlineTitleEditorVariant } from './InlineTitleEditor';
-export type {
-  CanvasResourceBodyEditor,
-  KindOperations,
-  CanvasResourceProps,
-  CanvasResourceState,
-} from './CanvasResource';
 export { SpaceResourceSelectors } from './SpaceResourceSelectors';
-export { ResourceShapeMenu } from './ResourceShapeMenu';
-export { RESOURCE_SHAPE_LABELS, ResourceShapeIcon } from './ResourceShape';
-export type { ResourceShapeMenuProps } from './ResourceShapeMenu';
+export { RailChoiceMenu } from './RailChoiceMenu';
+export type { RailChoiceMenuProps } from './RailChoiceMenu';
+export { CANVAS_RESOURCE_DRAG_TILT_DEGREES, PluginResource } from './PluginResource';
+export {
+  HostMapProvider,
+  MapEmbedSlotProvider,
+  useMapEmbedSlot,
+  type MapEmbedDraw,
+  type MapEmbedRequest,
+  type MapEmbedSlot,
+} from './ResourceEmbedding';
+export type { CanvasResourceState, MapTitle, PluginResourceProps } from './PluginResource';
+export { PresentedPluginResource } from './PresentedPluginResource';
+export { NO_ASSETS, PluginAssetsProvider, usePluginAssets } from './plugin-assets';
+export type { PresentedPluginResourceProps } from './PresentedPluginResource';
+export { ResourceFailureBoundary } from './ResourceFailureBoundary';
+export type { ResourceFailureBoundaryProps } from './ResourceFailureBoundary';
+export { NotCreatableContent, pluginCreations } from './kinds/plugin-views';
+export type {
+  ClaimHolder,
+  HostCreation,
+  HostCreationHost,
+  HostNew,
+  PluginCommits,
+  PluginCreationEntry,
+  PluginHostClaim,
+  PluginOperations,
+} from './kinds/plugin-views';
 export type {
   CanvasSpaceResourceChoice,
   CanvasSpaceResourceGraphChoice,
@@ -42,10 +51,6 @@ export type {
   CanvasSpaceResourceSelection,
   SpaceResourceSelectorsProps,
 } from './SpaceResourceSelectors';
-export { usePresence } from './use-presence';
-export type { Presence, PresenceState } from './use-presence';
-export { ResourceRail } from './ResourceRail';
-export type { ResourceRailProps } from './ResourceRail';
 export {
   ResourceRailAction,
   ResourceRailActions,
@@ -81,9 +86,14 @@ export type {
   ChoiceMenuTriggerProps,
 } from './ChoiceMenu';
 export { ResourceKindIcon, resourceKindName } from './ResourceKindIcon';
-export { BADGED_TARGET_GLYPH } from './kinds/kind-view';
-export { bareOperations, kindNaming } from './kinds/registry';
-export type { KindNaming, KindOperationsByKind } from './kinds/registry';
+export { BADGED_TARGET_GLYPH } from './kinds/plugin-listing';
+export { bareOperations, kindNaming, missingKindNaming } from './kinds/registry';
+export type {
+  KindNaming,
+  KindOperations,
+  KindOperationsByKind,
+  KindOperationsOf,
+} from './kinds/registry';
 export type { ResourceKindIconProps } from './ResourceKindIcon';
 export { ResourceSearchCombobox } from './ResourceSearchCombobox';
 export type { ResourceChoice, ResourceSearchComboboxProps } from './ResourceSearchCombobox';
@@ -121,14 +131,12 @@ export {
   GraphHeadMarker,
   GraphHeadShapeGlyph,
 } from './GraphHeadShape';
-export type { GraphHeadMarkerProps, GraphHeadShapeGlyphProps } from './GraphHeadShape';
-export { ImageReplaceTarget } from './ImageReplaceTarget';
 export type {
-  ImageReplaceEditor,
-  ImageReplaceTargetProps,
-  ImageReplacement,
-} from './ImageReplaceTarget';
-export { displayImageAsAuthored, ImageDisplayProvider, useImageDisplay } from './image-display';
+  GraphHeadMarkerProps,
+  GraphHeadShapeGlyphProps,
+  GraphHeadSize,
+} from './GraphHeadShape';
+export { displayImageAsAuthored } from './image-display';
 export type { ImageDisplay } from './image-display';
 export { PaletteColorPicker } from './PaletteColorPicker';
 export type { PaletteColorEntry, PaletteColorPickerProps } from './PaletteColorPicker';
@@ -141,7 +149,6 @@ export {
   CommitEditIcon,
   ChevronDownIcon,
   CloseIcon,
-  CloseResourceIcon,
   CopyIcon,
   DeleteIcon,
   EditIcon,
@@ -155,7 +162,6 @@ export {
   MapIcon,
   MarkdownIcon,
   OpenIndependentlyIcon,
-  OpenResourceIcon,
   ParentIcon,
   SpaceResourceIcon,
   SpaceIcon,
@@ -164,7 +170,6 @@ export {
   PlusIcon,
   RemoveFromMapIcon,
   FullViewIcon,
-  OpenAndExpandIcon,
   ZoomInIcon,
   ZoomOutIcon,
   PresentIcon,

@@ -5,6 +5,7 @@ import {
   isOwnContent,
   embedsMap,
   drawsContentArea,
+  EMPTY_ASSET_REF,
   uuidSchema,
   type ContentVia,
   type OwnResourceContent,
@@ -13,27 +14,31 @@ import {
 
 const id = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const contents = (via: ContentVia): ResourceContent[] => [
-  { kind: 'markdown', source: 'Body', via },
-  { kind: 'image', url: 'https://example.com/image.png', via },
-  { kind: 'space', view: { spaceId: id, map: id, graph: id, framing: undefined }, via },
-  { kind: 'ur', via },
+  { kind: 'markdown', content: { url: EMPTY_ASSET_REF }, via },
+  { kind: 'image', content: { url: 'https://example.com/image.png' }, via },
+  { kind: 'space', content: { spaceId: id, map: id, graph: id }, via },
+  { kind: 'ur', content: {}, via },
 ];
 const UNRESOLVED: ResourceContent = { kind: 'unresolved', via: 'target' };
 
 const viaArbitrary = fc.constantFrom<ContentVia>('self', 'target');
 const contentArbitrary: fc.Arbitrary<ResourceContent> = fc.oneof(
-  fc.record({ kind: fc.constant('markdown' as const), source: fc.string(), via: viaArbitrary }),
+  fc.record({
+    kind: fc.constant('markdown' as const),
+    content: fc.constant({ url: EMPTY_ASSET_REF }),
+    via: viaArbitrary,
+  }),
   fc.record({
     kind: fc.constant('image' as const),
-    url: fc.webUrl(),
+    content: fc.record({ url: fc.webUrl() }),
     via: viaArbitrary,
   }),
   fc.record({
     kind: fc.constant('space' as const),
-    view: fc.constant({ spaceId: id, map: id, graph: id, framing: undefined }),
+    content: fc.constant({ spaceId: id, map: id, graph: id }),
     via: viaArbitrary,
   }),
-  fc.record({ kind: fc.constant('ur' as const), via: viaArbitrary }),
+  fc.record({ kind: fc.constant('ur' as const), content: fc.constant({}), via: viaArbitrary }),
   fc.constant(UNRESOLVED),
 );
 const asSelf = (content: ResourceContent): ResourceContent =>
@@ -44,8 +49,9 @@ describe('content facts', () => {
     fc.assert(
       fc.property(contentArbitrary, (content) => {
         const offered = authorsContent(content);
-        // `unresolved` is always `via: 'target'`, so `via` alone excludes it.
-        expect(offered).toBe(content.via === 'self' && content.kind !== 'ur');
+        // `unresolved` is always `via: 'target'`, so `via` alone excludes it. A
+        // plugin kind authors its own content, so the canvas offers none.
+        expect(offered).toBe(content.via === 'self' && content.kind === 'space');
       }),
     );
   });
@@ -70,7 +76,7 @@ describe('content facts', () => {
   });
 
   it('answers each kind’s own authoring and content facts', () => {
-    expect(contents('self').map(authorsContent)).toEqual([true, true, true, false]);
+    expect(contents('self').map(authorsContent)).toEqual([false, false, true, false]);
     expect(authorsContent(UNRESOLVED)).toBe(false);
     expect([...contents('self'), UNRESOLVED].map(embedsMap)).toEqual([
       false,
@@ -79,10 +85,11 @@ describe('content facts', () => {
       false,
       false,
     ]);
-    // `unresolved` draws its "Target not found" notice in the content area.
+    // A plugin draws inside its own rect, so no content area is drawn
+    // for one; `unresolved` draws its "Target not found" notice there.
     expect([...contents('self'), UNRESOLVED].map(drawsContentArea)).toEqual([
-      true,
-      true,
+      false,
+      false,
       false,
       false,
       true,

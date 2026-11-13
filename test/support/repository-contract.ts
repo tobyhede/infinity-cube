@@ -1,4 +1,10 @@
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
+  EMPTY_ASSET_REF,
+  isMissingKindId,
+  newUuid,
   uuidSchema,
   type GraphEdge,
   type GraphHeadShape,
@@ -6,17 +12,21 @@ import {
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
-import { loadSpaceAggregate } from '@project/graph';
+import { loadSpaceAggregate, parseResourceFiles, serializeResource } from '@project/graph';
 import {
-  admitImage,
+  admitAsset,
+  assetPath,
   AggregateInvariantError,
   createWorkingSpaceLoader,
+  EMPTY_ASSET,
   REVISION_CEILING,
-  type StoredImage,
+  type StoredAsset,
 } from '@project/persistence';
 import { expect, it } from 'vitest';
-import type { SpaceRepository } from '@project/aggregate';
+import { MemorySpaceRepository, type SpaceRepository } from '@project/aggregate';
 import type { SqlStore } from '../../src/persistence/sql-store';
+import { exportAggregate } from '../../src/export/export-aggregate';
+import { importAggregate } from '../../src/import/import-aggregate';
 
 /**
  * The behaviour every `SpaceRepository` owes its callers, run against each
@@ -74,7 +84,7 @@ const FOURTH_GRAPH_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000025')
 
 const resource = (id: UUID, title: string) => ({
   id,
-  document: { title, kind: 'markdown' as const, content: { source: title } },
+  document: { title, kind: 'markdown' as const, content: { url: EMPTY_ASSET_REF } },
 });
 
 /**
@@ -163,8 +173,8 @@ const graphedSpace = (
           title: 'Owner',
           kind: 'positioned',
           positions: {
-            [from]: { x: 0, y: 0, open: false },
-            [to]: { x: 300, y: 0, open: false },
+            [from]: { x: 0, y: 0 },
+            [to]: { x: 300, y: 0 },
           },
           graphs: [{ id: graphId, title: input.graphTitle ?? 'Graph', edges: [{ from, to }] }],
           activeGraph: graphId,
@@ -193,7 +203,7 @@ const spaceWithDanglingEdge = (id: UUID, title: string, memberId: UUID): SpaceSn
         id: MAP_ID,
         title: 'Dangling',
         kind: 'positioned',
-        positions: { [memberId]: { x: 0, y: 0, open: false } },
+        positions: { [memberId]: { x: 0, y: 0 } },
         graphs: [
           { id: GRAPH_ID, title: 'Dangling', edges: [{ from: memberId, to: MISSING_RESOURCE_ID }] },
         ],
@@ -672,7 +682,7 @@ export const spaceRepositoryContract = (
         resources: [
           {
             id: RESOURCE_ID,
-            document: { title: 'Resource', kind: 'markdown', content: { source: 'Body' } },
+            document: { title: 'Resource', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
           },
         ],
       };
@@ -682,7 +692,7 @@ export const spaceRepositoryContract = (
         resources: [
           {
             id: RESOURCE_ID,
-            document: { content: { source: 'Body' }, kind: 'markdown', title: 'Resource' },
+            document: { content: { url: EMPTY_ASSET_REF }, kind: 'markdown', title: 'Resource' },
           },
         ],
       };
@@ -1009,7 +1019,7 @@ export const spaceRepositoryContract = (
             document: {
               title: 'Figure',
               kind: 'image',
-              content: { url: '/images/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU' },
+              content: { url: EMPTY_ASSET_REF },
             },
           },
         ],
@@ -1056,6 +1066,259 @@ export const spaceRepositoryContract = (
         kind: 'committed',
       });
       await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(renamed, 1n, null));
+    });
+  });
+
+  /**
+   * A Resource whose kind names no plugin in this build is the same Resource
+   * as any other (ADR 0142): the store holds its content and its Map content
+   * as JSON it never reads, renames it as an ordinary Edit, and hands it back
+   * whole to a fresh host, which is where a build that gains the plugin reads
+   * it through that plugin.
+   */
+  it(`${name} stores, renames and reloads a Resource whose plugin is missing unchanged`, async (context) => {
+    await withReopenHarness(context, async (repository, reopen) => {
+      const kind = 'vnd.example.diagram';
+      if (!isMissingKindId(kind)) throw new Error('A plugin in this build draws the kind');
+      const content = {
+        source: EMPTY_ASSET_REF,
+        options: { direction: 'TD', nodes: [1, 2.5, null, { nested: true }] },
+      };
+      const mapContent = { zoom: 2, layers: ['ink', { id: 7 }] };
+      const first: SpaceSnapshot = {
+        id: SPACE_ID,
+        document: {
+          version: 1,
+          title: 'Diagram',
+          defaultMap: MAP_ID,
+          maps: [
+            {
+              id: MAP_ID,
+              title: 'Map',
+              kind: 'positioned',
+              positions: { [SECOND_RESOURCE_ID]: { x: 10, y: 20, content: mapContent } },
+              graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
+            },
+          ],
+        },
+        resources: [
+          resource(RESOURCE_ID, 'Note'),
+          { id: SECOND_RESOURCE_ID, document: { title: 'Flow', kind, content } },
+        ],
+      };
+      await seed(repository, first);
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(first, 0n, null));
+
+      const renamed: SpaceSnapshot = {
+        ...first,
+        resources: [
+          resource(RESOURCE_ID, 'Note'),
+          { id: SECOND_RESOURCE_ID, document: { title: 'Renamed flow', kind, content } },
+        ],
+      };
+      await expect(commitUpdate(repository, renamed, 0n)).resolves.toMatchObject({
+        kind: 'committed',
+      });
+      await expect((await reopen()).loadAggregate()).resolves.toEqual({
+        kind: 'loaded',
+        aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(renamed, 1n, null)] },
+      });
+    });
+  });
+
+  /**
+   * Issue 09's round trip through this store: Import an Aggregate directory
+   * holding a Resource whose plugin is missing, discard the directory, Export
+   * into an empty one and Import that. The Resource file, `space.json` and an
+   * asset that is not valid UTF-8 come back byte-identical, although a store
+   * may answer the unread content and Map content in its own key order
+   * (PostgreSQL's `jsonb` does), and the re-read Resource is the one written.
+   */
+  it(`${name} carries a Resource whose plugin is missing through Import and Export byte-identical`, async () => {
+    await withHarness(async (repository) => {
+      const kind = 'vnd.example.chart';
+      if (!isMissingKindId(kind)) throw new Error('A plugin in this build draws the kind');
+      const asset = await admitAsset(
+        Uint8Array.from([0xff, 0xfe, 0x00, 0xc3, 0x28, 0xa0, 0xa1]),
+        'application/pdf',
+      );
+      if (asset.kind !== 'admitted') throw new Error(`Not an asset: ${asset.code}`);
+      // Keys jsonb would reorder: it sorts by length, then by bytes.
+      const content = {
+        source: assetPath(asset.asset.hash),
+        legend: 'a longer value',
+        options: { direction: 'TD', at: [1, 2.5, null, { nested: true }] },
+      };
+      const snapshot: SpaceSnapshot = {
+        id: SPACE_ID,
+        document: {
+          version: 1,
+          title: 'Chart',
+          defaultMap: MAP_ID,
+          maps: [
+            {
+              id: MAP_ID,
+              title: 'Map',
+              kind: 'positioned',
+              positions: {
+                [SECOND_RESOURCE_ID]: {
+                  x: 10,
+                  y: 20,
+                  content: { zoom: 2, at: ['ink', { id: 7 }] },
+                },
+              },
+              graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
+            },
+          ],
+        },
+        resources: [
+          resource(RESOURCE_ID, 'Note'),
+          { id: SECOND_RESOURCE_ID, document: { title: 'Flow', kind, content } },
+        ],
+      };
+      const scratch = await mkdtemp(join(tmpdir(), 'infinity-cube-contract-missing-plugin-'));
+      try {
+        const source = join(scratch, 'source');
+        const writer = new MemorySpaceRepository(
+          [{ snapshot, revision: 0n, exportedRevision: null }],
+          SPACE_ID,
+        );
+        await writer.storeAsset(asset.asset);
+        expect((await exportAggregate(writer, source)).kind).toBe('exported');
+        const files = ['space.json', join('resources', `${SECOND_RESOURCE_ID}.json`)];
+        const written = await Promise.all(
+          files.map((file) => readFile(join(source, SPACE_ID, file))),
+        );
+        const assetNames = await readdir(join(source, 'assets'));
+        const assetBytes = await Promise.all(
+          assetNames.map((file) => readFile(join(source, 'assets', file))),
+        );
+
+        await expect(
+          importAggregate(source, repository, { replace: false, newId: newUuid }),
+        ).resolves.toMatchObject({ kind: 'imported' });
+        await rm(source, { recursive: true });
+        const exported = join(scratch, 'exported');
+        expect((await exportAggregate(repository, exported)).kind).toBe('exported');
+
+        expect(
+          await Promise.all(files.map((file) => readFile(join(exported, SPACE_ID, file)))),
+        ).toEqual(written);
+        expect(await readdir(join(exported, 'assets'))).toEqual(assetNames);
+        expect(
+          await Promise.all(assetNames.map((file) => readFile(join(exported, 'assets', file)))),
+        ).toEqual(assetBytes);
+
+        const reread = new MemorySpaceRepository();
+        await expect(
+          importAggregate(exported, reread, { replace: false, newId: newUuid }),
+        ).resolves.toMatchObject({ kind: 'imported' });
+        const space = await reread.loadSpace(SPACE_ID);
+        expect(space?.snapshot).toEqual(snapshot);
+        const loaded = await reread.loadAsset(asset.asset.hash);
+        expect(loaded?.mediaType).toBe('application/pdf');
+        expect(loaded?.bytes).toEqual(asset.asset.bytes);
+      } finally {
+        await rm(scratch, { recursive: true, force: true });
+      }
+    });
+  });
+
+  /**
+   * Issue 09's restore, simulated by a kind this build does draw: the
+   * Resource is stored under a kind id no plugin names, carrying content the
+   * Image plugin reads, and the plugin's return is that id becoming `image`.
+   * Read again from this store, and from an Export of it into an empty
+   * directory once the source is gone, the Resource parses through the Image
+   * plugin, and its asset, which is not valid UTF-8, is byte-identical.
+   */
+  it(`${name} hands a Resource whose plugin is missing to that plugin when it returns`, async () => {
+    await withHarness(async (repository) => {
+      const kind = 'vnd.example.picture';
+      if (!isMissingKindId(kind)) throw new Error('A plugin in this build draws the kind');
+      const asset = await admitAsset(
+        Uint8Array.from([0xff, 0xfe, 0x00, 0xc3, 0x28, 0xa0, 0xa1]),
+        'application/pdf',
+      );
+      if (asset.kind !== 'admitted') throw new Error(`Not an asset: ${asset.code}`);
+      const content = { url: assetPath(asset.asset.hash) };
+      const snapshot: SpaceSnapshot = {
+        id: SPACE_ID,
+        document: {
+          version: 1,
+          title: 'Picture',
+          defaultMap: MAP_ID,
+          maps: [
+            {
+              id: MAP_ID,
+              title: 'Map',
+              kind: 'positioned',
+              positions: { [SECOND_RESOURCE_ID]: { x: 10, y: 20 } },
+              graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
+            },
+          ],
+        },
+        resources: [
+          resource(RESOURCE_ID, 'Note'),
+          { id: SECOND_RESOURCE_ID, document: { title: 'Picture', kind, content } },
+        ],
+      };
+      /** The plugin returns: the same Resource under the kind its plugin draws. */
+      const restored = (held: SpaceSnapshot): SpaceSnapshot => ({
+        ...held,
+        resources: held.resources.map((entry) =>
+          entry.id === SECOND_RESOURCE_ID
+            ? { id: entry.id, document: { title: entry.document.title, kind: 'image', content } }
+            : entry,
+        ),
+      });
+      const scratch = await mkdtemp(join(tmpdir(), 'infinity-cube-contract-plugin-returns-'));
+      try {
+        const source = join(scratch, 'source');
+        const writer = new MemorySpaceRepository(
+          [{ snapshot, revision: 0n, exportedRevision: null }],
+          SPACE_ID,
+        );
+        await writer.storeAsset(asset.asset);
+        expect((await exportAggregate(writer, source)).kind).toBe('exported');
+        await expect(
+          importAggregate(source, repository, { replace: false, newId: newUuid }),
+        ).resolves.toMatchObject({ kind: 'imported' });
+        await rm(source, { recursive: true });
+
+        // Over the store itself, with no Export or Import.
+        const held = await repository.loadAggregate();
+        if (held.kind !== 'loaded') throw new Error(`The store answered ${held.kind}`);
+        const inPlace = loadSpaceAggregate({
+          metaSpaceId: SPACE_ID,
+          snapshots: held.aggregate.spaces.map(({ snapshot: stored }) => restored(stored)),
+        });
+        if (!inPlace.ok) throw new Error(JSON.stringify(inPlace.errors));
+        expect(inPlace.aggregate.spaces[0]?.lookup.resource(SECOND_RESOURCE_ID)).toMatchObject({
+          kind: 'image',
+          content,
+        });
+
+        // Through an Export into an empty directory, re-read by the returned plugin.
+        const exported = join(scratch, 'exported');
+        expect((await exportAggregate(repository, exported)).kind).toBe('exported');
+        const file = join(exported, SPACE_ID, 'resources', `${SECOND_RESOURCE_ID}.json`);
+        const written: unknown = JSON.parse(await readFile(file, 'utf8'));
+        expect(written).toEqual({ id: SECOND_RESOURCE_ID, title: 'Picture', kind, content });
+        await writeFile(
+          file,
+          `${JSON.stringify({ id: SECOND_RESOURCE_ID, title: 'Picture', kind: 'image', content }, null, 2)}\n`,
+        );
+        const reread = new MemorySpaceRepository();
+        await expect(
+          importAggregate(exported, reread, { replace: false, newId: newUuid }),
+        ).resolves.toMatchObject({ kind: 'imported' });
+        expect((await reread.loadSpace(SPACE_ID))?.snapshot).toEqual(restored(snapshot));
+        const loaded = await reread.loadAsset(asset.asset.hash);
+        expect(loaded?.bytes).toEqual(asset.asset.bytes);
+      } finally {
+        await rm(scratch, { recursive: true, force: true });
+      }
     });
   });
 
@@ -1143,7 +1406,7 @@ export const spaceRepositoryContract = (
         const base = graphedSpace(SPACE_ID, 'Shaped', [RESOURCE_ID, SECOND_RESOURCE_ID]);
         return {
           ...base,
-          // Only an Ur Resource takes a Shape (ADR 0121).
+          // Only a kind a plugin draws keeps Map content (ADR 0142).
           resources: base.resources.map(({ id, document }) => ({
             id,
             document: { title: document.title, kind: 'ur', content: {} },
@@ -1174,7 +1437,7 @@ export const spaceRepositoryContract = (
     });
   });
 
-  it(`${name} keeps every Resource's Shape through initialization, commit and load`, async () => {
+  it(`${name} keeps every Resource's Map content through initialization, commit and load`, async () => {
     await withHarness(async (repository) => {
       const withResourceShapes = (
         first: ResourceShape,
@@ -1184,7 +1447,7 @@ export const spaceRepositoryContract = (
         const base = graphedSpace(SPACE_ID, 'Shaped', [RESOURCE_ID, SECOND_RESOURCE_ID]);
         return {
           ...base,
-          // Only an Ur Resource takes a Shape (ADR 0121).
+          // Only a kind a plugin draws keeps Map content (ADR 0142).
           resources: base.resources.map(({ id, document }) => ({
             id,
             document: { title: document.title, kind: 'ur', content: {} },
@@ -1194,16 +1457,15 @@ export const spaceRepositoryContract = (
             maps: (base.document.maps ?? []).map((m) => ({
               ...m,
               positions: {
-                [RESOURCE_ID]: { x: 0, y: 0, open: false, shape: first },
+                [RESOURCE_ID]: { x: 0, y: 0, content: { shape: first } },
                 [SECOND_RESOURCE_ID]: secondResized
                   ? {
                       x: 300,
                       y: 0,
-                      open: false,
                       size: { width: 560, height: 420 },
-                      shape: second,
+                      content: { shape: second },
                     }
-                  : { x: 300, y: 0, open: false, shape: second },
+                  : { x: 300, y: 0, content: { shape: second } },
               },
             })),
           },
@@ -1418,7 +1680,7 @@ export const spaceRepositoryContract = (
               id: MAP_ID,
               title: 'First map',
               kind: 'positioned',
-              positions: { [OTHER_RESOURCE_ID]: { x: 0, y: 0, open: false } },
+              positions: { [OTHER_RESOURCE_ID]: { x: 0, y: 0 } },
               graphs: [
                 { id: GRAPH_ID, title: 'First graph', edges: [] },
                 { id: THIRD_GRAPH_ID, title: 'Second graph', edges: [] },
@@ -1429,7 +1691,7 @@ export const spaceRepositoryContract = (
               id: SECOND_MAP_ID,
               title: 'Second map',
               kind: 'positioned',
-              positions: { [OTHER_RESOURCE_ID]: { x: 100, y: 100, open: false } },
+              positions: { [OTHER_RESOURCE_ID]: { x: 100, y: 100 } },
               graphs: [
                 { id: SECOND_GRAPH_ID, title: 'Third graph', edges: [] },
                 { id: FOURTH_GRAPH_ID, title: 'Fourth graph', edges: [] },
@@ -2047,8 +2309,8 @@ export const spaceRepositoryContract = (
               ...firstMap,
               positions: {
                 ...firstMap.positions,
-                [RESOURCE_ID]: { x: 40, y: 40, open: false },
-                [OTHER_RESOURCE_ID]: { x: 600, y: 0, open: false },
+                [RESOURCE_ID]: { x: 40, y: 40 },
+                [OTHER_RESOURCE_ID]: { x: 600, y: 0 },
               },
             },
           ],
@@ -2193,63 +2455,127 @@ export const spaceRepositoryContract = (
   }
 
   /*
-   * The store of images beside Spaces (ADR 0106). It holds content by its
+   * The one asset store beside Spaces (ADR 0142). It holds content by its
    * digest, so what is asserted is that the bytes and media type come back
-   * exactly, that the same bytes are stored once, and that neither aggregate
-   * lifecycle door reaches it.
+   * exactly, whatever the type, that the same bytes are stored once under the
+   * first type, that the asset of zero bytes always exists, and that neither
+   * aggregate lifecycle door reaches it.
    */
-  const storedImage = async (bytes: Uint8Array<ArrayBuffer>): Promise<StoredImage> => {
-    const admission = await admitImage(bytes);
-    if (admission.kind !== 'admitted') throw new Error(`Not an image: ${admission.code}`);
-    return admission.image;
+  const storedAsset = async (
+    bytes: Uint8Array<ArrayBuffer>,
+    mediaType: string,
+  ): Promise<StoredAsset> => {
+    const admission = await admitAsset(bytes, mediaType);
+    if (admission.kind !== 'admitted') throw new Error(`Not an asset: ${admission.code}`);
+    return admission.asset;
   };
   const pngBytes = () =>
     Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff, 0x7f, 0x80]);
-  const gifBytes = () => new TextEncoder().encode('GIF89a\u0001\u0000\u0000');
+  const textBytes = () => new TextEncoder().encode('# Notes\n');
+  const binaryBytes = () => Uint8Array.from([0x00, 0xff, 0x10, 0x80]);
 
-  it(`${name} stores an image and loads its bytes and media type unchanged`, async () => {
+  it(`${name} stores an asset of any type and loads its bytes and media type unchanged`, async () => {
     await withHarness(async (repository) => {
-      const png = await storedImage(pngBytes());
-      const gif = await storedImage(gifBytes());
+      const png = await storedAsset(pngBytes(), 'image/png');
+      const text = await storedAsset(textBytes(), 'text/markdown');
+      const binary = await storedAsset(binaryBytes(), 'application/x-made-up');
 
-      await expect(repository.storeImage(png)).resolves.toBe('stored');
-      await expect(repository.storeImage(gif)).resolves.toBe('stored');
+      for (const asset of [png, text, binary]) {
+        await expect(repository.storeAsset(asset)).resolves.toBe('stored');
+      }
 
-      await expect(repository.loadImage(png.id)).resolves.toEqual({
-        id: png.id,
+      await expect(repository.loadAsset(png.hash)).resolves.toEqual({
+        hash: png.hash,
         mediaType: 'image/png',
         bytes: pngBytes(),
       });
-      await expect(repository.loadImage(gif.id)).resolves.toEqual({
-        id: gif.id,
-        mediaType: 'image/gif',
-        bytes: gifBytes(),
+      await expect(repository.loadAsset(text.hash)).resolves.toEqual({
+        hash: text.hash,
+        mediaType: 'text/markdown',
+        bytes: textBytes(),
+      });
+      await expect(repository.loadAsset(binary.hash)).resolves.toEqual({
+        hash: binary.hash,
+        mediaType: 'application/x-made-up',
+        bytes: binaryBytes(),
       });
     });
   });
 
-  it(`${name} stores the same bytes once, answering the second store as existing`, async () => {
+  /**
+   * A Markdown Resource is one value wherever it is held (ADR 0142): the
+   * Resource its file decodes to is what this store holds and loads back, and
+   * writing what it loads gives the same file; its text, an asset, loads back
+   * as it was stored.
+   */
+  it(`${name} holds a Markdown Resource decoded from its file, and its text, as the same value`, async () => {
     await withHarness(async (repository) => {
-      const image = await storedImage(pngBytes());
+      const text = await storedAsset(textBytes(), 'text/markdown');
+      const files = serializeResource({
+        id: RESOURCE_ID,
+        title: 'Notes',
+        kind: 'markdown',
+        content: { url: `/assets/${text.hash}` },
+      });
+      const decoded = parseResourceFiles(files);
+      if (!decoded.ok) throw new Error('The Resource file is read.');
+      const fromFile = decoded.resources.map(({ resource: { id, ...document } }) => ({
+        id,
+        document,
+      }));
+      const first: SpaceSnapshot = { ...space(SPACE_ID, 'Talk', []), resources: fromFile };
+      await expect(repository.storeAsset(text)).resolves.toBe('stored');
+      await seed(repository, first);
 
-      await expect(repository.storeImage(image)).resolves.toBe('stored');
-      await expect(repository.storeImage(await storedImage(pngBytes()))).resolves.toBe('existing');
-      await expect(repository.loadImage(image.id)).resolves.toEqual(image);
+      const loaded = await repository.loadSpace(SPACE_ID);
+      expect(loaded?.snapshot.resources).toEqual(fromFile);
+      expect(
+        loaded?.snapshot.resources.flatMap(({ id, document }) =>
+          serializeResource({ id, ...document }),
+        ),
+      ).toEqual(files);
+      await expect(repository.loadAsset(text.hash)).resolves.toEqual({
+        hash: text.hash,
+        mediaType: 'text/markdown',
+        bytes: textBytes(),
+      });
     });
   });
 
-  it(`${name} answers an image it does not store as absent`, async () => {
+  it(`${name} stores the same bytes once, keeping the first media type`, async () => {
     await withHarness(async (repository) => {
-      const image = await storedImage(pngBytes());
-      await expect(repository.loadImage(image.id)).resolves.toBeUndefined();
+      const asset = await storedAsset(pngBytes(), 'image/png');
+
+      await expect(repository.storeAsset(asset)).resolves.toBe('stored');
+      await expect(
+        repository.storeAsset(await storedAsset(pngBytes(), 'text/plain')),
+      ).resolves.toBe('existing');
+      await expect(repository.loadAsset(asset.hash)).resolves.toEqual(asset);
     });
   });
 
-  it(`${name} keeps stored images outside the aggregate its lifecycle doors replace`, async () => {
+  it(`${name} answers an asset it does not store as absent`, async () => {
     await withHarness(async (repository) => {
-      const image = await storedImage(pngBytes());
+      const asset = await storedAsset(pngBytes(), 'image/png');
+      await expect(repository.loadAsset(asset.hash)).resolves.toBeUndefined();
+    });
+  });
+
+  it(`${name} holds the asset of zero bytes already, under the type it always has`, async () => {
+    await withHarness(async (repository) => {
+      await expect(repository.loadAsset(EMPTY_ASSET.hash)).resolves.toEqual(EMPTY_ASSET);
+      const stored = await storedAsset(new Uint8Array(0), 'text/plain');
+      expect(stored.hash).toBe(EMPTY_ASSET.hash);
+      await expect(repository.storeAsset(stored)).resolves.toBe('existing');
+      await expect(repository.loadAsset(EMPTY_ASSET.hash)).resolves.toEqual(EMPTY_ASSET);
+    });
+  });
+
+  it(`${name} keeps stored assets outside the aggregate its lifecycle doors replace`, async () => {
+    await withHarness(async (repository) => {
+      const asset = await storedAsset(pngBytes(), 'image/png');
       await seed(repository, space(SPACE_ID, 'Before', [RESOURCE_ID]));
-      await repository.storeImage(image);
+      await repository.storeAsset(asset);
 
       await expect(
         repository.replaceAggregate(
@@ -2257,16 +2583,16 @@ export const spaceRepositoryContract = (
           SPACE_ID,
         ),
       ).resolves.toMatchObject({ kind: 'replaced' });
-      await expect(repository.loadImage(image.id)).resolves.toEqual(image);
+      await expect(repository.loadAsset(asset.hash)).resolves.toEqual(asset);
     });
   });
 
-  it(`${name} keeps a stored image across a fresh repository host`, async (context) => {
+  it(`${name} keeps a stored asset across a fresh repository host`, async (context) => {
     await withReopenHarness(context, async (repository, reopen) => {
-      const image = await storedImage(pngBytes());
-      await repository.storeImage(image);
+      const asset = await storedAsset(textBytes(), 'text/markdown');
+      await repository.storeAsset(asset);
 
-      await expect((await reopen()).loadImage(image.id)).resolves.toEqual(image);
+      await expect((await reopen()).loadAsset(asset.hash)).resolves.toEqual(asset);
     });
   });
 };

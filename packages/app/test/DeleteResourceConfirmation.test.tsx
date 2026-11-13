@@ -1,6 +1,12 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { uuidSchema, type Graph, type Map as SpaceMap, type Resource } from '@project/core';
+import {
+  EMPTY_ASSET_REF,
+  uuidSchema,
+  type Graph,
+  type Map as SpaceMap,
+  type Resource,
+} from '@project/core';
 import { deletionReach, type DeletionReach } from '@project/graph';
 import { DeleteConfirmation } from '../src/components/DeleteConfirmation';
 import { resourceDeletionWords } from '../src/resource-deletion';
@@ -25,7 +31,12 @@ const ask = (
 
 describe('the question Delete from Space asks', () => {
   it('names the Resource, says what deleting does, and answers with Delete', () => {
-    ask({ id: id('000000000001'), title: 'Auth', kind: 'markdown', content: { source: '' } });
+    ask({
+      id: id('000000000001'),
+      title: 'Auth',
+      kind: 'markdown',
+      content: { url: EMPTY_ASSET_REF },
+    });
 
     const question = screen.getByRole('alertdialog', { name: 'Delete Auth From Space?' });
     expect(question).toHaveTextContent(
@@ -40,7 +51,7 @@ describe('the question Delete from Space asks', () => {
       id: id('000000000002'),
       title: 'Resource Title\nThat\nSpans\nLines',
       kind: 'markdown',
-      content: { source: '' },
+      content: { url: EMPTY_ASSET_REF },
     });
 
     expect(
@@ -53,7 +64,7 @@ describe('the question Delete from Space asks', () => {
       id: id('000000000010'),
       title: 'Auth',
       kind: 'markdown',
-      content: { source: '' },
+      content: { url: EMPTY_ASSET_REF },
     };
     const other = id('000000000011');
     const graph = (suffix: string, title: string, touching: boolean): Graph => ({
@@ -62,8 +73,8 @@ describe('the question Delete from Space asks', () => {
       edges: touching ? [{ from: subject.id, to: other }] : [],
     });
     const spaceMap = (suffix: string, title: string, graphs: Graph[], places = true): SpaceMap => {
-      const positions: SpaceMap['positions'] = { [other]: { x: 300, y: 0, open: false } };
-      if (places) positions[subject.id] = { x: 0, y: 0, open: false };
+      const positions: SpaceMap['positions'] = { [other]: { x: 300, y: 0 } };
+      if (places) positions[subject.id] = { x: 0, y: 0 };
       return { id: id(suffix), title, kind: 'positioned', positions, graphs };
     };
 
@@ -134,7 +145,7 @@ describe('the question Delete from Space asks', () => {
       expect(screen.queryByRole('list')).toBeNull();
     });
 
-    it('opens on Cancel, with the reach a focusable region of its own', async () => {
+    it('opens on Delete, with the reach a focusable region of its own', async () => {
       ask(
         subject,
         deletionReach(
@@ -145,7 +156,7 @@ describe('the question Delete from Space asks', () => {
 
       const question = screen.getByRole('alertdialog');
       await waitFor(() =>
-        expect(within(question).getByRole('button', { name: 'Cancel' })).toHaveFocus(),
+        expect(within(question).getByRole('button', { name: 'Delete' })).toHaveFocus(),
       );
       expect(
         within(question).getByRole('region', { name: 'What the deletion reaches' }),

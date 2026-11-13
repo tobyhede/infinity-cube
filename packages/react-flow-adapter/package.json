@@ -14,6 +14,7 @@
   "dependencies": {
     "@project/core": "workspace:*",
     "@project/graph": "workspace:*",
+    "@project/resource-api": "workspace:*",
     "@project/ui": "workspace:*"
   },
   "peerDependencies": {

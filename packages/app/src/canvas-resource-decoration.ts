@@ -1,11 +1,11 @@
-import { takesOpen, type KindId, type ResourceId } from '@project/core';
+import type { KindId, ResourceId } from '@project/core';
 import {
   isResourceNodeOf,
   type ResourceFlowNode,
   type ResourceFlowNodeOf,
   type ResourceNodeData,
 } from '@project/react-flow-adapter';
-import type { EntityActionGroup, KindOperationsByKind, ResourceDisplay } from '@project/ui';
+import type { EntityActionGroup, KindOperationsOf } from '@project/ui';
 import type { ResourceResize } from './render-adapter';
 import { RESOURCE_SIZE } from './resource';
 
@@ -14,19 +14,15 @@ export type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
 /** What the shared decoration adds to a Resource of any kind. */
 export type CanvasResourceDataPatch = Partial<
-  Pick<
-    ResourceNodeData,
-    'onOpenChange' | 'onBeginTitleEditing' | 'resize' | 'titleEditor' | 'entityActions'
-  >
+  Pick<ResourceNodeData, 'onBeginTitleEditing' | 'resize' | 'titleEditor' | 'entityActions'>
 >;
 
 /**
  * What one kind's decoration supplies: that kind's operations whole, and the
- * display or context notice where it changes them.
+ * context notice where it changes it.
  */
 export interface KindDecoration<K extends ResourceFlowNode['data']['kind']> {
-  readonly kindOperations: KindOperationsByKind[K];
-  readonly display?: ResourceDisplay;
+  readonly kindOperations: KindOperationsOf<K>;
   readonly contextNotice?: string;
 }
 
@@ -39,16 +35,12 @@ export interface CanvasResourceDecorationContext {
   readonly authorOnCanvas: boolean;
   readonly bodyEditing: boolean;
   readonly editableResourceIds: ReadonlySet<string>;
-  readonly openResource: (resourceId: string) => 'completed' | 'retained';
-  readonly closeResource: (resourceId: ResourceId) => 'completed' | 'retained';
   readonly beginTitleEditing: (resourceId: string) => void;
   readonly onSelectResource: (resourceId: ResourceId) => void;
   readonly resourceResize: ResourceResize;
   readonly editingTitleResourceId: string | null;
   readonly completeResourceTitle: (resourceId: string, title: string) => string | null;
   readonly clearCaret: () => void;
-  readonly beginBodyEditing: (node: ResourceFlowNode) => void;
-  readonly bodyEditorResourceId: string | null;
   readonly resourceEntityActions?:
     ((resourceId: ResourceId) => readonly EntityActionGroup[]) | undefined;
 }
@@ -71,9 +63,7 @@ export function applyKindDecoration<K extends ResourceFlowNode['data']['kind']>(
   decoration: KindDecoration<K>,
 ): ResourceFlowNodeOf<K> {
   const offersNothing =
-    Object.keys(decoration.kindOperations).length === 1 &&
-    decoration.display === undefined &&
-    decoration.contextNotice === undefined;
+    Object.keys(decoration.kindOperations).length === 1 && decoration.contextNotice === undefined;
   if (offersNothing) return node;
   return { ...node, data: { ...node.data, ...decoration } };
 }
@@ -216,10 +206,7 @@ type SharedResourceDecorationContext = Pick<
   CanvasResourceDecorationContext,
   | 'authorOnCanvas'
   | 'bodyEditing'
-  | 'bodyEditorResourceId'
   | 'editableResourceIds'
-  | 'openResource'
-  | 'closeResource'
   | 'beginTitleEditing'
   | 'onSelectResource'
   | 'resourceResize'
@@ -235,28 +222,13 @@ export function decorateSharedResourceNode(
 ): CanvasResourceDataPatch {
   const resourceBelongsToWorkingSpace = context.editableResourceIds.has(node.data.resourceId);
   const patch: Mutable<
-    Pick<
-      ResourceNodeData,
-      'onOpenChange' | 'onBeginTitleEditing' | 'resize' | 'titleEditor' | 'entityActions'
-    >
+    Pick<ResourceNodeData, 'onBeginTitleEditing' | 'resize' | 'titleEditor' | 'entityActions'>
   > = {};
-  if (resourceBelongsToWorkingSpace && context.authorOnCanvas && takesOpen(node.data.kind)) {
-    // A kind that declares no Open offers no Open or Close.
-    patch.onOpenChange = (open) =>
-      open ? context.openResource(node.id) : context.closeResource(node.data.resourceId);
-  } else if (resourceBelongsToWorkingSpace && node.id === context.bodyEditorResourceId) {
-    // A live content editor keeps its Close drawn when the canvas withdraws
-    // authoring — a running image replacement withdraws it — so the control
-    // stays in its slot, unavailable, instead of vanishing and returning.
-    // `CanvasResource` draws it disabled while the edit runs; withdrawn, it
-    // also retains rather than running an Open or Close Edit.
-    patch.onOpenChange = () => 'retained';
-  }
   if (resourceBelongsToWorkingSpace && context.authorOnCanvas && !context.bodyEditing) {
     patch.onBeginTitleEditing = () => context.beginTitleEditing(node.id);
   }
   if (resourceBelongsToWorkingSpace && context.authorOnCanvas) {
-    // Every kind resizes, Open or Closed (ADR 0122); `ResourceNode` draws the
+    // Every kind resizes (ADR 0122); `ResourceNode` draws the
     // control only while the Resource is selected. The Closed Size is the one
     // floor, and the control's own minimum keeps a proposal at or above it.
     patch.resize = {
@@ -294,12 +266,12 @@ export function decorateSharedResourceNode(
     // The same gate every other control on the rail takes: these commands are
     // drawn in that rail, so a canvas that has withdrawn authoring would
     // otherwise reinstate the one cluster that survived it. Withdrawn is `[]`,
-    // never `undefined`: `CanvasResource` keeps its `EntityActions` wrapper
+    // never `undefined`: `PluginResource` keeps its `EntityActions` wrapper
     // mounted for any defined list, so withdrawing authoring does not remount
-    // the Resource and lose a running replacement's target. Held by
-    // `canvas-resource-decoration.test.ts` ('asks for entity actions only where
-    // authoring is on…') and `CanvasResource.test.tsx` ('keeps a pending
-    // replacement mounted when its entity actions become unavailable').
+    // the Resource. `[]` is held by `canvas-resource-decoration.test.ts` ('asks
+    // for entity actions only where authoring is on…'), and the plugin kept
+    // mounted by `packages/ui/test/PluginResource.test.tsx` ('keeps a drawing
+    // plugin and its state mounted when its Actions are withdrawn…').
     patch.entityActions = context.authorOnCanvas
       ? context.resourceEntityActions(node.data.resourceId)
       : [];

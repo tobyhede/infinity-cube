@@ -90,7 +90,21 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'surfaces/resources-popover.stories.tsx',
     storyExport: 'MetaSpaces',
     claim:
-      'Each Resource row ends in a Delete <name> from Space control on the row’s own line, a Space row keeps that slot empty, and pressing the control asks to delete that Resource rather than adding it to the Map.',
+      'Each Resource row ends in a Delete <name> from Space control on the row’s own line, drawn only while the row is hovered or holds keyboard focus and without moving the row; a Space row has none, and pressing the control asks to delete that Resource rather than adding it to the Map.',
+  },
+  {
+    id: 'resources-popover-cuts-a-long-name-short',
+    storyFile: 'surfaces/resources-popover.stories.tsx',
+    storyExport: 'LongNames',
+    claim:
+      'A Resource or Space name longer than its row is cut short before the marks at the row’s end — its membership capsules and Delete — rather than running under them or past the row.',
+  },
+  {
+    id: 'resources-popover-delete-takes-the-place-of-the-capsules',
+    storyFile: 'surfaces/resources-popover.stories.tsx',
+    storyExport: 'PlacedElsewhere',
+    claim:
+      'While a Resource row’s Delete is drawn, the membership capsules it is laid over are hidden; during a drag from the list, and on a row a pointer left holding focus, Delete is not drawn and the capsules show.',
   },
   {
     id: 'resources-popover-drags-a-space-onto-the-canvas',
@@ -100,11 +114,18 @@ export const parityClaims: readonly ParityClaim[] = [
       'A Space row carries the drag grip and a tooltip naming both gestures, and dropping it on the canvas places that Space — authoring the Space Resource that frames it at the drop point — while the list that started the drag stays open to take its answer.',
   },
   {
+    id: 'resources-popover-names-each-space-selection',
+    storyFile: 'surfaces/resources-popover.stories.tsx',
+    storyExport: 'SpaceSelections',
+    claim:
+      'Where a Space Resource row and a Space row share a name, each Space Resource row names the Map and Graph it selects, under its name and in its description, and the Space row reads "New Space Resource" and is named as adding a new Space Resource for that Space.',
+  },
+  {
     id: 'resources-popover-counts-what-each-filter-contributes',
     storyFile: 'surfaces/resources-popover.stories.tsx',
     storyExport: 'AvailableResources',
     claim:
-      'Each filter switch draws its glyph beside the number of rows it is contributing under the current search — including zero, and including a switch the reader has turned off — and the count moves with the search rather than reporting what the Space holds.',
+      'Each filter switch draws its glyph with the number of rows it is contributing under the current search on its corner — including zero, and including a switch the reader has turned off — and the count moves with the search rather than reporting what the Space holds.',
   },
   {
     id: 'resources-popover-marks-where-else-a-resource-is-placed',
@@ -153,7 +174,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'ResizeControl',
     claim:
-      'The production CanvasResource fills a React Flow node whose authored rect differs from the collapsed default.',
+      'The production PluginResource fills a React Flow node whose authored rect differs from the collapsed default.',
   },
   {
     id: 'selected-resource-offers-one-resize-control',
@@ -204,7 +225,7 @@ export const parityClaims: readonly ParityClaim[] = [
     claim:
       'Rest, selected and dragging are visually distinct states for both a Markdown and a Reference Resource.',
     // React Flow's own selection/dragging booleans, and ResourceNode's translation
-    // of them into CanvasResource's four-value `state`, are unit-tested directly
+    // of them into PluginResource's four-value `state`, are unit-tested directly
     // (`ResourceNode.test.tsx`, "translates React Flow selection and dragging into
     // shared visual states"). Dragging a real Resource is exercised throughout
     // `editing.spec.ts`'s drag-and-drop coverage, and selection through
@@ -212,11 +233,11 @@ export const parityClaims: readonly ParityClaim[] = [
     // evidence above. What this story adds beyond those is the *visual*
     // pairing of state with treatment (box-shadow ring, rotated drop shadow)
     // side by side for review — and it renders through `CanvasResourceSpecimen`,
-    // a thin pass-through to the shipped `CanvasResource`, so there is no
+    // a thin pass-through to the shipped `PluginResource`, so there is no
     // facsimile that could drift from what the translated state actually
     // draws.
     applicationEvidence:
-      'React Flow selection/dragging and their translation into state are covered by ResourceNode.test.tsx and by editing.spec.ts drag coverage; selection is also exercised by canvas-resource-exposes-kind-and-keyboard-actions. This story renders the shipped CanvasResource through CanvasResourceSpecimen (no facsimile) to pin the visual treatment per state for review, which is not itself a distinct browser-observable product behaviour beyond those.',
+      'React Flow selection/dragging and their translation into state are covered by ResourceNode.test.tsx and by editing.spec.ts drag coverage; selection is also exercised by canvas-resource-exposes-kind-and-keyboard-actions. This story renders the shipped PluginResource through CanvasResourceSpecimen (no facsimile) to pin the visual treatment per state for review, which is not itself a distinct browser-observable product behaviour beyond those.',
   },
   {
     id: 'closed-resource-draws-only-its-title-lines',
@@ -247,67 +268,46 @@ export const parityClaims: readonly ParityClaim[] = [
       "An Ur Resource's rail draws its Shape as a control whose face is the Shape it is drawn in, named `Shape: <Shape>`; it opens the four Shapes as an uncaptioned radio list, each row the Shape's glyph and its name with the current one chosen, and choosing one redraws the Resource in it (ADR 0121).",
   },
   {
-    id: 'closed-image-resource-draws-title-and-kind',
+    id: 'image-resource-draws-its-picture-bare',
     storyFile: 'components/resource.stories.tsx',
-    storyExport: 'Closed',
+    storyExport: 'ImageResource',
     claim:
-      'A Closed Image Resource draws its Title and the image kind glyph at the one Closed size, and no picture (ADR 0106).',
+      'An Image Resource is its picture: drawn over its whole rect at any size, fitted whole and never cropped, named by its Title, with no drawn Title and no Open or Close; at rest the canvas strokes no border, and selected it strokes its border and ring (ADR 0106, ADR 0142).',
   },
   {
-    id: 'open-image-resource-draws-its-image',
+    id: 'image-resource-shows-failed-state',
     storyFile: 'components/resource.stories.tsx',
-    storyExport: 'OpenImage',
+    storyExport: 'ImageResource',
     claim:
-      'An Open Image Resource is drawn as an Open Markdown Resource with its picture as the content: the picture fills the content area above the Title footer, contained and never enlarged past its natural size, named by the Resource (ADR 0106).',
-  },
-  {
-    id: 'open-image-resource-shows-failed-state',
-    storyFile: 'components/resource.stories.tsx',
-    storyExport: 'OpenImage',
-    claim:
-      'An Open Image Resource whose picture does not load keeps its Title and draws the failed-image state naming the URL (ADR 0106).',
+      'An Image Resource whose picture does not load draws the failed-image state in its rect, naming the URL (ADR 0106).',
   },
   {
     id: 'open-image-resource-shows-skeleton-while-loading',
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'OpenImageReference',
     claim:
-      "Wherever an Image Resource's picture is drawn — its own content, a Reference Resource's, the Stage — a picture that has not loaded yet draws a skeleton in its place, a status named Loading image, and the picture replaces it on load. The Ladle story draws it through a Reference Resource, the one story whose picture a test can hold back.",
+      "Wherever an Image Resource's picture is drawn — its own rect, a Reference Resource's content, the Stage — a picture that has not loaded yet draws a skeleton in its place, a status named Loading image, and the picture replaces it on load. The Ladle story draws it through a Reference Resource, the one story whose picture a test can hold back.",
   },
   {
-    id: 'image-resource-replace-from-the-upload-target',
+    id: 'image-resource-replace-from-the-rail',
     storyFile: 'space/replace-image.stories.tsx',
     storyExport: 'Default',
     claim:
-      "An Image Resource's toolbar offers Replace where a Markdown Resource offers Edit, opening a Closed one first; the content becomes an upload target — an outline Empty with Upload at its centre and a URL field beneath — Cancel replaces Replace and Close is unavailable, and a new URL or a chosen file replaces the picture in one Edit that keeps the Resource's Title (ADR 0106).",
+      "An Image Resource's rail offers Replace, whose picker opens in the press; the chosen picture is stored and named in one Edit that keeps the Resource's identity, Title, placement and Edges (ADR 0106, ADR 0142).",
   },
   {
     id: 'image-resource-replace-holds-navigation',
     storyFile: 'space/replace-image.stories.tsx',
     storyExport: 'Default',
     claim:
-      'While image replacement is pending, the target remains mounted with its inputs unavailable, Close stays drawn but unavailable, and the Dock’s navigation is drawn unavailable by aria-disabled and stays focusable; its answer releases them.',
+      'While a Replace runs, the Resource says Replacing image… over its picture and the Dock’s navigation is drawn unavailable by aria-disabled and stays focusable; its answer releases them (ADR 0126).',
   },
   {
-    id: 'image-resource-replace-refuses-in-the-target',
+    id: 'image-resource-replace-refuses',
     storyFile: 'space/replace-image.stories.tsx',
     storyExport: 'Default',
     claim:
-      'A refused replacement — a data: URL, a dropped file that is not an image, or more than one dropped image — is said in the upload target in the application’s words, and the target stays up with the picture unchanged (ADR 0106).',
-  },
-  {
-    id: 'image-resource-replace-fits-the-closed-size',
-    storyFile: 'space/replace-image.stories.tsx',
-    storyExport: 'Default',
-    claim:
-      'An Image Resource at the Closed Size draws its upload target compactly: Upload, the URL field and a refusal all lie inside the content area, and a URL still replaces the picture there (ADR 0106).',
-  },
-  {
-    id: 'image-resource-failed-state-offers-replace',
-    storyFile: 'space/replace-image.stories.tsx',
-    storyExport: 'Default',
-    claim:
-      "An Open Image Resource's failed-image state offers Replace even when unselected, showing the same upload target with Cancel visible (ADR 0106).",
+      'A file that is not a picture, or an SVG, is refused before anything is stored: the refusal is said over the picture in the application’s words, and the picture stays as it was (ADR 0106).',
   },
   {
     id: 'canvas-resource-shows-kind-treatment',
@@ -338,7 +338,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'Hover',
     claim:
-      "Hovering the real React Flow node reveals the adapter's Edge handles and none of CanvasResource's commands; selecting it draws its commands in React Flow's NodeToolbar.",
+      "Hovering the real React Flow node reveals the adapter's Edge handles and none of PluginResource's commands; selecting it draws its commands in React Flow's NodeToolbar.",
   },
   {
     id: 'canvas-resource-owns-title-editing-and-refusal',
@@ -389,7 +389,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'OpenImageReference',
     claim:
-      "An Open Reference Resource whose Target is an Image Resource keeps its own Title and draws the Target's picture read-only, as its own content would be, offering Close and no Replace, and naming the URL with no Replace when the picture does not load (ADR 0070, ADR 0106).",
+      "An Open Reference Resource whose Target is an Image Resource draws the Target's picture read-only, named by its own Title and renamed from its rail without touching the Target's, offering Close and no Replace, and naming the URL with no Replace when the picture does not load (ADR 0070, ADR 0106, ADR 0142).",
   },
   /*
    * **No claim covers a saving lifecycle.** The Command Dock mounts
@@ -533,7 +533,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Replacing',
     claim:
-      'While an Image Resource’s replacement is held, Open Spaces and the Space, Map and Graph names each report aria-disabled, stay in the Dock’s arrow order and open nothing when pressed.',
+      'While an Image Resource’s Replace runs, Open Spaces and the Space, Map and Graph names each report aria-disabled, stay in the Dock’s arrow order and open nothing when pressed.',
   },
   {
     id: 'command-dock-offers-a-mounted-session-every-edit',

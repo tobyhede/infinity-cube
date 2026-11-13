@@ -1,6 +1,17 @@
-import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import {
+  EMPTY_ASSET_REF,
+  isMissingKindId,
+  spaceSnapshotSchema,
+  uuidSchema,
+  type SpaceSnapshot,
+  type UUID,
+} from '@project/core';
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import { loadSpaceAggregate, type SpaceAggregateError } from '../src/index';
+import {
+  loadSpaceAggregate,
+  refusedUnrootedSpaceIds,
+  type SpaceAggregateError,
+} from '../src/index';
 
 const uuid = (value: string): UUID => uuidSchema.parse(value);
 const META = uuid('00000000-0000-4000-8000-000000000101');
@@ -18,7 +29,7 @@ type StoredResource = SpaceSnapshot['resources'][number];
 
 const markdown = (id: UUID, title = id): StoredResource => ({
   id,
-  document: { title, kind: 'markdown', content: { source: '' } },
+  document: { title, kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
 });
 
 /**
@@ -62,7 +73,7 @@ const snapshot = (
                 positions: Object.fromEntries(
                   resources.map(({ id: resourceId }, index) => [
                     resourceId,
-                    { x: index * 100, y: 0, open: false },
+                    { x: index * 100, y: 0 },
                   ]),
                 ),
                 graphs: [{ id: GRAPH, title: 'Graph', edges: [] }],
@@ -79,7 +90,7 @@ const snapshot = (
                 positions: Object.fromEntries(
                   resources.map(({ id: resourceId }, index) => [
                     resourceId,
-                    { x: index * 100, y: 100, open: false },
+                    { x: index * 100, y: 100 },
                   ]),
                 ),
                 graphs: [{ id: SECOND_GRAPH, title: 'Second Graph', edges: [] }],
@@ -230,6 +241,79 @@ describe('loadSpaceAggregate', () => {
     expect(errors).toEqual([{ kind: 'ordinary-space-unreferenced', spaceId: CHILD }]);
   });
 
+  /**
+   * A Resource whose plugin is missing may be what refers to a Space, and
+   * nothing can read its content to say, so while one is in the aggregate an
+   * unrooted Space is held (ADR 0142). Once none is, the rooting rule refuses
+   * that Space again, as it does when the plugin returns.
+   */
+  describe('while a plugin is missing', () => {
+    const PORTAL = 'vnd.example.portal';
+    if (!isMissingKindId(PORTAL)) throw new Error('A plugin draws the portal kind');
+    const portal = (id: UUID): StoredResource => ({
+      id,
+      document: { title: 'Portal', kind: PORTAL, content: { to: CHILD } },
+    });
+
+    it('holds an ordinary Space with no inbound Space Resource', () => {
+      const result = loadSpaceAggregate({
+        metaSpaceId: META,
+        snapshots: [
+          snapshot(META, [portal(META_RESOURCE)]),
+          snapshot(CHILD, [markdown(CHILD_RESOURCE)]),
+        ],
+      });
+
+      expect(result.ok).toBe(true);
+    });
+
+    it('holds it while any Resource of a missing kind stays, wherever it is', () => {
+      const result = loadSpaceAggregate({
+        metaSpaceId: META,
+        snapshots: [snapshot(META, []), snapshot(CHILD, [portal(CHILD_RESOURCE)])],
+      });
+
+      expect(result.ok).toBe(true);
+    });
+
+    it('refuses that Space, naming it, once no Resource of a missing kind is left', () => {
+      const errors = errorsOf(
+        loadSpaceAggregate({
+          metaSpaceId: META,
+          snapshots: [
+            snapshot(META, [markdown(SECOND_META_RESOURCE)]),
+            snapshot(CHILD, [markdown(CHILD_RESOURCE)]),
+          ],
+        }),
+      );
+
+      expect(errors).toEqual([{ kind: 'ordinary-space-unreferenced', spaceId: CHILD }]);
+    });
+
+    it('still refuses a Space Resource whose target is missing', () => {
+      const errors = errorsOf(
+        loadSpaceAggregate({
+          metaSpaceId: META,
+          snapshots: [
+            snapshot(META, [
+              portal(META_RESOURCE),
+              spaceResource(SECOND_META_RESOURCE, OTHER, SELECTS_FIRST),
+            ]),
+          ],
+        }),
+      );
+
+      expect(errors).toEqual([
+        {
+          kind: 'space-reference-missing',
+          spaceId: META,
+          resourceId: SECOND_META_RESOURCE,
+          targetSpaceId: OTHER,
+        },
+      ]);
+    });
+  });
+
   it('locates an explicit Map that the target does not supply', () => {
     const errors = errorsOf(
       loadSpaceAggregate({
@@ -345,5 +429,33 @@ describe('loadSpaceAggregate', () => {
       kind: 'space',
       content: { map: SECOND_MAP, graph: SECOND_GRAPH },
     });
+  });
+});
+
+describe('refusedUnrootedSpaceIds', () => {
+  const MISSING = 'vnd.example.chart';
+  if (!isMissingKindId(MISSING)) throw new Error('A plugin draws the chart kind');
+  const unplugged = { kind: MISSING };
+  const drawn = { kind: 'markdown' as const };
+
+  it('holds a Space already held while a Resource of a missing kind remains', () => {
+    expect(
+      refusedUnrootedSpaceIds([CHILD], { unrooted: [CHILD], spaces: [{ resources: [unplugged] }] }),
+    ).toEqual([]);
+  });
+
+  it('refuses a Space no longer held once no Resource of a missing kind remains', () => {
+    expect(
+      refusedUnrootedSpaceIds([CHILD], { unrooted: [CHILD], spaces: [{ resources: [drawn] }] }),
+    ).toEqual([CHILD]);
+  });
+
+  it('refuses a Space left unrooted that was not already held', () => {
+    expect(
+      refusedUnrootedSpaceIds([CHILD], {
+        unrooted: [CHILD, OTHER],
+        spaces: [{ resources: [drawn] }, { resources: [unplugged] }],
+      }),
+    ).toEqual([OTHER]);
   });
 });

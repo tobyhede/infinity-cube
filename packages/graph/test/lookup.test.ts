@@ -1,3 +1,4 @@
+import { EMPTY_ASSET_REF } from '@project/core';
 import type { Resource, ResourceContent } from '@project/core';
 import { describe, expect, it } from 'vitest';
 import { loadSpaceSnapshot, resolveResourceContent, type Space } from '../src/index';
@@ -26,7 +27,7 @@ function everyKind(): Space {
     resources: [
       {
         id: MARKDOWN,
-        document: { title: 'Notes', kind: 'markdown', content: { source: 'Some notes.\n' } },
+        document: { title: 'Notes', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       },
       {
         id: IMAGE,
@@ -87,7 +88,7 @@ function refusedByIntake(resources: readonly Resource[]): Space {
   return { ...everyKind(), resources, lookup: built.lookup };
 }
 
-const framedView = {
+const framedContent = {
   spaceId: TARGET_SPACE,
   map: TARGET_MAP,
   graph: TARGET_GRAPH,
@@ -103,56 +104,64 @@ describe('resolveResourceContent', () => {
   };
 
   it.each<[string, string, ResourceContent]>([
-    ['a Markdown Resource', MARKDOWN, { kind: 'markdown', source: 'Some notes.\n', via: 'self' }],
+    [
+      'a Markdown Resource',
+      MARKDOWN,
+      { kind: 'markdown', content: { url: EMPTY_ASSET_REF }, via: 'self' },
+    ],
     [
       'an Image Resource',
       IMAGE,
       {
         kind: 'image',
-        url: 'https://example.com/harbour.png',
+        content: { url: 'https://example.com/harbour.png' },
         via: 'self',
       },
     ],
-    ['a framed Space Resource', FRAMED_SPACE, { kind: 'space', view: framedView, via: 'self' }],
+    [
+      'a framed Space Resource',
+      FRAMED_SPACE,
+      { kind: 'space', content: framedContent, via: 'self' },
+    ],
     [
       'an unframed Space Resource',
       UNFRAMED_SPACE,
       {
         kind: 'space',
-        view: { spaceId: TARGET_SPACE, map: TARGET_MAP, graph: TARGET_GRAPH, framing: undefined },
+        content: { spaceId: TARGET_SPACE, map: TARGET_MAP, graph: TARGET_GRAPH },
         via: 'self',
       },
     ],
-    ['an Ur Resource', UR, { kind: 'ur', via: 'self' }],
+    ['an Ur Resource', UR, { kind: 'ur', content: {}, via: 'self' }],
     [
       'a Reference Resource to Markdown',
       TO_MARKDOWN,
-      { kind: 'markdown', source: 'Some notes.\n', via: 'target' },
+      { kind: 'markdown', content: { url: EMPTY_ASSET_REF }, via: 'target' },
     ],
     [
       'a Reference Resource to an image',
       TO_IMAGE,
       {
         kind: 'image',
-        url: 'https://example.com/harbour.png',
+        content: { url: 'https://example.com/harbour.png' },
         via: 'target',
       },
     ],
     [
       'a Reference Resource to a Space',
       TO_SPACE,
-      { kind: 'space', view: framedView, via: 'target' },
+      { kind: 'space', content: framedContent, via: 'target' },
     ],
-    ['a Reference Resource to an Ur Resource', TO_UR, { kind: 'ur', via: 'target' }],
+    ['a Reference Resource to an Ur Resource', TO_UR, { kind: 'ur', content: {}, via: 'target' }],
   ])('resolves %s', (_, id, expected) => {
     expect(resolveResourceContent(space, of(id))).toStrictEqual(expected);
   });
 
-  it('keeps an empty body as empty Markdown rather than as unresolved', () => {
-    const empty = resource('00000000-0000-4000-8000-000000000081', 'Empty', '');
+  it('keeps the empty text as Markdown rather than as unresolved', () => {
+    const empty = resource('00000000-0000-4000-8000-000000000081', 'Empty');
     expect(resolveResourceContent(refusedByIntake([empty]), empty)).toStrictEqual({
       kind: 'markdown',
-      source: '',
+      content: { url: EMPTY_ASSET_REF },
       via: 'self',
     });
   });
@@ -170,7 +179,7 @@ describe('resolveResourceContent', () => {
   });
 
   it('answers unresolved for a Reference Resource to a Reference Resource', () => {
-    const target = resource('00000000-0000-4000-8000-000000000083', 'Target', 'Body.\n');
+    const target = resource('00000000-0000-4000-8000-000000000083', 'Target');
     const first = reference('00000000-0000-4000-8000-000000000084', 'First', target.id);
     const second = reference('00000000-0000-4000-8000-000000000085', 'Second', first.id);
     expect(resolveResourceContent(refusedByIntake([target, first, second]), second)).toStrictEqual({

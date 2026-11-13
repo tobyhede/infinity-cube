@@ -1,10 +1,9 @@
 import { useCallback } from 'react';
 import {
   kindFlags,
-  referenceKind,
-  spaceKind,
+  spaceSelection,
   titleName,
-  type KindId,
+  type PluginKind,
   type Map as SpaceMap,
   type Resource,
   type ResourceId,
@@ -13,10 +12,8 @@ import type { Space } from '@project/graph';
 import {
   DeleteIcon,
   EnterSpaceIcon,
-  kindNaming,
   PresentIcon,
   FullViewIcon,
-  OpenAndExpandIcon,
   RemoveFromMapIcon,
   ResourceKindIcon,
   type EntityActionGroup,
@@ -28,6 +25,7 @@ import { canvasElement } from './canvas-element';
 import type { FocusFallback } from './delete-confirmation';
 import { isOpenIndependently, type SpaceEntity } from './entity-actions';
 import type { OpenSpaces } from './open-spaces';
+import { RESOURCE_CREATIONS } from './resource-placement';
 import {
   ABSENT,
   bindCommand,
@@ -35,16 +33,21 @@ import {
   removeFromMapReportedBy,
   type BoundCommand,
 } from './canvas-commands';
+import { referenceTerminal } from './authoring-refusal';
 import { bindingOf } from './key-bindings';
 import { shortcutOf } from './shortcut-sheet';
 
-/** The sentence the unavailable Create Reference row of a Resource that may not be a Target carries. */
-export const referenceTerminal = (kind: KindId): string =>
-  `${kindNaming(kind).listName} cannot be referenced.`;
+/** A creation a Resource's rail offers on it, as a plugin declares one from a Resource (ADR 0142). */
+export interface RailCreation {
+  readonly kind: PluginKind;
+  /** What the command is called, as its plugin declares it. */
+  readonly label: string;
+  readonly run: () => EntityActionOutcome;
+}
 
 export interface ResourceRailCommands {
-  /** Create Reference, or `null` while no Resource may be added. */
-  readonly createReference: (() => EntityActionOutcome) | null;
+  /** The creations offered on this Resource, as Create Reference is, or `null` while no Resource may be added. */
+  readonly createFrom: readonly RailCreation[] | null;
   /** Remove from Map: the command Delete and Backspace run, bound to this Resource. */
   readonly removeFromMap: BoundCommand;
   /** Arm Delete from Space's confirmation, or `null` while it is unavailable. */
@@ -55,8 +58,6 @@ export interface ResourceRailCommands {
   readonly present: BoundCommand;
   /** Read this Resource in Full View: the canvas's command Space runs. */
   readonly fullView: BoundCommand;
-  /** Open this Resource and expand it to fit its content: the canvas's command Shift+Enter runs. */
-  readonly openAndExpand: BoundCommand;
 }
 
 /**
@@ -65,10 +66,7 @@ export interface ResourceRailCommands {
  * item and the key cannot disagree. A rail drawn with none — a Map inside a
  * Space Resource — offers them as absent.
  */
-export type CanvasRailCommands = Pick<
-  ResourceRailCommands,
-  'openAndExpand' | 'fullView' | 'present'
->;
+export type CanvasRailCommands = Pick<ResourceRailCommands, 'fullView' | 'present'>;
 
 const absent = (id: BoundCommand['id']): BoundCommand => ({
   id,
@@ -77,7 +75,6 @@ const absent = (id: BoundCommand['id']): BoundCommand => ({
 });
 
 const NO_CANVAS_COMMANDS: CanvasRailCommands = {
-  openAndExpand: absent('canvas.openAndExpand'),
   fullView: absent('canvas.showFullView'),
   present: absent('canvas.presentFromHere'),
 };
@@ -135,58 +132,36 @@ export function resourceRailGroups(
   connect: EntityActionGroup,
   commands: ResourceRailCommands,
 ): readonly EntityActionGroup[] {
-  const {
-    createReference,
-    removeFromMap,
-    deleteFromSpace,
-    enter,
-    present,
-    fullView,
-    openAndExpand,
-  } = commands;
-  // A Resource no other may reference as its Target offers Create Reference
-  // disabled, saying why, so referencing stays a single hop (ADR 0113).
+  const { createFrom, removeFromMap, deleteFromSpace, enter, present, fullView } = commands;
+  // A Resource no other may reference as its Target offers each creation
+  // from it disabled, saying why, since what it creates references it, so
+  // referencing stays a single hop (ADR 0113).
   const terminal = kindFlags(resource.kind).mayBeTarget ? null : referenceTerminal(resource.kind);
   const reference: readonly EntityActionGroup[] =
-    createReference === null
+    createFrom === null || createFrom.length === 0
       ? []
       : [
-          [
-            {
-              id: 'create-reference',
-              // Named for the vocabulary the other creations use; the menu is
-              // already named for its Resource.
-              label: 'Create Reference',
-              disabled: terminal !== null,
-              description: terminal ?? undefined,
-              icon: <ResourceKindIcon kind={referenceKind.id} decorative />,
-              // **No `report`, and that is what closes the menu.** A reporting
-              // item is held open to show its word (`EntityActionsMenu`), and
-              // this command puts the caret in the new Reference Resource's
-              // Title editor on the canvas — a menu left up would intercept
-              // every pointer event over it. A refusal takes the standing
-              // notice, which is where ADR 0089 puts the outcome of a creation
-              // that completes on activation.
-              onSelect: createReference,
-            },
-          ],
+          createFrom.map(({ kind, label, run }) => ({
+            id: `create-${kind}`,
+            label,
+            disabled: terminal !== null,
+            description: terminal ?? undefined,
+            icon: <ResourceKindIcon kind={kind} decorative />,
+            // **No `report`, and that is what closes the menu.** A reporting
+            // item is held open to show its word (`EntityActionsMenu`), and
+            // this command puts the caret in the new Resource's Title editor
+            // on the canvas — a menu left up would intercept every pointer
+            // event over it. A refusal takes the standing notice, which is
+            // where ADR 0089 puts the outcome of a creation that completes on
+            // activation.
+            onSelect: run,
+          })),
         ];
   const presentItem = commandItem(present);
-  const openAndExpandItem = commandItem(openAndExpand);
   const fullViewItem = commandItem(fullView);
-  // Seeing a Resource whole: expanding it on the Map, which is an Edit, then
-  // reading it and presenting from it, which change nothing in the Space.
+  // Seeing a Resource whole: reading it and presenting from it, which change
+  // nothing in the Space.
   const presenting: EntityActionGroup = [
-    ...(openAndExpandItem === null
-      ? []
-      : [
-          {
-            id: 'open-and-expand',
-            label: 'Open and Expand',
-            icon: <OpenAndExpandIcon />,
-            ...openAndExpandItem,
-          },
-        ]),
     ...(fullViewItem === null
       ? []
       : [{ id: 'full-view', label: 'Read in Full View', icon: <FullViewIcon />, ...fullViewItem }]),
@@ -237,7 +212,7 @@ export function resourceRailGroups(
           },
         ]),
   ];
-  if (resource.kind === spaceKind.id) {
+  if (spaceSelection(resource) !== undefined) {
     // The Title edits in place on the drawn Resource; this menu authors neither
     // the Resource's name nor the target Space's.
     const links = addresses.flat();
@@ -283,7 +258,8 @@ export interface ResourceRailInput {
     'addResource' | 'authorOnCanvas' | 'deleteResource' | 'navigate'
   >;
   readonly editingResourceBody: boolean;
-  readonly createReferenceFrom: (resource: Resource) => EntityActionOutcome;
+  /** Run the creation of `kind` offered on `resource`. */
+  readonly createFromResource: (kind: string, resource: Resource) => EntityActionOutcome;
   readonly spaces: OpenSpaces | null;
 }
 
@@ -335,7 +311,7 @@ export function useResourceRailActions(
     entityActions,
     availability,
     editingResourceBody,
-    createReferenceFrom,
+    createFromResource,
     spaces,
   }: ResourceRailInput,
 ): ResourceRailActions {
@@ -350,12 +326,21 @@ export function useResourceRailActions(
       // A node the projection is still drawing for a Resource the working Space
       // no longer has: no commands rather than commands that name nothing.
       if (resource === undefined) return [];
+      // Entering is the application's: a Resource showing another Space's Map
+      // enters the view it shows (ADR 0068), whichever plugin draws it.
+      const shown = spaceSelection(resource);
       return resourceRailGroups(
         resource,
         entityActions({ kind: 'resource', resource, map: selectedMap }),
         connect,
         {
-          createReference: addResource ? () => createReferenceFrom(resource) : null,
+          createFrom: addResource
+            ? RESOURCE_CREATIONS.flatMap(({ kind, label, accepts }) =>
+                accepts?.(resource) === false
+                  ? []
+                  : [{ kind, label, run: () => createFromResource(kind, resource) }],
+              )
+            : null,
           removeFromMap: bindCommand(REMOVE_SELECTION, {
             occurrence: {
               authorOnCanvas,
@@ -370,7 +355,7 @@ export function useResourceRailActions(
                 resourceDeletion.askToDelete(resource, railFocusFallback(currentSpace, resourceId))
             : null,
           enter:
-            spaces === null || resource.kind !== spaceKind.id
+            spaces === null || shown === undefined
               ? null
               : {
                   available: navigate,
@@ -379,10 +364,10 @@ export function useResourceRailActions(
                       'space-enter',
                       async () =>
                         spaces.enter(
-                          resource.content.spaceId,
-                          resource.content.map,
-                          resource.content.graph,
-                          resource.content.framing,
+                          shown.spaceId,
+                          shown.map,
+                          shown.graph,
+                          shown.framing,
                           space.id,
                         ),
                       { subject: titleName(resource.title) },
@@ -402,7 +387,7 @@ export function useResourceRailActions(
       deleteResource,
       navigate,
       editingResourceBody,
-      createReferenceFrom,
+      createFromResource,
       spaces,
       authoring,
       commandOutcomes,

@@ -2,18 +2,21 @@
 import { z } from 'zod';
 import { COLLAPSED_RESOURCE_SIZE } from './resource-geometry';
 import {
+  KIND_ID_FORM,
   contentParser,
-  fileContentParser,
+  isMissingKindId,
   isRegisteredKind,
-  KIND_IDS,
-  kindFlags,
   type KindId,
   type Resource,
   type ResourceDocument,
   type ResourceFileDocument,
+  type Unplugged,
 } from './kinds/registry';
 import { RESOURCE_TITLE_REQUIRED, normalizeTitle } from './title';
 import { uuidSchema } from './uuid';
+import { jsonValueSchema, type JsonObject } from './json-value';
+
+import { OUTLINES } from '@project/resource-api/domain';
 
 export { newUuid, uuidSchema } from './uuid';
 
@@ -63,36 +66,52 @@ const resourceTitleSchema = z
 const declaredKindAndContentSchema = z.object({ kind: z.string(), content: z.unknown() });
 
 /**
- * The content a Resource's kind parses, tagged with its kind, or `undefined`
- * with each issue added to `ctx`: a kind no module registers is refused, and
- * the registered kind's module is the one parser of its content.
+ * The content of a Resource whose kind names no plugin in this build: a JSON
+ * object, as the envelope makes every Resource's content (ADR 0128), carried
+ * whole and never read as the JSON value it parses to. Export writes it with
+ * its keys sorted (`canonicalJsonValue`) and each number as JavaScript writes
+ * it, so `1.0` comes back as `1` and an integer beyond 2^53 loses precision.
  */
-/**
- * The `params.code` of the issue refusing a kind no module registers, so a door
- * that knows the declared kind can quote it beside the schema's message.
- */
-export const KIND_UNREGISTERED = 'kind-unregistered';
+const unreadContentSchema: z.ZodType<JsonObject, z.ZodTypeDef, unknown> = jsonValueSchema.refine(
+  (value): value is JsonObject =>
+    typeof value === 'object' && value !== null && !Array.isArray(value),
+  { message: 'must be an object' },
+);
 
+/**
+ * The content a Resource's kind parses, tagged with its kind, or `undefined`
+ * with each issue added to `ctx`. A plugin in this build is the one parser of
+ * its kind's content, and content its schema rejects is refused. A
+ * well-formed kind no plugin draws is carried whole (ADR 0142): its content is
+ * JSON the host never reads, which the default plugin draws and the plugin
+ * that returns reads as it stands. A kind that is not a kind id is refused.
+ */
 const kindedContent = <Kinded>(
   kind: string,
   content: unknown,
   parserOf: (kind: KindId) => z.ZodType<Kinded, z.ZodTypeDef, unknown>,
   ctx: z.RefinementCtx,
-): Kinded | undefined => {
-  if (!isRegisteredKind(kind)) {
+): Kinded | Unplugged | undefined => {
+  if (isRegisteredKind(kind)) {
+    const parsed = parserOf(kind).safeParse(content);
+    if (parsed.success) return parsed.data;
+    for (const issue of parsed.error.issues) {
+      ctx.addIssue({ ...issue, path: ['content', ...issue.path] });
+    }
+    return undefined;
+  }
+  if (!isMissingKindId(kind)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['kind'],
       // Not echoing the kind: a summary that folds case would misquote it.
-      // The registered ids are lower case, so the fold leaves them intact.
-      message: `names no kind this build registers (${KIND_IDS.join(', ')})`,
-      params: { code: KIND_UNREGISTERED },
+      message: `is not a kind id — ${KIND_ID_FORM}`,
     });
     return undefined;
   }
-  const parsed = parserOf(kind).safeParse(content);
-  if (parsed.success) return parsed.data;
-  for (const issue of parsed.error.issues) {
+  const json = unreadContentSchema.safeParse(content);
+  if (json.success) return { kind, content: json.data };
+  for (const issue of json.error.issues) {
     ctx.addIssue({ ...issue, path: ['content', ...issue.path] });
   }
   return undefined;
@@ -131,24 +150,17 @@ export const resourceSchema: z.ZodType<Resource, z.ZodTypeDef, unknown> = envelo
  * `docs/schema/resource/` specifies it: the envelope is strict, and so is
  * every kind's content schema, so a key no kind declares is refused, naming
  * it, and no authored key is dropped on intake (ADR 0127). `kind` is
- * required, and the content is the kind's file content, which its file codec
- * maps to the document's.
+ * required, and the content is the Resource's content as its kind's schema
+ * parses it, the same value a store holds (ADR 0142).
  */
 export const resourceFileSchema: z.ZodType<ResourceFileDocument, z.ZodTypeDef, unknown> = enveloped(
   z
     .object({ id: idSchema, title: resourceTitleSchema, kind: z.string(), content: z.unknown() })
     .strict(),
-  fileContentParser,
+  contentParser,
 );
 
 const declaredKindSchema = z.object({ kind: z.string() });
-const declaredIdSchema = z.object({ id: z.string() });
-
-/** The `id` a Resource file's JSON declares, when it is an object declaring a string one. */
-export const declaredId = (json: unknown): string | undefined => {
-  const parsed = declaredIdSchema.safeParse(json);
-  return parsed.success ? parsed.data.id : undefined;
-};
 
 /** The `kind` a Resource file's JSON declares, when it is an object declaring a string one. */
 export const declaredKind = (json: unknown): string | undefined => {
@@ -260,38 +272,31 @@ const resourceSizeSchema = z
   .strict();
 
 /**
- * The outline a Resource whose kind takes a Shape is drawn in on a Map (ADR 0121), Open or Closed.
- * Every member touches the midpoint of each side of the Resource's rect, where
- * Edges attach.
+ * The outlines the canvas strokes a Resource's border and ring on (ADR 0142):
+ * the Resource API's, which a plugin's declared outline names, as an Ur
+ * Resource's Shape does (ADR 0121). Every member touches the midpoint of each
+ * side of the Resource's rect, where Edges attach.
  */
-export const RESOURCE_SHAPES = ['rectangle', 'pill', 'ellipse', 'diamond'] as const;
+export const RESOURCE_SHAPES = OUTLINES;
 
 export const resourceShapeSchema = z.enum(RESOURCE_SHAPES);
 
 /**
- * Whether a Resource of this kind takes a Shape other than the rectangle (ADR
- * 0121), as its kind declares.
- */
-export const takesResourceShape = (kind: KindId): boolean => kindFlags(kind).takesResourceShape;
-
-/** Whether a Resource of this kind may be Open, as its kind declares (ADR 0122). */
-export const takesOpen = (kind: KindId): boolean => kindFlags(kind).canOpen;
-
-/**
- * What a Map stores for one Resource: its origin, and optionally whether it is
- * Open, its size and its Shape. Each optional field has an application
- * default, as a Graph's `headShape` does: an entry with no `open` is Closed
- * (`resourceOpen`), one with no `size` is the Closed Size (`resourceSize`), and
- * one with no `shape` is the rectangle (`resourceShape`). Size and Open/Closed
- * are independent: Open changes what is drawn inside the rect, never the rect.
+ * What a Map stores for one Resource: its origin, and optionally its size and
+ * its plugin's Map content (ADR 0142). An entry with no `size` is the Closed
+ * Size (`resourceSize`), and one with no `content` gives its plugin the
+ * plugin's declared default (`resolvedMapContent`). Whether a Resource is Open,
+ * and an Ur Resource's Shape, are its plugin's Map content, never the entry's.
+ *
+ * `content` is any JSON value here: which values a Resource may keep is its
+ * plugin's schema's answer, which intake asks with the Resource's kind in view.
  *
  * **Strict**, as the Map is: a stripped key is a question answered silently.
  */
 export const resourcePlacementSchema = mapPositionSchema
   .extend({
-    open: z.boolean().optional(),
     size: resourceSizeSchema.optional(),
-    shape: resourceShapeSchema.optional(),
+    content: jsonValueSchema.optional(),
   })
   .strict();
 

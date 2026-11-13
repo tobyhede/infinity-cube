@@ -5,7 +5,7 @@ import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { ChromeContinuation } from '../src/components/ChromeContinuation';
 import { composeApp, type ComposedApp } from '../src/compose-app';
-import { unusedImageSources } from './image-sources';
+import { textAsset } from './markdown-texts';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -23,7 +23,7 @@ const snapshot: SpaceSnapshot = {
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [RESOURCE_A]: { x: 10, y: 20, open: false },
+          [RESOURCE_A]: { x: 10, y: 20 },
         },
         graphs: [{ id: GRAPH_ID, title: 'Main', edges: [] }],
       },
@@ -31,7 +31,10 @@ const snapshot: SpaceSnapshot = {
     defaultMap: MAP_ID,
   },
   resources: [
-    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
+    {
+      id: RESOURCE_A,
+      document: { title: 'A', kind: 'markdown', content: { url: textAsset('A') } },
+    },
   ],
 };
 
@@ -39,8 +42,7 @@ function open(): ComposedApp['continuation'] {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const backend = MemorySpaceBackend.asMeta(loaded);
   const session = openSpaceSession(backend, loaded);
-  return composeApp({ images: unusedImageSources, spaceSession: session, selection: MAP_ID })
-    .continuation;
+  return composeApp({ spaceSession: session, selection: MAP_ID }).continuation;
 }
 
 function Harness({

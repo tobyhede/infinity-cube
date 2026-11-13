@@ -1,6 +1,12 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { newUuid, spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
+import {
+  EMPTY_ASSET_REF,
+  newUuid,
+  spaceSnapshotSchema,
+  uuidSchema,
+  type SpaceSnapshot,
+} from '@project/core';
 import { MemorySpaceBackend } from '@project/persistence';
 import { createOpenSpaces, type OpenSpaces } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
@@ -8,7 +14,6 @@ import { recordingHistory } from './browser-history';
 import { beginRename, dock, exitSpaceItem } from './command-dock';
 import { expectMenuGroups } from './menu-assertions';
 import { selectResource } from './resource-selection';
-import { unusedImageSources } from './image-sources';
 import { refusingFullscreen } from './fullscreen';
 import { unlinkedPresentations } from './presentations';
 import { stubResizeObserver } from './resize-observer';
@@ -57,8 +62,8 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Collection 1',
         kind: 'positioned',
         positions: {
-          [DRAWN_A]: { x: 0, y: 0, open: false },
-          [DRAWN_B]: { x: 264, y: 0, open: false },
+          [DRAWN_A]: { x: 0, y: 0 },
+          [DRAWN_B]: { x: 264, y: 0 },
         },
         graphs: [
           { id: SELECTED_GRAPH_ID, title: 'Overview', edges: [{ from: DRAWN_A, to: DRAWN_B }] },
@@ -68,18 +73,28 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
         id: OTHER_MAP_ID,
         title: 'Collection 2',
         kind: 'positioned',
-        positions: { [UNPLACED]: { x: 0, y: 0, open: false } },
+        positions: { [UNPLACED]: { x: 0, y: 0 } },
         graphs: [{ id: OTHER_GRAPH_ID, title: 'Second pass', edges: [] }],
       },
     ],
     defaultMap: OTHER_MAP_ID,
   },
   resources: [
-    { id: DRAWN_A, document: { title: 'Intake', kind: 'markdown', content: { source: '' } } },
-    { id: DRAWN_B, document: { title: 'Storage', kind: 'markdown', content: { source: '' } } },
+    {
+      id: DRAWN_A,
+      document: { title: 'Intake', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+    },
+    {
+      id: DRAWN_B,
+      document: { title: 'Storage', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+    },
     {
       id: UNPLACED,
-      document: { title: 'Elsewhere entirely', kind: 'markdown', content: { source: '' } },
+      document: {
+        title: 'Elsewhere entirely',
+        kind: 'markdown',
+        content: { url: EMPTY_ASSET_REF },
+      },
     },
   ],
 });
@@ -95,8 +110,8 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [HOME_RESOURCE_ID]: { x: 10, y: 20, open: false },
-          [SPACE_RESOURCE_ID]: { x: 600, y: 20, open: false },
+          [HOME_RESOURCE_ID]: { x: 10, y: 20 },
+          [SPACE_RESOURCE_ID]: { x: 600, y: 20 },
         },
         graphs: [{ id: HOME_GRAPH_ID, title: 'Graph 1', edges: [] }],
       },
@@ -106,7 +121,7 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
   resources: [
     {
       id: HOME_RESOURCE_ID,
-      document: { title: 'Start here', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Start here', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
     {
       id: SPACE_RESOURCE_ID,
@@ -130,9 +145,9 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [META_RESOURCE_ID]: { x: 0, y: 0, open: false },
-          [META_TO_HOME_ID]: { x: 300, y: 0, open: false },
-          [META_TO_TARGET_ID]: { x: 600, y: 0, open: false },
+          [META_RESOURCE_ID]: { x: 0, y: 0 },
+          [META_TO_HOME_ID]: { x: 300, y: 0 },
+          [META_TO_TARGET_ID]: { x: 600, y: 0 },
         },
         graphs: [{ id: META_GRAPH_ID, title: 'Graph 1', edges: [] }],
       },
@@ -142,7 +157,7 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
   resources: [
     {
       id: META_RESOURCE_ID,
-      document: { title: 'Meta', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Meta', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
     {
       id: META_TO_HOME_ID,
@@ -179,7 +194,6 @@ async function mount(): Promise<OpenSpaces> {
   const spaces = createOpenSpaces({
     fullscreen: refusingFullscreen,
     presentations: unlinkedPresentations,
-    images: unusedImageSources,
     backend,
     metaSpaceId: META_ID,
     metaSpaceTitle: meta.document.title,
@@ -240,7 +254,7 @@ describe('entering a Space Resource', { timeout: 15_000 }, () => {
     expectMenuGroups(menu, [
       ['Create Reference'],
       ['Connect to Resource'],
-      ['Open and Expand', 'Read in Full View', 'Present from Here'],
+      ['Read in Full View', 'Present from Here'],
       ['Enter', 'Open in New Tab'],
       ['Copy link to Resource in Map', 'Copy link to Resource', 'Copy link to Space'],
       ['Remove from Map', 'Delete from Space'],

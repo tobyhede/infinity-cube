@@ -11,7 +11,7 @@ export const nameOnCreationOf = (pending: PendingContinuation | null): ResourceI
 /**
  * The Resource whose inline Title editor a creation opens.
  *
- * It reaches `CanvasResource` as a prop rather than through the continuation
+ * It reaches `PluginResource` as a prop rather than through the continuation
  * module: `@project/ui` owns that editor and depends only on `core`, and a
  * component refocusing its own control after its own edit is genuine locality.
  */

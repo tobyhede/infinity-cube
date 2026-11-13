@@ -1,6 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import { uuidSchema, type SpaceSnapshot } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type SpaceSnapshot } from '@project/core';
 import type { SpaceAggregateError, SpaceError } from '@project/graph';
 import type { LoadedSpace } from '../src/backend';
 import {
@@ -38,7 +38,10 @@ const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: { version: 1, title: 'One' },
   resources: [
-    { id: RESOURCE_ID, document: { title: 'A', kind: 'markdown', content: { source: '' } } },
+    {
+      id: RESOURCE_ID,
+      document: { title: 'A', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+    },
   ],
 };
 
@@ -223,8 +226,6 @@ describe('aggregate wire protocol', () => {
       { kind: 'retired-space-graphs', message: 'message' },
       { kind: 'invalid-json', path: 'resource.json', message: 'message' },
       { kind: 'invalid-resource-file', path: 'resource.json', message: 'message' },
-      { kind: 'missing-sidecar', path: 'resource.json', message: 'message' },
-      { kind: 'unclaimed-sidecar', path: 'resource.md', message: 'message' },
       { kind: 'duplicate-resource-id', ...described },
       { kind: 'duplicate-graph-id', ...described },
       { kind: 'duplicate-map-id', ...described },
@@ -240,8 +241,7 @@ describe('aggregate wire protocol', () => {
       { kind: 'reference-target-not-targetable', ...described },
       { kind: 'reference-target-not-targetable', ...described },
       { kind: 'space-reference-cycle', ...described },
-      { kind: 'shape-not-taken', ...described },
-      { kind: 'open-requires-content', ...described },
+      { kind: 'map-content-invalid', ...described },
     ];
     const location = { spaceId: SPACE_ID, resourceId: RESOURCE_ID, targetSpaceId: secondId };
     const errors: SpaceAggregateError[] = [

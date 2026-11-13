@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { importSpaceFileSchema, importSpaceSchema, spaceSnapshotSchema } from '../src/index';
+import { EMPTY_ASSET_REF } from '../src/assets';
 
 const SPACE_ID = '00000000-0000-4000-8000-000000000001';
 const RESOURCE_A = '00000000-0000-4000-8000-000000000002';
@@ -18,8 +19,8 @@ const identified = {
         title: 'Working',
         kind: 'positioned' as const,
         positions: {
-          [RESOURCE_A]: { x: 0, y: 0, open: false },
-          [RESOURCE_B]: { x: 320, y: 0, open: false },
+          [RESOURCE_A]: { x: 0, y: 0 },
+          [RESOURCE_B]: { x: 320, y: 0 },
         },
         graphs: [{ id: GRAPH_ID, title: 'Main', edges: [{ from: RESOURCE_A, to: RESOURCE_B }] }],
       },
@@ -29,11 +30,11 @@ const identified = {
   resources: [
     {
       id: RESOURCE_A,
-      document: { title: 'A', kind: 'markdown' as const, content: { source: 'A' } },
+      document: { title: 'A', kind: 'markdown' as const, content: { url: EMPTY_ASSET_REF } },
     },
     {
       id: RESOURCE_B,
-      document: { title: 'B', kind: 'markdown' as const, content: { source: 'B' } },
+      document: { title: 'B', kind: 'markdown' as const, content: { url: EMPTY_ASSET_REF } },
     },
   ],
 };
@@ -56,7 +57,7 @@ describe('import space schema', () => {
       maps: [
         {
           title: 'Generated map',
-          positions: { [RESOURCE_A]: { x: 0, y: 0, open: false } },
+          positions: { [RESOURCE_A]: { x: 0, y: 0 } },
           graphs: [{ title: 'Generated graph', edges: [{ from: RESOURCE_A, to: RESOURCE_B }] }],
         },
       ],
@@ -85,7 +86,7 @@ describe('import space schema', () => {
         maps: [
           {
             title: 'Working',
-            positions: { [RESOURCE_A]: { x: 0, y: 0, open: false } },
+            positions: { [RESOURCE_A]: { x: 0, y: 0 } },
             graphs: [{ ...graph, id: undefined }],
           },
         ],

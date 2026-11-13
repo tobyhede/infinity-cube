@@ -1,8 +1,9 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import type { Resource, UUID } from '@project/core';
+import { isOfKind, EMPTY_ASSET_REF, type KindId, type Resource, type UUID } from '@project/core';
 import { loadSpace, resolveResourceContent, serializeResource, type Space } from '../src/index';
 import { resourceFile, uuid } from './resource-files';
+import { textRef } from './text-asset';
 
 /**
  * The aggregate properties of intake, stated over generated documents and
@@ -31,7 +32,7 @@ function mapOver(index: number, ids: number[], graphCount: number) {
     title: `Map ${index}`,
     kind: 'positioned' as const,
     positions: Object.fromEntries(
-      ids.map((id, i) => [resourceId(id), { x: i * 320, y: index * 200, open: false }]),
+      ids.map((id, i) => [resourceId(id), { x: i * 320, y: index * 200 }]),
     ),
     graphs: Array.from({ length: graphCount }, (_, g) => ({
       id: graphId(index * 100 + g),
@@ -255,14 +256,19 @@ describe('what intake refuses, over generated documents', () => {
   });
 });
 
-type ContentKind = Resource['kind'];
+type ContentKind = KindId;
 
 /** A Resource of the chosen kind that owns its content. */
 function contentOwner(id: UUID, index: number, kind: Exclude<ContentKind, 'reference'>): Resource {
   const title = `Resource ${index}`;
   switch (kind) {
     case 'markdown':
-      return { id, title, kind, content: { source: index % 3 === 0 ? '' : `Body ${index}\n` } };
+      return {
+        id,
+        title,
+        kind,
+        content: { url: index % 3 === 0 ? EMPTY_ASSET_REF : textRef(`Body ${index}\n`) },
+      };
     case 'image':
       return { id, title, kind, content: { url: `https://example.com/${index}.png` } };
     case 'space': {
@@ -352,8 +358,8 @@ describe('resolved content, over generated Spaces of every kind', () => {
       fc.property(mapsArb, kindsArb, targetsArb, (maps, kinds, targets) => {
         const space = acceptedWithKinds(maps, kinds, targets);
         for (const resource of space.resources) {
-          if (resource.kind !== 'reference') continue;
-          const target = space.lookup.resource(resource.content.target);
+          if (!isOfKind(resource, 'reference')) continue;
+          const target = space.lookup.resource(uuid(resource.content.target));
           if (target === undefined) throw new Error('intake accepted a missing Target');
           expect(resolveResourceContent(space, resource)).toStrictEqual({
             ...resolveResourceContent(space, target),

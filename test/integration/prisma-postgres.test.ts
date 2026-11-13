@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { postgresTestDatabase as db } from '../support/postgres-database';
+import { EMPTY_ASSET_REF } from '@project/core';
 
 describe('Prisma Next PostgreSQL contract', () => {
   const spaces = db.orm.public.Space;
@@ -21,7 +22,7 @@ describe('Prisma Next PostgreSQL contract', () => {
         document: {
           title: 'Typed resource',
           kind: 'markdown',
-          content: { source: 'Database-backed content' },
+          content: { url: EMPTY_ASSET_REF },
         },
       });
 
@@ -36,7 +37,7 @@ describe('Prisma Next PostgreSQL contract', () => {
         document: {
           title: 'Typed resource',
           kind: 'markdown',
-          content: { source: 'Database-backed content' },
+          content: { url: EMPTY_ASSET_REF },
         },
       });
     } finally {

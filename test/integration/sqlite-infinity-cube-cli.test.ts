@@ -1,7 +1,13 @@
 import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { AGGREGATE_FILE_VERSION, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import {
+  EMPTY_ASSET_REF,
+  AGGREGATE_FILE_VERSION,
+  uuidSchema,
+  type SpaceSnapshot,
+  type UUID,
+} from '@project/core';
 import { afterEach, describe, expect, it } from 'vitest';
 import { writeSpaceDirectory as writeLoadedSpaceDirectory } from '../../src/aggregate-directory';
 import { runInfinityCube } from '../../src/cli/run';
@@ -12,7 +18,7 @@ import { createSqliteDatabase } from '../../src/sqlite/db';
 import { sqliteSqlStore } from '../../src/sqlite/sql-store';
 import { runInfinityCubeScript } from '../support/infinity-cube-command';
 import { migrateSqliteFile } from '../support/sqlite-harness';
-import { admitted, pngBytes, showing } from '../support/stored-images';
+import { admitted, pngBytes, showing } from '../support/stored-assets';
 
 const META_SPACE_ID = uuidSchema.parse('e1111111-1111-4111-8111-111111111111');
 const TARGET_SPACE_ID = uuidSchema.parse('e2222222-2222-4222-8222-222222222222');
@@ -52,7 +58,7 @@ const metaSpace: SpaceSnapshot = {
       document: {
         title: 'Opening',
         kind: 'markdown',
-        content: { source: 'Durable SQLite body.\n' },
+        content: { url: EMPTY_ASSET_REF },
       },
     },
     {
@@ -219,8 +225,8 @@ describe('infinity-cube CLI --store sqlite', () => {
         replaceAggregate: (input, expected) => repository.replaceAggregate(input, expected),
         markExported: (id, revision) => repository.markExported(id, revision),
         commit: (request) => repository.commit(request),
-        storeImage: (image) => repository.storeImage(image),
-        loadImage: (id) => repository.loadImage(id),
+        storeAsset: (asset) => repository.storeAsset(asset),
+        loadAsset: (hash) => repository.loadAsset(hash),
         loadMetaSpaceId: async () => {
           const read = await repository.loadMetaSpaceId();
           await repository.replaceAggregate(
@@ -380,7 +386,7 @@ describe('infinity-cube CLI --store sqlite', () => {
    * picture an Aggregate directory carries is stored by Import and written
    * back by Export.
    */
-  it('stores the images an imported directory carries, and exports them again', async () => {
+  it('stores the assets an imported directory carries, and exports them again', async () => {
     const path = await migratedFile();
     const image = await admitted(pngBytes(1));
     const pictured: SpaceSnapshot = {
@@ -388,12 +394,12 @@ describe('infinity-cube CLI --store sqlite', () => {
       resources: [...metaSpace.resources, { id: PICTURE_ID, document: showing(image) }],
     };
     const source = await aggregateDirectory(META_SPACE_ID, [targetSpace, pictured]);
-    await mkdir(join(source, 'images'));
-    await writeFile(join(source, 'images', `${image.id}.png`), pngBytes(1));
+    await mkdir(join(source, 'assets'));
+    await writeFile(join(source, 'assets', `${image.hash}.png`), pngBytes(1));
 
     expect((await cube(path, ['import', source])).status).toBe(0);
     await withRepository(path, async (repository) => {
-      await expect(repository.loadImage(image.id)).resolves.toEqual(image);
+      await expect(repository.loadAsset(image.hash)).resolves.toEqual(image);
     });
 
     const destination = join(
@@ -401,9 +407,9 @@ describe('infinity-cube CLI --store sqlite', () => {
       'exported',
     );
     expect((await cube(path, ['export', destination])).status).toBe(0);
-    expect(new Uint8Array(await readFile(join(destination, 'images', `${image.id}.png`)))).toEqual(
-      pngBytes(1),
-    );
+    expect(
+      new Uint8Array(await readFile(join(destination, 'assets', `${image.hash}.png`))),
+    ).toEqual(pngBytes(1));
   });
 
   it('refuses to run without SQLITE_PATH naming a file', async () => {

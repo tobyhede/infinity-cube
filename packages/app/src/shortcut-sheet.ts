@@ -49,11 +49,11 @@ const sectionOf = (title: string, bindings: readonly KeyBinding[]): KeyboardShor
 });
 
 // A command's key is read by its id, as the dispatcher and the rail read it;
-// a key no command answers has only its binding.
+// a key no command answers has only its binding. Open and Open and expand are
+// not listed: a plugin keeps every kind's Open (ADR 0142), so Enter and
+// Shift+Enter open no Resource on the canvas.
 const CANVAS_ROWS: readonly KeyBinding[] = [
   bindingOf('canvas.addResource'),
-  bindingOf('canvas.openResource'),
-  bindingOf('canvas.openAndExpand'),
   bindingOf('canvas.showFullView'),
   bindingOf('canvas.renameResource'),
   CANVAS_KEYS.navigateLeft,

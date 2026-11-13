@@ -83,7 +83,9 @@ const NOT_THE_KIND = new Map<string, ReadonlyMap<string, readonly string[]>>([
 const isScannedSource = (file: string): boolean =>
   /^(?:packages\/[^/]+\/src|src)\/.*\.(?:tsx?|css)$/u.test(file);
 
-const isKindModule = (file: string): boolean => file.includes('/kinds/');
+/** A `kinds/` module, or a Resource plugin's own package, which declares its kind (ADR 0142). */
+const isKindModule = (file: string): boolean =>
+  file.includes('/kinds/') || /^packages\/plugin-[^/]+\//u.test(file);
 
 const sourceOf = (file: string): string =>
   file.endsWith('.css') ? maskedCssSource(file) : maskedTsSource(file);
@@ -157,49 +159,12 @@ const namings = (kind: string): readonly string[] =>
  * `.scratch/resource-kind-modules/`.
  */
 const ONE_KIND_FEATURES = new Map<string, readonly string[]>([
-  // A Markdown body's completion.
-  [
-    'packages/app/src/canvas-resource-authoring.ts',
-    ["if (stored?.document.kind !== markdownKind.id) return 'retained';"],
-  ],
   // The Space glyph on the Space cluster's own controls.
   [
     'packages/app/src/components/CommandDockSpaces.tsx',
     [
       '<ResourceKindIcon kind={spaceKind.id} decorative />',
       'icon={<ResourceKindIcon kind={spaceKind.id} decorative />}',
-    ],
-  ],
-  // Replace is an Image Resource's (ADR 0106).
-  [
-    'packages/app/src/image-replacement.ts',
-    ['if (stored?.document.kind !== imageKind.id) return undefined;'],
-  ],
-  // Create Reference's glyph, and a Space Resource's Enter and menu.
-  [
-    'packages/app/src/resource-rail-actions.tsx',
-    [
-      'icon: <ResourceKindIcon kind={referenceKind.id} decorative />,',
-      'if (resource.kind === spaceKind.id) {',
-      'spaces === null || resource.kind !== spaceKind.id',
-    ],
-  ],
-  // Creating an Image or a Reference Resource, and Replace.
-  [
-    'packages/app/src/space-authoring.ts',
-    [
-      'return { title, kind: imageKind.id, content };',
-      'if (resource.document.kind !== imageKind.id)',
-      'kind: referenceKind.id,',
-    ],
-  ],
-  // The Space Resource lifecycle (ADR 0074): its create.
-  ['packages/persistence/src/space-resource-planning.ts', ['kind: spaceKind.id,']],
-  // A stored image's bytes travel with the Image Resource that references it (ADR 0118).
-  [
-    'src/aggregate-directory/images.ts',
-    [
-      'const id = document.kind === imageKind.id ? storedImageId(document.content.url) : undefined;',
     ],
   ],
 ]);
@@ -254,6 +219,7 @@ describe('a kind is named only by its module', () => {
 
   it('reads source in the kinds/ directories as module source', () => {
     expect(isKindModule('packages/core/src/kinds/ur.ts')).toBe(true);
+    expect(isKindModule('packages/plugin-ur/src/domain.ts')).toBe(true);
     expect(isKindModule('packages/core/src/schema.ts')).toBe(false);
   });
 });

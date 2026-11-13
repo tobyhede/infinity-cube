@@ -28,7 +28,7 @@ Built. A Resource's rail carries **Connect** (Lucide `Spline`, `ConnectIcon`), f
 
 **Evidence.**
 - Unit tests: `edge-authoring.test.ts` covers the choices, including a property test that each row agrees with `accepts`, and the connect, refusal, beside placement for closed and Open sources, and the Active Graph continuation.
-- Component tests: `ResourcesPopover.test.tsx` covers the connect purpose, `CanvasResource-rail-toolbar.test.tsx` the slot, `canvas-resource-decoration.test.ts` the gating, and `resource-rail-actions.test.tsx` the rail-to-Edit wiring.
+- Component tests: `ResourcesPopover.test.tsx` covers the connect purpose, `resource-rail-toolbar.test.tsx` the slot, `canvas-resource-decoration.test.ts` the gating, and `resource-rail-actions.test.tsx` the rail-to-Edit wiring.
 - Three parity claims on `Space/Edge Toolbar`: `resource-connect-draws-an-edge-from-the-keyboard`, `resource-connect-keeps-refused-targets` and `resource-connect-creates-a-new-resource`. They are proved in `ladle-e2e/resource-connect.spec.ts` and `e2e/keyboard-connect.spec.ts`.
 
 ## Comments

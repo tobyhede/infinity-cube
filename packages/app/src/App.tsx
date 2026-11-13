@@ -40,6 +40,7 @@ import { PlacementPending } from './components/PlacementPending';
 import { PresentingStage } from './components/PresentingStage';
 import { ShortcutSheet } from './components/ShortcutSheet';
 import { createKeyDispatcher, KeyDispatcherContext, useKeyCover } from './key-dispatcher';
+import { useExclusiveRunning } from './plugin-host/plugin-gate-context';
 import {
   CommandNotices,
   DrawnSpaceNotices,
@@ -73,6 +74,9 @@ export const createApp = (
    * guard is here rather than on `ComposedApp`.
    */
   const reportBreak = createNonThrowingReporter(reportObserverError);
+  // What this Space's plugin surfaces claim on, and where a plugin that throws
+  // is reported (ADR 0142).
+  const plugins = { gate: composition.pluginGate, report: reportBreak };
   const currentSpaceId = () => currentSpace().id;
   const openingGraphId = opening?.graphId ?? null;
   const openingPresentationResourceId = opening?.presentationResourceId ?? null;
@@ -131,10 +135,8 @@ export const createApp = (
           : entries,
       );
     }, []);
-    const replacingImage = useSyncExternalStore(
-      composition.imageReplacement.subscribe,
-      composition.imageReplacement.getState,
-    );
+    // Exclusive work on any plugin surface holds this Space (ADR 0126, ADR 0142).
+    const replacingImage = useExclusiveRunning(composition.pluginGate);
     const authoringState = useSyncExternalStore(authoring.subscribe, authoring.getState);
     const { session: sessionState, navigation: navigationState, replacementEpoch } = authoringState;
     // The address, the disclosure and the Stage's Copy link read the Map id
@@ -212,7 +214,7 @@ export const createApp = (
       entityActions,
       availability,
       editingResourceBody,
-      createReferenceFrom: placement.createReferenceFrom,
+      createFromResource: placement.createFromResource,
       spaces,
     });
     useUnsettledLeaveGuard(sessionState.persistence.kind, replacingImage);
@@ -243,6 +245,7 @@ export const createApp = (
           outside: view.resourcesOutsideMap,
           memberships: view.membershipsOutsideMap,
           spaceTitleById: spaceResourceTargets.titleById,
+          spaceSelectionNameById: spaceResourceTargets.selectionNameById,
           disclose: discloseResources,
           addressedResourceId,
           placement,
@@ -406,8 +409,7 @@ export const createApp = (
                   onDrawnSpacesChange={reportDrawnSpaces}
                   commandOutcomes={commandOutcomes}
                   deleteConfirmation={deleteConfirmation}
-                  imageReplacement={composition.imageReplacement}
-                  pickImages={composition.pickImages}
+                  plugins={plugins}
                   nameOnCreation={nameOnCreation}
                   spaceSession={spaceSession}
                   spaceResourceTargets={spaceResourceTargets.targets}
@@ -425,6 +427,8 @@ export const createApp = (
               mapId={selectedMapId}
               graphId={presentedGraphId}
               resourceId={activeResourceId}
+              onPluginFailure={plugins.report}
+              replacementEpoch={replacementEpoch}
               moves={moves}
               canRetreat={canRetreat(navigationState)}
               onSelectBranch={presentingWindow.commands.selectBranch}

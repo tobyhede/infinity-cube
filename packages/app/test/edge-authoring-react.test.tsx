@@ -7,7 +7,7 @@ import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { graphRenderEdgeId } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession, type SpaceSession } from '@project/persistence';
 import { bareKindData, ROUTED_EDGE_TYPE, type ResourceFlowNode } from '@project/react-flow-adapter';
-import { CLOSED_DISPLAY, Toolbar, ToolbarButton } from '@project/ui';
+import { Toolbar, ToolbarButton } from '@project/ui';
 import { RESOURCES_TRIGGER } from '../src/components/command-dock-triggers';
 import { composeApp, type EdgeCollaborators } from '../src/compose-app';
 import type { ConnectionCompletion } from '../src/connection-completion';
@@ -18,9 +18,9 @@ import { ArmedDeleteConfirmation } from '../src/components/DeleteConfirmation';
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
 import { RESOURCE_SIZE } from '../src/resource';
 import { mountSettled } from './settled-mount';
-import { unusedImageSources } from './image-sources';
 import { stubResizeObserver } from './resize-observer';
 import { canvasReading, IDLE_PLACEMENT } from './map-surfaces';
+import { textAsset } from './markdown-texts';
 
 /**
  * Edge Authoring's React interface: what it hands React Flow, and the controls
@@ -56,9 +56,9 @@ const snapshot: SpaceSnapshot = {
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [RESOURCE_A]: { x: 0, y: 0, open: false },
-          [RESOURCE_B]: { x: 400, y: 0, open: false },
-          [RESOURCE_C]: { x: 800, y: 0, open: false },
+          [RESOURCE_A]: { x: 0, y: 0 },
+          [RESOURCE_B]: { x: 400, y: 0 },
+          [RESOURCE_C]: { x: 800, y: 0 },
         },
         graphs: [
           { id: GRAPH_ID, title: 'Main', edges: [EDGE] },
@@ -69,9 +69,18 @@ const snapshot: SpaceSnapshot = {
     defaultMap: MAP_ID,
   },
   resources: [
-    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
-    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', content: { source: 'B' } } },
-    { id: RESOURCE_C, document: { title: 'C', kind: 'markdown', content: { source: 'C' } } },
+    {
+      id: RESOURCE_A,
+      document: { title: 'A', kind: 'markdown', content: { url: textAsset('A') } },
+    },
+    {
+      id: RESOURCE_B,
+      document: { title: 'B', kind: 'markdown', content: { url: textAsset('B') } },
+    },
+    {
+      id: RESOURCE_C,
+      document: { title: 'C', kind: 'markdown', content: { url: textAsset('C') } },
+    },
   ],
 };
 
@@ -129,7 +138,6 @@ function resourceNode(id: string, x: number, title: string): ResourceFlowNode {
       ...bareKindData('markdown'),
       ...fixtureFacts('markdown'),
       selectedForAuthoring: false,
-      display: CLOSED_DISPLAY,
       activeGraphId: GRAPH_ID,
       activeGraphColor: '#8a94a6',
       borderColor: null,
@@ -212,7 +220,6 @@ function compose({
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
   const composed = composeApp({
-    images: unusedImageSources,
     spaceSession: session,
     selection,
     connections,
@@ -314,8 +321,6 @@ function DeleteWhenCommitted({ armed }: { readonly armed: boolean }) {
 /** The composition `App` performs, narrowed to what an Edge test needs. */
 function CanvasHarness({
   surface,
-  imageReplacement,
-  pickImages,
   adapter,
   continuation,
   commandOutcomes,
@@ -326,8 +331,6 @@ function CanvasHarness({
 }: Pick<
   ReturnType<typeof compose>,
   | 'surface'
-  | 'imageReplacement'
-  | 'pickImages'
   | 'adapter'
   | 'continuation'
   | 'commandOutcomes'
@@ -369,8 +372,6 @@ function CanvasHarness({
           selectEdge: adapter.getState().selectEdge,
         })}
         placement={IDLE_PLACEMENT}
-        imageReplacement={imageReplacement}
-        pickImages={pickImages}
         commandOutcomes={commandOutcomes}
         deleteConfirmation={deleteConfirmation}
         nameOnCreation={null}
@@ -1240,7 +1241,7 @@ describe('the React Flow properties', () => {
     expect(result.current.reactFlowProps).toBe(first);
   });
 
-  it('configures the deletion, reconnection and single-selection policy', () => {
+  it('configures the deletion, reconnection and selection policy', () => {
     const composed = compose();
     const { result } = renderHook(
       () =>
@@ -1266,9 +1267,10 @@ describe('the React Flow properties', () => {
       // No Edge's end can be moved; focusability is per-Edge, Active Graph only.
       edgesReconnectable: false,
       edgesFocusable: false,
-      // Version 1 authors one element at a time.
-      multiSelectionKeyCode: null,
-      selectionKeyCode: null,
+      // Resources are selected together by a modifier click or a Shift drag's
+      // box; a plain drag still pans.
+      multiSelectionKeyCode: ['Shift', 'Meta', 'Control'],
+      selectionKeyCode: 'Shift',
       selectionOnDrag: false,
     });
   });

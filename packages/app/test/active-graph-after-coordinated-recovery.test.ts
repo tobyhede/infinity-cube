@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import {
   createSpaceSessionRegistry,
   MemorySpaceBackend,
@@ -9,7 +9,6 @@ import { composeApp } from '../src/compose-app';
 import { canvasProjection } from '../src/canvas-projection';
 import { resolveMap } from '../src/map-resolution';
 import { mintingIds } from './minting';
-import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
 
 /**
@@ -74,8 +73,8 @@ const targetSnapshot: SpaceSnapshot = {
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [TARGET_RESOURCE_ID]: { x: 0, y: 0, open: false },
-          [TARGET_RESOURCE_TWO]: { x: 300, y: 0, open: false },
+          [TARGET_RESOURCE_ID]: { x: 0, y: 0 },
+          [TARGET_RESOURCE_TWO]: { x: 300, y: 0 },
         },
         graphs: [
           {
@@ -91,11 +90,11 @@ const targetSnapshot: SpaceSnapshot = {
   resources: [
     {
       id: TARGET_RESOURCE_ID,
-      document: { title: 'Architecture', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Architecture', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
     {
       id: TARGET_RESOURCE_TWO,
-      document: { title: 'Second', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Second', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
   ],
 };
@@ -112,8 +111,8 @@ const metaSnapshot: SpaceSnapshot = {
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [META_RESOURCE_ID]: { x: 0, y: 0, open: false },
-          [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false },
+          [META_RESOURCE_ID]: { x: 0, y: 0 },
+          [SPACE_RESOURCE_ID]: { x: 240, y: 80 },
         },
         graphs: [{ id: META_GRAPH_ID, title: 'Graph 1', edges: [] }],
         activeGraph: META_GRAPH_ID,
@@ -123,7 +122,7 @@ const metaSnapshot: SpaceSnapshot = {
   resources: [
     {
       id: META_RESOURCE_ID,
-      document: { title: 'Meta', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Meta', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
     {
       id: SPACE_RESOURCE_ID,
@@ -162,7 +161,6 @@ const openRolledBackTarget = async (): Promise<ReturnType<typeof composeApp>> =>
   });
 
   const target = composeApp({
-    images: unusedImageSources,
     spaceSession: targetSession,
     newId: mintingIds(ADDED_GRAPH_ID),
   });
@@ -189,7 +187,6 @@ const openRolledBackTarget = async (): Promise<ReturnType<typeof composeApp>> =>
   // The author answers on the containing Space, through the operation
   // `PersistenceControl`'s "use the stored Space" spends.
   const metaApp = composeApp({
-    images: unusedImageSources,
     spaceSession: meta,
     newId: mintsNothing('Accepting the stored Space minted an identity.'),
   });
@@ -224,7 +221,6 @@ const openRolledBackOverCreatedMap = async (): Promise<ReturnType<typeof compose
   });
 
   const target = composeApp({
-    images: unusedImageSources,
     spaceSession: targetSession,
     newId: mintingIds(CREATED_MAP_ID, CREATED_MAP_GRAPH_ID),
   });
@@ -246,7 +242,6 @@ const openRolledBackOverCreatedMap = async (): Promise<ReturnType<typeof compose
     .delete({ containingSpaceId: META_ID, resourceId: SPACE_RESOURCE_ID });
   await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('conflicted'));
   const metaApp = composeApp({
-    images: unusedImageSources,
     spaceSession: meta,
     newId: mintsNothing('Accepting the stored Space minted an identity.'),
   });

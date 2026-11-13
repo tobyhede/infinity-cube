@@ -1,13 +1,14 @@
 import { StrictMode, useEffect, useLayoutEffect, type ReactNode } from 'react';
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type SpaceSnapshot } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
 import { createMapSurface } from '../src/map-surface';
 import { CANVAS } from '../src/space-authoring';
 import { useMapSurface } from '../src/use-map-surface';
-import { unusedImageSources } from './image-sources';
+import { createdEmpty } from './created-resources';
+import { holdExclusive } from './held-exclusive';
 
 const id = (tail: string) => uuidSchema.parse(`00000000-0000-4000-8000-${tail.padStart(12, '0')}`);
 const SPACE = id('1');
@@ -27,7 +28,7 @@ function composition() {
           id: MAP,
           title: 'Canvas',
           kind: 'positioned',
-          positions: { [RESOURCE]: { x: 10, y: 20, open: false } },
+          positions: { [RESOURCE]: { x: 10, y: 20 } },
           graphs: [{ id: GRAPH, title: 'Graph', edges: [] }],
         },
       ],
@@ -35,13 +36,13 @@ function composition() {
     resources: [
       {
         id: RESOURCE,
-        document: { title: 'Resource 1', kind: 'markdown', content: { source: '' } },
+        document: { title: 'Resource 1', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       },
     ],
   };
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-  return composeApp({ spaceSession, images: unusedImageSources });
+  return composeApp({ spaceSession });
 }
 
 const strict = ({ children }: { readonly children: ReactNode }) => (
@@ -60,11 +61,7 @@ describe('useMapSurface', () => {
     }));
     // The Space gains `Resource 2` after the drawing's snapshot was taken and
     // before anything observes it, as a drawn Map's first render can see.
-    const created = app.authoring.complete(CANVAS, {
-      kind: 'created-resource',
-      resourceKind: 'markdown',
-      anchor: { x: 0, y: 0 },
-    });
+    const created = app.authoring.complete(CANVAS, createdEmpty('markdown', { x: 0, y: 0 }));
     expect(created.kind).toBe('completed');
     await vi.waitFor(() =>
       expect(app.authoring.getState().session.persistence.kind).toBe('settled'),
@@ -98,11 +95,7 @@ describe('useMapSurface', () => {
     // The Space gains `Resource 2` between the surface's creation and its
     // `observe()`, as `EmbeddedMapAuthoring` creates in `useState` and observes
     // in an effect.
-    app.authoring.complete(CANVAS, {
-      kind: 'created-resource',
-      resourceKind: 'markdown',
-      anchor: { x: 0, y: 0 },
-    });
+    app.authoring.complete(CANVAS, createdEmpty('markdown', { x: 0, y: 0 }));
     await vi.waitFor(() =>
       expect(app.authoring.getState().session.persistence.kind).toBe('settled'),
     );
@@ -123,5 +116,33 @@ describe('useMapSurface', () => {
 
     expect(committed).not.toHaveLength(0);
     expect(new Set(committed)).toEqual(new Set(['Resource 3']));
+  });
+
+  it("withholds authoring while exclusive work runs behind its composition's gate, with no open set mounted", async () => {
+    const app = composition();
+    const surface = createMapSurface(app, () => ({
+      kind: 'drawn',
+      mapId: MAP,
+      graphId: GRAPH,
+      policy: 'authoring',
+      occurrence: 'drawing',
+    }));
+    const { result } = renderHook(() => {
+      useEffect(() => surface.observe(), []);
+      return useMapSurface(app, surface, { presenting: false, spaceOnCanvas: true });
+    });
+    await act(() => Promise.resolve());
+    expect(result.current.availability.addResource).toBe(true);
+
+    let held: ReturnType<typeof holdExclusive>;
+    act(() => {
+      held = holdExclusive(app.pluginGate, RESOURCE);
+    });
+    expect(result.current.availability.addResource).toBe(false);
+    await act(async () => {
+      held?.release();
+      await held?.running;
+    });
+    expect(result.current.availability.addResource).toBe(true);
   });
 });

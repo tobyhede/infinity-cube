@@ -12,7 +12,11 @@ import { sqliteSqlStore } from '../../src/sqlite/sql-store';
 import { clearInfinityCubeContent } from '../support/clear-infinity-cube-content';
 import { openSqliteRepository } from '../support/sqlite-harness';
 import { postgresTestDatabase } from '../support/postgres-database';
-import { markdownResourceFiles, writeAggregateInto } from '../support/aggregate-directory';
+import {
+  markdownResourceFiles,
+  textAssetFiles,
+  writeAggregateInto,
+} from '../support/aggregate-directory';
 
 const META_SPACE_ID = uuidSchema.parse('f1111111-1111-4111-8111-111111111111');
 const RESOURCE_ID = uuidSchema.parse('f2222222-2222-4222-8222-222222222222');
@@ -125,13 +129,19 @@ describe.each(cases)('database CLI target ($name)', (targetCase) => {
     const stdout = vi.fn();
     const stderr = vi.fn();
     const opening = markdownResourceFiles(RESOURCE_ID, 'Opening', 'Hello.\n');
-    const source = await writeAggregateInto(await temporaryDirectory(), META_SPACE_ID, [
-      {
-        name: META_SPACE_ID,
-        spaceFile: JSON.stringify({ version: 1, id: META_SPACE_ID, title: 'Meta' }),
-        resources: opening,
-      },
-    ]);
+    const openingText = textAssetFiles('Hello.\n');
+    const source = await writeAggregateInto(
+      await temporaryDirectory(),
+      META_SPACE_ID,
+      [
+        {
+          name: META_SPACE_ID,
+          spaceFile: JSON.stringify({ version: 1, id: META_SPACE_ID, title: 'Meta' }),
+          resources: opening,
+        },
+      ],
+      openingText,
+    );
     const destination = join(await temporaryDirectory(), 'exported');
     try {
       await expect(
@@ -157,11 +167,14 @@ describe.each(cases)('database CLI target ($name)', (targetCase) => {
       await expect(readFile(join(destination, AGGREGATE_FILE_NAME), 'utf8')).resolves.toBe(
         `${JSON.stringify({ version: 1, metaSpaceId: META_SPACE_ID }, null, 2)}\n`,
       );
-      // The Resource file and its sidecar come back as they were written.
+      // The Resource file and its text's asset come back as they were written.
       for (const [name, text] of Object.entries(opening)) {
         await expect(
           readFile(join(destination, META_SPACE_ID, 'resources', name), 'utf8'),
         ).resolves.toBe(text);
+      }
+      for (const [name, text] of Object.entries(openingText)) {
+        await expect(readFile(join(destination, 'assets', name), 'utf8')).resolves.toBe(text);
       }
       await expect(opened.repository.loadSpace(META_SPACE_ID)).resolves.toMatchObject({
         revision: 0n,

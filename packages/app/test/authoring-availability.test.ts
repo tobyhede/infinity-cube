@@ -32,7 +32,6 @@ const ALL_AVAILABLE: AuthoringAvailability = {
   createMap: true,
   authorOnCanvas: true,
   authorInEmbeddedMap: true,
-  editResourceBody: true,
   connectOnCanvas: true,
   dragNodes: true,
   selectNodes: true,
@@ -44,12 +43,7 @@ const ALL_AVAILABLE: AuthoringAvailability = {
 describe('authoring availability', () => {
   it('withdraws other operations while replacing an image but keeps its editor mounted', () => {
     expect(authoringAvailability({ ...NOTHING_IN_PROGRESS, replacingImage: true })).toEqual(
-      Object.fromEntries(
-        Object.keys(ALL_AVAILABLE).map((key) => [
-          key,
-          key === 'editResourceBody' || key === 'embeddedMapEdit',
-        ]),
-      ),
+      Object.fromEntries(Object.keys(ALL_AVAILABLE).map((key) => [key, key === 'embeddedMapEdit'])),
     );
   });
   it('offers every operation when nothing is in progress', () => {
@@ -68,7 +62,6 @@ describe('authoring availability', () => {
         deleteResource: false,
         authorOnCanvas: false,
         authorInEmbeddedMap: false,
-        editResourceBody: false,
         connectOnCanvas: false,
         dragNodes: false,
       },
@@ -86,7 +79,6 @@ describe('authoring availability', () => {
         createMap: false,
         authorOnCanvas: false,
         authorInEmbeddedMap: false,
-        editResourceBody: false,
         connectOnCanvas: false,
         dragNodes: false,
         selectNodes: false,
@@ -177,16 +169,6 @@ describe('authoring availability', () => {
             .connectOnCanvas,
         ).toBe(false);
       }
-    });
-
-    it('keeps a live content editor through a chrome rename that withdraws canvas authoring', () => {
-      const availability = authoringAvailability({
-        ...NOTHING_IN_PROGRESS,
-        editingChromeTitle: true,
-      });
-
-      expect(availability.editResourceBody).toBe(true);
-      expect(availability.authorOnCanvas).toBe(false);
     });
 
     it('leaves an embedded Map authorable while withdrawing the canvas around it', () => {

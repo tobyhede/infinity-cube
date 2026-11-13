@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { Story } from '@ladle/react';
-import { uuidSchema, type Resource, type UUID } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type Resource, type UUID } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { ResourcesPopover, SPACE_DRAG_TYPE } from '#components/ResourcesPopover';
 import { PersistenceNotice } from '#components/PersistenceControl';
@@ -9,7 +9,7 @@ import { composeApp } from '#src/compose-app';
 import { resolveMap, resourcesOutsideMap } from '#src/map-resolution';
 import { otherMapMemberships, type MapMemberships } from '#src/map-memberships';
 import type { SpaceDrag } from '#src/resources-drag';
-import { storelessImages } from '../support/image-sources';
+import { spaceTitlesById, spaceSelectionNamesById } from '#src/space-resource-targets';
 import { sparseAuthoredSnapshot, widelyPlacedSpace } from '../support/spaces';
 import { CANVAS } from '#src/space-authoring';
 
@@ -18,13 +18,23 @@ export default { title: 'Surfaces/Resources Popover' };
 const id = (suffix: string) => uuidSchema.parse(`00000000-0000-4000-8000-${suffix}`);
 
 const RESOURCES: readonly Resource[] = [
-  { id: id('000000000001'), title: 'API boundaries', kind: 'markdown', content: { source: '' } },
-  { id: id('000000000002'), title: 'Architecture', kind: 'markdown', content: { source: '' } },
+  {
+    id: id('000000000001'),
+    title: 'API boundaries',
+    kind: 'markdown',
+    content: { url: EMPTY_ASSET_REF },
+  },
+  {
+    id: id('000000000002'),
+    title: 'Architecture',
+    kind: 'markdown',
+    content: { url: EMPTY_ASSET_REF },
+  },
   {
     id: id('000000000003'),
     title: 'Design constraints',
     kind: 'markdown',
-    content: { source: '' },
+    content: { url: EMPTY_ASSET_REF },
   },
   {
     id: id('000000000004'),
@@ -44,7 +54,7 @@ const LONG_RESOURCES: readonly Resource[] = Array.from({ length: 18 }, (_, index
   id: id(String(index + 100).padStart(12, '0')),
   title: `Reference ${String(index + 1).padStart(2, '0')}`,
   kind: 'markdown' as const,
-  content: { source: '' },
+  content: { url: EMPTY_ASSET_REF },
 }));
 
 /** Spaces of the Meta Space, which are not Resources and are in no Map. */
@@ -60,6 +70,8 @@ function ResourcesPopoverFixture({
   notice,
   spaces,
   memberships,
+  spaceTitleById,
+  spaceSelectionNameById,
 }: {
   readonly resources?: readonly Resource[];
   readonly allResources?: readonly Resource[];
@@ -67,6 +79,8 @@ function ResourcesPopoverFixture({
   readonly notice?: ReactNode;
   readonly spaces?: readonly { readonly id: UUID; readonly title: string }[];
   readonly memberships?: MapMemberships;
+  readonly spaceTitleById?: ReadonlyMap<UUID, string>;
+  readonly spaceSelectionNameById?: ReadonlyMap<Resource['id'], string>;
 }) {
   const [open, setOpen] = useState(false);
   const [added, setAdded] = useState<readonly string[]>([]);
@@ -114,6 +128,8 @@ function ResourcesPopoverFixture({
             spaceDrag.current = null;
           }}
           memberships={memberships}
+          spaceTitleById={spaceTitleById}
+          spaceSelectionNameById={spaceSelectionNameById}
         />
       </header>
       {notice}
@@ -146,10 +162,7 @@ function RefusedAdd() {
     const stored = { snapshot: sparseAuthoredSnapshot, revision: 0n, exportedRevision: null };
     return openSpaceSession(MemorySpaceBackend.asMeta(stored), stored);
   }, []);
-  const composed = useMemo(
-    () => composeApp({ spaceSession: session, images: storelessImages }),
-    [session],
-  );
+  const composed = useMemo(() => composeApp({ spaceSession: session }), [session]);
   useSyncExternalStore(session.subscribe, session.getState);
   const space = composed.currentSpace();
   const selectedMap = space.lookup.map(composed.navigation.getState().selectedMapId)?.map;
@@ -230,6 +243,114 @@ export const PlacedElsewhere: Story = () => {
   );
 };
 PlacedElsewhere.meta = { iframed: true };
+
+const ROADMAP_ID = id('000000000040');
+const PLAN_MAP = id('000000000041');
+const RISKS_MAP = id('000000000042');
+
+/** The target Space as the target read answers it: its Maps and their Graphs. */
+const ROADMAP_TARGETS = new Map([
+  [
+    ROADMAP_ID,
+    {
+      id: ROADMAP_ID,
+      title: 'Roadmap',
+      maps: [
+        {
+          id: PLAN_MAP,
+          title: 'Plan',
+          graphs: [
+            {
+              id: id('000000000043'),
+              title: 'Milestones',
+              color: '#1f77b4',
+              headShape: 'arrow' as const,
+            },
+          ],
+        },
+        {
+          id: RISKS_MAP,
+          title: 'Risks',
+          graphs: [
+            {
+              id: id('000000000044'),
+              title: 'Security',
+              color: '#d62728',
+              headShape: 'arrow' as const,
+            },
+          ],
+        },
+      ],
+    },
+  ],
+]);
+
+const ROADMAP_RESOURCES: readonly Resource[] = [
+  {
+    id: id('000000000045'),
+    title: 'Roadmap',
+    kind: 'space',
+    content: { spaceId: ROADMAP_ID, map: PLAN_MAP, graph: id('000000000043') },
+  },
+  {
+    id: id('000000000046'),
+    title: 'Roadmap',
+    kind: 'space',
+    content: { spaceId: ROADMAP_ID, map: RISKS_MAP, graph: id('000000000044') },
+  },
+  {
+    id: id('000000000047'),
+    title: 'Release notes',
+    kind: 'markdown',
+    content: { url: EMPTY_ASSET_REF },
+  },
+];
+
+/**
+ * One Space under three rows that share its name: two Space Resources showing
+ * it differently, one of them also on another Map, and the Space itself. Each
+ * Space Resource row names the Map and Graph it shows, read from the target the
+ * way the application reads it, and the Space row says it makes a new Space Resource.
+ */
+export const SpaceSelections: Story = () => (
+  <ResourcesPopoverFixture
+    resources={ROADMAP_RESOURCES}
+    spaces={[{ id: ROADMAP_ID, title: 'Roadmap' }]}
+    spaceTitleById={spaceTitlesById(ROADMAP_TARGETS)}
+    spaceSelectionNameById={spaceSelectionNamesById(ROADMAP_TARGETS, ROADMAP_RESOURCES)}
+    memberships={
+      new Map([
+        [id('000000000046'), [{ mapId: id('000000000048'), mapTitle: 'Deep dive', graphs: [] }]],
+      ])
+    }
+  />
+);
+SpaceSelections.meta = { iframed: true };
+
+const LONG_NAME = 'A Resource whose name runs far past the width the list can give it';
+const LONG_SPACE_NAME = 'A Space whose name runs far past the width the list can give it';
+const LONG_NAMED: readonly Resource[] = [
+  { id: id('000000000050'), title: LONG_NAME, kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+];
+
+/**
+ * A name longer than its row: a Resource placed in another Map, so its row
+ * also carries a capsule and Delete, and a Space. Each name is cut short
+ * with an ellipsis before the marks at the row's end rather than running
+ * under them.
+ */
+export const LongNames: Story = () => (
+  <ResourcesPopoverFixture
+    resources={LONG_NAMED}
+    spaces={[{ id: id('000000000051'), title: LONG_SPACE_NAME }]}
+    memberships={
+      new Map([
+        [id('000000000050'), [{ mapId: id('000000000052'), mapTitle: 'Elsewhere', graphs: [] }]],
+      ])
+    }
+  />
+);
+LongNames.meta = { iframed: true };
 
 export const Empty: Story = () => (
   <ResourcesPopoverFixture resources={[]} allResources={RESOURCES} />

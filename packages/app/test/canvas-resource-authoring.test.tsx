@@ -1,5 +1,6 @@
-import { act, renderHook } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { isValidElement } from 'react';
+import { act, fireEvent, render, renderHook, screen } from '@testing-library/react';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { spaceSnapshotSchema, uuidSchema, type ResourceId } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { bareKindData, type ResourceFlowNode } from '@project/react-flow-adapter';
@@ -12,11 +13,18 @@ import {
   NO_SPACE_RESOURCE_TARGETS,
   type SpaceResourceTargets,
 } from '../src/space-resource-targets';
-import { fixtureDisplay, fixtureFacts } from './render-adapter-fixtures';
-import type { ImageSources } from '../src/image-creation';
-import { heldImageSources, unusedImageSources } from './image-sources';
+import { fixtureFacts } from './render-adapter-fixtures';
+import {
+  PluginAssetsProvider,
+  ResourceRailActions,
+  type MapEmbedRequest,
+  type SpaceResourceSelectorsProps,
+} from '@project/ui';
+import type { Claim } from '@project/resource-api/view';
+import { createMapEmbeddings, type MapEmbeddings } from '../src/map-embeddings';
 import { CANVAS } from '../src/space-authoring';
 import { canvasAuthoring } from './canvas-authoring';
+import { textAsset } from './markdown-texts';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -46,10 +54,10 @@ const snapshot = spaceSnapshotSchema.parse({
         title: 'Map',
         kind: 'positioned',
         positions: {
-          [RESOURCE_ID]: { x: 0, y: 0, open: false },
-          [REFERENCE_ID]: { x: 300, y: 0, open: false },
-          [SPACE_RESOURCE_ID]: { x: 600, y: 0, open: false },
-          [UR_ID]: { x: 900, y: 0, open: false },
+          [RESOURCE_ID]: { x: 0, y: 0 },
+          [REFERENCE_ID]: { x: 300, y: 0 },
+          [SPACE_RESOURCE_ID]: { x: 600, y: 0 },
+          [UR_ID]: { x: 900, y: 0 },
         },
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
       },
@@ -59,7 +67,7 @@ const snapshot = spaceSnapshotSchema.parse({
   resources: [
     {
       id: RESOURCE_ID,
-      document: { title: 'A', kind: 'markdown', content: { source: 'A source' } },
+      document: { title: 'A', kind: 'markdown', content: { url: textAsset('A source') } },
     },
     {
       id: REFERENCE_ID,
@@ -112,10 +120,8 @@ const node = (
     title: 'A',
     readOnly: false,
     ...bareKindData(kind),
-    ...fixtureFacts(kind),
-    open,
+    ...fixtureFacts(kind, open, 'A source'),
     selectedForAuthoring: false,
-    display: fixtureDisplay(open, kind, 'A source'),
     activeGraphId: GRAPH_ID,
     activeGraphColor: '#8a94a6',
     borderColor: null,
@@ -138,11 +144,9 @@ const mountAuthoring = (
 ) => {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-  const { authoring, adapter, imageReplacement, pickImages, commandOutcomes, continuation } =
-    composeApp({
-      images: unusedImageSources,
-      spaceSession,
-    });
+  const { authoring, adapter, commandOutcomes, continuation, pluginGate } = composeApp({
+    spaceSession,
+  });
   const initialProps: HookProps = {
     open: false,
     enabled: true,
@@ -154,8 +158,6 @@ const mountAuthoring = (
     ({ open, enabled, presenting, nameOnCreation, resourceId }: HookProps) =>
       useCanvasResourceAuthoring({
         continuation,
-        imageReplacement,
-        pickImages,
         nodes: [node(open, resourceId, projectedKind)],
         // The two facts this hook's rules turn on, stated as facts and turned
         // into answers by the one module that owns them. A live chrome rename is
@@ -184,26 +186,30 @@ const mountAuthoring = (
       initialProps,
     },
   );
-  return { ...hook, spaceSession, authoring, adapter, commandOutcomes };
+  return { ...hook, spaceSession, authoring, adapter, commandOutcomes, pluginGate };
 };
 
-/** The content edit a Resource's kind offers, where its kind has one. */
-const beginEditOf = (node: ResourceFlowNode): (() => void) | undefined => {
-  const operations = node.data.kindOperations;
-  return operations.kind === 'markdown' || operations.kind === 'image'
-    ? operations.onBeginEdit
-    : undefined;
-};
-
-/** An Ur Resource's Shape choice, where it is offered. */
-const resourceShapeChangeOf = (node: ResourceFlowNode) =>
-  node.data.kindOperations.kind === 'ur'
-    ? node.data.kindOperations.onResourceShapeChange
-    : undefined;
+/** An Ur Resource's Map content commit, where its plugin surface is offered one. */
+const mapCommitOf = (node: ResourceFlowNode) =>
+  node.data.kindOperations.kind === 'ur' ? node.data.kindOperations.commitMap : undefined;
 
 /** A Space Resource's own operations, or nothing for another kind. */
 const spaceOperationsOf = (data: ResourceFlowNode['data']) =>
   data.kindOperations.kind === 'space' ? data.kindOperations : undefined;
+
+/** What an Open Space Resource's plugin asks its Map embedding for. */
+/** The key of the drawing the Space Resource's plugin embeds its Map from. */
+const SPACE_DRAWING = Symbol('space drawing');
+
+const spaceEmbed = (claim?: Claim): MapEmbedRequest => ({
+  space: TARGET_SPACE_ID,
+  view: { map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
+  select: {
+    value: { map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
+    commit: () => Promise.resolve('completed'),
+  },
+  claim,
+});
 
 const onlyNode = (nodes: readonly ResourceFlowNode[]): ResourceFlowNode => {
   const decorated = nodes[0];
@@ -212,33 +218,37 @@ const onlyNode = (nodes: readonly ResourceFlowNode[]): ResourceFlowNode => {
 };
 
 describe('canvas Resource authoring', () => {
-  it('authors Open before installing the body editor for Edit on a Closed Resource', () => {
-    const { result, rerender, spaceSession } = mountAuthoring();
-
-    const closed = onlyNode(result.current.nodes);
-    expect(closed.data.display.shown).not.toBe('editing');
-
-    act(() => {
-      expect(closed.data.onOpenChange?.(true)).toBe('completed');
-      beginEditOf(closed)?.();
-    });
-    expect(spaceSession.getState().working.document.maps?.[0]?.positions[RESOURCE_ID]?.open).toBe(
-      true,
-    );
-    expect(result.current.nodes[0]?.data.display.shown).not.toBe('editing');
-
-    rerender({
-      open: true,
-      enabled: true,
-      presenting: false,
-      nameOnCreation: null,
-      resourceId: RESOURCE_ID,
-    });
-    expect(result.current.nodes[0]?.data.display.shown).toBe('editing');
+  /**
+   * The host holds no `editing` state for a Markdown Resource (ADR 0142): its
+   * plugin owns the edit, so the host offers commits and a Claim and never a
+   * body editor of its own, whatever the Resource's Map content says.
+   */
+  it('holds no editing state for a Markdown Resource, offering its plugin commits and a Claim', () => {
+    const { result, rerender } = mountAuthoring();
+    for (const open of [false, true]) {
+      rerender({
+        open,
+        enabled: true,
+        presenting: false,
+        nameOnCreation: null,
+        resourceId: RESOURCE_ID,
+      });
+      const markdown = onlyNode(result.current.nodes);
+      const operations = markdown.data.kindOperations;
+      if (operations.kind !== 'markdown') throw new Error('Expected Markdown operations');
+      expect(operations.commitContent).toBeDefined();
+      expect(operations.commitMap).toBeDefined();
+      expect(operations.claim).toBeDefined();
+    }
   });
 
-  it('authors Open for a Reference Resource through the same Resource operation', () => {
-    const { result, rerender, spaceSession } = mountAuthoring(undefined, 'reference');
+  /**
+   * A Reference Resource's Open is its plugin's Map content (ADR 0142): the
+   * host offers its plugin the Map content commit, through which Open and
+   * Close are its rail commands.
+   */
+  it('offers a Reference Resource’s plugin the Map content commit', () => {
+    const { result, rerender } = mountAuthoring(undefined, 'reference');
     rerender({
       open: false,
       enabled: true,
@@ -246,38 +256,20 @@ describe('canvas Resource authoring', () => {
       nameOnCreation: null,
       resourceId: REFERENCE_ID,
     });
-
-    act(() => expect(result.current.openResource(REFERENCE_ID)).toBe('completed'));
-    expect(spaceSession.getState().working.document.maps?.[0]?.positions[REFERENCE_ID]?.open).toBe(
-      true,
-    );
-
-    rerender({
-      open: true,
-      enabled: true,
-      presenting: false,
-      nameOnCreation: null,
-      resourceId: REFERENCE_ID,
-    });
-
-    // Open and read-only are the two halves of ADR 0070, and this Reference Resource is in
-    // the working Space, so nothing else is withholding these. Opening keeps
-    // Close and the shared Title interaction; it never hands the Reference Resource the
-    // caret or the editor that would let it author the Target's content.
     const reference = onlyNode(result.current.nodes);
-    expect(reference.data.onOpenChange).toBeDefined();
     expect(reference.data.onBeginTitleEditing).toBeDefined();
-    expect(beginEditOf(reference)).toBeUndefined();
-    expect(reference.data.display.shown).not.toBe('editing');
+    const operations = reference.data.kindOperations;
+    if (operations.kind !== 'reference') throw new Error('Expected Reference operations');
+    expect(operations.commitMap).toBeDefined();
+    expect(operations.commitTitle).toBeDefined();
   });
 
   /**
-   * An Ur Resource has no content (ADR 0113): it Opens through the one Resource
-   * operation and keeps Close and its Title, and nothing hands it a caret or an
-   * editor.
+   * An Ur Resource has no content (ADR 0113): it keeps its Title, and nothing
+   * hands it a caret or an editor.
    */
-  it('offers an Ur Resource no Open, Close or content edit, and Opens nothing for it', () => {
-    const { result, rerender, spaceSession } = mountAuthoring(undefined, 'ur');
+  it('offers an Ur Resource its Title and no content edit', () => {
+    const { result, rerender } = mountAuthoring(undefined, 'ur');
     rerender({
       open: false,
       enabled: true,
@@ -286,22 +278,17 @@ describe('canvas Resource authoring', () => {
       resourceId: UR_ID,
     });
     const ur = onlyNode(result.current.nodes);
-    expect(ur.data.onOpenChange).toBeUndefined();
     expect(ur.data.onBeginTitleEditing).toBeDefined();
-    expect(beginEditOf(ur)).toBeUndefined();
-    const before = spaceSession.getState().working;
-
-    act(() => expect(result.current.openResource(UR_ID)).toBe('retained'));
-    expect(spaceSession.getState().working).toBe(before);
+    expect(ur.data.titleEditor).toBeUndefined();
   });
 
   /**
-   * An Ur Resource's Shape is chosen on its rail (ADR 0121): one Edit on the
-   * Map, offered only where a refusal can be reported.
+   * An Ur Resource's plugin commits its Map content (ADR 0142): one Edit on the
+   * Map, answering how it settled, and withdrawn while presenting.
    */
-  it('changes an Ur Resource’s Shape on its Map, and offers no choice without command outcomes', () => {
-    const resourceShapeOf = (spaceSession: ReturnType<typeof mountAuthoring>['spaceSession']) =>
-      spaceSession.getState().working.document.maps?.[0]?.positions[UR_ID]?.shape;
+  it('commits an Ur Resource’s Map content on its Map, answering how it settled', async () => {
+    const mapContentOf = (spaceSession: ReturnType<typeof mountAuthoring>['spaceSession']) =>
+      spaceSession.getState().working.document.maps?.[0]?.positions[UR_ID]?.content;
     const props = {
       open: false,
       enabled: true,
@@ -310,49 +297,31 @@ describe('canvas Resource authoring', () => {
       resourceId: UR_ID,
     };
 
-    const silent = mountAuthoring(undefined, 'ur');
-    silent.rerender(props);
-    expect(resourceShapeChangeOf(onlyNode(silent.result.current.nodes))).toBeUndefined();
-    silent.unmount();
-
-    const { result, rerender, spaceSession } = mountAuthoring(undefined, 'ur', true);
+    const { result, rerender, spaceSession } = mountAuthoring(undefined, 'ur');
     rerender(props);
-    act(() => resourceShapeChangeOf(onlyNode(result.current.nodes))?.('diamond'));
-    expect(resourceShapeOf(spaceSession)).toBe('diamond');
-
-    rerender({ ...props, open: true });
-    act(() => resourceShapeChangeOf(onlyNode(result.current.nodes))?.('ellipse'));
-    expect(resourceShapeOf(spaceSession)).toBe('ellipse');
-  });
-
-  /**
-   * `openResource` refuses on `authorOnCanvas`, so presenting withdraws it.
-   *
-   * Unreachable through today's two call sites, both of which are already
-   * behind the same answer, which is exactly why it is pinned here: the
-   * presenting chrome does reach this canvas (`connectOnCanvas` deliberately
-   * survives a presentation), so a future caller Opening a Resource mid-traversal
-   * would otherwise take a silent `'retained'` with nothing failing.
-   */
-  it('withholds Open while presenting, which authorOnCanvas withdraws', () => {
-    const { result, rerender, spaceSession } = mountAuthoring();
-
-    rerender({
-      open: false,
-      enabled: true,
-      presenting: true,
-      nameOnCreation: null,
-      resourceId: RESOURCE_ID,
+    const commit = mapCommitOf(onlyNode(result.current.nodes));
+    expect(commit).toBeDefined();
+    await act(async () => {
+      await expect(commit?.({ shape: 'diamond' })).resolves.toBe('completed');
     });
+    expect(mapContentOf(spaceSession)).toEqual({ shape: 'diamond' });
+    await act(async () => {
+      await expect(commit?.({ shape: 'diamond' })).resolves.toBe('unchanged');
+    });
+    await act(async () => {
+      const answer = await commit?.({ shape: 'hexagon' });
+      expect(answer === 'completed' || answer === 'unchanged' ? '' : answer?.refused).toMatch(
+        /\S/u,
+      );
+    });
+    expect(mapContentOf(spaceSession)).toEqual({ shape: 'diamond' });
 
-    act(() => expect(result.current.openResource(RESOURCE_ID)).toBe('retained'));
-    expect(
-      spaceSession.getState().working.document.maps?.[0]?.positions[RESOURCE_ID]?.open,
-    ).not.toBe(true);
+    rerender({ ...props, presenting: true });
+    expect(mapCommitOf(onlyNode(result.current.nodes))).toBeUndefined();
   });
 
   it('forgets a title caret when canvas authoring is withdrawn', () => {
-    const { result, rerender, spaceSession } = mountAuthoring();
+    const { result, rerender } = mountAuthoring();
     act(() => result.current.beginTitleEditing(RESOURCE_ID));
     expect(onlyNode(result.current.nodes).data.titleEditor).toBeDefined();
 
@@ -373,81 +342,8 @@ describe('canvas Resource authoring', () => {
       resourceId: RESOURCE_ID,
     });
     expect(onlyNode(result.current.nodes).data.titleEditor).toBeUndefined();
-    act(() => expect(result.current.openResource(RESOURCE_ID)).toBe('completed'));
-    expect(spaceSession.getState().working.document.maps?.[0]?.positions[RESOURCE_ID]?.open).toBe(
-      true,
-    );
-  });
-
-  it('keeps a live body editor when a modal withdraws canvas controls', () => {
-    const { result, rerender } = mountAuthoring();
-    rerender({
-      open: true,
-      enabled: true,
-      presenting: false,
-      nameOnCreation: null,
-      resourceId: RESOURCE_ID,
-    });
-    act(() => beginEditOf(onlyNode(result.current.nodes))?.());
-
-    rerender({
-      open: true,
-      enabled: false,
-      presenting: false,
-      nameOnCreation: null,
-      resourceId: RESOURCE_ID,
-    });
-
-    const withdrawn = onlyNode(result.current.nodes);
-    expect(withdrawn.data.display.shown).toBe('editing');
-    expect(withdrawn.data.resize).toBeUndefined();
-  });
-
-  it('withholds competing Resource edits while a body caret is live', () => {
-    const { result, rerender } = mountAuthoring();
-    rerender({
-      open: true,
-      enabled: true,
-      presenting: false,
-      nameOnCreation: null,
-      resourceId: RESOURCE_ID,
-    });
-    act(() => beginEditOf(onlyNode(result.current.nodes))?.());
-
-    const editing = onlyNode(result.current.nodes);
-    expect(editing.data.onBeginTitleEditing).toBeUndefined();
-    expect(beginEditOf(editing)).toBeUndefined();
-  });
-
-  it('temporarily hides a body editor while presenting without discarding its caret', () => {
-    const { result, rerender } = mountAuthoring();
-    rerender({
-      open: true,
-      enabled: true,
-      presenting: false,
-      nameOnCreation: null,
-      resourceId: RESOURCE_ID,
-    });
-    act(() => beginEditOf(onlyNode(result.current.nodes))?.());
-    expect(onlyNode(result.current.nodes).data.display.shown).toBe('editing');
-
-    rerender({
-      open: true,
-      enabled: true,
-      presenting: true,
-      nameOnCreation: null,
-      resourceId: RESOURCE_ID,
-    });
-    expect(onlyNode(result.current.nodes).data.display.shown).not.toBe('editing');
-
-    rerender({
-      open: true,
-      enabled: true,
-      presenting: false,
-      nameOnCreation: null,
-      resourceId: RESOURCE_ID,
-    });
-    expect(onlyNode(result.current.nodes).data.display.shown).toBe('editing');
+    act(() => result.current.beginTitleEditing(RESOURCE_ID));
+    expect(onlyNode(result.current.nodes).data.titleEditor).toBeDefined();
   });
 
   /**
@@ -460,7 +356,12 @@ describe('canvas Resource authoring', () => {
       'space',
     );
     act(() => {
-      authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: SPACE_RESOURCE_ID });
+      // A Space Resource is Open by its Map content, which its plugin commits (ADR 0142).
+      authoring.complete(CANVAS, {
+        kind: 'changed-map-content',
+        resourceId: SPACE_RESOURCE_ID,
+        content: { open: true },
+      });
     });
     rerender({
       open: true,
@@ -481,7 +382,7 @@ describe('canvas Resource authoring', () => {
     act(() => space.data.resize?.onResizeEnd());
     expect(
       spaceSession.getState().working.document.maps?.[0]?.positions[SPACE_RESOURCE_ID],
-    ).toMatchObject({ open: true, size: { width: 280, height: 220 } });
+    ).toMatchObject({ content: { open: true }, size: { width: 280, height: 220 } });
     act(() => {
       space.data.resize?.onResizeStart();
       space.data.resize?.onResize({ width: 100, height: 100 });
@@ -489,7 +390,7 @@ describe('canvas Resource authoring', () => {
     });
     expect(
       spaceSession.getState().working.document.maps?.[0]?.positions[SPACE_RESOURCE_ID],
-    ).toMatchObject({ open: true, size: RESOURCE_SIZE });
+    ).toMatchObject({ content: { open: true }, size: RESOURCE_SIZE });
   });
 
   it.each(['markdown', 'reference'] as const)(
@@ -524,56 +425,20 @@ describe('canvas Resource authoring', () => {
       act(() => result.current.beginTitleEditing(MISSING_RESOURCE_ID));
 
       const missing = onlyNode(result.current.nodes);
-      expect(missing.data.onOpenChange).toBeUndefined();
       expect(missing.data.onBeginTitleEditing).toBeUndefined();
-      expect(beginEditOf(missing)).toBeUndefined();
       expect(missing.data.resize).toBeUndefined();
       expect(missing.data.titleEditor).toBeUndefined();
-      expect(missing.data.display.shown).not.toBe('editing');
     },
   );
 
   it('withdraws authoring when the working Space changes without a projection render', () => {
     const { result, spaceSession } = mountAuthoring();
-    expect(onlyNode(result.current.nodes).data.onOpenChange).toBeDefined();
+    expect(onlyNode(result.current.nodes).data.onBeginTitleEditing).toBeDefined();
 
     act(() => spaceSession.submit(snapshotWithoutResource));
 
     const staleProjection = onlyNode(result.current.nodes);
-    expect(staleProjection.data.onOpenChange).toBeUndefined();
     expect(staleProjection.data.onBeginTitleEditing).toBeUndefined();
-  });
-
-  it('forgets an observed body caret when the Resource stops being Open', () => {
-    const bodyEditingChanged = vi.fn();
-    const { result, rerender } = mountAuthoring(bodyEditingChanged);
-    rerender({
-      open: true,
-      enabled: true,
-      presenting: false,
-      nameOnCreation: null,
-      resourceId: RESOURCE_ID,
-    });
-    act(() => beginEditOf(onlyNode(result.current.nodes))?.());
-    expect(bodyEditingChanged).toHaveBeenLastCalledWith(true);
-
-    rerender({
-      open: false,
-      enabled: true,
-      presenting: false,
-      nameOnCreation: null,
-      resourceId: RESOURCE_ID,
-    });
-    rerender({
-      open: true,
-      enabled: true,
-      presenting: false,
-      nameOnCreation: null,
-      resourceId: RESOURCE_ID,
-    });
-
-    expect(onlyNode(result.current.nodes).data.display.shown).not.toBe('editing');
-    expect(bodyEditingChanged).toHaveBeenLastCalledWith(false);
   });
 
   it('opens title editing only when a newly created Resource identity changes', () => {
@@ -618,17 +483,18 @@ describe('canvas Resource authoring Space rail', () => {
   });
 
   const mountRail = (open: boolean, withTarget: boolean, readOnly = false, enabled = true) => {
+    // What the drawn plugin publishes: an Open Space Resource embeds its Map.
+    const mapEmbeddings = createMapEmbeddings();
+    if (open)
+      mapEmbeddings.publish(SPACE_RESOURCE_ID, SPACE_RESOURCE_ID, spaceEmbed(), SPACE_DRAWING);
     const loaded = { snapshot, revision: 0n, exportedRevision: null };
     const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-    const { authoring, adapter, imageReplacement, pickImages, continuation } = composeApp({
-      images: unusedImageSources,
+    const { authoring, adapter, continuation } = composeApp({
       spaceSession,
     });
     return renderHook(() =>
       useCanvasResourceAuthoring({
         continuation,
-        imageReplacement,
-        pickImages,
         nodes: [spaceNode(open, readOnly)],
         availability: authoringAvailability({
           editable: true,
@@ -646,34 +512,34 @@ describe('canvas Resource authoring Space rail', () => {
         resourceResize: adapter.getState().resourceResize,
         onSelectResource: () => undefined,
         spaceResourceTargets: withTarget ? new Map([[TARGET_SPACE_ID, target]]) : undefined,
+        mapEmbeddings,
       }),
     );
   };
 
   it('omits the rail while closed even when the target is read', () => {
     const { result } = mountRail(false, true);
-    expect(spaceOperationsOf(onlyNode(result.current.nodes).data)?.spaceRail).toBeUndefined();
-    expect(spaceOperationsOf(onlyNode(result.current.nodes).data)?.portal).toBeUndefined();
+    expect(spaceOperationsOf(onlyNode(result.current.nodes).data)?.mapRail).toBeUndefined();
   });
 
   it('omits the rail while the target is unread', () => {
     const { result } = mountRail(true, false);
-    expect(spaceOperationsOf(onlyNode(result.current.nodes).data)?.spaceRail).toBeUndefined();
+    expect(spaceOperationsOf(onlyNode(result.current.nodes).data)?.mapRail).toBeUndefined();
   });
 
   it('omits the rail on a read-only Resource', () => {
     const { result } = mountRail(true, true, true);
-    expect(spaceOperationsOf(onlyNode(result.current.nodes).data)?.spaceRail).toBeUndefined();
+    expect(spaceOperationsOf(onlyNode(result.current.nodes).data)?.mapRail).toBeUndefined();
   });
 
   it('builds the rail for an Open Space Resource whose target is read', () => {
     const { result } = mountRail(true, true);
-    expect(spaceOperationsOf(onlyNode(result.current.nodes).data)?.spaceRail).toBeDefined();
+    expect(spaceOperationsOf(onlyNode(result.current.nodes).data)?.mapRail).toBeDefined();
   });
 
   it('still draws a disabled rail when canvas authoring is withdrawn', () => {
     const { result } = mountRail(true, true, false, false);
-    expect(spaceOperationsOf(onlyNode(result.current.nodes).data)?.spaceRail).toBeDefined();
+    expect(spaceOperationsOf(onlyNode(result.current.nodes).data)?.mapRail).toBeDefined();
   });
 });
 
@@ -699,6 +565,15 @@ describe('canvas Resource authoring decoration identity', () => {
     readonly portalEditing: ReadonlySet<ResourceId>;
   }
 
+  /** The Space Resource's plugin embeds its Map, passing its Claim while it is authored in place. */
+  const publishSpaceEmbed = (embeddings: MapEmbeddings, editing: boolean) =>
+    embeddings.publish(
+      SPACE_RESOURCE_ID,
+      SPACE_RESOURCE_ID,
+      spaceEmbed(editing ? { release: () => undefined } : undefined),
+      SPACE_DRAWING,
+    );
+
   const dataOf = (nodes: readonly ResourceFlowNode[], resourceId: ResourceId) => {
     const found = nodes.find((candidate) => candidate.data.resourceId === resourceId);
     if (found === undefined) throw new Error('The Resource was not decorated.');
@@ -712,7 +587,7 @@ describe('canvas Resource authoring decoration identity', () => {
       resources: [
         {
           id: RESOURCE_ID,
-          document: { title: 'A', kind: 'markdown', content: { source: 'Edited source' } },
+          document: { title: 'A', kind: 'markdown', content: { url: textAsset('Edited source') } },
         },
         {
           id: REFERENCE_ID,
@@ -733,20 +608,24 @@ describe('canvas Resource authoring decoration identity', () => {
   const mountIdentity = () => {
     const loaded = { snapshot, revision: 0n, exportedRevision: null };
     const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-    const { authoring, adapter, imageReplacement, pickImages, continuation } = composeApp({
-      images: unusedImageSources,
+    const { authoring, adapter, continuation } = composeApp({
       spaceSession,
     });
     const surfaceAuthoring = canvasAuthoring(authoring);
     const onSelectResource = () => undefined;
-    const onPortalEditingChange = () => undefined;
     const resourceResize = adapter.getState().resourceResize;
+    const mapEmbeddings = createMapEmbeddings();
+    publishSpaceEmbed(mapEmbeddings, false);
     const hook = renderHook(
-      ({ spaceResourceTargets, portalEditing }: IdentityProps) =>
-        useCanvasResourceAuthoring({
+      ({ spaceResourceTargets, portalEditing }: IdentityProps) => {
+        // A rerender naming new editing publishes it, as the plugin passing its Claim does.
+        if (
+          (mapEmbeddings.getState().get(SPACE_RESOURCE_ID)?.request.claim !== undefined) !==
+          portalEditing.has(SPACE_RESOURCE_ID)
+        )
+          publishSpaceEmbed(mapEmbeddings, portalEditing.has(SPACE_RESOURCE_ID));
+        return useCanvasResourceAuthoring({
           continuation,
-          imageReplacement,
-          pickImages,
           nodes: projection,
           availability: authoringAvailability({
             editable: true,
@@ -764,9 +643,9 @@ describe('canvas Resource authoring decoration identity', () => {
           resourceResize,
           onSelectResource,
           spaceResourceTargets,
-          portalEditing,
-          onPortalEditingChange,
-        }),
+          mapEmbeddings,
+        });
+      },
       {
         initialProps: {
           spaceResourceTargets: NO_SPACE_RESOURCE_TARGETS,
@@ -774,8 +653,79 @@ describe('canvas Resource authoring decoration identity', () => {
         },
       },
     );
-    return { ...hook, spaceSession };
+    return { ...hook, spaceSession, mapEmbeddings };
   };
+
+  /** The Space Resource's chooser, as the canvas hands it to the plugin's rail. */
+  const chooserOf = (nodes: readonly ResourceFlowNode[]): SpaceResourceSelectorsProps => {
+    const rail = spaceOperationsOf(dataOf(nodes, SPACE_RESOURCE_ID))?.mapRail;
+    if (!isValidElement<SpaceResourceSelectorsProps>(rail)) throw new Error('No chooser drawn.');
+    return rail.props;
+  };
+
+  /** The canvas with its Space Resource's chooser drawn, saying something and mid-rename. */
+  const mountSpeakingChooser = () => {
+    const mounted = mountIdentity();
+    mounted.rerender({
+      spaceResourceTargets: new Map([[TARGET_SPACE_ID, target]]),
+      portalEditing: new Set<ResourceId>(),
+    });
+    const chooser = chooserOf(mounted.result.current.nodes);
+    act(() => {
+      chooser.onReport('Link copied.');
+      chooser.onEditingChange?.(true);
+    });
+    expect(dataOf(mounted.result.current.nodes, SPACE_RESOURCE_ID).contextNotice).toBe(
+      'Link copied.',
+    );
+    expect(mounted.result.current.titleEditing).toBe(true);
+    return mounted;
+  };
+
+  /** Whether the Space Resource, Opened again, draws its chooser afresh: no notice, no editing. */
+  const expectAfreshOnReopen = ({ result, mapEmbeddings }: ReturnType<typeof mountIdentity>) => {
+    expect(result.current.titleEditing).toBe(false);
+    act(() => publishSpaceEmbed(mapEmbeddings, false));
+    expect(
+      spaceOperationsOf(dataOf(result.current.nodes, SPACE_RESOURCE_ID))?.mapRail,
+    ).toBeDefined();
+    expect(dataOf(result.current.nodes, SPACE_RESOURCE_ID).contextNotice).toBeUndefined();
+    expect(result.current.titleEditing).toBe(false);
+  };
+
+  it("drops its chooser's notice and editing when its plugin Closes it, so neither returns on reopen", async () => {
+    const mounted = mountSpeakingChooser();
+    const commitMap = (next: { open: boolean }) =>
+      spaceOperationsOf(dataOf(mounted.result.current.nodes, SPACE_RESOURCE_ID))?.commitMap?.(next);
+    // The fixture stores it Closed: its plugin Opens it, then Closes it.
+    await act(async () => {
+      await expect(commitMap({ open: true })).resolves.toBe('completed');
+    });
+    await act(async () => {
+      await expect(commitMap({ open: false })).resolves.toBe('completed');
+    });
+    // The plugin's own Close leaves what its chooser said in place until the
+    // embedding goes.
+    expect(dataOf(mounted.result.current.nodes, SPACE_RESOURCE_ID).contextNotice).toBe(
+      'Link copied.',
+    );
+    // Closed, the plugin draws no `<Embed>`, which takes the embedding down.
+    act(() =>
+      mounted.mapEmbeddings.publish(SPACE_RESOURCE_ID, SPACE_RESOURCE_ID, null, SPACE_DRAWING),
+    );
+    expectAfreshOnReopen(mounted);
+  });
+
+  it("drops its chooser's notice and editing when a Close arrives from outside, as another author's Edit", () => {
+    const mounted = mountSpeakingChooser();
+    // No commit of this canvas's: the Resource Closed under it, as another
+    // author's Edit or a replacement Closes it, and its plugin took the
+    // embedding down.
+    act(() =>
+      mounted.mapEmbeddings.publish(SPACE_RESOURCE_ID, SPACE_RESOURCE_ID, null, SPACE_DRAWING),
+    );
+    expectAfreshOnReopen(mounted);
+  });
 
   it('keeps markdown and Reference Resource node.data when only Space Resource targets change', () => {
     const { result, rerender } = mountIdentity();
@@ -790,11 +740,11 @@ describe('canvas Resource authoring decoration identity', () => {
     expect(dataOf(result.current.nodes, RESOURCE_ID)).toBe(markdownData);
     expect(dataOf(result.current.nodes, REFERENCE_ID)).toBe(referenceData);
     expect(
-      spaceOperationsOf(dataOf(result.current.nodes, SPACE_RESOURCE_ID))?.spaceRail,
+      spaceOperationsOf(dataOf(result.current.nodes, SPACE_RESOURCE_ID))?.mapRail,
     ).toBeDefined();
   });
 
-  it('keeps markdown node.data when only portal editing changes', () => {
+  it('keeps markdown node.data when only portal editing changes, and the Space Resource keeps its chooser', () => {
     const { result, rerender } = mountIdentity();
     rerender({
       spaceResourceTargets: new Map([[TARGET_SPACE_ID, target]]),
@@ -809,8 +759,8 @@ describe('canvas Resource authoring decoration identity', () => {
 
     expect(dataOf(result.current.nodes, RESOURCE_ID)).toBe(markdownData);
     expect(
-      spaceOperationsOf(dataOf(result.current.nodes, SPACE_RESOURCE_ID))?.portal?.editing,
-    ).toBe(true);
+      spaceOperationsOf(dataOf(result.current.nodes, SPACE_RESOURCE_ID))?.mapRail,
+    ).toBeDefined();
   });
 
   it('keeps markdown and Reference Resource node.data when a body save does not change Resource membership', () => {
@@ -832,7 +782,7 @@ describe('canvas Resource authoring decoration identity', () => {
     });
     const markdownData = dataOf(result.current.nodes, RESOURCE_ID);
     const spaceData = dataOf(result.current.nodes, SPACE_RESOURCE_ID);
-    expect(spaceOperationsOf(spaceData)?.spaceRail).toBeDefined();
+    expect(spaceOperationsOf(spaceData)?.mapRail).toBeDefined();
 
     act(() => spaceSession.submit(editedBodySnapshot()));
 
@@ -841,9 +791,10 @@ describe('canvas Resource authoring decoration identity', () => {
   });
 });
 
-describe('canvas Resource authoring, replacing an image', () => {
+describe('canvas Resource authoring, an Image Resource’s plugin surface', () => {
   const IMAGE_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000b');
   const OLD_URL = 'https://example.com/old.png';
+  const NEW_URL = 'https://example.com/new.png';
   const withImage = spaceSnapshotSchema.parse({
     id: SPACE_ID,
     document: {
@@ -855,7 +806,7 @@ describe('canvas Resource authoring, replacing an image', () => {
           title: 'Map',
           kind: 'positioned',
           positions: {
-            [IMAGE_ID]: { x: 0, y: 0, open: true, size: { width: 640, height: 480 } },
+            [IMAGE_ID]: { x: 0, y: 0, size: { width: 640, height: 480 } },
           },
           graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
         },
@@ -879,40 +830,194 @@ describe('canvas Resource authoring, replacing an image', () => {
       readOnly: false,
       ...bareKindData('image'),
       ...fixtureFacts('image'),
-      open: true,
       selectedForAuthoring: false,
-      display: {
-        shown: 'open',
-        content: { kind: 'image', url: OLD_URL, via: 'self' },
-      },
+      ownContent: { url: OLD_URL },
+      mapContent: {},
       activeGraphId: GRAPH_ID,
       activeGraphColor: '#8a94a6',
       borderColor: null,
       receding: false,
     },
   };
-  /** The replacer an Image Resource's running edit carries, absent at rest. */
-  const replacerOf = (drawn: ResourceFlowNode) =>
-    drawn.data.display.shown === 'editing' && drawn.data.display.kind === 'image'
-      ? drawn.data.display.edit
-      : undefined;
-  /**
-   * The hook over a composed Space whose image replacements store and measure
-   * through `images`. What a replacement does is the replacement module's
-   * (`image-replacement.test.ts`); these prove only what the canvas draws and says.
-   */
-  const mountImage = (images: ImageSources = unusedImageSources) => {
+  /** The operations the Image Resource's plugin surface is handed. */
+  const operationsOf = (drawn: ResourceFlowNode) =>
+    drawn.data.kindOperations.kind === 'image' ? drawn.data.kindOperations : undefined;
+
+  const STORED = `/assets/${'B'.repeat(43)}` as const;
+  const store = vi.fn((bytes: Blob) =>
+    Promise.resolve(bytes.size > 0 ? STORED : { refused: 'Empty.' }),
+  );
+  const pick = vi.fn(() => Promise.resolve([]));
+
+  /** The hook over a composed Space holding one Image Resource, with an asset store supplied. */
+  const mountImage = (editable = true) => {
     const loaded = { snapshot: withImage, revision: 0n, exportedRevision: null };
     const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-    const { authoring, adapter, imageReplacement, pickImages, continuation } = composeApp({
-      images,
+    const { authoring, adapter, continuation } = composeApp({
       spaceSession,
       reportObserverError: vi.fn(),
     });
-    const hook = renderHook(() =>
+    const hook = renderHook(
+      () =>
+        useCanvasResourceAuthoring({
+          continuation,
+          nodes: [imageNode],
+          availability: authoringAvailability({
+            editable,
+            replacingImage: false,
+            presenting: false,
+            editingResourceBody: false,
+            editingResourceTitle: false,
+            editingChromeTitle: false,
+            spaceOnCanvas: true,
+            editingEmbeddedMap: false,
+          }),
+          nameOnCreation: null,
+          authoring: canvasAuthoring(authoring),
+          spaceSession,
+          resourceResize: adapter.getState().resourceResize,
+          onSelectResource: () => undefined,
+        }),
+      {
+        wrapper: ({ children }) => (
+          <PluginAssetsProvider value={{ url: (ref) => ref, read: vi.fn(), store, pick }}>
+            {children}
+          </PluginAssetsProvider>
+        ),
+      },
+    );
+    return { ...hook, spaceSession };
+  };
+
+  it('hands the plugin its Title and content commits, the asset store, the picker and a Claim', () => {
+    const { result } = mountImage();
+    const operations = operationsOf(onlyNode(result.current.nodes));
+    expect(operations?.commitTitle).toBeDefined();
+    expect(operations?.commitContent).toBeDefined();
+    expect(operations?.commitStore).toBeDefined();
+    expect(operations?.pick).toBeDefined();
+    expect(operations?.claim).toBeDefined();
+    expect(operations?.commitMap).toBeDefined();
+  });
+
+  it('hands a canvas that authors nothing no commit, store, picker or Claim', () => {
+    const { result } = mountImage(false);
+    const operations = operationsOf(onlyNode(result.current.nodes));
+    expect(operations?.kind).toBe('image');
+    for (const offered of [
+      'commitTitle',
+      'commitContent',
+      'commitMap',
+      'commitStore',
+      'pick',
+      'claim',
+    ]) {
+      expect(operations).not.toHaveProperty(offered);
+    }
+  });
+
+  it('replaces the picture by one content commit, keeping the Resource’s identity, Title and placement', async () => {
+    const { result, spaceSession } = mountImage();
+    const before = spaceSession.getState().working;
+    await act(async () => {
+      await expect(
+        operationsOf(onlyNode(result.current.nodes))?.commitContent?.({ url: NEW_URL }),
+      ).resolves.toBe('completed');
+    });
+    const after = spaceSession.getState().working;
+    expect(after.resources).toEqual([
+      { id: IMAGE_ID, document: { title: 'Figure', kind: 'image', content: { url: NEW_URL } } },
+    ]);
+    expect(after.document.maps?.[0]?.positions).toEqual(before.document.maps?.[0]?.positions);
+  });
+
+  it('answers unchanged for the content it already holds', async () => {
+    const { result, spaceSession } = mountImage();
+    const before = spaceSession.getState().working;
+    await act(async () => {
+      await expect(
+        operationsOf(onlyNode(result.current.nodes))?.commitContent?.({ url: OLD_URL }),
+      ).resolves.toBe('unchanged');
+    });
+    expect(spaceSession.getState().working).toBe(before);
+  });
+
+  it('refuses content the Image Resource cannot hold, in the application’s words', async () => {
+    const { result, spaceSession } = mountImage();
+    const before = spaceSession.getState().working;
+    let answer: unknown;
+    await act(async () => {
+      answer = await operationsOf(onlyNode(result.current.nodes))?.commitContent?.({
+        url: 'data:image/png;base64,AAAA',
+      });
+    });
+    expect(answer).toEqual({ refused: 'This Resource cannot hold that content.' });
+    expect(spaceSession.getState().working).toBe(before);
+  });
+
+  it('renames by a Title commit', async () => {
+    const { result, spaceSession } = mountImage();
+    await act(async () => {
+      await expect(
+        operationsOf(onlyNode(result.current.nodes))?.commitTitle?.('Harbour'),
+      ).resolves.toBe('completed');
+    });
+    expect(spaceSession.getState().working.resources[0]?.document.title).toBe('Harbour');
+  });
+
+  it('stores through the application’s asset store while no exclusive work runs', async () => {
+    const { result } = mountImage();
+    await expect(
+      operationsOf(onlyNode(result.current.nodes))?.commitStore?.(new Blob(['png'])),
+    ).resolves.toBe(STORED);
+    expect(store).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("canvas Resource authoring: an embedding's notice", () => {
+  beforeAll(() => {
+    HTMLElement.prototype.hasPointerCapture = () => false;
+    HTMLElement.prototype.setPointerCapture = () => undefined;
+    HTMLElement.prototype.releasePointerCapture = () => undefined;
+  });
+
+  const OTHER_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000c');
+  const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000d');
+  const target: SpaceResourceTarget = {
+    id: TARGET_SPACE_ID,
+    title: 'Architecture',
+    maps: [
+      {
+        id: TARGET_MAP_ID,
+        title: 'Collection 1',
+        graphs: [{ id: TARGET_GRAPH_ID, title: 'Overview', color: '#1f77b4', headShape: 'arrow' }],
+      },
+      {
+        id: OTHER_MAP_ID,
+        title: 'Collection 2',
+        graphs: [{ id: OTHER_GRAPH_ID, title: 'Detail', color: '#ff7f0e', headShape: 'dot' }],
+      },
+    ],
+  };
+  const UR_DRAWING = Symbol('ur drawing');
+  const refusingEmbed: MapEmbedRequest = {
+    ...spaceEmbed(),
+    select: {
+      value: { map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
+      commit: () => Promise.resolve({ refused: 'That Map is not offered.' }),
+    },
+  };
+
+  const mountEmbedding = (request: MapEmbedRequest) => {
+    const mapEmbeddings = createMapEmbeddings();
+    mapEmbeddings.publish(UR_ID, UR_ID, request, UR_DRAWING);
+    const loaded = { snapshot, revision: 0n, exportedRevision: null };
+    const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
+    const { authoring, adapter, continuation } = composeApp({ spaceSession });
+    const { result } = renderHook(() =>
       useCanvasResourceAuthoring({
         continuation,
-        nodes: [imageNode],
+        nodes: [node(false, UR_ID, 'ur')],
         availability: authoringAvailability({
           editable: true,
           replacingImage: false,
@@ -928,81 +1033,58 @@ describe('canvas Resource authoring, replacing an image', () => {
         spaceSession,
         resourceResize: adapter.getState().resourceResize,
         onSelectResource: () => undefined,
-        imageReplacement,
-        pickImages,
+        spaceResourceTargets: new Map([[TARGET_SPACE_ID, target]]),
+        mapEmbeddings,
       }),
     );
-    return { ...hook, spaceSession };
+    const rail = render(
+      <ResourceRailActions aria-label="Resource rail">
+        {onlyNode(result.current.nodes).data.kindOperations.mapRail}
+      </ResourceRailActions>,
+    );
+    const chooseOtherMap = async () => {
+      fireEvent.click(screen.getByTestId('space-resource-map'));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('menuitemradio', { name: 'Collection 2' }));
+        await Promise.resolve();
+      });
+    };
+    return { result, rail, mapEmbeddings, chooseOtherMap };
   };
 
-  it('installs the upload target when Replace begins on an Open Image Resource', () => {
-    const { result } = mountImage();
+  it('drops what the embedding said once its plugin stops embedding, whatever the kind, so reopening starts afresh', async () => {
+    const { result, rail, mapEmbeddings, chooseOtherMap } = mountEmbedding(refusingEmbed);
+    await chooseOtherMap();
+    expect(onlyNode(result.current.nodes).data.contextNotice).toBe('That Map is not offered.');
+    rail.unmount();
 
-    expect(replacerOf(onlyNode(result.current.nodes))).toBeUndefined();
-    act(() => beginEditOf(onlyNode(result.current.nodes))?.());
-
-    expect(replacerOf(onlyNode(result.current.nodes))).toBeDefined();
-    expect(result.current.bodyEditing).toBe(true);
+    act(() => mapEmbeddings.publish(UR_ID, UR_ID, null, UR_DRAWING));
+    act(() => mapEmbeddings.publish(UR_ID, UR_ID, refusingEmbed, UR_DRAWING));
+    expect(onlyNode(result.current.nodes).data.kindOperations.mapRail).toBeDefined();
+    expect(onlyNode(result.current.nodes).data.contextNotice).toBeUndefined();
   });
 
-  it('says a broken upload in the target and keeps the target open', async () => {
-    const { result, spaceSession } = mountImage();
-    act(() => beginEditOf(onlyNode(result.current.nodes))?.());
-    const before = spaceSession.getState().working;
-
+  it('says nothing of a choice answered after its embedding is gone', async () => {
+    let answer: (refused: { readonly refused: string }) => void = () => undefined;
+    const late: MapEmbedRequest = {
+      ...refusingEmbed,
+      select: {
+        value: { map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
+        commit: () =>
+          new Promise((resolve) => {
+            answer = resolve;
+          }),
+      },
+    };
+    const { result, rail, mapEmbeddings, chooseOtherMap } = mountEmbedding(late);
+    await chooseOtherMap();
+    rail.unmount();
+    act(() => mapEmbeddings.publish(UR_ID, UR_ID, null, UR_DRAWING));
     await act(async () => {
-      await expect(
-        replacerOf(onlyNode(result.current.nodes))?.onReplace({
-          kind: 'files',
-          files: [new File(['bytes'], 'figure.png', { type: 'image/png' })],
-        }),
-      ).resolves.toBe('This image was not replaced: No image store is reachable.');
+      answer({ refused: 'That Map is not offered.' });
+      await Promise.resolve();
     });
-    expect(spaceSession.getState().working).toBe(before);
-    expect(result.current.bodyEditing).toBe(true);
-  });
-
-  it('says another replacement is still running in the target, keeping it open', async () => {
-    const held = heldImageSources();
-    const { result } = mountImage(held.images);
-    act(() => beginEditOf(onlyNode(result.current.nodes))?.());
-    const replacer = replacerOf(onlyNode(result.current.nodes));
-
-    let first: Promise<string | null> | undefined;
-    await act(async () => {
-      first = replacer?.onReplace({ kind: 'url', url: 'https://example.com/first.png' });
-      await expect(
-        replacer?.onReplace({ kind: 'url', url: 'https://example.com/second.png' }),
-      ).resolves.toBe('Another image is still being replaced.');
-    });
-    expect(result.current.bodyEditing).toBe(true);
-
-    held.release();
-    await act(async () => {
-      await expect(first).resolves.toBeNull();
-    });
-  });
-
-  it('replaces the image from the target in one Edit, and says a refusal in the application’s words', async () => {
-    const { result, spaceSession } = mountImage();
-    act(() => beginEditOf(onlyNode(result.current.nodes))?.());
-    const replacer = replacerOf(onlyNode(result.current.nodes));
-
-    let refused: string | null | undefined;
-    let replaced: string | null | undefined;
-    await act(async () => {
-      refused = await replacer?.onReplace({ kind: 'url', url: 'data:image/png;base64,AAAA' });
-      replaced = await replacer?.onReplace({ kind: 'url', url: 'https://example.com/new.png' });
-    });
-    expect(refused).toBe('An image URL must start with https: or http:.');
-    expect(replaced).toBeNull();
-
-    expect(spaceSession.getState().working.resources[0]?.document).toEqual({
-      title: 'Figure',
-      kind: 'image',
-      content: { url: 'https://example.com/new.png' },
-    });
-    act(() => replacer?.onEnd());
-    expect(replacerOf(onlyNode(result.current.nodes))).toBeUndefined();
+    act(() => mapEmbeddings.publish(UR_ID, UR_ID, refusingEmbed, UR_DRAWING));
+    expect(onlyNode(result.current.nodes).data.contextNotice).toBeUndefined();
   });
 });

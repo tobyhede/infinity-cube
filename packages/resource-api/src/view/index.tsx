@@ -1,0 +1,412 @@
+import { useLayoutEffect, useState, type ComponentType, type ReactNode } from 'react';
+import type {
+  Answer,
+  AssetRef,
+  Kept,
+  Resource,
+  ResourceId,
+  ResourcePlugin,
+  Size,
+  SpaceFraming,
+} from '../domain';
+import { useResourceHost } from './host';
+
+/**
+ * The view half of the Resource API (ADR 0142): what a surface gives a
+ * plugin's one view, and the components a plugin draws its Title, its own
+ * pointer region and its commands with. A host provides those components'
+ * behaviour through `ResourceHostProvider`, which the host-only `/view/host`
+ * entry exports; a plugin never learns which surface it is on, only which
+ * capabilities are present.
+ */
+
+/** A Map content commit, which may carry a size hint on an author's gesture. */
+export type MapCommit<M> = (next: M, options?: { readonly sizeHint?: Size }) => Promise<Answer>;
+
+/** A Map content value and its commit, when the surface offers one. */
+export interface KeptMap<M> {
+  readonly value: M;
+  readonly commit?: MapCommit<M> | undefined;
+}
+
+/** What a surface offers for reaching assets (ADR 0142). */
+export interface Assets {
+  /** The URL an asset is drawn from. */
+  readonly url: (ref: AssetRef) => string;
+  /** An asset's bytes, or why they cannot be read. */
+  readonly read: (ref: AssetRef) => Promise<Blob | { readonly refused: string }>;
+  /** Ask the author for files, called in the press. */
+  readonly pick?: ((accept: string) => Promise<File[]>) | undefined;
+  /** Store bytes, answering their reference. */
+  readonly store?: ((bytes: Blob) => Promise<AssetRef | { readonly refused: string }>) | undefined;
+  /**
+   * The natural size of the picture at `src`, as the browser loads it, or
+   * `undefined` for one that does not load or has no intrinsic size. Absent,
+   * the surface measures nothing.
+   */
+  readonly measure?: ((src: string) => Promise<Size | undefined>) | undefined;
+}
+
+/** A Claim: who is interacting (ADR 0142). */
+export interface Claim {
+  /**
+   * Let it go. Never refused, and releasing again changes nothing: while a
+   * Claim inside it or its own exclusive work runs, the host keeps it until
+   * that ends and then releases it, so a plugin never retries a release.
+   */
+  release(): void;
+}
+
+/**
+ * The commits and store the surface offered, live only while exclusive work
+ * runs. Each writes only the calling plugin's Resource.
+ */
+export interface Exclusive<C, M> {
+  readonly title?: ((next: string) => Promise<Answer>) | undefined;
+  readonly content?: ((next: C) => Promise<Answer>) | undefined;
+  readonly map?: MapCommit<M> | undefined;
+  readonly store?: ((bytes: Blob) => Promise<AssetRef | { readonly refused: string }>) | undefined;
+}
+
+/** A Claim the plugin holds on its own surface, through which exclusivity is reached. */
+export interface OwnClaim<C, M> extends Claim {
+  /**
+   * Run `work` exclusively: every other commit, store and pick on every surface
+   * is withdrawn until it settles, and only `own` may commit. `busy` answers
+   * before any work starts when other exclusive work runs.
+   */
+  exclusively<T>(work: (own: Exclusive<C, M>) => Promise<T>): Promise<T | 'busy'>;
+}
+
+/**
+ * Which of a Space's Maps an embedding shows: a Map, the Graph it opens on, and
+ * how the window is framed. Without a Graph, the Map's own opening Graph.
+ */
+export interface EmbedView {
+  readonly map: string;
+  readonly graph?: string | undefined;
+  readonly framing?: SpaceFraming | undefined;
+}
+
+/**
+ * What the host-owned embedding draws (ADR 0142): another Resource, drawn by
+ * its own plugin under the Title passed, or a Space, drawn as one of its Maps.
+ *
+ * A Space with no `select` shows that Space's `defaultMap` and the Graph it
+ * opens on. `select` names the view to show; the host offers its Map and
+ * Graph chooser, which writes a choice or a framing only through the commit
+ * passed with it, so whatever withdraws the commit withdraws the choice. The
+ * shown Space's links are offered on the chooser without a Claim; its
+ * authoring, its Maps and Graphs included, only under a `claim` the plugin
+ * passes beside the commit, until that Claim is released. Every command
+ * comes from these props, never from the plugin's kind, as the canvas's
+ * `packages/app/test/embed-commands.test.tsx` holds.
+ */
+export type EmbedProps =
+  | { readonly resource: ResourceId; readonly title: Kept<string> }
+  | {
+      readonly space: string;
+      readonly select?: Kept<EmbedView> | undefined;
+      readonly claim?: Claim | undefined;
+    };
+
+/**
+ * What a surface hosts a plugin's view with: the Resource, its Title, content
+ * and Map content each with the commit the surface offers, the dimensions to
+ * draw into, whether it is selected, and the surface's capabilities.
+ */
+export interface Surface<C, M> {
+  readonly resource: Resource<C>;
+  readonly title: Kept<string>;
+  readonly content: Kept<C>;
+  readonly map: KeptMap<M>;
+  readonly size: Size;
+  readonly selected: boolean;
+  readonly claim?: (() => OwnClaim<C, M> | undefined) | undefined;
+  readonly assets: Assets;
+  /** One component for the surface's lifetime: unmounting releases, so a new type per render would release every Claim inside it. */
+  readonly Embed: ComponentType<EmbedProps>;
+}
+
+/** What a plugin's view is rendered with. */
+export interface PluginViewProps<C, M> {
+  readonly surface: Surface<C, M>;
+}
+
+/**
+ * The Space a new Resource names in its content: the Space, and the Map and
+ * Graph it opens on (ADR 0074, ADR 0079).
+ */
+export interface NewSpace {
+  readonly spaceId: string;
+  readonly map: string;
+  readonly graph: string;
+}
+
+/**
+ * One Resource a creation asks the host for: its content as a value, or, as
+ * `contentFor`, a function of the Space it names. That Space is the new one the
+ * host makes for an item with `newSpace`, at most one per create, or else the
+ * Space a creation `from` a Space was offered, as the host reads it when the
+ * Resource is made. A plugin never makes or deletes a Space itself; the host
+ * owns its lifetime (ADR 0074).
+ */
+export type New<C> =
+  | {
+      /** Its Title; absent, the host names it as it names every new Resource. */
+      readonly title?: string | undefined;
+      readonly content: C;
+    }
+  | {
+      readonly title?: string | undefined;
+      readonly contentFor: (space: NewSpace) => C;
+      readonly newSpace?: true | undefined;
+    };
+
+/**
+ * What a creation's `run` is given: the host's `create`, which places what it
+ * is asked for where the gesture was made, in one atomic Edit, and continues
+ * into the first one's Title; the asset store and picker; and `report`, since
+ * `run` has no surface to say a refusal of its own on.
+ */
+export interface CreationHost<C> {
+  /**
+   * Create these Resources, or refuse: when creation is no longer available,
+   * when another creation runs, or when the Edit refuses. The host shows a
+   * refusal itself, under the creation's {@link NotCreated} title, so a plugin
+   * need not.
+   */
+  create(items: readonly New<C>[]): Promise<Answer>;
+  readonly assets: Assets;
+  /** Say why nothing was created, in words the plugin worded; the host shows them as it shows a refusal. */
+  report(words: string): void;
+}
+
+/** Data arriving on a surface: files dropped, or a URL pasted. */
+export type CreationData =
+  | { readonly kind: 'files'; readonly files: readonly File[] }
+  | { readonly kind: 'url'; readonly url: string };
+
+/** The media type a pasted URL is matched as. */
+export const URL_MEDIA_TYPE = 'text/uri-list';
+
+/** A Space offered to a creation from a list of Spaces. */
+export interface OfferedSpace {
+  readonly spaceId: string;
+  readonly title: string;
+}
+
+/**
+ * The title a creation's refusal is shown under, as the standing notice;
+ * absent, its refusals are not shown. A creation that takes no input cannot
+ * refuse against a choice the author made and leaves nothing standing that a
+ * sentence could correct, so it declares none.
+ */
+export interface NotCreated {
+  readonly notCreated?: string | undefined;
+}
+
+/**
+ * How a plugin's Resources are created (ADR 0142): where the creation is
+ * offered, and what it runs when pressed, in the press, so a picker opened
+ * from it keeps the gesture. An `await` before `pick` loses the press.
+ */
+export type Creation<C> =
+  | ({
+      /** A press on the Command Dock. */
+      readonly from: 'dock';
+      readonly run: (host: CreationHost<C>) => void | Promise<void>;
+    } & NotCreated)
+  | ({
+      /**
+       * Data arriving on the canvas. `types` are media types, each exact or a
+       * wildcard (`image/*`, or `*` then `/*` for any type): among plugins
+       * accepting the same data, an exact match beats a wildcard, then build
+       * order decides. A pasted URL arrives as {@link URL_MEDIA_TYPE}.
+       */
+      readonly from: 'data';
+      readonly types: readonly string[];
+      /** Whether this data is the plugin's at all, beyond its media type. */
+      readonly accepts?: ((data: CreationData) => boolean) | undefined;
+      readonly run: (host: CreationHost<C>, data: CreationData) => void | Promise<void>;
+    } & NotCreated)
+  | ({
+      /**
+       * A command on another Resource, given that Resource, which what it
+       * creates references: on a Resource that may not be a Target the host
+       * offers it disabled, saying why (ADR 0113). `accepts` passes over a
+       * Resource it is not offered on at all.
+       */
+      readonly from: 'resource';
+      /** What the command offered on that Resource is called. */
+      readonly label: string;
+      readonly accepts?: ((resource: Resource) => boolean) | undefined;
+      readonly run: (host: CreationHost<C>, resource: Resource) => void | Promise<void>;
+    } & NotCreated)
+  | {
+      /** A Space chosen from a list of Spaces, given that Space. */
+      readonly from: 'spaces';
+      readonly run: (host: CreationHost<C>, space: OfferedSpace) => void | Promise<void>;
+    };
+
+/** A plugin's view half. */
+export interface PluginView<C, M> {
+  readonly kind: string;
+  readonly View: ComponentType<PluginViewProps<C, M>>;
+  readonly Glyph: ComponentType<{ readonly size?: number | undefined }>;
+  /** How its Resources are created, each where it is offered, at most one from each place; none, none are. */
+  readonly creates?: readonly Creation<C>[] | undefined;
+}
+
+/**
+ * Declare a plugin's view half for its domain half. A plugin offers at most
+ * one creation from each place, since the host finds a creation by its plugin
+ * and where it is offered from; a second throws when the plugin is built.
+ */
+export function definePluginView<const K extends string, C, M>(
+  plugin: ResourcePlugin<C, M> & { readonly kind: K },
+  view: Omit<PluginView<C, M>, 'kind'>,
+): PluginView<C, M> & { readonly kind: K } {
+  const offeredFrom = new Set<Creation<C>['from']>();
+  for (const { from } of view.creates ?? []) {
+    if (offeredFrom.has(from)) {
+      throw new Error(`The ${plugin.kind} plugin declares two creations from '${from}'.`);
+    }
+    offeredFrom.add(from);
+  }
+  return { kind: plugin.kind, View: view.View, Glyph: view.Glyph, creates: view.creates };
+}
+
+/** One choice in a choice command. */
+export interface RailChoice {
+  readonly id: string;
+  readonly label: string;
+  readonly icon?: ReactNode;
+}
+
+/**
+ * A command a plugin emits for the canvas to draw on its rail. Run in the
+ * press, so a picker opened from it keeps the gesture.
+ */
+export type RailCommand =
+  | {
+      readonly kind: 'action';
+      readonly id: string;
+      readonly label: string;
+      readonly icon: ReactNode;
+      readonly run: () => void;
+      readonly disabled?: boolean;
+      /**
+       * The keys that run it too, as `aria-keyshortcuts` names them. A command
+       * that names keys belongs to work running inside the plugin's rect, so
+       * pressing it keeps the focus where that work has it.
+       */
+      readonly keyshortcuts?: string;
+    }
+  | {
+      readonly kind: 'choice';
+      readonly id: string;
+      /** What the choice is of, which the trigger's name leads with. */
+      readonly label: string;
+      readonly choices: readonly RailChoice[];
+      readonly chosen: string;
+      readonly choose: (id: string) => void;
+    };
+
+/** What the host draws a plugin's Title with. */
+export interface TitleProps {
+  readonly className?: string;
+}
+
+/** What the host draws a plugin's own region with. */
+export interface OwnProps {
+  readonly children?: ReactNode;
+  readonly className?: string;
+}
+
+/** What the host renders Markdown text with. */
+export interface RenderedMarkdownProps {
+  readonly markdown: string;
+  /** A name already drawn above the text: a first heading that only repeats it is left out. */
+  readonly drawnName?: string | undefined;
+  readonly className?: string;
+  /**
+   * A press anywhere on the text begins an edit: the host draws the target,
+   * named `label` for a screen reader, over the text with nothing visible, so
+   * the rail's Edit stays the one keyboard way in.
+   */
+  readonly edit?: { readonly label: string; readonly begin: () => void } | undefined;
+}
+
+/** What the host draws a source editor with. */
+export interface SourceEditorProps {
+  readonly value: string;
+  readonly onValueChange: (value: string) => void;
+  /** Names the writing surface for a screen reader. */
+  readonly ariaLabel: string;
+  /** Whether the caret is put in it when it is drawn. */
+  readonly autoFocus?: boolean;
+  /** What `Mod-Enter` in the editor does: the edit's Save. */
+  readonly onSave?: () => void;
+  /** What `Escape` in the editor does: the edit's Cancel. */
+  readonly onCancel?: () => void;
+  readonly className?: string;
+}
+
+/**
+ * The band the canvas keeps clear along the top of every Resource it draws:
+ * eight pixels, the kind glyph's row, eight pixels. Each plugin pads its own
+ * Title by it, read as `useRailBand()`; the Closed Title's room below it is
+ * held by `packages/ui/test/canvas-resource-title-ladder.test.ts`.
+ */
+export const RAIL_BAND = 30;
+
+/** The words of a settled commit's refusal, or `null` where it completed or changed nothing. */
+export const refusalOf = (answer: Answer): string | null =>
+  answer === 'completed' || answer === 'unchanged' ? null : answer.refused;
+
+/** The Resource's Title, drawn as the surface draws a Title, with the rename it offers. */
+export function Title(props: TitleProps) {
+  const { Title: HostTitle } = useResourceHost('Title');
+  return <HostTitle {...props} />;
+}
+
+/**
+ * A region that is the plugin's for the pointer: inside it, pointer and key
+ * events are the plugin's rather than the canvas's.
+ */
+export function Own(props: OwnProps) {
+  const { Own: HostOwn } = useResourceHost('Own');
+  return <HostOwn {...props} />;
+}
+
+/**
+ * Markdown text rendered by the host's one parser and sanitiser. Text a plugin
+ * reads is untrusted, and is never inserted otherwise.
+ */
+export function RenderedMarkdown(props: RenderedMarkdownProps) {
+  const { RenderedMarkdown: HostRenderedMarkdown } = useResourceHost('RenderedMarkdown');
+  return <HostRenderedMarkdown {...props} />;
+}
+
+/** The band along the top of the rect this surface keeps clear for its rail, in pixels. */
+export function useRailBand(): number {
+  return useResourceHost('useRailBand').railBand;
+}
+
+/** The host's source editor, for a plugin whose content is text it edits. */
+export function SourceEditor(props: SourceEditorProps) {
+  const { SourceEditor: HostSourceEditor } = useResourceHost('SourceEditor');
+  return <HostSourceEditor {...props} />;
+}
+
+/** Emit commands for the canvas to draw on this Resource's rail. Draws nothing in place. */
+export function Rail({ commands }: { readonly commands: readonly RailCommand[] }) {
+  const { rail } = useResourceHost('Rail');
+  const [source] = useState(() => Symbol('rail'));
+  useLayoutEffect(() => {
+    rail.publish(source, commands);
+  }, [rail, source, commands]);
+  useLayoutEffect(() => () => rail.withdraw(source), [rail, source]);
+  return null;
+}

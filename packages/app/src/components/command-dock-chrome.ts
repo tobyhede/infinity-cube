@@ -9,6 +9,7 @@ import type {
   GraphId,
   Map,
   MapId,
+  PluginKind,
   Resource,
   ResourceId,
   UUID,
@@ -16,7 +17,6 @@ import type {
 import type { SpaceSessionState } from '@project/persistence';
 import type { FocusFallback } from '../delete-confirmation';
 import type { ExitOutcome } from '../dock-model';
-import type { DockCreate } from '../kind-creation';
 import type { MapMemberships } from '../map-memberships';
 import type { ListingRow, NamedSpace, RejectedExitConfirmation } from '../open-spaces';
 import type { ResourcesPopoverSpace, SettlePlacement, SettleResource } from '../resources-drag';
@@ -385,6 +385,8 @@ export interface DockResourcesList {
   readonly allResources: readonly Resource[];
   /** The Title of every Space a Space Resource in the list references. */
   readonly spaceTitleById?: ReadonlyMap<UUID, string> | undefined;
+  /** The Map and Graph each Space Resource in the list selects, as their target Map's and Graph's titles. */
+  readonly spaceSelectionNameById?: ReadonlyMap<ResourceId, string> | undefined;
   /**
    * Every Space this Meta Space holds bar the one being authored.
    *
@@ -461,8 +463,16 @@ export interface DockResources {
    * The kind is chosen at creation, so the cluster offers peers rather than a
    * split button with a hidden default. This is *Create*, distinct from adding
    * an existing Resource, which is what the list above is for. What a press
-   * does, and whether it may run, is each kind's (`kinds/registry.ts`); the
-   * cluster draws the kind's name and glyph and nothing else about it.
+   * does is each plugin's creation (ADR 0142); the cluster draws the kind's
+   * name and glyph and nothing else about it.
    */
   readonly create: readonly DockCreate[];
+}
+
+/** One Create the Command Dock draws: the kind it makes, whether it may run, and the press. */
+export interface DockCreate {
+  readonly kind: PluginKind;
+  readonly disabled: boolean;
+  /** Runs the plugin's creation, or nothing while it is withheld. */
+  readonly create: () => void;
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  EMPTY_ASSET_REF,
   encodeCompactUuid,
   spaceSnapshotSchema,
   uuidSchema,
@@ -45,8 +46,8 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Map',
         kind: 'positioned',
         positions: {
-          [RESOURCE_A]: { x: 0, y: 0, open: false },
-          [RESOURCE_B]: { x: 320, y: 0, open: false },
+          [RESOURCE_A]: { x: 0, y: 0 },
+          [RESOURCE_B]: { x: 320, y: 0 },
         },
         graphs: [
           { id: OPENING_GRAPH, title: 'Opening', edges: [{ from: RESOURCE_A, to: RESOURCE_B }] },
@@ -58,15 +59,24 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
         id: OTHER_MAP,
         title: 'Other Map',
         kind: 'positioned',
-        positions: { [RESOURCE_A]: { x: 0, y: 0, open: false } },
+        positions: { [RESOURCE_A]: { x: 0, y: 0 } },
         graphs: [{ id: OTHER_MAP_GRAPH, title: 'Other Map Graph', edges: [] }],
       },
     ],
   },
   resources: [
-    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: '' } } },
-    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', content: { source: '' } } },
-    { id: RESOURCE_OFF_MAP, document: { title: 'C', kind: 'markdown', content: { source: '' } } },
+    {
+      id: RESOURCE_A,
+      document: { title: 'A', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+    },
+    {
+      id: RESOURCE_B,
+      document: { title: 'B', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+    },
+    {
+      id: RESOURCE_OFF_MAP,
+      document: { title: 'C', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+    },
   ],
 });
 

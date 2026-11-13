@@ -1,10 +1,20 @@
 import { useEffect, useRef } from 'react';
-import { newUuid, uuidSchema, type SpaceSnapshot } from '@project/core';
-import { MemorySpaceBackendTestControl, type SpaceSessionState } from '@project/persistence';
+import {
+  isOfKind,
+  newUuid,
+  spaceKind,
+  uuidSchema,
+  type ResourceDocument,
+  type SpaceSnapshot,
+} from '@project/core';
+import {
+  MemorySpaceBackendTestControl,
+  type ShownSpace,
+  type SpaceSessionState,
+} from '@project/persistence';
 import { Application } from '#components/Application';
 import { snapshotFromSpace } from '#src/snapshot';
 import { storyOpening, storySpaces } from './application';
-import { heldImageSources } from './image-sources';
 import type { OpenSpace, OpenSpaces } from '#src/open-spaces';
 import { CANVAS } from '#src/space-authoring';
 import {
@@ -95,6 +105,16 @@ const quiesced = async (spaces: OpenSpaces): Promise<void> => {
   );
 };
 
+/** A lifecycle input with the document the Space plugin makes: the Space shown unframed, under its Title. */
+const showingSpace = <Input extends { readonly title: string }>(input: Input) => ({
+  ...input,
+  document: (shown: ShownSpace): ResourceDocument => ({
+    title: input.title,
+    kind: spaceKind.id,
+    content: shown,
+  }),
+});
+
 /**
  * A blocked recovery, through the real lifecycle: a Space
  * Resource created in `rendering` is rejected (C0), a second created inside
@@ -109,19 +129,22 @@ const blockSave = async (
   const containingMap = rendering.session.getState().working.document.defaultMap;
   if (containingMap === undefined) throw new Error('The blocked scenario needs a Map.');
   control.queueResult({ kind: 'permanent-failure', code: 'forbidden' });
-  const created = await spaces.spaceResources.create({
-    containingSpaceId: rendering.id,
-    mapId: containingMap,
-    title: 'Blocking Space',
-    position: { x: 640, y: 0 },
-  });
+  const created = await spaces.spaceResources.create(
+    showingSpace({
+      containingSpaceId: rendering.id,
+      mapId: containingMap,
+      title: 'Blocking Space',
+      position: { x: 640, y: 0 },
+    }),
+  );
   if (created.kind !== 'completed') throw new Error('The blocked scenario created nothing.');
   await reaches(rendering.session, 'rejected');
   const resource = rendering.session
     .getState()
     .working.resources.find(({ id }) => id === created.resourceId);
-  if (resource?.document.kind !== 'space') throw new Error('No Space Resource was created.');
-  const { entry: target } = await spaces.hold(resource.document.content.spaceId);
+  if (resource === undefined || !isOfKind(resource.document, 'space'))
+    throw new Error('No Space Resource was created.');
+  const { entry: target } = await spaces.hold(uuidSchema.parse(resource.document.content.spaceId));
   const stored = target.session.getState().working;
   const targetMap = stored.document.defaultMap;
   if (targetMap === undefined) throw new Error('The blocking Space has no Map.');
@@ -134,12 +157,14 @@ const blockSave = async (
       },
     ],
   });
-  await spaces.spaceResources.create({
-    containingSpaceId: target.id,
-    mapId: targetMap,
-    title: 'Child',
-    position: { x: 320, y: 0 },
-  });
+  await spaces.spaceResources.create(
+    showingSpace({
+      containingSpaceId: target.id,
+      mapId: targetMap,
+      title: 'Child',
+      position: { x: 320, y: 0 },
+    }),
+  );
   await reaches(target.session, 'conflicted');
 
   const notes = rendering.session.getState().working.resources[0];
@@ -218,10 +243,7 @@ export async function openDockStory(scenario: DockScenario) {
     ]);
     return storyOpening(spaces, await spaces.open(snapshot.id));
   }
-  const spaces =
-    scenario === 'replacing'
-      ? storySpaces(metaSnapshot.id, snapshots, control, heldImageSources().images)
-      : storySpaces(metaSnapshot.id, snapshots, control, undefined, scenario === 'mounted');
+  const spaces = storySpaces(metaSnapshot.id, snapshots, control, scenario === 'mounted');
   await spaces.open(metaSnapshot.id);
   await spaces.enter(platformSnapshot.id);
   await spaces.enter(designSystemSnapshot.id);
@@ -231,13 +253,15 @@ export async function openDockStory(scenario: DockScenario) {
   await spaces.switchTo(rendering.id);
 
   if (scenario === 'presenting') rendering.app.navigation.present();
-  // A real replacement of the Rendering Space's Image Resource, held while it
-  // measures for as long as the story is mounted.
-  if (scenario === 'replacing')
-    void rendering.app.imageReplacement.replace(HELD_IMAGE, {
-      kind: 'url',
-      url: 'https://example.com/replacement.png',
-    });
+  // Exclusive work on the Rendering Space's Image Resource, as its Replace
+  // runs, held for as long as the story is mounted (ADR 0126, ADR 0142).
+  if (scenario === 'replacing') {
+    const held = spaces.pluginGate.claim(
+      [{ resource: HELD_IMAGE, key: Symbol('held Image') }],
+      () => ({}),
+    );
+    void held?.exclusively(() => new Promise<never>(() => undefined));
+  }
   if (scenario === 'save-blocked') {
     await quiesced(spaces);
     await blockSave(spaces, control, rendering);
@@ -290,13 +314,7 @@ export async function openDockStory(scenario: DockScenario) {
     const result = target.app.authoring.complete(CANVAS, {
       kind: 'edited-resource',
       resourceId: resource.id,
-      document:
-        resource.document.kind === 'markdown'
-          ? {
-              ...resource.document,
-              content: { source: `${resource.document.content.source}\nStory edit` },
-            }
-          : { ...resource.document, title: `${resource.document.title} edited` },
+      document: { ...resource.document, title: `${resource.document.title} edited` },
     });
     if (result.kind !== 'completed')
       throw new Error('The failure scenario did not complete an Edit.');

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { resourceDocumentSchema, resourceSchema } from '../src/index';
+import { EMPTY_ASSET_REF } from '../src/assets';
 
 /**
  * A Resource is the envelope `{ id, title, kind, content }` (ADR 0128): the
@@ -13,7 +14,7 @@ const MAP_ID = '00000000-0000-4000-8000-000000000004';
 const GRAPH_ID = '00000000-0000-4000-8000-000000000005';
 
 const documents = [
-  { title: 'Prose', kind: 'markdown', content: { source: '# Prose' } },
+  { title: 'Prose', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
   {
     title: 'Picture',
     kind: 'image',

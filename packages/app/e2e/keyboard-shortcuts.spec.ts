@@ -4,6 +4,7 @@ import {
   presentControl,
   presentedName,
   resourceActions,
+  resourceControls,
   selectResource,
   selectedCanvas,
   settled,
@@ -184,18 +185,22 @@ test('Space reads a Resource in Full View, walks the Active Graph and leaves', a
 
   await page.keyboard.press('Space');
   await expect(fullView.getByRole('heading', { level: 2 })).toHaveText('B');
+  // Enter is not a Full View key: every Open is a plugin's rail command
+  // (resource-plugins issue 10), so it neither leaves nor Opens.
   await page.keyboard.press('Enter');
+  await expect(fullView.getByRole('heading', { level: 2 })).toHaveText('B');
+  await page.keyboard.press('Escape');
   await expect(fullView).toHaveCount(0);
-  await expect(b.locator('.canvas-resource[data-open="true"]')).toHaveCount(1);
+  await expect(b.locator('.canvas-resource__plugin [data-open="false"]')).toHaveCount(1);
 });
 
 /**
- * Shift+Enter Opens D, the fixture's long Resource, and grows it to fit its
- * content in one Edit: its text no longer overflows, A′ to its right makes
- * room, and the camera frames the whole of it. The Actions menu's Open and
- * Expand is the same Edit.
+ * Opening D, the fixture's long Markdown Resource, grows it to fit its content
+ * in one Edit, by the size hint its plugin carries: its text no longer
+ * overflows and A′ to its right makes room. Shift+Enter Opens nothing: every
+ * Open is a plugin's rail command (resource-plugins issues 05 and 10).
  */
-test('Shift+Enter and Open and Expand open a Resource grown to fit its content', async ({
+test('Opening a Markdown Resource grows it to fit its content, and Shift+Enter Opens nothing', async ({
   page,
 }) => {
   await page.goto('/');
@@ -214,8 +219,11 @@ test('Shift+Enter and Open and Expand open a Resource grown to fit its content',
 
   await selectResource(d);
   await page.keyboard.press('Shift+Enter');
+  await expect(d.locator('.canvas-resource__plugin [data-open="false"]')).toHaveCount(1);
+  await expect(persistence).toHaveAttribute('data-revision', String(revision));
+  await (await resourceControls(page, d)).getByRole('button', { name: 'Open Resource D' }).click();
 
-  await expect(d.locator('.canvas-resource[data-open="true"]')).toHaveCount(1);
+  await expect(d.locator('.canvas-resource__plugin [data-open="true"]')).toHaveCount(1);
   await expect(persistence).toHaveAttribute('data-revision', String(revision + 1));
   await settled(page);
   const body = d.locator('.markdown-resource-body__rendered');
@@ -228,21 +236,6 @@ test('Shift+Enter and Open and Expand open a Resource grown to fit its content',
   expect(open.left.height).toBeGreaterThan(closed.left.height);
   // A′ took the width change, so the room between them is what it was.
   expect(Math.abs(open.gap - closed.gap)).toBeLessThanOrEqual(1);
-  const viewport = page.viewportSize();
-  expect(viewport).not.toBeNull();
-  expect(open.left.x).toBeGreaterThanOrEqual(0);
-  expect(open.left.y).toBeGreaterThanOrEqual(0);
-  expect(open.left.x + open.left.width).toBeLessThanOrEqual(viewport?.width ?? 0);
-  expect(open.left.y + open.left.height).toBeLessThanOrEqual(viewport?.height ?? 0);
-
-  // Already Open at the size it fits: the same Edit again changes nothing.
-  await (
-    await resourceActions(page, 'D')
-  )
-    .getByRole('menuitem', { name: 'Open and Expand' })
-    .click();
-  await settled(page);
-  await expect(persistence).toHaveAttribute('data-revision', String(revision + 1));
 });
 
 /** A presentation clicker sends Page Down and Page Up; Home goes back to where the presentation began. */

@@ -92,7 +92,8 @@ test(
 
     await expect(body(page)).toBeFocused();
     await page.keyboard.press('ArrowRight');
-    await expect(presentedName(page)).toHaveText('Picture');
+    // An Image Resource draws no Title on the Stage: its Title names its picture (ADR 0142).
+    await expect(frame(page).getByRole('img', { name: 'Picture' })).toBeVisible();
     await expect.poll(scrollTop).toBe(0);
   },
 );
@@ -149,7 +150,7 @@ test(
     expect(room.y).toBeGreaterThanOrEqual(box.y - 0.5);
     expect(room.x + room.width).toBeLessThanOrEqual(box.x + box.width + 0.5);
     expect(room.y + room.height).toBeLessThanOrEqual(box.y + box.height + 0.5);
-    await expect(picture).toHaveCSS('object-fit', 'scale-down');
+    await expect(picture).toHaveCSS('object-fit', 'contain');
     expect(
       await body(page).evaluate((element) => element.scrollHeight <= element.clientHeight),
     ).toBe(true);

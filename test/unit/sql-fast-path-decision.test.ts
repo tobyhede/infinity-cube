@@ -1,5 +1,6 @@
 import fc from 'fast-check';
 import {
+  EMPTY_ASSET_REF,
   COLLAPSED_RESOURCE_SIZE,
   RESOURCE_SHAPES,
   uuidSchema,
@@ -47,11 +48,11 @@ const S_LINK_TO_T = idAt(51);
 const META_LINK_TO_T = idAt(60);
 const META_LINK_TO_S = idAt(61);
 
-const closed = (x: number, y: number) => ({ x, y, open: false as const });
+const closed = (x: number, y: number) => ({ x, y });
 
 const markdown = (id: UUID, title: string) => ({
   id,
-  document: { title, kind: 'markdown' as const, content: { source: `# ${title}` } },
+  document: { title, kind: 'markdown' as const, content: { url: EMPTY_ASSET_REF } },
 });
 
 const ur = (id: UUID, title: string) => ({
@@ -98,7 +99,7 @@ const target: SpaceSnapshot = {
       },
     ],
   },
-  // Ur Resources, so a generated `reshape` may give any of them a Shape (ADR 0121).
+  // Ur Resources, so a generated `reshape` may give any of them Map content (ADR 0142).
   resources: T_RESOURCES.map((id, index) => ur(id, `Resource ${index}`)),
 };
 
@@ -347,7 +348,7 @@ const applyOps = (snapshot: SpaceSnapshot, ops: readonly Op[]): SpaceSnapshot =>
           const next =
             current.kind === 'resize'
               ? { ...placed, size: { width: current.width, height: current.height } }
-              : { ...placed, open: false as const };
+              : placed;
           return { ...m, positions: { ...m.positions, [resource]: next } };
         });
         break;
@@ -358,7 +359,10 @@ const applyOps = (snapshot: SpaceSnapshot, ops: readonly Op[]): SpaceSnapshot =>
           if (resource === undefined || placed === undefined) return undefined;
           return {
             ...m,
-            positions: { ...m.positions, [resource]: { ...placed, shape: current.shape } },
+            positions: {
+              ...m.positions,
+              [resource]: { ...placed, content: { shape: current.shape } },
+            },
           };
         });
         break;

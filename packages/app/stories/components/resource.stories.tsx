@@ -2,18 +2,22 @@ import { useState } from 'react';
 import type { Story } from '@ladle/react';
 import {
   RESOURCE_SHAPES,
+  resolvedMapContent,
   uuidSchema,
+  type JsonValue,
   type Map,
   type Resource,
   type ResourceShape,
 } from '@project/core';
+import { referenceMapContentSchema } from '@project/plugin-reference/domain';
+import type { Answer } from '@project/resource-api/domain';
+import { urMapContentSchema } from '@project/plugin-ur/domain';
 import { productDestinationPath, type ProductDestination } from '@project/http';
 import {
-  CanvasResource,
-  CLOSED_DISPLAY,
-  type KindOperations,
+  PluginAssetsProvider,
+  PluginResource,
   type CanvasResourceState,
-  type ResourceDisplay,
+  type KindOperations,
 } from '@project/ui';
 import { spaceEntityActions } from '#src/entity-actions';
 import { resourceSizeVars } from '#src/resource';
@@ -23,8 +27,9 @@ import { requireDefaultMap } from '#src/map-resolution';
 import { CanvasResourceNodeSpecimen, type DrawnMap } from '../support/ReactFlowCanvas';
 import { resourceIds, GRAPH_PALETTE } from '../support/fixture';
 import { authoredSpace, imageReferenceIds, imageReferenceSpace } from '../support/spaces';
-import harbour from '#fixture-images/fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs.png';
+import harbour from '#fixture-assets/fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs.png';
 import '../support/inventory.css';
+import { storyText } from '../support/story-assets';
 
 export default { title: 'Components/Resource' };
 
@@ -32,7 +37,7 @@ export const States: Story = () => (
   <div className="inv inv-sheet" style={resourceSizeVars}>
     <CatalogueSection
       title="Resource states"
-      note="The shared CanvasResource presentation contract, drawn statically for rest, selected and dragging. Hover and selection are proven live in Hover and selection, and title editing in Title editing."
+      note="The shared PluginResource presentation contract, drawn statically for rest, selected and dragging. Hover and selection are proven live in Hover and selection, and title editing in Title editing."
     >
       <div className="inv-row">
         <Specimen label="resource · rest">
@@ -85,7 +90,9 @@ const OVERLONG_TITLE =
 const WRAPPING_TITLE = 'Why authored placement beats a layout engine that reshuffles on every edit';
 
 /**
- * Every kind `CanvasResource` declares, with the label each specimen carries.
+ * Every kind `PluginResource` declares, with the label each specimen carries,
+ * but the Image Resource, which is its picture and has no Closed state (ADR
+ * 0142); `Image Resource` draws it.
  *
  * The creation ghost is in the list and is not a Resource: it is what the canvas
  * draws while a new Resource is being placed, a Markdown Resource with no
@@ -94,12 +101,25 @@ const WRAPPING_TITLE = 'Why authored placement beats a layout engine that reshuf
  */
 const CLOSED_KINDS = [
   { kind: 'markdown', label: 'markdown' },
-  { kind: 'reference', label: 'reference' },
-  { kind: 'space', label: 'space' },
-  { kind: 'image', label: 'image' },
+  // A Reference Resource is made from its Target, which its content names.
+  { kind: 'reference', label: 'reference', content: { target: resourceIds.strategies } },
+  // A Space Resource is created with the Space it shows, which its content names.
+  {
+    kind: 'space',
+    label: 'space',
+    content: {
+      spaceId: '00000000-0000-4000-8000-000000000020',
+      map: '00000000-0000-4000-8000-000000000021',
+      graph: '00000000-0000-4000-8000-000000000022',
+    },
+  },
   { kind: 'ur', label: 'ur' },
   { kind: 'markdown', label: 'creation ghost' },
-] as const satisfies readonly { kind: KindOperations['kind']; label: string }[];
+] as const satisfies readonly {
+  kind: KindOperations['kind'];
+  label: string;
+  content?: unknown;
+}[];
 
 /**
  * The whole of a Closed Resource, at rest, for every kind the component draws.
@@ -122,19 +142,27 @@ export const Closed: Story = () => (
   <div className="inv inv-sheet" style={resourceSizeVars}>
     <CatalogueSection
       title="Closed Resource"
-      note="Every kind CanvasResource draws, at rest and at the one authored Closed Size, each with a one-line Title beside a three-line one. A Closed Resource draws its border — dotted only for a Reference Resource — and its Title Lines, and beneath the Title it draws nothing. A Closed Resource draws its kind glyph at its top-right corner, with or without a toolbar; an Open Resource draws none, and nor does an Ur Resource, whose Shape says what it is."
+      note="Every kind PluginResource draws, at rest and at the one authored Closed Size, each with a one-line Title beside a three-line one. A Closed Resource draws its border — dotted only for a Reference Resource — and its Title Lines, and beneath the Title it draws nothing. A Closed Resource draws its kind glyph at its top-right corner, with or without a toolbar; an Open Resource draws none, and nor does an Ur Resource, whose Shape says what it is."
     >
       <div className="inv-row">
         {CLOSED_KINDS.map((entry) => (
           <Specimen key={entry.label} label={`${entry.label} · one line`}>
-            <CanvasResourceSpecimen kind={entry.kind} title={ONE_LINE_TITLE} />
+            <CanvasResourceSpecimen
+              kind={entry.kind}
+              title={ONE_LINE_TITLE}
+              content={'content' in entry ? entry.content : undefined}
+            />
           </Specimen>
         ))}
       </div>
       <div className="inv-row">
         {CLOSED_KINDS.map((entry) => (
           <Specimen key={entry.label} label={`${entry.label} · three lines`}>
-            <CanvasResourceSpecimen kind={entry.kind} title={THREE_LINE_TITLE} />
+            <CanvasResourceSpecimen
+              kind={entry.kind}
+              title={THREE_LINE_TITLE}
+              content={'content' in entry ? entry.content : undefined}
+            />
           </Specimen>
         ))}
       </div>
@@ -262,13 +290,25 @@ export const ResourceShapeChoice: Story = () => {
   const [resourceShape, setResourceShape] = useState<ResourceShape>('rectangle');
   return (
     <div className="p-8" style={resourceSizeVars}>
-      <CanvasResource
-        kindOperations={{ kind: 'ur', onResourceShapeChange: setResourceShape }}
-        display={CLOSED_DISPLAY}
-        shape={resourceShape}
-        title="Decide"
+      <PluginResource
+        resourceId="decide"
+        kind="ur"
+        title={{ title: 'Decide', readOnly: false, onReturnFocus: () => undefined }}
+        content={{}}
+        mapContent={{ shape: resourceShape }}
+        outline={resourceShape}
         state="selected"
         graphColor="#ffc53d"
+        readOnly={false}
+        operations={{
+          kind: 'ur',
+          commitMap: (next) => {
+            const parsed = urMapContentSchema.safeParse(next);
+            if (!parsed.success) return Promise.resolve({ refused: 'Not a Shape.' });
+            setResourceShape(parsed.data.shape);
+            return Promise.resolve('completed');
+          },
+        }}
       />
     </div>
   );
@@ -279,7 +319,7 @@ export const Kinds: Story = () => (
   <div className="inv inv-sheet" style={resourceSizeVars}>
     <CatalogueSection
       title="Resource kinds"
-      note="Kind changes the icon and the border treatment (a Reference Resource's dotted border) without adding a textual kind label. This story exercises CanvasResource's presentation interface directly."
+      note="Kind changes the icon and the border treatment (a Reference Resource's dotted border) without adding a textual kind label. This story exercises PluginResource's presentation interface directly."
     >
       <div className="inv-row">
         <Specimen label="markdown">
@@ -441,10 +481,11 @@ ResizeControl.storyName = 'Resize control';
 ResizeControl.meta = { iframed: true };
 
 /**
- * One instance wired the way `ResourceNode` wires the production component: real
- * selection and dragging toggles standing in for React Flow's own, a real
- * Connect operation, and a visible record of when it fired — so the story
- * proves the same exposure the production graph does, not a facsimile of it.
+ * One instance wired the way `ResourceNode` wires the production host: real
+ * selection and dragging toggles standing in for React Flow's own, its
+ * plugin's Open and Close committing its Map content, and a visible record of
+ * when it fired — so the story proves the same exposure the production graph
+ * does, not a facsimile of it.
  */
 function Instance({
   initialTitle,
@@ -457,23 +498,16 @@ function Instance({
   const [selected, setSelected] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [open, setOpen] = useState(false);
-  const changeOpen = (next: boolean) => {
-    setOpen(next);
-    return 'completed' as const;
+  // Open and Close are the plugin's Map content, which it commits (ADR 0142).
+  const commitMap = (next: JsonValue): Promise<Answer> => {
+    setOpen(referenceMapContentSchema.safeParse(next).data?.open === true);
+    return Promise.resolve('completed');
   };
-  // Every kind Opens and Closes through the one operation (ADR 0070), so the
-  // Reference Resource takes it too.
-  const kindOperations: KindOperations = { kind };
-  const display: ResourceDisplay = open
-    ? {
-        shown: 'open',
-        content: {
-          kind: 'markdown',
-          source: 'Markdown content',
-          via: kind === 'reference' ? 'target' : 'self',
-        },
-      }
-    : CLOSED_DISPLAY;
+  const [content] = useState<JsonValue>(() =>
+    kind === 'reference'
+      ? { target: resourceIds.strategies }
+      : { url: storyText('Markdown content') },
+  );
   const state: Exclude<CanvasResourceState, 'editing'> = dragging
     ? 'dragging'
     : selected
@@ -487,13 +521,17 @@ function Instance({
         tabIndex={-1}
         onClick={() => setSelected(true)}
       >
-        <CanvasResource
-          kindOperations={kindOperations}
-          onOpenChange={changeOpen}
-          display={display}
+        <PluginResource
+          resourceId={`instance-${kind}`}
+          kind={kind}
+          title={{ title, readOnly: true, onReturnFocus: () => undefined }}
+          content={content}
+          mapContent={{ open }}
+          outline="rectangle"
           state={state}
-          title={title}
           graphColor="#ffc53d"
+          readOnly={false}
+          operations={{ kind, commitMap }}
         />
       </div>
       <label className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -504,7 +542,7 @@ function Instance({
         />
         Dragging
       </label>
-      {kindOperations.kind === 'markdown' && (
+      {kind === 'markdown' && (
         <p className="text-xs text-muted-foreground" data-testid="open-report">
           {open ? `${title} is open.` : `${title} is closed.`}
         </p>
@@ -557,7 +595,7 @@ export const OpenAndClose: Story = () => {
         <CanvasResourceNodeSpecimen
           open={open}
           onOpenChange={changeOpen}
-          content={{ kind: 'markdown', source: openMarkdown, via: 'self' }}
+          content={{ kind: 'markdown', content: { url: storyText(openMarkdown) }, via: 'self' }}
           nodeSize={open ? openFrame : closedFrame}
           stageClassName="inv-resource-node-stage--large"
         />
@@ -572,7 +610,11 @@ export const OpenAndClose: Story = () => {
           title="Long Markdown"
           content={{
             kind: 'markdown',
-            source: `${openMarkdown}\n\n### A deliberately long section\n\n${openMarkdown}\n\n${openMarkdown}`,
+            content: {
+              url: storyText(
+                `${openMarkdown}\n\n### A deliberately long section\n\n${openMarkdown}\n\n${openMarkdown}`,
+              ),
+            },
             via: 'self',
           }}
           nodeSize={longOpen ? openFrame : closedFrame}
@@ -584,23 +626,24 @@ export const OpenAndClose: Story = () => {
 };
 OpenAndClose.meta = { iframed: true };
 
+/**
+ * An Open Reference Resource is drawn by its plugin (ADR 0070, ADR 0142): it
+ * embeds its Target, Strategies, through the host's embedding, under its own
+ * Title, and its Open and Close are its Map content, changed from its rail.
+ */
 export const OpenReference: Story = () => {
   const [open, setOpen] = useState(true);
-  const changeOpen = (next: boolean) => {
-    setOpen(next);
-    return 'completed' as const;
+  const commitMap = (next: JsonValue): Promise<Answer> => {
+    setOpen(referenceMapContentSchema.parse(next).open);
+    return Promise.resolve('completed');
   };
   return (
     <div className="p-8">
       <CanvasResourceNodeSpecimen
         resourceId={resourceIds.openingReference}
-        open={open}
-        onOpenChange={changeOpen}
-        content={{
-          kind: 'markdown',
-          source: '## Strategies\n\nNo strategy is privileged.',
-          via: 'target',
-        }}
+        openOperationEnabled={false}
+        mapContent={{ open }}
+        commitMap={commitMap}
         nodeSize={open ? openFrame : closedFrame}
         stageClassName="inv-resource-node-stage--large"
       />
@@ -611,75 +654,93 @@ OpenReference.storyName = 'Open Reference Resource';
 OpenReference.meta = { iframed: true };
 
 /**
- * An Open Image Resource is drawn as an Open Markdown Resource with its picture as the
- * content. Three specimens at one canvas unit per pixel: a 400×300 picture in
- * a Resource sized to hold it — the picture plus the Resource's chrome — the same
- * picture in a Resource resized larger, where it keeps its natural size rather
- * than being enlarged, and a URL that does not load.
+ * An Image Resource is its picture (ADR 0106, ADR 0142), drawn whole into the
+ * rect it is given at any size and never cropped, named by its Title and with
+ * no drawn Title. Each is the image Space's Harbour, which is in no Graph and
+ * so drawn in no Graph's colour. Four specimens at one canvas
+ * unit per pixel: a 400×300 picture at rest, which has no border; the same picture selected, which the
+ * canvas strokes; the picture in a wider, shorter rect, which it fits whole;
+ * and a URL that does not load.
  */
-export const OpenImage: Story = () => {
-  const [open, setOpen] = useState(true);
-  const changeOpen = (next: boolean) => {
-    setOpen(next);
-    return 'completed' as const;
-  };
-  const sizedToPicture = { width: 408, height: 359 };
+/** The stored picture the Image Resource story draws, which its asset store resolves to the tracked file. */
+const HARBOUR_REF = '/assets/fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs';
+/** A stored picture the story's asset store resolves to a URL that does not load. */
+const MISSING_REF = '/assets/MISSINGpictureMISSINGpictureMISSINGpicture0';
+
+/** The catalogue's asset store: Harbour from the tracked file, and nothing else. */
+const imageStoryAssets = {
+  url: (ref: string) => (ref === HARBOUR_REF ? harbour : '/missing-picture.png'),
+  read: () => Promise.resolve({ refused: 'The catalogue reads no asset.' }),
+};
+
+export const ImageResource: Story = () => {
+  const sizedToPicture = { width: 400, height: 300 };
   return (
-    <div className="flex flex-wrap items-start gap-8 p-8">
-      <section aria-label="Sized to its picture" className="flex flex-col gap-2">
-        <p className="text-xs text-muted-foreground">400×300 in a Resource sized to hold it</p>
-        <CanvasResourceNodeSpecimen
-          title="Harbour"
-          kind="image"
-          content={{
-            kind: 'image',
-            url: harbour,
-            via: 'self',
-          }}
-          open={open}
-          onOpenChange={changeOpen}
-          nodeSize={open ? sizedToPicture : closedFrame}
-          zoom={1}
-          stageClassName="inv-resource-node-stage--large"
-        />
-      </section>
-      <section aria-label="Resized larger" className="flex flex-col gap-2">
-        <p className="text-xs text-muted-foreground">400×300 in a Resource resized larger</p>
-        <CanvasResourceNodeSpecimen
-          title="Harbour, larger"
-          kind="image"
-          content={{
-            kind: 'image',
-            url: harbour,
-            via: 'self',
-          }}
-          open
-          nodeSize={{ width: 600, height: 440 }}
-          zoom={1}
-          stageClassName="inv-resource-node-stage--large"
-        />
-      </section>
-      <section aria-label="Failed image" className="flex flex-col gap-2">
-        <p className="text-xs text-muted-foreground">a URL that does not load</p>
-        <CanvasResourceNodeSpecimen
-          title="Missing"
-          kind="image"
-          content={{
-            kind: 'image',
-            url: '/images/missing-picture.png',
-            via: 'self',
-          }}
-          open
-          nodeSize={sizedToPicture}
-          zoom={1}
-          stageClassName="inv-resource-node-stage--large"
-        />
-      </section>
-    </div>
+    <PluginAssetsProvider value={imageStoryAssets}>
+      <div className="flex flex-wrap items-start gap-8 p-8">
+        <section aria-label="At rest" className="flex flex-col gap-2">
+          <p className="text-xs text-muted-foreground">400×300, at rest</p>
+          <CanvasResourceNodeSpecimen
+            title="Harbour"
+            kind="image"
+            drawn={imageReferenceMap}
+            resourceId={imageReferenceIds.harbour}
+            picture={HARBOUR_REF}
+            openOperationEnabled={false}
+            nodeSize={sizedToPicture}
+            zoom={1}
+            stageClassName="inv-resource-node-stage--large"
+          />
+        </section>
+        <section aria-label="Selected" className="flex flex-col gap-2">
+          <p className="text-xs text-muted-foreground">400×300, selected</p>
+          <CanvasResourceNodeSpecimen
+            title="Harbour, selected"
+            kind="image"
+            drawn={imageReferenceMap}
+            resourceId={imageReferenceIds.harbour}
+            picture={HARBOUR_REF}
+            openOperationEnabled={false}
+            selected
+            nodeSize={sizedToPicture}
+            zoom={1}
+            stageClassName="inv-resource-node-stage--large"
+          />
+        </section>
+        <section aria-label="Wider" className="flex flex-col gap-2">
+          <p className="text-xs text-muted-foreground">400×300 in a wider, shorter rect</p>
+          <CanvasResourceNodeSpecimen
+            title="Harbour, wider"
+            kind="image"
+            drawn={imageReferenceMap}
+            resourceId={imageReferenceIds.harbour}
+            picture={HARBOUR_REF}
+            openOperationEnabled={false}
+            nodeSize={{ width: 600, height: 200 }}
+            zoom={1}
+            stageClassName="inv-resource-node-stage--large"
+          />
+        </section>
+        <section aria-label="Failed image" className="flex flex-col gap-2">
+          <p className="text-xs text-muted-foreground">a URL that does not load</p>
+          <CanvasResourceNodeSpecimen
+            title="Missing"
+            kind="image"
+            drawn={imageReferenceMap}
+            resourceId={imageReferenceIds.harbour}
+            picture={MISSING_REF}
+            openOperationEnabled={false}
+            nodeSize={sizedToPicture}
+            zoom={1}
+            stageClassName="inv-resource-node-stage--large"
+          />
+        </section>
+      </div>
+    </PluginAssetsProvider>
   );
 };
-OpenImage.storyName = 'Open Image Resource';
-OpenImage.meta = { iframed: true };
+ImageResource.storyName = 'Image Resource';
+ImageResource.meta = { iframed: true };
 
 const imageReferenceMap: DrawnMap = {
   space: imageReferenceSpace,
@@ -687,20 +748,25 @@ const imageReferenceMap: DrawnMap = {
 };
 
 /**
- * A Reference Resource whose Target is an Image Resource draws the Target's
- * picture read-only, as its own content would be (ADR 0070, ADR 0106): its own
- * Title, Close, and no Replace, even where the picture does not load. Both
- * Resources are in a Space that holds their Image Resource Targets, so what
- * each draws is resolved from its Target rather than handed to it. Each is
- * sized to hold the Target's 400×300 picture plus the Resource's chrome.
+ * A Reference Resource whose Target is an Image Resource is that picture,
+ * read-only (ADR 0070, ADR 0106, ADR 0142): named by its own Title, which its
+ * rail renames, with Close and no Replace, even where the picture does not
+ * load. Both Resources are in a Space that holds their Image Resource Targets,
+ * so what each draws is its Target, embedded by the host. Each is sized to the
+ * Target's 400×300 picture.
  */
 export const OpenImageReference: Story = () => {
   const [open, setOpen] = useState(true);
-  const changeOpen = (next: boolean) => {
-    setOpen(next);
-    return 'completed' as const;
+  const commitMap = (next: JsonValue): Promise<Answer> => {
+    setOpen(referenceMapContentSchema.parse(next).open);
+    return Promise.resolve('completed');
   };
-  const sizedToPicture = { width: 408, height: 359 };
+  const [title, setTitle] = useState('Harbour, again');
+  const commitTitle = (next: string): Promise<Answer> => {
+    setTitle(next);
+    return Promise.resolve('completed');
+  };
+  const sizedToPicture = { width: 400, height: 300 };
   return (
     <div className="flex flex-wrap items-start gap-8 p-8">
       <section aria-label="Image Target" className="flex flex-col gap-2">
@@ -708,8 +774,11 @@ export const OpenImageReference: Story = () => {
         <CanvasResourceNodeSpecimen
           drawn={imageReferenceMap}
           resourceId={imageReferenceIds.harbourReference}
-          open={open}
-          onOpenChange={changeOpen}
+          openOperationEnabled={false}
+          mapContent={{ open }}
+          commitMap={commitMap}
+          title={title}
+          commitTitle={commitTitle}
           nodeSize={open ? sizedToPicture : closedFrame}
           zoom={1}
           stageClassName="inv-resource-node-stage--large"
@@ -720,7 +789,8 @@ export const OpenImageReference: Story = () => {
         <CanvasResourceNodeSpecimen
           drawn={imageReferenceMap}
           resourceId={imageReferenceIds.missingReference}
-          open
+          openOperationEnabled={false}
+          mapContent={{ open: true }}
           nodeSize={sizedToPicture}
           zoom={1}
           stageClassName="inv-resource-node-stage--large"
@@ -731,47 +801,6 @@ export const OpenImageReference: Story = () => {
 };
 OpenImageReference.storyName = 'Open Image Reference Resource';
 OpenImageReference.meta = { iframed: true };
-
-/**
- * Enter is the Space Resource's kind command (ADR 0073, ADR 0068): it sits on the
- * rail whether the Resource is Open or Closed, and activating it is the crossing.
- *
- * The production `CanvasResource` is the component; the application proof is
- * `enter-space-resource.test.tsx` and `space-resource.spec.ts`.
- */
-export const EnterSpace: Story = () => {
-  const [entered, setEntered] = useState(false);
-  const changeOpen = () => 'completed' as const;
-  return (
-    <div className="p-8">
-      <CanvasResource
-        kindOperations={{ kind: 'space' }}
-        onOpenChange={changeOpen}
-        display={CLOSED_DISPLAY}
-        state="selected"
-        entityActions={[
-          [
-            {
-              id: 'enter',
-              label: 'Enter',
-              onSelect: () => {
-                setEntered(true);
-                return 'done';
-              },
-            },
-          ],
-        ]}
-        title="Architecture"
-        graphColor="#35d6c3"
-      />
-      <p className="mt-3 text-xs text-muted-foreground" data-testid="enter-report">
-        {entered ? 'Entered Architecture.' : 'Not entered.'}
-      </p>
-    </div>
-  );
-};
-EnterSpace.storyName = 'Enter Space';
-EnterSpace.meta = { iframed: true };
 
 const ARCHITECTURE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const ARCHITECTURE: Resource = {
@@ -788,11 +817,55 @@ const CONTAINING_MAP: Map = {
   id: uuidSchema.parse('00000000-0000-4000-8000-000000000003'),
   title: 'Collection 1',
   kind: 'positioned',
-  positions: { [ARCHITECTURE_ID]: { x: 0, y: 0, open: false } },
+  positions: { [ARCHITECTURE_ID]: { x: 0, y: 0 } },
   graphs: [
     { id: uuidSchema.parse('00000000-0000-4000-8000-000000000004'), title: 'Overview', edges: [] },
   ],
 };
+
+/**
+ * Enter is the Space Resource's kind command (ADR 0073, ADR 0068): it sits on the
+ * rail whether the Resource is Open or Closed, and activating it is the crossing.
+ *
+ * The production `PluginResource` is the host; the application proof is
+ * `enter-space-resource.test.tsx` and `space-resource.spec.ts`.
+ */
+export const EnterSpace: Story = () => {
+  const [entered, setEntered] = useState(false);
+  return (
+    <div className="p-8" style={resourceSizeVars}>
+      <PluginResource
+        resourceId={ARCHITECTURE_ID}
+        kind="space"
+        title={{ title: 'Architecture', readOnly: true, onReturnFocus: () => undefined }}
+        content={ARCHITECTURE.content}
+        mapContent={{ open: false }}
+        outline="rectangle"
+        readOnly={false}
+        operations={{ kind: 'space' }}
+        state="selected"
+        entityActions={[
+          [
+            {
+              id: 'enter',
+              label: 'Enter',
+              onSelect: () => {
+                setEntered(true);
+                return 'done';
+              },
+            },
+          ],
+        ]}
+        graphColor="#35d6c3"
+      />
+      <p className="mt-3 text-xs text-muted-foreground" data-testid="enter-report">
+        {entered ? 'Entered Architecture.' : 'Not entered.'}
+      </p>
+    </div>
+  );
+};
+EnterSpace.storyName = 'Enter Space';
+EnterSpace.meta = { iframed: true };
 
 /**
  * Independently opening the Space a Space Resource shows is a link to that
@@ -801,7 +874,6 @@ const CONTAINING_MAP: Map = {
  */
 export const OpenIndependently: Story = () => {
   const [opened, setOpened] = useState<ProductDestination | null>(null);
-  const changeOpen = () => 'completed' as const;
   const entityActions = spaceEntityActions({
     spaceId: uuidSchema.parse('00000000-0000-4000-8000-000000000001'),
     spaceTitle: 'Home',
@@ -813,13 +885,17 @@ export const OpenIndependently: Story = () => {
     onRename: null,
   })({ kind: 'resource', resource: ARCHITECTURE, map: CONTAINING_MAP });
   return (
-    <div className="p-8">
-      <CanvasResource
-        kindOperations={{ kind: 'space' }}
-        onOpenChange={changeOpen}
-        display={CLOSED_DISPLAY}
+    <div className="p-8" style={resourceSizeVars}>
+      <PluginResource
+        resourceId={ARCHITECTURE_ID}
+        kind="space"
+        title={{ title: 'Architecture', readOnly: true, onReturnFocus: () => undefined }}
+        content={ARCHITECTURE.content}
+        mapContent={{ open: false }}
+        outline="rectangle"
+        readOnly={false}
+        operations={{ kind: 'space' }}
         state="selected"
-        title="Architecture"
         graphColor="#35d6c3"
         entityActions={entityActions}
       />
@@ -857,12 +933,16 @@ export const RailActions: Story = () => {
     <div className="p-8" style={resourceSizeVars}>
       <div className="flex flex-wrap items-start gap-6">
         {authoredSpace.resources.slice(0, 2).map((resource, index) => (
-          <CanvasResource
+          <PluginResource
             key={resource.id}
-            kindOperations={{ kind: 'markdown' }}
-            onOpenChange={() => 'retained'}
-            display={CLOSED_DISPLAY}
-            title={resource.title}
+            resourceId={resource.id}
+            kind={resource.kind}
+            title={{ title: resource.title, readOnly: true, onReturnFocus: () => undefined }}
+            content={resource.content}
+            mapContent={resolvedMapContent(resource.kind, undefined)}
+            outline="rectangle"
+            readOnly={false}
+            operations={{ kind: resource.kind }}
             state={index === 1 ? 'selected' : 'rest'}
             graphColor="#ffc53d"
             entityActions={actions({ kind: 'resource', resource, map: firstMap })}

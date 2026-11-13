@@ -47,17 +47,45 @@ test(
  *
  * The table is the point: one loop over every kind the component declares, so
  * a new kind cannot be added with its own story slice and reviewed on its own.
+ * Every kind's plugin draws its Title in its own root (ADR 0142).
  */
 const CLOSED_KINDS = [
-  { label: 'markdown', kind: 'markdown', glyph: 'Markdown Resource', border: 'solid' },
-  { label: 'reference', kind: 'reference', glyph: 'Reference Resource', border: 'dotted' },
-  { label: 'space', kind: 'space', glyph: 'Space Resource', border: 'solid' },
-  { label: 'image', kind: 'image', glyph: 'Image Resource', border: 'solid' },
-  // An Ur Resource's Shape says what it is, so it draws no kind glyph.
-  { label: 'ur', kind: 'ur', glyph: null, border: 'solid' },
+  // A Markdown Resource's plugin draws its Title in a header of its own (ADR 0142).
+  {
+    label: 'markdown',
+    kind: 'markdown',
+    glyph: 'Markdown Resource',
+    border: 'solid',
+    body: '.canvas-resource__plugin > * > :first-child',
+  },
+  // So does a Reference Resource's (ADR 0142).
+  {
+    label: 'reference',
+    kind: 'reference',
+    glyph: 'Reference Resource',
+    border: 'dotted',
+    body: '.canvas-resource__plugin > * > :first-child',
+  },
+  // So does a Space Resource's (ADR 0142).
+  {
+    label: 'space',
+    kind: 'space',
+    glyph: 'Space Resource',
+    border: 'solid',
+    body: '.canvas-resource__plugin > * > :first-child',
+  },
+  // An Ur Resource's Shape says what it is, so it draws no kind glyph; its
+  // plugin draws its Title inside the outline (ADR 0142).
+  { label: 'ur', kind: 'ur', glyph: null, border: 'solid', body: '.canvas-resource__plugin > *' },
   // The creation ghost is not a Resource and takes the Markdown treatment, which is
   // why it is checked against the Markdown kind and glyph rather than its own.
-  { label: 'creation ghost', kind: 'markdown', glyph: 'Markdown Resource', border: 'solid' },
+  {
+    label: 'creation ghost',
+    kind: 'markdown',
+    glyph: 'Markdown Resource',
+    border: 'solid',
+    body: '.canvas-resource__plugin > * > :first-child',
+  },
 ] as const;
 
 const ONE_LINE = ['Strategies'];
@@ -99,9 +127,8 @@ test(
         const resource = specimen(page, `${entry.label} · ${suffix}`).getByRole('article');
         await expect(resource).toHaveAttribute('data-kind', entry.kind);
         await expect(resource).toHaveAttribute('data-state', 'rest');
-        await expect(resource).toHaveAttribute('data-open', 'false');
         if (entry.glyph === null) {
-          await expect(resource.locator('.resource-rail__kind')).toHaveCount(0);
+          await expect(resource.getByRole('img')).toHaveCount(0);
         } else {
           await expect(resource.getByRole('img', { name: entry.glyph })).toBeVisible();
         }
@@ -121,11 +148,8 @@ test(
         // no content surface is mounted on a closed Resource, and the Resource's own
         // text is the Title Lines and nothing else — which is what the two
         // undecided reference lines would fail.
-        await expect(resource.locator('.canvas-resource__body > *')).toHaveCount(1);
-        await expect(
-          resource.locator('.canvas-resource__body > .canvas-resource__title'),
-        ).toHaveCount(1);
-        await expect(resource.locator('.canvas-resource__content')).toHaveCount(0);
+        await expect(resource.locator(`${entry.body} > *`)).toHaveCount(1);
+        await expect(resource.locator(`${entry.body} > .canvas-resource__title`)).toHaveCount(1);
         const text = (await resource.innerText())
           .split('\n')
           .map((line) => line.trim())
@@ -141,31 +165,6 @@ test(
     const rungs = await sizesOf(ladder.locator('.canvas-resource__title-line'));
     expect(rungs[0]! > rungs[1]!).toBe(true);
     expect(rungs[1]! > rungs[2]!).toBe(true);
-  },
-);
-
-/**
- * A Closed Image Resource looks like any Resource (ADR 0106): its Title and its
- * kind glyph at the one Closed size, and no picture — a Closed Resource draws no
- * thumbnail, so no `img` element is mounted on it at all.
- */
-test(
-  'a Closed Image Resource draws its Title and kind at the Closed size, and no picture',
-  { tag: '@parity:closed-image-resource-draws-title-and-kind' },
-  async ({ page }) => {
-    await page.goto('/?story=components--resource--closed&mode=preview');
-
-    const image = specimen(page, 'image · one line').getByRole('article');
-    await expect(image).toHaveAttribute('data-kind', 'image');
-    await expect(image.getByRole('heading', { name: 'Strategies' })).toBeVisible();
-    await expect(image.getByRole('img', { name: 'Image Resource' })).toBeVisible();
-    await expect(image.locator('img')).toHaveCount(0);
-
-    const markdown = specimen(page, 'markdown · one line').getByRole('article');
-    const pictured = await image.boundingBox();
-    const closed = await markdown.boundingBox();
-    expect(pictured?.width).toBeCloseTo(closed?.width ?? 0, 0);
-    expect(pictured?.height).toBeCloseTo(closed?.height ?? 0, 0);
   },
 );
 
@@ -297,11 +296,6 @@ test(
         return resolved;
       }, label);
 
-      // The band behind the commands paints nothing at all.
-      await expect(item.locator('.canvas-resource__rail')).toHaveCSS(
-        'background-color',
-        'rgba(0, 0, 0, 0)',
-      );
       const commands = item.getByTestId('canvas-resource-actions');
       await expect(commands).toHaveCSS('opacity', '1');
       const surface = await commands.evaluate((el) => getComputedStyle(el).backgroundColor);
@@ -320,7 +314,7 @@ test(
 );
 
 test(
-  "hovering the real React Flow node reveals the adapter's Edge handles and none of CanvasResource's commands; selecting it draws them",
+  "hovering the real React Flow node reveals the adapter's Edge handles and none of the Resource's commands; selecting it draws them",
   { tag: '@parity:canvas-resource-hover-reveals-handles-and-selection-draws-commands' },
   async ({ page }) => {
     await page.goto('/?story=components--resource--hover&mode=preview');
@@ -471,22 +465,16 @@ test(
     await open.press('Enter');
     await expect(page.getByText('Strategies is open.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Close Resource Strategies' })).toBeVisible();
-    await expect.poll(() => titleTreatment()).toEqual(closedTitleTreatment);
+    // Open, the Markdown plugin draws its Title at the top of the rect rather
+    // than its foot, keeping the same inset from the left edge (ADR 0142).
+    await expect
+      .poll(async () => {
+        const { left, bodyPadding } = await titleTreatment();
+        return { left, bodyPadding };
+      })
+      .toEqual({ left: closedTitleTreatment.left, bodyPadding: closedTitleTreatment.bodyPadding });
   },
 );
-
-test('reduced motion removes Resource content transitions', async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('/?story=components--resource--open-and-close&mode=preview');
-
-  const resource = page
-    .getByRole('region', { name: 'Long Markdown Resource' })
-    .getByRole('article');
-  const content = resource.locator('.canvas-resource__content');
-
-  await expect(content).toHaveCSS('transition-duration', '0s');
-  await expect(content).toHaveCSS('transition-delay', '0s');
-});
 
 test(
   "the Resource's Title control begins editing by pointer or keyboard, stays field-local on a refusal, and completes or cancels from the keyboard",
@@ -616,50 +604,46 @@ test(
  * declarations themselves are held by
  * `packages/ui/test/canvas-resource-title-ladder.test.ts`.
  */
-test('a Title being written on more lines than fit does not push the rail out of its Resource', async ({
-  page,
-}) => {
+test('a Title being written on more lines than fit stays inside its Resource', async ({ page }) => {
   await page.goto('/?story=components--resource--editing--title&mode=preview');
 
   const group = page
     .getByRole('region', { name: 'Laddered Resource title editing' })
     .getByTestId('resource-group');
   const resource = group.locator('.canvas-resource');
-  const rail = group.locator('.resource-rail');
   await group.getByRole('button', { name: 'Edit Title Auth' }).click();
 
   const field = page.getByRole('textbox', { name: 'Resource title' });
   await expect(field).toBeFocused();
 
-  /** The field's drawn height, and whether the rail is still inside the Resource. */
+  /** The field's drawn height, and whether the field is still inside the Resource. */
   const geometry = async () => {
     const resourceBox = await resource.boundingBox();
-    const railBox = await rail.boundingBox();
     const fieldBox = await field.boundingBox();
-    if (resourceBox === null || railBox === null || fieldBox === null) {
+    if (resourceBox === null || fieldBox === null) {
       throw new Error('Resource geometry unavailable');
     }
     return {
       fieldHeight: Math.round(fieldBox.height),
-      // The border, which the rail sits inside of. A rail pushed above it is
-      // not merely misplaced, it is clipped.
-      railAboveResource: railBox.y < resourceBox.y,
+      // The border, which a Closed Title grows up from its foot towards. A
+      // field pushed above it is not merely misplaced, it is clipped.
+      fieldAboveResource: fieldBox.y < resourceBox.y,
     };
   };
 
   // Four lines is the ladder's ceiling, and the field draws all four.
   await field.fill('Auth\nhow tokens are minted\ndraft, 2026\nand a fourth');
   const atCeiling = await geometry();
-  expect(atCeiling.railAboveResource).toBe(false);
+  expect(atCeiling.fieldAboveResource).toBe(false);
 
-  // Past the ceiling the field stops at the same height rather than taking the
-  // rail with it, and the lines past the ceiling are reachable by scrolling
+  // Past the ceiling the field stops at the same height rather than growing
+  // out of the Resource, and the lines past the ceiling are reachable by scrolling
   // rather than lost.
   await field.fill(
     'Auth\nhow tokens are minted\ndraft, 2026\nand a fourth\nand a fifth\nand a sixth',
   );
   const pastCeiling = await geometry();
-  expect(pastCeiling.railAboveResource).toBe(false);
+  expect(pastCeiling.fieldAboveResource).toBe(false);
   expect(pastCeiling.fieldHeight).toBe(atCeiling.fieldHeight);
   expect(await field.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
 });
@@ -718,7 +702,6 @@ test(
       ] as const) {
         const resource = specimen(page, `${resourceShape} · ${suffix}`).getByRole('article');
         await expect(resource).toHaveAttribute('data-resource-shape', resourceShape);
-        await expect(resource).toHaveAttribute('data-open', 'false');
         await expect(resource.getByRole('img', { name: 'Ur Resource' })).toHaveCount(0);
         expect(await drawnOutline(resource), `${resourceShape} · ${suffix}`).toEqual({
           shape: resourceShape,

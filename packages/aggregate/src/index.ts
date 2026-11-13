@@ -21,7 +21,13 @@ export {
   type AggregateReadRefusal,
 } from './aggregate-refusal';
 export { describeSchemaFailure, identifySpace, SpaceIdentityError } from './identify-space';
-export { imageFileName, IMAGES_DIRECTORY_NAME } from './images';
+export {
+  assetFileExtension,
+  assetFileHash,
+  assetFileName,
+  assetPathHash,
+  ASSETS_DIRECTORY_NAME,
+} from './assets';
 export { MemorySpaceRepository } from './memory-space-repository';
 export { compareOrdinal } from './ordinal';
 export { createSpaceHost, type SpaceHostApplication } from './space-host';

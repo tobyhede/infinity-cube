@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import {
   MemorySpaceBackend,
   openSpaceSession,
@@ -40,9 +40,9 @@ const snapshot: SpaceSnapshot = {
         title: 'Map',
         kind: 'positioned',
         positions: {
-          [OPENING]: { x: 0, y: 0, open: false },
-          [MIDDLE]: { x: 300, y: 0, open: false },
-          [CLOSING]: { x: 600, y: 0, open: false },
+          [OPENING]: { x: 0, y: 0 },
+          [MIDDLE]: { x: 300, y: 0 },
+          [CLOSING]: { x: 600, y: 0 },
         },
         graphs: [
           {
@@ -61,7 +61,7 @@ const snapshot: SpaceSnapshot = {
   },
   resources: [OPENING, MIDDLE, CLOSING].map((id, index) => ({
     id,
-    document: { title: `Slide ${index}`, kind: 'markdown', content: { source: '' } },
+    document: { title: `Slide ${index}`, kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
   })),
 };
 

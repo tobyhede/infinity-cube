@@ -8,7 +8,6 @@ import {
   ResourceKindIcon,
   CheckIcon,
   ChevronDownIcon,
-  CloseResourceIcon,
   EditIcon,
   EnterSpaceIcon,
   HideTitleIcon,
@@ -18,7 +17,6 @@ import {
   GraphIcon,
   MapIcon,
   MarkdownIcon,
-  OpenResourceIcon,
   PlusIcon,
   PresentIcon,
   StopPresentingIcon,
@@ -95,12 +93,6 @@ describe('the public icon facade', () => {
         <span data-testid="reference">
           <ReferenceIcon />
         </span>
-        <span data-testid="open-resource">
-          <OpenResourceIcon />
-        </span>
-        <span data-testid="close-resource">
-          <CloseResourceIcon />
-        </span>
         <span data-testid="enter-space">
           <EnterSpaceIcon />
         </span>
@@ -142,8 +134,6 @@ describe('the public icon facade', () => {
       edit: 'pencil',
       chevron: 'chevron-down',
       plus: 'plus',
-      'open-resource': 'maximize-2',
-      'close-resource': 'minimize-2',
       'enter-space': 'log-in',
       'open-independently': 'external-link',
       markdown: 'sticky-note',

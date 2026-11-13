@@ -2,10 +2,9 @@ import { newUuid, uuidSchema, type SpaceSnapshot, type UUID } from '@project/cor
 import { loadSpaceSnapshot, type Space } from '@project/graph';
 import { MemorySpaceBackend } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
-import type { ImageSources } from '../src/image-creation';
 import type { OpenSpace } from '../src/open-spaces';
 import { openTestSpace } from './opened-space';
-import { unusedImageSources } from './image-sources';
+import { textAsset } from './markdown-texts';
 
 /**
  * One Space for the derivations `App` composes: two Resources placed on its one
@@ -31,8 +30,14 @@ export const derivationSnapshot: SpaceSnapshot = {
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [PLACED_A]: { x: 10, y: 20, open: false },
-          [PLACED_B]: { x: 400, y: 20, open: true, size: { width: 600, height: 400 } },
+          [PLACED_A]: { x: 10, y: 20 },
+          // A Markdown Resource is Open by its Map content (ADR 0142).
+          [PLACED_B]: {
+            x: 400,
+            y: 20,
+            content: { open: true },
+            size: { width: 600, height: 400 },
+          },
         },
         graphs: [{ id: GRAPH_ID, title: 'Main', edges: [{ from: PLACED_A, to: PLACED_B }] }],
       },
@@ -40,16 +45,19 @@ export const derivationSnapshot: SpaceSnapshot = {
         id: OTHER_MAP_ID,
         title: 'Map 2',
         kind: 'positioned',
-        positions: { [OUTSIDE]: { x: 0, y: 0, open: false } },
+        positions: { [OUTSIDE]: { x: 0, y: 0 } },
         graphs: [{ id: EMPTY_GRAPH_ID, title: 'Empty', edges: [] }],
       },
     ],
     defaultMap: MAP_ID,
   },
   resources: [
-    { id: PLACED_A, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
-    { id: PLACED_B, document: { title: 'B', kind: 'markdown', content: { source: 'B' } } },
-    { id: OUTSIDE, document: { title: 'Outside', kind: 'markdown', content: { source: 'C' } } },
+    { id: PLACED_A, document: { title: 'A', kind: 'markdown', content: { url: textAsset('A') } } },
+    { id: PLACED_B, document: { title: 'B', kind: 'markdown', content: { url: textAsset('B') } } },
+    {
+      id: OUTSIDE,
+      document: { title: 'Outside', kind: 'markdown', content: { url: textAsset('C') } },
+    },
   ],
 };
 
@@ -62,9 +70,9 @@ export const derivationSpace = (snapshot: SpaceSnapshot = derivationSnapshot): S
 /** The fixture Space opened and composed the way Open Spaces opens one. */
 export const openDerivationSpace = (
   newId: () => UUID = newUuid,
-  images: ImageSources = unusedImageSources,
+  snapshot: SpaceSnapshot = derivationSnapshot,
 ): OpenSpace => {
-  const stored = { snapshot: derivationSnapshot, revision: 0n, exportedRevision: null };
+  const stored = { snapshot, revision: 0n, exportedRevision: null };
   const { spaceSession, spaceResources } = openTestSpace(
     new MemorySpaceBackend(SPACE_ID, [stored]),
     stored,
@@ -73,7 +81,7 @@ export const openDerivationSpace = (
   return {
     id: SPACE_ID,
     session: spaceSession,
-    app: composeApp({ images, spaceSession, spaceResources, newId }),
+    app: composeApp({ spaceSession, spaceResources, newId }),
     spaceResources,
   };
 };

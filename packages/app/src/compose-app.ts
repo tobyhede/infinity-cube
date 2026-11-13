@@ -6,6 +6,7 @@ import type { ConnectionCompletion } from './connection-completion';
 import type { Continuation } from './continuation';
 import type { EdgeAuthoring } from './edge-authoring';
 import { createMapSurface, type MapSurface } from './map-surface';
+import { createPluginGate, type PluginGate } from './plugin-host/plugin-gate';
 import { createDeleteConfirmation, type DeleteConfirmation } from './delete-confirmation';
 import { createResourceDeletion, type ResourceDeletion } from './resource-deletion';
 import type { SpaceResourceAuthoring } from './space-resource-lifecycle';
@@ -23,14 +24,6 @@ import {
   type SpaceAuthoring,
   type SurfaceAuthoring,
 } from './space-authoring';
-import {
-  createImageResources,
-  type ImageEditResult,
-  type ImageOrigin,
-  type ImageSources,
-  type ImageTarget,
-} from './image-creation';
-import { createImageReplacements, type ImageReplacements } from './image-replacement';
 
 /**
  * What an opened Space is composed of.
@@ -70,16 +63,6 @@ export interface ComposeCoreDependencies {
 }
 
 export interface ComposeAppDependencies extends ComposeCoreDependencies {
-  /**
-   * Where this Space's created and replaced images are stored and measured
-   * (ADR 0106).
-   *
-   * Required with no default: both reach outside the process, so the caller
-   * that composes the Space names them, and a test supplies answers of its own.
-   * The composition is the only holder, so creating and replacing an image in
-   * this Space always use the same sources.
-   */
-  readonly images: ImageSources;
   /**
    * Mints the identity of every Resource, Map and Graph a completed Edit creates
    * (ADR 0109).
@@ -129,6 +112,18 @@ export interface ComposeAppDependencies extends ComposeCoreDependencies {
    */
   readonly mounted?: boolean | undefined;
   /**
+   * The application's one Claim chain and exclusive gate (ADR 0142), shared by
+   * every composed Space so exclusive work in one withdraws every Edit in all.
+   * Absent, this composition has a gate of its own, as a lone Space does.
+   */
+  readonly pluginGate?: PluginGate | undefined;
+  /**
+   * The Spaces the aggregate, as read when the application opened, holds
+   * because a plugin is missing (ADR 0142), which Space Authoring reads before
+   * deleting a Resource of a missing kind. Absent, none is.
+   */
+  readonly heldSpaceIds?: readonly UUID[] | undefined;
+  /**
    * The address a destination opened in a new browsing context is given: the
    * browser location's `href`, which carries the query and a mounted page's
    * `source` (ADR 0130), so a Notes window mounts the revision its presenting
@@ -170,25 +165,9 @@ export interface ComposedApp extends AppCore {
    * rehearsal notes, the Notes window, fullscreen and the link (ADR 0129).
    */
   readonly presenting: PresentingWindow;
-  /**
-   * Create Image Resources from one gesture's files or URL, over this Space's
-   * image sources and Authoring.
-   */
-  readonly createImageResources: (
-    origin: ImageOrigin,
-    target: ImageTarget,
-  ) => Promise<ImageEditResult>;
-  /**
-   * This Space's image picker, {@link ImageSources.pick}: the one Create Image
-   * Resource and Replace image both open.
-   */
-  readonly pickImages: ImageSources['pick'];
-  /**
-   * This Space's image replacements: the one way to replace an Image
-   * Resource's picture, and its busy state.
-   */
-  readonly imageReplacement: ImageReplacements;
   readonly authoring: SpaceAuthoring;
+  /** The gate this Space's Authoring asks at `complete`, which its plugin surfaces claim on. */
+  readonly pluginGate: PluginGate;
   readonly adapter: RenderAdapter;
   readonly surface: MapSurface;
   /**
@@ -251,7 +230,6 @@ export function composeCore({ spaceSession, selection }: ComposeCoreDependencies
 export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
   const {
     spaceSession,
-    images,
     newId = newUuid,
     reportObserverError,
     connections,
@@ -260,6 +238,8 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     fullscreen = NO_FULLSCREEN,
     mounted = false,
     addressOf = productDestinationPath,
+    pluginGate = createPluginGate(),
+    heldSpaceIds,
   } = dependencies;
   const core = composeCore(dependencies);
   const { currentSpace, navigation } = core;
@@ -274,6 +254,8 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     currentSpace,
     newId,
     reportObserverError,
+    exclusiveWork: pluginGate,
+    heldSpaceIds,
   });
   const deleteConfirmation = createDeleteConfirmation({ authoring, reportObserverError });
   const surface = createMapSurface(
@@ -328,15 +310,8 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
   return {
     ...core,
     presenting,
-    createImageResources: (origin, target) =>
-      createImageResources({ images, authoring }, origin, target),
-    pickImages: images.pick,
-    imageReplacement: createImageReplacements({
-      images,
-      authoring,
-      reportObserverError: compositionReporter,
-    }),
     authoring,
+    pluginGate,
     adapter,
     surface,
     continuation,

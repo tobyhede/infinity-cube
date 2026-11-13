@@ -21,7 +21,14 @@ import { trackedFiles } from '../support/structural-scan';
 const RULE = '@typescript-eslint/no-restricted-imports';
 
 /** The modules under a `kinds/` directory that name no kind: the interface and the registry. */
-const KIND_NEUTRAL_MODULES = new Set(['registry', 'kind-module', 'kind-view']);
+const KIND_NEUTRAL_MODULES = new Set([
+  'registry',
+  'plugin-module',
+  'plugin-listing',
+  'plugins',
+  'plugin-kind',
+  'plugin-views',
+]);
 
 const moduleNameOf = (file: string): string =>
   file.slice(file.lastIndexOf('/') + 1).replace(/\.tsx?$/u, '');
@@ -97,6 +104,8 @@ const KIND_MODULE_NAMES = new Set(['core', 'ui', 'app'].flatMap(kindModuleFiles)
 
 /** Whether a specifier reaches a kind module by relative path. */
 const reachesKindModule = (specifier: string): boolean => {
+  // A plugin package is a kind module (ADR 0142).
+  if (specifier.startsWith('@project/plugin-')) return true;
   const name = /(?:^|\/)kinds\/([^/]+)$/u.exec(specifier)?.[1];
   return name !== undefined && KIND_MODULE_NAMES.has(name);
 };
@@ -195,6 +204,15 @@ describe('a kind module is imported only under kinds/ or by a feature of its kin
     ).toEqual([]);
   });
 
+  it('refuses a plugin package, which is a kind module (ADR 0142)', async () => {
+    expect(
+      await misjudged([
+        { line: "import { admitImage } from '@project/plugin-image/domain';", refused: true },
+        { line: "import { urPluginView } from '@project/plugin-ur/view';", refused: true },
+      ]),
+    ).toEqual([]);
+  });
+
   it('refuses a namespace import of either package', async () => {
     expect(
       await misjudged([
@@ -207,7 +225,7 @@ describe('a kind module is imported only under kinds/ or by a feature of its kin
   it('lets a listed file import a kind module’s export', async () => {
     const refused = await refusedLines(
       ["import { imageKind } from '@project/core';"],
-      'packages/app/src/image-replacement.ts',
+      'packages/ui/src/icons.tsx',
     );
     expect([...refused]).toEqual([]);
   });
@@ -225,7 +243,7 @@ describe('a kind module is imported only under kinds/ or by a feature of its kin
 
   it('reads a named import, and an `export *` of a kind module, as importing a refused name', () => {
     expect(importsKindModuleName(RULED_FILE)).toBe(false);
-    expect(importsKindModuleName('packages/app/src/image-replacement.ts')).toBe(true);
+    expect(importsKindModuleName('packages/app/src/components/CommandDockSpaces.tsx')).toBe(true);
     expect(importsKindModuleName('packages/core/src/index.ts')).toBe(true);
   });
 });

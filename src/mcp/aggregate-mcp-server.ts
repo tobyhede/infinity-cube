@@ -2,14 +2,21 @@ import { lstat, mkdir, readFile, readdir, rm } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { AGGREGATE_FILE_NAME } from '@project/aggregate';
+import { AGGREGATE_FILE_NAME, assetFileHash, ASSETS_DIRECTORY_NAME } from '@project/aggregate';
+import {
+  admitAsset,
+  EMPTY_ASSET,
+  MAX_ASSET_BYTES,
+  mediaTypeForExtension,
+} from '@project/persistence';
+import { lineFeedText } from '@project/resource-api/domain';
 import type { UUID } from '@project/core';
 import { z } from 'zod';
 import { rejectSymbolicLinks, replaceFile } from '../aggregate-directory/write-in-place';
 import { describeCheckFailure, describeError } from '../cli/describe-error';
 import { describeCheck } from '../cli/run-refusal';
 
-const INSTRUCTIONS = `This server edits one InfinityCube Aggregate directory: a talk's Spaces, Maps, Graphs and Resources as JSON and Markdown files, by paths relative to the directory. The format is https://github.com/tobyhede/infinity-cube/blob/main/docs/aggregate-directory.md. Edit only a directory no pnpm cube run is serving, since a run overwrites what you write. Call list_files first; read ${AGGREGATE_FILE_NAME} and each space.json it lists before writing, and if it lists none the directory is empty and check says what to write. Call check after writing: it Imports the directory as a run does and answers what it refuses. Dot-entries and symbolic links are refused.`;
+const INSTRUCTIONS = `This server edits one InfinityCube Aggregate directory: a talk's Spaces, Maps, Graphs and Resources as JSON files, and the assets they name, such as a Markdown Resource's text, by paths relative to the directory. Write an asset with write_asset, which names it by its SHA-256 and answers the URL a Resource's content names it by. The format is https://github.com/tobyhede/infinity-cube/blob/main/docs/aggregate-directory.md. Edit only a directory no pnpm cube run is serving, since a run overwrites what you write. Call list_files first; read ${AGGREGATE_FILE_NAME} and each space.json it lists before writing, and if it lists none the directory is empty and check says what to write. Call check after writing: it Imports the directory as a run does and answers what it refuses. Dot-entries and symbolic links are refused.`;
 
 const EMPTY = `The directory holds no aggregate yet. Write ${AGGREGATE_FILE_NAME} and its Meta Space's directory as the format reference describes, then check again.`;
 
@@ -19,6 +26,24 @@ const answer = (text: string, isError = false): CallToolResult => ({
 });
 
 class PathRefusal extends Error {}
+
+/** UTF-8 that refuses bytes it cannot decode rather than replacing them. */
+const STRICT_UTF8 = new TextDecoder('utf-8', { fatal: true });
+
+/**
+ * Markdown text as the Markdown plugin stores what it saves: UTF-8 with `\n`
+ * line endings, so the same text is one asset. Bytes that are not UTF-8 are
+ * refused rather than decoded with replacement characters.
+ */
+const markdownBytes = (given: Uint8Array<ArrayBuffer>): Uint8Array<ArrayBuffer> => {
+  let text: string;
+  try {
+    text = STRICT_UTF8.decode(given);
+  } catch {
+    throw new PathRefusal('Markdown is UTF-8 text, and these bytes are not.');
+  }
+  return new TextEncoder().encode(lineFeedText(text));
+};
 
 /**
  * The absolute path `path` names inside `root`, refusing an absolute path, one
@@ -113,7 +138,7 @@ export const createAggregateMcpServer = (given: string, newId: () => UUID): McpS
         const bytes = await readFile(await fileInside(directory, file));
         if (carried === 'base64') return answer(bytes.toString('base64'));
         try {
-          return answer(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+          return answer(STRICT_UTF8.decode(bytes));
         } catch {
           throw new PathRefusal(`${file} is not UTF-8 text; read it with encoding base64.`);
         }
@@ -140,6 +165,72 @@ export const createAggregateMcpServer = (given: string, newId: () => UUID): McpS
           carried === 'base64' ? Buffer.from(content, 'base64') : new TextEncoder().encode(content),
         );
         return answer(`Wrote ${file}.`);
+      }),
+  );
+
+  server.registerTool(
+    'write_asset',
+    {
+      description:
+        'Write bytes as an asset, assets/<hash>.<extension>, named by their SHA-256, answering the URL a Resource\'s content names it by, such as a Markdown Resource\'s { "url": "/assets/<hash>" }',
+      inputSchema: {
+        content: z.string().describe("The asset's text, or its bytes as base64"),
+        encoding,
+        extension: z
+          .string()
+          .regex(/^[A-Za-z0-9]+$/u)
+          .optional()
+          .describe(
+            'The file extension, which names its media type: md, the default for text, for Markdown. Bytes carried as base64 name theirs.',
+          ),
+      },
+      annotations: { destructiveHint: false, idempotentHint: true },
+    },
+    ({ content, encoding: carried, extension: named }) =>
+      attempt(async () => {
+        // Bytes carry no media type of their own, so they name the extension
+        // that gives them one rather than being taken for Markdown.
+        if (carried === 'base64' && named === undefined) {
+          throw new PathRefusal(
+            'Name the extension of bytes carried as base64, such as png for a PNG image.',
+          );
+        }
+        const extension = named ?? 'md';
+        const given = new Uint8Array(
+          carried === 'base64' ? Buffer.from(content, 'base64') : new TextEncoder().encode(content),
+        );
+        // Admitted as Import admits an asset file: typed by its extension,
+        // and refused over the host's size cap.
+        const admission = await admitAsset(
+          extension.toLowerCase() === 'md' ? markdownBytes(given) : given,
+          mediaTypeForExtension(extension),
+        );
+        if (admission.kind === 'refused') {
+          throw new PathRefusal(
+            `An asset is at most ${MAX_ASSET_BYTES / (1024 * 1024)} MiB, and these bytes are more.`,
+          );
+        }
+        const { hash, bytes } = admission.asset;
+        // The empty asset always exists, so no file is written for it.
+        if (hash === EMPTY_ASSET.hash) {
+          return answer(`Name it as /assets/${hash}; it needs no file.`);
+        }
+        const name = `${hash}.${extension}`;
+        const file = `${ASSETS_DIRECTORY_NAME}/${name}`;
+        const target = await fileInside(directory, file);
+        await mkdir(dirname(target), { recursive: true });
+        // One hash names one file: a file of another extension, or of none,
+        // holding these bytes is the asset already, and Import refuses a second.
+        const held = (await readdir(dirname(target))).find(
+          (other) => other !== name && assetFileHash(other) === hash,
+        );
+        if (held !== undefined) {
+          throw new PathRefusal(
+            `${ASSETS_DIRECTORY_NAME}/${held} already holds these bytes; name them as /assets/${hash}, or delete ${ASSETS_DIRECTORY_NAME}/${held} first.`,
+          );
+        }
+        await replaceFile(target, bytes);
+        return answer(`Wrote ${file}. Name it as /assets/${hash}.`);
       }),
   );
 

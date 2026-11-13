@@ -1,13 +1,18 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
-import { newUuid, spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
+import {
+  EMPTY_ASSET_REF,
+  newUuid,
+  spaceSnapshotSchema,
+  uuidSchema,
+  type SpaceSnapshot,
+} from '@project/core';
 import { MemorySpaceBackend } from '@project/persistence';
 import { embeddedNodeId } from '../src/embedded-map';
 import { createOpenSpaces } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { recordingHistory } from './browser-history';
 import { mountSettled } from './settled-mount';
-import { unusedImageSources } from './image-sources';
 import { refusingFullscreen } from './fullscreen';
 import { unlinkedPresentations } from './presentations';
 import { stubResizeObserver } from './resize-observer';
@@ -46,8 +51,8 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Collection 1',
         kind: 'positioned',
         positions: {
-          [INTAKE]: { x: 0, y: 0, open: false },
-          [STORAGE]: { x: 264, y: 0, open: false },
+          [INTAKE]: { x: 0, y: 0 },
+          [STORAGE]: { x: 264, y: 0 },
         },
         graphs: [
           { id: TARGET_GRAPH_ID, title: 'Overview', edges: [{ from: INTAKE, to: STORAGE }] },
@@ -57,8 +62,14 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
     defaultMap: TARGET_MAP_ID,
   },
   resources: [
-    { id: INTAKE, document: { title: 'Intake', kind: 'markdown', content: { source: '' } } },
-    { id: STORAGE, document: { title: 'Storage', kind: 'markdown', content: { source: '' } } },
+    {
+      id: INTAKE,
+      document: { title: 'Intake', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+    },
+    {
+      id: STORAGE,
+      document: { title: 'Storage', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+    },
   ],
 });
 
@@ -76,7 +87,7 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
           [SPACE_RESOURCE_ID]: {
             x: 0,
             y: 0,
-            open: true,
+            content: { open: true },
             size: { width: 700, height: 500 },
           },
         },
@@ -108,8 +119,8 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [META_TO_HOME_ID]: { x: 0, y: 0, open: false },
-          [META_TO_TARGET_ID]: { x: 300, y: 0, open: false },
+          [META_TO_HOME_ID]: { x: 0, y: 0 },
+          [META_TO_TARGET_ID]: { x: 300, y: 0 },
         },
         graphs: [{ id: META_GRAPH_ID, title: 'Graph 1', edges: [] }],
       },
@@ -174,7 +185,6 @@ it('asks once when the drawn Space is also listed and hidden', async () => {
   const spaces = createOpenSpaces({
     fullscreen: refusingFullscreen,
     presentations: unlinkedPresentations,
-    images: unusedImageSources,
     backend,
     metaSpaceId: META_ID,
     metaSpaceTitle: meta.document.title,

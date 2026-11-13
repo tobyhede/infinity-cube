@@ -3,16 +3,14 @@ import type { ZodIssue } from 'zod';
 import {
   EDGE_TITLE_ONE_LINE,
   GRAPH_HEAD_SHAPES,
-  IMAGE_URL_UNSUPPORTED,
   DEFAULT_RESOURCE_SHAPE,
   RESOURCE_SHAPES,
   graphEdgeSchema,
   graphSchema,
+  isOfKind,
   resourceDocumentSchema,
   resourceFileSchema,
   resourceSchema,
-  resourceOpen,
-  resourceShape,
   resourceSize,
   spaceFileSchema,
   uuidSchema,
@@ -32,8 +30,8 @@ const WORKING = {
   title: 'Working',
   kind: 'positioned',
   positions: {
-    '00000000-0000-4000-8000-000000000002': { x: 0, y: 0, open: false },
-    '00000000-0000-4000-8000-000000000003': { x: 320, y: -40, open: false },
+    '00000000-0000-4000-8000-000000000002': { x: 0, y: 0 },
+    '00000000-0000-4000-8000-000000000003': { x: 320, y: -40 },
   },
   graphs: [MAIN],
 };
@@ -68,8 +66,8 @@ describe('space file schema', () => {
           id: '00000000-0000-4000-8000-000000000010',
           title: 'Working',
           positions: {
-            '00000000-0000-4000-8000-000000000002': { x: 0, y: 0, open: false },
-            '00000000-0000-4000-8000-000000000003': { x: 320, y: -40, open: false },
+            '00000000-0000-4000-8000-000000000002': { x: 0, y: 0 },
+            '00000000-0000-4000-8000-000000000003': { x: 320, y: -40 },
           },
           graphs: [
             {
@@ -152,7 +150,7 @@ describe('space file schema', () => {
         {
           id: '00000000-0000-4000-8000-000000000010',
           title: 'Working',
-          positions: { '00000000-0000-4000-8000-000000000002': { x: 0, y: 0, open: false } },
+          positions: { '00000000-0000-4000-8000-000000000002': { x: 0, y: 0 } },
           activeGraph: '00000000-0000-4000-8000-000000000004',
         },
       ],
@@ -172,7 +170,7 @@ describe('space file schema', () => {
         {
           id: 'working',
           title: 'Working',
-          positions: { a: { x: 0, y: 0, open: false } },
+          positions: { a: { x: 0, y: 0 } },
           graphs: [{ id: 'main', title: 'Main', edges: [{ from: 'a', to: 'b' }] }],
         },
       ],
@@ -302,7 +300,7 @@ describe('resource file schema', () => {
     id: A,
     title: 'A',
     kind: 'markdown',
-    content: { path: `${A}.md`, mediaType: 'text/markdown' },
+    content: { url: '/assets/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU' },
   };
 
   /** The messages a refused file prints, in order. */
@@ -324,28 +322,33 @@ describe('resource file schema', () => {
     expect(resourceFileSchema.safeParse({ id: A, title: 'A', content: {} }).success).toBe(false);
   });
 
-  it('refuses a kind no module registers', () => {
+  it('refuses a kind that is not a kind id', () => {
     expect(resourceFileSchema.safeParse({ ...MARKDOWN_FILE, kind: 'a.b' }).success).toBe(false);
-    expect(resourceFileSchema.safeParse({ ...MARKDOWN_FILE, kind: 'chart' }).success).toBe(false);
+    expect(resourceFileSchema.safeParse({ ...MARKDOWN_FILE, kind: '' }).success).toBe(false);
   });
 
-  it('reads a Markdown Resource file as the locator of its sidecar', () => {
+  it('reads a kind no plugin draws whole, its content unread (ADR 0142)', () => {
+    const chart = { ...MARKDOWN_FILE, kind: 'chart', content: { series: [1, 2], legend: null } };
+    expect(resourceFileSchema.parse(chart)).toEqual(chart);
+  });
+
+  it('refuses content a present plugin rejects, though a missing plugin would read it', () => {
+    expect(
+      resourceFileSchema.safeParse({ ...MARKDOWN_FILE, content: { series: [1, 2] } }).success,
+    ).toBe(false);
+  });
+
+  it('reads a Markdown Resource file as the URL of the asset holding its text (ADR 0142)', () => {
     expect(resourceFileSchema.parse(MARKDOWN_FILE)).toEqual(MARKDOWN_FILE);
   });
 
-  it('compares the Markdown media type case-insensitively, and refuses any other', () => {
-    const withMediaType = (mediaType: string) => ({
-      ...MARKDOWN_FILE,
-      content: { ...MARKDOWN_FILE.content, mediaType },
-    });
-    expect(resourceFileSchema.safeParse(withMediaType('Text/Markdown')).success).toBe(true);
-    expect(resourceFileSchema.safeParse(withMediaType('text/plain')).success).toBe(false);
-  });
-
-  it('refuses a Markdown Resource file that carries its source rather than locating it', () => {
-    expect(
-      resourceFileSchema.safeParse({ ...MARKDOWN_FILE, content: { source: '# A' } }).success,
-    ).toBe(false);
+  it('refuses a Markdown Resource file that carries its source, a sidecar or an outside URL', () => {
+    for (const content of [
+      { source: '# A' },
+      { path: `${A}.md`, mediaType: 'text/markdown' },
+      { url: 'https://example.com/a.md' },
+    ])
+      expect(resourceFileSchema.safeParse({ ...MARKDOWN_FILE, content }).success).toBe(false);
   });
 
   it('refuses a key the envelope does not declare, naming it', () => {
@@ -372,7 +375,7 @@ describe('resource file schema', () => {
       kind: 'reference',
       content: { target: A },
     });
-    expect(reference.kind === 'reference' && reference.content.target).toBe(A);
+    expect(isOfKind(reference, 'reference') && reference.content.target).toBe(A);
   });
 
   it('gives a reference resource no body field at all', () => {
@@ -384,6 +387,7 @@ describe('resource file schema', () => {
     });
 
     expect('body' in reference).toBe(false);
+    if (!isOfKind(reference, 'reference')) throw new Error(`Parsed as ${reference.kind}`);
     expect('body' in reference.content).toBe(false);
   });
 
@@ -473,7 +477,7 @@ describe('resource file schema', () => {
       id: A,
       title: 'A',
       kind: 'markdown',
-      content: { source: '' },
+      content: { url: '/assets/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU' },
       description: 'What A is',
     });
     expect('description' in resource).toBe(false);
@@ -482,7 +486,10 @@ describe('resource file schema', () => {
         id: A,
         title: 'A',
         kind: 'markdown',
-        content: { source: '', description: 'What A is' },
+        content: {
+          url: '/assets/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU',
+          description: 'What A is',
+        },
       }).success,
     ).toBe(false);
   });
@@ -503,8 +510,8 @@ describe('space file maps', () => {
     const parsed = file.maps?.[0];
     expect(parsed?.kind).toBe('positioned');
     expect(parsed?.positions).toEqual({
-      '00000000-0000-4000-8000-000000000002': { x: 0, y: 0, open: false },
-      '00000000-0000-4000-8000-000000000003': { x: 320, y: -40, open: false },
+      '00000000-0000-4000-8000-000000000002': { x: 0, y: 0 },
+      '00000000-0000-4000-8000-000000000003': { x: 320, y: -40 },
     });
   });
 
@@ -528,18 +535,14 @@ describe('space file maps', () => {
       }).success;
 
     it.each([Infinity, -Infinity, NaN])('rejects a coordinate of %s', (value) => {
-      expect(parsePlacement({ x: value, y: 0, open: false })).toBe(false);
-      expect(parsePlacement({ x: 0, y: value, open: false })).toBe(false);
+      expect(parsePlacement({ x: value, y: 0 })).toBe(false);
+      expect(parsePlacement({ x: 0, y: value })).toBe(false);
     });
 
     it.each([Infinity, NaN])('rejects a size dimension of %s', (value) => {
-      expect(parsePlacement({ x: 0, y: 0, open: true, size: { width: value, height: 146 } })).toBe(
-        false,
-      );
+      expect(parsePlacement({ x: 0, y: 0, size: { width: value, height: 146 } })).toBe(false);
       expect(parsePlacement({ x: 0, y: 0, size: { width: 260, height: value } })).toBe(false);
-      expect(
-        parsePlacement({ x: 0, y: 0, open: false, size: { width: value, height: value } }),
-      ).toBe(false);
+      expect(parsePlacement({ x: 0, y: 0, size: { width: value, height: value } })).toBe(false);
     });
 
     it('rejects the infinity a numeric overflow in JSON decodes to', () => {
@@ -553,9 +556,7 @@ describe('space file maps', () => {
     });
 
     it('keeps negative coordinates and the minimum size', () => {
-      expect(
-        parsePlacement({ x: -1e6, y: -0.5, open: true, size: { width: 260, height: 146 } }),
-      ).toBe(true);
+      expect(parsePlacement({ x: -1e6, y: -0.5, size: { width: 260, height: 146 } })).toBe(true);
     });
 
     it('round-trips accepted finite geometry through JSON', () => {
@@ -569,9 +570,8 @@ describe('space file maps', () => {
               [A]: {
                 x: -12.5,
                 y: 1e300,
-                open: true,
                 size: { width: 260, height: 146 },
-                shape: 'diamond',
+                content: { shape: 'diamond' },
               },
             },
           },
@@ -582,15 +582,16 @@ describe('space file maps', () => {
     });
   });
 
-  describe('a Shape on each entry (ADR 0121)', () => {
+  describe('Map content on each entry (ADR 0142)', () => {
     const A = '00000000-0000-4000-8000-000000000002';
-    /** An entry as a hand or a stale writer might put it on disk, Shape and all. */
+    /** An entry as a hand or a stale writer might put it on disk. */
     interface StoredEntry {
       readonly x: number;
       readonly y: number;
       readonly open?: boolean;
       readonly size?: { readonly width: number; readonly height: number };
-      readonly shape?: string | number | null;
+      readonly content?: unknown;
+      readonly shape?: string;
     }
     const parseEntry = (entry: StoredEntry) =>
       spaceFileSchema.safeParse({
@@ -598,69 +599,39 @@ describe('space file maps', () => {
         maps: [{ ...working, positions: { ...working.positions, [A]: entry } }],
       });
 
-    it('accepts each of the four Shapes, Closed and Open', () => {
-      expect(RESOURCE_SHAPES).toEqual(['rectangle', 'pill', 'ellipse', 'diamond']);
-      for (const resourceShape of RESOURCE_SHAPES) {
-        const closed = parseEntry({ x: 0, y: 0, open: false, shape: resourceShape });
-        expect(closed.success, resourceShape).toBe(true);
-        expect(closed.data?.maps?.[0]?.positions).toMatchObject({ [A]: { shape: resourceShape } });
-        const opened = parseEntry({
-          x: 0,
-          y: 0,
-          open: true,
-          size: { width: 400, height: 300 },
-          shape: resourceShape,
-        });
-        expect(opened.data?.maps?.[0]?.positions).toMatchObject({ [A]: { shape: resourceShape } });
+    it('keeps any JSON value as Map content, at any size, leaving its meaning to the plugin', () => {
+      for (const content of [{ shape: 'pill' }, 'x', 3, true, null, [1, { a: [] }]]) {
+        const closed = parseEntry({ x: 0, y: 0, content });
+        expect(closed.success, JSON.stringify(content)).toBe(true);
+        expect(closed.data?.maps?.[0]?.positions[uuidSchema.parse(A)]?.content).toEqual(content);
+        const sized = parseEntry({ x: 0, y: 0, size: { width: 400, height: 300 }, content });
+        expect(sized.success, JSON.stringify(content)).toBe(true);
       }
     });
 
-    it('accepts an entry with no Shape, Closed and Open, which draws as the rectangle', () => {
-      for (const entry of [
-        { x: 0, y: 0, open: false },
-        { x: 0, y: 0, open: true, size: { width: 400, height: 300 } },
-      ]) {
-        const parsed = parseEntry(entry);
-        expect(parsed.success).toBe(true);
-        const placed = parsed.data?.maps?.[0]?.positions[uuidSchema.parse(A)];
-        expect(placed).not.toHaveProperty('shape');
-        expect(placed === undefined ? undefined : resourceShape(placed)).toBe('rectangle');
-      }
-    });
-
-    it('answers a stored Shape as the one drawn, the rectangle included', () => {
-      for (const stored of RESOURCE_SHAPES) {
-        expect(resourceShape({ shape: stored })).toBe(stored);
-      }
+    it('leaves an entry with no Map content without one', () => {
+      const parsed = parseEntry({ x: 0, y: 0 });
+      expect(parsed.success).toBe(true);
+      expect(parsed.data?.maps?.[0]?.positions[uuidSchema.parse(A)]).not.toHaveProperty('content');
       expect(DEFAULT_RESOURCE_SHAPE).toBe('rectangle');
+      expect(RESOURCE_SHAPES).toEqual(['rectangle', 'pill', 'ellipse', 'diamond']);
     });
 
-    it('refuses a Shape outside the four, the hexagon among them', () => {
-      for (const resourceShape of [
-        'hexagon',
-        'triangle',
-        'cloud',
-        'Rectangle',
-        'square',
-        '',
-        1,
-        null,
-      ]) {
-        expect(
-          parseEntry({ x: 0, y: 0, open: false, shape: resourceShape }).success,
-          String(resourceShape),
-        ).toBe(false);
-      }
+    it('refuses a value JSON cannot carry, and the retired shape and open keys', () => {
+      expect(parseEntry({ x: 0, y: 0, content: Number.POSITIVE_INFINITY }).success).toBe(false);
+      expect(parseEntry({ x: 0, y: 0, content: { at: Number.NaN } }).success).toBe(false);
+      expect(parseEntry({ x: 0, y: 0, shape: 'pill' }).success).toBe(false);
+      expect(parseEntry({ x: 0, y: 0, open: false }).success).toBe(false);
+      expect(parseEntry({ x: 0, y: 0, open: true }).success).toBe(false);
     });
   });
 
-  describe('a size and an Open/Closed state on each entry', () => {
+  describe('a size on each entry', () => {
     const A = '00000000-0000-4000-8000-000000000002';
     /** An entry as a hand or a stale writer might put it on disk, the retired key included. */
     interface StoredEntry {
       readonly x: number;
       readonly y: number;
-      readonly open?: boolean;
       readonly size?: { readonly width: number; readonly height: number };
       readonly openSize?: { readonly width: number; readonly height: number };
     }
@@ -672,54 +643,37 @@ describe('space file maps', () => {
     const placedOf = (entry: StoredEntry) =>
       parseEntry(entry).data?.maps?.[0]?.positions[uuidSchema.parse(A)];
 
-    it('reads an entry with neither as Closed at the Closed Size', () => {
+    it('reads an entry with none as the Closed Size', () => {
       const placed = placedOf({ x: 0, y: 0 });
       expect(placed).toEqual({ x: 0, y: 0 });
       expect(placed === undefined ? undefined : resourceSize(placed)).toEqual({
         width: 260,
         height: 146,
       });
-      expect(placed === undefined ? undefined : resourceOpen(placed)).toBe(false);
     });
 
-    it('answers a stored size and state as the ones drawn, Open or Closed', () => {
+    it('answers a stored size as the one drawn', () => {
       expect(resourceSize({ size: { width: 400, height: 300 } })).toEqual({
         width: 400,
         height: 300,
       });
-      expect(resourceOpen({ open: true })).toBe(true);
-      expect(resourceOpen({ open: false })).toBe(false);
-      for (const open of [true, false]) {
-        expect(placedOf({ x: 0, y: 0, open, size: { width: 400, height: 300 } })).toEqual({
-          x: 0,
-          y: 0,
-          open,
-          size: { width: 400, height: 300 },
-        });
-      }
+      expect(placedOf({ x: 0, y: 0, size: { width: 400, height: 300 } })).toEqual({
+        x: 0,
+        y: 0,
+        size: { width: 400, height: 300 },
+      });
     });
 
-    it('refuses a size below the Closed Size on either axis, Open or Closed', () => {
-      for (const open of [true, false, undefined]) {
-        const at = (width: number, height: number) =>
-          parseEntry(
-            open === undefined
-              ? { x: 0, y: 0, size: { width, height } }
-              : { x: 0, y: 0, open, size: { width, height } },
-          ).success;
-        expect(at(259, 146)).toBe(false);
-        expect(at(260, 145)).toBe(false);
-        expect(at(260, 146)).toBe(true);
-      }
+    it('refuses a size below the Closed Size on either axis', () => {
+      const at = (width: number, height: number) =>
+        parseEntry({ x: 0, y: 0, size: { width, height } }).success;
+      expect(at(259, 146)).toBe(false);
+      expect(at(260, 145)).toBe(false);
+      expect(at(260, 146)).toBe(true);
     });
 
-    it('refuses the retired openSize, Open or Closed', () => {
-      expect(
-        parseEntry({ x: 0, y: 0, open: true, openSize: { width: 400, height: 300 } }).success,
-      ).toBe(false);
-      expect(
-        parseEntry({ x: 0, y: 0, open: false, openSize: { width: 400, height: 300 } }).success,
-      ).toBe(false);
+    it('refuses the retired openSize', () => {
+      expect(parseEntry({ x: 0, y: 0, openSize: { width: 400, height: 300 } }).success).toBe(false);
     });
 
     it('refuses a size carrying a key the format does not declare, rather than stripping it', () => {
@@ -766,7 +720,7 @@ describe('space file maps', () => {
     for (const positions of [
       { '00000000-0000-4000-8000-000000000002': { x: 0 } },
       { '00000000-0000-4000-8000-000000000002': [0, 0] },
-      { '00000000-0000-4000-8000-000000000002': { x: '0', y: '0', open: false } },
+      { '00000000-0000-4000-8000-000000000002': { x: '0', y: '0' } },
     ]) {
       expect(
         spaceFileSchema.safeParse({ ...validSpaceFile, maps: [{ ...working, positions }] }).success,
@@ -777,7 +731,7 @@ describe('space file maps', () => {
   it('rejects a position keyed by an empty resource id', () => {
     const result = spaceFileSchema.safeParse({
       ...validSpaceFile,
-      maps: [{ ...working, positions: { '': { x: 0, y: 0, open: false } } }],
+      maps: [{ ...working, positions: { '': { x: 0, y: 0 } } }],
     });
     expect(result.success).toBe(false);
   });
@@ -954,16 +908,14 @@ describe('an Image Resource', () => {
   /** The unpadded base64url SHA-256 of the empty string, a real stored-image id. */
   const STORED_ID = '47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU';
 
-  /** Whether a refusal carries the domain's identity for an image URL it does not accept. */
+  /** Whether a refusal names the image URL, which the Image plugin's content schema refuses. */
   const refusesUrl = (issues: readonly ZodIssue[]): boolean =>
-    issues.some(
-      (issue) => issue.code === 'custom' && issue.params?.['code'] === IMAGE_URL_UNSUPPORTED,
-    );
+    issues.some((issue) => issue.code === 'custom' && issue.path.at(-1) === 'url');
 
   it.each([
     'https://example.com/figure.png',
     'http://example.com/figure.png',
-    `/images/${STORED_ID}`,
+    `/assets/${STORED_ID}`,
   ])('parses an image URL it accepts: %s', (url) => {
     expect(resourceSchema.parse({ ...IMAGE, content: { url } })).toEqual({
       ...IMAGE,
@@ -984,10 +936,10 @@ describe('an Image Resource', () => {
     '../images/figure.png',
     '//example.com/figure.png',
     '/files/figure.png',
-    '/images/',
-    `/images/${STORED_ID}.png`,
-    `/images/${STORED_ID.slice(1)}`,
-    `/images/${STORED_ID}=`,
+    '/assets/',
+    `/assets/${STORED_ID}.png`,
+    `/assets/${STORED_ID.slice(1)}`,
+    `/assets/${STORED_ID}=`,
     '',
   ])('refuses an image URL it does not accept, naming the rule: %j', (url) => {
     const result = resourceSchema.safeParse({ ...IMAGE, content: { url } });

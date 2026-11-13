@@ -58,9 +58,9 @@ export type {
   LayoutStrategy,
 } from './layout';
 
-// Content resolution is the only function here: identity lookup is reached
-// through `space.lookup`, which the Space carries.
-export { resolveResourceContent } from './lookup';
+// Content resolution and the Resources a Resource's content references; identity
+// lookup is reached through `space.lookup`, which the Space carries.
+export { referencedResources, resolveResourceContent } from './lookup';
 export type { OwnedGraph, ResolvedMap, SpaceLookup } from './lookup';
 
 export { initializeSpace, newGraph, newSpace } from './new-space';
@@ -110,7 +110,7 @@ export type { GraphRenderEdge } from './graph-rendering';
 export { documentRefusal, loadSpace, loadSpaceSnapshot } from './space';
 export type { LoadSpaceResult, LoadSpaceSnapshotResult, Space, SpaceError } from './space';
 
-export { loadSpaceAggregate } from './space-aggregate';
+export { loadSpaceAggregate, refusedUnrootedSpaceIds } from './space-aggregate';
 export type {
   LoadSpaceAggregateInput,
   LoadSpaceAggregateResult,

@@ -1,4 +1,5 @@
 import {
+  EMPTY_ASSET_REF,
   newUuid,
   uuidSchema,
   type ResourcePlacement,
@@ -9,6 +10,7 @@ import {
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
+import { storyText } from './story-assets';
 import {
   loadSpace,
   loadSpaceSnapshot,
@@ -89,9 +91,7 @@ const RESOURCE_E = uuidSchema.parse('00000000-0000-4000-8000-00000000000c');
 const SPINE = [RESOURCE_A, RESOURCE_B, RESOURCE_C, RESOURCE_D, RESOURCE_E] as const;
 
 const positions = (count: number): Record<string, ResourcePlacement> =>
-  Object.fromEntries(
-    SPINE.slice(0, count).map((id, index) => [id, { x: index * 420, y: 0, open: false }]),
-  );
+  Object.fromEntries(SPINE.slice(0, count).map((id, index) => [id, { x: index * 420, y: 0 }]));
 
 /** The first `links` steps along the spine: three Graphs of one shape at three lengths. */
 const chain = (links: number): GraphEdge[] =>
@@ -168,7 +168,11 @@ export const authoredSnapshot: SpaceSnapshot = {
   },
   resources: SPINE.map((id, index) => ({
     id,
-    document: { title: `Resource ${index + 1}`, kind: 'markdown', content: { source: '' } },
+    document: {
+      title: `Resource ${index + 1}`,
+      kind: 'markdown',
+      content: { url: EMPTY_ASSET_REF },
+    },
   })),
 };
 
@@ -375,14 +379,14 @@ export const storyGraphIds = (): (() => GraphId) => {
  * judge a row of choices whose labels are all the same length.
  */
 const traversalPositions = (ids: readonly ResourceId[]): Record<string, ResourcePlacement> =>
-  Object.fromEntries(ids.map((id, index) => [id, { x: index * 420, y: 0, open: false }]));
+  Object.fromEntries(ids.map((id, index) => [id, { x: index * 420, y: 0 }]));
 
 const traversalResources = (
   titled: readonly (readonly [ResourceId, string])[],
 ): SpaceSnapshot['resources'] =>
   titled.map(([id, title]) => ({
     id,
-    document: { title, kind: 'markdown', content: { source: '' } },
+    document: { title, kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
   }));
 
 const TRAVERSAL_MAP = uuidSchema.parse('00000000-0000-4000-8000-000000000060');
@@ -652,7 +656,7 @@ const dockResourceDocument = (
       content: { url: DOCK_IMAGE_URL, naturalSize: { width: 400, height: 300 } },
     };
   if (kind === 'ur') return { title, kind, content: {} };
-  return { title, kind, content: { source: '' } };
+  return { title, kind, content: { url: EMPTY_ASSET_REF } };
 };
 
 const DOCK_RESOURCES: SpaceSnapshot['resources'] = [
@@ -675,10 +679,7 @@ const dockChain = (links: number): GraphEdge[] =>
 
 const dockPositions = (count: number): Record<string, ResourcePlacement> =>
   Object.fromEntries(
-    DOCK_PLACED.slice(0, count).map((resource, index) => [
-      resource.id,
-      { x: index * 420, y: 0, open: false },
-    ]),
+    DOCK_PLACED.slice(0, count).map((resource, index) => [resource.id, { x: index * 420, y: 0 }]),
   );
 
 /**
@@ -782,7 +783,7 @@ const crossingSpace = (
         positions: Object.fromEntries(
           targets.map((_, index): [string, ResourcePlacement] => [
             chainId(block + 3 + index),
-            { x: (index % 2) * 420, y: Math.floor(index / 2) * 320, open: false },
+            { x: (index % 2) * 420, y: Math.floor(index / 2) * 320 },
           ]),
         ),
         graphs: [{ id: chainId(block + 2), title: 'Catalogue', edges: [] }],
@@ -879,7 +880,7 @@ export const metaSnapshot: SpaceSnapshot = {
         positions: Object.fromEntries(
           META_TARGETS.map((_, index): [string, ResourcePlacement] => [
             metaId(0x8 + index),
-            { x: (index % 2) * 420, y: Math.floor(index / 2) * 320, open: false },
+            { x: (index % 2) * 420, y: Math.floor(index / 2) * 320 },
           ]),
         ),
         graphs: [{ id: META_GRAPH, title: 'Catalogue', edges: [] }],
@@ -957,12 +958,12 @@ export const edgeToolbarSnapshot: SpaceSnapshot = {
         title: 'Titled Edges',
         kind: 'positioned',
         positions: {
-          [EDGE_R1]: { x: 0, y: 0, open: false },
-          [EDGE_R2]: { x: 260 + EDGE_SHORT_GAP, y: 0, open: false },
-          [EDGE_R3]: { x: 2 * 260 + EDGE_SHORT_GAP + EDGE_LONG_GAP, y: 0, open: false },
-          [EDGE_R4]: { x: 0, y: 420, open: false },
-          [EDGE_R5]: { x: 260 + EDGE_LONG_GAP, y: 420, open: false },
-          [EDGE_R6]: { x: 2 * (260 + EDGE_LONG_GAP), y: 420, open: false },
+          [EDGE_R1]: { x: 0, y: 0 },
+          [EDGE_R2]: { x: 260 + EDGE_SHORT_GAP, y: 0 },
+          [EDGE_R3]: { x: 2 * 260 + EDGE_SHORT_GAP + EDGE_LONG_GAP, y: 0 },
+          [EDGE_R4]: { x: 0, y: 420 },
+          [EDGE_R5]: { x: 260 + EDGE_LONG_GAP, y: 420 },
+          [EDGE_R6]: { x: 2 * (260 + EDGE_LONG_GAP), y: 420 },
         },
         graphs: [
           {
@@ -987,7 +988,11 @@ export const edgeToolbarSnapshot: SpaceSnapshot = {
   },
   resources: [EDGE_R1, EDGE_R2, EDGE_R3, EDGE_R4, EDGE_R5, EDGE_R6].map((id, index) => ({
     id,
-    document: { title: `Resource ${index + 1}`, kind: 'markdown', content: { source: '' } },
+    document: {
+      title: `Resource ${index + 1}`,
+      kind: 'markdown',
+      content: { url: EMPTY_ASSET_REF },
+    },
   })),
 };
 
@@ -1034,10 +1039,10 @@ export const imageReferenceSnapshot: SpaceSnapshot = {
         title: 'Pictures',
         kind: 'positioned',
         positions: {
-          [imageReferenceIds.harbour]: { x: 0, y: 0, open: false },
-          [imageReferenceIds.harbourReference]: { x: 360, y: 0, open: false },
-          [imageReferenceIds.missing]: { x: 0, y: 200, open: false },
-          [imageReferenceIds.missingReference]: { x: 360, y: 200, open: false },
+          [imageReferenceIds.harbour]: { x: 0, y: 0 },
+          [imageReferenceIds.harbourReference]: { x: 360, y: 0 },
+          [imageReferenceIds.missing]: { x: 0, y: 200 },
+          [imageReferenceIds.missingReference]: { x: 360, y: 200 },
         },
         graphs: [{ id: imageReferenceId(1), title: 'Main', edges: [] }],
         activeGraph: imageReferenceId(1),
@@ -1154,7 +1159,11 @@ export const stageSnapshot: SpaceSnapshot = {
   resources: [
     {
       id: stageIds.longRead,
-      document: { title: 'Long read', kind: 'markdown', content: { source: LONG_READ_BODY } },
+      document: {
+        title: 'Long read',
+        kind: 'markdown',
+        content: { url: storyText(LONG_READ_BODY) },
+      },
     },
     {
       id: stageIds.picture,
@@ -1163,7 +1172,7 @@ export const stageSnapshot: SpaceSnapshot = {
     { id: stageIds.titleSlide, document: { title: 'Title slide', kind: 'ur', content: {} } },
     {
       id: stageIds.unbroken,
-      document: { title: 'Unbroken', kind: 'markdown', content: { source: UNBROKEN_BODY } },
+      document: { title: 'Unbroken', kind: 'markdown', content: { url: storyText(UNBROKEN_BODY) } },
     },
   ],
 };
@@ -1187,8 +1196,8 @@ export const notesIds = {
   backup: notesId(0x22),
 } as const;
 
-const markdownResource = (id: UUID, title: string, source: string) =>
-  ({ id, document: { title, kind: 'markdown', content: { source } } }) as const;
+const markdownResource = (id: UUID, title: string, text: string) =>
+  ({ id, document: { title, kind: 'markdown', content: { url: storyText(text) } } }) as const;
 
 /**
  * A talk that forks after its welcome and rejoins for questions, with a
@@ -1207,13 +1216,13 @@ export const notesSnapshot: SpaceSnapshot = {
         title: 'Launch',
         kind: 'positioned',
         positions: {
-          [notesIds.welcome]: { x: 0, y: 0, open: false },
-          [notesIds.demo]: { x: 420, y: -200, open: false },
-          [notesIds.architecture]: { x: 420, y: 200, open: false },
-          [notesIds.questions]: { x: 840, y: 0, open: false },
-          [notesIds.outage]: { x: 0, y: 400, open: false },
-          [notesIds.thanks]: { x: 0, y: 700, open: false },
-          [notesIds.backup]: { x: 420, y: 400, open: false },
+          [notesIds.welcome]: { x: 0, y: 0 },
+          [notesIds.demo]: { x: 420, y: -200 },
+          [notesIds.architecture]: { x: 420, y: 200 },
+          [notesIds.questions]: { x: 840, y: 0 },
+          [notesIds.outage]: { x: 0, y: 400 },
+          [notesIds.thanks]: { x: 0, y: 700 },
+          [notesIds.backup]: { x: 420, y: 400 },
         },
         graphs: [
           {

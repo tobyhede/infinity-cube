@@ -58,7 +58,7 @@ function fixture(): Space {
           id: FIRST_MAP,
           title: 'First graph',
           positions: {
-            [RESOURCE_A]: { x: 0, y: 0, open: false },
+            [RESOURCE_A]: { x: 0, y: 0 },
           },
           graphs: [{ id: GRAPH_THREE, title: 'Three', edges: [] }],
         },
@@ -66,9 +66,9 @@ function fixture(): Space {
           id: MAP,
           title: 'Second graph',
           positions: {
-            [RESOURCE_A]: { x: -320, y: 200, open: false },
-            [RESOURCE_B]: { x: 0, y: 200, open: false },
-            [RESOURCE_C]: { x: 320, y: 200, open: false },
+            [RESOURCE_A]: { x: -320, y: 200 },
+            [RESOURCE_B]: { x: 0, y: 200 },
+            [RESOURCE_C]: { x: 320, y: 200 },
           },
           graphs: [
             { id: GRAPH_ONE, title: 'One', edges: [{ from: RESOURCE_A, to: RESOURCE_B }] },
@@ -103,10 +103,7 @@ function spaceOwning(
           id: MAP,
           title: 'Only',
           positions: Object.fromEntries(
-            resources.map((resource, index) => [
-              resource.id,
-              { x: index * 320, y: 0, open: false },
-            ]),
+            resources.map((resource, index) => [resource.id, { x: index * 320, y: 0 }]),
           ),
           graphs,
         },
@@ -163,9 +160,9 @@ it('traverses an Edge from the changing working Space without installing a copy'
           id: MAP,
           title: 'Second graph',
           positions: {
-            [resourceA]: { x: 0, y: 0, open: false },
-            [resourceB]: { x: 320, y: 0, open: false },
-            [resourceC]: { x: 640, y: 0, open: false },
+            [resourceA]: { x: 0, y: 0 },
+            [resourceB]: { x: 320, y: 0 },
+            [resourceC]: { x: 640, y: 0 },
           },
           graphs: [
             {

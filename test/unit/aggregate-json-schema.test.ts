@@ -78,7 +78,7 @@ const graph = (edges: Json[] = [edge()]) => ({
   headShape: 'arrow',
   edges,
 });
-const placement = () => ({ x: 0, y: 0, open: false });
+const placement = () => ({ x: 0, y: 0 });
 const mapEntry = (
   positions: Record<string, Json> = { [resourceA]: placement() },
   graphs: Json[] = [graph()],
@@ -121,8 +121,9 @@ const spaceCases: [string, Json][] = [
   ['a Map with no Graphs', space([mapEntry(undefined, [])])],
   ['a position keyed by a non-Id', space([mapEntry({ nope: placement() })])],
   ['a misspelt placement key', withPlacement({ opne: true })],
-  ['a Shape', withPlacement({ shape: 'pill' })],
-  ['an unknown Shape', withPlacement({ shape: 'star' })],
+  ['Map content', withPlacement({ content: { shape: 'pill' } })],
+  ['Map content that is not an object', withPlacement({ content: ['any', 1, null] })],
+  ['a shape key, which Map content replaced', withPlacement({ shape: 'pill' })],
   ['a size', withPlacement({ size: { width: 480, height: 320 } })],
   ['a size below the minimum', withPlacement({ size: { width: 100, height: 146 } })],
   ['an unknown size key', withPlacement({ size: { width: 300, height: 200, depth: 1 } })],
@@ -180,6 +181,8 @@ describe('the aggregate JSON Schemas agree with intake', () => {
 
 const id = '6f1d6a2e-3b7c-4d2a-9c1e-0a5b7d9e1f20';
 const envelope = (kind: string, content: Json) => ({ id, title: 'A', kind, content });
+/** A Markdown Resource's text, by its asset reference: here the empty text's. */
+const TEXT = '/assets/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU';
 
 const refused: [string, Json, { instancePath: string; keyword: string }][] = [
   [
@@ -187,7 +190,6 @@ const refused: [string, Json, { instancePath: string; keyword: string }][] = [
     { id, title: 'A', content: {} },
     { instancePath: '', keyword: 'required' },
   ],
-  ['a bare kind no build registers', envelope('video', {}), { instancePath: '', keyword: 'oneOf' }],
   [
     'a media type as a vendor kind',
     envelope('vnd.acme.image/png', {}),
@@ -205,7 +207,7 @@ const refused: [string, Json, { instancePath: string; keyword: string }][] = [
   ],
   [
     'an unknown Markdown content key',
-    envelope('markdown', { path: `${id}.md`, mediaType: 'text/markdown', source: 'x' }),
+    envelope('markdown', { url: TEXT, source: 'x' }),
     { instancePath: '/content', keyword: 'unevaluatedProperties' },
   ],
   [
@@ -224,8 +226,13 @@ const refused: [string, Json, { instancePath: string; keyword: string }][] = [
     { instancePath: '/content', keyword: 'additionalProperties' },
   ],
   [
-    'Markdown content by URL',
+    'Markdown content by an external URL',
     envelope('markdown', { url: 'https://example.com/a.md' }),
+    { instancePath: '/content/url', keyword: 'pattern' },
+  ],
+  [
+    'Markdown content by path',
+    envelope('markdown', { path: `${id}.md`, mediaType: 'text/markdown' }),
     { instancePath: '/content', keyword: 'required' },
   ],
   [
@@ -238,8 +245,8 @@ const refused: [string, Json, { instancePath: string; keyword: string }][] = [
 /**
  * The schema is held to compiling under strict mode, to accepting the example
  * its README publishes for each kind, to refusing what ADR 0128 names at the
- * place it names (a missing or malformed `kind`, a bare kind no build
- * registers, an unknown key at either level, Ur content, and a locator form
+ * place it names (a missing or malformed `kind`, an unknown key at either
+ * level, Ur content, and a locator form
  * the kind does not take), and to accepting what only intake refuses. The
  * next block holds it to intake itself.
  */
@@ -251,6 +258,15 @@ describe('the Resource file JSON Schema', () => {
     expect(existsSync(join(examples, `${kind}.json`))).toBe(true);
   });
 
+  // The `if` choosing builtInKinds lists the registered ids by hand; a kind
+  // left out of it would be read as one whose plugin is missing.
+  it('applies builtInKinds to exactly the registered kinds', () => {
+    expect([...resourceSchema.if.properties.kind.enum].sort()).toEqual([...KIND_IDS].sort());
+    expect(
+      resourceSchema.$defs.builtInKinds.oneOf.map(({ properties }) => properties.kind.const).sort(),
+    ).toEqual([...KIND_IDS].sort());
+  });
+
   it.each(KIND_IDS)('accepts the published %s example', (kind) => {
     const example: unknown = JSON.parse(readFileSync(join(examples, `${kind}.json`), 'utf8'));
     expect(resourceFileSchema(example), JSON.stringify(resourceFileSchema.errors)).toBe(true);
@@ -259,10 +275,7 @@ describe('the Resource file JSON Schema', () => {
   it.each([
     ['a vendor kind with any content', envelope('vnd.acme.chart', { series: [1, 2] })],
     ['a vendor kind in upper case', envelope('vnd.Acme.Chart', {})],
-    [
-      'a Markdown media type in another case',
-      envelope('markdown', { path: `${id}.md`, mediaType: 'Text/Markdown' }),
-    ],
+    ['a bare kind no build registers, with any content', envelope('video', { frames: [] })],
   ])('accepts %s', (_name, file) => {
     expect(resourceFileSchema(file), JSON.stringify(resourceFileSchema.errors)).toBe(true);
   });
@@ -280,21 +293,24 @@ describe('the Resource file JSON Schema', () => {
     },
   );
 
-  it.each(['a.md', 'dir/a.md', 'a..b/c.md', '.hidden/a.md'])('locates by the path %j', (path) => {
-    expect(locator({ path, mediaType: 'text/markdown' }), JSON.stringify(locator.errors)).toBe(
+  it.each([
+    { path: 'a.md', mediaType: 'text/markdown' },
+    { path: 'a.md', url: '/assets/a' },
+    { url: '/assets/a', mediaType: 'text/markdown' },
+  ])('refuses a locator naming a path or a media type, %j', (content) => {
+    expect(locator(content)).toBe(false);
+  });
+
+  it('locates by a URL', () => {
+    expect(locator({ url: 'https://example.com/a.png' }), JSON.stringify(locator.errors)).toBe(
       true,
     );
   });
 
-  it.each(['/a.md', 'a//b.md', 'dir/', '../a.md', 'a/./b.md', 'a/..', 'a\\b.md', ''])(
-    'refuses the path %j',
-    (path) => {
-      expect(locator({ path, mediaType: 'text/markdown' })).toBe(false);
-    },
-  );
-
-  it("names a Markdown sidecar by the Id schema's own pattern", () => {
-    expect(markdownSchema.properties.path.pattern).toBe(`${idSchema.pattern.slice(0, -1)}\\.md$`);
+  it("names a Markdown text by the Image schema's stored-asset pattern", () => {
+    expect(markdownSchema.properties.url.pattern).toBe(
+      imageSchema.properties.url.anyOf[1]?.pattern,
+    );
   });
 });
 
@@ -309,12 +325,9 @@ describe('the Resource file JSON Schema refuses only what intake refuses', () =>
   const examples = join(repoRoot, 'docs/schema/resource/examples');
   const space = uuidSchema.parse('c0000000-0000-4000-8000-000000000001');
   const other = 'c0000000-0000-4000-8000-000000000002';
-  const markdown = (path: string) => envelope('markdown', { path, mediaType: 'text/markdown' });
-
-  /** A Resource file at `resources/<id>.json`, with whatever sidecars the row puts beside it. */
-  const filesOf = (file: Json, sidecars: readonly string[] = []): ResourceFile[] => [
+  /** A Resource file at `resources/<id>.json`. */
+  const filesOf = (file: Json): ResourceFile[] => [
     { path: `resources/${id}.json`, text: JSON.stringify(file) },
-    ...sidecars.map((name) => ({ path: `resources/${name}`, text: 'Body.\n' })),
   ];
 
   const intakeRefuses = (files: readonly ResourceFile[]): boolean => {
@@ -337,19 +350,13 @@ describe('the Resource file JSON Schema refuses only what intake refuses', () =>
     const text = readFileSync(join(examples, `${kind}.json`), 'utf8');
     const example: unknown = JSON.parse(text);
     expect(resourceFileSchema(example)).toBe(true);
-    const sidecars = (kind === 'markdown' ? ['0b9e4f3a-1c2d-4e5f-8a6b-7c8d9e0f1a2b.md'] : []).map(
-      (name) => ({
-        path: `resources/${name}`,
-        text: readFileSync(join(examples, name), 'utf8'),
-      }),
-    );
-    const decoded = parseResourceFiles([{ path: `resources/${kind}.json`, text }, ...sidecars]);
+    const decoded = parseResourceFiles([{ path: `resources/${kind}.json`, text }]);
     expect(decoded.ok, JSON.stringify(decoded)).toBe(true);
   });
 
   it('admits a valid Resource file through the whole of intake', () => {
     expect(intakeRefuses(filesOf(envelope('ur', {})))).toBe(false);
-    expect(intakeRefuses(filesOf(markdown(`${id}.md`), [`${id}.md`]))).toBe(false);
+    expect(intakeRefuses(filesOf(envelope('markdown', { url: TEXT })))).toBe(false);
     const target = {
       path: `resources/${other}.json`,
       text: JSON.stringify({ id: other, title: 'T', kind: 'ur', content: {} }),
@@ -363,12 +370,6 @@ describe('the Resource file JSON Schema refuses only what intake refuses', () =>
   const invalid: [string, ResourceFile[], 'both' | 'only intake'][] = [
     ['a Resource with no kind', filesOf({ id, title: 'A', content: {} }), 'both'],
     ['a malformed kind id', filesOf(envelope('a.b', {})), 'both'],
-    ['a bare kind no build registers', filesOf(envelope('video', {})), 'both'],
-    [
-      'a vendor kind this build does not register',
-      filesOf(envelope('vnd.acme.chart', {})),
-      'only intake',
-    ],
     ['an unknown envelope key', filesOf({ ...envelope('ur', {}), body: 'x' }), 'both'],
     [
       'an unknown content key',
@@ -382,16 +383,13 @@ describe('the Resource file JSON Schema refuses only what intake refuses', () =>
       'only intake',
     ],
     [
-      "a Markdown path naming another Resource's <id>.md",
-      filesOf(markdown(`${other}.md`), [`${other}.md`]),
-      'only intake',
+      'Markdown content by an external URL',
+      filesOf(envelope('markdown', { url: 'https://example.com/a.md' })),
+      'both',
     ],
-    ['a Markdown sidecar that does not exist', filesOf(markdown(`${id}.md`)), 'only intake'],
     [
-      'a Markdown media type spelled with the Kelvin sign',
-      filesOf(envelope('markdown', { path: `${id}.md`, mediaType: 'text/mar\u212Adown' }), [
-        `${id}.md`,
-      ]),
+      'Markdown content by path',
+      filesOf(envelope('markdown', { path: `${id}.md`, mediaType: 'text/markdown' })),
       'both',
     ],
     [
@@ -420,5 +418,19 @@ describe('the Resource file JSON Schema refuses only what intake refuses', () =>
 
   it.each(refused)('intake refuses %s too, which the schema refuses', (_name, file) => {
     expect(intakeRefuses(filesOf(file))).toBe(true);
+  });
+
+  it.each([
+    ['a bare kind no plugin draws', envelope('video', { frames: [{ at: 0 }] })],
+    ['a vendor kind no plugin draws', envelope('vnd.acme.chart', { series: [1, 2] })],
+  ])('intake and the schema both accept %s, its content unread (ADR 0142)', (_name, file) => {
+    expect(intakeRefuses(filesOf(file))).toBe(false);
+    expect(resourceFileSchema(file), JSON.stringify(resourceFileSchema.errors)).toBe(true);
+  });
+
+  it('intake and the schema both refuse a kind no plugin draws whose content is not an object', () => {
+    const file = envelope('video', ['frame']);
+    expect(intakeRefuses(filesOf(file))).toBe(true);
+    expect(resourceFileSchema(file)).toBe(false);
   });
 });

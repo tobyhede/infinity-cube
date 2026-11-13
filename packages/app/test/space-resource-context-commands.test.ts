@@ -5,7 +5,6 @@ import { MemorySpaceBackend, MemorySpaceBackendTestControl } from '@project/pers
 import { createOpenSpaces } from '../src/open-spaces';
 import { spaceResourceContextCommands } from '../src/space-resource-context-commands';
 import { recordingHistory } from './browser-history';
-import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
 import { refusingFullscreen } from './fullscreen';
 import { unlinkedPresentations } from './presentations';
@@ -41,7 +40,7 @@ const meta: SpaceSnapshot = {
         id: META_MAP,
         title: 'Meta Map',
         kind: 'positioned',
-        positions: { [RESOURCE]: { x: 0, y: 0, open: false } },
+        positions: { [RESOURCE]: { x: 0, y: 0 } },
         graphs: [{ id: META_GRAPH, title: 'Meta Graph', edges: [] }],
       },
       {
@@ -95,7 +94,6 @@ async function setup(available = true) {
   const spaces = createOpenSpaces({
     fullscreen: refusingFullscreen,
     presentations: unlinkedPresentations,
-    images: unusedImageSources,
     backend,
     metaSpaceId: META,
     metaSpaceTitle: meta.document.title,
@@ -112,7 +110,7 @@ async function setup(available = true) {
       containingSpaceId: META,
       deleteConfirmation: source.app.deleteConfirmation,
     },
-    { ...document.content, framing: document.content.framing },
+    { spaceId: TARGET, map: SECOND_MAP, graph: SECOND_GRAPH, framing: undefined },
     (m, graph) => {
       const result = source.app.authoring.complete(CANVAS, {
         kind: 'edited-resource',

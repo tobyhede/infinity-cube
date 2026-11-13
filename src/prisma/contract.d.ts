@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:d4a0693a3c0aa69bb8e801dc1c840c9703fc5e6200b70d78ead42496a89737ce'>;
+  StorageHashBase<'sha256:e655537afe49c0de3d59bfba9eee79693d3760ef21fcd4872411e39587115e04'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:26bc77f03788a526b20f8ac61c5d438d7c0bdb48156350feb364c8f0e868f393'>;
 export type ProfileHash =
@@ -45,8 +45,8 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
 
 export type FieldOutputTypes = {
   readonly public: {
-    readonly Image: {
-      readonly id: CodecTypes['pg/text@1']['output'];
+    readonly Asset: {
+      readonly hash: CodecTypes['pg/text@1']['output'];
       readonly mediaType: CodecTypes['pg/text@1']['output'];
       readonly bytes: CodecTypes['pg/bytea@1']['output'];
       readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
@@ -74,8 +74,8 @@ export type FieldOutputTypes = {
 };
 export type FieldInputTypes = {
   readonly public: {
-    readonly Image: {
-      readonly id: CodecTypes['pg/text@1']['input'];
+    readonly Asset: {
+      readonly hash: CodecTypes['pg/text@1']['input'];
       readonly mediaType: CodecTypes['pg/text@1']['input'];
       readonly bytes: CodecTypes['pg/bytea@1']['input'];
       readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
@@ -103,10 +103,10 @@ export type FieldInputTypes = {
 };
 export type StorageColumnTypes = {
   readonly public: {
-    readonly images: {
+    readonly assets: {
       readonly bytes: CodecTypes['pg/bytea@1']['output'];
       readonly created_at: CodecTypes['pg/timestamptz@1']['output'];
-      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly hash: CodecTypes['pg/text@1']['output'];
       readonly media_type: CodecTypes['pg/text@1']['output'];
     };
     readonly repository_state: {
@@ -132,10 +132,10 @@ export type StorageColumnTypes = {
 };
 export type StorageColumnInputTypes = {
   readonly public: {
-    readonly images: {
+    readonly assets: {
       readonly bytes: CodecTypes['pg/bytea@1']['input'];
       readonly created_at: CodecTypes['pg/timestamptz@1']['input'];
-      readonly id: CodecTypes['pg/text@1']['input'];
+      readonly hash: CodecTypes['pg/text@1']['input'];
       readonly media_type: CodecTypes['pg/text@1']['input'];
     };
     readonly repository_state: {
@@ -176,9 +176,9 @@ type ContractBase = Omit<
         readonly kind: 'postgres-schema';
         readonly entries: {
           readonly table: {
-            readonly images: {
+            readonly assets: {
               columns: {
-                readonly id: {
+                readonly hash: {
                   readonly nativeType: 'text';
                   readonly codecId: 'pg/text@1';
                   readonly nullable: false;
@@ -200,7 +200,7 @@ type ContractBase = Omit<
                   readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
                 };
               };
-              primaryKey: { readonly columns: readonly ['id'] };
+              primaryKey: { readonly columns: readonly ['hash'] };
               uniques: readonly [];
               indexes: readonly [];
               foreignKeys: readonly [];
@@ -372,15 +372,15 @@ type ContractBase = Omit<
       readonly model: 'RepositoryState';
     };
     readonly resources: { readonly namespace: 'public' & NamespaceId; readonly model: 'Resource' };
-    readonly images: { readonly namespace: 'public' & NamespaceId; readonly model: 'Image' };
+    readonly assets: { readonly namespace: 'public' & NamespaceId; readonly model: 'Asset' };
   };
   readonly domain: {
     readonly namespaces: {
       readonly public: {
         readonly models: {
-          readonly Image: {
+          readonly Asset: {
             readonly fields: {
-              readonly id: {
+              readonly hash: {
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
@@ -399,10 +399,10 @@ type ContractBase = Omit<
             };
             readonly relations: Record<string, never>;
             readonly storage: {
-              readonly table: 'images';
+              readonly table: 'assets';
               readonly namespaceId: 'public';
               readonly fields: {
-                readonly id: { readonly column: 'id' };
+                readonly hash: { readonly column: 'hash' };
                 readonly mediaType: { readonly column: 'media_type' };
                 readonly bytes: { readonly column: 'bytes' };
                 readonly createdAt: { readonly column: 'created_at' };

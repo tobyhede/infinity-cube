@@ -1,17 +1,17 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { uuidSchema, type SpaceSnapshot } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { MemorySpaceBackend } from '@project/persistence';
 import { createOpenSpaces, type OpenSpace } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { unavailable } from './command-dock';
 import { recordingHistory } from './browser-history';
-import { heldImageSources } from './image-sources';
 import { refusingFullscreen } from './fullscreen';
 import { unlinkedPresentations } from './presentations';
 import { selectResource } from './resource-selection';
 import { mintingIds } from './minting';
 import { stubResizeObserver } from './resize-observer';
+import { textAsset } from './markdown-texts';
 
 /**
  * A mounted session authors as any session does (ADR 0131): its Edits are
@@ -44,8 +44,8 @@ const meta: SpaceSnapshot = {
         title: 'Map',
         kind: 'positioned',
         positions: {
-          [NOTE_ID]: { x: 0, y: 0, open: false },
-          [SPACE_RESOURCE_ID]: { x: 0, y: 40, open: false },
+          [NOTE_ID]: { x: 0, y: 0 },
+          [SPACE_RESOURCE_ID]: { x: 0, y: 40 },
         },
         graphs: [
           {
@@ -61,7 +61,7 @@ const meta: SpaceSnapshot = {
   resources: [
     {
       id: NOTE_ID,
-      document: { title: 'Note', kind: 'markdown', content: { source: 'Body' } },
+      document: { title: 'Note', kind: 'markdown', content: { url: textAsset('Body') } },
     },
     {
       id: SPACE_RESOURCE_ID,
@@ -85,7 +85,7 @@ const other: SpaceSnapshot = {
         id: OTHER_MAP_ID,
         title: 'Other Map',
         kind: 'positioned',
-        positions: { [OTHER_RESOURCE_ID]: { x: 0, y: 0, open: false } },
+        positions: { [OTHER_RESOURCE_ID]: { x: 0, y: 0 } },
         graphs: [{ id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] }],
         activeGraph: OTHER_GRAPH_ID,
       },
@@ -94,7 +94,7 @@ const other: SpaceSnapshot = {
   resources: [
     {
       id: OTHER_RESOURCE_ID,
-      document: { title: 'Inside', kind: 'markdown', content: { source: '' } },
+      document: { title: 'Inside', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
   ],
 };
@@ -112,7 +112,7 @@ const metaWithOpenSpaceResource: SpaceSnapshot = {
     ...meta.document,
     maps: meta.document.maps?.map((m) => ({
       ...m,
-      positions: { ...m.positions, [SPACE_RESOURCE_ID]: { x: 0, y: 40, open: true } },
+      positions: { ...m.positions, [SPACE_RESOURCE_ID]: { x: 0, y: 40, content: { open: true } } },
     })),
   },
 };
@@ -126,7 +126,6 @@ async function openMeta(mounted: boolean, root: SpaceSnapshot = meta): Promise<O
   const spaces = createOpenSpaces({
     fullscreen: refusingFullscreen,
     presentations: unlinkedPresentations,
-    images: heldImageSources().images,
     backend,
     metaSpaceId: META_ID,
     metaSpaceTitle: 'Meta',
@@ -255,18 +254,16 @@ describe('the canvas of a mounted session', () => {
     await waitFor(() => expect(initial.session.getState().working.resources).toHaveLength(3));
   });
 
-  it.each(BOTH)('mounted %s: Enter on a Resource opens it', async (mounted) => {
+  // A Space Resource's Open is its plugin's Map content, Opened from its rail (ADR 0142).
+  it.each(BOTH)('mounted %s: Open on a Resource opens it', async (mounted) => {
     const initial = await openMeta(mounted);
-    const node = nodeOf('Note');
+    await selectResource('Other');
 
-    act(() => {
-      node.focus();
-      fireEvent.keyDown(node, { key: 'Enter' });
-    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Resource Other' }));
 
     await waitFor(() => {
       const { maps } = initial.session.getState().working.document;
-      expect(maps?.[0]?.positions[NOTE_ID]?.open).toBe(true);
+      expect(maps?.[0]?.positions[SPACE_RESOURCE_ID]?.content).toEqual({ open: true });
     });
   });
 

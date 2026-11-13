@@ -33,6 +33,26 @@ export async function exerciseSpaceResourceContextMenus(
     await trigger.focus();
     await trigger.press('Enter');
   };
+  // A link authors nothing, so it is offered before any Claim is taken.
+  await openMenu('map');
+  await page.getByRole('menuitem', { name: 'Copy link to Map', exact: true }).click();
+  await expect(resource.getByRole('status')).toHaveText('Link copied.');
+  const mapLink = await page.evaluate(() => navigator.clipboard.readText());
+  expect(new URL(mapLink).pathname).toMatch(/^\/spaces\/[^/]+\/maps\/[^/]+$/);
+  await openMenu('graph');
+  await page.getByRole('menuitem', { name: 'Copy link to Graph', exact: true }).click();
+  const graphLink = await page.evaluate(() => navigator.clipboard.readText());
+  expect(graphLink).toContain(mapLink);
+  // The shown Space's own Maps and Graphs are authored only under the Claim
+  // Edit takes (ADR 0142).
+  await (
+    await resourceControls(page, resource)
+  )
+    .getByRole('button', { name: /^Edit Resource/ })
+    .click();
+  await expect(
+    (await resourceControls(page, resource)).getByRole('button', { name: /^Done Resource/ }),
+  ).toBeVisible();
   // One grouping grammar: the
   // Map list, New Map on its own, Rename beside Copy link to
   // Map, then Delete — one separator between each group.
@@ -56,11 +76,6 @@ export async function exerciseSpaceResourceContextMenus(
   await canvas.focus();
   await expect(page.getByRole('textbox', { name: 'Map name', exact: true })).toHaveCount(0);
   await expect(canvas).toBeFocused();
-  await openMenu('map');
-  await page.getByRole('menuitem', { name: 'Copy link to Map', exact: true }).click();
-  await expect(resource.getByRole('status')).toHaveText('Link copied.');
-  const mapLink = await page.evaluate(() => navigator.clipboard.readText());
-  expect(new URL(mapLink).pathname).toMatch(/^\/spaces\/[^/]+\/maps\/[^/]+$/);
 
   // Same grammar, with Colour… and Shape… heading the commands on this Graph —
   // and no permanent address offered.
@@ -126,10 +141,6 @@ export async function exerciseSpaceResourceContextMenus(
   ).toHaveAttribute('aria-checked', 'true');
   await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
-  await openMenu('graph');
-  await page.getByRole('menuitem', { name: 'Copy link to Graph', exact: true }).click();
-  const graphLink = await page.evaluate(() => navigator.clipboard.readText());
-  expect(graphLink).toContain(mapLink);
 
   await openMenu('graph');
   await expect(
@@ -155,7 +166,7 @@ export async function exerciseSpaceResourceContextMenus(
   await expect(graphTrigger).toBeFocused();
   await openMenu('graph');
   await page.getByRole('menuitem', { name: 'Delete Graph 1', exact: true }).click();
-  await expect(graphQuestion.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused();
+  await expect(graphQuestion.getByRole('button', { name: 'Delete', exact: true })).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(graphQuestion).toHaveCount(0);
   await expect(graphTrigger).toBeFocused();
@@ -183,7 +194,7 @@ export async function exerciseSpaceResourceContextMenus(
   await expect(mapQuestion).toContainText(
     'Permanently deletes the Map, and all Graphs from the Space.',
   );
-  await expect(mapQuestion.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused();
+  await expect(mapQuestion.getByRole('button', { name: 'Delete', exact: true })).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(mapQuestion).toHaveCount(0);
   await expect(mapTrigger).toBeFocused();
@@ -195,6 +206,11 @@ export async function exerciseSpaceResourceContextMenus(
     (await resourceControls(page, resource)).getByTestId('space-resource-map'),
   ).toHaveText('Target context');
   await expect(canvas).toHaveText(containingMap ?? '');
+  await (
+    await resourceControls(page, resource)
+  )
+    .getByRole('button', { name: /^Done Resource/ })
+    .click();
 }
 
 /** The Space Resource entity menu and its Reference Resource creation, through both production hosts. */
@@ -247,7 +263,7 @@ export async function exerciseSpaceResourceEntityMenu(
   await expectMenuGroups(page.getByRole('menu'), [
     ['Create Reference'],
     ['Connect to Resource'],
-    ['Open and Expand', 'Read in Full View', /^Present from Here/],
+    ['Read in Full View', /^Present from Here/],
     ['Enter', 'Open in New Tab'],
     ['Copy link to Resource in Map', 'Copy link to Resource', 'Copy link to Space'],
     ['Remove from Map', 'Delete from Space'],
@@ -276,7 +292,7 @@ export async function exerciseSpaceResourceEntityMenu(
   await expect(embedded.first()).toBeVisible();
   expect(
     await reference
-      .locator('.canvas-resource__body')
+      .getByTestId('space-resource-footer')
       .evaluate((body) => (body instanceof HTMLElement ? body.offsetHeight : 0)),
   ).toBeLessThan(50);
   await expect(embedded.getByTestId('canvas-resource-actions')).toHaveCount(0);

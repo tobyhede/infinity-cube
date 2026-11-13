@@ -1,6 +1,12 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { normalizeTitle, titleLines, type Resource } from '@project/core';
+import {
+  EMPTY_ASSET_REF,
+  normalizeTitle,
+  titleLines,
+  type KindId,
+  type Resource,
+} from '@project/core';
 import { parseResourceFiles, serializeResource } from '../src/index';
 import { uuid } from './resource-files';
 
@@ -25,7 +31,7 @@ const SPACE_ID = uuid('00000000-0000-4000-8000-000000000103');
 const MAP_ID = uuid('00000000-0000-4000-8000-000000000104');
 const GRAPH_ID = uuid('00000000-0000-4000-8000-000000000105');
 
-type ResourceKind = Resource['kind'];
+type ResourceKind = KindId;
 
 const EVERY_KIND: readonly ResourceKind[] = ['markdown', 'reference', 'space', 'image', 'ur'];
 
@@ -38,7 +44,7 @@ const EVERY_KIND: readonly ResourceKind[] = ['markdown', 'reference', 'space', '
 function resourceOf(kind: ResourceKind, title: string): Resource {
   switch (kind) {
     case 'markdown':
-      return { id: ID, title, kind, content: { source: 'The body, which is not the Title.\n' } };
+      return { id: ID, title, kind, content: { url: EMPTY_ASSET_REF } };
     case 'reference':
       return { id: ID, title, kind, content: { target: TARGET } };
     case 'space':

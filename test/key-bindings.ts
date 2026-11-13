@@ -1,5 +1,5 @@
 export interface KeyBinding {
-  readonly module: `packages/${'app' | 'ui'}/src/${string}`;
+  readonly module: `packages/${'app' | 'ui' | `plugin-${string}`}/src/${string}`;
   readonly sourceKey: string;
   readonly occurrence: number;
   readonly key: string;
@@ -8,8 +8,8 @@ export interface KeyBinding {
 }
 
 /**
- * Every keyboard binding authored by InfinityCube in the app and UI packages that
- * reads `event.key` itself.
+ * Every keyboard binding authored by InfinityCube in the app and UI packages, and
+ * in each Resource plugin package, that reads `event.key` itself.
  *
  * The application's shortcuts are not here: they are declared as data in
  * `packages/app/src/key-bindings.ts` (`CANVAS_KEYS`, `PRESENTING_KEYS`), whose
@@ -139,28 +139,20 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     behaviour: 'withhold the Resource surface commit chord from CodeMirror',
   },
   {
-    module: 'packages/ui/src/MarkdownResourceBody.tsx',
+    module: 'packages/ui/src/ResourceTextHost.tsx',
     sourceKey: 'Escape',
     occurrence: 1,
     key: 'Escape',
-    surface: 'Markdown Resource body',
-    behaviour: 'cancel Markdown editing',
+    surface: 'source editor a host gives a plugin',
+    behaviour: "run the plugin's Cancel, as the Markdown plugin's edit does",
   },
   {
-    module: 'packages/ui/src/MarkdownResourceBody.tsx',
+    module: 'packages/ui/src/ResourceTextHost.tsx',
     sourceKey: 'Enter',
     occurrence: 1,
     key: 'Mod-Enter',
-    surface: 'Markdown Resource body',
-    behaviour: 'commit Markdown editing',
-  },
-  {
-    module: 'packages/ui/src/ImageReplaceTarget.tsx',
-    sourceKey: 'Escape',
-    occurrence: 1,
-    key: 'Escape',
-    surface: 'Image Resource upload target',
-    behaviour: 'cancel replacing the image',
+    surface: 'source editor a host gives a plugin',
+    behaviour: "run the plugin's Save, as the Markdown plugin's edit does",
   },
   {
     module: 'packages/ui/src/InlineTitleEditor.tsx',
@@ -188,6 +180,38 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
   },
   {
     module: 'packages/app/src/edge-authoring-react.tsx',
+    sourceKey: 'Shift',
+    occurrence: 1,
+    key: 'Shift',
+    surface: 'Canvas',
+    behaviour: 'add a clicked Resource to the selection',
+  },
+  {
+    module: 'packages/app/src/edge-authoring-react.tsx',
+    sourceKey: 'Meta',
+    occurrence: 1,
+    key: 'Meta',
+    surface: 'Canvas',
+    behaviour: 'add a clicked Resource to the selection',
+  },
+  {
+    module: 'packages/app/src/edge-authoring-react.tsx',
+    sourceKey: 'Control',
+    occurrence: 1,
+    key: 'Control',
+    surface: 'Canvas',
+    behaviour: 'add a clicked Resource to the selection',
+  },
+  {
+    module: 'packages/app/src/edge-authoring-react.tsx',
+    sourceKey: 'Shift',
+    occurrence: 2,
+    key: 'Shift',
+    surface: 'Canvas',
+    behaviour: 'draw a selection box with a drag instead of panning',
+  },
+  {
+    module: 'packages/app/src/edge-authoring-react.tsx',
     sourceKey: 'Enter',
     occurrence: 1,
     key: 'Enter',
@@ -201,5 +225,21 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     key: 'Escape',
     surface: 'Edge toolbar and Title',
     behaviour: 'return focus from the Edge chrome to the Edge',
+  },
+  {
+    module: 'packages/plugin-image/src/view.tsx',
+    sourceKey: 'Escape',
+    occurrence: 1,
+    key: 'Escape',
+    surface: "Image Resource's rail Rename field",
+    behaviour: 'abandon the rename, committing nothing',
+  },
+  {
+    module: 'packages/plugin-image/src/view.tsx',
+    sourceKey: 'Enter',
+    occurrence: 1,
+    key: 'Enter',
+    surface: "Image Resource's rail Rename field",
+    behaviour: 'commit the draft Title; Shift+Enter adds a line',
   },
 ];

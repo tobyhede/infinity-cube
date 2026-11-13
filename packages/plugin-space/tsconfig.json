@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["react", "react-dom"],
+    // A Resource plugin reaches the Resource API and nothing else of ours
+    // (ADR 0142). The lint zone for `packages/plugin-*` says the same about a
+    // package specifier and a relative escape. (No `rootDir` — see `graph`.)
+    "paths": {
+      "@project/resource-api/domain": ["../resource-api/src/domain/index.ts"],
+      "@project/resource-api/view": ["../resource-api/src/view/index.tsx"]
+    }
+  },
+  "include": ["src"]
+}

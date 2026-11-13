@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { Resource } from '@project/core';
+import { isMissingKindId, type Resource } from '@project/core';
 import { Placement } from '@project/graph';
 import type { EntityActionGroup, EntityActionOutcome } from '@project/ui';
 import { activeGraphOf } from '../src/dock-chrome';
 import { mapView } from '../src/map-view';
 import { nameOnCreationOf } from '../src/name-on-creation';
+import { capSizeHint } from '../src/visible-canvas-cap';
 import { showsSpace } from '../src/open-spaces-context';
 import { RESOURCE_HEIGHT, RESOURCE_WIDTH } from '../src/resource';
 import { REFERENCE_OFFSET_RATIO, referenceAnchor } from '../src/resource-placement';
@@ -43,6 +44,30 @@ const resource = (id: typeof PLACED_A): Resource => {
   if (found === undefined) throw new Error(`No Resource ${id} in the fixture.`);
   return found;
 };
+
+describe('capSizeHint', () => {
+  it('keeps a hint the cap holds as it is', () => {
+    expect(capSizeHint({ width: 640, height: 300 }, { width: 1000, height: 800 })).toEqual({
+      width: 640,
+      height: 300,
+    });
+  });
+
+  it('grows a hint the cap narrows taller, so text reflowed at the narrower width still fits', () => {
+    // 640 by 300 holds 192000 square units of text; at 400 wide that is 480 tall.
+    expect(capSizeHint({ width: 640, height: 300 }, { width: 400, height: 800 })).toEqual({
+      width: 400,
+      height: 480,
+    });
+  });
+
+  it('never grows a hint past the cap’s height', () => {
+    expect(capSizeHint({ width: 640, height: 300 }, { width: 320, height: 500 })).toEqual({
+      width: 320,
+      height: 500,
+    });
+  });
+});
 
 describe('showsSpace', () => {
   it('answers true for an isolated mount, which has no open set', () => {
@@ -97,18 +122,17 @@ describe('referenceAnchor', () => {
   const centre = () => ({ x: -7, y: -9 });
 
   it('steps three quarters of a collapsed Resource from a Closed source', () => {
-    expect(referenceAnchor({ x: 10, y: 20, open: false }, centre)).toEqual({
+    expect(referenceAnchor({ x: 10, y: 20 }, centre)).toEqual({
       x: 10 + Math.round(RESOURCE_WIDTH * REFERENCE_OFFSET_RATIO),
       y: 20 + Math.round(RESOURCE_HEIGHT * REFERENCE_OFFSET_RATIO),
     });
   });
 
-  it('steps from a resized source’s bottom-right corner, Open or Closed', () => {
-    for (const open of [true, false]) {
-      expect(
-        referenceAnchor({ x: 0, y: 0, open, size: { width: 600, height: 400 } }, centre),
-      ).toEqual({ x: 600 - 260 + 195, y: 400 - 146 + 110 });
-    }
+  it('steps from a resized source’s bottom-right corner', () => {
+    expect(referenceAnchor({ x: 0, y: 0, size: { width: 600, height: 400 } }, centre)).toEqual({
+      x: 600 - 260 + 195,
+      y: 400 - 146 + 110,
+    });
   });
 
   it('lands at the visible centre for a source the Map does not place', () => {
@@ -223,13 +247,14 @@ describe('resourceRailGroups', () => {
     { id: 'connect-resource', label: 'Connect to Resource', onSelect: () => 'done' },
   ];
   const everything: ResourceRailCommands = {
-    createReference: (): EntityActionOutcome => 'done',
+    createFrom: [
+      { kind: 'reference', label: 'Create Reference', run: (): EntityActionOutcome => 'done' },
+    ],
     removeFromMap: bound('canvas.removeSelection', AVAILABLE),
     deleteFromSpace: () => undefined,
     enter: { run: () => undefined, available: true },
     present: bound('canvas.presentFromHere', AVAILABLE),
     fullView: bound('canvas.showFullView', AVAILABLE),
-    openAndExpand: bound('canvas.openAndExpand', AVAILABLE),
   };
   const ids = (groups: readonly EntityActionGroup[]) =>
     groups.map((group) => group.map(({ id }) => id));
@@ -240,7 +265,7 @@ describe('resourceRailGroups', () => {
     expect(ids(resourceRailGroups(ur, addresses, connect, everything))).toEqual([
       ['create-reference'],
       ['connect-resource'],
-      ['open-and-expand', 'full-view', 'present-from-here'],
+      ['full-view', 'present-from-here'],
       ['copy-link'],
       ['remove-from-map', 'delete-resource'],
     ]);
@@ -298,13 +323,12 @@ describe('resourceRailGroups', () => {
     expect(
       ids(
         resourceRailGroups(resource(PLACED_A), addresses, connect, {
-          createReference: null,
+          createFrom: null,
           removeFromMap: bound('canvas.removeSelection', ABSENT),
           deleteFromSpace: null,
           enter: null,
           present: bound('canvas.presentFromHere', ABSENT),
           fullView: bound('canvas.showFullView', ABSENT),
-          openAndExpand: bound('canvas.openAndExpand', ABSENT),
         }),
       ),
     ).toEqual([['connect-resource'], ['copy-link']]);
@@ -342,6 +366,18 @@ describe('resourceRailGroups', () => {
       id: 'create-reference',
       disabled: true,
       description: 'Reference Resources cannot be referenced.',
+    });
+  });
+  it('draws Create Reference unavailable on a Resource whose plugin is missing, naming its kind', () => {
+    const kind = 'vnd.example.chart';
+    if (!isMissingKindId(kind)) throw new Error('A plugin in this build draws the kind');
+    const unplugged: Resource = { id: OUTSIDE, title: 'A chart', kind, content: {} };
+    const row = resourceRailGroups(unplugged, addresses, connect, everything)[0]?.[0];
+    expect(row).toMatchObject({
+      id: 'create-reference',
+      disabled: true,
+      description:
+        '“vnd.example.chart” is not available in this build, so it cannot be referenced.',
     });
   });
 });

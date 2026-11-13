@@ -3,35 +3,34 @@ import {
   createEvent,
   fireEvent,
   screen,
+  waitFor,
   within,
   type RenderResult,
 } from '@testing-library/react';
+import { useSyncExternalStore, type ReactElement } from 'react';
+import { z } from 'zod';
 import { ReactFlowProvider } from '@xyflow/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { resourceOpen, spaceSnapshotSchema, uuidSchema, type ResourceId } from '@project/core';
+import { spaceSnapshotSchema, uuidSchema, type KindId, type ResourceId } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
-import {
-  bareKindData,
-  type ResourceFlowNode,
-  type ResourceNodeData,
-} from '@project/react-flow-adapter';
+import { bareKindData, type ResourceFlowNode } from '@project/react-flow-adapter';
 import { RESOURCE_DRAG_TYPE, SPACE_DRAG_TYPE } from '../src/components/ResourcesPopover';
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
 import { composeApp } from '../src/compose-app';
 import { RESOURCE_SIZE } from '../src/resource';
 import type { ResourceResize } from '../src/render-adapter';
 import { mountSettled } from './settled-mount';
-import { CLOSED_DISPLAY } from '@project/ui';
-import { fixtureDisplay, fixtureFacts } from './render-adapter-fixtures';
-import { unusedImageSources } from './image-sources';
+import { fixtureFacts } from './render-adapter-fixtures';
 import { stubResizeObserver } from './resize-observer';
 import { canvasReading, holdCanvasPolicy, IDLE_PLACEMENT } from './map-surfaces';
 import type { MapSurfacePolicy } from '../src/map-surface-policy';
+import { textAsset } from './markdown-texts';
 
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const OTHER_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const REFERENCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const UR_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+const SPACE_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
@@ -47,10 +46,10 @@ const snapshot = spaceSnapshotSchema.parse({
         title: 'Map',
         kind: 'positioned',
         positions: {
-          [RESOURCE_ID]: { x: 0, y: 0, open: false },
-          [OTHER_RESOURCE_ID]: { x: 300, y: 0, open: false },
-          [REFERENCE_ID]: { x: 600, y: 0, open: false },
-          [UR_ID]: { x: 900, y: 0, open: false },
+          [RESOURCE_ID]: { x: 0, y: 0 },
+          [OTHER_RESOURCE_ID]: { x: 300, y: 0 },
+          [REFERENCE_ID]: { x: 600, y: 0 },
+          [UR_ID]: { x: 900, y: 0 },
         },
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
       },
@@ -58,13 +57,31 @@ const snapshot = spaceSnapshotSchema.parse({
     defaultMap: MAP_ID,
   },
   resources: [
-    { id: RESOURCE_ID, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
-    { id: OTHER_RESOURCE_ID, document: { title: 'B', kind: 'markdown', content: { source: 'B' } } },
+    {
+      id: RESOURCE_ID,
+      document: { title: 'A', kind: 'markdown', content: { url: textAsset('A') } },
+    },
+    {
+      id: OTHER_RESOURCE_ID,
+      document: { title: 'B', kind: 'markdown', content: { url: textAsset('B') } },
+    },
     {
       id: REFERENCE_ID,
-      document: { title: 'A again', kind: 'reference', content: { target: RESOURCE_ID } },
+      document: { title: 'A again', kind: 'reference', content: { target: SPACE_RESOURCE_ID } },
     },
     { id: UR_ID, document: { title: 'Gateway', kind: 'ur', content: {} } },
+    {
+      id: SPACE_RESOURCE_ID,
+      document: {
+        title: 'Architecture',
+        kind: 'space',
+        content: {
+          spaceId: uuidSchema.parse('00000000-0000-4000-8000-000000000095'),
+          map: uuidSchema.parse('00000000-0000-4000-8000-000000000097'),
+          graph: uuidSchema.parse('00000000-0000-4000-8000-000000000096'),
+        },
+      },
+    },
   ],
 });
 
@@ -77,7 +94,34 @@ const resourceNode = (
   title: string,
   id: typeof RESOURCE_ID = RESOURCE_ID,
   selected = false,
-  kind: ResourceNodeData['kind'] = 'markdown',
+  kind: KindId = 'markdown',
+): ResourceFlowNode => {
+  const node = drawnNode(title, id, selected, kind);
+  // A Markdown Resource is drawn by its plugin, from its content and Map content (ADR 0142).
+  if (kind === 'markdown') {
+    node.data = {
+      ...node.data,
+      ownContent: { url: textAsset(title) },
+      mapContent: { open: false },
+    };
+  }
+  return node;
+};
+
+/**
+ * The Reference Resource, to a Space Resource: the application still draws it
+ * and keeps its Open on the Map entry until resource-plugins issue 07, where a
+ * Reference to a Resource a plugin draws keeps its Open in Map content.
+ */
+const spaceReferenceNode = (): ResourceFlowNode =>
+  drawnNode('A again', REFERENCE_ID, false, 'reference');
+
+/** A Resource node as the projection draws it, before any plugin's own data. */
+const drawnNode = (
+  title: string,
+  id: typeof RESOURCE_ID,
+  selected: boolean,
+  kind: KindId,
 ): ResourceFlowNode => ({
   id,
   type: 'resource',
@@ -93,13 +137,15 @@ const resourceNode = (
     ...bareKindData(kind),
     ...fixtureFacts(kind),
     selectedForAuthoring: false,
-    display: CLOSED_DISPLAY,
     activeGraphId: null,
     activeGraphColor: '#8a94a6',
     borderColor: null,
     receding: false,
   },
 });
+
+/** Markdown's Map content while it is Open. */
+const OPEN_MAP_CONTENT = z.object({ open: z.literal(true) });
 
 interface Harness {
   readonly view: RenderResult;
@@ -150,68 +196,82 @@ async function mountGraph(
     canPresentFrom: (resourceId: typeof RESOURCE_ID) => resourceId === RESOURCE_ID,
     run: presentFrom,
   };
+  // Full View is the composition's state, so the canvas reads it as it reads
+  // any store, and an effect that ends it renders nothing from inside itself.
   let fullViewOf: ResourceId | null = null;
-  let rerenderGraph = (): void => undefined;
+  const fullViewListeners = new Set<() => void>();
   const show = (resourceId: ResourceId | null): void => {
     fullViewOf = resourceId;
-    rerenderGraph();
+    for (const listener of [...fullViewListeners]) listener();
   };
+  const subscribeFullView = (listener: () => void): (() => void) => {
+    fullViewListeners.add(listener);
+    return () => {
+      fullViewListeners.delete(listener);
+    };
+  };
+  const readFullView = (): ResourceId | null => fullViewOf;
+  const FullViewOf = ({
+    children,
+  }: {
+    readonly children: (resourceId: ResourceId | null) => ReactElement;
+  }): ReactElement => children(useSyncExternalStore(subscribeFullView, readFullView, readFullView));
   let nodes = initialNodes;
   let titleEditing = true;
   const stored = { snapshot, revision: 0n, exportedRevision: null };
   const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(stored), stored);
-  const { surface, commandOutcomes, deleteConfirmation, imageReplacement, pickImages } = composeApp(
-    {
-      images: unusedImageSources,
-      spaceSession,
-    },
-  );
+  const { surface, commandOutcomes, deleteConfirmation } = composeApp({
+    spaceSession,
+  });
   const placement = {
     ...IDLE_PLACEMENT,
-    createResource: addResource,
+    createOnCanvas: addResource,
     dropExistingResource: addExistingResource,
     dropSpace: placeSpace,
   };
   const graph = () => (
     <ReactFlowProvider>
-      <SpaceCanvas
-        surface={surface}
-        reading={canvasReading(surface, {
-          // What the render adapter holds, and whether the Map's placement has
-          // resolved into a projection: `replacing` holds the drawn Resources
-          // while a replacement placement resolves, and `nothing` holds none.
-          projection: held === 'nothing' ? null : { nodes, edges: [] },
-          projected: held === 'placed' ? { nodes, edges: [] } : null,
-          // `titleEditing` is the chrome rename `App` reports — the fact that
-          // withdraws canvas authoring.
-          facts: { editingChromeTitle: !titleEditing },
-          changeNodes: nodesChanged,
-          selectResource: onSelectResource,
-          resourceResize,
-          setEditingResourceTitle: titleEditingChanged,
-        })}
-        placement={placement}
-        imageReplacement={imageReplacement}
-        pickImages={pickImages}
-        commandOutcomes={commandOutcomes}
-        deleteConfirmation={deleteConfirmation}
-        nameOnCreation={null}
-        spaceSession={spaceSession}
-        presentFrom={presentable}
-        fullView={{ resourceId: fullViewOf, show }}
-      />
+      <FullViewOf>
+        {(fullViewResourceId) => (
+          <SpaceCanvas
+            surface={surface}
+            reading={canvasReading(surface, {
+              // What the render adapter holds, and whether the Map's placement has
+              // resolved into a projection: `replacing` holds the drawn Resources
+              // while a replacement placement resolves, and `nothing` holds none.
+              projection: held === 'nothing' ? null : { nodes, edges: [] },
+              projected: held === 'placed' ? { nodes, edges: [] } : null,
+              // `titleEditing` is the chrome rename `App` reports — the fact that
+              // withdraws canvas authoring.
+              facts: { editingChromeTitle: !titleEditing },
+              changeNodes: nodesChanged,
+              selectResource: onSelectResource,
+              resourceResize,
+              setEditingResourceTitle: titleEditingChanged,
+            })}
+            placement={placement}
+            commandOutcomes={commandOutcomes}
+            deleteConfirmation={deleteConfirmation}
+            nameOnCreation={null}
+            spaceSession={spaceSession}
+            presentFrom={presentable}
+            fullView={{ resourceId: fullViewResourceId, show }}
+          />
+        )}
+      </FullViewOf>
     </ReactFlowProvider>
   );
   const view = await mountSettled(graph());
-  // Inside whatever event or render asked for it, which is already a test boundary.
-  rerenderGraph = () => view.rerender(graph());
   return {
     view,
     opened: () => {
       const { maps = [] } = spaceSession.getState().working.document;
       const positions = maps.find(({ id }) => id === MAP_ID)?.positions ?? {};
+      // Open is a plugin's Map content, as Markdown's is (ADR 0142).
       return Object.entries(positions)
-        .filter(([, entry]) => entry !== undefined && resourceOpen(entry))
+        .filter(
+          ([, entry]) => entry !== undefined && OPEN_MAP_CONTENT.safeParse(entry.content).success,
+        )
         .map(([resourceId]) => resourceId);
     },
     addResource,
@@ -294,7 +354,8 @@ describe('a title Edit the graph refused', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Resource B' }));
 
-    expect(opened()).toEqual([OTHER_RESOURCE_ID]);
+    // The plugin reads its text to measure, then commits its Map content.
+    await waitFor(() => expect(opened()).toEqual([OTHER_RESOURCE_ID]));
   });
 });
 
@@ -320,7 +381,7 @@ describe('opening a Resource', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Resource A' }));
 
-    expect(opened()).toEqual([RESOURCE_ID]);
+    await waitFor(() => expect(opened()).toEqual([RESOURCE_ID]));
   });
 
   it('leaves the Title control free to rename without Opening the Resource', async () => {
@@ -392,20 +453,23 @@ describe.each([
       fireEvent.click(button);
     }
 
-    expect(opened()).toEqual([RESOURCE_ID]);
+    await waitFor(() => expect(opened()).toEqual([RESOURCE_ID]));
   });
 });
 
-it.each(['Enter'])('opens a focused Reference Resource with %s', async (key) => {
-  const reference = resourceNode('A again', REFERENCE_ID);
-  reference.data.kind = 'reference';
-  const { opened } = await mountGraph([reference]);
+/**
+ * Every kind's Open is its plugin's Map content (ADR 0142), a Reference
+ * Resource's to a Space Resource included, so the canvas's Open key opens
+ * none of them through the host.
+ */
+it.each(['Enter'])('leaves %s to the plugin on a focused Reference Resource', async (key) => {
+  const { opened } = await mountGraph([spaceReferenceNode()]);
 
   const focusedReference = nodeOf(REFERENCE_ID);
   focusedReference.focus();
   fireEvent.keyDown(focusedReference, { key });
 
-  expect(opened()).toEqual([REFERENCE_ID]);
+  expect(opened()).toEqual([]);
 });
 
 it.each(['Enter', ' '])('leaves %s to a `.nokey` region inside a Resource', async (key) => {
@@ -422,28 +486,19 @@ it.each(['Enter', ' '])('leaves %s to a `.nokey` region inside a Resource', asyn
 });
 
 /**
- * Shift+Enter is Open and expand (ADR 0137): one Edit that Opens the Resource
- * at the size its content needs. jsdom lays nothing out, so the visible canvas
- * it is capped at is the Closed Size and the Edit Opens it there.
+ * The application keeps no Open for a Markdown Resource (ADR 0142): its Open
+ * is its plugin's rail command, so the canvas leaves Enter and Shift+Enter alone.
  */
-it('opens and expands a focused Resource with Shift+Enter', async () => {
+it.each([
+  ['Enter', false],
+  ['Enter', true],
+] as const)('leaves %s (shift %s) alone on a Markdown Resource', async (key, shiftKey) => {
   const { opened } = await mountGraph([resourceNode('A')]);
 
   const focused = nodeOf(RESOURCE_ID);
   focused.focus();
-  fireEvent.keyDown(focused, { key: 'Enter', shiftKey: true });
+  fireEvent.keyDown(focused, { key, shiftKey });
 
-  expect(opened()).toEqual([RESOURCE_ID]);
-});
-
-it('leaves Shift+Enter alone on a Resource it cannot open and expand', async () => {
-  const { opened } = await mountGraph([resourceNode('Gateway', UR_ID, false, 'ur')]);
-
-  const focused = nodeOf(UR_ID);
-  focused.focus();
-  const unhandled = fireEvent.keyDown(focused, { key: 'Enter', shiftKey: true });
-
-  expect(unhandled).toBe(true);
   expect(opened()).toEqual([]);
 });
 
@@ -469,28 +524,28 @@ it('draws no Resource while the render adapter holds no projection', async () =>
  * pending").
  * Those Resources stay authorable through that window.
  */
-describe.each([
-  ['Resource', resourceNode('A'), RESOURCE_ID],
-  ['Reference Resource', resourceNode('A again', REFERENCE_ID, false, 'reference'), REFERENCE_ID],
-] as const)('a %s held while a replacement placement resolves', (_kind, held, id) => {
-  it.each(['Enter'])('opens with %s', async (key) => {
-    const { opened } = await mountGraph([held], undefined, undefined, 'replacing');
-    const focused = nodeOf(id);
-    focused.focus();
+describe.each([['Reference Resource', spaceReferenceNode(), REFERENCE_ID]] as const)(
+  'a %s held while a replacement placement resolves',
+  (_kind, held, id) => {
+    it.each(['Enter'])('leaves %s to its plugin', async (key) => {
+      const { opened } = await mountGraph([held], undefined, undefined, 'replacing');
+      const focused = nodeOf(id);
+      focused.focus();
 
-    fireEvent.keyDown(focused, { key });
+      fireEvent.keyDown(focused, { key });
 
-    expect(opened()).toEqual([id]);
-  });
+      expect(opened()).toEqual([]);
+    });
 
-  it('announces the authoring keyboard commands', async () => {
-    await mountGraph([held], undefined, undefined, 'replacing');
+    it('announces the authoring keyboard commands', async () => {
+      await mountGraph([held], undefined, undefined, 'replacing');
 
-    expect(nodeOf(id)).toHaveAccessibleDescription(
-      'Press enter to open a Resource, shift enter to open and expand it, space to read it in Full View, backspace or delete to remove it from this Map, and escape to cancel a move or unselect it. From a selected Resource, press the arrow keys to go along the Active Graph, or shift and the arrow keys to move it.',
-    );
-  });
-});
+      expect(nodeOf(id)).toHaveAccessibleDescription(
+        'Press space to read a Resource in Full View, backspace or delete to remove it from this Map, and escape to cancel a move or unselect it. From a selected Resource, press the arrow keys to go along the Active Graph, or shift and the arrow keys to move it.',
+      );
+    });
+  },
+);
 
 describe('the Resource affordance', () => {
   it('opens the Resource rather than renaming its title on the graph', async () => {
@@ -498,7 +553,7 @@ describe('the Resource affordance', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Resource A' }));
 
-    expect(opened()).toEqual([RESOURCE_ID]);
+    await waitFor(() => expect(opened()).toEqual([RESOURCE_ID]));
     expect(screen.queryByRole('textbox', { name: 'Resource title' })).not.toBeInTheDocument();
   });
 });
@@ -506,11 +561,13 @@ describe('the Resource affordance', () => {
 describe('withdrawing canvas authoring from an Open Resource', () => {
   it('withdraws body editing and resize through the same complete gate', async () => {
     const opened = resourceNode('A', RESOURCE_ID, true);
-    opened.data.open = true;
-    opened.data.display = fixtureDisplay(true, 'markdown', '# A');
+    opened.data.mapContent = { open: true };
     const { view, setTitleEditing } = await mountGraph([opened]);
 
-    expect(screen.getByRole('button', { name: 'Edit Markdown source of A' })).toBeVisible();
+    // Drawn transparent over the body, so present rather than visible.
+    expect(
+      await screen.findByRole('button', { name: 'Edit Markdown source of A' }),
+    ).toBeInTheDocument();
     expect(view.container.querySelector('.react-flow__resize-control')).toBeInTheDocument();
 
     setTitleEditing(false);
@@ -523,10 +580,9 @@ describe('withdrawing canvas authoring from an Open Resource', () => {
     'does not Open a Resource with %s while its body is being edited',
     async (key) => {
       const drawn = resourceNode('A', RESOURCE_ID, true);
-      drawn.data.open = true;
-      drawn.data.display = fixtureDisplay(true, 'markdown', '# A');
+      drawn.data.mapContent = { open: true };
       const { opened } = await mountGraph([drawn]);
-      fireEvent.click(screen.getByRole('button', { name: 'Edit Markdown source of A' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit Markdown source of A' }));
 
       const editor = await screen.findByRole('textbox', { name: 'Markdown source of A' });
       editor.focus();
@@ -633,11 +689,9 @@ function dragResizeControlTo(clientX: number, clientY: number): void {
  */
 describe('resize belongs to Resource rather than to a Resource kind', () => {
   it('offers a resize operation to a selected Resource whatever its kind', async () => {
-    const reference = resourceNode('Reference Resource', RESOURCE_ID, false);
-    reference.data.kind = 'reference';
-    reference.data.open = true;
+    const reference = spaceReferenceNode();
+    reference.data.mapContent = { open: true };
     reference.data.selectedForAuthoring = true;
-    reference.data.display = fixtureDisplay(true, 'reference');
     const { view } = await mountGraph([reference]);
 
     expect(view.container.querySelector('.react-flow__resize-control')).toBeInTheDocument();
@@ -663,9 +717,8 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
    */
   it('routes one resize lifecycle from the control to the canvas capability', async () => {
     const opened = resourceNode('A', RESOURCE_ID, false);
-    opened.data.open = true;
+    opened.data.mapContent = { open: true };
     opened.data.selectedForAuthoring = true;
-    opened.data.display = fixtureDisplay(true, 'markdown', '# A');
     const onSelectResource = vi.fn();
     const resourceResize: ResourceResize = {
       beginResize: vi.fn(),
@@ -700,9 +753,8 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
    */
   it('proposes no node change to React Flow while it resizes', async () => {
     const opened = resourceNode('A', RESOURCE_ID, false);
-    opened.data.open = true;
+    opened.data.mapContent = { open: true };
     opened.data.selectedForAuthoring = true;
-    opened.data.display = fixtureDisplay(true, 'markdown');
     const resourceResize: ResourceResize = {
       beginResize: vi.fn(),
       previewResize: vi.fn(),
@@ -723,9 +775,8 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
 
   it('routes loss of an active resize to cancellation', async () => {
     const opened = resourceNode('A', RESOURCE_ID, false);
-    opened.data.open = true;
+    opened.data.mapContent = { open: true };
     opened.data.selectedForAuthoring = true;
-    opened.data.display = fixtureDisplay(true, 'markdown');
     const resourceResize: ResourceResize = {
       beginResize: vi.fn(),
       previewResize: vi.fn(),
@@ -759,9 +810,8 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
    */
   it('keeps a touch gesture alive across the projection its own frames publish', async () => {
     const opened = resourceNode('A', RESOURCE_ID, false);
-    opened.data.open = true;
+    opened.data.mapContent = { open: true };
     opened.data.selectedForAuthoring = true;
-    opened.data.display = fixtureDisplay(true, 'markdown');
     const resourceResize: ResourceResize = {
       beginResize: vi.fn(),
       previewResize: vi.fn(),
@@ -774,9 +824,8 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
     expect(resourceResize.beginResize).toHaveBeenCalledWith(RESOURCE_ID);
 
     const republished = resourceNode('A', RESOURCE_ID, false);
-    republished.data.open = true;
+    republished.data.mapContent = { open: true };
     republished.data.selectedForAuthoring = true;
-    republished.data.display = fixtureDisplay(true, 'markdown');
     setNodes([republished]);
 
     touchResizeControl('touchmove', 80, 60);
@@ -932,8 +981,7 @@ describe('the C shortcut', () => {
 
 /**
  * Space reads the focused Resource in Full View: drawn over the canvas,
- * read-only, and left with Space or Escape back to the Resource, or with Enter
- * into the Resource Opened on the canvas.
+ * read-only, and left with Space or Escape back to the Resource.
  */
 describe('Full View', () => {
   const enterFullView = async () => {
@@ -965,7 +1013,8 @@ describe('Full View', () => {
     expect(opened()).toEqual([]);
   });
 
-  it('leaves on Enter and Opens the Resource on the canvas', async () => {
+  // The host keeps no Open (ADR 0142), so Enter neither leaves nor Opens.
+  it('stays on Enter, Opening nothing', async () => {
     const { opened, fullViewOf } = await enterFullView();
 
     // Flushes the updates the press schedules, which land after it returns.
@@ -974,8 +1023,8 @@ describe('Full View', () => {
       return Promise.resolve();
     });
 
-    expect(fullViewOf()).toBeNull();
-    expect(opened()).toEqual([RESOURCE_ID]);
+    expect(fullViewOf()).toBe(RESOURCE_ID);
+    expect(opened()).toEqual([]);
   });
 
   it('keeps a canvas command from running on the Map it covers', async () => {
@@ -1003,6 +1052,7 @@ describe('Full View', () => {
   it('ends when the canvas surface is held', async () => {
     const { fullViewOf, holdPolicy } = await enterFullView();
 
+    // The plugin's surface settles its withdrawn commits after the hold lands.
     holdPolicy('inert');
 
     expect(fullViewOf()).toBeNull();

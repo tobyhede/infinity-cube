@@ -3,7 +3,8 @@ import { kindFlags, uuidSchema, type SpaceSnapshot, type Resource } from '@proje
 import { MemorySpaceBackend } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
 import { openTestSpace } from './opened-space';
-import { unusedImageSources } from './image-sources';
+import { textAsset } from './markdown-texts';
+import { showingSpace } from './showing-space';
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const RESOURCE_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
@@ -28,8 +29,8 @@ const snapshot: SpaceSnapshot = {
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [RESOURCE_A]: { x: 10, y: 20, open: false },
-          [RESOURCE_B]: { x: 300, y: 40, open: false },
+          [RESOURCE_A]: { x: 10, y: 20 },
+          [RESOURCE_B]: { x: 300, y: 40 },
         },
         graphs: [{ id: GRAPH_ID, title: 'Main', edges: [EDGE] }],
       },
@@ -37,8 +38,14 @@ const snapshot: SpaceSnapshot = {
     defaultMap: MAP_ID,
   },
   resources: [
-    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
-    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', content: { source: 'B' } } },
+    {
+      id: RESOURCE_A,
+      document: { title: 'A', kind: 'markdown', content: { url: textAsset('A') } },
+    },
+    {
+      id: RESOURCE_B,
+      document: { title: 'B', kind: 'markdown', content: { url: textAsset('B') } },
+    },
   ],
 };
 
@@ -55,7 +62,6 @@ function open(stored: SpaceSnapshot = snapshot) {
   const { spaceSession: session, spaceResources } = openTestSpace(backend, loaded);
   const reported: unknown[] = [];
   const composed = composeApp({
-    images: unusedImageSources,
     spaceSession: session,
     selection: MAP_ID,
     spaceResources,
@@ -160,12 +166,14 @@ describe('deleting', () => {
   it('deletes a Resource whose kind owns its Spaces through the Space Resource lifecycle', async () => {
     const opened = open();
     const { resourceDeletion, spaceResources, session } = opened;
-    const created = await spaceResources.create({
-      containingSpaceId: SPACE_ID,
-      mapId: MAP_ID,
-      title: 'Linked',
-      position: { x: 600, y: 0 },
-    });
+    const created = await spaceResources.create(
+      showingSpace({
+        containingSpaceId: SPACE_ID,
+        mapId: MAP_ID,
+        title: 'Linked',
+        position: { x: 600, y: 0 },
+      }),
+    );
     if (created.kind !== 'completed') throw new Error('the Space Resource was not created');
     expect(kindFlags(lookupResource(opened, created.resourceId).kind).ownsReferencedSpaces).toBe(
       true,

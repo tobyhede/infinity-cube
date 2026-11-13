@@ -1,7 +1,13 @@
+import { createHash } from 'node:crypto';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
-import { AGGREGATE_FILE_VERSION, type ResourceFileDocument, type UUID } from '@project/core';
-import { AGGREGATE_FILE_NAME } from '@project/aggregate';
+import {
+  AGGREGATE_FILE_VERSION,
+  type AssetRef,
+  type ResourceFileDocument,
+  type UUID,
+} from '@project/core';
+import { AGGREGATE_FILE_NAME, ASSETS_DIRECTORY_NAME } from '@project/aggregate';
 
 /** One Space directory inside a canonical aggregate, written from raw bytes. */
 export interface SpaceDirectory {
@@ -23,20 +29,29 @@ export const resourceFiles = (document: ResourceFileDocument) => ({
   [`${document.id}.json`]: `${JSON.stringify(document, null, 2)}\n`,
 });
 
-/** A Markdown Resource's files under `resources/`: its Resource file and its `<id>.md` sidecar. */
-export const markdownResourceFiles = (id: UUID, title: string, source: string) => ({
-  ...resourceFiles({
-    id,
-    title,
-    kind: 'markdown',
-    content: { path: `${id}.md`, mediaType: 'text/markdown' },
-  }),
-  [`${id}.md`]: source,
-});
+/** The hash a text is stored by: the SHA-256 of its UTF-8 bytes, unpadded base64url. */
+const textHash = (text: string): string => createHash('sha256').update(text).digest('base64url');
+
+/** The asset URL a Markdown Resource names `text` by (ADR 0142). */
+export const textAssetRef = (text: string): AssetRef => `/assets/${textHash(text)}`;
+
+/** Files of the aggregate's `assets/`, by name: each text under its hash with `.md`. */
+export const textAssetFiles = (...texts: readonly string[]): Readonly<Record<string, string>> =>
+  Object.fromEntries(texts.map((text) => [`${textHash(text)}.md`, text]));
+
+/**
+ * A Markdown Resource's file under `resources/`, naming `text` by its asset URL.
+ * The text itself is the aggregate's, under `assets/`: pass {@link textAssetFiles}
+ * to {@link writeAggregateInto} when a test reads it.
+ */
+export const markdownResourceFiles = (id: UUID, title: string, text: string) =>
+  resourceFiles({ id, title, kind: 'markdown', content: { url: textAssetRef(text) } });
 
 /**
  * Write a canonical aggregate directory into `root`: a versioned aggregate file
  * naming the Meta Space, and one `<space-uuid>/` child per Space.
+ *
+ * `assets` are the files of its `assets/`, by name, written only when given.
  *
  * Public import takes nothing else, so every import test starts from this shape
  * rather than a bare Space directory — which is why it lives here rather than in
@@ -49,6 +64,7 @@ export const writeAggregateInto = async (
   root: string,
   metaSpaceId: UUID,
   spaces: readonly SpaceDirectory[],
+  assets: Readonly<Record<string, string>> = {},
 ): Promise<string> => {
   await writeFile(
     join(root, AGGREGATE_FILE_NAME),
@@ -60,6 +76,12 @@ export const writeAggregateInto = async (
     await writeFile(join(directory, 'space.json'), space.spaceFile);
     for (const [name, text] of Object.entries(space.resources ?? {})) {
       await writeFile(join(directory, 'resources', name), text);
+    }
+  }
+  if (Object.keys(assets).length > 0) {
+    await mkdir(join(root, ASSETS_DIRECTORY_NAME), { recursive: true });
+    for (const [name, text] of Object.entries(assets)) {
+      await writeFile(join(root, ASSETS_DIRECTORY_NAME, name), text);
     }
   }
   return root;

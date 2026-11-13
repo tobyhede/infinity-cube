@@ -25,20 +25,18 @@ import {
   type KindCanvasDecoration,
   type KindDecorator,
 } from '../src/canvas-resource-decoration';
-import { decorateImageResourceNode } from '../src/kinds/image';
+import { imageDecoration } from '../src/kinds/image';
 import { decorateMarkdownResourceNode } from '../src/kinds/markdown';
 import { decorateSpaceResourceNode } from '../src/kinds/space';
-import {
-  decorateUrResourceNode,
-  urDecoration,
-  type UrResourceDecorationContext,
-} from '../src/kinds/ur';
+import type { PluginResourceDecorationContext } from '../src/kinds/plugin-decoration';
+import { urDecoration } from '../src/kinds/ur';
 import type { KindDecorationContext } from '../src/kinds/registry';
+import type { PluginHost } from '../src/plugin-host/plugin-commits';
+import { createPluginGate } from '../src/plugin-host/plugin-gate';
+import { NO_CLAIMS } from '../src/plugin-host/claim-chain';
+import type { AuthoringResult } from '../src/space-authoring';
 import { RESOURCE_SIZE } from '../src/resource';
-import { NO_SPACE_RESOURCE_TARGETS } from '../src/space-resource-targets';
-import type { SpaceResourceTarget } from '../src/space-resource-lifecycle';
-import type { Continuation } from '../src/continuation';
-import { fixtureDisplay, fixtureFacts } from './render-adapter-fixtures';
+import { fixtureFacts } from './render-adapter-fixtures';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -49,18 +47,6 @@ const TARGET_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 const TARGET_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
 const MISSING_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const UR_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000b');
-
-const target: SpaceResourceTarget = {
-  id: TARGET_SPACE_ID,
-  title: 'Architecture',
-  maps: [
-    {
-      id: TARGET_MAP_ID,
-      title: 'Collection 1',
-      graphs: [{ id: TARGET_GRAPH_ID, title: 'Overview', color: '#1f77b4', headShape: 'arrow' }],
-    },
-  ],
-};
 
 const projectionNode = (
   resourceId: ResourceId,
@@ -79,10 +65,8 @@ const projectionNode = (
     title: 'A',
     readOnly,
     ...bareKindData(kind),
-    ...fixtureFacts(kind),
-    open,
+    ...fixtureFacts(kind, open),
     selectedForAuthoring: false,
-    display: fixtureDisplay(open, kind),
     activeGraphId: null,
     activeGraphColor: '#8a94a6',
     borderColor: null,
@@ -105,29 +89,25 @@ const spaceDocument = {
   content: { spaceId: TARGET_SPACE_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
 };
 
-/**
- * Never spent: these contexts hold `spaces: null`, so no Space Resource rail is
- * built and nothing reads the continuation.
- */
-const continuation: Continuation = {
-  getState: () => ({ pending: null }),
-  subscribe: () => () => undefined,
-  request: () => undefined,
-  take: () => undefined,
-  dispose: () => undefined,
-};
+/** A plugin host that lands Edits through `complete`, with no document and no assets. */
+const testPluginHost = (complete: PluginHost['complete']): PluginHost => ({
+  gate: createPluginGate(),
+  claims: NO_CLAIMS,
+  replacementEpoch: () => 0,
+  complete,
+  report: () => undefined,
+  document: () => undefined,
+  assets: {},
+});
 
 /** Every field a decoration reads: the shared ones and each kind's own. */
 type DecorationContext = CanvasResourceDecorationContext & KindDecorationContext;
 
 const context = (overrides: Partial<DecorationContext> = {}): DecorationContext => ({
   authorOnCanvas: true,
+  embeddedMapEdit: true,
   bodyEditing: false,
-  pickImageFiles: () => Promise.resolve([]),
-  replaceResourceImage: () => Promise.resolve(null),
   editableResourceIds: new Set([RESOURCE_ID, REFERENCE_ID, SPACE_RESOURCE_ID, UR_ID]),
-  openResource: () => 'completed',
-  closeResource: () => 'completed',
   beginTitleEditing: () => undefined,
   onSelectResource: () => undefined,
   resourceResize: {
@@ -139,37 +119,15 @@ const context = (overrides: Partial<DecorationContext> = {}): DecorationContext 
   editingTitleResourceId: null,
   completeResourceTitle: () => null,
   clearCaret: () => undefined,
-  beginBodyEditing: () => undefined,
-  bodyEditorResourceId: null,
-  completeResourceBody: () => 'completed',
-  continuation,
-  containingSpaceId: SPACE_ID,
-  spaceSelections: new Map([
-    [
-      SPACE_RESOURCE_ID,
-      { spaceId: TARGET_SPACE_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID, framing: undefined },
-    ],
-  ]),
-  spaceResourceTargets: new Map([[TARGET_SPACE_ID, target]]),
-  spaces: null,
-  commandOutcomes: undefined,
-  deleteConfirmation: undefined,
-  completeSpaceResourceSelection: () => null,
-  portalEditing: undefined,
-  onPortalEditingChange: undefined,
-  contextNotices: new Map(),
-  onContextEditingChange: () => undefined,
-  onContextReport: () => undefined,
   ...overrides,
 });
 
 describe('decorateSharedResourceNode', () => {
-  it('offers Open, title editing and entity actions on a Resource of the working Space', () => {
+  it('offers title editing and entity actions on a Resource of the working Space', () => {
     const patch = decorateSharedResourceNode(
-      projectionNode(RESOURCE_ID, 'markdown'),
+      projectionNode(RESOURCE_ID, 'space'),
       context({ resourceEntityActions: () => [] }),
     );
-    expect(patch.onOpenChange).toBeTypeOf('function');
     expect(patch.onBeginTitleEditing).toBeTypeOf('function');
     expect(patch.entityActions).toEqual([]);
   });
@@ -203,43 +161,10 @@ describe('decorateSharedResourceNode', () => {
 
   it('withholds competing title controls while a body caret is live', () => {
     const patch = decorateSharedResourceNode(
-      projectionNode(RESOURCE_ID, 'markdown', true),
+      projectionNode(RESOURCE_ID, 'space', true),
       context({ bodyEditing: true }),
     );
     expect(patch.onBeginTitleEditing).toBeUndefined();
-    expect(patch.onOpenChange).toBeTypeOf('function');
-  });
-
-  it('keeps the live content editor’s Close drawn, and inert, while authoring is withdrawn', () => {
-    const openResource = vi.fn(() => 'completed' as const);
-    const closeResource = vi.fn(() => 'completed' as const);
-    const withdrawn = context({
-      authorOnCanvas: false,
-      bodyEditing: true,
-      bodyEditorResourceId: RESOURCE_ID,
-      openResource,
-      closeResource,
-      resourceEntityActions: () => [[]],
-    });
-
-    const patch = decorateSharedResourceNode(
-      projectionNode(RESOURCE_ID, 'markdown', true),
-      withdrawn,
-    );
-    expect(patch.onOpenChange).toBeTypeOf('function');
-    expect(patch.onOpenChange?.(false)).toBe('retained');
-    expect(patch.onOpenChange?.(true)).toBe('retained');
-    expect(closeResource).not.toHaveBeenCalled();
-    expect(openResource).not.toHaveBeenCalled();
-    expect(patch.onBeginTitleEditing).toBeUndefined();
-    expect(patch.resize).toBeUndefined();
-    expect(patch.titleEditor).toBeUndefined();
-    expect(patch.entityActions).toEqual([]);
-
-    expect(
-      decorateSharedResourceNode(projectionNode(REFERENCE_ID, 'markdown', true), withdrawn)
-        .onOpenChange,
-    ).toBeUndefined();
   });
 
   it('withholds every authoring control from a projected Resource absent from the working Space', () => {
@@ -247,7 +172,6 @@ describe('decorateSharedResourceNode', () => {
       projectionNode(MISSING_RESOURCE_ID, 'markdown', true),
       context(),
     );
-    expect(patch.onOpenChange).toBeUndefined();
     expect(patch.onBeginTitleEditing).toBeUndefined();
     expect(patch.resize).toBeUndefined();
     expect(patch.titleEditor).toBeUndefined();
@@ -272,7 +196,7 @@ describe('decorateSharedResourceNode', () => {
     } satisfies SpaceSnapshot);
     if (!loaded.ok) throw new Error('Expected a valid reference fixture');
     const node = projectResourceNodes(loaded.space, {
-      openResourceIds: new Set([REFERENCE_ID]),
+      mapContent: (id) => (id === REFERENCE_ID ? { open: true } : undefined),
     }).find((candidate) => candidate.id === REFERENCE_ID);
     if (node === undefined) throw new Error('Expected the Reference projection');
     const previewResize = vi.fn();
@@ -316,7 +240,7 @@ describe('decorateSharedResourceNode', () => {
 
   it('attaches the title editor only to the Resource holding the caret', () => {
     const patch = decorateSharedResourceNode(
-      projectionNode(RESOURCE_ID, 'reference'),
+      projectionNode(RESOURCE_ID, 'space'),
       context({ editingTitleResourceId: RESOURCE_ID }),
     );
     expect(patch.titleEditor).toBeDefined();
@@ -334,190 +258,191 @@ describe('decorateSharedResourceNode', () => {
  * operation and no content edit from any decorator.
  */
 describe('an Ur Resource’s decoration', () => {
-  it('offers title editing and entity actions, and no Open, Close or body editing', () => {
+  it('offers title editing and entity actions', () => {
     const patch = decorateSharedResourceNode(
       projectionNode(UR_ID, 'ur'),
       context({ resourceEntityActions: () => [] }),
     );
-    expect(patch.onOpenChange).toBeUndefined();
     expect(patch.onBeginTitleEditing).toBeTypeOf('function');
     expect(patch.entityActions).toEqual([]);
   });
 
-  /** An Ur Resource takes a Shape (ADR 0121), whatever its projected state. */
-  it('offers the Shape choice where the Map may be authored', () => {
-    const changeResourceShape = vi.fn();
-    const ur = (open = false) => ofKind(projectionNode(UR_ID, 'ur', open), 'ur');
-    for (const open of [false, true]) {
-      decorateUrResourceNode(
-        ur(open),
-        context({ changeResourceShape }),
-      ).kindOperations.onResourceShapeChange?.('ellipse');
-    }
-    expect(changeResourceShape.mock.calls).toEqual([
-      [UR_ID, 'ellipse'],
-      [UR_ID, 'ellipse'],
-    ]);
+  /** An Ur Resource's plugin surface commits its Map content where the Map may be authored (ADR 0142). */
+  it('offers the plugin its Map content commit where the Map may be authored', async () => {
+    const complete = vi.fn((): AuthoringResult => ({ kind: 'completed' }));
+    const pluginHost = testPluginHost(complete);
+    const ur = () => ofKind(projectionNode(UR_ID, 'ur'), 'ur');
+    const commit = urDecoration.decorate(ur(), context({ pluginHost })).kindOperations.commitMap;
+    await expect(commit?.({ shape: 'ellipse' })).resolves.toBe('completed');
+    expect(complete).toHaveBeenCalledWith(
+      { kind: 'changed-map-content', resourceId: UR_ID, content: { shape: 'ellipse' } },
+      expect.any(Function),
+    );
 
     expect(
-      decorateUrResourceNode(ur(), context({ changeResourceShape, authorOnCanvas: false }))
-        .kindOperations.onResourceShapeChange,
+      urDecoration.decorate(ur(), context({ pluginHost, authorOnCanvas: false })).kindOperations
+        .commitMap,
     ).toBeUndefined();
     expect(
-      decorateUrResourceNode(ur(), context({ changeResourceShape, editableResourceIds: new Set() }))
-        .kindOperations.onResourceShapeChange,
+      urDecoration.decorate(ur(), context({ pluginHost, editableResourceIds: new Set() }))
+        .kindOperations.commitMap,
     ).toBeUndefined();
-    expect(
-      decorateUrResourceNode(ur(), context()).kindOperations.onResourceShapeChange,
-    ).toBeUndefined();
+    expect(urDecoration.decorate(ur(), context()).kindOperations.commitMap).toBeUndefined();
   });
 });
 
 describe('decorateMarkdownResourceNode', () => {
-  it('offers body editing where the canvas is authored', () => {
-    const beginBodyEditing = vi.fn();
-    const markdown = ofKind(projectionNode(RESOURCE_ID, 'markdown', true), 'markdown');
-    const { kindOperations } = decorateMarkdownResourceNode(
-      markdown,
-      context({ beginBodyEditing }),
-    );
-    expect(kindOperations.onBeginEdit).toBeTypeOf('function');
-    kindOperations.onBeginEdit?.();
-    expect(beginBodyEditing).toHaveBeenCalledWith(markdown);
-    expect(
-      decorateMarkdownResourceNode(markdown, context({ authorOnCanvas: false })).kindOperations
-        .onBeginEdit,
-    ).toBeUndefined();
+  const EMPTY_TEXT = '/assets/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU';
+  const NEXT_TEXT = '/assets/BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBA';
+  const markdown = () => ofKind(projectionNode(RESOURCE_ID, 'markdown', true), 'markdown');
+  const hostWith = (complete: PluginHost['complete']): PluginHost => ({
+    gate: createPluginGate(),
+    claims: NO_CLAIMS,
+    replacementEpoch: () => 0,
+    complete,
+    report: () => undefined,
+    document: (resourceId) =>
+      resourceId === RESOURCE_ID
+        ? { title: 'Notes', kind: 'markdown', content: { url: EMPTY_TEXT } }
+        : undefined,
   });
 
-  it('enters the editing display, focused, on an Open Resource whose caret is live', () => {
-    const markdown = ofKind(projectionNode(RESOURCE_ID, 'markdown', true), 'markdown');
-    const patch = decorateMarkdownResourceNode(
-      markdown,
-      context({ bodyEditorResourceId: RESOURCE_ID }),
-    );
-    expect(patch.display).toMatchObject({
-      shown: 'editing',
-      kind: 'markdown',
-      content: { kind: 'markdown', via: 'self' },
-      edit: { autoFocus: true },
-    });
-    expect(decorateMarkdownResourceNode(markdown, context()).display).toBeUndefined();
+  /**
+   * The canvas holds no editing state for a Markdown Resource (ADR 0142): its
+   * decoration is the plugin's commits and Claim, and never a display.
+   */
+  it('offers the plugin its commits and a Claim where the canvas is authored, and no display', () => {
+    const pluginHost = hostWith(vi.fn((): AuthoringResult => ({ kind: 'completed' })));
+    const patch = decorateMarkdownResourceNode(markdown(), context({ pluginHost }));
+    expect(patch).not.toHaveProperty('display');
+    expect(patch.kindOperations.commitContent).toBeTypeOf('function');
+    expect(patch.kindOperations.commitTitle).toBeTypeOf('function');
+    expect(patch.kindOperations.commitMap).toBeTypeOf('function');
+    expect(patch.kindOperations.claim).toBeTypeOf('function');
+    for (const withheld of [
+      context({ pluginHost, authorOnCanvas: false }),
+      context({ pluginHost, editableResourceIds: new Set() }),
+      context(),
+    ]) {
+      const withheldOperations = decorateMarkdownResourceNode(markdown(), withheld).kindOperations;
+      expect(withheldOperations.commitContent).toBeUndefined();
+      expect(withheldOperations.commitTitle).toBeUndefined();
+      expect(withheldOperations.commitMap).toBeUndefined();
+      expect(withheldOperations.claim).toBeUndefined();
+    }
   });
 
-  it('leaves a Closed Resource’s display alone although its caret is live', () => {
-    expect(
-      decorateMarkdownResourceNode(
-        ofKind(projectionNode(RESOURCE_ID, 'markdown'), 'markdown'),
-        context({ bodyEditorResourceId: RESOURCE_ID }),
-      ).display,
-    ).toBeUndefined();
+  it('commits content as one changed-content Edit carrying its URL', async () => {
+    const complete = vi.fn((): AuthoringResult => ({ kind: 'completed' }));
+    const { commitContent } = decorateMarkdownResourceNode(
+      markdown(),
+      context({ pluginHost: hostWith(complete) }),
+    ).kindOperations;
+    await expect(commitContent?.({ url: NEXT_TEXT })).resolves.toBe('completed');
+    expect(complete).toHaveBeenCalledOnce();
+    expect(complete).toHaveBeenCalledWith(
+      { kind: 'changed-content', resourceId: RESOURCE_ID, content: { url: NEXT_TEXT } },
+      expect.any(Function),
+    );
+  });
+
+  it('commits a Title as an Edit of the stored document', async () => {
+    const complete = vi.fn((): AuthoringResult => ({ kind: 'completed' }));
+    const { commitTitle } = decorateMarkdownResourceNode(
+      markdown(),
+      context({ pluginHost: hostWith(complete) }),
+    ).kindOperations;
+    await expect(commitTitle?.('Renamed')).resolves.toBe('completed');
+    expect(complete).toHaveBeenCalledWith(
+      {
+        kind: 'edited-resource',
+        resourceId: RESOURCE_ID,
+        document: { title: 'Renamed', kind: 'markdown', content: { url: EMPTY_TEXT } },
+      },
+      expect.any(Function),
+    );
+    expect(complete).toHaveBeenCalledOnce();
   });
 });
 
-describe('decorateImageResourceNode', () => {
-  const IMAGE_URL = 'https://example.com/figure.png';
-  const imageNode = (open: boolean): ResourceFlowNodeOf<'image'> => {
-    const node = projectionNode(RESOURCE_ID, 'markdown', open);
+describe('the Image kind’s decoration', () => {
+  const imageNode = (): ResourceFlowNodeOf<'image'> => {
+    const node = projectionNode(RESOURCE_ID, 'markdown', false);
     return ofKind(
       {
         ...node,
-        data: {
-          ...node.data,
-          ...bareKindData('image'),
-          ...fixtureFacts('image'),
-          display: open
-            ? {
-                shown: 'open',
-                content: { kind: 'image', url: IMAGE_URL, via: 'self' },
-              }
-            : node.data.display,
-        },
+        data: { ...node.data, ...bareKindData('image'), ...fixtureFacts('image') },
       },
       'image',
     );
   };
-  const pickImageFiles = (): Promise<readonly File[]> => Promise.resolve([]);
-  const replacing = context({
-    bodyEditorResourceId: RESOURCE_ID,
-    replaceResourceImage: () => Promise.resolve(null),
-    pickImageFiles,
+
+  it('offers the plugin its commits and a Claim where the canvas authors the Resource', async () => {
+    const complete = vi.fn((): AuthoringResult => ({ kind: 'completed' }));
+    const operations = imageDecoration.decorate(
+      imageNode(),
+      context({ pluginHost: testPluginHost(complete) }),
+    ).kindOperations;
+    expect(operations.claim).toBeTypeOf('function');
+    await expect(operations.commitContent?.({ url: 'https://example.com/b.png' })).resolves.toBe(
+      'completed',
+    );
+    expect(complete).toHaveBeenCalledWith(
+      {
+        kind: 'changed-content',
+        resourceId: RESOURCE_ID,
+        content: { url: 'https://example.com/b.png' },
+      },
+      expect.any(Function),
+    );
   });
 
-  it('enters the replacement on an Open Image Resource whose caret is live', () => {
-    expect(decorateImageResourceNode(imageNode(true), replacing).display).toMatchObject({
-      shown: 'editing',
+  it('offers nothing where the Resource is not editable or there is no host', () => {
+    const pluginHost = testPluginHost(vi.fn());
+    expect(
+      imageDecoration.decorate(imageNode(), context({ pluginHost, editableResourceIds: new Set() }))
+        .kindOperations,
+    ).toEqual(expect.objectContaining({ kind: 'image' }));
+    expect(
+      imageDecoration.decorate(imageNode(), context({ pluginHost, editableResourceIds: new Set() }))
+        .kindOperations,
+    ).not.toHaveProperty('commitContent');
+    expect(imageDecoration.decorate(imageNode(), context()).kindOperations).toEqual({
       kind: 'image',
-      content: { kind: 'image', url: IMAGE_URL, via: 'self' },
-      edit: { pick: pickImageFiles },
     });
-  });
-
-  it('leaves a Closed Image Resource’s display alone although its caret is live', () => {
-    expect(decorateImageResourceNode(imageNode(false), replacing).display).toBeUndefined();
   });
 });
 
 describe('decorateSpaceResourceNode', () => {
-  it('omits the rail while closed, unread, or read-only', () => {
+  const openSpaceNode = (readOnly = false) =>
+    ofKind(projectionNode(SPACE_RESOURCE_ID, 'space', true, readOnly), 'space');
+
+  it("offers the plugin's commits and Claim where the canvas authors it", () => {
+    const pluginHost = testPluginHost(vi.fn());
+    const operations = decorateSpaceResourceNode(
+      openSpaceNode(),
+      context({ pluginHost }),
+    ).kindOperations;
+    expect(operations.kind).toBe('space');
+    expect(operations.commitContent).toBeTypeOf('function');
+    expect(operations.commitMap).toBeTypeOf('function');
+    expect(operations.claim).toBeTypeOf('function');
     expect(
       decorateSpaceResourceNode(
-        ofKind(projectionNode(SPACE_RESOURCE_ID, 'space'), 'space'),
-        context(),
-      ).kindOperations.spaceRail,
-    ).toBeUndefined();
-    expect(
-      decorateSpaceResourceNode(
-        ofKind(projectionNode(SPACE_RESOURCE_ID, 'space', true), 'space'),
-        context({ spaceResourceTargets: NO_SPACE_RESOURCE_TARGETS }),
-      ).kindOperations.spaceRail,
-    ).toBeUndefined();
-    expect(
-      decorateSpaceResourceNode(
-        ofKind(projectionNode(SPACE_RESOURCE_ID, 'space', true, true), 'space'),
-        context(),
-      ).kindOperations.spaceRail,
-    ).toBeUndefined();
+        openSpaceNode(),
+        context({ pluginHost, editableResourceIds: new Set() }),
+      ).kindOperations,
+    ).not.toHaveProperty('commitContent');
   });
 
-  it('builds the rail for an Open Space Resource whose target is read, and still when authoring is withdrawn', () => {
-    expect(
-      decorateSpaceResourceNode(
-        ofKind(projectionNode(SPACE_RESOURCE_ID, 'space', true), 'space'),
-        context(),
-      ).kindOperations.spaceRail,
-    ).toBeDefined();
-    expect(
-      decorateSpaceResourceNode(
-        ofKind(projectionNode(SPACE_RESOURCE_ID, 'space', true), 'space'),
-        context({ authorOnCanvas: false }),
-      ).kindOperations.spaceRail,
-    ).toBeDefined();
-  });
-
-  it('withholds context notice when the rail is absent', () => {
-    const patch = decorateSpaceResourceNode(
-      ofKind(projectionNode(SPACE_RESOURCE_ID, 'space'), 'space'),
-      context({ contextNotices: new Map([[SPACE_RESOURCE_ID, 'Link copied.']]) }),
-    );
-    expect(patch.contextNotice).toBeUndefined();
-  });
-
-  it('carries a context notice and portal Edit once the rail is present', () => {
-    const onPortalEditingChange = vi.fn();
-    const patch = decorateSpaceResourceNode(
-      ofKind(projectionNode(SPACE_RESOURCE_ID, 'space', true), 'space'),
-      context({
-        contextNotices: new Map([[SPACE_RESOURCE_ID, 'Link copied.']]),
-        onPortalEditingChange,
-        portalEditing: new Set([SPACE_RESOURCE_ID]),
-      }),
-    );
-    expect(patch.contextNotice).toBe('Link copied.');
-    expect(patch.kindOperations.portal?.editing).toBe(true);
-    expect(patch.kindOperations.portal?.onEditingChange).toBeTypeOf('function');
-    patch.kindOperations.portal?.onEditingChange(false);
-    expect(onPortalEditingChange).toHaveBeenCalledWith(SPACE_RESOURCE_ID, false);
+  it('offers no Claim where the Map surface policy withholds a Space Resource its Edit, keeping its commits', () => {
+    // As inside an embedded Map: authoring stops at the canvas's own Map.
+    const operations = decorateSpaceResourceNode(
+      openSpaceNode(),
+      context({ pluginHost: testPluginHost(vi.fn()), embeddedMapEdit: false }),
+    ).kindOperations;
+    expect(operations.commitMap).toBeTypeOf('function');
+    expect(operations).not.toHaveProperty('claim');
   });
 });
 
@@ -576,25 +501,26 @@ describe('decorating each kind from its own part of the context', () => {
     expect(reads).toHaveBeenCalledTimes(4);
   });
 
-  it('decorates an Ur Resource again when only its optional Shape change is replaced', () => {
+  it('decorates an Ur Resource again when only its optional plugin host is replaced', async () => {
     const decorate = kindDecorationMemo([kindDecorator(urDecoration)]);
     const urNodes = [projectionNode(UR_ID, 'ur')];
-    const first = vi.fn();
-    const second = vi.fn();
-    decorate(urNodes, context({ changeResourceShape: first }));
-    const [node] = decorate(urNodes, context({ changeResourceShape: second }));
+    const host = testPluginHost;
+    const first = vi.fn((): AuthoringResult => ({ kind: 'completed' }));
+    const second = vi.fn((): AuthoringResult => ({ kind: 'completed' }));
+    decorate(urNodes, context({ pluginHost: host(first) }));
+    const [node] = decorate(urNodes, context({ pluginHost: host(second) }));
     if (node === undefined || !isResourceNodeOf(node, 'ur')) throw new Error('no Ur Resource');
-    node.data.kindOperations.onResourceShapeChange?.('ellipse');
+    await node.data.kindOperations.commitMap?.({ shape: 'ellipse' });
     expect(first).not.toHaveBeenCalled();
-    expect(second).toHaveBeenCalledWith(UR_ID, 'ellipse');
+    expect(second).toHaveBeenCalledTimes(1);
   });
 
   it('names every field of a kind’s context in the part it reads', () => {
-    const dropsOptional: KindCanvasDecoration<UrKindId, UrResourceDecorationContext> = {
+    const dropsOptional: KindCanvasDecoration<UrKindId, PluginResourceDecorationContext> = {
       kind: urKind.id,
       // @ts-expect-error A part read field by field names every field, the optional ones too.
       slice: ({ authorOnCanvas, editableResourceIds }) => ({ authorOnCanvas, editableResourceIds }),
-      decorate: decorateUrResourceNode,
+      decorate: urDecoration.decorate,
     };
     expect(dropsOptional.kind).toBe(urKind.id);
   });

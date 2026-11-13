@@ -9,7 +9,13 @@ import {
 } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { newUuid, spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
+import {
+  EMPTY_ASSET_REF,
+  newUuid,
+  spaceSnapshotSchema,
+  uuidSchema,
+  type SpaceSnapshot,
+} from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
 import { productDestinationPath } from '@project/http';
 import {
@@ -40,7 +46,6 @@ import {
   unavailable,
   waitUntilMapContinuationReady,
 } from './command-dock';
-import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
 import { PRESENT_OFF_GRAPH, PRESENT_WHILE_EDITING } from '../src/canvas-commands';
 import type { MapSurface } from '../src/map-surface';
@@ -48,6 +53,7 @@ import type { MapView } from '../src/map-view';
 import { refusingFullscreen } from './fullscreen';
 import { unlinkedPresentations } from './presentations';
 import { stubResizeObserver } from './resize-observer';
+import { TestAssets } from './markdown-texts';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -70,7 +76,7 @@ const snapshot = (title: string, resourceTitle: string, x: number, y: number): S
           id: MAP_ID,
           title: 'Map',
           kind: 'positioned',
-          positions: { [RESOURCE_ID]: { x, y, open: false } },
+          positions: { [RESOURCE_ID]: { x, y } },
           // A Map owns at least one Graph (ADR 0040), and one Resource has
           // nothing to connect — so the Graph it opens on holds no Edges.
           graphs: [{ id: OWNED_GRAPH_ID, title: 'Graph', edges: [] }],
@@ -81,7 +87,7 @@ const snapshot = (title: string, resourceTitle: string, x: number, y: number): S
     resources: [
       {
         id: RESOURCE_ID,
-        document: { title: resourceTitle, kind: 'markdown', content: { source: resourceTitle } },
+        document: { title: resourceTitle, kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       },
     ],
   });
@@ -150,7 +156,6 @@ it('offers Exit on a Space opened by its own address, which has no opener', asyn
   const spaces = createOpenSpaces({
     fullscreen: refusingFullscreen,
     presentations: unlinkedPresentations,
-    images: unusedImageSources,
     backend,
     metaSpaceId: SPACE_ID,
     metaSpaceTitle: meta.document.title,
@@ -198,7 +203,6 @@ it('keeps a hidden Space presentation unchanged when the active Space receives E
   const spaces = createOpenSpaces({
     fullscreen: refusingFullscreen,
     presentations: unlinkedPresentations,
-    images: unusedImageSources,
     backend,
     metaSpaceId: SPACE_ID,
     metaSpaceTitle: first.document.title,
@@ -249,7 +253,6 @@ const openPresentable = async (
   const spaces = createOpenSpaces({
     fullscreen: refusingFullscreen,
     presentations: unlinkedPresentations,
-    images: unusedImageSources,
     backend,
     metaSpaceId: SPACE_ID,
     metaSpaceTitle: first.document.title,
@@ -258,7 +261,7 @@ const openPresentable = async (
   });
   const initial = await spaces.open(SPACE_ID);
   await act(async () => {
-    render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
+    render(<OpenSpacesApplication spaces={spaces} initial={initial} />, { wrapper: TestAssets });
     await Promise.resolve();
   });
   act(() => initial.app.adapter.getState().selectResource(RESOURCE_ID));
@@ -396,7 +399,7 @@ describe('Space app conflict recovery', () => {
       {
         id: runtime(local).id,
         session,
-        app: composeApp({ images: unusedImageSources, spaceSession: session }),
+        app: composeApp({ spaceSession: session }),
         spaceResources,
       },
       (app) => {
@@ -468,7 +471,7 @@ describe('Space app conflict recovery', () => {
       {
         id: runtime(local).id,
         session,
-        app: composeApp({ images: unusedImageSources, spaceSession: session }),
+        app: composeApp({ spaceSession: session }),
         spaceResources,
       },
       (app) => {
@@ -551,7 +554,7 @@ describe('Space app conflict recovery', () => {
       {
         id: runtime(local).id,
         session,
-        app: composeApp({ images: unusedImageSources, spaceSession: session }),
+        app: composeApp({ spaceSession: session }),
         spaceResources,
       },
       (app) => {
@@ -626,7 +629,7 @@ describe('Space app permanent save refusal', () => {
       {
         id: runtime(local).id,
         session,
-        app: composeApp({ images: unusedImageSources, spaceSession: session }),
+        app: composeApp({ spaceSession: session }),
         spaceResources,
       },
       (app) => {
@@ -677,7 +680,7 @@ describe('Space app failure reporting', () => {
       {
         id: runtime(addressed).id,
         session,
-        app: composeApp({ images: unusedImageSources, spaceSession: session }),
+        app: composeApp({ spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -749,7 +752,7 @@ describe('Space app failure reporting', () => {
           {
             id: runtime(valid).id,
             session,
-            app: composeApp({ images: unusedImageSources, spaceSession: session }),
+            app: composeApp({ spaceSession: session }),
             spaceResources,
           },
           (app) => render(app),
@@ -831,7 +834,7 @@ describe('Space app failure reporting', () => {
         {
           id: runtime(valid).id,
           session,
-          app: composeApp({ images: unusedImageSources, spaceSession: session }),
+          app: composeApp({ spaceSession: session }),
           spaceResources,
         },
         (app) => render(app),
@@ -873,7 +876,7 @@ describe('Space app failure reporting', () => {
         exportedRevision: null,
       },
     );
-    const app = composeApp({ images: unusedImageSources, spaceSession: session });
+    const app = composeApp({ spaceSession: session });
     // Written straight onto the session, past the validation every authoring
     // path performs first: reaching this state means an invariant has already
     // broken, which is what the guard is a backstop for.
@@ -922,7 +925,7 @@ describe('Space app failure reporting', () => {
       {
         id: runtime(valid).id,
         session,
-        app: composeApp({ images: unusedImageSources, spaceSession: session }),
+        app: composeApp({ spaceSession: session }),
         spaceResources,
       },
       (app) => {
@@ -970,7 +973,7 @@ describe('Space app Resources list', () => {
       {
         id: runtime(empty).id,
         session,
-        app: composeApp({ images: unusedImageSources, spaceSession: session }),
+        app: composeApp({ spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -1009,7 +1012,7 @@ describe('Space app Resources list', () => {
       {
         id: runtime(base).id,
         session,
-        app: composeApp({ images: unusedImageSources, spaceSession: session }),
+        app: composeApp({ spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -1054,7 +1057,7 @@ describe('Space app Resources list', () => {
       {
         id: runtime(base).id,
         session,
-        app: composeApp({ images: unusedImageSources, spaceSession: session }),
+        app: composeApp({ spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -1107,7 +1110,7 @@ describe('Space app Resources list', () => {
       {
         id: runtime(base).id,
         session,
-        app: composeApp({ images: unusedImageSources, spaceSession: session }),
+        app: composeApp({ spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -1159,7 +1162,7 @@ describe('Space app Resources list', () => {
       {
         id: runtime(base).id,
         session,
-        app: composeApp({ images: unusedImageSources, spaceSession: session }),
+        app: composeApp({ spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -1211,7 +1214,7 @@ describe('Space app Resources list', () => {
       {
         id: runtime(base).id,
         session,
-        app: composeApp({ images: unusedImageSources, spaceSession: session }),
+        app: composeApp({ spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -1251,7 +1254,7 @@ describe('Space app Resources list', () => {
       {
         id: runtime(base).id,
         session,
-        app: composeApp({ images: unusedImageSources, spaceSession: session }),
+        app: composeApp({ spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -1306,7 +1309,7 @@ describe('Space app Resources list', () => {
       {
         id: runtime(base).id,
         session,
-        app: composeApp({ images: unusedImageSources, spaceSession: session }),
+        app: composeApp({ spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -1340,7 +1343,7 @@ describe('Space app Resources list', () => {
       new MemorySpaceBackend(SPACE_ID, [stored]),
       stored,
     );
-    const app = composeApp({ images: unusedImageSources, spaceSession: session });
+    const app = composeApp({ spaceSession: session });
     const complete = app.authoring.complete;
     vi.spyOn(app.authoring, 'complete').mockImplementation((target, completion) =>
       completion.kind === 'renamed-map'
@@ -1379,7 +1382,7 @@ describe('Space app Resources list', () => {
       new MemorySpaceBackend(SPACE_ID, [stored]),
       stored,
     );
-    const app = composeApp({ images: unusedImageSources, spaceSession: session });
+    const app = composeApp({ spaceSession: session });
     const complete = app.authoring.complete;
     vi.spyOn(app.authoring, 'complete').mockImplementation((target, completion) =>
       completion.kind === 'renamed-graph'
@@ -1417,7 +1420,7 @@ describe('Space app Resources list', () => {
       new MemorySpaceBackend(SPACE_ID, [stored]),
       stored,
     );
-    const app = composeApp({ images: unusedImageSources, spaceSession: session });
+    const app = composeApp({ spaceSession: session });
     const complete = app.authoring.complete;
     vi.spyOn(app.authoring, 'complete').mockImplementation((target, completion) =>
       completion.kind === 'created-map'
@@ -1451,7 +1454,7 @@ describe('Space app Resources list', () => {
       new MemorySpaceBackend(SPACE_ID, [stored]),
       stored,
     );
-    const app = composeApp({ images: unusedImageSources, spaceSession: session });
+    const app = composeApp({ spaceSession: session });
     // A second Map, selected, so Delete is available on it.
     expect(app.authoring.complete(CANVAS, { kind: 'created-map' }).kind).toBe('completed');
     const selected = app.navigation.getState().selectedMapId;
@@ -1505,7 +1508,7 @@ describe('Space app Resources list', () => {
       {
         id: runtime(base).id,
         session,
-        app: composeApp({ images: unusedImageSources, spaceSession: session }),
+        app: composeApp({ spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -1546,7 +1549,7 @@ describe('Space app Resources list', () => {
       {
         id: runtime(base).id,
         session,
-        app: composeApp({ images: unusedImageSources, spaceSession: session }),
+        app: composeApp({ spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -1583,7 +1586,7 @@ describe('Space app Resources list', () => {
       {
         id: runtime(base).id,
         session,
-        app: composeApp({ images: unusedImageSources, spaceSession: session }),
+        app: composeApp({ spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -1627,7 +1630,11 @@ describe('Space app Resources list', () => {
         ...base.resources,
         {
           id: OUTSIDE_RESOURCE_ID,
-          document: { title: 'Outside resource', kind: 'markdown', content: { source: '' } },
+          document: {
+            title: 'Outside resource',
+            kind: 'markdown',
+            content: { url: EMPTY_ASSET_REF },
+          },
         },
       ],
     };
@@ -1641,7 +1648,7 @@ describe('Space app Resources list', () => {
       {
         id: runtime(local).id,
         session,
-        app: composeApp({ images: unusedImageSources, spaceSession: session, selection: MAP_ID }),
+        app: composeApp({ spaceSession: session, selection: MAP_ID }),
         spaceResources,
       },
       (app) => render(app),
@@ -1715,7 +1722,7 @@ describe('Space app Resources list', () => {
             // The Resource is placed here too, so this Map stays editable: an
             // empty Map withdraws chrome editing on its own and would clear
             // the draft for a reason that has nothing to do with the arrival.
-            positions: { [RESOURCE_ID]: { x: 40, y: 50, open: false } },
+            positions: { [RESOURCE_ID]: { x: 40, y: 50 } },
             graphs: [{ id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] }],
           },
         ],
@@ -1734,7 +1741,7 @@ describe('Space app Resources list', () => {
       {
         id: runtime(local).id,
         session,
-        app: composeApp({ images: unusedImageSources, spaceSession: session, selection: MAP_ID }),
+        app: composeApp({ spaceSession: session, selection: MAP_ID }),
         spaceResources,
       },
       (app) => render(app),
@@ -1798,7 +1805,7 @@ describe('Space app Resources list', () => {
       {
         id: runtime(local).id,
         session,
-        app: composeApp({ images: unusedImageSources, spaceSession: session, selection: MAP_ID }),
+        app: composeApp({ spaceSession: session, selection: MAP_ID }),
         spaceResources,
       },
       (app) => render(app),
@@ -1846,7 +1853,11 @@ describe('Space app Resources list drop', () => {
         ...base.resources,
         {
           id: OUTSIDE_RESOURCE_ID,
-          document: { title: 'Outside resource', kind: 'markdown', content: { source: '' } },
+          document: {
+            title: 'Outside resource',
+            kind: 'markdown',
+            content: { url: EMPTY_ASSET_REF },
+          },
         },
       ],
     };
@@ -1856,7 +1867,6 @@ describe('Space app Resources list drop', () => {
       stored,
     );
     const app = composeApp({
-      images: unusedImageSources,
       spaceSession: session,
       selection: MAP_ID,
     });
@@ -1923,11 +1933,19 @@ describe('Space app Map reading', () => {
         ...base.resources,
         {
           id: OUTSIDE_RESOURCE_ID,
-          document: { title: 'Outside resource', kind: 'markdown', content: { source: '' } },
+          document: {
+            title: 'Outside resource',
+            kind: 'markdown',
+            content: { url: EMPTY_ASSET_REF },
+          },
         },
         {
           id: UNPLACED_RESOURCE_ID,
-          document: { title: 'Unplaced resource', kind: 'markdown', content: { source: '' } },
+          document: {
+            title: 'Unplaced resource',
+            kind: 'markdown',
+            content: { url: EMPTY_ASSET_REF },
+          },
         },
       ],
       document: {
@@ -1938,7 +1956,7 @@ describe('Space app Map reading', () => {
             id: OTHER_MAP_ID,
             title: 'Other Map',
             kind: 'positioned',
-            positions: { [OUTSIDE_RESOURCE_ID]: { x: 40, y: 50, open: false } },
+            positions: { [OUTSIDE_RESOURCE_ID]: { x: 40, y: 50 } },
             graphs: [{ id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] }],
           },
         ],
@@ -1950,7 +1968,6 @@ describe('Space app Map reading', () => {
       stored,
     );
     const composed = composeApp({
-      images: unusedImageSources,
       spaceSession: session,
       selection: MAP_ID,
     });

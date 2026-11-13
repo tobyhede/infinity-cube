@@ -50,6 +50,7 @@ const fixture = (): string => {
   // one, so the fixture has to supply them even where a case does not use them.
   write(root, 'packages/app/src/styles.css', '');
   mkdirSync(join(root, 'packages/react-flow-adapter/src'), { recursive: true });
+  mkdirSync(join(root, 'packages/resource-api/src/view'), { recursive: true });
   mkdirSync(join(root, 'packages/app/stories/support'), { recursive: true });
   return root;
 };
@@ -569,6 +570,16 @@ describe('production component coverage', () => {
     ]);
   });
 
+  it.each(['packages/plugin-probe/src/view.tsx', 'packages/resource-api/src/view/Part.tsx'])(
+    'holds %s, a plugin’s or the Resource API’s view, to a story (ADR 0142)',
+    (module) => {
+      const root = fixture();
+      write(root, module, 'export const Part = () => null;');
+
+      expect(() => buildUiCatalog(root)).toThrowError(`${module} is rendered by no stable story`);
+    },
+  );
+
   it('takes a recorded reason in place of a story, and reports it', () => {
     const root = fixture();
     write(
@@ -705,7 +716,7 @@ describe('hand-rolled application styles', () => {
 
   /**
    * A colocated component stylesheet is not inventory debt — `canvas-resource.css` beside
-   * `CanvasResource` is the pattern, not the exception — so the *recorded block* half does
+   * `PluginResource` is the pattern, not the exception — so the *recorded block* half does
    * not apply to it. The dead-rule half does: moving a block out of `styles.css` and
    * beside its component must not be a way to stop the ratchet reading it.
    */
@@ -723,8 +734,8 @@ describe('hand-rolled application styles', () => {
     write(root, 'packages/ui/src/canvas-resource.css', '.canvas-resource__rail { color: red; }');
     write(
       root,
-      'packages/ui/src/CanvasResource.tsx',
-      'export const CanvasResource = () => <div className="canvas-resource__rail" />;',
+      'packages/ui/src/PluginResource.tsx',
+      'export const PluginResource = () => <div className="canvas-resource__rail" />;',
     );
 
     expect(() => buildUiCatalog(root)).not.toThrowError(/canvas-resource__rail.*is not recorded/);
@@ -803,6 +814,7 @@ describe('hand-rolled application styles', () => {
   it.each([
     ['packages/app/src/styles.css', /packages\/app\/src\/styles\.css is missing/],
     ['packages/react-flow-adapter/src', /packages\/react-flow-adapter\/src is missing/],
+    ['packages/resource-api/src/view', /packages\/resource-api\/src\/view is missing/],
   ])('refuses to pass quietly when %s has gone', (path, expected) => {
     const root = fixture();
     rmSync(join(root, path), { recursive: true, force: true });

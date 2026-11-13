@@ -1,9 +1,10 @@
 import type { GraphId, MapId, ResourceId } from '@project/core';
-import { resolveResourceContent, type Space } from '@project/graph';
-import { PresentedResource, Stage } from '@project/ui';
+import type { Space } from '@project/graph';
+import { Stage } from '@project/ui';
 import { presentedNotes } from '../notes-window';
 import { PresentedNotesList } from './PresentedNotesList';
 import { PresentingChrome, type PresentingChromeProps } from './PresentingChrome';
+import { StagedResource } from './StagedResource';
 import './rehearsal-notes.css';
 
 export interface PresentingStageProps extends PresentingChromeProps {
@@ -15,6 +16,10 @@ export interface PresentingStageProps extends PresentingChromeProps {
   readonly graphId: GraphId;
   /** The Resource Navigation is presenting. */
   readonly resourceId: ResourceId;
+  /** Told what a Resource plugin threw while drawing (ADR 0142). */
+  readonly onPluginFailure?: ((error: Error) => void) | undefined;
+  /** The Replacement epoch, on which a plugin's drawing starts again. */
+  readonly replacementEpoch?: number | undefined;
 }
 
 /**
@@ -22,16 +27,18 @@ export interface PresentingStageProps extends PresentingChromeProps {
  * with the presenting chrome in the strip below the frame, and below that the
  * Resource's notes while the presenter rehearses with them (ADR 0129).
  *
- * The Resource is drawn by its kind, through the content
- * `resolveResourceContent` answers, and never by its position, size, Shape or
- * Open state on any Map — so nothing about how it sits on the canvas reaches
- * the audience. Nothing here authors the Space.
+ * The Resource is drawn by its plugin with the Map content its plugin gives
+ * where there is no Map (ADR 0142), and never by its position, size or Map
+ * content on any Map — so nothing about how it sits on the canvas reaches the
+ * audience. Nothing here authors the Space.
  */
 export function PresentingStage({
   space,
   mapId,
   graphId,
   resourceId,
+  onPluginFailure,
+  replacementEpoch,
   ...chrome
 }: PresentingStageProps) {
   const resource = space.lookup.resource(resourceId);
@@ -53,7 +60,12 @@ export function PresentingStage({
         </>
       }
     >
-      <PresentedResource title={resource.title} content={resolveResourceContent(space, resource)} />
+      <StagedResource
+        space={space}
+        resourceId={resource.id}
+        onPluginFailure={onPluginFailure}
+        replacementEpoch={replacementEpoch}
+      />
     </Stage>
   );
 }

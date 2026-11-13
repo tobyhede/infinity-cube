@@ -4,13 +4,17 @@ import {
   type MapPosition,
   type GraphId,
   type ResourceId,
+  type SpaceFraming,
+  uuidSchema,
 } from '@project/core';
 import { authorsEmbeddedMap, type ResourceFlowNode } from '@project/react-flow-adapter';
-import { spaceViewOf } from '@project/ui';
 import { mapSurfacePolicy, type MapSurfacePolicy } from './map-surface-policy';
 
 import { DRAG_TILT_RADIANS, tiltResourcePosition } from './drag-tilt';
 import type { EmbeddedBounds } from './embedded-map';
+import { resolveEmbedView } from './embed-view';
+import type { MapEmbedEntry } from './map-embeddings';
+import type { SpaceResourceTarget } from './space-resource-lifecycle';
 
 /**
  * The containing Resource's box in canvas space, which bounds math reads without
@@ -43,10 +47,23 @@ export interface DiscoverEmbeddedOpenSpaceResourcesInput<
   Entry extends { readonly id: ResourceId },
 > {
   readonly root: EmbeddedRoot;
-  readonly editingResources: ReadonlySet<ResourceId>;
+  /** The placements whose embedded Map is authored in place, by node id. */
+  readonly editingPortals: ReadonlySet<string>;
   readonly staleSpaces: ReadonlySet<ResourceId>;
   readonly nodes: readonly ResourceFlowNode[];
+  /**
+   * The Map embeddings drawn, by the placement whose rect each is drawn in: a
+   * plugin's `<Embed space>` publishes one while it is drawn, so a Closed Space
+   * Resource requests nothing (ADR 0142).
+   */
+  readonly embeds: ReadonlyMap<string, MapEmbedEntry>;
   readonly entries: readonly Entry[];
+  /**
+   * The shown Space's Maps, where it has been read: what an embedding given no
+   * view, or no Graph, is resolved against. Absent, such an embedding is not
+   * drawn until it is.
+   */
+  readonly targetOf?: ((space: string) => SpaceResourceTarget | undefined) | undefined;
   readonly publications: ReadonlyMap<string, EmbeddedPublicationSnapshot>;
   readonly bodyHeights: ReadonlyMap<string, number>;
   /**
@@ -65,6 +82,8 @@ export interface EmbeddedOpenSpaceResourceRequest<Entry extends { readonly id: R
   readonly spaceId: ResourceId;
   readonly mapId: MapId;
   readonly graphId: GraphId;
+  /** The framing the embedding asks for, absent until the view has been framed. */
+  readonly framing: SpaceFraming | undefined;
   readonly entry: Entry | undefined;
   readonly absolute: MapPosition;
   /**
@@ -106,8 +125,48 @@ interface EmbedWindow {
   readonly bounds: EmbeddedBounds;
 }
 
+/** The ids a Map embedding asks for, as the core's, or `undefined` when one is not a UUID. */
+export const embeddedViewIds = (view: {
+  readonly spaceId: string;
+  readonly map: string;
+  readonly graph: string;
+}): { readonly spaceId: ResourceId; readonly map: MapId; readonly graph: GraphId } | undefined => {
+  const spaceId = uuidSchema.safeParse(view.spaceId);
+  const mapId = uuidSchema.safeParse(view.map);
+  const graphId = uuidSchema.safeParse(view.graph);
+  return spaceId.success && mapId.success && graphId.success
+    ? { spaceId: spaceId.data, map: mapId.data, graph: graphId.data }
+    : undefined;
+};
+
+/** The view an embedding draws, read off its shown Space only where the request leaves that to it. */
+const resolvedEmbedView = (
+  embedded: MapEmbedEntry,
+  targetOf: ((space: string) => SpaceResourceTarget | undefined) | undefined,
+) => {
+  const { space, view } = embedded.request;
+  return resolveEmbedView(space, view, view?.graph === undefined ? targetOf?.(space) : undefined);
+};
+
+/**
+ * The Spaces whose embeddings are drawn from what is read of them: each was
+ * given no view, or no Graph, so its Map is that Space's to say (ADR 0142). A
+ * drawing holds each for as long as the embedding stands, so it is read and
+ * stays read while the embedding draws from it.
+ */
+export const embedSpacesToRead = (
+  embeds: ReadonlyMap<string, MapEmbedEntry>,
+): ReadonlyMap<string, ResourceId> => {
+  const toRead = new Map<string, ResourceId>();
+  for (const [nodeId, { request }] of embeds) {
+    const spaceId = uuidSchema.safeParse(request.space);
+    if (spaceId.success && request.view?.graph === undefined) toRead.set(nodeId, spaceId.data);
+  }
+  return toRead;
+};
+
 /** Title-footer border, added to a measured footer in place of the reserved inset. */
-const FOOTER_BORDER = 4;
+export const FOOTER_BORDER = 4;
 
 /**
  * The containing-relative position a nested window is built from.
@@ -210,19 +269,23 @@ export function discoverEmbeddedOpenSpaceResources<Entry extends { readonly id: 
   }));
   for (const item of queue) {
     const { parent, origin, containingDrawn, clip, path } = item;
-    if (parent.data.open !== true) continue;
-    const shown = spaceViewOf(parent.data.display);
-    if (shown === undefined) continue;
-    const { view, via } = shown;
+    const embedded = input.embeds.get(parent.id);
+    if (embedded === undefined) continue;
+    const resolved = resolvedEmbedView(embedded, input.targetOf);
+    const ids = resolved === undefined ? undefined : embeddedViewIds(resolved);
+    if (resolved === undefined || ids === undefined) continue;
+    const view = { ...ids, framing: resolved.framing };
     const policy = mapSurfacePolicy({
       inherited: item.policy,
-      throughReference: via !== 'self',
+      // A Map embedded by a Resource that does not show its own Map, as a
+      // Reference to a Space Resource does, is drawn read-only (ADR 0070).
+      throughReference: !authorsEmbeddedMap(parent.data),
       stale:
         input.staleSpaces.has(view.spaceId) ||
         (input.publications.has(parent.id) &&
           !input.entries.some((entry) => entry.id === view.spaceId)),
       depth: item.depth,
-      editing: input.editingResources.has(parent.data.resourceId),
+      editing: input.editingPortals.has(parent.id),
     });
     const crossing = `${view.spaceId}:${view.map}`;
     if (path.has(crossing)) continue;
@@ -256,6 +319,7 @@ export function discoverEmbeddedOpenSpaceResources<Entry extends { readonly id: 
       spaceId: view.spaceId,
       mapId: view.map,
       graphId: view.graph,
+      framing: view.framing,
       entry: input.entries.find((entry) => entry.id === view.spaceId),
       absolute: window.absolute,
       drawnAbsolute,
@@ -283,11 +347,11 @@ export function discoverEmbeddedOpenSpaceResources<Entry extends { readonly id: 
 export function editingPortalAncestor(
   start: ResourceFlowNode | undefined,
   nodesById: ReadonlyMap<string, ResourceFlowNode>,
-  editingPortals: ReadonlySet<ResourceId>,
+  editingPortals: ReadonlySet<string>,
 ): ResourceFlowNode | undefined {
   let current = start;
   while (current !== undefined) {
-    if (authorsEmbeddedMap(current.data) && editingPortals.has(current.data.resourceId)) {
+    if (authorsEmbeddedMap(current.data) && editingPortals.has(current.id)) {
       return current;
     }
     current = current.parentId === undefined ? undefined : nodesById.get(current.parentId);
@@ -298,7 +362,7 @@ export function editingPortalAncestor(
 export function embeddingIsPortalEditing(
   parent: ResourceFlowNode,
   nodesById: ReadonlyMap<string, ResourceFlowNode>,
-  editingPortals: ReadonlySet<ResourceId>,
+  editingPortals: ReadonlySet<string>,
 ): boolean {
   return editingPortalAncestor(parent, nodesById, editingPortals) !== undefined;
 }

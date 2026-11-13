@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { newUuid, uuidSchema, type SpaceSnapshot } from '@project/core';
+import { EMPTY_ASSET_REF, newUuid, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
@@ -8,7 +8,6 @@ import { createOpenSpaces } from '../src/open-spaces';
 import { recordingHistory } from './browser-history';
 import { openTestSpace } from './opened-space';
 import { node, settled } from './render-adapter-fixtures';
-import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
 import { refusingFullscreen } from './fullscreen';
 import { unlinkedPresentations } from './presentations';
@@ -46,14 +45,14 @@ describe('Map delete draws the right geometry', () => {
           id: DELETED_MAP_ID,
           title: 'Deleted',
           kind: 'positioned',
-          positions: { [SHARED_RESOURCE_ID]: { x: 10, y: 20, open: false } },
+          positions: { [SHARED_RESOURCE_ID]: { x: 10, y: 20 } },
           graphs: [{ id: DELETED_GRAPH_ID, title: 'Deleted Graph', edges: [] }],
         },
         {
           id: SURVIVING_MAP_ID,
           title: 'Surviving',
           kind: 'positioned',
-          positions: { [SHARED_RESOURCE_ID]: { x: 500, y: 600, open: false } },
+          positions: { [SHARED_RESOURCE_ID]: { x: 500, y: 600 } },
           graphs: [{ id: SURVIVING_GRAPH_ID, title: 'Surviving Graph', edges: [] }],
         },
       ],
@@ -61,7 +60,7 @@ describe('Map delete draws the right geometry', () => {
     resources: [
       {
         id: SHARED_RESOURCE_ID,
-        document: { title: 'Shared', kind: 'markdown', content: { source: '' } },
+        document: { title: 'Shared', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       },
     ],
   };
@@ -73,7 +72,7 @@ describe('Map delete draws the right geometry', () => {
       revision: 0n,
       exportedRevision: null,
     });
-    const app = composeApp({ images: unusedImageSources, spaceSession: session });
+    const app = composeApp({ spaceSession: session });
     expect(app.navigation.getState().selectedMapId).toBe(DELETED_MAP_ID);
 
     // What the Dock's Delete does (`dock-chrome.ts`): Map authoring deletes the Map and
@@ -104,7 +103,7 @@ describe('Map delete draws the right geometry', () => {
     const written = session
       .getState()
       .working.document.maps?.find((m) => m.id === SURVIVING_MAP_ID);
-    expect(written?.positions[SHARED_RESOURCE_ID]).toEqual({ x: 500, y: 600, open: false });
+    expect(written?.positions[SHARED_RESOURCE_ID]).toEqual({ x: 500, y: 600 });
   });
 });
 
@@ -131,7 +130,7 @@ describe('Entering draws the entered Map’s geometry', () => {
           id: META_MAP_ID,
           title: 'Meta Map',
           kind: 'positioned',
-          positions: { [META_RESOURCE_ID]: { x: 0, y: 0, open: false } },
+          positions: { [META_RESOURCE_ID]: { x: 0, y: 0 } },
           graphs: [{ id: META_GRAPH_ID, title: 'Meta Graph', edges: [] }],
         },
       ],
@@ -139,7 +138,7 @@ describe('Entering draws the entered Map’s geometry', () => {
     resources: [
       {
         id: META_RESOURCE_ID,
-        document: { title: 'Meta Resource', kind: 'markdown', content: { source: '' } },
+        document: { title: 'Meta Resource', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       },
     ],
   };
@@ -160,14 +159,14 @@ describe('Entering draws the entered Map’s geometry', () => {
           id: DEFAULT_MAP_ID,
           title: 'Default',
           kind: 'positioned',
-          positions: { [SHARED_RESOURCE_ID]: { x: 10, y: 20, open: false } },
+          positions: { [SHARED_RESOURCE_ID]: { x: 10, y: 20 } },
           graphs: [{ id: DEFAULT_GRAPH_ID, title: 'Default Graph', edges: [] }],
         },
         {
           id: ENTERED_MAP_ID,
           title: 'Entered',
           kind: 'positioned',
-          positions: { [SHARED_RESOURCE_ID]: { x: 500, y: 600, open: false } },
+          positions: { [SHARED_RESOURCE_ID]: { x: 500, y: 600 } },
           graphs: [{ id: ENTERED_GRAPH_ID, title: 'Entered Graph', edges: [] }],
         },
       ],
@@ -175,7 +174,7 @@ describe('Entering draws the entered Map’s geometry', () => {
     resources: [
       {
         id: SHARED_RESOURCE_ID,
-        document: { title: 'Shared', kind: 'markdown', content: { source: '' } },
+        document: { title: 'Shared', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       },
     ],
   };
@@ -188,7 +187,6 @@ describe('Entering draws the entered Map’s geometry', () => {
     const spaces = createOpenSpaces({
       fullscreen: refusingFullscreen,
       presentations: unlinkedPresentations,
-      images: unusedImageSources,
       backend,
       metaSpaceId: META_ID,
       metaSpaceTitle: metaSnapshot.document.title,
@@ -210,7 +208,7 @@ describe('Entering draws the entered Map’s geometry', () => {
     const written = entered.session
       .getState()
       .working.document.maps?.find((m) => m.id === ENTERED_MAP_ID);
-    expect(written?.positions[SHARED_RESOURCE_ID]).toEqual({ x: 500, y: 600, open: false });
+    expect(written?.positions[SHARED_RESOURCE_ID]).toEqual({ x: 500, y: 600 });
   });
 });
 
@@ -234,14 +232,14 @@ describe('An embedded Edit in an unselected Map leaves no stale member', () => {
           id: TOP_MAP_ID,
           title: 'Top',
           kind: 'positioned',
-          positions: { [TOP_RESOURCE_ID]: { x: 10, y: 20, open: false } },
+          positions: { [TOP_RESOURCE_ID]: { x: 10, y: 20 } },
           graphs: [{ id: TOP_GRAPH_ID, title: 'Top Graph', edges: [] }],
         },
         {
           id: OTHER_MAP_ID,
           title: 'Other',
           kind: 'positioned',
-          positions: { [OTHER_RESOURCE_ID]: { x: 500, y: 600, open: false } },
+          positions: { [OTHER_RESOURCE_ID]: { x: 500, y: 600 } },
           graphs: [{ id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] }],
         },
       ],
@@ -249,11 +247,11 @@ describe('An embedded Edit in an unselected Map leaves no stale member', () => {
     resources: [
       {
         id: TOP_RESOURCE_ID,
-        document: { title: 'Top Resource', kind: 'markdown', content: { source: '' } },
+        document: { title: 'Top Resource', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       },
       {
         id: OTHER_RESOURCE_ID,
-        document: { title: 'Other Resource', kind: 'markdown', content: { source: '' } },
+        document: { title: 'Other Resource', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       },
     ],
   };
@@ -272,7 +270,7 @@ describe('An embedded Edit in an unselected Map leaves no stale member', () => {
   it('produces a snapshot intake accepts after a later top-level Edit', () => {
     const backend = MemorySpaceBackend.asMeta({ snapshot, revision: 0n, exportedRevision: null });
     const session = openSpaceSession(backend, { snapshot, revision: 0n, exportedRevision: null });
-    const app = composeApp({ images: unusedImageSources, spaceSession: session });
+    const app = composeApp({ spaceSession: session });
     expect(app.navigation.getState().selectedMapId).toBe(TOP_MAP_ID);
 
     // An embedded Edit against a Map other than the one selected at the
@@ -300,7 +298,7 @@ describe('An embedded Edit in an unselected Map leaves no stale member', () => {
     expect(loaded.ok).toBe(true);
 
     const top = written.document.maps?.find((m) => m.id === TOP_MAP_ID);
-    expect(top?.positions[TOP_RESOURCE_ID]).toEqual({ x: 10, y: 20, open: false });
+    expect(top?.positions[TOP_RESOURCE_ID]).toEqual({ x: 10, y: 20 });
     const other = written.document.maps?.find((m) => m.id === OTHER_MAP_ID);
     expect(other?.graphs.map((graph) => ({ id: graph.id, title: graph.title }))).toEqual([
       { id: OTHER_GRAPH_ID, title: 'Renamed Other Graph' },
@@ -327,16 +325,22 @@ describe('A queued drag holds its drop point', () => {
           title: 'Map',
           kind: 'positioned',
           positions: {
-            [RESOURCE_A]: { x: 10, y: 20, open: false },
-            [RESOURCE_B]: { x: 300, y: 20, open: false },
+            [RESOURCE_A]: { x: 10, y: 20 },
+            [RESOURCE_B]: { x: 300, y: 20 },
           },
           graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
         },
       ],
     },
     resources: [
-      { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: '' } } },
-      { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', content: { source: '' } } },
+      {
+        id: RESOURCE_A,
+        document: { title: 'A', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+      },
+      {
+        id: RESOURCE_B,
+        document: { title: 'B', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
+      },
     ],
   };
 
@@ -355,7 +359,6 @@ describe('A queued drag holds its drop point', () => {
     const backend = MemorySpaceBackend.asMeta({ snapshot, revision: 0n, exportedRevision: null });
     const session = openSpaceSession(backend, { snapshot, revision: 0n, exportedRevision: null });
     const { authoring, adapter } = composeApp({
-      images: unusedImageSources,
       spaceSession: session,
       selection: MAP_ID,
     });

@@ -10,7 +10,7 @@
     "#lib/*": "./src/lib/*.ts",
     "#src/entity-actions": "./src/entity-actions.tsx",
     "#src/*": "./src/*.ts",
-    "#fixture-images/*": "./fixture/images/*"
+    "#fixture-assets/*": "./fixture/assets/*"
   },
   "scripts": {
     "dev": "vite",
@@ -33,7 +33,14 @@
     "@project/graph": "workspace:*",
     "@project/http": "workspace:*",
     "@project/persistence": "workspace:*",
+    "@project/plugin-default": "workspace:*",
+    "@project/plugin-image": "workspace:*",
+    "@project/plugin-markdown": "workspace:*",
+    "@project/plugin-reference": "workspace:*",
+    "@project/plugin-space": "workspace:*",
+    "@project/plugin-ur": "workspace:*",
     "@project/react-flow-adapter": "workspace:*",
+    "@project/resource-api": "workspace:*",
     "@project/ui": "workspace:*",
     "@xyflow/react": "12.11.2",
     "react": "^18.3.1",

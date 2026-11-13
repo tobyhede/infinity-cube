@@ -2,6 +2,7 @@ import { stat } from 'node:fs/promises';
 import { relative } from 'node:path';
 import {
   SPACE_FILE_VERSION,
+  canonicalJsonValue,
   canonicalResource,
   type GraphEdge,
   type SpaceFile,
@@ -70,11 +71,21 @@ const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
       id: m.id,
       title: m.title,
       kind: m.kind,
-      // `Placement.fromMap` rebuilds every entry key by key — state, size and
-      // Shape included — so a stored `{"y":…,"x":…}` exports in the canonical order
-      // rather than the one `jsonb` handed back; the sort fixes the entries' order.
+      // `Placement.fromMap` rebuilds every entry key by key — state and size
+      // included — so a stored `{"y":…,"x":…}` exports in the canonical order
+      // rather than the one `jsonb` handed back; the sort fixes the entries'
+      // order. Map content keeps its place in the entry, written in
+      // `canonicalJsonValue`'s one form: its keys are the plugin's, so no
+      // literal can fix their order, and `jsonb` hands them back in its own.
       positions: Object.fromEntries(
-        [...Placement.fromMap(m)].sort(([left], [right]) => compareOrdinal(left, right)),
+        [...Placement.fromMap(m)]
+          .sort(([left], [right]) => compareOrdinal(left, right))
+          .map(([id, entry]) => [
+            id,
+            entry.content === undefined
+              ? entry
+              : { ...entry, content: canonicalJsonValue(entry.content) },
+          ]),
       ),
       graphs: canonicalGraphs(m.graphs),
     };
@@ -93,8 +104,8 @@ const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
 
 /**
  * One Space's canonical files, by path relative to its Space directory:
- * `space.json`, one `resources/<id>.json` per Resource, and a Markdown
- * Resource's sidecar `resources/<id>.md` beside its Resource file.
+ * `space.json` and one `resources/<id>.json` per Resource. No file sits beside
+ * a Resource file: its bytes are assets, which `assets/` holds (ADR 0142).
  */
 export const spaceDirectoryFiles = (stored: LoadedSpace): ReadonlyMap<string, string> => {
   const files = new Map<string, string>([
@@ -131,19 +142,12 @@ export const scannedSpaceFiles = async (directory: string): Promise<readonly str
  * whatever the reader would have discovered there and leaving everything else
  * alone.
  *
- * What it removes is exactly what `readSingleSpace` scans — `*.md` beside the
- * space file, `resources/*.json` and `resources/*.md`, and `space.json` — so a
- * Resource deleted since the last export leaves neither its Resource file nor
- * its sidecar behind to be read back, and every other Resource's files stay.
- * Anything the reader would not have looked at survives, which is what lets a
- * Space directory carry notes or assets across a round trip.
- *
- * **Markdown is not among what survives, and a `README.md` here is no
- * exception.** The reader scans root `*.md` so that it can refuse one no
- * Resource file names, so a README beside `space.json` is not an ignored file
- * at all — left in place it would refuse the import. Removing it is the
- * correct behaviour rather than a gap; prose that belongs with a Space directory
- * has to sit under a name the reader does not scan.
+ * What it removes is exactly what `readSingleSpace` scans — `resources/*.json`
+ * and `space.json` — so a Resource deleted since the last export leaves no
+ * Resource file behind to be read back, and every other Resource's file stays.
+ * Anything the reader would not have looked at survives, a `README.md` or any
+ * other `*.md` included (ADR 0119, ADR 0142), which is what lets a Space
+ * directory carry notes across a round trip.
  */
 export const writeSpaceDirectory = async (
   stored: LoadedSpace,

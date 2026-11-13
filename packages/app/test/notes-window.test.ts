@@ -13,6 +13,7 @@ import { createPresentingWindow } from '../src/presenting-window';
 import { refusingFullscreen } from './fullscreen';
 import { mintingIds } from './minting';
 import { channelHub } from './presentation-channels';
+import { textAsset } from './markdown-texts';
 
 const uuid = (n: number): UUID =>
   uuidSchema.parse(`00000000-0000-4000-8000-${n.toString().padStart(12, '0')}`);
@@ -29,9 +30,9 @@ const LOWER_NOTE = uuid(20);
 const UPPER_NOTE = uuid(21);
 const LEFT_NOTE = uuid(22);
 
-const markdown = (id: UUID, title: string, source: string) => ({
+const markdown = (id: UUID, title: string, text: string) => ({
   id,
-  document: { title, kind: 'markdown' as const, content: { source } },
+  document: { title, kind: 'markdown' as const, content: { url: textAsset(text) } },
 });
 
 /** A talk that forks after its opening, with a notes Graph from two of its Resources. */
@@ -46,12 +47,12 @@ const snapshot: SpaceSnapshot = {
         title: 'Map',
         kind: 'positioned',
         positions: {
-          [OPENING]: { x: 0, y: 0, open: false },
-          [LEFT]: { x: 300, y: -100, open: false },
-          [RIGHT]: { x: 300, y: 100, open: false },
-          [LOWER_NOTE]: { x: 0, y: 400, open: false },
-          [UPPER_NOTE]: { x: 0, y: 200, open: false },
-          [LEFT_NOTE]: { x: 300, y: 400, open: false },
+          [OPENING]: { x: 0, y: 0 },
+          [LEFT]: { x: 300, y: -100 },
+          [RIGHT]: { x: 300, y: 100 },
+          [LOWER_NOTE]: { x: 0, y: 400 },
+          [UPPER_NOTE]: { x: 0, y: 200 },
+          [LEFT_NOTE]: { x: 300, y: 400 },
         },
         graphs: [
           {
@@ -93,7 +94,7 @@ const withFurther: SpaceSnapshot = {
     ...snapshot.document,
     maps: snapshot.document.maps?.map((m) => ({
       ...m,
-      positions: { ...m.positions, [FURTHER]: { x: 600, y: -100, open: false } },
+      positions: { ...m.positions, [FURTHER]: { x: 600, y: -100 } },
       graphs: m.graphs.map((graph) =>
         graph.id === TALK
           ? { ...graph, edges: [...graph.edges, { from: LEFT, to: FURTHER }] }

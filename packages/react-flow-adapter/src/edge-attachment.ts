@@ -28,6 +28,9 @@ const centre = (rect: AnchorRect) => ({
 const gap = (aMin: number, aMax: number, bMin: number, bMax: number): number =>
   Math.max(aMin - bMax, bMin - aMax);
 
+/** Whether the target lies on the positive side: by the chosen axis, or the other where it ties. */
+const ahead = (along: number, across: number): boolean => (along === 0 ? across >= 0 : along > 0);
+
 /**
  * Which side of each Resource faces the other (ADR 0087).
  *
@@ -42,7 +45,10 @@ const gap = (aMin: number, aMax: number, bMin: number, bMax: number): number =>
  * When the rects overlap on both axes neither gap is positive, and the larger —
  * the axis they overlap on least — still names the side an Edge crosses by the
  * shortest route. The direction is then the centre vector's, which is the only
- * fact that can answer it once the axis is fixed.
+ * fact that can answer it once the axis is fixed. Where the middles
+ * are level on that axis, the vector's other component decides, so an Edge and
+ * its reverse always face opposite ways (ADR 0143's two-way lanes read their
+ * side from it).
  */
 export function facingSides(source: AnchorRect, target: AnchorRect): FacingSides {
   const horizontal = gap(source.x, source.x + source.width, target.x, target.x + target.width);
@@ -50,12 +56,15 @@ export function facingSides(source: AnchorRect, target: AnchorRect): FacingSides
   const from = centre(source);
   const to = centre(target);
 
+  // Middles level on the chosen axis take their direction from the other
+  // axis, so an Edge and its reverse still face opposite ways; only middles
+  // that coincide fall to the positive side.
   if (horizontal >= vertical) {
-    return to.x >= from.x
+    return ahead(to.x - from.x, to.y - from.y)
       ? { source: Position.Right, target: Position.Left }
       : { source: Position.Left, target: Position.Right };
   }
-  return to.y >= from.y
+  return ahead(to.y - from.y, to.x - from.x)
     ? { source: Position.Bottom, target: Position.Top }
     : { source: Position.Top, target: Position.Bottom };
 }

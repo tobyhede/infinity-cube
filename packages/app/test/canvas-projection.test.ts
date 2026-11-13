@@ -37,8 +37,8 @@ const mapOwning = (...graphs: readonly object[]) => ({
   title: 'Working',
   kind: 'positioned',
   positions: {
-    [RESOURCE_A]: { x: 0, y: 0, open: false },
-    [RESOURCE_B]: { x: 400, y: 0, open: false },
+    [RESOURCE_A]: { x: 0, y: 0 },
+    [RESOURCE_B]: { x: 400, y: 0 },
   },
   graphs,
 });
@@ -192,8 +192,8 @@ describe('canvasProjection', () => {
     expect(nodes.map((node) => Object.keys(node.data))).not.toContainEqual(
       expect.arrayContaining(['active']),
     );
-    expect(byId[RESOURCE_A]?.display.shown).toBe('closed');
-    expect(byId[RESOURCE_B]?.display.shown).toBe('closed');
+    expect(byId[RESOURCE_A]?.mapContent).toEqual({ open: false });
+    expect(byId[RESOURCE_B]?.mapContent).toEqual({ open: false });
   });
 
   it('draws every Graph a selected Map owns', async () => {
@@ -235,8 +235,14 @@ describe('canvasProjection', () => {
     const authoredMap = {
       ...mapOwning(DRAWN),
       positions: {
-        [RESOURCE_A]: { x: 0, y: 0, open: true, size: { width: 560, height: 420 } },
-        [RESOURCE_B]: { x: 700, y: 0, open: false, size: { width: 400, height: 300 } },
+        // A Markdown Resource is Open by its Map content (ADR 0142).
+        [RESOURCE_A]: {
+          x: 0,
+          y: 0,
+          content: { open: true },
+          size: { width: 560, height: 420 },
+        },
+        [RESOURCE_B]: { x: 700, y: 0, size: { width: 400, height: 300 } },
       },
     };
     const space = spaceWith({ maps: [authoredMap] });
@@ -253,30 +259,29 @@ describe('canvasProjection', () => {
     expect(nodes.find(({ id }) => id === RESOURCE_A)).toMatchObject({
       width: 560,
       height: 420,
-      data: { open: true },
+      data: { mapContent: { open: true } },
     });
     expect(nodes.find(({ id }) => id === RESOURCE_B)).toMatchObject({
       width: 400,
       height: 300,
-      data: { display: { shown: 'closed' } },
+      data: { mapContent: { open: false } },
     });
   });
 
-  it("carries each Resource's Shape from the Map it draws, at any size", async () => {
+  it("carries each Resource's outline and Map content from the Map it draws, at any size", async () => {
     const diamondMap = {
       ...mapOwning(DRAWN),
       positions: {
-        [RESOURCE_A]: { x: 0, y: 0, open: false, shape: 'diamond' },
+        [RESOURCE_A]: { x: 0, y: 0, content: { shape: 'diamond' } },
         [RESOURCE_B]: {
           x: 700,
           y: 0,
-          open: false,
           size: { width: 560, height: 420 },
-          shape: 'diamond',
+          content: { shape: 'diamond' },
         },
       },
     };
-    // Only an Ur Resource takes a Shape (ADR 0121).
+    // Only a kind a plugin draws keeps Map content (ADR 0142).
     const urResources = [RESOURCE_A, RESOURCE_B].flatMap((id) =>
       jsonResourceFile(id, id, 'ur', {}),
     );
@@ -286,25 +291,30 @@ describe('canvasProjection', () => {
       MAP,
     );
 
-    expect(nodes.map(({ id, data, width }) => [id, data.shape, width])).toEqual([
-      [RESOURCE_A, 'diamond', 260],
-      [RESOURCE_B, 'diamond', 560],
+    expect(nodes.map(({ id, data, width }) => [id, data.shape, data.mapContent, width])).toEqual([
+      [RESOURCE_A, 'diamond', { shape: 'diamond' }, 260],
+      [RESOURCE_B, 'diamond', { shape: 'diamond' }, 560],
     ]);
   });
 
-  it('draws an entry with no Shape stored, and one storing the rectangle, as the rectangle', async () => {
+  it('gives each plugin its own default where the entry stores no Map content', async () => {
     const rectangleMap = {
       ...mapOwning(DRAWN),
       positions: {
-        [RESOURCE_A]: { x: 0, y: 0, open: false },
-        [RESOURCE_B]: { x: 700, y: 0, open: false, shape: 'rectangle' },
+        [RESOURCE_A]: { x: 0, y: 0 },
+        [RESOURCE_B]: { x: 700, y: 0 },
       },
     };
-    const { nodes } = await projectThrough(spaceWith({ maps: [rectangleMap] }), AT_REST, MAP);
+    const ur = jsonResourceFile(RESOURCE_A, RESOURCE_A, 'ur', {});
+    const { nodes } = await projectThrough(
+      spaceWith({ maps: [rectangleMap] }, [...ur, ...resourceFile(RESOURCE_B)]),
+      AT_REST,
+      MAP,
+    );
 
-    expect(nodes.map(({ id, data }) => [id, data.shape])).toEqual([
-      [RESOURCE_A, 'rectangle'],
-      [RESOURCE_B, 'rectangle'],
+    expect(nodes.map(({ id, data }) => [id, data.shape, data.mapContent])).toEqual([
+      [RESOURCE_A, 'rectangle', { shape: 'rectangle' }],
+      [RESOURCE_B, 'rectangle', { open: false }],
     ]);
   });
 });

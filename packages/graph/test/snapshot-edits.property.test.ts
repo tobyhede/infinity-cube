@@ -1,6 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
+  EMPTY_ASSET_REF,
   COLLAPSED_RESOURCE_SIZE,
   RESOURCE_SHAPES,
   resourceSize,
@@ -46,10 +47,26 @@ const titleArb = fc
   .string({ minLength: 1, maxLength: 12 })
   .filter((s) => s.trim().length > 0 && !s.includes('\n'));
 
-const markdownDocument = (title: string): ResourceDocument => ({
+/** The Space Resource every Reference Resource here targets, held by no Map. */
+const TARGET_ID = uuid('00000000-0000-4000-8000-0000000000f0');
+const TARGET_SPACE = uuid('00000000-0000-4000-8000-0000000000f1');
+const target = {
+  id: TARGET_ID,
+  document: {
+    title: 'Target',
+    kind: 'space',
+    content: { spaceId: TARGET_SPACE, map: TARGET_SPACE, graph: TARGET_SPACE },
+  },
+} as const;
+
+/**
+ * A Reference Resource to a Space Resource. Every Resource is drawn by a
+ * plugin, which keeps any Open in its Map content (ADR 0142).
+ */
+const openableDocument = (title: string): ResourceDocument => ({
   title,
-  kind: 'markdown',
-  content: { source: '' },
+  kind: 'reference',
+  content: { target: TARGET_ID },
 });
 
 /** A chain Edge through every consecutive pair, so an interior Resource carries incident Edges on both sides. */
@@ -64,6 +81,13 @@ const chainEdges = (ids: readonly UUID[]): GraphEdge[] => {
 };
 
 /** One Map owning one Graph over every generated Resource, at the given positions. */
+/** A Markdown Resource's document, whose Open is its plugin's Map content (ADR 0142). */
+const markdownDocument = (title: string): ResourceDocument => ({
+  title,
+  kind: 'markdown',
+  content: { url: EMPTY_ASSET_REF },
+});
+
 /** An Ur Resource's document, the one kind a Map may draw in any Shape (ADR 0121). */
 const urDocument = (title: string): ResourceDocument => ({ title, kind: 'ur', content: {} });
 
@@ -71,7 +95,7 @@ const baseSnapshot = (
   ids: readonly UUID[],
   positions: Record<UUID, ResourcePlacement>,
   edges: readonly GraphEdge[] = [],
-  documentOf: (title: string) => ResourceDocument = markdownDocument,
+  documentOf: (title: string) => ResourceDocument = openableDocument,
 ): SpaceSnapshot => ({
   id: SPACE_ID,
   document: {
@@ -88,15 +112,15 @@ const baseSnapshot = (
       },
     ],
   },
-  resources: ids.map((id, index) => ({ id, document: documentOf(`Resource ${index}`) })),
+  resources: [
+    ...ids.map((id, index) => ({ id, document: documentOf(`Resource ${index}`) })),
+    target,
+  ],
 });
 
 const closedPlacement = (ids: readonly UUID[], coords: readonly number[]): Placement =>
   Placement.fromEntries(
-    ids.map((id, i) => [
-      id,
-      { x: coords[i * 2] ?? 0, y: coords[i * 2 + 1] ?? 0, open: false as const },
-    ]),
+    ids.map((id, i) => [id, { x: coords[i * 2] ?? 0, y: coords[i * 2 + 1] ?? 0 }]),
   );
 
 describe('SnapshotEdit.deleteFromSpace properties', () => {
@@ -117,7 +141,7 @@ describe('SnapshotEdit.deleteFromSpace properties', () => {
     );
   });
 
-  it('moves no other Resource when it deletes one, Open or resized', () => {
+  it('moves no other Resource when it deletes one, resized', () => {
     // Removal changes no size, so it displaces nobody.
     fc.assert(
       fc.property(
@@ -125,14 +149,16 @@ describe('SnapshotEdit.deleteFromSpace properties', () => {
         coordsArb,
         fc.nat({ max: 8 }),
         sizeArb,
-        fc.boolean(),
-        (ids, coords, subjectSeed, size, open) => {
+        (ids, coords, subjectSeed, size) => {
           const subject = ids[subjectSeed % ids.length];
           if (subject === undefined) return;
           const closed = closedPlacement(ids, coords);
           const subjectAt = closed.get(subject);
           if (subjectAt === undefined) return;
-          const placement = Placement.place(closed, subject, { ...subjectAt, open, size });
+          const placement = Placement.place(closed, subject, {
+            ...subjectAt,
+            size,
+          });
           const snapshot = baseSnapshot(ids, Placement.toPositions(placement));
 
           const deleted = SnapshotEdit.deleteFromSpace(snapshot, subject);
@@ -225,9 +251,7 @@ describe('deletionReach properties', () => {
           if (generated.placed[r] !== true) return;
           const at = { x: generated.coords[r * 2] ?? 0, y: generated.coords[r * 2 + 1] ?? 0 };
           positions[id] =
-            generated.open[r] === true
-              ? { ...at, open: true, size: { width: 560, height: 420 } }
-              : { ...at, open: false };
+            generated.open[r] === true ? { ...at, size: { width: 560, height: 420 } } : at;
         });
         const graphs = generated.graphs.map((pairs, g): Graph => {
           const seen = new Set<string>();
@@ -258,10 +282,13 @@ describe('deletionReach properties', () => {
           defaultMap: documentMaps[0]?.id ?? MAP_ID,
           maps: documentMaps,
         },
-        resources: resourceIds.map((id, index) => ({
-          id,
-          document: markdownDocument(`Resource ${index}`),
-        })),
+        resources: [
+          ...resourceIds.map((id, index) => ({
+            id,
+            document: openableDocument(`Resource ${index}`),
+          })),
+          target,
+        ],
       };
       const subject = resourceIds[subjectSeed % resourceIds.length] ?? resourceIds[0];
       return { snapshot, subject };
@@ -362,11 +389,11 @@ describe('SnapshotEdit.createInMap properties', () => {
     );
   });
 
-  /** The document a Target of `kind` replaces the base Markdown Resource with, if any. */
+  /** The document a Target of `kind` replaces the base Resource with. */
   const contentOwningTarget = (kind: 'markdown' | 'space' | 'ur'): ResourceDocument | undefined => {
     switch (kind) {
       case 'markdown':
-        return undefined;
+        return { title: 'Prose', kind: 'markdown', content: { url: EMPTY_ASSET_REF } };
       case 'space':
         return {
           title: 'Nested',
@@ -429,7 +456,7 @@ describe('SnapshotEdit.createInMap properties', () => {
     );
   });
 
-  it('creates an Ur Resource, which intake accepts and which refuses to Open', () => {
+  it('creates an Ur Resource, which intake accepts', () => {
     fc.assert(
       fc.property(idsArb, coordsArb, fc.uuid().map(uuid), (ids, coords, newResourceId) => {
         fc.pre(!ids.includes(newResourceId));
@@ -448,11 +475,6 @@ describe('SnapshotEdit.createInMap properties', () => {
         if (created.kind !== 'completed') return;
         expect(loadSpaceSnapshot(created.snapshot).ok).toBe(true);
         expect(created.snapshot.resources.at(-1)).toEqual({ id: newResourceId, document });
-
-        expect(SnapshotEdit.open(created.snapshot, MAP_ID, newResourceId)).toEqual({
-          kind: 'refused',
-          refusal: { code: 'open-requires-content' },
-        });
       }),
     );
   });
@@ -475,7 +497,7 @@ describe('SnapshotEdit.createInMap properties', () => {
             baseSnapshot(ids, positions),
             MAP_ID,
             newResourceId,
-            markdownDocument('New'),
+            openableDocument('New'),
             anchor,
             'exact',
           );
@@ -487,7 +509,6 @@ describe('SnapshotEdit.createInMap properties', () => {
           expect(outcome.snapshot.document.maps?.[0]?.positions[newResourceId]).toEqual({
             x: anchor.x,
             y: anchor.y,
-            open: false,
           });
         },
       ),
@@ -513,7 +534,7 @@ describe('SnapshotEdit.createInMap properties', () => {
             snapshot,
             missingMapId,
             newResourceId,
-            markdownDocument('New'),
+            openableDocument('New'),
             { x: 0, y: 0 },
             'avoidingOverlap',
           );
@@ -539,7 +560,7 @@ describe('SnapshotEdit.createInMap properties', () => {
           snapshot,
           MAP_ID,
           newResourceId,
-          markdownDocument('New'),
+          openableDocument('New'),
           anchor,
           'avoidingOverlap',
         );
@@ -561,17 +582,15 @@ describe('SnapshotEdit.createInMap properties', () => {
 });
 
 /**
- * Open, Close and Resize (ADR 0084, ADR 0093, ADR 0122), over one Map of five
- * Resources.
+ * Resize and Map content (ADR 0084, ADR 0093, ADR 0122, ADR 0142), over one Map
+ * of five Resources.
  *
  * The transform `Placement.displace` is held to its round trip by
- * `placement.test.ts`; what these hold is the whole of what an Open,
- * a Close and a Resize choose to apply — which growth each reads off which
- * entry, in which order, and what they write back into the Map. The transform
- * can be an exact involution and the Edits still drift, if an Open reads the
- * default Open Size while the Close reads the remembered one.
+ * `placement.test.ts`; what these hold is the whole of what a Resize chooses
+ * to apply — which growth it reads off which entry, and what it writes back
+ * into the Map.
  */
-describe('SnapshotEdit.open, close and resize properties', () => {
+describe('SnapshotEdit.resize and Map content properties', () => {
   const RESOURCE_IDS = [
     uuid('00000000-0000-4000-8000-000000000012'),
     uuid('00000000-0000-4000-8000-000000000013'),
@@ -585,7 +604,7 @@ describe('SnapshotEdit.open, close and resize properties', () => {
    * floor below is measured against is a fixed fact of the suite rather than a
    * roll of the dice: a floor that holds once holds on every machine.
    */
-  const SEED = 84;
+  const SEED = 1;
   const RUNS = 200;
   const COVERAGE_FLOOR = 40;
 
@@ -593,14 +612,12 @@ describe('SnapshotEdit.open, close and resize properties', () => {
 
   /**
    * One entry and the kind of the Resource it places. Only an Ur Resource takes
-   * a Shape and only another kind may be Open, so the generator never pairs
-   * either with the wrong kind.
+   * a Shape, so the generator never pairs one with the wrong kind.
    */
   type GeneratedEntry = {
-    readonly kind: 'ur' | 'markdown';
+    readonly kind: 'ur' | 'reference' | 'markdown';
     readonly x: number;
     readonly y: number;
-    readonly open: boolean;
     readonly size: Extent | undefined;
     readonly shape: ResourceShape | undefined;
   };
@@ -647,15 +664,13 @@ describe('SnapshotEdit.open, close and resize properties', () => {
         ur: fc.boolean(),
         x: coordinateArb,
         y: coordinateArb,
-        open: fc.boolean(),
         size: fc.option(storedSizeArb, { nil: undefined }),
         shape: fc.option(fc.constantFrom(...RESOURCE_SHAPES), { nil: undefined }),
       })
       .map((generated): GeneratedEntry => ({
-        kind: generated.ur ? 'ur' : 'markdown',
+        kind: generated.ur ? 'ur' : 'reference',
         x: generated.x,
         y: generated.y,
-        open: !generated.ur && generated.open,
         size: generated.size,
         shape: generated.ur ? generated.shape : undefined,
       })),
@@ -665,9 +680,9 @@ describe('SnapshotEdit.open, close and resize properties', () => {
   const subjectArb = fc.nat({ max: RESOURCE_IDS.length - 1 });
 
   const placementOf = (entry: GeneratedEntry): ResourcePlacement => {
-    let placement: ResourcePlacement = { x: entry.x, y: entry.y, open: entry.open };
+    let placement: ResourcePlacement = { x: entry.x, y: entry.y };
     if (entry.size !== undefined) placement = { ...placement, size: entry.size };
-    if (entry.shape !== undefined) placement = { ...placement, shape: entry.shape };
+    if (entry.shape !== undefined) placement = { ...placement, content: { shape: entry.shape } };
     return placement;
   };
 
@@ -678,9 +693,9 @@ describe('SnapshotEdit.open, close and resize properties', () => {
   ): readonly GeneratedEntry[] =>
     entries.map((entry, index) => (index === at ? { ...entry, ...change } : entry));
 
-  /** The entries with the subject a Markdown Resource, which may be Open. */
-  const markdownSubject = (entries: readonly GeneratedEntry[], at: number) =>
-    with_(entries, at, { kind: 'markdown', shape: undefined });
+  /** The entries with the subject a Reference Resource, which may be Open. */
+  const openableSubject = (entries: readonly GeneratedEntry[], at: number) =>
+    with_(entries, at, { kind: 'reference', shape: undefined });
 
   const snapshotOf = (entries: readonly GeneratedEntry[]): SpaceSnapshot => {
     const positions: Record<UUID, ResourcePlacement> = {};
@@ -694,7 +709,9 @@ describe('SnapshotEdit.open, close and resize properties', () => {
       resources: base.resources.map((resource, index) =>
         entries[index]?.kind === 'ur'
           ? { id: resource.id, document: urDocument(resource.document.title) }
-          : resource,
+          : entries[index]?.kind === 'markdown'
+            ? { id: resource.id, document: markdownDocument(resource.document.title) }
+            : resource,
       ),
     };
   };
@@ -727,7 +744,7 @@ describe('SnapshotEdit.open, close and resize properties', () => {
    * the subject's rect.
    */
   const createCoverage = () => {
-    const counts = { x: 0, y: 0, both: 0, neither: 0, open: 0, closed: 0 };
+    const counts = { x: 0, y: 0, both: 0, neither: 0 };
     const record = (entries: readonly GeneratedEntry[], subjectIndex: number): void => {
       const subject = entries[subjectIndex];
       if (subject === undefined) return;
@@ -745,8 +762,6 @@ describe('SnapshotEdit.open, close and resize properties', () => {
       for (const relation of ['x', 'y', 'both', 'neither'] as const) {
         if (seen[relation]) counts[relation] += 1;
       }
-      if (subject.open) counts.open += 1;
-      else counts.closed += 1;
     };
     const expectEveryCaseGenerated = (): void => {
       for (const count of Object.values(counts)) {
@@ -756,45 +771,7 @@ describe('SnapshotEdit.open, close and resize properties', () => {
     return { record, expectEveryCaseGenerated };
   };
 
-  it('Opens and Closes changing nothing but the subject’s open', () => {
-    fc.assert(
-      fc.property(entriesArb, subjectArb, (generated, subjectIndex) => {
-        const subjectId = RESOURCE_IDS[subjectIndex];
-        if (subjectId === undefined) return;
-        const start = snapshotOf(markdownSubject(generated, subjectIndex));
-        const startAt = positionsOf(start)[subjectId];
-
-        const opened = settled(start, SnapshotEdit.open(start, MAP_ID, subjectId));
-        expect(positionsOf(opened)).toEqual({
-          ...positionsOf(start),
-          [subjectId]: { ...startAt, open: true },
-        });
-        const closed = completed(SnapshotEdit.close(opened, MAP_ID, subjectId));
-        expect(positionsOf(closed)).toEqual({
-          ...positionsOf(start),
-          [subjectId]: { ...startAt, open: false },
-        });
-      }),
-      { seed: SEED, numRuns: RUNS },
-    );
-  });
-
-  it('refuses to Open an Ur Resource, which has no content to show', () => {
-    fc.assert(
-      fc.property(entriesArb, subjectArb, (generated, subjectIndex) => {
-        const subjectId = RESOURCE_IDS[subjectIndex];
-        if (subjectId === undefined) return;
-        const snapshot = snapshotOf(with_(generated, subjectIndex, { kind: 'ur', open: false }));
-
-        expect(SnapshotEdit.open(snapshot, MAP_ID, subjectId)).toEqual({
-          kind: 'refused',
-          refusal: { code: 'open-requires-content' },
-        });
-      }),
-    );
-  });
-
-  it('resizes Open or Closed, writing the size and keeping open, Shape and every Edge', () => {
+  it('resizes, writing the size and keeping Map content and every Edge', () => {
     fc.assert(
       fc.property(entriesArb, subjectArb, sizeArb, (generated, subjectIndex, size) => {
         const subjectId = RESOURCE_IDS[subjectIndex];
@@ -816,7 +793,7 @@ describe('SnapshotEdit.open, close and resize properties', () => {
     );
   });
 
-  it('restores every position through a grow and the shrink back, Open or Closed', () => {
+  it('restores every position through a grow and the shrink back', () => {
     const coverage = createCoverage();
     fc.assert(
       fc.property(
@@ -844,69 +821,6 @@ describe('SnapshotEdit.open, close and resize properties', () => {
     coverage.expectEveryCaseGenerated();
   });
 
-  it('Opens and expands as one Edit, the Open then the Resize it stands for', () => {
-    fc.assert(
-      fc.property(entriesArb, subjectArb, sizeArb, (generated, subjectIndex, size) => {
-        const subjectId = RESOURCE_IDS[subjectIndex];
-        if (subjectId === undefined) return;
-        const start = snapshotOf(markdownSubject(generated, subjectIndex));
-        const outcome = SnapshotEdit.openAndExpand(start, MAP_ID, subjectId, size);
-
-        const opened = settled(start, SnapshotEdit.open(start, MAP_ID, subjectId));
-        const stepwise = settled(opened, SnapshotEdit.resize(opened, MAP_ID, subjectId, size));
-        if (stepwise === start) {
-          expect(outcome).toEqual({ kind: 'unchanged' });
-          return;
-        }
-        expect(positionsOf(completed(outcome))).toEqual(positionsOf(stepwise));
-      }),
-      { seed: SEED, numRuns: RUNS },
-    );
-  });
-
-  it('floors an Open and expand at the Closed Size on each axis', () => {
-    fc.assert(
-      fc.property(
-        entriesArb,
-        subjectArb,
-        fc.record({ width: fc.nat({ max: 900 }), height: fc.nat({ max: 900 }) }),
-        (generated, subjectIndex, size) => {
-          const subjectId = RESOURCE_IDS[subjectIndex];
-          if (subjectId === undefined) return;
-          const start = snapshotOf(
-            with_(markdownSubject(generated, subjectIndex), subjectIndex, { open: false }),
-          );
-          const grown = completed(SnapshotEdit.openAndExpand(start, MAP_ID, subjectId, size));
-          const at = positionsOf(grown)[subjectId];
-
-          expect(at?.open).toBe(true);
-          expect(resourceSize(at ?? {}).width).toBe(
-            Math.max(size.width, COLLAPSED_RESOURCE_SIZE.width),
-          );
-          expect(resourceSize(at ?? {}).height).toBe(
-            Math.max(size.height, COLLAPSED_RESOURCE_SIZE.height),
-          );
-        },
-      ),
-      { seed: SEED, numRuns: RUNS },
-    );
-  });
-
-  it('refuses to Open and expand an Ur Resource, resizing nothing', () => {
-    fc.assert(
-      fc.property(entriesArb, subjectArb, sizeArb, (generated, subjectIndex, size) => {
-        const subjectId = RESOURCE_IDS[subjectIndex];
-        if (subjectId === undefined) return;
-        const snapshot = snapshotOf(with_(generated, subjectIndex, { kind: 'ur', open: false }));
-
-        expect(SnapshotEdit.openAndExpand(snapshot, MAP_ID, subjectId, size)).toEqual({
-          kind: 'refused',
-          refusal: { code: 'open-requires-content' },
-        });
-      }),
-    );
-  });
-
   it('answers unchanged for a Resize to the Closed Size of an entry storing none', () => {
     fc.assert(
       fc.property(entriesArb, subjectArb, (generated, subjectIndex) => {
@@ -923,46 +837,34 @@ describe('SnapshotEdit.open, close and resize properties', () => {
 
   it('refuses a Map the snapshot does not name and a Resource the Map does not hold, changing nothing', () => {
     fc.assert(
-      fc.property(
-        entriesArb,
-        fc.uuid().map(uuid),
-        fc.constantFrom<'open' | 'close' | 'resize' | 'openAndExpand'>(
-          'open',
-          'close',
-          'resize',
-          'openAndExpand',
-        ),
-        (entries, stranger, operation) => {
-          fc.pre(!RESOURCE_IDS.some((id) => id === stranger) && stranger !== MAP_ID);
-          const snapshot = snapshotOf(entries);
-          const subjectId = RESOURCE_IDS[0];
-          const run = (mapId: UUID, resourceId: UUID) =>
-            operation === 'resize' || operation === 'openAndExpand'
-              ? SnapshotEdit[operation](snapshot, mapId, resourceId, { width: 560, height: 420 })
-              : SnapshotEdit[operation](snapshot, mapId, resourceId);
+      fc.property(entriesArb, fc.uuid().map(uuid), (entries, stranger) => {
+        fc.pre(!RESOURCE_IDS.some((id) => id === stranger) && stranger !== MAP_ID);
+        const snapshot = snapshotOf(entries);
+        const subjectId = RESOURCE_IDS[0];
+        const run = (mapId: UUID, resourceId: UUID) =>
+          SnapshotEdit.resize(snapshot, mapId, resourceId, { width: 560, height: 420 });
 
-          expect(run(stranger, subjectId)).toEqual({
-            kind: 'refused',
-            refusal: { code: 'map-not-found' },
-          });
-          expect(run(MAP_ID, stranger)).toEqual({
-            kind: 'refused',
-            refusal: { code: 'resource-not-in-map' },
-          });
-        },
-      ),
+        expect(run(stranger, subjectId)).toEqual({
+          kind: 'refused',
+          refusal: { code: 'map-not-found' },
+        });
+        expect(run(MAP_ID, stranger)).toEqual({
+          kind: 'refused',
+          refusal: { code: 'resource-not-in-map' },
+        });
+      }),
     );
   });
 
-  /** Every Shape the Map records, so a whole Map can be compared at once. */
+  /** Every entry's Map content, so a whole Map can be compared at once. */
   const resourceShapesOf = (snapshot: SpaceSnapshot) =>
     Object.fromEntries(
-      Object.entries(positionsOf(snapshot)).map(([resourceId, at]) => [resourceId, at?.shape]),
+      Object.entries(positionsOf(snapshot)).map(([resourceId, at]) => [resourceId, at?.content]),
     );
 
-  it('keeps every Shape through any number of Resizes, Open and Close', () => {
-    // A Shape changes no rect, so the Edits that move and resize Resources carry
-    // every entry's Shape through untouched (ADR 0121).
+  it('keeps every Map content through any number of Resizes', () => {
+    // Map content changes no rect, so the Edits that move and resize Resources
+    // carry every entry's Map content through untouched (ADR 0142).
     fc.assert(
       fc.property(
         entriesArb,
@@ -979,19 +881,13 @@ describe('SnapshotEdit.open, close and resize properties', () => {
             current = settled(current, SnapshotEdit.resize(current, MAP_ID, subjectId, size));
             expect(resourceShapesOf(current)).toEqual(resourceShapes);
           }
-          if (entries[subjectIndex]?.kind === 'markdown') {
-            current = settled(current, SnapshotEdit.open(current, MAP_ID, subjectId));
-            expect(resourceShapesOf(current)).toEqual(resourceShapes);
-          }
-          current = settled(current, SnapshotEdit.close(current, MAP_ID, subjectId));
-          expect(resourceShapesOf(current)).toEqual(resourceShapes);
         },
       ),
       { seed: SEED, numRuns: RUNS },
     );
   });
 
-  it("changes one Resource's Shape and nothing else, and the Shape it has is unchanged", () => {
+  it("changes one Resource's Map content and nothing else, and the content it has is unchanged", () => {
     fc.assert(
       fc.property(
         entriesArb,
@@ -999,17 +895,14 @@ describe('SnapshotEdit.open, close and resize properties', () => {
         fc.constantFrom(...RESOURCE_SHAPES),
         (generated, subjectIndex, resourceShape) => {
           const subjectId = RESOURCE_IDS[subjectIndex];
-          const entries = with_(generated, subjectIndex, { kind: 'ur', open: false });
+          const entries = with_(generated, subjectIndex, { kind: 'ur' });
           const subject = entries[subjectIndex];
           if (subjectId === undefined || subject === undefined) return;
           const snapshot = snapshotOf(entries);
 
-          const outcome = SnapshotEdit.changeResourceShape(
-            snapshot,
-            MAP_ID,
-            subjectId,
-            resourceShape,
-          );
+          const outcome = SnapshotEdit.changeMapContent(snapshot, MAP_ID, subjectId, {
+            shape: resourceShape,
+          });
 
           const drawn = subject.shape ?? 'rectangle';
           if (resourceShape === drawn) {
@@ -1019,7 +912,7 @@ describe('SnapshotEdit.open, close and resize properties', () => {
           const changed = completed(outcome);
           expect(positionsOf(changed)).toEqual({
             ...positionsOf(snapshot),
-            [subjectId]: { ...positionsOf(snapshot)[subjectId], shape: resourceShape },
+            [subjectId]: { ...positionsOf(snapshot)[subjectId], content: { shape: resourceShape } },
           });
           expect({ ...changed, document: { ...changed.document, maps: [] } }).toEqual({
             ...snapshot,
@@ -1027,10 +920,10 @@ describe('SnapshotEdit.open, close and resize properties', () => {
           });
           expect(changed.document.maps?.[0]?.graphs).toEqual(snapshot.document.maps?.[0]?.graphs);
           // Undone by changing it back: the Edit's inverse is the same Edit, which
-          // writes the Shape chosen, so an entry that stored none now stores the
-          // rectangle it drew as.
+          // writes the content chosen, so an entry that stored none now stores the
+          // default it was given.
           expect(
-            completed(SnapshotEdit.changeResourceShape(changed, MAP_ID, subjectId, drawn)),
+            completed(SnapshotEdit.changeMapContent(changed, MAP_ID, subjectId, { shape: drawn })),
           ).toEqual(
             subject.shape === undefined
               ? snapshotOf(with_(entries, subjectIndex, { shape: 'rectangle' }))
@@ -1042,22 +935,115 @@ describe('SnapshotEdit.open, close and resize properties', () => {
     );
   });
 
-  it('refuses a Shape for a Map the snapshot does not name or a Resource the Map does not hold', () => {
+  it('refuses Map content for a Map the snapshot does not name or a Resource the Map does not hold', () => {
     fc.assert(
       fc.property(entriesArb, fc.uuid().map(uuid), (entries, stranger) => {
         fc.pre(!RESOURCE_IDS.some((id) => id === stranger) && stranger !== MAP_ID);
         const snapshot = snapshotOf(entries);
         const subjectId = RESOURCE_IDS[0];
 
-        expect(SnapshotEdit.changeResourceShape(snapshot, stranger, subjectId, 'diamond')).toEqual({
+        const diamond = { shape: 'diamond' };
+        expect(SnapshotEdit.changeMapContent(snapshot, stranger, subjectId, diamond)).toEqual({
           kind: 'refused',
           refusal: { code: 'map-not-found' },
         });
-        expect(SnapshotEdit.changeResourceShape(snapshot, MAP_ID, stranger, 'diamond')).toEqual({
+        expect(SnapshotEdit.changeMapContent(snapshot, MAP_ID, stranger, diamond)).toEqual({
           kind: 'refused',
           refusal: { code: 'resource-not-in-map' },
         });
       }),
+    );
+  });
+
+  /** The entries with the subject a Closed Markdown Resource storing no size. */
+  const markdownSubject = (entries: readonly GeneratedEntry[], at: number) =>
+    with_(entries, at, { kind: 'markdown', size: undefined, shape: undefined });
+
+  /** A size hint as a plugin might ask: any size, some below the Closed Size, some fractional. */
+  const hintArb = fc.record({
+    width: fc.double({ min: 0, max: 1200, noNaN: true }),
+    height: fc.double({ min: 0, max: 1200, noNaN: true }),
+  });
+
+  /** The Resize's answer, read as the completed Open it follows when it changed nothing. */
+  const settledOutcome = (
+    snapshot: SpaceSnapshot,
+    outcome: SnapshotEditOutcome,
+  ): SnapshotEditOutcome =>
+    outcome.kind === 'unchanged' ? { kind: 'completed', snapshot } : outcome;
+
+  it('applies a Map content Edit’s size hint as a Resize does, floored at the Closed Size', () => {
+    fc.assert(
+      fc.property(entriesArb, subjectArb, hintArb, (generated, subjectIndex, hint) => {
+        const subjectId = RESOURCE_IDS[subjectIndex];
+        if (subjectId === undefined) return;
+        const start = snapshotOf(markdownSubject(generated, subjectIndex));
+        const opened = completed(
+          SnapshotEdit.changeMapContent(start, MAP_ID, subjectId, { open: true }),
+        );
+        const floored = {
+          width: Math.max(Math.round(hint.width), COLLAPSED_RESOURCE_SIZE.width),
+          height: Math.max(Math.round(hint.height), COLLAPSED_RESOURCE_SIZE.height),
+        };
+        // One Edit: the content, then the size it hints at with the displacement
+        // that size causes, exactly as the Resize it stands for.
+        expect(
+          SnapshotEdit.changeMapContent(start, MAP_ID, subjectId, { open: true }, hint),
+        ).toEqual(settledOutcome(opened, SnapshotEdit.resize(opened, MAP_ID, subjectId, floored)));
+      }),
+      { seed: SEED, numRuns: RUNS },
+    );
+  });
+
+  it('ignores a size hint on an entry that already stores a size, and on content that is unchanged', () => {
+    fc.assert(
+      fc.property(
+        entriesArb,
+        subjectArb,
+        sizeArb,
+        hintArb,
+        (generated, subjectIndex, stored, hint) => {
+          const subjectId = RESOURCE_IDS[subjectIndex];
+          if (subjectId === undefined) return;
+          const sized = snapshotOf(
+            with_(markdownSubject(generated, subjectIndex), subjectIndex, { size: stored }),
+          );
+          expect(
+            SnapshotEdit.changeMapContent(sized, MAP_ID, subjectId, { open: true }, hint),
+          ).toEqual(SnapshotEdit.changeMapContent(sized, MAP_ID, subjectId, { open: true }));
+          const closed = snapshotOf(markdownSubject(generated, subjectIndex));
+          expect(
+            SnapshotEdit.changeMapContent(closed, MAP_ID, subjectId, { open: false }, hint),
+          ).toEqual({ kind: 'unchanged' });
+        },
+      ),
+      { seed: SEED, numRuns: RUNS },
+    );
+  });
+
+  it('keeps the Map content its plugin accepts and refuses what it refuses, whichever plugin it is', () => {
+    fc.assert(
+      fc.property(entriesArb, subjectArb, (generated, subjectIndex) => {
+        const subjectId = RESOURCE_IDS[subjectIndex];
+        if (subjectId === undefined) return;
+        // A Reference Resource to a Space Resource is drawn by its plugin: it
+        // keeps its `{ open }` and nothing else.
+        const reference = snapshotOf(openableSubject(generated, subjectIndex));
+        expect(
+          SnapshotEdit.changeMapContent(reference, MAP_ID, subjectId, { open: true }).kind,
+        ).not.toBe('refused');
+        expect(
+          SnapshotEdit.changeMapContent(reference, MAP_ID, subjectId, { shape: 'rectangle' }),
+        ).toEqual({ kind: 'refused', refusal: { code: 'map-content-invalid' } });
+        const ur = snapshotOf(with_(generated, subjectIndex, { kind: 'ur' }));
+        for (const content of [{ shape: 'hexagon' }, 'pill', null, {}]) {
+          expect(SnapshotEdit.changeMapContent(ur, MAP_ID, subjectId, content)).toEqual({
+            kind: 'refused',
+            refusal: { code: 'map-content-invalid' },
+          });
+        }
+      }),
+      { seed: SEED, numRuns: RUNS },
     );
   });
 });
@@ -1082,11 +1068,8 @@ describe('SnapshotEdit across two Maps: addToMap, removeFromMap and deleteFromSp
     const first = Placement.toPositions(
       Placement.fromEntries(
         members.map((id): [UUID, ResourcePlacement] => {
-          const at = placement.get(id) ?? { x: 0, y: 0, open: false };
-          return [
-            id,
-            open ? { x: at.x, y: at.y, open: true, size: { width: 560, height: 420 } } : at,
-          ];
+          const at = placement.get(id) ?? { x: 0, y: 0 };
+          return [id, open ? { x: at.x, y: at.y, size: { width: 560, height: 420 } } : at];
         }),
       ),
     );
@@ -1169,7 +1152,6 @@ describe('SnapshotEdit across two Maps: addToMap, removeFromMap and deleteFromSp
             SnapshotEdit.addToMap(snapshot, MAP_ID, subject, anchor, 'avoidingOverlap'),
           );
           const landed = mapIn(avoiding, MAP_ID)?.positions[subject];
-          expect(landed?.open).toBe(false);
           expect(
             others.some((id) => positions[id]?.x === landed?.x && positions[id]?.y === landed?.y),
           ).toBe(false);
@@ -1183,14 +1165,13 @@ describe('SnapshotEdit across two Maps: addToMap, removeFromMap and deleteFromSp
           expect(mapIn(exact, MAP_ID)?.positions[subject]).toEqual({
             x: anchor.x,
             y: anchor.y,
-            open: false,
           });
         },
       ),
     );
   });
 
-  it('moves no other Resource when it removes or deletes an Open, resized one', () => {
+  it('moves no other Resource when it removes or deletes a resized one', () => {
     // Removal changes no size, so it displaces nobody, in any Map.
     fc.assert(
       fc.property(idsArb, coordsArb, fc.nat({ max: 8 }), (ids, coords, subjectSeed) => {
@@ -1198,12 +1179,7 @@ describe('SnapshotEdit across two Maps: addToMap, removeFromMap and deleteFromSp
         if (subject === undefined) return;
         const closed = twoMaps(ids, coords, false);
         const opened = completed(
-          SnapshotEdit.resize(
-            completed(SnapshotEdit.open(closed, MAP_ID, subject)),
-            OTHER_MAP_ID,
-            subject,
-            { width: 560, height: 420 },
-          ),
+          SnapshotEdit.resize(closed, OTHER_MAP_ID, subject, { width: 560, height: 420 }),
         );
         const removed = completed(SnapshotEdit.removeFromMap(opened, MAP_ID, subject));
         const deleted = completed(SnapshotEdit.deleteFromSpace(opened, subject));

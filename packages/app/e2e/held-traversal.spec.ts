@@ -10,7 +10,7 @@ import { seedPositionedMap } from './seed';
 const IMAGE_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000a1');
 const FIGURE_URL = 'https://example.com/figure.png';
 const HARBOUR = readFileSync(
-  new URL('../fixture/images/fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs.png', import.meta.url),
+  new URL('../fixture/assets/fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs.png', import.meta.url),
 );
 
 /** Open a Space holding a Closed Image Resource on the Map `Pictures`, and a second Map `Elsewhere`. */
@@ -21,7 +21,7 @@ async function openPicturesAndElsewhere(page: Page): Promise<void> {
   const seeded = await seedPositionedMap(
     page,
     'Pictures',
-    () => ({ [IMAGE_ID]: { x: 400, y: 0, open: false } }),
+    () => ({ [IMAGE_ID]: { x: 400, y: 0 } }),
     [
       {
         id: IMAGE_ID,
@@ -43,30 +43,25 @@ async function openPicturesAndElsewhere(page: Page): Promise<void> {
 }
 
 /**
- * Begin replacing the Image Resource's picture with a file, and hold the host's
- * answer so the replacement stays in flight and refuses every traversal.
+ * Replace the Image Resource's picture with a file from its rail (ADR 0142), and
+ * hold the host's answer so the Replace stays in flight and refuses every
+ * traversal.
  */
 async function holdReplacement(page: Page): Promise<void> {
-  const node = page.locator(`.react-flow__node[data-id="${IMAGE_ID}"]`);
-  const controls = await resourceControls(page, node);
-  await controls.getByRole('button', { name: 'Replace image of Resource Figure' }).click();
-  const target = node.getByRole('group', { name: 'Replace image of Figure' });
-  await expect(target).toBeVisible();
-  await settled(page);
   const never = Promise.withResolvers<undefined>();
   await page.route(
-    (url) => url.pathname === '/images',
+    (url) => url.pathname === '/assets',
     async (route) => {
       await never.promise;
       await route.continue();
     },
   );
+  const node = page.locator(`.react-flow__node[data-id="${IMAGE_ID}"]`);
+  const controls = await resourceControls(page, node);
   const chooser = page.waitForEvent('filechooser');
-  await target.getByRole('button', { name: 'Upload' }).click();
-  await (
-    await chooser
-  ).setFiles({ name: 'fake.png', mimeType: 'image/png', buffer: Buffer.from('not a picture') });
-  await expect(target).toHaveAttribute('aria-busy', 'true');
+  await controls.getByRole('button', { name: 'Replace image of Resource Figure' }).click();
+  await (await chooser).setFiles({ name: 'harbour.png', mimeType: 'image/png', buffer: HARBOUR });
+  await expect(node.getByTestId('image-notice')).toHaveText('Replacing image…');
 }
 
 /**

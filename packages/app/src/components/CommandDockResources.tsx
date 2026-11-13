@@ -10,9 +10,8 @@ import { bindingOf } from '../key-bindings';
 import type { MenuSide } from '../dock-placement';
 import { RESOURCES_TRIGGER } from './command-dock-triggers';
 import { DockDisclosureContext, RESOURCES_DISCLOSURE_ID } from './command-dock-shared';
-import type { DockResources, DockResourcesList } from './command-dock-chrome';
+import type { DockCreate, DockResources, DockResourcesList } from './command-dock-chrome';
 import { SetTrigger } from './CommandDockParts';
-import type { DockCreate } from '../kind-creation';
 import { ResourcesPopover } from './ResourcesPopover';
 
 /**
@@ -85,7 +84,7 @@ function CreatePeers({ creates }: { readonly creates: readonly DockCreate[] }) {
 
 function ResourcesTrigger() {
   return (
-    /* The Resource glyph the rows in its own list carry, not `OpenResourceIcon`'s
+    /* The Resource glyph the rows in its own list carry, not a plugin Open's
        expand arrows: beside a Space, a Map and a Graph's colour, the icon
        slot names what the cluster is about, and "expand" named a gesture this
        cluster does not have. */
@@ -149,6 +148,7 @@ function ResourcesList({
       resources={list.resources}
       allResources={list.allResources}
       spaceTitleById={list.spaceTitleById}
+      spaceSelectionNameById={list.spaceSelectionNameById}
       spaces={list.spaces}
       onAddSpace={list.onAddSpace}
       memberships={list.memberships}

@@ -2,6 +2,7 @@
 
 Status: accepted
 Refines: 0135
+Refined by: 0142
 Related: 0121
 
 ADR 0135 kept the selection ring in ink so that selection would read the same on every Resource. In the sand theme the ink is near-black, so a selected Resource in no Graph showed a black border made thicker, while a selected Resource in a Graph showed a black ring around a coloured border. The dark theme's ink is a neutral grey, the colour of a Resource in no Graph, and the theme ringed selection in its chrome's magenta instead. That broke 0135, and it put the magenta out of reach of every Graph colour, because a Graph drawn in it would look selected.

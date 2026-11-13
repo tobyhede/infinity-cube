@@ -32,6 +32,7 @@ import { authoredFromDrawn, type SpaceResourceFraming } from '../space-resource-
 import { spaceResourceEmbedCamera } from '../camera';
 import { CanvasContinuation } from './CanvasContinuation';
 import { useNameOnCreation } from '../name-on-creation';
+import { sameEmbedding, type Embedding } from '../plugin-host/claim-chain';
 
 export type { EmbeddedPublication };
 
@@ -51,6 +52,7 @@ export function EmbeddedMapAuthoring({
   drawnAbsolute: { x: drawnX, y: drawnY },
   tiltCenter,
   publish,
+  embeddedIn,
 }: {
   readonly parent: ResourceFlowNode;
   readonly entry: OpenSpace;
@@ -79,6 +81,12 @@ export function EmbeddedMapAuthoring({
   /** The centre a dragged ancestor leans about, or `undefined` while none moves. */
   readonly tiltCenter: MapPosition | undefined;
   readonly publish: (id: string, value: EmbeddedPublication | null) => void;
+  /**
+   * The Resources this Map is drawn inside, outermost first, ending with the
+   * one embedding it, so a Claim taken on a Resource drawn here nests under
+   * the Claim that Resource holds (ADR 0142).
+   */
+  readonly embeddedIn: Embedding;
 }) {
   const parentId = parent.id;
   const chromeRoot = useRef<HTMLElement>(null);
@@ -132,7 +140,7 @@ export function EmbeddedMapAuthoring({
     entityActions,
     availability,
     editingResourceBody,
-    createReferenceFrom: placement.createReferenceFrom,
+    createFromResource: placement.createFromResource,
     spaces,
   });
   const selectResource = state.selectResource;
@@ -167,12 +175,23 @@ export function EmbeddedMapAuthoring({
   const readTarget = useCallback((id: ResourceId) => entry.spaceResources.target(id), [entry]);
   const targets = useSpaceResourceTargets(space.resources, readTarget);
   const nameOnCreation = useNameOnCreation(composition.continuation);
+  // The drawings, not the array's identity, which the canvas mints afresh each render.
+  const [embeddedInDrawings, setEmbeddedInDrawings] = useState(embeddedIn);
+  if (embeddedInDrawings !== embeddedIn && !sameEmbedding(embeddedInDrawings, embeddedIn))
+    setEmbeddedInDrawings(embeddedIn);
+  const plugins = useMemo(
+    () => ({
+      gate: entry.app.pluginGate,
+      report: entry.app.reportObserverError,
+      embeddedIn: embeddedInDrawings,
+    }),
+    [entry.app, embeddedInDrawings],
+  );
   const authoring = useCanvasResourceAuthoring({
+    plugins,
     continuation: composition.continuation,
     commandOutcomes: entry.app.commandOutcomes,
     deleteConfirmation: entry.app.deleteConfirmation,
-    imageReplacement: entry.app.imageReplacement,
-    pickImages: entry.app.pickImages,
     nodes: canvasRendering.liveProjection?.nodes ?? EMPTY_NODES,
     availability,
     nameOnCreation,
@@ -333,7 +352,6 @@ export function EmbeddedMapAuthoring({
       surface: composition,
       edgeSurface,
       availability,
-      openResource: authoring.openResource,
       beginTitleEditing: authoring.beginTitleEditing,
       mapId,
       nodes,
@@ -385,7 +403,6 @@ export function EmbeddedMapAuthoring({
     placement,
     absoluteX,
     absoluteY,
-    authoring.openResource,
     authoring.beginTitleEditing,
     authoring.bodyEditing,
     authoring.titleEditing,

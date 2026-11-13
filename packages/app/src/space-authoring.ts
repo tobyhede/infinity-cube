@@ -1,11 +1,9 @@
 import {
+  isMissingKind,
   kindFlags,
   newDefaultResourceDocument,
-  newResourceDocument,
-  referenceKind,
   resourceReferences,
   spaceReferences,
-  type EmptyCreatableKindId,
   type ResourceDocument,
   type ResourceId,
   type Graph,
@@ -16,27 +14,25 @@ import {
   type MapId,
   type MapPosition,
   type ResourcePlacement,
-  type ResourceShape,
+  type JsonValue,
+  type MissingKind,
   COLLAPSED_RESOURCE_SIZE,
   resourceSize,
   EDGE_TITLE_ONE_LINE,
-  IMAGE_URL_UNSUPPORTED,
-  isAcceptedImageUrl,
-  type ImageNaturalSize,
+  resourceDocumentSchema,
   graphHeadShape,
   isOneLineEdgeTitle,
   RESOURCE_TITLE_REQUIRED,
   normalizeTitle,
   type SpaceSnapshot,
   type UUID,
-  imageKind,
-  type ImageKindId,
 } from '@project/core';
 import {
   graphColorsByGraphId,
   loadSpaceSnapshot,
   newGraph,
   Placement,
+  refusedUnrootedSpaceIds,
   SnapshotEdit,
   type PlacementMode,
   type SnapshotEditOutcome,
@@ -102,21 +98,18 @@ const assertValidAuthoredSnapshot = (snapshot: SpaceSnapshot): void => {
   }
 };
 
-/** One picture an Image Resource is created for: its URL, and its size when it loaded. */
-export interface CreatedImage {
-  readonly url: string;
-  readonly naturalSize?: ImageNaturalSize;
+/**
+ * One Resource a creation asks for (ADR 0142): its kind, its Title or none,
+ * and its content, which the kind's schema decides.
+ */
+export interface NewResource {
+  readonly kind: string;
+  readonly title?: string | undefined;
+  readonly content: JsonValue;
 }
 
-/** An Image Resource's document: its Title, its URL, and its natural size when the picture loaded. */
-const imageDocument = (title: string, { url, naturalSize }: CreatedImage): ResourceDocument => {
-  const content: Extract<ResourceDocument, { kind: ImageKindId }>['content'] = { url };
-  if (naturalSize !== undefined) content.naturalSize = naturalSize;
-  return { title, kind: imageKind.id, content };
-};
-
-/** The gap between Image Resources a single gesture creates side by side. */
-const IMAGE_ROW_GAP = 40;
+/** The gap between Resources a single creation places side by side. */
+const CREATED_ROW_GAP = 40;
 
 /**
  * One completed authored fact, as the interaction that finished knows it.
@@ -142,31 +135,24 @@ export type AuthoringCompletion =
        */
       readonly moved: ReadonlyMap<ResourceId, MapPosition>;
     }
-  | { readonly kind: 'opened-resource'; readonly resourceId: ResourceId }
-  | { readonly kind: 'closed-resource'; readonly resourceId: ResourceId }
   | {
       readonly kind: 'resized-resource';
       readonly resourceId: ResourceId;
       readonly size: { readonly width: number; readonly height: number };
     }
   /**
-   * Open and expand: Open one Resource and Resize it to fit its content, as one
-   * Edit (ADR 0137). `size` is the fitted size, floored at the Closed Size.
+   * Change Map content: what one Resource's plugin keeps for it on the Map the
+   * Edit is written into (ADR 0142), as an Ur Resource keeps its Shape (ADR
+   * 0121). Its plugin's schema decides what is accepted; the value the plugin is
+   * already given there is `unchanged`. `size` is a plugin's size hint as the
+   * canvas capped it, applied in the same Edit on an entry with no stored size,
+   * floored and displacing as a Resize does.
    */
   | {
-      readonly kind: 'opened-resource-to-fit';
+      readonly kind: 'changed-map-content';
       readonly resourceId: ResourceId;
-      readonly size: { readonly width: number; readonly height: number };
-    }
-  /**
-   * Change Shape: the outline one Resource is drawn in on the Map the Edit is
-   * written into (ADR 0121). Open or Closed alike; the Shape it already draws as
-   * is `unchanged`.
-   */
-  | {
-      readonly kind: 'changed-resource-shape';
-      readonly resourceId: ResourceId;
-      readonly shape: ResourceShape;
+      readonly content: JsonValue;
+      readonly size?: { readonly width: number; readonly height: number } | undefined;
     }
   | {
       readonly kind: 'connected-resources';
@@ -184,16 +170,17 @@ export type AuthoringCompletion =
       readonly document: ResourceDocument;
     }
   /**
-   * Replace image: the Image Resource's URL and the natural size measured when
-   * it was set, absent when the picture did not load (ADR 0106). Identity,
-   * Title, placement, size and Edges are kept, and the URL it
-   * already holds is `unchanged`.
+   * Change content: a Resource's whole `content`, as its plugin commits it
+   * (ADR 0142), as an Image Resource's Replace names its new picture. The
+   * Resource's kind's schema decides what is accepted, and the rest is the
+   * `edited-resource` Edit's: identity, Title, placement, size and Edges are
+   * kept, what it references may not change, and the content it already holds
+   * is `unchanged`.
    */
   | {
-      readonly kind: 'replaced-image';
+      readonly kind: 'changed-content';
       readonly resourceId: ResourceId;
-      readonly url: string;
-      readonly naturalSize?: ImageNaturalSize;
+      readonly content: JsonValue;
     }
   | {
       readonly kind: 'create-and-connect';
@@ -202,35 +189,17 @@ export type AuthoringCompletion =
       readonly position: MapPosition | 'beside-source';
     }
   /**
-   * Create Resource: a detached Resource of a kind that starts empty, at the
-   * visible centre, neutrally titled, with the content its kind's module
-   * declares it starts with.
+   * Create Resources (ADR 0142): what a plugin's creation asked the host for,
+   * in one Edit, placed in a row from the anchor the gesture gave. Each is
+   * titled as given, normalized as a rename is, or `Resource N` in order when
+   * it is given none or an empty one, and its content is parsed by its kind's
+   * schema here, so content it refuses is answered rather than thrown by
+   * intake. A Resource naming a Space is the coordinated lifecycle's, never
+   * this Edit's (ADR 0074).
    */
   | {
-      readonly kind: 'created-resource';
-      readonly resourceKind: EmptyCreatableKindId;
-      readonly anchor: MapPosition;
-    }
-  /**
-   * Create Reference: created with its Target, because a Reference Resource without
-   * one is not a valid Resource. The caller supplies the Target's Title; an empty
-   * title mints `Resource N` like any other Resource.
-   */
-  | {
-      readonly kind: 'created-reference';
-      readonly target: ResourceId;
-      readonly title?: string;
-      readonly anchor: MapPosition;
-    }
-  /**
-   * Create Image Resources: one per image, in one Edit, each titled
-   * `Resource N` in order and placed in a row from the anchor (ADR 0106). The
-   * caller has already stored or measured each picture; this Edit only
-   * records what it was told.
-   */
-  | {
-      readonly kind: 'created-images';
-      readonly images: readonly CreatedImage[];
+      readonly kind: 'created-resources';
+      readonly items: readonly NewResource[];
       readonly anchor: MapPosition;
       /**
        * `exact` for a drop or a paste, which aimed at their point; a press has
@@ -322,11 +291,8 @@ type MapRequiredOperation = Extract<
   AuthoringCompletion,
   | { readonly kind: 'added-resource-to-map' }
   | { readonly kind: 'removed-resource-from-map' }
-  | { readonly kind: 'opened-resource' }
-  | { readonly kind: 'closed-resource' }
   | { readonly kind: 'resized-resource' }
-  | { readonly kind: 'opened-resource-to-fit' }
-  | { readonly kind: 'changed-resource-shape' }
+  | { readonly kind: 'changed-map-content' }
   | { readonly kind: 'renamed-map' }
   | { readonly kind: 'renamed-graph' }
   | { readonly kind: 'recolored-graph' }
@@ -362,12 +328,17 @@ export type AuthoringRefusal =
   | { readonly code: 'reference-target-immutable' }
   | { readonly code: 'space-resource-target-immutable' }
   | { readonly code: 'space-resource-deletion-unsupported' }
+  /**
+   * Deleting the last Resource of a missing kind in this Space while the
+   * aggregate holds a Space only because a plugin is missing (ADR 0142).
+   */
+  | { readonly code: 'missing-plugin-holds-space'; readonly kind: MissingKind }
   // The one code here the domain owns rather than this module: `@project/core`
   // raises it from the Resource schema, so both ends spell it from one constant.
   | { readonly code: typeof RESOURCE_TITLE_REQUIRED }
   | { readonly code: 'map-title-required' }
-  // Spelt from `@project/core`'s constant, which the Image Resource schema raises too.
-  | { readonly code: typeof IMAGE_URL_UNSUPPORTED }
+  /** A created Resource naming a Space, which only the coordinated lifecycle makes (ADR 0074). */
+  | { readonly code: 'space-reference-creation-unsupported' }
   /**
    * Rename Space with nothing left after the trim. `spaceFileSchema` declares
    * the title as `z.string().min(1)`, which counts characters, so blank is the
@@ -379,8 +350,16 @@ export type AuthoringRefusal =
   | { readonly code: 'reference-target-not-targetable'; readonly targetId: ResourceId }
   | { readonly code: 'resource-already-in-map' }
   | { readonly code: 'resource-not-in-map' }
-  | { readonly code: 'open-requires-content' }
-  | { readonly code: 'shape-not-taken' }
+  /** Map content the Resource's plugin's schema refuses. */
+  | { readonly code: 'map-content-invalid' }
+  /** Exclusive work runs, and this Edit is not its own (ADR 0142). */
+  | { readonly code: 'exclusive-work-running' }
+  /** Content the Resource's kind's schema refuses (ADR 0142). */
+  | { readonly code: 'resource-content-invalid' }
+  /** A queued Edit discarded because a replacement Space was opened before it drained (ADR 0042). */
+  | { readonly code: 'space-replaced' }
+  /** A queued Edit discarded because the Edit draining the queue failed before reaching it. */
+  | { readonly code: 'edit-abandoned' }
   | {
       readonly code: 'resource-has-references';
       /** The Reference Resources by **name**, which is what a sentence listing Resources says (ADR 0083). */
@@ -460,7 +439,7 @@ export interface SurfaceAuthoring {
   /** The drawn Map's own placement, derived fresh from the working snapshot. */
   readonly mapPlacement: () => Placement;
   readonly edgeEligibility: (proposal: EdgeProposal) => EdgeEligibility;
-  readonly complete: (completion: DrawnCompletion) => AuthoringResult;
+  readonly complete: (completion: DrawnCompletion, settle?: Settle) => AuthoringResult;
 }
 
 export interface SpaceAuthoring {
@@ -488,8 +467,8 @@ export interface SpaceAuthoring {
    * authors its Map without moving this Space's canvas.
    */
   readonly complete: {
-    (target: DrawnEditTarget, completion: DrawnCompletion): AuthoringResult;
-    (target: CanvasEditTarget, completion: AuthoringCompletion): AuthoringResult;
+    (target: DrawnEditTarget, completion: DrawnCompletion, settle?: Settle): AuthoringResult;
+    (target: CanvasEditTarget, completion: AuthoringCompletion, settle?: Settle): AuthoringResult;
   };
   readonly retryPersistence: () => void;
   /**
@@ -577,13 +556,6 @@ interface ReportedCompletion {
   readonly completion: AuthoringCompletion;
 }
 
-/**
- * Create Image Resources, addressed to the Map the gesture was made on: storing
- * and measuring outlast the gesture, so the canvas may be drawing another Map
- * by the time this Edit lands (`image-creation.ts`).
- */
-export type ImagesCompletion = Extract<AuthoringCompletion, { kind: 'created-images' }>;
-
 /** A `ReportedCompletion` waiting behind the Edit that was installing when it arrived. */
 interface QueuedCompletion extends ReportedCompletion {
   /**
@@ -591,7 +563,26 @@ interface QueuedCompletion extends ReportedCompletion {
    * current in — read by the drain, and the only reason it is recorded.
    */
   readonly replacementEpoch: number;
+  /**
+   * Whether it was admitted as running exclusive work's own (ADR 0142). The
+   * drain refuses one that was not while exclusive work runs, since that work
+   * may have begun after it queued.
+   */
+  readonly admitted: boolean;
+  /** Told how the queued Edit settled, when its caller asked. */
+  readonly settle?: Settle;
 }
+
+/** How an Edit settled: every answer but `queued`, which is not an outcome. */
+export type SettledResult = Exclude<AuthoringResult, { readonly kind: 'queued' }>;
+
+/**
+ * Told once how a `queued` Edit settled (ADR 0142): its own result when the
+ * drain reaches it, or refused when the Space was replaced before then or a
+ * throw abandoned the queue. Never called for an Edit that did not queue,
+ * whose answer `complete` already returned.
+ */
+export type Settle = (result: SettledResult) => void;
 
 interface SpaceAuthoringDependencies {
   readonly session: SpaceSession;
@@ -624,6 +615,21 @@ interface SpaceAuthoringDependencies {
    * second source of minted identity behind the one the composition names.
    */
   readonly newId: () => UUID;
+  /**
+   * The application's exclusive gate (ADR 0142): while a plugin's exclusive
+   * work runs, every Edit that is not that work's own is refused here, at the
+   * one door every Edit enters by, whichever control or Space made it.
+   */
+  readonly exclusiveWork?:
+    { readonly withdraws: () => boolean; readonly exclusiveRunning: () => boolean } | undefined;
+  /**
+   * The Spaces the aggregate, as read when the application opened, holds
+   * because a plugin is missing (ADR 0142). The store refuses a commit that
+   * leaves one unrooted and no longer held (`refusedUnrootedSpaceIds`); this
+   * seam asks the same of a deletion before the working state changes, over
+   * the one Space it reads. Absent, none is held.
+   */
+  readonly heldSpaceIds?: readonly UUID[] | undefined;
 }
 
 /**
@@ -718,7 +724,7 @@ const trimmedNonBlankTitle = (title: string): string | null => {
  * the one intake mints from the same bytes — derived state disagreeing with the
  * code that derives it, which this repo fixes at the source.
  */
-const namedResourceTitle = (title: string): string | null => {
+export const namedResourceTitle = (title: string): string | null => {
   const normalized = normalizeTitle(title);
   return normalized.length === 0 ? null : normalized;
 };
@@ -772,6 +778,8 @@ export function createSpaceAuthoring({
   currentSpace,
   reportObserverError = (error) => console.error('SpaceAuthoring observer failed', error),
   newId,
+  exclusiveWork,
+  heldSpaceIds = [],
 }: SpaceAuthoringDependencies): SpaceAuthoring {
   let replacementEpoch = 0;
   let installing = 0;
@@ -1209,27 +1217,38 @@ export function createSpaceAuthoring({
       snapshot = outcome.snapshot;
       return { id };
     };
-    if (completion.kind === 'edited-resource') {
+    if (completion.kind === 'edited-resource' || completion.kind === 'changed-content') {
       const resourceIndex = snapshot.resources.findIndex(
         (resource) => resource.id === completion.resourceId,
       );
       const resource = snapshot.resources[resourceIndex];
       if (resource === undefined) return refuse({ code: 'resource-not-found' });
+      let proposed: ResourceDocument;
+      if (completion.kind === 'changed-content') {
+        // Content a plugin committed is parsed by its kind's schema here, so a
+        // value it refuses is answered rather than thrown by intake.
+        const parsed = resourceDocumentSchema.safeParse({
+          ...resource.document,
+          content: completion.content,
+        });
+        if (!parsed.success) return refuse({ code: 'resource-content-invalid' });
+        proposed = parsed.data;
+      } else {
+        proposed = completion.document;
+      }
       // Kind is fixed for a Resource's lifetime, and changing it is out of scope for
       // version 1. Everything else the editor holds — a Markdown Resource's Title
       // and body, or a Reference Resource's Title and Target — is one ordinary Edit of
       // this Resource.
-      if (resource.document.kind !== completion.document.kind) {
+      if (resource.document.kind !== proposed.kind) {
         return refuse({ code: 'resource-kind-immutable' });
       }
       // What a Resource references is fixed for its lifetime too: a Reference
       // Resource's Target (ADR 0070) and a Space Resource's target Space.
-      if (
-        !sameValue(resourceReferences(resource.document), resourceReferences(completion.document))
-      ) {
+      if (!sameValue(resourceReferences(resource.document), resourceReferences(proposed))) {
         return refuse({ code: 'reference-target-immutable' });
       }
-      if (!sameValue(spaceReferences(resource.document), spaceReferences(completion.document))) {
+      if (!sameValue(spaceReferences(resource.document), spaceReferences(proposed))) {
         return refuse({ code: 'space-resource-target-immutable' });
       }
       // Normalized and refused *here* rather than only at the surface that
@@ -1238,108 +1257,53 @@ export function createSpaceAuthoring({
       // by throwing, and an author's mistake may not throw. Every caller of
       // this operation is covered by one rule instead of each remembering it,
       // and that one rule is the schema's own (ADR 0083).
-      const title = namedResourceTitle(completion.document.title);
+      const title = namedResourceTitle(proposed.title);
       if (title === null) return refuse({ code: RESOURCE_TITLE_REQUIRED });
-      const document: ResourceDocument = { ...completion.document, title };
+      const document: ResourceDocument = { ...proposed, title };
       if (sameValue(resource.document, document)) return UNCHANGED;
       const resources = [...snapshot.resources];
       resources[resourceIndex] = { id: resource.id, document };
       snapshot = { ...snapshot, resources };
-    } else if (completion.kind === 'replaced-image') {
-      const resourceIndex = snapshot.resources.findIndex(
-        (resource) => resource.id === completion.resourceId,
-      );
-      const resource = snapshot.resources[resourceIndex];
-      if (resource === undefined) return refuse({ code: 'resource-not-found' });
-      if (resource.document.kind !== imageKind.id)
-        return refuse({ code: 'resource-kind-immutable' });
-      if (completion.url === resource.document.content.url) return UNCHANGED;
-      // A URL the schema will not hold is refused before intake, which answers
-      // it by throwing, and an author's URL may not throw
-      // (`image-replacement.test.ts`, "refuses a URL an Image Resource may not
-      // hold rather than throwing on intake").
-      if (!isAcceptedImageUrl(completion.url)) return refuse({ code: IMAGE_URL_UNSUPPORTED });
-      const document = imageDocument(resource.document.title, completion);
-      const resources = [...snapshot.resources];
-      resources[resourceIndex] = { id: resource.id, document };
-      snapshot = { ...snapshot, resources };
-    } else if (completion.kind === 'opened-resource') {
-      const outcome = SnapshotEdit.open(snapshot, mapId, completion.resourceId);
-      if (outcome.kind !== 'completed') return notCompleted(outcome);
-      snapshot = outcome.snapshot;
-    } else if (completion.kind === 'closed-resource') {
-      const outcome = SnapshotEdit.close(snapshot, mapId, completion.resourceId);
-      if (outcome.kind !== 'completed') return notCompleted(outcome);
-      snapshot = outcome.snapshot;
     } else if (completion.kind === 'resized-resource') {
       const outcome = SnapshotEdit.resize(snapshot, mapId, completion.resourceId, completion.size);
       if (outcome.kind !== 'completed') return notCompleted(outcome);
       snapshot = outcome.snapshot;
-    } else if (completion.kind === 'opened-resource-to-fit') {
-      const outcome = SnapshotEdit.openAndExpand(
+    } else if (completion.kind === 'changed-map-content') {
+      const outcome = SnapshotEdit.changeMapContent(
         snapshot,
         mapId,
         completion.resourceId,
+        completion.content,
         completion.size,
       );
       if (outcome.kind !== 'completed') return notCompleted(outcome);
       snapshot = outcome.snapshot;
-    } else if (completion.kind === 'changed-resource-shape') {
-      const outcome = SnapshotEdit.changeResourceShape(
-        snapshot,
-        mapId,
-        completion.resourceId,
-        completion.shape,
-      );
-      if (outcome.kind !== 'completed') return notCompleted(outcome);
-      snapshot = outcome.snapshot;
-    } else if (completion.kind === 'created-resource') {
-      const title = nextResourceTitle(snapshot);
-      const document = newResourceDocument(completion.resourceKind, title);
-      const created = createResource(document, completion.anchor, 'avoidingOverlap');
-      if ('kind' in created) return created;
-      createdResourceId = created.id;
-    } else if (completion.kind === 'created-images') {
-      // A URL the schema will not hold is refused before intake, which answers
-      // it by throwing, and an author's paste may not throw
-      // (`space-authoring-operations.test.ts`, "refuses a URL an Image Resource
-      // may not hold rather than throwing on intake").
-      if (completion.images.length === 0) return UNCHANGED;
-      if (completion.images.some(({ url }) => !isAcceptedImageUrl(url))) {
-        return refuse({ code: IMAGE_URL_UNSUPPORTED });
-      }
-      const step = COLLAPSED_RESOURCE_SIZE.width + IMAGE_ROW_GAP;
-      for (const [index, image] of completion.images.entries()) {
-        // Titled after the Resources created before it in this same Edit, so a
-        // row of three takes three successive numbers.
-        const document = imageDocument(nextResourceTitle(snapshot), image);
+    } else if (completion.kind === 'created-resources') {
+      if (completion.items.length === 0) return UNCHANGED;
+      const step = COLLAPSED_RESOURCE_SIZE.width + CREATED_ROW_GAP;
+      for (const [index, item] of completion.items.entries()) {
+        // An empty title mints the same neutral `Resource N` every other
+        // created Resource gets, titled after the Resources created before it
+        // in this same Edit, so a row of three takes three successive numbers.
+        // Text the caller gave is never overwritten, and is normalized the way
+        // a rename is: creation and renaming write one field, so the same
+        // typed bytes reach the same stored document whichever wrote them
+        // (ADR 0083).
+        const title = namedResourceTitle(item.title ?? '') ?? nextResourceTitle(snapshot);
+        const parsed = resourceDocumentSchema.safeParse({
+          title,
+          kind: item.kind,
+          content: item.content,
+        });
+        if (!parsed.success) return refuse({ code: 'resource-content-invalid' });
+        if (spaceReferences(parsed.data).length > 0) {
+          return refuse({ code: 'space-reference-creation-unsupported' });
+        }
         const at = { ...completion.anchor, x: completion.anchor.x + index * step };
-        const created = createResource(document, at, completion.placement);
+        const created = createResource(parsed.data, at, completion.placement);
         if ('kind' in created) return created;
         createdResourceId ??= created.id;
       }
-    } else if (completion.kind === 'created-reference') {
-      // An empty title mints the same neutral `Resource N` every other created Resource
-      // gets; text the author already entered is never overwritten. `??` cannot
-      // express this — the empty string is a value a caller really sends, and
-      // the whole point is that it does not count as one.
-      //
-      // The caller names the Reference Resource after its Target, and it is
-      // renamed in place afterwards; two Resources sharing a name is not a
-      // collision because a title is not an identifier (ADR 0089). What stays
-      // this module's is the default and the normalization, not the choice.
-      // Normalized the way a rename is, and for the same reason: creation and
-      // renaming write one field, so the same typed bytes have to reach the
-      // same stored document whichever path wrote them (ADR 0083).
-      const entered = namedResourceTitle(completion.title ?? '');
-      const document: ResourceDocument = {
-        title: entered ?? nextResourceTitle(snapshot),
-        kind: referenceKind.id,
-        content: { target: completion.target },
-      };
-      const created = createResource(document, completion.anchor, 'avoidingOverlap');
-      if ('kind' in created) return created;
-      createdResourceId = created.id;
     } else if (completion.kind === 'added-resource-to-map') {
       const outcome = SnapshotEdit.addToMap(
         snapshot,
@@ -1373,6 +1337,20 @@ export function createSpaceAuthoring({
       // targets still answers this rather than `resource-has-references`.
       if (kindFlags(deleted.kind).ownsReferencedSpaces) {
         return refuse({ code: 'space-resource-deletion-unsupported' });
+      }
+      // The store would refuse this commit with the Resource already gone from
+      // the working state, so it is refused here first, by the store's own
+      // rule. Deleting leaves every held Space unrooted, and another Space's
+      // Resource of a missing kind is not counted: this seam reads one Space.
+      if (
+        heldSpaceIds.length > 0 &&
+        isMissingKind(deleted.kind) &&
+        refusedUnrootedSpaceIds(heldSpaceIds, {
+          unrooted: heldSpaceIds,
+          spaces: [{ resources: space.resources.filter(({ id }) => id !== deleted.id) }],
+        }).length > 0
+      ) {
+        return refuse({ code: 'missing-plugin-holds-space', kind: deleted.kind });
       }
       // Everything else — a Reference Resource still targeting it, and the
       // cascade through every Map, the one this Edit is drawing included — is
@@ -1411,7 +1389,7 @@ export function createSpaceAuthoring({
     } else if (completion.kind === 'settled-resource-movement') {
       // The moved Resources' drop points, merged over the Map's own positions
       // this Edit already started from — `Placement.next` is what keeps each
-      // Resource's Open/Closed state, size and Shape while overwriting `x`/`y`.
+      // Resource's size and Map content while overwriting `x`/`y`.
       writePlacement(
         Placement.next(placement, Placement.fromEntries(completion.moved), [
           ...completion.moved.keys(),
@@ -1613,7 +1591,7 @@ export function createSpaceAuthoring({
     });
   };
 
-  const performCompletion = (reported: ReportedCompletion): AuthoringResult => {
+  const performCompletion = (reported: ReportedCompletion): SettledResult => {
     const derived = deriveCompletedEdit(reported);
     // `unchanged` and `refused` are already the answer — the core and the
     // interface share one vocabulary rather than translating between two.
@@ -1628,13 +1606,34 @@ export function createSpaceAuthoring({
 
   let completing = false;
   const queued: QueuedCompletion[] = [];
-  const complete = (target: EditTarget, completion: AuthoringCompletion): AuthoringResult => {
+  const settleSafely = (settle: Settle | undefined, result: SettledResult): void => {
+    if (settle === undefined) return;
+    try {
+      settle(result);
+    } catch (error) {
+      safelyReport(error);
+    }
+  };
+  const complete = (
+    target: EditTarget,
+    completion: AuthoringCompletion,
+    settle?: Settle,
+  ): AuthoringResult => {
+    if (exclusiveWork?.withdraws() === true) {
+      return { kind: 'refused', refusal: { code: 'exclusive-work-running' } };
+    }
     if (target.kind === 'drawn' && currentSpace().lookup.map(target.mapId) === undefined) {
       return { kind: 'refused', refusal: { code: 'map-not-found' } };
     }
     const reported: ReportedCompletion = { target, completion };
     if (completing) {
-      queued.push({ ...reported, replacementEpoch });
+      // Past the gate while exclusive work runs: this Edit is that work's own.
+      const admitted = exclusiveWork?.exclusiveRunning() === true;
+      const entry: QueuedCompletion =
+        settle === undefined
+          ? { ...reported, replacementEpoch, admitted }
+          : { ...reported, replacementEpoch, admitted, settle };
+      queued.push(entry);
       return { kind: 'queued' };
     }
     completing = true;
@@ -1660,12 +1659,23 @@ export function createSpaceAuthoring({
         // install-gate rule.
         if (next.replacementEpoch !== replacementEpoch) {
           discardedAsReplaced += 1;
+          settleSafely(next.settle, { kind: 'refused', refusal: { code: 'space-replaced' } });
+          continue;
+        }
+        // Exclusive work an observer began while this Edit waited withdraws it
+        // as it would have at `complete`, unless it is that work's own.
+        if (!next.admitted && exclusiveWork?.exclusiveRunning() === true) {
+          settleSafely(next.settle, {
+            kind: 'refused',
+            refusal: { code: 'exclusive-work-running' },
+          });
           continue;
         }
         try {
-          performCompletion(next);
+          settleSafely(next.settle, performCompletion(next));
         } catch (error) {
           safelyReport(error);
+          settleSafely(next.settle, { kind: 'refused', refusal: { code: 'edit-abandoned' } });
           break;
         }
       }
@@ -1687,7 +1697,10 @@ export function createSpaceAuthoring({
       // partway through the drain: those Edits are gone, and saying so is the
       // difference between a readable failure and a silent one.
       const discarded = queued.length;
-      queued.length = 0;
+      const abandoned = queued.splice(0);
+      for (const entry of abandoned) {
+        settleSafely(entry.settle, { kind: 'refused', refusal: { code: 'edit-abandoned' } });
+      }
       if (discarded > 0) {
         safelyReport(
           new Error(`SpaceAuthoring discarded ${discarded} queued completion(s) after a failure.`),

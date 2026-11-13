@@ -19,9 +19,9 @@ import {
   type HistoryApi,
 } from './browser-location';
 import { composeApp, type ComposedApp } from './compose-app';
+import { createPluginGate, type PluginGate } from './plugin-host/plugin-gate';
 import { createMountedEdits, type MountedEdits } from './mounted-edits';
 import { destinationOpening, type DestinationOpening } from './destination-opening';
-import type { ImageSources } from './image-creation';
 import type { Fullscreen } from './presenting-fullscreen';
 import type { PresentationLinks } from './presentation-link';
 import {
@@ -155,6 +155,12 @@ export type SelectSpaceResult =
 export interface OpenSpaces {
   readonly metaSpaceId: UUID;
   /**
+   * The page's one Claim chain and exclusive gate (ADR 0142): every Space
+   * composed here shares it, so exclusive work in one withdraws every Edit in
+   * all of them, and every plugin surface claims on it.
+   */
+  readonly pluginGate: PluginGate;
+  /**
    * Every row the Open Spaces menu draws, Meta first whether or not it is open,
    * then the tree the rest of the open set makes below it.
    *
@@ -244,12 +250,6 @@ export interface OpenSpacesOptions {
    */
   readonly history: HistoryApi;
   /**
-   * Where an Image Resource's picture is stored and measured, required with no
-   * default for the reason `history` is: `createSpaceStartup` names the host
-   * and the browser, and a test supplies answers of its own.
-   */
-  readonly images: ImageSources;
-  /**
    * What Present asks to put fullscreen, required with no default for the
    * reason `history` is: `main.tsx` supplies the one adapter over `document`,
    * and a test or a story supplies one of its own. A default would let a mount
@@ -270,6 +270,12 @@ export interface OpenSpacesOptions {
    * carry the mounted `source`. Absent, it is not.
    */
   readonly mounted?: boolean | undefined;
+  /**
+   * The Spaces the aggregate, as read when the application opened, holds
+   * because a plugin is missing (ADR 0142), which Space Authoring reads before
+   * deleting a Resource of a missing kind. Absent, none is.
+   */
+  readonly heldSpaceIds?: readonly UUID[] | undefined;
 }
 
 interface ValidatedLoadedSpace {
@@ -389,15 +395,16 @@ export function createOpenSpaces({
   metaSpaceTitle,
   newId,
   history,
-  images,
   fullscreen,
   presentations,
   reportObserverError,
   mounted,
+  heldSpaceIds,
 }: OpenSpacesOptions): OpenSpaces {
   const report: ObserverErrorReporter =
     reportObserverError ?? console.error.bind(console, 'Open Spaces observer failed');
   const registry = createSpaceSessionRegistry(backend, { reportObserverError: report });
+  const pluginGate = createPluginGate();
   // Opening a Space is a working load, so it initializes a stored mapless
   // Space before anything composes against it (ADR 0079).
   const loadWorkingSpace = createWorkingSpaceLoader(backend, newId);
@@ -417,6 +424,14 @@ export function createOpenSpaces({
     },
     report,
   );
+  // Exclusive work anywhere is the hold ADR 0126 sets on every composed Space:
+  // it is published as `replacingImage`, withdrawing authoring and navigation
+  // until the work settles (ADR 0142).
+  pluginGate.subscribe(() => {
+    const state = observable.getState();
+    const replacingImage = pluginGate.exclusiveRunning();
+    if (state.replacingImage !== replacingImage) observable.publish({ ...state, replacingImage });
+  });
   const mountedEdits = createMountedEdits(report);
   const compositions = new Map<UUID, Promise<OpenSpace>>();
   const drawingHolds = new Map<UUID, number>();
@@ -596,13 +611,14 @@ export function createOpenSpaces({
       app: composeApp({
         spaceSession: session,
         selection,
-        images,
         newId,
         reportObserverError: report,
         spaceResources,
         presentations,
         fullscreen,
         mounted,
+        pluginGate,
+        heldSpaceIds,
         // The Notes window's address carries the query as every other address
         // the location writes does, `source` included only when Mounting.
         addressOf: browserLocation.href,
@@ -629,11 +645,6 @@ export function createOpenSpaces({
       const state = observable.getState();
       if (!state.composed.some((entry) => entry.session === session)) return;
       observable.publish({ ...state, entries: [...state.entries], composed: [...state.composed] });
-    });
-    opened.app.imageReplacement.subscribe(() => {
-      const state = observable.getState();
-      const replacingImage = state.composed.some((entry) => entry.app.imageReplacement.getState());
-      if (state.replacingImage !== replacingImage) observable.publish({ ...state, replacingImage });
     });
     const state = observable.getState();
     observable.publish({ ...state, composed: [...state.composed, opened] });
@@ -872,11 +883,7 @@ export function createOpenSpaces({
 
     const state = observable.getState();
     const composed = state.composed.filter((entry) => entry !== target);
-    observable.publish({
-      ...state,
-      composed,
-      replacingImage: composed.some((entry) => entry.app.imageReplacement.getState()),
-    });
+    observable.publish({ ...state, composed });
   };
 
   const releaseUnheld = async (target: OpenSpace): Promise<void> => {
@@ -1029,6 +1036,7 @@ export function createOpenSpaces({
 
   return {
     metaSpaceId,
+    pluginGate,
     listing,
     opener,
     select,

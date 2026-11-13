@@ -1,16 +1,15 @@
 import {
   spaceReferences,
-  DEFAULT_RESOURCE_SHAPE,
-  resourceOpen,
-  resourceShape,
-  takesOpen,
-  takesResourceShape,
+  mapContentProblem,
   uuidSchema,
   type Resource,
   type Map,
   type UUID,
 } from '@project/core';
-import { resourceReferenceProblems, type ResourceReferenceProblem } from './declared-references';
+import {
+  storedResourceReferenceProblems,
+  type ResourceReferenceProblem,
+} from './declared-references';
 import { repeatedGraphEdges } from './graph-edges';
 
 /**
@@ -65,10 +64,8 @@ export type SpaceReferenceErrorKind =
   | 'reference-target-not-targetable'
   /** A Space reference a kind declares names the Space holding it. */
   | 'space-reference-cycle'
-  /** A Map gives a Resource whose kind takes no Shape a Shape other than the rectangle. */
-  | 'shape-not-taken'
-  /** A Map stores a Resource with no content to show Open. */
-  | 'open-requires-content';
+  /** A Map gives a Resource Map content its plugin's schema refuses (ADR 0142). */
+  | 'map-content-invalid';
 
 /**
  * One failed cross-reference. Named for the space whose references it is about,
@@ -187,22 +184,16 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
         continue;
       }
       // The kind is read from the Resource, because the entry does not carry it.
-      if (
-        !takesResourceShape(member.kind) &&
-        placement !== undefined &&
-        resourceShape(placement) !== DEFAULT_RESOURCE_SHAPE
-      ) {
+      // Which Map content a Resource keeps is its plugin's schema's answer.
+      const mapContentRefusal =
+        placement?.content === undefined
+          ? undefined
+          : mapContentProblem(member.kind, placement.content);
+      if (mapContentRefusal !== undefined) {
         errors.push({
-          kind: 'shape-not-taken',
+          kind: 'map-content-invalid',
           ref: resourceId,
-          message: `Map "${subject.id}" draws ${member.kind} resource "${resourceId}" as a ${resourceShape(placement)}; its kind takes no Shape other than the rectangle`,
-        });
-      }
-      if (!takesOpen(member.kind) && placement !== undefined && resourceOpen(placement)) {
-        errors.push({
-          kind: 'open-requires-content',
-          ref: resourceId,
-          message: `Map "${subject.id}" stores ${member.kind} resource "${resourceId}" Open; a Resource with no content is always Closed`,
+          message: `Map "${subject.id}" keeps Map content for ${member.kind} resource "${resourceId}" that its plugin refuses: ${mapContentRefusal}`,
         });
       }
     }
@@ -282,10 +273,11 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
   }
 
   // Every Resource reference a kind declares resolves, to a kind that may be a
-  // Target, so referencing stays a single hop (ADR 0113).
+  // Target, so referencing stays a single hop (ADR 0113). One that names a
+  // Resource whose plugin is missing is carried.
   const kindOf = (id: UUID) => resourceById.get(id)?.kind;
   for (const resource of space.resources) {
-    for (const problem of resourceReferenceProblems(resource.id, resource, kindOf)) {
+    for (const problem of storedResourceReferenceProblems(resource.id, resource, kindOf)) {
       errors.push(describeReferenceProblem(resource.id, problem));
     }
   }

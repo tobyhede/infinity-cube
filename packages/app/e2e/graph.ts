@@ -38,7 +38,7 @@ const fixtureDir = `${fixtureRoot}/${fixtureMetaId}`;
  * Ordinary Spaces the fixture aggregate already holds, excluding Meta.
  *
  * A child directory is a Space when it holds a `space.json`, as Import
- * discovers them; `images/` and any other directory are not.
+ * discovers them; `assets/` and any other directory are not.
  *
  * `space-resource.spec.ts` (`stops offering a Space…`, `deleting the last Space
  * Resource…`) lands back on this count after destroying a Space it just created.
@@ -98,6 +98,28 @@ export function nodeByTitle(page: Page, title: string): Locator {
   return page
     .locator('.react-flow__node')
     .filter({ has: page.getByRole('heading', { name: title, exact: true }) });
+}
+
+/**
+ * Every Open Resource on the page, however it is drawn.
+ *
+ * A Resource the shared frame draws carries its Open on `.canvas-resource`. A
+ * plugin's Card always carries `data-open="false"`, since Open is the plugin's
+ * Map content (ADR 0142); the Markdown plugin carries it on its own element
+ * inside `.canvas-resource__plugin`. A guard that a gesture Opened nothing reads
+ * both.
+ */
+export function openResources(page: Page): Locator {
+  return page.locator(
+    '.canvas-resource:not(.canvas-resource--plugin)[data-open="true"], .canvas-resource__plugin [data-open="true"]',
+  );
+}
+
+/** Every Closed Resource on the page that could be Open, read as `openResources` reads Open. */
+export function closedResources(page: Page): Locator {
+  return page.locator(
+    '.canvas-resource:not(.canvas-resource--plugin)[data-open="false"], .canvas-resource__plugin [data-open="false"]',
+  );
 }
 
 /** The visible face shares its node's complete rectangle, including during resize. */

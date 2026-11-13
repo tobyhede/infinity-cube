@@ -17,8 +17,8 @@ import {
 import { RESOURCE_SIZE } from '../src/resource';
 import { mintingIds } from './minting';
 import { node } from './render-adapter-fixtures';
-import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
+import { textAsset } from './markdown-texts';
 
 /**
  * Edge Authoring through its own interface: the one draft, what cancels it, what
@@ -56,9 +56,18 @@ const automaticSnapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: { version: 1, title: 'Space' },
   resources: [
-    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
-    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', content: { source: 'B' } } },
-    { id: RESOURCE_C, document: { title: 'C', kind: 'markdown', content: { source: 'C' } } },
+    {
+      id: RESOURCE_A,
+      document: { title: 'A', kind: 'markdown', content: { url: textAsset('A') } },
+    },
+    {
+      id: RESOURCE_B,
+      document: { title: 'B', kind: 'markdown', content: { url: textAsset('B') } },
+    },
+    {
+      id: RESOURCE_C,
+      document: { title: 'C', kind: 'markdown', content: { url: textAsset('C') } },
+    },
   ],
 };
 
@@ -73,9 +82,9 @@ const positionedSnapshot: SpaceSnapshot = {
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [RESOURCE_A]: { x: 10, y: 20, open: false },
-          [RESOURCE_B]: { x: 300, y: 40, open: false },
-          [RESOURCE_C]: { x: 600, y: 40, open: false },
+          [RESOURCE_A]: { x: 10, y: 20 },
+          [RESOURCE_B]: { x: 300, y: 40 },
+          [RESOURCE_C]: { x: 600, y: 40 },
         },
         graphs: [
           { id: GRAPH_ID, title: 'Main', edges: [EDGE] },
@@ -86,7 +95,7 @@ const positionedSnapshot: SpaceSnapshot = {
         id: OTHER_MAP_ID,
         title: 'Map 2',
         kind: 'positioned',
-        positions: { [RESOURCE_C]: { x: 0, y: 0, open: false } },
+        positions: { [RESOURCE_C]: { x: 0, y: 0 } },
         graphs: [{ id: THIRD_GRAPH_ID, title: 'Third', edges: [] }],
       },
     ],
@@ -102,7 +111,7 @@ function open(
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
   const { navigation, authoring, adapter, continuation, edgeAuthoring, deleteConfirmation } =
-    composeApp({ images: unusedImageSources, spaceSession: session, selection: mapId, newId });
+    composeApp({ spaceSession: session, selection: mapId, newId });
   adapter.getState().syncProjection(PROJECTED, []);
   return {
     session,
@@ -459,7 +468,6 @@ describe('draft invalidation', () => {
     });
     const session = openSpaceSession(backend, loaded);
     const { authoring, edgeAuthoring: edges } = composeApp({
-      images: unusedImageSources,
       spaceSession: session,
       selection: MAP_ID,
     });
@@ -804,7 +812,6 @@ describe('connecting from the Connect list', () => {
     expect(working.document.maps?.[0]?.positions[MINTED]).toEqual({
       x: 10 + RESOURCE_SIZE.width * 1.5,
       y: 20,
-      open: false,
     });
     expect(continuation.getState().pending).toEqual({
       target: { kind: 'edge', graphId: GRAPH_ID, edge: { from: RESOURCE_A, to: MINTED } },
@@ -824,7 +831,12 @@ describe('connecting from the Connect list', () => {
                 ...m,
                 positions: {
                   ...m.positions,
-                  [RESOURCE_A]: { x: 10, y: 20, open: true, size: { width: 560, height: 420 } },
+                  [RESOURCE_A]: {
+                    x: 10,
+                    y: 20,
+                    content: { open: true },
+                    size: { width: 560, height: 420 },
+                  },
                 },
               }
             : m,
@@ -838,7 +850,6 @@ describe('connecting from the Connect list', () => {
     expect(session.getState().working.document.maps?.[0]?.positions[MINTED]).toEqual({
       x: 10 + 560 + RESOURCE_SIZE.width / 2,
       y: 20,
-      open: false,
     });
   });
 

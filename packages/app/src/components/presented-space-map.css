@@ -1,0 +1,18 @@
+/* A Space Resource's Map on the Stage is drawn on the slide's own paper, and
+   takes no pointer: the audience watches it, nobody works it. It fills the
+   room its plugin gave the Map embedding, which React Flow needs a size for. */
+.presented-map {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.presented-map__flow {
+  background: transparent;
+}
+
+/* A Resource's name is sized for an author at a desk; across a room it reads
+   a third as large again. */
+.presented-map .canvas-resource {
+  --canvas-resource-title-size: 24px;
+}

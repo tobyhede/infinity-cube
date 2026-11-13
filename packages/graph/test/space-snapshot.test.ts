@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { SpaceSnapshot } from '@project/core';
+import { isOfKind, type SpaceSnapshot } from '@project/core';
 import { loadSpaceSnapshot } from '../src/index';
 import { uuid } from './resource-files';
+import { textRef } from './text-asset';
 
 const SPACE_ID = uuid('00000000-0000-4000-8000-000000000001');
 const RESOURCE_A = uuid('00000000-0000-4000-8000-000000000002');
@@ -20,16 +21,22 @@ const snapshot: SpaceSnapshot = {
         title: 'Working',
         kind: 'positioned',
         positions: {
-          [RESOURCE_A]: { x: 0, y: 0, open: false },
-          [RESOURCE_B]: { x: 320, y: 0, open: false },
+          [RESOURCE_A]: { x: 0, y: 0 },
+          [RESOURCE_B]: { x: 320, y: 0 },
         },
         graphs: [{ id: GRAPH_ID, title: 'Main', edges: [{ from: RESOURCE_A, to: RESOURCE_B }] }],
       },
     ],
   },
   resources: [
-    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: 'Body A' } } },
-    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', content: { source: 'Body B' } } },
+    {
+      id: RESOURCE_A,
+      document: { title: 'A', kind: 'markdown', content: { url: textRef('Body A') } },
+    },
+    {
+      id: RESOURCE_B,
+      document: { title: 'B', kind: 'markdown', content: { url: textRef('Body B') } },
+    },
   ],
 };
 
@@ -75,7 +82,7 @@ describe('loadSpaceSnapshot', () => {
             ...firstMap,
             positions: {
               ...firstMap.positions,
-              [RESOURCE_A]: { x: 0, y: 0, open: true, size: { width: Infinity, height: 146 } },
+              [RESOURCE_A]: { x: 0, y: 0, size: { width: Infinity, height: 146 } },
             },
           },
         ],
@@ -109,7 +116,7 @@ describe('loadSpaceSnapshot', () => {
     const result = loadSpaceSnapshot({
       ...snapshot,
       resources: [
-        { id: RESOURCE_A, document: { kind: 'markdown', content: { source: 'Body A' } } },
+        { id: RESOURCE_A, document: { kind: 'markdown', content: { url: textRef('Body A') } } },
       ],
     });
 
@@ -132,7 +139,9 @@ describe('loadSpaceSnapshot', () => {
     if (!result.ok) return;
     expect(result.space.id).toBe(SPACE_ID);
     const resource = result.space.lookup.resource(RESOURCE_A);
-    expect(resource?.kind === 'markdown' && resource.content.source).toBe('Body A');
+    expect(resource !== undefined && isOfKind(resource, 'markdown') && resource.content.url).toBe(
+      textRef('Body A'),
+    );
     expect(result.space.lookup.graph(GRAPH_ID)?.graph.title).toBe('Main');
   });
 

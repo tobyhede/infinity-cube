@@ -1,4 +1,4 @@
-import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import { HttpSpaceBackend } from '@project/http';
 import {
   decodeLoadedSpace,
@@ -55,7 +55,7 @@ const RELEASE_CLOCK_TOLERANCE_MS = 100;
 
 const markdown = (id: UUID, title: string) => ({
   id,
-  document: { title, kind: 'markdown' as const, content: { source: title } },
+  document: { title, kind: 'markdown' as const, content: { url: EMPTY_ASSET_REF } },
 });
 
 const child: SpaceSnapshot = {

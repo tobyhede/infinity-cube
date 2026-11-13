@@ -1,9 +1,11 @@
+import { isMissingKind, type ResourceKind, type UUID } from '@project/core';
 import type { SpaceAggregateError, SpaceError } from '@project/graph';
+import { kindNaming } from '@project/ui';
 import {
-  IMAGE_MEDIA_TYPES,
-  MAX_IMAGE_BYTES,
-  type ImageMediaType,
-  type ImageRefusal,
+  ASSET_ABSENT,
+  ASSET_TOO_LARGE,
+  MAX_ASSET_BYTES,
+  type AssetRefusalCode,
   type SaveBlock,
   type SpaceSessionState,
 } from '@project/persistence';
@@ -39,49 +41,28 @@ type PresentedAuthoringRefusal =
  */
 const MAP_NO_LONGER_IN_SPACE = 'This Map is no longer part of the Space.';
 
-/**
- * What the author calls each format the host stores. `satisfies` for the reason
- * the aggregate table below gives: a format added without a name fails here.
- */
-const IMAGE_FORMAT_NAMES = {
-  'image/png': 'PNG',
-  'image/jpeg': 'JPEG',
-  'image/webp': 'WebP',
-  'image/gif': 'GIF',
-} satisfies Record<ImageMediaType, string>;
-
-const storedFormatNames = IMAGE_MEDIA_TYPES.map((type) => IMAGE_FORMAT_NAMES[type]);
-
-/** The stored formats as one phrase, in the host's order: `PNG, JPEG, WebP or GIF`. */
-const STORED_IMAGE_FORMATS = `${storedFormatNames.slice(0, -1).join(', ')} or ${storedFormatNames.slice(-1).join('')}`;
-
-/** The host's limit as the author reads it: `MAX_IMAGE_BYTES` in units of 1024², written MB. */
-const MAX_IMAGE_MEGABYTES = MAX_IMAGE_BYTES / (1024 * 1024);
+/** The sentence the unavailable Create Reference row of a Resource that may not be a Target carries. */
+export const referenceTerminal = (kind: ResourceKind): string =>
+  isMissingKind(kind)
+    ? `“${kind}” is not available in this build, so it cannot be referenced.`
+    : `${kindNaming(kind).listName} cannot be referenced.`;
 
 /**
- * Application-owned copy for an image refused for storing (ADR 0106), naming
- * the file refused.
+ * {@link describeAuthoringRefusal}, naming the kind when a Reference's Target
+ * is a Resource whose plugin is missing: the general sentence says
+ * referencing is a single hop, which is not why that one is refused.
+ * `kindOf` answers the kind of a Resource the Space holds.
  */
-const describeImageRefusal = (code: ImageRefusal, name: string): string => {
-  switch (code) {
-    case 'image-too-large':
-      return `${name} is larger than ${MAX_IMAGE_MEGABYTES} MB, the largest image that can be stored.`;
-    case 'image-format-unsupported':
-      return `${name} is not a ${STORED_IMAGE_FORMATS} image.`;
-    case 'image-svg-unsupported':
-      return `${name} is an SVG image, which cannot be stored. Use ${STORED_IMAGE_FORMATS}.`;
+export const describeAuthoringRefusalIn = (
+  refusal: PresentedAuthoringRefusal,
+  kindOf: (id: UUID) => ResourceKind | undefined,
+): string => {
+  if (refusal.code === 'reference-target-not-targetable') {
+    const kind = kindOf(refusal.targetId);
+    if (kind !== undefined && isMissingKind(kind)) return referenceTerminal(kind);
   }
+  return describeAuthoringRefusal(refusal);
 };
-
-/** A file refused for storing, named so the sentence can say which. */
-export interface RefusedFile {
-  readonly code: ImageRefusal;
-  readonly name: string;
-}
-
-/** A sentence for each refused file, in the order the gesture brought them. */
-export const describeImageRefusals = (refusals: readonly RefusedFile[]): string =>
-  refusals.map(({ code, name }) => describeImageRefusal(code, name)).join(' ');
 
 /** Application-owned copy for a stable Authoring refusal identity. */
 export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): string => {
@@ -95,8 +76,8 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
         return 'Select a Map to add an existing Resource to it.';
       if (refusal.operation === 'removed-resource-from-map')
         return 'Select a Map to remove a Resource from it.';
-      if (refusal.operation === 'changed-resource-shape')
-        return 'Select a Map to change the Shape a Resource is drawn in.';
+      if (refusal.operation === 'changed-map-content')
+        return 'Select a Map to change how a Resource is drawn on it.';
       if (
         refusal.operation === 'renamed-graph' ||
         refusal.operation === 'recolored-graph' ||
@@ -114,12 +95,14 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
       return 'A Space Resource keeps the target Space it was created with.';
     case 'space-resource-deletion-unsupported':
       return 'Deleting this Space Resource requires a coordinated multi-Space Edit, which this control cannot perform.';
+    case 'missing-plugin-holds-space':
+      return `“${refusal.kind}” is not available in this build, and a Space nothing else refers to may depend on this Resource, so it cannot be deleted.`;
     case 'resource-title-required':
       return 'A Resource title is required.';
     case 'map-title-required':
       return 'A Map title is required.';
-    case 'image-url-unsupported':
-      return 'An image URL must start with https: or http:.';
+    case 'space-reference-creation-unsupported':
+      return 'A Resource showing a Space is created with that Space, which this control cannot do.';
     case 'space-title-required':
       return 'A Space title is required.';
     case 'reference-targets-self':
@@ -132,10 +115,16 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
       return 'This Resource is already in this Map.';
     case 'resource-not-in-map':
       return 'This Resource is not in this Map.';
-    case 'open-requires-content':
-      return 'An Ur Resource has no content to open.';
-    case 'shape-not-taken':
-      return 'Only an Ur Resource can be drawn in a Shape other than the rectangle.';
+    case 'map-content-invalid':
+      return 'This Resource cannot be drawn that way on a Map.';
+    case 'resource-content-invalid':
+      return 'This Resource cannot hold that content.';
+    case 'exclusive-work-running':
+      return 'Wait for the change in progress to finish.';
+    case 'space-replaced':
+      return 'The Space was replaced before this change could be made.';
+    case 'edit-abandoned':
+      return 'This change was not made, because an earlier one failed.';
     case 'resource-has-references':
       return `Delete the Reference Resources of this Resource first: ${refusal.referenceTitles.join(', ')}.`;
     case 'graph-title-required':
@@ -487,13 +476,16 @@ export const describeSpaceResourceBreak: SpaceResourceBreak = (failure) =>
 export const describeSpaceResourceCreationBreak: SpaceResourceBreak = (failure) =>
   `This Resource was not created: ${failureMessage(failure)}`;
 
-/** A replacement's transport or unexpected failure, said beside its upload target. */
-export type ImageReplacementBreak = (failure: unknown) => string;
-
-/** @see ImageReplacementBreak */
-export const describeImageReplacementBreak: ImageReplacementBreak = (failure) =>
-  `This image was not replaced: ${failureMessage(failure)}`;
-
-/** A replacement begun while another still holds the Space, said beside its upload target. */
-export const describeImageReplacementPending = (): string =>
-  'Another image is still being replaced.';
+/**
+ * Application-owned copy for an asset store's refusal (ADR 0057, ADR 0142),
+ * from its stable code: what a Resource plugin reads in `{ refused }`, never
+ * the code itself.
+ */
+export const describeAssetRefusal = (code: AssetRefusalCode): string => {
+  switch (code) {
+    case ASSET_TOO_LARGE:
+      return `This file is larger than ${MAX_ASSET_BYTES / (1024 * 1024)} MB, the largest that can be stored.`;
+    case ASSET_ABSENT:
+      return 'This file is not stored here.';
+  }
+};

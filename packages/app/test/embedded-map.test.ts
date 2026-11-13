@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { SPACE_RESOURCE_EMBED_INSET, spaceSnapshotSchema, uuidSchema } from '@project/core';
+import {
+  EMPTY_ASSET_REF,
+  SPACE_RESOURCE_EMBED_INSET,
+  spaceSnapshotSchema,
+  uuidSchema,
+} from '@project/core';
 import { loadSpaceSnapshot, Placement, positionedStrategy } from '@project/graph';
 import {
   bareKindData,
   AUTHORING_HANDLE_DIAMETER,
+  EMBEDDING_RESOURCE_Z_INDEX,
   ROUTED_EDGE_TYPE,
   type ResourceFlowNode,
 } from '@project/react-flow-adapter';
@@ -22,6 +28,7 @@ import {
 } from '../src/embedded-map';
 import { resolveMap } from '../src/map-resolution';
 import { edgeSelectionOf } from '../src/render-adapter';
+import { textAsset } from './markdown-texts';
 
 const id = (value: number) =>
   uuidSchema.parse(`00000000-0000-4000-8000-${value.toString().padStart(12, '0')}`);
@@ -47,11 +54,16 @@ async function projection(open = false) {
             title: 'Map',
             kind: 'positioned',
             positions: {
-              [A]: { x: 0, y: 0, open: false },
-              [B]: { x: 400, y: 0, open: false },
+              [A]: { x: 0, y: 0 },
+              [B]: { x: 400, y: 0 },
               [REFERENCE]: open
-                ? { x: 0, y: 300, open: true, size: { width: 560, height: 420 } }
-                : { x: 0, y: 300, open: false },
+                ? {
+                    x: 0,
+                    y: 300,
+                    size: { width: 560, height: 420 },
+                    content: { open: true },
+                  }
+                : { x: 0, y: 300 },
             },
             graphs: [{ id: GRAPH, title: 'Graph', edges: [{ from: A, to: B }] }],
           },
@@ -60,9 +72,9 @@ async function projection(open = false) {
       resources: [
         {
           id: A,
-          document: { kind: 'markdown', title: 'A', content: { source: 'Target content' } },
+          document: { kind: 'markdown', title: 'A', content: { url: textAsset('Target content') } },
         },
-        { id: B, document: { kind: 'markdown', title: 'B', content: { source: '' } } },
+        { id: B, document: { kind: 'markdown', title: 'B', content: { url: EMPTY_ASSET_REF } } },
         {
           id: REFERENCE,
           document: { kind: 'reference', title: 'Reference Resource', content: { target: A } },
@@ -188,6 +200,24 @@ describe('an embedded production projection', () => {
     expect(drawFrom({ ...initial, zIndex: (initial.zIndex ?? 0) + 1 }, projected)).not.toEqual(
       drawFrom(initial, projected),
     );
+  });
+
+  it('stacks embedded Resources and Edges one above their containing Resource', async () => {
+    const { projected, parent: containing } = await draw();
+    for (const zIndex of [containing.zIndex, undefined]) {
+      const drawn = embeddedMap({
+        parent: { ...containing, zIndex },
+        projection: projected,
+        offset: { x: 16, y: 42 },
+        policy: 'authoring',
+      });
+      // A containing Resource not yet raised stands at the embedding z-index.
+      const above = (zIndex ?? EMBEDDING_RESOURCE_Z_INDEX) + 1;
+      expect(drawn.nodes.length).toBeGreaterThan(0);
+      expect(drawn.edges.length).toBeGreaterThan(0);
+      for (const node of drawn.nodes) expect(node.zIndex).toBe(above);
+      for (const edge of drawn.edges) expect(edge.zIndex).toBe(above);
+    }
   });
 
   it('redraws when the target projection or ancestor bounds change', async () => {
@@ -393,18 +423,15 @@ describe('an embedded production projection', () => {
     }
   });
 
-  it('uses the target projection for Open Reference Resource content and its authored placement', async () => {
+  it('hands an Open Reference Resource its Map content and its Target to embed, at its authored placement', async () => {
     const { drawn } = await draw(true);
     expect(drawn.nodes.find((node) => node.data.resourceId === REFERENCE)).toMatchObject({
       width: 560,
       height: 420,
       data: {
-        open: true,
         kind: 'reference',
-        display: {
-          shown: 'open',
-          content: { kind: 'markdown', source: 'Target content', via: 'target' },
-        },
+        mapContent: { open: true },
+        embeddable: [{ id: A, kind: 'markdown', title: 'A' }],
       },
     });
     // B sits at the target Map's authored 400 plus the embedding offset, and

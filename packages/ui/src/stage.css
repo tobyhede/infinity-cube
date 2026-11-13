@@ -37,8 +37,9 @@
 }
 
 /* A slide scrolls only when its author marked further content with a
-   horizontal rule; content with none is clipped to the frame, however long. */
-.stage__body:has(.resource__body hr) {
+   horizontal rule; content with none is clipped to the frame, however long.
+   A plugin's text is drawn by the host's rendered-Markdown component. */
+.stage__body:has(:is(.resource__body, .markdown-resource-body__rendered) hr) {
   overflow-y: auto;
 }
 
@@ -64,16 +65,6 @@
   line-height: 1.2;
 }
 
-/* A picture is fitted inside the frame, whole, so its Resource is exactly the
-   frame's height rather than at least it: the name stacks over the picture, and
-   the picture takes the room left below the name. */
-.stage__body .resource--full:has(> .resource-image) {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-}
-
 .stage__body .resource__body > * {
   margin: 0 0 2cqw;
 }
@@ -88,6 +79,16 @@
   padding-left: 4cqw;
 }
 
+/* Tailwind's preflight takes every list's markers away; a slide's lists keep
+   theirs, as the canvas's do (markdown-resource-body.css). */
+.stage__body .resource__body ul {
+  list-style: disc;
+}
+
+.stage__body .resource__body ol {
+  list-style: decimal;
+}
+
 .stage__body .resource__body :is(code, pre) {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.9em;
@@ -98,4 +99,32 @@
   padding: 2cqw;
   border-radius: var(--canvas-resource-radius);
   background: color-mix(in srgb, currentcolor 8%, transparent);
+}
+
+/* A Resource a plugin draws fills the frame, which is its rect (ADR 0142): the
+   plugin lays out everything inside it, its Title included. A plugin drawing
+   text in flow grows past the frame, for the body to clip or scroll by its
+   rule; one drawn at the rect's size fills it. */
+.stage__body .resource--full.resource--plugin {
+  position: relative;
+  min-height: 100%;
+  padding: 0;
+}
+
+/* The plugin's rendered text grows to its length on the Stage rather than
+   being clipped to the room it was given, so the body clips or scrolls it, and
+   it reads at the Stage's type scale, as every presented text does. */
+.stage__body .resource--plugin :is(.markdown-resource-body, .markdown-resource-body__rendered) {
+  flex: none;
+  min-height: auto;
+  overflow: visible;
+}
+
+.stage__body .resource--plugin .markdown-resource-body__rendered {
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.stage__body .resource--plugin .resource__title {
+  margin: 0;
 }

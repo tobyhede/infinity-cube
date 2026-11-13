@@ -260,7 +260,15 @@
       // actually parses it. Same boundary-parser category as issue 02's two
       // excepted files — this is that same kind of code, just in
       // `@project/graph` instead of `@project/persistence`.
-      "files": ["packages/graph/src/space.ts"],
+      //
+      // `packages/core/src/assets.ts` reads raw values in the same way:
+      // `isAssetRef` takes `unknown` because `assetRefSchema`'s `z.custom`
+      // calls it with raw input before anything is parsed, and the
+      // asset-reference walk (ADR 0142) reads a Resource's `content` whatever
+      // kind declared it, whose parsed type is a union of each kind's content
+      // with optional fields rather than a `JsonValue`, so it takes `unknown`
+      // and tells a string, array or object apart with `typeof`.
+      "files": ["packages/graph/src/space.ts", "packages/core/src/assets.ts"],
       "rules": {
         "anti-slop/no-runtime-typeof": "off",
         "anti-slop/no-unknown-parameters": "off"

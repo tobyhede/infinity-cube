@@ -1,13 +1,15 @@
 import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { uuidSchema } from '@project/core';
-import type { LoadedSpace, StoredImage } from '@project/persistence';
+import { EMPTY_ASSET_REF, uuidSchema, type AssetRef, type UUID } from '@project/core';
+import { createSpaceHttpApp, httpAssetClient, HttpSpaceBackend } from '@project/http';
+import type { LoadedSpace, StoredAsset } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { exportAggregate } from '../../src/export/export-aggregate';
 import { captureError } from '../support/capture-error';
 import { MemorySpaceRepository } from '@project/aggregate';
-import { admitted, directoryTree, pngBytes, showing } from '../support/stored-images';
+import { admitted, directoryTree, pngBytes, showing } from '../support/stored-assets';
+import { browserPluginAssets } from '../../packages/app/src/space';
 
 const SPACE_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000001');
 const RESOURCE_A = uuidSchema.parse('a0000000-0000-4000-8000-000000000010');
@@ -54,8 +56,8 @@ const storedSpace: LoadedSpace = {
           title: 'Spine',
           kind: 'positioned',
           positions: {
-            [RESOURCE_B]: { x: 260, y: 0, open: false, shape: 'diamond' },
-            [RESOURCE_A]: { x: 0, y: 0, open: false },
+            [RESOURCE_B]: { x: 260, y: 0, content: { shape: 'diamond' } },
+            [RESOURCE_A]: { x: 0, y: 0 },
           },
           graphs: [
             {
@@ -73,8 +75,8 @@ const storedSpace: LoadedSpace = {
           title: 'Echo',
           kind: 'positioned',
           positions: {
-            [RESOURCE_E]: { x: 0, y: 200, open: false, shape: 'pill' },
-            [RESOURCE_F]: { x: 260, y: 200, open: false },
+            [RESOURCE_E]: { x: 0, y: 200, content: { shape: 'pill' } },
+            [RESOURCE_F]: { x: 260, y: 200 },
           },
           graphs: [
             { id: ECHO_GRAPH_ID, title: 'Echo', edges: [{ from: RESOURCE_E, to: RESOURCE_F }] },
@@ -87,11 +89,11 @@ const storedSpace: LoadedSpace = {
       { id: RESOURCE_B, document: { title: 'B', kind: 'ur', content: {} } },
       {
         id: RESOURCE_A,
-        document: { title: 'A', kind: 'markdown', content: { source: 'A body.\n' } },
+        document: { title: 'A', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       },
       {
         id: RESOURCE_F,
-        document: { title: 'F', kind: 'markdown', content: { source: 'F body.\n' } },
+        document: { title: 'F', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
       },
       { id: RESOURCE_E, document: { title: 'E', kind: 'ur', content: {} } },
     ],
@@ -146,8 +148,8 @@ describe('canonical export', () => {
           title: 'Spine',
           kind: 'positioned',
           positions: {
-            [RESOURCE_A]: { x: 0, y: 0, open: false },
-            [RESOURCE_B]: { x: 260, y: 0, open: false, shape: 'diamond' },
+            [RESOURCE_A]: { x: 0, y: 0 },
+            [RESOURCE_B]: { x: 260, y: 0, content: { shape: 'diamond' } },
           },
           graphs: [
             {
@@ -165,8 +167,8 @@ describe('canonical export', () => {
           title: 'Echo',
           kind: 'positioned',
           positions: {
-            [RESOURCE_E]: { x: 0, y: 200, open: false, shape: 'pill' },
-            [RESOURCE_F]: { x: 260, y: 200, open: false },
+            [RESOURCE_E]: { x: 0, y: 200, content: { shape: 'pill' } },
+            [RESOURCE_F]: { x: 260, y: 200 },
           },
           graphs: [
             { id: ECHO_GRAPH_ID, title: 'Echo', edges: [{ from: RESOURCE_E, to: RESOURCE_F }] },
@@ -199,13 +201,13 @@ describe('canonical export', () => {
       resources: [
         {
           id: RESOURCE_A,
-          document: { kind: 'markdown', content: { source: 'A body.\n' }, title: 'A' },
+          document: { kind: 'markdown', content: { url: EMPTY_ASSET_REF }, title: 'A' },
         },
         { id: RESOURCE_E, document: { title: 'E', kind: 'ur', content: {} } },
         { id: RESOURCE_B, document: { kind: 'ur', content: {}, title: 'B' } },
         {
           id: RESOURCE_F,
-          document: { kind: 'markdown', title: 'F', content: { source: 'F body.\n' } },
+          document: { kind: 'markdown', title: 'F', content: { url: EMPTY_ASSET_REF } },
         },
       ],
       id: SPACE_ID,
@@ -226,16 +228,16 @@ describe('canonical export', () => {
             ],
             title: 'Spine',
             positions: {
-              [RESOURCE_A]: { y: 0, x: 0, open: false },
-              [RESOURCE_B]: { y: 0, shape: 'diamond', x: 260, open: false },
+              [RESOURCE_A]: { y: 0, x: 0 },
+              [RESOURCE_B]: { y: 0, content: { shape: 'diamond' }, x: 260 },
             },
             id: SPINE_MAP_ID,
           },
           {
             title: 'Echo',
             positions: {
-              [RESOURCE_F]: { open: false, y: 200, x: 260 },
-              [RESOURCE_E]: { shape: 'pill', y: 200, x: 0, open: false },
+              [RESOURCE_F]: { y: 200, x: 260 },
+              [RESOURCE_E]: { content: { shape: 'pill' }, y: 200, x: 0 },
             },
             graphs: [
               { title: 'Echo', edges: [{ to: RESOURCE_F, from: RESOURCE_E }], id: ECHO_GRAPH_ID },
@@ -260,15 +262,13 @@ describe('canonical export', () => {
       await readFile(spaceFileIn(second), 'utf8'),
     );
     const resources = join(SPACE_ID, 'resources');
-    // Every Resource file, and the sidecar of each Markdown Resource.
+    // Every Resource file and nothing else: a Markdown Resource's text is an asset (ADR 0142).
     expect((await readdir(join(first, resources))).sort()).toEqual(
       [
         `${RESOURCE_A}.json`,
-        `${RESOURCE_A}.md`,
         `${RESOURCE_B}.json`,
         `${RESOURCE_E}.json`,
         `${RESOURCE_F}.json`,
-        `${RESOURCE_F}.md`,
       ].sort(),
     );
     expect(await directoryTree(join(second, resources))).toEqual(
@@ -292,8 +292,14 @@ describe('canonical export', () => {
             title: 'Spine',
             kind: 'positioned',
             positions: {
-              [RESOURCE_A]: { x: 0, y: 0, open: true, size: { height: 420, width: 560 } },
-              [RESOURCE_B]: { x: 260, y: 0, open: false, size: { height: 300, width: 400 } },
+              // A Markdown Resource is Open by its Map content (ADR 0142).
+              [RESOURCE_A]: {
+                x: 0,
+                y: 0,
+                content: { open: true },
+                size: { height: 420, width: 560 },
+              },
+              [RESOURCE_B]: { x: 260, y: 0, size: { height: 300, width: 400 } },
             },
             graphs: [
               { id: LONG_GRAPH_ID, title: 'Long', edges: [{ from: RESOURCE_A, to: RESOURCE_B }] },
@@ -304,11 +310,11 @@ describe('canonical export', () => {
       resources: [
         {
           id: RESOURCE_A,
-          document: { title: 'A', kind: 'markdown', content: { source: 'A body.\n' } },
+          document: { title: 'A', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
         {
           id: RESOURCE_B,
-          document: { title: 'B', kind: 'markdown', content: { source: 'B body.\n' } },
+          document: { title: 'B', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
         },
       ],
     },
@@ -349,8 +355,13 @@ describe('canonical export', () => {
           title: 'Spine',
           kind: 'positioned',
           positions: {
-            [RESOURCE_A]: { x: 0, y: 0, open: true, size: { width: 560, height: 420 } },
-            [RESOURCE_B]: { x: 260, y: 0, open: false, size: { width: 400, height: 300 } },
+            [RESOURCE_A]: {
+              x: 0,
+              y: 0,
+              content: { open: true },
+              size: { width: 560, height: 420 },
+            },
+            [RESOURCE_B]: { x: 260, y: 0, size: { width: 400, height: 300 } },
           },
           graphs: [
             { id: LONG_GRAPH_ID, title: 'Long', edges: [{ from: RESOURCE_A, to: RESOURCE_B }] },
@@ -487,14 +498,16 @@ describe('canonical export', () => {
   });
 });
 
-describe('stored image bytes', () => {
+describe('stored asset bytes', () => {
   const PICTURE_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000040');
   const LINKED_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000041');
+  const NOTES_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000042');
+  const DATA_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000043');
 
-  /** The stored Space, also holding these Image Resources. */
-  const withImages = (
-    ...documents: readonly { id: typeof PICTURE_ID; document: ReturnType<typeof showing> }[]
-  ): LoadedSpace => ({
+  type StoredResource = LoadedSpace['snapshot']['resources'][number];
+
+  /** The stored Space, also holding these Resources. */
+  const withImages = (...documents: readonly StoredResource[]): LoadedSpace => ({
     ...storedSpace,
     snapshot: {
       ...storedSpace.snapshot,
@@ -502,21 +515,31 @@ describe('stored image bytes', () => {
     },
   });
 
+  /**
+   * A Markdown Resource whose text is the asset `url` names. The walk reads no
+   * kind, so an asset URL is a reference wherever it stands, in a Resource of
+   * a kind other than Image as in an Image's, whatever bytes it names.
+   */
+  const markdownNaming = (id: typeof PICTURE_ID, url: AssetRef): StoredResource => ({
+    id,
+    document: { title: 'Notes', kind: 'markdown', content: { url } },
+  });
+
   const holding = async (
     space: LoadedSpace,
-    images: readonly StoredImage[],
+    assets: readonly StoredAsset[],
   ): Promise<MemorySpaceRepository> => {
     const repository = new MemorySpaceRepository([space], SPACE_ID);
-    for (const image of images) await repository.storeImage(image);
+    for (const asset of assets) await repository.storeAsset(asset);
     return repository;
   };
 
   /*
-   * What Export removes from `images/` is exactly what Import scans there, so
-   * a picture no Resource shows any more leaves the directory rather than
-   * being imported again as a stored image nothing references.
+   * What Export removes from `assets/` is exactly what Import owns there, so
+   * an asset no Resource references any more leaves the directory rather than
+   * being imported again as one nothing references.
    */
-  it('rewrites images whole, so a picture no Resource shows leaves the directory', async () => {
+  it('rewrites assets whole, so an asset no Resource references leaves the directory', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     const shown = await admitted(pngBytes(1));
     const unshown = await admitted(pngBytes(2));
@@ -524,20 +547,98 @@ describe('stored image bytes', () => {
       await holding(withImages({ id: PICTURE_ID, document: showing(shown) }), [shown, unshown]),
       destination,
     );
-    expect(await readdir(join(destination, 'images'))).toEqual([`${shown.id}.png`]);
+    expect(await readdir(join(destination, 'assets'))).toEqual([`${shown.hash}.png`]);
 
     await exportTo(await holding(storedSpace, [shown, unshown]), destination);
 
-    expect(await readdir(destination)).not.toContain('images');
+    expect(await readdir(destination)).not.toContain('assets');
+  });
+
+  /*
+   * Text and binary bytes stored by a Resource that is not an Image are
+   * carried while it references them and left out once it does not.
+   */
+  it('carries the text and binary assets a Resource of another kind references, and not after', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'exported');
+    const text = await admitted(new TextEncoder().encode('# Notes\n'), 'text/markdown');
+    const binary = await admitted(Uint8Array.from([0x00, 0xff, 0x10]), 'application/x-made-up');
+    await exportTo(
+      await holding(
+        withImages(
+          markdownNaming(NOTES_ID, `/assets/${text.hash}`),
+          markdownNaming(DATA_ID, `/assets/${binary.hash}`),
+        ),
+        [text, binary],
+      ),
+      destination,
+    );
+
+    expect((await readdir(join(destination, 'assets'))).sort()).toEqual(
+      [`${text.hash}.md`, `${binary.hash}.bin`].sort(),
+    );
+    await expect(readFile(join(destination, 'assets', `${text.hash}.md`), 'utf8')).resolves.toBe(
+      '# Notes\n',
+    );
+
+    await exportTo(
+      await holding(withImages(markdownNaming(NOTES_ID, `/assets/${text.hash}`)), [text, binary]),
+      destination,
+    );
+    expect(await readdir(join(destination, 'assets'))).toEqual([`${text.hash}.md`]);
+
+    await exportTo(await holding(storedSpace, [text, binary]), destination);
+    expect(await readdir(destination)).not.toContain('assets');
+  });
+
+  /*
+   * The bytes reach the store the way a plugin stores them: through the asset
+   * client the application hands a plugin, over the real Fetch application, into
+   * the repository Export reads. The Resources referencing them were authored
+   * with the references the store answers.
+   */
+  it('carries text and binary bytes a plugin stored through its asset client', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'exported');
+    const text = await admitted(new TextEncoder().encode('# Notes\n'), 'text/markdown');
+    const binary = await admitted(Uint8Array.from([0x00, 0xff, 0x10]), 'font/woff2');
+    const repository = await holding(
+      withImages(
+        markdownNaming(NOTES_ID, `/assets/${text.hash}`),
+        markdownNaming(DATA_ID, `/assets/${binary.hash}`),
+      ),
+      [],
+    );
+    const mintsNothing = (): UUID => {
+      throw new Error('Storing an asset mints no identity.');
+    };
+    const app = createSpaceHttpApp(repository, { newId: mintsNothing });
+    const plugin = browserPluginAssets(
+      httpAssetClient(
+        new HttpSpaceBackend('http://example.test', {
+          fetch: async (input, init) => app.fetch(new Request(input, init)),
+        }),
+      ),
+    );
+
+    const stored = [
+      await plugin.store?.(new Blob(['# Notes\n'], { type: 'text/markdown' })),
+      await plugin.store?.(new Blob([Uint8Array.from([0x00, 0xff, 0x10])], { type: 'font/woff2' })),
+    ];
+    await exportTo(repository, destination);
+
+    expect(stored).toEqual([`/assets/${text.hash}`, `/assets/${binary.hash}`]);
+    expect(await directoryTree(join(destination, 'assets'))).toEqual({
+      [`${text.hash}.md`]: Buffer.from('# Notes\n'),
+      [`${binary.hash}.woff2`]: Buffer.from([0x00, 0xff, 0x10]),
+    });
   });
 
   /*
    * Neither picture has bytes the repository holds — one is somebody else's,
    * the other was never stored here — so each is written as its URL and the
-   * Export still completes: one missing picture does not stop an edit reaching
+   * Export still completes: one missing asset does not stop an edit reaching
    * disk (ADR 0118).
    */
-  it('exports an external URL and a stored URL whose bytes are missing as URLs only', async () => {
+  it('exports an external URL and an asset URL whose bytes are absent as URLs only', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     const missing = await admitted(pngBytes(3));
     const repository = await holding(
@@ -555,43 +656,129 @@ describe('stored image bytes', () => {
       kind: 'exported',
     });
 
-    expect(await readdir(destination)).not.toContain('images');
+    expect(await readdir(destination)).not.toContain('assets');
     await expect(
       readFile(join(destination, SPACE_ID, 'resources', `${PICTURE_ID}.json`), 'utf8'),
-    ).resolves.toContain(`"url": "/images/${missing.id}"`);
+    ).resolves.toContain(`"url": "/assets/${missing.hash}"`);
+  });
+
+  it('completes and removes no file of the name of a referenced asset whose bytes are absent', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'exported');
+    const missing = await admitted(pngBytes(3));
+    const unshown = await admitted(pngBytes(4));
+    await mkdir(join(destination, 'assets'), { recursive: true });
+    await writeFile(join(destination, 'assets', `${missing.hash}.png`), pngBytes(3));
+    await writeFile(join(destination, 'assets', `${unshown.hash}.png`), pngBytes(4));
+
+    await expect(
+      exportAggregate(
+        await holding(withImages({ id: PICTURE_ID, document: showing(missing) }), []),
+        destination,
+      ),
+    ).resolves.toMatchObject({ kind: 'exported' });
+
+    expect(await readdir(join(destination, 'assets'))).toEqual([`${missing.hash}.png`]);
   });
 
   /*
-   * Import scans the visible regular files in `images/`, so those are what
-   * Export replaces; a dotfile or a directory there is the author's.
+   * A file Export keeps is one the next Import reads, so it is read back with
+   * the files Export writes: a directory Import would refuse is refused here,
+   * before anything is written, rather than reported as exported.
    */
-  it('keeps what Import does not scan inside images/', async () => {
+  it.each([
+    [
+      'is not named for its content',
+      (hash: string) => [[`${hash}.png`, pngBytes(5)]] as const,
+      'must be named for its content',
+    ],
+    [
+      'shares its hash with another file',
+      (hash: string) =>
+        [
+          [`${hash}.png`, pngBytes(3)],
+          [`${hash}.jpg`, pngBytes(3)],
+        ] as const,
+      'two files of one hash',
+    ],
+  ])(
+    'refuses, writing nothing, when a kept file of an absent asset %s',
+    async (_, kept, refusal) => {
+      const destination = join(await makeTemporaryDirectory(), 'exported');
+      const missing = await admitted(pngBytes(3));
+      await mkdir(join(destination, 'assets'), { recursive: true });
+      for (const [name, bytes] of kept(missing.hash)) {
+        await writeFile(join(destination, 'assets', name), bytes);
+      }
+
+      await expect(
+        exportAggregate(
+          await holding(withImages({ id: PICTURE_ID, document: showing(missing) }), []),
+          destination,
+        ),
+      ).rejects.toThrow(refusal);
+
+      expect(await readdir(destination)).toEqual(['assets']);
+    },
+  );
+
+  it('writes no file for the asset of zero bytes, which needs none', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'exported');
+
+    await exportTo(
+      await holding(withImages(markdownNaming(NOTES_ID, EMPTY_ASSET_REF)), []),
+      destination,
+    );
+
+    expect(await readdir(destination)).not.toContain('assets');
+  });
+
+  it('keeps the name an asset has in the directory, so its extension survives', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'exported');
+    const bytes = new TextEncoder().encode('graph TD; A-->B\n');
+    const diagram = await admitted(bytes, 'application/octet-stream');
+    await mkdir(join(destination, 'assets'), { recursive: true });
+    await writeFile(join(destination, 'assets', `${diagram.hash}.mermaid`), bytes);
+
+    await exportTo(
+      await holding(withImages(markdownNaming(NOTES_ID, `/assets/${diagram.hash}`)), [diagram]),
+      destination,
+    );
+
+    expect(await readdir(join(destination, 'assets'))).toEqual([`${diagram.hash}.mermaid`]);
+  });
+
+  /*
+   * Import owns the files in `assets/` named by a hash, so those are what
+   * Export replaces; anything else there is the author's.
+   */
+  it('keeps what Import does not own inside assets/', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     const shown = await admitted(pngBytes(1));
-    await mkdir(join(destination, 'images', 'drafts'), { recursive: true });
-    await writeFile(join(destination, 'images', '.gitkeep'), '');
-    await writeFile(join(destination, 'images', 'drafts', 'sketch.txt'), 'sketch\n');
+    await mkdir(join(destination, 'assets', 'drafts'), { recursive: true });
+    await writeFile(join(destination, 'assets', '.gitkeep'), '');
+    await writeFile(join(destination, 'assets', 'README.md'), 'notes\n');
+    await writeFile(join(destination, 'assets', 'drafts', 'sketch.txt'), 'sketch\n');
 
     await exportTo(
       await holding(withImages({ id: PICTURE_ID, document: showing(shown) }), [shown]),
       destination,
     );
 
-    expect((await readdir(join(destination, 'images'))).sort()).toEqual(
-      ['.gitkeep', 'drafts', `${shown.id}.png`].sort(),
+    expect((await readdir(join(destination, 'assets'))).sort()).toEqual(
+      ['.gitkeep', 'README.md', 'drafts', `${shown.hash}.png`].sort(),
     );
     await expect(
-      readFile(join(destination, 'images', 'drafts', 'sketch.txt'), 'utf8'),
+      readFile(join(destination, 'assets', 'drafts', 'sketch.txt'), 'utf8'),
     ).resolves.toBe('sketch\n');
   });
 
-  it('refuses a destination whose images directory is a symbolic link', async () => {
+  it('refuses a destination whose assets directory is a symbolic link', async () => {
     const root = await makeTemporaryDirectory();
     const destination = join(root, 'exported');
     const elsewhere = join(root, 'elsewhere');
     await mkdir(elsewhere);
     await mkdir(destination);
-    await symlink(elsewhere, join(destination, 'images'));
+    await symlink(elsewhere, join(destination, 'assets'));
     const shown = await admitted(pngBytes(1));
 
     const thrown = await captureError(async () =>
@@ -605,14 +792,14 @@ describe('stored image bytes', () => {
     await expect(readdir(elsewhere)).resolves.toEqual([]);
   });
 
-  it('refuses a destination whose image file is a symbolic link', async () => {
+  it('refuses a destination whose asset file is a symbolic link', async () => {
     const root = await makeTemporaryDirectory();
     const destination = join(root, 'exported');
     const outside = join(root, 'outside.png');
     await writeFile(outside, 'outside\n');
     const shown = await admitted(pngBytes(1));
-    await mkdir(join(destination, 'images'), { recursive: true });
-    await symlink(outside, join(destination, 'images', `${shown.id}.png`));
+    await mkdir(join(destination, 'assets'), { recursive: true });
+    await symlink(outside, join(destination, 'assets', `${shown.hash}.png`));
 
     const thrown = await captureError(async () =>
       exportAggregate(

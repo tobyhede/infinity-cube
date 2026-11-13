@@ -195,9 +195,9 @@ const trackedFiles = (): readonly string[] =>
     });
 
 /**
- * A Markdown Resource's sidecar is Markdown too, and it is product data the
- * fixtures and the example Space seed, so it is read like its Resource file
- * and `space.json`.
+ * A Markdown Resource's text is a Markdown asset, `assets/<hash>.md`, and it
+ * is product data the fixtures and the example Space seed, so it is read like
+ * its Resource file and `space.json`.
  */
 const SPACE_CONTENT_TREES = ['packages/app/example/', 'packages/app/fixture/'] as const;
 
@@ -268,7 +268,7 @@ describe('the retired domain vocabulary is gone from tracked files', () => {
 
   it('reaches the kinds of file the rename actually touched', () => {
     // A file list that quietly stopped resolving would report nothing forever.
-    // The scan crosses source, Markdown sidecars, and Resource files and
+    // The scan crosses source, Markdown text assets, and Resource files and
     // `space.json` fixtures, and only the first is a compiler's concern.
     expect(scanned).toContain('packages/core/src/schema.ts');
     expect(scanned).not.toContain('AGENTS.md');
@@ -1669,7 +1669,7 @@ const withoutForeignResourceSpellings = (source: string): string =>
 
 /**
  * The files where the retired spelling is the **shadcn registry's** rather than
- * ours: the vendored module, the barrel that re-exports it, the two components
+ * ours: the vendored module, the barrel that re-exports it, the component
  * and the catalogue fixture that render it, and the vendored skill's evals
  * (ADR 0047, ADR 0050, ADR 0085).
  */
@@ -1681,21 +1681,20 @@ const FOREIGN_RESOURCE_FILES: readonly string[] = [
   '.agents/skills/shadcn/evals/evals.json',
   'packages/ui/src/components/card.tsx',
   'packages/ui/src/index.ts',
-  'packages/ui/src/CanvasResource.tsx',
-  'packages/ui/src/ResourceRail.tsx',
+  'packages/ui/src/MapTitle.tsx',
   'packages/ui/test/design-system-baseline.test.tsx',
 ];
 
 /**
  * The implementation source that renders the registry's *bare* component, which
  * is spelled exactly as the domain type was. Narrower than the list above on
- * purpose: `ResourceRail` takes only the header, and the catalogue fixture and
+ * purpose: `MapTitle` takes only the title, and the catalogue fixture and
  * the skill's evals are not implementation source, so neither reaches the bare arm at all.
  */
 const FOREIGN_BARE_RESOURCE_FILES: readonly string[] = [
   'packages/ui/src/components/card.tsx',
   'packages/ui/src/index.ts',
-  'packages/ui/src/CanvasResource.tsx',
+  'packages/ui/src/PluginResource.tsx',
 ];
 
 /**
@@ -3196,7 +3195,7 @@ describe('the Resource has no front (ADR 0125)', () => {
   const scanned = scannableFiles();
 
   it('reaches the kinds of file the rename actually touched', () => {
-    expect(scanned).toContain('packages/ui/src/CanvasResource.tsx');
+    expect(scanned).toContain('packages/ui/src/PluginResource.tsx');
     expect(scanned).toContain('packages/react-flow-adapter/src/ResourceNode.tsx');
     expect(scanned).toContain('packages/app/stories/parity-claims.ts');
     expect(scanned).toContain('packages/app/ladle-e2e/resource.spec.ts');

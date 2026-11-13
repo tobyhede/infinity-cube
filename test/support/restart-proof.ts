@@ -2,7 +2,7 @@ import { expect, type Browser, type BrowserContext, type Page } from '@playwrigh
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { encodeCompactUuid, type SpaceSnapshot, type UUID } from '@project/core';
+import { EMPTY_ASSET_REF, encodeCompactUuid, type SpaceSnapshot, type UUID } from '@project/core';
 import { type SpaceRepository, AGGREGATE_FILE_NAME } from '@project/aggregate';
 import { exportAggregate } from '../../src/export/export-aggregate';
 import { dragBy, nodeByTitle, positionOf, settled } from '../../packages/app/e2e/graph';
@@ -36,7 +36,7 @@ export const restartProofFixture = (input: {
         id: input.mapId,
         title: 'Map 1',
         kind: 'positioned',
-        positions: { [input.resourceId]: { x: 0, y: 0, open: false } },
+        positions: { [input.resourceId]: { x: 0, y: 0 } },
         graphs: [{ id: input.graphId, title: 'Graph 1', edges: [] }],
         activeGraph: input.graphId,
       },
@@ -46,7 +46,7 @@ export const restartProofFixture = (input: {
   resources: [
     {
       id: input.resourceId,
-      document: { title: 'Restart resource', kind: 'markdown', content: { source: 'Durable.' } },
+      document: { title: 'Restart resource', kind: 'markdown', content: { url: EMPTY_ASSET_REF } },
     },
   ],
 });

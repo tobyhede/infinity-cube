@@ -8,19 +8,15 @@ import {
   CircleAlert,
   Copy,
   Ellipsis,
-  Expand,
   ExternalLink,
   Eye,
   EyeOff,
   Image as ImageGlyph,
-  ImageUp,
   LayoutGrid,
   Link2Off,
   LogIn,
   Maximize,
-  Maximize2,
   Minus,
-  Minimize2,
   Monitor,
   Moon,
   Pencil,
@@ -113,11 +109,6 @@ export const StopPresentingIcon = ({ color }: { color: string }) => (
 /** Edit the content of a Markdown Resource. */
 export const EditIcon = (props: ResourceActionIconProps) => <Pencil size={14} {...props} />;
 
-/** Replace an Image Resource's image: the image kind's counterpart to Edit. */
-export const ReplaceImageIcon = (props: ResourceActionIconProps) => (
-  <ImageUp size={14} {...props} />
-);
-
 /** Commit the edit running on a Resource's content. */
 export const CommitEditIcon = (props: ResourceActionIconProps) => <Check size={14} {...props} />;
 
@@ -130,7 +121,7 @@ export const AbandonEditIcon = (props: ResourceActionIconProps) => (
  * Enter the Space a Space Resource references.
  *
  * Lucide `log-in`: an arrow going *into* a container, deliberately unlike
- * Open's `maximize-2`. Entering the Space and opening the Resource in place
+ * a plugin's Open, `maximize-2`. Entering the Space and opening the Resource in place
  * are two destinations and must not share a symbol.
  */
 export const EnterSpaceIcon = (props: ResourceActionIconProps) => <LogIn size={14} {...props} />;
@@ -145,23 +136,8 @@ export const OpenIndependentlyIcon = (props: ResourceActionIconProps) => (
   <ExternalLink size={14} {...props} />
 );
 
-/** Open a Resource in place. */
-export const OpenResourceIcon = (props: ResourceActionIconProps) => (
-  <Maximize2 size={14} {...props} />
-);
-
-/** Open a Resource and expand it to fit its content. Lucide `expand`: growing outward, not Opening alone. */
-export const OpenAndExpandIcon = (props: ResourceActionIconProps) => (
-  <Expand size={14} {...props} />
-);
-
 /** Read a Resource in Full View, over the canvas. Lucide `book-open`: reading, not Opening. */
 export const FullViewIcon = (props: ResourceActionIconProps) => <BookOpen size={14} {...props} />;
-
-/** Close a Resource that is open in place. */
-export const CloseResourceIcon = (props: ResourceActionIconProps) => (
-  <Minimize2 size={14} {...props} />
-);
 
 /** The shared affordance for a trigger that opens a list or menu. */
 export const ChevronDownIcon = () => <ChevronDown size={14} />;

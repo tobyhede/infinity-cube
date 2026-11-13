@@ -35,18 +35,15 @@
  */
 export interface AuthoringInProgress {
   /**
-   * Some composed Space, listed or only drawn, is replacing an image.
+   * Some composed Space, listed or only drawn, is running a plugin's
+   * exclusive work, as an Image Resource's Replace does (ADR 0126, ADR 0142).
    *
-   * A replacement is the application's exclusive operation until its Edit is
-   * applied (`.scratch/image-resource/issues/05-an-author-replaces-the-image.md`,
-   * "Other actions while a replacement runs"; ADR 0112), wherever it began:
-   * every answer is withdrawn except `editResourceBody`, which is what keeps
-   * the replacement's own target mounted to show its answer, and
-   * `embeddedMapEdit`, a control left drawn over an embedding that is itself
-   * withdrawn. Several Edits
-   * move the address as well as authoring — New Map and New Graph continue in
-   * what they create, and deleting the selected Map reselects — so authoring
-   * and navigation are withdrawn together rather than one at a time.
+   * Exclusive work is the application's one operation until it settles,
+   * wherever it began: every answer is withdrawn except `embeddedMapEdit`, a
+   * control left drawn over an embedding that is itself withdrawn. Several Edits move the address as well as authoring — New Map
+   * and New Graph continue in what they create, and deleting the selected Map
+   * reselects — so authoring and navigation are withdrawn together rather than
+   * one at a time.
    *
    * The open set answers it for every composed Space, as
    * `OpenSpacesState.replacingImage`, and refuses navigation on the same answer
@@ -66,7 +63,7 @@ export interface AuthoringInProgress {
   readonly editable: boolean;
   /** A traversal of the Active Graph is running (ADR 0024). */
   readonly presenting: boolean;
-  /** A Resource's Markdown content edit is running on the canvas (ADR 0064). */
+  /** A plugin holds a Claim on the canvas, as a Markdown Resource's text edit does (ADR 0064, ADR 0142). */
   readonly editingResourceBody: boolean;
   /** A Resource's inline title edit is running on the canvas (ADR 0065). */
   readonly editingResourceTitle: boolean;
@@ -130,8 +127,6 @@ export interface AuthoringAvailability {
   readonly authorOnCanvas: boolean;
   /** An embedded Map drawn on this canvas may author the Space it draws. */
   readonly authorInEmbeddedMap: boolean;
-  /** A live Resource content editor may stay mounted on the canvas. */
-  readonly editResourceBody: boolean;
   /** A drag may begin at a Resource's authoring handles. */
   readonly connectOnCanvas: boolean;
   /** React Flow may move a node. */
@@ -184,7 +179,6 @@ export const NOTHING_AVAILABLE: AuthoringAvailability = {
   createMap: false,
   authorOnCanvas: false,
   authorInEmbeddedMap: false,
-  editResourceBody: false,
   connectOnCanvas: false,
   dragNodes: false,
   selectNodes: false,
@@ -196,8 +190,6 @@ export const NOTHING_AVAILABLE: AuthoringAvailability = {
 export function authoringAvailability(inProgress: AuthoringInProgress): AuthoringAvailability {
   const availability = availabilityBesideReplacement(inProgress);
   if (!inProgress.replacingImage) return availability;
-  // The running replacement's target is a live content editor, so it keeps the
-  // one answer that holds such an editor mounted, by the same rule as any other.
   return {
     resourcesView: false,
     chromeTitleEdit: false,
@@ -213,7 +205,6 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
     selectNodes: false,
     navigate: false,
     replaceSession: false,
-    editResourceBody: availability.editResourceBody,
     // The Edit control of an Open Space Resource stays drawn, as it is beside
     // every other withdrawal; the embedding it would edit is withdrawn above.
     embeddedMapEdit: availability.embeddedMapEdit,
@@ -412,25 +403,9 @@ function availabilityBesideReplacement(inProgress: AuthoringInProgress): Authori
   const connectOnCanvas = editable && soleAuthoringSurface && !presenting;
 
   /**
-   * **Deliberately not `authorOnCanvas`**: a live content editor survives a
-   * modal dialog opening over the canvas.
-   *
-   * The dialog owns its own modality, and the editor is still there when it
-   * closes — so a Resource mid-edit is covered rather than settled, and none of
-   * ADR 0064's four exits is spent behind the reader's back. What it cannot
-   * survive is presenting, which covers the canvas with the Stage and makes it
-   * inert, and a placement that has not resolved, which has no Resource mounted
-   * to hold it.
-   */
-  const editResourceBody = editable && !presenting;
-
-  /**
    * While presenting the arrow keys control traversal, so React Flow must not
    * also read them as moving or selecting a node. A canvas with no resolved
    * placement has nowhere to move a node to.
-   *
-   * The same rule as `editResourceBody` and a different operation: a term added to
-   * one of them is not thereby added to the other.
    */
   const dragNodes = editable && !presenting;
   const selectNodes = !presenting;
@@ -455,7 +430,6 @@ function availabilityBesideReplacement(inProgress: AuthoringInProgress): Authori
     createMap,
     authorOnCanvas,
     authorInEmbeddedMap,
-    editResourceBody,
     connectOnCanvas,
     dragNodes,
     selectNodes,
