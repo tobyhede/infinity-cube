@@ -358,4 +358,3 @@ The rule ids in `../maps-and-graphs.md` are append-only from this version on.
 | Cross-doc audit, duplicates | MG-47 against SR-46; MG-82 against UI-68 | MG-47 now points to SR-46; MG-82 keeps only the domain half and points to UI-68 |
 | Cross-doc audit B4 | MG-61's *Why* named a ui.md sentence that the drag path never shows | narrowed: the reason shows on the Connect list (UI-72); a drag marks the target ineligible |
 | Cross-doc audit N7 | RD rules on "no Active Graph" against MG-34/43/44 | not changed here: every Map has a Graph and resolves one Active Graph; RD owns the fix |
-
