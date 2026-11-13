@@ -6,7 +6,7 @@
 
 **Blocked by:** None
 
-**Status:** in-review
+**Status:** resolved
 
 - [x] A Space Resource row names its Map and Graph selections under its name and in its description, once its target has been read
 - [x] A Space row reads "New Space Resource" and its accessible name says it adds a new Space Resource

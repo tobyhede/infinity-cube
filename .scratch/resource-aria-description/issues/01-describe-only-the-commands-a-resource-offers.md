@@ -1,6 +1,6 @@
 # 01: Describe only the commands a Resource offers
 
-Status: ready-for-agent
+Status: needs-triage — criteria predate ADR 0142; the Open/Enter cases are gone and the remaining cases need restating for Claims
 
 **What to build:** A Resource's accessible description names only the keyboard commands the canvas offers it at that moment.
 

@@ -4,7 +4,7 @@
 
 **Blocked by:** 03, 04, 05, 06.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] A test lists every window `keydown` listener the app adds and finds only the dispatcher's, apart from React Flow's `useKeyPress` and Edge Authoring's Alt tracker, which answer no command and are named in the test.
 - [ ] A test checks that each command id appears in exactly one binding (per id: one key may serve ids in different contexts), and that the bindings React Flow performs (nudge, unselect) have no command id.

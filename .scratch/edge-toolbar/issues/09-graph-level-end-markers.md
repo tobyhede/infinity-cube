@@ -1,6 +1,6 @@
 # 09 — Graph-level end markers
 
-Status: needs-info
+Status: resolved — decided by ADR 0105 (one head shape per Graph)
 
 **What to decide:** Whether a Graph chooses the end marker its Edges draw. Deferred out of the Edge toolbar effort; nothing in it depends on this.
 

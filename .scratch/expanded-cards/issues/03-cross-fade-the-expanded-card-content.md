@@ -4,7 +4,7 @@
 
 **Blocked by:** 02 — the node box must be the single animated element; and 05 — the Card must own Markdown body presence before it can own that body's exit. Fading content against a box that snaps or a body callers mount just moves the discontinuity.
 
-**Status:** implemented — repository verification is blocked by the committed UI-import restriction inconsistency recorded under Answer
+**Status:** superseded — delivered, then retired with the shared frame (resource-plugins issue 10, ADR 0142)
 
 ## Why this is separate from 02
 

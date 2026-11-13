@@ -1,6 +1,6 @@
 # 03 — The asset store
 
-Status: ready-for-agent
+Status: done
 
 **Blocked by:** 02 — The Resource API and its hosts.
 

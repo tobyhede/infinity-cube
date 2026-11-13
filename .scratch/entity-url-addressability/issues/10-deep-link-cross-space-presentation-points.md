@@ -4,7 +4,7 @@
 
 **Blocked by:** 06 — Deep-link ordinary presentation points; 09 — Traverse into and out of a Space Card.
 
-**Status:** ready-for-agent
+**Status:** needs-info — deferred by ADR 0111 until cross-Space Edges are decided
 
 - [ ] The URL starts at the root Layout and Graph and canonically encodes the ordered Space Card, target Layout and target Graph crossing stack (ADR 0079).
 - [ ] Immutable Space Card references derive every intervening Space, and the final Card resolves in the last derived Space.

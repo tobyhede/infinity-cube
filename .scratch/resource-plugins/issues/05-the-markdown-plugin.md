@@ -1,6 +1,6 @@
 # 05 — The Markdown plugin
 
-Status: ready-for-agent
+Status: done
 
 **Blocked by:** 02 — The Resource API and its hosts; 03 — The asset store.
 

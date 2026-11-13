@@ -1,6 +1,6 @@
 # 03: Overrides kept in this browser
 
-Status: ready-for-agent
+Status: needs-triage (until ADR 0138 is accepted)
 
 ADR 0138. Depends on 02.
 

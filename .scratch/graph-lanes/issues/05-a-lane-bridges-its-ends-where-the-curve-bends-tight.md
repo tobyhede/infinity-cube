@@ -6,7 +6,7 @@ Spec: `.scratch/graph-lanes/spec-lane-bridges.md`. Research: `.scratch/graph-lan
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] Seen red first: on a Right→Left Edge to a target 100 ahead and 300 across with lanes at 8, 16 and 24 (reach 24), no lane comes nearer its inner neighbour than 4.5, and in the trimmed middle each lane is within 0.5 of its offset from the centre.
 - [x] A property over Left/Right and Top/Bottom attachments in both directions and pairs of 2–4 lanes: the smallest gap between neighbouring lanes is never less than the same lanes moved whole give, less 0.05.

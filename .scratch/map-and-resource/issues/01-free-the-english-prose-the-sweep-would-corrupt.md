@@ -1,6 +1,6 @@
 # 01 — Free the English prose the sweep would corrupt
 
-**Status:** ready-for-agent
+**Status:** resolved
 **Blocked by:** none
 
 **What to build:** Read every lowercase `thing`/`things` and `diagram`/`diagrams` that the codemod reports as sitting in prose behind an English determiner, and reword the ones that are ordinary English rather than the entity, so that when 02 sweeps, no comment or document says "the same resource" where its writer meant "the same thing".

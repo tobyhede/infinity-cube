@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 The namespaced entry, which is the whole change. The item URL shape was confirmed against the live registry — the documented `add` command redirects to it:
 
