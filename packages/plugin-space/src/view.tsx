@@ -203,9 +203,32 @@ function SpacePluginView({ surface }: PluginViewProps<SpaceContent, SpaceMapCont
   );
 }
 
-/** The Space glyph. */
+/**
+ * The Space glyph: the cube every list draws a Space with, so a Space Resource
+ * reads as the Space it shows. Drawn a little larger and heavier than the
+ * Box it is made of, so its isometric silhouette reads as the same size as a
+ * square glyph on lightened chrome; the stroke is divided back out by the
+ * scale, so the correction changes the silhouette and not the weight.
+ */
 function SpaceGlyph({ size = 14 }: { readonly size?: number | undefined }) {
-  return <Box size={size} />;
+  const view = 24;
+  const stroke = 2.25;
+  const scale = (view - stroke) / 20;
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      viewBox={`0 0 ${view} ${view}`}
+      fill="none"
+      aria-hidden="true"
+      data-icon="space"
+    >
+      <g transform={`translate(12 12) scale(${scale}) translate(-12 -12)`}>
+        <Box size={view} strokeWidth={stroke / scale} />
+      </g>
+    </svg>
+  );
 }
 
 /** The content showing a Space on the Map and Graph it opens on, unframed. */

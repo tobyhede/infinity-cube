@@ -3,19 +3,22 @@
   "compilerOptions": {
     /*
      * `paths` is the package boundary: the core reaches the Resource API's
-     * domain half and the domain half of each plugin the build-time plugin list
-     * names (ADR 0142), and nothing else of ours. The relative-escape half of
+     * domain half and the build's plugin list, `@project/plugins/domain`, which
+     * alone imports a plugin (ADR 0142), and nothing else of ours. The relative-escape half of
      * the boundary is ESLint's, as it is for every package with a dependency
      * (`rootDir` would reject these legitimate imports, which resolve outside
      * the package). See AGENTS.md, "Package layout & boundaries".
      */
     "paths": {
+      "@project/plugins/domain": ["../plugins/src/domain.ts"],
+      // Resolved for the list package's own imports; the lint zone allows only
+      // `packages/plugins` to import a plugin.
       "@project/plugin-default/domain": ["../plugin-default/src/domain.ts"],
       "@project/plugin-image/domain": ["../plugin-image/src/domain.ts"],
-      "@project/plugin-ur/domain": ["../plugin-ur/src/domain.ts"],
       "@project/plugin-markdown/domain": ["../plugin-markdown/src/domain.ts"],
       "@project/plugin-reference/domain": ["../plugin-reference/src/domain.ts"],
       "@project/plugin-space/domain": ["../plugin-space/src/domain.ts"],
+      "@project/plugin-ur/domain": ["../plugin-ur/src/domain.ts"],
       "@project/resource-api/domain": ["../resource-api/src/domain/index.ts"]
     }
   },

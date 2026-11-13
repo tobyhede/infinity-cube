@@ -13,10 +13,11 @@ import {
   type ResourceNodeData,
   type ResourceTitleEditor,
 } from '../src/projection';
-import type { KindId, ResourceContent } from '@project/core';
+import type { ResourceContent } from '@project/core';
 import { graphPaint, type PluginOperations } from '@project/ui';
 import { textAsset, WithTexts } from './markdown-texts';
 import { uuid } from './uuid';
+import { type PluginKind } from '@project/plugins/testing';
 
 /**
  * React Flow is the system boundary here, so the mock stands in for it and the
@@ -213,7 +214,7 @@ interface Overrides {
   /** What React Flow answers for this node from `nodesConnectable`/`node.connectable`. */
   isConnectable?: boolean;
   title?: string;
-  kind?: KindId;
+  kind?: PluginKind;
   titleEditor?: ResourceTitleEditor;
   onBeginTitleEditing?: () => void;
   open?: boolean;
@@ -245,7 +246,7 @@ interface Overrides {
 }
 
 /** What the projection resolves for a fixture Resource of `kind`. */
-function ownContent(kind: KindId, source: string, url: string): ResourceContent {
+function ownContent(kind: PluginKind, source: string, url: string): ResourceContent {
   switch (kind) {
     case 'markdown':
       return { kind: 'markdown', content: { url: textAsset(source) }, via: 'self' };

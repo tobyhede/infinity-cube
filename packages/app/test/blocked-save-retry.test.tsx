@@ -1,12 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import {
-  isOfKind,
-  EMPTY_ASSET_REF,
-  uuidSchema,
-  type SpaceSnapshot,
-  type UUID,
-} from '@project/core';
+import { EMPTY_ASSET_REF, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { isOfKind } from '@project/plugins/testing';
 import { MemorySpaceBackend, MemorySpaceBackendTestControl } from '@project/persistence';
 import { createOpenSpaces, type OpenSpace, type OpenSpaces } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';

@@ -2,7 +2,6 @@ import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  isOfKind,
   EMPTY_ASSET_REF,
   newUuid,
   spaceFileSchema,
@@ -10,6 +9,7 @@ import {
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
+import { isOfKind } from '@project/plugins/testing';
 import { createWorkingSpaceLoader, isAssetHash, type LoadedSpace } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { exportAggregate } from '../../src/export/export-aggregate';

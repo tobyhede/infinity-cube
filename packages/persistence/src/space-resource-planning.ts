@@ -94,7 +94,7 @@ export interface CreateSpaceResourceInput {
   readonly mapId: UUID;
   readonly title: string;
   readonly position: MapPosition;
-  /** The Resource made, from the Space it shows. */
+  /** The Resource made, which its plugin's creation supplies; the lifecycle names no kind. */
   readonly document: SpaceResourceDocument;
 }
 /**

@@ -2,7 +2,6 @@ import fc from 'fast-check';
 import { expect, it } from 'vitest';
 
 import {
-  isOfKind,
   EMPTY_ASSET_REF,
   GRAPH_HEAD_SHAPES,
   normalizeTitle,
@@ -13,6 +12,7 @@ import {
   type MapId,
   type SpaceSnapshot,
 } from '@project/core';
+import { isOfKind } from '@project/plugins/testing';
 import { GRAPH_PALETTE, loadSpaceSnapshot } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
@@ -334,7 +334,6 @@ function resolve(
               ...document,
               title: generated.title,
               content: {
-                ...document.content,
                 target: uuidSchema.parse(proposedTarget?.id ?? document.content.target),
               },
             }

@@ -6,7 +6,7 @@ import {
   NotCreatableContent,
   type HostCreationHost,
   type HostNew,
-} from '../src/kinds/plugin-views';
+} from '../src/plugin-catalog';
 
 /** A plugin's creation as the host runs it, its types erased (ADR 0142). */
 

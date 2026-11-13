@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { isOfKind, titleName, uuidSchema } from '@project/core';
+import { titleName, uuidSchema } from '@project/core';
+import { isOfKind } from '@project/plugins/testing';
 import { loadSpace, type ResourceFile } from '@project/graph';
 import fixtureJson from '../fixture/00000000-0000-4000-8000-000000000040/space.json';
 import presentationJson from '../fixture/00000000-0000-4000-8000-000000000060/space.json';

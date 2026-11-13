@@ -30,8 +30,7 @@
  *
  * Every Resource creation completes its Edit on activation, so there is no
  * modal creation surface for the rest of the product to stand out of the way
- * of. A kind whose Create is withheld for a window of its own says so in its
- * app half (`kinds/space.ts`), narrowing `addResource` there.
+ * of.
  */
 export interface AuthoringInProgress {
   /**

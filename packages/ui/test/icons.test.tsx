@@ -4,7 +4,6 @@ import {
   ReferenceIcon,
   ParentIcon,
   SpaceIcon,
-  SpaceResourceIcon,
   ResourceKindIcon,
   CheckIcon,
   ChevronDownIcon,
@@ -43,21 +42,17 @@ describe('the public icon facade', () => {
     ]);
   });
 
-  it('uses the same cube for Spaces, Space Resources and their kind glyphs', () => {
+  it('uses the same cube for Spaces and the Space plugin’s glyph', () => {
     render(
       <>
         <span data-testid="space">
           <SpaceIcon size={16} />
-        </span>
-        <span data-testid="space-resource">
-          <SpaceResourceIcon size={16} />
         </span>
         <ResourceKindIcon kind="space" size={16} />
       </>,
     );
     for (const glyph of [
       screen.getByTestId('space'),
-      screen.getByTestId('space-resource'),
       screen.getByRole('img', { name: 'Space Resource' }),
     ]) {
       expect(glyph.querySelector('.lucide-box')).toBeInTheDocument();
@@ -159,7 +154,7 @@ describe('the public icon facade', () => {
           <ReferenceIcon />
         </span>
         <span data-testid="reference-of-space">
-          <ReferenceIcon Base={SpaceResourceIcon} />
+          <ReferenceIcon Base={SpaceIcon} />
         </span>
       </>,
     );

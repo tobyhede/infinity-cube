@@ -2,14 +2,8 @@ import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/pr
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  isOfKind,
-  assetHashOfPath,
-  titleName,
-  uuidSchema,
-  type Resource,
-  type UUID,
-} from '@project/core';
+import { assetHashOfPath, titleName, uuidSchema, type Resource, type UUID } from '@project/core';
+import { isOfKind } from '@project/plugins/testing';
 import { loadSpaceAggregate } from '@project/graph';
 import { isAssetHash } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';

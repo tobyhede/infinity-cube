@@ -4,13 +4,13 @@ import {
   embedsMap,
   uuidSchema,
   type JsonValue,
-  type KindId,
   type ResourceContent,
   type UUID,
 } from '@project/core';
 import { bareKindData, type ResourceFlowNode } from '@project/react-flow-adapter';
 import type { RenderAdapter } from '../src/render-adapter';
 import { textAsset } from './markdown-texts';
+import { type PluginKind } from '@project/plugins/testing';
 
 export function node(id: string, x: number, y: number, title = id): ResourceFlowNode {
   return {
@@ -47,7 +47,7 @@ interface FixtureView {
 
 const FIXTURE_VIEW: FixtureView = { spaceId: FIXTURE_TARGET_SPACE, map: FIXTURE_TARGET_MAP };
 
-function fixtureContent(kind: KindId, source: string, space: FixtureView): ResourceContent {
+function fixtureContent(kind: PluginKind, source: string, space: FixtureView): ResourceContent {
   switch (kind) {
     case 'markdown':
       return { kind: 'markdown', content: { url: textAsset(source) }, via: 'self' };
@@ -72,7 +72,7 @@ function fixtureContent(kind: KindId, source: string, space: FixtureView): Resou
 
 /** What a fixture Resource of `kind` stores; a Reference Resource names a Target. */
 function fixtureOwnContent(
-  kind: KindId,
+  kind: PluginKind,
   source: string,
   space: FixtureView,
 ): ResourceFlowNode['data']['ownContent'] {
@@ -95,7 +95,7 @@ function fixtureOwnContent(
  * (ADR 0142): Open for the kinds whose plugin keeps it, the Shape for an Ur
  * Resource and nothing for an Image Resource.
  */
-export function fixtureMapContent(open: boolean, kind: KindId): JsonValue {
+export function fixtureMapContent(open: boolean, kind: PluginKind): JsonValue {
   switch (kind) {
     case 'image':
       return {};
@@ -114,7 +114,7 @@ export function fixtureMapContent(open: boolean, kind: KindId): JsonValue {
  * text and `space` the view a Space Resource goes to.
  */
 export function fixtureFacts(
-  kind: KindId,
+  kind: PluginKind,
   open = false,
   source = '',
   space: FixtureView = FIXTURE_VIEW,

@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
 import {
-  isOfKind,
   resourceSize,
   spaceSnapshotSchema,
   uuidSchema,
@@ -9,6 +8,7 @@ import {
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
+import { isOfKind } from '@project/plugins/testing';
 
 /*
  * Deterministic aggregates and small Edits for the persistence cost harness

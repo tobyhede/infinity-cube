@@ -3,7 +3,6 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { describe, expect, it, vi } from 'vitest';
 import {
   EMPTY_ASSET_REF,
-  KIND_IDS,
   isMissingKindId,
   uuidSchema,
   type Resource,
@@ -19,6 +18,7 @@ import type { SettlePlacement, SettleResource } from '../src/resources-drag';
 import type { FocusFallback } from '../src/delete-confirmation';
 import type { MapMemberships } from '../src/map-memberships';
 import { resourceDeletionWords } from '../src/resource-deletion';
+import { LISTED_KINDS } from '@project/plugins/testing';
 
 const id = (suffix: string) => uuidSchema.parse(`00000000-0000-4000-8000-${suffix}`);
 
@@ -1258,7 +1258,7 @@ describe('ResourcesPopover', () => {
 
     // The registry's kinds, so the kinds come off the one list of them rather
     // than off a list written beside it.
-    const kinds = [...KIND_IDS];
+    const kinds = [...LISTED_KINDS];
     const drawn = screen
       .getAllByRole('button', { pressed: true })
       .map((toggle) => toggle.getAttribute('title'));
@@ -1461,7 +1461,7 @@ describe('ResourcesPopover as a Connect list', () => {
     const toggles = screen
       .getAllByRole('button', { pressed: true })
       .map((toggle) => toggle.getAttribute('title'));
-    expect(toggles).toHaveLength(KIND_IDS.length);
+    expect(toggles).toHaveLength(LISTED_KINDS.length);
     expect(toggles).not.toContain('Spaces in this Meta Space');
   });
 

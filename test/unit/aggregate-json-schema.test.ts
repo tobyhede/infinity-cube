@@ -2,13 +2,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Ajv2020 } from 'ajv/dist/2020';
-import {
-  KIND_IDS,
-  aggregateFileSchema,
-  importSpaceFileSchema,
-  isAcceptedImageUrl,
-  uuidSchema,
-} from '@project/core';
+import { aggregateFileSchema, importSpaceFileSchema, uuidSchema } from '@project/core';
+import { isAcceptedImageUrl } from '@project/plugin-image/domain';
 import {
   loadSpace,
   loadSpaceAggregate,
@@ -27,6 +22,7 @@ import urSchema from '../../docs/schema/resource/kinds/ur.schema.json';
 import locatorSchema from '../../docs/schema/resource/locator.schema.json';
 import resourceSchema from '../../docs/schema/resource/resource.schema.json';
 import spaceFileSchema from '../../docs/schema/space.schema.json';
+import { LISTED_KINDS } from '@project/plugins/testing';
 
 /**
  * `docs/schema/aggregate.schema.json` and `space.schema.json` publish the shapes
@@ -253,21 +249,21 @@ const refused: [string, Json, { instancePath: string; keyword: string }][] = [
 describe('the Resource file JSON Schema', () => {
   const examples = join(repoRoot, 'docs/schema/resource/examples');
 
-  it.each(KIND_IDS)('specifies the registered %s kind beside the others', (kind) => {
+  it.each(LISTED_KINDS)('specifies the registered %s kind beside the others', (kind) => {
     expect(existsSync(join(repoRoot, `docs/schema/resource/kinds/${kind}.schema.json`))).toBe(true);
     expect(existsSync(join(examples, `${kind}.json`))).toBe(true);
   });
 
-  // The `if` choosing builtInKinds lists the registered ids by hand; a kind
+  // The `if` choosing builtInKinds lists the listed plugins' kinds by hand; a kind
   // left out of it would be read as one whose plugin is missing.
-  it('applies builtInKinds to exactly the registered kinds', () => {
-    expect([...resourceSchema.if.properties.kind.enum].sort()).toEqual([...KIND_IDS].sort());
+  it('applies builtInKinds to exactly the listed kinds', () => {
+    expect([...resourceSchema.if.properties.kind.enum].sort()).toEqual([...LISTED_KINDS].sort());
     expect(
       resourceSchema.$defs.builtInKinds.oneOf.map(({ properties }) => properties.kind.const).sort(),
-    ).toEqual([...KIND_IDS].sort());
+    ).toEqual([...LISTED_KINDS].sort());
   });
 
-  it.each(KIND_IDS)('accepts the published %s example', (kind) => {
+  it.each(LISTED_KINDS)('accepts the published %s example', (kind) => {
     const example: unknown = JSON.parse(readFileSync(join(examples, `${kind}.json`), 'utf8'));
     expect(resourceFileSchema(example), JSON.stringify(resourceFileSchema.errors)).toBe(true);
   });
@@ -346,13 +342,16 @@ describe('the Resource file JSON Schema refuses only what intake refuses', () =>
     return !loadSpaceAggregate({ metaSpaceId: space, snapshots: [snapshot] }).ok;
   };
 
-  it.each(KIND_IDS)("decodes the published %s example through its kind's file codec", (kind) => {
-    const text = readFileSync(join(examples, `${kind}.json`), 'utf8');
-    const example: unknown = JSON.parse(text);
-    expect(resourceFileSchema(example)).toBe(true);
-    const decoded = parseResourceFiles([{ path: `resources/${kind}.json`, text }]);
-    expect(decoded.ok, JSON.stringify(decoded)).toBe(true);
-  });
+  it.each(LISTED_KINDS)(
+    "decodes the published %s example through its kind's file codec",
+    (kind) => {
+      const text = readFileSync(join(examples, `${kind}.json`), 'utf8');
+      const example: unknown = JSON.parse(text);
+      expect(resourceFileSchema(example)).toBe(true);
+      const decoded = parseResourceFiles([{ path: `resources/${kind}.json`, text }]);
+      expect(decoded.ok, JSON.stringify(decoded)).toBe(true);
+    },
+  );
 
   it('admits a valid Resource file through the whole of intake', () => {
     expect(intakeRefuses(filesOf(envelope('ur', {})))).toBe(false);

@@ -1,14 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import {
-  isOfKind,
   newUuid,
   uuidSchema,
   type GraphId,
   type MapId,
-  type SpaceResourceDocument,
+  type ResourceDocument,
   type SpaceSnapshot,
 } from '@project/core';
+import { contentOf } from '@project/plugins/testing';
 import {
   MemorySpaceBackend,
   MemorySpaceBackendTestControl,
@@ -44,11 +44,11 @@ const THIRD_GRAPH = id('11');
 const SECOND_COLOR = '#aa0000';
 const OTHER_COLOR = '#00aa00';
 
-const document: SpaceResourceDocument = {
+const document = {
   kind: 'space',
   title: 'Target',
   content: { spaceId: TARGET, map: SECOND_MAP, graph: SECOND_GRAPH },
-};
+} satisfies ResourceDocument;
 const meta: SpaceSnapshot = {
   id: META,
   document: {
@@ -135,9 +135,8 @@ const selectOn =
 
 const storedSelection = (source: OpenSpace) => {
   const stored = source.session.getState().working.resources[0]?.document;
-  return stored !== undefined && isOfKind(stored, 'space')
-    ? { map: stored.content.map, graph: stored.content.graph }
-    : undefined;
+  const content = stored === undefined ? undefined : contentOf(stored, 'space');
+  return content === undefined ? undefined : { map: content.map, graph: content.graph };
 };
 
 const graphsOf = (space: OpenSpace, mapId: MapId): readonly GraphId[] =>

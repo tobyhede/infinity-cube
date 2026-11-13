@@ -36,11 +36,11 @@ import { EntityActions, EntityActionsTrigger, type EntityActionGroup } from './E
 import { graphPaint } from './graph-color';
 import { EntityActionsIcon } from './icons';
 import {
-  pluginEntryFor,
-  type PluginSurfaceEntries,
+  usePluginEntry,
+  type PluginEntry,
   type PluginHostClaim,
   type PluginOperations,
-} from './kinds/plugin-views';
+} from './plugin-catalog';
 import { readingAssets, usePluginAssets } from './plugin-assets';
 import { RailChoiceMenu } from './RailChoiceMenu';
 import { MapTitleContext, MapTitleView, type MapTitle } from './MapTitle';
@@ -63,7 +63,7 @@ import {
 import { resourceShapeOutline, type OutlineSize } from './resource-shape-outline';
 import { ResourceShapeOutlineDrawing } from './ResourceShapeOutlineDrawing';
 import './canvas-resource.css';
-import './kinds/reference-canvas.css';
+import './target-canvas.css';
 
 /**
  * The Map surface's host for a Resource a plugin draws (ADR 0142).
@@ -273,7 +273,7 @@ function guarded(
 
 /** A Resource a plugin in this build draws, on the Map. */
 export function PluginResource(props: PluginResourceProps) {
-  return <PluginSurface {...props} entry={pluginEntryFor(props.kind)} />;
+  return <PluginSurface {...props} entry={usePluginEntry(props.kind)} />;
 }
 
 /**
@@ -281,7 +281,7 @@ export function PluginResource(props: PluginResourceProps) {
  * `PluginResource` draws, and what a test draws a plugin of its own through,
  * on its own surface or on the one it embeds.
  */
-export function PluginSurface(props: PluginResourceProps & PluginSurfaceEntries) {
+export function PluginSurface(props: PluginResourceProps & { readonly entry: PluginEntry }) {
   const { kind, title, state } = props;
   // Exclusive work elsewhere withdraws every authoring control the surface
   // draws, not only the plugin's commits (ADR 0142).
@@ -364,7 +364,6 @@ export function PluginSurface(props: PluginResourceProps & PluginSurfaceEntries)
   });
   const onFailure = props.onFailure ?? props.operations.onFailure;
   const embeddable = props.embeddable;
-  const entryFor = props.entryFor ?? pluginEntryFor;
   const embedding: Embedding = useMemo(
     () => ({
       resources: embeddable ?? [],
@@ -375,9 +374,8 @@ export function PluginSurface(props: PluginResourceProps & PluginSurfaceEntries)
       size,
       selected: state === 'selected' || state === 'editing',
       onFailure,
-      entryFor,
     }),
-    [embeddable, props.resourceId, host, rail, size, state, onFailure, entryFor],
+    [embeddable, props.resourceId, host, rail, size, state, onFailure],
   );
 
   const onMapEmbed = props.onMapEmbed;
@@ -450,6 +448,8 @@ export function PluginSurface(props: PluginResourceProps & PluginSurfaceEntries)
       data-testid="resource"
       data-kind={kind}
       data-content-kind={kind}
+      // Dotted at rest where its plugin shows another's content (`target-canvas.css`).
+      data-shows-target={props.entry.showsTarget || undefined}
       data-state={state}
       // A surface holding a Claim is being worked in, which keeps its active
       // face as an edit does (`canvas-resource.css`).

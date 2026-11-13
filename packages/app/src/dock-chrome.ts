@@ -1,7 +1,6 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   graphHeadShape,
-  KIND_IDS,
   type Graph,
   type GraphHeadShape,
   type GraphId,
@@ -33,10 +32,8 @@ import { CANVAS } from './space-authoring';
 import type { ResourcesDisclosure } from './resources-disclosure';
 import { useReferenceableSpaces } from './referenceable-spaces';
 
-/** The Dock's Creates in registry order (`KIND_IDS`), whatever order the plugins are built in. */
-const ORDERED_DOCK_CREATIONS = [...DOCK_CREATIONS].sort(
-  (a, b) => KIND_IDS.indexOf(a.kind) - KIND_IDS.indexOf(b.kind),
-);
+/** The Dock's Creates, in the build's plugin list order (ADR 0142). */
+const ORDERED_DOCK_CREATIONS = DOCK_CREATIONS;
 
 /**
  * The Graph the Dock's Graph cluster names: the Active Graph, or nothing.

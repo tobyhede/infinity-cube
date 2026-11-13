@@ -9,7 +9,6 @@ import type {
   GraphId,
   Map,
   MapId,
-  PluginKind,
   Resource,
   ResourceId,
   UUID,
@@ -474,7 +473,7 @@ export interface DockResources {
 
 /** One Create the Command Dock draws: the kind it makes, whether it may run, and the press. */
 export interface DockCreate {
-  readonly kind: PluginKind;
+  readonly kind: string;
   readonly disabled: boolean;
   /** Runs the plugin's creation, or nothing while it is withheld. */
   readonly create: () => void;

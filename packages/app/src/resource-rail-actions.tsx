@@ -3,7 +3,6 @@ import {
   kindFlags,
   spaceSelection,
   titleName,
-  type PluginKind,
   type Map as SpaceMap,
   type Resource,
   type ResourceId,
@@ -39,7 +38,7 @@ import { shortcutOf } from './shortcut-sheet';
 
 /** A creation a Resource's rail offers on it, as a plugin declares one from a Resource (ADR 0142). */
 export interface RailCreation {
-  readonly kind: PluginKind;
+  readonly kind: string;
   /** What the command is called, as its plugin declares it. */
   readonly label: string;
   readonly run: () => EntityActionOutcome;

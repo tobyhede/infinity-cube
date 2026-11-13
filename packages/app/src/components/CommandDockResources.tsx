@@ -4,7 +4,7 @@
  * {@link ResourcesControl}.
  */
 import { useContext, useEffect, useId, useRef } from 'react';
-import { DEFAULT_KIND } from '@project/core';
+import { ADD_KIND } from '../add-kind';
 import { ResourceKindIcon, resourceKindName, ToolbarButton, ToolbarGroup } from '@project/ui';
 import { bindingOf } from '../key-bindings';
 import type { MenuSide } from '../dock-placement';
@@ -56,15 +56,15 @@ function CreatePeers({ creates }: { readonly creates: readonly DockCreate[] }) {
           size="icon"
           className="nokey"
           aria-label={`Create ${resourceKindName(kind)}`}
-          // The canvas's C creates the default kind, so its button teaches it,
+          // The canvas's C creates the kind Add creates, so its button teaches it,
           // while C can create one.
           aria-keyshortcuts={
-            kind === DEFAULT_KIND && !disabled
+            kind === ADD_KIND && !disabled
               ? bindingOf('canvas.addResource').ariaKeyShortcuts
               : undefined
           }
           title={
-            kind === DEFAULT_KIND && !disabled
+            kind === ADD_KIND && !disabled
               ? `Create ${resourceKindName(kind)} (${bindingOf('canvas.addResource').ariaKeyShortcuts})`
               : `Create ${resourceKindName(kind)}`
           }
@@ -88,7 +88,7 @@ function ResourcesTrigger() {
        expand arrows: beside a Space, a Map and a Graph's colour, the icon
        slot names what the cluster is about, and "expand" named a gesture this
        cluster does not have. */
-    <SetTrigger icon={<ResourceKindIcon kind={DEFAULT_KIND} />}>Resources</SetTrigger>
+    <SetTrigger icon={<ResourceKindIcon kind={ADD_KIND} />}>Resources</SetTrigger>
   );
 }
 

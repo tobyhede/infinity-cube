@@ -5,17 +5,19 @@ import {
   KIND_ID_FORM,
   contentParser,
   isMissingKindId,
-  isRegisteredKind,
-  type KindId,
   type Resource,
   type ResourceDocument,
   type ResourceFileDocument,
-  type Unplugged,
-} from './kinds/registry';
+} from './plugin-modules';
 import { RESOURCE_TITLE_REQUIRED, normalizeTitle } from './title';
 import { uuidSchema } from './uuid';
-import { jsonValueSchema, type JsonObject } from './json-value';
+import { jsonValueSchema, type JsonObject, type JsonValue } from './json-value';
 
+/** A Resource's kind and content, its content parsed by its plugin's schema or carried unread. */
+interface KindAndContent {
+  readonly kind: string;
+  readonly content: JsonValue;
+}
 import { OUTLINES } from '@project/resource-api/domain';
 
 export { newUuid, uuidSchema } from './uuid';
@@ -86,15 +88,15 @@ const unreadContentSchema: z.ZodType<JsonObject, z.ZodTypeDef, unknown> = jsonVa
  * JSON the host never reads, which the default plugin draws and the plugin
  * that returns reads as it stands. A kind that is not a kind id is refused.
  */
-const kindedContent = <Kinded>(
+const kindedContent = (
   kind: string,
   content: unknown,
-  parserOf: (kind: KindId) => z.ZodType<Kinded, z.ZodTypeDef, unknown>,
   ctx: z.RefinementCtx,
-): Kinded | Unplugged | undefined => {
-  if (isRegisteredKind(kind)) {
-    const parsed = parserOf(kind).safeParse(content);
-    if (parsed.success) return parsed.data;
+): KindAndContent | undefined => {
+  const parser = contentParser(kind);
+  if (parser !== undefined) {
+    const parsed = parser.safeParse(content);
+    if (parsed.success) return { kind, content: parsed.data };
     for (const issue of parsed.error.issues) {
       ctx.addIssue({ ...issue, path: ['content', ...issue.path] });
     }
@@ -124,16 +126,15 @@ const kindedContent = <Kinded>(
  * other answers, so a Resource failing both is refused with every issue at
  * once: the check runs in a transform over `unknown`, whose base never fails.
  */
-const enveloped = <Envelope extends object, Kinded>(
+const enveloped = <Envelope extends object>(
   envelopeSchema: z.ZodType<Envelope, z.ZodTypeDef, unknown>,
-  parserOf: (kind: KindId) => z.ZodType<Kinded, z.ZodTypeDef, unknown>,
 ) =>
   z.unknown().transform((input, ctx) => {
     const envelope = envelopeSchema.safeParse(input);
     if (!envelope.success) for (const issue of envelope.error.issues) ctx.addIssue(issue);
     const declared = declaredKindAndContentSchema.safeParse(input);
     const kinded = declared.success
-      ? kindedContent(declared.data.kind, declared.data.content, parserOf, ctx)
+      ? kindedContent(declared.data.kind, declared.data.content, ctx)
       : undefined;
     if (!envelope.success || kinded === undefined) return z.NEVER;
     return { ...envelope.data, ...kinded };
@@ -142,7 +143,6 @@ const enveloped = <Envelope extends object, Kinded>(
 /** A Resource: the envelope, and the content its kind's module parses. */
 export const resourceSchema: z.ZodType<Resource, z.ZodTypeDef, unknown> = enveloped(
   z.object({ id: idSchema, title: resourceTitleSchema, kind: z.string(), content: z.unknown() }),
-  contentParser,
 );
 
 /**
@@ -157,7 +157,6 @@ export const resourceFileSchema: z.ZodType<ResourceFileDocument, z.ZodTypeDef, u
   z
     .object({ id: idSchema, title: resourceTitleSchema, kind: z.string(), content: z.unknown() })
     .strict(),
-  contentParser,
 );
 
 const declaredKindSchema = z.object({ kind: z.string() });
@@ -431,7 +430,6 @@ export const spaceDocumentSchema = spaceFileObjectSchema.omit({ id: true });
 /** The JSONB document stored beside a resource's relational UUID: the Resource less its id. */
 export const resourceDocumentSchema: z.ZodType<ResourceDocument, z.ZodTypeDef, unknown> = enveloped(
   z.object({ title: resourceTitleSchema, kind: z.string(), content: z.unknown() }),
-  contentParser,
 );
 
 /** A complete, fully identified snapshot of one Space, exchanged at persistence seams. */

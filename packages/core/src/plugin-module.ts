@@ -1,9 +1,8 @@
-/* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import type { z } from 'zod';
-import type { ContentFacts } from '../resource-content';
-import type { UUID } from '../types';
+import type { ContentFacts } from './resource-content';
+import type { UUID } from './types';
 import type { Outline, SpaceFraming as ApiSpaceFraming } from '@project/resource-api/domain';
-import type { JsonValue } from '../json-value';
+import type { JsonValue } from './json-value';
 
 /**
  * What a kind says about the rules every Resource meets, so that no rule names
@@ -109,103 +108,48 @@ export interface SpaceSelection<Content> {
   ) => SpaceSelectionProblem | undefined;
 }
 
-/** What a kind's content resolves to, tagged with a kind. Whether it is the Resource's own is the registry's to say. */
-export interface KindResolvedContent {
+/**
+ * What a plugin's content resolves to: its kind, which its own view draws, and
+ * its content as its plugin's schema parsed it, which a surface embedding it
+ * hands that view. Whether it is the Resource's own is the reader's to say.
+ */
+export interface PluginContent {
   readonly kind: string;
+  readonly content: JsonValue;
 }
 
 /**
- * A Resource kind (ADR 0120): its id, the schema its `content` is
- * parsed by, and every rule it declares. The core reads these and names no
- * kind; a kind with nothing to say about a rule takes `defineKind`'s answer.
- * The view half is the application's.
+ * A plugin's domain half as the core reads it (ADR 0142): the schema its
+ * `content` is parsed by, and every rule it declares, each over content the
+ * core holds as it stores it and the plugin's schema parses again. The core
+ * reads these and names no kind; a plugin with nothing to say about a rule
+ * takes the answer of one that has nothing to say.
  */
-export interface PluginModule<
-  K extends string,
-  Content,
-  Resolved extends KindResolvedContent = KindResolvedContent,
-> {
-  readonly id: K;
+export interface PluginModule {
+  readonly id: string;
   /**
    * The one parser of this kind's `content`, strict, for a stored document, a
    * Resource file and the wire alike: the envelope parses `content` through it
    * (ADR 0128, ADR 0142).
    */
-  readonly contentSchema: z.ZodType<Content, z.ZodTypeDef, unknown>;
+  readonly contentSchema: z.ZodType<JsonValue, z.ZodTypeDef, unknown>;
   readonly flags: KindFlags;
   /** What this kind's content resolves to, however the Resource showing it reached it. */
-  readonly resolveContent: (content: Content) => Resolved;
+  readonly resolveContent: (content: JsonValue) => PluginContent;
   /** The Resources this content references, which intake resolves. */
-  readonly resourceReferences: (content: Content) => readonly UUID[];
+  readonly resourceReferences: (content: JsonValue) => readonly UUID[];
   /** The Resource whose content this one shows, when it shows another's (ADR 0070). */
-  readonly contentTarget: (content: Content) => UUID | undefined;
+  readonly contentTarget: (content: JsonValue) => UUID | undefined;
   /** The Spaces this content references, from which the core enforces cycles, lifetime and rooting. */
-  readonly spaceReferences: (content: Content) => readonly UUID[];
+  readonly spaceReferences: (content: JsonValue) => readonly UUID[];
   /** How this kind's content shows a view of another Space, when it shows one. */
-  readonly selection?: SpaceSelection<Content>;
+  readonly selection: SpaceSelection<JsonValue> | undefined;
   /** The content as Export writes it, so a file's bytes do not depend on how it was built. */
-  readonly canonicalContent: (content: Content) => Content;
-  /** What an author may do with this kind's own content and how it lays out, when it owns content (ADR 0114). */
-  readonly facts?: ContentFacts;
-  /** The content a new Resource of this kind starts with, when it may be created empty. */
-  readonly newContent?: Content;
+  readonly canonicalContent: (content: JsonValue) => JsonValue;
+  /** What an author may do with this kind's own content and how it lays out (ADR 0114). */
+  readonly facts: ContentFacts;
+  /** The content a new Resource of this kind starts with, where it may be created empty. */
+  readonly newContent: JsonValue | undefined;
   /** What a Resource of this kind keeps on each Map: its plugin's Map content (ADR 0142). */
   readonly mapContent: KindMapContent;
-}
-
-/**
- * A kind a Resource may be created as from nothing but a press: its module
- * declares the content a new one starts with, and its type says so, so the
- * kinds that may be created empty are derived from the modules rather than
- * listed.
- */
-export interface StartsEmpty<Content> {
-  readonly newContent: Content;
-}
-
-/** The rules every kind declares, since each is a plugin and the plugin answers them (ADR 0142). */
-type DeclaredRule =
-  | 'id'
-  | 'contentSchema'
-  | 'flags'
-  | 'resolveContent'
-  | 'resourceReferences'
-  | 'contentTarget'
-  | 'spaceReferences'
-  | 'mapContent';
-
-/** What a kind must declare; the rest takes {@link defineKind}'s answer. */
-type KindDeclaration<K extends string, Content, Resolved extends KindResolvedContent> = Pick<
-  PluginModule<K, Content, Resolved>,
-  DeclaredRule
-> &
-  Partial<Omit<PluginModule<K, Content, Resolved>, DeclaredRule>>;
-
-/** The content in its schema's key order, or as given when the schema refuses it, so this never throws. */
-const inSchemaOrder =
-  <Content>(schema: z.ZodType<Content, z.ZodTypeDef, unknown>) =>
-  (content: Content): Content => {
-    const parsed = schema.safeParse(content);
-    return parsed.success ? parsed.data : content;
-  };
-
-/**
- * A kind module with every rule it does not declare answered as a kind that
- * has no content of its own to author and puts its content in its schema's
- * key order on Export. A module that declares the
- * content a new Resource starts with keeps it in its type.
- */
-export function defineKind<const K extends string, Content, Resolved extends KindResolvedContent>(
-  declaration: KindDeclaration<K, Content, Resolved> & StartsEmpty<Content>,
-): PluginModule<K, Content, Resolved> & StartsEmpty<Content>;
-export function defineKind<const K extends string, Content, Resolved extends KindResolvedContent>(
-  declaration: KindDeclaration<K, Content, Resolved>,
-): PluginModule<K, Content, Resolved>;
-export function defineKind<K extends string, Content, Resolved extends KindResolvedContent>(
-  declaration: KindDeclaration<K, Content, Resolved>,
-): PluginModule<K, Content, Resolved> {
-  return {
-    canonicalContent: inSchemaOrder(declaration.contentSchema),
-    ...declaration,
-  };
 }

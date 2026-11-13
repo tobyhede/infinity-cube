@@ -1,6 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
 import { builtinModules } from 'node:module';
-import { join } from 'node:path';
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
@@ -224,99 +222,26 @@ const packageInternalsPattern = (exemptApp) => ({
 });
 
 /**
- * The kind-neutral modules under a `kinds/` directory: the interface every kind
- * implements, the registry each choice among kinds goes through, and the
- * plugin list and its adapters, which read every Resource plugin alike (ADR
- * 0142). Every other module there is one kind's, and what it exports names
- * that kind.
+ * Only the build's plugin list imports a Resource plugin (ADR 0142): every
+ * other package reads the list, `@project/plugins/domain` or `/view`, or the
+ * core's and ui's readers over it, so a plugin is added or removed in one
+ * file. A kind id is a string the list resolves, and nothing outside a plugin
+ * names one.
  */
-const KIND_NEUTRAL_MODULES = new Set([
-  'registry',
-  'plugin-module',
-  'plugin-listing',
-  'plugins',
-  'plugin-kind',
-  'plugin-views',
-]);
-
-/** Each name a module's source exports, by declaration or by an `export { … }` list. */
-const exportedNames = (source) => [
-  ...[
-    ...source.matchAll(
-      /^export\s+(?:declare\s+)?(?:async\s+)?(?:const|let|var|function\*?|type|interface|(?:abstract\s+)?class|enum)\s+([A-Za-z_$][\w$]*)/gmu,
-    ),
-  ].map((match) => match[1]),
-  ...[...source.matchAll(/^export\s+(?:type\s+)?\{([^}]*)\}/gmu)].flatMap((match) =>
-    match[1]
-      .split(',')
-      .map((entry) => entry.trim().replace(/^type\s+/u, ''))
-      .filter((entry) => entry.length > 0)
-      .map((entry) => entry.split(/\s+as\s+/u).at(-1)),
-  ),
-];
-
-/**
- * The names one package's kind modules export, read from their source, so a
- * kind module's new export is banned outside `kinds/` with no list to update.
- * `test/unit/kind-module-imports.test.ts` holds this reading to the compiler's.
- */
-const kindModuleNames = (pkg) => {
-  const directory = join(import.meta.dirname, 'packages', pkg, 'src', 'kinds');
-  return [
-    ...new Set(
-      readdirSync(directory)
-        .filter((file) => /\.tsx?$/u.test(file))
-        .filter((file) => !KIND_NEUTRAL_MODULES.has(file.replace(/\.tsx?$/u, '')))
-        .flatMap((file) => exportedNames(readFileSync(join(directory, file), 'utf8'))),
-    ),
-  ].sort();
-};
-
-const KIND_MODULE_MESSAGE =
-  'A kind is named only by its module under kinds/ (ADR 0128). Route a choice among kinds through kinds/registry.ts; a feature that exists for one kind alone is listed in KIND_FEATURE_FILES in eslint.config.js, with its reason.';
-
-/**
- * Outside a `kinds/` directory, nothing imports what one kind's module exports:
- * by name from `@project/core` or `@project/ui`, which re-export the kind
- * modules, or by relative path to the module itself. A namespace import of
- * either package is refused by the same rule, so it cannot reach round the
- * names. A literal kind id is not an import, and stays
- * `test/unit/kind-ids-in-modules.test.ts`'s to count.
- *
- * It is the `@typescript-eslint` form of the rule, so it neither replaces nor
- * is replaced by the package zones' `no-restricted-imports`, and it refuses an
- * `import type` as well.
- */
-const KIND_MODULE_IMPORTS = {
-  paths: [
-    { name: '@project/core', importNames: kindModuleNames('core'), message: KIND_MODULE_MESSAGE },
-    { name: '@project/ui', importNames: kindModuleNames('ui'), message: KIND_MODULE_MESSAGE },
-  ],
+const PLUGIN_LIST_IMPORTS = {
   patterns: [
     {
-      regex: `(?:^|/)kinds/(?!(?:${[...KIND_NEUTRAL_MODULES].join('|')})$)[^/.]+$`,
-      message: KIND_MODULE_MESSAGE,
-    }, // A plugin package is a kind module (ADR 0142): only kinds/ and a listed
-    // one-kind feature read it.
-    { regex: '^@project/plugin-', message: KIND_MODULE_MESSAGE },
+      regex: '^@project/plugin-',
+      message:
+        "Only packages/plugins imports a Resource plugin (ADR 0142). Read the build's list through @project/plugins/domain or /view, or the core and ui readers over it.",
+    },
+    {
+      regex: '^@project/plugins/testing$',
+      message:
+        '@project/plugins/testing reads a Resource by its kind, which only a test may do; the host reads it through its plugin (ADR 0142).',
+    },
   ],
 };
-
-/**
- * The files outside `kinds/` that import a kind module's export, each for a
- * feature that exists for that kind alone. The list only shrinks: a new entry
- * needs a ticket under `.scratch/resource-kind-modules/`, and
- * `test/unit/kind-module-imports.test.ts` fails an entry that no longer imports
- * one.
- */
-const KIND_FEATURE_FILES = [
-  // The core's surface, which re-exports every kind module.
-  'packages/core/src/index.ts',
-  // The kinds a Reference badge sits on are every kind but Reference; the flag saying so is a runtime boolean, so no type reads it.
-  'packages/ui/src/icons.tsx',
-  // The Space glyph on the Space cluster's own controls.
-  'packages/app/src/components/CommandDockSpaces.tsx',
-];
 
 export default tseslint.config(
   {
@@ -763,9 +688,16 @@ export default tseslint.config(
   },
   {
     files: ['packages/*/src/**/*.{ts,tsx}', 'src/**/*.{ts,tsx}'],
-    ignores: ['**/kinds/**', ...KIND_FEATURE_FILES],
+    ignores: ['packages/plugins/**', 'packages/plugin-*/**'],
     rules: {
-      '@typescript-eslint/no-restricted-imports': ['error', KIND_MODULE_IMPORTS],
+      '@typescript-eslint/no-restricted-imports': ['error', PLUGIN_LIST_IMPORTS],
+    },
+  },
+  // The list's domain half is loaded by the server and the CLI, so it names no view.
+  {
+    files: ['packages/plugins/src/domain.ts'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [DOMAIN_NAMES_NO_VIEW_PATTERN] }],
     },
   },
   // Vite loads these in Node and externalizes bare specifiers, so a `@project/*`

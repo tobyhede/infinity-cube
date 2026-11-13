@@ -1,6 +1,6 @@
-import { contentFacts, type ResourceContent } from './kinds/registry';
+import { contentFacts, type ResourceContent } from './plugin-modules';
 
-export type { ResourceContent } from './kinds/registry';
+export type { ResourceContent } from './plugin-modules';
 
 /**
  * Whether content is the Resource's own or its content Target's, the Resource

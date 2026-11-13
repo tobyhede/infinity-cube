@@ -1,7 +1,7 @@
 import {
   isMissingKind,
   kindFlags,
-  newDefaultResourceDocument,
+  newEmptyResourceDocument,
   resourceReferences,
   spaceReferences,
   type ResourceDocument,
@@ -15,7 +15,6 @@ import {
   type MapPosition,
   type ResourcePlacement,
   type JsonValue,
-  type MissingKind,
   COLLAPSED_RESOURCE_SIZE,
   resourceSize,
   EDGE_TITLE_ONE_LINE,
@@ -332,7 +331,7 @@ export type AuthoringRefusal =
    * Deleting the last Resource of a missing kind in this Space while the
    * aggregate holds a Space only because a plugin is missing (ADR 0142).
    */
-  | { readonly code: 'missing-plugin-holds-space'; readonly kind: MissingKind }
+  | { readonly code: 'missing-plugin-holds-space'; readonly kind: string }
   // The one code here the domain owns rather than this module: `@project/core`
   // raises it from the Resource schema, so both ends spell it from one constant.
   | { readonly code: typeof RESOURCE_TITLE_REQUIRED }
@@ -1366,7 +1365,7 @@ export function createSpaceAuthoring({
       // source placed; the refusal below only satisfies the compiler.
       const source = placement.get(completion.from);
       if (source === undefined) return refuse({ code: 'edge-resource-outside-map' });
-      const newResource = newDefaultResourceDocument(nextResourceTitle(snapshot));
+      const newResource = newEmptyResourceDocument(nextResourceTitle(snapshot));
       const created =
         completion.position === 'beside-source'
           ? createResource(newResource, besideSource(source), 'avoidingOverlap')

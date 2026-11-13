@@ -1,38 +1,31 @@
-import { describe, expect, expectTypeOf, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
-  KIND_IDS,
+  PLUGIN_KINDS,
   contentTarget,
   isKindId,
   isMissingKindId,
-  isRegisteredKind,
+  isPluginKind,
   mapContentProblem,
+  newEmptyResourceDocument,
   newResourceDocument,
   resolveContent,
   startsEmpty,
   UNRESOLVED_CONTENT,
   resourceReferences,
-  type EmptyCreatableKindId,
   type ResourceDocument,
-} from '../src/kinds/registry';
+} from '../src/plugin-modules';
 import { uuidSchema } from '../src/schema';
 import { EMPTY_ASSET_REF } from '../src/assets';
-import { imageKind } from '../src/kinds/image';
-import { markdownKind } from '../src/kinds/markdown';
-import { referenceKind } from '../src/kinds/reference';
-import { spaceKind } from '../src/kinds/space';
-import { urKind } from '../src/kinds/ur';
 
-describe('the kind registry', () => {
-  it('registers every kind module', () => {
-    for (const kind of [urKind, imageKind, markdownKind, referenceKind, spaceKind]) {
-      expect(isRegisteredKind(kind.id), kind.id).toBe(true);
-    }
+describe('the build’s plugins, read as kinds', () => {
+  it.each(['markdown', 'space', 'image', 'ur', 'reference'])('reads the %s plugin', (kind) => {
+    expect(isPluginKind(kind)).toBe(true);
   });
 
   it.each(['chart', 'vnd.example.chart', 'Markdown', ''])(
-    'does not register %j, which no module declares',
+    'reads no plugin for %j, which none in the list draws',
     (kind) => {
-      expect(isRegisteredKind(kind)).toBe(false);
+      expect(isPluginKind(kind)).toBe(false);
     },
   );
 
@@ -40,7 +33,7 @@ describe('the kind registry', () => {
     const missing = 'vnd.example.chart';
     if (!isMissingKindId(missing)) throw new Error('A plugin in this build draws the kind');
     expect(mapContentProblem(missing, { zoom: 2, open: true })).toBeUndefined();
-    expect(mapContentProblem(urKind.id, { open: true })).toBeDefined();
+    expect(mapContentProblem('ur', { open: true })).toBeDefined();
   });
 });
 
@@ -49,15 +42,15 @@ const SPACE = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 
 /** Content of every kind: what each kind starts with, and one of each that references something. */
 const REPRESENTATIVE: readonly ResourceDocument[] = [
-  ...KIND_IDS.filter(startsEmpty).map((kind) => newResourceDocument(kind, 'New')),
-  { title: 'Figure', kind: imageKind.id, content: { url: 'https://example.com/a.png' } },
-  { title: 'Recap', kind: referenceKind.id, content: { target: TARGET } },
-  { title: 'Inner', kind: spaceKind.id, content: { spaceId: SPACE, map: SPACE, graph: SPACE } },
+  ...PLUGIN_KINDS.flatMap((kind) => newResourceDocument(kind, 'New') ?? []),
+  { title: 'Figure', kind: 'image', content: { url: 'https://example.com/a.png' } },
+  { title: 'Recap', kind: 'reference', content: { target: TARGET } },
+  { title: 'Inner', kind: 'space', content: { spaceId: SPACE, map: SPACE, graph: SPACE } },
 ];
 
 describe("a kind's content Target", () => {
-  it('has content of every registered kind to read', () => {
-    expect(new Set(REPRESENTATIVE.map(({ kind }) => kind))).toEqual(new Set(KIND_IDS));
+  it('has content of every listed kind to read', () => {
+    expect(new Set(REPRESENTATIVE.map(({ kind }) => kind))).toEqual(new Set(PLUGIN_KINDS));
   });
 
   /** Resolution reads the Target intake has resolved as a Resource reference, and no other. */
@@ -73,8 +66,8 @@ describe("a kind's content Target", () => {
 
 describe('where resolved content came from', () => {
   const OWN = REPRESENTATIVE.filter((doc) => contentTarget(doc) === undefined);
-  const NOTES = { kind: markdownKind.id, content: { url: EMPTY_ASSET_REF } } as const;
-  const RECAP = { kind: referenceKind.id, content: { target: TARGET } } as const;
+  const NOTES = { kind: 'markdown', content: { url: EMPTY_ASSET_REF } } as const;
+  const RECAP = { kind: 'reference', content: { target: TARGET } } as const;
 
   it.each(OWN)('is the Resource itself when its kind names no Target: $kind $title', (doc) => {
     expect(resolveContent(doc, () => undefined).via).toBe('self');
@@ -82,7 +75,7 @@ describe('where resolved content came from', () => {
 
   it('is the Target when its kind names one', () => {
     expect(resolveContent(RECAP, () => NOTES)).toEqual({
-      kind: markdownKind.id,
+      kind: 'markdown',
       content: NOTES.content,
       via: 'target',
     });
@@ -94,12 +87,7 @@ describe('where resolved content came from', () => {
     expect(UNRESOLVED_CONTENT).toEqual({ kind: 'unresolved', via: 'target' });
   });
 
-  it('is not said by any kind module', () => {
-    expectTypeOf<ReturnType<typeof markdownKind.resolveContent>>().not.toHaveProperty('via');
-    expectTypeOf<ReturnType<typeof imageKind.resolveContent>>().not.toHaveProperty('via');
-    expectTypeOf<ReturnType<typeof spaceKind.resolveContent>>().not.toHaveProperty('via');
-    expectTypeOf<ReturnType<typeof urKind.resolveContent>>().not.toHaveProperty('via');
-    expectTypeOf<ReturnType<typeof referenceKind.resolveContent>>().not.toHaveProperty('via');
+  it('is the Resource itself for every Resource that shows its own content', () => {
     for (const doc of OWN)
       expect(resolveContent(doc, () => undefined)).toHaveProperty('via', 'self');
   });
@@ -131,18 +119,17 @@ describe('a kind id', () => {
   });
 });
 
-/**
- * The kinds a press may create empty, written out once, so the type the
- * modules' declarations derive and the runtime answer are held to the same list.
- */
-const STARTS_EMPTY = ['markdown', 'ur'] as const;
-
 describe('the kinds a Resource may be created empty as', () => {
-  it('are typed as exactly the kinds whose module declares new content', () => {
-    expectTypeOf<EmptyCreatableKindId>().toEqualTypeOf<(typeof STARTS_EMPTY)[number]>();
+  it('are the plugins that declare new content, in list order', () => {
+    expect(PLUGIN_KINDS.filter(startsEmpty)).toEqual(['markdown', 'ur']);
   });
 
-  it('are answered at runtime as the same kinds', () => {
-    expect(KIND_IDS.filter(startsEmpty)).toEqual(STARTS_EMPTY);
+  it('start a Resource created with no kind chosen as the first of them in list order', () => {
+    expect(newEmptyResourceDocument('New').kind).toBe(PLUGIN_KINDS.filter(startsEmpty)[0]);
+  });
+
+  it('do not include a kind whose plugin declares no new content', () => {
+    expect(newResourceDocument('reference', 'New')).toBeUndefined();
+    expect(newResourceDocument('chart', 'New')).toBeUndefined();
   });
 });

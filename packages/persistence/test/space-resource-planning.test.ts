@@ -1,6 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { isOfKind, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { isOfKind } from '@project/plugins/testing';
 import type { LoadedSpace } from '../src/backend';
 import {
   cascadeDeletion,

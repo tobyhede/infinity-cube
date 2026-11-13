@@ -12,7 +12,7 @@ import {
   EMPTY_ASSET_REF,
   spaceSnapshotSchema,
   uuidSchema,
-  type SpaceResourceDocument,
+  type ResourceDocument,
   type SpaceSnapshot,
 } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
@@ -129,7 +129,7 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
  * that seeds a *stale* selection has to say so with real ids rather than with a
  * value the type would not have allowed.
  */
-const home = (spaceResource: SpaceResourceDocument): SpaceSnapshot =>
+const home = (spaceResource: ResourceDocument): SpaceSnapshot =>
   spaceSnapshotSchema.parse({
     id: HOME_ID,
     document: {

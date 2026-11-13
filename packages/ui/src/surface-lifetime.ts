@@ -1,4 +1,4 @@
-import type { PluginHostClaim } from './kinds/plugin-views';
+import type { PluginHostClaim } from './plugin-catalog';
 
 /**
  * One mounted surface's lifetime: the key its drawing is known by, whether it

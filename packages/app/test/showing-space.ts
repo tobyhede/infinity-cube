@@ -1,5 +1,4 @@
-import { spaceKind, type ResourceDocument } from '@project/core';
-import type { ShownSpace } from '@project/persistence';
+import { spaceResourceMaker } from '@project/plugins/testing';
 
 /**
  * A Space Resource lifecycle input carrying the document the Space plugin
@@ -7,9 +6,5 @@ import type { ShownSpace } from '@project/persistence';
  */
 export const showingSpace = <Input extends { readonly title: string }>(input: Input) => ({
   ...input,
-  document: (shown: ShownSpace): ResourceDocument => ({
-    title: input.title,
-    kind: spaceKind.id,
-    content: shown,
-  }),
+  document: spaceResourceMaker(input.title),
 });

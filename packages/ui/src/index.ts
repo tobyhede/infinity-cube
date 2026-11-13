@@ -32,7 +32,15 @@ export { NO_ASSETS, PluginAssetsProvider, usePluginAssets } from './plugin-asset
 export type { PresentedPluginResourceProps } from './PresentedPluginResource';
 export { ResourceFailureBoundary } from './ResourceFailureBoundary';
 export type { ResourceFailureBoundaryProps } from './ResourceFailureBoundary';
-export { NotCreatableContent, pluginCreations } from './kinds/plugin-views';
+export {
+  BUILD_CATALOG,
+  NotCreatableContent,
+  PluginCatalogProvider,
+  catalogCreations,
+  pluginCatalog,
+  pluginCreations,
+  usePluginCatalog,
+} from './plugin-catalog';
 export type {
   ClaimHolder,
   HostCreation,
@@ -41,8 +49,10 @@ export type {
   PluginCommits,
   PluginCreationEntry,
   PluginHostClaim,
+  PluginCatalog,
+  PluginEntry,
   PluginOperations,
-} from './kinds/plugin-views';
+} from './plugin-catalog';
 export type {
   CanvasSpaceResourceChoice,
   CanvasSpaceResourceGraphChoice,
@@ -85,15 +95,13 @@ export type {
   ChoiceMenuSide,
   ChoiceMenuTriggerProps,
 } from './ChoiceMenu';
-export { ResourceKindIcon, resourceKindName } from './ResourceKindIcon';
-export { BADGED_TARGET_GLYPH } from './kinds/plugin-listing';
-export { bareOperations, kindNaming, missingKindNaming } from './kinds/registry';
-export type {
-  KindNaming,
-  KindOperations,
-  KindOperationsByKind,
-  KindOperationsOf,
-} from './kinds/registry';
+export {
+  ResourceKindIcon,
+  kindNaming,
+  missingKindNaming,
+  resourceKindName,
+} from './ResourceKindIcon';
+export type { KindNaming } from './ResourceKindIcon';
 export type { ResourceKindIconProps } from './ResourceKindIcon';
 export { ResourceSearchCombobox } from './ResourceSearchCombobox';
 export type { ResourceChoice, ResourceSearchComboboxProps } from './ResourceSearchCombobox';
@@ -163,7 +171,6 @@ export {
   MarkdownIcon,
   OpenIndependentlyIcon,
   ParentIcon,
-  SpaceResourceIcon,
   SpaceIcon,
   SearchIcon,
   UrIcon,

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { newUuid, uuidSchema, type SpaceSnapshot, type SpaceResourceDocument } from '@project/core';
+import { newUuid, uuidSchema, type SpaceSnapshot, type ResourceDocument } from '@project/core';
 import { GRAPH_PALETTE } from '@project/graph';
 import { MemorySpaceBackend, MemorySpaceBackendTestControl } from '@project/persistence';
 import { createOpenSpaces } from '../src/open-spaces';
@@ -24,11 +24,11 @@ const SURVIVOR_GRAPH = id('10');
 const OTHER_META_MAP = id('11');
 const OTHER_META_GRAPH = id('12');
 
-const document: SpaceResourceDocument = {
+const document = {
   kind: 'space',
   title: 'Target',
   content: { spaceId: TARGET, map: SECOND_MAP, graph: SECOND_GRAPH },
-};
+} satisfies ResourceDocument;
 const meta: SpaceSnapshot = {
   id: META,
   document: {

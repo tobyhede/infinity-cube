@@ -1,6 +1,7 @@
 import { act } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { isMissingKindId, isOfKind, uuidSchema, type JsonValue } from '@project/core';
+import { isMissingKindId, uuidSchema, type JsonValue } from '@project/core';
+import { isOfKind } from '@project/plugins/testing';
 import { MemorySpaceBackend } from '@project/persistence';
 import { isStoredAsset } from '@project/resource-api/domain';
 import type { CreationData } from '@project/resource-api/view';

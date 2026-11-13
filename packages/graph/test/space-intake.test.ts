@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  isOfKind,
   EMPTY_ASSET_REF,
+  jsonValueSchema,
   type JsonValue,
   type Resource,
   type ResourcePlacement,
 } from '@project/core';
+import { isOfKind } from '@project/plugins/testing';
 import { loadSpace, loadSpaceSnapshot, type LoadSpaceResult } from '../src/index';
 import type { SpaceReferenceError } from '../src/validate';
 import { jsonResourceFile, referenceFile, resourceFile, uuid } from './resource-files';
@@ -57,7 +58,12 @@ const viaFiles: Loader = ({ resources, ...structure }) =>
     resources.flatMap((resource) =>
       isOfKind(resource, 'markdown')
         ? resourceFile(resource.id, resource.title, resource.content.url)
-        : jsonResourceFile(resource.id, resource.title, resource.kind, resource.content),
+        : jsonResourceFile(
+            resource.id,
+            resource.title,
+            resource.kind,
+            jsonValueSchema.parse(resource.content),
+          ),
     ),
   );
 

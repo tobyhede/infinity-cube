@@ -1,4 +1,10 @@
-import { EMPTY_ASSET_REF, type JsonValue, type MapPosition, type ResourceId } from '@project/core';
+import {
+  jsonValueSchema,
+  newResourceDocument,
+  type JsonValue,
+  type MapPosition,
+  type ResourceId,
+} from '@project/core';
 import type { PlacementMode } from '@project/graph';
 import type { AuthoringCompletion } from '../src/space-authoring';
 
@@ -10,18 +16,17 @@ import type { AuthoringCompletion } from '../src/space-authoring';
 
 type Created = Extract<AuthoringCompletion, { kind: 'created-resources' }>;
 
-/** The content each kind that starts empty starts with, as its plugin's Dock creation asks for it. */
-const EMPTY_CONTENT = { markdown: { url: EMPTY_ASSET_REF }, ur: {} } as const satisfies Readonly<
-  Record<string, JsonValue>
->;
-
 /** One Resource of a kind that starts empty, as its plugin's Dock creation asks for it. */
-export const createdEmpty = (kind: keyof typeof EMPTY_CONTENT, anchor: MapPosition): Created => ({
-  kind: 'created-resources',
-  items: [{ kind, content: EMPTY_CONTENT[kind] }],
-  anchor,
-  placement: 'avoidingOverlap',
-});
+export const createdEmpty = (kind: string, anchor: MapPosition): Created => {
+  const document = newResourceDocument(kind, 'unused');
+  if (document === undefined) throw new Error(`Resources of kind "${kind}" do not start empty`);
+  return {
+    kind: 'created-resources',
+    items: [{ kind, content: jsonValueSchema.parse(document.content) }],
+    anchor,
+    placement: 'avoidingOverlap',
+  };
+};
 
 /** One Reference Resource to `target`, as the Reference plugin asks for it from its Target. */
 export const createdReference = (

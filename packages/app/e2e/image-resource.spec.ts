@@ -1,13 +1,8 @@
 // `test` comes from ./fixtures, not @playwright/test — it carries the auto-use
 // gate that fails a test if React Flow logged a warning while it ran.
 import { readFileSync } from 'node:fs';
-import {
-  isOfKind,
-  COLLAPSED_RESOURCE_SIZE,
-  encodeCompactUuid,
-  uuidSchema,
-  type UUID,
-} from '@project/core';
+import { COLLAPSED_RESOURCE_SIZE, encodeCompactUuid, uuidSchema, type UUID } from '@project/core';
+import { isOfKind } from '@project/plugins/testing';
 import { decodeLoadedSpace } from '@project/persistence';
 import { expect, test, type Locator, type Page } from './fixtures';
 import {

@@ -5,13 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
-import {
-  encodeCompactUuid,
-  isMissingKindId,
-  uuidSchema,
-  type MissingKind,
-  type UUID,
-} from '@project/core';
+import { encodeCompactUuid, isMissingKindId, uuidSchema, type UUID } from '@project/core';
 import { decodeLoadedSpace } from '@project/persistence';
 import { expect, test, type Page } from './fixtures';
 import {
@@ -39,7 +33,7 @@ import { directoryViteConfig } from '../database-vite-config';
  */
 
 const UNPLUGGED_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000e1');
-const missing = (kind: string): MissingKind => {
+const missing = (kind: string): string => {
   if (!isMissingKindId(kind)) throw new Error('A plugin in this build draws the kind');
   return kind;
 };

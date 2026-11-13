@@ -1,41 +1,24 @@
-import { describe, expect, expectTypeOf, it, vi } from 'vitest';
-import {
-  urKind,
-  uuidSchema,
-  type ResourceId,
-  type SpaceSnapshot,
-  type UrKindId,
-} from '@project/core';
+import { describe, expect, it, vi } from 'vitest';
+import { uuidSchema, type ResourceId, type SpaceSnapshot } from '@project/core';
 import {
   bareKindData,
-  isResourceNodeOf,
   projectResourceNodes,
   type ResourceFlowNode,
-  type ResourceFlowNodeOf,
 } from '@project/react-flow-adapter';
 import { loadSpaceSnapshot } from '@project/graph';
 import {
-  decorateKinds,
+  decoratePluginSurface,
   decorateSharedResourceNode,
-  kindDecorationMemo,
-  kindDecorator,
-  type AgreeingAllOf,
+  pluginOperationsFor,
   type CanvasResourceDecorationContext,
-  type ClashingFields,
-  type KindCanvasDecoration,
-  type KindDecorator,
+  type PluginSurfaceDecorationContext,
 } from '../src/canvas-resource-decoration';
-import { imageDecoration } from '../src/kinds/image';
-import { decorateMarkdownResourceNode } from '../src/kinds/markdown';
-import { decorateSpaceResourceNode } from '../src/kinds/space';
-import type { PluginResourceDecorationContext } from '../src/kinds/plugin-decoration';
-import { urDecoration } from '../src/kinds/ur';
-import type { KindDecorationContext } from '../src/kinds/registry';
 import type { PluginHost } from '../src/plugin-host/plugin-commits';
 import { createPluginGate } from '../src/plugin-host/plugin-gate';
 import { NO_CLAIMS } from '../src/plugin-host/claim-chain';
 import type { AuthoringResult } from '../src/space-authoring';
 import { RESOURCE_SIZE } from '../src/resource';
+import type { PluginKind } from '@project/plugins/testing';
 import { fixtureFacts } from './render-adapter-fixtures';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -50,7 +33,7 @@ const UR_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000b');
 
 const projectionNode = (
   resourceId: ResourceId,
-  kind: 'markdown' | 'reference' | 'space' | 'ur',
+  kind: PluginKind,
   open = false,
   readOnly = false,
 ): ResourceFlowNode => ({
@@ -74,15 +57,6 @@ const projectionNode = (
   },
 });
 
-/** `node`, narrowed to the kind a kind's decoration takes. */
-function ofKind<K extends ResourceFlowNode['data']['kind']>(
-  node: ResourceFlowNode,
-  kind: K,
-): ResourceFlowNodeOf<K> {
-  if (!isResourceNodeOf(node, kind)) throw new Error(`${node.id} is not a ${kind} Resource`);
-  return node;
-}
-
 const spaceDocument = {
   title: 'Architecture',
   kind: 'space' as const,
@@ -100,8 +74,8 @@ const testPluginHost = (complete: PluginHost['complete']): PluginHost => ({
   assets: {},
 });
 
-/** Every field a decoration reads: the shared ones and each kind's own. */
-type DecorationContext = CanvasResourceDecorationContext & KindDecorationContext;
+/** Every field a decoration reads: the shared ones and the plugin surface's. */
+type DecorationContext = CanvasResourceDecorationContext & PluginSurfaceDecorationContext;
 
 const context = (overrides: Partial<DecorationContext> = {}): DecorationContext => ({
   authorOnCanvas: true,
@@ -254,47 +228,14 @@ describe('decorateSharedResourceNode', () => {
 });
 
 /**
- * An Ur Resource has no content (ADR 0113): it takes every shared Resource
- * operation and no content edit from any decorator.
+ * What a Resource's plugin is offered on the canvas (ADR 0142): one rule for
+ * every Resource, read from the node and the surface's context, never from
+ * its kind.
  */
-describe('an Ur Resource’s decoration', () => {
-  it('offers title editing and entity actions', () => {
-    const patch = decorateSharedResourceNode(
-      projectionNode(UR_ID, 'ur'),
-      context({ resourceEntityActions: () => [] }),
-    );
-    expect(patch.onBeginTitleEditing).toBeTypeOf('function');
-    expect(patch.entityActions).toEqual([]);
-  });
-
-  /** An Ur Resource's plugin surface commits its Map content where the Map may be authored (ADR 0142). */
-  it('offers the plugin its Map content commit where the Map may be authored', async () => {
-    const complete = vi.fn((): AuthoringResult => ({ kind: 'completed' }));
-    const pluginHost = testPluginHost(complete);
-    const ur = () => ofKind(projectionNode(UR_ID, 'ur'), 'ur');
-    const commit = urDecoration.decorate(ur(), context({ pluginHost })).kindOperations.commitMap;
-    await expect(commit?.({ shape: 'ellipse' })).resolves.toBe('completed');
-    expect(complete).toHaveBeenCalledWith(
-      { kind: 'changed-map-content', resourceId: UR_ID, content: { shape: 'ellipse' } },
-      expect.any(Function),
-    );
-
-    expect(
-      urDecoration.decorate(ur(), context({ pluginHost, authorOnCanvas: false })).kindOperations
-        .commitMap,
-    ).toBeUndefined();
-    expect(
-      urDecoration.decorate(ur(), context({ pluginHost, editableResourceIds: new Set() }))
-        .kindOperations.commitMap,
-    ).toBeUndefined();
-    expect(urDecoration.decorate(ur(), context()).kindOperations.commitMap).toBeUndefined();
-  });
-});
-
-describe('decorateMarkdownResourceNode', () => {
+describe('pluginOperationsFor', () => {
   const EMPTY_TEXT = '/assets/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU';
   const NEXT_TEXT = '/assets/BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBA';
-  const markdown = () => ofKind(projectionNode(RESOURCE_ID, 'markdown', true), 'markdown');
+  const markdown = () => projectionNode(RESOURCE_ID, 'markdown', true);
   const hostWith = (complete: PluginHost['complete']): PluginHost => ({
     gate: createPluginGate(),
     claims: NO_CLAIMS,
@@ -307,37 +248,40 @@ describe('decorateMarkdownResourceNode', () => {
         : undefined,
   });
 
-  /**
-   * The canvas holds no editing state for a Markdown Resource (ADR 0142): its
-   * decoration is the plugin's commits and Claim, and never a display.
-   */
-  it('offers the plugin its commits and a Claim where the canvas is authored, and no display', () => {
+  it('offers the plugin its commits and a Claim where the canvas authors the Resource', () => {
     const pluginHost = hostWith(vi.fn((): AuthoringResult => ({ kind: 'completed' })));
-    const patch = decorateMarkdownResourceNode(markdown(), context({ pluginHost }));
-    expect(patch).not.toHaveProperty('display');
-    expect(patch.kindOperations.commitContent).toBeTypeOf('function');
-    expect(patch.kindOperations.commitTitle).toBeTypeOf('function');
-    expect(patch.kindOperations.commitMap).toBeTypeOf('function');
-    expect(patch.kindOperations.claim).toBeTypeOf('function');
+    for (const node of [markdown(), projectionNode(UR_ID, 'ur')]) {
+      const operations = pluginOperationsFor(node, context({ pluginHost }));
+      expect(operations.kind).toBe(node.data.kind);
+      expect(operations.commitContent).toBeTypeOf('function');
+      expect(operations.commitTitle).toBeTypeOf('function');
+      expect(operations.commitMap).toBeTypeOf('function');
+      expect(operations.claim).toBeTypeOf('function');
+    }
+  });
+
+  it('offers nothing to commit where authoring is off, the Resource is not editable or there is no host', () => {
+    const pluginHost = hostWith(vi.fn());
     for (const withheld of [
       context({ pluginHost, authorOnCanvas: false }),
       context({ pluginHost, editableResourceIds: new Set() }),
       context(),
     ]) {
-      const withheldOperations = decorateMarkdownResourceNode(markdown(), withheld).kindOperations;
-      expect(withheldOperations.commitContent).toBeUndefined();
-      expect(withheldOperations.commitTitle).toBeUndefined();
-      expect(withheldOperations.commitMap).toBeUndefined();
-      expect(withheldOperations.claim).toBeUndefined();
+      const operations = pluginOperationsFor(markdown(), withheld);
+      expect(operations.commitContent).toBeUndefined();
+      expect(operations.commitTitle).toBeUndefined();
+      expect(operations.commitMap).toBeUndefined();
+      expect(operations.claim).toBeUndefined();
     }
+    expect(pluginOperationsFor(markdown(), context())).toEqual({ kind: 'markdown' });
   });
 
-  it('commits content as one changed-content Edit carrying its URL', async () => {
+  it('commits content as one changed-content Edit', async () => {
     const complete = vi.fn((): AuthoringResult => ({ kind: 'completed' }));
-    const { commitContent } = decorateMarkdownResourceNode(
+    const { commitContent } = pluginOperationsFor(
       markdown(),
       context({ pluginHost: hostWith(complete) }),
-    ).kindOperations;
+    );
     await expect(commitContent?.({ url: NEXT_TEXT })).resolves.toBe('completed');
     expect(complete).toHaveBeenCalledOnce();
     expect(complete).toHaveBeenCalledWith(
@@ -348,10 +292,10 @@ describe('decorateMarkdownResourceNode', () => {
 
   it('commits a Title as an Edit of the stored document', async () => {
     const complete = vi.fn((): AuthoringResult => ({ kind: 'completed' }));
-    const { commitTitle } = decorateMarkdownResourceNode(
+    const { commitTitle } = pluginOperationsFor(
       markdown(),
       context({ pluginHost: hostWith(complete) }),
-    ).kindOperations;
+    );
     await expect(commitTitle?.('Renamed')).resolves.toBe('completed');
     expect(complete).toHaveBeenCalledWith(
       {
@@ -361,184 +305,65 @@ describe('decorateMarkdownResourceNode', () => {
       },
       expect.any(Function),
     );
-    expect(complete).toHaveBeenCalledOnce();
   });
-});
 
-describe('the Image kind’s decoration', () => {
-  const imageNode = (): ResourceFlowNodeOf<'image'> => {
-    const node = projectionNode(RESOURCE_ID, 'markdown', false);
-    return ofKind(
-      {
-        ...node,
-        data: { ...node.data, ...bareKindData('image'), ...fixtureFacts('image') },
-      },
-      'image',
-    );
-  };
-
-  it('offers the plugin its commits and a Claim where the canvas authors the Resource', async () => {
+  it('commits Map content as one changed-map-content Edit', async () => {
     const complete = vi.fn((): AuthoringResult => ({ kind: 'completed' }));
-    const operations = imageDecoration.decorate(
-      imageNode(),
+    const { commitMap } = pluginOperationsFor(
+      projectionNode(UR_ID, 'ur'),
       context({ pluginHost: testPluginHost(complete) }),
-    ).kindOperations;
-    expect(operations.claim).toBeTypeOf('function');
-    await expect(operations.commitContent?.({ url: 'https://example.com/b.png' })).resolves.toBe(
-      'completed',
     );
+    await expect(commitMap?.({ shape: 'ellipse' })).resolves.toBe('completed');
     expect(complete).toHaveBeenCalledWith(
-      {
-        kind: 'changed-content',
-        resourceId: RESOURCE_ID,
-        content: { url: 'https://example.com/b.png' },
-      },
+      { kind: 'changed-map-content', resourceId: UR_ID, content: { shape: 'ellipse' } },
       expect.any(Function),
     );
   });
 
-  it('offers nothing where the Resource is not editable or there is no host', () => {
+  it('offers no Claim to a Resource embedding a Map where the surface policy withholds it, keeping its commits', () => {
     const pluginHost = testPluginHost(vi.fn());
-    expect(
-      imageDecoration.decorate(imageNode(), context({ pluginHost, editableResourceIds: new Set() }))
-        .kindOperations,
-    ).toEqual(expect.objectContaining({ kind: 'image' }));
-    expect(
-      imageDecoration.decorate(imageNode(), context({ pluginHost, editableResourceIds: new Set() }))
-        .kindOperations,
-    ).not.toHaveProperty('commitContent');
-    expect(imageDecoration.decorate(imageNode(), context()).kindOperations).toEqual({
-      kind: 'image',
-    });
-  });
-});
-
-describe('decorateSpaceResourceNode', () => {
-  const openSpaceNode = (readOnly = false) =>
-    ofKind(projectionNode(SPACE_RESOURCE_ID, 'space', true, readOnly), 'space');
-
-  it("offers the plugin's commits and Claim where the canvas authors it", () => {
-    const pluginHost = testPluginHost(vi.fn());
-    const operations = decorateSpaceResourceNode(
-      openSpaceNode(),
-      context({ pluginHost }),
-    ).kindOperations;
-    expect(operations.kind).toBe('space');
-    expect(operations.commitContent).toBeTypeOf('function');
-    expect(operations.commitMap).toBeTypeOf('function');
-    expect(operations.claim).toBeTypeOf('function');
-    expect(
-      decorateSpaceResourceNode(
-        openSpaceNode(),
-        context({ pluginHost, editableResourceIds: new Set() }),
-      ).kindOperations,
-    ).not.toHaveProperty('commitContent');
-  });
-
-  it('offers no Claim where the Map surface policy withholds a Space Resource its Edit, keeping its commits', () => {
+    const embedding = projectionNode(SPACE_RESOURCE_ID, 'space', true);
+    expect(embedding.data.embedsMap).toBe(true);
+    expect(pluginOperationsFor(embedding, context({ pluginHost })).claim).toBeTypeOf('function');
     // As inside an embedded Map: authoring stops at the canvas's own Map.
-    const operations = decorateSpaceResourceNode(
-      openSpaceNode(),
-      context({ pluginHost: testPluginHost(vi.fn()), embeddedMapEdit: false }),
-    ).kindOperations;
-    expect(operations.commitMap).toBeTypeOf('function');
+    const withheld = pluginOperationsFor(
+      embedding,
+      context({ pluginHost, embeddedMapEdit: false }),
+    );
+    expect(withheld.commitMap).toBeTypeOf('function');
+    expect(withheld).not.toHaveProperty('claim');
+    // A Resource embedding no Map keeps its Claim on every drawing.
+    expect(
+      pluginOperationsFor(markdown(), context({ pluginHost, embeddedMapEdit: false })).claim,
+    ).toBeTypeOf('function');
+  });
+
+  it('offers a Resource whose kind names no plugin its Title commit alone', () => {
+    const node = projectionNode(RESOURCE_ID, 'markdown');
+    const missing: ResourceFlowNode = {
+      ...node,
+      data: { ...node.data, ...bareKindData('vnd.example.chart') },
+    };
+    const operations = pluginOperationsFor(
+      missing,
+      context({ pluginHost: testPluginHost(vi.fn()) }),
+    );
+    expect(operations.commitTitle).toBeTypeOf('function');
+    expect(operations).not.toHaveProperty('commitContent');
+    expect(operations).not.toHaveProperty('commitMap');
     expect(operations).not.toHaveProperty('claim');
   });
 });
 
-describe('decorating each kind from its own part of the context', () => {
-  interface Labels {
-    readonly markdownLabel: string;
-    readonly urLabel: string;
-  }
-  /** Decorations that mark each node of their kind with the label they read, counting each node decorated. */
-  const labelling = (reads: () => void = () => undefined): KindDecorator<Labels>[] => [
-    kindDecorator<'markdown', Pick<Labels, 'markdownLabel'>>({
-      kind: 'markdown',
-      slice: ({ markdownLabel }) => ({ markdownLabel }),
-      decorate: (_node, { markdownLabel }) => {
-        reads();
-        return { kindOperations: { kind: 'markdown' }, contextNotice: markdownLabel };
-      },
-    }),
-    kindDecorator<'ur', Pick<Labels, 'urLabel'>>({
-      kind: 'ur',
-      slice: ({ urLabel }) => ({ urLabel }),
-      decorate: (_node, { urLabel }) => {
-        reads();
-        return { kindOperations: { kind: 'ur' }, contextNotice: urLabel };
-      },
-    }),
-  ];
-  const nodes = [projectionNode(RESOURCE_ID, 'markdown'), projectionNode(UR_ID, 'ur')];
-  const labels = { markdownLabel: 'm', urLabel: 'u' };
-
-  it('keeps every kind’s nodes, and answers what it kept, while no kind’s part changes', () => {
-    const decorators = labelling();
-    const first = decorateKinds(decorators, nodes, labels, undefined);
-    expect(first.nodes.map((node) => node.data.contextNotice)).toEqual(['m', 'u']);
-    expect(decorateKinds(decorators, nodes, { ...labels }, first)).toBe(first);
+describe('decoratePluginSurface', () => {
+  it('keeps a node offered nothing beyond its bare kind as it is', () => {
+    const node = projectionNode(RESOURCE_ID, 'markdown');
+    expect(decoratePluginSurface(node, context())).toBe(node);
   });
 
-  it('decorates again only the kind whose part changed', () => {
-    const reads = vi.fn();
-    const decorate = kindDecorationMemo(labelling(reads));
-    const first = decorate(nodes, labels);
-    const second = decorate(nodes, { ...labels, urLabel: 'v' });
-    expect(second[0]).toBe(first[0]);
-    expect(second[1]).not.toBe(first[1]);
-    expect(second[1]?.data.contextNotice).toBe('v');
-    expect(reads).toHaveBeenCalledTimes(3);
-  });
-
-  it('decorates every kind again over other nodes', () => {
-    const reads = vi.fn();
-    const decorate = kindDecorationMemo(labelling(reads));
-    const first = decorate(nodes, labels);
-    const second = decorate([...nodes], labels);
-    expect(second[0]).not.toBe(first[0]);
-    expect(second[1]).not.toBe(first[1]);
-    expect(reads).toHaveBeenCalledTimes(4);
-  });
-
-  it('decorates an Ur Resource again when only its optional plugin host is replaced', async () => {
-    const decorate = kindDecorationMemo([kindDecorator(urDecoration)]);
-    const urNodes = [projectionNode(UR_ID, 'ur')];
-    const host = testPluginHost;
-    const first = vi.fn((): AuthoringResult => ({ kind: 'completed' }));
-    const second = vi.fn((): AuthoringResult => ({ kind: 'completed' }));
-    decorate(urNodes, context({ pluginHost: host(first) }));
-    const [node] = decorate(urNodes, context({ pluginHost: host(second) }));
-    if (node === undefined || !isResourceNodeOf(node, 'ur')) throw new Error('no Ur Resource');
-    await node.data.kindOperations.commitMap?.({ shape: 'ellipse' });
-    expect(first).not.toHaveBeenCalled();
-    expect(second).toHaveBeenCalledTimes(1);
-  });
-
-  it('names every field of a kind’s context in the part it reads', () => {
-    const dropsOptional: KindCanvasDecoration<UrKindId, PluginResourceDecorationContext> = {
-      kind: urKind.id,
-      // @ts-expect-error A part read field by field names every field, the optional ones too.
-      slice: ({ authorOnCanvas, editableResourceIds }) => ({ authorOnCanvas, editableResourceIds }),
-      decorate: urDecoration.decorate,
-    };
-    expect(dropsOptional.kind).toBe(urKind.id);
-  });
-
-  it('refuses a context two kinds read under one field name with different types', () => {
-    interface Shared {
-      readonly shared: boolean;
-    }
-    expectTypeOf<
-      ClashingFields<(Shared & { a: string }) | (Shared & { a: number })>
-    >().toEqualTypeOf<'a'>();
-    expectTypeOf<
-      AgreeingAllOf<(Shared & { a: string }) | (Shared & { a: number })>
-    >().toEqualTypeOf<{
-      readonly fieldsDeclaredWithDifferentTypes: 'a';
-    }>();
-    expectTypeOf<
-      AgreeingAllOf<(Shared & { a: string }) | (Shared & { b: number })>
-    >().toEqualTypeOf<Shared & { a: string } & { b: number }>();
+  it('carries what the plugin is offered on the node', () => {
+    const node = projectionNode(UR_ID, 'ur');
+    const decorated = decoratePluginSurface(node, context({ pluginHost: testPluginHost(vi.fn()) }));
+    expect(decorated.data.kindOperations.commitMap).toBeTypeOf('function');
   });
 });

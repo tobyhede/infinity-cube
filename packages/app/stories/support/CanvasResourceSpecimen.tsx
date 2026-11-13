@@ -1,6 +1,11 @@
 import type { CSSProperties } from 'react';
-import { PLUGINS, resolvedMapContent, type ResourceShape } from '@project/core';
-import { PluginResource, type KindOperations, type CanvasResourceState } from '@project/ui';
+import {
+  mapContentProblem,
+  newResourceDocument,
+  resolvedMapContent,
+  type ResourceShape,
+} from '@project/core';
+import { PluginResource, type CanvasResourceState } from '@project/ui';
 
 interface CanvasResourceSpecimenCommonProps {
   readonly title: string;
@@ -13,7 +18,7 @@ interface CanvasResourceSpecimenCommonProps {
    * resized to it. Absent, it is the Closed Size.
    */
   readonly size?: { readonly width: number; readonly height: number };
-  readonly kind?: KindOperations['kind'];
+  readonly kind?: string;
   /**
    * The content a Resource its plugin draws is given, for a kind whose plugin
    * starts no content of its own (a Reference Resource is made from its
@@ -49,17 +54,16 @@ export function CanvasResourceSpecimen({
   content,
 }: CanvasResourceSpecimenProps) {
   // A fresh Resource of the kind, in the Shape asked for where its Map content takes one.
-  const plugin = PLUGINS.find((entry) => entry.kind === kind);
-  const askedMapContent = plugin?.mapContent.schema.safeParse({ shape: resourceShape });
+  const askedMapContent = { shape: resourceShape };
   const drawn = (
     <PluginResource
       resourceId={`specimen-${kind}`}
       kind={kind}
       title={{ title, readOnly: true, onReturnFocus: () => undefined }}
-      content={content ?? plugin?.newContent ?? {}}
+      content={content ?? newResourceDocument(kind, title)?.content ?? {}}
       mapContent={
-        askedMapContent?.success === true
-          ? askedMapContent.data
+        mapContentProblem(kind, askedMapContent) === undefined
+          ? askedMapContent
           : resolvedMapContent(kind, undefined)
       }
       outline={resourceShape}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { definePlugin, type Outline } from '@project/resource-api/domain';
-import { declaredOutline, kindFromPlugin } from '../src/kinds/plugin-kind';
+import { declaredOutline, moduleOf } from '../src/plugin-modules';
 import {
   isPluginKind,
   jsonValueSchema,
@@ -15,7 +15,7 @@ import {
 
 describe('a Resource plugin read as a kind (ADR 0142)', () => {
   it('lists every plugin this build draws', () => {
-    expect(PLUGIN_KINDS).toEqual(['image', 'markdown', 'reference', 'space', 'ur']);
+    expect(PLUGIN_KINDS).toEqual(['markdown', 'space', 'image', 'ur', 'reference']);
     expect(isPluginKind('ur')).toBe(true);
     expect(isPluginKind('image')).toBe(true);
     expect(isPluginKind('markdown')).toBe(true);
@@ -59,7 +59,7 @@ describe('a Resource plugin read as a kind (ADR 0142)', () => {
 });
 
 describe('the references a plugin declares', () => {
-  const linking = kindFromPlugin(
+  const linking = moduleOf(
     definePlugin({
       apiVersion: 1,
       kind: 'linking',
@@ -135,8 +135,8 @@ describe('a plugin’s outline that fails', () => {
   const unknown = outlining(() => z.custom<Outline>(() => true).parse('hexagon'));
 
   it('is stroked as a rectangle, so projecting the canvas never throws', () => {
-    expect(kindFromPlugin(throwing).mapContent.outline(null)).toBe('rectangle');
-    expect(kindFromPlugin(unknown).mapContent.outline(null)).toBe('rectangle');
+    expect(moduleOf(throwing).mapContent.outline(null)).toBe('rectangle');
+    expect(moduleOf(unknown).mapContent.outline(null)).toBe('rectangle');
   });
 
   it('throws where its host draws the Resource, which reports it', () => {
