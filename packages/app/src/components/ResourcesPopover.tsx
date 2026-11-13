@@ -13,6 +13,7 @@ import {
   contentTarget,
   isMissingKind,
   KIND_IDS,
+  lifetimeSpaceReferences,
   spaceReferences,
   titleName,
   type KindId,
@@ -207,7 +208,8 @@ export interface ResourcesPlacingProps extends ResourcesPopoverSurfaceProps {
    * nothing here filters it against one, and placing it authors the Space Resource
    * that frames it (ADR 0074 — a Space exists because a Space Resource references
    * it, so this list is the one surface where both readings of "Space" are
-   * offered together).
+   * offered together). The list withholds a Space while a listed Space
+   * Resource placed on no Map frames it (`unframedSpaces`).
    */
   readonly spaces?: readonly ResourcesPopoverSpace[] | undefined;
   /**
@@ -240,9 +242,11 @@ export interface ResourcesPlacingProps extends ResourcesPopoverSurfaceProps {
     ((space: ResourcesPopoverSpace, settle: SettlePlacement) => void) | undefined;
   /**
    * Where each Resource is placed outside this Map (`otherMapMemberships`).
-   * Absent, every row draws as placed nowhere else.
+   * Required because a Resource it does not name is read as placed on no Map,
+   * which draws its row as placed nowhere else and lets a Space Resource
+   * withhold the row of the Space it frames (`unframedSpaces`).
    */
-  readonly memberships?: MapMemberships | undefined;
+  readonly memberships: MapMemberships;
   /**
    * Arm Delete from Space for a Resource row, naming the filter as where the
    * caret goes if a completed deletion takes the row away. Absent while
@@ -427,6 +431,31 @@ const searchableText = (
 };
 
 /**
+ * The Spaces a Space row may be offered for: those no listed Space Resource
+ * placed on no Map frames.
+ *
+ * A Space row means "frame this Space with a new Space Resource", so offering
+ * it beside an unplaced Space Resource that already frames the Space would
+ * author a second one the author did not ask for, and show one name twice.
+ * Placing that Space Resource brings the row back. A Space Resource placed on
+ * another Map does not withhold the row: re-adding it would share one
+ * Resource, and its selection, across both Maps, and a new view of the Space
+ * stays one press away (ADR 0144).
+ */
+const unframedSpaces = (
+  spaces: readonly ResourcesPopoverSpace[],
+  resources: readonly Resource[],
+  memberships: MapMemberships,
+): readonly ResourcesPopoverSpace[] => {
+  const framed = new Set(
+    resources
+      .filter((resource) => membershipsOf(memberships, resource.id).length === 0)
+      .flatMap(lifetimeSpaceReferences),
+  );
+  return framed.size === 0 ? spaces : spaces.filter((space) => !framed.has(space.id));
+};
+
+/**
  * Why the list is empty, over **both** sources.
  *
  * The two standing sentences are claims about the Resources — that the Space has
@@ -572,7 +601,7 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
   const { resources, allResources, open, onOpenChange, side, spaceTitleById } = props;
   const connecting = props.purpose === 'connect' ? props : null;
   const placing = props.purpose === 'connect' ? null : props;
-  const spaces = placing?.spaces ?? NO_SPACES;
+  const offered = placing?.spaces ?? NO_SPACES;
   /**
    * The `unavailable` toggle is drawn only while the Space holds a Resource of
    * a kind no plugin in this build draws: in every other build it would be a
@@ -595,6 +624,10 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
   const caretElsewhere = useRef(false);
   const onSpaceDragStart = placing?.onSpaceDragStart;
   const memberships = placing?.memberships ?? NO_MEMBERSHIPS;
+  const spaces = useMemo(
+    () => unframedSpaces(offered, resources, memberships),
+    [offered, resources, memberships],
+  );
   const describedBy = useId();
   const [query, setQuery] = useState('');
   const [shown, setShown] = useState<readonly ResourcesFilter[]>(ALL_FILTERS);
@@ -1075,10 +1108,9 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
                               // The rule is the one written above `filterField`, not an
                               // exception to it: the caret moves because a completed Add
                               // takes its own row away, and a Space row is not taken
-                              // away. `referenceableSpaces` withholds only the containing
-                              // Space, so a Space stays offered however many Space Resources
-                              // frame it — ADR 0074's convergence, which is why two Resources
-                              // may reference one Space. Moving the caret off a row that
+                              // away. The Space Resource a press authors is placed on
+                              // this Map, so it is not listed and does not withhold the
+                              // row (`unframedSpaces`). Moving the caret off a row that
                               // is still there costs the reader their place in the list
                               // and claims a completion the surface cannot see.
                               //
