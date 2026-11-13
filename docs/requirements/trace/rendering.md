@@ -7,7 +7,7 @@ For audit only. Every source rule that feeds `../rendering.md` appears exactly o
 - **sent → DOC**: it belongs to another doc.
 - **→ removed (drafting rule 6)**: presentation, not a requirement.
 
-Where an ADR feeds RD only in part, only the parts the mapping tables send to RD are listed; the rest are traced by the doc named. §3 groups the sends by receiving doc. §3a lists every item other traces send here. §4 lists code-only rules. §5 holds code notes.
+Where an ADR feeds RD only in part, only the parts the mapping tables send to RD are listed; the rest are traced by the doc named. §3 groups the sends by receiving doc. §3a lists every item other traces send here. §4 lists code-only rules. §5 holds code notes. §6 traces the sources added or changed on main after the baseline (`797b2908`), which the doc was brought up to on 13 November 2026; where §1 or §2 lands a baseline rule on a rule since rewritten or removed, §6 says where it now lands.
 
 Abbreviations:
 - "rN" is the Nth rule of an ADR as numbered in the mapping tables (`map-*.md`); where a table gives no numbers, rules are named by their first words.
@@ -123,11 +123,11 @@ The rule ids in `../rendering.md` are append-only from this version on.
 | 0090 anchors still render on every Resource | folded → RD-33 |
 | 0090 reconnect drag (sources when a `from` end moves) | dropped: there is no reconnection (MG-67, RD-47) |
 | 0100 each Edge sharing a pair in its own lane, 8 apart | → RD-37; the spacing → removed (drafting rule 6) |
-| 0100 Active Graph centred and connects; both directions split the centre | → RD-38 |
-| 0100 other Graphs below (right when stacked), one spacing further each | → RD-39 |
-| 0100 trim a fifth at each end, along the curve, in geometry | → RD-40; the fraction and its measure → removed (drafting rule 6) |
+| 0100 Active Graph centred and connects; both directions split the centre | centre → RD-39; both directions superseded by 0143 → RD-85 |
+| 0100 other Graphs below (right when stacked), one spacing further each | → RD-39 (one-way pairs only, per 0143) |
+| 0100 trim a fifth at each end, along the curve, in geometry | in geometry → RD-38 (RD-40 removed, §6); the fraction and its measure → removed (drafting rule 6); superseded by 0143's ranked trims |
 | 0100 only the connecting Edge carries an arrowhead | dropped: superseded by 0105 (→ RD-43) |
-| 0100 non-active stops short even alone; with no Active Graph nothing stops short | folded → RD-40 |
+| 0100 non-active stops short even alone; with no Active Graph nothing stops short | dropped: superseded by 0143 (§6); RD-40 removed |
 | 0100 lanes parallel, never fanned | folded → RD-37 |
 | 0100 lanes decided in the projection; activation moves lanes; sign is the screen's; drag carries lanes | → RD-39 (siting is a code note §5) |
 | 0100 Active Graph painted last; others recede by opacity, narrower stroke | folded → RD-29; opacity and stroke width → removed (drafting rule 6) |
@@ -142,7 +142,7 @@ The rule ids in `../rendering.md` are append-only from this version on.
 | 0103 span per pair, so lanes never cross | folded → RD-41 |
 | 0103 no span: whole pair falls back to the translate | folded → RD-41 |
 | 0103 lanes parallel, never fanned | folded → RD-37 |
-| 0103 ends and heads where a translate puts them; sign convention; label at offset midpoint; trim along the lane | → RD-42 (trim folded → RD-40; sign folded → RD-39) |
+| 0103 ends and heads where a translate puts them; sign convention; label at offset midpoint; trim along the lane | → RD-42 (trim folded → RD-38; sign folded → RD-39, and for a two-way pair superseded by 0143 → RD-85) |
 | 0103 self-Edge lanes unchanged | folded → RD-42 |
 | 0104 render id `${graphId}::${from}::${to}`; Title no part of identity | → RD-31 |
 | 0104 Edge Title, `titleHidden`, refusals, no per-Edge style, no reconnect | sent → MG (MG-57, MG-64–MG-67); "Title not Label" sent → GL |
@@ -213,7 +213,7 @@ The rule ids in `../rendering.md` are append-only from this version on.
 | G§b3 Edge chrome: `EdgeTitle`, `EdgeToolbar`, reveal, keyboard, legend in `GraphHud` | Title drawing → RD-46, RD-47; key → RD-48. Toolbar, reveal, keyboard and Title editing sent → UI (UI-78–UI-82, pointed to from the Edge Titles section) |
 | G§b4 structured refusal across Edge Authoring | sent → ED, UI |
 | G§b5 0042 draft invalidation (Map, Active Graph, epoch, subject) | Edge gesture → RD-56; epoch sent → ED |
-| G§b6 controls reach `CanvasResource` only with their operation | sent → UI (code note §5) |
+| G§b6 controls reach `CanvasResource` (now `PluginResource`) only with their operation | sent → UI (code note §5) |
 | G§b7 content resolves once through the kinds; display `closed`/`open`/`editing`; a drawn Resource names nothing outside itself; glyph on every kind but Ur | resolution sent → SR; drawing → RD-11, RD-77; "names nothing outside itself" → RD-78; glyph → RD-9, RD-9 |
 | G§b8–b10 drag lean as a rigid motion; Edges follow; clip turns with it; `nodeLookup`; angle written once | the lean → removed (drafting rule 6); the rigid motion and Edges following → RD-21 (code only). Mechanics are code notes §5 |
 | G§b11 resizing is one canvas draft; preview only the resizing Resource; no `move` draft; floor; no snap | preview → RD-57; drag → RD-58; floor sent → UI (MG-82); displacement sent → MG |
@@ -337,7 +337,7 @@ Every item another trace sends to rendering, with where it landed.
 Kept under drafting rule 5 (code plus a test, contradicted by nothing):
 - RD-7 the image skeleton and failed state naming its URL.
 - RD-8 the Close fade and reduced motion → removed (drafting rule 6).
-- RD-10 the Reference Resource's distinct border at rest → removed (drafting rule 6); the glyph (RD-9) tells a Reference apart. Its solid border while hovered, selected or dragged (`ui/src/kinds/reference-canvas.css`) is untested and cut from the rule (§5).
+- RD-10 the Reference Resource's distinct border at rest → removed (drafting rule 6); the glyph (RD-9) tells a Reference apart. Its solid border while hovered, selected or dragged (`ui/src/target-canvas.css`) is untested and cut from the rule (§5).
 - RD-12 the rung weights, same ink, and the `title`/`subtitle`/`caption` roles → removed (drafting rule 6).
 - RD-15 three visual lines of a single-line Title. The per-Shape ceiling numbers are untested and kept as a code note (§5).
 - RD-20 distinct rest, selected and dragging treatments.
@@ -358,9 +358,9 @@ Kept under drafting rule 5 (code plus a test, contradicted by nothing):
 ## 5. Code notes
 
 - The facing side is chosen in the Edge component (`useEdgeAttachment` in `react-flow-adapter/src/RoutedEdge.tsx`) because the projection does not re-run during a drag; the rule is the pure `facingSides` in `edge-attachment.ts`.
-- Lanes are decided in the projection (`graphLanes`, `laneBezier` in `edge-lanes.ts`), which alone sees every Edge of a pair; constants `GRAPH_LANE_SPACING = 8`, `DETACHED_END_TRIM = 0.2`.
-- Receding Edges: `OTHER_GRAPH_OPACITY = 0.35`, stroke 3 for the Active Graph and 2 for the rest (`projection.ts`).
-- Head markers: `graphHeadMarkerId` is `graph-head-<graphId>`, unprefixed because a page draws Graph Edges in one `<ReactFlow>`; a second flow drawing Graph Edges would need ids namespaced per flow.
+- Lanes are decided in the projection (`graphLanes` in `edge-lanes.ts`, copied onto each Edge by `projectGraphEdges`), which alone sees every Edge of a pair; `laneBezier` draws them. Constants: `ACTIVE_LANE_SPACING = 12` beside the Active Graph's Edge and `GRAPH_LANE_SPACING = 8` elsewhere; each rank past the first in a direction leaves `END_TRIM_INCREMENT = 0.1` more of its length undrawn at each end, up to `MAX_END_TRIM = 0.3`. A lane's `side` is `screen` for a one-way pair and a loop, and `travel` for a two-way pair, where a positive offset is the Edge's left as it travels.
+- Receding Edges (ADR 0143): while a Graph is active the others are hairlines, `RECEDING_STROKE_WIDTH = 1` at `OTHER_GRAPH_OPACITY = 0.8`, ending in a `small` head of fixed size; the Active Graph's Edges keep a 3-unit stroke and a `full` head sized in stroke widths; with no Graph active every Edge is a 2-unit line at full strength with a `full` head (`projection.ts`).
+- Head markers: `graphHeadMarkerId` is `graph-head-<graphId>` for a `full` head and `graph-head-<graphId>-small` for a `small` one, unprefixed because a page draws Graph Edges in one `<ReactFlow>`; a second flow drawing Graph Edges would need ids namespaced per flow.
 - Camera numbers: `OVERVIEW_FIT = { padding: 0.2, maxZoom: 1 }`, `MAX_ZOOM = 16`, `minZoom={0.2}` (untested) in `app/src/camera.ts` and `SpaceCanvas.tsx`. `fitView` runs only when the canvas has no opening framing.
 - Framing gestures on a drawn Map in Edit are the portal handlers in `SpaceCanvas.tsx`: pointer drag pans and persists on release; the wheel listener runs in capture, stops propagation and persists after a 160 ms debounce.
 - Camera command sites: `components/cameras.tsx`, `components/CanvasContinuation.tsx`, `react-flow-adapter/src/ZoomSlider.tsx`, and `SpaceCanvas`'s `fitView` prop. `fitView` before `panZoom` exists hangs; nothing calls it that early.
@@ -369,11 +369,54 @@ Kept under drafting rule 5 (code plus a test, contradicted by nothing):
 - The drag lean: `CANVAS_RESOURCE_DRAG_TILT_DEGREES` in `@project/ui`, written once; the dragged Resource comes from React Flow's `nodeLookup`; the embedded canvas leans one frame late.
 - `canvasProjection` is pure and tested in Node; the render adapter (Zustand) holds the published projection and the canvas selection.
 - `ResourceNodeData` carries operations, never capability flags (`projection-types.test.ts`).
-- The kind glyph is `CanvasResource`'s `kindMark`: null when Open or when the kind takes a Shape.
+- The kind glyph is each plugin's own, drawn on its Closed face. The host's treatment for a Resource whose plugin declares a content Target (the Reference's dotted border and badged glyph) is keyed on that declaration (`data-shows-target`, `ui/src/target-canvas.css`), never on a kind.
 - 0122's "embedded Map fits" and Markdown "scrolls" are overruled by DEC Rendering C1 (RD-5). An unframed drawn Map's origin is the least `x` and `y` of its Resources, read once in `EmbeddedMapAuthoring.tsx` (`useState`).
 - Title ladder ceilings (`--canvas-resource-title-ladder-lines` in `ui/src/canvas-resource.css`): 4 in the rectangle, 3 in an ellipse or pill, 2 in a diamond. Only the base token is tested.
 - Lane span (`laneBezier`): the widest stretch around the curve's midpoint that bends no tighter than twice the pair's reach (how far out its outermost lane runs) and at whose ends the offsets at the reach lie ahead of the anchors along the facing axis; outside it, one cubic bridge per end. Each lane carries its pair's reach (`laneReach`).
-- A Reference Resource's border turns solid while hovered, selected or dragged (`ui/src/kinds/reference-canvas.css`); untested, so not a rule.
+- A Reference Resource's border turns solid while hovered, selected or dragged (`ui/src/target-canvas.css`); untested, so not a rule.
 - Edge Title fit constants in `ui/src/edge-title-room.ts`: `EDGE_TITLE_CEILING` 224, `EDGE_TITLE_CLEARANCE` 28, `EDGE_TITLE_BOX_CHROME` 26, `EDGE_TITLE_LEAST_TEXT` 34.
 - The URL reveal calls `fitView({ nodes: [node], padding: 0.5, duration: 0 })` with no `maxZoom` (`CanvasContinuation.tsx`).
 - Active Graph fade: content opacity transitions over `--resource-placement-duration * 0.4` (presentation; C2 closed by drafting rule 6).
+- A plugin's drawing is `PluginResource` on a Map and `PresentedPluginResource` on the Stage and in Full View (`ui/src/`); its failure boundary is `ResourceFailureBoundary.tsx`; a Reference's embedding is `ResourceEmbedding.tsx`; an Open Space Resource's Map is drawn over its rect as sibling nodes by `app/src/components/CanvasMapEmbed.tsx`, publishing into `app/src/map-embeddings.ts`.
+
+## 6. Sources added or changed on main
+
+The ADRs below are archived in `docs/adr/archive/`. "G′" is main's old guide `docs/adr/archive/agent-guides/rendering.md` as main left it.
+
+| Source | Disposition |
+|---|---|
+| 0142 the canvas owns the rect; the plugin owns every pixel inside its outline; no shared drawing a plugin fills | → RD-82, RD-2 |
+| 0142 a plugin may declare its outline; the canvas strokes the border and the selection ring on it and applies receding, for every plugin | → RD-82. The ring's colour → removed (drafting rule 6) |
+| 0142 Image Resource is its picture; Open and Closed stop being the application's | → RD-4, RD-1. Which plugin keeps Open sent → MG (MG-27, MG-28) |
+| 0142 a plugin's glyph is its own; a host treatment keyed on a declared Target, never on a kind | → RD-9. The dotted border and badge → removed (drafting rule 6) |
+| 0142 each Resource inside its own failure boundary | → RD-83 |
+| 0142 embedding is host-owned: a Resource drawn by its own plugin; a Reference embeds its Target passing its Title and rename, so at most one Title draws; a Reference to an Image is a picture; a Space drawn as one of its Maps, its `defaultMap` where no view is given; recursion and a deleted Target guarded | → RD-11, RD-77, RD-59. The chooser, its commit and authoring under a Claim sent → SR, UI |
+| 0142 a kind with no plugin is drawn by the default plugin | → RD-84. Intake, Import and Export sent → SR, ST |
+| 0142 the host hands every plugin the Markdown renderer and source editor | renderer → RD-6. Editor sent → UI |
+| 0142 a size hint, which the canvas floors, caps and applies with displacement | sent → MG (MG-88). RD-3 and RD-5 point to it |
+| 0142 rejected: every plugin draws its border and ring; a ring on the rect with a plugin opting out; a layered helper drawing a titled rectangle | folded → RD-82 |
+| superseded 0137 Open and expand; the camera frames the expanded Resource | dropped: superseded by 0142. Its camera move is not kept: RD-65 (the camera never follows an Open) |
+| 0139 the selection ring is the border drawn again outside it, in the border's colour, in every theme | → removed (drafting rule 6): the ring's colour and weight. That the host draws the ring on every plugin's outline → RD-82 |
+| 0139 selection is told by the double border and the anchor handles | handles folded → RD-52; the border → removed (drafting rule 6) |
+| 0140 a presented Space Resource draws its Map | sent → NV |
+| 0143 each direction of a pair ranked on its own: Active Graph first, then Graph order | → RD-38 |
+| 0143 the first runs anchor to anchor; each further one a trim increment shorter, up to three tenths; an Edge alone in its direction is full length | → RD-38; the increments → code note §5 |
+| 0143 a one-way pair keeps 0100's layout on 0103's screen side | → RD-39 |
+| 0143 a two-way pair stacks each direction on its own left of travel, half a gap from the centre | → RD-85 |
+| 0143 an Active Graph running both ways is one line with a head at each end | → RD-85 |
+| 0143 the gap beside the Active Graph's Edge is 12, every other 8 | the clearance of the Active Graph's head → RD-85; the numbers → removed (drafting rule 6), kept as a code note §5 |
+| 0143 receding Edges are hairlines with a small head of fixed size | → removed (drafting rule 6). One marker per head size → RD-44 |
+| 0143 a two-way offset is relative to travel, turned into a screen side while drawing, so it holds mid-drag | → RD-85 |
+| 0143 loops nest outwards, Active Graph innermost | → RD-86 |
+| 0143 activating a Graph brings its Edges to the centre | → RD-39 |
+| 0143 rejected: every inactive Edge stopping short; ranking a pair as a whole | folded → RD-38 |
+| G′ Edge attachment: centres level on the chosen axis take the sign on the other, so an Edge and its reverse face opposite ways | → RD-34 |
+| G′ Lanes bullet (ADR 0143) | → RD-37, RD-38, RD-39, RD-85, RD-86; constants → code note §5 |
+| G′ head markers at the Edge's head size (`full`, `small`) | → RD-44 |
+| G′ every kind drawn by its plugin through `PluginResource`; Open and Close a plugin's Map commit; Markdown edit and Image Replace each under a Claim inside its rect | → RD-82, RD-2. Claims sent → ED |
+| G′ a presented Resource scrolls only where a horizontal rule marks further content | sent → NV |
+| G′ the Presenting commands answered by the key dispatcher | sent → NV, UI |
+| G′ its plugin surfaces claim on the page's one plugin gate | sent → ED |
+| 0084, 0093, 0100, 0103, 0105 and others: "Refined by" lines naming 0142 and 0143 | dropped: status lines, no rule |
+| Code only (drafting rule 5): a plugin drawn bare at rest draws no border while unselected and in no Graph; a picture the browser already holds draws at once; a throwing plugin is drawn again once the Space is replaced or its Map content changes | → RD-82, RD-7, RD-83 |
+| RD-4 "never enlarged" (from 0122 "a picture scales down") | → removed (drafting rule 6): how far a picture scales inside its rect is CSS (`object-fit: contain` in `plugin-image/src/view.tsx`). That the picture is drawn whole stays in RD-4 |

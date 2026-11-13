@@ -45,7 +45,7 @@ The rule ids in `../navigation.md` are append-only from this version on.
 | `popstate` reopens what the pathname resolves to; unresolved reported not corrected; first move away writes and clears | → NV-33, NV-34 |
 | Held traversal: `false` holds; returns to the entry left by key (Navigation API) or relative `history.go` | → NV-35. Mechanism §6 |
 | A promise answers later; late `false` holds while no later traversal kept | folded → NV-35 |
-| Entry numbering (`hyperHistoryIndex`), fragment entries, uncounted foreign `pushState` | §6 code note |
+| Entry numbering (`infinityCubeHistoryIndex`), fragment entries, uncounted foreign `pushState` | §6 code note |
 
 ### `docs/adr/archive/agent-guides/rendering.md` (Stage and presenting parts only; the rest is RD's)
 
@@ -106,7 +106,7 @@ The rule ids in `../navigation.md` are append-only from this version on.
 | 0068 r7 a Space with no Graph shows with no presenting | dropped: lapsed; every Map has a Graph (MG-34) |
 | 0068 r9 an opened Space Resource embeds its Map; may be Entered or opened in a new tab with no containing state | embed sent → SR. Enter → NV-40. New tab → NV-41 |
 | 0068 r10 editing inside authors that Space; moving the Space Resource authors the containing Map | sent → SR |
-| 0068 r11 Entering seeds a live selection; changing Map inside writes nothing; switching away keeps it; Exit closes the entry | → NV-40, NV-42, NV-48, NV-87. "Changing the Graph inside writes nothing" struck by DEC 1 (an entered Space is its own canvas; MG-45). "Reload resets to the stored selection" dropped: reload restores the address (0069, later, and the code: NV-27, `space-routing.spec.ts` › "choosing a Map pushes history and Back, Forward and reload restore it without authoring") |
+| 0068 r11 Entering seeds a live selection; changing Map inside writes nothing; switching away keeps it; Exit closes the entry | → NV-40, NV-42, NV-48, NV-87. "Changing the Graph inside writes nothing" struck by DEC 1 (an entered Space is its own canvas; MG-45). "Reload resets to the stored selection" dropped: reload restores the address (0069, later, and the code: NV-27, `app/e2e/space-routing.spec.ts` › "choosing a Map pushes history and Back, Forward and reload restore it without authoring") |
 | 0068 r12 Open Spaces: entries stay until Exit; one per Space; selecting switches and closes nothing; Exit explicit in that Space's surface; root never closable | → NV-42, NV-48. Root → NV-49 (Meta) and NV-82: ruling Navigation C1 (12 November 2026, closing C1) reads it as Meta, the only permanent Space, and exiting the last open Space opens Meta (not built). "Drawn only when more than one is open; width from the sidebar" dropped: placement is treatment (0082, later; `CONTEXT.md` "Open Spaces") |
 | 0068 r12 "an entry names a Space and remembers nothing else, not the chain" | dropped under drafting rule 1: 0112 (later) speaks of a Space "without an Opener", and the code records the Opener (NV-43, NV-44). Its reason, that closing one Space never closes another, is kept by NV-44 |
 | 0068 r13 entering an open Space focuses its entry | → NV-40 |
@@ -160,7 +160,7 @@ The rule ids in `../navigation.md` are append-only from this version on.
 | 0123 r1 Stage fills the window; canvas mounted, inert, unreachable, unfocusable, not shown | → NV-59 |
 | 0123 r2 Stage offers no authoring | → NV-60 |
 | 0123 r3 traversal unchanged; chrome reads outgoing Edges at render | → NV-60 (new Edge available), NV-64 |
-| 0123 r4 Stage draws by kind through resolved content | → NV-61 |
+| 0123 r4 Stage draws by kind through resolved content | → NV-61 (by plugin since 0142; its Space Resource line refined by 0140, §7) |
 | 0123 r5 position, size, Shape, Open/Closed never reach the Stage | → NV-62 |
 | 0123 negatives: no presenting on the canvas, no authoring on the Stage, not a deck | folded → NV-59, NV-60, NV-15 |
 | 0123 "frame, typography, fit, fullscreen, transitions are treatment" | Frame and fullscreen kept under drafting rule 5 (tested, contradicted by nothing) → NV-63, NV-58. Typography and transitions dropped: no behaviour to state |
@@ -297,12 +297,12 @@ The rule ids in `../navigation.md` are append-only from this version on.
 
 ## 5. Code only (drafting rule 5)
 
-NV-7, NV-9, NV-10, NV-11 (no source names the shared selection beyond 0112's sentence), NV-14, NV-17, NV-18, NV-28, NV-32, NV-33, NV-34, NV-35, NV-37, NV-43–NV-45 (Opener and Meta listing: `CONTEXT.md` and 0112's mention only), NV-56, NV-58, NV-63, NV-64 (chrome contents), NV-65, NV-66, NV-71, NV-73 (moves preview and timer, beyond 0129's "names the chosen Graph"), NV-75, NV-76, NV-89–NV-91, NV-81 (its "opening uses the live session" part), NV-83, NV-85 (the size rejection and blocked recovery), NV-87 (the URL reopening).
+NV-7, NV-9, NV-10, NV-11 (no source names the shared selection beyond 0112's sentence), NV-14, NV-17, NV-18, NV-28, NV-32, NV-33, NV-34, NV-35, NV-37, NV-43–NV-45 (Opener and Meta listing: `CONTEXT.md` and 0112's mention only), NV-56, NV-58, NV-63, NV-64 (chrome contents), NV-65, NV-66, NV-71, NV-73 (moves preview and timer, beyond 0129's "names the chosen Graph"), NV-75, NV-76, NV-89–NV-91, NV-81 (its "opening uses the live session" part), NV-83, NV-85 (the size rejection and blocked recovery), NV-87 (the URL reopening). Since the baseline: NV-65's Page Down, Page Up and Home and NV-91's page keys (no ADR or guide states them), and NV-61's leaving out a first heading that repeats the name.
 
 ## 6. Code notes (not requirements)
 
 - **Modules.** `navigation.ts` (state, address, traversal), `destination-coordination.ts` (`destinationSync`), `browser-location.ts` and `browser-history.ts` (the one browser adapter; `window` is named in `space.ts` `browserHistory()` and read once in `main.tsx`), `destination-opening.ts`, `open-spaces.ts`, `presenting-window.ts`, `presentation-link.ts` over `browser-presentation-channel.ts` (`BroadcastChannel`), `presenting-fullscreen.ts` over `browser-fullscreen.ts`, `graph/src/presentation-notes.ts`, `graph/src/traversal.ts`, `http/src/product-destination.ts`.
-- **History mechanics.** The adapter numbers entries in `history.state` (`hyperHistoryIndex`), numbers a fragment entry on arrival, and returns a held traversal by key through `navigation.traverseTo` where available, else `history.go`. A foreign same-document `pushState` goes uncounted.
+- **History mechanics.** The adapter numbers entries in `history.state` (`infinityCubeHistoryIndex`), numbers a fragment entry on arrival, and returns a held traversal by key through `navigation.traverseTo` where available, else `history.go`. A foreign same-document `pushState` goes uncounted.
 - **`moves()`** is called at render, not memoised and not in a store selector; effects key on the changed value, never on the array.
 - **Fullscreen** is requested synchronously in the Present gesture on `document.documentElement`, so portalled dialogs stay visible.
 - **`refused` at Exit and in the mark.** `dock-model.ts` `UNWELL_STATUS` maps `refused` to the rejected word, and `open-spaces.ts` `retireOpenSpace` warns on both (NV-84).
@@ -313,3 +313,23 @@ NV-7, NV-9, NV-10, NV-11 (no source names the shared selection beyond 0112's sen
 - **Stale comment.** `navigation.ts` (`advance`) says presenting admits "a pointer connection". The Stage offers no authoring (NV-60), so the comment predates the Stage.
 - **`continueInMap`'s refusal** throws for a Graph the adopted Map does not draw; no product path reaches it.
 - **`destinationOpening`** opens the Space at its default Map for a `notes` destination; only a caller outside startup reaches it.
+
+## 7. Sources since the baseline
+
+Main moved on after the rewrite's baseline (commit `797b2908`). The archived guide `docs/adr/archive/agent-guides/navigation.md` is main's version; its one change since the baseline renames the history index (`infinityCubeHistoryIndex`, §6). These are the rules main's later ADRs and glossary add or change that feed this doc.
+
+| Source | Disposition |
+|---|---|
+| 0140 r1 a Space Resource on the Stage draws its name over the Map and Graph it selects, whole, fitted below the name, at full strength, taking no pointer, by the same Map surface as its embedding, under the inert policy | → NV-61. This reverses NV-61's baseline line "Space: its name alone", which 0123 gave |
+| 0140 r2 a Reference to a Space Resource draws the same, by one hop | → NV-61 |
+| 0140 r3 the Stage says the Map is not available when the target cannot be held or has no such Map | → NV-61 |
+| 0140 r4 to assistive technology the drawing is one image named by its Map | → NV-61 |
+| 0140 r5 presenting still draws no camera move across the presented Map, and placement, size, Shape and Open never reach the Stage; an Ur Resource and a Reference to one draw their name alone | folded → NV-62, NV-61 |
+| 0140 r6 presenting holds the target Space while the slide is shown and releases it when the slide changes | → NV-61; the hold itself is NV-81's |
+| 0142 the Stage is a Resource surface with no Map and no authoring; a plugin draws on it with its own value for no Map | → NV-61, NV-60 |
+| 0142 the default plugin draws a Resource whose kind names no plugin, on the Stage too | → NV-61 |
+| `CONTEXT.md` (main) Selected Resource: other Resources may be selected together, by Shift and a drag or by Shift, Cmd or Ctrl and a click; a drag moves them all and Remove from Map removes them all; an Edge is never selected with anything | → NV-9, which drops its baseline "one selected subject" |
+| main's presenting keys (commits `da18eb7f`, `f0b53cdd`): Page Down and Page Up move as Right and Left do, Home returns to the start, each left to content that still scrolls | → NV-65, NV-91 (code only, §5) |
+| main's shortcuts sheet on `?` while presenting | sent → UI (UI-104) |
+| main's Full View, which reads a Resource on the Stage over the canvas and writes nothing | sent → UI (UI-105, UI-106) |
+

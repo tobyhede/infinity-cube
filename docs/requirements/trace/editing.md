@@ -6,7 +6,7 @@ For audit only. Every source rule appears exactly once in §1–§4, with one of
 - **dropped**: with the reason.
 - **sent → DOC**: it belongs to another doc.
 
-§5 groups the sends by receiving doc. §6 lists the code-only rules, §7 holds code notes.
+§5 groups the sends by receiving doc. §6 lists the code-only rules, §7 holds code notes. §8 traces the sources added or changed on main after the baseline (`797b2908`), which the doc was brought up to on 13 November 2026; image replacement in §1–§4 now lands on the exclusive-work rules, which §8 traces.
 
 Abbreviations:
 - "EP n" is a bullet of the old guide `docs/adr/archive/agent-guides/editing-and-persistence.md`, by line number.
@@ -335,7 +335,9 @@ The rule ids in `../editing.md` are append-only from this version on.
 ## 6. Code only (no source; drafting rule 5)
 
 - ED-21: applying guard 2 to every drawn completion. `graph-not-owned` itself is a source rule for Edge and Graph actions (CAS).
-- ED-51: the leave guard also stands while an image replacement runs.
+- ED-51: the leave guard also stands while exclusive work, such as an image replacement, runs.
+- ED-81: a plugin commit from a surface that has gone, or kept past a replacement, is refused without reaching Space Authoring.
+- ED-10, ED-31: a caller that asked to be told how its queued Edit settled hears `edit-abandoned` or `space-replaced` (untested).
 
 ## 7. Code notes (not requirements)
 
@@ -345,4 +347,33 @@ The rule ids in `../editing.md` are append-only from this version on.
 - **Map resolution** lives in one module, `app/src/map-resolution.ts`, with five exports and no wrapper type.
 - **The lifecycle's application surface** is `createSpaceResourceLifecycle` (`app/src/space-resource-lifecycle.ts`), composed once by `createOpenSpaces` and required on every `OpenSpace`.
 - **The space-authoring comment on Rename Space** cites "Activating a Graph is not an Edit (ADR 0028)". DEC 1 reverses that; the code changes with MG-45.
-- **Exclusivity keeps one control drawn.** During a replacement `authoringAvailability` keeps `embeddedMapEdit` (the Edit control of an Open Space Resource) drawn while the embedding it would edit is withdrawn.
+- **Exclusivity keeps one control drawn.** During exclusive work `authoringAvailability` keeps `embeddedMapEdit` (the Edit control of an Open Space Resource) drawn while the embedding it would edit is withdrawn. The availability fact is still named `replacingImage`.
+- **The exclusive gate** is `app/src/plugin-host/plugin-gate.ts` (`PluginGate.admit` admits the work's own Edits), passed to Space Authoring as `exclusiveWork`; the Claim chain is `app/src/plugin-host/claim-chain.ts`. A queued Edit carries whether it was admitted (`QueuedCompletion.admitted`).
+- **Settling a queued Edit**: `complete(target, completion, settle?)` in `app/src/space-authoring.ts`; `completeAsAnswer` in `app/src/plugin-host/plugin-commits.ts` turns it into the plugin's `Answer`, and `app/src/plugin-host/creation.ts` does the same for a creation.
+
+## 8. Sources added or changed on main
+
+The ADRs below are archived in `docs/adr/archive/`. "CAS′" is main's `docs/adr/archive/agent-guides/authoring-refusal-cascade.md`; "EP′" is main's `docs/adr/archive/agent-guides/editing-and-persistence.md`.
+
+| Source | Disposition |
+|---|---|
+| 0142 a commit writes only the plugin's own Resource, goes through Space Authoring, and settles once applied, including an Edit that waited behind another | → ED-81 |
+| 0142 a refusal reaches a plugin as copy the host has worded from its code; the plugin shows it and never interprets it | → ED-81 |
+| 0142 absence is enforced: the host refuses a commit from a withdrawn surface | → ED-81 |
+| 0142 commands are data; "Editing" is no longer the application's word; a plugin with a mode owns its draft; a replaced working Space remounts every plugin, which discards a running draft | the draft folded → ED-24, ED-30; remounting → ED-73. Commands sent → UI |
+| 0142 a Claim is who is interacting; Claims nest through embeddings; deepest holds the keyboard; a sibling is refused; inner release returns to the outer; an outer Claim is not released while an inner one runs | → ED-80. The keyboard and commands sent → UI |
+| 0142 a Claim may run work exclusively, withdrawing authoring and navigation from every composed Space until it settles (refining 0126); the plugin stays mounted; held Claims' kept commits refused; only the work commits and stores an asset; one at a time | → ED-68, ED-69, ED-71, ED-82. Navigation sent → NV |
+| 0142 an image replacement is an ordinary content commit, run exclusively | folded → ED-68. What it writes sent → SR |
+| 0142 the host does the creating, atomically, refused if creation is no longer available | sent → SR. Single flight folded → ED-33 |
+| 0142 Space Authoring refuses a Delete that would leave a Space held only by a missing plugin unrooted | sent → SR |
+| CAS′ exclusive work: every `complete`, every action, asks the gate first; the work's own commits admitted, and an Edit queued from inside one | → ED-82 |
+| CAS′ `space-replaced` and `edit-abandoned` settle a queued Edit through `settle` | → ED-31, ED-10 |
+| CAS′ "32 codes", counts | dropped as a count |
+| CAS′ `changed-content`, `created-resources`, `deleted-resource`'s `missing-plugin-holds-space` rows | sent → SR |
+| CAS′ `changed-map-content` row; no Open or Close Edit | sent → MG (MG-87) |
+| EP′ file format, assets, missing kinds, Export | sent → ST, SR |
+| EP′ the mounted notice reports reload loss after the first Edit | sent → UI, ST |
+| 0141 an agent authors a running aggregate through Space Authoring; revisions per tool call; a push channel | dropped: proposed (drafting rule 3) |
+| 0126 "Refined by: 0142" and other status lines | dropped: status lines, no rule |
+| Code only (drafting rule 5): an asset upload also ends when its answer never finishes arriving; a Replace reads a picture's declared size and loads nothing to measure it | → ED-72 |
+| Code only: a creation that asked to run alone withholds a second press of the same Create, and another kind's stays offered | → ED-33 |

@@ -14,7 +14,7 @@ Abbreviations:
 - "R" ids are the old contract `docs/adr/archive/agent-guides/maps-and-graphs.md`, received through `trace/maps-and-graphs.md` §3.
 - Docs: SR space-and-resources.md, MG maps-and-graphs.md, ED editing.md, RD rendering.md, UI ui.md, NV navigation.md, GL `CONTEXT.md`, PROC process docs (AGENTS.md, workflow.md, anti-slop.md, build-tooling.md).
 
-The rule ids in `../storage.md` are append-only from this version on. ST-99 was added after ST-11 to keep one behaviour per id. The revision after the CODE and SCOPE audits added ST-100–ST-108 and removed ST-26 (see SR-10), ST-38 (see ST-24) and ST-93 (see NV-39). The reconciliation pass removed ST-100 (see ED-1).
+The rule ids in `../storage.md` are append-only from this version on. ST-99 was added after ST-11 to keep one behaviour per id. The revision after the CODE and SCOPE audits added ST-100–ST-108 and removed ST-26 (see SR-10), ST-38 (see ST-24) and ST-93 (see NV-39). The reconciliation pass removed ST-100 (see ED-1). The pass that brought this doc up to the InfinityCube code (after ADRs 0136–0144) added ST-109–ST-112 and rewrote ST-24, ST-25, ST-27, ST-30, ST-31, ST-34, ST-35, ST-39, ST-40, ST-42, ST-49, ST-60, ST-61, ST-68, ST-69, ST-74–ST-76 and ST-91 for `aggregate.json`, assets, the Resource plugins and the `cube` CLI.
 
 ## 1. ADRs
 
@@ -117,9 +117,9 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 | 0098 r5 the identity rule lives in `decideCommit`; the codec decodes shape only | folded → ST-4 |
 | 0098 r6 transport failure classification stays in the transport | → ST-101 (Storage owns it; ED points here) |
 | 0104 Edge schema strict | → ST-24 (via MG trace §3) |
-| 0106 r3 stored at `/images/<id>`, id the SHA-256 as base64url | → ST-76. "A later kind's collection is named for its content (`/files/<id>`)" dropped: guidance for a kind that does not exist |
-| 0106 r4 PNG, JPEG, WebP, GIF from bytes, ≤10 MiB, named refusals | → ST-75 |
-| 0106 r5 no stored image deleted singly; only a reset clears the store | → ST-76, ST-99 |
+| 0106 r3 stored at `/images/<id>`, id the SHA-256 as base64url | → ST-76, as `/assets/<hash>` (0142 makes the image store the asset store, DR 1). "A later kind's collection is named for its content (`/files/<id>`)" dropped: reversed by 0142, one asset store for every kind |
+| 0106 r4 PNG, JPEG, WebP, GIF from bytes, ≤10 MiB, named refusals | The store half dropped: 0142 makes the host admit any media type (→ ST-75, DR 1). The picture rule sent → SR (SR-63), where 0142 puts it |
+| 0106 r5 no stored image deleted singly; only a reset clears the store | → ST-76, ST-99 (every asset, 0142) |
 | 0106 r12 external URL bytes are not the repository's | → ST-61 |
 | 0106 r1–r2, r6–r11 kind, URL forms, Replace, Title as alt, natural size, load failure, Reference, creation | sent → SR (RD for drawing, UI for Replace's control) |
 | 0107 (proposed) | dropped: proposed (DR 3, DEC 7) |
@@ -134,17 +134,17 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 | 0117 r8 Running always uses the memory store | → ST-62 |
 | 0117 r9 cost: a crash in the quiet period loses edits | folded → ST-63 (*Why:*) |
 | 0117 missing or empty directory served as a new Space | dropped: reversed by 0124 (DR 1) |
-| 0118 r1 `images/<content-id>.<ext>`; one picture once | → ST-34 |
-| 0118 r2 Export writes only referenced images and owns visible files in `images/` | → ST-60 |
+| 0118 r1 `images/<content-id>.<ext>`; one picture once | → ST-34, as `assets/<hash>.<ext>` (0142, DR 1) |
+| 0118 r2 Export writes only referenced images and owns visible files in `images/` | → ST-60, as the hash-named files in `assets/` (0142, DR 1) |
 | 0118 r3 external and missing-byte URLs export as URLs | → ST-61 |
-| 0118 r4 Import admits every image by the upload rule before storing; a bad file refuses | → ST-49 |
+| 0118 r4 Import admits every image by the upload rule before storing; a bad file refuses | → ST-49. Refusing a file that is not an image dropped: reversed by 0142 (the host admits any media type) |
 | 0118 r5 Import does not refuse missing bytes; the fixture importer does | → ST-49, ST-50 |
 | 0118 r6 images are outside the revision; a refused Import's images stay | → ST-49 (the second clause is untested) |
 | 0118 r7 one directory format whichever store wrote it | → ST-35 |
 | 0118 staged write | dropped: replaced by 0119 (DR 1) |
 | 0119 r1 every Export writes in place; no atomicity or backup | → ST-55, ST-58 |
 | 0119 r2 directories never moved; a missing one created | → ST-55 |
-| 0119 r3 Hyper owns exactly what Import reads | → ST-56 |
+| 0119 r3 the product owns exactly what Import reads | → ST-56 |
 | 0119 r4 compute, verify read-back, skip identical, temp and rename, remove owned then emptied dirs | → ST-53, ST-55, ST-56 |
 | 0119 r5 no write or remove through a link; fresh temp files | → ST-57 |
 | 0119 r6 a crash leaves a mix; git restores; revision recorded last | → ST-58, ST-59 |
@@ -156,15 +156,15 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 | 0124 r3 `run` serves only an existing directory, pointing at `init` | → ST-67 |
 | 0124 r4 `--store`, default postgres, never inferred; `init`/`run` refuse it | → ST-69 |
 | 0124 r5 `import` establishes or refuses; `--dangerous-replace` replaces | → ST-46, ST-71 |
-| 0124 r6 bare `hyper` prints usage; usage error exits 2; database hosts initialize at start-up | → ST-68, ST-10 |
+| 0124 r6 a bare command prints usage; usage error exits 2; database hosts initialize at start-up | → ST-68, ST-10. The command is now `cube` (AGENTS.md, Commands) |
 | 0127 r1 Graph and size objects strict at every reader | → ST-24 |
 | 0127 r2 Resource file key strictness at file intake only; stored schemas non-strict | envelope half → ST-25. Content half dropped: 0128 makes content strict at every door and the code agrees (DR 1) |
 | 0127 r3 nested `framing`, `naturalSize` strict at file intake | folded → ST-25 (content is strict everywhere) |
 | 0127 missing kind is Ur | dropped: reversed by 0128 (DR 1) |
 | 0128 Resource is the envelope everywhere | → ST-29. The kind model sent → SR |
 | 0128 file `resources/<id>.json`; identity inside; directory is inventory | → ST-29 |
-| 0128 locator `{ path, mediaType }` or `{ url }`; Markdown sidecar; Image URL form | → ST-31. The Image URL rules sent → SR |
-| 0128 `kind` required; core refuses unknown top-level keys; kind refuses unknown content keys | → ST-30, ST-25 |
+| 0128 locator `{ path, mediaType }` or `{ url }`; Markdown sidecar; Image URL form | The `{ url }` locator → ST-31. The path locator and the Markdown sidecar dropped: replaced by 0142, a Markdown Resource's text is an asset (DR 1). The Image URL rules sent → SR |
+| 0128 `kind` required; core refuses unknown top-level keys; kind refuses unknown content keys | → ST-30, ST-25. Refusing a kind no module registers dropped: reversed by 0142 (→ ST-30, SR-62) |
 | 0128 kind id grammar | sent → SR (SR-17 states it; ST-30 points there) |
 | 0128 modules declare references and flags; core enforces Target, hop, cycles, lifetime, reachability | sent → SR |
 | 0128 Map rules by kind are flags | sent → SR, MG |
@@ -189,7 +189,7 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 | 0131 r1 a mounted session authors as any session | sent → ED |
 | 0131 r2 the in-page app accepts writes with the same intake | → ST-91 |
 | 0131 r3 an uploaded image is drawn from its bytes | → ST-91 |
-| 0131 r4 Edits lost on reload; the Dock says so; persistence reported as any session | "Lost on reload" is today's state, recorded in ST-95's not-built note (DEC 4, DR 1: 0132 replaces it). The mark sent → UI; persistence reporting sent → ED |
+| 0131 r4 Edits lost on reload; the Dock says so; persistence reported as any session | "Lost on reload" is today's state, recorded in ST-95's not-built note (DEC 4, DR 1: 0132 replaces it). The mark sent → UI (on main it is a notice over the canvas in the shell, not a Dock mark: UI-42); persistence reporting sent → ED |
 | 0131 r5 nothing writes to GitHub | → ST-92 |
 | 0132 r1 IndexedDB repository, shared contract, one-transaction commits | → ST-95 (DEC 4, not built), transaction clause included |
 | 0132 r2 scoped by repository, directory, commit | → ST-95 |
@@ -201,16 +201,39 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 | 0132 r8 no export out of the page | → ST-107 (holds today) |
 | 0132 r9 exception: browser storage holds an Aggregate | folded → ST-95 |
 | 0133 r1 source: name, list, read, concurrency; neither throws | → ST-39 |
-| 0133 r2 the reader decides; `hyper.json` first; one bounded pool; all reported; no `node:` | → ST-39, ST-40, ST-41 |
+| 0133 r2 the reader decides; the root file first; one bounded pool; all reported; no `node:` | → ST-39, ST-40, ST-41. The root file is `aggregate.json` (0136) |
 | 0133 r3 three sources | folded → ST-39 |
 | 0133 r4 a source keeps its reach policy; a refused fetch is an unreadable file | → ST-43 |
 | 0133 r5 Export owns what the listing finds | folded → ST-56 |
 | 0134 r1 sources list links as links | → ST-42 |
-| 0134 r2 the owned paths; a link there is a discovery failure | → ST-42 |
+| 0134 r2 the owned paths; a link there is a discovery failure | → ST-42, with `aggregate.json` and `assets/` for the earlier names (0136, 0142) and no `*.md` (0142: Export owns no `*.md`) |
 | 0134 r3 an unowned link is the author's | → ST-42 |
 | 0134 r4 Export meets the rule through the scan and its own check | → ST-57 |
 | 0134 r5 every source answers the same | folded → ST-42 |
 | 0134 cost | dropped: a cost, not a rule |
+| 0136 the root file is `aggregate.json`, contents unchanged, schema `aggregate.schema.json` | → ST-27, ST-109 |
+| 0136 no fallback: every source reads `aggregate.json` only; the earlier file is refused as a missing root | → ST-109 (ST-40, ST-67, ST-88 name the file) |
+| 0136 Export leaves the earlier root file untouched | → ST-109 (folded from ST-56) |
+| 0136 a talk is renamed before a page that mounts it is rebuilt; links to older commits refused | dropped: a deployment step, not behaviour; the refusal is ST-109. `docs/deploy-cloudflare.md` says it to operators |
+| 0136 ownership and links follow the name | folded → ST-42, ST-56 |
+| 0136 rejected options | dropped: rejected alternatives |
+| 0141 (proposed) an agent authors a running aggregate through Space Authoring | dropped: proposed (DR 3). The file-tool route it names, `cube mcp`, is built and code only (§4) |
+| 0142 the plugins are listed once; the core reads the domain half; the host holds `content` as JSON | sent → SR (SR-15, SR-9) |
+| 0142 the stored `kind` stays; one structure everywhere; no file codec | → ST-29 (the file is that structure). The structure sent → SR (SR-8) |
+| 0142 every file a Resource uses is an asset, named by SHA-256, in one store, written to `assets/`; reached by URL; the `<id>.md` sidecar, its locator and stored source retired | → ST-31, ST-34, ST-60. The Markdown content sent → SR (SR-21) |
+| 0142 a reference to a stored asset is a whole string value in content or Map content, found by walking, read or unread | → ST-60 |
+| 0142 Export carries the assets found; an unreferenced one left out; the store never deletes; no plugin declares its assets | → ST-60, ST-76 |
+| 0142 Export owns `assets/` and no `*.md` | → ST-31, ST-42, ST-56, ST-60 |
+| 0142 the host admits any media type; picture admission is the Image plugin's | → ST-75. The picture rule sent → SR (SR-63) |
+| 0142 the asset of zero bytes always exists | → ST-31, ST-60, ST-76 |
+| 0142 Import, a store and Export carry a missing kind's Resource whole, its assets by the same walk | → ST-30, ST-60. The rule sent → SR (SR-62) |
+| 0142 a missing kind's content and Map content written in one key order | → ST-35 (every Map content, as the code writes it; the guide named only a missing kind's) |
+| 0142 the held-Space exception and the refused last deletion | sent → SR (SR-64) |
+| 0142 a missing plugin is drawn by the default plugin; no new Reference to it | sent → SR (SR-62) |
+| 0142 Map content, size hints, outline, surfaces, Claims, Embed, failure boundary, creation | sent → SR, MG, RD, ED, UI (each owns its part) |
+| 0142 old content: no versioning of content | folded → ST-36 |
+| 0142 cost: an asset URL inside another asset's bytes is not found, so it is not carried | → ST-60 |
+| 0142 cost and rejected options otherwise | dropped: costs and rejected alternatives |
 
 ## 2. Guides
 
@@ -219,6 +242,9 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 | Source | Disposition |
 |---|---|
 | Commands › Run: port 4173 or the next free one; opens the browser unless `--no-open` | → ST-108 |
+| Commands › Run: `pnpm cube check <dir>` reads through the same Import, exits zero or refuses, neither serves nor writes | → ST-110 |
+| Commands › Run: `pnpm cube mcp <dir>` serves a stdio MCP server over the directory's files; start it with `--silent` | → ST-111. The `--silent` advice dropped: operator guidance in `docs/aggregate-directory.md` |
+| Commands › every verb is `pnpm cube <verb>` | → ST-68 |
 
 **`docs/adr/archive/agent-guides/editing-and-persistence.md`** (by section and bullet)
 
@@ -234,13 +260,13 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 | SQL 3: stored documents parsed once | dropped: implementation |
 | SQL 4: failure classification; `unclassified` is 500 | → ST-80. Driver codes dropped: implementation |
 | SQL 5: `verifyMarker: false` | sent → PROC (code comment) |
-| Map/Graph 1: the JSON Resource file | → ST-25, ST-28–ST-32. "Body is not a word" sent → GL |
+| Map/Graph 1: the JSON Resource file; a missing kind carried and written canonically; Markdown text as an asset at `assets/<hash>.md`; no file codec; a `.md` not read | → ST-25, ST-28–ST-32, ST-35. The missing kind and its Target rule sent → SR (SR-62). "Body is not a word" sent → GL |
 | Map/Graph 2: Graphs are the only connection structure | sent → MG (MG-37 holds it) |
 | Map/Graph 3: `loadSpace`, the space directory, no `Draft` | → ST-22, ST-23, ST-28. "No `Draft`; editors install valid state" sent → ED |
 | Map/Graph 4: cycles and self-Edges; duplicate refused | sent → MG (MG-36, MG-60, MG-61) |
 | SpaceBackend 1: the browser never imports files; the Mount exception; 0132 | → ST-1, ST-85–ST-92, ST-95–ST-98 |
-| SpaceBackend 2: the CLI's unit is the Aggregate; in-place Export; Import; replacement; id minting; images | → ST-12–ST-14, ST-34, ST-44, ST-46, ST-49–ST-61, ST-69, ST-71 |
-| SpaceBackend 3: one reader fed by sources | → ST-39–ST-43, ST-89 |
+| SpaceBackend 2: the CLI's unit is the Aggregate; in-place Export; Import; replacement; id minting; assets (extension table, references walked, kept names) | → ST-12–ST-14, ST-27, ST-34, ST-44, ST-46, ST-49–ST-61, ST-69, ST-71 |
+| SpaceBackend 3: one reader fed by sources | → ST-39–ST-43, ST-89. Its list of owned links and scanned files still names a Space directory's `*.md` and `resources/*.md`: dropped as stale, since 0142 and the reader (`aggregate/src/aggregate-file.ts`) own no `*.md` |
 | SpaceBackend 4: "Aggregate" has one meaning | sent → GL |
 | SpaceBackend 5: one Aggregate-aware contract; commits; locks; candidate acceptance | → ST-2, ST-5, ST-16–ST-19. Lock mechanics dropped: implementation. Aggregate validity sent → SR |
 | SpaceBackend 6: Space Resource lifecycle | sent → ED, SR |
@@ -262,7 +288,7 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 | 6: Hono's validator typing | sent → PROC |
 | 7: `Content-Length` never trusted; drain | → ST-77 |
 | 8: Problem Details; strict codec; no compatibility decoder | → ST-79 |
-| 9: stored images at `/images` | → ST-75, ST-76 |
+| 9: stored assets at `/assets`: any media type, `asset-too-large`, the served-type rule, `X-Asset-Media-Type`, the zero-byte asset, the asset client | → ST-74, ST-75, ST-76. The Vite host's forwarding of `/assets/<hash>` only dropped: dev-host implementation. Image's picture rule sent → SR (SR-63) |
 
 ## 2a. Items received from other traces
 
@@ -320,14 +346,15 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 | Item | Disposition |
 |---|---|
 | 0020 r1, r2, r5, r6 | → ST-28, ST-29, ST-23 (r6 folded → ST-29) |
-| 0063 Export line endings | → ST-35 |
+| 0063 Export line endings | dropped from ST-35: 0142 makes the text an asset written as stored; the Markdown plugin saves `\n` line endings (SR-21) |
 | 0074 Meta identity | → ST-8, ST-9 (the Meta identity in the repository); Meta's lifetime is SR-55 |
-| 0106 image store, deletion, Export, fixtures | → ST-75, ST-76, ST-99, ST-60, ST-61, ST-50 |
-| 0128 file, locator, sidecar, strictness, JSON Schema | → ST-25, ST-29–ST-31 |
+| 0106 image store, deletion, Export, fixtures | → ST-75, ST-76, ST-99, ST-60, ST-61, ST-50 (now the asset store, 0142) |
+| 0128 file, locator, sidecar, strictness, JSON Schema | → ST-25, ST-29–ST-31 (the sidecar retired by 0142) |
 | E&P line 25 file format | → ST-25, ST-28–ST-32 |
 | E&P line 38 forgiven `ordinary-space-unreferenced` | → ST-104 (it bounced: this trace had sent it to SR; the commit decision is Storage's) |
 | E&P line 38 round trip, fixtures | → ST-105; the fixture note is dropped (see §2, SpaceBackend 7) |
 | `newSpace`'s default title `New space` | → ST-11 |
+| 0142 assets, the missing kind's carriage through Import and Export, the asset store admitting any type | → ST-30, ST-31, ST-34, ST-60, ST-75 |
 
 **From trace/ui.md**
 
@@ -344,6 +371,7 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 - Which Aggregates are valid (Meta the sole root, unreachable Spaces, duplicate Resource ids across Spaces); deleting Meta is refused (`test/support/repository-contract.ts` › "refuses an authored commit that deletes the Meta Space").
 - 0070 Target immutability; a Space Resource's durable selection.
 - 0020 r4 (order by Title, then id: SR-10) and 0128's kind-id grammar (SR-17), which this doc now points to.
+- 0142: the plugin list and the Resource structure (SR-8, SR-9, SR-15); the Markdown content as text (SR-21); the Image picture rule (SR-63); the missing kind and the default plugin (SR-62); the held-Space exception (SR-64).
 
 **maps-and-graphs.md (MG):** nothing new. MG-37, MG-36, MG-60, MG-61 already hold the guide's Graph bullets.
 
@@ -355,7 +383,7 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 
 **navigation.md (NV):** 0069's URL rules; 0130 r3, r4, r11 and r5's `source` on every product URL (the address records the resolved source, scoped presentation messaging, `/` in the client); 0130's unknown-URL exception (NV-39).
 
-**ui.md (UI):** 0057 r3; the Dock's "Edits lost on reload" mark (0131 r4); "Edited in this browser" and Discard local edits as a control (0132 r4–r5, not built).
+**ui.md (UI):** 0057 r3; the "Edits lost on reload" notice (0131 r4; a shell notice on main, UI-42); "Edited in this browser" and Discard local edits as a control (0132 r4–r5, not built).
 
 **rendering.md (RD):** how a stored image is fitted (0106).
 
@@ -368,7 +396,7 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 - ST-6 (second sentence): a created Space lands at revision 0.
 - ST-21: Resources answered in ascending id order.
 - ST-33: Map `kind` defaults to `positioned` and no other kind is read.
-- ST-35 (third sentence): width before height and envelope key order. LF line endings come from 0063 (via SR).
+- ST-35 (second sentence): width before height and envelope key order.
 - ST-44 (minting order): ids minted in directory order.
 - ST-77: UTF-8 charset and the content-encoding refusal.
 - ST-82: 503 at `/` with no Meta Space.
@@ -377,13 +405,17 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 - ST-101: the problem-to-result mapping (0098 r6 states only that the transport classifies).
 - ST-94: the static build's Content Security Policy.
 - ST-103: export status derives from acknowledged revisions (received from ED).
+- ST-110: what `cube check` prints and that it names a missing asset's file (AGENTS.md states the verb).
+- ST-111, ST-112: the MCP server, its tools, path confinement and asset writer. AGENTS.md names the server; 0141, which describes it, is proposed.
+- ST-35 (Map content sorting): every Map content is written in canonical key order (`src/aggregate-directory/write-space-directory.ts`); 0142 and the guide name only a missing kind's.
+- ST-76: the served-type rule and `X-Asset-Media-Type` come from the guide; the sandboxing Content Security Policy on a served asset is code only.
 
 ## 5. Code notes
 
-- **ST-65 (bug).** `startRun` wraps the memory store in `ObservedRepository`, which marks the directory changed and schedules a write on every `committed` commit while serving. The single-Space route's loader commits a first working read's initialization to that store, so opening a mapless Space under Running Exports. `test/unit/aggregate-round-trip.test.ts` › "exports the Map and Graph a later initialization gave it" shows that an initialization, once Exported, is written. No test opens a mapless Space under Running. The fix must not drop the initialization: it stays in the store, and the next Export an Edit triggers writes it.
+- **ST-65 (bug, still at the InfinityCube code).** `startRun` wraps the memory store in `ObservedRepository`, which marks the directory changed and schedules a write on every `committed` commit while serving. The single-Space route's loader commits a first working read's initialization to that store, so opening a mapless Space under Running Exports. `test/unit/aggregate-round-trip.test.ts` › "exports the Map and Graph a later initialization gave it" shows that an initialization, once Exported, is written. No test opens a mapless Space under Running. The fix must not drop the initialization: it stays in the store, and the next Export an Edit triggers writes it.
 - **Two doors, one intake.** 0010 says `loadSpace` is the only intake. `loadSpaceSnapshot` (`graph/src/space.ts`) builds a Space from a stored snapshot; both go through `buildSpace` and `documentRefusal`, so ST-22 states one intake and names no function. `docs/adr/archive/agent-guides/editing-and-persistence.md` repeats "the one intake" for `loadSpace` alone.
 - **Strictness split.** `spaceFileObjectSchema` is a `strictObject`, and `.omit()`/`.extend()` carry it to the stored document, snapshot and import variants. Only the Resource envelope differs: `resourceFileSchema` is `.strict()`, `resourceDocumentSchema` is not. Each kind's content schema is strict at every door (`core/test/resource-document-equality.test.ts`). This answers audit-split §3 item 10.
 - **Stale comment.** `core/src/schema.ts` says of `maps` that "a Space with no Maps … is what a new Space is"; a new Space has a Map (see SR).
 - **Space directory names.** A Space directory's name is its identity (ST-27, ST-44), unlike a Resource file's (ST-29). No ADR states the Space half; `docs/aggregate-directory.md` does, and the reader enforces it.
-- **SVG.** `persistence/src/images.ts` refuses SVG with `image-svg-unsupported`, and only `nosniff` is sent for stored images; 0107 is proposed and left out.
+- **SVG.** The asset store admits SVG like any bytes but serves it as `application/octet-stream` (`persistence/src/assets.ts` `servedMediaType`); the Image plugin refuses an SVG picture (`plugin-image/src/domain.ts`). 0107 is proposed and left out.
 - **Mounting status.** `.scratch/mounting/issues/` 01–07, 09, 10, 13 are resolved; 11 (0132) and 12 (download an edited talk) are needs-triage; 08 is a launch task.

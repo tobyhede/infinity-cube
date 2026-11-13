@@ -10,7 +10,7 @@ For audit only. Every source rule appears exactly once in §1–§3, with one of
 
 Abbreviations: "rN" is the Nth rule of an ADR as numbered in the mapping tables (`map-*.md`). "DEC n" is ruling n in `../DECISIONS.md`. Docs: MG maps-and-graphs.md, ED editing.md, ST storage.md, RD rendering.md, UI ui.md, NV navigation.md, GL `CONTEXT.md`, PROC process docs. "E&P" is `docs/adr/archive/agent-guides/editing-and-persistence.md`; "ARC" is `docs/adr/archive/agent-guides/authoring-refusal-cascade.md`.
 
-The rule ids in `../space-and-resources.md` are append-only from this version on.
+The rule ids in `../space-and-resources.md` are append-only from this version on. The pass that brought this doc up to the InfinityCube code (after ADRs 0136–0144) added SR-62–SR-66 and rewrote SR-8, SR-9, SR-15–SR-22, SR-24–SR-30, SR-33, SR-36, SR-39, SR-49 and SR-52 for the Resource plugins and assets. SR-19 moved from **not built** to **built**.
 
 ## 1. ADRs
 
@@ -123,7 +123,7 @@ The rule ids in `../space-and-resources.md` are append-only from this version on
 | 0092 Jump to Target, Copy link to Target | Jump → SR-35. Copy link sent → NV, UI |
 | 0106 kind `image`; content is a URL; no bytes, no flag | → SR-23 |
 | 0106 accepted URLs; `data:` and others refused | → SR-24 |
-| 0106 stored images at `/images/<id>`, SHA-256 id, formats, 10 MiB, codes | sent → ST |
+| 0106 stored images at `/images/<id>`, SHA-256 id, formats, 10 MiB, codes | sent → ST (now the asset store at `/assets/<hash>`, 0142). The formats and the 10 MiB cap → SR-63, which 0142 makes the Image plugin's rule |
 | 0106 no stored image deleted singly | sent → ST |
 | 0106 Replace is one Edit keeping identity, Title, placement, Edges; same URL unchanged | → SR-22 |
 | 0106 Title is the text alternative | → SR-25 |
@@ -158,38 +158,66 @@ The rule ids in `../space-and-resources.md` are append-only from this version on
 | 0114 kind glyph decided by stored kind | sent → RD |
 | 0114 first-Open size and resize floor | dropped: retired by 0122 |
 | 0120 kind is a behaviour; media type is a format; `kind` never a media type | folded → SR-17 |
-| 0120 kinds declare media types; creation picks kind by media type | → SR-19 (not built, DEC 6) |
-| 0120 kinds are modules; domain names no kind | → SR-15 |
+| 0120 kinds declare media types; creation picks kind by media type | → SR-19 (built since 0142: exact match, then wildcard, then list order) |
+| 0120 kinds are modules; domain names no kind | → SR-15 (each kind is now its plugin, 0142) |
 | 0120 compiled in; runtime kinds kept possible | folded → SR-9 (content crosses unparsed), SR-17 (namespaced ids) |
 | 0120 bare built-in ids; `vnd.<owner>.<name>` | → SR-17 |
 | 0120 Ur, Reference, Space not content kinds | sent → GL (Terms block points to it) |
 | 0120 any content kind and Ur can be a Target | folded → SR-30 (every kind but Reference; 0070 adds Space Resource) |
-| 0120 unregistered kind refused | → SR-16 |
+| 0120 unregistered kind refused | dropped: reversed by 0142 (DR 1). A missing kind is carried → SR-62 |
 | 0120 domain half wherever intake runs; view half only in the app | → SR-20 |
 | 0120 missing kind = Ur; `kind` optional | dropped: reversed by 0128 |
 | 0122 Open only for kinds with content; Ur refused | sent → MG (MG-28) |
 | 0125 Closed or Open at the entry's size; "front" names nothing | sent → GL; Open/Closed is MG-27 |
-| 0128 every kind a module; domain names no kind | folded → SR-15 |
+| 0128 every kind a module; domain names no kind | folded → SR-15. The per-package `kinds/` halves dropped: retired by 0142 |
 | 0128 envelope `{ id, title, kind, content }` everywhere; content unparsed | → SR-8, SR-9 |
 | 0128 Resource file `resources/<id>.json`; identity inside | sent → ST |
 | 0128 content locator; Markdown sidecar; Image URL form only | sent → ST |
 | 0128 `kind` required; strict at both levels | required → SR-16; strictness sent → ST |
 | 0128 kind id characters | folded → SR-17 |
 | 0128 aggregate rules from declarations: Target, single hop, no cycles, lifetime, rooting; one narrow module check | → SR-30, SR-45, SR-56, SR-57; module check → SR-44 |
-| 0128 Map rules by kind are flags | folded → SR-15; the rules are MG-28, MG-30 |
+| 0128 Map rules by kind are flags | dropped: replaced by 0142, which makes Open and a Shape each plugin's Map content, accepted or refused by its schema (sent → MG) |
 | 0128 JSON Schema in `docs/schema/resource/` | sent → ST |
 | 0128 domain and view halves stand | folded → SR-20 |
-| DEC 6 media types kept, not built; cross-Space Edges to open questions | → SR-19; Open questions |
+| DEC 6 media types kept, not built; cross-Space Edges to open questions | → SR-19, now built (0142 built what DEC 6 kept, and reverses nothing it ruled); Open questions |
 | DEC C2 switching Graphs in an Open Space Resource writes only its selection | → SR-46 |
+| 0142 a Resource is drawn and authored by its plugin; the canvas owns the rect, position, size, Resize, selection, Edges | → SR-18. The drawing half sent → RD |
+| 0142 one public Resource API; no private door; a declared API version | → SR-20 (one door). The API version check folded → SR-17 (the list refuses what it cannot load) |
+| 0142 the plugins are listed once, with the default plugin; the core reads the domain half; every list of kinds is that order; nothing else imports a plugin | → SR-15 |
+| 0142 the host gives a Resource no type per kind; `content` is a JSON value | → SR-9 |
+| 0142 a host treatment keyed on a declaration, never a kind; a plugin's glyph is its own | sent → RD |
+| 0142 the stored `kind` stays and selects a plugin; the Title is required | folded → SR-16, SR-13 |
+| 0142 one structure in file, store, wire and plugin; no file codec | → SR-8 |
+| 0142 every file a Resource uses is an asset; Markdown text is an asset | → SR-21. The format sent → ST (ST-31) |
+| 0142 Resource content and Map content, each parsed by the plugin's strict schema | → SR-9. Map content sent → MG |
+| 0142 commits go through Space Authoring; a plugin never writes position, size or Edge; refusals reach it worded | → SR-18 (never writes position, size or Edge). Commit settlement and wording sent → ED, UI |
+| 0142 Open and Closed and an Ur's Shape become Map content | → SR-28 (Ur has a Shape and no Open). The rest sent → MG |
+| 0142 size hints, outline, surfaces and capabilities, commands as data | sent → MG, RD, UI |
+| 0142 a Claim; exclusive work | → SR-22, SR-52 (where a kind uses one). The rule sent → ED |
+| 0142 an embedding is host-owned; a Reference embeds its Target with its own Title and rename; a Space is drawn as one of its Maps, or its `defaultMap` with no view; the chooser writes through the plugin's commit | → SR-33, SR-49. The drawing sent → RD, the chooser's control → UI |
+| 0142 each Resource inside its own failure boundary | sent → RD |
+| 0142 a plugin declares how it is created; the host creates atomically, places, continues into the Title and owns a new Space's lifetime; exact match beats wildcard, then build order | → SR-36, SR-19. Space lifetime folded → SR-55, SR-57 |
+| 0142 picture admission is the Image plugin's rule | → SR-63 |
+| 0142 an image replacement is an ordinary content commit, run exclusively | → SR-22 |
+| 0142 a kind with no plugin is drawn by the default plugin; reverses 0120's refusal; no `kind` and rejected content stay refused | → SR-62, SR-16 |
+| 0142 the default plugin offers no content authoring; a Reference already naming it kept; no new Reference to it | → SR-62, SR-30 |
+| 0142 a Resource with no plugin is still a Resource; Import, store and Export carry it whole; its plugin reads it as it stands | → SR-62. Carriage sent → ST (ST-30, ST-60) |
+| 0142 the held-Space exception; a commit deleting the last such Resource refused; Space Authoring refuses first | → SR-64 |
+| 0142 old content: a bundled plugin rolls forward; no content versioning | sent → ST (ST-36) |
+| 0142 cost: a Space a missing kind's content shares with a Space Resource is deleted with it | dropped: a cost, not a rule; SR-57 counts only references the host can read |
+| 0142 rejected options; negative rules | dropped: rejected alternatives. The negative rules are restated by SR-8, SR-15, SR-18 and ST-31 |
+| 0144 a Space row authors a new Space Resource framing its Space, never an existing one | → SR-66 |
+| 0144 the list withholds a Space row while an unplaced Space Resource frames that Space; placed elsewhere does not withhold; decided over the source; count and empty sentence | sent → UI |
+| 0144 rejected options; cost | dropped: rejected alternatives and a cost |
 
 ## 2. Guides
 
 | Source | Disposition |
 |---|---|
 | E&P line 5: Target immutable; `reference-target-immutable` | folded → SR-31. "No surface offers a Target" sent → UI |
-| E&P line 25: envelope; kind id rule; unregistered refused | folded → SR-8, SR-16, SR-17 |
+| E&P line 25: envelope; kind id rule; a missing kind carried whole, drawn by the default plugin, never a Target; a Reference already naming one kept | folded → SR-8, SR-16, SR-17; the missing kind → SR-62 |
 | E&P line 25: file, sidecar, locator, strictness, codec, discovery, identity not file name, duplicate across files | sent → ST (duplicate id folded → SR-6) |
-| E&P line 25: Image URL form; `image-url-unsupported` | folded → SR-24 |
+| E&P line 25: Image URL form (`/assets/<hash>`); `image-url-unsupported`; a creation naming another URL refuses `resource-content-invalid` | folded → SR-24 |
 | E&P line 25: "body" is not a word | sent → GL |
 | E&P line 37: five lifecycle operations; coordination, barrier, recovery refusals | operations → SR-41, SR-43, SR-59 (Map/Graph deletion is MG). Coordination sent → ED |
 | E&P line 37: Map deletion resets framing, Graph deletion keeps it | sent → MG (MG-15, MG-55) |
@@ -243,7 +271,7 @@ See §6.
 | EP 37: `space-resource-deletion-unsupported` | SR-59 |
 | EP 38: selection durable; dangling-reference codes | SR-44 |
 | 0089: placement does not await its commit; a refused creation removes it | SR-42 |
-| 0063 r1, 0120, 0128 kind model | SR-21, SR-15 to SR-20 |
+| 0063 r1, 0120, 0128 kind model | SR-21, SR-15 to SR-20 (as rewritten for 0142) |
 
 ### From trace/navigation.md
 
@@ -280,6 +308,7 @@ See §6.
 | Deleting Meta is refused at commit | SR-55 |
 | 0070 Target immutability | SR-31 |
 | A Space Resource's durable selection; `ordinary-space-unreferenced` forgiveness | SR-44; forgiveness is ST-104, pointed to from SR-56 |
+| 0142 plugin list, Resource structure, Markdown content as text, picture rule, missing kind, held Space; the guide's missing-kind bullet; http.md's Image picture rule | SR-8, SR-9, SR-15, SR-21, SR-62, SR-63, SR-64 |
 
 ### From trace/ui.md
 
@@ -296,15 +325,15 @@ See §6.
 
 ## 5. Sent to other docs
 
-**maps-and-graphs.md (MG):** 0004 r1, r3, r4; 0051 r4 (MG-22); 0068 r20; 0079 Map parts; 0122 Open rule; E&P framing on relocation.
+**maps-and-graphs.md (MG):** 0004 r1, r3, r4; 0051 r4 (MG-22); 0068 r20; 0079 Map parts; 0122 Open rule; E&P framing on relocation; 0142 Map content (Open and Closed, Shape), size hints and the replaced Map rules by kind.
 
-**editing.md (ED):** 0074 and DEC 5 Undo; 0112 Undo per occurrence; 0112 and 0126 navigation and authoring held during image replacement, with its 2-minute upload and 10-second measurement bounds (measuring stops under DEC Space and Resources C1, SR-26); 0113 availability; E&P line 37 coordination, barrier and recovery refusals; ARC universal guard; 0068 r16–r18 statuses.
+**editing.md (ED):** 0142 Claims, exclusive work and how a plugin's commit settles; 0074 and DEC 5 Undo; 0112 Undo per occurrence; 0112 and 0126 navigation and authoring held during image replacement, with its 2-minute upload and 10-second measurement bounds (measuring stops under DEC Space and Resources C1, SR-26); 0113 availability; E&P line 37 coordination, barrier and recovery refusals; ARC universal guard; 0068 r16–r18 statuses.
 
-**storage.md (ST):** 0020 r1, r2, r5, r6; 0063 Export line endings; 0074 Meta identity; 0106 image store, deletion, Export, fixtures; 0128 file, locator, sidecar, strictness, JSON Schema; E&P line 25 file format; E&P line 38 forgiveness (ST-104), round trip and fixtures; where an unframed drawn Map is placed (RD-5, DEC Rendering C1); `newSpace`'s default title `New space` (§7).
+**storage.md (ST):** 0020 r1, r2, r5, r6; 0063 Export line endings (dropped there: 0142 makes the text an asset); 0142 assets, the format of Markdown content, a missing kind carried through Import and Export, the asset store admitting any type, old content; 0074 Meta identity; 0106 image store, deletion, Export, fixtures; 0128 file, locator, sidecar, strictness, JSON Schema; E&P line 25 file format; E&P line 38 forgiveness (ST-104), round trip and fixtures; where an unframed drawn Map is placed (RD-5, DEC Rendering C1); `newSpace`'s default title `New space` (§7).
 
-**rendering.md (RD):** 0009 signal and 0114 glyph; 0051 r4 drawing; 0068 r19 and compound canvas (one camera); 0070 r6 renderer reuse; 0083 r6, r9, r10 ladder, clamp, no resize; a Space Resource with no framing is placed at authored scale from its Resources' top-left, not fitted (RD-5, DEC Rendering C1).
+**rendering.md (RD):** 0142 drawing inside the rect, the outline the host strokes, treatments keyed on declarations, the embedding and the failure boundary; 0009 signal and 0114 glyph; 0051 r4 drawing; 0068 r19 and compound canvas (one camera); 0070 r6 renderer reuse; 0083 r6, r9, r10 ladder, clamp, no resize; a Space Resource with no framing is placed at authored scale from its Resources' top-left, not fitted (RD-5, DEC Rendering C1).
 
-**ui.md (UI):** 0039 r4; 0046 r3; 0063 r2–r5; 0070 r4 "no source editor", r9; 0074 r7 confirmation (including "its Space may go with it"); 0083 r2 surfaces, r7, r8, r15; 0089 r1 select and caret, r3 list row and drag, r5 refusal channel, r7 disabled Create Reference; 0112 continuation (UI-87), notice area, cross-drawing wording; E&P line 37 `target` read; 0113 Dock creation cluster; E&P "no surface offers a Target"; the short Title question (§2).
+**ui.md (UI):** 0142 commands as data and the embedding's chooser; 0144 when the Resources list withholds a Space row; 0039 r4; 0046 r3; 0063 r2–r5; 0070 r4 "no source editor", r9; 0074 r7 confirmation (including "its Space may go with it"); 0083 r2 surfaces, r7, r8, r15; 0089 r1 select and caret, r3 list row and drag, r5 refusal channel, r7 disabled Create Reference; 0112 continuation (UI-87), notice area, cross-drawing wording; E&P line 37 `target` read; 0113 Dock creation cluster; E&P "no surface offers a Target"; the short Title question (§2).
 
 **navigation.md (NV):** 0001 r3 moving between levels; 0068 r9 Enter and new tab, r11–r18; 0092 Copy link to Target; 0112 selection per occurrence, holds (NV-81) and Exit, only the canvas's own Space presents; 0113 Ur presents as its Title; E&P Enter.
 
@@ -321,13 +350,16 @@ Behaviour the code implements and a test asserts, with no source against it (dra
 - SR-53 the four drawn-drop codes.
 - SR-58 `resource-has-references` (0070 implies it through intake; no source states the refusal).
 - SR-59 `space-resource-deletion-unsupported` on the one-Space path, and `space-resource-not-found`.
+- SR-21 a draft unchanged from stored text with other line endings saves nothing.
+- SR-24 the `resource-content-invalid` code an Edit or creation answers for a refused URL.
+- SR-62 a missing kind's content must be an object.
 
 ## 7. Code notes (not requirements)
 
-- **Resolution** lives in the kind registry (`core/src/kinds/registry.ts` `resolveContent`), wrapped by `graph/src/lookup.ts`. 0009 placed it in `graph`.
+- **Resolution** lives in the plugin modules (`core/src/plugin-modules.ts`, each module's `resolveContent`), wrapped by `graph/src/lookup.ts`. 0009 placed it in `graph`.
 - **Reading a Title** goes through `titleLines`, `titleName` and `shortTitle` in `core/src/title.ts`.
-- **`naturalSize`** is written by `image-creation.ts`, `image-replacement.ts` and `space-authoring.ts` and read nowhere (SR-26, DEC Space and Resources C1). Measuring is `measureInBrowser` in `app/src/space.ts`, with a 10-second limit.
+- **`naturalSize`** is written by the Image plugin's creation and Replace (`plugin-image/src/picture.ts` `pictureAt`, `plugin-image/src/creation.ts`) and read nowhere (SR-26, DEC Space and Resources C1). A stored file is sized from its header (`pictureSize`); a pasted URL is measured by the surface's `assets.measure`.
 - **`newSpace`** titles the Space `New space`; Create Space Resource passes `Space N` to `initializeSpace` (`graph/src/new-space.ts`).
 - **Residue name.** `SpaceView`, `selectSpaceView` and `frameSpaceView` in `core` keep the retired Space View term for a Space Resource's selection.
 - **Resource order tie-break.** `graph/src/space.ts` sorts by Title, then id; no test has two equal Titles, so SR-10 states only the Title order.
-- **Starts empty.** Only Markdown and Ur declare starting content (`newContent`), which is what makes them creatable from a press.
+- **Starts empty.** Only Markdown and Ur declare starting content (`newContent`), which is what makes them creatable from a press (`core/test/plugin-modules.test.ts` › "are the plugins that declare new content, in list order").

@@ -10,7 +10,8 @@ For audit only. Every source rule appears exactly once in §1 or §2, with one o
 §3 checks off what maps-and-graphs sent here. §4 groups this doc's sends by receiving doc. §5 lists code-only rules. §6 holds code notes.
 
 Abbreviations:
-- "G n" is the bullet of the old guide `docs/adr/archive/agent-guides/ui.md` that starts on line n.
+- "G n" is the bullet that starts on line n of the old guide as it stood at the rewrite's baseline, commit `797b2908` (`git show 797b2908:docs/agents/ui.md`). The archived copy at `docs/adr/archive/agent-guides/ui.md` is main's later version, whose line numbers differ after line 12.
+- "M n" is the bullet of that later archived guide that starts on line n; §7 traces the bullets main added or changed.
 - "rN" is the Nth rule of an ADR as numbered in the mapping tables.
 - "DEC n" is ruling n in `../DECISIONS.md`.
 - Docs: SR is space-and-resources.md, MG maps-and-graphs.md, ED editing.md, ST storage.md, RD rendering.md, NV navigation.md, GL `CONTEXT.md`, PROC is process docs (AGENTS.md, workflow.md, anti-slop.md, build-tooling.md).
@@ -26,7 +27,7 @@ The rule ids in `../ui.md` are append-only from this version on.
 | G7 Opening and editing are separate | Closed/Open offers → UI-53; Edit on Closed → UI-54; Save/Cancel/Close → UI-55; blur ends nothing → UI-56; editor swap → UI-55. "Open and Close author only `open`" sent → MG (MG-27). Sanitised renderer, no `nowheel`, no 16:9, no camera follow sent → RD |
 | G8 Open Reference read-only | Offers Close and Title editing, no Edit, Save, Cancel or Target picker → UI-19. Ordinary Open by pointer, Enter, Space folded → UI-53. Draws through the Target kind's surfaces, content resolves once sent → RD. Target immutability, descendants read-only, authored like any Resource sent → SR. Create Reference copies the name and puts the caret in the Title: creation sent → SR, caret folded → UI-86. Unavailable on a Reference → UI-21. Space Resource menu groups → UI-20. `ResourceSearchCombobox` has no consumer: dropped (inventory fact, not behaviour) |
 | G10 shadcn default; hand-roll a deviation | → UI-1. The `inert` dialog example dropped: reasoning, not a rule. "A contract contradicting a primitive default loses" folded → UI-1 |
-| G11 Base UI and Lucide | Base UI only, `base-nova`, no `@radix-ui` → UI-2; `neutral`/CSS variables → removed (drafting rule 6). Lucide default, custom icon only for a Hyper meaning → UI-3 (the OPEN artwork for Meta and the shared cube are its tested instances). Palette is Hyper's → removed (drafting rule 6). Manual QA report not run: dropped (status of a report, history). Version `1.7.0`, cmdk not migrated, no Anchor part, Positioner/Popup props, `null` controlled value, Dialog focus hooks: §6 code notes. `nokey` on portalled popups folded → "Keys pressed in chrome never act on the canvas" (Effects) |
+| G11 Base UI and Lucide | Base UI only, `base-nova`, no `@radix-ui` → UI-2; `neutral`/CSS variables → removed (drafting rule 6). Lucide default, custom icon only for an InfinityCube meaning → UI-3 (the OPEN artwork for Meta and the shared cube are its tested instances). Palette is the product's own → removed (drafting rule 6). Manual QA report not run: dropped (status of a report, history). Version `1.7.0`, cmdk not migrated, no Anchor part, Positioner/Popup props, `null` controlled value, Dialog focus hooks: §6 code notes. `nokey` on portalled popups folded → "Keys pressed in chrome never act on the canvas" (Effects) |
 | G12 every shortcut declared once | → UI-7. The guard → UI-9. No Ctrl/Meta/Alt, plain takes no Shift → UI-8. Enter/Space and Delete/Backspace aimed at a Resource → UI-10. "Don't add a listener testing `event.key`" folded → UI-7. `.nokey` not read by the guard; Save/Cancel cannot import the table; plan pointer: §6 code notes |
 | G13 `Kbd`/`KbdGroup` | Shortcut hint and `aria-keyshortcuts` → UI-57. The `keyName="modifier"` registry extension: §6 code note |
 | G14 Escape and commit decided by the surface | Title commits on blur, Escape reverts → UI-48. Body exits → UI-56. No surface pends several fields; creation completes on activation: sent → SR (creation, 0089) |
@@ -77,7 +78,7 @@ The rule ids in `../ui.md` are append-only from this version on.
 | 0048, 0074 "no undo" | sent → ED (DEC 5). UI-83's Why says Undo is not built |
 | 0050 r1 Base UI, `base-nova`, no mixing | → UI-2 |
 | 0050 r2 Lucide default, custom icon with a named meaning | → UI-3 |
-| 0050 r3 Hyper's palette, not a restyle | → removed (drafting rule 6) |
+| 0050 r3 the product's own palette, not a restyle | → removed (drafting rule 6) |
 | 0052 r1–r4 story parity | sent → PROC |
 | 0057 r3 wording, field attribution and recovery owned by the conducting surface | → UI-89, UI-90, UI-91 |
 | 0057 r3 "accepted Edit closes its surface without waiting for persistence" | sent → ED (completed is authoritative) |
@@ -111,8 +112,8 @@ The rule ids in `../ui.md` are append-only from this version on.
 | 0073 one `role="toolbar"`, roving tabindex, one tab stop | → UI-12 |
 | 0073 action owns treatment, canvas suppression, `holdFocus` | → UI-14, UI-58. "No `variant`/`size`": §6 |
 | 0073 a cluster earns a toolbar by repeating or by count | applied → UI-79 (the Edge's controls stay a group) |
-| 0073 kind and shared named groups; empty group draws nothing | → UI-13 |
-| 0073 order: menu, kind, Open/Close last | → UI-13 |
+| 0073 kind and shared named groups; empty group draws nothing | → UI-13, as 0142 refines it: the commands are the plugin's, in one group named for its kind, and the shared group draws nothing |
+| 0073 order: menu, kind, Open/Close last | → UI-13 (with the Map embedding's choices between the menu and the plugin's group, M20 and 0142) |
 | 0073 arrows cross group boundaries | → UI-13 |
 | 0073 unavailable stays focusable, `aria-disabled`, styled by the attribute | → UI-29; the styling clause → removed (drafting rule 6) |
 | 0073 tests read the attribute, not `toBeDisabled` | sent → PROC |
@@ -173,7 +174,7 @@ The rule ids in `../ui.md` are append-only from this version on.
 | 0122 no keyboard resize | → UI-69 |
 | 0122 thin rect border on a non-rectangle Shape | the frame sent → RD (RD-18); the control on its corner → UI-70 |
 | 0122 Edit on a Closed Resource Opens it first | folded → UI-54 |
-| 0131 Dock mark: Edits lost on reload | → UI-42 |
+| 0131 Dock mark: Edits lost on reload | → UI-42, rewritten by M19: a neutral notice over the canvas, never a Dock mark |
 | 0132 r4 Dock mark: Edited in this browser | → UI-43 (not built, DEC 4) |
 | 0132 r5 Discard local edits | the control → UI-95 (not built, DEC 4); what it does → ST-96 |
 | 0006s Open is one verb across kinds | dropped: superseded; 0064 carries Open (UI-53) |
@@ -252,7 +253,7 @@ The rule ids in `../ui.md` are append-only from this version on.
 | 0121, 0122 resize control and Shape choice | UI-66–UI-70, UI-26 |
 | G§b1 Connect to Resource and key commands | UI-72–UI-75, UI-10 |
 | G§b3 Edge toolbar, reveal, keyboard | UI-78–UI-82 |
-| G§b6 controls reach `CanvasResource` only with their operation | §6 code note |
+| G§b6 controls reach the Resource only with their operation | §6 code note |
 | G§b11 resize floor | UI-68 |
 | G§Camera b3 presenting keys | returned → NV (presenting) |
 | G§RF b5 arrow keys | UI-10 (key names; travel is NV-13) |
@@ -345,7 +346,11 @@ Rules no source states, kept under drafting rule 5 (code plus a test, contradict
 - UI-94: the notice area's placement above the Dock and its dismissal (0112 states one notice area only).
 - UI-96: the zoom control (RD sent it; no ADR states it).
 - UI-25: where the selection menus' choices come from (SR sent EP 37; no ADR states it).
-- UI-84: the Delete question opens on Cancel, returns the caret, and withholds its answers while deleting (0074 asks only that it asks).
+- UI-84: the Delete question's opening caret, its return of the caret, and its withheld answers while deleting (0074 asks only that it asks). At the baseline the caret opened on Cancel; main moved it to Delete (commit `7efc2add`, "Open Delete from Space on Delete"), and UI-84 follows main.
+- UI-10's Space (Full View) and the absence of any Enter binding, UI-102 to UI-106 and UI-108: the Canvas commands, the one dispatcher, the shortcuts sheet, Full View and the theme choice (ADR 0138, which states the first two, is proposed and so left out by drafting rule 3; its built parts are kept here under drafting rule 5).
+- UI-109's detail beyond 0142's sentence: a key acting in the drawing the deepest Claim is inside, Close withdrawn and the chooser unavailable on the outer Claim's Resource, the Dock's Present unavailable.
+- UI-62's drop on the picture, single-file refusal and polite status (0142 states only that Replace runs as exclusive work under a Claim).
+- UI-90's plugin refusals shown in the plugin's rect.
 - UI-4: the bar on Base UI, cmdk and Lucide outside `@project/ui` (only the editor half is 0067's).
 - UI-10's `C`, arrows, Shift+arrows, `P` and Escape bindings come from the binding table (G12 states the table, not each key).
 
@@ -353,15 +358,81 @@ Rules no source states, kept under drafting rule 5 (code plus a test, contradict
 
 - **Undo wording.** The delete question's visible words say nothing about undo, so UI-83 holds after Undo ships. Two code comments still say "V1 has no undo" (`app/src/components/DeleteConfirmation.tsx:23`, `app/src/resource-rail-actions.tsx:172`); they must change when Undo is built (DEC 5).
 
-- **Controls carry their operation** (RD G§b6): a Resource's control reaches `CanvasResource` only with the operation that performs it, so presence of the operation is the whole capability.
+- **Controls carry their operation** (RD G§b6): a plugin is handed a commit only where the surface offers it (`ui/src/PluginResource.tsx`), so presence of the commit is the whole capability (0142: a capability is present or absent).
 
 - **Primitives.** `@base-ui/react` 1.7.0. Base UI has no Anchor part: a non-trigger anchor is a ref handed to `PopoverContent`'s `anchor`. Positioning props belong to `Positioner`, popup props to `Popup`. A controlled choice ignores the `null` from `onValueChange`. A modal with its own starting field sets `initialFocus={false}` and `finalFocus={false}`.
 - **cmdk** behind `Command` is not migrated; any `@radix-ui` in the lockfile is cmdk's transitive dependency, not a UI-2 breach.
-- **`nokey`** sits on every portalled popup and on chrome outside the canvas, because React Flow subscribes its delete key on `document`. The key guard (`keyBelongsElsewhere`) does not read `.nokey`; `SpaceCanvas`'s `NOT_A_CANVAS_COMMAND` does.
-- **Save and Cancel** live in `@project/ui`, which cannot import `app`'s binding table; `Kbd` carries a local `keyName="modifier"` extension to keep when refreshing the registry file.
+- **`nokey`** sits on every portalled popup and on chrome outside the canvas, because React Flow subscribes its delete key on `document`. The key guard (`keyBelongsElsewhere`) does not read `.nokey`; `NOT_A_CANVAS_COMMAND` in `app/src/canvas-commands.ts` does.
+- **Save and Cancel** live in the Markdown plugin's view (`plugin-markdown/src/view.tsx`, `keyshortcuts`), which cannot import `app`'s binding table; `Kbd` carries a local `keyName="modifier"` extension to keep when refreshing the registry file.
 - **Continuation.** `continuation.ts`; targets `resource | edge | canvas | control`; the one chrome address is `'map-name'`, spent by `ChromeContinuation` through `data-continuation-control`; `CanvasContinuation` re-resolves on every render; the New Map row raises `restoresFocusOnClose` so the menu does not take the caret back.
 - **Resources list.** `modal={false}` declines the dismissals a drag onto the canvas produces; in its Connect purpose it takes them, and unmounts with its close so `CanvasContinuation` can focus the Edge.
 - **Toolbar parts.** `CanvasCommandToolbar` and `CanvasCommand` (shared surface, root keydown stop, `nodrag nopan`, `holdFocus`); `ResourceRailActions`/`ResourceRailAction`; no `variant`/`size` per action. Without a React Flow adapter the toolbar draws in the Resource's band, always shown (stories and unit tests).
 - **Status panels.** `StatusFailure` (`boundedDetail`, `panelClassName`) and `StatusBusy`; distinct from `FieldError` and `AlertDialog`.
 - **Editor.** `@uiw/react-codemirror` behind `MarkdownSourceEditor`; `PANE_OWNED_KEYS` is `Escape` and `Mod-Enter`; `indentWithTab: false`.
 - **MG-82** can move to built: `app/test/canvas-resource-decoration.test.ts` › "offers resize on every kind, Open or Closed, where the Map may be authored" asserts the `minWidth`/`minHeight` floor.
+
+## 7. Sources since the baseline
+
+Main moved on after the rewrite's baseline (commit `797b2908`). These are the rules main's later ADRs and guide add or change that feed this doc. "M n" is a bullet of the archived guide `docs/adr/archive/agent-guides/ui.md` as main left it.
+
+### Guide bullets main added or changed
+
+| Source | Disposition |
+|---|---|
+| M8 an Open Reference Resource draws its Target through the host-owned embedding, passing its own Title and rename; a Reference to an Image is the picture, renamed from the rail; notes in place of a deleted, forbidden or self-containing Target | → UI-19. The embedding's notes and the refused late Title commit sent → RD |
+| M12 a Space answers keys through one dispatcher; a command answers by its id; a covering surface decides what answers; a canvas key is a Canvas command whose aim picks its guard and whose availability its item draws from | → UI-103, UI-102, UI-7 |
+| M12 Space (Full View), Delete and Backspace aimed at a Resource through `NOT_A_CANVAS_COMMAND` | → UI-10 |
+| M12 `?` opens the shortcuts sheet, read from the table for the reader's mode; menu items carry their key; the Dock's default Create names `C` | → UI-104 |
+| M13 Full View: Space or Read in Full View draws the Resource on the Stage over the canvas, read-only, with the Dock above; App state alone; ends when the Resource leaves the canvas or the surface stops taking selection | → UI-105 |
+| M13 inside Full View the arrows walk the Active Graph, Space and Escape leave, Enter does nothing; modal, the canvas inert, `C`, `F2` and `P` do nothing; no Full View in a drawn Map | → UI-106; the drawn-Map clause → UI-105 |
+| M14 `PluginResource` announces each plugin command's `keyshortcuts` | folded → UI-57 |
+| M15 the body's exits are the Markdown plugin's, through the host's source editor | folded → UI-56 |
+| M19 a fact that is not a failure is a neutral notice in the shell, never a Dock mark; `MountedEditsNotice` | → UI-42 |
+| M20 `Dialog` has one consumer, the shortcuts sheet | §6 (inventory fact) |
+| M22 a Space Resource row names the Map and Graph it shows; a Space row reads "New Space Resource"; a Space row is withheld while an unplaced Space Resource frames it | → UI-107 |
+| M24 `MapTitle` sets `multiline` | folded → UI-49 |
+| M26 the host's source editor is a second consumer of the split point | folded → UI-65 |
+| M27 every creation a plugin declares reports on one `resource-create` channel unless the asking surface keeps the sentence | → UI-90 |
+| M28 everything inside the rect is the plugin's; the host keys no style on a kind; `target-canvas.css`; contrast in both themes | sent → RD (drawing), PROC (stylesheet layout) |
+| M31 a plugin's view has no design-system primitives yet; a refusal it draws keeps `role="alert"` | sent → PROC (the design-system gap); the refusal's place → UI-90 |
+
+### ADR 0138 (proposed)
+
+| Source | Disposition |
+|---|---|
+| r1 a shortcut is a key bound to a named command with a stable id | → UI-102, UI-7, kept as code only (§5): the ADR is proposed (drafting rule 3) and the code builds this part |
+| r2 one dispatcher reads each press once, applies the shared guard and then its context's narrower one | → UI-103, UI-9 (code only) |
+| r3 a Canvas command's aim, the Maps it serves, its three availability answers and one run path | → UI-102 (code only) |
+| r4 the key takes the press only when its command is available, otherwise stays silent | → UI-102 (code only) |
+| r5 the keymap is data; a reader's overrides kept in that browser's `localStorage`; the WCAG 2.1.4 switch; keys that cannot be remapped; a press bound twice refused | dropped: proposed (drafting rule 3) and not built |
+| r6 the editor's Save and Cancel stay outside the keymap | §6 code note ("Save and Cancel") |
+
+### ADR 0142
+
+| Source | Disposition |
+|---|---|
+| the canvas owns the rect, selection, Edges and Map actions; the plugin owns everything inside its outline | sent → SR, RD |
+| commands are data a plugin emits and the canvas draws | → UI-13 |
+| a Claim: the deepest holds the keyboard and shows its commands | → UI-109 (its toolbar drawn: UI-16) |
+| Claims nest; a sibling is refused; exclusive work withdraws authoring and navigation | sent → ED |
+| Open and Closed are a plugin's Map content; no Edit, command or key opens a Resource but its plugin's own | → UI-10 (Enter bound to nothing), UI-53, UI-28 |
+| a plugin may hint at a size on Open | sent → MG |
+| a Markdown Resource's edit is its own Claim, source editor and draft | → UI-55, UI-56, UI-59, UI-63 |
+| Image's Replace runs as exclusive work under a Claim | → UI-62 |
+| an embedding is host-owned; its commands come from what the plugin passes (`select`, `claim`) | → UI-25, UI-61 |
+| a Reference Resource embeds its Target on a surface offering no authoring of it, passing its own Title and rename | → UI-19 |
+| the Stage and Full View draw a Resource by its plugin (`PresentedPluginResource`) | → UI-105; the Stage sent → NV (NV-61) |
+| each Resource drawn inside its own failure boundary | sent → RD |
+| creation is a plugin's declaration, carried out by the host; list order decides | → UI-40; the rest sent → SR |
+| the default plugin draws a Resource whose kind no plugin draws | sent → SR; its Stage drawing → NV (NV-61) |
+
+### Other ADRs
+
+| Source | Disposition |
+|---|---|
+| 0139 the selection ring is the border drawn again in its own colour, in every theme | sent → RD (the ring's colour is drafting rule 6 there) |
+| 0140 a presented Space Resource draws its Map | sent → NV (NV-61) |
+| 0144 r1 a Space row frames its Space with a new Space Resource and never reuses one | → UI-107 |
+| 0144 r2 the row is withheld while the list holds an unplaced Space Resource framing that Space | → UI-107 |
+| 0144 r3 a Space Resource placed on another Map withholds nothing | → UI-107 |
+| 0144 r4 withholding is decided over the list's source; counts and the empty sentence read the same set | → UI-107 |

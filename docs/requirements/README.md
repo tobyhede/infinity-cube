@@ -1,6 +1,6 @@
 # Requirements
 
-These seven documents are the binding rules for Hyper. A behaviour change updates its document in the same commit. Status and evidence distinguish the intended behaviour from what is built.
+These seven documents are the binding rules for InfinityCube. A behaviour change updates its document in the same commit. Status and evidence distinguish the intended behaviour from what is built.
 
 | Task | Read |
 | --- | --- |

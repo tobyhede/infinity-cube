@@ -6,7 +6,7 @@ For audit only. Every source rule appears exactly once in §1 or §2, with one o
 - **dropped**: with the reason.
 - **sent → DOC**: it belongs to another doc.
 
-§3 groups the sends by receiving doc, so each doc can check them off. §4 holds code notes.
+§3 groups the sends by receiving doc, so each doc can check them off. §4 holds code notes. §6 traces the sources added or changed on main after the baseline (`797b2908`), which the doc was brought up to on 13 November 2026; where §1 or §2 lands a baseline rule on a rule since rewritten, §6 says what the rule now holds.
 
 Abbreviations:
 - "R" and "A" are ids in the old contract `docs/adr/archive/agent-guides/maps-and-graphs.md`.
@@ -338,7 +338,8 @@ The rule ids in `../maps-and-graphs.md` are append-only from this version on.
 ## 4. Code notes (not requirements)
 
 - **Auto-arrange (MG-71)** is to live in `graph`. Building it moves the render-time engine ban in `eslint.config.js` (the `elkjs` paths and patterns) rather than obeying it.
-- **Resolvers.** Every reader resolves an entry's defaults through `resourceOpen`, `resourceSize` and `resourceShape`, and a Graph's head shape through `graphHeadShape` (`@project/core`).
+- **Resolvers.** Every reader resolves an entry's size through `resourceSize`, its Map content through `resolvedMapContent` (the plugin's declared default where it stores none), and a Graph's head shape through `graphHeadShape` (`@project/core`). `resourceOpen` and `resourceShape` are retired with the entry's `open` and `shape` keys.
+- **Size hints (MG-88).** The cap is `visibleCanvasCap` and `capSizeHint` in `app/src/visible-canvas-cap.ts` (a 48-pixel margin each side); the floor and the Resize are applied in `changeMapContent` in `graph/src/snapshot-edits.ts`; the canvas hands the capped hint to the `changed-map-content` completion in `app/src/plugin-host/plugin-commits.ts`.
 - **`Placement.drawn` and `Placement.authoredPoint`** must not return (0084). MG-21 states the behaviour.
 - **One point type (0038).** The code has `MapPosition`, while `LayoutStrategyResource` declares its own `x?`/`y?`. Whether that breaks 0038 is a PROC question.
 - **Map `kind`.** Every Map stores `kind: 'positioned'`, the only kind (`core/src/schema.ts` `mapSchema`). This is a format matter for ST.
@@ -358,3 +359,46 @@ The rule ids in `../maps-and-graphs.md` are append-only from this version on.
 | Cross-doc audit, duplicates | MG-47 against SR-46; MG-82 against UI-68 | MG-47 now points to SR-46; MG-82 keeps only the domain half and points to UI-68 |
 | Cross-doc audit B4 | MG-61's *Why* named a ui.md sentence that the drag path never shows | narrowed: the reason shows on the Connect list (UI-72); a drag marks the target ineligible |
 | Cross-doc audit N7 | RD rules on "no Active Graph" against MG-34/43/44 | not changed here: every Map has a Graph and resolves one Active Graph; RD owns the fix |
+
+## 6. Sources added or changed on main
+
+The ADRs below are archived in `docs/adr/archive/`. "R′" and "A′" are rows of main's old contract (`docs/adr/archive/agent-guides/maps-and-graphs.md`) as main left it; "CAS′" is main's `docs/adr/archive/agent-guides/authoring-refusal-cascade.md`.
+
+| Source | Disposition |
+|---|---|
+| 0142 the canvas owns the rect and what connects rects; the plugin owns every pixel inside its outline | rect half folded → MG-87 (a plugin never writes a position, a size or an Edge). Drawing sent → RD |
+| 0142 Resource content and Map content, each parsed by a strict schema the plugin declares; a Map entry holds `x`, `y`, `size` and the plugin's Map content | → MG-86. Resource content sent → SR |
+| 0142 a plugin always has a value: stored, its declared default, or its own value where there is no Map | → MG-86 |
+| 0142 a commit writes only the plugin's own Resource, through Space Authoring, and settles once applied | → MG-87. Settling sent → ED (ED-81) |
+| 0142 Open and Closed stop being the application's; Markdown, Space and Reference keep them in Map content; Image and Ur have none | → MG-27, MG-28 |
+| 0142 an Ur Resource's Shape moves to its Map content; which kind may be Open or take a Shape is the plugin's schema's answer | → MG-29, MG-30 |
+| 0142 every tracked file rolls forward | sent → ST |
+| 0142 a Map content commit on an author's gesture may carry a size hint; the canvas floors, caps and displaces in one Edit, or ignores it; once per gesture | → MG-88. The floor folded → MG-22 |
+| 0142 Open and expand is retired | dropped: superseded by the size hint (MG-88) |
+| 0142 the plugin's declared outline, stroked by the canvas | sent → RD |
+| 0142 Claims, exclusive work, failure boundary, surfaces, embeddings, creation, assets, the default plugin | sent → ED, RD, SR, ST, UI. The default plugin's Map content kept unread folded → MG-86 |
+| 0142 rejected: Open/Closed or Shape in Resource content | folded → MG-5 (Map content differs per Map) |
+| 0142 rejected: Open/Closed universal, each kind choosing what Closed draws | folded → MG-28 |
+| 0142 rejected: a plugin never hints at a size; Open and expand kept as an application Edit | folded → MG-88 |
+| superseded 0137 Open and expand Opens and sizes in one Edit | dropped: superseded by 0142 (MG-88). Its size rule (reading width 640, height at least 16:9, capped at the visible canvas) survives only as the Markdown plugin's hint and the canvas cap: the hint's width is the plugin's (`plugin-markdown/test/markdown-plugin.test.tsx` › "Opens with one Map content commit carrying a size hint at least the reading width"), and the cap → MG-88 |
+| 0141 an agent authors a running aggregate through Space Authoring | dropped: proposed (drafting rule 3) |
+| 0084, 0093, 0122 and others: "Refined by" lines naming 0137, 0142, 0143, 0144 | dropped: status lines, no rule |
+| R′33 Add to Map arrives with no Map content and no Edges | → MG-16 |
+| R′35 removal moves nobody; only a Resize or an accepted hint displaces | folded → MG-26 |
+| R′37 size is the canvas's and Map content the plugin's; `resourceSize`; the plugin's default | → MG-22, MG-86. Resolver note in §4 |
+| R′38 only the canvas changes a size, on a Resize or a hint; a plugin writes only its own Map content; no magnetic Close | → MG-87, MG-88, MG-23 |
+| R′39 Open and Close belong to the plugins that keep them; each plugin's Open; the application opens nothing; strict entry refuses `open` and `shape` | → MG-27, MG-28, MG-86. "No Open key, the canvas binds no Enter, Space reads in Full View" sent → UI |
+| R′40 one floor; only a Resize or an accepted hint displaces | → MG-22, MG-26 |
+| R′45 the Shape is the Ur plugin's Map content | → MG-29 |
+| R′46 only Ur; another kind's Shape refused by its plugin's schema | → MG-30 |
+| R′47 optional, default rectangle, read by the Ur plugin | → MG-29, MG-31 |
+| A′17 cost: unless the canvas applies a hint | folded → MG-88 |
+| A′23 resolver now `resolvedMapContent` | §4 |
+| A′24 a plugin's hint is not a kind floor | folded → MG-22 |
+| A′27 Open/Closed or a Shape in Resource content | folded → MG-5 |
+| A′28 Open/Closed universal | folded → MG-28 |
+| A′29 Open and expand kept | folded → MG-88 |
+| CAS′ exclusive work asked before anything else | sent → ED (ED-82). The operations index points to it |
+| CAS′ `changed-map-content` row | → operations index, Change Map content row; MG-87 |
+| CAS′ `opened-resource`, `closed-resource`, `changed-resource-shape` rows removed; `open-requires-content` and `shape-not-taken` retired | the Open, Close and Choose Shape rows of the operations index replaced by Change Map content; MG-27, MG-28, MG-30, MG-31 rewritten with `map-content-invalid` |
+| Code only (drafting rule 5): a hint the cap narrows keeps its area up to the cap's height; a hint the canvas cannot cap is dropped | → MG-88 |

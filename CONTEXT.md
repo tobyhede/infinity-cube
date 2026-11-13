@@ -1,4 +1,4 @@
-# Hyper
+# InfinityCube
 
 Graph-native technical content: Resources live in spatial Maps and connect into curated directed Graphs. This glossary names the domain; [the requirements](docs/requirements/) define its behaviour.
 
@@ -31,7 +31,7 @@ _Avoid_: generation, timestamp, replacement epoch.
 ## Resources
 
 **Resource**:
-An addressable piece of a Space with a Title and a kind, and an endpoint for Graph Edges.
+An addressable piece of a Space with a Title and a Resource kind, and an endpoint for Graph Edges. The canvas owns its position, its size and the Edges connecting it; everything else is its Resource plugin's.
 _Avoid_: Card, Thing, node, slide, page, tile, subgraph.
 
 **Title**:
@@ -41,19 +41,50 @@ _Avoid_: heading, label, caption, description, subtitle as separate fields.
 **Short Title**:
 The first Title Line, followed by “…” when more lines follow, used when a sentence quotes a Title, including questions, notices and Edge labels. Controls, list rows and chrome use the first line alone.
 
-**Kind**:
-What a Resource's content is and does: Markdown, Image, Space, Reference or Ur. A content kind adds content of its own: Markdown or Image.
-_Avoid_: MIME type, content type, file type, format.
+**Resource kind**:
+What a Resource's content is and does, and the name that selects its Resource plugin. Five are bundled: Markdown, Image, Space, Reference and Ur. A content kind adds content of its own: Markdown or Image.
+_Avoid_: MIME type, content type, file type, format; a bare "kind" where another sort of kind could be meant.
+
+**Resource plugin**:
+The module that makes a Resource kind what it is: its content and how it is kept, what it draws inside the rect it is given, and every way its content is authored. Plugins are compiled into the application and listed once.
+_Avoid_: kind for the module, extension, add-on; plugin for code loaded at runtime.
+
+**Resource API**:
+Everything the application offers a Resource plugin, and all a plugin may reach. Every plugin uses the same one.
+_Avoid_: SDK, hooks as the name of the whole.
+
+**Default plugin**:
+The Resource plugin that draws a Resource whose Resource kind names no plugin in this build. What the missing plugin kept is carried unread.
+_Avoid_: default kind, fallback kind, placeholder as the plugin's name.
+
+**Resource content**:
+What a Resource plugin keeps for a Resource, the same on every Map.
+
+**Map content**:
+What a Resource plugin keeps for one Resource on one Map, beside the position and size the canvas owns, such as an Ur Resource's Shape or a Markdown Resource's Open or Closed state.
+_Avoid_: view state, placement.
+
+**Resource surface**:
+What hosts a Resource plugin's drawing: a Map, the Stage, or another Resource embedding it. It offers capabilities that are each present or absent.
+_Avoid_: read-only as a mode of a plugin, Resource canvas.
+
+**Claim**:
+A Resource plugin's hold on the interaction while an author works in it. Claims nest through what a plugin embeds, and the deepest holds the keyboard and shows its commands. A Claim may run work exclusively.
+_Avoid_: lock, focus, edit mode.
+
+**Asset**:
+Bytes with a media type, named by their content, that a Resource reaches by a URL in its Resource content or Map content. Every file a Resource uses is one, a picture or Markdown text alike.
+_Avoid_: sidecar, attachment; asset as a name for an Image Resource.
 
 **Content action**:
-An action offered by a Resource's own content, such as editing Markdown, replacing an image or authoring the Map inside a Space Resource.
-_Avoid_: capability, edit mode.
+What a Resource plugin lets an author do to its Resource's content, such as editing Markdown, replacing an image or authoring the Map inside a Space Resource.
+_Avoid_: capability (what a Resource surface offers a plugin), edit mode.
 
 **Markdown Resource**:
 A Resource whose content is Markdown written by the author.
 
 **Image Resource**:
-A Resource whose content is a picture identified by its image URL. Its Title is also the picture's text alternative.
+A Resource whose content is a picture identified by its image URL. Its Title is also the picture's text alternative. It is always its picture, with no Closed state.
 _Avoid_: picture, photo, media, asset, attachment, file, thumbnail as names for the Resource.
 
 **Ur Resource**:
@@ -78,11 +109,11 @@ An authored entity within a Space holding a placement and an ordered collection 
 _Avoid_: Diagram, Layout, View, placement as a synonym.
 
 **Placement**:
-The mapping of Resources to their positions, sizes, Open/Closed states and Shapes within a Map. A Resource absent from this mapping is absent from that Map.
+The mapping of Resources to their positions, sizes and Map content within a Map. A Resource absent from this mapping is absent from that Map.
 _Avoid_: arrangement, layer.
 
 **Shape**:
-An Ur Resource's outline in a Map: rectangle, pill, ellipse or diamond.
+An Ur Resource's outline in a Map, kept as its Map content: rectangle, pill, ellipse or diamond.
 _Avoid_: head shape, node shape, symbol, figure, border, frame; Shape as a Resource kind.
 
 **Layout strategy**:
@@ -137,17 +168,21 @@ The identity of the working Space against which local drafts and pending work we
 _Avoid_: revision, version, generation, session, dirty flag, cancellation registry, opening.
 
 **Selected Resource**:
-The Resource an authoring gesture acts on, separate from Opening and Presenting. It shares one selection with Selected Edge: only one of them is selected at a time.
+The Resource an authoring gesture acts on, separate from Opening and Presenting. Other Resources may be selected together with it. An Edge is never selected together with anything.
 _Avoid_: focus, highlight, current Resource; Active Resource (Presenting's position).
 
 **Selected Edge**:
-The Edge in the Active Graph that an authoring gesture acts on, sharing one selection with Selected Resource.
+The Edge in the Active Graph that an authoring gesture acts on. Selecting it clears every Selected Resource.
 _Avoid_: Active Edge (Active Graph names the Graph; Active Resource names Presenting's position), focused Edge, highlighted Edge.
+
+**Canvas command**:
+A named action on the canvas, reached by a key, by an item on a Resource's toolbar or menu, or by both, which can be available, unavailable with a reason, or absent for a target.
+_Avoid_: shortcut (the key bound to it), action (the toolbar's word for its items), Command Dock, handler, hotkey.
 
 ## Opening and navigating
 
 **Opening**:
-Showing a Resource's content on the Resource itself, within its Map placement. Open and Closed are authored states of that placement, independent of its size.
+Showing a Resource's content on the Resource itself, within its Map placement. A Resource plugin may give its Resources an Open and a Closed state, kept in its Map content and independent of the Resource's size: a Markdown, Space or Reference Resource has one.
 _Avoid_: Expanded, expansion, Open Size, preview, popup, modal, dialog, drill-down, view mode, edit mode.
 
 **Entering**:
@@ -176,7 +211,7 @@ Traversing a Graph for an audience, one Resource at a time on the Stage.
 _Avoid_: deck, slide, step, slideshow, playback, present mode.
 
 **Stage**:
-The surface showing the Active Resource's content while Presenting.
+The Resource surface showing the Active Resource's content while Presenting, with no Map and no authoring.
 _Avoid_: slide, viewer, presenter view, canvas.
 
 **Active Resource**:
@@ -206,7 +241,7 @@ Writing a complete Aggregate into an Aggregate directory.
 _Avoid_: saving, publishing, syncing; exporting a single Space.
 
 **Importing**:
-Taking a complete Aggregate from outside Hyper to establish or replace the stored Aggregate.
+Taking a complete Aggregate from outside InfinityCube to establish or replace the stored Aggregate.
 _Avoid_: loading, restoring, syncing, merging.
 
 **Running**:

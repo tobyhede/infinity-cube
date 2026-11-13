@@ -74,7 +74,7 @@ The bar is `AGENTS.md`'s “Before claiming done”. In addition:
 
 ### Fixture data
 
-`packages/app/fixture/` is the purpose-shaped tracked aggregate used by the fixture host and Playwright. Its positions are authored test data; do not regenerate them from a layout strategy. Preserve the disconnected Maps, overlapping Graph spines, unconnected member, multiline Title and Reference returns that exercise the application. Read `packages/app/README.md` before changing its shape. The narrative content under `packages/app/example/` is separate from test fixtures. Keep fixture documentation outside a Space directory, where Markdown is read as a Resource.
+`packages/app/fixture/` is the purpose-shaped tracked aggregate used by the fixture host and Playwright. Its positions are authored test data; do not regenerate them from a layout strategy. Preserve the disconnected Maps, overlapping Graph spines, unconnected member, multiline Title and Reference returns that exercise the application. Read `packages/app/README.md` before changing its shape. The narrative content under `packages/app/example/` is separate from test fixtures. Keep fixture documentation outside the fixture directory, so the fixture holds only the files Import reads.
 
 ### Stories are production evidence
 
