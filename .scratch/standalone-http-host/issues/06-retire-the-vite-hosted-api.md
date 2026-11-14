@@ -4,7 +4,7 @@
 
 **Blocked by:** 03 — Memory runtimes and the E2E suite on the standalone host; 04 — SQLite host and both restart proofs on the standalone host; 05 — Preview through the built standalone host.
 
-**Status:** ready-for-agent
+**Status:** wontfix — dropped with standalone-http-host/01 (2026-11-13)
 
 - [ ] No Vite configuration or E2E harness loads a runtime module in process; the plugin and the tests that exist only for it are gone, and their `eslint-suppressions.json` entries are pruned rather than hand-edited.
 - [ ] `AGENTS.md`'s Commands section and the HTTP and build-tooling agent docs describe one host process per command, how to tell whether one is running, and that stopping it closes its database.

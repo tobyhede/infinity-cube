@@ -13,7 +13,7 @@ selected Layout and Graph until that ticket lands: `layout` and `graph` are stil
 optional on `spaceCardFrontmatterSchema`
 (`packages/core/src/schema.ts:61-62`).
 
-**Status:** ready-for-agent
+**Status:** needs-triage — rewrite against Maps/Resources/plugins and `cube init`; decide whether a CLI hard reset survives ADR 0117
 Tags: release/v1
 
 - [ ] First initialization creates the permanent Meta Space with one top-level

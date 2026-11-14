@@ -1,6 +1,6 @@
 # 07 — The Space plugin
 
-Status: ready-for-agent
+Status: done
 
 **Blocked by:** 06 — The Reference plugin.
 

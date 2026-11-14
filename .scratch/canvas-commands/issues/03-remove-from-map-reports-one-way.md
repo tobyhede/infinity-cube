@@ -4,7 +4,7 @@
 
 **Blocked by:** 02.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] A test shows Delete and the rail item reporting the same refusal through command outcomes.
 - [ ] Delete pressed from the Command Dock, from a node's toolbar or from an Open Resource's editor does nothing.

@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately). It gates issue 03.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] A tracked module declares the bindings as data: each entry names the key or chord, the surface that owns it, and the behaviour. Both packages' surfaces appear in it — the Markdown source editor's withheld keys, the Markdown Card body, the registry Sidebar's own shortcut, the Canvas Card, the canvas itself, the open Card, presenting, Edge authoring and the selected-Edge controls — along with the key codes handed to React Flow as props.
 - [ ] A test under the repo-level unit suite scans both source trees and fails on a key literal no entry names, in the manner of the vocabulary and CodeMirror-encapsulation scans that already live there. It fails in both directions: an entry naming a binding no module makes is also a failure, so the list cannot outlive the code.

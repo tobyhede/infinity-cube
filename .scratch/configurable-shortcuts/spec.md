@@ -2,7 +2,7 @@
 
 Status: needs-triage
 
-ADR 0138 (proposed). Every key the application answers becomes a key bound to a named command, answered by one dispatcher from a keymap. The defaults are today's binding table (`packages/app/src/key-bindings.ts`). A reader can remap a command's keys or turn them off from the `?` sheet, and can turn off every single-character shortcut at once, which is what WCAG 2.1.4 (Character Key Shortcuts) asks of keys answered outside one focused component. Overrides live in `localStorage`, which is per origin: each dev host, `pnpm hyper run` and each host serving a mounted page keeps its own.
+ADR 0138 (accepted). Every key the application answers becomes a key bound to a named command, answered by one dispatcher from a keymap. The defaults are today's binding table (`packages/app/src/key-bindings.ts`). A reader can remap a command's keys or turn them off from the `?` sheet, and can turn off every single-character shortcut at once, which is what WCAG 2.1.4 (Character Key Shortcuts) asks of keys answered outside one focused component. Overrides live in `localStorage`, which is per origin: each dev host, `pnpm cube run` and each host serving a mounted page keeps its own.
 
 Builds on the keyboard-shortcuts stack (`.scratch/keyboard-shortcuts/`, PRs #426–#430), merged into `main` on 2026-10-28. Every file, binding and test the tickets name is on `main` from then; this branch was cut before the stack and does not carry them. Ticket 01 is the follow-up the #426 review left open: one keydown dispatcher in place of the canvas's per-command listeners.
 

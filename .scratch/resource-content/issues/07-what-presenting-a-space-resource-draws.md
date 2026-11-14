@@ -4,7 +4,7 @@
 
 **Blocked by:** nothing. 03 is resolved.
 
-**Status:** ready-for-human
+**Status:** resolved — decided by ADR 0140 and built with the Space plugin (resource-plugins/07)
 
 - [ ] A decision on what a presented Space Resource draws, recorded where it belongs (an ADR refining 0123 and 0068 if it draws the Map; otherwise a note here that ADR 0123's name-alone rule stands, and `PresentedResource.tsx`'s pointer to this ticket removed).
 

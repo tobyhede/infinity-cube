@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 — Record that the HTTP host is its own process; database-persistence/26 — One database target composition.
 
-**Status:** ready-for-agent
+**Status:** wontfix — dropped with standalone-http-host/01 (2026-11-13)
 
 - [ ] One command starts the host and Vite, and stopping it stops both; neither is left running.
 - [ ] The host composes the PostgreSQL target, attempts to establish Meta once before serving, and closes its database when it stops. It keeps the existing degraded start (`src/http/postgres-http-runtime.ts`): a failed first attempt is reported and the host still starts and serves while the retry continues in the background, and a retry that gives up is reported without stopping the host. Throughout, the root address answers service-unavailable while the repository is unreachable or has no Meta Space.

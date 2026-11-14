@@ -2,7 +2,7 @@
 
 **What to build:** Nothing scheduled. This is a reference list of where the suppressed assertions are, for whoever is already editing one of these files.
 
-**Status:** ready-for-human
+**Status:** wontfix — the suppressions baseline (`eslint-suppressions.json`) is the inventory; ADR 0062 drains it as files are touched
 
 **Why the framing changed:** written when issue 06 meant a cleanup. Under ADR 0062 these are in the suppressions baseline and drain as files are touched for other reasons. A project to empty the list is the cleanup that ADR explicitly rejected, arriving under a different name.
 

@@ -2,7 +2,7 @@
 
 Status: ready-for-agent
 
-Refines ADR 0138 (proposed) and replaces the design half of `.scratch/configurable-shortcuts/issues/01-command-ids-and-one-dispatcher.md`. Settled with Toby on 2026-10-28 in an architecture review of the keyboard-shortcuts stack (PRs #427–#430), candidate 1. Builds after that stack merges.
+Refines ADR 0138 and replaces the design half of `.scratch/configurable-shortcuts/issues/01-command-ids-and-one-dispatcher.md`. Settled with Toby on 2026-10-28 in an architecture review of the keyboard-shortcuts stack (PRs #427–#430), candidate 1. Builds after that stack merges.
 
 ## Problem Statement
 
@@ -69,7 +69,7 @@ The keys answered by an element's own handler rather than the window are not Can
 - **Contexts.** The dispatcher answers canvas commands only while the Space is the one on screen, is not presenting, and has no Full View shown. Presenting commands are answered only while presenting. `?` is answered everywhere, through the same dispatcher registered in the capture phase, because Full View stops every key pressed in it. The dispatcher therefore holds one window `keydown` listener per phase it has registrations in.
 - **Presenting commands are a sibling module** with the same interface, no target and the presenting context. They replace the presenting keys hook's own listener. PageDown and PageUp keep their rule that the content they land in scrolls first, expressed as availability.
 - **Keys React Flow performs** (Shift+arrow nudge, Escape unselect) stay as bindings with no command id until configurable-shortcuts ticket 06 takes them over. The `?` sheet still lists them.
-- **ADR 0138 is amended, not superseded**, because it is still proposed. It gains the Canvas command, the three aims, the three availability answers and the single run path. Configurable-shortcuts ticket 01 is rewritten to build this spec, keeping its done-when (one window `keydown` listener, existing key tests unchanged, each id in exactly one binding).
+- **ADR 0138 is amended, not superseded**, because it was still proposed when this was written. It gains the Canvas command, the three aims, the three availability answers and the single run path. Configurable-shortcuts ticket 01 is rewritten to build this spec, keeping its done-when (one window `keydown` listener, existing key tests unchanged, each id in exactly one binding).
 
 ## Testing Decisions
 

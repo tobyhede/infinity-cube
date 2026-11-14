@@ -2,7 +2,7 @@
 
 **What to build:** Replace the Sidebar's persistent "Copy link to X" / "Copy link in this Layout" buttons with one entity-actions menu — Rename, Copy link, Copy permanent link, Open in new tab — reachable two ways: a trailing icon on the entity's own row or rail, and a right click anywhere on it. For Cards, Graphs, Layouts and Spaces alike. This ticket does not change addressing, routing, or the product-destination table (ADR 0069, ADR 0072) — only where and how a person reaches the two link forms those ADRs already define, plus one existing capability (rename) it now also surfaces.
 
-**Status:** interaction direction chosen; production wiring remains open
+**Status:** resolved
 
 **ADR 0079 reconciliation:** the retired `space-view` `SpaceEntity` kind is gone —
 `layout-only-v1/03` removed it, and `SpaceSidebar` now asks one entity at a time as

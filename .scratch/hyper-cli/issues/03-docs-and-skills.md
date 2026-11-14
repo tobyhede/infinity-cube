@@ -4,7 +4,7 @@
 
 **Blocked by:** 02 — `init` and `run`.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] `README.md`: quick start and "How Running works" use `init` and `run`, including that `run` refuses a missing or empty directory; "Developing Hyper" uses `import`/`export`/`--store`/`--dangerous-replace`
 - [x] `AGENTS.md` Commands section: `pnpm start` and `pnpm hyper:sqlite` entries become the verbs; the rule that an agent may start and stop `run --no-open` on a directory of its own is kept
