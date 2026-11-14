@@ -1,7 +1,9 @@
 # The host stores SVG, and serves every stored image sandboxed
 
-Status: proposed
+Status: accepted
 Refines: 0106
+
+> Accepted on 2026-11-14. Since this was written, stored images became assets (ADR 0142): they are served from `/assets/<id>`, not `/images/<id>`, and every asset is already served with `Content-Security-Policy: default-src 'none'; sandbox` (`packages/http/src/index.ts`). A mounted talk hands its assets to the page as object URLs, which carry no response policy, so an SVG there needs its own answer; `.scratch/image-resource/issues/10-store-an-svg.md` builds this decision and settles that.
 
 ADR 0106 left SVG for its own decision, and storing refused it with a code of its own, `image-svg-unsupported`. An Image Resource could already show an SVG from an external URL, because an external URL shows whatever the browser can draw, so the refusal only stopped an author who had the file and no URL for it. The host now stores SVG as a fifth format, `image/svg+xml`, identified from the bytes by the SVG detection storing already does, under the same 10 MiB cap and content-addressed id as the other four. `image-svg-unsupported`, its Problem Details type and its copy are deleted rather than kept, and an SVG declared by the browser is sent like any other image type.
 
