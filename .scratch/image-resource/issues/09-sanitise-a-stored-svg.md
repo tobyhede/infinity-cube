@@ -26,3 +26,9 @@
 **Category:** enhancement. **State:** needs-triage.
 
 Deferred and blocked: ADR 0107 is still proposed and absent from the ADR index, SVG is still refused (`packages/persistence/src/images.ts:182`), no CSP is sent (`packages/http/src/index.ts:72`), and no ticket implements ADR 0107. The body now records the unmet blocker, the interaction with ADR 0118's `images/` bytes, and that server-side DOMPurify would need jsdom. Open decisions: whether ADR 0107 is accepted and built, and, after that, whether this second layer is wanted at all and what the image id is the digest of.
+
+### Triage, 2026-11-14
+
+> *Recorded by AI from Toby's decision in the project thread.*
+
+ADR 0107 is accepted and `10-store-an-svg.md` builds it, so once 10 lands this ticket is no longer blocked. It stays parked as a second layer: take it up only if the sandbox policy is found not to hold in a browser, or before stored assets are served anywhere with users.
