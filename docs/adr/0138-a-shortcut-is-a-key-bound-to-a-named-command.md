@@ -4,6 +4,8 @@ Status: accepted
 
 > ADR 0142, accepted since, makes every Open a Resource plugin's Map content, so the canvas binds neither Enter nor Shift+Enter: the Enter and Shift+Enter commands named below have no binding. Read them against ADR 0142.
 
+> Decided on 2026-11-14, with configurable-shortcuts/04: the shortcut sheet has no single-character key. `?` is retired; the sheet opens from the Command Dock and from `Ctrl+/` (`⌘/` on macOS), so turning single-character shortcuts off never hides it. Read each `?` below as that binding.
+
 Every key the application answers is declared once, in `packages/app/src/key-bindings.ts`, and that table drives the handlers, `aria-keyshortcuts`, the tooltips and the `?` sheet. But the table names keys, not actions: each binding is matched by the handler that performs it, and those handlers listen separately (the canvas adds its own window `keydown` listener for each of `C`, `P`, `F2` and Delete). So a key cannot be changed without changing the code that answers it, and nothing can turn a key off. Single-character keys such as `C`, `P`, `N`, `S` and `?` are answered anywhere on the canvas except in text controls, menus and dialogs, which is wider than focus on one component, so WCAG 2.1.4 (Character Key Shortcuts) asks that a reader can turn them off or remap them.
 
 **A shortcut is a key bound to a named command.** Each action a key performs is a command with a stable id, such as `canvas.presentFromHere`. A command knows nothing of its key. The **keymap** is data: for each command, the keys and presses that perform it and the context it is answered in (the canvas, Full View, presenting, or everywhere). The defaults are the binding table as it stands, and they are code.
