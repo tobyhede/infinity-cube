@@ -50,7 +50,7 @@ export const trackedFiles = (): readonly string[] =>
  * The two source trees: `.tsx`/`.ts` class strings and
  * hand-rolled `.css` under `packages/*\/src` — the same root
  * `command-surface-sharing.test.ts` and `codemirror-encapsulation.test.ts`
- * read, and the one `docs/agents/ui.md` names as where product appearance is
+ * read, and the one `docs/agents/build-tooling.md` names as where product appearance is
  * either `@project/ui`, colocated with its component, or `styles.css`.
  * `packages/*\/stories` and `test/**` are deliberately outside it: a story or
  * a fixture is not a surface the product draws.

@@ -4,15 +4,15 @@ Every accepted ADR, one line each. The line states what the decision **binds** �
 the thing that must change if the decision is reversed. It is not a summary of
 the document.
 
-This index discovers decisions. It is not where the current design is stated.
-For a topic with a current contract, read that contract before the ADRs: it
-states the live rules in current words, with their reasons and source links
-([ADR 0115](0115-current-contracts-state-the-live-design-and-adrs-keep-its-history.md)).
-Open an ADR when you need the full argument, a rejected alternative or the
-history, or when you are about to change what it binds. The topics that have a
-contract are listed in
-[`workflow.md`](../agents/workflow.md#current-contracts); a section below names
-its contract where one exists.
+**ADRs are binding and append-only.** A new decision, or a change to what an
+accepted ADR decides, is a new ADR. The seven
+[requirements documents](../requirements/README.md) restate the accepted ADRs in
+current words as a snapshot: each names the commit it was checked against and
+the highest ADR it incorporates. Read the owning requirements document first;
+then read any ADR newer than its snapshot marker, which binds where the two
+differ. A requirement that disagrees with an accepted ADR is a defect in the
+requirement. Open an ADR when you need the full argument, a rejected
+alternative or the history, or when you are about to change what it binds.
 
 - A retired decision moves to [`superseded/`](superseded/). It stays readable,
   and a live ADR that points at one still resolves. It is history, not a rule.
@@ -22,6 +22,8 @@ its contract where one exists.
 - An ADR binds structure. A test binds behaviour. `CONTEXT.md` binds words. Where
   an ADR body describes an arrangement of controls, the tests and `CONTEXT.md`
   are what hold, not the prose.
+- The product guides the requirements replaced are kept, as history, under
+  [`archive/agent-guides/`](archive/agent-guides/).
 
 **The lines below keep the vocabulary of the ADR they describe**, so an older
 line names an entity by a word `CONTEXT.md` has since retired. Read them in
@@ -45,6 +47,8 @@ under `superseded/`.
 
 ## Domain model and intake
 
+The current statement of these decisions is [Space and Resources](../requirements/space-and-resources.md).
+
 | ADR | Binds |
 | --- | --- |
 | [0085](0085-thing-and-diagram-are-the-first-public-names-for-card-and-layout.md) | A Card is a Thing and a Layout is a Diagram. `LayoutStrategy` keeps its name. |
@@ -60,20 +64,23 @@ under `superseded/`.
 | [0038](0038-a-point-has-one-type.md) | `LayoutPosition` is the one representation of a point. |
 | [0051](0051-card-kinds-own-everything-beyond-the-title.md) | A Card kind owns everything past the Title. |
 | [0125](0125-the-resource-has-no-front.md) | A Resource on a Map is drawn Closed or Open, and nothing is its front; a kind's operations are `KindOperations` (refines 0051). |
-| [0083](0083-a-card-title-is-title-lines.md) | A Card Title is one or more Title Lines, and the first line is the Card's name. |
+| [0083](0083-a-card-title-is-title-lines.md) | A Card Title is one or more Title Lines, and the first line is the Card's name. A sentence quotes it by its short Title (0151). |
+| [0151](0151-a-sentence-quotes-a-title-by-its-short-title.md) | A sentence that quotes a Title (a question, a notice, an Edge label and its accessible name) uses the short Title, the first line plus "…" when more follow; controls, rows and chrome use the first line alone (refines 0083). |
 | [0009](0009-alias-resolution-is-lazy-and-single-hop.md) | An Alias resolves lazily and in one hop. |
 | [0039](0039-an-alias-delegates-content-authoring-to-its-target.md) | An Alias gives content authoring to its Target. |
 | [0046](0046-an-occurrence-authors-its-own-title-and-target.md) | An occurrence authors its own Title and Target in the pane that opens it. |
 | [0070](0070-an-open-alias-shows-immutable-target-content-read-only.md) | An Alias keeps its Target for life and shows that content read-only. Since 0142 the Target's plugin draws it, with the Reference's own Title. |
 | [0092](0092-reference-thing-is-the-first-public-name-for-alias.md) | A Reference Thing is the first-public name for Alias. Alias is retired. |
 | [0068](0068-a-space-card-shows-a-space-view.md) | A Space Card shows another Space through the selection it carries; ADR 0079 makes that selection a Layout. |
-| [0074](0074-space-card-references-own-the-target-space.md) | The Space Cards referencing a Space own its lifetime. Deleting the last one deletes the Space. |
+| [0074](0074-space-card-references-own-the-target-space.md) | The Space Cards referencing a Space own its lifetime. Deleting the last one deletes the Space. 0153 asks before Remove from Map only when Edges would go. |
+| [0153](0153-remove-from-map-asks-first-only-when-edges-would-go.md) | Remove from Map asks first only when it would delete Edges, naming the Graphs that lose them, and otherwise removes at once (refines 0074). |
 | [0144](0144-a-space-row-frames-its-space-with-a-new-space-resource.md) | A Resources list Space row authors a new Space Resource and never reuses one; it is withheld while the list holds a Space Resource framing that Space placed on no Map (refines 0068, 0074). |
 | [0076](0076-multi-space-edits-coordinate-per-space-sessions-behind-space-card-lifecycle.md) | Multi-Space edits coordinate per-Space sessions behind the Space Card lifecycle. |
 | [0097](0097-a-multi-space-edit-is-judged-against-what-it-commits.md) | A multi-Space Edit is derived and judged with `decideCommit` against the stored Spaces plus its participants' working Spaces. |
 | [0099](0099-the-barrier-waits-only-for-commits-in-flight.md) | The coordination barrier pauses, then awaits only in-flight commits; one recovery rule covers both deletion cascades, reading stored and working state. |
-| [0106](0106-an-image-resource-owns-a-url-not-bytes.md) | An Image Resource owns a URL, not bytes. The host stores images at `/images/<sha256>`, named for what they are and outside the aggregate. The repo-state rule is deliberately waived for the picture. |
+| [0106](0106-an-image-resource-owns-a-url-not-bytes.md) | An Image Resource owns a URL, not bytes. The host stores images at `/images/<sha256>`, named for what they are and outside the aggregate. The repo-state rule is deliberately waived for the picture. 0150 stops measuring its natural size. |
 | [0118](0118-an-aggregate-directory-carries-stored-image-bytes.md) | An Aggregate directory carries the bytes of every stored image the aggregate references in `images/<content-id>.<ext>`; Export rewrites `images/` whole and Import admits it before storing the aggregate, on every store (amends 0106). |
+| [0150](0150-an-image-s-natural-size-is-not-measured.md) | Nothing measures an image's natural size; creation and Replace write the URL alone, and `naturalSize` stays optional and unread until the next format change (refines 0106, 0126). |
 | [0113](0113-every-capability-is-a-resources-and-an-ur-resource-has-no-content.md) | Every capability is a Resource's, and a kind only adds actions; Reference is the terminal exception. An Ur Resource has no content and no Edit; since 0122 it is never Open either. A self-targeting Reference Resource was rejected. Since 0142 Open and Close are a plugin's, which Image and Ur do not have. |
 | [0114](0114-a-reference-resource-takes-its-targets-geometry-and-withholds-only-content-actions.md) | Map embedding and content area are decided from resolved content, so a Reference Resource takes its Target's; its kind withholds only content actions. 0122 retires the first Open Size and the per-content resize floor. Since 0142 a Reference's plugin embeds its Target, which draws the Reference's Title. |
 | [0120](0120-a-kind-is-a-behaviour-and-a-media-type-is-its-contents-format.md) | A kind is a behaviour and a media type is its content's format; `kind` never holds a media type. Content kinds are modules registered at composition, built in today with namespaced ids so runtime kinds stay possible. Ur, Reference and Space stay the domain's, and a Resource with no kind is an Ur Resource (0128 makes every kind a module and requires `kind`). |
@@ -81,7 +88,7 @@ under `superseded/`.
 
 ## Layout, View and Graph
 
-The current statement of these decisions is [`docs/agents/maps-and-graphs.md`](../agents/maps-and-graphs.md).
+The current statement of these decisions is [Maps and Graphs](../requirements/maps-and-graphs.md).
 
 | ADR | Binds |
 | --- | --- |
@@ -93,7 +100,8 @@ The current statement of these decisions is [`docs/agents/maps-and-graphs.md`](.
 | [0110](0110-an-edge-faces-across-the-larger-gap-between-two-resources.md) | The facing side is on the axis with the larger gap between the two rects, and the centre difference on that axis alone picks the direction. A self-Edge keeps its fixed loop. |
 | [0100](0100-graphs-sharing-a-pair-of-things-run-in-parallel-lanes.md) | Edges joining the same two Things are drawn as parallel translated copies; the Active Graph connects on the centre with its head shape; the others run below it and stop short (their heads: ADR 0105). |
 | [0103](0103-a-lane-is-offset-along-its-curve.md) | A lane is the Edge's curve offset along its normal at a constant distance, over one span of the curve per pair judged at its reach, with one cubic bridge from each end of the span to the lane's point beside its anchor, and the translate only where a pair has no span; its ends and arrowheads stay where a translate puts them and its label sits at the offset midpoint; self-Edges keep their own rule. |
-| [0104](0104-an-edge-may-carry-a-title.md) | An Edge may carry an optional one-line Title, never minted, and `titleHidden: true`; its identity stays `(from, to)` within its Graph. |
+| [0104](0104-an-edge-may-carry-a-title.md) | An Edge may carry an optional one-line Title, never minted, and `titleHidden: true`; its identity stays `(from, to)` within its Graph. Drawing one the Graph already holds is refused (0147). |
+| [0147](0147-drawing-an-edge-the-graph-already-holds-is-refused.md) | Drawing an Edge the Graph already holds is refused (`edge-already-exists`) and draws nothing, rather than being a silent no-op (refines 0032, 0104). |
 | [0105](0105-a-graphs-edges-share-one-head-shape.md) | A Graph carries one head shape (`arrow`, `vee`, `dot`, `diamond`, default `arrow`), drawn at every drawn Edge's head, including those that stop short (refines 0100); no `none`, no tail shape, no per-Edge override; the legend's line marks end in it. |
 | [0143](0143-lanes-are-laid-out-from-the-centre-out.md) | Each direction of a pair ranks the Active Graph's Edge first, then Graph order; the first runs anchor to anchor and each further one is a tenth shorter at each end, up to three tenths. One-way pairs and loops keep ADR 0100's layout on ADR 0103's screen-fixed side; two-way pairs stack each direction on its own left of travel, and an Active Graph running both ways is one line with a head at each end. Lanes run 12 apart beside the Active Graph's Edge and 8 elsewhere, and while a Graph is active the others are hairlines with small heads (refines 0100, 0103, 0105). |
 | [0040](0040-layouts-own-card-membership-and-routes.md) | A Layout owns its Card membership and its Graphs. |
@@ -102,23 +110,28 @@ The current statement of these decisions is [`docs/agents/maps-and-graphs.md`](.
 | [0080](0080-new-spaces-start-complete-and-layoutless-stored-spaces-are-repaired.md) | New Spaces persist their first Card in a complete Layout; first working load repairs stored layoutless Spaces without placing their Cards. |
 | [0015](0015-a-space-may-have-no-routes.md) | A Space may hold no Graph. It then cannot present. |
 | [0003](0003-routes-may-conflict.md) | Graphs are independent, and their orders may disagree. |
-| [0032](0032-routes-may-contain-cycles.md) | A Graph may contain a cycle. |
-| [0041](0041-graph-is-the-first-public-name-for-route.md) | Graph is the first-public name for Route. |
+| [0032](0032-routes-may-contain-cycles.md) | A Graph may contain a cycle. (0147 refuses drawing an Edge the Graph already holds.) |
+| [0041](0041-graph-is-the-first-public-name-for-route.md) | Graph is the first-public name for Route. (0146 makes switching Graphs an Edit; 0148 gives the canvas no Traversal history.) |
 | [0116](0116-only-an-edit-on-the-canvas-moves-where-a-space-opens.md) | Only an Edit through the canvas's Map records it as `defaultMap` and writes its Active Graph; an Edit through a drawn Map leaves both alone, except that Add Graph still activates its new Graph. |
 
 ## Editing and persistence
 
+The current statement of these decisions is [Editing](../requirements/editing.md) for Edits, outcomes and coordination, and [Storage and hosts](../requirements/storage.md) for repositories, formats, Import, Export, Running and Mounting.
+
 | ADR | Binds |
 | --- | --- |
 | [0035](0035-space-authoring-owns-the-edit-lifecycle.md) | Space Authoring owns the full Edit lifecycle. |
-| [0042](0042-interaction-drafts-stay-local-and-space-replacement-invalidates-them.md) | An interaction draft stays local, and a Space replacement discards it. |
+| [0042](0042-interaction-drafts-stay-local-and-space-replacement-invalidates-them.md) | An interaction draft stays local, and a Space replacement discards it. 0154 makes a permanent rejection a dialog that takes focus. |
+| [0154](0154-a-permanent-rejection-is-a-dialog-that-takes-focus.md) | A permanent rejection, and a refused save, is an announced dialog that takes focus until acknowledged; a retryable failure still takes none (refines 0042). |
 | [0057](0057-errors-cross-seams-as-stable-identities.md) | An error crosses a seam as a stable identity, not as prose. |
 | [0109](0109-nondeterminism-is-injected-once-at-composition.md) | A nondeterministic function is a required composition parameter, named at the composition root. Tests own a generator and never mock `crypto.randomUUID`. |
-| [0028](0028-activating-a-route-is-not-an-edit.md) | To activate a Graph is not an Edit. |
+| [0028](0028-activating-a-route-is-not-an-edit.md) | To activate a Graph is not an Edit. (0146 makes switching Graphs an Edit.) |
+| [0146](0146-switching-graphs-is-an-edit.md) | Switching Graphs on the canvas is an Edit that writes the Map's `activeGraph` and records the canvas Map as `defaultMap`; switching to the saved Active Graph is unchanged; inside an Open Space Resource it writes only that Space Resource's selection (refines 0028, 0041, 0068, 0116). |
 | [0030](0030-postgres-is-the-live-write-model.md) | PostgreSQL is the live write model. Files are imported and exported. |
 | [0018](0018-a-new-space-is-a-single-centered-card.md) | A new Space is one centred Card. |
 | [0054](0054-the-unreleased-prototype-rolls-forward.md) | The prototype is unreleased, so a document format change rolls forward with its fixtures and adds no versioned reader. Relational schema changes still go through `migrations/app/`. |
-| [0056](0056-the-repository-is-the-only-source-of-state.md) | The repository is the only source of state. Every artifact is derived. ADR 0106 excepts an Image Resource's picture; ADR 0118 narrows that to external URLs and stored images nothing references; 0142 widens it from pictures to every asset. |
+| [0056](0056-the-repository-is-the-only-source-of-state.md) | The repository is the only source of state. Every artifact is derived. ADR 0106 excepts an Image Resource's picture; ADR 0118 narrows that to external URLs and stored images nothing references; 0142 widens it from pictures to every asset. 0152 gives the reason for a copy outside the repository. |
+| [0152](0152-no-compatibility-promise-for-a-copy-outside-the-repository.md) | The format rolls forward because InfinityCube is unreleased and makes no compatibility promise for any copy outside the repository; an Aggregate directory is recovered from git or read with the build that wrote it (refines 0054, 0056). |
 | [0077](0077-the-meta-space-starts-from-one-replaceable-default-aggregate.md) | The Meta Space starts from one deterministic, editable aggregate. The CLI hard reset that restores it is decided but not built (`.scratch/v1-release/issues/16`); today `pnpm hyper import <dir> --dangerous-replace` (ADR 0094, spelled by ADR 0124) replaces the aggregate from a directory. |
 | [0078](0078-the-server-side-repository-owns-meta-lifecycle.md) | The server-side repository owns Meta lifecycle; its browser seam does not expose lifecycle administration. |
 | [0094](0094-dangerous-truncate-replaces-whatever-is-stored.md) | `--dangerous-replace` (ADR 0124's spelling) replaces whatever is stored, valid or not, still authorized by the Meta identity it read. |
@@ -140,6 +153,8 @@ The current statement of these decisions is [`docs/agents/maps-and-graphs.md`](.
 
 ## HTTP
 
+The current statement of these decisions is [Storage and hosts](../requirements/storage.md) for the HTTP host and [Navigation](../requirements/navigation.md) for product URLs.
+
 | ADR | Binds |
 | --- | --- |
 | [0034](0034-the-http-application-is-fetch-native.md) | The HTTP application is Fetch-native. |
@@ -149,9 +164,12 @@ The current statement of these decisions is [`docs/agents/maps-and-graphs.md`](.
 
 ## Canvas and camera
 
+The current statement of these decisions is [Rendering](../requirements/rendering.md) for the canvas, camera and handles, and [Navigation](../requirements/navigation.md) for presenting.
+
 | ADR | Binds |
 | --- | --- |
 | [0024](0024-presenting-is-traversing-a-route.md) | To present is to traverse a Graph. There is no deck. |
+| [0148](0148-graph-navigation-on-the-canvas-keeps-no-history.md) | Graph navigation on the canvas moves to an Active Graph neighbour in the arrow's direction, along an Edge either way, and keeps no Traversal history; that history is presenting's alone (refines 0041). |
 | [0043](0043-a-camera-command-is-issued-never-awaited.md) | A camera command is issued and never awaited. |
 | [0123](0123-presenting-draws-on-its-own-stage-not-on-the-canvas.md) | Presenting draws the Active Resource on its own Stage over an inert canvas, by kind and never by placement, size, Shape or Open. The Stage offers no authoring (supersedes 0027 and 0044). |
 | [0129](0129-presentation-notes-are-a-graph-found-by-its-title.md) | A presentation's notes are Resources linked by a Presentation Notes Graph on the same Map, found by its title (the talk's title plus "Presentation Notes", "Notes" or "Presentation …", or a marker alone) and read in a Notes window that follows the presenting window (refines 0123). |
@@ -163,6 +181,8 @@ The current statement of these decisions is [`docs/agents/maps-and-graphs.md`](.
 | [0126](0126-an-image-replacement-is-the-application-s-exclusive-operation-wherever-it-runs.md) | While any composed Space replaces an image, every Space withdraws authoring and navigation; the target stays mounted (refines 0112). |
 
 ## UI foundation
+
+The current statement of these decisions is [UI](../requirements/ui.md), with Open content and size in [Rendering](../requirements/rendering.md) and [Maps and Graphs](../requirements/maps-and-graphs.md).
 
 | ADR | Binds |
 | --- | --- |
@@ -181,9 +201,12 @@ The current statement of these decisions is [`docs/agents/maps-and-graphs.md`](.
 | [0102](0102-a-resources-commands-float-in-react-flows-node-toolbar.md) | A Resource's commands float in React Flow's `NodeToolbar`, drawn while the Resource is the one selected or an edit is running, at the Dock's size. |
 | [0084](0084-displacement-is-applied-by-the-edit-that-causes-it.md) | The Edit that changes a size moves its neighbours once. Nothing is derived at render. Since 0122 only Resize does, and since 0142 an applied size hint too. |
 | [0093](0093-a-thing-makes-room-on-one-axis-once-clear-of-the-collapsed-subject.md) | A Thing makes room on one axis, `x` first, once clear of the subject's rect; 0122 measures that rect at the size before the Resize, as an applied size hint does since 0142. |
-| [0122](0122-a-resources-size-is-independent-of-open.md) | A Resource's size is its Map entry's, optional with the Closed Size as default and as every kind's floor; only Resize changes it and only Resize displaces. Open changes what is drawn, never a rect, and an Ur Resource offers none. Supersedes 0066. Since 0142 a plugin's Open may carry a size hint, which the canvas applies with a Resize's floor and displacement in that Edit, or ignores. |
+| [0122](0122-a-resources-size-is-independent-of-open.md) | A Resource's size is its Map entry's, optional with the Closed Size as default and as every kind's floor; only Resize changes it and only Resize displaces. Open changes what is drawn, never a rect, and an Ur Resource offers none. Supersedes 0066. Since 0142 a plugin's Open may carry a size hint, which the canvas applies with a Resize's floor and displacement in that Edit, or ignores. 0149 clips Open content that does not fit rather than scrolling or fitting it, though a picture still scales down to its rect. |
+| [0149](0149-open-content-is-clipped-on-the-canvas.md) | Open content that does not fit its rect is clipped on the canvas: Markdown does not scroll there, and a drawn Map with no framing is placed at authored scale, not fitted; presenting still scrolls Markdown (refines 0122). |
 
 ## Toolchain
+
+These are engineering decisions, restated in [Build and tooling](../agents/build-tooling.md) and [Anti-slop](../agents/anti-slop.md) rather than in a requirements document.
 
 | ADR | Binds |
 | --- | --- |
@@ -193,6 +216,8 @@ The current statement of these decisions is [`docs/agents/maps-and-graphs.md`](.
 
 ## Guidance and records
 
+How the requirements and ADRs are kept is in [Workflow](../agents/workflow.md).
+
 | ADR | Binds |
 | --- | --- |
-| [0115](0115-current-contracts-state-the-live-design-and-adrs-keep-its-history.md) | A topic's current contract in `docs/agents/` owns its live rules and is updated with each accepted decision; ADR bodies stay unchanged as the history. |
+| [0145](0145-the-requirements-are-a-snapshot-of-the-accepted-adrs.md) | The seven requirements documents restate the accepted ADRs as a snapshot with a marker naming the commit and the highest ADR incorporated; ADRs stay binding and append-only, a requirement that disagrees with one is a defect, and accepting an ADR updates the owning requirement in the same change (supersedes 0115). |

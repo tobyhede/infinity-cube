@@ -1,6 +1,6 @@
 # Resource file schema
 
-The JSON Schema (draft 2020-12) for a Resource file: the `resources/<id>.json` that [ADR 0128](../../adr/0128-every-resource-kind-is-a-module-and-a-resource-file-is-json.md) makes every Resource. It is the specification of that format.
+The JSON Schema (draft 2020-12) for a Resource file: the `resources/<id>.json` that the [Storage requirements](../../requirements/storage.md#file-format) make every Resource. It is the specification of that format.
 
 - `envelope.schema.json` is the core's half, `{ id, title, kind, content }`. It names no kind: `kind` is any well-formed kind id, and `content` any object.
 - `resource.schema.json` is the envelope composed with the built-in kinds, as a build registers them. Its `builtInKinds` is that registration, one entry per kind pairing its id with its content schema, so adding a kind is one entry there and one schema under `kinds/`. Any other well-formed kind id, bare or vendor (`vnd.<owner>.<name>`, ADR 0120), is a kind whose plugin a build reading the file may not have (ADR 0142); this schema accepts its `content` as any object, which such a build carries whole and never reads, and which the kind's own plugin checks where it is present.

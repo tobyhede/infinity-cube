@@ -352,8 +352,8 @@ describe('A queued drag holds its drop point', () => {
    * an `EditCompleted` notification of an unrelated, already-in-flight Edit —
    * which is exactly what makes Space Authoring's `completing` gate answer
    * `queued` rather than deriving it immediately (`session-registry`/
-   * `space-authoring.ts` reentrancy rules, `docs/agents/editing-and-persistence.md`
-   * "Session notification is non-throwing…").
+   * `space-authoring.ts` reentrancy rules, `docs/requirements/editing.md` ED-9
+   * and ED-11).
    */
   it('keeps a moved Resource drawn at its drop point while its completion waits behind an in-flight one', () => {
     const backend = MemorySpaceBackend.asMeta({ snapshot, revision: 0n, exportedRevision: null });

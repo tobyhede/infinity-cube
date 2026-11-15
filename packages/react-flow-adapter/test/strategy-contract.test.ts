@@ -17,8 +17,9 @@ import { uuid } from './uuid';
  * `gridStrategy` and `positionedStrategy` each have their own tests, in
  * separate files, sharing no assertions: those verify that each does what *it*
  * does, and this checks they agree on what they have in common — which is the
- * whole reason the seam exists. docs/agents/rendering.md says `gridStrategy` is
- * kept "partly to keep the seam honest"; this is what makes that true.
+ * whole reason the seam exists. docs/requirements/maps-and-graphs.md MG-69 keeps
+ * `gridStrategy` because a second implementation keeps the seam honest; this is
+ * what makes that true.
  *
  * A strategy is free to put resources anywhere. What it may not do is lose one,
  * invent one, drop an edge, rewrite an identity, or return something other than

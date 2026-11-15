@@ -1,6 +1,6 @@
 # Deploying to Cloudflare
 
-A talk in a public GitHub repository can be shown from a static copy of InfinityCube, with no server: **Mounting** (ADR 0130). `pnpm build:mount` writes that copy to `packages/app/dist-mount`, and the repository's `wrangler.jsonc` serves it from Cloudflare Workers static assets, with every product URL answered by the application. The page reads the talk from GitHub when it opens. Edits made there work as anywhere else but last only as long as the page (ADR 0131), so lasting edits stay `pnpm cube run` on the author's machine.
+A talk in a public GitHub repository can be shown from a static copy of InfinityCube, with no server: **Mounting** ([Storage requirements](requirements/storage.md#mounting)). `pnpm build:mount` writes that copy to `packages/app/dist-mount`, and the repository's `wrangler.jsonc` serves it from Cloudflare Workers static assets, with every product URL answered by the application. The page reads the talk from GitHub when it opens. Edits made there work as anywhere else but last only as long as the page, so lasting edits stay `pnpm cube run` on the author's machine.
 
 A **GitHub location** is `github:owner/repo@ref/path`. `@ref` defaults to the repository's default branch and `/path` to its root; the directory it names must hold `aggregate.json`. Any page takes one as `?source=github:…`. A build variable, `VITE_DEFAULT_SPACE_SOURCE`, sets the one the bare domain opens; without it, and without `?source=`, the page asks for a location.
 
@@ -31,4 +31,4 @@ The files themselves come from `raw.githubusercontent.com`, which is not the API
 1. Create another Worker from this repository as in [Deploy](#deploy), with `VITE_DEFAULT_SPACE_SOURCE=github:owner/repo@<ref>` (add `/path` when `aggregate.json` is not at the repository's root).
 2. The Worker's **Settings** > **Domains & Routes** > **Add** > **Custom Domain**, and enter the domain. Its zone must be on Cloudflare; Cloudflare creates the DNS record and certificate.
 
-Every mounted page records the commit it read in its address, so a link someone shared keeps showing that commit after the default moves on, as long as that commit's root file is `aggregate.json`. A link to a commit that still holds `hyper.json` is refused ([ADR 0136](adr/0136-an-aggregate-directory-is-rooted-at-aggregate-json.md)).
+Every mounted page records the commit it read in its address, so a link someone shared keeps showing that commit after the default moves on, as long as that commit's root file is `aggregate.json`. A link to a commit that still holds `hyper.json` is refused ([Storage requirements](requirements/storage.md#file-format)).

@@ -781,7 +781,7 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
    * SQLite, whose stored document may not even be JSON) a `SyntaxError` from
    * `readDocument`'s `JSON.parse`. All are stored state no aggregate can be
    * read from, and every caller of this method is an aggregate-level read
-   * whose failure a reader classifies (`docs/agents/editing-and-persistence.md`).
+   * whose failure a reader classifies (`docs/requirements/storage.md` ST-7, ST-80).
    * Nothing inside the `try` performs I/O -- `tables.Space.loadEvery()` above
    * already has, on both databases -- so the catch below is unconditional, by
    * position rather than by type: a connection failure cannot reach it, and

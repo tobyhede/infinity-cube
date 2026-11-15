@@ -19,8 +19,8 @@ import type { ImageDisplay } from '@project/ui';
  * application's own HTTP API to it.
  *
  * This is the one composition in which the browser parses an aggregate and
- * reaches the aggregate lifecycle, both of which `editing-and-persistence.md`
- * otherwise keeps on the server. Nothing behind the backend it returns learns
+ * reaches the aggregate lifecycle, both of which `docs/requirements/storage.md`
+ * otherwise keeps on the server (ST-1, ST-86). Nothing behind the backend it returns learns
  * it is in a page: the backend is the ordinary `HttpSpaceBackend`, and every
  * request it sends is answered by the Space host's own HTTP application over
  * an ordinary memory repository.

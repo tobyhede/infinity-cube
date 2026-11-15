@@ -1098,7 +1098,7 @@ export function SpaceCanvas({
   // React Flow `onKeyDown` branch, would be an unguarded one, renaming whichever
   // Resource is selected when the key is typed into a control. Neither answers
   // while Full View covers the canvas, and either leaves its key alone where its
-  // command cannot run (`docs/agents/rendering.md`'s keyboard contract).
+  // command cannot run (`docs/requirements/ui.md` UI-9, UI-102, UI-106).
   const authoringOf = (occurrence: (typeof occurrences)[number]): AuthoringOccurrence => ({
     authorOnCanvas: occurrence.availability.authorOnCanvas,
     bodyEditing: occurrence.bodyEditing,

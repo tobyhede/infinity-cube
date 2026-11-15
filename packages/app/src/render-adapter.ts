@@ -372,7 +372,7 @@ function reconcile(
     // bookkeeping. An active drag alone keeps its live position: replacing it
     // would jump the Resource away from the pointer mid-gesture. `handles` must come
     // through: React Flow builds `handleBounds`
-    // from the declaration rather than measuring the DOM (docs/agents/rendering.md), so a live
+    // from the declaration rather than measuring the DOM (docs/requirements/rendering.md RD-72), so a live
     // node that kept a stale set would resolve a new Edge against the handles the
     // Resource had before it gained one. `handles`/`className` are assigned only when
     // the projection sets them, for `exactOptionalPropertyTypes`; the projection

@@ -1,6 +1,7 @@
 # Current contracts state the live design, and ADRs keep its history
 
-Status: accepted
+Status: superseded
+Superseded by: 0145
 Related: 0116
 
 ADRs record decisions in the words and circumstances in which they were made. Refinements and renames leave accepted bodies that describe rules which no longer hold beside rules that still bind. To read the current design, a contributor had to reconstruct that history from the ADRs, the glossary, `AGENTS.md` and overlapping scoped guides, and those summaries carried implementation history and repeated the same rules in several places. Updates were costly, and disagreements were hard to see.
@@ -22,7 +23,7 @@ Start at `AGENTS.md`, use `CONTEXT.md` for terms, then read the owning contract 
 
 ## Authority and conflicts
 
-A contract cannot silently override an accepted decision. When a contract and an accepted ADR disagree, or two accepted sources do, the disagreement is surfaced and resolved explicitly. The latest prose and the current code are not automatic authorities. A resolution that changes what an accepted ADR decides, or that an ADR requires to be recorded, is a new decision under the ADR admission rules ([`workflow.md`](../agents/workflow.md#when-to-write-an-adr)). A resolution that only settles which of two accepted sources holds, or that records treatment no ADR states, is recorded in the contract with its date and in its source inventory.
+A contract cannot silently override an accepted decision. When a contract and an accepted ADR disagree, or two accepted sources do, the disagreement is surfaced and resolved explicitly. The latest prose and the current code are not automatic authorities. A resolution that changes what an accepted ADR decides, or that an ADR requires to be recorded, is a new decision under the ADR admission rules ([`workflow.md`](../../agents/workflow.md#when-to-write-an-adr)). A resolution that only settles which of two accepted sources holds, or that records treatment no ADR states, is recorded in the contract with its date and in its source inventory.
 
 Implementation evidence is distinct from accepted design. Code shows what is built. It does not show what is decided, and code alone never retires an accepted rule. A contract lists accepted behaviour that is not built separately from its rules, links each gap to its delivery issue, and drops the gap note in the change that verifies the implementation.
 
@@ -39,7 +40,7 @@ Topics move one per change, each with a reviewable rule-to-source inventory, rea
 
 ## Evidence
 
-The Map and Graph pilot ([`REPORT.md`](../../.scratch/adr-consolidation/pilot/REPORT.md)) compared fresh readers answering ten fixed questions. Through the existing guidance, two readers scored 3/10 and 2/10. Through a single contract, two readers each scored 10/10, reading about 3,700 words in two files against 16,000–18,600 words in six to eleven. The commonest baseline failure was a reason missing or replaced by an appeal to authority. Others were a rule taken from an ADR body that a later ADR had changed, a fixture sentence read as a general rule, and an undo stated as working because one summary implied it. The sample is small, and every reader had the pre-adoption `AGENTS.md` in context. That contract is now [`docs/agents/maps-and-graphs.md`](../agents/maps-and-graphs.md), the first adopted contract.
+The Map and Graph pilot ([`REPORT.md`](../../../.scratch/adr-consolidation/pilot/REPORT.md)) compared fresh readers answering ten fixed questions. Through the existing guidance, two readers scored 3/10 and 2/10. Through a single contract, two readers each scored 10/10, reading about 3,700 words in two files against 16,000–18,600 words in six to eleven. The commonest baseline failure was a reason missing or replaced by an appeal to authority. Others were a rule taken from an ADR body that a later ADR had changed, a fixture sentence read as a general rule, and an undo stated as working because one summary implied it. The sample is small, and every reader had the pre-adoption `AGENTS.md` in context. That contract is now [`docs/agents/maps-and-graphs.md`](../../agents/maps-and-graphs.md), the first adopted contract.
 
 ## Alternatives and costs
 
