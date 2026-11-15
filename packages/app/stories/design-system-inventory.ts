@@ -77,7 +77,7 @@ export const uncataloguedComponents = [
   {
     module: 'packages/ui/src/Select.tsx',
     reason:
-      'Without a consumer since ADR 0089 retired the Space Resource creation pane, whose target-Space field was the last one. `CLAUDE.md` records that this primitive has spent a while with none before and came back; keeping it is also what closes the "one flow asking two ways" seam `docs/agents/ui.md` records, since choosing a Map or a Graph is `ChoiceMenu`\'s and choosing a Resource is the Resources list\'s everywhere that remains.',
+      'Without a consumer since ADR 0089 retired the Space Resource creation pane, whose target-Space field was the last one. `CLAUDE.md` records that this primitive has spent a while with none before and came back; keeping it is also what closes the "one flow asking two ways" seam the UI requirements record (`docs/requirements/ui.md` UI-6), since choosing a Map or a Graph is `ChoiceMenu`\'s and choosing a Resource is the Resources list\'s everywhere that remains.',
   },
 ] as const;
 

@@ -2,6 +2,7 @@
 
 Status: accepted
 Refines: 0079, 0112
+Refined by: 0146
 Related: 0028, 0115
 
 A Space opens on its `defaultMap` (ADR 0079). An Edit through the canvas's Map records that Map as `defaultMap`, Add Map included, and writes the Map's resolved `activeGraph`. An Edit through a Map drawn inside an Open Space Resource writes that Map's content where it stands, keeps the Map's stored `activeGraph`, and leaves the target Space's `defaultMap` unchanged. The one exception is Add Graph, which activates the Graph it creates wherever the Map is drawn, because creating and activating that Graph is a single authored Edit (ADR 0040). Choosing or viewing a Map without editing records nothing.

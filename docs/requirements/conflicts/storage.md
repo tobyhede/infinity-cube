@@ -10,7 +10,7 @@ None.
 
 ### S2. Closed by ruling S2
 
-Ruling Storage S2 in `../DECISIONS.md` ("Checkpoint 3 rulings", ruled 12 November 2026): option (a), extended to browser-stored copies. The format rolls forward because InfinityCube is unreleased and makes no compatibility promise for any copy outside the repository; an Aggregate directory is recovered from git or read with the build that wrote it, and a browser's stored copy of a mounted talk (not built) may be unreadable after a deploy. ST-36's *Why:* states it; the rule is unchanged.
+Ruling Storage S2 in `../DECISIONS.md` ("Checkpoint 3 rulings", ruled 12 November 2026), recorded as ADR 0152, which refines 0054 and 0056: option (a), extended to browser-stored copies. The format rolls forward because InfinityCube is unreleased and makes no compatibility promise for any copy outside the repository; an Aggregate directory is recovered from git or read with the build that wrote it, and a browser's stored copy of a mounted talk (not built) may be unreadable after a deploy. ST-36's *Why:* states it; the rule is unchanged.
 
 For the record, the conflict as it stood:
 

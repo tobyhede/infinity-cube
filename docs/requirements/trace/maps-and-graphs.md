@@ -10,8 +10,8 @@ For audit only. Every source rule appears exactly once in §1 or §2, with one o
 
 Abbreviations:
 - "R" and "A" are ids in the old contract `docs/adr/archive/agent-guides/maps-and-graphs.md`.
-- "rN" is the Nth rule of an ADR as numbered in the mapping tables.
-- "DEC n" is ruling n in `../DECISIONS.md`.
+- "rN" is the Nth rule of an ADR as numbered in the rewrite's mapping tables (`map-*.md`). Those tables were never committed, so a number cannot be looked up, and the numbers do not follow the order of the ADR's text (0028's r1, "activation is not an Edit", is the second rule its text states). Resolve a row by its description, which names the claim, and find that claim in the ADR in `docs/adr/` or `docs/adr/superseded/`.
+- "DEC n" is ruling n in `../DECISIONS.md`. A ruling that changes what an accepted ADR decides is recorded as an ADR (DEC 1, C1 and C2 as ADR 0146; C3 as 0147; Navigation C2 as 0148; Rendering C1 as 0149; Space and Resources C1 as 0150; UI C3 as 0151; Storage S2 as 0152), and that ADR is what binds; `../DECISIONS.md`, "Rulings recorded as ADRs", lists them. A row below that says a rule was "struck" or "overruled" by a ruling means the ADR that records the ruling refines the source ADR.
 - Docs: SR is space-and-resources.md, ED editing.md, ST storage.md, RD rendering.md, UI ui.md, NV navigation.md, GL `CONTEXT.md`, PROC is process docs (AGENTS.md, workflow.md, anti-slop.md).
 
 The rule ids in `../maps-and-graphs.md` are append-only from this version on.
@@ -362,7 +362,7 @@ The rule ids in `../maps-and-graphs.md` are append-only from this version on.
 
 ## 6. Sources added or changed on main
 
-The ADRs below are archived in `docs/adr/archive/`. "R′" and "A′" are rows of main's old contract (`docs/adr/archive/agent-guides/maps-and-graphs.md`) as main left it; "CAS′" is main's `docs/adr/archive/agent-guides/authoring-refusal-cascade.md`.
+The ADRs below are in `docs/adr/` and bind; this section records where the snapshot restates them. "R′" and "A′" are rows of main's old contract (`docs/adr/archive/agent-guides/maps-and-graphs.md`) as main left it; "CAS′" is main's `docs/adr/archive/agent-guides/authoring-refusal-cascade.md`.
 
 | Source | Disposition |
 |---|---|
@@ -402,3 +402,15 @@ The ADRs below are archived in `docs/adr/archive/`. "R′" and "A′" are rows o
 | CAS′ `changed-map-content` row | → operations index, Change Map content row; MG-87 |
 | CAS′ `opened-resource`, `closed-resource`, `changed-resource-shape` rows removed; `open-requires-content` and `shape-not-taken` retired | the Open, Close and Choose Shape rows of the operations index replaced by Change Map content; MG-27, MG-28, MG-30, MG-31 rewritten with `map-content-invalid` |
 | Code only (drafting rule 5): a hint the cap narrows keeps its area up to the cap's height; a hint the canvas cannot cap is dropped | → MG-88 |
+
+## 7. ADRs with one disposition throughout
+
+Added 15 November 2026. These ADRs had no row in any trace. Each has one outcome throughout, so each takes one document-level row. A superseded ADR is history: its successor carries whatever survives, and the successor's rows are the ones to read.
+
+| Source | Disposition |
+|---|---|
+| 0012 (superseded) a route does not revisit a card; return via an alias | historical: superseded by 0032 (cycles allowed), traced in §2 |
+| 0017 (superseded) a Space with no Layout gets one when it opens | historical: superseded by 0025, which 0075 superseded, which 0079 superseded. 0079 (first open initializes a Map) is traced in §2 |
+| 0022 (superseded) a Layout filters its routes and marks one active | historical: superseded by 0026, which 0040 superseded. 0026 and 0040 (a Map owns its Graphs) are traced in §2 |
+| 0045 (superseded) a View takes Cards and Graphs and returns a Layout | historical: superseded by 0079; the layout strategy contract it described is MG's, from 0079 and 0086 |
+| 0075 (superseded) computed Views are read-only and Create Layout converts | historical: superseded by 0079, which retired computed Views |

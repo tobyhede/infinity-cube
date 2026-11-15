@@ -940,8 +940,8 @@ describe('the Option/Alt empty drop', () => {
 /**
  * The precedence rule: two sources, one answer.
  *
- * The argument is `docs/agents/rendering.md`'s bullet beginning *"Neither React
- * Flow's `toNode` nor the DOM alone answers"*. `getClosestHandle` resolves
+ * The rule is `docs/requirements/rendering.md` RD-55: a connection target within
+ * React Flow's connection radius outranks the element under the pointer. `getClosestHandle` resolves
  * `toNode` by distance to a *handle* within `connectionRadius` — 20 at the
  * pinned 12.11.2 — so it is non-null over blank canvas near a handle and null
  * over the middle of a Resource, whose centre is some 73px from the nearest handle

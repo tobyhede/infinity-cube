@@ -67,6 +67,11 @@ test-results/
 # when ticket 04 is reopened and decided again.
 !.scratch/impact-gate/calibration.py
 
+# The requirements snapshot's checkers are tracked so the next refresh re-runs
+# them rather than rebuilding them; `.scratch/requirements-rewrite/RUN.md` says
+# how. They go when the snapshot gets checks of its own under `test/`.
+!.scratch/requirements-rewrite/*.py
+
 # Package-local spike harnesses: runnable code that proved something and was
 # never meant to ship. What they proved belongs in a finding or an ADR, in
 # words — a local prototype does not carry a second copy of the app around to

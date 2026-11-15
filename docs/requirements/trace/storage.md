@@ -9,8 +9,8 @@ For audit only. Every source rule appears exactly once in §1 or §2, with one o
 §2a checks off the items other traces sent here. §3 groups the sends by receiving doc. §4 lists the code-only rules. §5 holds code notes.
 
 Abbreviations:
-- "rN" is the Nth rule of an ADR as numbered in the mapping tables (`map-*.md`).
-- "DR n" is drafting rule n and "DEC n" ruling n in `../DECISIONS.md`.
+- "rN" is the Nth rule of an ADR as numbered in the rewrite's mapping tables (`map-*.md`). Those tables were never committed, so a number cannot be looked up, and the numbers do not follow the order of the ADR's text (0028's r1, "activation is not an Edit", is the second rule its text states). Resolve a row by its description, which names the claim, and find that claim in the ADR in `docs/adr/` or `docs/adr/superseded/`.
+- "DR n" is drafting rule n and "DEC n" ruling n in `../DECISIONS.md`. A ruling that changes what an accepted ADR decides is recorded as an ADR (DEC 1, C1 and C2 as ADR 0146; C3 as 0147; Navigation C2 as 0148; Rendering C1 as 0149; Space and Resources C1 as 0150; UI C3 as 0151; Storage S2 as 0152), and that ADR is what binds; `../DECISIONS.md`, "Rulings recorded as ADRs", lists them. A row below that says a rule was "struck" or "overruled" by a ruling means the ADR that records the ruling refines the source ADR.
 - "R" ids are the old contract `docs/adr/archive/agent-guides/maps-and-graphs.md`, received through `trace/maps-and-graphs.md` §3.
 - Docs: SR space-and-resources.md, MG maps-and-graphs.md, ED editing.md, RD rendering.md, UI ui.md, NV navigation.md, GL `CONTEXT.md`, PROC process docs (AGENTS.md, workflow.md, anti-slop.md, build-tooling.md).
 
@@ -419,3 +419,13 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 - **Space directory names.** A Space directory's name is its identity (ST-27, ST-44), unlike a Resource file's (ST-29). No ADR states the Space half; `docs/aggregate-directory.md` does, and the reader enforces it.
 - **SVG.** The asset store admits SVG like any bytes but serves it as `application/octet-stream` (`persistence/src/assets.ts` `servedMediaType`); the Image plugin refuses an SVG picture (`plugin-image/src/domain.ts`). 0107 is proposed and left out.
 - **Mounting status.** `.scratch/mounting/issues/` 01–07, 09, 10, 13 are resolved; 11 (0132) and 12 (download an edited talk) are needs-triage; 08 is a launch task.
+
+## 6. ADRs with one disposition throughout
+
+Added 15 November 2026. These ADRs had no row in any trace. Each has one outcome throughout, so each takes one document-level row. A superseded ADR is history: its successor carries whatever survives, and the successor's rows are the ones to read.
+
+| Source | Disposition |
+|---|---|
+| 0061 TypeScript 7 is the compiler and TypeScript 6 a bridge | sent → PROC: an engineering rule, owned by `docs/agents/build-tooling.md` |
+| 0062 the narrowing assertions we have are the most we will have | sent → PROC: an engineering rule, owned by `docs/agents/anti-slop.md` |
+| 0088 "Aggregate" names the Meta-rooted collection; one Space with its Resources is a Space snapshot | vocabulary → GL (`CONTEXT.md`, "Aggregate" and "Space snapshot"); ST uses both terms as defined (storage.md, Terms) |

@@ -112,7 +112,7 @@ export interface CanvasSpaceResourceSelection {
  * The shape the application's Space Resource rail renders
  * (`build-space-resource-rail.tsx`) — the Dock's identical-looking
  * clusters are a different operation over the same primitive and are not
- * built from this type (`docs/agents/ui.md`, `command-surface-sharing.test.ts`).
+ * built from this type (`docs/requirements/ui.md` UI-6, `command-surface-sharing.test.ts`).
  */
 export interface SpaceResourceSelectorsProps extends CanvasSpaceResourceSelection {
   readonly onReport: (message: string | null) => void;

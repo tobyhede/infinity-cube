@@ -1,6 +1,7 @@
 # An Edge may carry a Title
 
 Status: accepted
+Refined by: 0147
 Related: 0024, 0032, 0057, 0083
 
 An Edge may carry a **Title**: optional, one line, and absent unless an author writes one. It is the Edge's own content. It takes no part in the Edge's identity, which stays `(from, to)` within its Graph. Beside it an Edge may carry `titleHidden: true`, which says the Title does not draw at rest. Both are stored on the Edge inside the Map's Graph (`graphEdgeSchema`) and authored by three Edits, `titled-edge`, `hid-edge-title` and `showed-edge-title`.

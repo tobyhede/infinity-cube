@@ -8,7 +8,7 @@ For audit only. Every source rule appears exactly once in §1–§3, with one of
 
 §4 checks off the items every other trace sent here. §5 groups this doc's sends by receiving doc. §6 lists code-only rules. §7 holds code notes.
 
-Abbreviations: "rN" is the Nth rule of an ADR as numbered in the mapping tables (`map-*.md`). "DEC n" is ruling n in `../DECISIONS.md`. Docs: MG maps-and-graphs.md, ED editing.md, ST storage.md, RD rendering.md, UI ui.md, NV navigation.md, GL `CONTEXT.md`, PROC process docs. "E&P" is `docs/adr/archive/agent-guides/editing-and-persistence.md`; "ARC" is `docs/adr/archive/agent-guides/authoring-refusal-cascade.md`.
+Abbreviations: "rN" is the Nth rule of an ADR as numbered in the rewrite's mapping tables (`map-*.md`). Those tables were never committed, so a number cannot be looked up, and the numbers do not follow the order of the ADR's text (0028's r1, "activation is not an Edit", is the second rule its text states). Resolve a row by its description, which names the claim, and find that claim in the ADR in `docs/adr/` or `docs/adr/superseded/`. "DEC n" is ruling n in `../DECISIONS.md`. A ruling that changes what an accepted ADR decides is recorded as an ADR (DEC 1, C1 and C2 as ADR 0146; C3 as 0147; Navigation C2 as 0148; Rendering C1 as 0149; Space and Resources C1 as 0150; UI C3 as 0151; Storage S2 as 0152), and that ADR is what binds; `../DECISIONS.md`, "Rulings recorded as ADRs", lists them. A row below that says a rule was "struck" or "overruled" by a ruling means the ADR that records the ruling refines the source ADR. Docs: MG maps-and-graphs.md, ED editing.md, ST storage.md, RD rendering.md, UI ui.md, NV navigation.md, GL `CONTEXT.md`, PROC process docs. "E&P" is `docs/adr/archive/agent-guides/editing-and-persistence.md`; "ARC" is `docs/adr/archive/agent-guides/authoring-refusal-cascade.md`.
 
 The rule ids in `../space-and-resources.md` are append-only from this version on. The pass that brought this doc up to the InfinityCube code (after ADRs 0136–0144) added SR-62–SR-66 and rewrote SR-8, SR-9, SR-15–SR-22, SR-24–SR-30, SR-33, SR-36, SR-39, SR-49 and SR-52 for the Resource plugins and assets. SR-19 moved from **not built** to **built**.
 
@@ -363,3 +363,15 @@ Behaviour the code implements and a test asserts, with no source against it (dra
 - **Residue name.** `SpaceView`, `selectSpaceView` and `frameSpaceView` in `core` keep the retired Space View term for a Space Resource's selection.
 - **Resource order tie-break.** `graph/src/space.ts` sorts by Title, then id; no test has two equal Titles, so SR-10 states only the Title order.
 - **Starts empty.** Only Markdown and Ur declare starting content (`newContent`), which is what makes them creatable from a press (`core/test/plugin-modules.test.ts` › "are the plugins that declare new content, in list order").
+
+## 8. ADRs with one disposition throughout
+
+Added 15 November 2026. These ADRs had no row in any trace. Each has one outcome throughout, so each takes one document-level row. A superseded ADR is history: its successor carries whatever survives, and the successor's rows are the ones to read.
+
+| Source | Disposition |
+|---|---|
+| 0049 (superseded) an Alias pane authors only the Alias | historical: superseded by 0070 (an Open Reference shows its Target read-only), traced in §1 |
+| 0058 (superseded) a Space Card creates and reaches a Space | historical: superseded by 0068, traced in §1 |
+| 0059 (superseded) a Space Card creates the normal new Space | historical: superseded by 0068, traced in §1 |
+| 0060 (superseded) a nested Space has one owner | historical: superseded by 0068, traced in §1 |
+| 0085 Thing and Diagram are the first-public names for Card and Layout | historical vocabulary: its names were replaced by 0092 (Reference) and 0101 (Resource and Map), and it restates the invariants of earlier ADRs rather than deciding them. What survives is held elsewhere: the names are GL (`CONTEXT.md`), and `LayoutStrategy` keeping its name is the code's (`graph/src/layout.ts`), not a requirement |

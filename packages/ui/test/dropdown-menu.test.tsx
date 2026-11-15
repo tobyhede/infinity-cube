@@ -41,7 +41,7 @@ describe('DropdownMenu', () => {
   /**
    * React Flow's live Space-key pan activation subscription reaches a
    * portalled popup, so the popup must carry its own exclusion marker
-   * (docs/agents/ui.md).
+   * (docs/requirements/ui.md UI-9: a menu keeps every key).
    */
   it('excludes its portalled popup from Space-key canvas panning', () => {
     render(

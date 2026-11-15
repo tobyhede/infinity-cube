@@ -1654,8 +1654,8 @@ export function createSpaceAuthoring({
         // publication this queue fills during. An entry the epoch has outlived
         // is therefore discarded rather than derived against the Space that
         // replaced it, and a later entry still drains — why refusing would not
-        // save it, and why this skips rather than stops, is docs/agents/editing-and-persistence.md's
-        // install-gate rule.
+        // save it, and why this skips rather than stops, is docs/requirements/editing.md
+        // ED-31.
         if (next.replacementEpoch !== replacementEpoch) {
           discardedAsReplaced += 1;
           settleSafely(next.settle, { kind: 'refused', refusal: { code: 'space-replaced' } });

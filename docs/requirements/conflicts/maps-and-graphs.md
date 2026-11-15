@@ -2,9 +2,9 @@
 
 Every Maps and Graphs conflict is closed by the "Checkpoint 2 rulings" in [../DECISIONS.md](../DECISIONS.md). Conflict ids are never reused. The code changes the rulings require are listed under "Bugs" in [../maps-and-graphs.md](../maps-and-graphs.md).
 
-- **C1. Closed by ruling C1.** Switching Graphs on the canvas also records `defaultMap`. See MG-46 (bug).
-- **C2. Closed by ruling C2.** Switching inside an Open Space Resource writes only the Space Resource's selection. See MG-47 (built).
-- **C3. Closed by ruling C3.** Drawing an existing Edge is refused with `edge-already-exists`. See MG-61 (built). `CONTEXT.md` must change; see the trace, §3.
+- **C1. Closed by ruling C1.** Switching Graphs on the canvas also records `defaultMap`. See MG-46 (bug). Recorded as ADR 0146.
+- **C2. Closed by ruling C2.** Switching inside an Open Space Resource writes only the Space Resource's selection. See MG-47 (built). Recorded as ADR 0146.
+- **C3. Closed by ruling C3.** Drawing an existing Edge is refused with `edge-already-exists`. See MG-61 (built). Recorded as ADR 0147. `CONTEXT.md` must change; see the trace, §3.
 - **C4. Closed by rulings C4.1–C4.3.**
   - Canvas deletions record `defaultMap`: MG-81 (bug).
   - Delete Map keeps `defaultMap` if it survives, else takes the first survivor: MG-14 (bug in the embedded case).

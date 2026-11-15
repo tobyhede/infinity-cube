@@ -16,7 +16,7 @@ For the record:
 
 ### C2. Closed by ruling Navigation C2
 
-Ruling Navigation C2 in `../DECISIONS.md` (Checkpoint 3 rulings, 12 November 2026): Graph navigation on the canvas moves to the Active Graph neighbour in the arrow's direction, along an Edge either way, and keeps no history. It overrules 0041:144-147 and the matching `CONTEXT.md` entries. Built. The rule is NV-13.
+Ruling Navigation C2 in `../DECISIONS.md` (Checkpoint 3 rulings, 12 November 2026): Graph navigation on the canvas moves to the Active Graph neighbour in the arrow's direction, along an Edge either way, and keeps no history. It changes what 0041:144-147 decided, and ADR 0148 records it, refining 0041; the matching `CONTEXT.md` entries change with it. Built. The rule is NV-13.
 
 For the record:
 - **What the conflict was.** 0041:144-147 gave working Graph navigation its own Traversal history, and `CONTEXT.md` ("Graph navigation", "Traversal history", "Active Resource") gave it presenting's fork, merge, cycle and backtracking rules. The code moves the selection spatially along Active Graph Edges either way and keeps no history.

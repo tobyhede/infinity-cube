@@ -6,7 +6,7 @@ InfinityCube is a local prototype for graph-native technical presentations: Reso
 
 ## Read before changing an area
 
-The seven docs in [`docs/requirements/`](docs/requirements/) are the binding record of behaviour. Read the relevant doc before the code. Its status distinguishes the requirement from what is built; code does not override a requirement. A behaviour change updates its owning doc in the same commit. [`CONTEXT.md`](CONTEXT.md) defines names. [`docs/adr/archive/`](docs/adr/archive/) is history, not binding.
+Accepted ADRs in [`docs/adr/`](docs/adr/README.md) are binding and append-only. The seven docs in [`docs/requirements/`](docs/requirements/) restate them in current words as a snapshot: each opens with a marker naming the commit it was checked against and the highest ADR it incorporates, and an ADR accepted after that marker binds where the two differ. Read [`CONTEXT.md`](CONTEXT.md) for names, then the owning doc below, then any ADR newer than its marker, before the code. A requirement that disagrees with an accepted ADR is a defect in the requirement. Status in a doc distinguishes the requirement from what is built; code does not override either. A behaviour change updates its owning doc in the same commit, and a new or changed decision is a new ADR that updates the owning doc and its marker in the same change ([Workflow](docs/agents/workflow.md#adrs-and-the-requirements-snapshot)). [`docs/adr/archive/`](docs/adr/archive/) holds only the retired product guides, kept as history.
 
 | Task | Read |
 | --- | --- |
@@ -18,6 +18,7 @@ The seven docs in [`docs/requirements/`](docs/requirements/) are the binding rec
 | Change the canvas projection, drawn Map, camera, handles, Edge gesture or Open content | [Rendering](docs/requirements/rendering.md) |
 | Change a control, menu, editor, key, focus, announcement, confirmation or notice | [UI](docs/requirements/ui.md) |
 | Change selection, Graph navigation, product URLs, browser history, Open Spaces or presenting | [Navigation](docs/requirements/navigation.md) |
+| Record a decision, or change what an accepted ADR decides | [Workflow](docs/agents/workflow.md#when-to-write-an-adr), [ADR index](docs/adr/README.md), [Domain docs](docs/agents/domain.md) |
 | Change cross-module coordination, comments, domain vocabulary or a tracked skill | [Workflow](docs/agents/workflow.md) |
 | Change assertions, parsing, mocks, injected ids, reflective access or anti-slop suppressions | [Anti-slop](docs/agents/anti-slop.md) |
 | Change TypeScript, Vite configuration, formatting or a spike harness | [Build and tooling](docs/agents/build-tooling.md) |

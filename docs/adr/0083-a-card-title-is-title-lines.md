@@ -2,6 +2,7 @@
 
 Status: accepted
 Refines: 0046
+Refined by: 0151
 Related: 0009, 0014, 0020, 0047, 0050, 0052, 0057, 0064, 0065, 0070
 
 A Card's **Title** is one or more **Title Lines**. It is stored as it always was — one `string` on the Card document — and the newlines inside it are load-bearing: the **first line is the Card's name**, and the lines after it draw beneath the name on the Card front at descending typographic weight. A Title with no newline in it is exactly the Title Hyper has always had, drawn exactly as it has always been drawn.

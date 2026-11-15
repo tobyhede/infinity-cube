@@ -1,6 +1,6 @@
 # InfinityCube
 
-Graph-native technical content: Resources live in spatial Maps and connect into curated directed Graphs. This glossary names the domain; [the requirements](docs/requirements/) define its behaviour.
+Graph-native technical content: Resources live in spatial Maps and connect into curated directed Graphs. This glossary names the domain. [Accepted ADRs](docs/adr/README.md) decide its behaviour, and [the requirements](docs/requirements/) restate them in current words as a snapshot.
 
 ## Spaces
 
@@ -11,6 +11,9 @@ _Avoid_: presentation, manifest, deck, document, canvas, board, file, subgraph, 
 **Meta Space**:
 The one permanent Space, at the root of Space Resource ownership in an Aggregate.
 _Avoid_: root Space, home Space, default Space, Entry Space.
+
+**Ordinary Space**:
+Any Space other than the Meta Space.
 
 **Aggregate**:
 All Spaces together, rooted at the Meta Space through Space Resource references.
@@ -27,6 +30,9 @@ _Avoid_: guid, key, slug, local id, authored id.
 **Revision**:
 The version counter of a stored Space; its exported revision identifies the revision last captured by Exporting.
 _Avoid_: generation, timestamp, replacement epoch.
+
+**Door**:
+Any place a Resource enters a Space: intake of a file or stored snapshot, an Edit, or Importing.
 
 ## Resources
 
@@ -108,9 +114,24 @@ _Avoid_: alias, link, copy, transclusion, mirror; Reference as a family that inc
 An authored entity within a Space holding a placement and an ordered collection of Graphs over the Resources in that placement. Capitalised Map names the entity; lowercase map is a verb.
 _Avoid_: Diagram, Layout, View, placement as a synonym.
 
+**Canvas Map**:
+The Map a Space's own canvas draws, and the Map an Edit made there changes.
+
+**Drawn Map**:
+A Map drawn inside an Open Space Resource. An Edit made through it changes that Map in its own Space, the Space Resource's target Space.
+
+**Starting Map**:
+A Map with no Resources that owns one empty Graph, which is its Active Graph: what a Space's first working read and Add Map create.
+
 **Placement**:
 The mapping of Resources to their positions, sizes and Map content within a Map. A Resource absent from this mapping is absent from that Map.
 _Avoid_: arrangement, layer.
+
+**Closed Size**:
+The size a Resource takes in a Map that stores no size for it, and the least size it may take there.
+
+**Size hint**:
+A size a Resource's plugin asks for with a Map content Edit made on an author's gesture. The canvas decides whether and how far it applies.
 
 **Shape**:
 An Ur Resource's outline in a Map, kept as its Map content: rectangle, pill, ellipse or diamond.
@@ -139,9 +160,18 @@ _Avoid_: marker, end marker, arrowhead.
 A directed connection in one Graph from a tail Resource to a head Resource, optionally bearing a one-line Title. Its identity is the pair of endpoints within that Graph.
 _Avoid_: link, connection, transition, arrow, step, relationship; label for its Title.
 
+**Lane**:
+The path one of several Edges joining the same two Resources takes beside the others.
+
 **Active Graph**:
 The Graph selected in a drawn Map, emphasised there and receiving new Edges.
 _Avoid_: selected Graph, current Graph as separate concepts; focus, mode.
+
+**Saved Active Graph**:
+The Active Graph a Map stores, which it opens on.
+
+**Recede**:
+To be drawn at reduced strength while staying fully interactive.
 
 ## Authoring
 
@@ -162,6 +192,9 @@ _Avoid_: error, failure, exception, validation error for these outcomes.
 **Availability**:
 Whether an authoring operation may start, given the interactions already in progress. A withheld operation has not been attempted and therefore has no refusal.
 _Avoid_: eligibility, permission, enabled, disabled, refusal, mode.
+
+**Absent**:
+Of a command: not offered for a target at all, and so not drawn. An absent command differs from an unavailable one, which is drawn in place and refuses to run.
 
 **Replacement epoch**:
 The identity of the working Space against which local drafts and pending work were made, invalidated by accepting the stored Space. A coordinated Accept stored replaces every Space the save covered, advancing each one's epoch and discarding its drafts and pending work.

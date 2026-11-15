@@ -86,7 +86,7 @@ const snapshot: SpaceSnapshot = {
 
 /**
  * Nodes carrying declared handles, which is how this repo gives React Flow
- * handle geometry (docs/agents/rendering.md): `parseHandles` prefers a declaration to the DOM,
+ * handle geometry (docs/requirements/rendering.md RD-72): `parseHandles` prefers a declaration to the DOM,
  * and jsdom measures nothing, so without these no Edge resolves a position and
  * none is drawn at all.
  *

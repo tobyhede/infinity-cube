@@ -10,9 +10,9 @@ For audit only. Every source rule that feeds `../rendering.md` appears exactly o
 Where an ADR feeds RD only in part, only the parts the mapping tables send to RD are listed; the rest are traced by the doc named. §3 groups the sends by receiving doc. §3a lists every item other traces send here. §4 lists code-only rules. §5 holds code notes. §6 traces the sources added or changed on main after the baseline (`797b2908`), which the doc was brought up to on 13 November 2026; where §1 or §2 lands a baseline rule on a rule since rewritten or removed, §6 says where it now lands.
 
 Abbreviations:
-- "rN" is the Nth rule of an ADR as numbered in the mapping tables (`map-*.md`); where a table gives no numbers, rules are named by their first words.
+- "rN" is the Nth rule of an ADR as numbered in the rewrite's mapping tables (`map-*.md`). Those tables were never committed, so a number cannot be looked up, and the numbers do not follow the order of the ADR's text (0028's r1, "activation is not an Edit", is the second rule its text states). Resolve a row by its description, which names the claim, and find that claim in the ADR in `docs/adr/` or `docs/adr/superseded/`. Where a table gave no numbers, rules are named by their first words.
 - "R" ids are the old contract `docs/adr/archive/agent-guides/maps-and-graphs.md`. "G§" is the old guide `docs/adr/archive/agent-guides/rendering.md`, by section and bullet.
-- "DEC n" is a ruling in `../DECISIONS.md`.
+- "DEC n" is a ruling in `../DECISIONS.md`. A ruling that changes what an accepted ADR decides is recorded as an ADR (DEC 1, C1 and C2 as ADR 0146; C3 as 0147; Navigation C2 as 0148; Rendering C1 as 0149; Space and Resources C1 as 0150; UI C3 as 0151; Storage S2 as 0152), and that ADR is what binds; `../DECISIONS.md`, "Rulings recorded as ADRs", lists them. A row below that says a rule was "struck" or "overruled" by a ruling means the ADR that records the ruling refines the source ADR.
 - Docs: SR space-and-resources.md, MG maps-and-graphs.md, ED editing.md, ST storage.md, UI ui.md, NV navigation.md, GL `CONTEXT.md`, PROC process docs (AGENTS.md, workflow.md, anti-slop.md, build-tooling.md).
 
 The rule ids in `../rendering.md` are append-only from this version on.
@@ -381,7 +381,7 @@ Kept under drafting rule 5 (code plus a test, contradicted by nothing):
 
 ## 6. Sources added or changed on main
 
-The ADRs below are archived in `docs/adr/archive/`. "G′" is main's old guide `docs/adr/archive/agent-guides/rendering.md` as main left it.
+The ADRs below are in `docs/adr/` and bind; this section records where the snapshot restates them. "G′" is main's old guide `docs/adr/archive/agent-guides/rendering.md` as main left it.
 
 | Source | Disposition |
 |---|---|
@@ -420,3 +420,12 @@ The ADRs below are archived in `docs/adr/archive/`. "G′" is main's old guide `
 | 0084, 0093, 0100, 0103, 0105 and others: "Refined by" lines naming 0142 and 0143 | dropped: status lines, no rule |
 | Code only (drafting rule 5): a plugin drawn bare at rest draws no border while unselected and in no Graph; a picture the browser already holds draws at once; a throwing plugin is drawn again once the Space is replaced or its Map content changes | → RD-82, RD-7, RD-83 |
 | RD-4 "never enlarged" (from 0122 "a picture scales down") | → removed (drafting rule 6): how far a picture scales inside its rect is CSS (`object-fit: contain` in `plugin-image/src/view.tsx`). That the picture is drawn whole stays in RD-4 |
+
+## 7. ADRs with one disposition throughout
+
+Added 15 November 2026. These ADRs had no row in any trace. Each has one outcome throughout, so each takes one document-level row. A superseded ADR is history: its successor carries whatever survives, and the successor's rows are the ones to read.
+
+| Source | Disposition |
+|---|---|
+| 0011 (superseded) opening a card shows its Markdown source | historical: superseded by 0064 (Open expands in place, editing is separate), traced in §1 |
+| 0021 (superseded) routes are authored as React Flow edges with neutral handles | historical: superseded by 0033 (spatial handles in the Active Graph's colour), traced in §1 |

@@ -47,7 +47,7 @@ Closed by the rulings of 12 November 2026 (DECISIONS, Checkpoint 3 rulings). The
 
 ### C3. How a question or notice names a Resource, Map or Graph
 
-**Closed by ruling UI C3 (12 November 2026).** Wherever a sentence quotes a Title it uses the short Title; controls, list rows and chrome use the first line alone (option (a)). Notices that quote the bare name are bugs. See UI-99 (bug: code differs) and Effects "Names".
+**Closed by ruling UI C3 (12 November 2026), recorded as ADR 0151, which refines 0083.** Wherever a sentence quotes a Title it uses the short Title; controls, list rows and chrome use the first line alone (option (a)). Notices that quote the bare name are bugs. See UI-99 (bug: code differs) and Effects "Names".
 
 **Rules affected:** UI-99; UI-83; Effects "Names".
 

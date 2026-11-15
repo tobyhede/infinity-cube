@@ -11,8 +11,8 @@ For audit only. Every source rule appears exactly once in §1–§4, with one of
 Abbreviations:
 - "EP n" is a bullet of the old guide `docs/adr/archive/agent-guides/editing-and-persistence.md`, by line number.
 - "CAS" is the old guide `docs/adr/archive/agent-guides/authoring-refusal-cascade.md`.
-- "rN" is the Nth rule of an ADR as numbered in the mapping tables; "s" after an ADR number marks a superseded ADR.
-- "DEC n" is ruling n in `../DECISIONS.md`.
+- "rN" is the Nth rule of an ADR as numbered in the rewrite's mapping tables (`map-*.md`). Those tables were never committed, so a number cannot be looked up, and the numbers do not follow the order of the ADR's text (0028's r1, "activation is not an Edit", is the second rule its text states). Resolve a row by its description, which names the claim, and find that claim in the ADR in `docs/adr/` or `docs/adr/superseded/`; "s" after an ADR number marks a superseded ADR.
+- "DEC n" is ruling n in `../DECISIONS.md`. A ruling that changes what an accepted ADR decides is recorded as an ADR (DEC 1, C1 and C2 as ADR 0146; C3 as 0147; Navigation C2 as 0148; Rendering C1 as 0149; Space and Resources C1 as 0150; UI C3 as 0151; Storage S2 as 0152), and that ADR is what binds; `../DECISIONS.md`, "Rulings recorded as ADRs", lists them. A row below that says a rule was "struck" or "overruled" by a ruling means the ADR that records the ruling refines the source ADR.
 - Docs: SR is space-and-resources.md, MG maps-and-graphs.md, ST storage.md, RD rendering.md, UI ui.md, NV navigation.md, GL `CONTEXT.md`, PROC is process docs (AGENTS.md, workflow.md, anti-slop.md, build-tooling.md).
 
 The rule ids in `../editing.md` are append-only from this version on.
@@ -353,7 +353,7 @@ The rule ids in `../editing.md` are append-only from this version on.
 
 ## 8. Sources added or changed on main
 
-The ADRs below are archived in `docs/adr/archive/`. "CAS′" is main's `docs/adr/archive/agent-guides/authoring-refusal-cascade.md`; "EP′" is main's `docs/adr/archive/agent-guides/editing-and-persistence.md`.
+The ADRs below are in `docs/adr/` and bind; this section records where the snapshot restates them. "CAS′" is main's `docs/adr/archive/agent-guides/authoring-refusal-cascade.md`; "EP′" is main's `docs/adr/archive/agent-guides/editing-and-persistence.md`.
 
 | Source | Disposition |
 |---|---|

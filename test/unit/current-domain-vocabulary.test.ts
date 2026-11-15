@@ -63,7 +63,7 @@ const upper = ENTITY.toUpperCase();
  * accident, and the entity cannot come back without one, because it needs an
  * id, an edge and a field to live in.
  *
- * The `Routed*` geometry `docs/agents/rendering.md` carves out falls out of the shape rather
+ * The `Routed*` geometry `docs/agents/domain.md` carves out falls out of the shape rather
  * than needing an exception: the retired name followed by a *lowercase* letter
  * is a different word, so that component and the bare English one never match.
  * The carve-out is the *shape*, not any dependency.
@@ -458,7 +458,7 @@ describe('the vocabulary that guard reads', () => {
 
   it('stays silent on the qualified senses the ADR keeps', () => {
     const kept = [
-      // Routed graph-layout geometry and its component (docs/agents/rendering.md).
+      // Routed graph-layout geometry and its component (docs/agents/domain.md).
       `import { ${ENTITY}dEdge } from './${ENTITY}dEdge';`,
       `// a single layout pass ${lower}s them around the resources`,
       // Hono and the HTTP application.

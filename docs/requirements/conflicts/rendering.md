@@ -8,7 +8,7 @@ None.
 
 ## Closed
 
-Closed by ruling Rendering C1 (DECISIONS, Checkpoint 3 rulings, ruled 12 November 2026).
+Closed by ruling Rendering C1 (DECISIONS, Checkpoint 3 rulings, ruled 12 November 2026), recorded as ADR 0149, which refines 0122.
 
 - **C1. Open content that does not fit its rect.** Option 1: Open content is clipped on the canvas, Markdown does not scroll there, and an unframed drawn Map is placed at authored scale from its Resources' top-left, not fitted. The author resizes for room, or pans and zooms the drawn Map while its Space Resource is in Edit. RD-5 states it; RD-61 (drag pans, wheel zooms) and RD-67 (the Edit exception) were corrected with it.
 

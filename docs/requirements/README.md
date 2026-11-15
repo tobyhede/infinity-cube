@@ -1,6 +1,6 @@
 # Requirements
 
-These seven documents are the binding rules for InfinityCube. A behaviour change updates its document in the same commit. Status and evidence distinguish the intended behaviour from what is built.
+These seven documents restate InfinityCube's accepted ADRs in current words, as a snapshot. They decide nothing themselves: [ADRs](../adr/README.md) are binding and append-only, and a requirement that disagrees with an accepted ADR is a defect in the requirement. Each document opens with a snapshot marker naming the commit it was checked against, the date, and the highest ADR it incorporates; an ADR accepted after that marker binds where it differs, until the document is updated. Accepting an ADR updates the owning document and its marker in the same change, and a behaviour change updates its document in the same commit ([workflow](../agents/workflow.md#adrs-and-the-requirements-snapshot)). Status and evidence distinguish the intended behaviour from what is built.
 
 | Task | Read |
 | --- | --- |
@@ -14,6 +14,8 @@ These seven documents are the binding rules for InfinityCube. A behaviour change
 
 [CONTEXT.md](../../CONTEXT.md) defines names. [AGENTS.md](../../AGENTS.md) routes implementation tasks and links engineering guidance.
 
-[Trace files](trace/) record the sources and disposition of old rules. [Conflict records](conflicts/) and [rewrite decisions](DECISIONS.md) preserve the rewrite’s rulings. The [ADR archive](../adr/README.md) is history, not binding.
+Read a document in this order: [CONTEXT.md](../../CONTEXT.md) for terms, the owning document, then any ADR numbered above its marker. Open an older ADR for the full argument, a rejected alternative or the history.
+
+[Trace files](trace/) record the sources and disposition of old rules. [Conflict records](conflicts/) and [rewrite decisions](DECISIONS.md) preserve the rewrite’s rulings; a ruling that changes what an accepted ADR decides is recorded as a new ADR. The product guides these documents replaced are kept, as history, under [`docs/adr/archive/agent-guides/`](../adr/archive/agent-guides/).
 
 Rule identifiers are append-only. Keep removed rules as tombstones and never renumber surviving rules. Each document lists known implementation gaps under Bugs or marks them not built; those gaps do not weaken its requirements.

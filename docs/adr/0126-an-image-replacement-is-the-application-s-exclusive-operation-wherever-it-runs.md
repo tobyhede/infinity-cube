@@ -2,6 +2,7 @@
 
 Status: accepted
 Refines: 0112
+Refined by: 0150
 Related: 0081, 0123
 
 While any composed Space, listed or only drawn, is replacing an image, every Space withdraws its authoring and its navigation until the replacement's Edit is applied. The replacement's own target stays mounted to show its answer, and panning and zooming stay available. This is the rule the image replacement ticket gave a single Space (`.scratch/image-resource/issues/05-an-author-replaces-the-image.md`, "Other actions while a replacement runs"), applied to every composed Space.
