@@ -23,4 +23,4 @@ ADR 0042 decides what a retryable failure, a conflict and a permanent rejection 
 
 ## Consequences
 
-- No code change: the application and its tests already do this (UI UI-93).
+- No code change: the application already does this (UI UI-93). Its tests check the dialog, its wording and its acknowledgement, but not yet that focus moves into it.
