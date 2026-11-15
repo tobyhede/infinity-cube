@@ -11,7 +11,7 @@ This is the durable record of the requirements rewrite (PR 475, https://github.c
 | Baseline (the rewrite's first source revision) | `797b2908` |
 | Target (main, last checked 15 November 2026) | `d14ff974`. Main had not moved past it when this record was written. |
 | Branch head when this record was written | `e503e525` ("docs: keep the ADRs binding and in place"), with the 15 November realignment edits uncommitted on top of it |
-| Highest ADR at the target | 0144 (0141 proposed, not incorporated). This pass adds 0145–0152. |
+| Highest ADR at the target | 0144 (0141 proposed, not incorporated). This pass adds 0145–0153. |
 
 ## Scope and authorization
 
@@ -32,7 +32,7 @@ This is the durable record of the requirements rewrite (PR 475, https://github.c
 | UI | `docs/requirements/ui.md` | `trace/ui.md` | `conflicts/ui.md` |
 | Navigation (with Presenting) | `docs/requirements/navigation.md` | `trace/navigation.md` | `conflicts/navigation.md` |
 
-`CONTEXT.md` keeps names. Engineering rules stay in `docs/agents/` (`build-tooling.md`, `anti-slop.md`, `workflow.md`, `domain.md`, `http.md`). The replaced product guides are kept, byte-identical to main, in `docs/adr/archive/agent-guides/`.
+`CONTEXT.md` keeps names. Engineering rules stay in `docs/agents/` (`build-tooling.md`, `anti-slop.md`, `workflow.md`, `domain.md`, `http.md`). The replaced product guides are kept in `docs/adr/archive/agent-guides/`, identical to main's except that their relative links are rebased to the new location.
 
 ## Source inventory and dispositions
 
@@ -42,7 +42,7 @@ This is the durable record of the requirements rewrite (PR 475, https://github.c
 ## Decisions
 
 - Drafting rules and maintainer rulings: `docs/requirements/DECISIONS.md` (3, 6 and 12 November 2026; ruling 8 reversed 15 November 2026).
-- Rulings that change what an accepted ADR decides are ADRs: 0146 (DEC 1, C1, C2: switching Graphs is an Edit), 0147 (C3: drawing an existing Edge is refused), 0148 (Navigation C2: canvas Graph navigation keeps no history), 0149 (Rendering C1: Open content is clipped), 0150 (Space and Resources C1: natural size is not measured), 0151 (UI C3: a sentence quotes the short Title), 0152 (Storage S2: no compatibility promise outside the repository). `DECISIONS.md`, "Rulings recorded as ADRs", maps each ruling to its ADR and requirements.
+- Rulings that change what an accepted ADR decides are ADRs: 0146 (DEC 1, C1, C2: switching Graphs is an Edit), 0147 (C3: drawing an existing Edge is refused), 0148 (Navigation C2: canvas Graph navigation keeps no history), 0149 (Rendering C1: Open content is clipped), 0150 (Space and Resources C1: natural size is not measured), 0151 (UI C3: a sentence quotes the short Title), 0152 (Storage S2: no compatibility promise outside the repository), 0153 (UI C2: Remove from Map asks first only when Edges would go, added after review). `DECISIONS.md`, "Rulings recorded as ADRs", maps each ruling to its ADR and requirements.
 - ADR 0145: the requirements are a snapshot of the accepted ADRs; it supersedes 0115.
 
 ## Limits: what was not preserved or could not be checked
@@ -62,7 +62,7 @@ Run from the repository root.
 | Command | What it checks | Result (15 November 2026, last run) |
 |---|---|---|
 | `python3 .scratch/requirements-rewrite/check-evidence.py` | Every `` `file` › "title" `` citation in `docs/requirements/*.md` names an existing file containing that test title | 1,432 titles, 0 missing files, 0 titles not found |
-| `python3 .scratch/requirements-rewrite/check-links.py` | Relative Markdown links and anchors in `docs/` (ADR bodies skipped), `AGENTS.md`, `CONTEXT.md`, `README.md`, `.agents/skills/`, `plugins/` | 74 files, 475 links, 0 broken live links; 7 broken links inside the archived guides, reported for information (the guides are byte-identical copies moved two levels down) |
+| `python3 .scratch/requirements-rewrite/check-links.py` | Relative Markdown links and anchors in `docs/` (ADR bodies skipped), `AGENTS.md`, `CONTEXT.md`, `README.md`, `.agents/skills/`, `plugins/` | 74 files, 475 links, 0 broken, the archived guides included once their relative links were rebased |
 | `python3 .scratch/requirements-rewrite/check-dispositions.py` | Every ADR number in `docs/adr/` and `docs/adr/superseded/` appears in a trace row, a conflict file or `DECISIONS.md` | 152 ADRs (29 superseded), 0 without a row |
 | `pnpm exec vitest run test/unit/adr-status-blocks.test.ts test/unit/current-domain-vocabulary.test.ts test/unit/docs-agents-citation-accuracy.test.ts test/unit/agent-skill-commands.test.ts test/unit/check-typescript-toolchain.test.ts` | ADR status blocks, vocabulary, citations in agent docs, skill commands, the toolchain check | 5 files, 180 tests passed (Node 22) |
 | `pnpm exec prettier --check docs/requirements .scratch/requirements-rewrite` | Formatting | all matched files pass. `.prettierignore` excludes `.scratch/**`, so this checks the docs only |

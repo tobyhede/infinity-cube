@@ -2,7 +2,7 @@
 
 Rulings made by the maintainer while the requirements docs were written. Each was put to the maintainer on a checkpoint page with its evidence; those pages were not preserved in the repository. Where a ruling closed a conflict, the conflict file under `conflicts/` keeps the disagreement, the options and the evidence. The run record, `.scratch/requirements-rewrite/RUN.md`, says what else of the run survives.
 
-These rulings do not bind on their own. ADRs bind (ADR 0145): a ruling that changes what an accepted ADR decides is recorded as an ADR, listed under "Rulings recorded as ADRs" below (ADR 0146–0152), and the requirements restate it from there.
+These rulings do not bind on their own. ADRs bind (ADR 0145): a ruling that changes what an accepted ADR decides is recorded as an ADR, listed under "Rulings recorded as ADRs" below (ADR 0146–0153), and the requirements restate it from there.
 
 ## Structure
 
@@ -41,7 +41,7 @@ The principle behind C1, C4 and C7: an Edit on the canvas records where the auth
 
 ## Checkpoint 3 rulings (6 November 2026)
 
-- **Drafting rule 6. Presentation is not a requirement.** A rule that only fixes how something looks or moves, and can be changed in CSS or styling alone without changing what the author can see, reach or do, does not belong in these docs. Examples: durations, easing, colour values, opacity levels, sizes, spacing, fonts, shadows and animation choreography. The code and its tests are the record for these. A rule stays when it is structural: what is drawn and what it means, what is visible or hidden, what can be reached or clicked, what is announced or focused, and what is stored. Removed rules become "XX-n: removed (drafting rule 6)".
+- **Drafting rule 6. Presentation is not a requirement.** A rule that only fixes how something looks or moves, and can be changed in CSS or styling alone without changing what the author can see, reach or do, does not belong in these docs. Examples: durations, easing, colour values, opacity levels, sizes, spacing, fonts, shadows and animation choreography. The code and its tests are the record for these. A rule stays when it is structural: what is drawn and what it means, what is visible or hidden, what can be reached or clicked, what is announced or focused, and what is stored. Removed rules become "XX-n: removed (drafting rule 6)". Removing a rule from these docs does not unbind it: where an accepted ADR decides the presentation, such as ADR 0139's ring colour or ADR 0143's lane gaps, that ADR still binds, and changing it takes a new ADR.
 - **Rendering C2 is closed by drafting rule 6.** How fast a Resource fades when the Active Graph changes is presentation. RD-28 is removed.
 
 Ruled 12 November 2026, after an independent audit of each recommendation. Code changes these rulings call for are out of scope for the docs: each rule records the ruled behaviour with its status.
@@ -71,5 +71,6 @@ When ruling 8 was reversed, every ruling above that changes what an accepted ADR
 | Rendering C1. Open content that does not fit is clipped | the fitting and scrolling part of 0122 | ADR 0149 | RD-5, RD-61, RD-67 |
 | Space and Resources C1. Stop measuring an image's natural size | 0106's measurement on set, and 0126's bound on it | ADR 0150 | SR-26 |
 | UI C3. A sentence quotes a Title by its short Title | 0083's "the first line and nothing else" for sentences | ADR 0151 | UI-99 |
+| UI C2. Remove from Map asks first only when Edges would go | 0074's "asks first wherever authored work would be lost" for Remove from Map | ADR 0153 | UI-85 |
 | Storage S2. No compatibility promise for a copy outside the repository | the reason 0054 and 0056 give for rolling forward | ADR 0152 | ST-36 |
 | 8. (reversed) | 0115 | ADR 0145, which supersedes 0115 | `README.md`; every doc's snapshot marker |

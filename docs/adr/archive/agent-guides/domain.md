@@ -7,7 +7,7 @@ This is a **single-context** repo: one `CONTEXT.md` + `docs/adr/` at the root. I
 ## Before exploring, read these
 
 - **`CONTEXT.md`** at the repo root, for terms.
-- **The current contract for the topic**, where one exists — see [`workflow.md`](workflow.md#current-contracts) for the list and the reading rules. It states the live rules with their reasons and source ADRs.
+- **The current contract for the topic**, where one exists — see [`workflow.md`](../../../agents/workflow.md#adrs-and-the-requirements-snapshot) for the list and the reading rules. It states the live rules with their reasons and source ADRs.
 - **`docs/adr/`** — for a topic without a contract, read the ADRs that touch the area; for one with a contract, open its source ADRs when you need the full argument or the history.
 
 If any of these files don't exist, **proceed silently**. Don't flag their absence or suggest creating them upfront; create them lazily when terms or decisions actually get resolved.

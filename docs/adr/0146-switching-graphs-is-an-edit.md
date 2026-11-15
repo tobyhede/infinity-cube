@@ -25,4 +25,4 @@ The maintainer ruled on 3 November 2026 (rulings 1, C1 and C2 in `docs/requireme
 ## Consequences
 
 - Code differs today: switching only changes navigation state and is saved when a later canvas Edit writes it (Maps and Graphs MG-45, MG-46, MG-84). Switching inside an Open Space Resource already writes only the selection (MG-47).
-- Each switch is a commit, so a talk's directory under Running changes when an author switches Graphs.
+- A switch is saved as any Edit is, coalescing with Edits made while a commit is in flight and waiting for Retry while a save has failed, so a talk's directory under Running changes when an author switches Graphs.

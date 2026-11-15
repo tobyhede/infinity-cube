@@ -2,7 +2,7 @@
 
 **Purpose:** what Maps, Map entries, Graphs and Edges hold, and what each Edit does to them.
 
-**Snapshot:** checked against `d14ff974` (2026-11-15); incorporates accepted ADRs through 0152. ADRs accepted after it bind where they differ, until this document is updated.
+**Snapshot:** checked against `d14ff974` (2026-11-15); incorporates accepted ADRs through 0153. ADRs accepted after it bind where they differ, until this document is updated.
 
 Open conflicts are listed in [conflicts/maps-and-graphs.md](conflicts/maps-and-graphs.md). Sources are traced in [trace/maps-and-graphs.md](trace/maps-and-graphs.md).
 
@@ -122,7 +122,7 @@ Every completion first asks the exclusive gate (editing.md ED-82), then runs the
   - otherwise, if `y ≥ sy + h`, it moves by Δh on `y` only;
   - otherwise it does not move.
 
-  The test on one axis ignores the other, so a Resource left of or above the subject never moves, and the subject itself never moves. This happens in the same Edit.
+  The test on one axis ignores the other, so a Resource past the subject's right edge moves sideways even when it is above the subject, one below its bottom edge moves down even when it is left of it, a Resource that is neither never moves, and the subject itself never moves. This happens in the same Edit.
 
   *Example:* the subject at (0, 0), 260×146, grows to 400×200 (Δw = 140, Δh = 54). A at (300, 0) moves to (440, 0). B at (0, 200) moves to (0, 254). C at (300, 300) moves to (440, 300) (`x` wins). D at (100, 100) and E at (−300, 0) stay put.
 

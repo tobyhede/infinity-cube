@@ -1,8 +1,8 @@
 # Maps and Graphs
 
-The current contract for Maps, Graphs, placement, Open and Close, initialization and layout strategies. It states the accepted design in current words, with the reason for each rule, the alternatives that were rejected, and what is accepted but not built. How a current contract relates to the ADRs is [ADR 0115][0115]; [workflow.md](workflow.md#current-contracts) states the reading and update rules.
+The current contract for Maps, Graphs, placement, Open and Close, initialization and layout strategies. It states the accepted design in current words, with the reason for each rule, the alternatives that were rejected, and what is accepted but not built. How a current contract relates to the ADRs is [ADR 0115][0115]; [workflow.md](../../../agents/workflow.md#adrs-and-the-requirements-snapshot) states the reading and update rules.
 
-This contract decides nothing on its own. Each rule names the ADRs it restates; follow them for the full argument or the history. A disagreement with an ADR, and the difference between built and decided, are handled as [workflow.md](workflow.md#current-contracts) sets out.
+This contract decides nothing on its own. Each rule names the ADRs it restates; follow them for the full argument or the history. A disagreement with an ADR, and the difference between built and decided, are handled as [workflow.md](../../../agents/workflow.md#adrs-and-the-requirements-snapshot) sets out.
 
 ## Read this before
 
@@ -149,8 +149,8 @@ Older ADRs use retired names. Read Layout or Diagram as Map, Card or Thing as Re
 
 Every rule above is built except these:
 
-- **Auto-arrange** (R6), with any returning automatic strategy (R7). Delivery: [`.scratch/auto-arrange/issues/01-auto-arrange-a-map.md`](../../.scratch/auto-arrange/issues/01-auto-arrange-a-map.md), which also holds the two open questions: whether the Edit records which strategy produced the positions, and whether it asks for confirmation before rewriting a whole Map while undo does not exist.
-- **Manual Graph reordering** (R25). Delivery: [`.scratch/graph-reordering/issues/01-reorder-a-maps-graphs.md`](../../.scratch/graph-reordering/issues/01-reorder-a-maps-graphs.md).
+- **Auto-arrange** (R6), with any returning automatic strategy (R7). Delivery: [`.scratch/auto-arrange/issues/01-auto-arrange-a-map.md`](../../../../.scratch/auto-arrange/issues/01-auto-arrange-a-map.md), which also holds the two open questions: whether the Edit records which strategy produced the positions, and whether it asks for confirmation before rewriting a whole Map while undo does not exist.
+- **Manual Graph reordering** (R25). Delivery: [`.scratch/graph-reordering/issues/01-reorder-a-maps-graphs.md`](../../../../.scratch/graph-reordering/issues/01-reorder-a-maps-graphs.md).
 
 Remove an entry here in the change that verifies its implementation.
 
@@ -158,7 +158,7 @@ Remove an entry here in the change that verifies its implementation.
 
 ## Provenance
 
-The rule-to-source [inventory] accounts for every rule, rejected alternative, omitted historical claim and source disagreement behind this contract, and the [pilot report](../../.scratch/adr-consolidation/pilot/REPORT.md) records how the contract was evaluated.
+The rule-to-source [inventory] accounts for every rule, rejected alternative, omitted historical claim and source disagreement behind this contract, and the [pilot report](../../../../.scratch/adr-consolidation/pilot/REPORT.md) records how the contract was evaluated.
 
 | IDs | Section | Sources |
 |---|---|---|
@@ -205,46 +205,46 @@ The rule-to-source [inventory] accounts for every rule, rejected alternative, om
 | A1–A29 | Rejected alternatives | Cited in each row |
 | D12 | §6, Undo | [0086], [0084], [0048], [0074] |
 
-[context]: ../../CONTEXT.md
-[inventory]: ../../.scratch/adr-consolidation/pilot/inventory.md
-[0115]: ../adr/0115-current-contracts-state-the-live-design-and-adrs-keep-its-history.md
-[0004]: ../adr/0004-cards-are-the-graph.md
-[0005]: ../adr/0005-layout-is-a-strategy.md
-[0014]: ../adr/0014-layout-is-the-authored-data-strategy-is-the-behaviour.md
-[0015]: ../adr/0015-a-space-may-have-no-routes.md
-[0018]: ../adr/0018-a-new-space-is-a-single-centered-card.md
-[0028]: ../adr/0028-activating-a-route-is-not-an-edit.md
-[0040]: ../adr/0040-layouts-own-card-membership-and-routes.md
-[0041]: ../adr/0041-graph-is-the-first-public-name-for-route.md
-[0048]: ../adr/0048-escape-and-commit-are-decided-by-the-surface-not-the-field.md
-[0064]: ../adr/0064-opening-a-card-expands-it-in-place.md
-[0066]: ../adr/superseded/0066-open-size-survives-closing.md
-[0069]: ../adr/0069-entities-have-durable-web-addresses.md
-[0074]: ../adr/0074-space-card-references-own-the-target-space.md
-[0079]: ../adr/0079-v1-exposes-only-layouts-and-first-open-initializes-one.md
-[0080]: ../adr/0080-new-spaces-start-complete-and-layoutless-stored-spaces-are-repaired.md
-[0084]: ../adr/0084-displacement-is-applied-by-the-edit-that-causes-it.md
-[0086]: ../adr/0086-automatic-arrangement-is-an-edit-not-a-render-path.md
-[0091]: ../adr/0091-context-deletion-relocates-every-space-thing.md
-[0093]: ../adr/0093-a-thing-makes-room-on-one-axis-once-clear-of-the-collapsed-subject.md
-[0101]: ../adr/0101-map-and-resource-are-the-first-public-names-for-diagram-and-thing.md
-[0108]: ../adr/0108-graph-identity-is-unique-within-the-space.md
-[0112]: ../adr/0112-a-map-behaves-the-same-wherever-it-is-drawn.md
-[0116]: ../adr/0116-only-an-edit-on-the-canvas-moves-where-a-space-opens.md
-[0013]: ../adr/superseded/0013-editing-requires-a-positioned-layout.md
-[0022]: ../adr/superseded/0022-a-layout-names-the-routes-it-shows.md
-[0025]: ../adr/superseded/0025-a-layout-is-optional-and-editing-makes-it-positioned.md
-[0026]: ../adr/superseded/0026-a-route-is-active-and-the-layout-may-name-it.md
-[0110]: ../adr/0110-an-edge-faces-across-the-larger-gap-between-two-resources.md
-[0105]: ../adr/0105-a-graphs-edges-share-one-head-shape.md
-[0113]: ../adr/0113-every-capability-is-a-resources-and-an-ur-resource-has-no-content.md
-[0121]: ../adr/0121-a-shape-is-a-maps-and-an-ur-resource-draws-it-open-and-closed.md
-[0122]: ../adr/0122-a-resources-size-is-independent-of-open.md
-[0137]: ../adr/superseded/0137-open-and-expand-opens-and-sizes-in-one-edit.md
-[0128]: ../adr/0128-every-resource-kind-is-a-module-and-a-resource-file-is-json.md
-[0142]: ../adr/0142-a-resource-plugin-owns-everything-inside-its-rect.md
-[0106]: ../adr/0106-an-image-resource-owns-a-url-not-bytes.md
-[0114]: ../adr/0114-a-reference-resource-takes-its-targets-geometry-and-withholds-only-content-actions.md
-[0130]: ../adr/0130-mounting-reads-an-aggregate-from-github-into-a-read-only-page.md
-[0131]: ../adr/0131-a-mounted-talk-is-editable-in-memory.md
-[0135]: ../adr/0135-a-resource-is-drawn-in-the-colour-of-its-graph.md
+[context]: ../../../../CONTEXT.md
+[inventory]: ../../../../.scratch/adr-consolidation/pilot/inventory.md
+[0115]: ../../superseded/0115-current-contracts-state-the-live-design-and-adrs-keep-its-history.md
+[0004]: ../../0004-cards-are-the-graph.md
+[0005]: ../../0005-layout-is-a-strategy.md
+[0014]: ../../0014-layout-is-the-authored-data-strategy-is-the-behaviour.md
+[0015]: ../../0015-a-space-may-have-no-routes.md
+[0018]: ../../0018-a-new-space-is-a-single-centered-card.md
+[0028]: ../../0028-activating-a-route-is-not-an-edit.md
+[0040]: ../../0040-layouts-own-card-membership-and-routes.md
+[0041]: ../../0041-graph-is-the-first-public-name-for-route.md
+[0048]: ../../0048-escape-and-commit-are-decided-by-the-surface-not-the-field.md
+[0064]: ../../0064-opening-a-card-expands-it-in-place.md
+[0066]: ../../superseded/0066-open-size-survives-closing.md
+[0069]: ../../0069-entities-have-durable-web-addresses.md
+[0074]: ../../0074-space-card-references-own-the-target-space.md
+[0079]: ../../0079-v1-exposes-only-layouts-and-first-open-initializes-one.md
+[0080]: ../../0080-new-spaces-start-complete-and-layoutless-stored-spaces-are-repaired.md
+[0084]: ../../0084-displacement-is-applied-by-the-edit-that-causes-it.md
+[0086]: ../../0086-automatic-arrangement-is-an-edit-not-a-render-path.md
+[0091]: ../../0091-context-deletion-relocates-every-space-thing.md
+[0093]: ../../0093-a-thing-makes-room-on-one-axis-once-clear-of-the-collapsed-subject.md
+[0101]: ../../0101-map-and-resource-are-the-first-public-names-for-diagram-and-thing.md
+[0108]: ../../0108-graph-identity-is-unique-within-the-space.md
+[0112]: ../../0112-a-map-behaves-the-same-wherever-it-is-drawn.md
+[0116]: ../../0116-only-an-edit-on-the-canvas-moves-where-a-space-opens.md
+[0013]: ../../superseded/0013-editing-requires-a-positioned-layout.md
+[0022]: ../../superseded/0022-a-layout-names-the-routes-it-shows.md
+[0025]: ../../superseded/0025-a-layout-is-optional-and-editing-makes-it-positioned.md
+[0026]: ../../superseded/0026-a-route-is-active-and-the-layout-may-name-it.md
+[0110]: ../../0110-an-edge-faces-across-the-larger-gap-between-two-resources.md
+[0105]: ../../0105-a-graphs-edges-share-one-head-shape.md
+[0113]: ../../0113-every-capability-is-a-resources-and-an-ur-resource-has-no-content.md
+[0121]: ../../0121-a-shape-is-a-maps-and-an-ur-resource-draws-it-open-and-closed.md
+[0122]: ../../0122-a-resources-size-is-independent-of-open.md
+[0137]: ../../superseded/0137-open-and-expand-opens-and-sizes-in-one-edit.md
+[0128]: ../../0128-every-resource-kind-is-a-module-and-a-resource-file-is-json.md
+[0142]: ../../0142-a-resource-plugin-owns-everything-inside-its-rect.md
+[0106]: ../../0106-an-image-resource-owns-a-url-not-bytes.md
+[0114]: ../../0114-a-reference-resource-takes-its-targets-geometry-and-withholds-only-content-actions.md
+[0130]: ../../0130-mounting-reads-an-aggregate-from-github-into-a-read-only-page.md
+[0131]: ../../0131-a-mounted-talk-is-editable-in-memory.md
+[0135]: ../../0135-a-resource-is-drawn-in-the-colour-of-its-graph.md

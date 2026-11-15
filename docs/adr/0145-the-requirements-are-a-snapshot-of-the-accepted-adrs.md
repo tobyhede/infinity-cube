@@ -27,7 +27,7 @@ ADR 0115 adopted current contracts in `docs/agents/`: one topic's accepted desig
 ## Consequences
 
 - `docs/agents/` keeps engineering guides (workflow, tooling, anti-slop, HTTP) and pointer pages; the product guides 0115 called contracts are archived under `docs/adr/archive/agent-guides/`.
-- The rulings made during the rewrite that changed accepted decisions are ADRs 0146 to 0152, each refining the ADR it changes.
+- The rulings made during the rewrite that changed accepted decisions are ADRs 0146 to 0153, each refining the ADR it changes.
 - `docs/adr/README.md` points each topic at its owning requirements document.
 - The cost is the same as 0115's: a second current-state account beside each topic's ADRs that must be kept accurate. The same-change rule and the snapshot marker bound it; review and fresh-reader checks remain the controls for a restatement that misstates its source while passing every mechanical check.
 

@@ -13,7 +13,7 @@ Abbreviations:
 - "G n" is the bullet that starts on line n of the old guide as it stood at the rewrite's baseline, commit `797b2908` (`git show 797b2908:docs/agents/ui.md`). The archived copy at `docs/adr/archive/agent-guides/ui.md` is main's later version, whose line numbers differ after line 12.
 - "M n" is the bullet of that later archived guide that starts on line n; §7 traces the bullets main added or changed.
 - "rN" is the Nth rule of an ADR as numbered in the rewrite's mapping tables (`map-*.md`). Those tables were never committed, so a number cannot be looked up, and the numbers do not follow the order of the ADR's text (0028's r1, "activation is not an Edit", is the second rule its text states). Resolve a row by its description, which names the claim, and find that claim in the ADR in `docs/adr/` or `docs/adr/superseded/`.
-- "DEC n" is ruling n in `../DECISIONS.md`. A ruling that changes what an accepted ADR decides is recorded as an ADR (DEC 1, C1 and C2 as ADR 0146; C3 as 0147; Navigation C2 as 0148; Rendering C1 as 0149; Space and Resources C1 as 0150; UI C3 as 0151; Storage S2 as 0152), and that ADR is what binds; `../DECISIONS.md`, "Rulings recorded as ADRs", lists them. A row below that says a rule was "struck" or "overruled" by a ruling means the ADR that records the ruling refines the source ADR.
+- "DEC n" is ruling n in `../DECISIONS.md`. A ruling that changes what an accepted ADR decides is recorded as an ADR (DEC 1, C1 and C2 as ADR 0146; C3 as 0147; Navigation C2 as 0148; Rendering C1 as 0149; Space and Resources C1 as 0150; UI C2 as 0153; UI C3 as 0151; Storage S2 as 0152), and that ADR is what binds; `../DECISIONS.md`, "Rulings recorded as ADRs", lists them. A row below that says a rule was "struck" or "overruled" by a ruling means the ADR that records the ruling refines the source ADR.
 - Docs: SR is space-and-resources.md, MG maps-and-graphs.md, ED editing.md, ST storage.md, RD rendering.md, NV navigation.md, GL `CONTEXT.md`, PROC is process docs (AGENTS.md, workflow.md, anti-slop.md, build-tooling.md).
 
 The rule ids in `../ui.md` are append-only from this version on.
@@ -64,7 +64,7 @@ The rule ids in `../ui.md` are append-only from this version on.
 | 0042 r1 drafts local to the surface | sent → ED |
 | 0042 r4 cancelling the rename keeps the created entity | sent → ED (ED-18); UI-52 points there |
 | 0042 r5 refusal to the initiating surface, which keeps focus and draft | where → UI-90; the refused Markdown save → UI-59. Outcome semantics sent → ED |
-| 0042 r6 nothing steals focus | retryable failure takes no focus → UI-93. Conflict and permanent rejection are focus-taking dialogs (UI-93): 0068 r17 covers the conflict dialog; for the permanent rejection the agreeing source is the old guide (G15: the Space's "existing `Alert`/`AlertDialog` states"), with the code and `app/ladle-e2e/command-dock.spec.ts` › "a permanent rejection explains itself and can be acknowledged". Drafting rule 1 narrows 0042's "none" accordingly; no conflict raised. Locking and coalescing sent → ED |
+| 0042 r6 nothing steals focus | retryable failure takes no focus → UI-93. Conflict and permanent rejection are focus-taking dialogs (UI-93): 0068 r17 covers the conflict dialog; for the permanent rejection the agreeing source is the old guide (G15: the Space's "existing `Alert`/`AlertDialog` states"), with the code and `app/ladle-e2e/command-dock.spec.ts` › "a permanent rejection explains itself and can be acknowledged". A drafting rule cannot narrow an accepted ADR, so the permanent rejection's focus is open as C4 (raised on review, 15 November 2026) Locking and coalescing sent → ED |
 | 0042 r8 target-bound surfaces close, canvas focused | focus → UI-88 (bug: no focus placed); surfaces closing → ED-30. Selection and Traversal history clearing sent → NV. Epoch sent → ED |
 | 0042 r2, r3, r7, r9–r11 | sent → ED (r11 checklist → PROC) |
 | 0047 r1–r3 | → UI-1 |
@@ -122,7 +122,8 @@ The rule ids in `../ui.md` are append-only from this version on.
 | 0073 Escape and commit stay surface-decided | folded → UI-48, UI-56 |
 | 0073 Tab traverses Resources, arrows one Resource's commands | dropped as written by 0102; the reach it promised → UI-18 (not built, DEC 6) |
 | 0073 Alias metadata modal; Space Card kind commands | dropped: the Alias pane is gone (0070); Space Resource commands → UI-20, UI-25, UI-61 |
-| 0074 r7 a destructive action names its scope and asks first where authored work would be lost; its Space may go with it | → UI-83 (including the Space Resource cascade sentence). Remove from Map → UI-85 (bug; ruling UI C2 of 12 November 2026 closed C2: asks only when Edges would go) |
+| 0074 r7 a destructive action names its scope and asks first where authored work would be lost; its Space may go with it | → UI-83 (including the Space Resource cascade sentence). Remove from Map → UI-85 (bug; ruling UI C2 of 12 November 2026 closed C2: asks only when Edges would go, recorded as ADR 0153, which refines 0074) |
+| 0153 Remove from Map asks first only when it would delete Edges, naming the Graphs that lose them; otherwise it removes at once | → UI-85 |
 | 0074 other rules | sent → SR |
 | 0082 one exclusive Map choice, no second control, no empty value | → UI-34 |
 | 0082 activating a Graph is not that choice | → UI-35 |

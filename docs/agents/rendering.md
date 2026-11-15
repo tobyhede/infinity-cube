@@ -10,4 +10,4 @@ This topic's rules are in the requirements docs below, which restate the accepte
 
 The [archived guide](../adr/archive/agent-guides/rendering.md) is history: the requirements docs and ADRs replace it, and it is not updated.
 
-Remove this page once no source comment, test, configuration or document cites `docs/agents/rendering.md`; `grep -rn docs/agents/rendering.md --exclude-dir=node_modules --exclude-dir=archive .` finds them.
+Remove this page once no source comment, test, configuration or document cites `docs/agents/rendering.md`; `grep -rln rendering.md --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=archive . | grep -v '^./docs/agents/rendering.md$'` finds them, relative links such as `../agents/rendering.md` included.

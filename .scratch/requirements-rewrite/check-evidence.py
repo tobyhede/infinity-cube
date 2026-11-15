@@ -51,7 +51,12 @@ def matches(title, source, source_pattern):
 
 def template_pattern(source):
     """A regex matching any test title in the source whose placeholders take any text."""
-    titles = re.findall(r"(?:it|test|describe)(?:\.\w+)*(?:\([^)]*\))?\(\s*`([^`]*)`", source)
+    titles = [
+        m.group(2)
+        for m in re.finditer(
+            r"(?:it|test|describe)(?:\.\w+)*(?:\([^)]*\))?\(\s*([`'\"])((?:\\.|(?!\1).)*)\1", source
+        )
+    ]
     alts = []
     for t in titles:
         if placeholder.search(t):

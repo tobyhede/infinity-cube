@@ -28,5 +28,5 @@ Ruling S1 in `../DECISIONS.md` ("Checkpoint 2 rulings"): every working read goes
 
 For the record:
 - **What the conflict was.** 0080 said one server-side boundary. The old contract R18 said one boundary per context. The code builds the loader in three places.
-- **What the ruling settles.** The number of call sites is not a requirement. Each site must use the one loader.
+- **What the ruling settles.** The number of call sites is not a requirement. Each site must use the one loader. The ruling keeps 0080's one server-side boundary: behind HTTP the browser's loaders read through the single-Space route, which has already initialized the Space, and a mounted page hosts that route itself because ADR 0130 puts the HTTP application in the page. "Wherever it runs" means those hosts, not a second boundary.
 - **Evidence.** `http/src/index.ts` (the single-Space route); `persistence/src/session-registry.ts` (`workingTargetSelection`); `app/src/open-spaces.ts` (`compose`); `persistence/src/working-space.ts` `createWorkingSpaceLoader`. Behind HTTP, the browser loaders read through the single-Space route, which has already initialized the Space.

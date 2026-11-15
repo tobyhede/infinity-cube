@@ -23,7 +23,7 @@ Closed by ruling Editing C2 in `../DECISIONS.md` ("Checkpoint 3 rulings", 12 Nov
 
 For the record:
 - **Rules.** ED-78. Related: ED-9, ED-12, ED-17.
-- **What the conflict was.** `CONTEXT.md` ("Completion outcome") gives one outcome per attempt, and 0042 and 0057 send a refusal back to its surface. The code answers `queued` at once and discards the drained outcome, and its callers disagree on what `queued` means.
+- **What the conflict was.** `CONTEXT.md` ("Completion outcome") gives one outcome per attempt, and 0042 and 0057 send a refusal back to its surface. The code answers `queued` at once and, for a caller that passes no settle callback, discards the drained outcome; its callers disagree on what `queued` means.
 - **Evidence.** `app/src/space-authoring.ts` `complete` (`:1647`); `app/src/authoring-commands.ts:104-121`; `app/src/authoring-contexts.ts:270`; `app/src/resource-placement.ts:258`; `app/src/connection-completion.ts:115`; `app/src/edge-authoring.ts:484`; `app/test/command-outcomes.test.ts` › "leaves the channel clear on unchanged and queued".
 
 ### C3. Is a broken invariant from a canvas gesture always reported, never thrown?

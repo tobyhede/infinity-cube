@@ -2,7 +2,7 @@
 
 **Purpose:** what changes what is shown without writing the Space: choosing a Map, selection, traversal, product URLs and browser history, Open Spaces, and presenting.
 
-**Snapshot:** checked against `d14ff974` (2026-11-15); incorporates accepted ADRs through 0152. ADRs accepted after it bind where they differ, until this document is updated.
+**Snapshot:** checked against `d14ff974` (2026-11-15); incorporates accepted ADRs through 0153. ADRs accepted after it bind where they differ, until this document is updated.
 
 Open conflicts are listed in [conflicts/navigation.md](conflicts/navigation.md). Sources are traced in [trace/navigation.md](trace/navigation.md).
 
@@ -152,7 +152,7 @@ Open conflicts are listed in [conflicts/navigation.md](conflicts/navigation.md).
 - **NV-84** A `refused` save (editing.md) counts as rejected: its entry is marked with the rejected word, and Exit warns on it as on `rejected` (NV-86). *Why:* both recover only through a further Edit, which is what the mark and the warning are for. Sources: ADR 0068; `DECISIONS.md` ruling Navigation C3. **built**: `app/test/dock-report.test.ts` › "in the words `openSpaceStatusLabel` decides"; `app/test/open-spaces.test.tsx` › "warns before exiting refused work and permits an explicit exit".
 - **NV-88** A conflict dialog opens only when its Space is on the canvas; an entry carries the mark meanwhile. *Why:* a decision belongs to the Space on screen. Sources: ADR 0068. **built (untested)**: `app/src/components/OpenSpacesApplication.tsx` hides every other Space.
 - **NV-49** Meta cannot be exited (`meta-space-permanent`). *Why:* Meta is where navigation starts. Sources: ADR 0068. **built**: `app/test/open-spaces.test.tsx` › "never exits the permanent Meta Space".
-- **NV-82** Meta is the only permanent Space: any other Space can be exited, whether it was Entered or opened by its product URL. Exiting the last open Space opens Meta with no Opener and writes Meta's product URL to the location (on a mounted page, with `source`, NV-36). *Why:* the author is never left with nothing on the canvas, and the location must name what is shown. Sources: ADR 0068. **not built**: exiting the last open Space leaves nothing on the canvas and writes no location, so the location still names the exited Space and reload reopens it (`app/src/open-spaces.ts` `exit`, `followActiveSpace`; untested).
+- **NV-82** Meta is the only permanent Space: any other Space can be exited, whether it was Entered or opened by its product URL. Exiting the last open Space opens Meta with no Opener and writes Meta's product URL to the location (on a mounted page, with `source`, NV-36). *Why:* the author is never left with nothing on the canvas, and the location must name what is shown. Sources: ADR 0068. **bug: code differs**: exiting the last open Space leaves nothing on the canvas and writes no location, so the location still names the exited Space and reload reopens it (`app/src/open-spaces.ts` `exit`, `followActiveSpace`; untested).
 - **NV-81** A Space stays composed (its session live) while its listing in Open Spaces or any drawing of one of its Maps holds it. Exit releases only the listing: a Space still drawn elsewhere keeps its session, unlisted and without an Opener, and the last release disposes it. Entering or opening a Space already composed, listed or only drawn, uses its live session. *Why:* being listed and being drawn are separate reasons to keep a Space. Sources: ADR 0112. **built**: `app/test/open-spaces.test.tsx` › "Exit releases only its listing hold and the last drawing disposes the composition", "holds a drawn target without listing it, and Enter reuses its composition", "holds the target a Reference Resource to a Space Resource draws, and Close releases it".
 
 ## While an image is replaced
@@ -247,4 +247,8 @@ Open conflicts are listed in [conflicts/navigation.md](conflicts/navigation.md).
 
 ## Bugs
 
-None found in this doc. Switching Graphs saving nothing is MG-45.
+Each line is a rule the code does not meet, with the change it needs.
+
+- **NV-82**: exiting the last open Space must open Meta with no Opener and write Meta's product URL to the location, instead of leaving the canvas empty and the location naming the exited Space.
+
+Switching Graphs saving nothing is MG-45.
