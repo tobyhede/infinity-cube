@@ -2,7 +2,7 @@
 
 **Purpose:** everything behind `SpaceBackend`: the repository and Meta lifecycle, intake and schema strictness, the file format, the Aggregate directory and its assets, the asset store, Import, Export, `cube run`, the CLI (including `check` and `mcp`), the HTTP application and wire, the working-space loader, and Mounting.
 
-**Snapshot:** checked against `d14ff974` (2026-11-15); incorporates accepted ADRs through 0153. ADRs accepted after it bind where they differ, until this document is updated. Proposed ADR 0141 (an agent authoring a running aggregate) is not incorporated; the `cube mcp` rules here restate the code and `AGENTS.md`.
+**Snapshot:** checked against `d14ff974` (2026-11-15); incorporates accepted ADRs through 0154. ADRs accepted after it bind where they differ, until this document is updated. Proposed ADR 0141 (an agent authoring a running aggregate) is not incorporated; the `cube mcp` rules here restate the code and `AGENTS.md`.
 
 Conflicts, open and closed, are listed in [conflicts/storage.md](conflicts/storage.md). Sources are traced in [trace/storage.md](trace/storage.md).
 

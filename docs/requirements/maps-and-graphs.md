@@ -2,7 +2,7 @@
 
 **Purpose:** what Maps, Map entries, Graphs and Edges hold, and what each Edit does to them.
 
-**Snapshot:** checked against `d14ff974` (2026-11-15); incorporates accepted ADRs through 0153. ADRs accepted after it bind where they differ, until this document is updated.
+**Snapshot:** checked against `d14ff974` (2026-11-15); incorporates accepted ADRs through 0154. ADRs accepted after it bind where they differ, until this document is updated.
 
 Open conflicts are listed in [conflicts/maps-and-graphs.md](conflicts/maps-and-graphs.md). Sources are traced in [trace/maps-and-graphs.md](trace/maps-and-graphs.md).
 

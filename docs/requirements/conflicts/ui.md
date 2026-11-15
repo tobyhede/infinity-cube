@@ -2,25 +2,7 @@
 
 These are conflicts for [../ui.md](../ui.md) that drafting rules 1–5 and [../DECISIONS.md](../DECISIONS.md) do not settle. Conflict ids are never reused. Paths are relative to `packages/`.
 
-One conflict is open.
-
-## Open
-
-### C4. Whether a permanent rejection takes focus
-
-Raised on review, 15 November 2026.
-
-**Rules affected:** UI-93 (the "rejected, refused" row).
-
-**The disagreement.** ADR 0042 decides what a failed save, a conflict and a permanent rejection keep, and ends: "None steals focus." ADR 0068 later makes the conflict a choice the author must take, so the conflict dialog taking focus has an ADR behind it. Nothing later says the same for a permanent rejection. The code shows a rejection, and a refused save, as an `alertdialog` that takes focus until "Continue editing" is pressed. The rewrite kept that by narrowing 0042 with drafting rule 1, on the strength of the old guide (G15) and the code, and raised no conflict. A drafting rule cannot narrow an accepted ADR.
-
-**Options.**
-- **(a) A rejection is a dialog that takes focus.** Record it as an ADR refining 0042: a save the server will never accept is a decision the author must see before working on, as a conflict is. UI-93 stays as the code is.
-- **(b) A rejection steals no focus.** Keep 0042: the rejection explains itself where the standing alert does, announced, and the author acknowledges it without being moved. UI-93's row becomes "no", and the dialog is a bug.
-
-**Recommendation: (a).** Unlike a retryable failure, a rejection has no Retry for a standing alert to offer, only an explanation to read; and the code and its tests already do this.
-
-**Evidence.** `docs/adr/0042-interaction-drafts-stay-local-and-space-replacement-invalidates-them.md:46`; `app/ladle-e2e/command-dock.spec.ts` › "a permanent rejection explains itself and can be acknowledged", "a refused aggregate explains itself as one sentence and can be acknowledged"; `trace/ui.md` (the 0042 r6 row).
+No conflict is open.
 
 ## Closed
 
@@ -78,3 +60,21 @@ Closed by the rulings of 12 November 2026 (DECISIONS, Checkpoint 3 rulings). The
 **Recommendation: (a).** The ellipsis keeps the name 0083 asks for and only adds the signal that more follows, which is 0083's own concern (part of a Title must not read as the whole). It is built and tested.
 
 **Evidence.** `docs/adr/0083-a-card-title-is-title-lines.md:27`; `CONTEXT.md:47`; `app/test/DeleteResourceConfirmation.test.tsx` › "names a Resource whose Title spans several lines by its first line and an ellipsis"; `app/test/resource-rail-actions.test.tsx` › "names the Resource in the question by its short Title and not by its whole Title".
+
+### C4. Whether a permanent rejection takes focus
+
+**Closed by ruling UI C4 (15 November 2026), recorded as ADR 0154, which refines 0042.** A permanent rejection, and a refused save, is a dialog that takes focus until acknowledged; a retryable failure still takes none (option (a)). UI-93 is built as it stands.
+
+Raised on review, 15 November 2026.
+
+**Rules affected:** UI-93 (the "rejected, refused" row).
+
+**The disagreement.** ADR 0042 decides what a failed save, a conflict and a permanent rejection keep, and ends: "None steals focus." ADR 0068 later makes the conflict a choice the author must take, so the conflict dialog taking focus has an ADR behind it. Nothing later says the same for a permanent rejection. The code shows a rejection, and a refused save, as an `alertdialog` that takes focus until "Continue editing" is pressed. The rewrite kept that by narrowing 0042 with drafting rule 1, on the strength of the old guide (G15) and the code, and raised no conflict. A drafting rule cannot narrow an accepted ADR.
+
+**Options.**
+- **(a) A rejection is a dialog that takes focus.** Record it as an ADR refining 0042: a save the server will never accept is a decision the author must see before working on, as a conflict is. UI-93 stays as the code is.
+- **(b) A rejection steals no focus.** Keep 0042: the rejection explains itself where the standing alert does, announced, and the author acknowledges it without being moved. UI-93's row becomes "no", and the dialog is a bug.
+
+**Recommendation: (a).** Unlike a retryable failure, a rejection has no Retry for a standing alert to offer, only an explanation to read; and the code and its tests already do this.
+
+**Evidence.** `docs/adr/0042-interaction-drafts-stay-local-and-space-replacement-invalidates-them.md:46`; `app/ladle-e2e/command-dock.spec.ts` › "a permanent rejection explains itself and can be acknowledged", "a refused aggregate explains itself as one sentence and can be acknowledged"; `trace/ui.md` (the 0042 r6 row).

@@ -2,7 +2,7 @@
 
 Rulings made by the maintainer while the requirements docs were written. Each was put to the maintainer on a checkpoint page with its evidence; those pages were not preserved in the repository. Where a ruling closed a conflict, the conflict file under `conflicts/` keeps the disagreement, the options and the evidence. The run record, `.scratch/requirements-rewrite/RUN.md`, says what else of the run survives.
 
-These rulings do not bind on their own. ADRs bind (ADR 0145): a ruling that changes what an accepted ADR decides is recorded as an ADR, listed under "Rulings recorded as ADRs" below (ADR 0146–0153), and the requirements restate it from there.
+These rulings do not bind on their own. ADRs bind (ADR 0145): a ruling that changes what an accepted ADR decides is recorded as an ADR, listed under "Rulings recorded as ADRs" below (ADR 0146–0154), and the requirements restate it from there.
 
 ## Structure
 
@@ -58,6 +58,7 @@ Ruled 12 November 2026, after an independent audit of each recommendation. Code 
 - **UI C1 is closed with no ruling.** The code already refuses a connection released on another drawing with wording ("An Edge can connect Resources only within the same drawn Map."), and two end-to-end tests assert it. The ADR and the code agree.
 - **UI C2.** Remove from Map asks first only when it would delete Edges, and the question names the Graphs that lose them. Otherwise it removes at once. This applies from the menu and from the Delete key, embedded drawings included, and overrules the ticket that said Remove from Map is not a deletion. Bug: code differs.
 - **UI C3.** Wherever a sentence quotes a Title, it uses the short Title: the first line, plus "…" when more lines follow. This covers questions, notices and Edge labels and their accessible names. Controls, list rows and chrome use the first line alone. Notices that quote the bare name are bugs. Recorded as ADR 0151.
+- **UI C4** (15 November 2026, raised on review). A permanent rejection, and a refused save, is a dialog that takes focus until acknowledged. A retryable failure still takes none.
 
 ## Rulings recorded as ADRs (15 November 2026)
 
@@ -72,5 +73,6 @@ When ruling 8 was reversed, every ruling above that changes what an accepted ADR
 | Space and Resources C1. Stop measuring an image's natural size | 0106's measurement on set, and 0126's bound on it | ADR 0150 | SR-26 |
 | UI C3. A sentence quotes a Title by its short Title | 0083's "the first line and nothing else" for sentences | ADR 0151 | UI-99 |
 | UI C2. Remove from Map asks first only when Edges would go | 0074's "asks first wherever authored work would be lost" for Remove from Map | ADR 0153 | UI-85 |
+| UI C4. A permanent rejection is a dialog that takes focus | 0042's "None steals focus" for a permanent rejection | ADR 0154 | UI-93 |
 | Storage S2. No compatibility promise for a copy outside the repository | the reason 0054 and 0056 give for rolling forward | ADR 0152 | ST-36 |
 | 8. (reversed) | 0115 | ADR 0145, which supersedes 0115 | `README.md`; every doc's snapshot marker |

@@ -6,7 +6,7 @@ Written 15 November 2026, at branch `docs/requirements-rewrite` (HEAD `e503e525`
 
 **How each was answered.** Starting at the `AGENTS.md` task table, then `CONTEXT.md` for terms, then the owning requirements doc. A question **passes** when that path reaches a rule that gives the expected answer and its status, without opening an ADR or the code. It **fails** on discovery when the path does not reach the rule, and on content when the rule found says something else. "Route" names the `AGENTS.md` row that sends the reader to the doc.
 
-The ADR numbers are from the trace rows (`docs/requirements/trace/`) for each rule. Where a maintainer ruling changed what an ADR decided, the ADR that records the ruling (0146–0153) is named.
+The ADR numbers are from the trace rows (`docs/requirements/trace/`) for each rule. Where a maintainer ruling changed what an ADR decided, the ADR that records the ruling (0146–0154) is named.
 
 ## Space and Resources
 

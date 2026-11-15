@@ -121,7 +121,8 @@ The current statement of these decisions is [Editing](../requirements/editing.md
 | ADR | Binds |
 | --- | --- |
 | [0035](0035-space-authoring-owns-the-edit-lifecycle.md) | Space Authoring owns the full Edit lifecycle. |
-| [0042](0042-interaction-drafts-stay-local-and-space-replacement-invalidates-them.md) | An interaction draft stays local, and a Space replacement discards it. |
+| [0042](0042-interaction-drafts-stay-local-and-space-replacement-invalidates-them.md) | An interaction draft stays local, and a Space replacement discards it. 0154 makes a permanent rejection a dialog that takes focus. |
+| [0154](0154-a-permanent-rejection-is-a-dialog-that-takes-focus.md) | A permanent rejection, and a refused save, is an announced dialog that takes focus until acknowledged; a retryable failure still takes none (refines 0042). |
 | [0057](0057-errors-cross-seams-as-stable-identities.md) | An error crosses a seam as a stable identity, not as prose. |
 | [0109](0109-nondeterminism-is-injected-once-at-composition.md) | A nondeterministic function is a required composition parameter, named at the composition root. Tests own a generator and never mock `crypto.randomUUID`. |
 | [0028](0028-activating-a-route-is-not-an-edit.md) | To activate a Graph is not an Edit. (0146 makes switching Graphs an Edit.) |
