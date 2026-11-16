@@ -1,4 +1,4 @@
-# 05 — A Cargo workspace under crates/ with its own CI job
+# 09 — A Cargo workspace under crates/ with its own CI job
 
 **Status:** ready-for-agent
 

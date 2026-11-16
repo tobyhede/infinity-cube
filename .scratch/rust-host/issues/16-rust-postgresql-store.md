@@ -1,8 +1,8 @@
-# 14 — The Rust PostgreSQL store
+# 16 — The Rust PostgreSQL store
 
 **Status:** needs-triage
 
-**Blocked by:** 13.
+**Blocked by:** 15.
 
 **What to build:** The same SQL repository on PostgreSQL; the CLI gains the PostgreSQL host; migration ownership moves to Rust; the PostgreSQL restart proof runs against it.
 

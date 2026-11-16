@@ -1,4 +1,4 @@
-# 03 — An intake conformance corpus, run against the TypeScript intake
+# 07 — An intake conformance corpus, run against the TypeScript intake
 
 **Status:** ready-for-agent
 

@@ -1,8 +1,8 @@
-# 15 — The remaining CLI verbs, MCP, and retiring the TypeScript server
+# 17 — The remaining CLI verbs, MCP, and retiring the TypeScript server
 
 **Status:** needs-triage
 
-**Blocked by:** 14.
+**Blocked by:** 16.
 
 **What to build:** `init`, `import` and `export` (with `--store`) and the MCP server in the Rust binary; `pnpm dev` and the e2e hosts served by it; the TypeScript server-side packages and `src/` host code removed, with `aggregate` keeping what Mounting needs in the page.
 
