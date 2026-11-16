@@ -11,7 +11,7 @@ No tracked issue covers this. lizard #331 "TSX Support" is closed, and ImpactGat
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-human
+**Status:** wontfix — parked work closed under the MVP scope rule (2026-11-16)
 
 - [x] A synthetic repro that shares no code with this repo, as small as it will go, showing a wrong span under lizard 1.23.0. It should cover both shapes if they turn out to be separate causes: an interface derailing a later function, and a function-typed parameter annotation ending a span early. (Two separate causes, and neither is the interface; see the Answer.)
 - [x] The repro is checked against lizard's latest release, and the result is recorded here. (1.24.0, identical.)
@@ -75,3 +75,11 @@ Reach on this repo, by a TypeScript-compiler-API scan for functions whose own pa
 ### Upstream
 
 Both are small, self-contained reports for lizard's tracker: bug 2 wants a parenthesis-depth counter in `_dec`, and bug 1 wants the TSX tag reader to fail safe on `<{`. Filing is outward-facing and left to a human.
+
+## Comments
+
+### Decision, 2026-11-16
+
+> *Recorded by AI from Toby's answer in the project thread.*
+
+Closed under the "keep to the MVP" rule: nothing is waiting on it. Reopen it if the need comes back; it stays in git history.

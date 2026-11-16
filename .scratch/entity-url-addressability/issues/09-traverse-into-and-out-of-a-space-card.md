@@ -12,3 +12,11 @@ cross-Space Edges / traversal cut `08` left in its tail.
 - [ ] Presentation carries one containing Graph context per crossed Space Card; local and exit Edges form ordinary forks, and Back retraces crossings.
 - [ ] Independent presentation of the target Graph sees none of another Space's entry or exit Edges.
 - [ ] `pnpm verify`, `pnpm e2e` and the relevant Ladle E2E evidence pass.
+
+## Comments
+
+### Decision, 2026-11-16
+
+> *Recorded by AI from Toby's answer in the project thread.*
+
+Cross-Space Edges stay parked, not dropped. Nothing builds them, or this ticket, until they are decided.

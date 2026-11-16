@@ -1,6 +1,6 @@
 # 25: Run mutation testing in CI
 
-**Status:** needs-triage — deferred by Toby Hede (2026-09-25) and excluded from the active queue (`../DECISIONS-2026-09-25.md`). The decisions below stay open until it is picked up again.
+**Status:** wontfix — parked work closed under the MVP scope rule (2026-11-16)
 
 **Blocked by:** None; follows the Stryker decision in 13
 
@@ -34,3 +34,8 @@ This reverses a standing rule. AGENTS.md ("a deliberate local diagnostic, never 
 
 Still valid. There is no CI job: `stryker.conf.mjs:5-6` and AGENTS.md still say "never a gate", and `package.json:40-41` still holds the two `mutate:*` campaigns. It stays deferred by Toby Hede's decision (`../DECISIONS-2026-09-25.md:21`). The body was refreshed in two ways. "To decide" is narrowed to a report-only, non-required job, because the same decisions note (`:14`) keeps mutation testing outside mandatory CI gates with no threshold. The `build-tooling.md` quote is corrected, since that file does not say "never a gate". The open decision when it is picked up: whether to run it at all, on which trigger, and over which campaigns.
 
+### Decision, 2026-11-16
+
+> *Recorded by AI from Toby's answer in the project thread.*
+
+Closed under the "keep to the MVP" rule: nothing is waiting on it. Reopen it if the need comes back; it stays in git history.

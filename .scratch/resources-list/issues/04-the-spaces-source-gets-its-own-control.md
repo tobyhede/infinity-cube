@@ -6,10 +6,18 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** wontfix — parked work closed under the MVP scope rule (2026-11-16)
 
 - [ ] Started with the `shadcn-first-ui` skill: the control is built from `@project/ui` or the shadcn registry, or a deviation is recorded before it is written
 - [ ] The kind row holds one toggle per registered kind and nothing else
 - [ ] The Spaces control carries its count and an accessible name that includes it, and turning it off withholds Space rows
 - [ ] The Connect list, which never offers Spaces, draws no Spaces control
 - [ ] The Ladle story and its spec are updated; `pnpm ui:catalog:check` passes
+
+## Comments
+
+### Decision, 2026-11-16
+
+> *Recorded by AI from Toby's answer in the project thread.*
+
+Closed under the "keep to the MVP" rule: nothing is waiting on it. Reopen it if the need comes back; it stays in git history.

@@ -12,3 +12,11 @@
 - [ ] Missing, incompatible or changed crossing context returns an actual HTTP 404 rather than dropping context or choosing fallbacks.
 - [ ] Presentation moves add only local browser history; the copied URL does not encode the path previously traversed.
 - [ ] `pnpm verify` and `pnpm e2e` pass.
+
+## Comments
+
+### Decision, 2026-11-16
+
+> *Recorded by AI from Toby's answer in the project thread.*
+
+Cross-Space Edges stay parked, not dropped. Nothing builds them, or this ticket, until they are decided.
