@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -79,10 +79,16 @@ const sourcesUnder = (directory: string): readonly string[] =>
     return source ? [path] : [];
   });
 
-/** Every package's own source tree, as repository-relative paths. */
+/**
+ * Every package's own source tree, as repository-relative paths. A package
+ * with no `src`, the desktop shell's, has no TypeScript surface to draw a
+ * Title on.
+ */
 const packageSources = (): readonly string[] =>
   readdirSync(join(repoRoot, 'packages'), { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
+    .filter(
+      (entry) => entry.isDirectory() && existsSync(join(repoRoot, 'packages', entry.name, 'src')),
+    )
     .flatMap((entry) => {
       const src = join(repoRoot, 'packages', entry.name, 'src');
       return sourcesUnder(src).map((path) => relative(repoRoot, path));

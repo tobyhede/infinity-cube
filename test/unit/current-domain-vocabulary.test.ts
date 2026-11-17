@@ -2382,7 +2382,9 @@ const RETIRED_SPACE_BARE = new RegExp(`\\b${RETIRED_SPACE}s?\\b`);
 
 /**
  * The three identifiers naming a parsed `package.json` or the file that lists
- * the packages. npm's and pnpm's sense, arriving with their file formats rather
+ * the packages, and the two spellings of Tauri's build-time list of the
+ * desktop shell's commands (`packages/desktop/src-tauri/build.rs`). npm's,
+ * pnpm's and Tauri's sense, arriving with their file formats and APIs rather
  * than ours to sweep — the same carve-out Lucide's glyph gets above, and masked
  * by spelling for the same reason: a domain compound added to one of these
  * modules is our vocabulary wearing a forgiven name, and stays visible.
@@ -2394,6 +2396,8 @@ const FOREIGN_SPACE_SPELLINGS: readonly string[] = [
   `Typechecking${RETIRED_SPACE_CAPITAL}`,
   `app${RETIRED_SPACE_CAPITAL}`,
   `root${RETIRED_SPACE_CAPITAL}`,
+  `App${RETIRED_SPACE_CAPITAL}`,
+  `app_${RETIRED_SPACE}`,
 ];
 
 /**
@@ -3281,6 +3285,13 @@ const RETIRED_PRODUCT_NAME = new RegExp(RETIRED_PRODUCT, 'i');
 const PRODUCT_HISTORY_TREES = ['migrations/', 'migrations-sqlite/'] as const;
 
 /**
+ * Cargo's lockfile for the desktop shell names a Rust HTTP crate the Tauri
+ * runtime depends on, which shares the earlier name; Cargo writes the file,
+ * and the crate's name is its publisher's.
+ */
+const PRODUCT_FOREIGN_FILES: readonly string[] = ['packages/desktop/src-tauri/Cargo.lock'];
+
+/**
  * The spellings that keep the earlier name, each for a reason outside this
  * repository's text. Each is removed from a line before the line is read, so a
  * second use of the name on the same line is still reported.
@@ -3318,7 +3329,8 @@ describe('the application is named InfinityCube', () => {
   const scanned = trackedFiles().filter(
     (file) =>
       ![...HISTORICAL_TREES, ...PRODUCT_HISTORY_TREES].some((tree) => file.startsWith(tree)) &&
-      !/\.(png|jpe?g|gif|ico|woff2?|pdf|webp)$/i.test(file),
+      !PRODUCT_FOREIGN_FILES.includes(file) &&
+      !/\.(png|jpe?g|gif|ico|icns|woff2?|pdf|webp)$/i.test(file),
   );
 
   it('reaches the kinds of file the rename actually touched', () => {

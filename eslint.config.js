@@ -250,6 +250,10 @@ export default tseslint.config(
       '**/dist-http/**',
       '**/dist-desktop-sidecar/**',
       '**/dist-mount/**',
+      // The desktop shell's Cargo output, generated schemas and built sidecar.
+      'packages/desktop/src-tauri/target/**',
+      'packages/desktop/src-tauri/gen/**',
+      'packages/desktop/src-tauri/binaries/**',
       // `ladle build` output is gitignored, but flat ESLint config does not
       // read `.gitignore` and would otherwise lint the generated bundles.
       'packages/app/build/**',
@@ -731,5 +735,11 @@ export default tseslint.config(
   {
     files: ['**/*.{js,mjs,cjs}'],
     extends: [tseslint.configs.disableTypeChecked],
+  },
+  // The desktop shell's home window runs this script in its webview, with no
+  // bundler (packages/desktop/ui/).
+  {
+    files: ['packages/desktop/ui/**/*.js'],
+    languageOptions: { globals: globals.browser },
   },
 );
