@@ -2,7 +2,7 @@
 
 **Status:** needs-triage
 
-**Blocked by:** 16.
+**Blocked by:** 16, and every ticket under `.scratch/standalone-http-host/issues/` (they move these hosts onto the Node host first).
 
 **What to build:** `pnpm dev` (PostgreSQL), `pnpm dev:new` and `pnpm dev:fixture` (memory), `pnpm dev:roadmap`, `pnpm dev:sqlite`, and the hosts the Playwright suites start (`pnpm e2e`, `pnpm e2e:postgres`, `pnpm e2e:sqlite`) served by the Rust binary, with Vite serving only the browser application's assets in development. The `.scratch/standalone-http-host/` tickets move these hosts onto the production Node host (03) first (spec, decision 12); this ticket moves them from it to Rust. Each script keeps its port and `--strictPort` behaviour, and each e2e test still owns a fresh host and store.
 

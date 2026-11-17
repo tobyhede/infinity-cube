@@ -8,6 +8,8 @@
 
 **One origin per talk.** Each talk is served from its own origin under the scheme, with the talk in the host part (spec, decision 4), so two talks presenting at once do not share a `BroadcastChannel` or Web Locks; and the host part is the same on every launch of that talk, so what the page keeps in `localStorage` (the colour scheme) survives a restart, which the sidecar's random port did not give. Opening a Resource independently and the Notes window open under the same origin as their talk.
 
+**Windows.** Tauri serves a custom scheme on Windows from `http://<scheme>.localhost`, so the scheme, not the host part, sets the origin there, and talks under one scheme would share an origin. Decide before the swap, and record here: either register one scheme per talk on Windows, named stably from the talk so the origin survives a restart, or key the presentation channel and lock names by talk and accept a shared `localStorage` on Windows. 22 ships Windows; this ticket does not, but its seam must not rule either out.
+
 **What goes and what stays.** The shell's sidecar wiring (`src-tauri/src/sidecar.rs`), `packages/desktop/scripts/build-sidecar.ts`, the `externalBin` entry, the Node single-executable build and the sidecar step in 06's release pipeline go. The production Node host itself (03, `src/desktop/`) stays: it is the host 08 holds every other one to in CI, and the host the standalone-http-host tickets adopt, until 20 retires it.
 
 **A seam first.** Today `main.rs` calls the sidecar directly (`sidecar::start` and the `Sidecar` type). Put the talk server behind a small seam in the shell (a trait, or an enum of the two servers) before the swap, so that swapping is one module and the window code does not change.
@@ -18,6 +20,6 @@
 - [ ] 08's body-limit, header, redirect and fallback cases green against the scheme handler's `Request -> Response` function, not only against the CLI's loopback listener.
 - [ ] A talk window never navigates to a remote origin: navigation is limited to that talk's own origin under the scheme, as the sidecar's shell limits it to the sidecar's origin.
 - [ ] The scheme handler refuses a mutation (any method but `GET` and `HEAD`) whose `Origin` is not the application's scheme, so a page from elsewhere cannot edit the talk; this check replaces the launch secret and the `Host` check.
-- [ ] Two talks presenting at once do not cross; a talk's colour scheme survives closing and reopening it.
+- [ ] Two talks presenting at once do not cross; a talk's colour scheme survives closing and reopening it (on macOS and Linux; Windows as the decision above records).
 - [ ] The release pipeline (06) builds no Node single executable.
 - [ ] Storage requirements and the `AGENTS.md` desktop entry describe the shell serving the Rust host through the scheme, with no sidecar.
