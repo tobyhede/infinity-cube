@@ -1,5 +1,7 @@
 # Running InfinityCube as a desktop app
 
+**Superseded in part, 17 November 2026:** ADRs 0155–0157 and `.scratch/rust-host/spec.md` decided against this research's recommendation. The desktop shell is Tauri, first with a Node sidecar (option B here) and then with a Rust host (option C, which this research left out of scope). The points that still hold (per-talk origins, Tauri's undocumented sidecar stop, signing) are carried into the spec's decisions and open questions; read the rest as the evidence of 15 November, not as the plan.
+
 Date: 2026-11-15
 Checked against: the working tree at `/home/claude/hyper` on this date (no commit hash: the copy read here is not a git checkout); external docs fetched on this date.
 
