@@ -16,6 +16,8 @@
 - [ ] Opening a talk and closing without an edit leaves the directory unchanged (ST-65).
 - [ ] A 10 MiB asset upload works through the custom scheme.
 - [ ] 08's body-limit, header, redirect and fallback cases green against the scheme handler's `Request -> Response` function, not only against the CLI's loopback listener.
+- [ ] A talk window never navigates to a remote origin: navigation is limited to that talk's own origin under the scheme, as the sidecar's shell limits it to the sidecar's origin.
+- [ ] The scheme handler refuses a mutation (any method but `GET` and `HEAD`) whose `Origin` is not the application's scheme, so a page from elsewhere cannot edit the talk; this check replaces the launch secret and the `Host` check.
 - [ ] Two talks presenting at once do not cross; a talk's colour scheme survives closing and reopening it.
 - [ ] The release pipeline (06) builds no Node single executable.
 - [ ] Storage requirements and the `AGENTS.md` desktop entry describe the shell serving the Rust host through the scheme, with no sidecar.

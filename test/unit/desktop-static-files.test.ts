@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -12,7 +12,9 @@ afterEach(async () => {
 
 /**
  * A built application beside a file it must never serve:
- * `<root>/secret.txt` and `<root>/built-other/secret.txt` sit outside `<root>/built`.
+ * `<root>/secret.txt` and `<root>/built-other/secret.txt` sit outside `<root>/built`,
+ * and `<root>/built` holds a link to each: `assets/linked-secret.txt` to the
+ * file and `linked-other` to its directory.
  */
 const builtBesideASecret = async () => {
   const root = await mkdtemp(join(tmpdir(), 'infinity-cube-built-'));
@@ -24,6 +26,10 @@ const builtBesideASecret = async () => {
   await writeFile(join(root, 'secret.txt'), 'secret');
   await mkdir(join(root, 'built-other'));
   await writeFile(join(root, 'built-other', 'secret.txt'), 'secret');
+  await writeFile(join(built, 'assets', 'worker-abc123.mjs'), 'export {}');
+  await writeFile(join(built, 'assets', 'module-abc123.wasm'), '\0asm');
+  await symlink(join(root, 'secret.txt'), join(built, 'assets', 'linked-secret.txt'));
+  await symlink(join(root, 'built-other'), join(built, 'linked-other'));
   return builtFiles(built);
 };
 
@@ -35,6 +41,21 @@ describe('The built files the desktop sidecar serves', () => {
     expect(file && text(file.bytes)).toBe('console.log(1)');
     expect(file?.contentType).toBe('text/javascript; charset=utf-8');
   });
+
+  it.each([
+    ['/assets/worker-abc123.mjs', 'text/javascript; charset=utf-8'],
+    ['/assets/module-abc123.wasm', 'application/wasm'],
+  ])('serves %s as %s', async (pathname, contentType) => {
+    const file = await (await builtBesideASecret())(pathname);
+    expect(file?.contentType).toBe(contentType);
+  });
+
+  it.each(['/assets/linked-secret.txt', '/linked-other/secret.txt'])(
+    'never serves %s, a link inside the build to a file outside it',
+    async (pathname) => {
+      expect(await (await builtBesideASecret())(pathname)).toBeUndefined();
+    },
+  );
 
   it('decodes an escaped name inside the build', async () => {
     const file = await (await builtBesideASecret())('/name%20with%20space.txt');

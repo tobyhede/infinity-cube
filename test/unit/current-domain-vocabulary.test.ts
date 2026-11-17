@@ -3285,13 +3285,6 @@ const RETIRED_PRODUCT_NAME = new RegExp(RETIRED_PRODUCT, 'i');
 const PRODUCT_HISTORY_TREES = ['migrations/', 'migrations-sqlite/'] as const;
 
 /**
- * Cargo's lockfile for the desktop shell names a Rust HTTP crate the Tauri
- * runtime depends on, which shares the earlier name; Cargo writes the file,
- * and the crate's name is its publisher's.
- */
-const PRODUCT_FOREIGN_FILES: readonly string[] = ['packages/desktop/src-tauri/Cargo.lock'];
-
-/**
  * The spellings that keep the earlier name, each for a reason outside this
  * repository's text. Each is removed from a line before the line is read, so a
  * second use of the name on the same line is still reported.
@@ -3303,6 +3296,9 @@ const PRODUCT_FOREIGN_FILES: readonly string[] = ['packages/desktop/src-tauri/Ca
  *   deploys a second Worker beside the first.
  * - The root file ADR 0136 renamed is named where an author or operator is
  *   told to move a talk that still holds it.
+ * - A Rust HTTP crate the desktop shell's Tauri runtime depends on shares the
+ *   earlier name, and Cargo's lockfile names it and its utility crate; the
+ *   crates' names are their publisher's.
  */
 const PRODUCT_KEPT_SPELLINGS: readonly RegExp[] = [
   /\b\d{4}-[a-z0-9-]+\.md\b/g,
@@ -3311,6 +3307,7 @@ const PRODUCT_KEPT_SPELLINGS: readonly RegExp[] = [
   new RegExp(`"name": "${RETIRED_PRODUCT}"`, 'g'),
   new RegExp(`\`wrangler\\.jsonc\`'s \`${RETIRED_PRODUCT}\``, 'g'),
   new RegExp(`\\b${RETIRED_PRODUCT}\\.json\\b`, 'g'),
+  new RegExp(`(?:name = |(?<=^|\\n) )"${RETIRED_PRODUCT}(?:-util)?"`, 'g'),
 ];
 
 const withoutKeptProductSpellings = (line: string): string =>
@@ -3329,7 +3326,6 @@ describe('the application is named InfinityCube', () => {
   const scanned = trackedFiles().filter(
     (file) =>
       ![...HISTORICAL_TREES, ...PRODUCT_HISTORY_TREES].some((tree) => file.startsWith(tree)) &&
-      !PRODUCT_FOREIGN_FILES.includes(file) &&
       !/\.(png|jpe?g|gif|ico|icns|woff2?|pdf|webp)$/i.test(file),
   );
 

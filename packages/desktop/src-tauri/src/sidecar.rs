@@ -1,6 +1,6 @@
 //! The desktop sidecar, as the shell starts and stops it (ADR 0155).
 //!
-//! A sidecar runs one talk folder. It announces itself with one JSON line on
+//! A sidecar runs one Aggregate directory. It announces itself with one JSON line on
 //! standard output (`src/desktop/announcement.ts`) and is stopped by closing
 //! its standard input, on which it writes any edit not yet on disk and exits.
 
@@ -46,7 +46,7 @@ pub enum SidecarError {
     Announcement(#[from] serde_json::Error),
 }
 
-/// A sidecar that is serving a talk folder.
+/// A sidecar that is serving an Aggregate directory.
 ///
 /// Dropping one stops it as [`Sidecar::stop`] does with [`STOP_GRACE`], so
 /// no path leaves it running or unreaped.
@@ -73,10 +73,23 @@ pub enum Started {
 /// How a sidecar ended when asked to stop.
 #[derive(Debug, Clone, Copy)]
 pub enum Stopped {
-    /// It wrote its last edit and exited by itself.
+    /// It exited by itself, writing its last edit if the status is success.
     Exited(ExitStatus),
     /// It had not exited within the grace period and was killed.
     Killed,
+}
+
+impl Stopped {
+    /// Why the last edit may not be on disk, or `None` if the sidecar
+    /// exited successfully, having written it.
+    #[must_use]
+    pub fn unwritten(&self) -> Option<String> {
+        match self {
+            Self::Exited(status) if status.success() => None,
+            Self::Exited(status) => Some(format!("its sidecar stopped with {status}")),
+            Self::Killed => Some("its sidecar did not stop in time and was killed".to_owned()),
+        }
+    }
 }
 
 /// Start a sidecar on `talk`, serving the built application in `built`, and
@@ -93,17 +106,25 @@ pub fn start(
     built: &Path,
     deadline: Duration,
 ) -> Result<Started, SidecarError> {
-    let mut child = Command::new(binary)
+    let mut command = Command::new(binary);
+    command
         .arg(talk)
         .arg(built)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .spawn()
-        .map_err(|source| SidecarError::Spawn {
-            path: binary.to_path_buf(),
-            source,
-        })?;
+        .stderr(Stdio::inherit());
+    // The sidecar is a console program and the shell is not: without this,
+    // Windows opens a console window beside each talk.
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    let mut child = command.spawn().map_err(|source| SidecarError::Spawn {
+        path: binary.to_path_buf(),
+        source,
+    })?;
     let stdin = child.stdin.take();
     let stdout = child.stdout.take();
     let mut sidecar = Sidecar {
@@ -151,6 +172,16 @@ impl Sidecar {
     #[must_use]
     pub fn stop(mut self, grace: Duration) -> Stopped {
         self.finish(grace)
+    }
+
+    /// How the sidecar exited, if it has, without asking it to stop.
+    pub fn exited(&mut self) -> Option<ExitStatus> {
+        if let Some(Stopped::Exited(status)) = self.ended {
+            return Some(status);
+        }
+        let status = self.child.try_wait().ok().flatten()?;
+        self.ended = Some(Stopped::Exited(status));
+        Some(status)
     }
 
     fn finish(&mut self, grace: Duration) -> Stopped {
@@ -220,7 +251,7 @@ mod tests {
         );
     }
 
-    /// A fake sidecar: `sh` runs the "talk folder" argument as its script.
+    /// A fake sidecar: `sh` runs the directory argument as its script.
     #[cfg(target_os = "linux")]
     fn fake_sidecar(name: &str, script: &str) -> PathBuf {
         let path = std::env::temp_dir().join(format!(
@@ -331,5 +362,112 @@ mod tests {
             reaped(&pid),
             "a sidecar refused after it started should be stopped and reaped, not left behind"
         );
+    }
+
+    #[cfg(unix)]
+    mod given_a_stopped_sidecar {
+        use super::*;
+        use std::os::unix::process::ExitStatusExt;
+
+        #[test]
+        fn a_successful_exit_wrote_the_last_edit() {
+            assert_eq!(
+                Stopped::Exited(ExitStatus::from_raw(0)).unwritten(),
+                None,
+                "a sidecar that exited zero should have written its last edit"
+            );
+        }
+
+        #[test]
+        fn a_failed_exit_may_not_have_written_it() {
+            let reason = Stopped::Exited(ExitStatus::from_raw(1 << 8)).unwritten();
+            assert!(
+                reason
+                    .as_deref()
+                    .is_some_and(|reason| reason.contains("exit status: 1")),
+                "a sidecar that exited non-zero should say its last edit may be lost, got {reason:?}"
+            );
+        }
+
+        #[test]
+        fn a_killed_sidecar_may_not_have_written_it() {
+            assert!(
+                Stopped::Killed.unwritten().is_some(),
+                "a sidecar killed after the grace period should say its last edit may be lost"
+            );
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    mod given_a_sidecar_that_has_announced {
+        use super::*;
+
+        const LISTENING: &str = r#"echo '{"kind":"listening","port":1,"secret":"s"}'"#;
+
+        /// A fake sidecar that announces it listens, then runs `then`.
+        fn listening(name: &str, then: &str) -> Option<(Sidecar, PathBuf)> {
+            let script = fake_sidecar(name, &format!("{LISTENING}\n{then}\n"));
+            match start(
+                Path::new("/bin/sh"),
+                &script,
+                Path::new("unused"),
+                ANNOUNCE_DEADLINE,
+            ) {
+                Ok(Started::Listening { sidecar, .. }) => Some((sidecar, script)),
+                _ => {
+                    let _ = std::fs::remove_file(&script);
+                    None
+                }
+            }
+        }
+
+        #[test]
+        fn an_exit_of_its_own_is_seen_with_its_status() {
+            let listening = listening("dies", "exit 3");
+            assert!(
+                listening.is_some(),
+                "the fake sidecar should announce that it listens"
+            );
+            let Some((mut sidecar, script)) = listening else {
+                return;
+            };
+            let deadline = Instant::now() + Duration::from_secs(10);
+            let mut status = sidecar.exited();
+            while status.is_none() && Instant::now() < deadline {
+                thread::sleep(Duration::from_millis(50));
+                status = sidecar.exited();
+            }
+            let _ = std::fs::remove_file(&script);
+            assert_eq!(
+                status.and_then(|status| status.code()),
+                Some(3),
+                "a sidecar that exits by itself should be seen to have exited, with its code"
+            );
+        }
+
+        #[test]
+        fn a_running_sidecar_has_not_exited() {
+            let listening = listening("serves", "exec cat > /dev/null");
+            assert!(
+                listening.is_some(),
+                "the fake sidecar should announce that it listens"
+            );
+            let Some((mut sidecar, script)) = listening else {
+                return;
+            };
+            thread::sleep(Duration::from_millis(200));
+            let status = sidecar.exited();
+            let stopped = sidecar.stop(STOP_GRACE);
+            let _ = std::fs::remove_file(&script);
+            assert_eq!(
+                status, None,
+                "a sidecar still serving should not be seen to exit"
+            );
+            assert_eq!(
+                stopped.unwritten(),
+                None,
+                "a sidecar that exits when its input closes should have written its last edit"
+            );
+        }
     }
 }

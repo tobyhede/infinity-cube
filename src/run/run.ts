@@ -73,7 +73,8 @@ export type RunStart =
  */
 const answeringRead = new AsyncLocalStorage<true>();
 
-const isRead = (method: string): boolean => method === 'GET' || method === 'HEAD';
+/** Whether `method` only reads: `GET` or `HEAD`. */
+export const isRead = (method: string): boolean => method === 'GET' || method === 'HEAD';
 
 /**
  * The host, answering its reads inside {@link answeringRead}. `fetch` is an

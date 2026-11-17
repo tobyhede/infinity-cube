@@ -13,9 +13,10 @@ import {
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { isAssetRef, newUuid, uuidSchema, type SpaceSnapshot } from '@project/core';
-import { HttpSpaceBackend } from '@project/http';
+import { isAssetRef, newUuid, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { HttpSpaceBackend, productDestinationPath } from '@project/http';
 import { afterEach, describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { AGGREGATE_FILE_NAME } from '@project/aggregate';
 import { readSingleSpace } from '../../src/aggregate-directory';
 import {
@@ -30,6 +31,8 @@ import { admitted, pngBytes } from '../support/stored-assets';
 
 const FIXTURE = fileURLToPath(new URL('../../packages/app/fixture', import.meta.url));
 const META_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
+/** The fixture's other Space, which an Edit to the Meta Space does not carry. */
+const AUTHORING_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000080');
 
 /**
  * A clock the test advances by hand: `startRun` takes its scheduler at
@@ -117,16 +120,16 @@ const backendFor = (run: Run) =>
     fetch: (input, init) => Promise.resolve(run.host.fetch(new Request(input, init))),
   });
 
-/** Rename the Meta Space through the Fetch app, exactly as the browser commits. */
-const renameMeta = async (run: Run, title: string): Promise<void> => {
+/** Rename a Space through the Fetch app, exactly as the browser commits. */
+const renameSpace = async (run: Run, spaceId: UUID, title: string): Promise<void> => {
   const backend = backendFor(run);
-  const loaded = await backend.loadSpace(META_SPACE_ID);
-  if (loaded === undefined) throw new Error('Expected the Meta Space');
+  const loaded = await backend.loadSpace(spaceId);
+  if (loaded === undefined) throw new Error(`Expected the Space ${spaceId}`);
   const result = await backend.commit({
     changes: [
       {
         kind: 'update',
-        spaceId: META_SPACE_ID,
+        spaceId,
         snapshot: { ...loaded.snapshot, document: { ...loaded.snapshot.document, title } },
         expectedRevision: loaded.revision,
       },
@@ -134,6 +137,9 @@ const renameMeta = async (run: Run, title: string): Promise<void> => {
   });
   expect(result.kind).toBe('committed');
 };
+
+const renameMeta = (run: Run, title: string): Promise<void> =>
+  renameSpace(run, META_SPACE_ID, title);
 
 const writes = (events: readonly RunEvent[]) => events.filter(({ kind }) => kind === 'written');
 
@@ -305,27 +311,54 @@ describe('Running an Aggregate directory', () => {
   /*
    * ST-65: a working read that initializes a Space (MG-74) commits to the
    * store, but only an author's Edit writes their files. A Space with Maps and
-   * no `defaultMap` is initialized by its first load, through the API and
-   * through a product address alike.
+   * no `defaultMap`, or with no Map at all, is initialized by its first load
+   * through the API, and the next Edit's write carries that initialization even
+   * when the Edit is to another Space. Resolving a product address loads the
+   * Space without initializing it: the page it answers then loads through the
+   * API (MG-75).
    */
-  const withoutDefaultMap = async (directory: string): Promise<void> => {
-    const path = join(directory, META_SPACE_ID, 'space.json');
-    const text = await readFile(path, 'utf8');
-    const without = text.replace(/^\s*"defaultMap": "[^"]+",\n/m, '');
-    expect(without).not.toBe(text);
-    await writeFile(path, without);
+  /** A Space file's Map fields, beside whatever else it holds, kept as written. */
+  const authoredMaps = z
+    .object({ defaultMap: z.string(), maps: z.array(z.unknown()) })
+    .passthrough();
+
+  /** Rewrite a Space file without its `defaultMap`, or also without its Maps. */
+  const removeFromSpaceFile = async (
+    directory: string,
+    spaceId: string,
+    remove: 'defaultMap' | 'maps',
+  ): Promise<void> => {
+    const path = join(directory, spaceId, 'space.json');
+    const {
+      defaultMap: _defaultMap,
+      maps,
+      ...rest
+    } = authoredMaps.parse(JSON.parse(await readFile(path, 'utf8')));
+    const space = remove === 'maps' ? rest : { ...rest, maps };
+    await writeFile(path, `${JSON.stringify(space, null, 2)}\n`);
   };
+
+  const withoutDefaultMap = (directory: string, spaceId: string): Promise<void> =>
+    removeFromSpaceFile(directory, spaceId, 'defaultMap');
+
+  const withoutMaps = (directory: string, spaceId: string): Promise<void> =>
+    removeFromSpaceFile(directory, spaceId, 'maps');
 
   it('writes nothing when opening a Space initializes it and nothing is edited (ST-65)', async () => {
     const directory = await fixtureCopy();
-    await withoutDefaultMap(directory);
+    await withoutDefaultMap(directory, META_SPACE_ID);
     const before = await filesUnder(directory);
     const { clock, start, events } = await started(directory);
     const run = running(start);
 
+    await expect(
+      run.host.resolveProductRequest(
+        productDestinationPath({ kind: 'space', spaceId: META_SPACE_ID }),
+        'GET',
+      ),
+    ).resolves.toBeUndefined();
     const loaded = await backendFor(run).loadSpace(META_SPACE_ID);
     expect(loaded?.snapshot.document.defaultMap).toBeDefined();
-    await run.host.resolveProductRequest(`/spaces/${META_SPACE_ID}`, 'GET');
     clock.advance(RUN_QUIET_MILLISECONDS);
     await run.stop();
 
@@ -335,16 +368,54 @@ describe('Running an Aggregate directory', () => {
 
   it('writes the initialization with the next Edit (ST-65)', async () => {
     const directory = await fixtureCopy();
-    await withoutDefaultMap(directory);
+    await withoutDefaultMap(directory, AUTHORING_SPACE_ID);
     const { start } = await started(directory);
     const run = running(start);
 
-    await renameMeta(run, 'Edited after opening');
+    const loaded = await backendFor(run).loadSpace(AUTHORING_SPACE_ID);
+    const defaultMap = loaded?.snapshot.document.defaultMap;
+    expect(defaultMap).toBeDefined();
+    await renameMeta(run, 'Edited after opening another Space');
     await run.stop();
 
+    expect(await spaceTitle(directory, META_SPACE_ID)).toBe('Edited after opening another Space');
+    const written = await readSingleSpace(join(directory, AUTHORING_SPACE_ID));
+    expect(written.document.defaultMap).toBe(defaultMap);
+  });
+
+  it('initializes a Space with no Map when it is read, and writes those same ids with the next Edit (ST-65)', async () => {
+    const directory = await fixtureCopy();
+    // Every other fixture Space has a Map a Space Resource selects.
+    await withoutMaps(directory, META_SPACE_ID);
+    const before = await filesUnder(directory);
+    const { clock, start, events } = await started(directory);
+    const run = running(start);
+
+    const loaded = await backendFor(run).loadSpace(META_SPACE_ID);
+    const [initializedMap, ...otherMaps] = loaded?.snapshot.document.maps ?? [];
+    expect(otherMaps).toEqual([]);
+    expect(initializedMap?.graphs).toHaveLength(1);
+    expect(loaded?.snapshot.document.defaultMap).toBe(initializedMap?.id);
+    clock.advance(RUN_QUIET_MILLISECONDS);
+    expect(writes(events)).toEqual([]);
+    expect(await filesUnder(directory)).toEqual(before);
+
+    await renameSpace(run, AUTHORING_SPACE_ID, 'Edited after reading a Space with no Map');
+    await run.stop();
+
+    expect(await spaceTitle(directory, AUTHORING_SPACE_ID)).toBe(
+      'Edited after reading a Space with no Map',
+    );
     const written = await readSingleSpace(join(directory, META_SPACE_ID));
-    expect(written.document.title).toBe('Edited after opening');
-    expect(written.document.defaultMap).toBeDefined();
+    expect(written.document.defaultMap).toBe(initializedMap?.id);
+    expect(
+      (written.document.maps ?? []).map(({ id, graphs }) => ({
+        id,
+        graphs: graphs.map((graph) => graph.id),
+      })),
+    ).toEqual([
+      { id: initializedMap?.id, graphs: initializedMap?.graphs.map((graph) => graph.id) },
+    ]);
   });
 
   it.each(EMPTY_DIRECTORIES)(

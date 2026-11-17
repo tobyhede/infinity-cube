@@ -42,6 +42,31 @@ if (triple === undefined) {
   process.stderr.write('`rustc -vV` named no host target triple.\n');
   process.exit(1);
 }
+// The executable is a copy of this Node, so the triple Tauri selects it by
+// must name this Node's platform and architecture.
+const [tripleArch = '', ...tripleRest] = triple.split('-');
+const tripleOs = tripleRest.join('-');
+const archOfTriple =
+  new Map([
+    ['aarch64', 'arm64'],
+    ['x86_64', 'x64'],
+    ['i686', 'ia32'],
+  ]).get(tripleArch) ?? tripleArch;
+const platformOfTriple = tripleOs.includes('darwin')
+  ? 'darwin'
+  : tripleOs.includes('windows')
+    ? 'win32'
+    : tripleOs.includes('linux')
+      ? 'linux'
+      : tripleOs;
+if (archOfTriple !== process.arch || platformOfTriple !== process.platform) {
+  process.stderr.write(
+    `Rust's host target is ${triple}, but this Node is ${process.platform}-${process.arch}, ` +
+      'and the sidecar is a copy of this Node. Run this with a Node built for the Rust target, ' +
+      'or with a Rust toolchain whose host is this platform.\n',
+  );
+  process.exit(1);
+}
 const extension = process.platform === 'win32' ? '.exe' : '';
 const output = join(binaries, `desktop-sidecar-${triple}${extension}`);
 mkdirSync(binaries, { recursive: true });

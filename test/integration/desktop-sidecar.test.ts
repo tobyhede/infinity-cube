@@ -6,7 +6,8 @@ import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { uuidSchema } from '@project/core';
 import { HttpSpaceBackend } from '@project/http';
-import { afterEach, describe, expect, it } from 'vitest';
+import { build } from 'vite';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { readSingleSpace } from '../../src/aggregate-directory';
 import {
   sidecarAnnouncementSchema,
@@ -48,14 +49,22 @@ const builtApplication = async (root: string): Promise<string> => {
   return built;
 };
 
-const startSidecar = (directory: string, built: string) => {
-  const child = spawn(
-    process.execPath,
-    ['--import', 'tsx', 'src/desktop/desktop-process.ts', directory, built],
-    { cwd: REPOSITORY_ROOT },
-  );
+/** The arguments to Node that start the sidecar: its source, unless a bundle is named. */
+const SOURCE_ENTRY = ['--import', 'tsx', 'src/desktop/desktop-process.ts'];
+
+const spawnSidecar = (
+  directory: string,
+  built: string,
+  entry: readonly string[] = SOURCE_ENTRY,
+) => {
+  const child = spawn(process.execPath, [...entry, directory, built], { cwd: REPOSITORY_ROOT });
   children.push(child);
   const exited = new Promise<number | null>((resolve) => child.once('exit', resolve));
+  return { child, exited };
+};
+
+const startSidecar = (directory: string, built: string, entry?: readonly string[]) => {
+  const { child, exited } = spawnSidecar(directory, built, entry);
   const announcement = new Promise<SidecarAnnouncement>((resolve, reject) => {
     const lines = createInterface({ input: child.stdout });
     lines.once('line', (line) => resolve(sidecarAnnouncementSchema.parse(JSON.parse(line))));
@@ -72,11 +81,15 @@ const listening = (announcement: SidecarAnnouncement) => {
 };
 
 /** Open a sidecar on a copy of the fixture, and commit one edit through its window. */
-const sidecarWithAnEdit = async () => {
+const sidecarWithAnEdit = async (entry?: readonly string[]) => {
   const root = await temporaryRoot();
   const directory = join(root, 'talk');
   await cp(FIXTURE, directory, { recursive: true });
-  const { child, exited, announcement } = startSidecar(directory, await builtApplication(root));
+  const { child, exited, announcement } = startSidecar(
+    directory,
+    await builtApplication(root),
+    entry,
+  );
   const { port, secret } = listening(await announcement);
   const origin = `http://127.0.0.1:${String(port)}`;
 
@@ -143,8 +156,79 @@ describe('The desktop sidecar', () => {
       const { exited, child } = startSidecar(join(root, 'missing'), await builtApplication(root));
       const lines = createInterface({ input: child.stdout });
       const first = await new Promise<string>((resolve) => lines.once('line', resolve));
-      expect(sidecarAnnouncementSchema.parse(JSON.parse(first))).toMatchObject({ kind: 'refused' });
+      const announcement = sidecarAnnouncementSchema.parse(JSON.parse(first));
+      expect(announcement).toMatchObject({ kind: 'refused' });
+      // A presenter has the desktop application, not a clone with pnpm in it.
+      expect(announcement.kind === 'refused' && announcement.message).not.toContain('pnpm');
       expect(await exited).toBe(1);
+    },
+    START_TIMEOUT_MS,
+  );
+
+  it(
+    'announces the whole of a refusal larger than a pipe holds before exiting',
+    async () => {
+      const root = await temporaryRoot();
+      const directory = join(root, 'talk');
+      await cp(FIXTURE, directory, { recursive: true });
+      // Each Resource file that declares no kind is one diagnostic in the
+      // refusal, so four thousand of them make a line far past what a pipe holds.
+      const resources = join(directory, '00000000-0000-4000-8000-000000000080', 'resources');
+      const last = '10000000-0000-4000-8000-000000004000';
+      await Promise.all(
+        Array.from({ length: 4000 }, (_, index) =>
+          writeFile(
+            join(resources, `10000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}.json`),
+            '{}',
+          ),
+        ),
+      );
+      const { child, exited } = spawnSidecar(directory, await builtApplication(root));
+      const chunks: Buffer[] = [];
+      child.stdout.on('data', (chunk: Buffer) => chunks.push(chunk));
+      const ended = new Promise<void>((resolve) => child.stdout.once('end', resolve));
+      expect(await exited).toBe(1);
+      await ended;
+      const output = Buffer.concat(chunks).toString('utf8');
+      expect(output).toMatch(new RegExp(`${last}\\.json[^"]*"\\}\\n$`));
+      const announcement = sidecarAnnouncementSchema.parse(JSON.parse(output));
+      expect(announcement.kind === 'refused' && announcement.message).toContain(`${last}.json`);
+    },
+    START_TIMEOUT_MS,
+  );
+});
+
+/*
+ * The desktop application ships the bundle `desktop-sidecar:build` writes, not
+ * the source, so the same edit-and-stop check runs on a bundle built here with
+ * that build's own configuration.
+ */
+describe('The desktop sidecar bundle', () => {
+  let bundleRoot: string | undefined;
+
+  beforeAll(async () => {
+    bundleRoot = await mkdtemp(join(tmpdir(), 'infinity-cube-sidecar-bundle-'));
+    await build({
+      configFile: join(REPOSITORY_ROOT, 'packages/app/desktop-sidecar-build.config.ts'),
+      build: { outDir: bundleRoot, emptyOutDir: true },
+      logLevel: 'warn',
+    });
+  }, START_TIMEOUT_MS);
+
+  afterAll(async () => {
+    if (bundleRoot !== undefined) await rm(bundleRoot, { recursive: true, force: true });
+  });
+
+  it(
+    'writes an edit to the directory and exits zero when its standard input closes',
+    async () => {
+      if (bundleRoot === undefined) throw new Error('The bundle was not built');
+      const { child, exited, directory } = await sidecarWithAnEdit([
+        join(bundleRoot, 'desktop-sidecar.mjs'),
+      ]);
+      child.stdin.end();
+      expect(await exited).toBe(0);
+      expect(await writtenTitle(directory)).toBe('From the window');
     },
     START_TIMEOUT_MS,
   );

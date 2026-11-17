@@ -1,6 +1,7 @@
 import { readFile, stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import path from 'node:path';
+import { builtMediaType } from '../mount-headers';
 
 /**
  * A static file server for the mount build (ADR 0130), standing in for
@@ -19,26 +20,6 @@ if (directoryArgument === undefined || portArgument === undefined) {
 }
 const directory = path.resolve(directoryArgument);
 const port = Number(portArgument);
-
-const MEDIA_TYPES = new Map([
-  ['.html', 'text/html; charset=utf-8'],
-  ['.js', 'text/javascript; charset=utf-8'],
-  ['.css', 'text/css; charset=utf-8'],
-  ['.map', 'application/json'],
-  ['.json', 'application/json'],
-  ['.webmanifest', 'application/manifest+json'],
-  ['.txt', 'text/plain; charset=utf-8'],
-  ['.svg', 'image/svg+xml'],
-  ['.png', 'image/png'],
-  ['.jpg', 'image/jpeg'],
-  ['.jpeg', 'image/jpeg'],
-  ['.gif', 'image/gif'],
-  ['.webp', 'image/webp'],
-  ['.avif', 'image/avif'],
-  ['.ico', 'image/x-icon'],
-  ['.woff', 'font/woff'],
-  ['.woff2', 'font/woff2'],
-]);
 
 interface HeaderRule {
   readonly path: string;
@@ -86,10 +67,7 @@ createServer((request, response) => {
       if (!matches(rule.path, pathname)) continue;
       for (const [name, value] of rule.headers) response.setHeader(name, value);
     }
-    response.setHeader(
-      'Content-Type',
-      MEDIA_TYPES.get(path.extname(file)) ?? 'application/octet-stream',
-    );
+    response.setHeader('Content-Type', builtMediaType(file));
     response.end(await readFile(file));
   })().catch(() => {
     response.statusCode = 500;

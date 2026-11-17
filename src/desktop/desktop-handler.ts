@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { ASSET_COLLECTION_PATH, assetHashOfPath } from '@project/core';
 import type { SpaceHostApplication } from '@project/aggregate';
+import { isRead } from '../run/run';
 
 /**
  * The request handler of the desktop sidecar (ADR 0155): a run's host and the
@@ -67,9 +68,11 @@ const refused = (status: 403 | 421, detail: string): Response =>
   });
 
 /**
- * Whether the Fetch application serves `pathname`: the API, or the stored
- * asset collection and a stored asset. The built application's own files are
- * also under `/assets/`, but never under a valid asset hash.
+ * Whether the Fetch application serves `pathname` before the build is asked:
+ * the API, or the stored asset collection and a stored asset. The built
+ * application's own files are also under `/assets/`, but never under a valid
+ * asset hash; any other path there the build does not hold is the Fetch
+ * application's too, which answers it as a malformed hash (ST-76).
  */
 const isApplicationPath = (pathname: string): boolean =>
   pathname === '/api' ||
@@ -77,7 +80,8 @@ const isApplicationPath = (pathname: string): boolean =>
   pathname === ASSET_COLLECTION_PATH ||
   assetHashOfPath(pathname) !== undefined;
 
-const isRead = (method: string): boolean => method === 'GET' || method === 'HEAD';
+const isAssetsPath = (pathname: string): boolean =>
+  pathname.startsWith(`${ASSET_COLLECTION_PATH}/`);
 
 export const createDesktopHandler = (
   options: DesktopHandlerOptions,
@@ -88,6 +92,18 @@ export const createDesktopHandler = (
     'X-Content-Type-Options': 'nosniff',
     'Cache-Control': 'no-store',
   };
+  const serveFile = (method: string, pathname: string, file: StaticFile): Response =>
+    new Response(method === 'HEAD' ? null : file.bytes, {
+      status: 200,
+      headers: {
+        'Content-Type': file.contentType,
+        'X-Content-Type-Options': 'nosniff',
+        // The build names every file under `/assets/` by its content.
+        'Cache-Control': isAssetsPath(pathname)
+          ? 'public, max-age=31536000, immutable'
+          : 'no-cache',
+      },
+    });
   const servePage = (method: string): Response =>
     new Response(method === 'HEAD' ? null : options.page.bytes, {
       status: 200,
@@ -120,6 +136,12 @@ export const createDesktopHandler = (
     }
 
     if (isApplicationPath(url.pathname)) return options.host.fetch(request);
+    if (isAssetsPath(url.pathname)) {
+      const built = isRead(request.method) ? await options.staticFile(url.pathname) : undefined;
+      return built === undefined
+        ? options.host.fetch(request)
+        : serveFile(request.method, url.pathname, built);
+    }
 
     const product = await options.host.resolveProductRequest(
       url.pathname,
@@ -138,16 +160,6 @@ export const createDesktopHandler = (
     }
     const file = url.pathname === '/' ? undefined : await options.staticFile(url.pathname);
     if (file === undefined) return servePage(request.method);
-    return new Response(request.method === 'HEAD' ? null : file.bytes, {
-      status: 200,
-      headers: {
-        'Content-Type': file.contentType,
-        'X-Content-Type-Options': 'nosniff',
-        // The build names every file under `/assets/` by its content.
-        'Cache-Control': url.pathname.startsWith('/assets/')
-          ? 'public, max-age=31536000, immutable'
-          : 'no-cache',
-      },
-    });
+    return serveFile(request.method, url.pathname, file);
   };
 };

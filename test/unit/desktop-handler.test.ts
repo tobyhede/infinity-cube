@@ -141,6 +141,19 @@ describe('The desktop sidecar handler', () => {
     expect(response.headers.get('cache-control')).toContain('immutable');
   });
 
+  it.each(['GET', 'POST'])(
+    'answers %s of an asset path the build does not hold as the Fetch application does: 400 invalid-asset-hash (ST-76)',
+    async (method) => {
+      const handle = await handlerOnFixture();
+      const response = await handle(request('/assets/not-a-hash', { method }));
+      expect(response.status).toBe(400);
+      expect(response.headers.get('content-type')).toBe('application/problem+json');
+      expect(await response.json()).toMatchObject({
+        type: 'urn:infinity-cube:problem:invalid-asset-hash',
+      });
+    },
+  );
+
   it('answers a path the build does not hold with the page', async () => {
     const handle = await handlerOnFixture();
     const response = await handle(request('/somewhere/else'));
