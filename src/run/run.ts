@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { readdir } from 'node:fs/promises';
 import type { UUID } from '@project/core';
 import {
@@ -63,7 +64,35 @@ export type RunStart =
   /** The directory read cleanly, and aggregate intake refused what it holds. */
   | { readonly kind: 'aggregate-refused'; readonly diagnostics: readonly string[] };
 
-/** A memory store that tells the run about every commit it accepts. */
+/**
+ * Whether the request being answered is a read: `GET` or `HEAD`, or a product
+ * address, which accepts nothing else. A read may still commit, because the
+ * first working read of a Space initializes it (MG-74), but a commit made while
+ * answering one is not an Edit and does not write the directory (ST-65). The
+ * next Edit's write carries it, since a write reads the whole store.
+ */
+const answeringRead = new AsyncLocalStorage<true>();
+
+const isRead = (method: string): boolean => method === 'GET' || method === 'HEAD';
+
+/**
+ * The host, answering its reads inside {@link answeringRead}. `fetch` is an
+ * own property of a Hono application, and `request` dispatches through it, so
+ * replacing it here covers both.
+ */
+const readsMarked = (host: SpaceHostApplication): SpaceHostApplication => {
+  const fetch = host.fetch;
+  const resolveProductRequest = host.resolveProductRequest.bind(host);
+  host.fetch = (request, ...rest) =>
+    isRead(request.method)
+      ? answeringRead.run(true, () => fetch(request, ...rest))
+      : fetch(request, ...rest);
+  host.resolveProductRequest = (pathname, method, accept) =>
+    answeringRead.run(true, () => resolveProductRequest(pathname, method, accept));
+  return host;
+};
+
+/** A memory store that tells the run about every Edit it accepts. */
 class ObservedRepository extends MemorySpaceRepository {
   readonly #committed: () => void;
 
@@ -74,7 +103,7 @@ class ObservedRepository extends MemorySpaceRepository {
 
   override async commit(request: SpaceCommit): Promise<RepositoryCommitResult> {
     const result = await super.commit(request);
-    if (result.kind === 'committed') this.#committed();
+    if (result.kind === 'committed' && answeringRead.getStore() === undefined) this.#committed();
     return result;
   }
 }
@@ -278,7 +307,7 @@ export const startRun = async (directory: string, options: RunOptions): Promise<
 
   serving = true;
   const run: Run = {
-    host: createSpaceHost(repository, options.newId),
+    host: readsMarked(createSpaceHost(repository, options.newId)),
     stop: async () => {
       serving = false;
       pending?.();

@@ -302,6 +302,51 @@ describe('Running an Aggregate directory', () => {
     expect(await filesUnder(directory)).toEqual(before);
   });
 
+  /*
+   * ST-65: a working read that initializes a Space (MG-74) commits to the
+   * store, but only an author's Edit writes their files. A Space with Maps and
+   * no `defaultMap` is initialized by its first load, through the API and
+   * through a product address alike.
+   */
+  const withoutDefaultMap = async (directory: string): Promise<void> => {
+    const path = join(directory, META_SPACE_ID, 'space.json');
+    const text = await readFile(path, 'utf8');
+    const without = text.replace(/^\s*"defaultMap": "[^"]+",\n/m, '');
+    expect(without).not.toBe(text);
+    await writeFile(path, without);
+  };
+
+  it('writes nothing when opening a Space initializes it and nothing is edited (ST-65)', async () => {
+    const directory = await fixtureCopy();
+    await withoutDefaultMap(directory);
+    const before = await filesUnder(directory);
+    const { clock, start, events } = await started(directory);
+    const run = running(start);
+
+    const loaded = await backendFor(run).loadSpace(META_SPACE_ID);
+    expect(loaded?.snapshot.document.defaultMap).toBeDefined();
+    await run.host.resolveProductRequest(`/spaces/${META_SPACE_ID}`, 'GET');
+    clock.advance(RUN_QUIET_MILLISECONDS);
+    await run.stop();
+
+    expect(writes(events)).toEqual([]);
+    expect(await filesUnder(directory)).toEqual(before);
+  });
+
+  it('writes the initialization with the next Edit (ST-65)', async () => {
+    const directory = await fixtureCopy();
+    await withoutDefaultMap(directory);
+    const { start } = await started(directory);
+    const run = running(start);
+
+    await renameMeta(run, 'Edited after opening');
+    await run.stop();
+
+    const written = await readSingleSpace(join(directory, META_SPACE_ID));
+    expect(written.document.title).toBe('Edited after opening');
+    expect(written.document.defaultMap).toBeDefined();
+  });
+
   it.each(EMPTY_DIRECTORIES)(
     'refuses a %s directory as holding no aggregate, and writes nothing',
     async (_, make) => {
