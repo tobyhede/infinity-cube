@@ -2,7 +2,7 @@
 
 **What to build:** Nothing yet. The question is whether this repository should run baseline-versus-skill agent evaluations at all.
 
-**Status:** needs-info
+**Status:** wontfix — parked work closed under the MVP scope rule (2026-11-16)
 
 **Why parked:** The source specification's Phase 6 is its largest and least-defined chunk — ten adversarial task evals plus trigger evals, each run twice and compared. The argument for it is sound in the abstract: a skill that reads well is not a skill that works, and under-triggering is the most likely failure and the least visible.
 
@@ -21,3 +21,11 @@ Questions to answer before this becomes work:
 - [ ] Does issue 06 already cover enough? Fixtures prove the rules bite. What they do not prove is that agents reach for the skill unprompted — which is the actual open risk.
 
 **Recommendation:** do issue 06, then run the ten adversarial tasks once by hand against the finished skills and record what they showed. Revisit a harness only if that pass finds under-triggering worth defending against permanently. Do not gate `.scratch/typescript-7/` on any of this.
+
+## Comments
+
+### Decision, 2026-11-16
+
+> *Recorded by AI from Toby's answer in the project thread.*
+
+Closed under the "keep to the MVP" rule: nothing is waiting on it. Reopen it if the need comes back; it stays in git history.

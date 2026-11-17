@@ -4,7 +4,7 @@
 
 **Blocked by:** 02. The guard has to know which surfaces bind keys of their own, and that list does not exist yet.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 Today the canvas hands React Flow a delete key code, React Flow subscribes it on `document`, and it excludes a target only by tag name or by a marker class on an ancestor. Every portalled surface and every chrome control therefore carries that marker — a component in the presentation package encoding another package's listener. The replacement already exists and is already trusted: the canvas has a selector naming what is *not* a canvas command, and three handlers ask it before acting. This ticket makes deletion the fourth, and takes the subscription off React Flow so there is only one.
 

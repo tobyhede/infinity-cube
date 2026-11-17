@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] `import` and `export` are verbs; a path with no verb is a usage error
 - [x] `--store postgres|sqlite` chooses the database, default `postgres`; `DATABASE_URL` and `SQLITE_PATH` still carry connection details

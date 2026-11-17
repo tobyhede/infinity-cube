@@ -6,7 +6,7 @@ This ticket makes the one intended change in behaviour: Read in Full View on the
 
 **Blocked by:** 02.
 
-**Status:** ready-for-agent
+**Status:** resolved — built in #443; ADR 0142 has since removed the Enter and Shift+Enter commands, leaving `canvas.showFullView`
 
 - [ ] Command-level tests cover all three: an embedded occurrence (only Enter answers), a Resource kind that does not take Open, and body editing (Open absent; the other two keys silent while their rail items stay).
 - [ ] A test shows Read in Full View absent from the rail while the canvas cannot be selected on, and present otherwise. This is the only rail test whose expectation changes.

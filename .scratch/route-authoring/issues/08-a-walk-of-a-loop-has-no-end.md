@@ -9,7 +9,7 @@ advance.
 **Blocked by:** nothing. `07` gave a cyclic Graph a place to start. This is the
 other end of the same traversal.
 
-**Status:** needs-triage — deferred 2026-08-05; re-triaged 2026-10-09, decision still open.
+**Status:** wontfix — parked work closed under the MVP scope rule (2026-11-16)
 
 ## Deferred
 
@@ -185,3 +185,9 @@ rather than waited for.
 **Category:** enhancement. **State:** needs-triage.
 
 Still real: `advance` appends with no check (`packages/app/src/navigation.ts:437-448`), nothing bounds `traversalHistory`, and `presenting-end` renders only when there are no moves (`packages/app/src/components/PresentingChrome.tsx:178`). The camera argument is gone: `PresentingCamera` was deleted in `1637e45d` (presenting-stage/03) and presenting draws on the Stage (ADR 0123), so the body now states the Stage behaviour — a self-Edge leaves `contentKey` unchanged (`packages/app/src/components/PresentingStage.tsx:28`), and a longer cycle swaps content and resets scroll. The body was refreshed to current vocabulary (Walk → Traversal history, Card → Resource, Route → Graph, `routeStartCard` → `graphStartResource` at `traversal.ts:70-71`), the current e2e test name (`packages/app/e2e/new-space.spec.ts:327`) and current line refs; the 2026-08-13 sweep above is left as written. The open decision for a human is warn, limit, visualise or nothing, which ADR 0032:18 still defers.
+
+### Decision, 2026-11-16
+
+> *Recorded by AI from Toby's answer in the project thread.*
+
+Closed under the "keep to the MVP" rule: nothing is waiting on it. Reopen it if the need comes back; it stays in git history.

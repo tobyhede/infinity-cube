@@ -1,6 +1,6 @@
 # 08 — Creation through the API
 
-Status: ready-for-agent
+Status: done
 
 **Blocked by:** 07 — The Space plugin.
 

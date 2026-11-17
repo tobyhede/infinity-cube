@@ -1,6 +1,6 @@
 # 06 — Finalise the V1 product design
 
-Status: ready-for-agent
+Status: wontfix — no V1 release is planned (2026-11-16)
 Tags: release/v1
 Blocked by: `command-dock/07`; 03, 05; `entity-url-addressability/08`;
 `interaction-draft-invalidation/04`
@@ -59,3 +59,9 @@ into the criterion so the pass has something to check rather than a word.
 light and feature-owned treatments" the original framing named was answered by
 `a5a76669`, which put the values in `tailwind.css` once. What is left under that
 criterion is icon language, spacing and control hierarchy.
+
+### Decision, 2026-11-16
+
+> *Recorded by AI from Toby's answer in the project thread.*
+
+There is no release to prepare: the repository has no production and no release (AGENTS.md, "State"), and Toby has no interest in a V1 milestone. Closed with the rest of `.scratch/v1-release/`'s open tickets.

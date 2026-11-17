@@ -4,7 +4,7 @@
 
 **Blocked by:** nothing. 02 — Present on the Stage — is resolved (`8b2e02d6`).
 
-**Status:** needs-triage — deferred on 2026-10-07: ticket 02 returns the canvas unmoved, and whether the pan is wanted is undecided.
+**Status:** wontfix — parked work closed under the MVP scope rule (2026-11-16)
 
 Building this changes accepted behaviour. ADR 0123's cost-accepted section says leaving presenting "returns the canvas exactly as it was", and `packages/app/e2e/presenting.spec.ts:347` ("leaving presenting leaves the canvas viewport as it was") asserts it; both would change. The presenting and overview cameras were deleted in `1637e45d` (ticket 03), so a pan needs a new camera command rather than reviving one.
 
@@ -21,3 +21,9 @@ Building this changes accepted behaviour. ADR 0123's cost-accepted section says 
 **Category:** enhancement. **State:** needs-triage.
 
 Still valid as parked work: leaving presenting does not move the canvas today, as `packages/app/e2e/presenting.spec.ts:347` asserts. The body now notes that a pan contradicts ADR 0123's "returns the canvas exactly as it was", that the presenting cameras were deleted in `1637e45d` so a pan needs a new camera command, that the e2e test would have to change, and that ticket 02 is resolved. The open decision is whether leaving presenting should move the canvas at all.
+
+### Decision, 2026-11-16
+
+> *Recorded by AI from Toby's answer in the project thread.*
+
+Closed under the "keep to the MVP" rule: nothing is waiting on it. Reopen it if the need comes back; it stays in git history.

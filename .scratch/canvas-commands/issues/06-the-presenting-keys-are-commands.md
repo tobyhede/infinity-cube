@@ -4,7 +4,7 @@
 
 **Blocked by:** 02.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] `presenting-keys.test.tsx`, `packages/app/e2e/presenting.spec.ts` and the presenting chrome Ladle spec pass unchanged.
 - [ ] Space on a focused chrome control still activates that control once, not the control plus advance.

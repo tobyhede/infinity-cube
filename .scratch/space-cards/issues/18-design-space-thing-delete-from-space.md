@@ -1,6 +1,6 @@
 # 18 — Design how an author deletes a Space Thing from the Space
 
-Status: ready-for-human
+Status: resolved — Delete from Space ships on a Space Resource's rail with the ADR 0074 cascade confirmation
 
 Surfaced by: Bugbot on `prototype/space-thing-edit-portal` (`App.tsx` ~1167).
 Related: ADR 0074, ADR 0076, `space-cards/16`, `command-dock/27` entity menu,

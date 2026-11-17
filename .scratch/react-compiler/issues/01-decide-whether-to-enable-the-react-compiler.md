@@ -1,6 +1,6 @@
 # 01 — Decide whether to enable the React Compiler
 
-Status: ready-for-human
+Status: wontfix — parked work closed under the MVP scope rule (2026-11-16)
 
 **What to decide:** Whether this repo enables the React Compiler, or commits to
 hand-memoization as the standing convention.
@@ -56,3 +56,9 @@ package name `typescript` deliberately resolves to the TypeScript 6 bridge, and
 **Category:** enhancement. **State:** ready-for-human.
 
 Still valid: the compiler is enabled in neither pipeline (`packages/app/database-vite-config.ts:56,76` use a plain `react()`; `packages/app/ladle-vite.config.ts` has `tailwindcss()` only). The body was refreshed: the application's config path now points at `database-vite-config.ts`, the third checkbox is ticked because `fad244874` removed the open decision from the story, and two cost facts were added — React 18.3.1 needs `react-compiler-runtime`, and the `eslint-plugin-react-hooks` 7 recommended rules are already on. The open decision is the human's: enable the compiler in both the application and Ladle configs, or adopt hand-memoization as the stated convention.
+
+### Decision, 2026-11-16
+
+> *Recorded by AI from Toby's answer in the project thread.*
+
+Closed under the "keep to the MVP" rule: nothing is waiting on it. Reopen it if the need comes back; it stays in git history.

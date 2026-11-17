@@ -11,7 +11,7 @@ Thing that still has no `openSize`.
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** wontfix — superseded by ADR 0122 (size independent of Open) and ADR 0142
 
 - [ ] First Open of a Space Thing with no remembered Open Size uses the bounds of
       the Things on its **selected** Diagram, plus the embed inset, and is never

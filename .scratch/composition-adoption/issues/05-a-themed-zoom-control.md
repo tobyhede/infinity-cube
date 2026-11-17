@@ -4,7 +4,7 @@
 
 **Blocked by:** 01. The registry the replacement comes from has to be declared before the search step can find it.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] The decision is taken the ADR 0047 way and recorded: search this repo's own package first, then the registry now reachable under the declared namespace, and hand-roll only as the last option. The registry ships a zoom control; if it is taken, say so, and if it is refused, the reason is written before anything is hand-rolled.
 - [ ] Whatever the canvas ends up mounting is themed with the application's tokens and readable against the dark canvas, and the interactive control it composes comes from this repo's package rather than being reimplemented — the registry component's own dependency on a slider resolves through the shadcn manifests to the Base UI primitive, per ADR 0050, and a slider primitive that does not exist here yet is generated the same way every other one was.

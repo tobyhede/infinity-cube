@@ -6,7 +6,7 @@ The dispatcher answers canvas commands only for the Space on screen, while it is
 
 **Blocked by:** The keyboard-shortcuts stack (#427–#430) merged; 01.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] A test asks the command for availability and runs it on a composed Space, without a keydown.
 - [ ] A test shows the key and the rail item agree: both refuse while an edit is in progress, and both refuse off the Active Graph with the reason.

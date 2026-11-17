@@ -4,7 +4,7 @@
 
 **Blocked by:** 06 — Deep-link ordinary presentation points; 09 — Traverse into and out of a Space Card.
 
-**Status:** ready-for-agent
+**Status:** needs-triage — deferred by ADR 0111 until cross-Space Edges are decided
 
 - [ ] The URL starts at the root Layout and Graph and canonically encodes the ordered Space Card, target Layout and target Graph crossing stack (ADR 0079).
 - [ ] Immutable Space Card references derive every intervening Space, and the final Card resolves in the last derived Space.
@@ -12,3 +12,11 @@
 - [ ] Missing, incompatible or changed crossing context returns an actual HTTP 404 rather than dropping context or choosing fallbacks.
 - [ ] Presentation moves add only local browser history; the copied URL does not encode the path previously traversed.
 - [ ] `pnpm verify` and `pnpm e2e` pass.
+
+## Comments
+
+### Decision, 2026-11-16
+
+> *Recorded by AI from Toby's answer in the project thread.*
+
+Cross-Space Edges stay parked, not dropped. Nothing builds them, or this ticket, until they are decided.

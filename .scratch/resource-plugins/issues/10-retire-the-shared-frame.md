@@ -1,6 +1,6 @@
 # 10 — Retire the shared frame and the core fields
 
-Status: ready-for-agent
+Status: done
 
 **Blocked by:** 07 — The Space plugin; 08 — Creation through the API; 09 — The default plugin.
 

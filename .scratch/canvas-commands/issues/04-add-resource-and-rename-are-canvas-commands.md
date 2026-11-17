@@ -4,7 +4,7 @@
 
 **Blocked by:** 02.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] Command-level tests cover availability for both commands: authoring withdrawn, body editing, Full View shown, an embedded occurrence.
 - [ ] The existing `C` and F2 key tests pass unchanged.

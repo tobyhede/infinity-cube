@@ -6,10 +6,10 @@ import type { AggregateInput } from '@project/aggregate';
  * The aggregate a repository is initialized from — ADR 0077's **Default
  * Content**, which is a release-fixture label rather than a domain entity.
  *
- * This is the seam and not yet the content. `.scratch/v1-release/issues/16`
- * owns the canonical generator — the concise examples of the V1 Resource kinds ADR
- * 0077 describes, shared with the CLI hard reset — and replaces the body of
- * this one function when it lands. Until then a repository starts from the
+ * This is the seam and not yet the content.
+ * `.scratch/default-content/issues/01-generate-the-starter-content.md` owns
+ * the canonical generator — a short starter talk with an example of each
+ * Resource kind — and replaces the body of this one function when it lands. Until then a repository starts from the
  * ordinary new Space (ADR 0018), named as Meta so that first initialization
  * already goes through the one lifecycle operation rather than through a
  * second Space-creation path.

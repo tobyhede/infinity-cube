@@ -13,7 +13,7 @@ selected Layout and Graph until that ticket lands: `layout` and `graph` are stil
 optional on `spaceCardFrontmatterSchema`
 (`packages/core/src/schema.ts:61-62`).
 
-**Status:** ready-for-agent
+**Status:** wontfix — no V1 release is planned (2026-11-16)
 Tags: release/v1
 
 - [ ] First initialization creates the permanent Meta Space with one top-level
@@ -49,3 +49,13 @@ Tags: release/v1
       no-reseed reload, confirmed/forced reset, cancellation and atomic failure;
       browser evidence proves the expected Default Content opens and behaves as
       ordinary editable Cards.
+
+## Comments
+
+### Decision, 2026-11-16
+
+> *Recorded by AI from Toby's answer in the project thread.*
+
+There is no release to prepare: the repository has no production and no release (AGENTS.md, "State"), and Toby has no interest in a V1 milestone. Closed with the rest of `.scratch/v1-release/`'s open tickets.
+
+The starter content itself is split out to `.scratch/default-content/issues/01-generate-the-starter-content.md`; only the hard reset and the V1 framing are closed here.

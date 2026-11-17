@@ -1,6 +1,6 @@
 # 02 — The Resource API and its hosts, with Ur on it
 
-Status: ready-for-agent
+Status: done
 
 **Blocked by:** 01 — Prove the interface.
 

@@ -22,3 +22,9 @@ Open before this is ready: where the MCP endpoint is served and how ChatGPT, whi
 2026-10-31: Toby chose file tools over the directory as ticket 03 and this as ticket 04, after it. It stays needs-triage until ADR 0141 names its credential and is accepted.
 
 2026-10-31: Toby chose OAuth 2.1 (MCP's authorization specification) over a static bearer token, and deferred the ticket.
+
+### Decision, 2026-11-16
+
+> *Recorded by AI from Toby's answer in the project thread.*
+
+Stays deferred, and ADR 0141 stays proposed. Nothing depends on it.
