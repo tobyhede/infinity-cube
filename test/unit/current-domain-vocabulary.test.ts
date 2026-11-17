@@ -669,7 +669,7 @@ const isAuthoredSource = (file: string): boolean =>
 /**
  * The modules that are pnpm's vocabulary rather than ours: the alias table,
  * the shared database Vite config, the mount build's Vite config and the HTTP
- * server build config that import it, and the toolchain check that reads the package list plus its test. The two
+ * server and desktop sidecar build configs that import it, and the toolchain check that reads the package list plus its test. The two
  * target-specific Vite configs delegate to that one shared owner and carry no
  * exemption.
  * Composed from the fragment above for the same reason every retired name in
@@ -681,6 +681,7 @@ const MONOREPO_VOCABULARY: readonly string[] = [
   'packages/app/database-vite-config.ts',
   'packages/app/vite.mount.config.ts',
   'packages/app/http-server-build.config.ts',
+  'packages/app/desktop-sidecar-build.config.ts',
   'scripts/check-typescript-toolchain.ts',
   'test/unit/check-typescript-toolchain.test.ts',
 ];
@@ -2851,6 +2852,7 @@ const FOREIGN_ALIAS_FILES: readonly string[] = [
   'packages/app/database-vite-config.ts',
   'packages/app/vite.mount.config.ts',
   'packages/app/http-server-build.config.ts',
+  'packages/app/desktop-sidecar-build.config.ts',
   'packages/app/e2e/space-resource-drag-benchmark-vite.config.ts',
   'vitest.config.ts',
   'vitest.integration.config.ts',

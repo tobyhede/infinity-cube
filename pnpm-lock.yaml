@@ -16,6 +16,9 @@ importers:
 
   .:
     dependencies:
+      '@hono/node-server':
+        specifier: 2.0.12
+        version: 2.0.12(hono@4.12.33)
       '@modelcontextprotocol/sdk':
         specifier: 1.32.2
         version: 1.32.2(zod@3.25.76)

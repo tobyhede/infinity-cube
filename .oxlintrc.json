@@ -8,6 +8,7 @@
   "ignorePatterns": [
     "**/dist/**",
     "**/dist-http/**",
+    "**/dist-desktop-sidecar/**",
     "**/dist-mount/**",
     "packages/app/build/**",
     "**/node_modules/**",
@@ -405,8 +406,9 @@
       // chrome command's throw is caught, reported and described. The CLI has
       // its own copy of the narrowing, `src/cli/describe-error.ts`, and two
       // reporters that receive the caught value and pass it there:
-      // `database-command.ts`'s `reportImportFileError` and `run-process.ts`'s
-      // `.catch` callbacks. Two are
+      // `database-command.ts`'s `reportImportFileError` and the `.catch`
+      // callbacks of `run-process.ts` and the desktop sidecar's
+      // `desktop-process.ts`. Two are
       // genuine external contracts, not our own seam: `SpaceApp.tsx`'s
       // `getDerivedStateFromError` overrides React's own lifecycle method
       // signature, and `space-authoring.test.ts`'s
@@ -431,6 +433,7 @@
         "src/cli/describe-error.ts",
         "src/cli/database-command.ts",
         "src/cli/run-process.ts",
+        "src/desktop/desktop-process.ts",
         "src/aggregate-directory/space-directory.ts"
       ],
       "rules": {

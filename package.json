@@ -19,6 +19,7 @@
     "build": "pnpm --filter @project/app build",
     "build:mount": "pnpm --filter @project/app build:mount",
     "http-server:build": "pnpm --filter @project/app http-server:build",
+    "desktop-sidecar:build": "pnpm --filter @project/app desktop-sidecar:build",
     "contract:emit": "prisma-next contract emit",
     "contract:check": "pnpm contract:emit && git diff --exit-code -- src/prisma/contract.json src/prisma/contract.d.ts && prisma-next migration check --format json",
     "contract:emit:sqlite": "prisma-next contract emit --config prisma-next.config.sqlite.ts",
@@ -109,6 +110,7 @@
     "wrangler": "4.147.0"
   },
   "dependencies": {
+    "@hono/node-server": "2.0.12",
     "@modelcontextprotocol/sdk": "1.32.2",
     "@prisma-next/postgres": "0.16.0",
     "@prisma-next/sqlite": "0.16.0",
