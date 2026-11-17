@@ -2001,6 +2001,19 @@ const currentVocabularyFiles = (): readonly string[] =>
   scannableFiles().filter((file) => !RETIRED_SCHEMA_TREES.some((tree) => file.startsWith(tree)));
 
 /**
+ * The Mermaid plugin draws diagrams in Mermaid's own sense (ADR 0158): the word
+ * there names what the library draws inside one Resource's rect, never a Map.
+ * Its tree is exempt from the retired Map name only; the retired Resource name
+ * is still scanned there, and the exemption is held earned below.
+ */
+const MERMAID_PLUGIN_TREES = ['packages/plugin-mermaid/'] as const;
+
+const mapVocabularyFiles = (): readonly string[] =>
+  currentVocabularyFiles().filter(
+    (file) => !MERMAID_PLUGIN_TREES.some((tree) => file.startsWith(tree)),
+  );
+
+/**
  * A citation into a tree this rename does not rewrite — the historical records
  * and the working notes — named under the spelling it has on disk. Renaming one
  * breaks a link rather than updating a record, which is the same argument the
@@ -2015,8 +2028,11 @@ const currentVocabularyFiles = (): readonly string[] =>
 const withoutHistoricalCitations = (source: string): string =>
   source.replace(CITED_HISTORICAL_PATH, 'path');
 
-const expectNoRetiredIdentifier = (pattern: RegExp): void => {
-  const found = currentVocabularyFiles().flatMap((file) => {
+const expectNoRetiredIdentifier = (
+  pattern: RegExp,
+  files: readonly string[] = currentVocabularyFiles(),
+): void => {
+  const found = files.flatMap((file) => {
     const source = readTracked(file);
     return source === null
       ? []
@@ -2048,13 +2064,14 @@ const expectNoRetiredFileName = (pattern: RegExp): void => {
   expect(currentVocabularyFiles().filter((file) => pattern.test(file))).toEqual([]);
 };
 
-const expectNoRetiredBareType = (pattern: RegExp): void => {
-  const found = currentVocabularyFiles()
-    .filter(isImplementationSource)
-    .flatMap((file) => {
-      const source = readTracked(file);
-      return source === null ? [] : hits(source, pattern).map((hit) => `${file}:${hit}`);
-    });
+const expectNoRetiredBareType = (
+  pattern: RegExp,
+  files: readonly string[] = currentVocabularyFiles(),
+): void => {
+  const found = files.filter(isImplementationSource).flatMap((file) => {
+    const source = readTracked(file);
+    return source === null ? [] : hits(source, pattern).map((hit) => `${file}:${hit}`);
+  });
 
   expect(found).toEqual([]);
 };
@@ -2082,11 +2099,23 @@ describe('a Map has no retired identifier (ADR 0101)', () => {
   });
 
   it('finds no retired identifier shape', () => {
-    expectNoRetiredIdentifier(previousMapPattern);
+    expectNoRetiredIdentifier(previousMapPattern, mapVocabularyFiles());
   });
 
   it('finds no retired bare type in implementation source', () => {
-    expectNoRetiredBareType(previousMapBare);
+    expectNoRetiredBareType(previousMapBare, mapVocabularyFiles());
+  });
+
+  it('keeps the Mermaid-plugin exemption earned', () => {
+    for (const tree of MERMAID_PLUGIN_TREES) {
+      const files = currentVocabularyFiles().filter((file) => file.startsWith(tree));
+      expect(files, `${tree} is exempt but contains no scanned files`).not.toEqual([]);
+      const sources = files.map((file) => readTracked(file) ?? '').join('\n');
+      expect(
+        hits(sources, previousMapBare),
+        `${tree} no longer names a diagram in Mermaid's sense`,
+      ).not.toEqual([]);
+    }
   });
 
   it('finds no retired name in a tracked file name', () => {

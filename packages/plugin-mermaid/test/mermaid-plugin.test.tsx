@@ -11,8 +11,10 @@ import {
   mermaidPluginView as builtView,
   mermaidPluginViewWith,
   READING_WIDTH,
-  type RenderMermaid,
+  type DiagramTheme,
+  type RenderDiagram,
 } from '@project/plugin-mermaid/view';
+import { withTheme } from '../src/mermaid';
 
 const TEXT_REF: AssetRef = '/assets/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 const SAVED_REF: AssetRef = '/assets/BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBA';
@@ -27,8 +29,10 @@ const closed: MermaidMapContent = { open: false };
  * refuses one it cannot parse.
  */
 const drawn: string[] = [];
-const drawText: RenderMermaid = (id, source) => {
+const themes: DiagramTheme[] = [];
+const drawText: RenderDiagram = (id, source, theme) => {
   drawn.push(source);
+  themes.push(theme);
   if (source.startsWith('bad')) {
     return Promise.reject(new Error('Parse error on line 1: expecting a diagram type.'));
   }
@@ -39,6 +43,20 @@ const mermaidPluginView = mermaidPluginViewWith(drawText);
 
 beforeEach(() => {
   drawn.length = 0;
+  themes.length = 0;
+});
+
+/**
+ * A theme set on the document root, as the canvas sets its own. jsdom does not
+ * inherit `color-scheme`, so the rule names every element under the root.
+ */
+const scheme = document.createElement('style');
+scheme.textContent =
+  ":root[data-scheme='dark'], :root[data-scheme='dark'] * { color-scheme: dark; }";
+document.head.append(scheme);
+
+afterEach(() => {
+  delete document.documentElement.dataset['scheme'];
 });
 
 const reading = (texts: Record<string, string>) => ({
@@ -94,7 +112,7 @@ describe('the Mermaid plugin’s view', () => {
     });
     expect(screen.getByTestId('plugin-title')).toHaveTextContent('Notes');
     await Promise.resolve();
-    expect(screen.queryByTestId('mermaid-drawing')).toBeNull();
+    expect(screen.queryByTestId('mermaid-diagram')).toBeNull();
     expect(screen.queryByRole('toolbar')).toBeNull();
     expect(rendered.commits.map).toEqual([]);
   });
@@ -106,7 +124,7 @@ describe('the Mermaid plugin’s view', () => {
       title: 'Notes',
       assets: reading({ [TEXT_REF]: 'graph TD\n  A --> B' }),
     });
-    const diagram = await screen.findByTestId('mermaid-drawing');
+    const diagram = await screen.findByTestId('mermaid-diagram');
     expect(diagram.querySelector('svg')).toHaveTextContent('graph TD A --> B');
     expect(screen.queryByRole('toolbar')).toBeNull();
   });
@@ -122,14 +140,14 @@ describe('the Mermaid plugin’s view', () => {
     await Promise.resolve();
     expect(drawn).toEqual([]);
     act(() => rendered.changeMap(open));
-    await screen.findByTestId('mermaid-drawing');
+    await screen.findByTestId('mermaid-diagram');
     fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
     fireEvent.change(screen.getByRole('textbox', { name: 'Mermaid source of Notes' }), {
       target: { value: 'graph LR\n  A --> C' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Save Resource Notes' }));
     await waitFor(() =>
-      expect(screen.getByTestId('mermaid-drawing')).toHaveTextContent('graph LR A --> C'),
+      expect(screen.getByTestId('mermaid-diagram')).toHaveTextContent('graph LR A --> C'),
     );
     expect(drawn).toEqual(['graph TD\n  A --> B', 'graph LR\n  A --> C']);
   });
@@ -145,7 +163,7 @@ describe('the Mermaid plugin’s view', () => {
     expect(await screen.findByRole('note')).toHaveTextContent(
       'This diagram cannot be drawn. Parse error on line 1: expecting a diagram type.',
     );
-    expect(screen.queryByTestId('mermaid-drawing')).toBeNull();
+    expect(screen.queryByTestId('mermaid-diagram')).toBeNull();
     expect(screen.getByRole('button', { name: 'Edit Resource Notes' })).toBeEnabled();
   });
 
@@ -175,6 +193,23 @@ describe('the Mermaid plugin’s view', () => {
     );
     expect(drawn).toEqual([]);
     expect(screen.getByRole('button', { name: 'Edit Resource Notes' })).toBeEnabled();
+  });
+
+  it('draws its diagram in the canvas’s colour scheme, again when that changes', async () => {
+    document.documentElement.dataset['scheme'] = 'dark';
+    renderPlugin(mermaidPluginView.View, {
+      content,
+      map: open,
+      title: 'Notes',
+      assets: reading({ [TEXT_REF]: 'graph TD' }),
+    });
+    await screen.findByTestId('mermaid-diagram');
+    expect(themes).toEqual(['dark']);
+    act(() => {
+      delete document.documentElement.dataset['scheme'];
+    });
+    await waitFor(() => expect(themes).toEqual(['dark', 'light']));
+    expect(drawn).toEqual(['graph TD', 'graph TD']);
   });
 
   it('measures its Open size only once its diagram is drawn', async () => {
@@ -274,7 +309,7 @@ describe('the Mermaid plugin’s view', () => {
     expect(stored).toEqual(['New\nline']);
     expect(rendered.commits.content).toEqual([{ url: SAVED_REF }]);
     expect(rendered.commits.claims.released).toBe(1);
-    expect(screen.getByTestId('mermaid-drawing')).toHaveTextContent('New line');
+    expect(screen.getByTestId('mermaid-diagram')).toHaveTextContent('New line');
   });
 
   it('Saves nothing for an unchanged draft of a text stored with `\\r\\n` endings', async () => {
@@ -427,7 +462,7 @@ describe('the Mermaid plugin’s view', () => {
     await screen.findByRole('button', { name: 'Open Resource Notes' });
     readable = true;
     fireEvent.click(screen.getByRole('button', { name: 'Open Resource Notes' }));
-    expect(await screen.findByTestId('mermaid-drawing')).toHaveTextContent('Text');
+    expect(await screen.findByTestId('mermaid-diagram')).toHaveTextContent('Text');
     expect(rendered.commits.map).toEqual([open, closed, open]);
     // The failed read had no size to hint at; the later one, read, does.
     expect(rendered.commits.hints[2]?.width).toBe(READING_WIDTH);
@@ -646,5 +681,21 @@ describe('the Mermaid plugin’s view', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open Resource Notes' }));
     await screen.findByRole('button', { name: 'Close Resource Notes' });
     expect(screen.queryByRole('img', { name: 'Mermaid Resource' })).toBeNull();
+  });
+});
+
+describe('the theme a diagram is drawn in', () => {
+  it('leads the source with an init directive choosing Mermaid’s theme', () => {
+    expect(withTheme('graph TD', 'dark')).toBe('%%{init: {"theme": "dark"}}%%\ngraph TD');
+    expect(withTheme('graph TD', 'light')).toBe('%%{init: {"theme": "neutral"}}%%\ngraph TD');
+  });
+
+  it('keeps frontmatter first, ended by a newline even where the source ends with it', () => {
+    expect(withTheme('---\ntitle: A\n---\ngraph TD', 'dark')).toBe(
+      '---\ntitle: A\n---\n%%{init: {"theme": "dark"}}%%\ngraph TD',
+    );
+    expect(withTheme('---\ntitle: A\n---', 'dark')).toBe(
+      '---\ntitle: A\n---\n%%{init: {"theme": "dark"}}%%\n',
+    );
   });
 });

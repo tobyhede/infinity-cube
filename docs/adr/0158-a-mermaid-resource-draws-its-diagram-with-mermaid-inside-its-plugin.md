@@ -11,6 +11,8 @@ A **Mermaid Resource** is a bundled kind, `mermaid`, whose content is Mermaid so
 
 **The SVG Mermaid answers is inserted into the plugin's rect.** Mermaid answers markup, not React elements, so this is the one place a plugin inserts markup it did not build. It is safe because Mermaid is run at its `strict` security level, which sanitises the SVG and runs nothing the source names (no click handlers, no HTML labels), and with its error drawing suppressed, so a source it cannot draw leaves nothing in the document and is said as a note in Mermaid's own words. An empty source is drawn as a note asking for one rather than as a failure.
 
+**A diagram is drawn in the canvas's colour scheme.** The plugin reads the computed `color-scheme` of its own rect, which the canvas's theme sets, and draws in Mermaid's `neutral` theme where that is light and its `dark` theme where it is dark, straight onto the rect with no card of its own; a change of theme draws the diagram again. Mermaid's configuration is global, so the theme travels with each diagram as an init directive placed after any frontmatter, and a theme the source chooses for itself comes after it and wins. The plugin reads no attribute of the host's, so it follows any surface that sets `color-scheme`.
+
 **Its source is stored as `text/vnd.mermaid`, and written to an Aggregate directory as `assets/<hash>.mmd`.** The host's table between extensions and media types gains that one row, so the source keeps its media type through Export and Import rather than travelling as `application/octet-stream` in a `.bin` file.
 
 ## Considered options
@@ -22,7 +24,7 @@ A **Mermaid Resource** is a bundled kind, `mermaid`, whose content is Mermaid so
 
 ## Cost accepted
 
-The Mermaid plugin duplicates the Markdown plugin's edit, Open and measuring code rather than sharing it, because a plugin imports no other plugin (ADR 0142); a fix to one is made to both. Mermaid draws in its own `neutral` theme on a light card of its own, so a diagram does not follow the canvas's dark theme. The host's source editor highlights the source as Markdown, which is harmless but not Mermaid-aware. Mermaid needs a browser's layout, so the plugin's tests draw with a stand-in and only a browser draws a real diagram.
+The Mermaid plugin duplicates the Markdown plugin's edit, Open and measuring code rather than sharing it, because a plugin imports no other plugin (ADR 0142); a fix to one is made to both. Mermaid's two themes are close to the canvas's but are not its tokens, so a diagram's colours are Mermaid's own in either scheme. The host's source editor highlights the source as Markdown, which is harmless but not Mermaid-aware. Mermaid needs a browser's layout, so the plugin's tests draw with a stand-in and only a browser draws a real diagram.
 
 ## Negative
 

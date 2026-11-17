@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type RefObject,
 } from 'react';
 import { z } from 'zod';
 import { Check, Maximize2, Minimize2, Pencil, Workflow, X } from 'lucide-react';
@@ -36,7 +37,7 @@ import {
   type MermaidContent,
   type MermaidMapContent,
 } from './domain';
-import { renderWithMermaid, type RenderMermaid } from './mermaid';
+import { renderWithMermaid, type DiagramTheme, type RenderDiagram } from './mermaid';
 
 /**
  * The Mermaid plugin's view (ADR 0142, ADR 0158), the Markdown plugin's in
@@ -79,7 +80,7 @@ const UNSAVED = 'The text could not be saved. Your draft is kept; Save again to 
 const UNEDITABLE = 'This text cannot be read, so it cannot be edited.';
 
 /** What is drawn in place of the diagram where its source is empty. */
-const EMPTY_SOURCE = 'This diagram is empty. Edit it to write its Mermaid source.';
+const EMPTY_DIAGRAM = 'This diagram is empty. Edit it to write its Mermaid source.';
 
 /**
  * Read the text an asset holds, once per URL, starting from text this view
@@ -137,35 +138,75 @@ const textOf = (blob: Blob): Promise<string> =>
   });
 
 /** A diagram drawn from source, as far as Mermaid has drawn it. */
-type Drawing =
+type Diagram =
   | { readonly state: 'drawing' }
   | { readonly state: 'drawn'; readonly svg: string }
   | { readonly state: 'empty' }
   | { readonly state: 'failed'; readonly failed: string };
 
-const DRAWING: Drawing = { state: 'drawing' };
+const DRAWING: Diagram = { state: 'drawing' };
 
 /** What a note says where Mermaid failed without saying why. */
 const UNDRAWN = 'Mermaid could not draw it.';
 
 /**
- * Draw `source` with `render`, once per source, under an id unique to this
- * view. Nothing is drawn while there is no source to draw (`null`), and an
- * empty or blank source is no diagram rather than a failed one.
+ * The colour scheme `element` is drawn in: its computed `color-scheme`, which
+ * the canvas's theme sets, and where that offers both, the one the browser
+ * prefers.
  */
-function useDrawing(source: string | null, render: RenderMermaid): Drawing {
+const schemeOf = (element: Element): DiagramTheme => {
+  const offered = getComputedStyle(element).colorScheme.split(/\s+/u);
+  if (!offered.includes('dark')) return 'light';
+  if (!offered.includes('light')) return 'dark';
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+};
+
+/**
+ * The colour scheme the element `at` holds is drawn in, read again whenever
+ * the document root's attributes change, which is how the canvas changes its
+ * theme, or the browser's preference does.
+ */
+function useScheme(at: RefObject<Element | null>): DiagramTheme {
+  // The document's scheme until the element itself is read, so the first
+  // diagram is not drawn in a scheme about to change.
+  const [scheme, setScheme] = useState(() => schemeOf(document.documentElement));
+  useEffect(() => {
+    const read = (): void => {
+      if (at.current !== null) setScheme(schemeOf(at.current));
+    };
+    read();
+    const observer = new MutationObserver(read);
+    observer.observe(document.documentElement, { attributes: true });
+    const preference = window.matchMedia('(prefers-color-scheme: dark)');
+    preference.addEventListener('change', read);
+    return () => {
+      observer.disconnect();
+      preference.removeEventListener('change', read);
+    };
+  }, [at]);
+  return scheme;
+}
+
+/**
+ * Draw `source` in `theme` with `render`, once per source and theme, under an
+ * id unique to this view. Nothing is drawn while there is no source to draw
+ * (`null`), and an empty or blank source is no diagram rather than a failed
+ * one.
+ */
+function useDiagram(source: string | null, theme: DiagramTheme, render: RenderDiagram): Diagram {
   const id = `mermaid-${useId().replace(/[^a-zA-Z0-9-]/gu, '')}`;
-  const [drawn, setDrawn] = useState<{ readonly source: string; readonly drawing: Drawing }>({
-    source: '',
-    drawing: DRAWING,
-  });
+  const [drawn, setDrawn] = useState<{
+    readonly source: string;
+    readonly theme: DiagramTheme;
+    readonly diagram: Diagram;
+  }>({ source: '', theme, diagram: DRAWING });
   const blank = source === null || source.trim() === '';
   useEffect(() => {
     if (source === null || blank) return undefined;
     let live = true;
-    const draw = async (): Promise<Drawing> => {
+    const draw = async (): Promise<Diagram> => {
       try {
-        return { state: 'drawn', svg: await render(id, source) };
+        return { state: 'drawn', svg: await render(id, source, theme) };
       } catch (error) {
         // Mermaid's own message where it gave one, which names the line its
         // parser stopped at.
@@ -174,16 +215,16 @@ function useDrawing(source: string | null, render: RenderMermaid): Drawing {
         return { state: 'failed', failed };
       }
     };
-    void draw().then((drawing) => {
-      if (live) setDrawn({ source, drawing });
+    void draw().then((diagram) => {
+      if (live) setDrawn({ source, theme, diagram });
     });
     return () => {
       live = false;
     };
-  }, [id, source, blank, render]);
+  }, [id, source, theme, blank, render]);
   if (source === null) return DRAWING;
   if (blank) return { state: 'empty' };
-  return drawn.source === source ? drawn.drawing : DRAWING;
+  return drawn.source === source && drawn.theme === theme ? drawn.diagram : DRAWING;
 }
 
 /** The one text a view knows, so a view that Saves many times holds one. */
@@ -263,7 +304,7 @@ const fill: CSSProperties = {
 function MermaidView({
   surface,
   render,
-}: PluginViewProps<MermaidContent, MermaidMapContent> & { readonly render: RenderMermaid }) {
+}: PluginViewProps<MermaidContent, MermaidMapContent> & { readonly render: RenderDiagram }) {
   const name = titleName(surface.title.value);
   const url = surface.content.value.url;
   const [known] = useState(createKnownText);
@@ -278,6 +319,8 @@ function MermaidView({
   const [editing, setEditing] = useState<Editing | null>(null);
   const claim = useRef<Claim | null>(null);
   const measurer = useRef<HTMLDivElement | null>(null);
+  const root = useRef<HTMLDivElement | null>(null);
+  const scheme = useScheme(root);
   const railBand = useRailBand();
 
   // A release is asked once: the host completes one asked during exclusive
@@ -296,7 +339,7 @@ function MermaidView({
   const readable = text.state === 'read' ? text.text : null;
   // The diagram is drawn wherever its source is wanted and read, and is not
   // drawn while the draft replaces it.
-  const drawing = useDrawing(editing === null ? readable : null, render);
+  const diagram = useDiagram(editing === null ? readable : null, scheme, render);
   const mayAuthor = contentCommit !== undefined && store !== undefined && takeClaim !== undefined;
   const mayEdit = open && readable !== null && mayAuthor;
   // Edit on a Closed Resource Opens it and then begins editing (ADR 0064):
@@ -402,10 +445,10 @@ function MermaidView({
     opening.current = { commitMap, width };
   }, [commitMap, width]);
   const textState = text.state;
-  const drawingState = textState === 'read' ? drawing.state : null;
+  const diagramState = textState === 'read' ? diagram.state : null;
   useEffect(() => {
     // A diagram is measured once Mermaid has drawn it, or failed to.
-    if (!measuring || textState === 'reading' || drawingState === 'drawing') return undefined;
+    if (!measuring || textState === 'reading' || diagramState === 'drawing') return undefined;
     const element = measurer.current;
     const measured = new AbortController();
     const { signal } = measured;
@@ -423,7 +466,7 @@ function MermaidView({
       now.commitMap({ open: true }, { width: Math.round(now.width), height: Math.round(height) });
     });
     return () => measured.abort();
-  }, [measuring, textState, drawingState]);
+  }, [measuring, textState, diagramState]);
 
   const commands = useMemo((): readonly RailCommand[] => {
     // Open and Close are one command whose name swaps, so a keyboard author's
@@ -535,6 +578,7 @@ function MermaidView({
             ? { ...fill, height: '100%' }
             : fill
       }
+      ref={root}
       data-open={open}
       data-editing={editing !== null}
     >
@@ -581,8 +625,8 @@ function MermaidView({
               {`This text cannot be read. ${text.refused}`}
             </p>
           ) : text.state === 'read' ? (
-            <MermaidDrawing
-              drawing={drawing}
+            <DrawnDiagram
+              diagram={diagram}
               edit={
                 mayEdit && surface.selected
                   ? { label: `Edit Mermaid source of ${name}`, begin: beginEdit }
@@ -613,7 +657,7 @@ function MermaidView({
           <div style={{ padding: `${railBand}px ${INSET}px 0` }}>
             <Title />
           </div>
-          {readable !== null && <MermaidDrawing drawing={drawing} />}
+          {readable !== null && <DrawnDiagram diagram={diagram} />}
         </div>
       )}
       <Rail commands={commands} />
@@ -627,32 +671,31 @@ function MermaidView({
  * the whole diagram, out of the tab order since the rail's Edit is the
  * keyboard's way in, as the host's rendered Markdown draws its own.
  */
-function MermaidDrawing({
-  drawing,
+function DrawnDiagram({
+  diagram,
   edit,
 }: {
-  readonly drawing: Drawing;
+  readonly diagram: Diagram;
   readonly edit?: { readonly label: string; readonly begin: () => void } | undefined;
 }) {
   return (
     <div style={{ position: 'relative', padding: INSET }}>
-      {drawing.state === 'drawn' ? (
+      {diagram.state === 'drawn' ? (
         <div
-          data-testid="mermaid-drawing"
+          data-testid="mermaid-diagram"
           // Mermaid's `strict` security level sanitises the SVG it answers
           // and the source is drawn by nothing else (ADR 0158). The diagram
-          // sits on a light card of its own, since Mermaid's theme is not the
-          // canvas's.
-          style={{ background: '#ffffff', borderRadius: 4, padding: 8, lineHeight: 0 }}
-          dangerouslySetInnerHTML={{ __html: drawing.svg }}
+          // is drawn in the canvas's colour scheme, straight onto the rect.
+          style={{ lineHeight: 0 }}
+          dangerouslySetInnerHTML={{ __html: diagram.svg }}
         />
-      ) : drawing.state === 'failed' ? (
+      ) : diagram.state === 'failed' ? (
         <p role="note" style={{ margin: 0, fontSize: 12 }}>
-          {`This diagram cannot be drawn. ${drawing.failed}`}
+          {`This diagram cannot be drawn. ${diagram.failed}`}
         </p>
-      ) : drawing.state === 'empty' ? (
+      ) : diagram.state === 'empty' ? (
         <p role="note" style={{ margin: 0, fontSize: 12 }}>
-          {EMPTY_SOURCE}
+          {EMPTY_DIAGRAM}
         </p>
       ) : (
         <div role="status" aria-label="Drawing diagram" style={{ minHeight: 24 }} />
@@ -702,7 +745,7 @@ const createFromDock: Creation<MermaidContent> = {
  * itself in the build (`mermaidPluginView`), and a test's stand-in under
  * jsdom, which has no layout for Mermaid to draw with.
  */
-export const mermaidPluginViewWith = (render: RenderMermaid) => {
+export const mermaidPluginViewWith = (render: RenderDiagram) => {
   function View(props: PluginViewProps<MermaidContent, MermaidMapContent>) {
     return <MermaidView {...props} render={render} />;
   }
@@ -715,4 +758,4 @@ export const mermaidPluginViewWith = (render: RenderMermaid) => {
 
 export const mermaidPluginView = mermaidPluginViewWith(renderWithMermaid);
 
-export type { RenderMermaid } from './mermaid';
+export type { DiagramTheme, RenderDiagram } from './mermaid';
