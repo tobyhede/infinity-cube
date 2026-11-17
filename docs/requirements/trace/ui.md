@@ -177,7 +177,7 @@ The rule ids in `../ui.md` are append-only from this version on.
 | 0122 thin rect border on a non-rectangle Shape | the frame sent → RD (RD-18); the control on its corner → UI-70 |
 | 0122 Edit on a Closed Resource Opens it first | folded → UI-54 |
 | 0131 Dock mark: Edits lost on reload | → UI-42, rewritten by M19: a neutral notice over the canvas, never a Dock mark |
-| 0132 r4 Dock mark: Edited in this browser | → UI-43 (not built, DEC 4) |
+| 0132 r4 Dock mark: Edited in this browser; the first copy includes a mapless Space's first working read; revisions never count | → UI-43 (not built, DEC 4) |
 | 0132 r5 Discard local edits | the control → UI-95 (not built, DEC 4); what it does → ST-96 |
 | 0006s Open is one verb across kinds | dropped: superseded; 0064 carries Open (UI-53) |
 | 0039 r4 a Reference's Title is authored inline like any Resource's | folded → UI-44 |
