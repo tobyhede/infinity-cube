@@ -53,6 +53,7 @@
     "mount-headers.ts",
     "vite-space-http-plugin.ts",
     "http-server-build.config.ts",
+    "desktop-sidecar-build.config.ts",
     "ladle-vite.config.ts"
   ]
 }

@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // The desktop package imports nothing of ours: the sidecar it ships is
+    // built from `src/desktop/` by `@project/app`'s build, and the shell is
+    // Rust (`src-tauri/`). Only the build script is TypeScript.
+    "paths": {},
+    "types": ["node"]
+  },
+  "include": ["scripts"]
+}
