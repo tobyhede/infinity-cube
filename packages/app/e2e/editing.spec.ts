@@ -319,14 +319,18 @@ test('the Resource affordance opens rendered Markdown and edits it in place', as
   await expect(resource).toBeVisible();
   await settled(page);
 
-  await openResource(resource, 'A');
+  const openedRevision = await openResourcePersisted(resource, 'A');
 
   await expect(resource).toContainText('entry point');
   await (await controls(resource)).getByRole('button', { name: 'Edit Resource A' }).click();
   const source = page.getByRole('textbox', { name: 'Markdown source of A' });
   await source.fill('Authored from the graph');
   await (await controls(resource)).getByRole('button', { name: 'Save Resource A' }).click();
-  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+  // Save stores the text as an asset before it commits, so "Persisted" alone
+  // can still be the status from the Open: wait for the Save's one Edit.
+  const persistence = page.getByTestId('persistence-status');
+  await expect(persistence).toHaveAttribute('data-revision', String(Number(openedRevision) + 1));
+  await expect(persistence).toHaveText('Persisted');
 
   await page.reload();
   const reopened = nodeByTitle(page, 'A').first();
@@ -1561,7 +1565,9 @@ test(
     await selectCanvas(page, 'Collection 1');
     const resource = nodeByTitle(page, 'A').first();
     await expect(resource).toBeVisible();
-    await openResource(resource, 'A');
+    // The Open Edit lands only once the text is read and measured, and the growth
+    // it starts is the transition to wait out before the control is measured.
+    await openResourcePersisted(resource, 'A');
     await resource.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
