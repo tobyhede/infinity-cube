@@ -50,7 +50,8 @@ const FIXTURE_VIEW: FixtureView = { spaceId: FIXTURE_TARGET_SPACE, map: FIXTURE_
 function fixtureContent(kind: PluginKind, source: string, space: FixtureView): ResourceContent {
   switch (kind) {
     case 'markdown':
-      return { kind: 'markdown', content: { url: textAsset(source) }, via: 'self' };
+    case 'mermaid':
+      return { kind, content: { url: textAsset(source) }, via: 'self' };
     case 'reference':
       return { kind: 'markdown', content: { url: textAsset(source) }, via: 'target' };
     case 'space':
@@ -78,6 +79,7 @@ function fixtureOwnContent(
 ): ResourceFlowNode['data']['ownContent'] {
   switch (kind) {
     case 'markdown':
+    case 'mermaid':
       return { url: textAsset(source) };
     case 'reference':
       return { target: FIXTURE_TARGET };
@@ -102,6 +104,7 @@ export function fixtureMapContent(open: boolean, kind: PluginKind): JsonValue {
     case 'ur':
       return { shape: 'rectangle' };
     case 'markdown':
+    case 'mermaid':
     case 'reference':
     case 'space':
       return { open };

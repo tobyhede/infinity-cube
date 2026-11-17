@@ -163,6 +163,7 @@ const EXTENSION_MEDIA_TYPES: readonly (readonly [string, string])[] = [
   ['avif', 'image/avif'],
   ['svg', 'image/svg+xml'],
   ['md', 'text/markdown'],
+  ['mmd', 'text/vnd.mermaid'],
   ['txt', 'text/plain'],
   ['csv', 'text/csv'],
   ['html', 'text/html'],

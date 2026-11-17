@@ -249,7 +249,8 @@ interface Overrides {
 function ownContent(kind: PluginKind, source: string, url: string): ResourceContent {
   switch (kind) {
     case 'markdown':
-      return { kind: 'markdown', content: { url: textAsset(source) }, via: 'self' };
+    case 'mermaid':
+      return { kind, content: { url: textAsset(source) }, via: 'self' };
     case 'image':
       return { kind: 'image', content: { url }, via: 'self' };
     case 'reference':

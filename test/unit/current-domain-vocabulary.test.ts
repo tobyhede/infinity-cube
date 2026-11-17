@@ -1138,6 +1138,9 @@ const QUALIFIED_SPELLINGS: readonly string[] = [
   // as prose about arranging rather than as the entity; the hyphenated form is
   // the same phrase and takes the same reading.
   `abstract-${retiredMapLower}`,
+  // A package's name in the lockfile: Cytoscape's base library, which Mermaid
+  // brings in, and which is someone else's catalogue as Lucide's glyph is.
+  `${retiredMapLower}-base`,
 ];
 
 const CITED_PATH = /\S*\/\S*|\b\d{4}-[a-z0-9-]+/g;

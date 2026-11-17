@@ -2,6 +2,7 @@ import { pluginList } from '@project/resource-api/domain';
 import { defaultPlugin } from '@project/plugin-default/domain';
 import { imagePlugin } from '@project/plugin-image/domain';
 import { markdownPlugin } from '@project/plugin-markdown/domain';
+import { mermaidPlugin } from '@project/plugin-mermaid/domain';
 import { referencePlugin } from '@project/plugin-reference/domain';
 import { spacePlugin } from '@project/plugin-space/domain';
 import { urPlugin } from '@project/plugin-ur/domain';
@@ -18,6 +19,7 @@ export const PLUGINS = pluginList([
   imagePlugin,
   urPlugin,
   referencePlugin,
+  mermaidPlugin,
 ]);
 
 /**

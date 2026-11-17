@@ -11,7 +11,13 @@ describe('the Dock’s Creates', () => {
     const createFromDock = vi.fn();
     const creates = dockCreates({ createFromDock, creating: NOTHING_CREATING }, true, current);
 
-    expect(creates.map(({ kind }) => kind)).toEqual(['markdown', 'space', 'image', 'ur']);
+    expect(creates.map(({ kind }) => kind)).toEqual([
+      'markdown',
+      'space',
+      'image',
+      'ur',
+      'mermaid',
+    ]);
     expect(creates.every(({ disabled }) => !disabled)).toBe(true);
   });
 
@@ -41,6 +47,11 @@ describe('the Dock’s Creates', () => {
     for (const create of creates) create.create();
 
     expect(creates.filter(({ disabled }) => disabled).map(({ kind }) => kind)).toEqual(['space']);
-    expect(createFromDock.mock.calls.map(([kind]) => kind)).toEqual(['markdown', 'image', 'ur']);
+    expect(createFromDock.mock.calls.map(([kind]) => kind)).toEqual([
+      'markdown',
+      'image',
+      'ur',
+      'mermaid',
+    ]);
   });
 });

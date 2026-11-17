@@ -16,6 +16,7 @@ import idSchema from '../../docs/schema/id.schema.json';
 import envelopeSchema from '../../docs/schema/resource/envelope.schema.json';
 import imageSchema from '../../docs/schema/resource/kinds/image.schema.json';
 import markdownSchema from '../../docs/schema/resource/kinds/markdown.schema.json';
+import mermaidSchema from '../../docs/schema/resource/kinds/mermaid.schema.json';
 import referenceSchema from '../../docs/schema/resource/kinds/reference.schema.json';
 import spaceKindSchema from '../../docs/schema/resource/kinds/space.schema.json';
 import urSchema from '../../docs/schema/resource/kinds/ur.schema.json';
@@ -43,6 +44,7 @@ ajv.addSchema([
   envelopeSchema,
   urSchema,
   markdownSchema,
+  mermaidSchema,
   imageSchema,
   referenceSchema,
   spaceKindSchema,

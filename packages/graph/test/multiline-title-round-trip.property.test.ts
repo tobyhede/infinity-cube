@@ -28,7 +28,14 @@ const GRAPH_ID = uuid('00000000-0000-4000-8000-000000000105');
 
 type ResourceKind = PluginKind;
 
-const EVERY_KIND: readonly ResourceKind[] = ['markdown', 'reference', 'space', 'image', 'ur'];
+const EVERY_KIND: readonly ResourceKind[] = [
+  'markdown',
+  'reference',
+  'space',
+  'image',
+  'ur',
+  'mermaid',
+];
 
 /**
  * The same Title on each Resource kind. Every kind writes its Title through the one
@@ -39,6 +46,7 @@ const EVERY_KIND: readonly ResourceKind[] = ['markdown', 'reference', 'space', '
 function resourceOf(kind: ResourceKind, title: string): Resource {
   switch (kind) {
     case 'markdown':
+    case 'mermaid':
       return { id: ID, title, kind, content: { url: EMPTY_ASSET_REF } };
     case 'reference':
       return { id: ID, title, kind, content: { target: TARGET } };

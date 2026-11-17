@@ -10,7 +10,7 @@
     "required": ["kind"],
     "properties": {
       "kind": {
-        "enum": ["ur", "markdown", "image", "reference", "space"]
+        "enum": ["ur", "markdown", "image", "reference", "space", "mermaid"]
       }
     }
   },
@@ -78,6 +78,18 @@
             },
             "content": {
               "$ref": "kinds/space.schema.json"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind"],
+          "properties": {
+            "kind": {
+              "const": "mermaid"
+            },
+            "content": {
+              "$ref": "kinds/mermaid.schema.json"
             }
           }
         }
