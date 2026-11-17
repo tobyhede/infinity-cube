@@ -34,7 +34,13 @@ export interface DesktopHandlerOptions {
   readonly expectedHost: () => string;
 }
 
-export const SESSION_COOKIE = 'infinity-cube-session';
+/**
+ * The session cookie's name for the sidecar answering `host`. A webview keeps
+ * one cookie store for every talk window, and scopes a cookie by host, not
+ * port (RFC 6265 §8.5), so each sidecar's cookie carries its port.
+ */
+export const sessionCookieName = (host: string): string =>
+  `infinity-cube-session-${host.slice(host.lastIndexOf(':') + 1)}`;
 
 const LAUNCH_PARAMETER = 'launch';
 
@@ -89,7 +95,8 @@ export const createDesktopHandler = (
     });
 
   return async (request) => {
-    if (request.headers.get('host') !== options.expectedHost()) {
+    const host = options.expectedHost();
+    if (request.headers.get('host') !== host) {
       return refused(421, 'This server answers only its own window.');
     }
     const url = new URL(request.url);
@@ -102,12 +109,12 @@ export const createDesktopHandler = (
         status: 302,
         headers: {
           Location: '/',
-          'Set-Cookie': `${SESSION_COOKIE}=${options.secret}; HttpOnly; SameSite=Strict; Path=/`,
+          'Set-Cookie': `${sessionCookieName(host)}=${options.secret}; HttpOnly; SameSite=Strict; Path=/`,
           'Cache-Control': 'no-store',
         },
       });
     }
-    const session = cookieValue(request.headers.get('cookie'), SESSION_COOKIE);
+    const session = cookieValue(request.headers.get('cookie'), sessionCookieName(host));
     if (session === undefined || !sameSecret(session, options.secret)) {
       return refused(403, 'Open this talk from InfinityCube.');
     }

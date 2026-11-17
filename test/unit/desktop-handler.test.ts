@@ -5,8 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { newUuid } from '@project/core';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
-  SESSION_COOKIE,
   createDesktopHandler,
+  sessionCookieName,
   type StaticFile,
 } from '../../src/desktop/desktop-handler';
 import { desktopContentSecurityPolicy } from '../../src/desktop/static-files';
@@ -16,6 +16,7 @@ const FIXTURE = fileURLToPath(new URL('../../packages/app/fixture', import.meta.
 const HOST = '127.0.0.1:43210';
 const ORIGIN = `http://${HOST}`;
 const SECRET = 'launch-secret-for-this-window';
+const SESSION_COOKIE = sessionCookieName(HOST);
 const PAGE = '<!doctype html><script>window.guard = 1;</script><div id="root"></div>';
 
 const encode = (text: string): Uint8Array<ArrayBuffer> => new TextEncoder().encode(text);
@@ -34,7 +35,12 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
-const handlerOnFixture = async () => {
+const handlerOnFixture = async (
+  window: { host: string; secret: string } = {
+    host: HOST,
+    secret: SECRET,
+  },
+) => {
   const root = await mkdtemp(join(tmpdir(), 'infinity-cube-desktop-'));
   roots.push(root);
   const directory = join(root, 'talk');
@@ -52,8 +58,8 @@ const handlerOnFixture = async () => {
       Promise.resolve(pathname === BUILT_SCRIPT_PATH ? BUILT_SCRIPT : undefined),
     page: { bytes: encode(PAGE), contentType: 'text/html; charset=utf-8' },
     contentSecurityPolicy: desktopContentSecurityPolicy(PAGE),
-    secret: SECRET,
-    expectedHost: () => HOST,
+    secret: window.secret,
+    expectedHost: () => window.host,
   });
 };
 
@@ -91,7 +97,7 @@ describe('The desktop sidecar handler', () => {
     expect(response.status).toBe(302);
     expect(response.headers.get('location')).toBe('/');
     expect(response.headers.get('set-cookie')).toBe(
-      `${SESSION_COOKIE}=${SECRET}; HttpOnly; SameSite=Strict; Path=/`,
+      `infinity-cube-session-43210=${SECRET}; HttpOnly; SameSite=Strict; Path=/`,
     );
   });
 
@@ -146,5 +152,31 @@ describe('The desktop sidecar handler', () => {
     const handle = await handlerOnFixture();
     const response = await handle(request('/somewhere/else', { method: 'POST', body: '{}' }));
     expect(response.status).toBe(405);
+  });
+
+  it('keeps each window’s session when two talks share one cookie store', async () => {
+    // A webview's cookie store scopes a host-only cookie by host and path, not
+    // by port (RFC 6265 §8.5), and every talk window shares the default store.
+    const jar = new Map<string, string>();
+    const keep = (response: Response): void => {
+      const [pair = ''] = (response.headers.get('set-cookie') ?? '').split(';');
+      const separator = pair.indexOf('=');
+      if (separator !== -1) jar.set(pair.slice(0, separator), pair.slice(separator + 1));
+    };
+    const sent = (): string => [...jar].map(([name, value]) => `${name}=${value}`).join('; ');
+    const first = { host: '127.0.0.1:43211', secret: 'secret-of-the-first-window' };
+    const second = { host: '127.0.0.1:43212', secret: 'secret-of-the-second-window' };
+    const handleFirst = await handlerOnFixture(first);
+    const handleSecond = await handlerOnFixture(second);
+    const at = (window: { host: string }, path: string): Request =>
+      new Request(`http://${window.host}${path}`, {
+        headers: { host: window.host, cookie: sent() },
+      });
+
+    keep(await handleFirst(at(first, `/?launch=${first.secret}`)));
+    keep(await handleSecond(at(second, `/?launch=${second.secret}`)));
+
+    expect((await handleFirst(at(first, '/api/aggregate'))).status).toBe(200);
+    expect((await handleSecond(at(second, '/api/aggregate'))).status).toBe(200);
   });
 });

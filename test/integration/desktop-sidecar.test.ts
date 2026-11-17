@@ -71,50 +71,67 @@ const listening = (announcement: SidecarAnnouncement) => {
   return announcement;
 };
 
+/** Open a sidecar on a copy of the fixture, and commit one edit through its window. */
+const sidecarWithAnEdit = async () => {
+  const root = await temporaryRoot();
+  const directory = join(root, 'talk');
+  await cp(FIXTURE, directory, { recursive: true });
+  const { child, exited, announcement } = startSidecar(directory, await builtApplication(root));
+  const { port, secret } = listening(await announcement);
+  const origin = `http://127.0.0.1:${String(port)}`;
+
+  const launched = await fetch(`${origin}/?launch=${secret}`, { redirect: 'manual' });
+  expect(launched.status).toBe(302);
+  const cookie = (launched.headers.get('set-cookie') ?? '').split(';')[0] ?? '';
+
+  const backend = new HttpSpaceBackend(origin, {
+    fetch: (input, init) => {
+      const headers = new Headers(init?.headers);
+      headers.set('cookie', cookie);
+      return fetch(input, { ...init, headers });
+    },
+  });
+  const loaded = await backend.loadSpace(uuidSchema.parse(META_SPACE_ID));
+  if (loaded === undefined) throw new Error('Expected the Meta Space');
+  const committed = await backend.commit({
+    changes: [
+      {
+        kind: 'update',
+        spaceId: uuidSchema.parse(META_SPACE_ID),
+        snapshot: {
+          ...loaded.snapshot,
+          document: { ...loaded.snapshot.document, title: 'From the window' },
+        },
+        expectedRevision: loaded.revision,
+      },
+    ],
+  });
+  expect(committed.kind).toBe('committed');
+  return { child, exited, directory };
+};
+
+const writtenTitle = async (directory: string): Promise<string> =>
+  (await readSingleSpace(join(directory, META_SPACE_ID))).document.title;
+
 describe('The desktop sidecar', () => {
   it(
     'writes an edit to the directory and exits zero when its standard input closes',
     async () => {
-      const root = await temporaryRoot();
-      const directory = join(root, 'talk');
-      await cp(FIXTURE, directory, { recursive: true });
-      const { child, exited, announcement } = startSidecar(directory, await builtApplication(root));
-      const { port, secret } = listening(await announcement);
-      const origin = `http://127.0.0.1:${String(port)}`;
-
-      const launched = await fetch(`${origin}/?launch=${secret}`, { redirect: 'manual' });
-      expect(launched.status).toBe(302);
-      const cookie = (launched.headers.get('set-cookie') ?? '').split(';')[0] ?? '';
-
-      const backend = new HttpSpaceBackend(origin, {
-        fetch: (input, init) => {
-          const headers = new Headers(init?.headers);
-          headers.set('cookie', cookie);
-          return fetch(input, { ...init, headers });
-        },
-      });
-      const loaded = await backend.loadSpace(uuidSchema.parse(META_SPACE_ID));
-      if (loaded === undefined) throw new Error('Expected the Meta Space');
-      const committed = await backend.commit({
-        changes: [
-          {
-            kind: 'update',
-            spaceId: uuidSchema.parse(META_SPACE_ID),
-            snapshot: {
-              ...loaded.snapshot,
-              document: { ...loaded.snapshot.document, title: 'From the window' },
-            },
-            expectedRevision: loaded.revision,
-          },
-        ],
-      });
-      expect(committed.kind).toBe('committed');
-
+      const { child, exited, directory } = await sidecarWithAnEdit();
       child.stdin.end();
       expect(await exited).toBe(0);
-      expect((await readSingleSpace(join(directory, META_SPACE_ID))).document.title).toBe(
-        'From the window',
-      );
+      expect(await writtenTitle(directory)).toBe('From the window');
+    },
+    START_TIMEOUT_MS,
+  );
+
+  it(
+    'writes an edit to the directory and exits zero on SIGHUP, as a run does',
+    async () => {
+      const { child, exited, directory } = await sidecarWithAnEdit();
+      child.kill('SIGHUP');
+      expect(await exited).toBe(0);
+      expect(await writtenTitle(directory)).toBe('From the window');
     },
     START_TIMEOUT_MS,
   );

@@ -11,44 +11,57 @@ mod sidecar;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::thread;
-use std::time::Duration;
+use std::sync::{Mutex, MutexGuard, PoisonError};
+use std::thread::{self, JoinHandle};
 
 use tauri::{AppHandle, Manager, RunEvent, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
-use crate::sidecar::{Sidecar, Started, Stopped};
-
-/// How long a sidecar has to write its last edit before it is killed.
-const STOP_GRACE: Duration = Duration::from_secs(5);
+use crate::sidecar::{ANNOUNCE_DEADLINE, STOP_GRACE, Sidecar, Started, Stopped};
 
 const TALK_WINDOW_PREFIX: &str = "talk-";
 
-/// The sidecar behind each open talk window, by window label.
+/// The sidecar behind each open talk window, by window label, and the stops
+/// still under way for windows already closing.
 #[derive(Default)]
 struct Talks {
     sidecars: Mutex<HashMap<String, Sidecar>>,
+    stopping: Mutex<Vec<JoinHandle<()>>>,
     next: AtomicU64,
+}
+
+/// The data behind `mutex`, even if a thread panicked holding it: a map of
+/// sidecars stays valid whatever panicked, and losing one would orphan it.
+fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
 impl Talks {
     fn insert(&self, label: String, sidecar: Sidecar) {
-        if let Ok(mut sidecars) = self.sidecars.lock() {
-            sidecars.insert(label, sidecar);
-        }
+        lock(&self.sidecars).insert(label, sidecar);
     }
 
     fn take(&self, label: &str) -> Option<Sidecar> {
-        self.sidecars.lock().ok()?.remove(label)
+        lock(&self.sidecars).remove(label)
     }
 
     fn take_all(&self) -> Vec<Sidecar> {
-        self.sidecars
-            .lock()
-            .map(|mut sidecars| sidecars.drain().map(|(_, sidecar)| sidecar).collect())
-            .unwrap_or_default()
+        lock(&self.sidecars)
+            .drain()
+            .map(|(_, sidecar)| sidecar)
+            .collect()
+    }
+
+    /// Keep a closing window's stop, so quitting waits for it.
+    fn keep_stopping(&self, stop: JoinHandle<()>) {
+        let mut stopping = lock(&self.stopping);
+        stopping.retain(|stop| !stop.is_finished());
+        stopping.push(stop);
+    }
+
+    fn take_stopping(&self) -> Vec<JoinHandle<()>> {
+        std::mem::take(&mut *lock(&self.stopping))
     }
 }
 
@@ -101,7 +114,7 @@ fn open_talk(app: AppHandle) {
 
 fn open_talk_at(app: &AppHandle, folder: &Path) -> Result<(), OpenError> {
     let built = app.path().resource_dir()?.join("app");
-    match sidecar::start(&sidecar_binary()?, folder, &built)? {
+    match sidecar::start(&sidecar_binary()?, folder, &built, ANNOUNCE_DEADLINE)? {
         Started::Refused { message } => {
             show_error(app, &message);
             Ok(())
@@ -122,9 +135,13 @@ fn open_talk_at(app: &AppHandle, folder: &Path) -> Result<(), OpenError> {
                 |name| name.to_string_lossy().into_owned(),
             );
             talks.insert(label.clone(), sidecar);
+            let origin = url.origin();
             let built = WebviewWindowBuilder::new(app, &label, WebviewUrl::External(url))
                 .title(title)
                 .inner_size(1280.0, 800.0)
+                // A talk window shows its own sidecar and nothing else: a link
+                // to anywhere else in the talk's content is refused.
+                .on_navigation(move |to| to.origin() == origin)
                 .build();
             if let Err(error) = built {
                 if let Some(sidecar) = talks.take(&label) {
@@ -191,11 +208,12 @@ fn main() {
             };
             // The window stays until its sidecar has written the last edit.
             api.prevent_close();
+            let talks = window.state::<Talks>();
             let window = window.clone();
-            thread::spawn(move || {
+            talks.keep_stopping(thread::spawn(move || {
                 stop_sidecar(sidecar);
                 let _ = window.destroy();
-            });
+            }));
         })
         .build(tauri::generate_context!());
     let app = match app {
@@ -207,13 +225,15 @@ fn main() {
     };
     app.run(|app, event| {
         if let RunEvent::Exit = event {
-            // Every talk still open writes its last edit before the process ends.
-            let stopping: Vec<_> = app
-                .state::<Talks>()
+            // Every talk still open, or still closing, writes its last edit
+            // before the process ends.
+            let talks = app.state::<Talks>();
+            let mut stopping: Vec<_> = talks
                 .take_all()
                 .into_iter()
                 .map(|sidecar| thread::spawn(move || stop_sidecar(sidecar)))
                 .collect();
+            stopping.extend(talks.take_stopping());
             for stop in stopping {
                 let _ = stop.join();
             }

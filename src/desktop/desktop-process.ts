@@ -22,8 +22,8 @@ import { builtFiles, desktopContentSecurityPolicy } from './static-files';
  * once it can be reached, or `{"kind":"refused","message":…}` when the
  * directory cannot be run. Everything else goes to standard error. When its
  * standard input closes, which is how the desktop shell stops it, it stops
- * serving, writes any edit not yet on disk, and exits; SIGINT and SIGTERM do
- * the same, and a second one exits at once.
+ * serving, writes any edit not yet on disk, and exits; SIGINT, SIGTERM and
+ * SIGHUP do the same, as they do for a run, and a second one exits at once.
  */
 
 const announce = (announcement: SidecarAnnouncement): void => {
@@ -111,6 +111,7 @@ const main = async (): Promise<void> => {
   process.stdin.resume();
   process.on('SIGINT', stop);
   process.on('SIGTERM', stop);
+  process.on('SIGHUP', stop);
 };
 
 main().catch((error: unknown) => {
