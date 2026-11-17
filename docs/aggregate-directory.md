@@ -143,7 +143,7 @@ Only `resources/*.json` is read: a `.md` in `resources/` or beside `space.json` 
 The bytes of every stored asset the aggregate's Resources reference ([Storage: File format](requirements/storage.md#file-format)). An asset is any file a Resource uses, of any media type: a Markdown Resource's text and an Image Resource's picture are the ones a Resource kind writes today.
 
 - Each file is `assets/<hash>.<ext>`. The hash is the SHA-256 of the file's bytes as 43 characters of unpadded base64url, and it is also the last segment of the asset's URL, `/assets/<hash>`. The same bytes always have the same name, so they are stored once however many Resources reference them.
-- The extension gives the asset's media type, through one table: `png`, `jpg` and `jpeg`, `webp`, `gif`, `avif`, `svg`, `md`, `txt`, `csv`, `html`, `css`, `js`, `json`, `pdf`, `mp4`, `webm`, `mp3` and `woff2`. Any other extension, or none, is `application/octet-stream`. Exporting keeps the name of a file already there, so the extension you chose is written back; a new file gets the table's extension for its media type, or `.bin` for one the table does not list.
+- The extension gives the asset's media type, through one table: `png`, `jpg` and `jpeg`, `webp`, `gif`, `avif`, `svg`, `md`, `mmd` (Mermaid source), `txt`, `csv`, `html`, `css`, `js`, `json`, `pdf`, `mp4`, `webm`, `mp3` and `woff2`. Any other extension, or none, is `application/octet-stream`. Exporting keeps the name of a file already there, so the extension you chose is written back; a new file gets the table's extension for its media type, or `.bin` for one the table does not list.
 - To add an asset by hand, compute its name and copy it in:
 
   ```sh

@@ -2,7 +2,7 @@
 
 **Purpose:** the controls an author operates and the keys they press: what each control offers, how it commits and cancels, where focus goes and where an answer shows.
 
-**Snapshot:** checked against `d14ff974` (2026-11-15); incorporates accepted ADRs through 0154, and ADR 0158 (the Mermaid Resource) in UI-53. ADRs accepted after it bind where they differ, until this document is updated. Proposed ADR 0138 (shortcuts) is not incorporated; the shortcut rules here restate the code and the archived guide.
+**Snapshot:** checked against `9e9b094` (2026-11-17); incorporates accepted ADRs through 0158. ADRs accepted after it bind where they differ, until this document is updated. Proposed ADR 0138 (shortcuts) is not incorporated; the shortcut rules here restate the code and the archived guide.
 
 Conflicts, open and closed, are listed in [conflicts/ui.md](conflicts/ui.md). Sources are traced in [trace/ui.md](trace/ui.md).
 

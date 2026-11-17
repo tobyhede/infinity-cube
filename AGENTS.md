@@ -55,7 +55,7 @@ InfinityCube is unreleased and makes no compatibility promise for any copy outsi
 
 ## Package layout & boundaries
 
-Seventeen `@project/*` workspace packages under `packages/`:
+Eighteen `@project/*` workspace packages under `packages/`:
 
 - `resource-api` — the Resource API, the one door a Resource plugin reaches. `/domain` is the plugin contract with no React: `definePlugin`, `Resource<C>` (the one Resource structure, which `core`'s `Resource` instantiates per kind), outlines, asset references and `Answer`. `/view` is the view half a plugin draws with (`Surface`, Claims and exclusive work, `Title`, `Own` and `Rail`); `/view/host` is what a host provides those components with (`ResourceHostProvider` and the rail store), which a plugin's source may not import; `/view/testing` is `renderPlugin`, the test host, for a plugin's tests only. It depends on no package of ours, which its `rootDir` and lint zone enforce.
 - `plugin-ur` — the Ur plugin: `/domain` (its content and Map content schemas) and `/view` (what it draws in its rect). It imports no package of ours but `resource-api`'s `/domain` and `/view`, and its domain half no React and no view.

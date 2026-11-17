@@ -4,10 +4,9 @@ import { assetRefSchema, definePlugin, EMPTY_ASSET } from '@project/resource-api
 
 /**
  * The Mermaid plugin's domain half (ADR 0142, ADR 0158): a Resource whose
- * Mermaid source is an asset, exactly as a Markdown Resource's text is. Its
- * `content` names that asset by URL, and whether it is Open is what it keeps
- * on each Map, so one Mermaid Resource may be Open on one Map and Closed on
- * another.
+ * Mermaid source is an asset. Its `content` names that asset by URL, and
+ * whether it is Open is what it keeps on each Map, so one Mermaid Resource
+ * may be Open on one Map and Closed on another.
  */
 
 /** A Mermaid Resource's content: the asset its source is. */

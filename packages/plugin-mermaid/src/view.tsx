@@ -40,8 +40,8 @@ import {
 import { renderWithMermaid, type DiagramTheme, type RenderDiagram } from './mermaid';
 
 /**
- * The Mermaid plugin's view (ADR 0142, ADR 0158), the Markdown plugin's in
- * every way but what it draws. It draws its Title, and its diagram once the
+ * The Mermaid plugin's view (ADR 0142, ADR 0158). It draws its Title, and its
+ * diagram once the
  * source asset is read and Mermaid has drawn it, where its Map content says
  * it is Open. Open and Close are its rail commands, and Opening carries a size
  * hint for the diagram drawn at a reading width. Editing is its own mode: a
@@ -53,13 +53,16 @@ import { renderWithMermaid, type DiagramTheme, type RenderDiagram } from './merm
 /** The width the size hint asks for at least, so a diagram is drawn at a legible size. */
 export const READING_WIDTH = 640;
 
-/** The inset the text is drawn at inside the rect. */
+/** The inset the diagram and its notes are drawn at inside the rect. */
 const INSET = 12;
 
 /** The room a Closed Title keeps below it, which an Open one does not. */
 const CLOSED_FOOT = 8;
 
-/** How long Opening waits for the diagram's fonts to load before measuring without them. */
+/**
+ * How long Opening waits for Mermaid to draw the diagram, and then for its
+ * fonts to load, before Opening without them.
+ */
 const LOAD_WAIT = 2000;
 
 /** The text of the asset at a URL, as far as it has been read. */
@@ -74,13 +77,16 @@ const READING: Text = { state: 'reading' };
 const UNREAD = 'Reading it failed.';
 
 /** What the status says where a Save failed rather than being refused. */
-const UNSAVED = 'The text could not be saved. Your draft is kept; Save again to retry.';
+const UNSAVED = 'The source could not be saved. Your draft is kept; Save again to retry.';
 
-/** What the status says where Edit was pressed while Closed and the text it Opened to cannot be read. */
-const UNEDITABLE = 'This text cannot be read, so it cannot be edited.';
+/** What the status says where Edit was pressed while Closed and the source it Opened to cannot be read. */
+const UNEDITABLE = 'This source cannot be read, so it cannot be edited.';
 
 /** What is drawn in place of the diagram where its source is empty. */
-const EMPTY_DIAGRAM = 'This diagram is empty. Edit it to write its Mermaid source.';
+const EMPTY_DIAGRAM = 'This diagram is empty.';
+
+/** What is drawn in place of the diagram where its source is empty and Edit is offered. */
+const EMPTY_TO_EDIT = `${EMPTY_DIAGRAM} Edit it to write its Mermaid source.`;
 
 /**
  * Read the text an asset holds, once per URL, starting from text this view
@@ -187,26 +193,39 @@ function useScheme(at: RefObject<Element | null>): DiagramTheme {
   return scheme;
 }
 
+/** The diagram last drawn, and the source and theme it was drawn from. */
+interface Drawn {
+  readonly source: string;
+  readonly theme: DiagramTheme;
+  readonly diagram: Diagram;
+}
+
 /**
- * Draw `source` in `theme` with `render`, once per source and theme, under an
- * id unique to this view. Nothing is drawn while there is no source to draw
- * (`null`), and an empty or blank source is no diagram rather than a failed
- * one.
+ * Draw `source` in `theme` with `render`, laid out in the element `scratch`
+ * holds, under an id unique to this view. The diagram last drawn is kept, so
+ * a source and theme it was drawn from are not drawn again. Nothing is drawn
+ * while there is no source to draw (`null`), and an empty or blank source is
+ * no diagram rather than a failed one.
  */
-function useDiagram(source: string | null, theme: DiagramTheme, render: RenderDiagram): Diagram {
+function useDiagram(
+  source: string | null,
+  theme: DiagramTheme,
+  render: RenderDiagram,
+  scratch: RefObject<HTMLElement | null>,
+): Diagram {
   const id = `mermaid-${useId().replace(/[^a-zA-Z0-9-]/gu, '')}`;
-  const [drawn, setDrawn] = useState<{
-    readonly source: string;
-    readonly theme: DiagramTheme;
-    readonly diagram: Diagram;
-  }>({ source: '', theme, diagram: DRAWING });
+  const [drawn, setDrawn] = useState<Drawn>({ source: '', theme, diagram: DRAWING });
+  const kept = useRef(drawn);
   const blank = source === null || source.trim() === '';
   useEffect(() => {
     if (source === null || blank) return undefined;
+    if (kept.current.source === source && kept.current.theme === theme) return undefined;
+    const container = scratch.current;
+    if (container === null) return undefined;
     let live = true;
     const draw = async (): Promise<Diagram> => {
       try {
-        return { state: 'drawn', svg: await render(id, source, theme) };
+        return { state: 'drawn', svg: await render(id, source, theme, container) };
       } catch (error) {
         // Mermaid's own message where it gave one, which names the line its
         // parser stopped at.
@@ -216,12 +235,14 @@ function useDiagram(source: string | null, theme: DiagramTheme, render: RenderDi
       }
     };
     void draw().then((diagram) => {
-      if (live) setDrawn({ source, theme, diagram });
+      if (!live) return;
+      kept.current = { source, theme, diagram };
+      setDrawn(kept.current);
     });
     return () => {
       live = false;
     };
-  }, [id, source, theme, blank, render]);
+  }, [id, source, theme, blank, render, scratch]);
   if (source === null) return DRAWING;
   if (blank) return { state: 'empty' };
   return drawn.source === source && drawn.theme === theme ? drawn.diagram : DRAWING;
@@ -246,21 +267,12 @@ const createKnownText = (): KnownText => {
 };
 
 /**
- * Resolve once every image in `element` has loaded or failed, and the fonts
- * it is set in are ready, as a diagram's labels are, or after {@link LOAD_WAIT}, whichever is first.
- * Its listeners and timer go when `signal` aborts, and the timer when it
- * resolves.
+ * Resolve once the fonts `element` is set in are ready, as a diagram's labels
+ * are, or after {@link LOAD_WAIT}, whichever is first. Its timer goes when
+ * `signal` aborts or it resolves.
  */
 const laidOut = (element: HTMLElement, signal: AbortSignal): Promise<void> => {
-  const pending = [...element.querySelectorAll('img')]
-    .filter((image) => !image.complete)
-    .map(
-      (image) =>
-        new Promise<void>((resolve) => {
-          image.addEventListener('load', () => resolve(), { once: true, signal });
-          image.addEventListener('error', () => resolve(), { once: true, signal });
-        }),
-    );
+  const pending: Promise<void>[] = [];
   // A document without a font loading interface, as jsdom's, has no fonts to wait for.
   const document: Partial<Pick<Document, 'fonts'>> = element.ownerDocument;
   if (document.fonts !== undefined) pending.push(document.fonts.ready.then(() => undefined));
@@ -320,7 +332,9 @@ function MermaidView({
   const claim = useRef<Claim | null>(null);
   const measurer = useRef<HTMLDivElement | null>(null);
   const root = useRef<HTMLDivElement | null>(null);
+  const scratch = useRef<HTMLDivElement | null>(null);
   const scheme = useScheme(root);
+  const [drawWaited, setDrawWaited] = useState(false);
   const railBand = useRailBand();
 
   // A release is asked once: the host completes one asked during exclusive
@@ -339,7 +353,7 @@ function MermaidView({
   const readable = text.state === 'read' ? text.text : null;
   // The diagram is drawn wherever its source is wanted and read, and is not
   // drawn while the draft replaces it.
-  const diagram = useDiagram(editing === null ? readable : null, scheme, render);
+  const diagram = useDiagram(editing === null ? readable : null, scheme, render, scratch);
   const mayAuthor = contentCommit !== undefined && store !== undefined && takeClaim !== undefined;
   const mayEdit = open && readable !== null && mayAuthor;
   // Edit on a Closed Resource Opens it and then begins editing (ADR 0064):
@@ -435,10 +449,12 @@ function MermaidView({
     [mapCommit],
   );
 
-  // Opening measures the text at a reading width first, once it is read and
-  // its images and fonts have loaded, then commits Open with what it measured
-  // as one size hint: asked once, for this gesture. Text that cannot be read
-  // has no size to hint at. The measurer is drawn only until it has measured.
+  // Opening measures the diagram at a reading width first, once its source is
+  // read, Mermaid has drawn it and its fonts have loaded, then commits Open
+  // with what it measured as one size hint: asked once, for this gesture. A
+  // source that cannot be read, or a diagram Mermaid has not drawn within
+  // LOAD_WAIT, has no size to hint at. The measurer is drawn only until it has
+  // measured.
   const width = Math.max(surface.size.width, READING_WIDTH);
   const opening = useRef({ commitMap, width });
   useEffect(() => {
@@ -446,17 +462,26 @@ function MermaidView({
   }, [commitMap, width]);
   const textState = text.state;
   const diagramState = textState === 'read' ? diagram.state : null;
+  const awaitingDiagram = diagramState === 'drawing' && !drawWaited;
+  useEffect(() => {
+    // Mermaid may be fetched, or stall, while Opening waits: past LOAD_WAIT it
+    // Opens without a hint rather than leaving the press unanswered.
+    if (!measuring || !awaitingDiagram) return undefined;
+    const timer = setTimeout(() => setDrawWaited(true), LOAD_WAIT);
+    return () => clearTimeout(timer);
+  }, [measuring, awaitingDiagram]);
   useEffect(() => {
     // A diagram is measured once Mermaid has drawn it, or failed to.
-    if (!measuring || textState === 'reading' || diagramState === 'drawing') return undefined;
+    if (!measuring || textState === 'reading' || awaitingDiagram) return undefined;
     const element = measurer.current;
     const measured = new AbortController();
     const { signal } = measured;
     void (element === null ? Promise.resolve() : laidOut(element, signal)).then(() => {
       if (signal.aborted) return;
       setMeasuring(false);
+      setDrawWaited(false);
       const now = opening.current;
-      if (textState !== 'read' || element === null) {
+      if (textState !== 'read' || element === null || diagramState === 'drawing') {
         now.commitMap({ open: true });
         return;
       }
@@ -466,7 +491,7 @@ function MermaidView({
       now.commitMap({ open: true }, { width: Math.round(now.width), height: Math.round(height) });
     });
     return () => measured.abort();
-  }, [measuring, textState, diagramState]);
+  }, [measuring, textState, diagramState, awaitingDiagram]);
 
   const commands = useMemo((): readonly RailCommand[] => {
     // Open and Close are one command whose name swaps, so a keyboard author's
@@ -583,6 +608,22 @@ function MermaidView({
       data-editing={editing !== null}
     >
       <div
+        // Where Mermaid lays a diagram out while drawing it: unseen, in the
+        // rect's own fonts, and never the document body, which it would grow.
+        ref={scratch}
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          width: READING_WIDTH,
+          height: 0,
+          overflow: 'hidden',
+          visibility: 'hidden',
+          pointerEvents: 'none',
+        }}
+      />
+      <div
         style={{ padding: `${railBand}px ${INSET}px ${open ? 0 : CLOSED_FOOT}px`, minHeight: 0 }}
       >
         <Title />
@@ -622,11 +663,12 @@ function MermaidView({
             </Own>
           ) : text.state === 'refused' ? (
             <p role="note" style={{ margin: 0, padding: INSET, fontSize: 12 }}>
-              {`This text cannot be read. ${text.refused}`}
+              {`This source cannot be read. ${text.refused}`}
             </p>
           ) : text.state === 'read' ? (
             <DrawnDiagram
               diagram={diagram}
+              mayEdit={mayEdit}
               edit={
                 mayEdit && surface.selected
                   ? { label: `Edit Mermaid source of ${name}`, begin: beginEdit }
@@ -657,7 +699,7 @@ function MermaidView({
           <div style={{ padding: `${railBand}px ${INSET}px 0` }}>
             <Title />
           </div>
-          {readable !== null && <DrawnDiagram diagram={diagram} />}
+          {readable !== null && <DrawnDiagram diagram={diagram} mayEdit={mayEdit} />}
         </div>
       )}
       <Rail commands={commands} />
@@ -669,13 +711,16 @@ function MermaidView({
  * A diagram as Mermaid drew it, or a note saying why there is none, with the
  * press that begins an edit where one is offered: a transparent button over
  * the whole diagram, out of the tab order since the rail's Edit is the
- * keyboard's way in, as the host's rendered Markdown draws its own.
+ * keyboard's way in. An empty diagram's note names Edit only where Edit is
+ * offered (`mayEdit`).
  */
 function DrawnDiagram({
   diagram,
+  mayEdit,
   edit,
 }: {
   readonly diagram: Diagram;
+  readonly mayEdit: boolean;
   readonly edit?: { readonly label: string; readonly begin: () => void } | undefined;
 }) {
   return (
@@ -685,17 +730,24 @@ function DrawnDiagram({
           data-testid="mermaid-diagram"
           // Mermaid's `strict` security level sanitises the SVG it answers
           // and the source is drawn by nothing else (ADR 0158). The diagram
-          // is drawn in the canvas's colour scheme, straight onto the rect.
-          style={{ lineHeight: 0 }}
+          // is drawn in the canvas's colour scheme, straight onto the rect. As a
+          // flex item the SVG sits on no text baseline, and Mermaid's HTML
+          // labels keep the line height they were measured at.
+          style={{ display: 'flex' }}
           dangerouslySetInnerHTML={{ __html: diagram.svg }}
         />
       ) : diagram.state === 'failed' ? (
-        <p role="note" style={{ margin: 0, fontSize: 12 }}>
-          {`This diagram cannot be drawn. ${diagram.failed}`}
+        // Mermaid's message runs over lines, a source line under a caret among
+        // them, which are kept as it wrote them.
+        <p role="note" style={{ margin: 0, fontSize: 12, whiteSpace: 'pre-wrap' }}>
+          {'This diagram cannot be drawn. '}
+          <span style={{ display: 'block', fontFamily: 'ui-monospace, monospace' }}>
+            {diagram.failed}
+          </span>
         </p>
       ) : diagram.state === 'empty' ? (
         <p role="note" style={{ margin: 0, fontSize: 12 }}>
-          {EMPTY_DIAGRAM}
+          {mayEdit ? EMPTY_TO_EDIT : EMPTY_DIAGRAM}
         </p>
       ) : (
         <div role="status" aria-label="Drawing diagram" style={{ minHeight: 24 }} />

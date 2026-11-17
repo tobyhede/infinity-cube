@@ -82,7 +82,7 @@
           }
         },
         "content": {
-          "description": "The Map content the plugin drawing this Resource keeps on this Map, any JSON value: an Ur Resource's is {\"shape\": \"rectangle\" | \"pill\" | \"ellipse\" | \"diamond\"}, and a Markdown, Reference or Space Resource's is {\"open\": boolean} (ADR 0142). Absent means the plugin's default. Whether the plugin's own schema accepts it is intake's check, because it needs the Resource's kind; a Resource whose kind names no plugin in this build keeps whatever is stored, unread."
+          "description": "The Map content the plugin drawing this Resource keeps on this Map, any JSON value: an Ur Resource's is {\"shape\": \"rectangle\" | \"pill\" | \"ellipse\" | \"diamond\"}, and a Markdown, Mermaid, Reference or Space Resource's is {\"open\": boolean} (ADR 0142, ADR 0158). Absent means the plugin's default. Whether the plugin's own schema accepts it is intake's check, because it needs the Resource's kind; a Resource whose kind names no plugin in this build keeps whatever is stored, unread."
         }
       }
     },

@@ -195,6 +195,21 @@ export const interactiveDeviations = [
       '`packages/plugin-image/test/image-plugin.test.tsx` (renames from the rail; Escape abandons; a refused rename keeps its draft) and `packages/app/e2e/image-resource.spec.ts`.',
   },
   {
+    subject: 'packages/plugin-mermaid/src/view.tsx — beginning an edit from a press on the diagram',
+    existingInfinityCubeComponentConsidered:
+      "The host's rendered Markdown, which begins an edit from a press on its own body, is drawn for Markdown text only; the Resource API offers no press target over markup a plugin inserts, and no `@project/ui` component is reachable from a plugin (ADR 0142).",
+    shadcnOrBaseUiConsidered:
+      "shadcn's Button and Base UI's Button are both outside what a plugin may import, and neither covers inserted SVG.",
+    productRequirement:
+      "UI-53 and ADR 0158: a selected Open Mermaid Resource begins an edit from a press on its body, as a Markdown Resource does, with the rail's Edit as the keyboard's way in.",
+    whyCompositionIsInsufficient:
+      'The plugin draws inside its own rect with `@project/resource-api` alone, and the diagram is SVG Mermaid answers, so composition offers it no press target.',
+    customBehaviour:
+      'A transparent `<button>` covers the drawn diagram only while Edit is offered and the Resource is selected. It is named for the Edit it begins, out of the tab order, and stops its click so the canvas does not also act on it.',
+    tests:
+      '`packages/plugin-mermaid/test/mermaid-plugin.test.tsx` (begins an edit from a press on its selected body).',
+  },
+  {
     subject: 'packages/app/src/browser-file-picker.ts — the browser file picker',
     existingInfinityCubeComponentConsidered:
       '`@project/ui`\'s `Input` with `type="file"`, which `ImageFilePicker` was. A component is mounted by a surface, so Create Image Resource and Replace image each mounted one and the app had two pickers.',

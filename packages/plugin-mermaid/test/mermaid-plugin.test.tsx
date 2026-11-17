@@ -14,7 +14,7 @@ import {
   type DiagramTheme,
   type RenderDiagram,
 } from '@project/plugin-mermaid/view';
-import { withTheme } from '../src/mermaid';
+import { loadOnce, withTheme } from '../src/mermaid';
 
 const TEXT_REF: AssetRef = '/assets/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 const SAVED_REF: AssetRef = '/assets/BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBA';
@@ -30,9 +30,11 @@ const closed: MermaidMapContent = { open: false };
  */
 const drawn: string[] = [];
 const themes: DiagramTheme[] = [];
-const drawText: RenderDiagram = (id, source, theme) => {
+const containers: HTMLElement[] = [];
+const drawText: RenderDiagram = (id, source, theme, container) => {
   drawn.push(source);
   themes.push(theme);
+  containers.push(container);
   if (source.startsWith('bad')) {
     return Promise.reject(new Error('Parse error on line 1: expecting a diagram type.'));
   }
@@ -44,6 +46,7 @@ const mermaidPluginView = mermaidPluginViewWith(drawText);
 beforeEach(() => {
   drawn.length = 0;
   themes.length = 0;
+  containers.length = 0;
 });
 
 /**
@@ -210,6 +213,110 @@ describe('the Mermaid plugin’s view', () => {
     });
     await waitFor(() => expect(themes).toEqual(['dark', 'light']));
     expect(drawn).toEqual(['graph TD', 'graph TD']);
+  });
+
+  it('lays its diagram out in an unseen element of its own, never the document body', async () => {
+    renderPlugin(mermaidPluginView.View, {
+      content,
+      map: open,
+      title: 'Notes',
+      assets: reading({ [TEXT_REF]: 'graph TD' }),
+    });
+    const diagram = await screen.findByTestId('mermaid-diagram');
+    const [container] = containers;
+    expect(container).toBeDefined();
+    expect(container).not.toBe(document.body);
+    expect(container?.getAttribute('aria-hidden')).toBe('true');
+    expect(diagram.closest('[data-open]')?.contains(container ?? null)).toBe(true);
+  });
+
+  it('draws again neither on Cancel nor on a Save that changes nothing', async () => {
+    renderPlugin(mermaidPluginView.View, {
+      content,
+      map: open,
+      title: 'Notes',
+      grants: editable,
+      assets: reading({ [TEXT_REF]: 'graph TD' }),
+    });
+    await screen.findByTestId('mermaid-diagram');
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel editing Resource Notes' }));
+    await screen.findByTestId('mermaid-diagram');
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save Resource Notes' }));
+    await screen.findByTestId('mermaid-diagram');
+    await Promise.resolve();
+    expect(drawn).toEqual(['graph TD']);
+  });
+
+  it('keeps the lines of Mermaid’s message as Mermaid wrote them', async () => {
+    const lined = mermaidPluginViewWith(() =>
+      Promise.reject(
+        new Error('Parse error on line 2:\ngraph TD A--\n-----------^\nExpecting NODE'),
+      ),
+    );
+    renderPlugin(lined.View, {
+      content,
+      map: open,
+      title: 'Notes',
+      assets: reading({ [TEXT_REF]: 'graph TD A--' }),
+    });
+    expect(await screen.findByRole('note')).toHaveStyle({ whiteSpace: 'pre-wrap' });
+  });
+
+  it('draws a blank source as an empty diagram, asking Mermaid for nothing', async () => {
+    renderPlugin(mermaidPluginView.View, {
+      content,
+      map: open,
+      title: 'Notes',
+      grants: editable,
+      assets: reading({ [TEXT_REF]: '  \n\t\n' }),
+    });
+    expect(await screen.findByRole('note')).toHaveTextContent(
+      'This diagram is empty. Edit it to write its Mermaid source.',
+    );
+    expect(drawn).toEqual([]);
+  });
+
+  it('names no Edit in the empty note where Edit is not offered, as on the Stage', async () => {
+    renderPlugin(mermaidPluginView.View, {
+      content: { url: EMPTY_ASSET },
+      map: open,
+      title: 'Notes',
+      assets: reading({ [EMPTY_ASSET]: '' }),
+    });
+    expect(await screen.findByRole('note')).toHaveTextContent(/^This diagram is empty\.$/u);
+  });
+
+  it('Opens without a size hint once Mermaid has kept it waiting too long', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const asks: string[] = [];
+      const stalled = mermaidPluginViewWith((_id, source) => {
+        asks.push(source);
+        return new Promise<string>(() => undefined);
+      });
+      const rendered = renderPlugin(stalled.View, {
+        content,
+        map: closed,
+        title: 'Notes',
+        grants: { map: true },
+        assets: reading({ [TEXT_REF]: 'graph TD' }),
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Open Resource Notes' }));
+      // The source is read, then Mermaid is asked, and never answers.
+      for (let tick = 0; tick < 20 && asks.length === 0; tick += 1) {
+        await act(() => vi.advanceTimersByTimeAsync(10));
+      }
+      expect(asks).toEqual(['graph TD']);
+      await act(() => vi.advanceTimersByTimeAsync(1000));
+      expect(rendered.commits.map).toEqual([]);
+      await act(() => vi.advanceTimersByTimeAsync(5000));
+      expect(rendered.commits.map).toEqual([open]);
+      expect(rendered.commits.hints).toEqual([undefined]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('measures its Open size only once its diagram is drawn', async () => {
@@ -420,7 +527,7 @@ describe('the Mermaid plugin’s view', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Draft' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save Resource Notes' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('The text could not be saved.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('The source could not be saved.');
     expect(screen.getByRole('textbox')).toHaveValue('Draft');
     expect(screen.getByRole('button', { name: 'Save Resource Notes' })).toBeEnabled();
     expect(rendered.commits.content).toEqual([]);
@@ -438,7 +545,7 @@ describe('the Mermaid plugin’s view', () => {
       assets: { read: () => Promise.reject(new Error('timeout')) },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Open Resource Notes' }));
-    expect(await screen.findByRole('note')).toHaveTextContent('This text cannot be read.');
+    expect(await screen.findByRole('note')).toHaveTextContent('This source cannot be read.');
     expect(rendered.commits.map).toEqual([open]);
   });
 
@@ -578,7 +685,7 @@ describe('the Mermaid plugin’s view', () => {
     expect(screen.queryByRole('textbox')).toBeNull();
     // The Edit pressed is answered, not dropped.
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'This text cannot be read, so it cannot be edited.',
+      'This source cannot be read, so it cannot be edited.',
     );
   });
 
@@ -697,5 +804,19 @@ describe('the theme a diagram is drawn in', () => {
     expect(withTheme('---\ntitle: A\n---', 'dark')).toBe(
       '---\ntitle: A\n---\n%%{init: {"theme": "dark"}}%%\n',
     );
+  });
+});
+
+describe('Mermaid, fetched on first draw', () => {
+  it('is fetched once while that fetch holds, and again after one fails', async () => {
+    let calls = 0;
+    const load = loadOnce(() => {
+      calls += 1;
+      return calls === 1 ? Promise.reject(new Error('offline')) : Promise.resolve(calls);
+    });
+    await expect(load()).rejects.toThrow('offline');
+    await expect(load()).resolves.toBe(2);
+    await expect(load()).resolves.toBe(2);
+    expect(calls).toBe(2);
   });
 });

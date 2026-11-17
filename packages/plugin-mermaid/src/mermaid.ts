@@ -5,10 +5,37 @@ export type DiagramTheme = 'light' | 'dark';
 
 /**
  * Draw Mermaid source as SVG markup in `theme`, under `id`, which names the
- * diagram in the document while it is laid out. A source Mermaid cannot draw
- * rejects, with Mermaid's own words for why.
+ * diagram while it is laid out in `container`, an unseen element of the
+ * plugin's own. A source Mermaid cannot draw rejects, with Mermaid's own words
+ * for why.
  */
-export type RenderDiagram = (id: string, source: string, theme: DiagramTheme) => Promise<string>;
+export type RenderDiagram = (
+  id: string,
+  source: string,
+  theme: DiagramTheme,
+  container: HTMLElement,
+) => Promise<string>;
+
+/**
+ * `load`, run once and its answer kept while it holds, and run again on the
+ * next call after it rejects, so one failed fetch is not kept for the life of
+ * the page.
+ */
+export const loadOnce = <T>(load: () => Promise<T>): (() => Promise<T>) => {
+  let loaded: Promise<T> | undefined;
+  const attempt = async (): Promise<T> => {
+    try {
+      return await load();
+    } catch (error) {
+      loaded = undefined;
+      throw error;
+    }
+  };
+  return () => {
+    loaded ??= attempt();
+    return loaded;
+  };
+};
 
 /** Mermaid's theme for each canvas colour scheme. */
 const MERMAID_THEME = { light: 'neutral', dark: 'dark' } as const satisfies Record<
@@ -23,8 +50,7 @@ const FRONTMATTER = /^---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/u;
  * `source` with an init directive choosing Mermaid's theme for `theme`, set
  * after any frontmatter so that stays first. Mermaid's configuration is
  * global, so the theme travels with each diagram rather than with
- * `initialize`; a directive the source writes itself comes after this one and
- * so wins.
+ * `initialize`.
  */
 export const withTheme = (source: string, theme: DiagramTheme): string => {
   const directive = `%%{init: {"theme": "${MERMAID_THEME[theme]}"}}%%\n`;
@@ -35,29 +61,27 @@ export const withTheme = (source: string, theme: DiagramTheme): string => {
 };
 
 /* v8 ignore start -- drawn in a browser only: jsdom has no SVG layout for Mermaid to measure with. */
-let loaded: Promise<Mermaid> | undefined;
-
 /**
  * Mermaid, fetched the first time a diagram is drawn rather than with the
- * application, and set up once: `strict` sanitises the SVG it answers and
- * runs nothing a source names (ADR 0158), and a source it cannot draw rejects
- * rather than leaving Mermaid's error drawing in the document.
+ * application, and set up once, again after a failed fetch: `strict` encodes
+ * the HTML tags a source writes in its text and turns off the clicks it names
+ * (ADR 0158), and a source it cannot draw rejects rather than leaving
+ * Mermaid's error drawing in the document.
  */
-const mermaid = (): Promise<Mermaid> => {
-  loaded ??= import('mermaid').then(({ default: library }) => {
+const mermaid = loadOnce((): Promise<Mermaid> =>
+  import('mermaid').then(({ default: library }) => {
     library.initialize({
       startOnLoad: false,
       securityLevel: 'strict',
       suppressErrorRendering: true,
     });
     return library;
-  });
-  return loaded;
-};
+  }),
+);
 
 /** The Mermaid library's drawing, which needs a browser's layout and so is not run under jsdom. */
-export const renderWithMermaid: RenderDiagram = async (id, source, theme) => {
-  const { svg } = await (await mermaid()).render(id, withTheme(source, theme));
+export const renderWithMermaid: RenderDiagram = async (id, source, theme, container) => {
+  const { svg } = await (await mermaid()).render(id, withTheme(source, theme), container);
   return svg;
 };
 /* v8 ignore stop */

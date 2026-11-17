@@ -45,6 +45,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
   type RefObject,
@@ -229,6 +230,9 @@ interface DragState {
  * the caller's own frame the answer, and is what lets this cross into
  * `@project/ui` at all.
  */
+/** The surface's style: how many Creates its Resources row holds, which the vertical column's width counts. */
+type DockSurfaceStyle = CSSProperties & { readonly '--command-dock-creates': string };
+
 function Dock({
   dock,
   onDock,
@@ -236,6 +240,7 @@ function Dock({
   presenting,
   label,
   className,
+  creates,
   report,
   children,
 }: {
@@ -249,6 +254,8 @@ function Dock({
   readonly presenting: boolean;
   readonly label: string;
   readonly className?: string;
+  /** How many Creates the Resources row draws, one per plugin the Dock creates from. */
+  readonly creates: number;
   /**
    * What the surface has to say without being asked, drawn beside the commands
    * rather than among them.
@@ -264,6 +271,7 @@ function Dock({
   readonly children: ReactNode;
 }) {
   const frame = useRef<HTMLDivElement | null>(null);
+  const surfaceStyle: DockSurfaceStyle = { '--command-dock-creates': String(creates) };
   /**
    * The grip, which the slot menu positions against.
    *
@@ -513,6 +521,7 @@ function Dock({
           // so the paint and the keyboard cannot drift apart here.
           orientation={vertical ? 'vertical' : 'horizontal'}
           className={`command-dock__surface nokey nodrag nopan ${className ?? ''}`}
+          style={surfaceStyle}
         >
           {/* The grip is both the drag handle and the disclosure, which is what a
               grip on a movable panel already reads as. It draws its dots from CSS
@@ -727,6 +736,7 @@ export function CommandDock({
           container={container}
           presenting={chrome.graph.presenting}
           label="Command Dock"
+          creates={chrome.resources.create.length}
           report={
             <PersistenceReport
               persistence={chrome.persistence}

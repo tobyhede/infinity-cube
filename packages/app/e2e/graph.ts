@@ -516,7 +516,7 @@ export function presentControl(page: Page): Locator {
 
 /** The kinds the Dock offers, named as their controls announce them. */
 export type ResourceKindName =
-  'Markdown Resource' | 'Space Resource' | 'Image Resource' | 'Ur Resource';
+  'Markdown Resource' | 'Space Resource' | 'Image Resource' | 'Ur Resource' | 'Mermaid Resource';
 
 /**
  * One kind's Create control, which is also what reports whether creating is
