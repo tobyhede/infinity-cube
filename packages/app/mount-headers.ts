@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { extname } from 'node:path';
 
 /**
  * The headers the static build for Mounting travels with (ADR 0130), as a
@@ -31,14 +32,22 @@ const GITHUB_HOSTS = ['https://api.github.com', 'https://raw.githubusercontent.c
 const sha256 = (source: string): string =>
   `'sha256-${createHash('sha256').update(source).digest('base64')}'`;
 
-const contentSecurityPolicy = (inlineScripts: readonly string[]): string =>
+/**
+ * The page's Content Security Policy, given the inline scripts it carries and
+ * the origins beyond its own it fetches from. Mounting passes the GitHub hosts;
+ * the desktop host (`src/desktop/static-files.ts`) passes none.
+ */
+export const contentSecurityPolicy = (
+  inlineScripts: readonly string[],
+  connectSources: readonly string[],
+): string =>
   [
     "default-src 'self'",
     ['script-src', "'self'", ...inlineScripts.map(sha256)].join(' '),
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' blob: data: https:",
     "font-src 'self'",
-    ['connect-src', "'self'", ...GITHUB_HOSTS].join(' '),
+    ['connect-src', "'self'", ...connectSources].join(' '),
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
@@ -50,7 +59,7 @@ export const mountHeaderRules = (inlineScripts: readonly string[]): readonly Hea
   {
     path: '/*',
     headers: {
-      'Content-Security-Policy': contentSecurityPolicy(inlineScripts),
+      'Content-Security-Policy': contentSecurityPolicy(inlineScripts, GITHUB_HOSTS),
       'X-Content-Type-Options': 'nosniff',
     },
   },
@@ -72,3 +81,35 @@ export const inlineScriptSources = (html: string): string[] =>
   [...html.matchAll(SCRIPT)].flatMap(([, attributes = '', source = '']) =>
     /\bsrc\s*=/.test(attributes) ? [] : [source],
   );
+
+/**
+ * The media type of each kind of file a build holds, by extension, for a host
+ * that serves the build itself rather than through Cloudflare: the desktop
+ * host (`src/desktop/static-files.ts`) and the mount end-to-end run's static
+ * server (`e2e/static-server.ts`).
+ */
+const MEDIA_TYPES = new Map([
+  ['.html', 'text/html; charset=utf-8'],
+  ['.js', 'text/javascript; charset=utf-8'],
+  ['.mjs', 'text/javascript; charset=utf-8'],
+  ['.css', 'text/css; charset=utf-8'],
+  ['.map', 'application/json'],
+  ['.json', 'application/json'],
+  ['.webmanifest', 'application/manifest+json'],
+  ['.wasm', 'application/wasm'],
+  ['.txt', 'text/plain; charset=utf-8'],
+  ['.svg', 'image/svg+xml'],
+  ['.png', 'image/png'],
+  ['.jpg', 'image/jpeg'],
+  ['.jpeg', 'image/jpeg'],
+  ['.gif', 'image/gif'],
+  ['.webp', 'image/webp'],
+  ['.avif', 'image/avif'],
+  ['.ico', 'image/x-icon'],
+  ['.woff', 'font/woff'],
+  ['.woff2', 'font/woff2'],
+]);
+
+/** The media type a built file is served with, `application/octet-stream` for an extension not listed. */
+export const builtMediaType = (path: string): string =>
+  MEDIA_TYPES.get(extname(path).toLowerCase()) ?? 'application/octet-stream';

@@ -1,9 +1,14 @@
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type { RunEvent } from '../run/run';
 import type { RunCommand } from './arguments';
 import { describeError } from './describe-error';
 import { RUN_HANDLING_SIGNALS, RUN_SIGNALS, decodeRunCommand } from './run-launcher';
+import {
+  exitUncleanStop,
+  exitWithoutWaiting,
+  processRunOptions,
+  stopAndWrite,
+} from './run-lifecycle';
 import { describeRunRefusal } from './run-refusal';
 
 /**
@@ -18,12 +23,6 @@ import { describeRunRefusal } from './run-refusal';
  */
 
 const DEFAULT_PORT = 4173;
-
-const report = (event: RunEvent): void => {
-  if (event.kind === 'write-failed') {
-    process.stderr.write(`Could not write the directory: ${describeError(event.reason)}\n`);
-  }
-};
 
 interface RunLifecycle {
   stopping: boolean;
@@ -46,10 +45,7 @@ const serve = async ({ directory, port, open }: RunCommand): Promise<void> => {
       process.exit(0);
     }
     process.stdout.write('Stopping: writing any edit not yet on disk…\n');
-    lifecycle.stop().catch((error: unknown) => {
-      process.stderr.write(`Could not stop cleanly: ${describeError(error)}\n`);
-      process.exit(1);
-    });
+    lifecycle.stop().catch(exitUncleanStop);
   };
   // The first signal stops the run; any signal after it exits at once. The
   // launcher forwards each stop and each force once, so every signal here is one
@@ -59,8 +55,7 @@ const serve = async ({ directory, port, open }: RunCommand): Promise<void> => {
       beginStopping();
       return;
     }
-    process.stderr.write('Exiting without waiting for the last write.\n');
-    process.exit(1);
+    exitWithoutWaiting();
   };
   for (const signal of RUN_SIGNALS) process.on(signal, onSignal);
   // The launcher holds an IPC channel open for as long as it lives. Losing it
@@ -75,14 +70,7 @@ const serve = async ({ directory, port, open }: RunCommand): Promise<void> => {
     import('@project/core'),
     import('../run/run'),
   ]);
-  const started = await startRun(directory, {
-    newId: newUuid,
-    schedule: (callback, milliseconds) => {
-      const timer = setTimeout(callback, milliseconds);
-      return () => clearTimeout(timer);
-    },
-    report,
-  }).catch((error: unknown) => {
+  const started = await startRun(directory, processRunOptions(newUuid)).catch((error: unknown) => {
     process.stderr.write(`Could not start a run on ${directory}: ${describeError(error)}\n`);
     process.exit(1);
   });
@@ -117,18 +105,7 @@ const serve = async ({ directory, port, open }: RunCommand): Promise<void> => {
   process.stdin.removeAllListeners('end');
 
   lifecycle.stop = async () => {
-    // The server closes first, so no edit can be committed behind the last write.
-    // Its failing to close is no reason to skip the write.
-    await server.close().catch((error: unknown) => {
-      process.stderr.write(`Could not close the server: ${describeError(error)}\n`);
-    });
-    const stopped = await run.stop();
-    if (stopped.kind === 'unwritten') {
-      process.stderr.write(
-        `Stopped, but the last edits were not written: ${describeError(stopped.reason)}\n`,
-      );
-      process.exit(1);
-    }
+    await stopAndWrite(() => server.close(), run);
     process.stdout.write(`Stopped; ${directory} holds every edit.\n`);
     process.exit(0);
   };

@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "home",
+  "description": "The home window may ask the shell to open an Aggregate directory, and nothing else.",
+  "windows": ["home"],
+  "permissions": ["allow-open-talk"]
+}

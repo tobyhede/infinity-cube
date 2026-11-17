@@ -669,7 +669,7 @@ const isAuthoredSource = (file: string): boolean =>
 /**
  * The modules that are pnpm's vocabulary rather than ours: the alias table,
  * the shared database Vite config, the mount build's Vite config and the HTTP
- * server build config that import it, and the toolchain check that reads the package list plus its test. The two
+ * server and desktop sidecar build configs that import it, and the toolchain check that reads the package list plus its test. The two
  * target-specific Vite configs delegate to that one shared owner and carry no
  * exemption.
  * Composed from the fragment above for the same reason every retired name in
@@ -681,6 +681,7 @@ const MONOREPO_VOCABULARY: readonly string[] = [
   'packages/app/database-vite-config.ts',
   'packages/app/vite.mount.config.ts',
   'packages/app/http-server-build.config.ts',
+  'packages/app/desktop-sidecar-build.config.ts',
   'scripts/check-typescript-toolchain.ts',
   'test/unit/check-typescript-toolchain.test.ts',
 ];
@@ -2381,7 +2382,9 @@ const RETIRED_SPACE_BARE = new RegExp(`\\b${RETIRED_SPACE}s?\\b`);
 
 /**
  * The three identifiers naming a parsed `package.json` or the file that lists
- * the packages. npm's and pnpm's sense, arriving with their file formats rather
+ * the packages, and the two spellings of Tauri's build-time list of the
+ * desktop shell's commands (`packages/desktop/src-tauri/build.rs`). npm's,
+ * pnpm's and Tauri's sense, arriving with their file formats and APIs rather
  * than ours to sweep — the same carve-out Lucide's glyph gets above, and masked
  * by spelling for the same reason: a domain compound added to one of these
  * modules is our vocabulary wearing a forgiven name, and stays visible.
@@ -2393,6 +2396,8 @@ const FOREIGN_SPACE_SPELLINGS: readonly string[] = [
   `Typechecking${RETIRED_SPACE_CAPITAL}`,
   `app${RETIRED_SPACE_CAPITAL}`,
   `root${RETIRED_SPACE_CAPITAL}`,
+  `App${RETIRED_SPACE_CAPITAL}`,
+  `app_${RETIRED_SPACE}`,
 ];
 
 /**
@@ -2851,6 +2856,7 @@ const FOREIGN_ALIAS_FILES: readonly string[] = [
   'packages/app/database-vite-config.ts',
   'packages/app/vite.mount.config.ts',
   'packages/app/http-server-build.config.ts',
+  'packages/app/desktop-sidecar-build.config.ts',
   'packages/app/e2e/space-resource-drag-benchmark-vite.config.ts',
   'vitest.config.ts',
   'vitest.integration.config.ts',
@@ -3290,6 +3296,9 @@ const PRODUCT_HISTORY_TREES = ['migrations/', 'migrations-sqlite/'] as const;
  *   deploys a second Worker beside the first.
  * - The root file ADR 0136 renamed is named where an author or operator is
  *   told to move a talk that still holds it.
+ * - A Rust HTTP crate the desktop shell's Tauri runtime depends on shares the
+ *   earlier name, and Cargo's lockfile names it and its utility crate; the
+ *   crates' names are their publisher's.
  */
 const PRODUCT_KEPT_SPELLINGS: readonly RegExp[] = [
   /\b\d{4}-[a-z0-9-]+\.md\b/g,
@@ -3298,6 +3307,7 @@ const PRODUCT_KEPT_SPELLINGS: readonly RegExp[] = [
   new RegExp(`"name": "${RETIRED_PRODUCT}"`, 'g'),
   new RegExp(`\`wrangler\\.jsonc\`'s \`${RETIRED_PRODUCT}\``, 'g'),
   new RegExp(`\\b${RETIRED_PRODUCT}\\.json\\b`, 'g'),
+  new RegExp(`(?:name = |(?<=^|\\n) )"${RETIRED_PRODUCT}(?:-util)?"`, 'g'),
 ];
 
 const withoutKeptProductSpellings = (line: string): string =>
@@ -3316,7 +3326,7 @@ describe('the application is named InfinityCube', () => {
   const scanned = trackedFiles().filter(
     (file) =>
       ![...HISTORICAL_TREES, ...PRODUCT_HISTORY_TREES].some((tree) => file.startsWith(tree)) &&
-      !/\.(png|jpe?g|gif|ico|woff2?|pdf|webp)$/i.test(file),
+      !/\.(png|jpe?g|gif|ico|icns|woff2?|pdf|webp)$/i.test(file),
   );
 
   it('reaches the kinds of file the rename actually touched', () => {

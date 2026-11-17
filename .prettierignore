@@ -1,6 +1,10 @@
 **/dist/**
 **/dist-http/**
+**/dist-desktop-sidecar/**
 **/dist-mount/**
+packages/desktop/src-tauri/target/**
+packages/desktop/src-tauri/gen/**
+packages/desktop/src-tauri/binaries/**
 **/node_modules/**
 **/playwright-report/**
 **/test-results/**
