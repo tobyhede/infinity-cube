@@ -13,7 +13,7 @@ let loaded: Promise<Mermaid> | undefined;
 /**
  * Mermaid, fetched the first time a diagram is drawn rather than with the
  * application, and set up once: `strict` sanitises the SVG it answers and
- * runs nothing a source names (ADR 0155), and a source it cannot draw rejects
+ * runs nothing a source names (ADR 0158), and a source it cannot draw rejects
  * rather than leaving Mermaid's error drawing in the document.
  */
 const mermaid = (): Promise<Mermaid> => {

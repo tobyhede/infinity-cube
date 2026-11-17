@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { assetRefSchema, definePlugin, EMPTY_ASSET } from '@project/resource-api/domain';
 
 /**
- * The Mermaid plugin's domain half (ADR 0142, ADR 0155): a Resource whose
+ * The Mermaid plugin's domain half (ADR 0142, ADR 0158): a Resource whose
  * Mermaid source is an asset, exactly as a Markdown Resource's text is. Its
  * `content` names that asset by URL, and whether it is Open is what it keeps
  * on each Map, so one Mermaid Resource may be Open on one Map and Closed on

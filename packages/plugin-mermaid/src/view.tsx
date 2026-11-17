@@ -39,7 +39,7 @@ import {
 import { renderWithMermaid, type RenderMermaid } from './mermaid';
 
 /**
- * The Mermaid plugin's view (ADR 0142, ADR 0155), the Markdown plugin's in
+ * The Mermaid plugin's view (ADR 0142, ADR 0158), the Markdown plugin's in
  * every way but what it draws. It draws its Title, and its diagram once the
  * source asset is read and Mermaid has drawn it, where its Map content says
  * it is Open. Open and Close are its rail commands, and Opening carries a size
@@ -640,7 +640,7 @@ function MermaidDrawing({
         <div
           data-testid="mermaid-drawing"
           // Mermaid's `strict` security level sanitises the SVG it answers
-          // and the source is drawn by nothing else (ADR 0155). The diagram
+          // and the source is drawn by nothing else (ADR 0158). The diagram
           // sits on a light card of its own, since Mermaid's theme is not the
           // canvas's.
           style={{ background: '#ffffff', borderRadius: 4, padding: 8, lineHeight: 0 }}
