@@ -19,10 +19,10 @@ ADR 0071 sets the browser floor at any current evergreen browser that natively i
 ## Rejected
 
 - **Windows-only first, where WebView2 is Chromium.** No new engine to test, but no macOS or Linux application.
-- **No minimum operating system, relying on ADR 0071's wording.** A presenter on an older macOS would install an application that fails on its first product URL, because the renderer's compact identifiers use the codecs.
+- **No minimum operating system, relying on ADR 0071's wording.** A presenter on an older macOS would install an application that fails on its first product URL, because the product-URL codec (ADR 0069) reads its compact identifiers with them.
 
 ## Consequences
 
-- Accepting this ADR refines 0071: "evergreen browser" becomes "evergreen browser, or the declared minimum system for the desktop application".
+- Accepting this ADR refines 0071: "evergreen browser" becomes "evergreen browser, or the declared minimum system for the desktop application". This becomes `Refines: 0071` on acceptance.
 - Every behaviour `pnpm e2e` tests must hold in WebKit as well as Chromium. Whether the Ladle story suite (ADR 0052) also runs in WebKit is left to the ticket that adds the WebKit project.
-- The minimum versions are found by testing, recorded in the desktop application's bundle configuration, and restated in the UI requirements when this is accepted.
+- The minimum versions are found by testing, recorded in the desktop application's bundle configuration, and restated where ADR 0071's floor is, `docs/agents/build-tooling.md` (the platform-floor rule), when this is accepted. AGENTS.md's E2E line, which says `pnpm e2e` runs Chromium only, changes in the same change as the WebKit project.

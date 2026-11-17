@@ -437,6 +437,26 @@ export default tseslint.config(
       ],
     },
   },
+  // The desktop shell imports no package of ours: the sidecar it runs is built
+  // from `src/desktop/` by `@project/app`, and its home window is plain script.
+  {
+    files: ['packages/desktop/**/*.{ts,tsx,js}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            ESCAPE_PATTERN,
+            {
+              group: ['@project/*'],
+              message:
+                'The desktop shell imports no package of ours; the sidecar is built from src/desktop/ by @project/app (AGENTS.md).',
+            },
+          ],
+        },
+      ],
+    },
+  },
   // A Mount's source and the tests may import `@project/aggregate`; this
   // restates the `app` zone above without that ban.
   {
