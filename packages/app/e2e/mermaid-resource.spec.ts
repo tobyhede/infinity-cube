@@ -30,9 +30,10 @@ test('a Mermaid Resource draws its saved source with Mermaid, in the canvas’s 
   await source.fill('flowchart LR\n  Edit --> Save');
   await source.press(`${PRIMARY_MODIFIER}+Enter`);
 
-  const nodes = flow.getByTestId('mermaid-diagram').locator('svg .node');
+  const nodes = flow.locator('svg[aria-roledescription] .node');
   await expect(nodes).toHaveCount(2, { timeout: 20_000 });
-  await expect(flow.getByTestId('mermaid-diagram')).toContainText('Edit');
+  // The SVG Mermaid draws names its kind of drawing in `aria-roledescription`.
+  await expect(flow.locator('svg[aria-roledescription]')).toContainText('Edit');
   // Laid out inside the Resource, Mermaid never grows the page past its one
   // viewport.
   expect(
