@@ -265,6 +265,7 @@ function contentOwner(id: UUID, index: number, kind: Exclude<ContentKind, 'refer
   const title = `Resource ${index}`;
   switch (kind) {
     case 'markdown':
+    case 'mermaid':
       return {
         id,
         title,

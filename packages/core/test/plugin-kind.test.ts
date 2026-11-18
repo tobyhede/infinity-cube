@@ -15,7 +15,7 @@ import {
 
 describe('a Resource plugin read as a kind (ADR 0142)', () => {
   it('lists every plugin this build draws', () => {
-    expect(PLUGIN_KINDS).toEqual(['markdown', 'space', 'image', 'ur', 'reference']);
+    expect(PLUGIN_KINDS).toEqual(['markdown', 'space', 'image', 'ur', 'reference', 'mermaid']);
     expect(isPluginKind('ur')).toBe(true);
     expect(isPluginKind('image')).toBe(true);
     expect(isPluginKind('markdown')).toBe(true);

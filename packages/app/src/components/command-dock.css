@@ -263,9 +263,15 @@
    **disclosure** always lands in the second track and a row's **own verb** —
    Present, Create — in the third, empty where a row has neither. A reader who
    learns where the chevrons are at one cluster finds them at the next, and the
-   column does not move when the Space does. */
+   column does not move when the Space does.
+
+   The width is what the Resources row needs: 92px for the trigger's glyph and
+   chevron, then one 28px Create and a 1px gap for each plugin the Dock creates
+   from, which the Dock counts into `--command-dock-creates` so a new plugin
+   widens the column rather than squeezing the row. `command-dock.spec.ts`
+   holds the Creates at one pitch. */
 .command-dock__surface[data-orientation='vertical'] {
-  width: 208px;
+  width: calc(92px + var(--command-dock-creates) * 29px);
 }
 
 .command-dock__surface[data-orientation='vertical'] .command-dock__cluster,

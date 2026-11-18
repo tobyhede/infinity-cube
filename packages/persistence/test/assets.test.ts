@@ -84,6 +84,7 @@ describe('the host table of extensions and media types', () => {
     ['jpeg', 'image/jpeg'],
     ['PNG', 'image/png'],
     ['md', 'text/markdown'],
+    ['mmd', 'text/vnd.mermaid'],
     ['mermaid', 'application/octet-stream'],
     ['', 'application/octet-stream'],
   ])('maps .%s to %s', (extension, type) => {
@@ -94,6 +95,7 @@ describe('the host table of extensions and media types', () => {
     ['image/png', 'png'],
     ['image/jpeg', 'jpg'],
     ['text/markdown', 'md'],
+    ['text/vnd.mermaid', 'mmd'],
     ['application/octet-stream', 'bin'],
     ['application/x-made-up', 'bin'],
   ])('writes %s with .%s', (type, extension) => {

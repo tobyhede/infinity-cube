@@ -31,16 +31,22 @@ class PathRefusal extends Error {}
 const STRICT_UTF8 = new TextDecoder('utf-8', { fatal: true });
 
 /**
- * Markdown text as the Markdown plugin stores what it saves: UTF-8 with `\n`
- * line endings, so the same text is one asset. Bytes that are not UTF-8 are
+ * The extensions of source a plugin saves with `\n` line endings: Markdown
+ * (SR-21) and Mermaid (SR-67).
+ */
+const LINE_FEED_EXTENSIONS = new Set(['md', 'mmd']);
+
+/**
+ * Markdown text or Mermaid source as its plugin stores what it saves: UTF-8
+ * with `\n` line endings, so the same text is one asset. Bytes that are not UTF-8 are
  * refused rather than decoded with replacement characters.
  */
-const markdownBytes = (given: Uint8Array<ArrayBuffer>): Uint8Array<ArrayBuffer> => {
+const lineFeedTextBytes = (given: Uint8Array<ArrayBuffer>): Uint8Array<ArrayBuffer> => {
   let text: string;
   try {
     text = STRICT_UTF8.decode(given);
   } catch {
-    throw new PathRefusal('Markdown is UTF-8 text, and these bytes are not.');
+    throw new PathRefusal('Markdown and Mermaid source are UTF-8 text, and these bytes are not.');
   }
   return new TextEncoder().encode(lineFeedText(text));
 };
@@ -181,7 +187,7 @@ export const createAggregateMcpServer = (given: string, newId: () => UUID): McpS
           .regex(/^[A-Za-z0-9]+$/u)
           .optional()
           .describe(
-            'The file extension, which names its media type: md, the default for text, for Markdown. Bytes carried as base64 name theirs.',
+            'The file extension, which names its media type: md, the default for text, for Markdown, and mmd for Mermaid source. Bytes carried as base64 name theirs.',
           ),
       },
       annotations: { destructiveHint: false, idempotentHint: true },
@@ -202,7 +208,7 @@ export const createAggregateMcpServer = (given: string, newId: () => UUID): McpS
         // Admitted as Import admits an asset file: typed by its extension,
         // and refused over the host's size cap.
         const admission = await admitAsset(
-          extension.toLowerCase() === 'md' ? markdownBytes(given) : given,
+          LINE_FEED_EXTENSIONS.has(extension.toLowerCase()) ? lineFeedTextBytes(given) : given,
           mediaTypeForExtension(extension),
         );
         if (admission.kind === 'refused') {

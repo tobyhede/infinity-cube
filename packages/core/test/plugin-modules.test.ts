@@ -18,9 +18,12 @@ import { uuidSchema } from '../src/schema';
 import { EMPTY_ASSET_REF } from '../src/assets';
 
 describe('the build’s plugins, read as kinds', () => {
-  it.each(['markdown', 'space', 'image', 'ur', 'reference'])('reads the %s plugin', (kind) => {
-    expect(isPluginKind(kind)).toBe(true);
-  });
+  it.each(['markdown', 'space', 'image', 'ur', 'reference', 'mermaid'])(
+    'reads the %s plugin',
+    (kind) => {
+      expect(isPluginKind(kind)).toBe(true);
+    },
+  );
 
   it.each(['chart', 'vnd.example.chart', 'Markdown', ''])(
     'reads no plugin for %j, which none in the list draws',
@@ -121,7 +124,7 @@ describe('a kind id', () => {
 
 describe('the kinds a Resource may be created empty as', () => {
   it('are the plugins that declare new content, in list order', () => {
-    expect(PLUGIN_KINDS.filter(startsEmpty)).toEqual(['markdown', 'ur']);
+    expect(PLUGIN_KINDS.filter(startsEmpty)).toEqual(['markdown', 'ur', 'mermaid']);
   });
 
   it('start a Resource created with no kind chosen as the first of them in list order', () => {

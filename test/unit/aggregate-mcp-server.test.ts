@@ -285,6 +285,22 @@ describe('the Aggregate directory MCP server', () => {
     ).resolves.toBe('# Lines\nOne\nTwo\n');
   });
 
+  it('writes Mermaid source named `mmd` with `\\n` line endings, as its plugin saves it', async () => {
+    const directory = await writeTalk();
+    const client = await connect(directory);
+    const url = textAssetRef('flowchart LR\n  A --> B\n');
+
+    const stored = await callTool(client, 'write_asset', {
+      content: 'flowchart LR\r\n  A --> B\r\n',
+      extension: 'mmd',
+    });
+
+    expect(stored.text).toContain(url);
+    await expect(
+      readFile(join(directory, 'assets', `${url.slice('/assets/'.length)}.mmd`), 'utf8'),
+    ).resolves.toBe('flowchart LR\n  A --> B\n');
+  });
+
   it('refuses to write an asset whose bytes a file of another extension already holds', async () => {
     const directory = await writeTalk();
     const client = await connect(directory);

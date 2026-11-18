@@ -991,7 +991,7 @@ test(
     const resources = strip.getByRole('group', { name: 'Resources' });
     const graph = strip.getByRole('group', { name: 'Graph' });
 
-    // One row: the cluster carrying the disclosure and the four Creates is no taller
+    // One row: the cluster carrying the disclosure and the five Creates is no taller
     // than the one carrying a name, a disclosure and Present. Left as loose
     // siblings the vertical column auto-places them onto a row each and this is
     // what fails.
@@ -1002,8 +1002,8 @@ test(
     if (resourcesBox !== null && graphBox !== null)
       expect(Math.abs(resourcesBox.height - graphBox.height)).toBeLessThanOrEqual(1);
 
-    // One pitch: the chevron and the four Creates are evenly spaced, so the
-    // disclosure reads as the first of five glyphs. Centres rather than edges,
+    // One pitch: the chevron and the five Creates are evenly spaced, so the
+    // disclosure reads as the first of six glyphs. Centres rather than edges,
     // because the chevron is a 14px glyph inside a padded trigger and the
     // Creates are 14px glyphs inside 28px buttons.
     const centres = await strip.evaluate((root) => {
@@ -1022,7 +1022,7 @@ test(
           return rect.left + rect.width / 2;
         });
     });
-    expect(centres).toHaveLength(5);
+    expect(centres).toHaveLength(6);
     const pitches = centres.slice(1).map((centre, index) => centre - (centres[index] ?? 0));
     for (const pitch of pitches) expect(Math.abs(pitch - (pitches[0] ?? 0))).toBeLessThanOrEqual(1);
   },

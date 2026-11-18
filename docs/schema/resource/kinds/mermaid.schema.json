@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/tobyhede/infinity-cube/main/docs/schema/resource/kinds/mermaid.schema.json",
+  "title": "Mermaid content",
+  "description": "A Mermaid Resource's source is an asset (ADR 0142, ADR 0158), as a Markdown Resource's text is: its content is a locator whose URL is /assets/<hash>, naming the source by the SHA-256 of its bytes. Export writes the source to the Aggregate directory's assets/<hash>.mmd while a Resource references it; a Resource keeps no source of its own, no path and no media type.",
+  "type": "object",
+  "$ref": "../locator.schema.json",
+  "required": ["url"],
+  "properties": {
+    "url": {
+      "description": "A stored source's content id: the SHA-256 of its bytes as unpadded base64url, 43 characters in canonical spelling.",
+      "type": "string",
+      "pattern": "^/assets/[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$"
+    }
+  },
+  "unevaluatedProperties": false
+}

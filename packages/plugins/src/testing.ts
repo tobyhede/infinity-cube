@@ -14,6 +14,7 @@ const SCHEMAS = {
   image: pluginOf('image').content,
   ur: pluginOf('ur').content,
   reference: pluginOf('reference').content,
+  mermaid: pluginOf('mermaid').content,
 } satisfies { readonly [K in PluginKind]: ReturnType<typeof pluginOf<K>>['content'] };
 
 /** Each listed kind's content, as its plugin's schema parses it. */

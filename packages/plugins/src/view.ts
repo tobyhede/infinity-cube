@@ -6,6 +6,8 @@ import { imagePlugin } from '@project/plugin-image/domain';
 import { imagePluginView } from '@project/plugin-image/view';
 import { markdownPlugin } from '@project/plugin-markdown/domain';
 import { markdownPluginView } from '@project/plugin-markdown/view';
+import { mermaidPlugin } from '@project/plugin-mermaid/domain';
+import { mermaidPluginView } from '@project/plugin-mermaid/view';
 import { referencePlugin } from '@project/plugin-reference/domain';
 import { referencePluginView } from '@project/plugin-reference/view';
 import { spacePlugin } from '@project/plugin-space/domain';
@@ -45,6 +47,7 @@ export const PLUGIN_VIEWS: readonly PluginHalves[] = [
   pluginHalves(imagePlugin, imagePluginView),
   pluginHalves(urPlugin, urPluginView),
   pluginHalves(referencePlugin, referencePluginView),
+  pluginHalves(mermaidPlugin, mermaidPluginView),
 ];
 
 /** The default plugin's two halves, which draw a Resource whose kind names no plugin in this build. */

@@ -48,7 +48,7 @@ _Avoid_: heading, label, caption, description, subtitle as separate fields.
 The first Title Line, followed by “…” when more lines follow, used when a sentence quotes a Title, including questions, notices and Edge labels. Controls, list rows and chrome use the first line alone.
 
 **Resource kind**:
-What a Resource's content is and does, and the name that selects its Resource plugin. Five are bundled: Markdown, Image, Space, Reference and Ur. A content kind adds content of its own: Markdown or Image.
+What a Resource's content is and does, and the name that selects its Resource plugin. Six are bundled: Markdown, Mermaid, Image, Space, Reference and Ur. A content kind adds content of its own: Markdown, Mermaid or Image.
 _Avoid_: MIME type, content type, file type, format; a bare "kind" where another sort of kind could be meant.
 
 **Resource plugin**:
@@ -88,6 +88,9 @@ _Avoid_: capability (what a Resource surface offers a plugin), edit mode.
 
 **Markdown Resource**:
 A Resource whose content is Markdown written by the author.
+
+**Mermaid Resource**:
+A Resource whose content is Mermaid source written by the author, drawn as a diagram. Diagram here is Mermaid's word for what it draws, used inside the Mermaid plugin only; it is never a synonym for Map (ADR 0101, ADR 0158).
 
 **Image Resource**:
 A Resource whose content is a picture identified by its image URL. Its Title is also the picture's text alternative. It is always its picture, with no Closed state.
