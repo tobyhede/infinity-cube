@@ -31,17 +31,17 @@ class PathRefusal extends Error {}
 const STRICT_UTF8 = new TextDecoder('utf-8', { fatal: true });
 
 /**
- * Markdown text or Mermaid source as its plugin stores what it saves: UTF-8
- * with `\n` line endings, so the same text is one asset. Bytes that are not UTF-8 are
- * refused rather than decoded with replacement characters.
- */
-/**
  * The extensions of source a plugin saves with `\n` line endings: Markdown
  * (SR-21) and Mermaid (SR-67).
  */
 const LINE_FEED_EXTENSIONS = new Set(['md', 'mmd']);
 
-const markdownBytes = (given: Uint8Array<ArrayBuffer>): Uint8Array<ArrayBuffer> => {
+/**
+ * Markdown text or Mermaid source as its plugin stores what it saves: UTF-8
+ * with `\n` line endings, so the same text is one asset. Bytes that are not UTF-8 are
+ * refused rather than decoded with replacement characters.
+ */
+const lineFeedTextBytes = (given: Uint8Array<ArrayBuffer>): Uint8Array<ArrayBuffer> => {
   let text: string;
   try {
     text = STRICT_UTF8.decode(given);
@@ -208,7 +208,7 @@ export const createAggregateMcpServer = (given: string, newId: () => UUID): McpS
         // Admitted as Import admits an asset file: typed by its extension,
         // and refused over the host's size cap.
         const admission = await admitAsset(
-          LINE_FEED_EXTENSIONS.has(extension.toLowerCase()) ? markdownBytes(given) : given,
+          LINE_FEED_EXTENSIONS.has(extension.toLowerCase()) ? lineFeedTextBytes(given) : given,
           mediaTypeForExtension(extension),
         );
         if (admission.kind === 'refused') {

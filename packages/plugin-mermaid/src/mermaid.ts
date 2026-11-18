@@ -1,4 +1,4 @@
-import type { Mermaid } from 'mermaid';
+import type { Mermaid, MermaidConfig } from 'mermaid';
 
 /** The canvas's colour scheme, which a diagram is drawn to match. */
 export type DiagramTheme = 'light' | 'dark';
@@ -57,21 +57,26 @@ export const withTheme = (source: string, theme: DiagramTheme, authored: boolean
   return `${ended}%%{init: {"theme": "${MERMAID_THEME[theme]}"}}%%\n`;
 };
 
+/**
+ * How Mermaid is set up: `strict` encodes the HTML tags a source writes in its
+ * text and turns off the clicks it names (ADR 0158), and a source it cannot
+ * draw rejects rather than leaving Mermaid's error drawing in the document.
+ */
+export const MERMAID_SETTINGS = {
+  startOnLoad: false,
+  securityLevel: 'strict',
+  suppressErrorRendering: true,
+} as const satisfies MermaidConfig;
+
 /* v8 ignore start -- drawn in a browser only: jsdom has no SVG layout for Mermaid to measure with. */
 /**
  * Mermaid, fetched the first time a diagram is drawn rather than with the
- * application, and set up once, again after a failed fetch: `strict` encodes
- * the HTML tags a source writes in its text and turns off the clicks it names
- * (ADR 0158), and a source it cannot draw rejects rather than leaving
- * Mermaid's error drawing in the document.
+ * application, and set up once with {@link MERMAID_SETTINGS}, again after a
+ * failed fetch.
  */
 const mermaid = loadOnce((): Promise<Mermaid> =>
   import('mermaid').then(({ default: library }) => {
-    library.initialize({
-      startOnLoad: false,
-      securityLevel: 'strict',
-      suppressErrorRendering: true,
-    });
+    library.initialize(MERMAID_SETTINGS);
     return library;
   }),
 );

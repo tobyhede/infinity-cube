@@ -212,6 +212,9 @@ interface DragState {
   readonly moved: boolean;
 }
 
+/** The surface's style: how many Creates its Resources row holds, which the vertical column's width counts. */
+type DockSurfaceStyle = CSSProperties & { readonly '--command-dock-creates': string };
+
 /**
  * A dock that is dragged by its grip and snaps to the nearest edge.
  *
@@ -230,9 +233,6 @@ interface DragState {
  * the caller's own frame the answer, and is what lets this cross into
  * `@project/ui` at all.
  */
-/** The surface's style: how many Creates its Resources row holds, which the vertical column's width counts. */
-type DockSurfaceStyle = CSSProperties & { readonly '--command-dock-creates': string };
-
 function Dock({
   dock,
   onDock,

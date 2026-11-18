@@ -128,7 +128,7 @@ Every Resource has `id`, `title`, `kind` and `content`, and none may be left out
 | `kind` | `content` |
 | --- | --- |
 | `markdown` | `url`: `/assets/<hash>`, its text in `assets/`. No other URL, and no `path` or `mediaType`. |
-| `mermaid` | `url`: `/assets/<hash>`, its Mermaid source in `assets/`, written as `<hash>.mmd`. No other URL, and no `path` or `mediaType`. |
+| `mermaid` | `url`: `/assets/<hash>`, its Mermaid source in `assets/`, written as `<hash>.mmd` when Export writes a new file (a file already there keeps its name, and an empty source needs no file). No other URL, and no `path` or `mediaType`. |
 | `ur` | `{}`. An Ur Resource is its Title alone. |
 | `image` | `url`: `https:` or `http:`, or `/assets/<hash>` for a picture in `assets/`. Optional `naturalSize: { width, height }` in pixels. The Title is the image's text alternative. An Image Resource is never Open: a placement storing `"open": true` for one is refused. |
 | `reference` | `target`: the Id of another Resource **in the same Space**, not itself and not another Reference Resource. It shows its Target's content, read-only. |

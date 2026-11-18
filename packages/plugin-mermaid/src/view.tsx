@@ -156,9 +156,8 @@ const DRAWING: Diagram = { state: 'drawing' };
 const UNDRAWN = 'Mermaid could not draw it.';
 
 /**
- * The colour scheme `element` is drawn in: its computed `color-scheme`, which
- * the canvas's theme sets, and where that offers both, the one the browser
- * prefers.
+ * The colour scheme `element` is drawn in: its computed `color-scheme`, and
+ * where that offers both, the one the browser prefers.
  */
 const schemeOf = (element: Element): DiagramTheme => {
   const offered = getComputedStyle(element).colorScheme.split(/\s+/u);
@@ -169,8 +168,9 @@ const schemeOf = (element: Element): DiagramTheme => {
 
 /**
  * The colour scheme the element `at` holds is drawn in, read again whenever
- * the document root's attributes change, which is how the canvas changes its
- * theme, or the browser's preference does.
+ * the document root's attributes change or the browser's preference does. A
+ * `color-scheme` changed on any other element is not seen until one of those
+ * changes.
  */
 function useScheme(at: RefObject<Element | null>): DiagramTheme {
   // The document's scheme until the element itself is read, so the first
@@ -203,7 +203,8 @@ interface Drawn {
 /**
  * Draw `source` in `theme` with `render`, laid out in the element `scratch`
  * holds, under an id unique to this view. The diagram last drawn is kept, so
- * a source and theme it was drawn from are not drawn again. Nothing is drawn
+ * a source and theme it was drawn from are not drawn again, unless that draw
+ * failed. Nothing is drawn
  * while there is no source to draw (`null`), and an empty or blank source is
  * no diagram rather than a failed one.
  */
@@ -236,8 +237,11 @@ function useDiagram(
     };
     void draw().then((diagram) => {
       if (!live) return;
-      kept.current = { source, theme, diagram };
-      setDrawn(kept.current);
+      const next = { source, theme, diagram };
+      // A failure is shown but not kept, so the next time the source is
+      // wanted draws again, and fetches Mermaid again after a failed fetch.
+      if (diagram.state !== 'failed') kept.current = next;
+      setDrawn(next);
     });
     return () => {
       live = false;
@@ -351,9 +355,10 @@ function MermaidView({
   useEffect(() => release, [release]);
 
   const readable = text.state === 'read' ? text.text : null;
-  // The diagram is drawn wherever its source is wanted and read, and is not
-  // drawn while the draft replaces it.
-  const diagram = useDiagram(editing === null ? readable : null, scheme, render, scratch);
+  // The diagram is drawn while it is Open or being measured to Open, and not
+  // while the draft replaces it.
+  const drawable = editing === null && (open || measuring) ? readable : null;
+  const diagram = useDiagram(drawable, scheme, render, scratch);
   const mayAuthor = contentCommit !== undefined && store !== undefined && takeClaim !== undefined;
   const mayEdit = open && readable !== null && mayAuthor;
   // Edit on a Closed Resource Opens it and then begins editing (ADR 0064):
@@ -728,9 +733,9 @@ function DrawnDiagram({
       {diagram.state === 'drawn' ? (
         <div
           data-testid="mermaid-diagram"
-          // Mermaid's `strict` security level sanitises the SVG it answers
-          // and the source is drawn by nothing else (ADR 0158). The diagram
-          // is drawn in the canvas's colour scheme, straight onto the rect. As a
+          // Mermaid passes the SVG it answers through its DOMPurify sanitiser,
+          // and at `strict` encodes a source's HTML tags and turns off its
+          // clicks (ADR 0158). The diagram is drawn straight onto the rect. As a
           // flex item the SVG sits on no text baseline, and Mermaid's HTML
           // labels keep the line height they were measured at.
           style={{ display: 'flex' }}

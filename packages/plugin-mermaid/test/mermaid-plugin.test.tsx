@@ -14,7 +14,7 @@ import {
   type DiagramTheme,
   type RenderDiagram,
 } from '@project/plugin-mermaid/view';
-import { loadOnce, withTheme } from '../src/mermaid';
+import { MERMAID_SETTINGS, loadOnce, withTheme } from '../src/mermaid';
 
 const TEXT_REF: AssetRef = '/assets/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 const SAVED_REF: AssetRef = '/assets/BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBA';
@@ -247,6 +247,50 @@ describe('the Mermaid plugin’s view', () => {
     await screen.findByTestId('mermaid-diagram');
     await Promise.resolve();
     expect(drawn).toEqual(['graph TD']);
+  });
+
+  it('draws again on the next Open after a draw fails, as after a failed fetch', async () => {
+    let calls = 0;
+    const flaky = mermaidPluginViewWith((id, source, theme, container) => {
+      calls += 1;
+      return calls === 1
+        ? Promise.reject(new Error('Failed to fetch dynamically imported module'))
+        : drawText(id, source, theme, container);
+    });
+    renderPlugin(flaky.View, {
+      content,
+      map: open,
+      title: 'Notes',
+      grants: editable,
+      assets: reading({ [TEXT_REF]: 'graph TD' }),
+    });
+    expect(await screen.findByRole('note')).toHaveTextContent('Failed to fetch');
+    fireEvent.click(screen.getByRole('button', { name: 'Close Resource Notes' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Resource Notes' }));
+    await screen.findByTestId('mermaid-diagram');
+    expect(calls).toBe(2);
+  });
+
+  it('draws nothing while Closed, even when the colour scheme changes', async () => {
+    renderPlugin(mermaidPluginView.View, {
+      content,
+      map: open,
+      title: 'Notes',
+      grants: editable,
+      assets: reading({ [TEXT_REF]: 'graph TD' }),
+    });
+    await screen.findByTestId('mermaid-diagram');
+    fireEvent.click(screen.getByRole('button', { name: 'Close Resource Notes' }));
+    await screen.findByRole('button', { name: 'Open Resource Notes' });
+    await act(async () => {
+      document.documentElement.dataset['scheme'] = 'dark';
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(themes).toEqual(['light']);
+    await act(async () => {
+      delete document.documentElement.dataset['scheme'];
+      await Promise.resolve();
+    });
   });
 
   it('keeps the lines of Mermaid’s message as Mermaid wrote them', async () => {
@@ -813,6 +857,14 @@ describe('the theme a diagram is drawn in', () => {
 });
 
 describe('Mermaid, fetched on first draw', () => {
+  it('is set up at its `strict` security level, with its error drawing suppressed', () => {
+    expect(MERMAID_SETTINGS).toEqual({
+      startOnLoad: false,
+      securityLevel: 'strict',
+      suppressErrorRendering: true,
+    });
+  });
+
   it('is fetched once while that fetch holds, and again after one fails', async () => {
     let calls = 0;
     const load = loadOnce(() => {

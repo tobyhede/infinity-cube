@@ -90,7 +90,7 @@ _Avoid_: capability (what a Resource surface offers a plugin), edit mode.
 A Resource whose content is Markdown written by the author.
 
 **Mermaid Resource**:
-A Resource whose content is Mermaid source written by the author, drawn as a diagram.
+A Resource whose content is Mermaid source written by the author, drawn as a diagram. Diagram here is Mermaid's word for what it draws, used inside the Mermaid plugin only; it is never a synonym for Map (ADR 0101, ADR 0158).
 
 **Image Resource**:
 A Resource whose content is a picture identified by its image URL. Its Title is also the picture's text alternative. It is always its picture, with no Closed state.
