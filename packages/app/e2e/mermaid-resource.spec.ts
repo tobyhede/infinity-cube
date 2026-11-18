@@ -50,3 +50,41 @@ test('a Mermaid Resource draws its saved source with Mermaid, in the canvas’s 
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await expect.poll(fill).not.toBe(light);
 });
+
+test('a Mermaid source that chooses its own theme keeps it in either colour scheme', async ({
+  page,
+}) => {
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.goto('/');
+  await settled(page);
+  await createResource(page, 'Mermaid Resource');
+  const title = page.getByRole('textbox', { name: 'Resource title' });
+  await expect(title).toBeFocused();
+  await title.fill('Themed');
+  await title.press('Enter');
+
+  const themed = nodeByTitle(page, 'Themed').first();
+  await (
+    await resourceControls(page, themed)
+  )
+    .getByRole('button', { name: 'Edit Resource Themed' })
+    .click();
+  const source = page.getByRole('textbox', { name: 'Mermaid source of Themed' });
+  await expect(source).toBeFocused();
+  await source.fill('---\nconfig:\n  theme: forest\n---\nflowchart LR\n  A --> B');
+  await source.press(`${PRIMARY_MODIFIER}+Enter`);
+
+  const nodes = themed.locator('svg[aria-roledescription] .node');
+  await expect(nodes).toHaveCount(2, { timeout: 20_000 });
+  const fill = () =>
+    nodes.first().evaluate((node) => {
+      const box = node.querySelector('rect, polygon, path');
+      return box === null ? '' : getComputedStyle(box).fill;
+    });
+  // Mermaid's `forest` theme fills a node with this green in either scheme.
+  const FOREST = 'rgb(205, 228, 152)';
+  await expect.poll(fill).toBe(FOREST);
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect.poll(fill).toBe(FOREST);
+});

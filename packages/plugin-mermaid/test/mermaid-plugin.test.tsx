@@ -792,18 +792,23 @@ describe('the Mermaid plugin’s view', () => {
 });
 
 describe('the theme a diagram is drawn in', () => {
-  it('leads the source with an init directive choosing Mermaid’s theme', () => {
-    expect(withTheme('graph TD', 'dark')).toBe('%%{init: {"theme": "dark"}}%%\ngraph TD');
-    expect(withTheme('graph TD', 'light')).toBe('%%{init: {"theme": "neutral"}}%%\ngraph TD');
+  it('ends the source with an init directive choosing Mermaid’s theme', () => {
+    expect(withTheme('graph TD', 'dark', false)).toBe('graph TD\n%%{init: {"theme": "dark"}}%%\n');
+    expect(withTheme('graph TD\n', 'light', false)).toBe(
+      'graph TD\n%%{init: {"theme": "neutral"}}%%\n',
+    );
   });
 
-  it('keeps frontmatter first, ended by a newline even where the source ends with it', () => {
-    expect(withTheme('---\ntitle: A\n---\ngraph TD', 'dark')).toBe(
-      '---\ntitle: A\n---\n%%{init: {"theme": "dark"}}%%\ngraph TD',
+  it('leaves frontmatter, indented or not, at the start', () => {
+    expect(withTheme('  ---\n  title: A\n  ---\ngraph TD', 'dark', false)).toBe(
+      '  ---\n  title: A\n  ---\ngraph TD\n%%{init: {"theme": "dark"}}%%\n',
     );
-    expect(withTheme('---\ntitle: A\n---', 'dark')).toBe(
-      '---\ntitle: A\n---\n%%{init: {"theme": "dark"}}%%\n',
-    );
+  });
+
+  it('adds no theme to a source that chooses its own', () => {
+    const source = '%%{init: {"theme": "forest"}}%%\ngraph TD';
+    expect(withTheme(source, 'dark', true)).toBe(source);
+    expect(withTheme(source, 'light', true)).toBe(source);
   });
 });
 
