@@ -37,7 +37,10 @@ import {
   drawnHeadShape,
   settleNewMapName,
   nodeByTitle,
+  openResourcePersisted,
   openResources,
+  persistedAt,
+  persistedRevision,
   positionOf,
   presentControl,
   recolorActiveGraph,
@@ -97,25 +100,6 @@ function controls(resource: Locator): Promise<Locator> {
  */
 async function openResource(node: Locator, title: string): Promise<void> {
   await (await controls(node)).getByRole('button', { name: `Open Resource ${title}` }).click();
-}
-
-/**
- * Open a Closed Resource and wait for its one Open Edit to persist, answering
- * the revision it persisted at.
- *
- * "Persisted" alone does not show the Open landed: a Markdown Resource commits
- * Open only once it has read and measured its text, so the status can still be
- * the settled one from before the click.
- */
-async function openResourcePersisted(node: Locator, title: string): Promise<string> {
-  const persistence = node.page().getByTestId('persistence-status');
-  await expect(persistence).toHaveText('Persisted');
-  const closedRevision = Number(await persistence.getAttribute('data-revision'));
-  await openResource(node, title);
-  const openedRevision = String(closedRevision + 1);
-  await expect(persistence).toHaveAttribute('data-revision', openedRevision);
-  await expect(persistence).toHaveText('Persisted');
-  return openedRevision;
 }
 
 /** Select a placed Resource so its toolbar is drawn, and open its actions menu. */
@@ -326,11 +310,7 @@ test('the Resource affordance opens rendered Markdown and edits it in place', as
   const source = page.getByRole('textbox', { name: 'Markdown source of A' });
   await source.fill('Authored from the graph');
   await (await controls(resource)).getByRole('button', { name: 'Save Resource A' }).click();
-  // Save stores the text as an asset before it commits, so "Persisted" alone
-  // can still be the status from the Open: wait for the Save's one Edit.
-  const persistence = page.getByTestId('persistence-status');
-  await expect(persistence).toHaveAttribute('data-revision', String(Number(openedRevision) + 1));
-  await expect(persistence).toHaveText('Persisted');
+  await persistedAt(page, openedRevision + 1);
 
   await page.reload();
   const reopened = nodeByTitle(page, 'A').first();
@@ -405,13 +385,9 @@ test(
     await (await controls(resourceA)).getByRole('button', { name: 'Edit Resource A' }).click();
     const committedSource = page.getByRole('textbox', { name: 'Markdown source of A' });
     await committedSource.fill(exact);
-    // Save stores the text as an asset before it commits, so "Persisted" alone
-    // can still be the status from before it: wait for the Save's one Edit.
-    const persistence = page.getByTestId('persistence-status');
-    const editingRevision = Number(await persistence.getAttribute('data-revision'));
+    const editingRevision = await persistedRevision(page);
     await committedSource.press(`${PRIMARY_MODIFIER}+Enter`);
-    await expect(persistence).toHaveAttribute('data-revision', String(editingRevision + 1));
-    await expect(persistence).toHaveText('Persisted');
+    await persistedAt(page, editingRevision + 1);
     await page.reload();
     const persisted = nodeByTitle(page, 'A').first();
     await expect(persisted).toContainText('two spaces and code');
@@ -647,8 +623,7 @@ test(
     await selectCanvas(page, 'Collection 1');
     const resource = nodeByTitle(page, 'A').first();
     await expect(resource).toBeVisible();
-    await openResource(resource, 'A');
-    await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+    await openResourcePersisted(resource, 'A');
     // Opening grows the Resource through a transition, so its rect is still moving
     // for a moment: a drag started inside it would be measuring the animation.
     await resource.evaluate(async (element) => {
@@ -1244,7 +1219,7 @@ test(
     );
     // Pointer movement owns only the canvas draft. Persistence sees nothing
     // until the gesture releases.
-    await expect(persistence).toHaveAttribute('data-revision', openedRevision);
+    await expect(persistence).toHaveAttribute('data-revision', String(openedRevision));
 
     await page.mouse.up();
 
@@ -1253,7 +1228,7 @@ test(
     await expect(resource).toHaveClass(/selected/);
     await expect(page.locator('.react-flow__edge.selected')).toHaveCount(0);
     await expect(persistence).toHaveText('Persisted');
-    await expect(persistence).toHaveAttribute('data-revision', String(Number(openedRevision) + 1));
+    await expect(persistence).toHaveAttribute('data-revision', String(openedRevision + 1));
 
     await resource.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
@@ -1433,14 +1408,14 @@ test.describe('resizing by touch', () => {
     await gesture.moveTo(from.x + dragX, from.y + dragY);
     // Pointer movement owns only the canvas draft; persistence sees nothing
     // until the gesture releases.
-    await expect(persistence).toHaveAttribute('data-revision', openedRevision);
+    await expect(persistence).toHaveAttribute('data-revision', String(openedRevision));
 
     await gesture.release();
 
     // Chromium raises `pointerup` from the touch release, which is the signal
     // `ResourceNode` turns into the one completing Edit.
     await expect(persistence).toHaveText('Persisted');
-    await expect(persistence).toHaveAttribute('data-revision', String(Number(openedRevision) + 1));
+    await expect(persistence).toHaveAttribute('data-revision', String(openedRevision + 1));
 
     await resource.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
@@ -1455,7 +1430,7 @@ test.describe('resizing by touch', () => {
     // it — and touch is the path where a stray `pointerup`/`touchend` pair could
     // plausibly complete the same gesture twice.
     await quiescent(page);
-    await expect(persistence).toHaveAttribute('data-revision', String(Number(openedRevision) + 1));
+    await expect(persistence).toHaveAttribute('data-revision', String(openedRevision + 1));
 
     await page.reload();
     await selectCanvas(page, 'Collection 1');
@@ -1533,7 +1508,7 @@ test.describe('resizing by touch', () => {
     // gesture that never grew the Resource would restore the authored rect by
     // having never left it, and prove nothing.
     await expect.poll(async () => (await size()).width).toBeGreaterThan(authored.width);
-    await expect(persistence).toHaveAttribute('data-revision', openedRevision);
+    await expect(persistence).toHaveAttribute('data-revision', String(openedRevision));
 
     await gesture.cancel();
 
@@ -1542,7 +1517,7 @@ test.describe('resizing by touch', () => {
     await expect.poll(size).toEqual(authored);
     expect(await positionOf(resource)).toEqual(beforePosition);
     await quiescent(page);
-    await expect(persistence).toHaveAttribute('data-revision', openedRevision);
+    await expect(persistence).toHaveAttribute('data-revision', String(openedRevision));
 
     // And the gesture is disarmed. A later, unrelated press anywhere on the
     // page raises the `pointerup` that `finish()` answers, so a cancellation
@@ -1552,7 +1527,7 @@ test.describe('resizing by touch', () => {
     const elsewhere = await emptyCanvasPoint(page);
     await page.mouse.click(elsewhere.x, elsewhere.y);
     await quiescent(page);
-    await expect(persistence).toHaveAttribute('data-revision', openedRevision);
+    await expect(persistence).toHaveAttribute('data-revision', String(openedRevision));
     expect(await size()).toEqual(authored);
   });
 });
@@ -1565,8 +1540,8 @@ test(
     await selectCanvas(page, 'Collection 1');
     const resource = nodeByTitle(page, 'A').first();
     await expect(resource).toBeVisible();
-    // The Open Edit lands only once the text is read and measured, and the growth
-    // it starts is the transition to wait out before the control is measured.
+    // The growth the Open Edit starts is the transition to wait out before the
+    // control is measured.
     await openResourcePersisted(resource, 'A');
     await resource.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
@@ -1606,8 +1581,7 @@ test('a completed Resize animates the neighbours it displaces from the one durat
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   const resource = nodeByTitle(page, 'A').first();
-  await openResource(resource, 'A');
-  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+  await openResourcePersisted(resource, 'A');
   await page.addStyleTag({
     content: '.graph-area { --resource-placement-duration: 10s !important; }',
   });

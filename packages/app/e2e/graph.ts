@@ -184,6 +184,44 @@ export async function openResource(node: Locator, title: string): Promise<void> 
   await controls.getByRole('button', { name: `Open Resource ${title}` }).click();
 }
 
+/** The revision the settled, persisted Space stands at. */
+export async function persistedRevision(page: Page): Promise<number> {
+  const persistence = page.getByTestId('persistence-status');
+  await expect(persistence).toHaveText('Persisted');
+  return Number(await persistence.getAttribute('data-revision'));
+}
+
+/**
+ * Wait for the Space to be persisted at `revision`.
+ *
+ * "Persisted" alone does not show an Edit landed when the Edit commits after
+ * asynchronous work, since the status can still be the settled one from before
+ * it. A Markdown Save stores its text before its one commit
+ * (`packages/plugin-markdown/test/markdown-plugin.test.tsx` › "Saves by storing
+ * the text with `\n` endings, then committing its URL, and releases its Claim").
+ */
+export async function persistedAt(page: Page, revision: number): Promise<void> {
+  const persistence = page.getByTestId('persistence-status');
+  await expect(persistence).toHaveAttribute('data-revision', String(revision));
+  await expect(persistence).toHaveText('Persisted');
+}
+
+/**
+ * Open a Closed Resource and wait for its one Open Edit to persist, answering
+ * the revision it persisted at.
+ *
+ * A Markdown Resource's Open commit carries a size hint measured from its text
+ * (`packages/plugin-markdown/test/markdown-plugin.test.tsx` › "Opens with one
+ * Map content commit carrying a size hint at least the reading width"), so it
+ * follows the read of that text rather than the click.
+ */
+export async function openResourcePersisted(node: Locator, title: string): Promise<number> {
+  const closedRevision = await persistedRevision(node.page());
+  await openResource(node, title);
+  await persistedAt(node.page(), closedRevision + 1);
+  return closedRevision + 1;
+}
+
 /**
  * Select a placed Resource, so its toolbar is drawn (ADR 0102), and open its actions menu.
  *
