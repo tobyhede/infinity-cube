@@ -1,6 +1,6 @@
 # 01: Tidy the Command Dock and canvas toolbar copy
 
-**What to build:** an author reads one consistent voice across the Command Dock, the Resource rail and actions menu, the Edge toolbar, the Resources list and the delete confirmation. Every icon-only canvas command shows a tooltip on hover and on keyboard focus. Making something says Create, placing an existing Resource on a Map says Add, and menu rows say New. Menu rows are sentence case, with domain nouns (Space, Map, Graph, Resource, Edge, Title, Full View) capitalised, and Space is capitalised in the refusal and report sentences named below.
+**What to build:** an author reads one consistent voice across the Command Dock, a Resource's Toolbar (the code calls it the rail) and actions menu, the Edge toolbar, the Resources View (the code's Resources list) and the delete confirmation. Every icon-only canvas command shows a tooltip on hover and on keyboard focus. Making something says Create, placing an existing Resource on a Map says Add, and menu rows say New. Menu rows are sentence case, with domain nouns (Space, Map, Graph, Resource, Edge, Title, Full View) capitalised, and Space is capitalised in the refusal and report sentences named below.
 
 The source is the copy review of 2026-11-17 (Claude Doc "UX copy review: Command Dock and canvas toolbars"). The strings are restated here so this ticket stands alone. Where this ticket and the review differ, this ticket wins: the review proposed changes to wording that accepted ADRs decide, and those are listed under Out of scope.
 
@@ -10,34 +10,34 @@ The source is the copy review of 2026-11-17 (Claude Doc "UX copy review: Command
 
 ## Tooltips and names on the canvas toolbars
 
-Today the Resource rail and Edge toolbar commands are icon-only and carry an accessible name and nothing else. The Dock's controls carry a native `title`, which shows on hover only, so that pattern is not the one to copy.
+Today the Resource Toolbar and Edge toolbar commands are icon-only and carry an accessible name and nothing else. The Dock's controls carry a native `title`, which shows on hover only, so that pattern is not the one to copy.
 
-- [ ] Every Resource rail command and every Edge toolbar command shows a tooltip from `@project/ui`'s `Tooltip`, which opens on hover and on keyboard focus.
+- [ ] Every Resource Toolbar command and every Edge toolbar command shows a tooltip from `@project/ui`'s `Tooltip`, which opens on hover and on keyboard focus.
 - [ ] Each tooltip's text is contained in that command's accessible name (the rule UI-37 states for Dock controls, applied here to icon-only commands). The tooltips, with the name each sits inside:
 
   | Command | Tooltip | Accessible name |
   | --- | --- | --- |
-  | Rail: Open | Open | Open Resource \<name\> (unchanged) |
-  | Rail: Close | Close | Close Resource \<name\> (unchanged) |
-  | Rail: Edit (Markdown, Space) | Edit | Edit Resource \<name\> (unchanged) |
-  | Rail: Save (Markdown) | Save | Save Resource \<name\> (unchanged) |
-  | Rail: Cancel (Markdown) | Cancel editing | Cancel editing Resource \<name\> (unchanged) |
-  | Rail: Done (Space) | Finish editing | Finish editing Resource \<name\> (today "Done Resource \<name\>") |
-  | Rail: Replace (Image) | Replace image | Replace image of Resource \<name\> (unchanged) |
-  | Rail: Rename (Image) | Rename | Rename Resource \<name\> (unchanged) |
-  | Rail: actions trigger | Actions | Actions for Resource \<name\> (unchanged) |
+  | Toolbar: Open | Open | Open Resource \<name\> (unchanged) |
+  | Toolbar: Close | Close | Close Resource \<name\> (unchanged) |
+  | Toolbar: Edit (Markdown, Space) | Edit | Edit Resource \<name\> (unchanged) |
+  | Toolbar: Save (Markdown) | Save | Save Resource \<name\> (unchanged) |
+  | Toolbar: Cancel (Markdown) | Cancel editing | Cancel editing Resource \<name\> (unchanged) |
+  | Toolbar: Done (Space) | Done editing | Done editing Resource \<name\> (today "Done Resource \<name\>"; ADR 0102 names this control Done, so the word stays) |
+  | Toolbar: Replace (Image) | Replace image | Replace image of Resource \<name\> (unchanged) |
+  | Toolbar: Rename (Image) | Rename | Rename Resource \<name\> (unchanged) |
+  | Toolbar: actions trigger | Actions | Actions for Resource \<name\> (unchanged) |
   | Edge: title command | Rename | Rename Edge \<name\> (today "Edit Edge \<name\>"; it edits only the Edge's Title) |
   | Edge: Title toggle | Show Title, or Hide Title | Show Title \<name\>, or Hide Title \<name\> (unchanged) |
   | Edge: Delete | Delete Edge | Delete Edge \<name\> (unchanged) |
 
-  A plugin rail command not in this table gets a tooltip built the same way: its accessible name without the Resource name.
+  A plugin Toolbar command not in this table gets a tooltip built the same way: its accessible name without the Resource name.
 - [ ] The Edge Title toggle stays an action button whose name says the action, and its icon now draws that action too: the open eye on "Show Title", the crossed eye on "Hide Title". Today it draws the opposite (the state), so icon and name disagree.
 - [ ] `docs/requirements/ui.md` gains a requirement for these tooltips (open on hover and focus, text contained in the name), with its tests, in the same change.
 
 ## One verb per act
 
 - [ ] The shortcut sheet's `C` row reads "Create a Markdown Resource" (naming the default kind, as the Dock's Create tooltip does), not "Add a Resource".
-- [ ] "Add \<name\> to Map" in the Resources list, "New Map" and "New Graph" are unchanged.
+- [ ] "Add \<name\> to Map" in the Resources View, "New Map" and "New Graph" are unchanged.
 
 ## Delete confirmation
 
@@ -70,8 +70,8 @@ UI-83 says the question never says whether a deletion can be undone, so it stays
 - [ ] Actions menu: "Present from Here" becomes "Present from here", and "Open in New Tab" becomes "Open in new tab". "Read in Full View" is unchanged.
 - [ ] In the sentences an author reads in refusal notices and in the Exit Space report, "space" becomes "Space" and "space resource" becomes "Space Resource" wherever they mean a Space or a Space Resource. That covers every such sentence in the authoring refusal messages (snapshot and reference refusals, the stored-Space refusal, the conflict recovery descriptions, permission and size-limit refusals) and in the Exit Space report. No other word in those sentences changes.
 - [ ] Grip tooltip: "Drag to another slot, or press for the list" becomes "Drag to move the Dock, or click to pick a position". Map and Graph name tooltips: "Switch Map" becomes "Switch or edit Map", and "Switch Graph" becomes "Switch or edit Graph".
-- [ ] Resources list: the filter "Resources of a kind not in this build" becomes "Resources this app can’t show". "Space Resources in this Space" and "Spaces in this Meta Space" are unchanged.
-- [ ] Resources list empty states: "This Space has no Resources." becomes "This Space has no Resources yet. Create one from the Dock."; "All Resources are in this Map." becomes "Every Resource is already on this Map."; "No matching Resources." becomes "No Resources match your search or filters."
+- [ ] Resources View: the filter "Resources of a kind not in this build" becomes "Resources this app can’t show". "Space Resources in this Space" and "Spaces in this Meta Space" are unchanged.
+- [ ] Resources View empty states: "This Space has no Resources." becomes "This Space has no Resources yet. Create one from the Dock."; "All Resources are in this Map." becomes "Every Resource is already on this Map."; "No matching Resources." becomes "No Resources match your search or filters."
 
 ## Keeping the rest honest
 
