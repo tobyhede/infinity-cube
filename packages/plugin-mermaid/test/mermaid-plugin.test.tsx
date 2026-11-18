@@ -14,7 +14,7 @@ import {
   type DiagramTheme,
   type RenderDiagram,
 } from '@project/plugin-mermaid/view';
-import { MERMAID_SETTINGS, loadOnce, withTheme } from '../src/mermaid';
+import { MERMAID_SETTINGS, loadOnce, settingsIn } from '../src/mermaid';
 
 const TEXT_REF: AssetRef = '/assets/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 const SAVED_REF: AssetRef = '/assets/BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBA';
@@ -836,23 +836,9 @@ describe('the Mermaid plugin’s view', () => {
 });
 
 describe('the theme a diagram is drawn in', () => {
-  it('ends the source with an init directive choosing Mermaid’s theme', () => {
-    expect(withTheme('graph TD', 'dark', false)).toBe('graph TD\n%%{init: {"theme": "dark"}}%%\n');
-    expect(withTheme('graph TD\n', 'light', false)).toBe(
-      'graph TD\n%%{init: {"theme": "neutral"}}%%\n',
-    );
-  });
-
-  it('leaves frontmatter, indented or not, at the start', () => {
-    expect(withTheme('  ---\n  title: A\n  ---\ngraph TD', 'dark', false)).toBe(
-      '  ---\n  title: A\n  ---\ngraph TD\n%%{init: {"theme": "dark"}}%%\n',
-    );
-  });
-
-  it('adds no theme to a source that chooses its own', () => {
-    const source = '%%{init: {"theme": "forest"}}%%\ngraph TD';
-    expect(withTheme(source, 'dark', true)).toBe(source);
-    expect(withTheme(source, 'light', true)).toBe(source);
+  it('sets Mermaid’s theme for the canvas’s colour scheme beside its other settings', () => {
+    expect(settingsIn('light')).toEqual({ ...MERMAID_SETTINGS, theme: 'neutral' });
+    expect(settingsIn('dark')).toEqual({ ...MERMAID_SETTINGS, theme: 'dark' });
   });
 });
 

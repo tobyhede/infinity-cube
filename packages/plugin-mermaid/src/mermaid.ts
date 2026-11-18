@@ -44,20 +44,6 @@ const MERMAID_THEME = { light: 'neutral', dark: 'dark' } as const satisfies Reco
 >;
 
 /**
- * `source` with an init directive choosing Mermaid's theme for `theme`, unless
- * the source chooses a theme of its own (`authored`), in its frontmatter or a
- * directive, which then stands. Mermaid's configuration is global, so the
- * theme travels with each diagram rather than with `initialize`. The directive
- * goes last: Mermaid reads a directive anywhere in a source, and frontmatter
- * only at its start.
- */
-export const withTheme = (source: string, theme: DiagramTheme, authored: boolean): string => {
-  if (authored) return source;
-  const ended = source === '' || source.endsWith('\n') ? source : `${source}\n`;
-  return `${ended}%%{init: {"theme": "${MERMAID_THEME[theme]}"}}%%\n`;
-};
-
-/**
  * How Mermaid is set up: `strict` encodes the HTML tags a source writes in its
  * text and turns off the clicks it names (ADR 0158), and a source it cannot
  * draw rejects rather than leaving Mermaid's error drawing in the document.
@@ -68,28 +54,33 @@ export const MERMAID_SETTINGS = {
   suppressErrorRendering: true,
 } as const satisfies MermaidConfig;
 
-/* v8 ignore start -- drawn in a browser only: jsdom has no SVG layout for Mermaid to measure with. */
 /**
- * Mermaid, fetched the first time a diagram is drawn rather than with the
- * application, and set up once with {@link MERMAID_SETTINGS}, again after a
- * failed fetch.
+ * Mermaid's settings for a diagram drawn in `theme`: the theme of a source
+ * that chooses none. One that chooses its own, in its frontmatter or a
+ * directive, keeps it, since Mermaid reads a source's own configuration over
+ * these.
  */
+export const settingsIn = (theme: DiagramTheme): MermaidConfig => ({
+  ...MERMAID_SETTINGS,
+  theme: MERMAID_THEME[theme],
+});
+
+/* v8 ignore start -- drawn in a browser only: jsdom has no SVG layout for Mermaid to measure with. */
+/** Mermaid, fetched the first time a diagram is drawn rather than with the application, and again after a failed fetch. */
 const mermaid = loadOnce((): Promise<Mermaid> =>
-  import('mermaid').then(({ default: library }) => {
-    library.initialize(MERMAID_SETTINGS);
-    return library;
-  }),
+  import('mermaid').then(({ default: library }) => library),
 );
 
-/** The Mermaid library's drawing, which needs a browser's layout and so is not run under jsdom. */
+/**
+ * The Mermaid library's drawing, which needs a browser's layout and so is not
+ * run under jsdom. The source is drawn as written. Mermaid's settings are the
+ * page's rather than a diagram's, so they are set before each draw, with no
+ * wait between setting them and asking for the drawing.
+ */
 export const renderWithMermaid: RenderDiagram = async (id, source, theme, container) => {
   const library = await mermaid();
-  // Mermaid's own reading of the source's frontmatter and directives says
-  // whether it chooses a theme; a source it cannot parse is left for `render`
-  // to refuse in its own words.
-  const parsed = await library.parse(source, { suppressErrors: true });
-  const authored = parsed !== false && parsed.config.theme !== undefined;
-  const { svg } = await library.render(id, withTheme(source, theme, authored), container);
+  library.initialize(settingsIn(theme));
+  const { svg } = await library.render(id, source, container);
   return svg;
 };
 /* v8 ignore stop */

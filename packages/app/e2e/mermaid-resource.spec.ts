@@ -88,3 +88,32 @@ test('a Mermaid source that chooses its own theme keeps it in either colour sche
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await expect.poll(fill).toBe(FOREST);
 });
+
+test('a Mermaid source that cannot be drawn is refused in Mermaid’s words, naming the author’s own line', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await settled(page);
+  await createResource(page, 'Mermaid Resource');
+  const title = page.getByRole('textbox', { name: 'Resource title' });
+  await expect(title).toBeFocused();
+  await title.fill('Broken');
+  await title.press('Enter');
+
+  const broken = nodeByTitle(page, 'Broken').first();
+  await (
+    await resourceControls(page, broken)
+  )
+    .getByRole('button', { name: 'Edit Resource Broken' })
+    .click();
+  const source = page.getByRole('textbox', { name: 'Mermaid source of Broken' });
+  await expect(source).toBeFocused();
+  // Three lines, the third of them the one Mermaid cannot read.
+  await source.fill('flowchart LR\n  A --> B\n  B --> --> C');
+  await source.press(`${PRIMARY_MODIFIER}+Enter`);
+
+  // The source is drawn as written, so the line Mermaid names is the author's.
+  await expect(broken.getByRole('note')).toContainText('Parse error on line 3', {
+    timeout: 20_000,
+  });
+});
