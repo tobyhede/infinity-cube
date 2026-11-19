@@ -204,6 +204,25 @@ describe('naming the host command', () => {
   it('holds the production Node host to the launch lock', () => {
     expect(hostCommandFromEnvironment(undefined).keepsLock).toBe(true);
   });
+
+  it('refuses a command naming a key it does not read', () => {
+    expect(() =>
+      hostCommandFromEnvironment(
+        JSON.stringify({
+          name: 'Rust CLI',
+          argv: ['infinity-cube'],
+          stopsOnStdinClose: false,
+          keepLock: true,
+        }),
+      ),
+    ).toThrow(/keepLock/);
+  });
+
+  it('names the variable when its value is not JSON', () => {
+    expect(() => hostCommandFromEnvironment('{ name: ')).toThrow(
+      /INFINITY_CUBE_HTTP_CONFORMANCE_HOST is not valid JSON/,
+    );
+  });
 });
 
 describe('reading the announcement', () => {

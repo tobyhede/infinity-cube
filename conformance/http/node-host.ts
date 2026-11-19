@@ -29,7 +29,7 @@ export const NODE_HOST_COMMAND: HostCommand = {
  */
 export const HOST_COMMAND_VARIABLE = 'INFINITY_CUBE_HTTP_CONFORMANCE_HOST';
 
-const hostCommandSchema = z.object({
+const hostCommandSchema = z.strictObject({
   name: z.string().min(1),
   argv: z.array(z.string()).min(1),
   cwd: z.string().optional(),
@@ -40,6 +40,14 @@ const hostCommandSchema = z.object({
 /** The host command the environment names, or the production Node host. */
 export const hostCommandFromEnvironment = (variable: string | undefined): HostCommand => {
   if (variable === undefined || variable === '') return NODE_HOST_COMMAND;
-  const { cwd, ...command } = hostCommandSchema.parse(JSON.parse(variable));
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(variable);
+  } catch {
+    throw new Error(`${HOST_COMMAND_VARIABLE} is not valid JSON: ${variable}`);
+  }
+  // An unknown key fails rather than being dropped, so a misspelt `keepsLock`
+  // cannot leave the lock cases expecting no lock.
+  const { cwd, ...command } = hostCommandSchema.parse(parsed);
   return cwd === undefined ? command : { ...command, cwd };
 };

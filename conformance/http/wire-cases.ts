@@ -90,15 +90,23 @@ const fixtureTitles = async (): Promise<readonly { id: string; title: string }[]
   );
 };
 
-/** A Content Security Policy as each directive's sources, in no order. */
-const directivesOf = (policy: string): Map<string, string[]> =>
-  new Map(
-    policy
-      .split(';')
-      .map((directive) => directive.trim().split(/\s+/))
-      .filter(([name]) => name !== undefined && name !== '')
-      .map(([name = '', ...sources]): [string, string[]] => [name, sources.sort()]),
-  );
+/**
+ * A Content Security Policy as each directive's sources, in no order. A
+ * browser obeys the first of two directives of one name and ignores the
+ * second, so a policy that repeats one fails here rather than comparing by
+ * whichever came last.
+ */
+const directivesOf = (policy: string): Map<string, string[]> => {
+  const directives = new Map<string, string[]>();
+  for (const directive of policy.split(';')) {
+    const [name, ...sources] = directive.trim().split(/\s+/);
+    if (name === undefined || name === '') continue;
+    const normalized = name.toLowerCase();
+    expect(directives.has(normalized), `the policy repeats ${normalized}: ${policy}`).toBe(false);
+    directives.set(normalized, sources.sort());
+  }
+  return directives;
+};
 
 /** Bytes no earlier request stored, so storing them is a first store. */
 let uniqueAssets = 0;
