@@ -1,5 +1,7 @@
 node_modules/
 dist/
+# The Cargo workspace's build output (`Cargo.toml` at the root).
+/target/
 packages/app/dist-http/
 packages/app/dist-desktop-sidecar/
 # `pnpm build:mount`'s static application for Mounting (ADR 0130).

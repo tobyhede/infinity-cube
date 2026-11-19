@@ -2,6 +2,7 @@
 
 Status: accepted
 Refines: 0078, 0117
+Refined by: 0155
 Related: 0018, 0094, 0119
 
 Every command Hyper offers is a verb of one CLI, `pnpm hyper <verb>`:

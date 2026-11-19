@@ -2,7 +2,7 @@
 
 **Status:** ready-for-agent
 
-**Blocked by:** 03. Not blocked by 01: like 03, this implements ADR 0155's first stage while the ADR is proposed, and its code landed ahead of acceptance by the maintainer's choice (17 November 2026).
+**Blocked by:** 03. Not blocked by 01: like 03, this implements ADR 0155's first stage, and its code landed ahead of the ADR's acceptance by the maintainer's choice (17 November 2026).
 
 **What to build:** A Tauri v2 application in `packages/desktop/` (its `src-tauri/` joins the Cargo workspace in 09): an Open Folder dialog; one window per Aggregate directory, each starting its own sidecar (03) on that folder; reading the sidecar's announcement line (`{ "kind": "listening", "port", "secret" }` or `{ "kind": "refused", "message" }`, 03) and loading `http://127.0.0.1:<port>/?launch=<secret>`; minimal capabilities (no `shell` permission reachable from the window); closing a window closes its sidecar's stdin, waits up to five seconds for it to exit, then kills it; quitting does that for every window. macOS Apple Silicon first. A sidecar that fails to start, or refuses the folder, shows the intake's errors instead of a blank page: in this first stage as a native error dialog, never an empty window. A missing or empty folder is refused with text that names `pnpm cube init`, which a presenter does not have; 24 replaces that with creating a talk from the application.
 

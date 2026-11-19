@@ -1,6 +1,6 @@
 # 01 — Accept the Rust host ADRs
 
-**Status:** ready-for-human
+**Status:** resolved
 
 **Blocked by:** None.
 
@@ -12,6 +12,10 @@ The restatement covers, besides each ADR's own lines:
 - **Space and Resources:** intake as one rule with two implementations held to one corpus (ADR 0156), and the plugin-list rule: adding a plugin is one line in each half of `packages/plugins` and, once the Rust intake exists, its Rust module and one entry in the Rust plugin list (ADR 0156).
 - **UI:** the WebKit floor and the declared minimum systems (ADR 0157).
 
-- [ ] Each ADR accepted, amended or rejected by the maintainer.
-- [ ] Accepted ones indexed, reciprocal `Refines`/`Refined by` in place, `test/unit/adr-status-blocks.test.ts` green.
-- [ ] Storage (0155, 0156), Space and Resources (0156) and UI (0157) requirements restated as listed above, markers advanced.
+- [x] Each ADR accepted, amended or rejected by the maintainer.
+- [x] Accepted ones indexed, reciprocal `Refines`/`Refined by` in place, `test/unit/adr-status-blocks.test.ts` green.
+- [x] Storage (0155, 0156), Space and Resources (0156) and UI (0157) requirements restated as listed above, markers advanced.
+
+## Answer
+
+The maintainer accepted ADRs 0155, 0156 and 0157 on 18 November 2026, each with the `Refines:` lines named above, the reciprocal `Refined by:` lines, and an index row. Storage ST-22, ST-39, ST-90 and "Every door applies the same intake" say that across runtimes the doors agree on the kind of error and where it is. SR-15 names the Rust half of adding a plugin. UI-110 states the WebKit floor and the minimum systems as not built (05 builds it), and the platform-floor rule in `docs/agents/build-tooling.md` names the declared minimum system. The Storage, Space and Resources and UI snapshots, and the other four, now read "through 0157". The sidecar rules ST-113 to ST-116 cite ADR 0155 as accepted.

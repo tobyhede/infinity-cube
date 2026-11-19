@@ -2,6 +2,7 @@
 
 Status: accepted
 Refines: 0069
+Refined by: 0157
 
 Hyper pins Node 26.8.1. Its browser floor is any current evergreen browser that
 natively implements the `Uint8Array` base64 and hexadecimal codecs; browser

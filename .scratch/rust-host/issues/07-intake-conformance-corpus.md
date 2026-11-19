@@ -2,7 +2,7 @@
 
 **Status:** ready-for-agent
 
-**Blocked by:** None (ADR 0156 proposed; the corpus is useful to the TypeScript intake either way).
+**Blocked by:** None (ADR 0156 accepted; the corpus is useful to the TypeScript intake either way).
 
 **What to build:** First, give the TypeScript intake structured refusals. Today a refusal does not say where it is in a form a runner can compare: `invalid-shape` carries only a message (`packages/graph/src/space.ts`), `SpaceReferenceError` carries a kind and the id it failed on but no file or field (`packages/graph/src/validate.ts`), and a run's refusal is a list of strings (`RunRefusal` in `src/run/run.ts`). Each refusal gains `{ kind, file, id?, field? }` beside its message: `field` from the Zod issue's path, and an Edge, which has no id, located by its Graph's id with its `from` and `to`. The messages and what the CLI prints do not change.
 

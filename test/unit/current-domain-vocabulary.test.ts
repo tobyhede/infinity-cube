@@ -660,7 +660,7 @@ const RETIRED_LOOSE_BARE = new RegExp(RETIRED_LOOSE_NAME, 'i');
  * specs, Ladle stories, story fixtures, `styles.css`, the root unit tests and
  * `vitest.setup.ts`, and only the first of those sits under a `src/`.
  */
-const AUTHORED_TREES = ['packages/', 'src/', 'test/', 'scripts/'] as const;
+const AUTHORED_TREES = ['packages/', 'src/', 'test/', 'scripts/', 'crates/'] as const;
 
 const isAuthoredSource = (file: string): boolean =>
   AUTHORED_TREES.some((tree) => file.startsWith(tree)) ||
@@ -669,7 +669,8 @@ const isAuthoredSource = (file: string): boolean =>
 /**
  * The modules that are pnpm's vocabulary rather than ours: the alias table,
  * the shared database Vite config, the mount build's Vite config and the HTTP
- * server and desktop sidecar build configs that import it, and the toolchain check that reads the package list plus its test. The two
+ * server and desktop sidecar build configs that import it, and the toolchain check that reads the package list plus its test. Cargo's
+ * inheritance keys are forgiven by line instead (`CARGO_INHERITANCE`). The two
  * target-specific Vite configs delegate to that one shared owner and carry no
  * exemption.
  * Composed from the fragment above for the same reason every retired name in
@@ -689,6 +690,23 @@ const MONOREPO_VOCABULARY: readonly string[] = [
 /** A package manifest, anchored at a package root rather than by filename. */
 const MONOREPO_MANIFEST = /^packages\/[^/]+\/package\.json$/;
 
+/** A Cargo package's manifest, at any depth. */
+const CARGO_TOML = /(?:^|\/)Cargo\.toml$/;
+
+/** A field or dependency name that does not itself carry the word. */
+const CARGO_KEY = `(?![\\w-]*${RETIRED_LOOSE_NAME})[\\w-]+`;
+
+/**
+ * A hit that is a whole line of Cargo's inheritance keys, which take an entry
+ * from the root `Cargo.toml`: a field (`edition.<key> = true`), the lint table
+ * (`<key> = true`) and a dependency (`name = { <key> = true, ... }`). A line
+ * that also names a package or a feature with the word is not one.
+ */
+const CARGO_INHERITANCE = new RegExp(
+  `^\\d+: (?:(?:${CARGO_KEY}\\.)?${RETIRED_LOOSE_NAME} = true|${CARGO_KEY} = \\{ ${RETIRED_LOOSE_NAME} = true(?:, (?!.*${RETIRED_LOOSE_NAME}).*)? \\})$`,
+  'i',
+);
+
 /**
  * The bare-word hits a file is answerable for.
  *
@@ -697,13 +715,15 @@ const MONOREPO_MANIFEST = /^packages\/[^/]+\/package\.json$/;
  * `imports` entry or a renamed package lands in a manifest and nowhere else,
  * and exempting the file would let all three through. That also keeps the
  * exemption one rule rather than six paths — the protocol is in every manifest
- * that depends on a sibling, and a new package brings another.
+ * that depends on a sibling, and a new package brings another. A Cargo
+ * package's manifest is forgiven Cargo's inheritance keys by the same reasoning.
  */
 const reportableHits = (file: string, source: string): string[] => {
   const found = hits(source, RETIRED_LOOSE_BARE);
-  return MONOREPO_MANIFEST.test(file)
-    ? found.filter((hit) => !hit.includes(`"${RETIRED_LOOSE_NAME}:`))
-    : found;
+  if (MONOREPO_MANIFEST.test(file)) {
+    return found.filter((hit) => !hit.includes(`"${RETIRED_LOOSE_NAME}:`));
+  }
+  return CARGO_TOML.test(file) ? found.filter((hit) => !CARGO_INHERITANCE.test(hit)) : found;
 };
 
 describe('the name used loosely for a Space and its chrome is gone', () => {
@@ -724,6 +744,11 @@ describe('the name used loosely for a Space and its chrome is gone', () => {
     expect(authored.filter((file) => file.endsWith('.tsx')).length).toBeGreaterThan(0);
     expect(authored.filter((file) => file.endsWith('.ts')).length).toBeGreaterThan(0);
     expect(authored.filter((file) => file.endsWith('.css')).length).toBeGreaterThan(0);
+    // The Rust the repo authors: a crate's manifest and its source, and the
+    // desktop shell's.
+    expect(authored).toContain('crates/host/Cargo.toml');
+    expect(authored).toContain('crates/host/src/lib.rs');
+    expect(authored).toContain('packages/desktop/src-tauri/Cargo.toml');
   });
 
   it('finds no retired word in the source the repo authors', () => {
@@ -750,6 +775,15 @@ describe('the name used loosely for a Space and its chrome is gone', () => {
         return hits(source, RETIRED_LOOSE_BARE).length > reportableHits(file, source).length;
       }),
       'no manifest still uses the protocol its exemption exists for',
+    ).not.toEqual([]);
+
+    const cargoFiles = scanned.filter((file) => CARGO_TOML.test(file));
+    expect(
+      cargoFiles.filter((file) => {
+        const source = readTracked(file) ?? '';
+        return hits(source, RETIRED_LOOSE_BARE).length > reportableHits(file, source).length;
+      }),
+      "no Cargo manifest still inherits from the root, which Cargo's rule exists for",
     ).not.toEqual([]);
   });
 });
@@ -813,6 +847,36 @@ describe('the vocabulary the loose-name guard reads', () => {
     expect(reportableHits(manifest, `  "name": "@project/${RETIRED_LOOSE_NAME}-ui",`)).not.toEqual(
       [],
     );
+
+    // A Cargo manifest is forgiven Cargo's inheritance keys and nothing else:
+    // a field, the lint table and a dependency taking the root's entry are
+    // silent, and a package or feature named with the word is still reported.
+    const cargoFile = 'crates/host/Cargo.toml';
+    for (const line of [
+      `version.${RETIRED_LOOSE_NAME} = true`,
+      `rust-version.${RETIRED_LOOSE_NAME} = true`,
+      `${RETIRED_LOOSE_NAME} = true`,
+      `thiserror = { ${RETIRED_LOOSE_NAME} = true }`,
+      `tokio = { ${RETIRED_LOOSE_NAME} = true, features = ["fs", "rt"] }`,
+    ]) {
+      expect(reportableHits(cargoFile, line), line).toEqual([]);
+    }
+    expect(reportableHits(cargoFile, `name = "${RETIRED_LOOSE_NAME}-host"`)).not.toEqual([]);
+    expect(reportableHits(cargoFile, `${RETIRED_LOOSE_NAME}-sync = { version = "1" }`)).not.toEqual(
+      [],
+    );
+    expect(
+      reportableHits(cargoFile, `${RETIRED_LOOSE_NAME}-sync = { ${RETIRED_LOOSE_NAME} = true }`),
+    ).not.toEqual([]);
+    expect(
+      reportableHits(cargoFile, `${RETIRED_LOOSE_NAME}-sync.${RETIRED_LOOSE_NAME} = true`),
+    ).not.toEqual([]);
+    expect(
+      reportableHits(
+        cargoFile,
+        `serde = { ${RETIRED_LOOSE_NAME} = true, features = ["${RETIRED_LOOSE_NAME}"] }`,
+      ),
+    ).not.toEqual([]);
 
     // Nothing outside a manifest is forgiven a line at all.
     expect(

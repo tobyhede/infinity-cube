@@ -1,6 +1,7 @@
 # The HTTP application is Fetch-native
 
 Status: accepted
+Refined by: 0155
 Related: 0030
 
 Hyper's HTTP application is a Hono application whose interface is the Web
