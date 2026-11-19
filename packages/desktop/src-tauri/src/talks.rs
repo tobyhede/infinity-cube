@@ -1,5 +1,5 @@
 //! Which Aggregate directories are open, in which window, and how far each
-//! has got: starting its sidecar, open, or closing while the sidecar writes
+//! has got: starting its server, open, or closing while the server writes
 //! its last edit.
 //!
 //! The registry is generic over what serves a talk, so its transitions are
@@ -44,21 +44,13 @@ pub enum Reserved {
 /// What a request to close a window came to.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Close<S> {
-    /// The window's talk is open: stop `sidecar`, which serves `directory`,
+    /// The window's talk is open: stop `server`, which serves `directory`,
     /// and keep the window until it has stopped.
-    Stop { sidecar: S, directory: PathBuf },
-    /// The window's sidecar is already being stopped: keep the window.
+    Stop { server: S, directory: PathBuf },
+    /// The window's server is already being stopped: keep the window.
     StillClosing,
     /// The window holds no open talk: let it close.
     NotOpen,
-}
-
-/// An open talk whose sidecar ended without being asked to.
-#[derive(Debug, PartialEq, Eq)]
-pub struct Ended<E> {
-    pub label: String,
-    pub directory: PathBuf,
-    pub how: E,
 }
 
 impl<S> Default for Registry<S> {
@@ -95,25 +87,25 @@ impl<S> Registry<S> {
         Reserved::New(label)
     }
 
-    /// The reserved talk `label` is served by `sidecar`.
+    /// The reserved talk `label` is served by `server`.
     ///
     /// # Errors
     ///
-    /// Hands `sidecar` back if `label` is not a talk still starting.
-    pub fn opened(&mut self, label: &str, sidecar: S) -> Result<(), S> {
+    /// Hands `server` back if `label` is not a talk still starting.
+    pub fn opened(&mut self, label: &str, server: S) -> Result<(), S> {
         match self.talks.get_mut(label) {
             Some(talk) if matches!(talk.state, State::Starting) => {
-                talk.state = State::Open(sidecar);
+                talk.state = State::Open(server);
                 Ok(())
             }
-            _ => Err(sidecar),
+            _ => Err(server),
         }
     }
 
-    /// Forget talk `label`, which did not open, answering its sidecar if it had one.
+    /// Forget talk `label`, which did not open, answering its server if it had one.
     pub fn abandon(&mut self, label: &str) -> Option<S> {
         match self.talks.remove(label)?.state {
-            State::Open(sidecar) => Some(sidecar),
+            State::Open(server) => Some(server),
             State::Starting | State::Closing => None,
         }
     }
@@ -124,8 +116,8 @@ impl<S> Registry<S> {
             return Close::NotOpen;
         };
         match std::mem::replace(&mut talk.state, State::Closing) {
-            State::Open(sidecar) => Close::Stop {
-                sidecar,
+            State::Open(server) => Close::Stop {
+                server,
                 directory: talk.directory.clone(),
             },
             State::Closing => Close::StillClosing,
@@ -136,43 +128,32 @@ impl<S> Registry<S> {
         }
     }
 
-    /// Window `label`'s sidecar has stopped: its directory may be opened again.
+    /// Window `label`'s server has stopped: its directory may be opened again.
     pub fn closed(&mut self, label: &str) {
         self.talks.remove(label);
     }
 
-    /// Begin closing every open talk, answering each sidecar and its directory.
-    pub fn take_all(&mut self) -> Vec<(PathBuf, S)> {
+    /// Whether window `label`'s talk is closing: its server is still being
+    /// stopped, though its window may be gone.
+    #[must_use]
+    pub fn is_closing(&self, label: &str) -> bool {
+        self.talks
+            .get(label)
+            .is_some_and(|talk| matches!(talk.state, State::Closing))
+    }
+
+    /// Begin closing every open talk, answering each window's label, its
+    /// directory and its server.
+    pub fn take_all(&mut self) -> Vec<(String, PathBuf, S)> {
         let mut taken = Vec::new();
-        for talk in self.talks.values_mut() {
+        for (label, talk) in &mut self.talks {
             if matches!(talk.state, State::Open(_))
-                && let State::Open(sidecar) = std::mem::replace(&mut talk.state, State::Closing)
+                && let State::Open(server) = std::mem::replace(&mut talk.state, State::Closing)
             {
-                taken.push((talk.directory.clone(), sidecar));
+                taken.push((label.clone(), talk.directory.clone(), server));
             }
         }
         taken
-    }
-
-    /// Forget every open talk whose sidecar `ended` says has ended, answering
-    /// each with how.
-    pub fn ended<E>(&mut self, mut ended: impl FnMut(&mut S) -> Option<E>) -> Vec<Ended<E>> {
-        let mut found = Vec::new();
-        for (label, talk) in &mut self.talks {
-            if let State::Open(sidecar) = &mut talk.state
-                && let Some(how) = ended(sidecar)
-            {
-                found.push(Ended {
-                    label: label.clone(),
-                    directory: talk.directory.clone(),
-                    how,
-                });
-            }
-        }
-        for ended in &found {
-            self.talks.remove(&ended.label);
-        }
-        found
     }
 }
 
@@ -186,14 +167,14 @@ mod tests {
         }
     }
 
-    /// A registry with `directory` open in a window, served by `sidecar`.
-    fn open(directory: &str, sidecar: &'static str) -> (Registry<&'static str>, String) {
+    /// A registry with `directory` open in a window, served by `server`.
+    fn open(directory: &str, server: &'static str) -> (Registry<&'static str>, String) {
         let mut registry = Registry::default();
         let label = label_of(registry.reserve(Path::new(directory)));
         assert_eq!(
-            registry.opened(&label, sidecar),
+            registry.opened(&label, server),
             Ok(()),
-            "a reserved talk should take its sidecar"
+            "a reserved talk should take its server"
         );
         (registry, label)
     }
@@ -228,7 +209,7 @@ mod tests {
             assert_eq!(
                 registry.reserve(Path::new("/talks/rust")),
                 Reserved::Existing(label),
-                "a directory whose sidecar is starting should not start another"
+                "a directory whose server is starting should not start another"
             );
         }
     }
@@ -237,21 +218,21 @@ mod tests {
         use super::*;
 
         #[test]
-        fn the_first_request_stops_its_sidecar() {
-            let (mut registry, label) = open("/talks/rust", "sidecar");
+        fn the_first_request_stops_its_server() {
+            let (mut registry, label) = open("/talks/rust", "server");
             assert_eq!(
                 registry.begin_close(&label),
                 Close::Stop {
-                    sidecar: "sidecar",
+                    server: "server",
                     directory: PathBuf::from("/talks/rust")
                 },
-                "closing an open talk should stop its sidecar"
+                "closing an open talk should stop its server"
             );
         }
 
         #[test]
-        fn a_repeated_request_keeps_the_window_while_the_sidecar_writes() {
-            let (mut registry, label) = open("/talks/rust", "sidecar");
+        fn a_repeated_request_keeps_the_window_while_the_server_writes() {
+            let (mut registry, label) = open("/talks/rust", "server");
             let _ = registry.begin_close(&label);
             assert_eq!(
                 registry.begin_close(&label),
@@ -261,13 +242,13 @@ mod tests {
         }
 
         #[test]
-        fn its_directory_is_not_opened_again_until_the_sidecar_has_stopped() {
-            let (mut registry, label) = open("/talks/rust", "sidecar");
+        fn its_directory_is_not_opened_again_until_the_server_has_stopped() {
+            let (mut registry, label) = open("/talks/rust", "server");
             let _ = registry.begin_close(&label);
             assert_eq!(
                 registry.reserve(Path::new("/talks/rust")),
                 Reserved::Existing(label.clone()),
-                "a directory still being written should not be read by a new sidecar"
+                "a directory still being written should not be read by a new server"
             );
             registry.closed(&label);
             assert!(
@@ -278,12 +259,22 @@ mod tests {
 
         #[test]
         fn a_closing_talk_is_not_stopped_again_on_quit() {
-            let (mut registry, label) = open("/talks/rust", "sidecar");
+            let (mut registry, label) = open("/talks/rust", "server");
             let _ = registry.begin_close(&label);
             assert!(
                 registry.take_all().is_empty(),
-                "quitting should not take a sidecar a close already took"
+                "quitting should not take a server a close already took"
             );
+        }
+
+        #[test]
+        fn it_is_closing_until_its_server_has_stopped_and_no_open_talk_is() {
+            let (mut registry, label) = open("/talks/rust", "server");
+            assert!(!registry.is_closing(&label), "an open talk is not closing");
+            let _ = registry.begin_close(&label);
+            assert!(registry.is_closing(&label), "its server is being stopped");
+            registry.closed(&label);
+            assert!(!registry.is_closing(&label), "a closed talk is gone");
         }
 
         #[test]
@@ -297,45 +288,8 @@ mod tests {
         }
     }
 
-    mod given_a_sidecar_that_ends_by_itself {
-        use super::*;
-
-        #[test]
-        fn its_talk_is_answered_and_forgotten() {
-            let (mut registry, label) = open("/talks/rust", "sidecar");
-            let ended = registry.ended(|_| Some(3));
-            assert_eq!(
-                ended,
-                vec![Ended {
-                    label: label.clone(),
-                    directory: PathBuf::from("/talks/rust"),
-                    how: 3
-                }],
-                "an ended sidecar should be reported with its directory"
-            );
-            assert_eq!(
-                registry.begin_close(&label),
-                Close::NotOpen,
-                "an ended talk should leave nothing to stop"
-            );
-        }
-
-        #[test]
-        fn a_running_sidecar_is_left_open() {
-            let (mut registry, label) = open("/talks/rust", "sidecar");
-            assert!(
-                registry.ended(|_| None::<i32>).is_empty(),
-                "a running sidecar should not be reported"
-            );
-            assert!(
-                matches!(registry.begin_close(&label), Close::Stop { .. }),
-                "a running talk should still be open"
-            );
-        }
-    }
-
     #[test]
-    fn quitting_takes_every_open_sidecar() {
+    fn quitting_takes_every_open_server() {
         let (mut registry, _) = open("/talks/rust", "first");
         let second = label_of(registry.reserve(Path::new("/talks/go")));
         assert_eq!(
@@ -343,7 +297,7 @@ mod tests {
             Ok(()),
             "a second directory should open beside the first"
         );
-        let mut taken: Vec<_> = registry.take_all().into_iter().map(|(_, s)| s).collect();
+        let mut taken: Vec<_> = registry.take_all().into_iter().map(|(_, _, s)| s).collect();
         taken.sort_unstable();
         assert_eq!(
             taken,

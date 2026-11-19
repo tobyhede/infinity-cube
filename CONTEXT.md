@@ -80,7 +80,7 @@ _Avoid_: lock, focus, edit mode.
 
 **Asset**:
 Bytes with a media type, named by their content, that a Resource reaches by a URL in its Resource content or Map content. Every file a Resource uses is one, a picture or Markdown text alike.
-_Avoid_: sidecar, attachment; asset as a name for an Image Resource. "Sidecar" names only the desktop application's host process (Storage ST-113), never an Asset.
+_Avoid_: sidecar, attachment; asset as a name for an Image Resource. "Sidecar" names only the production Node host, `src/desktop/` (Storage ST-113), never an Asset.
 
 **Content action**:
 What a Resource plugin lets an author do to its Resource's content, such as editing Markdown, replacing an image or authoring the Map inside a Space Resource.

@@ -1,7 +1,7 @@
 [package]
 name = "infinity-cube-desktop"
 version.workspace = true
-description = "The InfinityCube desktop application: a Tauri shell over the desktop sidecar"
+description = "The InfinityCube desktop application: a Tauri shell over the Rust host"
 edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
@@ -12,10 +12,19 @@ tauri-build = { version = "=2.7.4", features = [] }
 [dependencies]
 tauri = { version = "=2.12.5", features = [] }
 tauri-plugin-dialog = "=2.8.4"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-thiserror = "2"
-url = "2"
+bytes = "1"
+host = { path = "../../../crates/host" }
+http = "1"
+http-body-util = "0.1"
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+tokio = { version = "1", features = ["fs", "rt", "sync", "time"] }
+url = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+tempfile = "3"
+tokio = { version = "1", features = ["fs", "macros", "rt", "rt-multi-thread", "sync", "test-util", "time"] }
 
 [lints]
 workspace = true

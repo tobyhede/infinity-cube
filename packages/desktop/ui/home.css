@@ -22,3 +22,12 @@ button {
   font: inherit;
   padding: 0.5rem 1rem;
 }
+#folders {
+  padding-left: 1.25rem;
+  overflow-wrap: anywhere;
+}
+.answers {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}

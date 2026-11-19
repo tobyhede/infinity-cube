@@ -1652,12 +1652,18 @@ dependencies = [
 name = "infinity-cube-desktop"
 version = "0.0.0"
 dependencies = [
- "serde",
+ "bytes",
+ "host",
+ "http",
+ "http-body-util",
  "serde_json",
+ "sha2 0.10.9",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
+ "tempfile",
  "thiserror 2.0.21",
+ "tokio",
  "url",
 ]
 

@@ -15,7 +15,7 @@ import {
 } from '../../src/desktop/announcement';
 
 /**
- * The desktop sidecar as the desktop shell drives it (ADR 0155): started on a
+ * The desktop sidecar driven as a process (ADR 0155): started on a
  * directory, announcing one JSON line, reached through the launch secret, and
  * stopped by closing its standard input, on which it writes the last edit.
  */
@@ -199,9 +199,9 @@ describe('The desktop sidecar', () => {
 });
 
 /*
- * The desktop application ships the bundle `desktop-sidecar:build` writes, not
- * the source, so the same edit-and-stop check runs on a bundle built here with
- * that build's own configuration.
+ * `desktop-sidecar:build` writes one bundle with every dependency inlined, so
+ * the same edit-and-stop check runs on a bundle built here with that build's
+ * own configuration, not only on the source.
  */
 describe('The desktop sidecar bundle', () => {
   let bundleRoot: string | undefined;

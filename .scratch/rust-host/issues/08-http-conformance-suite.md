@@ -1,6 +1,6 @@
 # 08 — An HTTP conformance suite, run against the production Node host
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 **Blocked by:** 02, 03.
 
@@ -15,7 +15,7 @@ No black-box suite exists today: the contract is tested in process. Lift those c
 - [x] Suite takes the host command as a parameter, so 12 can run it against the Rust binary unchanged; its body-limit, header, redirect and fallback cases can also be given a `Request -> Response` function instead of a base URL, so 13 can run them against the scheme handler.
 - [x] Every status in `COMMIT_OUTCOME_WIRE` and every product status reached by at least one case.
 - [x] The ST-65 case above, and the Host and cookie cases against the Node host.
-- [ ] Green against the TypeScript host in CI.
+- [x] Green against the TypeScript host in CI (`CI passed` green on its pull request, 484).
 
 ## Comments
 

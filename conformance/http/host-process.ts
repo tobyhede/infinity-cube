@@ -6,8 +6,8 @@ import { z } from 'zod';
 import type { ConformanceHost, Exchange } from './host';
 
 /**
- * A host run as its own process, driven the way the desktop shell and a
- * terminal drive one: started on a directory, found through the one line it
+ * A host run as its own process, driven the way a supervisor and a terminal
+ * drive one: started on a directory, found through the one line it
  * announces, reached over loopback HTTP, and stopped by closing its standard
  * input or by SIGINT. `README.md` beside this file states the contract a host
  * command must keep, in words that do not depend on the language it is written

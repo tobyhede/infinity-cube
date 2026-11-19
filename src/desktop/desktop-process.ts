@@ -27,7 +27,7 @@ import { builtFiles, desktopContentSecurityPolicy } from './static-files';
  * JSON line to standard output: `{"kind":"listening","port":…,"secret":…}`
  * once it can be reached, or `{"kind":"refused","message":…}` when the
  * directory cannot be run. Everything else goes to standard error. When its
- * standard input closes, which is how the desktop shell stops it, it stops
+ * standard input closes, which is how whatever starts it stops it, it stops
  * serving, writes any edit not yet on disk, and exits; SIGINT, SIGTERM and
  * SIGHUP do the same, as they do for a run, and a second one exits at once.
  */

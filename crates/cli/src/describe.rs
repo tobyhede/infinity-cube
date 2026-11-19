@@ -31,21 +31,6 @@ pub(crate) fn empty(directory: &Path) -> String {
     )
 }
 
-/// One refusal on one line: its message, then its kind and location.
-pub(crate) fn refusal_line(refusal: &Refusal) -> String {
-    let mut location = format!("{} at {}", refusal.kind(), refusal.file());
-    if let Some(id) = refusal.id() {
-        location.push_str(&format!(", id {id}"));
-    }
-    if let Some(field) = refusal.field() {
-        location.push_str(&format!(", field {field}"));
-    }
-    if let Some(edge) = refusal.edge() {
-        location.push_str(&format!(", edge {} -> {}", edge.from, edge.to));
-    }
-    format!("{refusal} ({location})")
-}
-
 /// Intake's refusals of a directory, one line each.
 pub(crate) fn refused(directory: &Path, refusals: &Refusals) -> String {
     let mut text = format!(
@@ -54,7 +39,7 @@ pub(crate) fn refused(directory: &Path, refusals: &Refusals) -> String {
     );
     for refusal in refusals.as_slice() {
         text.push('\n');
-        text.push_str(&refusal_line(refusal));
+        text.push_str(&refusal.located());
     }
     text
 }
@@ -109,7 +94,7 @@ mod tests {
             json!({ "kind": "aggregate-file-missing", "file": "aggregate.json" }),
             "absent keys are left out"
         );
-        let line = refusal_line(&refusal);
+        let line = refusal.located();
         assert!(
             line.ends_with("(aggregate-file-missing at aggregate.json)"),
             "kind and file: {line}"

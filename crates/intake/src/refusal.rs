@@ -796,6 +796,24 @@ impl Refusal {
             | Self::SpaceResourceSelection { .. } => None,
         }
     }
+
+    /// The refusal on one line, as a person reads it: its message, then
+    /// its kind and location, `(kind at file, id …, field …, edge … -> …)`,
+    /// naming only the parts it has.
+    #[must_use]
+    pub fn located(&self) -> String {
+        let mut location = format!("{} at {}", self.kind(), self.file());
+        if let Some(id) = self.id() {
+            location.push_str(&format!(", id {id}"));
+        }
+        if let Some(field) = self.field() {
+            location.push_str(&format!(", field {field}"));
+        }
+        if let Some(edge) = self.edge() {
+            location.push_str(&format!(", edge {} -> {}", edge.from, edge.to));
+        }
+        format!("{self} ({location})")
+    }
 }
 
 /// Every refusal intake gave, in the order it found them; never empty.
@@ -908,6 +926,29 @@ mod tests {
             refusal.edge(),
             Some(EdgeEnds { from, to }),
             "the Edge by its endpoints"
+        );
+        let line = refusal.located();
+        assert!(
+            line.starts_with(&refusal.to_string()),
+            "the message first: {line}"
+        );
+        assert!(
+            line.ends_with(
+                " (graph-edge-missing-resource at 10000000-0000-4000-8000-000000000001/space.json, \
+                 id 00000000-0000-4000-8000-000000000b01, field to, \
+                 edge 00000000-0000-4000-8000-000000000101 -> 00000000-0000-4000-8000-00000000dead)"
+            ),
+            "then every part of its location: {line}"
+        );
+    }
+
+    #[test]
+    fn locates_a_refusal_by_only_the_parts_it_has() {
+        assert!(
+            Refusal::AggregateFileMissing
+                .located()
+                .ends_with(" (aggregate-file-missing at aggregate.json)"),
+            "kind and file alone"
         );
     }
 }
