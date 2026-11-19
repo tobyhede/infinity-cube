@@ -34,8 +34,12 @@ fn snapshot(directory: &Path) -> Vec<(PathBuf, Vec<u8>)> {
 async fn open(
     directory: &Path,
     built: &Path,
-) -> (OpenTalks, TalkKey, Run<RandomIds, BuiltDirectory>) {
-    let run = open_run(directory, built::load(built).unwrap())
+) -> (
+    OpenTalks,
+    TalkKey,
+    Run<RandomIds, host::BuiltApplicationDirectory>,
+) {
+    let run = open_run(directory, built_shell(built).unwrap())
         .await
         .unwrap();
     let key = TalkKey::of(directory);
@@ -239,7 +243,7 @@ mod given_a_talk_window {
         let (temporary, directory) = fixture_copy();
         let run = open_run(
             &directory,
-            built::load(&stand_in_build(&temporary)).unwrap(),
+            built_shell(&stand_in_build(&temporary)).unwrap(),
         )
         .await
         .unwrap();
@@ -287,7 +291,7 @@ mod given_a_folder_intake_refuses {
         std::fs::remove_file(directory.join("aggregate.json")).unwrap();
         let error = open_run(
             &directory,
-            built::load(&stand_in_build(&temporary)).unwrap(),
+            built_shell(&stand_in_build(&temporary)).unwrap(),
         )
         .await
         .unwrap_err();

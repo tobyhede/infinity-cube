@@ -13,10 +13,11 @@ use intake::assets::{Base64, encode_base64};
 use crate::uri::decode_component;
 
 /// The built application's files other than its page, by the path a request
-/// names them with: decoded, relative to the build, without a leading `/`,
-/// and never holding an empty, `.` or `..` segment, a backslash or a NUL.
+/// names them with: decoded, relative to the built application, without a
+/// leading `/`, and never holding an empty, `.` or `..` segment, a backslash
+/// or a NUL.
 pub trait BuiltFiles: Send + Sync + 'static {
-    /// The file's bytes, or `None` when the build holds no such file.
+    /// The file's bytes, or `None` when the built application holds no such file.
     fn file(&self, path: &str) -> impl Future<Output = Option<Bytes>> + Send;
 }
 

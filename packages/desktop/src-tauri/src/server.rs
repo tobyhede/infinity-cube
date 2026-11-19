@@ -12,12 +12,14 @@ use std::collections::HashSet;
 use std::path::Path;
 use std::sync::{Arc, Mutex, PoisonError};
 
-use host::{BuiltFiles, ImportError, RandomIds, Run, RunEvent, RunStopped, Shell, TokioClock};
+use host::{
+    BuiltApplicationDirectory, BuiltApplicationError, BuiltFiles, ImportError, RandomIds, Run,
+    RunEvent, RunStopped, Shell, TokioClock,
+};
 use tauri::{AppHandle, Manager as _, WebviewUrl};
 use url::Url;
 
 use crate::address::{SchemeStyle, TalkAddress, TalkKey};
-use crate::built::{self, BuiltDirectory};
 use crate::scheme::{Closed, OpenTalks};
 
 /// Why a talk could not be opened.
@@ -25,12 +27,25 @@ use crate::scheme::{Closed, OpenTalks};
 pub enum OpenError {
     #[error(transparent)]
     Tauri(#[from] tauri::Error),
-    #[error("could not read the built application: {0}")]
-    Built(#[source] std::io::Error),
+    #[error("could not serve the built application: {0}")]
+    Built(#[source] BuiltApplicationError),
     #[error("could not start the talk: {0}")]
     Import(#[source] ImportError),
     #[error("the talk's address is not a URL: {0}")]
     Url(#[from] url::ParseError),
+}
+
+/// The shell for the built application in `directory`, the one the bundle
+/// carries as a resource.
+///
+/// # Errors
+///
+/// The directory cannot be resolved, or holds no readable `index.html`.
+pub fn built_shell(
+    directory: &Path,
+) -> Result<Shell<BuiltApplicationDirectory>, BuiltApplicationError> {
+    let (page, files) = BuiltApplicationDirectory::open(directory)?;
+    Ok(Shell::new(page, files))
 }
 
 /// What starting a talk came to.
@@ -124,7 +139,7 @@ fn refusal(directory: &Path, error: &ImportError) -> Option<String> {
 #[derive(Debug)]
 pub struct TalkServer {
     app: AppHandle,
-    run: Run<RandomIds, BuiltDirectory>,
+    run: Run<RandomIds, BuiltApplicationDirectory>,
     windows: Arc<TalkWindows>,
 }
 
@@ -268,7 +283,7 @@ impl TalkServer {
     /// [`OpenError`] when the talk cannot be started at all.
     pub fn start(app: &AppHandle, directory: &Path, label: &str) -> Result<Started, OpenError> {
         let shell =
-            built::load(&app.path().resource_dir()?.join("app")).map_err(OpenError::Built)?;
+            built_shell(&app.path().resource_dir()?.join("app")).map_err(OpenError::Built)?;
         let run = match tauri::async_runtime::block_on(open_run(directory, shell)) {
             Ok(run) => run,
             Err(error) => {

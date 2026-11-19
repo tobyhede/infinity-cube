@@ -61,6 +61,7 @@
 #![cfg_attr(not(test), deny(clippy::indexing_slicing))]
 
 mod assets;
+mod built_application;
 mod commit;
 mod directory;
 mod document;
@@ -80,6 +81,7 @@ pub use assets::{
     AssetHash, EMPTY_ASSET_HASH, MAX_ASSET_BYTES, StoredAsset, normalize_media_type,
     served_media_type,
 };
+pub use built_application::{BuiltApplicationDirectory, BuiltApplicationError};
 pub use commit::{CommitDecision, decide_commit};
 pub use directory::{EntryKind, Filesystem, TokioFilesystem};
 pub use export::{ExportError, Exported, absent_assets, export_aggregate};

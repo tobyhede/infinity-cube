@@ -21,11 +21,11 @@ use hyper_util::server::graceful::GracefulShutdown;
 use tokio::net::TcpListener;
 use tokio::task::JoinSet;
 
-use crate::built::BuiltFiles;
+use crate::built::Files;
 use crate::output::say;
 
 /// The application a run serves.
-pub(crate) type RunApplication = host::RunApplication<host::RandomIds, BuiltFiles>;
+pub(crate) type RunApplication = host::RunApplication<host::RandomIds, Files>;
 
 /// The port a run takes without `--port` (Storage ST-120).
 pub(crate) const DEFAULT_PORT: u16 = 4173;

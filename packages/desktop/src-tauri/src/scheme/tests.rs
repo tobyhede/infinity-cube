@@ -22,8 +22,7 @@ use tempfile::TempDir;
 
 use super::*;
 use crate::address::TalkKey;
-use crate::built;
-use crate::server::open_run;
+use crate::server::{built_shell, open_run};
 use crate::test_support::{
     META, META_ADDRESS, STAND_IN_ICON, STAND_IN_PAGE, STAND_IN_POLICY, STAND_IN_SCRIPT,
     fixture_copy, rename_text, stand_in_build,
@@ -34,13 +33,13 @@ const WINDOW: &str = "talk-0";
 struct Talk {
     open_talks: OpenTalks,
     address: TalkAddress,
-    run: Run<host::RandomIds, BuiltDirectory>,
+    run: Run<host::RandomIds, host::BuiltApplicationDirectory>,
     _temporary: TempDir,
 }
 
 async fn open() -> Talk {
     let (temporary, directory) = fixture_copy();
-    let shell = built::load(&stand_in_build(&temporary)).unwrap();
+    let shell = built_shell(&stand_in_build(&temporary)).unwrap();
     let run = open_run(&directory, shell).await.unwrap();
     let address = TalkAddress::new(TalkKey::of(&directory), SchemeStyle::HostPerTalk);
     let open_talks = OpenTalks::new(SchemeStyle::HostPerTalk);
