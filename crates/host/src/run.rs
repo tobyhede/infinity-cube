@@ -22,6 +22,7 @@ use crate::export::{ExportError, export_aggregate};
 use crate::http::Application;
 use crate::import::{IdSource, ImportError, import_directory};
 use crate::memory::MemorySpaceRepository;
+use crate::repository::RepositoryError;
 use crate::shell::{BuiltFiles, Shell};
 
 /// How long Edits must be quiet before a run writes.
@@ -65,6 +66,7 @@ pub enum RunStopped {
 }
 
 type Reporter = Arc<dyn Fn(&RunEvent) + Send + Sync>;
+type ErrorReporter = Arc<dyn Fn(&str, &RepositoryError) + Send + Sync>;
 
 /// A run's application: the memory store, the run's ids and the caller's shell.
 pub type RunApplication<I, B> = Application<MemorySpaceRepository, Arc<I>, B>;
@@ -78,6 +80,7 @@ pub struct RunBuilder<D, I, C, F = TokioFilesystem> {
     fs: F,
     quiet: Duration,
     report: Option<Reporter>,
+    failed: Option<ErrorReporter>,
 }
 
 impl<D, I, C, F> std::fmt::Debug for RunBuilder<D, I, C, F> {
@@ -102,6 +105,7 @@ impl<D, I, C, F> RunBuilder<D, I, C, F> {
             fs: self.fs,
             quiet: self.quiet,
             report: self.report,
+            failed: self.failed,
         }
     }
 
@@ -114,6 +118,7 @@ impl<D, I, C, F> RunBuilder<D, I, C, F> {
             fs: self.fs,
             quiet: self.quiet,
             report: self.report,
+            failed: self.failed,
         }
     }
 
@@ -126,6 +131,7 @@ impl<D, I, C, F> RunBuilder<D, I, C, F> {
             fs: self.fs,
             quiet: self.quiet,
             report: self.report,
+            failed: self.failed,
         }
     }
 
@@ -138,6 +144,7 @@ impl<D, I, C, F> RunBuilder<D, I, C, F> {
             fs,
             quiet: self.quiet,
             report: self.report,
+            failed: self.failed,
         }
     }
 
@@ -145,6 +152,17 @@ impl<D, I, C, F> RunBuilder<D, I, C, F> {
     #[must_use]
     pub fn on_event(mut self, report: impl Fn(&RunEvent) + Send + Sync + 'static) -> Self {
         self.report = Some(Arc::new(report));
+        self
+    }
+
+    /// Hear each store failure the application answers, as
+    /// [`Application::on_error`] does.
+    #[must_use]
+    pub fn on_error(
+        mut self,
+        observer: impl Fn(&str, &RepositoryError) + Send + Sync + 'static,
+    ) -> Self {
+        self.failed = Some(Arc::new(observer));
         self
     }
 }
@@ -163,11 +181,14 @@ impl<I: IdSource, C: Clock, F: Filesystem> RunBuilder<PathBuf, I, C, F> {
         import_directory(repository.as_ref(), &self.fs, &self.directory, ids.as_ref()).await?;
         let edits = Arc::new(Notify::new());
         let notified = Arc::clone(&edits);
-        let application = Arc::new(
+        let mut application =
             Application::new(Arc::clone(&repository), ids, shell).on_edit(move || {
                 notified.notify_one();
-            }),
-        );
+            });
+        if let Some(failed) = self.failed {
+            application = application.on_error(move |context, error| failed(context, error));
+        }
+        let application = Arc::new(application);
         let (stop, stopped) = oneshot::channel();
         let writer = Writer {
             repository,
@@ -218,6 +239,7 @@ impl Run<Unset, Unset> {
             fs: TokioFilesystem,
             quiet: RUN_QUIET_PERIOD,
             report: None,
+            failed: None,
         }
     }
 }

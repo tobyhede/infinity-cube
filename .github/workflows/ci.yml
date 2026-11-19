@@ -654,6 +654,27 @@ jobs:
       # nextest runs no doctests, so the examples in the crates' docs run here.
       - run: cargo test --workspace --doc --locked
       - run: cargo nextest run --workspace --locked
+      # The Rust CLI (`crates/cli`) held to the HTTP conformance suite
+      # (`conformance/http/README.md`), the same process cases the `postgres`
+      # job runs against the production Node host. Built with the browser
+      # application `sidecar:build` wrote above embedded, as a release is; then
+      # run twice: carrying that build, and handed the suite's stand-in build
+      # through `--built {built}`, which adds the cases that check the built
+      # files byte for byte. The intake corpus through `check` is a nextest
+      # test (`crates/cli/tests/check.rs`), run above.
+      - name: Build the Rust CLI with the browser application embedded
+        run: cargo build -p infinity-cube --locked
+        env:
+          INFINITY_CUBE_BUILT_APPLICATION: packages/app/dist
+      - name: HTTP conformance suite against the Rust CLI
+        run: |
+          binary="$GITHUB_WORKSPACE/target/debug/infinity-cube"
+          for built in no yes; do
+            extra=''
+            if [ "$built" = yes ]; then extra=',"--built","{built}"'; fi
+            INFINITY_CUBE_HTTP_CONFORMANCE_HOST="{\"name\":\"Rust CLI\",\"argv\":[\"$binary\",\"run\",\"{directory}\",\"--port\",\"{port}\",\"--no-open\"$extra],\"stopsOnStdinClose\":false}" \
+              pnpm exec vitest run --config vitest.integration.config.ts test/integration/http-conformance.test.ts
+          done
 
   ci:
     name: CI passed

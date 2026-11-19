@@ -11,6 +11,7 @@ The suite is written in TypeScript and runs under Vitest, but a host under test 
 | The production Node host, as a process | `pnpm exec vitest run --config vitest.integration.config.ts test/integration/http-conformance.test.ts` | `postgres` (which runs every integration file not named `sqlite-*`; this one needs no database) |
 | The production Node host's handler, as a `Request -> Response` function | `pnpm exec vitest run test/unit/http-conformance-handler.test.ts` | `coverage` |
 | Another host process | the first command, with `INFINITY_CUBE_HTTP_CONFORMANCE_HOST` set (below) | — |
+| The Rust CLI (`crates/cli`), as a process | the first command, with `INFINITY_CUBE_HTTP_CONFORMANCE_HOST` naming `target/debug/infinity-cube` as below, once without and once with `"--built", "{built}"` | `rust` |
 
 `INFINITY_CUBE_HTTP_CONFORMANCE_HOST` is JSON naming the host command: `{ "name": string, "argv": string[], "cwd"?: string, "stopsOnStdinClose": boolean, "keepsLock"?: boolean }`, where `keepsLock` (false when absent) says the host keeps the launch lock. For example, a host binary that takes its port and keeps no stdin protocol:
 
@@ -21,6 +22,8 @@ The suite is written in TypeScript and runs under Vitest, but a host under test 
   "stopsOnStdinClose": false
 }
 ```
+
+A relative program in `argv` is found from the suite's working directory, the repository root unless `cwd` says otherwise. The Rust CLI takes `--built <dir>` to serve a build from disk in place of the one it embeds, so appending `"--built", "{built}"` to its `argv` hands it the stand-in build and runs the built-file cases too. It keeps no launch lock and no standard-input protocol, so the cookie cases and the standard-input stop are skipped for it.
 
 ## The host-command contract
 

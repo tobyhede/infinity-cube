@@ -91,7 +91,7 @@ pub use assets::{
 };
 pub use commit::{CommitDecision, decide_commit};
 pub use directory::{EntryKind, Filesystem, TokioFilesystem};
-pub use export::{ExportError, Exported, export_aggregate};
+pub use export::{ExportError, Exported, absent_assets, export_aggregate};
 pub use http::{Application, MAX_COMMIT_BODY_BYTES};
 pub use import::{IdSource, ImportError, RandomIds, import_directory};
 pub use memory::MemorySpaceRepository;

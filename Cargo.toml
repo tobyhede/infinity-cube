@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/intake", "crates/host", "packages/desktop/src-tauri"]
+members = ["crates/intake", "crates/host", "crates/cli", "packages/desktop/src-tauri"]
 
 [workspace.package]
 version = "0.0.0"
@@ -9,9 +9,14 @@ rust-version = "1.97"
 publish = false
 
 [workspace.dependencies]
+bytes = "1"
+http = "1"
+http-body-util = "0.1"
 serde_json = "1"
 sha2 = "0.10"
+tempfile = "3"
 thiserror = "2"
+tokio = "1"
 url = "2"
 
 [workspace.lints.rust]

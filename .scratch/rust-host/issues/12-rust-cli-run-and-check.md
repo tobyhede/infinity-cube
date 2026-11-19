@@ -1,13 +1,15 @@
 # 12 — The Rust CLI: run and check
 
-**Status:** ready-for-agent
+**Status:** ready-for-human (built; it resolves once a CI run of the `rust` job is watched green and the first box below is ticked)
 
 **Blocked by:** 11.
 
 **What to build:** A binary over `host` with `run <dir> [--port] [--no-open]` (listener on `127.0.0.1` that refuses a request whose `Host` is not its own address, so a DNS-rebinding page cannot reach it; built web assets embedded; flush on SIGINT/SIGTERM/SIGHUP, second signal exits at once) and `check <dir>` (Import into a discarded store, exit zero or print intake errors), refusing what `pnpm cube run` and `pnpm cube check` refuse, with the same kind and location (ADR 0156). `run` writes the HTTP conformance suite's announcement (`conformance/http/README.md`) as one JSON line on standard output: `{"kind":"listening","port":…}` once it can be reached, or `{"kind":"refused","message":…}` before it exits non-zero; its other output goes to standard error, or to standard output as lines that are not that JSON. The suite reads no other announcement, so this is what lets 08 run against the binary. A missing or empty directory is refused naming `pnpm cube init <dir>`, the TypeScript verb that creates one, until 17 gives the Rust binary its own `init` and the text names that.
 
-- [ ] The HTTP conformance suite (08) green against this binary in CI.
-- [ ] The intake corpus (07) green through `check`.
-- [ ] A request naming another `Host` refused, by a case in 08 run against this binary.
-- [ ] `run` announces itself, and a refusal, as the suite's one JSON line.
-- [ ] Storage requirements (Running, `check`) and the `AGENTS.md` Commands section name the Rust CLI, how to build it and how to run it.
+- [ ] The HTTP conformance suite (08) green against this binary in CI. (The `rust` job's steps are written and pass locally, 61 passed and 5 skipped without `--built`, 63 and 3 with it; a CI run has not been watched yet.)
+- [x] The intake corpus (07) green through `check`.
+- [x] A request naming another `Host` refused, by a case in 08 run against this binary.
+- [x] `run` announces itself, and a refusal, as the suite's one JSON line.
+- [x] Storage requirements (Running, `check`) and the `AGENTS.md` Commands section name the Rust CLI, how to build it and how to run it.
+
+The binary is `crates/cli` (package and binary `infinity-cube`): `run` serves the host's `Application` through an HTTP/1.1 server on `127.0.0.1` behind the `Host` check, streaming request bodies into it, and stops on SIGINT, SIGTERM or SIGHUP by stopping accepting, letting open connections finish their request for at most three seconds and then dropping those still open, then `Run::stop`; `check` Imports into a discarded store and with `--json` answers in the shape of a corpus case's `expect`, which is how `crates/cli/tests/check.rs` runs every directory case through the binary. `crates/cli/tests/run.rs` drives the binary as a process (announcement, 421, each signal, the write on stop against the commit case `accepted-update`, the same with a request body stalled, the second signal, ports, opening the browser through a stand-in opener, refusals). The browser application is embedded by `build.rs` only when `INFINITY_CUBE_BUILT_APPLICATION` names a build, so plain `cargo build`, clippy and nextest need no web build and the binary then serves a placeholder page, saying so; `--built <dir>` serves a build from disk, which is how the suite hands it `{built}`. The `rust` CI job builds it with `packages/app/dist` embedded and runs the process suite against it with and without `--built {built}`. Two host changes: discovery now refuses a file named `resources` or `assets` as unlistable, as `scanAggregateFrom` does (the corpus cases `unreadable-resources-file` and `unreadable-assets-file` were accepted through the binary), and `host::absent_assets` names the referenced assets a store holds no bytes for, for `check`. No signal is dropped as a repeat: the 250ms drop belongs to the pnpm launcher, which the binary does not have. Rules: Storage ST-120. Deferred to 13 and 17: the launch lock and the standard-input stop (the desktop shell's protocol), and the binary's own `init`.
