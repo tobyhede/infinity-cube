@@ -137,9 +137,9 @@ const PORTS: readonly Port[] = [
       'answers / with 503 persistence-unavailable while no Meta Space is established':
         'a talk is served only once its run has Imported its directory into a memory store, which then holds a valid aggregate with its Meta Space; no store that cannot serve stands behind the scheme handler',
       'answers 503 persistence-unavailable for every read and write of an unreachable store':
-        'a talk is served from its run’s memory store, which is always reachable',
+        'a talk is served from its run’s memory store, and `crates/host/src/memory.rs` constructs no `RepositoryError::Unavailable`; no test holds that, and the scheme handler is not run against a store that can be unreachable',
       'answers 500 internal-error for broken stored state':
-        'a talk is served from its run’s memory store, which holds only what intake accepted',
+        'a talk is served from its run’s memory store, whose only `BrokenStoredState` is Spaces stored with no Meta Space, which its Import never leaves; no test holds that, and the scheme handler is not run against broken stored state',
       'answers a product address over a %s store with %s':
         'a talk is served from its run’s memory store, which can be in neither condition',
       'answers 421 to a request naming any Host but its own': NO_LOCK,
@@ -151,9 +151,9 @@ const PORTS: readonly Port[] = [
       'answers 403 forbidden to a change whose Origin is %s, changing nothing':
         'the scheme handler refuses a change whose Origin is not the talk’s itself, in plain text, before the application sees it (`comes_from`, `scheme.rs`), and its requests name no Host for the application to judge an Origin against',
       'commits a chunked body that declares no length':
-        'the webview hands the scheme handler a whole body, so no transfer encoding reaches it',
+        'the scheme handler takes the body as one `Vec<u8>` (`Talk::answer`, `scheme.rs`), so it never reads a body in chunks; whether the webview delivers a chunked upload whole is not tested',
       'answers 413 payload-too-large to a chunked body of * bytes that declares no length':
-        'the webview hands the scheme handler a whole body, so no transfer encoding reaches it',
+        'the scheme handler takes the body as one `Vec<u8>` (`Talk::answer`, `scheme.rs`), so it never reads a body in chunks; whether the webview delivers a chunked upload whole is not tested',
       'writes an edit once edits have been quiet, and keeps it on SIGINT':
         'the scheme handler writes nothing: the shell runs the host’s `Run`, which crates/host/tests/run.rs holds',
       'writes an edit not yet written when stopped by SIGINT, and exits zero':
