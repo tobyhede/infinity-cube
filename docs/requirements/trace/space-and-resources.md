@@ -35,6 +35,7 @@ The rule ids in `../space-and-resources.md` are append-only from this version on
 | 0020 r1 one Resource one file; directory is inventory | sent → ST |
 | 0020 r2 identity from the file's `id`, never its path | sent → ST |
 | 0020 r3 duplicate Resource id is an intake error | folded → SR-6 |
+| 0159 a Resource id a Space repeats is refused alone, at the file Export writes for it, with nothing judged against either copy; across Spaces, in each later Space ascending by Space id | → SR-6, SR-30. Map content sent → MG (MG-86); the cycle walk and commit order sent → ST (ST-117) |
 | 0020 r4 default order by Title | → SR-10. The code also breaks ties on id; no test asserts it, so it is not stated (§7) |
 | 0020 r5 `loadSpace` pure, takes files | sent → ST |
 | 0020 r6 no directory per kind | sent → ST |

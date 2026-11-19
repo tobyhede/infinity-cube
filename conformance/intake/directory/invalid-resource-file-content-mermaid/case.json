@@ -1,0 +1,13 @@
+{
+  "description": "A Mermaid Resource whose content its plugin refuses: no url.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "invalid-resource-file",
+        "file": "10000000-0000-4000-8000-000000000001/resources/00000000-0000-4000-8000-000000000102.json",
+        "field": "content.url"
+      }
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "description": "An Ur placement whose Shape is no outline the Resource API lists (rectangle, pill, ellipse, diamond).",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "map-content-invalid",
+        "file": "10000000-0000-4000-8000-000000000001/space.json",
+        "id": "00000000-0000-4000-8000-000000000a01",
+        "field": "positions.00000000-0000-4000-8000-000000000101.content"
+      }
+    ]
+  }
+}

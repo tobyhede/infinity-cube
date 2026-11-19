@@ -632,6 +632,49 @@ describe.each([
       );
     });
 
+    describe('a Resource id held by two Resources', () => {
+      // Either copy's Title may sort last, so each test tries both: no copy is
+      // the Resource the id names, whichever order the Space holds them in.
+      const titlePairs = [
+        ['A', 'B'],
+        ['B', 'A'],
+      ] as const;
+
+      it('judges no Map content kept for it, refusing only the repeated id', () => {
+        for (const [urTitle, markdownTitle] of titlePairs) {
+          const copies: Resource[] = [
+            { id: A, title: urTitle, kind: 'ur', content: {} },
+            { ...markdown(A), title: markdownTitle },
+          ];
+          const placed = load({
+            resources: copies,
+            maps: [
+              positionedMap(WORKING, { [A]: { x: 0, y: 0, content: { shape: 'pill' } } }, [
+                graph(MAIN, 'Main'),
+              ]),
+            ],
+          });
+          expect(refused(placed), urTitle).toEqual([
+            expect.objectContaining({ kind: 'duplicate-resource-id', ref: A }),
+          ]);
+        }
+      });
+
+      it('judges no Target kind for a reference to it, refusing only the repeated id', () => {
+        for (const [urTitle, referenceTitle] of titlePairs) {
+          const resources: Resource[] = [
+            { id: A, title: urTitle, kind: 'ur', content: {} },
+            { ...referenceTo(A, C), title: referenceTitle },
+            referenceTo(B, A),
+            markdown(C, 'C'),
+          ];
+          expect(refused(load({ resources, maps: [] })), urTitle).toEqual([
+            expect.objectContaining({ kind: 'duplicate-resource-id', ref: A }),
+          ]);
+        }
+      });
+    });
+
     it('refuses a reference resource that points at itself', () => {
       const errors = refused(load({ resources: [referenceTo(A, A)], maps: [] }));
       expect(errors).toContainEqual(

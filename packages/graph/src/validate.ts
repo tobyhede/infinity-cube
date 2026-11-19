@@ -123,8 +123,15 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
 
   const resourceById = new Map(space.resources.map((r) => [r.id, r]));
   const resourceIds = new Set(space.resources.map((r) => r.id));
+  // A repeated id names no one Resource, so no copy's plugin judges Map content
+  // kept for it, nor whether its kind may be a Target: the repeat is the one
+  // fault, whichever copy `resourceById` kept. The corpus cases
+  // `duplicate-resource-id-map-content` and
+  // `duplicate-resource-id-reference-target` hold it, in
+  // `test/unit/intake-conformance.test.ts` and `crates/intake/tests/conformance.rs`.
+  const repeatedResourceIds = new Set(duplicates(space.resources.map((r) => r.id)));
 
-  for (const id of duplicates(space.resources.map((r) => r.id))) {
+  for (const id of repeatedResourceIds) {
     errors.push({
       kind: 'duplicate-resource-id',
       ref: id,
@@ -200,7 +207,7 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
       // The kind is read from the Resource, because the entry does not carry it.
       // Which Map content a Resource keeps is its plugin's schema's answer.
       const mapContentRefusal =
-        placement?.content === undefined
+        placement?.content === undefined || repeatedResourceIds.has(resourceId)
           ? undefined
           : mapContentProblem(member.kind, placement.content);
       if (mapContentRefusal !== undefined) {
@@ -302,6 +309,11 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
   const kindOf = (id: UUID) => resourceById.get(id)?.kind;
   for (const resource of space.resources) {
     for (const problem of storedResourceReferenceProblems(resource.id, resource, kindOf)) {
+      if (
+        problem.code === 'reference-target-not-targetable' &&
+        repeatedResourceIds.has(problem.targetId)
+      )
+        continue;
       errors.push(describeReferenceProblem(resource.id, problem));
     }
   }

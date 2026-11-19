@@ -1,0 +1,13 @@
+{
+  "description": "One Resource id held by an Ur Resource titled B (a.json) and a Markdown Resource titled A (b.json), its Map placement keeping an Ur Shape. Which copy the placement belongs to is undefined, so its Map content is not judged by either plugin: only the repeated id is refused.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "duplicate-resource-id",
+        "file": "10000000-0000-4000-8000-000000000001/resources/00000000-0000-4000-8000-000000000101.json",
+        "id": "00000000-0000-4000-8000-000000000101"
+      }
+    ]
+  }
+}

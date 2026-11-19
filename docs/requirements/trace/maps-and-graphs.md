@@ -402,6 +402,7 @@ The ADRs below are in `docs/adr/` and bind; this section records where the snaps
 | CAS′ `changed-map-content` row | → operations index, Change Map content row; MG-87 |
 | CAS′ `opened-resource`, `closed-resource`, `changed-resource-shape` rows removed; `open-requires-content` and `shape-not-taken` retired | the Open, Close and Choose Shape rows of the operations index replaced by Change Map content; MG-27, MG-28, MG-30, MG-31 rewritten with `map-content-invalid` |
 | Code only (drafting rule 5): a hint the cap narrows keeps its area up to the cap's height; a hint the canvas cannot cap is dropped | → MG-88 |
+| 0159 Map content kept for a Resource id the Space repeats is judged by no plugin | → MG-86. The rest sent → SR (SR-6, SR-30), ST (ST-117) |
 
 ## 7. ADRs with one disposition throughout
 
