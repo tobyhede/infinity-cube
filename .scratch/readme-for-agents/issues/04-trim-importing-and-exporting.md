@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 **Why:** The section restates Storage's import rules ("two doors and no mode parameter", the Meta authorization, the race with a starting host) and repeats the Running section's in-place write and the SQLite path rule, citing Storage four times. Found by the README audit (`../audit/duplication.md` and `../audit/structure.md`).
 

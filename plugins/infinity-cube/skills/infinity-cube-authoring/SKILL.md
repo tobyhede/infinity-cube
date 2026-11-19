@@ -46,6 +46,6 @@ You reach the directory one of three ways, and each step says what differs:
 5. **Hand over.** Tell the person:
    - to review the diff and commit in the content directory's own repository;
    - to start the run again (`pnpm cube run "<dir>"`) to see the change, since a run reads the directory only when it starts;
-   - that the first edit a run writes rewrites the directory in canonical form: every Resource as `resources/<id>.json` in a fixed key order, and minted Ids filled in. Opening a Space that names no `defaultMap` records one, and that is itself an edit, so the rewrite can follow with no change made in the app. Starting and stopping a run with no edit otherwise changes nothing.
+   - that the first edit a run writes rewrites the directory in canonical form: every Resource as `resources/<id>.json` in a fixed key order, and minted Ids filled in. Opening a Space never writes the directory, so starting and stopping a run with no edit changes nothing but the empty `.infinity-cube.lock` file the run leaves there.
 
    Done when the person has been told all three and, shell, `git -C "<dir>" status` shows only the files you meant to add or change; remove anything else you wrote. MCP: `list_files` shows no file you did not mean to write; neither: you have named every file you wrote to the person.

@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 **Why:** The Architecture section (~600 words) and the Tests list restate AGENTS.md and have drifted: the package table misses the Mermaid plugin, the desktop package and the Rust crates; it places Graph navigation in `graph`, where Navigation is `app`'s; it claims clamping and monotonicity property tests that do not exist; it calls `ui` framework-agnostic; and it says only four `cube` verbs touch a directory. Found by the README audit (`../audit/staleness.md` and `../audit/duplication.md`).
 

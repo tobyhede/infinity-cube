@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 (Correct how the README and skills describe Running).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 **Why:** The audit found the top of the README dense in places, its best completion check buried at the end of a 139-word bullet, the presenting keys and other concepts split across sections, contributor-only material (the shadcn skills, the manifest version bump) in the install section, and bare requirement citations that say neither what the target holds nor when to read it. `../audit/structure.md` has replacement text for the intro, Quick start and Running, and a target outline.
 

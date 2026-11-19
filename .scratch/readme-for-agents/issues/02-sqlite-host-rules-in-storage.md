@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 **Why:** A rule that lives only in a README has no owning doc and no named test, against the repository's rule that a requirement names the test that holds it. Found by the README audit (`../audit/duplication.md`). Read the Workflow doc's section on ADRs and the requirements snapshot first: if a rule is a decision no accepted ADR records, it needs an ADR, not only an ST rule.
 

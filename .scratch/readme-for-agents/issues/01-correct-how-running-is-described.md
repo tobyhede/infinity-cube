@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 **Why:** The getting-started skill names the README's "How Running works" as the full description of Running, so the README's stale claims reach every agent that runs a talk. Found by the README audit (`../audit/staleness.md`). The binding sources are ADR 0162 and Storage ST-31, ST-64, ST-65, ST-66 and ST-124.
 

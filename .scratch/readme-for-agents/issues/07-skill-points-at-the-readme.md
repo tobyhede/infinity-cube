@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 (Correct how the README and skills describe Running), 05 (Restructure the user half of the README).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 **Why:** The skill's copy is where its stale claims came from: two copies of one meaning drift. Found by the README audit (`../audit/duplication.md`). Read the Workflow doc's skills section before changing it; the skill is also installed outside this repository, so it may link only by absolute URL.
 

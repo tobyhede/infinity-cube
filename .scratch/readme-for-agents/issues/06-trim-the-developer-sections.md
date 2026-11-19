@@ -4,7 +4,7 @@
 
 **Blocked by:** 03 (Cut Architecture and Tests down to a link to AGENTS.md), 05 (Restructure the user half of the README).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 **Why:** The audit found the Node, pnpm and install requirements repeated, a `pnpm verify` comment listing only some of its steps (AGENTS.md says the list lives in `package.json` alone), Playwright project detail, deployment advice inside "Local PostgreSQL", a "no undo" limitation repeating Running, a constant's name and path, Presentation Notes listed as a limitation, and a bundle measurement with history attached. `../audit/duplication.md` and `../audit/structure.md`.
 
