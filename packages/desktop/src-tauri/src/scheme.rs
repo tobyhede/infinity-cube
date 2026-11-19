@@ -29,10 +29,9 @@ use tokio::sync::Notify;
 use url::Url;
 
 use crate::address::{SchemeStyle, TalkAddress, TalkKey};
-use crate::built::BuiltDirectory;
 
 /// The application a talk's run answers with.
-pub type TalkApplication = host::RunApplication<host::RandomIds, BuiltDirectory>;
+pub type TalkApplication = host::RunApplication<host::RandomIds, host::BuiltApplicationDirectory>;
 
 /// The prefix of the label of every window a talk's page opens.
 pub const VIEW_WINDOW_PREFIX: &str = "view-";

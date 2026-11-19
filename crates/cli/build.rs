@@ -4,8 +4,8 @@
 //! (`packages/app/dist`), as an absolute path or one relative to the
 //! repository root. Every regular file below it is embedded with
 //! `include_bytes!`, so a release binary carries the application it serves;
-//! a link is followed by the rule `--built` reads a build by, so one leading
-//! out of the build is left out.
+//! a link is followed only while its target stays inside the built
+//! application, so one leading out of it is left out.
 //! Unset, nothing is embedded and the binary serves a placeholder page, which
 //! it reports when it starts: `cargo build`, clippy and the tests need no web
 //! build, and what a binary carries never depends on whether a `dist/`
@@ -17,10 +17,9 @@ use std::{env, fs, io};
 
 const VARIABLE: &str = "INFINITY_CUBE_BUILT_APPLICATION";
 
-/// Every file below `directory`, by the rule `--built` reads a build by
-/// (`src/built.rs`): a link is followed only while its target stays inside
-/// the build, and never back into a directory the walk is already inside,
-/// whose real paths `within` holds.
+/// Every file below `directory`: a link is followed only while its target
+/// stays inside the built application at `root`, and never back into a
+/// directory the walk is already inside, whose real paths `within` holds.
 fn walk(
     root: &Path,
     directory: &Path,

@@ -14,7 +14,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod address;
-mod built;
 mod question;
 mod scheme;
 mod server;
