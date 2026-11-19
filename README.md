@@ -34,7 +34,7 @@ You need Node ≥ 26.8.1 and pnpm 9. Node no longer bundles corepack, so install
 
 3. **Run it.** `pnpm cube run ~/spaces/rust-async`. Done when it prints the address it serves and your browser opens it.
 
-4. **Edit.** Pick a Graph in the Command Dock, the toolbar floating over the canvas; every Graph stays drawn, and the one you pick is emphasised. Select a Resource to reveal its toolbar, and use Edit to write its Title and Markdown. Drag a Resource to move it. Drag from one of a Resource's four handles to another Resource to add an Edge to the active Graph; hold Option (macOS) or Alt and drop on empty canvas to create a new Resource and connect it in one go. Done when the save indicator reads `Persisted`.
+4. **Edit.** Pick a Graph in the Command Dock, the toolbar floating over the canvas; every Graph stays drawn, and the one you pick is emphasised. Select a Resource to reveal its toolbar, and use Edit to write its Title and Markdown. Drag a Resource to move it. Drag from one of a Resource's four handles to another Resource to add an Edge to the Active Graph; hold Option (macOS) or Alt and drop on empty canvas to create a new Resource and connect it in one go. Done when the save indicator reads `Persisted`.
 
 5. **Present.** Press **Present**: `→` follows an Edge, `←` goes back, `↑` / `↓` choose at a fork. Done when `Esc` returns you to the Map as you left it.
 
@@ -46,10 +46,10 @@ Run every `pnpm cube` verb from the InfinityCube clone, pointing at whichever di
 
 ## On the canvas
 
-- **Every place has a link.** The Space, a Map, a Resource, a Graph and each Resource reached while presenting have durable URLs. The Command Dock and the presenting chrome offer **Copy link**, browser Back and Forward follow them, and a pasted link reopens the same place.
+- **Every place has a link.** The Space, a Map, a Resource, a Graph and each Active Resource reached while Presenting have durable URLs. The Command Dock and the presenting chrome offer **Copy link**, browser Back and Forward follow them, and a pasted link reopens the same place.
 - **A Resource is Closed or Open.** A Closed Markdown Resource shows its Title; Open, it shows its text and may grow to fit. Editing its source is a separate action.
 - **A Resource's size is authored, never measured.** Its default and smallest size is 260×146, and its content adapts to it.
-- **Edges between the same two Resources run in parallel lanes.** The active Graph's Edge in each direction runs full length and the others stop shorter, so switching Graphs changes which Edge leads, never where the Resources sit.
+- **Edges between the same two Resources run in parallel lanes.** In each direction one Edge runs full length, the Active Graph's where it has one there, and the others stop shorter, so switching Graphs changes which Edge leads, never where the Resources sit.
 
 The [Rendering](docs/requirements/rendering.md) and [Maps and Graphs](docs/requirements/maps-and-graphs.md) requirements hold the full rules for Edges, handles, sizes and Open.
 
@@ -60,8 +60,8 @@ The [Rendering](docs/requirements/rendering.md) and [Maps and Graphs](docs/requi
 - **Edits are written about a second after you stop editing**, so `git status` shows what you changed. InfinityCube writes only the files whose content changed.
 - **Git is your undo and your history.** InfinityCube keeps no history of its own and does not watch the directory. Edit files by hand, `git pull` or check out an earlier version with InfinityCube stopped: its next write replaces what is on disk with what it holds.
 - **One run per directory.** A run locks the directory, through the empty file `.infinity-cube.lock` it leaves there, so a second run of the same directory is refused, naming it, until the first stops. The lock ends when the process does, however it ends. Keep the file out of git with a `.gitignore` entry.
-- **InfinityCube owns `aggregate.json`, each Space's `space.json` and `resources/`, and `assets/`.** A Markdown Resource's text and an uploaded picture are files in `assets/`, named by their content; a picture linked by `https:` URL stays a link. Your own files, such as a README, `notes/` or `.git`, can sit anywhere else in the directory and are left alone. The format is described in [`docs/aggregate-directory.md`](docs/aggregate-directory.md).
-- **Starting.** `run` serves an existing Aggregate directory only. A missing or empty directory is refused, naming the `pnpm cube init` command that creates one, so a mistyped path never becomes a new Space. A directory that is not valid is refused with its problems printed; fix the files and start again. A run with no edits leaves your files as they were. Opening a Space never writes the directory.
+- **InfinityCube writes only its own files: `aggregate.json`, each Space's `space.json` and Resource files, and `assets/`**, which holds Markdown text and uploaded pictures. Anything else, such as `.git`, a README or `notes/`, and any `*.md` outside `assets/`, is left alone; [`docs/aggregate-directory.md`](docs/aggregate-directory.md) describes the format.
+- **Starting.** `run` serves an existing Aggregate directory only. A missing or empty directory is refused, naming the `pnpm cube init` command that creates one, so a mistyped path never becomes a new Space. A directory that is not valid is refused with its problems printed; fix the files and start again. A run with no edits leaves the directory as it was, beside its empty lock file. Opening a Space never writes the directory.
 - **Ports and the browser.** InfinityCube serves on port 4173, or the next free port. `--port <port>` picks the port and fails if it is taken. `--no-open` leaves the browser alone, for running headless or from an agent.
 
 ### Stopping and lost edits
@@ -82,12 +82,10 @@ A **stop** (Ctrl-C, closing the terminal, or SIGTERM) writes every pending edit 
 
 ## Using InfinityCube with agents
 
-This repository carries four agent skills, in [`.agents/skills/`](.agents/skills/) and linked from `.claude/skills/`. Two are for using InfinityCube, and are also published as the `infinity-cube` plugin, from [`plugins/infinity-cube/`](plugins/infinity-cube/):
+Two of this repository's agent skills, in [`.agents/skills/`](.agents/skills/) and linked from `.claude/skills/`, are for using InfinityCube. They are also published as the `infinity-cube` plugin, from [`plugins/infinity-cube/`](plugins/infinity-cube/):
 
 - **`infinity-cube-getting-started`**: sets a person up from a fresh clone: checks Node and pnpm, installs, chooses or creates the content directory as its own git repository, and starts a run.
 - **`infinity-cube-authoring`**: writes or changes an Aggregate directory as files: Spaces, Resources, Maps, Graphs, Edges and pictures. It stops the run first, because InfinityCube's next write would replace edits made underneath it.
-
-The other two, `shadcn-first-ui` and `shadcn`, are for developing InfinityCube's own UI.
 
 ### Installing the skills elsewhere
 
@@ -115,7 +113,7 @@ A chat application with no shell reaches neither command. For one that accepts a
 
 ## Developing InfinityCube
 
-Read [`AGENTS.md`](AGENTS.md) before changing code. It is written for coding agents and is the authority on commands, package boundaries, conventions and what "done" means here; this section is the human summary. The requirements in [`docs/requirements/`](docs/requirements/) say what each area does and name the tests that hold it.
+Read [`AGENTS.md`](AGENTS.md) before changing code. It is written for coding agents and is the authority on commands, package boundaries, conventions and what "done" means here; this section is the human summary. The `shadcn-first-ui` and `shadcn` skills are for developing InfinityCube's own UI. The requirements in [`docs/requirements/`](docs/requirements/) say what each area does and name the tests that hold it.
 
 ### Development servers
 
@@ -169,8 +167,8 @@ pnpm dev:sqlite                                                            # app
 SQLITE_PATH=/absolute/path/infinity-cube.db pnpm test:integration:sqlite   # migrates that file, then tests against temp files of its own
 ```
 
-- **`SQLITE_PATH` is an absolute path** in a local directory you own; every SQLite command refuses a relative, blank or unwritable one.
-- **One InfinityCube process per file.** Stop `pnpm dev:sqlite` before a `cube import` or `cube export --store sqlite` on the same file.
+- **`SQLITE_PATH` is an absolute path** in a local directory you own; every SQLite command refuses a relative, blank or unwritable one, and `cube import` and `cube export` also refuse a file that does not exist yet, so run `pnpm db:migrate:sqlite` first.
+- **One InfinityCube process per file.** Stop `pnpm dev:sqlite` before running `cube import --store sqlite` or `cube export --store sqlite` on the same file.
 - **To back up**, stop the host and copy the file, or use `sqlite3 infinity-cube.db ".backup copy.db"`.
 
 The [Storage requirements' SQLite host rules](docs/requirements/storage.md#the-sqlite-host) say what each refusal answers and what happens when two processes meet.
@@ -185,7 +183,7 @@ pnpm cube import ./my-aggregate                       # initialize an empty repo
 pnpm cube import ./my-aggregate --dangerous-replace   # replace the stored aggregate outright
 ```
 
-Both verbs reach PostgreSQL unless `--store sqlite` names SQLite. `import` initializes an empty repository and leaves an initialized one as it is, saying so; `--dangerous-replace` replaces whatever is stored, atomically. A host initializes an empty database when it starts, so importing into a database a host has run needs `--dangerous-replace`. The [Storage requirements](docs/requirements/storage.md#import) hold the rules for both verbs.
+Both verbs reach PostgreSQL unless `--store sqlite` names SQLite. `import` initializes an empty repository; an initialized one it refuses, naming `--dangerous-replace`, unless it already holds exactly this aggregate. `--dangerous-replace` replaces whatever is stored, atomically. A host initializes an empty database when it starts, so importing into a database a host has run needs `--dangerous-replace`. The [Storage requirements](docs/requirements/storage.md#import) hold the rules for both verbs.
 
 An exported directory is the only way to move an aggregate between the two databases:
 
