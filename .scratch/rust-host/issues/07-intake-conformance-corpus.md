@@ -22,7 +22,7 @@ Start from the JSON Schema examples in `docs/schema/` and add what schemas canno
 
 ## Comments
 
-- Built at `conformance/intake/` (59 directory cases, 7 commit cases; `README.md` is the format, the location rules and the closed list of kinds), run by `test/unit/intake-conformance.test.ts`, which the `test:coverage` job runs as part of `vitest run`. Storage ST-117 restates it.
+- Built at `conformance/intake/` (63 directory cases, 7 commit cases; `README.md` is the format, the location rules and the closed list of kinds), run by `test/unit/intake-conformance.test.ts`, which the `test:coverage` job runs as part of `vitest run`. Storage ST-117 restates it.
 - A refusal's location is `{ kind, file, id?, field?, edge? }`: an Edge is located as its Graph's `id` with `edge: { from, to }`, a pair rather than two optional keys. Inside the TypeScript intake it is `at` on each `SpaceError` and `ResourceFileError`, optional only because the HTTP refusal body does not carry it: the encoder leaves it off, so the wire is unchanged.
 - Kinds with no case, and why, are in the README's table: `unreadable` and `symbolic-link` (not representable in a portable checkout), `asset-refused` (a 10 MiB file), `duplicate-space-id` (unreachable from a directory or a commit).
 - A reference a plugin declares (a Reference's Target, a Space Resource's Space, Map and Graph) is located by its Resource's file and id with no `field`, because the generic intake does not know which field of the content declares it.

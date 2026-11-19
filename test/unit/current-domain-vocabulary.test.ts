@@ -3400,6 +3400,9 @@ const PRODUCT_HISTORY_TREES = ['migrations/', 'migrations-sqlite/'] as const;
  * - A Rust HTTP crate the desktop shell's Tauri runtime depends on shares the
  *   earlier name, and Cargo's lockfile names it and its utility crate; the
  *   crates' names are their publisher's.
+ * - The Rust CLI (`crates/cli`) serves HTTP through those same two crates,
+ *   named as its dependencies in its manifest and, in Rust source alone
+ *   (`PRODUCT_KEPT_IN_RUST`), by path.
  */
 const PRODUCT_KEPT_SPELLINGS: readonly RegExp[] = [
   /\b\d{4}-[a-z0-9-]+\.md\b/g,
@@ -3409,16 +3412,27 @@ const PRODUCT_KEPT_SPELLINGS: readonly RegExp[] = [
   new RegExp(`\`wrangler\\.jsonc\`'s \`${RETIRED_PRODUCT}\``, 'g'),
   new RegExp(`\\b${RETIRED_PRODUCT}\\.json\\b`, 'g'),
   new RegExp(`(?:name = |(?<=^|\\n) )"${RETIRED_PRODUCT}(?:-util)?"`, 'g'),
+  new RegExp(`(?<=^|\\n)${RETIRED_PRODUCT}(?:-util)? = \\{`, 'g'),
 ];
 
-const withoutKeptProductSpellings = (line: string): string =>
-  PRODUCT_KEPT_SPELLINGS.reduce((kept, spelling) => kept.replace(spelling, ''), line);
+/** The spellings kept only in a Rust source file: the two crates by path. */
+const PRODUCT_KEPT_IN_RUST: readonly RegExp[] = [
+  new RegExp(`(?<![\\w:])${RETIRED_PRODUCT}(?:_util)?::(?=[a-z_{])`, 'g'),
+];
 
-const productHits = (source: string): string[] =>
+const isRustSource = (file: string): boolean => file.endsWith('.rs');
+
+const withoutKeptProductSpellings = (line: string, file: string): string =>
+  [...PRODUCT_KEPT_SPELLINGS, ...(isRustSource(file) ? PRODUCT_KEPT_IN_RUST : [])].reduce(
+    (kept, spelling) => kept.replace(spelling, ''),
+    line,
+  );
+
+const productHits = (source: string, file = ''): string[] =>
   source
     .split('\n')
     .flatMap((line, index) =>
-      RETIRED_PRODUCT_NAME.test(withoutKeptProductSpellings(line))
+      RETIRED_PRODUCT_NAME.test(withoutKeptProductSpellings(line, file))
         ? [`${index + 1}: ${line.trim()}`]
         : [],
     );
@@ -3441,7 +3455,7 @@ describe('the application is named InfinityCube', () => {
   it('finds the earlier name nowhere it is not kept on purpose', () => {
     const found = scanned.flatMap((file) => {
       const source = readTracked(file);
-      return source === null ? [] : productHits(source).map((hit) => `${file}:${hit}`);
+      return source === null ? [] : productHits(source, file).map((hit) => `${file}:${hit}`);
     });
 
     expect(found).toEqual([]);
@@ -3453,6 +3467,13 @@ describe('the application is named InfinityCube', () => {
       expect(
         sources.some((source) => new RegExp(spelling.source).test(source)),
         `${spelling.source} is kept but nothing uses it`,
+      ).toBe(true);
+    }
+    const rustSources = scanned.filter(isRustSource).map((file) => readTracked(file) ?? '');
+    for (const spelling of PRODUCT_KEPT_IN_RUST) {
+      expect(
+        rustSources.some((source) => new RegExp(spelling.source).test(source)),
+        `${spelling.source} is kept in Rust source but nothing there uses it`,
       ).toBe(true);
     }
   });
@@ -3482,6 +3503,15 @@ describe('the application is named InfinityCube', () => {
     }
   });
 
+  it('forgives the Rust crates by path only in Rust source', () => {
+    const line = `use ${RETIRED_PRODUCT}_util::rt::{TokioIo, TokioTimer};`;
+    const prose = `The listener serves through ${RETIRED_PRODUCT}::server.`;
+
+    expect(productHits(line, 'crates/cli/src/listener.rs')).toEqual([]);
+    expect(productHits(line, 'docs/requirements/storage.md')).not.toEqual([]);
+    expect(productHits(prose, 'README.md')).not.toEqual([]);
+  });
+
   it('stays silent on the spellings kept on purpose', () => {
     const kept = [
       `([ADR 0124](docs/adr/0124-one-${RETIRED_PRODUCT}-cli.md))`,
@@ -3490,6 +3520,7 @@ describe('the application is named InfinityCube', () => {
       `  "name": "${RETIRED_PRODUCT}",`,
       `The Worker's name may differ from \`wrangler.jsonc\`'s \`${RETIRED_PRODUCT}\`.`,
       `rename it with \`git -C <dir> mv ${RETIRED_PRODUCT}.json aggregate.json\``,
+      `${RETIRED_PRODUCT}-util = { version = "0.1", features = ["http1"] }`,
     ];
 
     for (const line of kept) {

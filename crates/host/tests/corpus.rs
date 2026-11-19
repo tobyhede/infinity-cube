@@ -262,6 +262,35 @@ async fn every_commit_case_gets_its_expected_answer_and_exports_the_recorded_byt
     );
 }
 
+mod given_an_accepted_directory_case {
+    use super::*;
+
+    #[tokio::test]
+    async fn absent_assets_names_each_referenced_asset_the_directory_does_not_carry() {
+        let (_temporary, _directory, store) =
+            imported(&corpus().join("directory/accepted-image/aggregate")).await;
+        let absent: Vec<String> = host::absent_assets(&store)
+            .await
+            .unwrap()
+            .iter()
+            .map(|hash| hash.as_str().to_owned())
+            .collect();
+        assert_eq!(
+            absent,
+            vec!["n4bQgYhMfWWaL-qgxVrQFaO_TxsrC4Is0V1sFbDwCgg".to_owned()],
+            "the Image's picture is referenced and not carried"
+        );
+    }
+
+    #[tokio::test]
+    async fn absent_assets_is_empty_when_the_directory_carries_every_asset() {
+        let (_temporary, _directory, store) =
+            imported(&corpus().join("directory/accepted-markdown/aggregate")).await;
+        let absent = host::absent_assets(&store).await.unwrap();
+        assert!(absent.is_empty(), "every asset is carried: {absent:?}");
+    }
+}
+
 /// Import reads a directory on disk as intake's own runner reads the case's
 /// files: a file where Import lists a directory (`resources`, `assets`)
 /// cannot be listed, as `scanAggregateFrom` finds.

@@ -329,6 +329,54 @@ fn check_reads_back(
     }
 }
 
+/// Each asset a Resource's content or a placement's Map content references
+/// and the store holds no bytes for, but the asset of zero bytes, in code
+/// unit order: what `cube check` names as having no file
+/// (`checkAggregate` in `src/run/run.ts`).
+///
+/// # Errors
+///
+/// [`ExportError`]: an uninitialized store, or a store that failed.
+pub async fn absent_assets<R: SpaceRepository>(
+    repository: &R,
+) -> Result<Vec<AssetHash>, ExportError> {
+    let AggregateLoad::Loaded(aggregate) = repository.load_aggregate().await? else {
+        return Err(ExportError::Uninitialized);
+    };
+    let referenced = referenced_assets(repository, &aggregate).await?;
+    Ok(referenced
+        .unheld
+        .into_iter()
+        .filter(|hash| !hash.is_empty_asset())
+        .collect())
+}
+
+/// The assets an aggregate references, split by whether Export writes them.
+struct ReferencedAssets {
+    /// Those the store holds bytes for, which Export writes to `assets/`.
+    held: Vec<StoredAsset>,
+    /// Those it holds none for, and the asset of zero bytes, whose files
+    /// Export keeps as they are, in code unit order.
+    unheld: Vec<AssetHash>,
+}
+
+async fn referenced_assets<R: SpaceRepository>(
+    repository: &R,
+    aggregate: &LoadedAggregate,
+) -> Result<ReferencedAssets, ExportError> {
+    let mut referenced = ReferencedAssets {
+        held: Vec::new(),
+        unheld: Vec::new(),
+    };
+    for hash in referenced_asset_hashes(aggregate.spaces.iter().map(|space| &space.snapshot)) {
+        match repository.load_asset(&hash).await? {
+            Some(asset) if !hash.is_empty_asset() => referenced.held.push(asset),
+            _ => referenced.unheld.push(hash),
+        }
+    }
+    Ok(referenced)
+}
+
 /// Write the complete stored aggregate to `destination`, in place.
 ///
 /// One read of the aggregate is the whole of what is written. Each stored
@@ -351,16 +399,11 @@ pub async fn export_aggregate<R: SpaceRepository, F: Filesystem>(
     let AggregateLoad::Loaded(aggregate) = repository.load_aggregate().await? else {
         return Err(ExportError::Uninitialized);
     };
-    let mut carried = Vec::new();
-    let mut kept = BTreeSet::new();
-    for hash in referenced_asset_hashes(aggregate.spaces.iter().map(|space| &space.snapshot)) {
-        match repository.load_asset(&hash).await? {
-            Some(asset) if !hash.is_empty_asset() => carried.push(asset),
-            _ => {
-                kept.insert(hash.as_str().to_owned());
-            }
-        }
-    }
+    let ReferencedAssets {
+        held: carried,
+        unheld,
+    } = referenced_assets(repository, &aggregate).await?;
+    let kept: BTreeSet<String> = unheld.iter().map(|hash| hash.as_str().to_owned()).collect();
 
     let serialised = aggregate_files(&aggregate, &carried);
     reject_links(fs, destination, serialised.keys()).await?;

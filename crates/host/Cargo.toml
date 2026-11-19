@@ -7,21 +7,21 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
-bytes = "1"
-http = "1"
+bytes = { workspace = true }
+http = { workspace = true }
 http-body = "1"
-http-body-util = "0.1"
+http-body-util = { workspace = true }
 intake = { path = "../intake" }
 sha2 = { workspace = true }
 thiserror = { workspace = true }
-tokio = { version = "1", features = ["fs", "io-util", "macros", "rt", "sync", "time"] }
+tokio = { workspace = true, features = ["fs", "io-util", "macros", "rt", "sync", "time"] }
 uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
 proptest = "1"
 serde_json = { workspace = true }
-tempfile = "3"
-tokio = { version = "1", features = ["fs", "macros", "rt", "rt-multi-thread", "sync", "test-util", "time"] }
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["fs", "macros", "rt", "rt-multi-thread", "sync", "test-util", "time"] }
 
 [lints]
 workspace = true
