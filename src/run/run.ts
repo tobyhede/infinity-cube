@@ -18,6 +18,7 @@ import {
   AggregateDirectoryError,
 } from '@project/aggregate';
 import { importAggregate } from '../import/import-aggregate';
+import { lockDirectory } from './directory-lock';
 import { MemorySpaceRepository } from '@project/aggregate';
 import { establishMetaSpace } from '../startup/database-startup';
 
@@ -61,6 +62,8 @@ export type RunStart =
   | { readonly kind: 'running'; readonly run: Run }
   /** The directory is missing or empty, so there is no aggregate to run; `init` makes one. */
   | { readonly kind: 'empty' }
+  /** Another run, in this process or another, holds the directory's lock (ADR 0162). */
+  | { readonly kind: 'locked' }
   /**
    * The directory could not be read as an Aggregate directory. `diagnostics`
    * are what the author reads; `refusals` are the kind and place of each
@@ -236,7 +239,7 @@ const readInto = async (
   directory: string,
   repository: MemorySpaceRepository,
   newId: () => UUID,
-): Promise<RunRefusal | undefined> => {
+): Promise<Exclude<RunRefusal, { readonly kind: 'locked' }> | undefined> => {
   if (await holdsNothing(directory)) return { kind: 'empty' };
   let imported;
   try {
@@ -269,7 +272,8 @@ export type CheckResult =
        */
       readonly absentAssets: readonly AssetHash[];
     }
-  | RunRefusal;
+  /** A check takes no lock, so no other run refuses it. */
+  | Exclude<RunRefusal, { readonly kind: 'locked' }>;
 
 /**
  * Read an Aggregate directory as a run would, into a store that is then
@@ -296,9 +300,16 @@ export const checkAggregate = async (
  * tried again after the same period, so edits it did not write do not wait for
  * the next commit or the stop.
  *
+ * The run locks the directory before Import reads it and releases the lock
+ * once its last write has landed, refusing a directory another run holds
+ * (ADR 0162); a missing or empty directory is refused before any lock, so no
+ * lock file is created there. A lock that cannot be taken for any other
+ * reason throws.
+ *
  * Nothing is written for an existing directory until something is committed,
- * so a run that is stopped without an edit leaves the directory as it found it.
- * The directory is the durable copy; the store is discarded with the run.
+ * so a run that is stopped without an edit leaves the directory as it found it,
+ * beside the empty lock file. The directory is the durable copy; the store is
+ * discarded with the run.
  */
 export const startRun = async (directory: string, options: RunOptions): Promise<RunStart> => {
   let pending: (() => void) | undefined;
@@ -322,8 +333,20 @@ export const startRun = async (directory: string, options: RunOptions): Promise<
     if (event.kind === 'write-failed' && serving) scheduleWrite();
   });
 
-  const refusal = await readInto(directory, repository, options.newId);
-  if (refusal !== undefined) return refusal;
+  if (await holdsNothing(directory)) return { kind: 'empty' };
+  const lock = lockDirectory(directory);
+  if (lock === 'held') return { kind: 'locked' };
+  let refusal;
+  try {
+    refusal = await readInto(directory, repository, options.newId);
+  } catch (error) {
+    lock.release();
+    throw error;
+  }
+  if (refusal !== undefined) {
+    lock.release();
+    return refusal;
+  }
 
   serving = true;
   const run: Run = {
@@ -333,6 +356,7 @@ export const startRun = async (directory: string, options: RunOptions): Promise<
       pending?.();
       pending = undefined;
       await writer.write();
+      lock.release();
       const failure = writer.failure();
       return failure === undefined
         ? { kind: 'stopped' }

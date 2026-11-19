@@ -1481,7 +1481,6 @@ describe('runInfinityCube author verbs', () => {
         resources: markdownResourceFiles(OPENING_ID, 'Opening', 'Hello.\n'),
       },
     ]);
-    const before = await filesUnder(directory);
     const started = await startRun(directory, {
       newId: newUuid,
       schedule: () => () => undefined,
@@ -1492,6 +1491,7 @@ describe('runInfinityCube author verbs', () => {
       throw new Error('A run accepted a dangling placement');
     }
 
+    const before = await filesUnder(directory);
     const { output, exitCode } = author(['check', directory], '/authors/home');
 
     expect(await exitCode).toBe(1);

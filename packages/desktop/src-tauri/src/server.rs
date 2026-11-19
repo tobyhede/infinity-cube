@@ -10,6 +10,7 @@
 
 use std::collections::HashSet;
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 
 use host::{
@@ -17,9 +18,11 @@ use host::{
     RunEvent, RunStopped, Shell, TokioClock,
 };
 use tauri::{AppHandle, Manager as _, WebviewUrl};
+use tauri_plugin_dialog::{DialogExt as _, MessageDialogKind};
 use url::Url;
 
 use crate::address::{SchemeStyle, TalkAddress, TalkKey};
+use crate::saving::{SaveNotice, SaveStreak};
 use crate::scheme::{Closed, OpenTalks};
 
 /// Why a talk could not be opened.
@@ -40,7 +43,8 @@ pub enum OpenError {
 ///
 /// # Errors
 ///
-/// The directory cannot be resolved, or holds no readable `index.html`.
+/// The directory cannot be resolved, or its `index.html` does not resolve to
+/// a readable regular file inside it; a link to one inside it is followed.
 pub fn built_shell(
     directory: &Path,
 ) -> Result<Shell<BuiltApplicationDirectory>, BuiltApplicationError> {
@@ -87,7 +91,8 @@ pub async fn close_talk<B: BuiltFiles>(
 
 /// Start a run of `directory` with the built application `shell`. A failed
 /// write and a store failure the application answers are reported on
-/// standard error, naming the directory.
+/// standard error, naming the directory, and `notify` is handed the first
+/// failed write of a streak and the write that ends one ([`SaveStreak`]).
 ///
 /// # Errors
 ///
@@ -99,21 +104,61 @@ pub async fn close_talk<B: BuiltFiles>(
 pub async fn open_run<B: BuiltFiles>(
     directory: &Path,
     shell: Shell<B>,
+    notify: impl Fn(SaveNotice) + Send + Sync + 'static,
 ) -> Result<Run<RandomIds, B>, ImportError> {
     let written = directory.display().to_string();
     let served = written.clone();
+    let streak = Mutex::new(SaveStreak::default());
     Run::builder()
         .directory(directory)
         .ids(RandomIds)
         .clock(TokioClock)
         .on_event(move |event| {
-            if let RunEvent::WriteFailed(error) = event {
-                eprintln!("Could not write {written}: {error}; trying again once edits are quiet.");
+            let mut streak = streak.lock().unwrap_or_else(PoisonError::into_inner);
+            let notice = match event {
+                RunEvent::Written => streak.written(),
+                RunEvent::WriteFailed(error) => {
+                    eprintln!(
+                        "Could not write {written}: {error}; trying again once edits are quiet."
+                    );
+                    streak.failed(error)
+                }
+                _ => None,
+            };
+            drop(streak);
+            if let Some(notice) = notice {
+                notify(notice);
             }
         })
         .on_error(move |failed, error| eprintln!("{failed} for {served}: {error}"))
         .start(shell)
         .await
+}
+
+/// Show each [`SaveNotice`] for `directory` in a dialog, without waiting for
+/// it to be dismissed, until `closing` is set: a closing talk's last write
+/// is reported when the close ends (Storage ST-122), not as news.
+fn notify_in_dialog(
+    app: &AppHandle,
+    directory: &Path,
+    closing: Arc<AtomicBool>,
+) -> impl Fn(SaveNotice) + Send + Sync + 'static {
+    let app = app.clone();
+    let directory = directory.to_owned();
+    move |notice| {
+        if closing.load(Ordering::SeqCst) {
+            return;
+        }
+        let kind = match notice {
+            SaveNotice::Failing(_) => MessageDialogKind::Warning,
+            SaveNotice::Recovered => MessageDialogKind::Info,
+        };
+        app.dialog()
+            .message(notice.message(&directory))
+            .title("InfinityCube")
+            .kind(kind)
+            .show(|_| {});
+    }
 }
 
 /// What a presenter reads when a folder cannot be opened, or `None` when
@@ -123,6 +168,9 @@ fn refusal(directory: &Path, error: &ImportError) -> Option<String> {
     match error {
         // A presenter has no `pnpm cube init`, so no command is named.
         ImportError::Empty => Some(format!("{shown} holds no talk: it is missing or empty.")),
+        ImportError::Locked => Some(format!(
+            "{shown} is open in another InfinityCube window or run: close it there first."
+        )),
         ImportError::Refused(refusals) => {
             let mut message = format!("{shown} is not a talk InfinityCube can open:");
             for refusal in refusals.as_slice() {
@@ -140,14 +188,17 @@ fn refusal(directory: &Path, error: &ImportError) -> Option<String> {
 pub struct TalkServer {
     app: AppHandle,
     run: Run<RandomIds, BuiltApplicationDirectory>,
+    /// Set once the talk begins closing, which silences its save notices.
+    closing: Arc<AtomicBool>,
     windows: Arc<TalkWindows>,
 }
 
 /// The address a talk's window opens at: where its root address redirects,
 /// the Meta Space's product address, or the root when it does not redirect.
 ///
-/// WebKitGTK does not follow a redirect a custom scheme answers a navigation
-/// with, so the shell follows the root's itself and opens the window there.
+/// The shell follows the root's redirect itself and opens the window there,
+/// since WebKitGTK was seen not to follow one a custom scheme answers a
+/// navigation with (`.scratch/rust-host/issues/13-swap-the-sidecar-for-the-rust-host.md`).
 pub async fn first_address<B: BuiltFiles>(
     application: &host::RunApplication<RandomIds, B>,
 ) -> String {
@@ -216,7 +267,7 @@ impl TalkWindows {
     pub fn navigation(&self, url: &Url) -> Navigation {
         if !self.address.admits(url) {
             Navigation::Refuse
-        } else if url.path() == "/" && self.first.path() != "/" {
+        } else if matches!(url.path(), "/" | "") && self.first.path() != "/" {
             Navigation::Redirect(self.first.clone())
         } else {
             Navigation::Load
@@ -284,7 +335,9 @@ impl TalkServer {
     pub fn start(app: &AppHandle, directory: &Path, label: &str) -> Result<Started, OpenError> {
         let shell =
             built_shell(&app.path().resource_dir()?.join("app")).map_err(OpenError::Built)?;
-        let run = match tauri::async_runtime::block_on(open_run(directory, shell)) {
+        let closing = Arc::new(AtomicBool::new(false));
+        let notify = notify_in_dialog(app, directory, Arc::clone(&closing));
+        let run = match tauri::async_runtime::block_on(open_run(directory, shell, notify)) {
             Ok(run) => run,
             Err(error) => {
                 return match refusal(directory, &error) {
@@ -312,6 +365,7 @@ impl TalkServer {
         Ok(Started::Serving(Self {
             app: app.clone(),
             run,
+            closing,
             windows: Arc::new(TalkWindows::new(address, url, open_talks)),
         }))
     }
@@ -332,6 +386,8 @@ impl TalkServer {
     /// the windows the talk's page opened. Answers why the last edit may
     /// not be on disk, or `None` when it is.
     pub fn stop(self) -> Option<String> {
+        // How the last write ends is reported by the caller, not as news.
+        self.closing.store(true, Ordering::SeqCst);
         let (opened, stopped) = tauri::async_runtime::block_on(close_talk(
             &self.windows.open_talks,
             self.windows.address.key(),

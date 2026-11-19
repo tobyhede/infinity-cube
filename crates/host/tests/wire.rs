@@ -41,9 +41,12 @@ use serde_json::{Value, json};
 type Built = BTreeMap<String, Bytes>;
 type Host<R> = Application<R, Counted, Built>;
 
+/// The stand-in build as files, its page among them as `index.html`, as a
+/// build embedded in the CLI holds it.
 fn shell() -> Shell<Built> {
     let files = STAND_IN_FILES
         .into_iter()
+        .chain([("index.html", STAND_IN_PAGE)])
         .map(|(path, text)| (path.to_owned(), Bytes::from_static(text.as_bytes())))
         .collect();
     Shell::new(STAND_IN_PAGE, files)
@@ -256,18 +259,30 @@ mod given_a_commit {
             200,
             "joined and committed"
         );
-        let chunk = Bytes::from(vec![b' '; MAX_COMMIT_BODY_BYTES / 2 + 1]);
+        // A valid commit padded to one byte over the limit, as the case sends it.
+        let committed = load(&host, META).await;
+        let mut padded = rename_text(&committed, "Too big").into_bytes();
+        padded.resize(MAX_COMMIT_BODY_BYTES + 1, b' ');
+        let (left, right) = padded.split_at(padded.len() / 2);
         let request = Request::builder()
             .method("POST")
             .uri("/api/spaces")
             .header("content-type", "application/json")
-            .body(Chunks(VecDeque::from([chunk.clone(), chunk])))
+            .body(Chunks(VecDeque::from([
+                Bytes::copy_from_slice(left),
+                Bytes::copy_from_slice(right),
+            ])))
             .unwrap();
         problem(
             &host.handle(request).await,
             "payload-too-large",
             413,
             "Payload too large",
+        );
+        assert_eq!(
+            load(&host, META).await["revision"],
+            committed["revision"],
+            "nothing committed"
         );
     }
 }
@@ -367,6 +382,15 @@ mod given_a_change_from_another_site {
         let host = open().await;
         for origin in ["http://attacker.example", "http://127.0.0.1:1", "null"] {
             changes_refused(&host, &[("host", LISTENING_AT), ("origin", origin)]).await;
+            changes_refused(
+                &host,
+                &[
+                    ("host", LISTENING_AT),
+                    ("origin", origin),
+                    ("sec-fetch-site", "same-origin"),
+                ],
+            )
+            .await;
         }
     }
 

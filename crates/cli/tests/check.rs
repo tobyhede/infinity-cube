@@ -201,13 +201,15 @@ mod given_a_missing_or_empty_directory {
         for directory in [temporary.path().join("missing"), empty] {
             let output = check(&[directory.to_str().unwrap()]);
             assert_eq!(output.status.code(), Some(1), "{}", directory.display());
+            // The path is printed as one shell word, which quotes a Windows
+            // path, so the verb and the path are looked for apart.
+            let said = text(&output.stderr);
+            let (_, command) = said
+                .split_once("To create one there: pnpm cube init ")
+                .unwrap_or_else(|| panic!("names init: {said}"));
             assert!(
-                text(&output.stderr).contains(&format!(
-                    "To create one there: pnpm cube init {}",
-                    directory.display()
-                )),
-                "names init: {}",
-                text(&output.stderr)
+                command.contains(&directory.display().to_string()),
+                "names the directory: {said}"
             );
         }
     }

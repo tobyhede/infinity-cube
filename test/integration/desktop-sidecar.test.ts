@@ -1,5 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
@@ -160,6 +160,51 @@ describe('The desktop sidecar', () => {
       expect(announcement).toMatchObject({ kind: 'refused' });
       // A presenter has the desktop application, not a clone with pnpm in it.
       expect(announcement.kind === 'refused' && announcement.message).not.toContain('pnpm');
+      expect(await exited).toBe(1);
+    },
+    START_TIMEOUT_MS,
+  );
+
+  it(
+    'announces a refusal naming a directory another sidecar holds, and runs it once that one is killed',
+    async () => {
+      const root = await temporaryRoot();
+      const directory = join(root, 'talk');
+      await cp(FIXTURE, directory, { recursive: true });
+      const built = await builtApplication(root);
+      const holder = startSidecar(directory, built);
+      listening(await holder.announcement);
+
+      const second = startSidecar(directory, built);
+      expect(await second.announcement).toEqual({
+        kind: 'refused',
+        message: `${directory} is open in another InfinityCube window or run: close it there first.\n`,
+      });
+      expect(await second.exited).toBe(1);
+
+      // The operating system releases the lock of a process that ends however it ends.
+      holder.child.kill('SIGKILL');
+      await holder.exited;
+      const third = startSidecar(directory, built);
+      listening(await third.announcement);
+      third.child.stdin.end();
+      expect(await third.exited).toBe(0);
+    },
+    START_TIMEOUT_MS,
+  );
+
+  it(
+    'announces a refusal and exits non-zero when the built page is a link out of the build',
+    async () => {
+      const root = await temporaryRoot();
+      const directory = join(root, 'talk');
+      await cp(FIXTURE, directory, { recursive: true });
+      const built = join(root, 'built');
+      await mkdir(built);
+      await writeFile(join(root, 'outside.html'), '<p>outside</p>\n');
+      await symlink(join(root, 'outside.html'), join(built, 'index.html'));
+      const { announcement, exited } = startSidecar(directory, built);
+      expect(await announcement).toMatchObject({ kind: 'refused' });
       expect(await exited).toBe(1);
     },
     START_TIMEOUT_MS,

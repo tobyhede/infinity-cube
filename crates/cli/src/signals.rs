@@ -1,7 +1,7 @@
 //! The signals that stop a run (Storage ST-63): SIGINT, SIGTERM and SIGHUP,
 //! merged. On Windows, Ctrl-C, Ctrl-Break and the console closing stand in
-//! for them; Windows is not yet a supported platform (issue 22), and no CI
-//! job compiles or tests that half.
+//! for them; Windows is not yet a supported platform (issue 22): the
+//! `rust-windows` CI job compiles that half, and no test runs it.
 
 use std::io;
 

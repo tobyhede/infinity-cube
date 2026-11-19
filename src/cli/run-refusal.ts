@@ -7,6 +7,8 @@ export const describeRunRefusal = (refusal: RunRefusal, directory: string): stri
   switch (refusal.kind) {
     case 'empty':
       return `${directory} holds no aggregate: it is missing or empty. To create one there: pnpm cube init ${shellWord(directory)}\n`;
+    case 'locked':
+      return `${directory} is open in another run of InfinityCube: stop that run before starting this one.\n`;
     case 'unreadable':
     case 'aggregate-refused':
       return `${describeAggregateReadRefusal(refusal, directory)}\n`;

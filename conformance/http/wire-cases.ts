@@ -351,6 +351,24 @@ export const describeWireConformance = (options: WireConformanceOptions): void =
         await expectProblem(response, 'invalid-request', WHOLE_BODY_INVALID);
       });
 
+      // Import reads a Space directory only by a lower-case name, so a Space
+      // created under an upper-case id would be exported where no run reads it.
+      it('answers 400 invalid-request for a Space named in upper case', async () => {
+        const upper = 'ABCDEF00-0000-4000-8000-00000000000A';
+        const body = JSON.stringify({
+          changes: [
+            {
+              kind: 'create',
+              spaceId: upper,
+              snapshot: { id: upper, document: { version: 1, title: 'Upper' }, resources: [] },
+            },
+          ],
+        });
+        const response = await postCommit(host(), body);
+        expectApiPolicy(response);
+        await expectProblem(response, 'invalid-request', WHOLE_BODY_INVALID);
+      });
+
       it('answers 400 invalid-request for malformed JSON', async () => {
         await expectProblem(await postCommit(host(), '{'), 'invalid-request');
       });
@@ -588,6 +606,7 @@ export const describeWireConformance = (options: WireConformanceOptions): void =
         ['null', () => 'null'],
       ])('answers 403 forbidden to a change whose Origin is %s, changing nothing', async (_, origin) => {
         await expectChangesRefused({ origin: origin() });
+        await expectChangesRefused({ origin: origin(), 'sec-fetch-site': 'same-origin' });
       });
 
       it.each(['same-origin', 'none'])(
@@ -601,6 +620,14 @@ export const describeWireConformance = (options: WireConformanceOptions): void =
           expect(response.status).toBe(201);
         },
       );
+
+      it('stores an asset sent from its own origin naming no Sec-Fetch-Site', async () => {
+        const response = await postAsset(host(), freshBytes(16), {
+          'content-type': 'text/plain',
+          origin: ownOrigin(),
+        });
+        expect(response.status).toBe(201);
+      });
 
       it('answers a read whatever site a browser says sent it', async () => {
         const headers = { 'sec-fetch-site': 'cross-site', origin: 'http://attacker.example' };
@@ -690,6 +717,17 @@ export const describeWireConformance = (options: WireConformanceOptions): void =
         const page = await expectShell(await send(host(), spaceAddress(META)));
         expect(await expectShell(await send(host(), '/somewhere/else'))).toBe(page);
       });
+
+      // The build holds the page as `index.html`, but read by that name, however
+      // it is spelled, it is still the page with its policy, never a built file
+      // without one.
+      it.each(['/index.html', '/index%2Ehtml', '/./INDEX.HTML'])(
+        'serves the shell, with its policy, at %s',
+        async (pathname) => {
+          const page = await expectShell(await send(host(), spaceAddress(META)));
+          expect(await expectShell(await send(host(), pathname))).toBe(page);
+        },
+      );
 
       it('answers HEAD for the shell without its body', async () => {
         const response = await send(host(), '/somewhere/else', { method: 'HEAD' });

@@ -23,7 +23,7 @@ use host::{ImportError, RandomIds, Run, RunEvent, RunStopped, TokioClock};
 
 use crate::arguments::RunCommand;
 use crate::built::{self, Origin};
-use crate::describe::{empty, refused};
+use crate::describe::{empty, locked, refused};
 use crate::listener::{bind, own_host, serve};
 use crate::output::{announce_listening, announce_refused, say};
 use crate::signals::Signals;
@@ -39,6 +39,7 @@ fn refuse(message: &str) -> ExitCode {
 fn import_refusal(directory: &Path, error: &ImportError) -> String {
     match error {
         ImportError::Empty => empty(directory),
+        ImportError::Locked => locked(directory),
         ImportError::Refused(refusals) => refused(directory, refusals),
         other => format!("Could not start a run on {}: {other}", directory.display()),
     }

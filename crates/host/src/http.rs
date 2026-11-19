@@ -172,13 +172,15 @@ fn origin_authority(origin: &str) -> Option<&str> {
 /// `isCrossSiteChange` (ADR 0161, Storage ST-123): whether a change, a
 /// request that is not a read, comes from a page of another site, as the
 /// browser that sent it says. A `Sec-Fetch-Site` other than `same-origin` or
-/// `none` says so; failing that header, an `Origin` whose authority is not
-/// the `Host` the request names does, `null` included. A request naming no
+/// `none` says so, and so does an `Origin` whose authority is not the `Host`
+/// the request names, `null` included, whatever `Sec-Fetch-Site` says. A request naming no
 /// `Host`, such as the desktop scheme handler's, is not judged by its
 /// `Origin`, and one naming neither header is served.
 fn is_cross_site_change(headers: &HeaderMap) -> bool {
-    if let Some(site) = header_text(headers, &HeaderName::from_static("sec-fetch-site")) {
-        return site != "same-origin" && site != "none";
+    if header_text(headers, &HeaderName::from_static("sec-fetch-site"))
+        .is_some_and(|site| site != "same-origin" && site != "none")
+    {
+        return true;
     }
     match (header_text(headers, &ORIGIN), header_text(headers, &HOST)) {
         (Some(origin), Some(host)) => {

@@ -41,7 +41,7 @@ struct Talk {
 async fn open() -> Talk {
     let (temporary, directory) = fixture_copy();
     let shell = built_shell(&stand_in_build(&temporary)).unwrap();
-    let run = open_run(&directory, shell).await.unwrap();
+    let run = open_run(&directory, shell, |_| {}).await.unwrap();
     let address = TalkAddress::new(TalkKey::of(&directory), SchemeStyle::HostPerTalk);
     let open_talks = OpenTalks::new(SchemeStyle::HostPerTalk);
     open_talks.open(address.clone(), Arc::clone(run.application()), WINDOW);
@@ -180,6 +180,23 @@ mod given_a_request_at_the_trust_boundary {
             .body(Vec::new())
             .unwrap();
         shell(&talk.answer(&view, request).await);
+        talk.stop().await;
+    }
+
+    #[tokio::test]
+    async fn stops_admitting_a_window_the_talks_page_opened_once_it_is_gone() {
+        let talk = open().await;
+        let key = talk.address.key();
+        let view = talk.open_talks.open_view(key).expect("the talk is open");
+        talk.open_talks.forget_view(&view);
+        assert!(
+            !talk.open_talks.holds_window(key, &view),
+            "a window that is gone"
+        );
+        assert!(
+            talk.open_talks.holds_window(key, WINDOW),
+            "the talk's own window is still held"
+        );
         talk.stop().await;
     }
 

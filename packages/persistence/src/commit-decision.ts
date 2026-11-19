@@ -38,8 +38,13 @@ const ascendingById = (left: LoadedSpace, right: LoadedSpace): number => {
 
 /**
  * Refuse a change set the store will not judge: an empty one, one that names a
- * Space twice, or one whose change and snapshot disagree about which Space it
- * is. Answered before any read.
+ * Space twice, one that names a Space in other than lower case, or one whose
+ * change and snapshot disagree about which Space it is. Answered before any
+ * read.
+ *
+ * A Space's id is its directory's name, which Import reads only in lower case
+ * (`spaceDirectoryId`), so a Space created under an upper-case id would be
+ * exported to a directory no later run can read.
  *
  * It takes a plain change list rather than a `SpaceCommit`, which is a non-empty
  * tuple. Widening the parameter is what lets the empty case be *reached* — by a
@@ -68,6 +73,13 @@ export const commitRequestRefusal = (request: {
       };
     }
     ids.add(change.spaceId);
+    if (change.spaceId !== change.spaceId.toLowerCase()) {
+      return {
+        kind: 'rejected',
+        code: 'invalid-commit',
+        message: `Space ${change.spaceId} must be named in lower case`,
+      };
+    }
     if (change.kind !== 'delete' && change.snapshot.id !== change.spaceId) {
       return {
         kind: 'rejected',

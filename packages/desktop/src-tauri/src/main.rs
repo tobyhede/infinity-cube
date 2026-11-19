@@ -15,6 +15,7 @@
 
 mod address;
 mod question;
+mod saving;
 mod scheme;
 mod server;
 mod talks;
@@ -25,8 +26,9 @@ mod waiting;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{Receiver, TryRecvError};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
-use std::thread::{self, JoinHandle};
+use std::thread;
 
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::webview::NewWindowResponse;
@@ -51,7 +53,7 @@ use crate::waiting::{Choice, Effect, Event};
 #[derive(Default)]
 struct Talks {
     registry: Mutex<Registry<TalkServer>>,
-    stopping: Mutex<HashMap<String, JoinHandle<()>>>,
+    stopping: Mutex<HashMap<String, Receiver<()>>>,
     abandoned: Mutex<HashSet<String>>,
 }
 
@@ -80,15 +82,20 @@ impl Talks {
         lock(&self.registry)
     }
 
-    /// Keep a closing talk's stop, so quitting waits for it.
-    fn keep_stopping(&self, label: String, stop: JoinHandle<()>) {
+    /// Keep word of when a closing talk's last write ends, so quitting
+    /// waits for the write, and never for a dialog reporting it, which
+    /// needs the event loop quitting holds.
+    fn keep_stopping(&self, label: String, written: Receiver<()>) {
         let mut stopping = lock(&self.stopping);
-        stopping.retain(|_, stop| !stop.is_finished());
-        let _replaced = stopping.insert(label, stop);
+        stopping.retain(|_, written| matches!(written.try_recv(), Err(TryRecvError::Empty)));
+        let _replaced = stopping.insert(label, written);
     }
 
-    fn take_stopping(&self) -> Vec<JoinHandle<()>> {
-        lock(&self.stopping).drain().map(|(_, stop)| stop).collect()
+    fn take_stopping(&self) -> Vec<Receiver<()>> {
+        lock(&self.stopping)
+            .drain()
+            .map(|(_, written)| written)
+            .collect()
     }
 
     /// The presenter gave up on window `label`'s last write: nothing waits
@@ -118,8 +125,11 @@ fn spawn_stop(
 ) {
     let handle = app.clone();
     let kept = label.clone();
-    let stop = thread::spawn(move || {
+    let (written, ended) = std::sync::mpsc::channel();
+    let _stop = thread::spawn(move || {
         let failed = server.stop();
+        // Quitting waits for this, not for the dialog below.
+        let _told = written.send(());
         let talks = handle.state::<Talks>();
         let abandoned = talks.take_abandoned(&label);
         if let Some(reason) = failed {
@@ -128,7 +138,7 @@ fn spawn_stop(
         talks.registry().closed(&label);
         handle.state::<Closings>().send(Event::WriteFinished(label));
     });
-    app.state::<Talks>().keep_stopping(kept, stop);
+    app.state::<Talks>().keep_stopping(kept, ended);
 }
 
 /// Do what the close-wait decision decided.
@@ -374,6 +384,7 @@ fn open_view(app: &AppHandle, label: &str, url: Url, title: &str, windows: &Arc<
         Arc::clone(windows),
     );
     if let Err(error) = opened {
+        app.state::<SharedTalks>().forget_view(label);
         show_error(app, &format!("Could not open a window: {error}"));
         return;
     }
@@ -504,6 +515,12 @@ fn main() {
             Ok(())
         })
         .on_window_event(|window, event| {
+            if matches!(event, WindowEvent::Destroyed)
+                && window.label().starts_with(VIEW_WINDOW_PREFIX)
+            {
+                window.state::<SharedTalks>().forget_view(window.label());
+                return;
+            }
             let WindowEvent::CloseRequested { api, .. } = event else {
                 return;
             };
@@ -574,7 +591,7 @@ fn main() {
             }
             let talks = app.state::<Talks>();
             let open = talks.registry().take_all();
-            let mut stopping: Vec<_> = open
+            let stopping: Vec<_> = open
                 .into_iter()
                 .map(|(_label, directory, server)| {
                     thread::spawn(move || {
@@ -584,7 +601,11 @@ fn main() {
                     })
                 })
                 .collect();
-            stopping.extend(talks.take_stopping());
+            for written in talks.take_stopping() {
+                // Answered once the write ends, or at once if its stop
+                // ended without saying so.
+                let _ = written.recv();
+            }
             for stop in stopping {
                 let _ = stop.join();
             }
