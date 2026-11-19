@@ -40,7 +40,8 @@ pub enum OpenError {
 ///
 /// # Errors
 ///
-/// The directory cannot be resolved, or holds no readable `index.html`.
+/// The directory cannot be resolved, or its `index.html` does not resolve to
+/// a readable regular file inside it; a link to one inside it is followed.
 pub fn built_shell(
     directory: &Path,
 ) -> Result<Shell<BuiltApplicationDirectory>, BuiltApplicationError> {

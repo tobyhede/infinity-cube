@@ -291,6 +291,15 @@ mod given_an_edit {
             matches!(started.run.stop().await, RunStopped::Stopped),
             "stopped"
         );
+        assert!(
+            started.events.try_recv().is_err(),
+            "the stop writes nothing already on disk"
+        );
+        assert_eq!(
+            meta_title(&started.directory),
+            "Second",
+            "the written Edit is kept through the stop"
+        );
     }
 
     // Case: writes an edit not yet written when stopped by SIGINT, and exits zero

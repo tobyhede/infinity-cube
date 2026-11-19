@@ -256,18 +256,30 @@ mod given_a_commit {
             200,
             "joined and committed"
         );
-        let chunk = Bytes::from(vec![b' '; MAX_COMMIT_BODY_BYTES / 2 + 1]);
+        // A valid commit padded to one byte over the limit, as the case sends it.
+        let committed = load(&host, META).await;
+        let mut padded = rename_text(&committed, "Too big").into_bytes();
+        padded.resize(MAX_COMMIT_BODY_BYTES + 1, b' ');
+        let (left, right) = padded.split_at(padded.len() / 2);
         let request = Request::builder()
             .method("POST")
             .uri("/api/spaces")
             .header("content-type", "application/json")
-            .body(Chunks(VecDeque::from([chunk.clone(), chunk])))
+            .body(Chunks(VecDeque::from([
+                Bytes::copy_from_slice(left),
+                Bytes::copy_from_slice(right),
+            ])))
             .unwrap();
         problem(
             &host.handle(request).await,
             "payload-too-large",
             413,
             "Payload too large",
+        );
+        assert_eq!(
+            load(&host, META).await["revision"],
+            committed["revision"],
+            "nothing committed"
         );
     }
 }

@@ -1,8 +1,8 @@
 //! The built application served from a directory: its `index.html` is read
-//! once, when the directory is opened, and every other file when a request
-//! names it, so a file other than the page changed on disk is served as
-//! changed, and a rebuilt directory, whose page names other files, needs the
-//! directory opened again.
+//! once, when the directory is opened, and served as read at every address,
+//! and every other file is read when a request names it, so a file other
+//! than the page changed on disk is served as changed, and a rebuilt
+//! directory, whose page names other files, needs the directory opened again.
 
 use std::path::{Path, PathBuf};
 
@@ -33,12 +33,15 @@ pub enum BuiltApplicationError {
 #[derive(Debug, Clone)]
 pub struct BuiltApplicationDirectory {
     root: PathBuf,
+    /// The page as read when the directory was opened, which a request
+    /// naming `index.html` is answered with too.
+    page: Bytes,
 }
 
 impl BuiltApplicationDirectory {
     /// The built application in `directory`: its `index.html`, read now and
-    /// not again, as the page for [`Shell::new`], and the files beside it,
-    /// read on request.
+    /// not again, as the page for [`Shell::new`](crate::Shell::new), and the
+    /// files beside it, read on request.
     ///
     /// # Errors
     ///
@@ -72,14 +75,19 @@ impl BuiltApplicationDirectory {
         if !real.starts_with(&root) || !real.is_file() {
             return Err(no_page());
         }
-        let page = std::fs::read(&real)
-            .map_err(|error| BuiltApplicationError::Unreadable(page_path, error))?;
-        Ok((Bytes::from(page), Self { root }))
+        let page = Bytes::from(
+            std::fs::read(&real)
+                .map_err(|error| BuiltApplicationError::Unreadable(page_path, error))?,
+        );
+        Ok((page.clone(), Self { root, page }))
     }
 }
 
 impl BuiltFiles for BuiltApplicationDirectory {
     async fn file(&self, path: &str) -> Option<Bytes> {
+        if path == PAGE {
+            return Some(self.page.clone());
+        }
         // The trait hands over a path with no `.` or `..` segment.
         let real = tokio::fs::canonicalize(self.root.join(path)).await.ok()?;
         if !real.starts_with(&self.root) || !tokio::fs::metadata(&real).await.ok()?.is_file() {
@@ -107,11 +115,8 @@ mod tests {
     }
 
     async fn served(directory: &Path, path: &str) -> Option<Bytes> {
-        BuiltApplicationDirectory {
-            root: fs::canonicalize(directory).unwrap(),
-        }
-        .file(path)
-        .await
+        let (_page, files) = BuiltApplicationDirectory::open(directory).unwrap();
+        files.file(path).await
     }
 
     mod given_a_built_application_directory {
@@ -157,16 +162,30 @@ mod tests {
         async fn serves_a_file_changed_after_it_was_opened() {
             let temporary = tempfile::tempdir().unwrap();
             let root = built(temporary.path());
+            let (_page, files) = BuiltApplicationDirectory::open(&root).unwrap();
             assert_eq!(
-                served(&root, "assets/index-1.js").await,
+                files.file("assets/index-1.js").await,
                 Some(Bytes::from("1")),
                 "before"
             );
             fs::write(root.join("assets/index-1.js"), "2").unwrap();
             assert_eq!(
-                served(&root, "assets/index-1.js").await,
+                files.file("assets/index-1.js").await,
                 Some(Bytes::from("2")),
-                "after"
+                "after, from the same opened directory"
+            );
+        }
+
+        #[tokio::test]
+        async fn serves_the_page_as_it_was_opened_at_its_own_address() {
+            let temporary = tempfile::tempdir().unwrap();
+            let root = built(temporary.path());
+            let (page, files) = BuiltApplicationDirectory::open(&root).unwrap();
+            fs::write(root.join("index.html"), "<p>rebuilt</p>").unwrap();
+            assert_eq!(
+                files.file("index.html").await,
+                Some(page),
+                "the page read when the directory was opened, as the fallback serves it"
             );
         }
 
