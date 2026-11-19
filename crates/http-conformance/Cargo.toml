@@ -8,9 +8,9 @@ publish = false
 
 [dependencies]
 bytes = { workspace = true }
-host = { path = "../host" }
+host = { workspace = true }
 http = { workspace = true }
-intake = { path = "../intake" }
+intake = { workspace = true }
 serde_json = { workspace = true }
 
 [lints]

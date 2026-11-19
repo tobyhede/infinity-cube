@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -81,4 +81,20 @@ describe('The built files the desktop sidecar serves', () => {
       expect(await (await builtBesideASecret())(pathname)).toBeUndefined();
     },
   );
+
+  // The permission bits do not bind root, which reads the file anyway; the
+  // assertion then has no unreadable file to hold and the case returns.
+  it('answers nothing for a file whose permissions forbid reading it', async () => {
+    const files = await builtBesideASecret();
+    const path = join(roots[0] ?? '', 'built', 'assets', 'index-abc123.js');
+    await chmod(path, 0o000);
+    const readable = await readFile(path).then(
+      () => true,
+      () => false,
+    );
+    const answer = await files('/assets/index-abc123.js');
+    await chmod(path, 0o644);
+    if (readable) return;
+    expect(answer).toBeUndefined();
+  });
 });

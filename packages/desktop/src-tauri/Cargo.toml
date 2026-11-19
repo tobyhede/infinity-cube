@@ -13,7 +13,7 @@ tauri-build = { version = "=2.7.4", features = [] }
 tauri = { version = "=2.12.5", features = [] }
 tauri-plugin-dialog = "=2.8.4"
 bytes = "1"
-host = { path = "../../../crates/host" }
+host = { workspace = true }
 http = "1"
 http-body-util = "0.1"
 sha2 = { workspace = true }
@@ -22,7 +22,7 @@ tokio = { version = "1", features = ["fs", "rt", "sync", "time"] }
 url = { workspace = true }
 
 [dev-dependencies]
-http-conformance = { path = "../../../crates/http-conformance" }
+http-conformance = { workspace = true }
 serde_json = { workspace = true }
 tempfile = "3"
 tokio = { version = "1", features = ["fs", "macros", "rt", "rt-multi-thread", "sync", "test-util", "time"] }

@@ -679,6 +679,52 @@ jobs:
               pnpm exec vitest run --config vitest.integration.config.ts test/integration/http-conformance.test.ts
           done
 
+  rust-windows:
+    needs: reuse-pr-ci
+    # Same condition as `rust`, so a push to `main` still fills this job's
+    # cache.
+    if: ${{ !cancelled() && (github.event_name == 'push' || needs.reuse-pr-ci.outputs.should_skip != 'true') }}
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      NEXTEST_VERSION: 0.9.152
+    defaults:
+      run:
+        shell: bash
+    # The crates that build without the desktop shell's prerequisites: the
+    # intake, the host, the conformance cases and the CLI, run through
+    # nextest. This is the only job that compiles the `cfg(windows)` half of
+    # `crates/cli/src/signals.rs` and `crates/cli/src/browser.rs`. The CLI's
+    # `tests/run.rs` is `#![cfg(unix)]` and its signal helper uses `kill`, so
+    # the Windows signal handling still has no test that runs it. The shell is
+    # not built here.
+    #
+    # Not in the `ci` job's `needs`: this job has not yet run on Actions, so
+    # the gate does not yet depend on it.
+    #
+    # Line endings are left as the repository stores them, so the fixtures the
+    # host tests read are the bytes they hash. The cache and the nextest
+    # install are as in `rust`, keyed on this runner's OS.
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - name: Install the pinned Rust toolchain
+        run: rustup toolchain install
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/bin/cargo-nextest.exe
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: cargo-${{ runner.os }}-nextest-${{ env.NEXTEST_VERSION }}-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-nextest-${{ env.NEXTEST_VERSION }}-${{ hashFiles('rust-toolchain.toml') }}-
+      - name: Install cargo-nextest
+        run: command -v cargo-nextest || cargo install cargo-nextest --locked --version "$NEXTEST_VERSION"
+      - run: cargo nextest run --locked -p intake -p host -p http-conformance -p infinity-cube
+
   ci:
     name: CI passed
     needs: [reuse-pr-ci, static-checks, coverage, postgres, sqlite, e2e, ladle, mount, rust]

@@ -327,8 +327,11 @@ mod given_a_directory_it_cannot_run {
         let Some(Announcement::Refused(message)) = run.announcement.clone() else {
             panic!("expected a refusal, got {:?}", run.announcement);
         };
+        // Single-quoted where a shell would split or expand it, as on Windows.
+        let shown = missing.display();
         assert!(
-            message.contains(&format!("pnpm cube init {}", missing.display())),
+            message.contains(&format!("pnpm cube init {shown}"))
+                || message.contains(&format!("pnpm cube init '{shown}'")),
             "names init: {message}"
         );
         assert_eq!(run.exited().code(), Some(1), "exits one");

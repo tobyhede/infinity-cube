@@ -1,5 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
@@ -160,6 +160,23 @@ describe('The desktop sidecar', () => {
       expect(announcement).toMatchObject({ kind: 'refused' });
       // A presenter has the desktop application, not a clone with pnpm in it.
       expect(announcement.kind === 'refused' && announcement.message).not.toContain('pnpm');
+      expect(await exited).toBe(1);
+    },
+    START_TIMEOUT_MS,
+  );
+
+  it(
+    'announces a refusal and exits non-zero when the built page is a link out of the build',
+    async () => {
+      const root = await temporaryRoot();
+      const directory = join(root, 'talk');
+      await cp(FIXTURE, directory, { recursive: true });
+      const built = join(root, 'built');
+      await mkdir(built);
+      await writeFile(join(root, 'outside.html'), '<p>outside</p>\n');
+      await symlink(join(root, 'outside.html'), join(built, 'index.html'));
+      const { announcement, exited } = startSidecar(directory, built);
+      expect(await announcement).toMatchObject({ kind: 'refused' });
       expect(await exited).toBe(1);
     },
     START_TIMEOUT_MS,
