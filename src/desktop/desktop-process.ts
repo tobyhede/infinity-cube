@@ -14,7 +14,7 @@ import { describeRunRefusal } from '../cli/run-refusal';
 import { startRun, type RunRefusal } from '../run/run';
 import type { SidecarAnnouncement } from './announcement';
 import { createDesktopHandler } from './desktop-handler';
-import { builtFiles, desktopContentSecurityPolicy } from './static-files';
+import { builtFiles, builtPage, desktopContentSecurityPolicy } from './static-files';
 
 /**
  * The desktop sidecar (ADR 0155): runs one Aggregate directory for one window
@@ -84,7 +84,7 @@ const main = async (): Promise<void> => {
 
   // The page is read as every built file is, so one that is a link out of the
   // build is no page.
-  const page = await builtFiles(built)('/index.html');
+  const page = await builtPage(built);
   if (page === undefined) return refuse(`${built} holds no index.html inside it.\n`);
   const pageText = new TextDecoder().decode(page.bytes);
 
