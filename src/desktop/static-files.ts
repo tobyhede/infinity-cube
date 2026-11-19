@@ -18,6 +18,8 @@ const isInside = (base: string, path: string): boolean => {
  * from outside it: a path that would climb out, by its name or through a
  * symbolic link, answers `undefined`.
  */
+const PAGE_FILE = 'index.html';
+
 export const builtFiles =
   (root: string) =>
   async (pathname: string): Promise<StaticFile | undefined> => {
@@ -30,6 +32,10 @@ export const builtFiles =
     const base = resolve(root);
     const path = resolve(join(base, decoded));
     if (!isInside(base, path)) return undefined;
+    // The page is `index.html` in the build, but by that name it is still the
+    // page, served with its policy, never a file without one (ST-115). Its case
+    // is ignored for a file system that ignores it.
+    if (relative(base, path).toLowerCase() === PAGE_FILE) return undefined;
     // A path the build does not hold as a file, missing, a directory or
     // otherwise unreadable, is the single-page fallback's.
     try {

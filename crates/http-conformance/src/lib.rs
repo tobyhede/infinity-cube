@@ -180,6 +180,7 @@ macro_rules! cases {
             given_a_request_for_the_shell {
                 serves_the_shell_for_a_product_address_that_resolves,
                 falls_back_to_the_shell_for_an_address_not_the_applications,
+                serves_the_shell_with_its_policy_at_index_html,
                 answers_head_for_the_shell_without_its_body,
                 answers_405_to_a_write_to_an_address_not_the_applications,
                 serves_a_content_named_built_file_as_immutable,

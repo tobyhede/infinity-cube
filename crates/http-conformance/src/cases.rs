@@ -901,6 +901,13 @@ pub mod given_a_request_for_the_shell {
         shell(&get(subject, "/somewhere/else").await);
     }
 
+    // Case: serves the shell, with its policy, at %s
+    pub async fn serves_the_shell_with_its_policy_at_index_html<A: Adapter>(subject: &A) {
+        for path in ["/index.html", "/index%2Ehtml", "/./INDEX.HTML"] {
+            shell(&get(subject, path).await);
+        }
+    }
+
     // Case: answers HEAD for the shell without its body
     pub async fn answers_head_for_the_shell_without_its_body<A: Adapter>(subject: &A) {
         let response = send(subject, "HEAD", "/somewhere/else", &[], Bytes::new()).await;

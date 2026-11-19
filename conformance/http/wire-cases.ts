@@ -718,6 +718,17 @@ export const describeWireConformance = (options: WireConformanceOptions): void =
         expect(await expectShell(await send(host(), '/somewhere/else'))).toBe(page);
       });
 
+      // The build holds the page as `index.html`, but read by that name, however
+      // it is spelled, it is still the page with its policy, never a built file
+      // without one.
+      it.each(['/index.html', '/index%2Ehtml', '/./INDEX.HTML'])(
+        'serves the shell, with its policy, at %s',
+        async (pathname) => {
+          const page = await expectShell(await send(host(), spaceAddress(META)));
+          expect(await expectShell(await send(host(), pathname))).toBe(page);
+        },
+      );
+
       it('answers HEAD for the shell without its body', async () => {
         const response = await send(host(), '/somewhere/else', { method: 'HEAD' });
         expect(response.status).toBe(200);
