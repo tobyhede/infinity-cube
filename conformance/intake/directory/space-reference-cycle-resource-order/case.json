@@ -1,0 +1,13 @@
+{
+  "description": "Two Spaces referencing each other, reached from the Meta Space by Resources titled \"alpha\" (to the third Space) and \"Zeta\" (to the second). In code unit order \"Zeta\" comes first, so the walk enters the second Space and the third Space's reference back closes the cycle; a locale-aware order would walk \"alpha\" first and name the second Space's Resource instead.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "space-reference-cycle",
+        "file": "30000000-0000-4000-8000-000000000003/resources/00000000-0000-4000-8000-000000000301.json",
+        "id": "00000000-0000-4000-8000-000000000301"
+      }
+    ]
+  }
+}

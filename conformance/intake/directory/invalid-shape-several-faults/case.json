@@ -1,0 +1,23 @@
+{
+  "description": "A space.json with an empty Title, an undeclared key on its Map and an Edge endpoint that is not a string: one refusal for each.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "invalid-shape",
+        "file": "10000000-0000-4000-8000-000000000001/space.json",
+        "field": "title"
+      },
+      {
+        "kind": "invalid-shape",
+        "file": "10000000-0000-4000-8000-000000000001/space.json",
+        "field": "maps.0"
+      },
+      {
+        "kind": "invalid-shape",
+        "file": "10000000-0000-4000-8000-000000000001/space.json",
+        "field": "maps.0.graphs.0.edges.0.from"
+      }
+    ]
+  }
+}

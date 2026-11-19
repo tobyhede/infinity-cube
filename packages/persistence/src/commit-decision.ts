@@ -170,9 +170,12 @@ export const decideCommit = (
    * the identical change set conflicts again, forever. That falls through
    * to complete intake below and is refused.
    */
+  // Ascending by id, created Spaces among the stored ones, so a refusal's
+  // `snapshotIndex` is the position an ascending-by-id read gives the Space.
+  const candidateSpaces = [...candidate.values()].sort(ascendingById);
   const aggregate = loadSpaceAggregate({
     metaSpaceId,
-    snapshots: [...candidate.values()].map(({ snapshot }) => snapshot),
+    snapshots: candidateSpaces.map(({ snapshot }) => snapshot),
   });
   const deletedIds = new Set(
     request.changes.flatMap((change) => (change.kind === 'delete' ? [change.spaceId] : [])),
@@ -219,6 +222,6 @@ export const decideCommit = (
   return {
     kind: 'write',
     result: committed(request),
-    spaces: [...candidate.values()].sort(ascendingById),
+    spaces: candidateSpaces,
   };
 };

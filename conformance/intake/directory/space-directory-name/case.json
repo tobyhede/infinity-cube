@@ -1,0 +1,12 @@
+{
+  "description": "A Space directory named other than its Space Id.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "space-directory-name",
+        "file": "deep-dive"
+      }
+    ]
+  }
+}

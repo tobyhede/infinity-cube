@@ -1,0 +1,12 @@
+{
+  "description": "A file in assets/ named by a hash that is not its content's.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "asset-file-name",
+        "file": "assets/o-rV7trV34IxjFFoXbwcFHo20f-FhPyC3msI0L9jp5U.md"
+      }
+    ]
+  }
+}

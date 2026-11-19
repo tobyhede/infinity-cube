@@ -4,12 +4,21 @@ import {
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
+import { locateSnapshotIssue } from '@project/graph';
+import type { IntakeRefusal } from './intake-refusal';
 
-/** A space file or directory that cannot become a fully identified snapshot. */
+/**
+ * A space file or directory that cannot become a fully identified snapshot.
+ * `refusals` locate each fault with `file` relative to the Space directory,
+ * which the directory reader then places under the directory's name.
+ */
 export class SpaceIdentityError extends Error {
-  constructor(message: string) {
+  readonly refusals: readonly IntakeRefusal[];
+
+  constructor(message: string, refusals: readonly IntakeRefusal[]) {
     super(message);
     this.name = 'SpaceIdentityError';
+    this.refusals = refusals;
   }
 }
 
@@ -103,6 +112,7 @@ export const identifySpace = (
   if (input.id !== undefined && input.id !== spaceId) {
     throw new SpaceIdentityError(
       `the space file declares Space ${input.id} but it is identified as ${spaceId}`,
+      [{ kind: 'space-id-mismatch', file: 'space.json', field: 'id' }],
     );
   }
 
@@ -118,13 +128,16 @@ export const identifySpace = (
   // rewrote an unsupported document into a supported one.
   const document = maps === undefined ? { ...input.document } : { ...input.document, maps };
 
-  const parsed = spaceSnapshotSchema.safeParse({
-    id: spaceId,
-    document,
-    resources: input.resources,
-  });
+  const identified = { id: spaceId, document, resources: input.resources };
+  const parsed = spaceSnapshotSchema.safeParse(identified);
   if (!parsed.success) {
-    throw new SpaceIdentityError(describeSchemaFailure(parsed.error.issues, 'identified space'));
+    throw new SpaceIdentityError(
+      describeSchemaFailure(parsed.error.issues, 'identified space'),
+      parsed.error.issues.map((issue) => ({
+        kind: 'invalid-shape',
+        ...locateSnapshotIssue(identified, issue.path),
+      })),
+    );
   }
   return parsed.data;
 };

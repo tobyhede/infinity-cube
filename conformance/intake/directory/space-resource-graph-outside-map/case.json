@@ -1,0 +1,13 @@
+{
+  "description": "A Space Resource selecting a Graph its Space has but its selected Map does not own.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "space-resource-graph-outside-map",
+        "file": "10000000-0000-4000-8000-000000000001/resources/00000000-0000-4000-8000-000000000103.json",
+        "id": "00000000-0000-4000-8000-000000000103"
+      }
+    ]
+  }
+}

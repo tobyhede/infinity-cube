@@ -12,6 +12,7 @@ import {
   unrootedSpaces,
   type SpaceReference,
 } from './declared-references';
+import { compareOrdinal } from './ordinal';
 import { loadSpaceSnapshot, type Space, type SpaceError } from './space';
 
 /** The aggregate intake brand's carrier. */
@@ -140,10 +141,18 @@ export function loadSpaceAggregate({
   if (!byId.has(metaSpaceId)) {
     return { ok: false, errors: [{ kind: 'meta-space-missing', metaSpaceId }] };
   }
+  // Which Resource a cycle is reported at depends on the order the walk
+  // follows a Space's Resources, so they are read in code unit order of Title,
+  // then id, which no host's collation changes (`conformance/intake/README.md`).
   const declared = declaredSpaceReferences(
     spaces.map((space) => ({
       id: space.id,
-      resources: space.resources.map((resource) => ({ id: resource.id, document: resource })),
+      resources: [...space.resources]
+        .sort(
+          (left, right) =>
+            compareOrdinal(left.title, right.title) || compareOrdinal(left.id, right.id),
+        )
+        .map((resource) => ({ id: resource.id, document: resource })),
     })),
   );
   const located =

@@ -1,0 +1,13 @@
+{
+  "description": "A Reference whose Target is itself.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "reference-targets-self",
+        "file": "10000000-0000-4000-8000-000000000001/resources/00000000-0000-4000-8000-000000000102.json",
+        "id": "00000000-0000-4000-8000-000000000102"
+      }
+    ]
+  }
+}

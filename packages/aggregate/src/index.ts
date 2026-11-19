@@ -22,6 +22,12 @@ export {
 } from './aggregate-refusal';
 export { describeSchemaFailure, identifySpace, SpaceIdentityError } from './identify-space';
 export {
+  INTAKE_REFUSAL_KINDS,
+  locateAggregateRefusal,
+  type IntakeRefusal,
+  type IntakeRefusalKind,
+} from './intake-refusal';
+export {
   assetFileExtension,
   assetFileHash,
   assetFileName,
@@ -29,7 +35,7 @@ export {
   ASSETS_DIRECTORY_NAME,
 } from './assets';
 export { MemorySpaceRepository } from './memory-space-repository';
-export { compareOrdinal } from './ordinal';
+export { compareOrdinal } from '@project/graph';
 export { createSpaceHost, type SpaceHostApplication } from './space-host';
 export { AggregateDirectoryError, parseSingleSpace, refuseSpaceDocument } from './space-directory';
 export type {

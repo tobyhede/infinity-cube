@@ -1,0 +1,6 @@
+{
+  "description": "A kind no listed plugin draws is carried whole, its content and Map content unread.",
+  "expect": {
+    "outcome": "accepted"
+  }
+}

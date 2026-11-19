@@ -1,6 +1,6 @@
 # 07 — An intake conformance corpus, run against the TypeScript intake
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 **Blocked by:** None (ADR 0156 accepted; the corpus is useful to the TypeScript intake either way).
 
@@ -15,7 +15,17 @@ Start from the JSON Schema examples in `docs/schema/` and add what schemas canno
 
 **Export bytes.** For each accepted directory case, also record the bytes the TypeScript Export writes for it (key order, indentation, trailing newline), so the Rust Export can be held to write the same files and the first Edit after the swap (13) does not rewrite every file of a talk. A case whose files are already as Export writes them is expected to round-trip unchanged.
 
-- [ ] TypeScript intake refusals carry `{ kind, file, id?, field? }`, with Edges located as (Graph id, `from`, `to`); existing messages unchanged.
-- [ ] Corpus format, for directory and commit cases and the expected Export bytes, documented in the corpus's README, language-neutral so a Rust runner can read it.
-- [ ] One case per refusal kind intake has today, accepted cases for each listed plugin, and commit cases accepted and refused.
-- [ ] Runner green against the TypeScript intake; 10 and 11 run the same corpus.
+- [x] TypeScript intake refusals carry `{ kind, file, id?, field? }`, with Edges located as (Graph id, `from`, `to`); existing messages unchanged.
+- [x] Corpus format, for directory and commit cases and the expected Export bytes, documented in the corpus's README, language-neutral so a Rust runner can read it.
+- [x] One case per refusal kind intake has today, accepted cases for each listed plugin, and commit cases accepted and refused.
+- [x] Runner green against the TypeScript intake; 10 and 11 run the same corpus (their half is theirs: the format is language-neutral and the corpus sits where a crate reaches it).
+
+## Comments
+
+- Built at `conformance/intake/` (59 directory cases, 7 commit cases; `README.md` is the format, the location rules and the closed list of kinds), run by `test/unit/intake-conformance.test.ts`, which the `test:coverage` job runs as part of `vitest run`. Storage ST-117 restates it.
+- A refusal's location is `{ kind, file, id?, field?, edge? }`: an Edge is located as its Graph's `id` with `edge: { from, to }`, a pair rather than two optional keys. Inside the TypeScript intake it is `at` on each `SpaceError` and `ResourceFileError`, optional only because the HTTP refusal body does not carry it: the encoder leaves it off, so the wire is unchanged.
+- Kinds with no case, and why, are in the README's table: `unreadable` and `symbolic-link` (not representable in a portable checkout), `asset-refused` (a 10 MiB file), `duplicate-space-id` (unreachable from a directory or a commit).
+- A reference a plugin declares (a Reference's Target, a Space Resource's Space, Map and Graph) is located by its Resource's file and id with no `field`, because the generic intake does not know which field of the content declares it.
+- `decideCommit` now sorts the candidate aggregate before intake, as its docblock already said, so a created Space's `snapshotIndex` is its sorted position; the commit runner relies on it.
+- `space-reference-cycle` across Spaces is reported at each reference closing a cycle in a depth-first walk whose Resource order is by Title, then id, each compared by UTF-16 code unit and never by locale. `conformance/intake/README.md` states the walk, and `space-reference-cycle-resource-order` is the case where the order matters.
+

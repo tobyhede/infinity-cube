@@ -1,0 +1,14 @@
+{
+  "description": "defaultMap names no declared Map.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "unresolved-default-map",
+        "file": "10000000-0000-4000-8000-000000000001/space.json",
+        "id": "10000000-0000-4000-8000-000000000001",
+        "field": "defaultMap"
+      }
+    ]
+  }
+}

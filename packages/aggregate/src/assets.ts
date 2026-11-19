@@ -65,15 +65,19 @@ export const admitAssetFile = async (
 ): Promise<StoredAsset> => {
   const admission = await admitAsset(bytes, mediaTypeForExtension(assetFileExtension(name)));
   if (admission.kind === 'refused') {
-    throw new AggregateDirectoryError('parsing', [
-      `${path}: not an asset the host stores (${admission.code})`,
-    ]);
+    throw new AggregateDirectoryError(
+      'parsing',
+      [`${path}: not an asset the host stores (${admission.code})`],
+      [{ kind: 'asset-refused', file: `${ASSETS_DIRECTORY_NAME}/${name}` }],
+    );
   }
   const expected = admission.asset.hash;
   if (assetFileHash(name) !== expected) {
-    throw new AggregateDirectoryError('parsing', [
-      `${path}: an asset file must be named for its content, ${expected}`,
-    ]);
+    throw new AggregateDirectoryError(
+      'parsing',
+      [`${path}: an asset file must be named for its content, ${expected}`],
+      [{ kind: 'asset-file-name', file: `${ASSETS_DIRECTORY_NAME}/${name}` }],
+    );
   }
   return admission.asset;
 };

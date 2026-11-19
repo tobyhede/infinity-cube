@@ -11,6 +11,7 @@ import {
   type ResourceReferenceProblem,
 } from './declared-references';
 import { repeatedGraphEdges } from './graph-edges';
+import type { IntakeLocation } from './intake-location';
 
 /**
  * The resources and maps a reference check reads. Structural so it accepts both
@@ -79,7 +80,12 @@ export interface SpaceReferenceError {
   ref: string;
   /** Human-readable description, useful for surfacing in the UI or CLI. */
   message: string;
+  /** Where the fault is. See {@link IntakeLocation}. */
+  at?: IntakeLocation;
 }
+
+/** A Resource's file, which a fault in its content is located at. */
+const resourceFile = (id: string): IntakeLocation => ({ file: `resources/${id}.json`, id });
 
 function duplicates(ids: readonly string[]): string[] {
   const seen = new Set<string>();
@@ -123,12 +129,18 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
       kind: 'duplicate-resource-id',
       ref: id,
       message: `Duplicate resource id "${id}"`,
+      at: resourceFile(id),
     });
   }
 
   const maps = space.maps ?? [];
   for (const id of duplicates(maps.map((m) => m.id))) {
-    errors.push({ kind: 'duplicate-map-id', ref: id, message: `Duplicate map id "${id}"` });
+    errors.push({
+      kind: 'duplicate-map-id',
+      ref: id,
+      message: `Duplicate map id "${id}"`,
+      at: { file: 'space.json', id },
+    });
   }
 
   // A graph id is unique across the **space**, although one map owns it
@@ -158,6 +170,7 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
       kind: 'duplicate-graph-id',
       ref: graphId,
       message: `Duplicate graph id "${graphId}" at ${where}`,
+      at: { file: 'space.json', id: graphId },
     });
   }
 
@@ -180,6 +193,7 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
           kind: 'map-member-missing-resource',
           ref: resourceId,
           message: `Map "${subject.id}" holds a position for resource "${resourceId}", which the space does not hold`,
+          at: { file: 'space.json', id: subject.id, field: `positions.${resourceId}` },
         });
         continue;
       }
@@ -194,6 +208,7 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
           kind: 'map-content-invalid',
           ref: resourceId,
           message: `Map "${subject.id}" keeps Map content for ${member.kind} resource "${resourceId}" that its plugin refuses: ${mapContentRefusal}`,
+          at: { file: 'space.json', id: subject.id, field: `positions.${resourceId}.content` },
         });
       }
     }
@@ -209,19 +224,23 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
       // diagnostics still arrive in edge order rather than in two passes.
       const repeats = repeatedGraphEdges(graph.edges);
       graph.edges.forEach((edge, index) => {
+        const ends = { from: edge.from, to: edge.to };
         for (const end of ['from', 'to'] as const) {
           if (members.has(edge[end])) continue;
+          const at = { file: 'space.json', id: graph.id, edge: ends, field: end };
           errors.push(
             resourceIds.has(edge[end])
               ? {
                   kind: 'graph-edge-resource-outside-map',
                   ref: edge[end],
                   message: `Graph "${graph.id}" edge ${index} names "${edge[end]}" as its ${end}, which is a resource of the space but not a member of its map "${subject.id}"`,
+                  at,
                 }
               : {
                   kind: 'graph-edge-missing-resource',
                   ref: edge[end],
                   message: `Graph "${graph.id}" edge ${index} names "${edge[end]}" as its ${end}, which the space does not hold`,
+                  at,
                 },
           );
         }
@@ -233,6 +252,7 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
             kind: 'duplicate-graph-edge',
             ref,
             message: `Graph "${graph.id}" repeats edge ${ref} at index ${index} (first at index ${firstIndex})`,
+            at: { file: 'space.json', id: graph.id, edge: ends },
           });
         }
       });
@@ -244,17 +264,20 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
     // second map owns exists and is simply not this map's to open on.
     const activeGraph = subject.activeGraph;
     if (activeGraph !== undefined && !subject.graphs.some((g) => g.id === activeGraph)) {
+      const at = { file: 'space.json', id: subject.id, field: 'activeGraph' };
       errors.push(
         occurrencesByGraphId.has(activeGraph)
           ? {
               kind: 'map-active-graph-outside-map',
               ref: activeGraph,
               message: `Map "${subject.id}" opens active on graph "${activeGraph}", which another map owns`,
+              at,
             }
           : {
               kind: 'map-active-graph-missing',
               ref: activeGraph,
               message: `Map "${subject.id}" opens active on graph "${activeGraph}", which no map in the space owns`,
+              at,
             },
       );
     }
@@ -268,6 +291,7 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
         kind: 'unresolved-default-map',
         ref: space.defaultMap,
         message: `defaultMap "${space.defaultMap}" does not name a declared Map`,
+        at: { file: 'space.json', id: space.id, field: 'defaultMap' },
       });
     }
   }
@@ -290,6 +314,7 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
       kind: 'space-reference-cycle',
       ref: space.id,
       message: `Resource "${resource.id}" references its own Space "${space.id}"`,
+      at: resourceFile(resource.id),
     });
   }
 
@@ -306,18 +331,21 @@ const describeReferenceProblem = (
         kind: problem.code,
         ref: resourceId,
         message: `Resource "${resourceId}" references itself`,
+        at: resourceFile(resourceId),
       };
     case 'reference-target-missing':
       return {
         kind: problem.code,
         ref: problem.targetId,
         message: `Resource "${resourceId}" references missing resource "${problem.targetId}"`,
+        at: resourceFile(resourceId),
       };
     case 'reference-target-not-targetable':
       return {
         kind: problem.code,
         ref: problem.targetId,
         message: `Resource "${resourceId}" references "${problem.targetId}", whose kind may not be a Target; referencing is a single hop`,
+        at: resourceFile(resourceId),
       };
   }
 };

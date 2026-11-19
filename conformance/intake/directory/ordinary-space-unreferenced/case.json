@@ -1,0 +1,13 @@
+{
+  "description": "A second Space that no Space Resource references.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "ordinary-space-unreferenced",
+        "file": "30000000-0000-4000-8000-000000000003/space.json",
+        "id": "30000000-0000-4000-8000-000000000003"
+      }
+    ]
+  }
+}

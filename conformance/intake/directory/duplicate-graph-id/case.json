@@ -1,0 +1,13 @@
+{
+  "description": "Two Graphs, on two Maps, with one id.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "duplicate-graph-id",
+        "file": "10000000-0000-4000-8000-000000000001/space.json",
+        "id": "00000000-0000-4000-8000-000000000b01"
+      }
+    ]
+  }
+}

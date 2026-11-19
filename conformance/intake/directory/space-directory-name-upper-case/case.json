@@ -1,0 +1,12 @@
+{
+  "description": "A Space directory named for its Id in upper case.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "space-directory-name",
+        "file": "ABCDEF00-0000-4000-8000-00000000000A"
+      }
+    ]
+  }
+}

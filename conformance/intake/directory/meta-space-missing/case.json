@@ -1,0 +1,13 @@
+{
+  "description": "aggregate.json names a Meta Space the directory does not hold.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "meta-space-missing",
+        "file": "aggregate.json",
+        "field": "metaSpaceId"
+      }
+    ]
+  }
+}

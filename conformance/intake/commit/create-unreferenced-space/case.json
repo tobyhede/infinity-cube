@@ -1,0 +1,14 @@
+{
+  "description": "A commit creating a Space no Space Resource references.",
+  "base": "accepted-ur",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "ordinary-space-unreferenced",
+        "file": "30000000-0000-4000-8000-000000000003/space.json",
+        "id": "30000000-0000-4000-8000-000000000003"
+      }
+    ]
+  }
+}

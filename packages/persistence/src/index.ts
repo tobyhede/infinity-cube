@@ -8,6 +8,11 @@ export {
   COMMIT_OUTCOME_WIRE,
   commitOutcomeDecoder,
   decodeCommitRequest,
+  // What `decodeCommitRequest` throws for a refused snapshot, carrying where
+  // each issue is; offered so the intake conformance runner
+  // (`test/unit/intake-conformance.test.ts`) can hold a refused commit's
+  // location to the corpus. The Fetch application answers its message alone.
+  SnapshotDecodeError,
   decodeCommitConflict,
   decodeCommitRefusal,
   decodeCommitResponse,

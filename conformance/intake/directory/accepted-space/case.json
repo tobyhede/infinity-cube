@@ -1,0 +1,6 @@
+{
+  "description": "A Space Resource owning a second Space, selecting its Map and Graph.",
+  "expect": {
+    "outcome": "accepted"
+  }
+}

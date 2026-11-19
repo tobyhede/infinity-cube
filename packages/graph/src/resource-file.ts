@@ -5,6 +5,7 @@ import {
   resourceFileSchema,
   type Resource,
 } from '@project/core';
+import { fieldOf, located, type IntakeLocation } from './intake-location';
 
 /** A file of a Space directory's `resources/`, as read from disk: where it was found, and its text. */
 export interface ResourceFile {
@@ -19,6 +20,8 @@ export interface ResourceFileError {
   /** The file that failed, so a message can say which one. */
   path: string;
   message: string;
+  /** Where: `path`, and the field at fault inside the file. See {@link IntakeLocation}. */
+  at?: IntakeLocation;
 }
 
 /** A Resource and the Resource file it was read from. */
@@ -54,13 +57,21 @@ function decodeFile(file: ResourceFile): FileDecoding {
           kind: 'invalid-json',
           path: file.path,
           message: `${file.path}: is not valid JSON — ${String(error)}`,
+          at: { file: file.path },
         },
       ],
     };
   }
   const refused = (errors: ResourceFileError[]): FileDecoding => ({ ok: false, errors });
   const fail = (kind: ResourceFileErrorKind, message: string): FileDecoding =>
-    refused([{ kind, path: file.path, message: `${file.path}: ${message}` }]);
+    refused([
+      {
+        kind,
+        path: file.path,
+        message: `${file.path}: ${message}`,
+        at: { file: file.path, field: 'kind' },
+      },
+    ]);
 
   const kind = declaredKind(json);
   if (kind === undefined) {
@@ -77,6 +88,7 @@ function decodeFile(file: ResourceFile): FileDecoding {
         kind: 'invalid-resource-file',
         path: file.path,
         message: `${file.path}: ${issue.path.join('.') || '(resource)'}: ${issue.message}`,
+        at: located(file.path, fieldOf(issue.path)),
       })),
     );
   }

@@ -1,5 +1,5 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
-import { dirname, join, relative, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import type { ImportSpace } from '@project/core';
 import {
   AggregateDirectoryError,
@@ -52,25 +52,44 @@ export const discoverResourceFiles = async (spaceDirectory: string): Promise<str
 };
 
 export const readSingleSpace = async (inputPath: string): Promise<ImportSpace> => {
-  let spaceFile: string;
+  // A single Space directory has no Aggregate directory around it, so its
+  // refusals name files relative to the directory holding it.
+  const relativeTo =
+    (holder: string) =>
+    (path: string): string =>
+      relative(holder, path).split(sep).join('/');
+  let spaceFile: string | undefined;
   let resourcePaths: string[];
   try {
     spaceFile = await resolveSpaceFile(inputPath);
-    const spaceDirectory = dirname(spaceFile);
-    resourcePaths = await discoverResourceFiles(spaceDirectory);
+    resourcePaths = await discoverResourceFiles(dirname(spaceFile));
   } catch (error) {
-    throw new AggregateDirectoryError('discovery', [String(error)]);
+    // Before the space file is found, the input is named as what it was given
+    // as: a Space directory, or a `space.json` inside one, each relative to
+    // the directory holding the Space directory. After, the resources/ that
+    // could not be listed.
+    const absoluteInput = resolve(inputPath);
+    const inputSpaceDirectory =
+      basename(absoluteInput) === 'space.json' ? dirname(absoluteInput) : absoluteInput;
+    const file =
+      spaceFile === undefined
+        ? relativeTo(dirname(inputSpaceDirectory))(absoluteInput)
+        : relativeTo(dirname(dirname(spaceFile)))(join(dirname(spaceFile), 'resources'));
+    throw new AggregateDirectoryError('discovery', [String(error)], [{ kind: 'unreadable', file }]);
   }
+  const relativePath = relativeTo(dirname(dirname(spaceFile)));
 
   const readPaths = [spaceFile, ...resourcePaths];
   const readResults = await Promise.allSettled(readPaths.map((path) => readFile(path, 'utf8')));
   const readDiagnostics: string[] = [];
+  const unreadable: string[] = [];
   let spaceText: string | undefined;
   const resources: { path: string; text: string }[] = [];
   readResults.forEach((result, index) => {
     const path = readPaths[index] ?? spaceFile;
     if (result.status === 'rejected') {
       readDiagnostics.push(`${path}: ${String(result.reason)}`);
+      unreadable.push(relativePath(path));
     } else if (index === 0) {
       spaceText = result.value;
     } else {
@@ -81,8 +100,12 @@ export const readSingleSpace = async (inputPath: string): Promise<ImportSpace> =
   // With no space file there is no document, so `documentRefusal` decides
   // nothing and the read failure is the only available report.
   if (readDiagnostics.length > 0 || spaceText === undefined) {
-    refuseSpaceDocument(spaceFile, spaceText);
-    throw new AggregateDirectoryError('discovery', readDiagnostics);
+    refuseSpaceDocument(spaceFile, spaceText, relativePath);
+    throw new AggregateDirectoryError(
+      'discovery',
+      readDiagnostics,
+      unreadable.map((file) => ({ kind: 'unreadable', file })),
+    );
   }
-  return parseSingleSpace({ spaceFile, spaceText, resources });
+  return parseSingleSpace({ spaceFile, spaceText, resources, relative: relativePath });
 };

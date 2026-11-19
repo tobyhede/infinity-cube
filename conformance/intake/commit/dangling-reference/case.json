@@ -1,0 +1,14 @@
+{
+  "description": "An update adding a Reference whose Target the Space does not hold.",
+  "base": "accepted-ur",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "reference-target-missing",
+        "file": "10000000-0000-4000-8000-000000000001/resources/00000000-0000-4000-8000-000000000103.json",
+        "id": "00000000-0000-4000-8000-000000000103"
+      }
+    ]
+  }
+}

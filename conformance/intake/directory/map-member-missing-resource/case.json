@@ -1,0 +1,14 @@
+{
+  "description": "A Map places a Resource the Space does not hold.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "map-member-missing-resource",
+        "file": "10000000-0000-4000-8000-000000000001/space.json",
+        "id": "00000000-0000-4000-8000-000000000a01",
+        "field": "positions.00000000-0000-4000-8000-00000000dead"
+      }
+    ]
+  }
+}

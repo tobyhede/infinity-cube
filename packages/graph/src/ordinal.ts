@@ -7,6 +7,11 @@
  * and the order a canonical export will emit — so it has to come from the bytes
  * alone.
  *
+ * Intake orders with it too: the cross-Space cycle walk follows each Space's
+ * Resources in this order of Title, then id, so which Resource a
+ * `space-reference-cycle` names is the same on every machine
+ * (`conformance/intake/README.md`).
+ *
  * One module because the import and export sides of the round trip both decide
  * order with it, and the invariant that makes a re-export of untouched content
  * produce no diff is that they decide it the *same* way. Three copies of this

@@ -1,0 +1,13 @@
+{
+  "description": "A Map of a kind this build does not know, whose Title is also not a string: one refusal, at its kind.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "invalid-shape",
+        "file": "10000000-0000-4000-8000-000000000001/space.json",
+        "field": "maps.0.kind"
+      }
+    ]
+  }
+}

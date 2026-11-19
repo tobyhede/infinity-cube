@@ -1,0 +1,7 @@
+{
+  "description": "An update adding a Markdown Resource, placing it, and connecting it.",
+  "base": "accepted-ur",
+  "expect": {
+    "outcome": "accepted"
+  }
+}

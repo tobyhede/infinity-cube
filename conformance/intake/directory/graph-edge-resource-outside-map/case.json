@@ -1,0 +1,18 @@
+{
+  "description": "An Edge endpoint names a Resource of the Space that is not a member of the Graph's Map.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "graph-edge-resource-outside-map",
+        "file": "10000000-0000-4000-8000-000000000001/space.json",
+        "id": "00000000-0000-4000-8000-000000000b01",
+        "field": "to",
+        "edge": {
+          "from": "00000000-0000-4000-8000-000000000101",
+          "to": "00000000-0000-4000-8000-000000000102"
+        }
+      }
+    ]
+  }
+}

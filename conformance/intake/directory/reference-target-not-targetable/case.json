@@ -1,0 +1,13 @@
+{
+  "description": "A Reference to another Reference: referencing is a single hop.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "reference-target-not-targetable",
+        "file": "10000000-0000-4000-8000-000000000001/resources/00000000-0000-4000-8000-000000000102.json",
+        "id": "00000000-0000-4000-8000-000000000102"
+      }
+    ]
+  }
+}

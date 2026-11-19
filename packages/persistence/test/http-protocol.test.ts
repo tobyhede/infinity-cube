@@ -24,6 +24,7 @@ import {
   encodeLoadedSpace,
   problemCatalogue,
   problemCodeForType,
+  SnapshotDecodeError,
 } from '../src/http-protocol';
 import type {
   CommitRefusalBody,
@@ -264,6 +265,59 @@ describe('aggregate wire protocol', () => {
     const refusal = { kind: 'aggregate-refused' as const, errors };
 
     expect(decodeCommitRefusal(encodeCommitRefusal(refusal))).toEqual(refusal);
+  });
+
+  it('leaves where intake located a refusal off the wire, which does not carry it', () => {
+    const at = { file: 'space.json', id: SPACE_ID, field: 'defaultMap' };
+    const located: SpaceAggregateError[] = [
+      {
+        kind: 'invalid-space-snapshot',
+        snapshotIndex: 0,
+        errors: [
+          { kind: 'unresolved-default-map', ref: SPACE_ID, message: 'message', at },
+          { kind: 'invalid-json', path: 'resources/a.json', message: 'message', at },
+          { kind: 'invalid-shape', message: 'message', at },
+        ],
+      },
+    ];
+
+    expect(encodeCommitRefusal({ kind: 'aggregate-refused', errors: located })).toEqual({
+      errors: [
+        {
+          kind: 'invalid-space-snapshot',
+          snapshotIndex: 0,
+          errors: [
+            { kind: 'unresolved-default-map', ref: SPACE_ID, message: 'message' },
+            { kind: 'invalid-json', path: 'resources/a.json', message: 'message' },
+            { kind: 'invalid-shape', message: 'message' },
+          ],
+        },
+      ],
+    });
+  });
+
+  it('locates a snapshot the commit decoder refuses, in the words it always used', () => {
+    const refused = {
+      ...snapshot,
+      resources: snapshot.resources.map((resource) => ({
+        ...resource,
+        document: { ...resource.document, title: 7 },
+      })),
+    };
+    let thrown: unknown;
+    try {
+      decodeCommitRequest({ changes: [{ kind: 'create', spaceId: SPACE_ID, snapshot: refused }] });
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(SnapshotDecodeError);
+    if (!(thrown instanceof SnapshotDecodeError)) return;
+    expect(thrown.message).toBe(
+      'create change snapshot is invalid: resources.0.document.title expected string, received number',
+    );
+    expect(thrown.spaceId).toBe(SPACE_ID);
+    expect(thrown.at).toEqual([{ file: `resources/${RESOURCE_ID}.json`, field: 'title' }]);
   });
 
   it('declares the Space Resource Map refusal the way its decoder reads it', () => {

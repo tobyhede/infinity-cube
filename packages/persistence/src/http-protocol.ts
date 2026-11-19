@@ -6,7 +6,12 @@ import {
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
-import type { SpaceAggregateError, SpaceError } from '@project/graph';
+import {
+  locateSnapshotIssue,
+  type IntakeLocation,
+  type SpaceAggregateError,
+  type SpaceError,
+} from '@project/graph';
 import type {
   AggregateLoadResult,
   CommitOutcome,
@@ -209,6 +214,29 @@ const exactRecord = (
 };
 
 /**
+ * A change's snapshot the commit decoder refused: its message, and where each
+ * issue is among the Space directory's files, located by the rule intake
+ * locates a refused snapshot by (ADR 0156). The Fetch application answers the
+ * message alone; the location is for a caller in process, today only the
+ * intake conformance runner.
+ */
+export class SnapshotDecodeError extends Error {
+  /**
+   * The Space the change names, whose directory each location is relative to,
+   * or `undefined` for a snapshot no change names (a loaded Space's).
+   */
+  readonly spaceId: UUID | undefined;
+  readonly at: readonly IntakeLocation[];
+
+  constructor(message: string, spaceId: UUID | undefined, at: readonly IntakeLocation[]) {
+    super(message);
+    this.name = 'SnapshotDecodeError';
+    this.spaceId = spaceId;
+    this.at = at;
+  }
+}
+
+/**
  * Zod serializes its entire issue array into `Error.message`. The wire codec
  * needs concise corrective detail instead: the failing paths and their reasons,
  * nothing else.
@@ -229,7 +257,11 @@ const exactRecord = (
  * returning a zero-issue error, so the summary always names a path and
  * `remaining` never counts below zero.
  */
-const decodeSnapshot = (value: unknown, label: string): SpaceSnapshot => {
+const decodeSnapshot = (
+  value: unknown,
+  label: string,
+  spaceId: UUID | undefined,
+): SpaceSnapshot => {
   const parsed = spaceSnapshotSchema.safeParse(value);
   if (parsed.success) {
     return parsed.data;
@@ -239,8 +271,10 @@ const decodeSnapshot = (value: unknown, label: string): SpaceSnapshot => {
     .map((issue) => `${issue.path.join('.') || 'snapshot'} ${issue.message.toLowerCase()}`)
     .join('; ');
   const remaining = parsed.error.issues.length - 3;
-  throw new Error(
+  throw new SnapshotDecodeError(
     `${label} snapshot is invalid: ${described}${remaining > 0 ? ` (and ${remaining} more)` : ''}`,
+    spaceId,
+    parsed.error.issues.map((issue) => locateSnapshotIssue(value, issue.path)),
   );
 };
 
@@ -273,7 +307,7 @@ export const encodeLoadedSpace = (loaded: LoadedSpace): LoadedSpaceJson => ({
 export const decodeLoadedSpace = (value: unknown): LoadedSpace => {
   const record = exactRecord(value, ['snapshot', 'revision', 'exportedRevision'], 'loaded space');
   return {
-    snapshot: decodeSnapshot(record['snapshot'], 'loaded space'),
+    snapshot: decodeSnapshot(record['snapshot'], 'loaded space', undefined),
     revision: decodeRevision(record['revision'], 'revision'),
     exportedRevision: decodeNullableRevision(record['exportedRevision']),
   };
@@ -313,10 +347,11 @@ export const decodeCommitRequest = (value: unknown): DecodedCommitRequest => {
       : undefined;
     if (kind === 'create') {
       const change = exactRecord(value, ['kind', 'spaceId', 'snapshot'], 'create change');
+      const spaceId = requiredUuid(change['spaceId'], 'change Space id');
       return {
         kind,
-        spaceId: requiredUuid(change['spaceId'], 'change Space id'),
-        snapshot: decodeSnapshot(change['snapshot'], 'create change'),
+        spaceId,
+        snapshot: decodeSnapshot(change['snapshot'], 'create change', spaceId),
       };
     }
     if (kind === 'update') {
@@ -325,10 +360,11 @@ export const decodeCommitRequest = (value: unknown): DecodedCommitRequest => {
         ['kind', 'spaceId', 'snapshot', 'expectedRevision'],
         'update change',
       );
+      const spaceId = requiredUuid(change['spaceId'], 'change Space id');
       return {
         kind,
-        spaceId: requiredUuid(change['spaceId'], 'change Space id'),
-        snapshot: decodeSnapshot(change['snapshot'], 'update change'),
+        spaceId,
+        snapshot: decodeSnapshot(change['snapshot'], 'update change', spaceId),
         expectedRevision: decodeRevision(change['expectedRevision'], 'expectedRevision'),
       };
     }
@@ -505,8 +541,23 @@ export interface CommitRefusalBody {
   )[];
 }
 
+/** A Space intake refusal as the wire carries it: without where intake located it. */
+const wireSpaceError = (error: SpaceError): SpaceError => {
+  const { at: _located, ...wire } = error;
+  return wire;
+};
+
+/**
+ * The refusal body: kind, ids and message. Where intake located each Space
+ * intake refusal is left off the wire (ADR 0156 holds the hosts to location
+ * through the intake conformance corpus).
+ */
 export const encodeCommitRefusal = (result: AggregateRefused): CommitRefusalBody => ({
-  errors: result.errors,
+  errors: result.errors.map((error) =>
+    error.kind === 'invalid-space-snapshot'
+      ? { ...error, errors: error.errors.map(wireSpaceError) }
+      : error,
+  ),
 });
 
 const requiredString = (value: unknown, label: string): string => {

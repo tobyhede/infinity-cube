@@ -549,6 +549,7 @@ describe('Running an Aggregate directory', () => {
     expect(start.kind).toBe('unreadable');
     if (start.kind !== 'unreadable') return;
     expect(start.diagnostics.join('\n')).toContain(AGGREGATE_FILE_NAME);
+    expect(start.refusals).toEqual([{ kind: 'aggregate-file-missing', file: AGGREGATE_FILE_NAME }]);
   });
 
   it('refuses a directory the aggregate intake refuses, with its errors', async () => {
@@ -563,6 +564,9 @@ describe('Running an Aggregate directory', () => {
     expect(start.kind).toBe('aggregate-refused');
     if (start.kind !== 'aggregate-refused') return;
     expect(start.diagnostics.length).toBeGreaterThan(0);
+    expect(start.refusals).toEqual([
+      { kind: 'meta-space-missing', file: AGGREGATE_FILE_NAME, field: 'metaSpaceId' },
+    ]);
     expect(await filesUnder(directory)).toEqual(before);
   });
 });

@@ -1,3 +1,7 @@
 # Collapse fixture data in GitHub diffs. Reviewers can expand it when needed.
 packages/app/fixture/** linguist-generated=true
 packages/app/example/** linguist-generated=true
+
+# The intake conformance corpus is compared byte for byte, by this runtime and
+# by the Rust one, so git must never rewrite its line endings.
+conformance/** -text

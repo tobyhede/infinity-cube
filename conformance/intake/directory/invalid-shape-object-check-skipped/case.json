@@ -1,0 +1,13 @@
+{
+  "description": "An Edge whose endpoint is not a string and which hides a Title it does not have: the check across its fields is not made while a field has the wrong type.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "invalid-shape",
+        "file": "10000000-0000-4000-8000-000000000001/space.json",
+        "field": "maps.0.graphs.0.edges.0.from"
+      }
+    ]
+  }
+}
