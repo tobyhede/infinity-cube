@@ -472,6 +472,52 @@ describe('Vite Hono host', () => {
     },
   );
 
+  it.each([
+    {
+      failure: 'contradictory stored state',
+      error: new AggregateInvariantError('Stored Space does not parse'),
+      status: 500,
+      detail: 'Stored repository state is not usable.',
+    },
+    {
+      failure: 'an unreachable database',
+      error: new PersistenceUnavailableError('connect ECONNREFUSED 127.0.0.1:5432'),
+      status: 503,
+      detail: 'Try the request again later.',
+    },
+    {
+      failure: 'a failure that is neither',
+      error: new TypeError('Cannot read properties of undefined'),
+      status: 500,
+      detail: 'The request failed unexpectedly.',
+    },
+  ])(
+    'answers a product address whose Space read meets $failure as the root does',
+    async ({ error, status, detail }) => {
+      class FailingSpaceRepository extends MemorySpaceRepository {
+        override loadSpace(): ReturnType<SpaceRepository['loadSpace']> {
+          return Promise.reject(error);
+        }
+      }
+      const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const { host } = await startHost(createSpaceHost(new FailingSpaceRepository(), newUuid));
+
+      const response = await fetch(`${host.url}/spaces/${encodeCompactUuid(SPACE_ID)}`, {
+        headers: { Accept: 'application/problem+json' },
+      });
+
+      expect(response.status).toBe(status);
+      const body = await response.text();
+      expect(body).not.toContain(error.message);
+      expect(decodeProblemDetails(JSON.parse(body))).toMatchObject({ status, detail });
+      expect(logged).toHaveBeenCalledWith(
+        'Failed to resolve a product address',
+        expect.objectContaining({ message: error.message }),
+      );
+      logged.mockRestore();
+    },
+  );
+
   it('answers malformed and unresolved Space URLs before Vite fallback', async () => {
     const hostApp = createSpaceHost(new MemorySpaceRepository(), newUuid);
     const { host } = await startHost(hostApp);

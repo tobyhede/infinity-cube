@@ -1,11 +1,13 @@
 # 11 — The Rust host crate over a memory store
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 **Blocked by:** 08, 10.
 
 **What to build:** `host`: a `SpaceRepository` trait mirroring the TypeScript seam (list, load, load aggregate, commit, store and load asset, initialize, replace, mark exported, load Meta id); a memory implementation; the pure commit decision shared by every store; the HTTP application and product resolution as a `Request -> Response` function (no listener); Import from and Export to an Aggregate directory with Export on quiet and an awaitable stop that flushes; ST-65 honoured by an explicit read context: a commit made to initialize a Space during a working read does not schedule an Export (08's ST-65 case holds it), since the TypeScript host's way of telling them apart is Node-only. Export writes the bytes the TypeScript Export writes (07). A typestate builder requires the directory, id source and clock (ADR 0109).
 
-- [ ] Unit tests for the commit decision and Export scheduling.
-- [ ] The corpus's commit cases (07) answer as the TypeScript host does, and its Export bytes match.
-- [ ] No listener or Tauri dependency in the crate.
+- [x] Unit tests for the commit decision and Export scheduling.
+- [x] The corpus's commit cases (07) answer as the TypeScript host does, and its Export bytes match.
+- [x] No listener or Tauri dependency in the crate.
+
+The decision has 15 unit tests (`crates/host/src/commit/tests.rs`) and the writer seven paused-time tests (`crates/host/tests/run.rs`: quiet restart, no write without an Edit or for a read, flush on stop, retry after a failure, one more write for an Edit during a write, `Unwritten` when the last write fails, and a run dropped without `stop` still writing on its own task). `crates/host/tests/corpus.rs` runs every commit case and Exports every accepted directory case byte for byte. `crates/host/tests/wire.rs` runs every case of `conformance/http/wire-cases.ts` and `store-condition-cases.ts` against `Application`, and holds ST-65 at the application: only an accepted `POST /api/spaces` is an Edit. That is the route, not the explicit read context on the repository seam this issue asked for: the working read's initialization commits through the same `SpaceRepository::commit`, and the application, which knows which request it is answering, fires `on_edit` for the commit route alone. Nothing else commits, so no store needs to tell the two apart; a second caller of the seam that must not schedule a write would need the context moved onto it. The crate depends on `intake`, `http`, `http-body`, `http-body-util`, `bytes`, `tokio`, `uuid` (random ids), `sha2` (asset hashes and the page's script hashes) and `thiserror`, with no server, listener or Tauri crate. Rules: Storage ST-119. Deferred to 12 and 13: a binary, `init`, the `Host` and cookie lock of the desktop sidecar, and reading a build from disk (the caller hands `BuiltFiles` in).

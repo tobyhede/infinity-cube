@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { send, type ConformanceHost } from './host';
-import { expectApiPolicy, expectProblem, META, renameCommitText } from './wire';
+import { expectApiPolicy, expectProblem, META, renameCommitText, spaceAddress } from './wire';
 import type { OpenedHost } from './wire-cases';
 import { decodeLoadedAggregate, decodeSpaceSummaries } from '@project/persistence';
 
@@ -14,8 +14,9 @@ import { decodeLoadedAggregate, decodeSpaceSummaries } from '@project/persistenc
  * (`packages/http/src/product-destination.ts`).
  *
  * Sources of truth: `resolveProductRequest` (`packages/aggregate/src/space-host.ts`)
- * and `storedFailureProblem` (`packages/http/src/index.ts`), which answer by
- * `classifyStoredFailure` (`packages/persistence/src/repository.ts`).
+ * and `storedFailureAnswer` (`packages/http/src/index.ts`), which answer by
+ * `classifyStoredFailure` and `storedFailureProblem`
+ * (`packages/persistence/src/repository.ts`).
  */
 
 /**
@@ -85,5 +86,19 @@ export const describeStoreConditionConformance = (
         await expectProblem(await send(host, pathname), 'internal-error');
       }
     });
+
+    // A product address reads its Space to resolve, so a store that cannot
+    // serve answers it by the failure's classification, as `/` is answered.
+    it.each([
+      ['unavailable', 'persistence-unavailable'],
+      ['broken-stored-state', 'internal-error'],
+    ] as const)(
+      'answers a product address over a %s store with %s',
+      async (condition, code) => {
+        const host = await open(condition);
+        await expectProblem(await send(host, spaceAddress(META)), code);
+        await expectProblem(await send(host, `${spaceAddress(META)}/notes`), code);
+      },
+    );
   });
 };

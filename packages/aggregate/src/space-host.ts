@@ -11,7 +11,9 @@ import {
   encodeProblemDetails,
   problemCatalogue,
   classifyStoredFailure,
+  storedFailureProblem,
   type AggregateLoadResult,
+  type StoredFailure,
   type InfinityCubeProblemCode,
 } from '@project/persistence';
 import type { UUID } from '@project/core';
@@ -56,6 +58,16 @@ const problem = (
  */
 const PRODUCT_METHODS = 'GET, HEAD';
 
+/**
+ * A store read that failed, answered by what the failure is
+ * (`classifyStoredFailure`), once its reason is logged for the operator, in
+ * the words `storedFailureProblem` gives every host.
+ */
+const storedFailure = (failure: StoredFailure, accept?: string): ProductResponse => {
+  const { code, detail } = storedFailureProblem(failure);
+  return problem(code, detail, accept);
+};
+
 const methodNotAllowed = (accept?: string): ProductResponse => {
   const response = problem('method-not-allowed', 'Use GET or HEAD for a product URL.', accept);
   return { ...response, headers: { ...response.headers, allow: PRODUCT_METHODS } };
@@ -97,34 +109,15 @@ export const createSpaceHost = (
       try {
         loaded = await repository.loadAggregate();
       } catch (error) {
-        // The reason travels to the operator rather than in the answer. The
-        // detail is fixed prose like every other one here, so whatever a driver
-        // put in its message is not served to an unauthenticated client.
-        console.error('Failed to read the Meta Space', error);
-        // Three failures, told apart by type rather than by matching message
-        // prose (`classifyStoredFailure`, which walks the cause chain the
-        // driver wraps a failed rollback in). Contradictory stored state —
-        // Spaces without Meta, an aggregate that fails complete intake, or a
-        // stored document that does not parse — is a defect this deployment
-        // carries and no retry cures, so it is a 500. An unreachable database
-        // is temporary, and 503 says so. A failure that is neither — a code
-        // defect, or a driver failure nobody anticipated — is a 500 under its
-        // own detail rather than a 503 by default: nothing says it will pass.
-        //
         // `GET /api/aggregate` (`packages/http/src/index.ts`) does the same
         // resource on the same rule, independently, because `@project/http` cannot
         // import this module: this package depends on it, so the reverse import
         // would be a cycle. Each reads once and answers what that read threw
         // by the same three arms: `space-http-app.test.ts`'s aggregate cases
         // hold that half, and `vite-hono-host.test.ts` holds this branch.
-        switch (classifyStoredFailure(error)) {
-          case 'broken-stored-state':
-            return problem('internal-error', 'Stored repository state is not usable.', accept);
-          case 'unavailable':
-            return problem('persistence-unavailable', 'Try the request again later.', accept);
-          case 'unclassified':
-            return problem('internal-error', 'The request failed unexpectedly.', accept);
-        }
+        // The reason travels to the operator rather than in the answer.
+        console.error('Failed to read the Meta Space', error);
+        return storedFailure(classifyStoredFailure(error), accept);
       }
       if (loaded.kind === 'uninitialized') {
         // Healthy, and nothing to redirect to yet. 503 because it is the only
@@ -183,7 +176,16 @@ export const createSpaceHost = (
         : methodNotAllowed(accept);
     }
 
-    const resolution = await resolveProductDestination(repository, pathname);
+    // Resolving reads the addressed Space, and a read that fails is answered
+    // by the failure's classification, as the root's is, rather than thrown to
+    // the host's adapter.
+    let resolution: Awaited<ReturnType<typeof resolveProductDestination>>;
+    try {
+      resolution = await resolveProductDestination(repository, pathname);
+    } catch (error) {
+      console.error('Failed to resolve a product address', error);
+      return storedFailure(classifyStoredFailure(error), accept);
+    }
     switch (resolution.kind) {
       case 'outside':
       case 'resolved':

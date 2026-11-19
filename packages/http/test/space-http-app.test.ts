@@ -978,6 +978,67 @@ describe('Space HTTP commit request policy', () => {
     expect(commit).not.toHaveBeenCalled();
   });
 
+  // ADR 0160: a string no UTF-8 file or store can hold is answered as text
+  // that is not JSON, wherever it is.
+  it.each([
+    ['a value', String.raw`{"changes":[{"kind":"delete","spaceId":"\ud800"}]}`],
+    ['a key', String.raw`{"changes":[],"\udc00":1}`],
+  ])('rejects a lone surrogate escape in %s as a malformed body', async (_where, body) => {
+    const commit = vi.fn();
+    const response = await createSpaceHttpApp(repository({ commit }), {
+      newId: mintsNothing,
+    }).request('/api/spaces', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    });
+
+    const refusal = await expectProblem(
+      response,
+      'invalid-request',
+      'Malformed JSON in request body',
+    );
+    expect(refusal.errors).toBeUndefined();
+    expect(commit).not.toHaveBeenCalled();
+  });
+
+  // ADR 0160 keeps this difference: the Rust host refuses a body nested deeper
+  // than its intake reads (512 levels) as malformed, and this application
+  // decodes it, here as a Resource of a kind no plugin draws carried whole.
+  it('decodes a body nested deeper than the Rust host reads', async () => {
+    const commit = vi.fn(() =>
+      Promise.resolve({
+        kind: 'committed' as const,
+        revisions: [{ spaceId: SPACE_ID, revision: 1n }],
+        deletedSpaceIds: [],
+      }),
+    );
+    const levels = 600;
+    const content = `${'{"a":'.repeat(levels)}{}${'}'.repeat(levels)}`;
+    const body = JSON.stringify(
+      encodeCommitRequest(
+        updateCommit({
+          ...snapshot,
+          resources: [
+            { id: RESOURCE_ID, document: { title: 'Deep', kind: 'vnd.acme.deep', content: {} } },
+          ],
+        }),
+      ),
+    ).replace('"content":{}', `"content":${content}`);
+    expect(body).toContain(content);
+
+    const response = await createSpaceHttpApp(repository({ commit }), {
+      newId: mintsNothing,
+    }).request('/api/spaces', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    });
+
+    expect(response.status).toBe(200);
+    expect(commit).toHaveBeenCalledOnce();
+  });
+
   // A media-typed request with no body at all is the one path through
   // `requireBoundedCommitBody` that never reads a byte, and it must reach the
   // decoder rather than be answered by the size guard.

@@ -1,0 +1,17 @@
+{
+  "changes": [
+    {
+      "kind": "update",
+      "spaceId": "10000000-0000-4000-8000-000000000001",
+      "expectedRevision": "0",
+      "snapshot": {
+        "id": "10000000-0000-4000-8000-000000000001",
+        "document": {
+          "version": 1,
+          "title": "Talk"
+        },
+        "resources": []
+      }
+    }
+  ]
+}

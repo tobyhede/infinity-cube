@@ -1,0 +1,12 @@
+{
+  "description": "A Resource file whose Title escapes a lone UTF-16 surrogate, which no UTF-8 file or store can hold (ADR 0160).",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "invalid-json",
+        "file": "10000000-0000-4000-8000-000000000001/resources/00000000-0000-4000-8000-000000000102.json"
+      }
+    ]
+  }
+}

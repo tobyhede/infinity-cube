@@ -1,0 +1,14 @@
+{
+  "description": "A commit removing the last Resource of a missing kind, leaving refused the Space the stored aggregate held only because of it (ADR 0142).",
+  "base": "accepted-held-space",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "ordinary-space-unreferenced",
+        "file": "30000000-0000-4000-8000-000000000003/space.json",
+        "id": "30000000-0000-4000-8000-000000000003"
+      }
+    ]
+  }
+}

@@ -4,6 +4,7 @@ import {
   type ImportSpace,
   type SpaceSnapshot,
   type UUID,
+  parseJsonText,
 } from '@project/core';
 import { compareOrdinal, fieldOf, located } from '@project/graph';
 import type { StoredAsset } from '@project/persistence';
@@ -60,7 +61,7 @@ const missingAggregateFile = (path: string): AggregateDirectoryError =>
 const parseAggregateFile = (path: string, text: string): UUID => {
   let json: unknown;
   try {
-    json = JSON.parse(text);
+    json = parseJsonText(text);
   } catch (error) {
     throw new AggregateDirectoryError(
       'parsing',

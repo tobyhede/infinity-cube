@@ -30,26 +30,53 @@ pub fn is_asset_ref(text: &str) -> bool {
     text.strip_prefix("/assets/").is_some_and(is_asset_hash)
 }
 
-/// The name content-addressing gives `bytes`.
+/// The two spellings of bytes as base64 (RFC 4648) the host writes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Base64 {
+    /// `+` and `/`, padded with `=`: Node's `digest('base64')`, as a Content
+    /// Security Policy hash is written.
+    Standard,
+    /// `-` and `_`, unpadded: Node's `base64url`, as an asset hash and a
+    /// compact id are written.
+    Url,
+}
+
+/// `bytes` spelled in `alphabet`.
 #[must_use]
-pub fn asset_hash_of(bytes: &[u8]) -> String {
-    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-    let digest = Sha256::digest(bytes);
-    let mut out = String::with_capacity(43);
-    for chunk in digest.chunks(3) {
+pub fn encode_base64(bytes: &[u8], alphabet: Base64) -> String {
+    let (digits, padded): (&[u8; 64], bool) = match alphabet {
+        Base64::Standard => (
+            b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/",
+            true,
+        ),
+        Base64::Url => (
+            b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_",
+            false,
+        ),
+    };
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    for chunk in bytes.chunks(3) {
         let b0 = chunk.first().copied().unwrap_or_default();
         let b1 = chunk.get(1).copied().unwrap_or_default();
         let b2 = chunk.get(2).copied().unwrap_or_default();
         let triple = (u32::from(b0) << 16) | (u32::from(b1) << 8) | u32::from(b2);
-        let symbols = chunk.len() + 1;
-        for index in 0..symbols {
+        for index in 0..=chunk.len() {
             let sextet = (triple >> (18 - 6 * index)) & 0x3f;
             out.push(char::from(
-                ALPHABET.get(sextet as usize).copied().unwrap_or(b'A'),
+                digits.get(sextet as usize).copied().unwrap_or(b'A'),
             ));
+        }
+        if padded {
+            out.extend(std::iter::repeat_n('=', 3 - chunk.len()));
         }
     }
     out
+}
+
+/// The name content-addressing gives `bytes`.
+#[must_use]
+pub fn asset_hash_of(bytes: &[u8]) -> String {
+    encode_base64(&Sha256::digest(bytes), Base64::Url)
 }
 
 /// The hash a file name in `assets/` is named by, or `None` when Importing
@@ -125,6 +152,24 @@ pub struct Asset {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn spells_bytes_in_either_base64_as_node_does() {
+        for (bytes, standard, url) in [
+            (&b""[..], "", ""),
+            (b"f", "Zg==", "Zg"),
+            (b"fo", "Zm8=", "Zm8"),
+            (b"foo", "Zm9v", "Zm9v"),
+            (&[0xfb, 0xff, 0xfe][..], "+//+", "-__-"),
+        ] {
+            assert_eq!(
+                encode_base64(bytes, Base64::Standard),
+                standard,
+                "{bytes:?}"
+            );
+            assert_eq!(encode_base64(bytes, Base64::Url), url, "{bytes:?}");
+        }
+    }
 
     #[test]
     fn names_zero_bytes_as_the_typescript_host_does() {

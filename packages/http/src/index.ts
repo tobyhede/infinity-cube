@@ -1,4 +1,4 @@
-import { ASSET_COLLECTION_PATH, uuidSchema, type UUID } from '@project/core';
+import { ASSET_COLLECTION_PATH, parseJsonText, uuidSchema, type UUID } from '@project/core';
 import {
   admitAsset,
   ASSET_TOO_LARGE,
@@ -17,6 +17,7 @@ import {
   encodeLoadedSpace,
   createWorkingSpaceLoader,
   classifyStoredFailure,
+  storedFailureProblem,
   problemCatalogue,
   type InfinityCubeProblemCode,
   type AssetStore,
@@ -124,28 +125,14 @@ const problem = (
 /**
  * The answer for a stored-seam failure a route has already logged, by what the
  * failure is (`classifyStoredFailure`, which walks the cause chain the driver
- * wraps a failed rollback or COMMIT in) rather than by its message.
- *
- * Broken stored state is a defect this deployment carries and no retry cures,
- * so 500 `internal-error`. An unreachable database is temporary, so 503
- * `persistence-unavailable`. A failure that is neither — a code defect, or a
- * driver failure nobody anticipated — is 500 `internal-error` too, under its
- * own detail: 503 would tell the client to wait out something this code has
- * no evidence will pass, such as a wrong password. Every route that reads or
- * writes the stored seam answers by it — the collection and single-Space reads
- * included. `packages/aggregate/src/space-host.ts` answers `GET /` by the same
- * three arms; it cannot share this helper, because `@project/aggregate`
- * depends on `@project/http` and the reverse import would be a package cycle.
+ * wraps a failed rollback or COMMIT in) rather than by its message, in the
+ * words `storedFailureProblem` gives every host. Every route that reads or
+ * writes the stored seam answers by it, the collection and single-Space reads
+ * included.
  */
-const storedFailureProblem = (context: Context, error: unknown) => {
-  switch (classifyStoredFailure(error)) {
-    case 'broken-stored-state':
-      return problem(context, 'internal-error', 'Stored repository state is not usable.');
-    case 'unavailable':
-      return problem(context, 'persistence-unavailable', 'Try the request again later.');
-    case 'unclassified':
-      return problem(context, 'internal-error', 'The request failed unexpectedly.');
-  }
+const storedFailureAnswer = (context: Context, error: unknown) => {
+  const { code, detail } = storedFailureProblem(classifyStoredFailure(error));
+  return problem(context, code, detail);
 };
 
 const rejectOversizedBody = (context: Context) =>
@@ -258,6 +245,28 @@ const requireBoundedCommitBody = createMiddleware(async (context, next) => {
     duplex: 'half',
   };
   context.req.raw = new Request(context.req.raw, rebuilt);
+  return next();
+});
+
+/**
+ * The detail Hono's json validator answers a body that is not JSON with, and
+ * the one this application answers a body escaping a lone UTF-16 surrogate
+ * with, which is not JSON a commit may carry (ADR 0160).
+ */
+const MALFORMED_JSON = 'Malformed JSON in request body';
+
+/**
+ * Refuse a commit body `parseJsonText` refuses, before Hono's json validator
+ * reads it: text that is not JSON gets the answer the validator would give, and
+ * a lone surrogate escape, which `JSON.parse` would read, gets that answer too.
+ * The validator parses the text again, from the copy Hono keeps.
+ */
+const refuseIllFormedCommitJson = createMiddleware(async (context, next) => {
+  try {
+    parseJsonText(await context.req.text());
+  } catch {
+    return problem(context, 'invalid-request', MALFORMED_JSON);
+  }
   return next();
 });
 
@@ -456,13 +465,14 @@ export const createSpaceHttpApp = (
         return context.json(await repository.listSpaces(), 200);
       } catch (error) {
         invokeLogError(logError, 'Failed to list spaces', error);
-        return storedFailureProblem(context, error);
+        return storedFailureAnswer(context, error);
       }
     })
     .post(
       SPACE_COLLECTION_PATH,
       requireSupportedRequestMedia,
       requireBoundedCommitBody,
+      refuseIllFormedCommitJson,
       validateCommitBody,
       async (context) => {
         const commit = context.req.valid('json');
@@ -504,7 +514,7 @@ export const createSpaceHttpApp = (
         } catch (error) {
           invokeLogError(logError, 'Failed to commit spaces', error);
           // The same three arms `GET /api/aggregate` answers by below
-          // (`storedFailureProblem`). The broken-stored-state arm is an
+          // (`storedFailureAnswer`). The broken-stored-state arm is an
           // operator-facing distinction only — status code and log signal —
           // and not yet a client one: `commitFailureForProblem`
           // (`packages/http/src/backend.ts`) still maps both problem codes to
@@ -528,7 +538,7 @@ export const createSpaceHttpApp = (
           // here come from a stored row that will not parse or a revision the
           // codec refuses, which describe corrupt stored data rather than a
           // timing window, so a second attempt would not answer differently.
-          return storedFailureProblem(context, error);
+          return storedFailureAnswer(context, error);
         }
       },
     )
@@ -540,8 +550,8 @@ export const createSpaceHttpApp = (
         invokeLogError(logError, 'Failed to load the Space aggregate', error);
         // An invariant failure is a permanent defect no retry cures, and
         // `packages/aggregate/src/space-host.ts` answers `GET /` by the same
-        // rule; `storedFailureProblem` answers it and the other two arms.
-        return storedFailureProblem(context, error);
+        // rule; `storedFailureAnswer` answers it and the other two arms.
+        return storedFailureAnswer(context, error);
       }
     })
     .get(SPACE_RESOURCE_PATH, validateSpaceId, async (context) => {
@@ -554,7 +564,7 @@ export const createSpaceHttpApp = (
         return context.json(encodeLoadedSpace(loaded), 200);
       } catch (error) {
         invokeLogError(logError, `Failed to load space ${id}`, error);
-        return storedFailureProblem(context, error);
+        return storedFailureAnswer(context, error);
       }
     })
     // The body is the asset and its declared `Content-Type` is its media
@@ -589,7 +599,7 @@ export const createSpaceHttpApp = (
         return outcome === 'stored' ? context.json({ url }, 201) : context.json({ url }, 200);
       } catch (error) {
         invokeLogError(logError, 'Failed to store an asset', error);
-        return storedFailureProblem(context, error);
+        return storedFailureAnswer(context, error);
       }
     })
     .get(ASSET_RESOURCE_PATH, validateAssetHash, async (context) => {
@@ -606,7 +616,7 @@ export const createSpaceHttpApp = (
         });
       } catch (error) {
         invokeLogError(logError, `Failed to load asset ${hash}`, error);
-        return storedFailureProblem(context, error);
+        return storedFailureAnswer(context, error);
       }
     });
   app.notFound(
