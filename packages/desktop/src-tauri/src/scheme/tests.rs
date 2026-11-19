@@ -184,6 +184,23 @@ mod given_a_request_at_the_trust_boundary {
     }
 
     #[tokio::test]
+    async fn stops_admitting_a_window_the_talks_page_opened_once_it_is_gone() {
+        let talk = open().await;
+        let key = talk.address.key();
+        let view = talk.open_talks.open_view(key).expect("the talk is open");
+        talk.open_talks.forget_view(&view);
+        assert!(
+            !talk.open_talks.holds_window(key, &view),
+            "a window that is gone"
+        );
+        assert!(
+            talk.open_talks.holds_window(key, WINDOW),
+            "the talk's own window is still held"
+        );
+        talk.stop().await;
+    }
+
+    #[tokio::test]
     async fn names_no_window_twice_when_a_talk_is_opened_again() {
         let talk = open().await;
         let key = talk.address.key();

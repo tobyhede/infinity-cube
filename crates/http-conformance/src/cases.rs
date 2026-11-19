@@ -16,8 +16,15 @@ use crate::support::{
 };
 use crate::{
     Adapter, FIXTURE_SPACES, META, META_ADDRESS, NEW_SPACE, OUTSIDE_THE_BUILD, STAND_IN_ICON,
-    STAND_IN_SCRIPT, UNKNOWN_SPACE,
+    STAND_IN_SCRIPT, UNKNOWN_SPACE, fixture,
 };
+
+/// The largest commit body the wire takes, written here rather than read
+/// from a host (ST-77).
+const COMMIT_LIMIT: usize = 1 << 20;
+/// The largest asset the wire takes, written here rather than read from a
+/// host (ST-75).
+const ASSET_LIMIT: usize = 10 << 20;
 
 pub mod given_a_space_api_request {
     use super::*;
@@ -28,17 +35,25 @@ pub mod given_a_space_api_request {
         assert_eq!(response.status(), 200, "listed");
         json_media(&response);
         api_policy(&response);
-        let mut ids: Vec<String> = json_of(&response)
+        let mut listed: Vec<(String, String)> = json_of(&response)
             .as_array()
             .unwrap()
             .iter()
             .map(|summary| {
-                assert!(summary["title"].is_string(), "a title: {summary}");
-                summary["id"].as_str().unwrap().to_owned()
+                let id = summary["id"].as_str().unwrap().to_owned();
+                let title = summary["title"].as_str().unwrap().to_owned();
+                (id, title)
             })
             .collect();
-        ids.sort();
-        assert_eq!(ids, FIXTURE_SPACES, "every Space directory of the fixture");
+        listed.sort();
+        let expected: Vec<(String, String)> = FIXTURE_SPACES
+            .iter()
+            .map(|id| ((*id).to_owned(), fixture_title(id)))
+            .collect();
+        assert_eq!(
+            listed, expected,
+            "every Space directory of the fixture, with the title its space.json writes"
+        );
     }
 
     // Case: answers one Space with its snapshot and revision
@@ -62,11 +77,21 @@ pub mod given_a_space_api_request {
         let body = json_of(&response);
         assert_eq!(body["kind"], "loaded", "the aggregate is loaded");
         assert_eq!(body["aggregate"]["metaSpaceId"], META, "its Meta Space");
-        assert_eq!(
-            body["aggregate"]["spaces"].as_array().unwrap().len(),
-            FIXTURE_SPACES.len(),
-            "every Space"
-        );
+        let mut ids: Vec<&str> = body["aggregate"]["spaces"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|space| space["snapshot"]["id"].as_str().unwrap())
+            .collect();
+        ids.sort_unstable();
+        assert_eq!(ids, FIXTURE_SPACES, "every Space of the fixture");
+    }
+
+    /// The title a fixture Space's `space.json` writes.
+    fn fixture_title(id: &str) -> String {
+        let text = std::fs::read_to_string(fixture().join(id).join("space.json")).unwrap();
+        let document: serde_json::Value = serde_json::from_str(&text).unwrap();
+        document["title"].as_str().unwrap().to_owned()
     }
 
     // Case: answers 404 not-found for a Space that does not exist
@@ -229,14 +254,14 @@ pub mod given_a_commit {
     /// The ids of a snapshot's first Map's positions, in the order its JSON
     /// text writes them.
     fn first_map_positions(snapshot: &JsonValue) -> Vec<String> {
-        let map = match snapshot.as_object().unwrap().get("document").unwrap() {
+        let first_map = match snapshot.as_object().unwrap().get("document").unwrap() {
             JsonValue::Object(document) => match document.get("maps").unwrap() {
                 JsonValue::Array(maps) => maps.first().unwrap().clone(),
                 other => panic!("maps: {other}"),
             },
             other => panic!("document: {other}"),
         };
-        let positions = map.as_object().unwrap().get("positions").unwrap();
+        let positions = first_map.as_object().unwrap().get("positions").unwrap();
         positions
             .as_object()
             .unwrap()
@@ -455,10 +480,7 @@ pub mod given_a_commit {
     // Case: commits a body of exactly * bytes
     pub async fn commits_a_body_of_exactly_the_limit<A: Adapter>(subject: &A) {
         let loaded = load(subject, META).await;
-        let padded = padded(
-            &rename_text(&loaded, "At the limit"),
-            host::MAX_COMMIT_BODY_BYTES,
-        );
+        let padded = padded(&rename_text(&loaded, "At the limit"), COMMIT_LIMIT);
         assert_eq!(
             post_commit(subject, padded, "application/json")
                 .await
@@ -471,10 +493,7 @@ pub mod given_a_commit {
     // Case: answers 413 payload-too-large for a body of * bytes
     pub async fn answers_413_for_a_body_one_byte_over_the_limit<A: Adapter>(subject: &A) {
         let loaded = load(subject, META).await;
-        let padded = padded(
-            &rename_text(&loaded, "Too large"),
-            host::MAX_COMMIT_BODY_BYTES + 1,
-        );
+        let padded = padded(&rename_text(&loaded, "Too large"), COMMIT_LIMIT + 1);
         let response = post_commit(subject, padded, "application/json").await;
         api_policy(&response);
         problem(&response, "payload-too-large", 413, "Payload too large");
@@ -495,6 +514,10 @@ pub mod given_an_asset_request {
     ) {
         let bytes = fresh(64, "stores");
         let url = path_of(&bytes);
+        assert_eq!(
+            url, "/assets/en92Qf23B2hkBFm0qOk9IyHE7mrNoDfDHFzbAOri4gM",
+            "the unpadded base64url SHA-256 of the bytes"
+        );
         let first = post_asset(subject, bytes.clone(), &[("content-type", "image/png")]).await;
         assert_eq!(first.status(), 201, "stored");
         assert_eq!(
@@ -614,7 +637,7 @@ pub mod given_an_asset_request {
 
     // Case: stores an asset of exactly * bytes
     pub async fn stores_an_asset_of_exactly_the_limit<A: Adapter>(subject: &A) {
-        let bytes = fresh(host::MAX_ASSET_BYTES, "limit");
+        let bytes = fresh(ASSET_LIMIT, "limit");
         let response = post_asset(
             subject,
             bytes.clone(),
@@ -629,7 +652,7 @@ pub mod given_an_asset_request {
 
     // Case: answers 413 asset-too-large for an asset of * bytes
     pub async fn answers_413_for_an_asset_one_byte_over_the_limit<A: Adapter>(subject: &A) {
-        let bytes = fresh(host::MAX_ASSET_BYTES + 1, "over");
+        let bytes = fresh(ASSET_LIMIT + 1, "over");
         let path = path_of(&bytes);
         let response = post_asset(
             subject,
@@ -722,6 +745,24 @@ pub mod given_a_change_from_another_site {
             .await;
             assert_eq!(response.status(), 201, "{site}: stored");
         }
+    }
+
+    // Case: stores an asset sent from its own origin naming no Sec-Fetch-Site
+    pub async fn stores_an_asset_sent_from_its_own_origin_naming_no_sec_fetch_site<A: Adapter>(
+        subject: &A,
+    ) {
+        let address = subject.own_address();
+        let own = subject.own_origin();
+        let headers = naming(&address, &own, &[("content-type", "text/plain")]);
+        let response = send(
+            subject,
+            "POST",
+            "/assets",
+            &headers,
+            "own origin, no Sec-Fetch-Site",
+        )
+        .await;
+        assert_eq!(response.status(), 201, "stored");
     }
 
     // Case: answers a read whatever site a browser says sent it

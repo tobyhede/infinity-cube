@@ -588,6 +588,7 @@ export const describeWireConformance = (options: WireConformanceOptions): void =
         ['null', () => 'null'],
       ])('answers 403 forbidden to a change whose Origin is %s, changing nothing', async (_, origin) => {
         await expectChangesRefused({ origin: origin() });
+        await expectChangesRefused({ origin: origin(), 'sec-fetch-site': 'same-origin' });
       });
 
       it.each(['same-origin', 'none'])(
@@ -601,6 +602,14 @@ export const describeWireConformance = (options: WireConformanceOptions): void =
           expect(response.status).toBe(201);
         },
       );
+
+      it('stores an asset sent from its own origin naming no Sec-Fetch-Site', async () => {
+        const response = await postAsset(host(), freshBytes(16), {
+          'content-type': 'text/plain',
+          origin: ownOrigin(),
+        });
+        expect(response.status).toBe(201);
+      });
 
       it('answers a read whatever site a browser says sent it', async () => {
         const headers = { 'sec-fetch-site': 'cross-site', origin: 'http://attacker.example' };

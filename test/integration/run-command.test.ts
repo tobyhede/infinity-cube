@@ -81,16 +81,22 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
+/** A new aggregate in a temporary directory of its own. */
+const newAggregate = async (): Promise<string> => {
+  const root = await mkdtemp(join(tmpdir(), 'infinity-cube-run-'));
+  roots.push(root);
+  const directory = join(root, 'talk');
+  await initAggregate(directory, newUuid);
+  return directory;
+};
+
 /**
  * Start a run on a new directory, in a process group of its own so a signal
  * reaches every process in it together, as a terminal's does. `pnpm` runs it
  * as an author does; `launcher` runs the launcher with nothing in front of it.
  */
-const startRunning = async (via: 'pnpm' | 'launcher') => {
-  const root = await mkdtemp(join(tmpdir(), 'infinity-cube-run-'));
-  roots.push(root);
-  const directory = join(root, 'talk');
-  await initAggregate(directory, newUuid);
+const startRunning = async (via: 'pnpm' | 'launcher', existing?: string) => {
+  const directory = existing ?? (await newAggregate());
   const port = await freePort();
   const runArguments = ['run', directory, '--no-open', '--port', String(port)];
   const child =
@@ -162,6 +168,7 @@ const startRunning = async (via: 'pnpm' | 'launcher') => {
 
   return {
     child,
+    directory,
     exited,
     output: () => output,
     outputContaining,
@@ -345,6 +352,53 @@ describe('pnpm cube run', () => {
       }
     },
     START_TIMEOUT_MS * 2,
+  );
+
+  /*
+   * The launcher starts the run process in a process group of its own, so
+   * killing the launcher's group leaves the run to stop itself; the run
+   * process is killed by its own pid, as a crash would end it.
+   */
+  it(
+    'refuses a second run of the directory a run holds, naming it, and runs it once the holder is killed',
+    async () => {
+      const holder = await startRunning('launcher');
+      try {
+        const second = await runCommand(
+          process.execPath,
+          [
+            ...(await infinityCubeScript()),
+            'run',
+            holder.directory,
+            '--no-open',
+            '--port',
+            String(await freePort()),
+          ],
+          { cwd: REPOSITORY_ROOT, timeoutMs: START_TIMEOUT_MS },
+        );
+
+        expect(second.status, second.stderr).toBe(1);
+        expect(second.stderr).toBe(
+          `${holder.directory} is open in another run of InfinityCube: stop that run before starting this one.\n`,
+        );
+
+        const launcher = holder.child.pid;
+        if (launcher === undefined) throw new Error('The launcher did not start');
+        const runProcess = Number((await runCommand('pgrep', ['-P', String(launcher)])).stdout);
+        process.kill(runProcess, 'SIGKILL');
+        await holder.exited;
+        const after = await startRunning('launcher', holder.directory);
+        try {
+          after.signal('SIGINT');
+          expect(await after.exited, after.output()).toBe(0);
+        } finally {
+          after.kill();
+        }
+      } finally {
+        holder.kill();
+      }
+    },
+    START_TIMEOUT_MS * 3,
   );
 
   /*

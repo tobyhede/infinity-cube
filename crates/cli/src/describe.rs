@@ -31,6 +31,15 @@ pub(crate) fn empty(directory: &Path) -> String {
     )
 }
 
+/// A directory another run holds (ADR 0162), as `src/cli/run-refusal.ts`
+/// words it.
+pub(crate) fn locked(directory: &Path) -> String {
+    format!(
+        "{} is open in another run of InfinityCube: stop that run before starting this one.",
+        directory.display()
+    )
+}
+
 /// Intake's refusals of a directory, one line each.
 pub(crate) fn refused(directory: &Path, refusals: &Refusals) -> String {
     let mut text = format!(

@@ -41,11 +41,16 @@ pub fn copy_tree(from: &Path, to: &Path) {
     }
 }
 
-/// Every file below `root`, by path relative to it with `/` between segments.
+/// Every file below `root`, by path relative to it with `/` between segments,
+/// but for the lock file a run creates on starting (ADR 0162), which is no
+/// Export's.
 pub fn read_tree(root: &Path) -> BTreeMap<String, Vec<u8>> {
     fn walk(root: &Path, directory: &Path, files: &mut BTreeMap<String, Vec<u8>>) {
         for entry in fs::read_dir(directory).unwrap() {
             let path = entry.unwrap().path();
+            if path == root.join(host::LOCK_FILE_NAME) {
+                continue;
+            }
             if path.is_dir() {
                 walk(root, &path, files);
             } else {

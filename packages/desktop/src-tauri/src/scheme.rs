@@ -151,9 +151,10 @@ pub enum AdmittedBy {
 
 /// Which header shows that a change comes from the talk's own page, or
 /// `None` when it does not: its one `Origin` is the talk's, or, naming no
-/// `Origin`, its one `Referer` is a page of the talk. WebKitGTK 2.52 names
-/// no `Origin` on a page's request to its own origin under a custom scheme,
-/// and names the page as the `Referer`; a request naming neither is refused.
+/// `Origin`, its one `Referer` is a page of the talk; a request naming
+/// neither is refused. A page's request to its own origin under a custom
+/// scheme may name no `Origin` (what WebKitGTK sent is recorded in
+/// `.scratch/rust-host/issues/13-swap-the-sidecar-for-the-rust-host.md`).
 fn comes_from<B>(request: &Request<B>, address: &TalkAddress) -> Option<AdmittedBy> {
     match only(request, &ORIGIN) {
         Ok(Some(origin)) => (origin == address.origin()).then_some(AdmittedBy::Origin),
@@ -220,6 +221,14 @@ impl OpenTalks {
         );
         let _new = served.windows.insert(label.clone());
         Some(label)
+    }
+
+    /// Stop admitting the window `label` a talk's page opened, once it is
+    /// gone or could not be built, so a talk holds only the windows it has.
+    pub fn forget_view(&self, label: &str) {
+        for served in self.talks_mut().values_mut() {
+            let _held = served.windows.remove(label);
+        }
     }
 
     /// Whether the window `window` may reach the talk with `key`: false once

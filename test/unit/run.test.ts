@@ -19,8 +19,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { AGGREGATE_FILE_NAME } from '@project/aggregate';
 import { readSingleSpace } from '../../src/aggregate-directory';
+import { LOCK_FILE_NAME, lockDirectory } from '../../src/run/directory-lock';
 import {
   RUN_QUIET_MILLISECONDS,
+  checkAggregate,
   initAggregate,
   startRun,
   type Run,
@@ -296,7 +298,7 @@ describe('Running an Aggregate directory', () => {
     expect(writes(events)).toHaveLength(1);
   });
 
-  it('leaves the directory byte-for-byte unchanged when nothing is edited', async () => {
+  it('leaves the directory byte-for-byte unchanged when nothing is edited, beside its empty lock file', async () => {
     const directory = await fixtureCopy();
     await writeFile(join(directory, 'NOTES.txt'), 'kept\n');
     const before = await filesUnder(directory);
@@ -305,7 +307,7 @@ describe('Running an Aggregate directory', () => {
     await running(start).stop();
 
     expect(events).toEqual([]);
-    expect(await filesUnder(directory)).toEqual(before);
+    expect(await filesUnder(directory)).toEqual({ ...before, [LOCK_FILE_NAME]: '' });
   });
 
   /*
@@ -363,7 +365,7 @@ describe('Running an Aggregate directory', () => {
     await run.stop();
 
     expect(writes(events)).toEqual([]);
-    expect(await filesUnder(directory)).toEqual(before);
+    expect(await filesUnder(directory)).toEqual({ ...before, [LOCK_FILE_NAME]: '' });
   });
 
   it('writes the initialization with the next Edit (ST-65)', async () => {
@@ -398,7 +400,7 @@ describe('Running an Aggregate directory', () => {
     expect(loaded?.snapshot.document.defaultMap).toBe(initializedMap?.id);
     clock.advance(RUN_QUIET_MILLISECONDS);
     expect(writes(events)).toEqual([]);
-    expect(await filesUnder(directory)).toEqual(before);
+    expect(await filesUnder(directory)).toEqual({ ...before, [LOCK_FILE_NAME]: '' });
 
     await renameSpace(run, AUTHORING_SPACE_ID, 'Edited after reading a Space with no Map');
     await run.stop();
@@ -567,8 +569,78 @@ describe('Running an Aggregate directory', () => {
     expect(start.refusals).toEqual([
       { kind: 'meta-space-missing', file: AGGREGATE_FILE_NAME, field: 'metaSpaceId' },
     ]);
-    expect(await filesUnder(directory)).toEqual(before);
+    // The lock is taken before Import reads, so a refused directory keeps its empty lock file.
+    expect(await filesUnder(directory)).toEqual({ ...before, [LOCK_FILE_NAME]: '' });
   });
+});
+
+describe('Locking the directory a run serves (ADR 0162)', () => {
+  it('refuses a second run of a directory a run holds, and runs it once the first has stopped', async () => {
+    const directory = await fixtureCopy();
+    const first = running((await started(directory)).start);
+
+    const second = await started(directory);
+    expect(second.start).toEqual({ kind: 'locked' });
+
+    await first.stop();
+    const third = running((await started(directory)).start);
+    await third.stop();
+  });
+
+  it('runs another directory while one is held', async () => {
+    const held = running((await started(await fixtureCopy())).start);
+
+    const other = running((await started(await fixtureCopy())).start);
+
+    await other.stop();
+    await held.stop();
+  });
+
+  it('holds the lock until the last write has landed', async () => {
+    const directory = await fixtureCopy();
+    const first = await started(directory);
+    const run = running(first.start);
+    await renameSpace(run, META_SPACE_ID, 'Written on stop');
+
+    // Synchronously after stop is asked for, its write has begun and not landed.
+    const stopping = run.stop();
+    expect(lockDirectory(directory)).toBe('held');
+    await stopping;
+
+    expect(await spaceTitle(directory, META_SPACE_ID)).toBe('Written on stop');
+    const after = lockDirectory(directory);
+    if (after === 'held') throw new Error('Expected the stopped run to have released its lock');
+    after.release();
+  });
+
+  it('keeps its lock file out of what Import, Export and check read and write', async () => {
+    const directory = await fixtureCopy();
+    const first = await started(directory);
+    const run = running(first.start);
+    await renameSpace(run, META_SPACE_ID, 'Written beside the lock file');
+    first.clock.advance(RUN_QUIET_MILLISECONDS);
+    await first.nextEvent();
+    await run.stop();
+
+    expect(first.events).toEqual([{ kind: 'written' }]);
+    await expect(readFile(join(directory, LOCK_FILE_NAME), 'utf8')).resolves.toBe('');
+    await expect(checkAggregate(directory, newUuid)).resolves.toEqual({
+      kind: 'valid',
+      absentAssets: [],
+    });
+    expect(await spaceTitle(directory, META_SPACE_ID)).toBe('Written beside the lock file');
+  });
+
+  it.each(EMPTY_DIRECTORIES)(
+    'refuses a %s directory before locking it, creating no lock file',
+    async (_, make) => {
+      const directory = await make(await temporaryRoot());
+
+      expect((await started(directory)).start).toEqual({ kind: 'empty' });
+
+      await expect(stat(join(directory, LOCK_FILE_NAME))).rejects.toThrow();
+    },
+  );
 });
 
 describe('Initializing an Aggregate directory', () => {

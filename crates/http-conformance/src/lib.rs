@@ -166,6 +166,7 @@ macro_rules! cases {
             given_a_change_from_another_site {
                 refuses_a_change_another_site_sends_by_its_sec_fetch_site,
                 stores_an_asset_sent_from_its_own_origin,
+                stores_an_asset_sent_from_its_own_origin_naming_no_sec_fetch_site,
                 answers_a_read_whatever_site_sent_it,
             }
             given_a_product_address {

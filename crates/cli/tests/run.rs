@@ -126,8 +126,9 @@ mod given_a_directory_it_can_run {
     #[test]
     fn takes_the_default_port_or_the_next_free_one_without_port() {
         let (_temporary, directory) = fixture();
+        let (_other_temporary, other) = fixture();
         let first = start(&["run", directory.to_str().unwrap(), "--no-open"]);
-        let second = start(&["run", directory.to_str().unwrap(), "--no-open"]);
+        let second = start(&["run", other.to_str().unwrap(), "--no-open"]);
         assert!(first.port() >= 4173, "from 4173 up: {}", first.port());
         // Other tests take ports from 4173 up at the same time, so the
         // second is another free one from 4173 up, not always the next.
@@ -390,6 +391,146 @@ mod given_a_directory_it_cannot_run {
             run.announcement
         );
         assert_eq!(run.exited().code(), Some(1), "exits one");
+    }
+}
+
+/// What the binary announces for a directory another run holds (ADR 0162).
+fn locked(directory: &std::path::Path) -> Option<Announcement> {
+    Some(Announcement::Refused(format!(
+        "{} is open in another run of InfinityCube: stop that run before starting this one.",
+        directory.display()
+    )))
+}
+
+mod given_a_directory_another_run_holds {
+    use super::*;
+
+    #[test]
+    fn announces_a_second_run_refused_naming_the_directory_and_exits_one() {
+        let (_temporary, directory) = fixture();
+        let holder = start(&["run", directory.to_str().unwrap(), "--no-open"]);
+        let _port = holder.port();
+
+        let mut second = start(&["run", directory.to_str().unwrap(), "--no-open"]);
+
+        assert_eq!(
+            second.announcement,
+            locked(&directory),
+            "refused, naming it"
+        );
+        assert_eq!(second.exited().code(), Some(1), "exits one");
+    }
+
+    #[test]
+    fn runs_it_once_the_holder_is_killed() {
+        let (_temporary, directory) = fixture();
+        let mut holder = start(&["run", directory.to_str().unwrap(), "--no-open"]);
+        let _port = holder.port();
+
+        holder.signal("KILL");
+        let _killed = holder.exited();
+
+        let after = start(&["run", directory.to_str().unwrap(), "--no-open"]);
+        let _listening = after.port();
+    }
+
+    #[test]
+    fn runs_another_directory_beside_it() {
+        let (_temporary, directory) = fixture();
+        let (_other_temporary, other) = fixture();
+        let holder = start(&["run", directory.to_str().unwrap(), "--no-open"]);
+        let _port = holder.port();
+
+        let beside = start(&["run", other.to_str().unwrap(), "--no-open"]);
+        let _listening = beside.port();
+    }
+}
+
+/// The TypeScript host's lock, taken by Node through
+/// `src/run/directory-lock.ts` itself, which Node 26 runs as TypeScript. It
+/// prints `locked` and holds the lock until its standard input closes, or
+/// `held` when another run holds it, and exits.
+const NODE_LOCK: &str = r"
+const [module, directory] = process.argv.slice(1);
+const { lockDirectory } = await import(module);
+const lock = lockDirectory(directory);
+if (lock === 'held') {
+  process.stdout.write('held\n');
+  process.exit(0);
+}
+process.stdout.write('locked\n');
+process.stdin.on('end', () => {
+  lock.release();
+  process.exit(0);
+});
+process.stdin.resume();
+";
+
+/// Node taking the TypeScript host's lock on `directory`, and its first line.
+fn node_lock(directory: &std::path::Path) -> (std::process::Child, String) {
+    use std::io::BufRead as _;
+    let module = common::repository().join("src/run/directory-lock.ts");
+    let mut child = std::process::Command::new("node")
+        .args(["--input-type=module", "--eval", NODE_LOCK])
+        .arg(module.canonicalize().unwrap())
+        .arg(directory)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .expect("node, as the repository's .node-version names, is on PATH");
+    let mut line = String::new();
+    std::io::BufReader::new(child.stdout.take().unwrap())
+        .read_line(&mut line)
+        .unwrap();
+    (child, line.trim_end().to_owned())
+}
+
+mod given_a_directory_a_node_run_holds {
+    use super::*;
+
+    #[test]
+    fn announces_the_run_refused_and_runs_it_once_node_lets_go() {
+        let (_temporary, directory) = fixture();
+        let (mut node, said) = node_lock(&directory);
+        assert_eq!(said, "locked", "Node holds the lock");
+
+        let mut refused = start(&["run", directory.to_str().unwrap(), "--no-open"]);
+        assert_eq!(
+            refused.announcement,
+            locked(&directory),
+            "refused, naming it"
+        );
+        assert_eq!(refused.exited().code(), Some(1), "exits one");
+
+        drop(node.stdin.take());
+        assert!(node.wait().unwrap().success(), "Node let go");
+        let after = start(&["run", directory.to_str().unwrap(), "--no-open"]);
+        let _listening = after.port();
+    }
+}
+
+mod given_a_directory_this_binary_runs {
+    use super::*;
+
+    #[test]
+    fn refuses_node_the_lock_until_the_run_has_stopped() {
+        let (_temporary, directory) = fixture();
+        let mut run = start(&["run", directory.to_str().unwrap(), "--no-open"]);
+        let _port = run.port();
+
+        let (mut refused, said) = node_lock(&directory);
+        assert_eq!(said, "held", "the run holds the lock");
+        assert!(refused.wait().unwrap().success());
+
+        run.signal("INT");
+        assert_eq!(run.exited().code(), Some(0), "stopped");
+        let (mut node, said) = node_lock(&directory);
+        assert_eq!(
+            said, "locked",
+            "Node takes the lock once the run has stopped"
+        );
+        drop(node.stdin.take());
+        assert!(node.wait().unwrap().success());
     }
 }
 

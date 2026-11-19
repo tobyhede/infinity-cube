@@ -23,8 +23,8 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use host::{
-    EntryKind, Filesystem, ImportError, Run, RunApplication, RunEvent, RunStopped, Shell,
-    TokioClock, TokioFilesystem,
+    EntryKind, Filesystem, ImportError, LOCK_FILE_NAME, MemorySpaceRepository, Run, RunApplication,
+    RunEvent, RunStopped, Shell, TokioClock, TokioFilesystem, import_directory,
 };
 use http::Request;
 use http_body::Frame;
@@ -291,6 +291,15 @@ mod given_an_edit {
             matches!(started.run.stop().await, RunStopped::Stopped),
             "stopped"
         );
+        assert!(
+            started.events.try_recv().is_err(),
+            "the stop writes nothing already on disk"
+        );
+        assert_eq!(
+            meta_title(&started.directory),
+            "Second",
+            "the written Edit is kept through the stop"
+        );
     }
 
     // Case: writes an edit not yet written when stopped by SIGINT, and exits zero
@@ -429,6 +438,24 @@ mod given_a_write_that_fails {
             "the failure is answered"
         );
     }
+
+    #[tokio::test(start_paused = true)]
+    async fn reports_no_retry_for_a_last_write_that_fails() {
+        let flaky = Flaky::default();
+        let mut started = start(flaky.clone()).await;
+        let app = Arc::clone(started.run.application());
+        flaky.failures.store(usize::MAX, Ordering::SeqCst);
+        rename(&app, "Lost").await;
+        assert!(
+            matches!(started.run.stop().await, RunStopped::Unwritten(_)),
+            "the failure is answered"
+        );
+        assert_eq!(
+            started.events.try_recv().ok(),
+            None,
+            "nothing is tried again once the run has stopped, so no failure is reported as one that will be"
+        );
+    }
 }
 
 mod given_an_empty_directory {
@@ -448,17 +475,109 @@ mod given_an_empty_directory {
             matches!(refused, Err(ImportError::Empty)),
             "dot-entries do not count: {refused:?}"
         );
+        assert!(
+            !temporary.path().join(LOCK_FILE_NAME).exists(),
+            "refused before any lock is taken, so no lock file is created"
+        );
     }
 }
 
-/// Every file under `directory`, by its path relative to it, with its bytes.
+/// A run of `directory` with nothing to hear, or why it did not start.
+async fn try_start(directory: &Path) -> Result<Run<Counted, Built>, ImportError> {
+    Run::builder()
+        .directory(directory)
+        .ids(Counted::default())
+        .clock(TokioClock)
+        .start(Shell::new("<!doctype html>", Built::new()))
+        .await
+}
+
+/// ADR 0162: a run holds its directory's lock from before Import until its
+/// last write has landed.
+mod given_a_directory_a_run_holds {
+    use super::*;
+
+    #[tokio::test]
+    async fn refuses_a_second_run_until_the_first_has_stopped() {
+        let (_temporary, directory) = fixture_copy();
+        let first = try_start(&directory).await.unwrap();
+
+        let second = try_start(&directory).await;
+        assert!(
+            matches!(second, Err(ImportError::Locked)),
+            "the directory is held: {second:?}"
+        );
+
+        assert!(matches!(first.stop().await, RunStopped::Stopped));
+        let third = try_start(&directory).await.unwrap();
+        assert!(matches!(third.stop().await, RunStopped::Stopped));
+    }
+
+    #[tokio::test]
+    async fn runs_another_directory_beside_it() {
+        let (_held_temporary, held) = fixture_copy();
+        let (_other_temporary, other) = fixture_copy();
+        let first = try_start(&held).await.unwrap();
+
+        let second = try_start(&other).await.unwrap();
+
+        assert!(matches!(second.stop().await, RunStopped::Stopped));
+        assert!(matches!(first.stop().await, RunStopped::Stopped));
+    }
+
+    #[tokio::test]
+    async fn holds_the_lock_until_the_last_write_has_landed() {
+        let flaky = Flaky::default();
+        let (_temporary, directory) = fixture_copy();
+        let (run, _events) = start_on(&directory, flaky.clone()).await;
+        rename(run.application(), "Written on stop").await;
+        flaky.holding.store(true, Ordering::SeqCst);
+        let stopping = tokio::spawn(run.stop());
+        flaky.entered.notified().await;
+
+        let during = try_start(&directory).await;
+        assert!(
+            matches!(during, Err(ImportError::Locked)),
+            "held while the last write is under way: {during:?}"
+        );
+
+        flaky.release.notify_one();
+        assert!(matches!(stopping.await.unwrap(), RunStopped::Stopped));
+        assert_eq!(meta_title(&directory), "Written on stop", "on disk");
+        let after = try_start(&directory).await.unwrap();
+        assert!(matches!(after.stop().await, RunStopped::Stopped));
+    }
+
+    #[tokio::test]
+    async fn keeps_its_lock_file_out_of_what_import_and_export_read_and_write() {
+        let (_temporary, directory) = fixture_copy();
+        let run = try_start(&directory).await.unwrap();
+        rename(run.application(), "Written beside the lock file").await;
+        assert!(matches!(run.stop().await, RunStopped::Stopped));
+
+        assert_eq!(
+            fs::read(directory.join(LOCK_FILE_NAME)).unwrap(),
+            Vec::<u8>::new(),
+            "the lock file stays, empty"
+        );
+        assert_eq!(meta_title(&directory), "Written beside the lock file");
+        let store = MemorySpaceRepository::new();
+        import_directory(&store, &TokioFilesystem, &directory, &Counted::default())
+            .await
+            .unwrap();
+    }
+}
+
+/// Every file under `directory`, by its path relative to it, with its bytes,
+/// but for the lock file a run creates on starting (ADR 0162), which is no
+/// Export's.
 fn tree(directory: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
     fn walk(root: &Path, directory: &Path, files: &mut BTreeMap<PathBuf, Vec<u8>>) {
         for entry in fs::read_dir(directory).unwrap() {
             let path = entry.unwrap().path();
             if path.is_dir() {
                 walk(root, &path, files);
-            } else {
+            } else if path != root.join(LOCK_FILE_NAME) {
                 let bytes = fs::read(&path).unwrap();
                 files.insert(path.strip_prefix(root).unwrap().to_owned(), bytes);
             }

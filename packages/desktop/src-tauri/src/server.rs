@@ -40,7 +40,8 @@ pub enum OpenError {
 ///
 /// # Errors
 ///
-/// The directory cannot be resolved, or holds no readable `index.html`.
+/// The directory cannot be resolved, or its `index.html` does not resolve to
+/// a readable regular file inside it; a link to one inside it is followed.
 pub fn built_shell(
     directory: &Path,
 ) -> Result<Shell<BuiltApplicationDirectory>, BuiltApplicationError> {
@@ -123,6 +124,9 @@ fn refusal(directory: &Path, error: &ImportError) -> Option<String> {
     match error {
         // A presenter has no `pnpm cube init`, so no command is named.
         ImportError::Empty => Some(format!("{shown} holds no talk: it is missing or empty.")),
+        ImportError::Locked => Some(format!(
+            "{shown} is open in another InfinityCube window or run: close it there first."
+        )),
         ImportError::Refused(refusals) => {
             let mut message = format!("{shown} is not a talk InfinityCube can open:");
             for refusal in refusals.as_slice() {
@@ -146,8 +150,9 @@ pub struct TalkServer {
 /// The address a talk's window opens at: where its root address redirects,
 /// the Meta Space's product address, or the root when it does not redirect.
 ///
-/// WebKitGTK does not follow a redirect a custom scheme answers a navigation
-/// with, so the shell follows the root's itself and opens the window there.
+/// The shell follows the root's redirect itself and opens the window there,
+/// since WebKitGTK was seen not to follow one a custom scheme answers a
+/// navigation with (`.scratch/rust-host/issues/13-swap-the-sidecar-for-the-rust-host.md`).
 pub async fn first_address<B: BuiltFiles>(
     application: &host::RunApplication<RandomIds, B>,
 ) -> String {
@@ -216,7 +221,7 @@ impl TalkWindows {
     pub fn navigation(&self, url: &Url) -> Navigation {
         if !self.address.admits(url) {
             Navigation::Refuse
-        } else if url.path() == "/" && self.first.path() != "/" {
+        } else if matches!(url.path(), "/" | "") && self.first.path() != "/" {
             Navigation::Redirect(self.first.clone())
         } else {
             Navigation::Load

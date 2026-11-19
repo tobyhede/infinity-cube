@@ -22,8 +22,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use bytes::Bytes;
 use host::{
-    EntryKind, Filesystem, MemorySpaceRepository, RandomIds, Run, RunApplication, Shell,
-    TokioClock, TokioFilesystem, import_directory,
+    EntryKind, Filesystem, LOCK_FILE_NAME, MemorySpaceRepository, RandomIds, Run, RunApplication,
+    Shell, TokioClock, TokioFilesystem, import_directory,
 };
 use http_body_util::Full;
 use serde_json::{Value, json};
@@ -135,6 +135,10 @@ fn files(directory: &Path) -> (BTreeMap<PathBuf, Vec<u8>>, Vec<PathBuf>) {
         for entry in fs::read_dir(&next).unwrap() {
             let path = entry.unwrap().path();
             let relative = path.strip_prefix(directory).unwrap().to_path_buf();
+            // The lock file a run creates on starting (ADR 0162) is no Export's.
+            if relative == Path::new(LOCK_FILE_NAME) {
+                continue;
+            }
             if path.file_name().unwrap().to_string_lossy().starts_with('.') {
                 hidden.push(relative);
             } else if path.is_dir() {

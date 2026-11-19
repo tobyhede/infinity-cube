@@ -51,10 +51,13 @@ const refuse = async (message: string): Promise<never> => {
  * Why the directory was not run, for a presenter: they have the desktop
  * application, not a clone with `pnpm cube init` in it.
  */
-const describeRefusal = (refusal: RunRefusal, directory: string): string =>
-  refusal.kind === 'empty'
-    ? `${directory} holds no talk: the folder is missing or empty. Choose a folder that holds an InfinityCube talk.\n`
-    : describeRunRefusal(refusal, directory);
+const describeRefusal = (refusal: RunRefusal, directory: string): string => {
+  if (refusal.kind === 'empty')
+    return `${directory} holds no talk: the folder is missing or empty. Choose a folder that holds an InfinityCube talk.\n`;
+  if (refusal.kind === 'locked')
+    return `${directory} is open in another InfinityCube window or run: close it there first.\n`;
+  return describeRunRefusal(refusal, directory);
+};
 
 /**
  * Close the server and wait for it: it stops accepting at once, closes idle

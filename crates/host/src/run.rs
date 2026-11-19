@@ -5,7 +5,10 @@
 //! One writer task owns every write, so writes never overlap: an Edit during
 //! a write causes exactly one further write, nothing is written without an
 //! Edit, a failed write is tried again after the quiet period, and
-//! [`Run::stop`] writes what is not yet on disk before it answers. Only an
+//! [`Run::stop`] writes what is not yet on disk before it answers. The run
+//! locks its directory before Import reads it and the writer holds the lock
+//! until its last write has landed, so another run of the directory is
+//! refused (ADR 0162). Only an
 //! accepted `POST /api/spaces` is an Edit ([`Application::on_edit`]), so a
 //! commit made while answering a read never schedules a write (ST-65).
 
@@ -17,10 +20,11 @@ use std::time::Duration;
 use tokio::sync::{Notify, oneshot};
 use tokio::task::JoinHandle;
 
-use crate::directory::{Filesystem, TokioFilesystem};
+use crate::directory::{Filesystem, TokioFilesystem, holds_nothing};
 use crate::export::{ExportError, export_aggregate};
 use crate::http::Application;
 use crate::import::{IdSource, ImportError, import_directory};
+use crate::lock::{DirectoryLock, LockError};
 use crate::memory::MemorySpaceRepository;
 use crate::repository::RepositoryError;
 use crate::shell::{BuiltFiles, Shell};
@@ -166,9 +170,19 @@ impl<I: IdSource, C: Clock, F: Filesystem> RunBuilder<PathBuf, I, C, F> {
     /// # Errors
     ///
     /// [`ImportError::Empty`] for a missing or empty directory (`init` makes
-    /// one), [`ImportError::Refused`] with intake's refusals, or a directory
-    /// that could not be listed. Nothing is written.
+    /// one), refused before any lock is taken; [`ImportError::Locked`] when
+    /// another run holds the directory, [`ImportError::LockFailed`] when its
+    /// lock cannot be taken otherwise; [`ImportError::Refused`] with intake's
+    /// refusals, or a directory that could not be listed. Nothing is written
+    /// but the empty lock file.
     pub async fn start<B: BuiltFiles>(self, shell: Shell<B>) -> Result<Run<I, B>, ImportError> {
+        if holds_nothing(&self.fs, &self.directory).await? {
+            return Err(ImportError::Empty);
+        }
+        let lock = DirectoryLock::take(&self.directory).map_err(|error| match error {
+            LockError::Held => ImportError::Locked,
+            LockError::Failed(reason) => ImportError::LockFailed(reason),
+        })?;
         let repository = Arc::new(MemorySpaceRepository::new());
         let ids = Arc::new(self.ids);
         import_directory(repository.as_ref(), &self.fs, &self.directory, ids.as_ref()).await?;
@@ -190,6 +204,7 @@ impl<I: IdSource, C: Clock, F: Filesystem> RunBuilder<PathBuf, I, C, F> {
             clock: self.clock,
             report: self.report,
             edits,
+            _lock: lock,
         };
         let task = tokio::spawn(writer.run(stopped));
         Ok(Run {
@@ -262,6 +277,8 @@ struct Writer<C, F> {
     clock: C,
     report: Option<Reporter>,
     edits: Arc<Notify>,
+    /// Released with the writer, once its last write has landed or failed.
+    _lock: DirectoryLock,
 }
 
 impl<C: Clock, F: Filesystem> Writer<C, F> {
@@ -271,11 +288,16 @@ impl<C: Clock, F: Filesystem> Writer<C, F> {
         }
     }
 
-    /// One write; `None` when it landed.
-    async fn write(&self) -> Option<ExportError> {
-        let failure = export_aggregate(self.repository.as_ref(), &self.fs, &self.directory)
+    /// One write, reported to no one; `None` when it landed.
+    async fn export(&self) -> Option<ExportError> {
+        export_aggregate(self.repository.as_ref(), &self.fs, &self.directory)
             .await
-            .err();
+            .err()
+    }
+
+    /// One write that is tried again if it fails; `None` when it landed.
+    async fn write(&self) -> Option<ExportError> {
+        let failure = self.export().await;
         self.report(
             &failure
                 .as_ref()
@@ -311,12 +333,16 @@ impl<C: Clock, F: Filesystem> Writer<C, F> {
 
     /// Write until no Edit is left unwritten, including one committed while
     /// the last write ran, and answer the last write's failure, if any.
-    async fn flush(&self, mut changed: bool, mut failure: Option<ExportError>) -> RunStopped {
+    async fn flush(&self, mut changed: bool, failure: Option<ExportError>) -> RunStopped {
+        let mut failure = failure;
         while changed || self.edit_pending().await {
-            failure = self.write().await;
-            if failure.is_some() {
-                break;
+            // The last write is not tried again, so its failure is answered and
+            // not reported as one that will be.
+            if let Some(error) = self.export().await {
+                return RunStopped::Unwritten(error);
             }
+            self.report(&RunEvent::Written);
+            failure = None;
             changed = false;
         }
         failure.map_or(RunStopped::Stopped, RunStopped::Unwritten)
