@@ -10,7 +10,9 @@
 use std::path::PathBuf;
 
 use super::*;
-use crate::test_support::{META, META_API, fixture_copy, rename_text, stand_in_build};
+use crate::test_support::{
+    META, META_ADDRESS, fixture_copy, meta_api, rename_text, stand_in_build,
+};
 
 /// Every file below `directory`, with its bytes.
 fn snapshot(directory: &Path) -> Vec<(PathBuf, Vec<u8>)> {
@@ -71,7 +73,7 @@ mod given_a_talk_closing {
         let (temporary, directory) = fixture_copy();
         let (open_talks, key, run) = open(&directory, &stand_in_build(&temporary)).await;
         let loaded = open_talks
-            .answer("talk-0", request(&key, "GET", META_API, ""))
+            .answer("talk-0", request(&key, "GET", &meta_api(), ""))
             .await;
         let loaded: serde_json::Value = serde_json::from_slice(loaded.body()).unwrap();
         let committed = open_talks
@@ -103,12 +105,7 @@ mod given_a_talk_closing {
         let before = snapshot(&directory);
         let (open_talks, key, run) = open(&directory, &stand_in_build(&temporary)).await;
         // Opening the talk's page reads it, which initializes its Spaces (ST-65).
-        for path in [
-            "/",
-            "/spaces/AAAAAAAAQACAAAAAAAAAQA",
-            "/api/spaces",
-            META_API,
-        ] {
+        for path in ["/", META_ADDRESS, "/api/spaces", meta_api().as_str()] {
             let response = open_talks
                 .answer("talk-0", request(&key, "GET", path, ""))
                 .await;
@@ -134,7 +131,7 @@ mod given_a_talk_closing {
         let (temporary, directory) = fixture_copy();
         let (open_talks, key, run) = open(&directory, &stand_in_build(&temporary)).await;
         let loaded = open_talks
-            .answer("talk-0", request(&key, "GET", META_API, ""))
+            .answer("talk-0", request(&key, "GET", &meta_api(), ""))
             .await;
         let loaded: serde_json::Value = serde_json::from_slice(loaded.body()).unwrap();
         let Ok(admitted) = open_talks.admit(

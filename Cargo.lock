@@ -1325,6 +1325,7 @@ dependencies = [
  "http",
  "http-body",
  "http-body-util",
+ "http-conformance",
  "intake",
  "proptest",
  "serde_json",
@@ -1387,6 +1388,17 @@ dependencies = [
  "http",
  "http-body",
  "pin-project-lite",
+]
+
+[[package]]
+name = "http-conformance"
+version = "0.0.0"
+dependencies = [
+ "bytes",
+ "host",
+ "http",
+ "intake",
+ "serde_json",
 ]
 
 [[package]]
@@ -1656,7 +1668,7 @@ dependencies = [
  "host",
  "http",
  "http-body-util",
- "intake",
+ "http-conformance",
  "serde_json",
  "sha2 0.10.9",
  "tauri",

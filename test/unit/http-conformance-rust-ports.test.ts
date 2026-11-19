@@ -4,12 +4,15 @@ import { describe, expect, it } from 'vitest';
 
 /*
  * The HTTP conformance cases are written once, in TypeScript, and ported by
- * hand to the Rust tests that hold the Rust host's application and run
+ * hand to Rust for two adapters: the Rust host's application and run
  * (`crates/host/tests/`) and the desktop scheme handler
- * (`packages/desktop/src-tauri/src/scheme/tests.rs`) to them. This holds each
- * port to the case lists: every case is ported, by a Rust test carrying the
- * line `// Case: <name>` above it, or exempted below with the reason it cannot
- * run against that port.
+ * (`packages/desktop/src-tauri/src/scheme/tests.rs`). A case both adapters run
+ * is written once, in the table `crates/http-conformance/src/cases.rs`, which
+ * each adapter runs by invoking `http_conformance::cases!`; a case only one
+ * runs stays in that adapter's own files. This holds each adapter to the case
+ * lists: every case is ported, by a Rust test carrying the line
+ * `// Case: <name>` above it in the table or the adapter's own files, or
+ * exempted below with the reason it cannot run against that adapter.
  *
  * A case's name is the first argument of its `it`, `it.each(…)` or
  * `it.skipIf(…)` call, as written: a template literal's substitutions are
@@ -69,12 +72,39 @@ const MARKER = /^\s*\/\/ Case: (.+)$/gmu;
 const markedIn = (files: readonly string[]): string[] =>
   files.flatMap((file) => [...read(file).matchAll(MARKER)].map((match) => match[1] ?? ''));
 
+/** The cases both adapters run, written once. */
+const TABLE = 'crates/http-conformance/src/cases.rs';
+
+/** What an adapter's test binary writes to run the table. */
+const RUNS_TABLE = 'http_conformance::cases!(';
+
 interface Port {
   readonly name: string;
-  readonly files: readonly string[];
+  /** The adapter's own files: the one invoking the table first. */
+  readonly files: readonly [string, ...string[]];
   /** Each case that cannot run against the port, with why. */
   readonly exempt: Readonly<Record<string, string>>;
 }
+
+interface Marks {
+  /** The cases the table marks. */
+  readonly table: readonly string[];
+  /** The cases the adapter's own files mark. */
+  readonly own: readonly string[];
+  readonly exempt: Readonly<Record<string, string>>;
+}
+
+/** What is wrong with an adapter's marks and exemptions against `cases`. */
+const findings = (cases: readonly string[], { table, own, exempt }: Marks) => {
+  const marked = [...table, ...own];
+  return {
+    unported: cases.filter((name) => !marked.includes(name) && !(name in exempt)),
+    unknownMarks: marked.filter((name) => !cases.includes(name)),
+    unknownExemptions: Object.keys(exempt).filter((name) => !cases.includes(name)),
+    exemptAndPorted: Object.keys(exempt).filter((name) => marked.includes(name)),
+    inTableAndOwn: own.filter((name) => table.includes(name)),
+  };
+};
 
 const LISTENER =
   "a listener's, and the host library has none: CI's rust job runs process-cases.ts itself against the Rust CLI's listener";
@@ -147,18 +177,66 @@ describe('the HTTP conformance cases', () => {
 });
 
 describe.each(PORTS)('$name', ({ files, exempt }) => {
-  const marked = markedIn(files);
+  const found = findings(CASES, { table: markedIn([TABLE]), own: markedIn(files), exempt });
+
+  it('runs the table', () => {
+    expect(read(files[0])).toContain(RUNS_TABLE);
+  });
 
   it('ports every case it does not exempt', () => {
-    expect(CASES.filter((name) => !marked.includes(name) && !(name in exempt))).toEqual([]);
+    expect(found.unported).toEqual([]);
   });
 
   it('marks and exempts only cases the lists hold', () => {
-    expect(marked.filter((name) => !CASES.includes(name))).toEqual([]);
-    expect(Object.keys(exempt).filter((name) => !CASES.includes(name))).toEqual([]);
+    expect(found.unknownMarks).toEqual([]);
+    expect(found.unknownExemptions).toEqual([]);
   });
 
   it('exempts no case it ports', () => {
-    expect(Object.keys(exempt).filter((name) => marked.includes(name))).toEqual([]);
+    expect(found.exemptAndPorted).toEqual([]);
+  });
+
+  it('ports no case of the table in its own files too', () => {
+    expect(found.inTableAndOwn).toEqual([]);
+  });
+});
+
+describe('the port check', () => {
+  const cases = ['shared', 'own', 'exempt'];
+  const clean: Marks = { table: ['shared'], own: ['own'], exempt: { exempt: 'why' } };
+
+  it('finds nothing wrong with a case ported once, in the table or its own files, or exempted', () => {
+    expect(findings(cases, clean)).toEqual({
+      unported: [],
+      unknownMarks: [],
+      unknownExemptions: [],
+      exemptAndPorted: [],
+      inTableAndOwn: [],
+    });
+  });
+
+  it('finds a case with no port and no exemption', () => {
+    expect(findings(cases, { ...clean, table: [] }).unported).toEqual(['shared']);
+  });
+
+  it('finds a mark naming no case, in the table or its own files', () => {
+    expect(findings(cases, { ...clean, table: ['shared', 'gone'] }).unknownMarks).toEqual(['gone']);
+    expect(findings(cases, { ...clean, own: ['own', 'gone'] }).unknownMarks).toEqual(['gone']);
+  });
+
+  it('finds an exemption naming no case', () => {
+    expect(
+      findings(cases, { ...clean, exempt: { exempt: 'why', gone: 'why' } }).unknownExemptions,
+    ).toEqual(['gone']);
+  });
+
+  it('finds a case both exempted and ported', () => {
+    expect(
+      findings(cases, { ...clean, exempt: { exempt: 'why', shared: 'why' } }).exemptAndPorted,
+    ).toEqual(['shared']);
+  });
+
+  it('finds a case ported in the table and in its own files', () => {
+    expect(findings(cases, { ...clean, own: ['own', 'shared'] }).inTableAndOwn).toEqual(['shared']);
   });
 });

@@ -1,0 +1,17 @@
+[package]
+name = "http-conformance"
+description = "The HTTP conformance cases both Rust adapters share, run against each by one macro"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+bytes = { workspace = true }
+host = { path = "../host" }
+http = { workspace = true }
+intake = { path = "../intake" }
+serde_json = { workspace = true }
+
+[lints]
+workspace = true

@@ -15,35 +15,22 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::task::{Context, Poll};
 
 use bytes::Bytes;
 use host::{
-    Application, CommitResult, IdSource, MemorySpaceRepository, Revision, Shell, SpaceChange,
-    SpaceCommit, SpaceRepository, TokioFilesystem, import_directory,
+    Application, CommitResult, MemorySpaceRepository, Revision, Shell, SpaceChange, SpaceCommit,
+    SpaceRepository, TokioFilesystem, import_directory,
 };
 use http::{Request, Response};
 use http_body::Frame;
-use intake::{SpaceId, Uuid};
+use http_conformance::{Counted, META};
+use intake::SpaceId;
 use serde_json::{Value, json};
 use tokio::sync::Barrier;
 
-const META: &str = "00000000-0000-4000-8000-000000000040";
-
 /// How many commits are sent at once.
 const CONCURRENCY: usize = 32;
-
-/// Ids counted up from one.
-#[derive(Default)]
-struct Counted(AtomicUsize);
-
-impl IdSource for Counted {
-    fn new_id(&self) -> Uuid {
-        let next = self.0.fetch_add(1, Ordering::SeqCst) + 1;
-        Uuid::parse(&format!("00000000-0000-4000-8000-{next:012x}")).unwrap()
-    }
-}
 
 type Built = BTreeMap<String, Bytes>;
 type Host = Application<MemorySpaceRepository, Counted, Built>;
