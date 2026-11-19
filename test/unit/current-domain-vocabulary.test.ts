@@ -2479,8 +2479,11 @@ const RETIRED_SPACE_BARE = new RegExp(`\\b${RETIRED_SPACE}s?\\b`);
 /**
  * The three identifiers naming a parsed `package.json` or the file that lists
  * the packages, and the two spellings of Tauri's build-time list of the
- * desktop shell's commands (`packages/desktop/src-tauri/build.rs`). npm's,
- * pnpm's and Tauri's sense, arriving with their file formats and APIs rather
+ * desktop shell's commands (`packages/desktop/src-tauri/build.rs`), and
+ * Cargo's environment variable naming a crate's own directory, which the
+ * intake conformance corpus's README tells a Rust runner to reach it by
+ * (`crates/intake/tests/conformance.rs`). npm's, pnpm's, Tauri's and Cargo's
+ * sense, arriving with their file formats and APIs rather
  * than ours to sweep — the same carve-out Lucide's glyph gets above, and masked
  * by spelling for the same reason: a domain compound added to one of these
  * modules is our vocabulary wearing a forgiven name, and stays visible.
@@ -2494,6 +2497,7 @@ const FOREIGN_SPACE_SPELLINGS: readonly string[] = [
   `root${RETIRED_SPACE_CAPITAL}`,
   `App${RETIRED_SPACE_CAPITAL}`,
   `app_${RETIRED_SPACE}`,
+  `CARGO_${RETIRED_SPACE_UPPER}_DIR`,
 ];
 
 /**
@@ -2635,6 +2639,7 @@ describe('a Space is named once (ADR 0010)', () => {
       `interface Typechecking${RETIRED_SPACE_CAPITAL} { scripts: { typecheck: string } }`,
       `import app${RETIRED_SPACE_CAPITAL} from '../../packages/app/package.json';`,
       `const requested = root${RETIRED_SPACE_CAPITAL}.scripts['e2e:fixture'];`,
+      `PathBuf::from(concat!(env!("CARGO_${RETIRED_SPACE_UPPER}_DIR"), "/../../conformance/intake"))`,
     ]) {
       expect(RETIRED_SPACE_NAME.test(line), line).toBe(true);
       expect(RETIRED_SPACE_NAME.test(withoutForeignSpaceSpellings(line)), line).toBe(false);

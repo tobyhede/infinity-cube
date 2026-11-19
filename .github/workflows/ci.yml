@@ -651,6 +651,8 @@ jobs:
       - name: Build what the shell bundles
         run: pnpm --filter @project/desktop sidecar:build
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      # nextest runs no doctests, so the examples in the crates' docs run here.
+      - run: cargo test --workspace --doc --locked
       - run: cargo nextest run --workspace --locked
 
   ci:

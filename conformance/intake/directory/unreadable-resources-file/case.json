@@ -1,0 +1,12 @@
+{
+  "description": "A regular file named resources in a Space directory, where Import lists a directory: it cannot be listed.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "unreadable",
+        "file": "10000000-0000-4000-8000-000000000001/resources"
+      }
+    ]
+  }
+}

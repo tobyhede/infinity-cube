@@ -1,0 +1,12 @@
+{
+  "description": "A regular file named assets at the root, where Import lists a directory: it cannot be listed.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "unreadable",
+        "file": "assets"
+      }
+    ]
+  }
+}

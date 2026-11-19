@@ -1,0 +1,13 @@
+{
+  "description": "One Resource id held by an Ur Resource titled B (a.json) and a Reference Resource titled A (b.json), and a third Resource referencing that id. Which copy is the Target is undefined, so whether its kind may be one is not judged: only the repeated id is refused.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "duplicate-resource-id",
+        "file": "10000000-0000-4000-8000-000000000001/resources/00000000-0000-4000-8000-000000000101.json",
+        "id": "00000000-0000-4000-8000-000000000101"
+      }
+    ]
+  }
+}

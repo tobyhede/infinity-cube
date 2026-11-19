@@ -31,6 +31,7 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 | 0020 r1 one Resource, one file; the directory is the inventory | → ST-28, ST-29 |
 | 0020 r2 identity from the file's id, never its path | → ST-29 |
 | 0020 r3 duplicate Resource id is an intake error | → ST-29 |
+| 0159 the cross-Space cycle walk follows Resources by Title, then id, by code unit; a commit's candidate aggregate is judged ascending by Space id, created Spaces among the stored | → ST-117. The repeated Resource id rule sent → SR (SR-6, SR-30) and MG (MG-86) |
 | 0020 r4 default order by Title, then id | sent → SR (SR-10 states it; ST-26 removed as a duplicate) |
 | 0020 r5 `loadSpace` takes files as an argument, no I/O | → ST-23 |
 | 0020 r6 no directory per kind | folded → ST-29 (every Resource is in `resources/`) |

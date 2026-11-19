@@ -1,4 +1,5 @@
 import { uuidSchema, type UUID } from '@project/core';
+import { MAX_ASSET_BYTES } from '@project/persistence';
 import { describe, expect, it } from 'vitest';
 import { readAggregateFrom } from '../src/aggregate-file';
 import { mapSource, type AggregateSource } from '../src/aggregate-source';
@@ -77,6 +78,34 @@ describe('the directory reader locating its own faults', () => {
         throw minting;
       }),
     ).rejects.toBe(minting);
+  });
+
+  it('locates a symbolic link at a path it owns at the link', async () => {
+    const source = mapSource(
+      '/talk',
+      new Map([['aggregate.json', encode(JSON.stringify({ version: 1, metaSpaceId: META }))]]),
+      [`${META}/space.json`],
+    );
+
+    const error = await directoryError(source);
+
+    expect(error.refusals).toEqual([{ kind: 'symbolic-link', file: `${META}/space.json` }]);
+  });
+
+  it('locates an asset over its cap at its file in assets/', async () => {
+    const name = `${'A'.repeat(43)}.png`;
+    const source = mapSource(
+      '/talk',
+      new Map([
+        ['aggregate.json', encode(JSON.stringify({ version: 1, metaSpaceId: META }))],
+        [`${META}/space.json`, encode(JSON.stringify({ version: 1, title: 'Talk' }))],
+        [`assets/${name}`, new Uint8Array(MAX_ASSET_BYTES + 1)],
+      ]),
+    );
+
+    const error = await directoryError(source);
+
+    expect(error.refusals).toEqual([{ kind: 'asset-refused', file: `assets/${name}` }]);
   });
 });
 

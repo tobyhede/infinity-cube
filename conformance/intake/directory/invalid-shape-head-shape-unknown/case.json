@@ -1,0 +1,13 @@
+{
+  "description": "A Graph whose head shape is none of the closed list (arrow, vee, dot, diamond).",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "invalid-shape",
+        "file": "10000000-0000-4000-8000-000000000001/space.json",
+        "field": "maps.0.graphs.0.headShape"
+      }
+    ]
+  }
+}
