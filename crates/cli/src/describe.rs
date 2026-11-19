@@ -9,7 +9,7 @@ use intake::{Refusal, Refusals};
 use serde_json::{Map, Value, json};
 
 /// A path as one word a POSIX shell reads back unchanged, so a printed
-/// command can be pasted (`src/cli/shell-word.ts`).
+/// command can be pasted.
 pub(crate) fn shell_word(path: &str) -> String {
     let plain = !path.is_empty()
         && path

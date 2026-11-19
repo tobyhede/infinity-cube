@@ -1,6 +1,5 @@
 //! `check <dir>`: Import a directory as `run` does into a memory store that
-//! is then discarded, serving and writing nothing (`checkAggregate` in
-//! `src/run/run.ts`, `describeCheck` in `src/cli/run-refusal.ts`).
+//! is then discarded, serving and writing nothing (Storage ST-110, ST-120).
 
 use std::path::Path;
 use std::process::ExitCode;

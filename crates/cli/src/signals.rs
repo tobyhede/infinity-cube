@@ -1,7 +1,7 @@
-//! The signals that stop a run (`RUN_SIGNALS` in `src/cli/run-launcher.ts`):
-//! SIGINT, SIGTERM and SIGHUP, merged. On Windows, Ctrl-C, Ctrl-Break and
-//! the console closing stand in for them; Windows is not yet a supported
-//! platform (issue 22), so nothing tests that half but the compiler.
+//! The signals that stop a run (Storage ST-63): SIGINT, SIGTERM and SIGHUP,
+//! merged. On Windows, Ctrl-C, Ctrl-Break and the console closing stand in
+//! for them; Windows is not yet a supported platform (issue 22), and no CI
+//! job compiles or tests that half.
 
 use std::io;
 
@@ -44,6 +44,16 @@ impl Signals {
             ctrl_break: ctrl_break()?,
             ctrl_close: ctrl_close()?,
         })
+    }
+
+    /// Whether a stop signal has arrived and not been waited for, without
+    /// waiting: each listener holds a signal until it is received.
+    pub(crate) async fn pending(&mut self) -> bool {
+        tokio::select! {
+            biased;
+            () = self.next() => true,
+            () = std::future::ready(()) => false,
+        }
     }
 
     /// The next stop signal.

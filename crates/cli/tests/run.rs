@@ -39,14 +39,21 @@ mod given_a_directory_it_can_run {
     #[test]
     fn announces_the_port_it_listens_on_as_one_json_line() {
         let (_temporary, directory) = fixture();
-        let port = free_port();
-        let run = start(&[
-            "run",
-            directory.to_str().unwrap(),
-            "--port",
-            &port.to_string(),
-            "--no-open",
-        ]);
+        // A port free when asked can be taken before the run binds it, by
+        // another test's connection among them, so a refusal tries another.
+        let (port, run) = (0..5)
+            .find_map(|_| {
+                let port = free_port();
+                let run = start(&[
+                    "run",
+                    directory.to_str().unwrap(),
+                    "--port",
+                    &port.to_string(),
+                    "--no-open",
+                ]);
+                matches!(run.announcement, Some(Announcement::Listening(_))).then_some((port, run))
+            })
+            .expect("a free port within five tries");
         assert_eq!(
             run.announcement,
             Some(Announcement::Listening(port)),

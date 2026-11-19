@@ -1,6 +1,5 @@
-//! `run <dir>`: run an Aggregate directory (ADR 0117) as `pnpm cube run`
-//! does (`src/cli/run-process.ts`, `src/cli/run-lifecycle.ts`), with the
-//! announcement the HTTP conformance suite reads.
+//! `run <dir>`: run an Aggregate directory (ADR 0117) by Storage ST-120,
+//! with the announcement the HTTP conformance suite reads.
 //!
 //! Import first, refusing a directory it cannot run before any port is
 //! taken; then listen, announce, and serve until a stop signal. The first
@@ -9,12 +8,12 @@
 //! still open, so a stalled client cannot hold the write; it then writes
 //! any Edit not yet on disk and exits zero, or one if that write failed;
 //! any signal after it exits at once, one. A signal before the run serves
-//! exits zero, since nothing can have been committed.
+//! exits zero, since nothing can have been committed, and is checked again
+//! once the port is taken, so a run stopped by then announces nothing and
+//! opens no browser.
 //!
-//! Unlike `pnpm cube run`, no launcher stands between the terminal and the
-//! process, so every signal here is one the author sent and none is dropped
-//! as a repeat (`src/cli/run-launcher.ts` drops pnpm's second copy of one
-//! Ctrl-C).
+//! No launcher stands between the terminal and the process, so every signal
+//! here is one the author sent and none is dropped as a repeat.
 
 use std::path::Path;
 use std::process::ExitCode;
@@ -105,6 +104,13 @@ pub(crate) async fn run(command: RunCommand) -> ExitCode {
         }
     };
 
+    if signals.pending().await {
+        drop(listener);
+        let _stopped = run.stop().await;
+        say(&format!("Stopped before serving {}.", directory.display()));
+        return ExitCode::SUCCESS;
+    }
+
     announce_listening(port);
     let own = own_host(port);
     let url = format!("http://{own}/");
@@ -147,6 +153,11 @@ pub(crate) async fn run(command: RunCommand) -> ExitCode {
             ));
             ExitCode::FAILURE
         }
-        _ => ExitCode::FAILURE,
+        other => {
+            say(&format!(
+                "Stopped, but the run ended unexpectedly: {other:?}"
+            ));
+            ExitCode::FAILURE
+        }
     }
 }

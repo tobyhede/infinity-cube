@@ -27,7 +27,7 @@ use crate::output::say;
 /// The application a run serves.
 pub(crate) type RunApplication = host::RunApplication<host::RandomIds, BuiltFiles>;
 
-/// The port a run takes without `--port`, as `cube run` does.
+/// The port a run takes without `--port` (Storage ST-120).
 pub(crate) const DEFAULT_PORT: u16 = 4173;
 
 /// How long a client has to send a request's headers.
@@ -93,16 +93,26 @@ pub(crate) fn own_host(port: u16) -> String {
     format!("{}:{port}", Ipv4Addr::LOCALHOST)
 }
 
+/// Whether `named` is the authority `own`: byte for byte, or, on port 80,
+/// without the port, the form a client sends for the default port.
+fn is_own(named: &[u8], own: &str) -> bool {
+    named == own.as_bytes()
+        || own
+            .strip_suffix(":80")
+            .is_some_and(|bare| named == bare.as_bytes())
+}
+
 /// Whether a request names exactly one `Host`, this listener's own, and no
 /// other authority in its target, so a page reached through DNS rebinding,
 /// which names its own host, is refused.
 pub(crate) fn names_own_host<B>(request: &Request<B>, own: &str) -> bool {
     let mut hosts = request.headers().get_all(HOST).iter();
-    let named = matches!((hosts.next(), hosts.next()), (Some(host), None) if host.as_bytes() == own.as_bytes());
+    let named =
+        matches!((hosts.next(), hosts.next()), (Some(host), None) if is_own(host.as_bytes(), own));
     let target = request
         .uri()
         .authority()
-        .is_none_or(|authority| authority.as_str() == own);
+        .is_none_or(|authority| is_own(authority.as_str().as_bytes(), own));
     named && target
 }
 
@@ -134,22 +144,36 @@ pub(crate) async fn serve(
     let mut connections = JoinSet::new();
     let own: Arc<str> = Arc::from(own);
     let mut stop = std::pin::pin!(stop);
+    // Whether the last accept failed, so a failure that persists, such as a
+    // process out of descriptors, is reported once rather than on every pass.
+    let mut failing = false;
     loop {
         // Reap the connections that have ended, so a long run holds none.
         while connections.try_join_next().is_some() {}
-        let (stream, _peer) = tokio::select! {
+        let accepted = tokio::select! {
             biased;
             () = &mut stop => break,
-            accepted = listener.accept() => match accepted {
-                Ok(accepted) => accepted,
-                Err(error) => {
-                    // A connection that failed before it was accepted, or a
-                    // process out of descriptors: wait a moment and go on.
+            accepted = listener.accept() => accepted,
+        };
+        let (stream, _peer) = match accepted {
+            Ok(accepted) => {
+                failing = false;
+                accepted
+            }
+            Err(error) => {
+                // A connection that failed before it was accepted, or a
+                // process out of descriptors: wait a moment, still heeding
+                // a stop, and go on.
+                if !failing {
                     say(&format!("Could not accept a connection: {error}"));
-                    tokio::time::sleep(Duration::from_millis(50)).await;
-                    continue;
+                    failing = true;
                 }
-            },
+                tokio::select! {
+                    biased;
+                    () = &mut stop => break,
+                    () = tokio::time::sleep(Duration::from_millis(50)) => continue,
+                }
+            }
         };
         let application = Arc::clone(&application);
         let own = Arc::clone(&own);
@@ -248,5 +272,25 @@ mod tests {
             "no-store",
             "never cached"
         );
+    }
+
+    mod given_a_listener_on_port_80 {
+        use super::*;
+
+        #[test]
+        fn admits_its_own_host_with_or_without_the_default_port() {
+            let own = own_host(80);
+            for host in ["127.0.0.1", "127.0.0.1:80"] {
+                assert!(names_own_host(&request("/", &[host]), &own), "{host}");
+            }
+            assert!(
+                names_own_host(&request("http://127.0.0.1/", &["127.0.0.1"]), &own),
+                "its own authority in the target, without the port"
+            );
+            assert!(
+                !names_own_host(&request("/", &["127.0.0.1:8080"]), &own),
+                "another port"
+            );
+        }
     }
 }

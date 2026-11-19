@@ -1,6 +1,6 @@
-//! The command line, read as `src/cli/arguments.ts` reads `cube`'s: one
-//! directory, never an option or the empty string, and each option at most
-//! once, or a usage error.
+//! The command line: one directory, never an option or the empty string,
+//! each option that takes a value at most once, `--json` at most once, and
+//! any number of `--no-open`, or a usage error.
 
 use std::ffi::{OsStr, OsString};
 use std::path::PathBuf;

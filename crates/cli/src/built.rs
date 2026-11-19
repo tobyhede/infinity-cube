@@ -53,8 +53,7 @@ fn walk(
     };
     for entry in fs::read_dir(directory).map_err(unreadable(directory))? {
         let path = entry.map_err(unreadable(directory))?.path();
-        // A link is followed only while it stays inside the build
-        // (`src/desktop/static-files.ts`).
+        // A link is followed only while it stays inside the build.
         let Ok(real) = fs::canonicalize(&path) else {
             continue;
         };

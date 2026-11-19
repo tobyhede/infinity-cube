@@ -34,16 +34,20 @@ fn main() -> anyhow::Result<ExitCode> {
         output::say(USAGE.trim_end());
         return Ok(ExitCode::from(2));
     };
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .context("could not start the async runtime")?;
     Ok(match command {
         Command::Help => {
             output::answer(HELP.trim_end());
             ExitCode::SUCCESS
         }
-        Command::Check(command) => runtime.block_on(check::check(&command)),
-        Command::Run(command) => runtime.block_on(run::run(command)),
+        Command::Check(command) => tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .context("could not start the async runtime")?
+            .block_on(check::check(&command)),
+        Command::Run(command) => tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .context("could not start the async runtime")?
+            .block_on(run::run(command)),
     })
 }
