@@ -250,8 +250,9 @@ export default tseslint.config(
       '**/dist-http/**',
       '**/dist-desktop-sidecar/**',
       '**/dist-mount/**',
-      // The desktop shell's Cargo output, generated schemas and built sidecar.
-      'packages/desktop/src-tauri/target/**',
+      // The Cargo workspace's target directory.
+      'target/**',
+      // The desktop shell's generated schemas and built sidecar.
       'packages/desktop/src-tauri/gen/**',
       'packages/desktop/src-tauri/binaries/**',
       // `ladle build` output is gitignored, but flat ESLint config does not

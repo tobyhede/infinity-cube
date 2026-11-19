@@ -1,7 +1,9 @@
 # The desktop application ships on a Node host in a Tauri shell, and a Rust host then replaces every server-side host
 
-Status: proposed
-Related: 0030, 0034, 0071, 0078, 0095, 0109, 0117, 0119, 0124, 0130, 0141, 0156, 0157
+Status: accepted
+Date: 2026-11-18
+Refines: 0030, 0034, 0095, 0117, 0119, 0124
+Related: 0071, 0078, 0109, 0130, 0141, 0156, 0157
 
 InfinityCube is to be installed and run by presenters who are not its developers: a desktop application they download, open an Aggregate directory in, and edit. Today every server-side host is TypeScript on Node 26.8.1 (ADR 0071), and Running serves through Vite's development server, so it needs a clone of the repository, Node and pnpm. ADR 0034 already makes the HTTP application Fetch-native and calls the Node and Vite wiring "prototype composition, not architectural constraints". The maintainer decided on 16 November 2026 to move the server side to Rust and to ship the desktop application with Tauri, and on 17 November 2026 that the desktop application ships first on the existing Node host rather than waiting for Rust: working code before the port. The research behind this is `.scratch/desktop-app/research.md`; the plan is `.scratch/rust-host/spec.md`.
 
@@ -34,11 +36,11 @@ InfinityCube is to be installed and run by presenters who are not its developers
 ## Consequences
 
 - ADR 0034's "runtime hosts adapt the application" now includes a second implementation of the application itself, not only a second adapter.
-- Accepting this ADR refines 0030 and 0095 (the SQL repository moves to `sqlx` over plain-SQL migrations), 0034, 0117 (the desktop sidecar serves a run without Vite and stops on standard input), 0119 (Export in place is reimplemented in Rust, with the same rules), and 0124 for as long as two CLIs exist: the Rust binary takes verbs from `pnpm cube` stage by stage, and `pnpm cube` keeps the rest until it is retired. These become `Refines:` on acceptance.
+- This ADR refines 0030 and 0095 (the SQL repository moves to `sqlx` over plain-SQL migrations), 0034, 0117 (the desktop sidecar serves a run without Vite and stops on standard input), 0119 (Export in place is reimplemented in Rust, with the same rules), and 0124 for as long as two CLIs exist: the Rust binary takes verbs from `pnpm cube` stage by stage, and `pnpm cube` keeps the rest until it is retired.
 - ADR 0071's Node pin governs the TypeScript host until it is retired. The desktop application's browser floor is ADR 0157.
 - Running's semantics (ADR 0117 and its refinements) are unchanged: the directory is the durable copy, Export is the only write, and file watching and locking stay rejected. ST-65 (opening a Space never writes the directory) is fixed in the first stage, before the Node sidecar meets real talks.
 - The shell's five-second kill is a deliberate exception to Storage ST-63's "stopping never loses an edit", for the desktop sidecar only: a window must close even when its sidecar hangs. Its cost is that an Export still running after five seconds is cut short, and git answers for that partial write as ADR 0119 has it answer for any other.
 - The first installable release is unsigned, with Tauri's own updater keys; signing and notarization are a release blocker before a public launch.
-- Rust code follows the `rust-sdk-dx` conventions for its safety rules (`thiserror` errors, no `unwrap`, `expect` or `panic!` in library code, newtype identifiers, `#[must_use]`, tokio), relaxed to crate-root types for `#[non_exhaustive]` and doctests, since both consumers are ours. `serde` is a plain dependency of intake, not a feature.
+- Rust code follows the `rust-sdk-dx` conventions for its safety rules (`thiserror` errors, no `unwrap`, `expect` or `panic!` in library code, newtype identifiers, `#[must_use]`, tokio), relaxed to crate-root types for `#[non_exhaustive]` and doctests, since both consumers are ours. `intake` reads JSON with a parser of its own rather than `serde`, so that its answers follow `JSON.parse`'s (ADR 0156); `serde_json` is a dev-dependency of `intake`, reading the conformance corpus.
 - The Node sidecar's loopback port is the one surface this application exposes beyond its window, which is why it is locked to its Host and a per-launch secret; that surface goes when the Rust host replaces the sidecar.
-- The first stage's code (the ST-65 fix, the production Node host and the Tauri shell) lands while this ADR is proposed, by the maintainer's choice. The rest of the work is `.scratch/rust-host/issues/`.
+- The first stage's code (the ST-65 fix, the production Node host and the Tauri shell) was written before this ADR was accepted, by the maintainer's choice. The rest of the work is `.scratch/rust-host/issues/`.

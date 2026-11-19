@@ -1,0 +1,17 @@
+[workspace]
+resolver = "3"
+members = ["crates/intake", "crates/host", "packages/desktop/src-tauri"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.97"
+publish = false
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"

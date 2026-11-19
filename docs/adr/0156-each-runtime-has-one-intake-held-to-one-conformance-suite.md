@@ -1,7 +1,9 @@
 # Each runtime has one intake, held to one conformance suite
 
-Status: proposed
-Related: 0010, 0034, 0130, 0132, 0142, 0155
+Status: accepted
+Date: 2026-11-18
+Refines: 0010
+Related: 0034, 0130, 0132, 0142, 0155
 
 ADR 0010 makes `loadSpace` the only intake: it parses the shape, validates references and builds the index, so a Space is consistent by construction, and nothing downstream takes a value that has only passed the schema (Storage ST-22). ADR 0155 moves the server side to Rust, while the browser application and Mounting stay TypeScript and keep running the TypeScript intake. A Rust host must refuse a bad directory and a bad commit just as the TypeScript host does, so the server needs an intake of its own. The maintainer decided on 16 November 2026 that Rust reimplements intake.
 
@@ -25,7 +27,7 @@ ADR 0010 makes `loadSpace` the only intake: it parses the shape, validates refer
 
 ## Consequences
 
-- ADR 0010's "the only intake" becomes "the only intake in its runtime". Accepting this ADR refines 0010, and Storage ST-22 is restated to match. This becomes `Refines: 0010` on acceptance.
-- Across runtimes, "the same words" becomes "the same kind and location". Storage ST-39 (one reader, refusing in the same words at every door), ST-90 (a mount refuses what the CLI refuses, in the same words) and the invariant that every door applies the same intake (from ADRs 0130 and 0132) hold within a runtime; between a Rust door and a TypeScript one, such as the Rust CLI and a mount, they hold for the kind of error and where it is, not the wording. Those rules are restated to match on acceptance.
+- ADR 0010's "the only intake" becomes "the only intake in its runtime". This ADR refines 0010, and Storage ST-22 is restated to match.
+- Across runtimes, "the same words" becomes "the same kind and location". Storage ST-39 (one reader, refusing in the same words at every door), ST-90 (a mount refuses what the CLI refuses, in the same words) and the invariant that every door applies the same intake (from ADRs 0130 and 0132) hold within a runtime; between a Rust door and a TypeScript one, such as the Rust CLI and a mount, they hold for the kind of error and where it is, not the wording. Those rules are restated to match.
 - "Adding a plugin is one line in each half" (`packages/plugins`) now has a Rust counterpart: the plugin's Rust module and one entry in the Rust plugin list.
 - The conformance corpus is written against the TypeScript intake and host first, before any Rust exists, so it describes today's behaviour rather than a port's.

@@ -14,6 +14,6 @@ pnpm --filter @project/desktop sidecar:build   # browser app + sidecar executabl
 pnpm --filter @project/desktop tauri build     # the installable bundle
 ```
 
-For a quick run without bundling: `cargo build` in `src-tauri/`, then `src-tauri/target/debug/infinity-cube-desktop <Aggregate directory>`.
+For a quick run without bundling: `cargo build -p infinity-cube-desktop` from the repository root, then `target/debug/infinity-cube-desktop <Aggregate directory>` (the Cargo workspace's `target/` is at the root).
 
 The first release is unsigned: on macOS, allow it once under System Settings › Privacy & Security › Open Anyway.

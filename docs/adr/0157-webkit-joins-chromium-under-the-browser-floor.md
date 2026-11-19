@@ -1,7 +1,9 @@
 # WebKit joins Chromium under the browser floor
 
-Status: proposed
-Related: 0052, 0069, 0071, 0155
+Status: accepted
+Date: 2026-11-18
+Refines: 0071
+Related: 0052, 0069, 0155
 
 ADR 0071 sets the browser floor at any current evergreen browser that natively implements the `Uint8Array` base64 and hexadecimal codecs. In practice the repository tests Chromium only (`pnpm e2e`, `pnpm e2e:ladle`). ADR 0155 ships the desktop application with Tauri, which draws in the operating system's own engine: WebView2 (Chromium) on Windows, WKWebView on macOS and WebKitGTK on Linux. The WebKit versions follow the installed operating system or distribution, not an evergreen update channel.
 
@@ -23,6 +25,6 @@ ADR 0071 sets the browser floor at any current evergreen browser that natively i
 
 ## Consequences
 
-- Accepting this ADR refines 0071: "evergreen browser" becomes "evergreen browser, or the declared minimum system for the desktop application". This becomes `Refines: 0071` on acceptance.
+- This ADR refines 0071: "evergreen browser" becomes "evergreen browser, or the declared minimum system for the desktop application".
 - Every behaviour `pnpm e2e` tests must hold in WebKit as well as Chromium. Whether the Ladle story suite (ADR 0052) also runs in WebKit is left to the ticket that adds the WebKit project.
-- The minimum versions are found by testing, recorded in the desktop application's bundle configuration, and restated where ADR 0071's floor is, `docs/agents/build-tooling.md` (the platform-floor rule), when this is accepted. AGENTS.md's E2E line, which says `pnpm e2e` runs Chromium only, changes in the same change as the WebKit project.
+- The minimum versions are found by testing, recorded in the desktop application's bundle configuration, and restated where ADR 0071's floor is, `docs/agents/build-tooling.md` (the platform-floor rule). AGENTS.md's E2E line, which says `pnpm e2e` runs Chromium only, changes in the same change as the WebKit project.

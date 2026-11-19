@@ -10,7 +10,7 @@
     "**/dist-http/**",
     "**/dist-desktop-sidecar/**",
     "**/dist-mount/**",
-    "packages/desktop/src-tauri/target/**",
+    "target/**",
     "packages/desktop/src-tauri/gen/**",
     "packages/desktop/src-tauri/binaries/**",
     "packages/app/build/**",

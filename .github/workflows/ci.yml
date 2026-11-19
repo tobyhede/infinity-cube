@@ -582,9 +582,80 @@ jobs:
             test-results/
           retention-days: 7
 
+  rust:
+    needs: reuse-pr-ci
+    # Unlike the jobs above, this one also runs on a push to `main` whose tree
+    # passed PR CI: a pull request restores a cache only from its own ref or
+    # from `main`, so a skipped run here would leave `main` with no cache and
+    # every new pull request compiling `cargo-nextest` and the shell's tree
+    # from nothing. The gate below still passes on the reused result.
+    if: ${{ !cancelled() && (github.event_name == 'push' || needs.reuse-pr-ci.outputs.should_skip != 'true') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NEXTEST_VERSION: 0.9.152
+    # The Cargo workspace at the repository root: `crates/intake`, `crates/host`
+    # and the desktop shell, `packages/desktop/src-tauri`. Its own job because a
+    # Rust toolchain, WebKitGTK and a `target/` directory share nothing with the
+    # pnpm jobs but the checkout, and a red clippy is a different diagnosis from
+    # a red `tsc`.
+    #
+    # The shell is built here, not only the crates: its build script demands the
+    # files `tauri.conf.json` names, so `sidecar:build` runs first, which builds
+    # the browser application and the sidecar executable and so needs the pinned
+    # Node (`setup-node` below). The toolchain is whatever `rust-toolchain.toml`
+    # pins; `rustup toolchain install` with no argument reads that file, so the
+    # version lives in one place.
+    #
+    # `cargo-nextest` is installed with `cargo install --locked` at the version
+    # `NEXTEST_VERSION` pins and kept in the cache with the registry and
+    # `target/`, so a run that restores a cache skips the compile. The cache key
+    # is the runner's OS, that version, the toolchain file and the lockfile. The
+    # restore-key drops only the lockfile, so a `Cargo.lock` change restores the
+    # previous `target/`, builds beside it and saves the union; nothing prunes
+    # that within one toolchain pin, and a toolchain change starts afresh.
+    #
+    # `cargo fmt` runs straight after the toolchain is installed, so a
+    # formatting slip fails before the install, the apt packages and the build.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - name: Install the pinned Rust toolchain
+        run: rustup toolchain install
+      - run: cargo fmt --all --check
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # The packages Tauri v2 links against on Linux.
+      - name: Install WebKitGTK and its build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
+            librsvg2-dev libsoup-3.0-dev libssl-dev pkg-config build-essential file
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/bin/cargo-nextest
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: cargo-${{ runner.os }}-nextest-${{ env.NEXTEST_VERSION }}-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-nextest-${{ env.NEXTEST_VERSION }}-${{ hashFiles('rust-toolchain.toml') }}-
+      - name: Install cargo-nextest
+        run: command -v cargo-nextest || cargo install cargo-nextest --locked --version "$NEXTEST_VERSION"
+      - name: Build what the shell bundles
+        run: pnpm --filter @project/desktop sidecar:build
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo nextest run --workspace --locked
+
   ci:
     name: CI passed
-    needs: [reuse-pr-ci, static-checks, coverage, postgres, sqlite, e2e, ladle, mount]
+    needs: [reuse-pr-ci, static-checks, coverage, postgres, sqlite, e2e, ladle, mount, rust]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -613,13 +684,14 @@ jobs:
           E2E: ${{ needs.e2e.result }}
           LADLE: ${{ needs.ladle.result }}
           MOUNT: ${{ needs.mount.result }}
+          RUST: ${{ needs.rust.result }}
         run: |
           if [ "$REUSED" = "true" ]; then
             echo "All CI gates were reused from a successful run for the same Git tree."
             exit 0
           fi
 
-          for result in "$STATIC_CHECKS" "$COVERAGE" "$POSTGRES" "$SQLITE" "$E2E" "$LADLE" "$MOUNT"; do
+          for result in "$STATIC_CHECKS" "$COVERAGE" "$POSTGRES" "$SQLITE" "$E2E" "$LADLE" "$MOUNT" "$RUST"; do
             if [ "$result" != "success" ]; then
               echo "A required CI job did not succeed: $result"
               exit 1

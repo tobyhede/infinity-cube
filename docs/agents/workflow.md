@@ -100,9 +100,9 @@ Code follows these naming conventions:
 - “Arrangement” is prose, not a domain entity. `CanvasContent`'s `'resources'` means Resources are mounted on the canvas, not that Placement is settled.
 - Use core's `titleLines` and `titleName` helpers rather than splitting Titles ad hoc.
 
-`test/unit/current-domain-vocabulary.test.ts` guards authored source under `packages/`, `src/`, `test/`, `scripts/` and root TypeScript configuration. It does not scan Markdown or root tool configuration. Review prose vocabulary explicitly.
+`test/unit/current-domain-vocabulary.test.ts` guards authored source under `packages/`, `src/`, `test/`, `scripts/`, `crates/` and root TypeScript configuration. It does not scan Markdown or root tool configuration. Review prose vocabulary explicitly.
 
-Before changing a guard, read its shapes and exemption assertions. A retired word with an English suffix can evade compound and word-boundary patterns; kebab-case needs its own arms. Cited foreign paths use `CITED_PATH` masking. The dependency protocol is exempted by line, not by file. Keep an exemption only while its asserted occurrence still needs it; a foreign tool's word is not a reason to exempt unrelated domain uses. The bare word “workspace” is guarded for the loaded Space and the app chrome; say Space, Dock or canvas. pnpm's technical sense remains allowed at the guarded sites.
+Before changing a guard, read its shapes and exemption assertions. A retired word with an English suffix can evade compound and word-boundary patterns; kebab-case needs its own arms. Cited foreign paths use `CITED_PATH` masking. The dependency protocol, and Cargo's inheritance keys in a Cargo package's manifest, are exempted by line, not by file. Keep an exemption only while its asserted occurrence still needs it; a foreign tool's word is not a reason to exempt unrelated domain uses. The bare word “workspace” is guarded for the loaded Space and the app chrome; say Space, Dock or canvas. pnpm's technical sense remains allowed at the guarded sites.
 
 ## Renames and format changes
 
