@@ -12,6 +12,7 @@ import {
   dragBy,
   nodeByTitle,
   openResource,
+  openResourcePersisted,
   presentControl,
   presentedName,
   presentedResource,
@@ -183,11 +184,10 @@ test('a Closed, an Open and a resized Resource are framed identically', async ({
   await settled(page);
 
   // B Open at the size it has; C Open and then resized through the real control.
-  await openResource(nodeByTitle(page, 'B').first(), 'B');
+  await openResourcePersisted(nodeByTitle(page, 'B').first(), 'B');
   const c = nodeByTitle(page, 'C').first();
-  await openResource(c, 'C');
+  await openResourcePersisted(c, 'C');
   const persistence = page.getByTestId('persistence-status');
-  await expect(persistence).toHaveText('Persisted');
   await settled(page);
   const before = await c.evaluate((element) => element.getBoundingClientRect().width);
   await c.hover();
