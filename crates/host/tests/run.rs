@@ -23,30 +23,18 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use host::{
-    EntryKind, Filesystem, IdSource, ImportError, Run, RunApplication, RunEvent, RunStopped, Shell,
+    EntryKind, Filesystem, ImportError, Run, RunApplication, RunEvent, RunStopped, Shell,
     TokioClock, TokioFilesystem,
 };
 use http::Request;
 use http_body::Frame;
-use intake::Uuid;
+use http_conformance::{Counted, FIXTURE_SPACES, META, META_ADDRESS};
 use serde_json::{Value, json};
 use tokio::sync::mpsc;
 use tokio::time::Instant;
 
-const META: &str = "00000000-0000-4000-8000-000000000040";
-const OTHER_SPACE: &str = "00000000-0000-4000-8000-000000000080";
-/// The Meta Space's product address.
-const META_ADDRESS: &str = "/spaces/AAAAAAAAQACAAAAAAAAAQA";
-
-#[derive(Default)]
-struct Counted(AtomicUsize);
-
-impl IdSource for Counted {
-    fn new_id(&self) -> Uuid {
-        let next = self.0.fetch_add(1, Ordering::SeqCst) + 1;
-        Uuid::parse(&format!("00000000-0000-4000-8000-{next:012x}")).unwrap()
-    }
-}
+/// The last of the fixture's Spaces.
+const OTHER_SPACE: &str = FIXTURE_SPACES[3];
 
 /// The real filesystem, except that the next `failures` new files fail.
 #[derive(Clone, Default)]

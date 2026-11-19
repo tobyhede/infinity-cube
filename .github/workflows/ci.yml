@@ -595,7 +595,8 @@ jobs:
     env:
       NEXTEST_VERSION: 0.9.152
     # The Cargo workspace at the repository root: `crates/intake`, `crates/host`,
-    # `crates/cli` and the desktop shell, `packages/desktop/src-tauri`. Its own job because a
+    # `crates/http-conformance`, `crates/cli` and the desktop shell,
+    # `packages/desktop/src-tauri`. Its own job because a
     # Rust toolchain, WebKitGTK and a `target/` directory share nothing with the
     # pnpm jobs but the checkout, and a red clippy is a different diagnosis from
     # a red `tsc`.
