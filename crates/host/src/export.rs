@@ -162,7 +162,8 @@ fn asset_path_hash(path: &str) -> Option<&str> {
 }
 
 /// Refuse to write through a symbolic link: the directory, any path given,
-/// or any directory between them.
+/// or any directory between them. A link another process swaps in after
+/// this check is out of scope (ST-57): it could already write there.
 async fn reject_links<'a>(
     fs: &impl Filesystem,
     root: &Path,
