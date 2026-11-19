@@ -379,6 +379,15 @@ mod given_a_change_from_another_site {
         let host = open().await;
         for origin in ["http://attacker.example", "http://127.0.0.1:1", "null"] {
             changes_refused(&host, &[("host", LISTENING_AT), ("origin", origin)]).await;
+            changes_refused(
+                &host,
+                &[
+                    ("host", LISTENING_AT),
+                    ("origin", origin),
+                    ("sec-fetch-site", "same-origin"),
+                ],
+            )
+            .await;
         }
     }
 

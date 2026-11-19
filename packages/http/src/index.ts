@@ -462,15 +462,15 @@ const originAuthority = (origin: string): string | undefined =>
 /**
  * Whether a change, a request that is not a read, comes from a page of
  * another site, as the browser that sent it says (ADR 0161, Storage ST-123).
- * A `Sec-Fetch-Site` other than `same-origin` or `none` says so; failing that
- * header, an `Origin` whose authority is not the `Host` the request names
- * does, `null` included. A request naming no `Host` is not judged by its
+ * A `Sec-Fetch-Site` other than `same-origin` or `none` says so, and so does
+ * an `Origin` whose authority is not the `Host` the request names, `null`
+ * included, whatever `Sec-Fetch-Site` says. A request naming no `Host` is not judged by its
  * `Origin`, and one naming neither header is served. `is_cross_site_change`
  * (`crates/host/src/http.rs`) decides the same.
  */
 const isCrossSiteChange = (headers: Headers): boolean => {
   const site = headers.get('Sec-Fetch-Site');
-  if (site !== null) return site !== 'same-origin' && site !== 'none';
+  if (site !== null && site !== 'same-origin' && site !== 'none') return true;
   const origin = headers.get('Origin');
   const host = headers.get('Host');
   if (origin === null || host === null) return false;

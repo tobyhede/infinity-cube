@@ -747,6 +747,24 @@ pub mod given_a_change_from_another_site {
         }
     }
 
+    // Case: stores an asset sent from its own origin naming no Sec-Fetch-Site
+    pub async fn stores_an_asset_sent_from_its_own_origin_naming_no_sec_fetch_site<A: Adapter>(
+        subject: &A,
+    ) {
+        let address = subject.own_address();
+        let own = subject.own_origin();
+        let headers = naming(&address, &own, &[("content-type", "text/plain")]);
+        let response = send(
+            subject,
+            "POST",
+            "/assets",
+            &headers,
+            "own origin, no Sec-Fetch-Site",
+        )
+        .await;
+        assert_eq!(response.status(), 201, "stored");
+    }
+
     // Case: answers a read whatever site a browser says sent it
     pub async fn answers_a_read_whatever_site_sent_it<A: Adapter>(subject: &A) {
         let address = subject.own_address();
