@@ -326,7 +326,7 @@ export const describeHostProcessConformance = (options: HostProcessConformanceOp
 
     describe('refusal', () => {
       it(
-        'refuses a missing directory without listening, announcing why and exiting non-zero',
+        'refuses a missing directory, announcing why and exiting non-zero',
         async () => {
           const started = await launch(join(await temporaryDirectory(), 'missing'), caseKills);
           // `startHost` answers `listening` for a host that announced it was listening.
