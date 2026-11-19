@@ -51,7 +51,12 @@ fn committed_revision(change: &SpaceChange) -> Revision {
 }
 
 /// Refuse a change set the store will not judge: an empty one, one naming a
-/// Space twice, or one whose change and snapshot disagree about the Space.
+/// Space twice, one naming a Space in other than lower case, or one whose
+/// change and snapshot disagree about the Space.
+///
+/// A Space's id is its directory's name, which Import reads only in lower
+/// case, so a Space created under an upper-case id would be exported to a
+/// directory no later run can read.
 fn request_refusal(request: &SpaceCommit) -> Option<CommitDecision> {
     if request.changes.is_empty() {
         return Some(rejected("A commit requires at least one change".to_owned()));
@@ -61,6 +66,9 @@ fn request_refusal(request: &SpaceCommit) -> Option<CommitDecision> {
         let id = change.space_id();
         if !ids.insert(id) {
             return Some(rejected(format!("Space {id} is named more than once")));
+        }
+        if !id.uuid().is_lower_case() {
+            return Some(rejected(format!("Space {id} must be named in lower case")));
         }
         if let Some(snapshot) = change.snapshot()
             && snapshot.id != id

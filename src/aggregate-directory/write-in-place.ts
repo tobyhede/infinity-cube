@@ -25,7 +25,9 @@ const rejectSymbolicLink = async (path: string, refuse: (path: string) => Error)
  * Refuse to write through a symbolic link: the directory itself, any file it
  * should hold, or any directory between the two. Writing through one would
  * change files outside the directory, which nothing here owns. `refuse` names
- * the link found; by default it is Export's refusal.
+ * the link found; by default it is Export's refusal. A link another process
+ * swaps in after this check is out of scope (ST-57): it could already write
+ * there.
  */
 export const rejectSymbolicLinks = async (
   directory: string,

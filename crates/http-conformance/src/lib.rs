@@ -141,6 +141,7 @@ macro_rules! cases {
                 answers_422_for_a_space_no_space_resource_references,
                 answers_positions_in_the_order_the_commit_wrote_them,
                 answers_400_for_a_commit_the_store_will_not_judge,
+                answers_400_for_a_space_named_in_upper_case,
                 answers_400_for_malformed_json,
                 answers_400_for_a_lone_surrogate_as_for_malformed_json,
                 answers_400_for_a_body_that_is_not_a_commit,
@@ -179,6 +180,7 @@ macro_rules! cases {
             given_a_request_for_the_shell {
                 serves_the_shell_for_a_product_address_that_resolves,
                 falls_back_to_the_shell_for_an_address_not_the_applications,
+                serves_the_shell_with_its_policy_at_index_html,
                 answers_head_for_the_shell_without_its_body,
                 answers_405_to_a_write_to_an_address_not_the_applications,
                 serves_a_content_named_built_file_as_immutable,

@@ -61,6 +61,12 @@ impl<B: BuiltFiles> Shell<B> {
     /// The built file a request's pathname names, with its media type.
     pub(crate) async fn file(&self, pathname: &str) -> Option<(Bytes, &'static str)> {
         let path = built_path(pathname)?;
+        // The page is `index.html` in the build, but by that name it is still
+        // the page, served with its policy, never a file without one (ST-115).
+        // Its case is ignored for a file system that ignores it.
+        if path.eq_ignore_ascii_case(PAGE_FILE) {
+            return None;
+        }
         let bytes = self.files.file(&path).await?;
         Some((bytes, built_media_type(&path)))
     }
@@ -172,6 +178,9 @@ pub(crate) fn built_media_type(path: &str) -> &'static str {
 /// `decodeURIComponent` decodes it, its dot segments resolved, and `None`
 /// for one that resolves to the build itself or outside it, or that holds a
 /// backslash or a NUL (`builtFiles`, `src/desktop/static-files.ts`).
+/// The page's file in a build.
+const PAGE_FILE: &str = "index.html";
+
 fn built_path(pathname: &str) -> Option<String> {
     let decoded = decode_component(pathname)?;
     let mut segments: Vec<&str> = Vec::new();

@@ -88,7 +88,11 @@ impl BuiltFiles for BuiltApplicationDirectory {
         if path == PAGE {
             return Some(self.page.clone());
         }
-        // The trait hands over a path with no `.` or `..` segment.
+        // The trait hands over a path with no `.` or `..` segment. The read
+        // below is not bound to the file checked here, so a link swapped in
+        // between could be followed; that is accepted, as only the person
+        // running the build can write to its directory and nothing that
+        // reaches the host can.
         let real = tokio::fs::canonicalize(self.root.join(path)).await.ok()?;
         if !real.starts_with(&self.root) || !tokio::fs::metadata(&real).await.ok()?.is_file() {
             return None;

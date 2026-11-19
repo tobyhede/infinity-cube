@@ -41,9 +41,12 @@ use serde_json::{Value, json};
 type Built = BTreeMap<String, Bytes>;
 type Host<R> = Application<R, Counted, Built>;
 
+/// The stand-in build as files, its page among them as `index.html`, as a
+/// build embedded in the CLI holds it.
 fn shell() -> Shell<Built> {
     let files = STAND_IN_FILES
         .into_iter()
+        .chain([("index.html", STAND_IN_PAGE)])
         .map(|(path, text)| (path.to_owned(), Bytes::from_static(text.as_bytes())))
         .collect();
     Shell::new(STAND_IN_PAGE, files)

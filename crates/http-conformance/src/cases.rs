@@ -364,6 +364,29 @@ pub mod given_a_commit {
         whole_body_invalid(&response);
     }
 
+    /// Import reads a Space directory only by a lower-case name, so a Space
+    /// created under an upper-case id would be exported where no run reads it.
+    // Case: answers 400 invalid-request for a Space named in upper case
+    pub async fn answers_400_for_a_space_named_in_upper_case<A: Adapter>(subject: &A) {
+        let upper = "ABCDEF00-0000-4000-8000-00000000000A";
+        let text = json!({
+            "changes": [{
+                "kind": "create",
+                "spaceId": upper,
+                "snapshot": {
+                    "id": upper,
+                    "document": { "version": 1, "title": "Upper" },
+                    "resources": []
+                }
+            }]
+        })
+        .to_string();
+        let response = post_commit(subject, text, "application/json").await;
+        api_policy(&response);
+        invalid_request(&response);
+        whole_body_invalid(&response);
+    }
+
     // Case: answers 400 invalid-request for malformed JSON
     pub async fn answers_400_for_malformed_json<A: Adapter>(subject: &A) {
         let response = post_commit(subject, "{", "application/json").await;
@@ -876,6 +899,13 @@ pub mod given_a_request_for_the_shell {
         subject: &A,
     ) {
         shell(&get(subject, "/somewhere/else").await);
+    }
+
+    // Case: serves the shell, with its policy, at %s
+    pub async fn serves_the_shell_with_its_policy_at_index_html<A: Adapter>(subject: &A) {
+        for path in ["/index.html", "/index%2Ehtml", "/./INDEX.HTML"] {
+            shell(&get(subject, path).await);
+        }
     }
 
     // Case: answers HEAD for the shell without its body

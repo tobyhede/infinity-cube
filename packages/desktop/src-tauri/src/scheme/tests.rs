@@ -41,7 +41,7 @@ struct Talk {
 async fn open() -> Talk {
     let (temporary, directory) = fixture_copy();
     let shell = built_shell(&stand_in_build(&temporary)).unwrap();
-    let run = open_run(&directory, shell).await.unwrap();
+    let run = open_run(&directory, shell, |_| {}).await.unwrap();
     let address = TalkAddress::new(TalkKey::of(&directory), SchemeStyle::HostPerTalk);
     let open_talks = OpenTalks::new(SchemeStyle::HostPerTalk);
     open_talks.open(address.clone(), Arc::clone(run.application()), WINDOW);

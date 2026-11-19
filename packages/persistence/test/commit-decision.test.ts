@@ -39,6 +39,25 @@ describe('commitRequestRefusal', () => {
     ).toMatchObject({ kind: 'rejected', message: `Space ${SPACE_ID} is named more than once` });
   });
 
+  it('refuses a Space named in upper case, which Import could not read back', () => {
+    const upper = uuidSchema.parse('ABCDEF00-0000-4000-8000-00000000000A');
+    expect(
+      commitRequestRefusal({
+        changes: [
+          {
+            kind: 'create',
+            spaceId: upper,
+            snapshot: { ...snapshot, id: upper },
+          },
+        ],
+      }),
+    ).toEqual({
+      kind: 'rejected',
+      code: 'invalid-commit',
+      message: `Space ${upper} must be named in lower case`,
+    });
+  });
+
   it('refuses a change whose snapshot names another Space', () => {
     expect(
       commitRequestRefusal({
