@@ -43,14 +43,14 @@ const makeTemporaryDirectory = async (): Promise<string> => {
   return directory;
 };
 
-const writeTalk = async (root?: string): Promise<string> =>
+const writeAggregate = async (root?: string): Promise<string> =>
   writeAggregateInto(
     root ?? (await makeTemporaryDirectory()),
     SPACE_ID,
     [
       {
         name: SPACE_ID,
-        spaceFile: JSON.stringify({ version: 1, id: SPACE_ID, title: 'Talk' }),
+        spaceFile: JSON.stringify({ version: 1, id: SPACE_ID, title: 'Space' }),
         resources: markdownResourceFiles(OPENING_ID, 'Opening', OPENING_TEXT),
       },
     ],
@@ -69,7 +69,7 @@ const connect = async (directory: string): Promise<Client> => {
 
 describe('the Aggregate directory MCP server', () => {
   it('offers exactly the file tools, the asset writer and check', async () => {
-    const client = await connect(await writeTalk());
+    const client = await connect(await writeAggregate());
 
     const { tools } = await client.listTools();
 
@@ -84,7 +84,7 @@ describe('the Aggregate directory MCP server', () => {
   });
 
   it('lists every file by its path relative to the directory, leaving out dot-entries', async () => {
-    const directory = await writeTalk();
+    const directory = await writeAggregate();
     await mkdir(join(directory, '.git'));
     await writeFile(join(directory, '.git', 'HEAD'), 'ref: refs/heads/main\n');
     await writeFile(join(directory, SPACE_ID, '.DS_Store'), '');
@@ -102,7 +102,7 @@ describe('the Aggregate directory MCP server', () => {
   });
 
   it("reads a file's text", async () => {
-    const client = await connect(await writeTalk());
+    const client = await connect(await writeAggregate());
 
     const answer = await callTool(client, 'read_file', { path: OPENING_ASSET });
 
@@ -110,7 +110,7 @@ describe('the Aggregate directory MCP server', () => {
   });
 
   it('writes a new file, creating its parent directories, and replaces an existing one', async () => {
-    const directory = await writeTalk();
+    const directory = await writeAggregate();
     const client = await connect(directory);
     const spaceFile = `${SPACE_ID}/space.json`;
     const retitled = JSON.stringify({ version: 1, id: SPACE_ID, title: 'Retitled' });
@@ -139,7 +139,7 @@ describe('the Aggregate directory MCP server', () => {
   });
 
   it("carries a binary file's bytes unchanged as base64", async () => {
-    const directory = await writeTalk();
+    const directory = await writeAggregate();
     const client = await connect(directory);
     const bytes = Uint8Array.from([
       0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff, 0xfe,
@@ -159,7 +159,7 @@ describe('the Aggregate directory MCP server', () => {
   });
 
   it('refuses to read a file that is not UTF-8 as text, naming base64', async () => {
-    const directory = await writeTalk();
+    const directory = await writeAggregate();
     await mkdir(join(directory, 'assets'), { recursive: true });
     await writeFile(join(directory, 'assets', 'picture.png'), Uint8Array.from([0x89, 0xff, 0x00]));
     const client = await connect(directory);
@@ -171,7 +171,7 @@ describe('the Aggregate directory MCP server', () => {
   });
 
   it('deletes one file', async () => {
-    const directory = await writeTalk();
+    const directory = await writeAggregate();
     const client = await connect(directory);
 
     const answer = await callTool(client, 'delete_file', { path: OPENING_ASSET });
@@ -181,7 +181,7 @@ describe('the Aggregate directory MCP server', () => {
   });
 
   it('checks an accepted directory as cube check does', async () => {
-    const directory = await writeTalk();
+    const directory = await writeAggregate();
     const client = await connect(directory);
 
     const answer = await callTool(client, 'check');
@@ -190,7 +190,7 @@ describe('the Aggregate directory MCP server', () => {
   });
 
   it('checks a refused directory with the problems cube check prints', async () => {
-    const directory = await writeTalk();
+    const directory = await writeAggregate();
     await writeFile(
       join(directory, SPACE_ID, 'resources', `${OPENING_ID}.json`),
       JSON.stringify({
@@ -212,7 +212,7 @@ describe('the Aggregate directory MCP server', () => {
 
   /** The whole of adding a Markdown Resource, as an MCP client does it, with no other tool (ADR 0142). */
   it('adds a Markdown Resource with its tools alone, and check names a Resource file it refuses', async () => {
-    const directory = await writeTalk();
+    const directory = await writeAggregate();
     const client = await connect(directory);
     const added = uuidSchema.parse('77777777-7777-4777-8777-777777777777');
 
@@ -249,7 +249,7 @@ describe('the Aggregate directory MCP server', () => {
   });
 
   it('checks a Resource file naming text not yet written by naming the file to write, which write_asset then writes', async () => {
-    const directory = await writeTalk();
+    const directory = await writeAggregate();
     const client = await connect(directory);
     const added = uuidSchema.parse('77777777-7777-4777-8777-777777777777');
     const text = '# Added\n\nBy tools.\n';
@@ -273,7 +273,7 @@ describe('the Aggregate directory MCP server', () => {
   });
 
   it('writes Markdown text with `\\n` line endings, naming it by those bytes', async () => {
-    const directory = await writeTalk();
+    const directory = await writeAggregate();
     const client = await connect(directory);
     const url = textAssetRef('# Lines\nOne\nTwo\n');
 
@@ -286,7 +286,7 @@ describe('the Aggregate directory MCP server', () => {
   });
 
   it('writes Mermaid source named `mmd` with `\\n` line endings, as its plugin saves it', async () => {
-    const directory = await writeTalk();
+    const directory = await writeAggregate();
     const client = await connect(directory);
     const url = textAssetRef('flowchart LR\n  A --> B\n');
 
@@ -302,7 +302,7 @@ describe('the Aggregate directory MCP server', () => {
   });
 
   it('refuses to write an asset whose bytes a file of another extension already holds', async () => {
-    const directory = await writeTalk();
+    const directory = await writeAggregate();
     const client = await connect(directory);
     const hash = textAssetRef('Plain.\n').slice('/assets/'.length);
     await callTool(client, 'write_asset', { content: 'Plain.\n', extension: 'txt' });
@@ -318,7 +318,7 @@ describe('the Aggregate directory MCP server', () => {
   });
 
   it('refuses bytes carried as base64 that name no extension, writing nothing', async () => {
-    const directory = await writeTalk();
+    const directory = await writeAggregate();
     const client = await connect(directory);
     const assets = join(directory, 'assets');
     const before = await readdir(assets);
@@ -332,7 +332,7 @@ describe('the Aggregate directory MCP server', () => {
   });
 
   it('refuses Markdown whose bytes are not UTF-8 text, writing nothing', async () => {
-    const directory = await writeTalk();
+    const directory = await writeAggregate();
     const client = await connect(directory);
     const assets = join(directory, 'assets');
     const before = await readdir(assets);
@@ -350,7 +350,7 @@ describe('the Aggregate directory MCP server', () => {
   });
 
   it('refuses an asset over the host’s 10 MiB cap, writing nothing', async () => {
-    const directory = await writeTalk();
+    const directory = await writeAggregate();
     const client = await connect(directory);
     const assets = join(directory, 'assets');
     const before = await readdir(assets);
@@ -368,7 +368,7 @@ describe('the Aggregate directory MCP server', () => {
   });
 
   it('answers the empty asset’s URL without writing a file, as no file is needed for it', async () => {
-    const directory = await writeTalk();
+    const directory = await writeAggregate();
     const client = await connect(directory);
     const assets = join(directory, 'assets');
     const before = await readdir(assets);
@@ -381,7 +381,7 @@ describe('the Aggregate directory MCP server', () => {
   });
 
   it('refuses to write an asset whose bytes a file named by the bare hash already holds', async () => {
-    const directory = await writeTalk();
+    const directory = await writeAggregate();
     const client = await connect(directory);
     const assets = join(directory, 'assets');
     const before = await readdir(assets);
@@ -432,9 +432,9 @@ describe('the Aggregate directory MCP server', () => {
     await writeFile(join(outside, 'secret.txt'), 'secret\n');
     const parent = await makeTemporaryDirectory();
     await writeFile(join(parent, 'outside.txt'), 'outside\n');
-    const directory = join(parent, 'talk');
+    const directory = join(parent, 'space');
     await mkdir(directory);
-    await writeTalk(directory);
+    await writeAggregate(directory);
     await mkdir(join(directory, '.git'));
     await writeFile(join(directory, '.git', 'HEAD'), 'ref: refs/heads/main\n');
     await symlink(outside, join(directory, 'linked'));
@@ -455,7 +455,7 @@ describe('the Aggregate directory MCP server', () => {
   });
 
   it('serves over a pair of streams until the client ends its input', async () => {
-    const directory = await writeTalk();
+    const directory = await writeAggregate();
     const input = new PassThrough();
     const output = new PassThrough();
     const lines: string[] = [];

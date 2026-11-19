@@ -10,7 +10,7 @@ import { notesSpace } from './spaces';
 
 /** When the story's presentation started, on the clock both windows share. */
 const STARTED_AT = Date.UTC(2026, 9, 16, 9, 0, 0);
-/** The time the Notes window reads, twelve and a half minutes into the talk. */
+/** The time the Notes window reads, twelve and a half minutes into the presentation. */
 const NOW = STARTED_AT + 750_000;
 
 export interface NotesWindowFixtureProps {

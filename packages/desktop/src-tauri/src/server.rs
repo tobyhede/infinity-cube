@@ -1,10 +1,10 @@
-//! A talk served by the Rust host in the shell's own process (ADR 0155):
+//! An Aggregate served by the Rust host in the shell's own process (ADR 0155):
 //! starting its run, the address its window opens at, what each of its
 //! windows may navigate to and open, and stopping it when its window closes.
 //!
-//! Each talk is one [`Run`] of `host`, served through the scheme handler
-//! ([`crate::scheme`]) at the talk's own origin ([`crate::address`]): no
-//! port, no `Host` check and no launch secret. Stopping a talk first stops
+//! Each Aggregate is one [`Run`] of `host`, served through the scheme handler
+//! ([`crate::scheme`]) at the Aggregate's own origin ([`crate::address`]): no
+//! port, no `Host` check and no launch secret. Stopping an Aggregate first stops
 //! serving it, so no Edit arrives after the last write, then waits for
 //! the run to write any Edit not yet on disk, however long that takes.
 
@@ -21,20 +21,20 @@ use tauri::{AppHandle, Manager as _, WebviewUrl};
 use tauri_plugin_dialog::{DialogExt as _, MessageDialogKind};
 use url::Url;
 
-use crate::address::{SchemeStyle, TalkAddress, TalkKey};
+use crate::address::{AggregateAddress, AggregateKey, SchemeStyle};
 use crate::saving::{SaveNotice, SaveStreak};
-use crate::scheme::{Closed, OpenTalks};
+use crate::scheme::{Closed, OpenAggregates};
 
-/// Why a talk could not be opened.
+/// Why an Aggregate could not be opened.
 #[derive(Debug, thiserror::Error)]
 pub enum OpenError {
     #[error(transparent)]
     Tauri(#[from] tauri::Error),
     #[error("could not serve the built application: {0}")]
     Built(#[source] BuiltApplicationError),
-    #[error("could not start the talk: {0}")]
+    #[error("could not start the Space: {0}")]
     Import(#[source] ImportError),
-    #[error("the talk's address is not a URL: {0}")]
+    #[error("the Space's address is not a URL: {0}")]
     Url(#[from] url::ParseError),
 }
 
@@ -52,34 +52,34 @@ pub fn built_shell(
     Ok(Shell::new(page, files))
 }
 
-/// What starting a talk came to.
+/// What starting an Aggregate came to.
 #[derive(Debug)]
 pub enum Started {
-    /// The talk is served; open its window at [`TalkServer::window_url`].
-    Serving(TalkServer),
+    /// The Aggregate is served; open its window at [`AggregateServer::window_url`].
+    Serving(AggregateServer),
     /// The folder cannot be run; `message` says why, in the author's words.
     Refused { message: String },
 }
 
-/// Every open talk, which the scheme handler reads.
-pub type SharedTalks = Arc<OpenTalks>;
+/// Every open Aggregate, which the scheme handler reads.
+pub type SharedAggregates = Arc<OpenAggregates>;
 
-/// The schemes registered so far, where each talk has a scheme of its own.
+/// The schemes registered so far, where each Aggregate has a scheme of its own.
 #[derive(Debug, Default)]
 pub struct RegisteredSchemes(Mutex<HashSet<String>>);
 
-/// Close a talk: stop serving it, so no Edit arrives after the last
+/// Close an Aggregate: stop serving it, so no Edit arrives after the last
 /// write, wait for every change still being answered, so an Edit the page
 /// is told landed is in the last write, then stop its run, which writes
 /// any Edit not yet on disk and answers once the write has landed or
 /// failed. Nothing is given up on: a read still being answered commits no
 /// Edit, and a change waits on nothing outside the process.
-pub async fn close_talk<B: BuiltFiles>(
-    open_talks: &OpenTalks,
-    key: &TalkKey,
+pub async fn close_aggregate<B: BuiltFiles>(
+    open_aggregates: &OpenAggregates,
+    key: &AggregateKey,
     run: Run<RandomIds, B>,
 ) -> (Vec<String>, RunStopped) {
-    let windows = match open_talks.close(key) {
+    let windows = match open_aggregates.close(key) {
         Some(Closed { windows, in_flight }) => {
             in_flight.settled().await;
             windows
@@ -136,7 +136,7 @@ pub async fn open_run<B: BuiltFiles>(
 }
 
 /// Show each [`SaveNotice`] for `directory` in a dialog, without waiting for
-/// it to be dismissed, until `closing` is set: a closing talk's last write
+/// it to be dismissed, until `closing` is set: a closing Aggregate's last write
 /// is reported when the close ends (Storage ST-122), not as news.
 fn notify_in_dialog(
     app: &AppHandle,
@@ -167,12 +167,12 @@ fn refusal(directory: &Path, error: &ImportError) -> Option<String> {
     let shown = directory.display();
     match error {
         // A presenter has no `pnpm cube init`, so no command is named.
-        ImportError::Empty => Some(format!("{shown} holds no talk: it is missing or empty.")),
+        ImportError::Empty => Some(format!("{shown} holds no Space: it is missing or empty.")),
         ImportError::Locked => Some(format!(
             "{shown} is open in another InfinityCube window or run: close it there first."
         )),
         ImportError::Refused(refusals) => {
-            let mut message = format!("{shown} is not a talk InfinityCube can open:");
+            let mut message = format!("{shown} is not a Space InfinityCube can open:");
             for refusal in refusals.as_slice() {
                 message.push_str("\n- ");
                 message.push_str(&refusal.located());
@@ -183,17 +183,17 @@ fn refusal(directory: &Path, error: &ImportError) -> Option<String> {
     }
 }
 
-/// A talk served by the Rust host in this process.
+/// An Aggregate served by the Rust host in this process.
 #[derive(Debug)]
-pub struct TalkServer {
+pub struct AggregateServer {
     app: AppHandle,
     run: Run<RandomIds, BuiltApplicationDirectory>,
-    /// Set once the talk begins closing, which silences its save notices.
+    /// Set once the Aggregate begins closing, which silences its save notices.
     closing: Arc<AtomicBool>,
-    windows: Arc<TalkWindows>,
+    windows: Arc<SpaceWindows>,
 }
 
-/// The address a talk's window opens at: where its root address redirects,
+/// The address an Aggregate's window opens at: where its root address redirects,
 /// the Meta Space's product address, or the root when it does not redirect.
 ///
 /// The shell follows the root's redirect itself and opens the window there,
@@ -223,45 +223,45 @@ pub async fn first_address<B: BuiltFiles>(
     }
 }
 
-/// Where a window of a talk goes when it is asked to load an address.
+/// Where a window of an Aggregate goes when it is asked to load an address.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Navigation {
-    /// Load it: an address of the talk's own origin.
+    /// Load it: an address of the Aggregate's own origin.
     Load,
-    /// Load the talk's first address instead: the talk's root, which the
+    /// Load the Aggregate's first address instead: the Aggregate's root, which the
     /// application answers with a redirect WebKitGTK does not follow.
     Redirect(Url),
-    /// Load nothing: an address outside the talk's origin.
+    /// Load nothing: an address outside the Aggregate's origin.
     Refuse,
 }
 
-/// What every window of one talk is held to.
+/// What every window of one Aggregate is held to.
 #[derive(Debug)]
-pub struct TalkWindows {
-    address: TalkAddress,
+pub struct SpaceWindows {
+    address: AggregateAddress,
     first: Url,
-    open_talks: SharedTalks,
+    open_aggregates: SharedAggregates,
 }
 
-impl TalkWindows {
-    /// The windows of the talk at `address`, whose window opens at `first`.
+impl SpaceWindows {
+    /// The windows of the Aggregate at `address`, whose window opens at `first`.
     #[must_use]
-    pub fn new(address: TalkAddress, first: Url, open_talks: SharedTalks) -> Self {
+    pub fn new(address: AggregateAddress, first: Url, open_aggregates: SharedAggregates) -> Self {
         Self {
             address,
             first,
-            open_talks,
+            open_aggregates,
         }
     }
 
-    /// The address the talk's window opens at.
+    /// The address the Aggregate's window opens at.
     #[must_use]
     pub fn first(&self) -> &Url {
         &self.first
     }
 
-    /// Where a window of the talk asked to load `url` goes: within the
-    /// talk's own origin only, never to a remote one, and to its first
+    /// Where a window of the Aggregate asked to load `url` goes: within the
+    /// Aggregate's own origin only, never to a remote one, and to its first
     /// address in place of its root.
     #[must_use]
     pub fn navigation(&self, url: &Url) -> Navigation {
@@ -274,8 +274,8 @@ impl TalkWindows {
         }
     }
 
-    /// The label and address of a new window of the talk, for a page of the
-    /// talk asking to open `url` (a Resource opened independently, or the
+    /// The label and address of a new window of the Aggregate, for a page of the
+    /// Aggregate asking to open `url` (a Resource opened independently, or the
     /// Notes window), or `None` to refuse it.
     #[must_use]
     pub fn open_from_page(&self, url: &Url) -> Option<(String, Url)> {
@@ -284,26 +284,29 @@ impl TalkWindows {
             Navigation::Redirect(first) => first,
             Navigation::Load => url.clone(),
         };
-        self.open_talks
+        self.open_aggregates
             .open_view(self.address.key())
             .map(|label| (label, url))
     }
 
-    /// Whether the window `label` is still one of the talk's: false once the
-    /// talk has begun closing.
+    /// Whether the window `label` is still one of the Aggregate's: false once the
+    /// Aggregate has begun closing.
     #[must_use]
     pub fn holds(&self, label: &str) -> bool {
-        self.open_talks.holds_window(self.address.key(), label)
+        self.open_aggregates.holds_window(self.address.key(), label)
     }
 }
 
-/// Register `address`'s scheme, where each talk has a scheme of its own
+/// Register `address`'s scheme, where each Aggregate has a scheme of its own
 /// (Windows). Tauri hands a webview the schemes registered when it is
 /// created, and a plugin added to a running application registers its
 /// schemes then (`tauri` 2.12.5, `AppHandle::plugin`, `plugin.rs`
 /// `initialize`, `manager/webview.rs` `prepare_pending_webview`).
-fn register_talk_scheme(app: &AppHandle, address: &TalkAddress) -> Result<(), tauri::Error> {
-    if SchemeStyle::CURRENT != SchemeStyle::SchemePerTalk {
+fn register_aggregate_scheme(
+    app: &AppHandle,
+    address: &AggregateAddress,
+) -> Result<(), tauri::Error> {
+    if SchemeStyle::CURRENT != SchemeStyle::SchemePerAggregate {
         return Ok(());
     }
     let scheme = address.scheme();
@@ -312,13 +315,13 @@ fn register_talk_scheme(app: &AppHandle, address: &TalkAddress) -> Result<(), ta
     if registered.contains(&scheme) {
         return Ok(());
     }
-    let open_talks = Arc::clone(app.state::<SharedTalks>().inner());
+    let open_aggregates = Arc::clone(app.state::<SharedAggregates>().inner());
     // A plugin's name lives as long as the application, as the scheme does.
     let name: &'static str = Box::leak(scheme.clone().into_boxed_str());
     app.plugin(
         tauri::plugin::Builder::<tauri::Wry, ()>::new(name)
             .register_asynchronous_uri_scheme_protocol(name, move |context, request, responder| {
-                crate::respond(&open_talks, &context, request, responder);
+                crate::respond(&open_aggregates, &context, request, responder);
             })
             .build(),
     )?;
@@ -326,12 +329,12 @@ fn register_talk_scheme(app: &AppHandle, address: &TalkAddress) -> Result<(), ta
     Ok(())
 }
 
-impl TalkServer {
+impl AggregateServer {
     /// Start serving `directory`, whose window will have the label `label`.
     ///
     /// # Errors
     ///
-    /// [`OpenError`] when the talk cannot be started at all.
+    /// [`OpenError`] when the Aggregate cannot be started at all.
     pub fn start(app: &AppHandle, directory: &Path, label: &str) -> Result<Started, OpenError> {
         let shell =
             built_shell(&app.path().resource_dir()?.join("app")).map_err(OpenError::Built)?;
@@ -346,18 +349,18 @@ impl TalkServer {
                 };
             }
         };
-        let address = TalkAddress::new(TalkKey::of(directory), SchemeStyle::CURRENT);
-        let open_talks = Arc::clone(app.state::<SharedTalks>().inner());
-        if let Err(error) = register_talk_scheme(app, &address) {
+        let address = AggregateAddress::new(AggregateKey::of(directory), SchemeStyle::CURRENT);
+        let open_aggregates = Arc::clone(app.state::<SharedAggregates>().inner());
+        if let Err(error) = register_aggregate_scheme(app, &address) {
             let _stopped = tauri::async_runtime::block_on(run.stop());
             return Err(OpenError::Tauri(error));
         }
-        open_talks.open(address.clone(), Arc::clone(run.application()), label);
+        open_aggregates.open(address.clone(), Arc::clone(run.application()), label);
         let first = tauri::async_runtime::block_on(first_address(run.application()));
         let url = match address.window_url().and_then(|root| root.join(&first)) {
             Ok(url) => url,
             Err(error) => {
-                drop(open_talks.close(address.key()));
+                drop(open_aggregates.close(address.key()));
                 let _stopped = tauri::async_runtime::block_on(run.stop());
                 return Err(OpenError::Url(error));
             }
@@ -366,30 +369,30 @@ impl TalkServer {
             app: app.clone(),
             run,
             closing,
-            windows: Arc::new(TalkWindows::new(address, url, open_talks)),
+            windows: Arc::new(SpaceWindows::new(address, url, open_aggregates)),
         }))
     }
 
-    /// The address the talk's window opens at.
+    /// The address the Aggregate's window opens at.
     #[must_use]
     pub fn window_url(&self) -> WebviewUrl {
         WebviewUrl::CustomProtocol(self.windows.first().clone())
     }
 
-    /// What every window of the talk is held to.
+    /// What every window of the Aggregate is held to.
     #[must_use]
-    pub fn windows(&self) -> Arc<TalkWindows> {
+    pub fn windows(&self) -> Arc<SpaceWindows> {
         Arc::clone(&self.windows)
     }
 
     /// Stop serving, writing any edit not yet on disk first, and destroy
-    /// the windows the talk's page opened. Answers why the last edit may
+    /// the windows the Aggregate's page opened. Answers why the last edit may
     /// not be on disk, or `None` when it is.
     pub fn stop(self) -> Option<String> {
         // How the last write ends is reported by the caller, not as news.
         self.closing.store(true, Ordering::SeqCst);
-        let (opened, stopped) = tauri::async_runtime::block_on(close_talk(
-            &self.windows.open_talks,
+        let (opened, stopped) = tauri::async_runtime::block_on(close_aggregate(
+            &self.windows.open_aggregates,
             self.windows.address.key(),
             self.run,
         ));

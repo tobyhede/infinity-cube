@@ -6,8 +6,8 @@ import { describeRunRefusal } from '../../src/cli/run-refusal';
 
 describe('a run refusal', () => {
   it('names init, with the directory as one shell word, for a missing or empty directory', () => {
-    expect(describeRunRefusal({ kind: 'empty' }, '/talks/rust asycn')).toBe(
-      "/talks/rust asycn holds no aggregate: it is missing or empty. To create one there: pnpm cube init '/talks/rust asycn'\n",
+    expect(describeRunRefusal({ kind: 'empty' }, '/spaces/rust asycn')).toBe(
+      "/spaces/rust asycn holds no aggregate: it is missing or empty. To create one there: pnpm cube init '/spaces/rust asycn'\n",
     );
   });
 
@@ -15,16 +15,16 @@ describe('a run refusal', () => {
     expect(
       describeRunRefusal(
         { kind: 'unreadable', diagnostics: ['first', 'second'], refusals: [] },
-        '/talk',
+        '/space',
       ),
-    ).toBe('/talk is not an Aggregate directory:\nfirst\nsecond\n');
+    ).toBe('/space is not an Aggregate directory:\nfirst\nsecond\n');
   });
 
   it('lists what aggregate intake refused', () => {
     expect(
       describeRunRefusal(
         { kind: 'aggregate-refused', diagnostics: ['refused'], refusals: [] },
-        '/talk',
+        '/space',
       ),
     ).toBe('Aggregate validation failed:\nrefused\n');
   });
@@ -49,11 +49,11 @@ describe('the command the launcher hands the run process', () => {
 
   it.each([
     [[]],
-    [['/talk', '']],
-    [['/talk', '', 'open', 'extra']],
-    [['/talk', '41.5', 'open']],
-    [['/talk', '-1', 'open']],
-    [['/talk', '', 'yes']],
+    [['/space', '']],
+    [['/space', '', 'open', 'extra']],
+    [['/space', '41.5', 'open']],
+    [['/space', '-1', 'open']],
+    [['/space', '', 'yes']],
   ])('refuses %j', (args) => {
     expect(decodeRunCommand(args)).toBeUndefined();
   });

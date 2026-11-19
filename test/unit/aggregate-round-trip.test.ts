@@ -228,7 +228,7 @@ describe('a Markdown Resource Open on one Map and Closed on another', () => {
       id: META_SPACE_ID,
       document: {
         version: 1,
-        title: 'Talk',
+        title: 'Space',
         maps: [
           {
             id: META_MAP_ID,
@@ -323,7 +323,7 @@ describe('a fresh Space and a cube init directory', () => {
   });
 
   it('Exports and re-Imports a cube init directory with its first Resource’s text present', async () => {
-    const directory = join(await makeTemporaryDirectory(), 'talk');
+    const directory = join(await makeTemporaryDirectory(), 'space');
     await expect(initAggregate(directory, newUuid)).resolves.toEqual({ kind: 'initialized' });
 
     const imported = await importFrom(directory);

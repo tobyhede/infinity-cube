@@ -26,7 +26,7 @@ use crate::space::{Space, load_space, repeated};
 /// files.insert_file("aggregate.json", format!(r#"{{"version": 1, "metaSpaceId": "{meta}"}}"#));
 /// files.insert_file(
 ///     format!("{meta}/space.json"),
-///     format!(r#"{{"version": 1, "id": "{meta}", "title": "Talk"}}"#),
+///     format!(r#"{{"version": 1, "id": "{meta}", "title": "Space"}}"#),
 /// );
 ///
 /// let aggregate = import_aggregate(files, || unreachable!("every id is written down"))

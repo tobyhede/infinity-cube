@@ -1,6 +1,6 @@
 {
   "name": "infinity-cube",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Set up and run InfinityCube, and write an Aggregate directory's files.",
   "author": {
     "name": "InfinityCube contributors"
@@ -10,11 +10,11 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "InfinityCube",
-    "shortDescription": "Run and author InfinityCube talks.",
+    "shortDescription": "Run and author InfinityCube Spaces.",
     "longDescription": "Set a person up to run InfinityCube on their own content, and write or change an Aggregate directory's files.",
     "developerName": "InfinityCube contributors",
     "category": "Productivity",
     "capabilities": [],
-    "defaultPrompt": ["Help me set up InfinityCube for a new talk."]
+    "defaultPrompt": ["Help me set up InfinityCube for a new Space."]
   }
 }

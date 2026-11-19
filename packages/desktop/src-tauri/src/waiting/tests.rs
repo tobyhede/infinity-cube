@@ -15,34 +15,34 @@ use tokio::sync::mpsc;
 use super::*;
 
 fn folder(name: &str) -> PathBuf {
-    PathBuf::from(format!("/talks/{name}"))
+    PathBuf::from(format!("/spaces/{name}"))
 }
 
-fn close(talk: &'static str) -> Event<&'static str> {
+fn close(aggregate: &'static str) -> Event<&'static str> {
     Event::CloseRequested {
-        talk,
-        folder: folder(talk),
+        aggregate,
+        folder: folder(aggregate),
     }
 }
 
-/// A coordinator with `talk`'s window closing, and the wait it is in.
-fn closing(talk: &'static str) -> (Waiting<&'static str>, WaitId) {
+/// A coordinator with `space`'s window closing, and the wait it is in.
+fn closing(aggregate: &'static str) -> (Waiting<&'static str>, WaitId) {
     let mut waiting = Waiting::default();
-    let effects = waiting.on(close(talk));
+    let effects = waiting.on(close(aggregate));
     let [Effect::StartTimer(id)] = effects[..] else {
         panic!("a close starts the wait's timer, got {effects:?}");
     };
     (waiting, id)
 }
 
-/// A coordinator with `talk`'s window closing and its question showing.
-fn asking(talk: &'static str) -> (Waiting<&'static str>, WaitId) {
-    let (mut waiting, id) = closing(talk);
+/// A coordinator with `space`'s window closing and its question showing.
+fn asking(aggregate: &'static str) -> (Waiting<&'static str>, WaitId) {
+    let (mut waiting, id) = closing(aggregate);
     assert_eq!(
         waiting.on(Event::Elapsed(id)),
         vec![Effect::Ask {
             wait: id,
-            folders: vec![folder(talk)]
+            folders: vec![folder(aggregate)]
         }],
         "the question names the folder once the time has passed"
     );
@@ -143,7 +143,7 @@ mod given_a_window_closing {
     #[test]
     fn a_repeated_close_starts_no_second_wait() {
         let (mut waiting, _id) = closing("rust");
-        assert_eq!(waiting.on(close("rust")), vec![], "one wait per talk");
+        assert_eq!(waiting.on(close("rust")), vec![], "one wait per Aggregate");
     }
 
     #[test]
@@ -160,7 +160,7 @@ mod given_a_window_closing {
                 Effect::Dismiss(first),
                 Effect::Abandon(vec![("rust", folder("rust"))])
             ],
-            "abandoning one abandons only its own talk"
+            "abandoning one abandons only its own Aggregate"
         );
         assert_eq!(
             waiting.on(Event::WriteFinished("go")),
@@ -175,7 +175,10 @@ mod given_a_quit {
 
     fn quit(writing: &[&'static str]) -> Event<&'static str> {
         Event::QuitRequested {
-            writing: writing.iter().map(|talk| (*talk, folder(talk))).collect(),
+            writing: writing
+                .iter()
+                .map(|aggregate| (*aggregate, folder(aggregate)))
+                .collect(),
         }
     }
 
@@ -205,7 +208,7 @@ mod given_a_quit {
         assert_eq!(
             waiting.on(Event::WriteFinished("go")),
             vec![],
-            "a talk written during a quit closes nothing by itself"
+            "an Aggregate written during a quit closes nothing by itself"
         );
         assert_eq!(
             waiting.on(Event::Elapsed(id)),
@@ -282,7 +285,7 @@ mod given_a_quit {
     }
 
     #[test]
-    fn a_window_closing_with_its_write_still_running_holds_a_quit_with_no_other_talk() {
+    fn a_window_closing_with_its_write_still_running_holds_a_quit_with_no_other_aggregate() {
         let (mut waiting, _window) = closing("rust");
         let effects = waiting.on(quit(&[]));
         assert!(

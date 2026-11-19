@@ -30,6 +30,6 @@ TitleSlide.meta = { iframed: true };
 export const Unbroken: Story = () => <PresentingStageFixture advances={3} />;
 Unbroken.meta = { iframed: true };
 
-/** A talk with a Presentation Notes Graph, for rehearsing with its notes under the Stage. */
+/** A presentation with a Presentation Notes Graph, for rehearsing with its notes under the Stage. */
 export const RehearsalNotes: Story = () => <PresentingStageFixture space={notesSpace} />;
 RehearsalNotes.meta = { iframed: true };

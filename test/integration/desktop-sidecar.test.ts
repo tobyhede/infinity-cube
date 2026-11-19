@@ -83,7 +83,7 @@ const listening = (announcement: SidecarAnnouncement) => {
 /** Open a sidecar on a copy of the fixture, and commit one edit through its window. */
 const sidecarWithAnEdit = async (entry?: readonly string[]) => {
   const root = await temporaryRoot();
-  const directory = join(root, 'talk');
+  const directory = join(root, 'space');
   await cp(FIXTURE, directory, { recursive: true });
   const { child, exited, announcement } = startSidecar(
     directory,
@@ -169,7 +169,7 @@ describe('The desktop sidecar', () => {
     'announces a refusal naming a directory another sidecar holds, and runs it once that one is killed',
     async () => {
       const root = await temporaryRoot();
-      const directory = join(root, 'talk');
+      const directory = join(root, 'space');
       await cp(FIXTURE, directory, { recursive: true });
       const built = await builtApplication(root);
       const holder = startSidecar(directory, built);
@@ -197,7 +197,7 @@ describe('The desktop sidecar', () => {
     'announces a refusal and exits non-zero when the built page is a link out of the build',
     async () => {
       const root = await temporaryRoot();
-      const directory = join(root, 'talk');
+      const directory = join(root, 'space');
       await cp(FIXTURE, directory, { recursive: true });
       const built = join(root, 'built');
       await mkdir(built);
@@ -214,7 +214,7 @@ describe('The desktop sidecar', () => {
     'announces the whole of a refusal larger than a pipe holds before exiting',
     async () => {
       const root = await temporaryRoot();
-      const directory = join(root, 'talk');
+      const directory = join(root, 'space');
       await cp(FIXTURE, directory, { recursive: true });
       // Each Resource file that declares no kind is one diagnostic in the
       // refusal, so four thousand of them make a line far past what a pipe holds.

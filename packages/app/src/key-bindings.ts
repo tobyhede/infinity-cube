@@ -134,7 +134,7 @@ export const FULL_VIEW_KEYS = {
 /** The Traversal keys, answered while presenting. */
 export const PRESENTING_KEYS = {
   // A presentation clicker sends Page Down and Page Up, so they move through
-  // the talk as Right and Left do, once the content they land in has no
+  // the presentation as Right and Left do, once the content they land in has no
   // further to scroll (`presenting-commands.ts`).
   advance: {
     keys: ['ArrowRight', 'PageDown', ' '],

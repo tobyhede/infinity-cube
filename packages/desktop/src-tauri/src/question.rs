@@ -115,7 +115,7 @@ mod tests {
         fn only_a_question_window_names_its_wait() {
             let wait = WaitId::from_number(7);
             assert_eq!(wait_of(&label_of(wait)), Some(wait), "its own label");
-            for other in ["home", "talk-0", "closing-", "closing-7a", "closing--1"] {
+            for other in ["home", "space-0", "closing-", "closing-7a", "closing--1"] {
                 assert_eq!(wait_of(other), None, "{other}");
             }
         }
@@ -150,12 +150,12 @@ mod tests {
         #[test]
         fn escapes_every_separator_a_folder_may_hold() {
             let folders = [
-                PathBuf::from("/talks/a,b c"),
-                PathBuf::from("/talks/100%#é"),
+                PathBuf::from("/spaces/a,b c"),
+                PathBuf::from("/spaces/100%#é"),
             ];
             assert_eq!(
                 fragment(&folders),
-                "%2Ftalks%2Fa%2Cb%20c,%2Ftalks%2F100%25%23%C3%A9",
+                "%2Fspaces%2Fa%2Cb%20c,%2Fspaces%2F100%25%23%C3%A9",
                 "one comma between folders, none inside one"
             );
         }

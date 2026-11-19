@@ -539,7 +539,7 @@ mod given_a_usage_error {
 
     #[test]
     fn announces_nothing_and_exits_two() {
-        let mut run = start(&["run", "--port", "0", "talk"]);
+        let mut run = start(&["run", "--port", "0", "space"]);
         assert_eq!(run.announcement, None, "no announcement");
         assert_eq!(run.exited().code(), Some(2), "a usage error");
     }

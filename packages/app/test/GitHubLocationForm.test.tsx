@@ -27,9 +27,9 @@ describe('asking for a GitHub location', () => {
   it('opens a valid location by its source parameter', () => {
     const { navigated, submit } = ask();
 
-    submit('github:tobyhede/talk@main/slides');
+    submit('github:tobyhede/space@main/slides');
 
-    expect(navigated).toEqual(['?source=github:tobyhede/talk@main/slides']);
+    expect(navigated).toEqual(['?source=github:tobyhede/space@main/slides']);
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
@@ -39,15 +39,15 @@ describe('asking for a GitHub location', () => {
       'https://infinity-cube.test/?utm=feed&source=bad#x',
     );
 
-    submit('github:tobyhede/talk');
+    submit('github:tobyhede/space');
 
-    expect(navigated).toEqual(['?utm=feed&source=github:tobyhede/talk']);
+    expect(navigated).toEqual(['?utm=feed&source=github:tobyhede/space']);
   });
 
   it('says why an invalid location cannot be opened, and opens nothing', () => {
     const { navigated, field, submit } = ask();
 
-    submit('tobyhede/talk');
+    submit('tobyhede/space');
 
     expect(navigated).toEqual([]);
     expect(screen.getByRole('alert')).toHaveTextContent('a GitHub location begins with github:');
@@ -58,17 +58,17 @@ describe('asking for a GitHub location', () => {
     const { navigated, submit } = ask();
     submit('github:tobyhede');
 
-    submit('github:tobyhede/talk');
+    submit('github:tobyhede/space');
 
-    expect(navigated).toEqual(['?source=github:tobyhede/talk']);
+    expect(navigated).toEqual(['?source=github:tobyhede/space']);
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it('withdraws the reason once the location is edited', () => {
     const { field, submit } = ask();
-    submit('tobyhede/talk');
+    submit('tobyhede/space');
 
-    fireEvent.change(field, { target: { value: 'github:tobyhede/talk' } });
+    fireEvent.change(field, { target: { value: 'github:tobyhede/space' } });
 
     expect(screen.queryByRole('alert')).toBeNull();
     expect(field).toHaveAttribute('aria-invalid', 'false');

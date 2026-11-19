@@ -150,8 +150,8 @@ describe('the browser presentation channel', () => {
   });
 
   it('names two mounted revisions of one Space apart', () => {
-    const first = `github:tobyhede/talk@${'a'.repeat(40)}/slides`;
-    const second = `github:tobyhede/talk@${'b'.repeat(40)}/slides`;
+    const first = `github:tobyhede/space@${'a'.repeat(40)}/slides`;
+    const second = `github:tobyhede/space@${'b'.repeat(40)}/slides`;
 
     expect(presentationChannelName(uuid(2), first)).not.toBe(
       presentationChannelName(uuid(2), second),

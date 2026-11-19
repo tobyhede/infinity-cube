@@ -83,7 +83,7 @@ const mapEntry = (
   graphs: Json[] = [graph()],
 ) => ({
   id: 'b0000000-0000-4000-8000-000000000001',
-  title: 'Talk',
+  title: 'Space',
   kind: 'positioned',
   positions,
   graphs,

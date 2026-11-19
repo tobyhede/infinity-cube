@@ -119,7 +119,7 @@ struct Started {
 /// A fresh copy of the tracked fixture, in a temporary directory of its own.
 fn fixture_copy() -> (tempfile::TempDir, PathBuf) {
     let temporary = tempfile::tempdir().unwrap();
-    let directory = temporary.path().join("talk");
+    let directory = temporary.path().join("space");
     copy_tree(
         Path::new(concat!(
             env!("CARGO_MANIFEST_DIR"),

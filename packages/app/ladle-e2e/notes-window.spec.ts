@@ -24,7 +24,7 @@ test(
     await page.goto(story('fork'));
 
     await expect(notesWindow(page).getByText('Presenting Welcome')).toBeVisible();
-    await expect(notes(page).getByText('From Launch talk Presentation Notes')).toBeVisible();
+    await expect(notes(page).getByText('From Launch demo Presentation Notes')).toBeVisible();
     await expect(noteNames(page)).toHaveText(['Open with the outage', 'Thank the team']);
     await expect(moves(page).getByRole('button', { name: 'Go to Demo' })).toBeVisible();
     await expect(moves(page).getByRole('button', { name: 'Choose Architecture' })).toBeVisible();
@@ -57,13 +57,13 @@ test(
 );
 
 test(
-  'says when a Resource has no notes and the talk ends',
+  'says when a Resource has no notes and the presentation ends',
   { tag: '@parity:notes-window-marks-the-end-and-a-resource-without-notes' },
   async ({ page }) => {
     await page.goto(story('end'));
 
     await expect(notes(page).getByText('No notes for this Resource.')).toBeVisible();
-    await expect(moves(page).getByText('This is the end of the talk.')).toBeVisible();
+    await expect(moves(page).getByText('This is the end of the presentation.')).toBeVisible();
     await expect(moves(page).getByRole('button', { name: 'Back' })).toBeVisible();
   },
 );

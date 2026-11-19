@@ -163,7 +163,7 @@ fn cases(kind: &str) -> Vec<(String, PathBuf)> {
 /// Import a fresh copy of `aggregate` into a fresh store, answering both.
 async fn imported(aggregate: &Path) -> (tempfile::TempDir, PathBuf, MemorySpaceRepository) {
     let temporary = tempfile::tempdir().unwrap();
-    let directory = temporary.path().join("talk");
+    let directory = temporary.path().join("space");
     copy_tree(aggregate, &directory);
     let store = MemorySpaceRepository::new();
     import_directory(&store, &TokioFilesystem, &directory, &NoIds)
@@ -306,7 +306,7 @@ async fn every_directory_case_gets_its_expected_answer_through_import_directory(
             )),
         };
         let temporary = tempfile::tempdir().unwrap();
-        let directory = temporary.path().join("talk");
+        let directory = temporary.path().join("space");
         copy_tree(&case.join("aggregate"), &directory);
         let store = MemorySpaceRepository::new();
         let got = match import_directory(&store, &TokioFilesystem, &directory, &NoIds).await {

@@ -21,13 +21,13 @@ export interface NotesMove extends NotesResource {
 }
 
 /**
- * The notes a talk's Presentation Notes Graph holds for one of its Resources,
+ * The notes a presentation's Presentation Notes Graph holds for one of its Resources,
  * as the Notes window and the rehearsal notes under the Stage both draw them.
  */
 export interface PresentedNotes {
   /** The Title of the Graph being presented. */
-  readonly talk: string;
-  /** The Presentation Notes Graph's Title, or `null` when the talk has none. */
+  readonly presentedGraph: string;
+  /** The Presentation Notes Graph's Title, or `null` when the presentation has none. */
   readonly notesGraph: string | null;
   /** The Titles of the other Graphs that also read as notes, which were passed over. */
   readonly passedOver: readonly string[];
@@ -62,13 +62,13 @@ export function presentedNotes(
   resourceId: ResourceId,
 ): PresentedNotes | undefined {
   const shown = space.lookup.map(mapId)?.map;
-  const talk = space.lookup.graph(graphId)?.graph;
-  if (shown === undefined || talk === undefined) return undefined;
-  const found = presentationNotes(shown, talk, resourceId);
+  const presented = space.lookup.graph(graphId)?.graph;
+  if (shown === undefined || presented === undefined) return undefined;
+  const found = presentationNotes(shown, presented, resourceId);
   const notes = found.notes.flatMap((id) => drawn(space, id) ?? []);
   if (notes.length !== found.notes.length) return undefined;
   return {
-    talk: talk.title,
+    presentedGraph: presented.title,
     notesGraph: found.graph?.title ?? null,
     passedOver: found.passedOver.map((graph) => graph.title),
     notes,
@@ -164,7 +164,7 @@ export function createNotesWindow({
   let reloadAgain = false;
 
   // The presentation this window last drew. A new one reloads the Space
-  // first, so an Edit made since the last talk is drawn in this one.
+  // first, so an Edit made since the last presentation is drawn in this one.
   let drawnPresentation: UUID | null = null;
 
   /** Draw what the follower is following from the Space as this window holds it. */

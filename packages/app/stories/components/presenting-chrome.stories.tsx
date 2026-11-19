@@ -15,7 +15,7 @@ export default { title: 'Components/Presenting Chrome' };
  * into, `advance()`.
  */
 
-/** A line: the degenerate fork, and the shape most talks are. */
+/** A line: the degenerate fork, and the shape most presentations are. */
 export const Line: Story = () => <PresentingChromeFixture />;
 
 /** Four Edges out of one Resource, the longest of them well past what the row can hold. */

@@ -49,7 +49,7 @@ const storedSpace: LoadedSpace = {
     id: SPACE_ID,
     document: {
       version: 1,
-      title: 'Stored talk',
+      title: 'Stored space',
       maps: [
         {
           id: SPINE_MAP_ID,
@@ -141,7 +141,7 @@ describe('canonical export', () => {
     expect(written).toEqual({
       version: 1,
       id: SPACE_ID,
-      title: 'Stored talk',
+      title: 'Stored space',
       maps: [
         {
           id: SPINE_MAP_ID,
@@ -212,7 +212,7 @@ describe('canonical export', () => {
       ],
       id: SPACE_ID,
       document: {
-        title: 'Stored talk',
+        title: 'Stored space',
         maps: [
           {
             kind: 'positioned',
@@ -285,7 +285,7 @@ describe('canonical export', () => {
       id: SPACE_ID,
       document: {
         version: 1,
-        title: 'Stored talk',
+        title: 'Stored space',
         maps: [
           {
             id: SPINE_MAP_ID,
@@ -348,7 +348,7 @@ describe('canonical export', () => {
     expect(JSON.parse(written)).toEqual({
       version: 1,
       id: SPACE_ID,
-      title: 'Stored talk',
+      title: 'Stored space',
       maps: [
         {
           id: SPINE_MAP_ID,

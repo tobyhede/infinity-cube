@@ -1,6 +1,6 @@
 //! The scheme handler as a `Request -> Response` function, on a run of a
-//! fresh copy of the tracked fixture: its own admission (the talk's address,
-//! its windows, a change from its own page, a closed talk), and, through it,
+//! fresh copy of the tracked fixture: its own admission (the Aggregate's address,
+//! its windows, a change from its own page, a closed Aggregate), and, through it,
 //! the HTTP conformance cases `crates/http-conformance` writes once for both
 //! Rust adapters, generated here by its `cases!` in the module
 //! `conformance`. `test/unit/http-conformance-rust-ports.test.ts` holds those
@@ -21,7 +21,7 @@ use serde_json::Value;
 use tempfile::TempDir;
 
 use super::*;
-use crate::address::TalkKey;
+use crate::address::AggregateKey;
 use crate::server::{built_shell, open_run};
 use crate::test_support::{META, META_ADDRESS, fixture_copy, rename_text, stand_in_build};
 use bytes::Bytes;
@@ -29,36 +29,37 @@ use http_conformance::STAND_IN_SCRIPT;
 use http_conformance::support::assertions::shell;
 use http_conformance::support::{fresh, header, json_of};
 
-const WINDOW: &str = "talk-0";
-/// One talk open in the window [`WINDOW`], served through the scheme.
-struct Talk {
-    open_talks: OpenTalks,
-    address: TalkAddress,
+const WINDOW: &str = "space-0";
+/// One Aggregate open in the window [`WINDOW`], served through the scheme.
+struct Aggregate {
+    open_aggregates: OpenAggregates,
+    address: AggregateAddress,
     run: Run<host::RandomIds, host::BuiltApplicationDirectory>,
     _temporary: TempDir,
 }
 
-async fn open() -> Talk {
+async fn open() -> Aggregate {
     let (temporary, directory) = fixture_copy();
     let shell = built_shell(&stand_in_build(&temporary)).unwrap();
     let run = open_run(&directory, shell, |_| {}).await.unwrap();
-    let address = TalkAddress::new(TalkKey::of(&directory), SchemeStyle::HostPerTalk);
-    let open_talks = OpenTalks::new(SchemeStyle::HostPerTalk);
-    open_talks.open(address.clone(), Arc::clone(run.application()), WINDOW);
-    Talk {
-        open_talks,
+    let address =
+        AggregateAddress::new(AggregateKey::of(&directory), SchemeStyle::HostPerAggregate);
+    let open_aggregates = OpenAggregates::new(SchemeStyle::HostPerAggregate);
+    open_aggregates.open(address.clone(), Arc::clone(run.application()), WINDOW);
+    Aggregate {
+        open_aggregates,
         address,
         run,
         _temporary: temporary,
     }
 }
 
-impl Talk {
+impl Aggregate {
     fn url(&self, path: &str) -> String {
         format!("{}{path}", self.address.origin())
     }
 
-    /// A request from the talk's own window and page, as WebKitGTK sends a
+    /// A request from the Aggregate's own window and page, as WebKitGTK sends a
     /// page's request to its own origin under a custom scheme: naming the
     /// page as its `Referer`, and no `Origin`.
     async fn send(
@@ -82,7 +83,7 @@ impl Talk {
     /// The scheme's answer to `request` from `window`, as `Bytes` as the
     /// shared helpers take it.
     async fn answer(&self, window: &str, request: Request<Vec<u8>>) -> Response<Bytes> {
-        self.open_talks
+        self.open_aggregates
             .answer(window, request)
             .await
             .map(Bytes::from)
@@ -132,19 +133,23 @@ mod given_a_request_at_the_trust_boundary {
     use super::*;
 
     #[tokio::test]
-    async fn answers_a_read_from_the_talks_own_window() {
-        let talk = open().await;
-        let response = talk.get("/api/spaces").await;
-        assert_eq!(response.status(), 200, "the talk's window reads its talk");
-        talk.stop().await;
+    async fn answers_a_read_from_the_aggregates_own_window() {
+        let aggregate = open().await;
+        let response = aggregate.get("/api/spaces").await;
+        assert_eq!(
+            response.status(),
+            200,
+            "the Aggregate's window reads its Aggregate"
+        );
+        aggregate.stop().await;
     }
 
     #[tokio::test]
-    async fn refuses_an_address_naming_no_open_talk() {
-        let talk = open().await;
-        let elsewhere = TalkAddress::new(
-            TalkKey::of(Path::new("/talks/not-open")),
-            SchemeStyle::HostPerTalk,
+    async fn refuses_an_address_naming_no_open_aggregate() {
+        let aggregate = open().await;
+        let elsewhere = AggregateAddress::new(
+            AggregateKey::of(Path::new("/spaces/not-open")),
+            SchemeStyle::HostPerAggregate,
         );
         for uri in [
             format!("{}/api/spaces", elsewhere.origin()),
@@ -152,92 +157,101 @@ mod given_a_request_at_the_trust_boundary {
             "/api/spaces".to_owned(),
         ] {
             let request = Request::get(uri.as_str()).body(Vec::new()).unwrap();
-            refused_by_the_scheme(&talk.answer(WINDOW, request).await, 404);
+            refused_by_the_scheme(&aggregate.answer(WINDOW, request).await, 404);
         }
-        talk.stop().await;
+        aggregate.stop().await;
     }
 
     #[tokio::test]
-    async fn refuses_a_window_that_is_not_the_talks() {
-        let talk = open().await;
-        for window in ["home", "talk-1", ""] {
-            let request = Request::get(talk.url("/api/spaces"))
+    async fn refuses_a_window_that_is_not_the_aggregates() {
+        let aggregate = open().await;
+        for window in ["home", "space-1", ""] {
+            let request = Request::get(aggregate.url("/api/spaces"))
                 .body(Vec::new())
                 .unwrap();
-            refused_by_the_scheme(&talk.answer(window, request).await, 403);
+            refused_by_the_scheme(&aggregate.answer(window, request).await, 403);
         }
-        talk.stop().await;
+        aggregate.stop().await;
     }
 
     #[tokio::test]
-    async fn admits_a_window_the_talks_page_opened() {
-        let talk = open().await;
-        let view = talk
-            .open_talks
-            .open_view(talk.address.key())
-            .expect("the talk is open");
-        let request = Request::get(talk.url(META_ADDRESS))
+    async fn admits_a_window_the_aggregates_page_opened() {
+        let aggregate = open().await;
+        let view = aggregate
+            .open_aggregates
+            .open_view(aggregate.address.key())
+            .expect("the Aggregate is open");
+        let request = Request::get(aggregate.url(META_ADDRESS))
             .body(Vec::new())
             .unwrap();
-        shell(&talk.answer(&view, request).await);
-        talk.stop().await;
+        shell(&aggregate.answer(&view, request).await);
+        aggregate.stop().await;
     }
 
     #[tokio::test]
-    async fn stops_admitting_a_window_the_talks_page_opened_once_it_is_gone() {
-        let talk = open().await;
-        let key = talk.address.key();
-        let view = talk.open_talks.open_view(key).expect("the talk is open");
-        talk.open_talks.forget_view(&view);
+    async fn stops_admitting_a_window_the_aggregates_page_opened_once_it_is_gone() {
+        let aggregate = open().await;
+        let key = aggregate.address.key();
+        let view = aggregate
+            .open_aggregates
+            .open_view(key)
+            .expect("the Aggregate is open");
+        aggregate.open_aggregates.forget_view(&view);
         assert!(
-            !talk.open_talks.holds_window(key, &view),
+            !aggregate.open_aggregates.holds_window(key, &view),
             "a window that is gone"
         );
         assert!(
-            talk.open_talks.holds_window(key, WINDOW),
-            "the talk's own window is still held"
+            aggregate.open_aggregates.holds_window(key, WINDOW),
+            "the Aggregate's own window is still held"
         );
-        talk.stop().await;
+        aggregate.stop().await;
     }
 
     #[tokio::test]
-    async fn names_no_window_twice_when_a_talk_is_opened_again() {
-        let talk = open().await;
-        let key = talk.address.key();
-        let first = talk.open_talks.open_view(key).expect("the talk is open");
-        let _closed = talk.open_talks.close(key);
+    async fn names_no_window_twice_when_an_aggregate_is_opened_again() {
+        let aggregate = open().await;
+        let key = aggregate.address.key();
+        let first = aggregate
+            .open_aggregates
+            .open_view(key)
+            .expect("the Aggregate is open");
+        let _closed = aggregate.open_aggregates.close(key);
         assert!(
-            !talk.open_talks.holds_window(key, &first),
-            "a closing talk holds no window"
+            !aggregate.open_aggregates.holds_window(key, &first),
+            "a closing Aggregate holds no window"
         );
         assert_eq!(
-            talk.open_talks.open_view(key),
+            aggregate.open_aggregates.open_view(key),
             None,
-            "a closed talk opens no window"
+            "a closed Aggregate opens no window"
         );
-        talk.open_talks.open(
-            talk.address.clone(),
-            Arc::clone(talk.run.application()),
+        aggregate.open_aggregates.open(
+            aggregate.address.clone(),
+            Arc::clone(aggregate.run.application()),
             WINDOW,
         );
-        let again = talk
-            .open_talks
+        let again = aggregate
+            .open_aggregates
             .open_view(key)
-            .expect("the talk is open again");
+            .expect("the Aggregate is open again");
         assert_ne!(again, first, "a label Tauri may still hold is not reused");
-        assert!(talk.open_talks.holds_window(key, &again), "{again}");
-        talk.stop().await;
+        assert!(
+            aggregate.open_aggregates.holds_window(key, &again),
+            "{again}"
+        );
+        aggregate.stop().await;
     }
 
     /// A rename of the Meta Space naming `origins` and `referers`.
     fn change(
-        talk: &Talk,
+        aggregate: &Aggregate,
         loaded: &Value,
         origins: &[&str],
         referers: &[&str],
     ) -> Request<Vec<u8>> {
         let mut request =
-            Request::post(talk.url("/api/spaces")).header("content-type", "application/json");
+            Request::post(aggregate.url("/api/spaces")).header("content-type", "application/json");
         for origin in origins {
             request = request.header("origin", *origin);
         }
@@ -250,42 +264,42 @@ mod given_a_request_at_the_trust_boundary {
     }
 
     #[tokio::test]
-    async fn admits_a_change_naming_the_talks_own_origin_or_page() {
-        let talk = open().await;
-        let own = talk.address.origin();
-        let page = talk.url(META_ADDRESS);
+    async fn admits_a_change_naming_the_aggregates_own_origin_or_page() {
+        let aggregate = open().await;
+        let own = aggregate.address.origin();
+        let page = aggregate.url(META_ADDRESS);
         for (origins, referers) in [
             (&[own.as_str()][..], &[][..]),
             (&[own.as_str()], &[page.as_str()]),
             (&[], &[page.as_str()]),
         ] {
-            let loaded = talk.load(META).await;
-            let response = talk
-                .answer(WINDOW, change(&talk, &loaded, origins, referers))
+            let loaded = aggregate.load(META).await;
+            let response = aggregate
+                .answer(WINDOW, change(&aggregate, &loaded, origins, referers))
                 .await;
             assert_eq!(
                 response.status(),
                 200,
-                "Origin {origins:?}, Referer {referers:?} is the talk's own"
+                "Origin {origins:?}, Referer {referers:?} is the Aggregate's own"
             );
         }
-        talk.stop().await;
+        aggregate.stop().await;
     }
 
     #[tokio::test]
     async fn says_which_header_admitted_a_change_and_none_for_a_read() {
-        let talk = open().await;
-        let loaded = talk.load(META).await;
-        let own = talk.address.origin();
-        let page = talk.url(META_ADDRESS);
+        let aggregate = open().await;
+        let loaded = aggregate.load(META).await;
+        let own = aggregate.address.origin();
+        let page = aggregate.url(META_ADDRESS);
         for (origins, referers, expected) in [
             (&[own.as_str()][..], &[][..], AdmittedBy::Origin),
             (&[own.as_str()], &[page.as_str()], AdmittedBy::Origin),
             (&[], &[page.as_str()], AdmittedBy::Referer),
         ] {
-            let admitted = talk
-                .open_talks
-                .admit(WINDOW, change(&talk, &loaded, origins, referers))
+            let admitted = aggregate
+                .open_aggregates
+                .admit(WINDOW, change(&aggregate, &loaded, origins, referers))
                 .unwrap();
             assert_eq!(
                 admitted.by(),
@@ -294,33 +308,33 @@ mod given_a_request_at_the_trust_boundary {
             );
             assert_eq!(admitted.named(), "POST /api/spaces", "the request named");
         }
-        let read = talk
-            .open_talks
+        let read = aggregate
+            .open_aggregates
             .admit(
                 WINDOW,
-                Request::get(talk.url("/api/spaces"))
+                Request::get(aggregate.url("/api/spaces"))
                     .body(Vec::new())
                     .unwrap(),
             )
             .unwrap();
         assert_eq!(read.by(), None, "a read is admitted by no header");
         drop(read);
-        talk.stop().await;
+        aggregate.stop().await;
     }
 
     #[tokio::test]
-    async fn refuses_a_change_from_anywhere_but_the_talks_own_page() {
-        let talk = open().await;
-        let loaded = talk.load(META).await;
-        let own = talk.address.origin();
-        let page = talk.url(META_ADDRESS);
-        let other = TalkAddress::new(
-            TalkKey::of(Path::new("/talks/other")),
-            SchemeStyle::HostPerTalk,
+    async fn refuses_a_change_from_anywhere_but_the_aggregates_own_page() {
+        let aggregate = open().await;
+        let loaded = aggregate.load(META).await;
+        let own = aggregate.address.origin();
+        let page = aggregate.url(META_ADDRESS);
+        let other = AggregateAddress::new(
+            AggregateKey::of(Path::new("/spaces/other")),
+            SchemeStyle::HostPerAggregate,
         );
         let other_origin = other.origin();
         let other_page = format!("{other_origin}/spaces/x");
-        // The talk's origin followed by more host, as a prefix test would admit.
+        // The Aggregate's origin followed by more host, as a prefix test would admit.
         let longer = format!("{own}0/spaces/x");
         let cases: [(&[&str], &[&str]); 10] = [
             (&[], &[]),
@@ -336,18 +350,18 @@ mod given_a_request_at_the_trust_boundary {
         ];
         for (origins, referers) in cases {
             refused_by_the_scheme(
-                &talk
-                    .answer(WINDOW, change(&talk, &loaded, origins, referers))
+                &aggregate
+                    .answer(WINDOW, change(&aggregate, &loaded, origins, referers))
                     .await,
                 403,
             );
         }
         assert_eq!(
-            talk.load(META).await["revision"],
+            aggregate.load(META).await["revision"],
             loaded["revision"],
             "nothing committed"
         );
-        talk.stop().await;
+        aggregate.stop().await;
     }
 
     /// Whether a `Referrer-Policy` value, a comma-separated list whose last
@@ -372,42 +386,45 @@ mod given_a_request_at_the_trust_boundary {
     // refuse every Edit 403.
     #[tokio::test]
     async fn nothing_it_is_served_with_suppresses_the_admitting_referer() {
-        let talk = open().await;
-        let loaded = talk.load(META).await;
+        let aggregate = open().await;
+        let loaded = aggregate.load(META).await;
         let responses = [
-            ("the root", talk.get("/").await),
-            ("the page", talk.get(META_ADDRESS).await),
+            ("the root", aggregate.get("/").await),
+            ("the page", aggregate.get(META_ADDRESS).await),
             (
                 "a built file",
-                talk.get(&format!("/{}", STAND_IN_SCRIPT.0)).await,
+                aggregate.get(&format!("/{}", STAND_IN_SCRIPT.0)).await,
             ),
-            ("an API read", talk.get("/api/spaces").await),
+            ("an API read", aggregate.get("/api/spaces").await),
             (
                 "a commit",
-                talk.post_commit(rename_text(&loaded, "Referred"), "application/json")
+                aggregate
+                    .post_commit(rename_text(&loaded, "Referred"), "application/json")
                     .await,
             ),
             (
                 "a refused commit",
-                talk.post_commit("{", "application/json").await,
+                aggregate.post_commit("{", "application/json").await,
             ),
             (
                 "an asset stored",
-                talk.send(
-                    "POST",
-                    "/assets",
-                    &[("content-type", "application/octet-stream")],
-                    fresh(16, "referred"),
-                )
-                .await,
+                aggregate
+                    .send(
+                        "POST",
+                        "/assets",
+                        &[("content-type", "application/octet-stream")],
+                        fresh(16, "referred"),
+                    )
+                    .await,
             ),
             (
                 "the scheme's own refusal",
-                talk.answer(
-                    "talk-other",
-                    Request::get(talk.url("/")).body(Vec::new()).unwrap(),
-                )
-                .await,
+                aggregate
+                    .answer(
+                        "space-other",
+                        Request::get(aggregate.url("/")).body(Vec::new()).unwrap(),
+                    )
+                    .await,
             ),
         ];
         for (what, response) in &responses {
@@ -424,7 +441,7 @@ mod given_a_request_at_the_trust_boundary {
                 "{what} carries a referrer meta tag or attribute suppressing the Referer"
             );
         }
-        // The page every talk window loads is the built application's,
+        // The page every Space window loads is the built application's,
         // built from this one.
         let page = std::fs::read_to_string(
             Path::new(env!("CARGO_MANIFEST_DIR")).join("../../app/index.html"),
@@ -435,7 +452,7 @@ mod given_a_request_at_the_trust_boundary {
             !names_no_referrer(&page),
             "the browser application's index.html suppresses the Referer"
         );
-        talk.stop().await;
+        aggregate.stop().await;
     }
 
     #[test]
@@ -454,32 +471,41 @@ mod given_a_request_at_the_trust_boundary {
     }
 
     #[tokio::test]
-    async fn stops_serving_a_talk_once_it_is_closed() {
-        let talk = open().await;
-        let closed = talk.open_talks.close(talk.address.key());
+    async fn stops_serving_an_aggregate_once_it_is_closed() {
+        let aggregate = open().await;
+        let closed = aggregate.open_aggregates.close(aggregate.address.key());
         assert_eq!(
             closed.map(|closed| closed.windows),
             Some(vec![WINDOW.to_owned()]),
             "the windows that reached it"
         );
-        refused_by_the_scheme(&talk.get("/api/spaces").await, 404);
-        talk.stop().await;
+        refused_by_the_scheme(&aggregate.get("/api/spaces").await, 404);
+        aggregate.stop().await;
     }
 
     #[tokio::test(start_paused = true)]
     async fn a_close_waits_for_a_change_being_answered_and_not_for_a_read() {
-        let talk = open().await;
+        let aggregate = open().await;
         let request = |method: &str| {
             Request::builder()
                 .method(method)
-                .uri(talk.url("/api/spaces"))
-                .header("referer", talk.url(META_ADDRESS))
+                .uri(aggregate.url("/api/spaces"))
+                .header("referer", aggregate.url(META_ADDRESS))
                 .body(Vec::new())
                 .unwrap()
         };
-        let read = talk.open_talks.admit(WINDOW, request("GET")).unwrap();
-        let change = talk.open_talks.admit(WINDOW, request("POST")).unwrap();
-        let closed = talk.open_talks.close(talk.address.key()).unwrap();
+        let read = aggregate
+            .open_aggregates
+            .admit(WINDOW, request("GET"))
+            .unwrap();
+        let change = aggregate
+            .open_aggregates
+            .admit(WINDOW, request("POST"))
+            .unwrap();
+        let closed = aggregate
+            .open_aggregates
+            .close(aggregate.address.key())
+            .unwrap();
         let waited = std::time::Duration::from_secs(3600);
         assert!(
             tokio::time::timeout(waited, closed.in_flight.settled())
@@ -495,19 +521,19 @@ mod given_a_request_at_the_trust_boundary {
             "a read being answered does not"
         );
         drop(read);
-        talk.stop().await;
+        aggregate.stop().await;
     }
 }
 
 /// The scheme handler as the shared conformance cases reach it: a request
-/// from the talk's own window and page.
-impl http_conformance::Adapter for Talk {
+/// from the Aggregate's own window and page.
+impl http_conformance::Adapter for Aggregate {
     async fn open() -> Self {
         open().await
     }
 
     /// As WebKitGTK sends a page's request to its own origin under a custom
-    /// scheme: at the talk's origin, naming the page as its `Referer`.
+    /// scheme: at the Aggregate's origin, naming the page as its `Referer`.
     async fn send(&self, request: Request<Bytes>) -> Response<Bytes> {
         let (mut parts, body) = request.into_parts();
         parts.uri = self.url(&parts.uri.to_string()).parse().unwrap();
@@ -515,7 +541,7 @@ impl http_conformance::Adapter for Talk {
             REFERER,
             HeaderValue::from_str(&self.url(META_ADDRESS)).unwrap(),
         );
-        self.open_talks
+        self.open_aggregates
             .answer(WINDOW, Request::from_parts(parts, body.to_vec()))
             .await
             .map(Bytes::from)
@@ -534,4 +560,4 @@ impl http_conformance::Adapter for Talk {
     }
 }
 
-http_conformance::cases!(Talk);
+http_conformance::cases!(Aggregate);

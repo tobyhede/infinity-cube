@@ -26,7 +26,7 @@ const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
  * The retired words, built by joining fragments and never named by a constant
  * that is itself one of the shapes below, so this file holds none of them
  * literally and the scan can read it like every other tracked file. Excluding
- * this path instead would leave the one file that talks about the retired
+ * this path instead would leave the one file that discusses the retired
  * vocabulary as the one file it could hide in.
  */
 const ENTITY = ['R', 'oute'].join('');
@@ -539,7 +539,7 @@ const RETIRED_RENDERER_NAMES = [
  * Joined here rather than written out, in this file's established idiom, and the
  * prose above says which names these are without spelling one: no retired name
  * appears literally, so the scan reads this file like every other tracked one
- * instead of excluding the file that talks about them.
+ * instead of excluding the file that discusses them.
  */
 const RETIRED_SELECTED_CANVAS = ['Selected', 'Canvas', 'Renderer'].join('');
 
@@ -897,7 +897,7 @@ describe('the vocabulary the loose-name guard reads', () => {
  *
  * Built from fragments for the reason every other retired word here is: this
  * file is scanned like any other tracked file, and a literal would make the one
- * file that talks about the word the one place it could hide.
+ * file that discusses the word the one place it could hide.
  *
  * `CONTEXT.md` names Open Spaces as both the set and the surface that draws it.
  * The retired word named the set after `switchTo`, the operation that spends
@@ -3403,7 +3403,7 @@ const PRODUCT_HISTORY_TREES = ['migrations/', 'migrations-sqlite/'] as const;
  * - The Cloudflare Worker's name is the deployed Worker's identity: changing it
  *   deploys a second Worker beside the first.
  * - The root file ADR 0136 renamed is named where an author or operator is
- *   told to move a talk that still holds it.
+ *   told to move a directory that still holds it.
  * - A Rust HTTP crate the desktop shell's Tauri runtime depends on shares the
  *   earlier name, and Cargo's lockfile names it and its utility crate; the
  *   crates' names are their publisher's.
@@ -3494,7 +3494,7 @@ describe('the application is named InfinityCube', () => {
       `const ${RETIRED_PRODUCT}HistoryIndex = 0;`,
       `export const run${capital} = async () => 0;`,
       `const ${upper}_DIR = process.env['${upper}_DIR'];`,
-      `pnpm ${RETIRED_PRODUCT} run ~/talks/rust-async`,
+      `pnpm ${RETIRED_PRODUCT} run ~/spaces/rust-async`,
       `type: 'https://${RETIRED_PRODUCT}.dev/problems/not-found',`,
       `export const RESOURCE_DRAG_TYPE = 'application/x-${RETIRED_PRODUCT}-resource-id';`,
       `import { clear } from '../support/clear-${RETIRED_PRODUCT}-content';`,
@@ -3532,6 +3532,82 @@ describe('the application is named InfinityCube', () => {
 
     for (const line of kept) {
       expect(productHits(line), line).toEqual([]);
+    }
+  });
+});
+
+/**
+ * ADR 0164: the word that stood for an Aggregate directory, a presented Graph
+ * and whatever a person had opened names nothing. A person is shown a Space,
+ * the desktop application's window is a Space window, source says Aggregate for
+ * the directory and its run, and what is presented is a presented Graph.
+ *
+ * The pattern is the bare letters in any casing, so it reads every shape the
+ * word was written in: a type's prefix, a snake-case and a camel-case compound,
+ * a permission's kebab-case, a fixture's directory and a Title. That also
+ * reports the English verb, which this source therefore does not use.
+ *
+ * Composed from fragments because this file is scanned.
+ */
+const RETIRED_OPENED = ['ta', 'lk'].join('');
+const RETIRED_OPENED_NAME = new RegExp(RETIRED_OPENED, 'i');
+
+describe('the word for what a person opens is gone (ADR 0164)', () => {
+  const authored = scannableFiles().filter(isAuthoredSource);
+
+  it('reaches the kinds of file the rename actually touched', () => {
+    expect(authored).toContain('packages/desktop/src-tauri/src/aggregates.rs');
+    expect(authored).toContain('packages/desktop/src-tauri/capabilities/home.json');
+    expect(authored).toContain('packages/desktop/ui/index.html');
+    expect(authored).toContain('packages/app/src/components/NotesWindow.tsx');
+    expect(authored).toContain('packages/app/src/components/notes-window.css');
+    expect(authored).toContain('packages/graph/src/presentation-notes.ts');
+    expect(authored).toContain('crates/cli/src/arguments.rs');
+    expect(authored).toContain('src/desktop/desktop-process.ts');
+    expect(authored).toContain('test/unit/run.test.ts');
+    expect(
+      authored.filter((file) => file.startsWith('conformance/intake/directory/')).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it('finds the retired word nowhere in the source the repo authors', () => {
+    const found = authored.flatMap((file) => {
+      const source = readTracked(file);
+      return source === null
+        ? []
+        : hits(source, RETIRED_OPENED_NAME).map((hit) => `${file}:${hit}`);
+    });
+
+    expect(found).toEqual([]);
+  });
+
+  it('reads the shapes the word was actually written in', () => {
+    const capital = capitalised(RETIRED_OPENED);
+    const retired = [
+      `pub struct ${capital}Key(String);`,
+      `let open_${RETIRED_OPENED}s = Arc::clone(open_${RETIRED_OPENED}s);`,
+      `const ${RETIRED_OPENED}Directory = join(temporaryDirectory, '${RETIRED_OPENED}');`,
+      `"permissions": ["allow-open-${RETIRED_OPENED}"]`,
+      `pub const ${RETIRED_OPENED.toUpperCase()}_WINDOW_PREFIX: &str = "${RETIRED_OPENED}-";`,
+      `"title": "${capital}",`,
+      `.notes-window__${RETIRED_OPENED} {`,
+      `Open a ${RETIRED_OPENED} to present or edit it.`,
+    ];
+    for (const line of retired) {
+      expect(hits(line, RETIRED_OPENED_NAME), line).not.toEqual([]);
+    }
+  });
+
+  it('stays silent on the names that replaced it', () => {
+    const kept = [
+      'pub struct AggregateKey(String);',
+      'pub const SPACE_WINDOW_PREFIX: &str = "space-";',
+      '"permissions": ["allow-open-aggregate"]',
+      'readonly presentedGraph: string;',
+      'Open a Space to present or edit it.',
+    ];
+    for (const line of kept) {
+      expect(hits(line, RETIRED_OPENED_NAME), line).toEqual([]);
     }
   });
 });

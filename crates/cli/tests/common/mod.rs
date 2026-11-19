@@ -73,7 +73,7 @@ pub fn read_tree(root: &Path) -> BTreeMap<String, Vec<u8>> {
 /// A fresh copy of `aggregate` in a temporary directory of its own.
 pub fn copy_of(aggregate: &Path) -> (tempfile::TempDir, PathBuf) {
     let temporary = tempfile::tempdir().unwrap();
-    let directory = temporary.path().join("talk");
+    let directory = temporary.path().join("space");
     copy_tree(aggregate, &directory);
     (temporary, directory)
 }

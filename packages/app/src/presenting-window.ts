@@ -28,7 +28,7 @@ export interface PresentingWindow {
   readonly getState: () => PresentingWindowState;
   readonly subscribe: (listener: () => void) => () => void;
   /**
-   * Start presenting, or restart the talk as a new presentation, and within the
+   * Start presenting, or restart the presentation as a new presentation, and within the
    * same activation ask for fullscreen.
    */
   readonly present: () => void;
@@ -75,7 +75,7 @@ interface Under {
  * presentation link, behind one state and one set of commands.
  *
  * The one place a presentation starts. It starts when `presentationScope`
- * changes to a value it did not hold, or when Present restarts the talk while
+ * changes to a value it did not hold, or when Present restarts the presentation while
  * presenting, and only here are its identity and start time minted; the link
  * posts what this hands it. The rehearsal notes belong
  * to one presentation, so a new one shows them hidden without anything
@@ -97,7 +97,7 @@ export function createPresentingWindow({
 }: PresentingWindowDependencies): PresentingWindow {
   let under: Under | null = null;
   let rehearsing: UUID | null = null;
-  // Present pressed while presenting restarts the talk without changing its
+  // Present pressed while presenting restarts the presentation without changing its
   // scope, so the next presentation followed is a new one.
   let restarting = false;
   let disposed = false;
@@ -155,7 +155,7 @@ export function createPresentingWindow({
           presentation: follow,
         });
 
-  /** Present and Present from Here, either of which restarts a talk already under way. */
+  /** Present and Present from Here, either of which restarts a presentation already under way. */
   const startPresenting = (start: () => void): void => {
     restarting = navigation.getState().mode === 'presenting';
     try {

@@ -8,7 +8,7 @@ import type { AggregateInput } from '@project/aggregate';
  *
  * This is the seam and not yet the content.
  * `.scratch/default-content/issues/01-generate-the-starter-content.md` owns
- * the canonical generator — a short starter talk with an example of each
+ * the canonical generator — a short starter Space with an example of each
  * Resource kind — and replaces the body of this one function when it lands. Until then a repository starts from the
  * ordinary new Space (ADR 0018), named as Meta so that first initialization
  * already goes through the one lifecycle operation rather than through a

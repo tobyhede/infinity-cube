@@ -150,7 +150,7 @@ fn nested_resource(depth: usize) -> AggregateFiles {
     );
     files.insert_file(
         format!("{META}/space.json"),
-        format!(r#"{{"version": 1, "id": "{META}", "title": "Talk"}}"#),
+        format!(r#"{{"version": 1, "id": "{META}", "title": "Space"}}"#),
     );
     files.insert_file(
         format!("{META}/resources/{RESOURCE}.json"),

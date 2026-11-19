@@ -43,7 +43,7 @@ const handlerOnFixture = async (
 ) => {
   const root = await mkdtemp(join(tmpdir(), 'infinity-cube-desktop-'));
   roots.push(root);
-  const directory = join(root, 'talk');
+  const directory = join(root, 'space');
   await cp(FIXTURE, directory, { recursive: true });
   const started = await startRun(directory, {
     newId: newUuid,
@@ -167,9 +167,9 @@ describe('The desktop sidecar handler', () => {
     expect(response.status).toBe(405);
   });
 
-  it('keeps each window’s session when two talks share one cookie store', async () => {
+  it('keeps each window’s session when two Aggregates share one cookie store', async () => {
     // A webview's cookie store scopes a host-only cookie by host and path, not
-    // by port (RFC 6265 §8.5), and every talk window shares the default store.
+    // by port (RFC 6265 §8.5), and every Space window shares the default store.
     const jar = new Map<string, string>();
     const keep = (response: Response): void => {
       const [pair = ''] = (response.headers.get('set-cookie') ?? '').split(';');

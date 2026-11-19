@@ -83,8 +83,8 @@ mod tests {
 
         #[test]
         fn quotes_a_path_only_when_a_shell_would_split_or_expand_it() {
-            assert_eq!(shell_word("/tmp/talk-1"), "/tmp/talk-1", "plain");
-            assert_eq!(shell_word("/tmp/my talk"), "'/tmp/my talk'", "a space");
+            assert_eq!(shell_word("/tmp/space-1"), "/tmp/space-1", "plain");
+            assert_eq!(shell_word("/tmp/my space"), "'/tmp/my space'", "a space");
             assert_eq!(shell_word("it's"), "'it'\\''s'", "a quote");
             assert_eq!(shell_word(""), "''", "empty");
         }
@@ -96,8 +96,8 @@ mod tests {
         #[test]
         fn names_pnpm_cube_init_for_an_empty_directory() {
             assert_eq!(
-                empty(Path::new("/tmp/my talk")),
-                "/tmp/my talk holds no aggregate: it is missing or empty. To create one there: pnpm cube init '/tmp/my talk'",
+                empty(Path::new("/tmp/my space")),
+                "/tmp/my space holds no aggregate: it is missing or empty. To create one there: pnpm cube init '/tmp/my space'",
                 "the init command can be pasted"
             );
         }

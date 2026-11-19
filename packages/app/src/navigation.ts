@@ -119,11 +119,11 @@ export function canRetreat(state: NavigationState): boolean {
  *
  * A presentation starts when this changes to a value it did not hold. That
  * happens when presenting begins, and when a reopening or an Edit moves the
- * talk to another Map or Graph. A reopening on the same Map and Graph, as
- * browser Back and Forward through the talk are, stays in the presentation.
+ * presentation to another Map or Graph. A reopening on the same Map and Graph, as
+ * browser Back and Forward through the presentation are, stays in the presentation.
  * Present while presenting also starts one, which the presenting window
  * decides, since the scope does not change. It reads this rule once, for the
- * rehearsal notes, the talk timer and the presentation link
+ * rehearsal notes, the presentation timer and the presentation link
  * (`presenting-window.ts`).
  */
 export interface PresentationScope {
@@ -361,7 +361,7 @@ export function createNavigation(
       // traversal. The same Graph keeps it whole. Another Graph that holds the
       // presented Resource goes on from that Resource alone, because the
       // history was walked over the Graph before it and Back would leave the
-      // talk. A Graph without the Resource, or none, ends presenting, as
+      // presentation. A Graph without the Resource, or none, ends presenting, as
       // `activateGraph` does.
       if (state.mode === 'presenting' && activeGraphId !== null) {
         if (activeGraphId === state.activeGraphId) {

@@ -32,7 +32,7 @@ const B_EDITED = 'B edited.\n';
 const storedSpace = (bodyB = B_TEXT): LoadedSpace => ({
   snapshot: {
     id: SPACE_ID,
-    document: { version: 1, title: 'Stored talk' },
+    document: { version: 1, title: 'Stored space' },
     resources: [
       {
         id: RESOURCE_A,
@@ -194,7 +194,7 @@ describe('Export writes in place', () => {
     await mkdir(join(destination, '.git', 'objects', 'ab'), { recursive: true });
     await writeFile(join(destination, '.git', 'HEAD'), 'ref: refs/heads/main\n');
     await writeFile(join(destination, '.git', 'objects', 'ab', 'cdef'), 'object\n');
-    await writeFile(join(destination, 'README.md'), '# My talk\n');
+    await writeFile(join(destination, 'README.md'), '# My space\n');
     await mkdir(join(destination, 'notes'));
     await writeFile(join(destination, 'notes', 'ideas.md'), 'ideas\n');
     await mkdir(join(destination, 'assets', 'drafts'), { recursive: true });

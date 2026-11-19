@@ -215,7 +215,7 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 | 0136 the root file is `aggregate.json`, contents unchanged, schema `aggregate.schema.json` | → ST-27, ST-109 |
 | 0136 no fallback: every source reads `aggregate.json` only; the earlier file is refused as a missing root | → ST-109 (ST-40, ST-67, ST-88 name the file) |
 | 0136 Export leaves the earlier root file untouched | → ST-109 (folded from ST-56) |
-| 0136 a talk is renamed before a page that mounts it is rebuilt; links to older commits refused | dropped: a deployment step, not behaviour; the refusal is ST-109. `docs/deploy-cloudflare.md` says it to operators |
+| 0136 an Aggregate is renamed before a page that mounts it is rebuilt; links to older commits refused | dropped: a deployment step, not behaviour; the refusal is ST-109. `docs/deploy-cloudflare.md` says it to operators |
 | 0136 ownership and links follow the name | folded → ST-42, ST-56 |
 | 0136 rejected options | dropped: rejected alternatives |
 | 0141 (proposed) an agent authors a running aggregate through Space Authoring | dropped: proposed (DR 3). The file-tool route it names, `cube mcp`, is built and code only (§4) |
@@ -421,7 +421,7 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 - **Stale comment.** `core/src/schema.ts` says of `maps` that "a Space with no Maps … is what a new Space is"; a new Space has a Map (see SR).
 - **Space directory names.** A Space directory's name is its identity (ST-27, ST-44), unlike a Resource file's (ST-29). No ADR states the Space half; `docs/aggregate-directory.md` does, and the reader enforces it.
 - **SVG.** The asset store admits SVG like any bytes but serves it as `application/octet-stream` (`persistence/src/assets.ts` `servedMediaType`); the Image plugin refuses an SVG picture (`plugin-image/src/domain.ts`). 0107 is proposed and left out.
-- **Mounting status.** `.scratch/mounting/issues/` 01–07, 09, 10, 13 are resolved; 11 (0132) and 12 (download an edited talk) are needs-triage; 08 is a launch task.
+- **Mounting status.** `.scratch/mounting/issues/` 01–07, 09, 10, 13 are resolved; 11 (0132) and 12 (download an edited Aggregate) are needs-triage; 08 is a launch task.
 
 ## 6. ADRs with one disposition throughout
 

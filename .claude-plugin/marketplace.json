@@ -3,7 +3,7 @@
   "owner": {
     "name": "InfinityCube contributors"
   },
-  "description": "Agent skills for running and authoring InfinityCube talks, for Claude Code and Codex.",
+  "description": "Agent skills for running and authoring InfinityCube Spaces, for Claude Code and Codex.",
   "plugins": [
     {
       "name": "infinity-cube",
