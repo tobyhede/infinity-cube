@@ -14,8 +14,9 @@ import { decodeLoadedAggregate, decodeSpaceSummaries } from '@project/persistenc
  * (`packages/http/src/product-destination.ts`).
  *
  * Sources of truth: `resolveProductRequest` (`packages/aggregate/src/space-host.ts`)
- * and `storedFailureProblem` (`packages/http/src/index.ts`), which answer by
- * `classifyStoredFailure` (`packages/persistence/src/repository.ts`).
+ * and `storedFailureAnswer` (`packages/http/src/index.ts`), which answer by
+ * `classifyStoredFailure` and `storedFailureProblem`
+ * (`packages/persistence/src/repository.ts`).
  */
 
 /**

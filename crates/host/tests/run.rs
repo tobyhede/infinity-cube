@@ -366,6 +366,28 @@ async fn writes_once_more_for_an_edit_made_during_a_write() {
     );
 }
 
+#[tokio::test(start_paused = true)]
+async fn stop_writes_an_edit_made_during_its_own_write_before_it_answers() {
+    let flaky = Flaky::default();
+    let started = start(flaky.clone()).await;
+    let app = Arc::clone(started.run.application());
+    flaky.holding.store(true, Ordering::SeqCst);
+    rename(&app, "Before stop").await;
+    let stopping = tokio::spawn(started.run.stop());
+    flaky.entered.notified().await;
+    rename(&app, "During stop").await;
+    flaky.release.notify_one();
+    assert!(
+        matches!(stopping.await.unwrap(), RunStopped::Stopped),
+        "stopped"
+    );
+    assert_eq!(
+        meta_title(&started.directory),
+        "During stop",
+        "the Edit made during the stop's write is on disk"
+    );
+}
+
 #[tokio::test]
 async fn refuses_an_empty_directory() {
     let temporary = tempfile::tempdir().unwrap();

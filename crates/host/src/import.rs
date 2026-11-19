@@ -80,17 +80,8 @@ pub async fn import_directory<R: SpaceRepository, F: Filesystem, I: IdSource>(
         .into_iter()
         .map(intake::Space::into_snapshot)
         .collect();
-    match repository
-        .initialize_aggregate(AggregateInput {
-            meta_space_id,
-            spaces,
-        })
-        .await?
-    {
-        InitializeResult::Initialized(_) => {}
-        InitializeResult::AggregateRefused(refusals) => return Err(ImportError::Refused(refusals)),
-        _ => return Err(ImportError::NotFresh),
-    }
+    // The assets are stored before the lifecycle door runs (ST-49), so a
+    // failed asset write leaves the store fresh and the Import can be retried.
     for asset in imported.assets {
         let Some(hash) = AssetHash::parse(&asset.hash) else {
             continue;
@@ -102,6 +93,17 @@ pub async fn import_directory<R: SpaceRepository, F: Filesystem, I: IdSource>(
                 bytes: asset.bytes.into(),
             })
             .await?;
+    }
+    match repository
+        .initialize_aggregate(AggregateInput {
+            meta_space_id,
+            spaces,
+        })
+        .await?
+    {
+        InitializeResult::Initialized(_) => {}
+        InitializeResult::AggregateRefused(refusals) => return Err(ImportError::Refused(refusals)),
+        _ => return Err(ImportError::NotFresh),
     }
     Ok(())
 }

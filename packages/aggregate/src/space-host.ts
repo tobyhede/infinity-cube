@@ -11,6 +11,7 @@ import {
   encodeProblemDetails,
   problemCatalogue,
   classifyStoredFailure,
+  storedFailureProblem,
   type AggregateLoadResult,
   type StoredFailure,
   type InfinityCubeProblemCode,
@@ -59,28 +60,12 @@ const PRODUCT_METHODS = 'GET, HEAD';
 
 /**
  * A store read that failed, answered by what the failure is
- * (`classifyStoredFailure`), once its reason is logged for the operator.
- *
- * Three failures, told apart by type rather than by matching message prose
- * (`classifyStoredFailure` walks the cause chain the driver wraps a failed
- * rollback in). Contradictory stored state — Spaces without Meta, an aggregate
- * that fails complete intake, or a stored document that does not parse — is a
- * defect this deployment carries and no retry cures, so it is a 500. An
- * unreachable database is temporary, and 503 says so. A failure that is
- * neither — a code defect, or a driver failure nobody anticipated — is a 500
- * under its own detail rather than a 503 by default: nothing says it will pass.
- * The detail is fixed prose like every other one here, so whatever a driver
- * put in its message is not served to an unauthenticated client.
+ * (`classifyStoredFailure`), once its reason is logged for the operator, in
+ * the words `storedFailureProblem` gives every host.
  */
 const storedFailure = (failure: StoredFailure, accept?: string): ProductResponse => {
-  switch (failure) {
-    case 'broken-stored-state':
-      return problem('internal-error', 'Stored repository state is not usable.', accept);
-    case 'unavailable':
-      return problem('persistence-unavailable', 'Try the request again later.', accept);
-    case 'unclassified':
-      return problem('internal-error', 'The request failed unexpectedly.', accept);
-  }
+  const { code, detail } = storedFailureProblem(failure);
+  return problem(code, detail, accept);
 };
 
 const methodNotAllowed = (accept?: string): ProductResponse => {

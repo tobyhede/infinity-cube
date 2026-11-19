@@ -121,6 +121,26 @@ export const classifyStoredFailure = (cause: unknown): StoredFailure => {
 };
 
 /**
+ * The problem a host answers for a stored failure. Broken stored state is a
+ * defect this deployment carries and no retry cures, so 500 `internal-error`.
+ * An unreachable database is temporary, so 503 `persistence-unavailable`. A
+ * failure that is neither is 500 `internal-error` too, under its own detail:
+ * 503 would tell the client to wait out something nothing says will pass. The
+ * detail is fixed prose, so whatever a driver put in its message is not served.
+ * The Fetch application and the product host both answer by it.
+ */
+export const storedFailureProblem = (failure: StoredFailure) => {
+  switch (failure) {
+    case 'broken-stored-state':
+      return { code: 'internal-error', detail: 'Stored repository state is not usable.' } as const;
+    case 'unavailable':
+      return { code: 'persistence-unavailable', detail: 'Try the request again later.' } as const;
+    case 'unclassified':
+      return { code: 'internal-error', detail: 'The request failed unexpectedly.' } as const;
+  }
+};
+
+/**
  * The store-side result: what the store decided, plus its refusal of a request
  * it will not judge. No transport failures — nothing here has a client.
  */

@@ -302,8 +302,26 @@ impl<C: Clock, F: Filesystem> Writer<C, F> {
         self.flush(changed, failure).await
     }
 
-    async fn flush(&self, changed: bool, failure: Option<ExportError>) -> RunStopped {
-        let failure = if changed { self.write().await } else { failure };
+    /// Write until no Edit is left unwritten, including one committed while
+    /// the last write ran, and answer the last write's failure, if any.
+    async fn flush(&self, mut changed: bool, mut failure: Option<ExportError>) -> RunStopped {
+        while changed || self.edit_pending().await {
+            failure = self.write().await;
+            if failure.is_some() {
+                break;
+            }
+            changed = false;
+        }
         failure.map_or(RunStopped::Stopped, RunStopped::Unwritten)
+    }
+
+    /// Whether an Edit has been committed since the writer last waited for
+    /// one, without waiting: `notify_one` keeps its permit until it is taken.
+    async fn edit_pending(&self) -> bool {
+        tokio::select! {
+            biased;
+            () = self.edits.notified() => true,
+            () = std::future::ready(()) => false,
+        }
     }
 }
