@@ -149,8 +149,9 @@ pub struct TalkServer {
 /// The address a talk's window opens at: where its root address redirects,
 /// the Meta Space's product address, or the root when it does not redirect.
 ///
-/// WebKitGTK does not follow a redirect a custom scheme answers a navigation
-/// with, so the shell follows the root's itself and opens the window there.
+/// The shell follows the root's redirect itself and opens the window there,
+/// since WebKitGTK was seen not to follow one a custom scheme answers a
+/// navigation with (`.scratch/rust-host/issues/13-swap-the-sidecar-for-the-rust-host.md`).
 pub async fn first_address<B: BuiltFiles>(
     application: &host::RunApplication<RandomIds, B>,
 ) -> String {
@@ -219,7 +220,7 @@ impl TalkWindows {
     pub fn navigation(&self, url: &Url) -> Navigation {
         if !self.address.admits(url) {
             Navigation::Refuse
-        } else if url.path() == "/" && self.first.path() != "/" {
+        } else if matches!(url.path(), "/" | "") && self.first.path() != "/" {
             Navigation::Redirect(self.first.clone())
         } else {
             Navigation::Load

@@ -61,7 +61,7 @@ Every object in `aggregate.json`, `space.json` and a Resource file's envelope re
 | `cube run` | Imports into a memory store, serves it, Exports edits back | — | missing, empty or invalid directory | ST-62–ST-65, ST-67 |
 | `cube check` | Imports into a memory store it then discards, and reports | — | what `cube run` refuses on starting | ST-110 |
 | `cube mcp` | serves a stdio MCP server that edits a directory's files | — | a missing directory, or one that is a file | ST-111, ST-112 |
-| Desktop sidecar | runs a directory as Running does, for one desktop window, without Vite | — | what `cube run` refuses on starting | ST-113–ST-116 |
+| Desktop sidecar | runs a directory as Running does, without Vite, as one process the HTTP conformance suite drives; the desktop shell does not run it | — | what `cube run` refuses on starting | ST-113–ST-116 |
 | Desktop shell | runs a directory as Running does, for one desktop window, with the Rust host in its own process, through a custom URI scheme | — | what `cube run` refuses on starting | ST-121 |
 | `infinity-cube run`, `infinity-cube check` | the Rust CLI: runs or checks a directory as `cube run` and `cube check` do, with the Rust host | — | what `cube run` refuses on starting | ST-120 |
 | Mount | reads an Aggregate from GitHub into a page's store | — | the reader or intake refuses it | ST-85–ST-92, ST-94–ST-98, ST-106, ST-107 |

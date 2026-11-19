@@ -1,12 +1,10 @@
 //! Where a talk is served from: one origin per talk under the application's
-//! URI scheme, the same on every launch of that talk (spec, decision 4).
+//! URI scheme, the same on every launch of that talk (Storage ST-121).
 //!
 //! A talk's key is the first 128 bits of the SHA-256 of its canonical folder
 //! path, in lower-case hex. It needs no state: the shell already resolves a
 //! folder to its canonical path, so the same folder gives the same key on
-//! every launch, and two folders give two keys. An id the shell kept instead
-//! would need a file mapping folders to ids, and could not live in the folder
-//! itself, which only Export writes. Moving or renaming the folder gives the
+//! every launch, and two folders give two keys. Moving or renaming the folder gives the
 //! talk a new key, and so a new origin, and what the page kept in
 //! `localStorage` under the old one is not carried over. Hex is safe in a
 //! host and in a scheme name, and names nothing of the path.

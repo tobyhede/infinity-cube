@@ -216,6 +216,22 @@ mod given_a_talk_window {
     }
 
     #[test]
+    fn asked_for_its_origin_with_no_path_loads_the_address_the_root_redirects_to() {
+        let (windows, root) = windows();
+        let origin = Url::parse(root.as_str().trim_end_matches('/')).unwrap();
+        assert_eq!(
+            origin.path(),
+            "",
+            "a non-special scheme's origin has no path"
+        );
+        assert_eq!(
+            windows.navigation(&origin),
+            Navigation::Redirect(windows.first().clone()),
+            "`location.origin` is the root too"
+        );
+    }
+
+    #[test]
     fn loads_any_other_address_of_its_talk_and_none_elsewhere() {
         let (windows, root) = windows();
         assert_eq!(
