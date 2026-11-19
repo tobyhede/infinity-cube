@@ -13,12 +13,12 @@ path = "src/main.rs"
 [dependencies]
 anyhow = "1"
 bytes = { workspace = true }
-host = { path = "../host" }
+host = { workspace = true }
 http = { workspace = true }
 http-body-util = { workspace = true }
 hyper = { version = "1", features = ["http1", "server"] }
 hyper-util = { version = "0.1", features = ["http1", "server-graceful", "tokio"] }
-intake = { path = "../intake" }
+intake = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread", "signal", "sync", "time"] }

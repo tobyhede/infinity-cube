@@ -1,7 +1,6 @@
 import { randomBytes } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
 import type { AddressInfo } from 'node:net';
-import { join, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { serve } from '@hono/node-server';
 import { newUuid } from '@project/core';
 import { describeError } from '../cli/describe-error';
@@ -80,17 +79,22 @@ const main = async (): Promise<void> => {
   const directory = resolve(directoryArgument);
   const built = resolve(builtArgument);
 
+  // The page is read as every built file is, so one that is a link out of the
+  // build is no page.
+  const page = await builtFiles(built)('/index.html');
+  if (page === undefined) return refuse(`${built} holds no index.html inside it.\n`);
+  const pageText = new TextDecoder().decode(page.bytes);
+
   const started = await startRun(directory, processRunOptions(newUuid));
   if (started.kind !== 'running') return refuse(describeRefusal(started, directory));
   const { run } = started;
 
-  const pageText = await readFile(join(built, 'index.html'), 'utf8');
   const secret = randomBytes(32).toString('base64url');
   let port = 0;
   const handler = createDesktopHandler({
     host: run.host,
     staticFile: builtFiles(built),
-    page: { bytes: new TextEncoder().encode(pageText), contentType: 'text/html; charset=utf-8' },
+    page: { bytes: page.bytes, contentType: 'text/html; charset=utf-8' },
     contentSecurityPolicy: desktopContentSecurityPolicy(pageText),
     secret,
     expectedHost: () => `127.0.0.1:${String(port)}`,

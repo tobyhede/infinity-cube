@@ -27,7 +27,9 @@ pub enum BuiltApplicationError {
 /// link, the page's included, is followed only while it stays inside the
 /// directory. A file that cannot be read when a request names it, for want of
 /// permission or otherwise, is answered as no such file, so the request gets
-/// the page, as `builtFiles` in `src/desktop/static-files.ts` answers it.
+/// the page, as `builtFiles` in `src/desktop/static-files.ts` answers it, which
+/// `test/unit/desktop-static-files.test.ts` › "answers nothing for a file whose
+/// permissions forbid reading it" holds.
 #[derive(Debug, Clone)]
 pub struct BuiltApplicationDirectory {
     root: PathBuf,
@@ -157,6 +159,25 @@ mod tests {
                 Some(Bytes::from("2")),
                 "after"
             );
+        }
+
+        /// Holds the rule only for a user the permission bits bind: a process
+        /// that can read the file anyway, root, returns before the assertion.
+        #[cfg(unix)]
+        #[tokio::test]
+        async fn serves_none_for_a_file_whose_permissions_forbid_reading_it() {
+            use std::os::unix::fs::PermissionsExt as _;
+            let temporary = tempfile::tempdir().unwrap();
+            let root = built(temporary.path());
+            let file = root.join("assets/index-1.js");
+            fs::set_permissions(&file, fs::Permissions::from_mode(0o000)).unwrap();
+            let readable = fs::read(&file).is_ok();
+            let answer = served(&root, "assets/index-1.js").await;
+            fs::set_permissions(&file, fs::Permissions::from_mode(0o644)).unwrap();
+            if readable {
+                return;
+            }
+            assert_eq!(answer, None, "a file it may not read");
         }
 
         #[cfg(unix)]
