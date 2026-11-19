@@ -85,16 +85,11 @@ export const within = (directory: string, refusal: IntakeRefusal): IntakeRefusal
 /**
  * A single-Space intake refusal, located inside the Space directory `directory`.
  *
- * Only a refusal intake made is located here, and every one carries `at`; the
- * type leaves it optional because one decoded off the HTTP wire has none. A
- * refusal without one throws rather than being placed somewhere it may not be.
+ * Only a refusal intake made is located here, and its type carries `at`; one
+ * decoded off the HTTP wire is a `WireSpaceError`, which has none.
  */
-export const spaceErrorRefusal = (directory: string, error: SpaceError): IntakeRefusal => {
-  if (error.at === undefined) {
-    throw new Error(`An intake refusal of kind ${error.kind} carries no location`);
-  }
-  return within(directory, { kind: error.kind, ...error.at });
-};
+export const spaceErrorRefusal = (directory: string, error: SpaceError): IntakeRefusal =>
+  within(directory, { kind: error.kind, ...error.at });
 
 /** The Resource file of `resourceId` in the Space directory of `spaceId`. */
 const resourceFile = (spaceId: string, resourceId: string): IntakeRefusal['file'] =>

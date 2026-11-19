@@ -1,4 +1,5 @@
 import type { UUID } from '@project/core';
+import type { SpaceError } from '@project/graph';
 import type {
   AggregateLoadResult,
   CommitOutcome,
@@ -124,7 +125,7 @@ export const classifyStoredFailure = (cause: unknown): StoredFailure => {
  * it will not judge. No transport failures — nothing here has a client.
  */
 export type RepositoryCommitResult =
-  CommitOutcome | { kind: 'rejected'; code: 'invalid-commit'; message: string };
+  CommitOutcome<SpaceError> | { kind: 'rejected'; code: 'invalid-commit'; message: string };
 
 /** The narrow stored seam consumed by the Fetch application. */
 export interface StoredSpaceRepository {

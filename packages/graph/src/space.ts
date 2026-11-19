@@ -72,7 +72,7 @@ export interface Space {
 type UnsupportedVersionError = {
   kind: 'unsupported-version';
   message: string;
-  at?: IntakeLocation;
+  at: IntakeLocation;
 };
 
 /**
@@ -81,11 +81,20 @@ type UnsupportedVersionError = {
  * makes carries; see {@link IntakeLocation}.
  */
 export type SpaceError =
-  | { kind: 'invalid-shape'; message: string; at?: IntakeLocation }
+  | { kind: 'invalid-shape'; message: string; at: IntakeLocation }
   | UnsupportedVersionError
-  | { kind: 'retired-space-graphs'; message: string; at?: IntakeLocation }
+  | { kind: 'retired-space-graphs'; message: string; at: IntakeLocation }
   | ResourceFileError
   | SpaceReferenceError;
+
+/** Each member of `E` without its location. */
+type Unlocated<E> = E extends unknown ? Omit<E, 'at'> : never;
+
+/**
+ * A {@link SpaceError} as the HTTP commit refusal carries it: kind, ids and
+ * message, without where intake located it.
+ */
+export type WireSpaceError = Unlocated<SpaceError>;
 
 /**
  * The one error a document of the wrong version earns, or `null` to let the

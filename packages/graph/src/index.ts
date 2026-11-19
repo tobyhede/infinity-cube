@@ -121,7 +121,13 @@ export { documentRefusal, loadSpace, loadSpaceSnapshot, locateSnapshotIssue } fr
 // `@project/aggregate` locates its own parse faults with.
 export { fieldOf, located } from './intake-location';
 export type { IntakeLocation } from './intake-location';
-export type { LoadSpaceResult, LoadSpaceSnapshotResult, Space, SpaceError } from './space';
+export type {
+  LoadSpaceResult,
+  LoadSpaceSnapshotResult,
+  Space,
+  SpaceError,
+  WireSpaceError,
+} from './space';
 
 export { loadSpaceAggregate, refusedUnrootedSpaceIds } from './space-aggregate';
 export type {

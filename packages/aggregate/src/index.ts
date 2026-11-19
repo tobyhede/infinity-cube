@@ -1,6 +1,7 @@
 export {
   AGGREGATE_FILE_NAME,
   readAggregateFrom,
+  relativeTo,
   scanAggregateFrom,
   spaceDirectoryId,
   type AggregateDirectoryContents,

@@ -13,7 +13,7 @@ import {
   type SpaceReference,
 } from './declared-references';
 import { compareOrdinal } from './ordinal';
-import { loadSpaceSnapshot, type Space, type SpaceError } from './space';
+import { loadSpaceSnapshot, type Space, type SpaceError, type WireSpaceError } from './space';
 
 /** The aggregate intake brand's carrier. */
 const SPACE_AGGREGATE_INTAKE: unique symbol = Symbol('space-aggregate-intake');
@@ -46,11 +46,16 @@ interface SpaceResourceLocation {
 /** Why a Space Resource's selection does not resolve in its target, in the shape its kind's own check answers. */
 type SpaceSelectionProblem = NonNullable<ReturnType<typeof spaceSelectionProblem>>;
 
-export type SpaceAggregateError =
+/**
+ * Why an aggregate was refused. `E` is the form a Space's own refusals take:
+ * located, as intake makes them, or {@link WireSpaceError}, as the HTTP commit
+ * refusal carries them.
+ */
+export type SpaceAggregateError<E extends WireSpaceError = SpaceError> =
   | {
       readonly kind: 'invalid-space-snapshot';
       readonly snapshotIndex: number;
-      readonly errors: readonly SpaceError[];
+      readonly errors: readonly E[];
     }
   | {
       readonly kind: 'duplicate-space-id';

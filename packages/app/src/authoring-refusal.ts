@@ -1,5 +1,5 @@
 import { isMissingKind, type ResourceKind, type UUID } from '@project/core';
-import type { SpaceAggregateError, SpaceError } from '@project/graph';
+import type { SpaceAggregateError, SpaceError, WireSpaceError } from '@project/graph';
 import { kindNaming } from '@project/ui';
 import {
   ASSET_ABSENT,
@@ -187,8 +187,9 @@ const AGGREGATE_REFUSAL_REASONS = {
  * Deduplicated because one refusal commonly repeats across several Spaces, and
  * the same sentence three times reads as three problems rather than one.
  */
-export const describeAggregateRefusal = (errors: readonly SpaceAggregateError[]): string =>
-  [...new Set(errors.map((error) => AGGREGATE_REFUSAL_REASONS[error.kind]))].join(' ');
+export const describeAggregateRefusal = (
+  errors: readonly SpaceAggregateError<WireSpaceError>[],
+): string => [...new Set(errors.map((error) => AGGREGATE_REFUSAL_REASONS[error.kind]))].join(' ');
 
 /**
  * Why a pointer gesture on the canvas made nothing before any Edit was

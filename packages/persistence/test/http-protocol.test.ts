@@ -1,7 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { EMPTY_ASSET_REF, uuidSchema, type SpaceSnapshot } from '@project/core';
-import type { SpaceAggregateError, SpaceError } from '@project/graph';
+import type { SpaceAggregateError, WireSpaceError } from '@project/graph';
 import type { LoadedSpace } from '../src/backend';
 import {
   COMMIT_OUTCOME_WIRE,
@@ -221,7 +221,7 @@ describe('aggregate wire protocol', () => {
 
   it('round-trips every aggregate and nested Space intake refusal identity', () => {
     const described = { ref: 'ref', message: 'message' };
-    const intakeErrors: SpaceError[] = [
+    const intakeErrors: WireSpaceError[] = [
       { kind: 'invalid-shape', message: 'message' },
       { kind: 'unsupported-version', message: 'message' },
       { kind: 'retired-space-graphs', message: 'message' },
@@ -245,7 +245,7 @@ describe('aggregate wire protocol', () => {
       { kind: 'map-content-invalid', ...described },
     ];
     const location = { spaceId: SPACE_ID, resourceId: RESOURCE_ID, targetSpaceId: secondId };
-    const errors: SpaceAggregateError[] = [
+    const errors: SpaceAggregateError<WireSpaceError>[] = [
       { kind: 'invalid-space-snapshot', snapshotIndex: 0, errors: intakeErrors },
       { kind: 'duplicate-space-id', spaceId: SPACE_ID, snapshotIndexes: [0, 2] },
       { kind: 'duplicate-resource-id', resourceId: RESOURCE_ID, spaceIds: [SPACE_ID, secondId] },
@@ -262,9 +262,17 @@ describe('aggregate wire protocol', () => {
         graphId: secondId,
       },
     ];
-    const refusal = { kind: 'aggregate-refused' as const, errors };
+    // Intake locates every Space refusal; the wire carries none of it.
+    const at = { file: 'space.json' };
+    const located: SpaceAggregateError[] = errors.map((error) =>
+      error.kind === 'invalid-space-snapshot'
+        ? { ...error, errors: error.errors.map((wire) => ({ ...wire, at })) }
+        : error,
+    );
 
-    expect(decodeCommitRefusal(encodeCommitRefusal(refusal))).toEqual(refusal);
+    expect(
+      decodeCommitRefusal(encodeCommitRefusal({ kind: 'aggregate-refused', errors: located })),
+    ).toEqual({ kind: 'aggregate-refused', errors });
   });
 
   it('leaves where intake located a refusal off the wire, which does not carry it', () => {

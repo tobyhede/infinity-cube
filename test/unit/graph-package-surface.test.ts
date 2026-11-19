@@ -97,6 +97,7 @@ const OFFERED_TYPES = [
   'SpaceAggregateLookup',
   'SpaceError',
   'SpaceLookup',
+  'WireSpaceError',
   'DeletionReach',
   'PlacementMode',
   'SnapshotEditOutcome',

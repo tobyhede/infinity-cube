@@ -81,7 +81,7 @@ export interface SpaceReferenceError {
   /** Human-readable description, useful for surfacing in the UI or CLI. */
   message: string;
   /** Where the fault is. See {@link IntakeLocation}. */
-  at?: IntakeLocation;
+  at: IntakeLocation;
 }
 
 /** A Resource's file, which a fault in its content is located at. */

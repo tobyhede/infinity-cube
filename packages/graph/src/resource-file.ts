@@ -21,7 +21,7 @@ export interface ResourceFileError {
   path: string;
   message: string;
   /** Where: `path`, and the field at fault inside the file. See {@link IntakeLocation}. */
-  at?: IntakeLocation;
+  at: IntakeLocation;
 }
 
 /** A Resource and the Resource file it was read from. */

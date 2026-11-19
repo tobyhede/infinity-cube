@@ -6,6 +6,7 @@ import {
   compareOrdinal,
   parseSingleSpace,
   refuseSpaceDocument,
+  relativeTo as relativeToSlashed,
 } from '@project/aggregate';
 
 const resolveSpaceFile = async (inputPath: string): Promise<string> => {
@@ -54,10 +55,11 @@ export const discoverResourceFiles = async (spaceDirectory: string): Promise<str
 export const readSingleSpace = async (inputPath: string): Promise<ImportSpace> => {
   // A single Space directory has no Aggregate directory around it, so its
   // refusals name files relative to the directory holding it.
+  const slashed = (path: string): string => path.split(sep).join('/');
   const relativeTo =
     (holder: string) =>
     (path: string): string =>
-      relative(holder, path).split(sep).join('/');
+      relativeToSlashed(slashed(holder))(slashed(path));
   let spaceFile: string | undefined;
   let resourcePaths: string[];
   try {

@@ -1,5 +1,5 @@
 import { spaceSnapshotSchema, uuidSchema } from '@project/core';
-import type { SpaceAggregateError, SpaceError } from '@project/graph';
+import type { SpaceAggregateError } from '@project/graph';
 import { describe, expect, it } from 'vitest';
 import { locateAggregateRefusal, spaceErrorRefusal } from '../src/intake-refusal';
 
@@ -10,8 +10,6 @@ const RESOURCE = uuidSchema.parse('00000000-0000-4000-8000-000000000101');
 
 const snapshotOf = (id: string) =>
   spaceSnapshotSchema.parse({ id, document: { version: 1, title: 'A Space' }, resources: [] });
-
-const unlocated: SpaceError = { kind: 'invalid-shape', message: 'title: Required' };
 
 describe('spaceErrorRefusal', () => {
   it('moves the location intake made under the Space directory', () => {
@@ -28,10 +26,6 @@ describe('spaceErrorRefusal', () => {
       id: RESOURCE,
       field: 'positions.x.content',
     });
-  });
-
-  it('refuses to guess where a refusal carrying no location is', () => {
-    expect(() => spaceErrorRefusal(META, unlocated)).toThrow(/invalid-shape.*no location/);
   });
 });
 

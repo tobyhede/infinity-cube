@@ -39,7 +39,12 @@ describe('describeAggregateRefusal', () => {
         kind: 'invalid-space-snapshot',
         snapshotIndex: 0,
         errors: [
-          { kind: 'duplicate-graph-id', ref: GRAPH_ID, message: `Duplicate graph id ${GRAPH_ID}` },
+          {
+            kind: 'duplicate-graph-id',
+            ref: GRAPH_ID,
+            message: `Duplicate graph id ${GRAPH_ID}`,
+            at: { file: 'space.json' },
+          },
         ],
       }),
     ).toBe(`Space ${SPACE_ID} did not load:\n  Duplicate graph id ${GRAPH_ID}`);

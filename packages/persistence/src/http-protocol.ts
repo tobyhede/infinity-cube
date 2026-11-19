@@ -11,6 +11,7 @@ import {
   type IntakeLocation,
   type SpaceAggregateError,
   type SpaceError,
+  type WireSpaceError,
 } from '@project/graph';
 import type {
   AggregateLoadResult,
@@ -425,6 +426,7 @@ export const decodeLoadedAggregate = (value: unknown): AggregateLoadResult => {
 type Committed = Extract<CommitOutcome, { kind: 'committed' }>;
 type Conflict = Extract<CommitOutcome, { kind: 'conflict' }>;
 type AggregateRefused = Extract<CommitOutcome, { kind: 'aggregate-refused' }>;
+type LocatedAggregateRefused = Extract<CommitOutcome<SpaceError>, { kind: 'aggregate-refused' }>;
 
 export interface CommitResponseBody {
   readonly revisions: readonly { readonly spaceId: string; readonly revision: string }[];
@@ -491,7 +493,7 @@ export const decodeCommitConflict = (value: unknown): Conflict => {
 
 export interface CommitRefusalBody {
   readonly errors: readonly (
-    | Extract<SpaceAggregateError, { readonly kind: 'invalid-space-snapshot' }>
+    | Extract<SpaceAggregateError<WireSpaceError>, { readonly kind: 'invalid-space-snapshot' }>
     | {
         readonly kind: 'duplicate-space-id';
         readonly spaceId: string;
@@ -542,7 +544,7 @@ export interface CommitRefusalBody {
 }
 
 /** A Space intake refusal as the wire carries it: without where intake located it. */
-const wireSpaceError = (error: SpaceError): SpaceError => {
+const wireSpaceError = (error: SpaceError): WireSpaceError => {
   const { at: _located, ...wire } = error;
   return wire;
 };
@@ -552,7 +554,7 @@ const wireSpaceError = (error: SpaceError): SpaceError => {
  * intake refusal is left off the wire (ADR 0156 holds the hosts to location
  * through the intake conformance corpus).
  */
-export const encodeCommitRefusal = (result: AggregateRefused): CommitRefusalBody => ({
+export const encodeCommitRefusal = (result: LocatedAggregateRefused): CommitRefusalBody => ({
   errors: result.errors.map((error) =>
     error.kind === 'invalid-space-snapshot'
       ? { ...error, errors: error.errors.map(wireSpaceError) }
@@ -585,7 +587,7 @@ const discriminant = (value: unknown, label: string): string => {
   return requiredString(value.kind, `${label} kind`);
 };
 
-const decodeSpaceError = (value: unknown): SpaceError => {
+const decodeSpaceError = (value: unknown): WireSpaceError => {
   const kind = discriminant(value, 'Space intake error');
   switch (kind) {
     case 'invalid-shape':
@@ -636,7 +638,7 @@ const decodeSpaceResourceLocation = (record: Record<string, unknown>) => ({
   targetSpaceId: requiredUuid(record['targetSpaceId'], 'Space Resource target Space id'),
 });
 
-const decodeAggregateError = (value: unknown): SpaceAggregateError => {
+const decodeAggregateError = (value: unknown): SpaceAggregateError<WireSpaceError> => {
   const kind = discriminant(value, 'aggregate refusal');
   switch (kind) {
     case 'invalid-space-snapshot': {

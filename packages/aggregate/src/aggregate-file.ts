@@ -25,10 +25,10 @@ const joinPath = (directory: string, ...segments: readonly string[]): string =>
   [directory.endsWith('/') ? directory.slice(0, -1) : directory, ...segments].join('/');
 
 /**
- * A path `joinPath` made under `directory`, relative to it again, the form a
- * refusal names a file in. One it did not make is answered as it is.
+ * A `/`-separated path under `directory`, relative to it again, the form a
+ * refusal names a file in. One outside `directory` is answered as it is.
  */
-const relativeTo =
+export const relativeTo =
   (directory: string) =>
   (path: string): string => {
     const prefix = joinPath(directory, '');

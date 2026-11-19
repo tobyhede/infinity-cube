@@ -168,7 +168,13 @@ describe('describeStoredSpaceRefusal', () => {
     expect(
       describeStoredSpaceRefusal({
         code: 'stored-space-invalid',
-        errors: [{ kind: 'invalid-shape', message: 'document is not an object' }],
+        errors: [
+          {
+            kind: 'invalid-shape',
+            message: 'document is not an object',
+            at: { file: 'space.json' },
+          },
+        ],
       }),
     ).toBe('The remote space is invalid and was not accepted.');
   });
@@ -185,6 +191,7 @@ describe('describeStoredSpaceRefusal', () => {
       kind: 'graph-edge-missing-resource' as const,
       ref: `00000000-0000-4000-8000-00000000000${index}`,
       message: 'graph edge references unknown resource',
+      at: { file: 'space.json' },
     }));
 
     const description = describeStoredSpaceRefusal({ code: 'stored-space-invalid', errors });
@@ -202,6 +209,7 @@ describe('describeStoredSpaceRefusal', () => {
           kind: 'graph-edge-missing-resource',
           ref: MISSING_RESOURCE_ID,
           message: 'graph edge references unknown resource',
+          at: { file: 'space.json' },
         },
       ],
     });
