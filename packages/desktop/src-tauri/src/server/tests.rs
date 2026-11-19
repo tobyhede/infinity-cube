@@ -42,7 +42,7 @@ async fn open(
     TalkKey,
     Run<RandomIds, host::BuiltApplicationDirectory>,
 ) {
-    let run = open_run(directory, built_shell(built).unwrap())
+    let run = open_run(directory, built_shell(built).unwrap(), |_| {})
         .await
         .unwrap();
     let key = TalkKey::of(directory);
@@ -258,6 +258,7 @@ mod given_a_talk_window {
         let run = open_run(
             &directory,
             built_shell(&stand_in_build(&temporary)).unwrap(),
+            |_| {},
         )
         .await
         .unwrap();
@@ -305,12 +306,14 @@ mod given_a_folder_another_run_holds {
         let holder = open_run(
             &directory,
             built_shell(&stand_in_build(&temporary)).unwrap(),
+            |_| {},
         )
         .await
         .unwrap();
         let error = open_run(
             &directory,
             built_shell(&stand_in_build(&temporary)).unwrap(),
+            |_| {},
         )
         .await
         .unwrap_err();
@@ -337,6 +340,7 @@ mod given_a_folder_intake_refuses {
         let error = open_run(
             &directory,
             built_shell(&stand_in_build(&temporary)).unwrap(),
+            |_| {},
         )
         .await
         .unwrap_err();
