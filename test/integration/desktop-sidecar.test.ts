@@ -166,6 +166,34 @@ describe('The desktop sidecar', () => {
   );
 
   it(
+    'announces a refusal naming a directory another sidecar holds, and runs it once that one is killed',
+    async () => {
+      const root = await temporaryRoot();
+      const directory = join(root, 'talk');
+      await cp(FIXTURE, directory, { recursive: true });
+      const built = await builtApplication(root);
+      const holder = startSidecar(directory, built);
+      listening(await holder.announcement);
+
+      const second = startSidecar(directory, built);
+      expect(await second.announcement).toEqual({
+        kind: 'refused',
+        message: `${directory} is open in another InfinityCube window or run: close it there first.\n`,
+      });
+      expect(await second.exited).toBe(1);
+
+      // The operating system releases the lock of a process that ends however it ends.
+      holder.child.kill('SIGKILL');
+      await holder.exited;
+      const third = startSidecar(directory, built);
+      listening(await third.announcement);
+      third.child.stdin.end();
+      expect(await third.exited).toBe(0);
+    },
+    START_TIMEOUT_MS,
+  );
+
+  it(
     'announces a refusal and exits non-zero when the built page is a link out of the build',
     async () => {
       const root = await temporaryRoot();

@@ -2,6 +2,7 @@ import { cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/pr
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { LOCK_FILE_NAME } from '../../src/run/directory-lock';
 
 /**
  * The directories the suite runs a host on, and how it reads one back. Every
@@ -40,7 +41,11 @@ export const fixtureCopy = async (): Promise<string> => {
   return directory;
 };
 
-/** Every file under a directory, by its path relative to it, with its bytes. */
+/**
+ * Every file under a directory, by its path relative to it, with its bytes,
+ * but for the lock file a run holds (ADR 0162), which is no Export's and
+ * which a host creates on starting.
+ */
 export type FileTree = ReadonlyMap<string, Buffer>;
 
 /**
@@ -53,6 +58,7 @@ export const readFileTree = async (directory: string): Promise<FileTree> => {
   const files = entries
     .filter((entry) => entry.isFile())
     .map((entry) => relative(directory, join(entry.parentPath, entry.name)))
+    .filter((file) => file !== LOCK_FILE_NAME)
     .sort();
   const read = await Promise.all(
     files.map(async (file): Promise<[string, Buffer] | undefined> => {

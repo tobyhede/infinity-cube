@@ -123,6 +123,9 @@ fn refusal(directory: &Path, error: &ImportError) -> Option<String> {
     match error {
         // A presenter has no `pnpm cube init`, so no command is named.
         ImportError::Empty => Some(format!("{shown} holds no talk: it is missing or empty.")),
+        ImportError::Locked => Some(format!(
+            "{shown} is open in another InfinityCube window or run: close it there first."
+        )),
         ImportError::Refused(refusals) => {
             let mut message = format!("{shown} is not a talk InfinityCube can open:");
             for refusal in refusals.as_slice() {

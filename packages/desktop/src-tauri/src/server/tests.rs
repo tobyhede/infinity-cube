@@ -14,7 +14,8 @@ use crate::test_support::{
     META, META_ADDRESS, fixture_copy, meta_api, rename_text, stand_in_build,
 };
 
-/// Every file below `directory`, with its bytes.
+/// Every file below `directory`, with its bytes, but for the lock file a run
+/// creates on starting (ADR 0162), which is no Export's.
 fn snapshot(directory: &Path) -> Vec<(PathBuf, Vec<u8>)> {
     let mut files = Vec::new();
     let mut pending = vec![directory.to_path_buf()];
@@ -23,7 +24,7 @@ fn snapshot(directory: &Path) -> Vec<(PathBuf, Vec<u8>)> {
             let path = entry.unwrap().path();
             if path.is_dir() {
                 pending.push(path);
-            } else {
+            } else if path != directory.join(host::LOCK_FILE_NAME) {
                 files.push((path.clone(), std::fs::read(&path).unwrap()));
             }
         }
@@ -276,6 +277,37 @@ mod given_a_folder_with_no_talk {
             !message.contains("aggregate.json"),
             "a folder holding files but no aggregate.json is refused by intake, not as empty: {message}"
         );
+    }
+}
+
+mod given_a_folder_another_run_holds {
+    use super::*;
+
+    #[tokio::test]
+    async fn is_refused_naming_the_folder_and_no_command() {
+        let (temporary, directory) = fixture_copy();
+        let holder = open_run(
+            &directory,
+            built_shell(&stand_in_build(&temporary)).unwrap(),
+        )
+        .await
+        .unwrap();
+        let error = open_run(
+            &directory,
+            built_shell(&stand_in_build(&temporary)).unwrap(),
+        )
+        .await
+        .unwrap_err();
+        let message = refusal(&directory, &error).unwrap();
+        assert_eq!(
+            message,
+            format!(
+                "{} is open in another InfinityCube window or run: close it there first.",
+                directory.display()
+            ),
+            "as the Node sidecar words it"
+        );
+        let _stopped = holder.stop().await;
     }
 }
 

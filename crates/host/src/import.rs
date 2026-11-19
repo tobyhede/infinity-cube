@@ -53,6 +53,14 @@ pub enum ImportError {
     /// The store already held an aggregate; Import fills only a fresh one.
     #[error("the store already holds an aggregate")]
     NotFresh,
+    /// Another run, in this process or another, holds the directory's lock
+    /// (ADR 0162); only a run answers this.
+    #[error("another run holds the directory")]
+    Locked,
+    /// The directory's lock could not be taken for any other reason; only a
+    /// run answers this.
+    #[error("the directory could not be locked: {0}")]
+    LockFailed(String),
 }
 
 /// Import `directory` into the fresh `repository`: its aggregate through the

@@ -723,7 +723,7 @@ jobs:
           restore-keys: cargo-${{ runner.os }}-nextest-${{ env.NEXTEST_VERSION }}-${{ hashFiles('rust-toolchain.toml') }}-
       - name: Install cargo-nextest
         run: command -v cargo-nextest || cargo install cargo-nextest --locked --version "$NEXTEST_VERSION"
-      - run: cargo nextest run --locked -p intake -p host -p http-conformance -p infinity-cube
+      - run: cargo nextest run --locked --no-fail-fast -p intake -p host -p http-conformance -p infinity-cube
 
   ci:
     name: CI passed

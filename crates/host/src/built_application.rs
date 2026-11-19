@@ -49,12 +49,13 @@ impl BuiltApplicationDirectory {
     pub fn open(directory: &Path) -> Result<(Bytes, Self), BuiltApplicationError> {
         let root = std::fs::canonicalize(directory)
             .map_err(|error| BuiltApplicationError::Unreadable(directory.to_owned(), error))?;
-        // Asked first, as Windows answers a path below a regular file as not
-        // found, which would read as a directory holding no page.
+        // Asked here, since a page looked for below a regular file is not
+        // found on Windows and not a directory elsewhere.
         if !root.is_dir() {
+            let error = std::io::Error::from(std::io::ErrorKind::NotADirectory);
             return Err(BuiltApplicationError::Unreadable(
                 directory.to_owned(),
-                std::io::Error::from(std::io::ErrorKind::NotADirectory),
+                error,
             ));
         }
         let page_path = root.join(PAGE);
