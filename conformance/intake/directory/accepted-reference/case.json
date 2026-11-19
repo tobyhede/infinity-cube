@@ -1,0 +1,6 @@
+{
+  "description": "A Reference Resource showing a Markdown Target, Open on the Map.",
+  "expect": {
+    "outcome": "accepted"
+  }
+}

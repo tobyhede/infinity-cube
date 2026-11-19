@@ -1,0 +1,18 @@
+{
+  "description": "An Edge hiding a Title it does not have and carrying an undeclared key: its declared fields all have their types, so the check across them is made too, located at titleHidden.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "invalid-shape",
+        "file": "10000000-0000-4000-8000-000000000001/space.json",
+        "field": "maps.0.graphs.0.edges.0"
+      },
+      {
+        "kind": "invalid-shape",
+        "file": "10000000-0000-4000-8000-000000000001/space.json",
+        "field": "maps.0.graphs.0.edges.0.titleHidden"
+      }
+    ]
+  }
+}

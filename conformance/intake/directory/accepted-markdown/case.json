@@ -1,0 +1,6 @@
+{
+  "description": "A Markdown Resource Open on its Map, its text an asset.",
+  "expect": {
+    "outcome": "accepted"
+  }
+}

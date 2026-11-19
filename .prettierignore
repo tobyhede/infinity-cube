@@ -16,6 +16,11 @@ packages/desktop/src-tauri/binaries/**
 **/.claude/**
 **/.agents/**
 pnpm-lock.yaml
+
+# The intake conformance corpus: its files are the bytes a case is about —
+# some deliberately not as Prettier would write them — and the recorded Export
+# bytes are compared exactly (conformance/intake/README.md).
+conformance/**
 **/*.md
 **/coverage/**
 

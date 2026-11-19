@@ -4,28 +4,53 @@ import {
   type ImportSpace,
   type ImportSpaceFile,
 } from '@project/core';
-import { documentRefusal, parseResourceFiles } from '@project/graph';
+import { documentRefusal, fieldOf, located, parseResourceFiles } from '@project/graph';
+import { spaceErrorRefusal, type IntakeRefusal } from './intake-refusal';
 
 type AggregateDirectoryErrorKind = 'discovery' | 'parsing';
 
+/**
+ * Why an Aggregate directory's files did not read as an aggregate:
+ * `diagnostics` in the words an author reads, and `refusals`, the kind and
+ * place of each fault (ADR 0156). The two are separate lists, not one per
+ * line: a line may summarise several faults.
+ */
 export class AggregateDirectoryError extends Error {
   readonly kind: AggregateDirectoryErrorKind;
   readonly diagnostics: readonly string[];
+  readonly refusals: readonly IntakeRefusal[];
 
-  constructor(kind: AggregateDirectoryErrorKind, diagnostics: readonly string[]) {
+  constructor(
+    kind: AggregateDirectoryErrorKind,
+    diagnostics: readonly string[],
+    refusals: readonly IntakeRefusal[],
+  ) {
     super(diagnostics.join('\n'));
     this.name = 'AggregateDirectoryError';
     this.kind = kind;
     this.diagnostics = diagnostics;
+    this.refusals = refusals;
   }
 }
 
-/** A Space directory's files, by absolute path, as text. */
+/**
+ * A Space directory's files, by the path diagnostics name them by, as text,
+ * and `relative`, which answers such a path relative to the Aggregate
+ * directory, the form a refusal names a file in.
+ */
 export interface SpaceDirectoryFiles {
   readonly spaceFile: string;
   readonly spaceText: string;
   readonly resources: readonly { readonly path: string; readonly text: string }[];
+  readonly relative: (path: string) => string;
 }
+
+/** The Space directory holding `spaceFile`, relative to the Aggregate directory. */
+const spaceDirectoryOf = (relative: (path: string) => string, spaceFile: string): string => {
+  const file = relative(spaceFile);
+  const slash = file.lastIndexOf('/');
+  return slash === -1 ? '.' : file.slice(0, slash);
+};
 
 /** The space file's JSON value, and why it is not JSON when it is not. */
 interface SpaceJson {
@@ -55,10 +80,18 @@ const parseSpaceJson = (spaceFile: string, spaceText: string | undefined): Space
  * silence for a retired space-level `graphs`; and before a read failure, because
  * a document refused outright was never going to load.
  */
-const refuseDocument = (spaceFile: string, { json }: SpaceJson): void => {
+const refuseDocument = (
+  spaceFile: string,
+  relative: (path: string) => string,
+  { json }: SpaceJson,
+): void => {
   const refusal = documentRefusal(json);
   if (refusal !== null) {
-    throw new AggregateDirectoryError('parsing', [`${spaceFile}: ${refusal.message}`]);
+    throw new AggregateDirectoryError(
+      'parsing',
+      [`${spaceFile}: ${refusal.message}`],
+      [spaceErrorRefusal(spaceDirectoryOf(relative, spaceFile), refusal)],
+    );
   }
 };
 
@@ -69,8 +102,12 @@ const refuseDocument = (spaceFile: string, { json }: SpaceJson): void => {
  * could not be read, so that a document refused outright is reported as that
  * rather than as the read failure.
  */
-export const refuseSpaceDocument = (spaceFile: string, spaceText: string | undefined): void => {
-  refuseDocument(spaceFile, parseSpaceJson(spaceFile, spaceText));
+export const refuseSpaceDocument = (
+  spaceFile: string,
+  spaceText: string | undefined,
+  relative: (path: string) => string,
+): void => {
+  refuseDocument(spaceFile, relative, parseSpaceJson(spaceFile, spaceText));
 };
 
 /**
@@ -82,24 +119,27 @@ export const parseSingleSpace = ({
   spaceFile,
   spaceText,
   resources: resourceFiles,
+  relative,
 }: SpaceDirectoryFiles): ImportSpace => {
   const spaceJson = parseSpaceJson(spaceFile, spaceText);
-  refuseDocument(spaceFile, spaceJson);
+  refuseDocument(spaceFile, relative, spaceJson);
 
   const diagnostics: string[] = [];
+  const refusals: IntakeRefusal[] = [];
+  const file = relative(spaceFile);
   let parsedSpaceFile: ImportSpaceFile | undefined;
   if (spaceJson.diagnostic !== undefined) {
     diagnostics.push(spaceJson.diagnostic);
+    refusals.push({ kind: 'invalid-json', file });
   } else {
     const parsed = importSpaceFileSchema.safeParse(spaceJson.json);
     if (parsed.success) {
       parsedSpaceFile = parsed.data;
     } else {
-      diagnostics.push(
-        ...parsed.error.issues.map(
-          (issue) => `${spaceFile}: ${issue.path.join('.') || '(space)'}: ${issue.message}`,
-        ),
-      );
+      for (const issue of parsed.error.issues) {
+        diagnostics.push(`${spaceFile}: ${issue.path.join('.') || '(space)'}: ${issue.message}`);
+        refusals.push({ kind: 'invalid-shape', ...located(file, fieldOf(issue.path)) });
+      }
     }
   }
 
@@ -108,11 +148,16 @@ export const parseSingleSpace = ({
     ? parsedResources.resources.map(({ resource: { id, ...document } }) => ({ id, document }))
     : [];
   if (!parsedResources.ok) {
-    diagnostics.push(...parsedResources.errors.map((error) => error.message));
+    for (const error of parsedResources.errors) {
+      diagnostics.push(error.message);
+      // Located at the file's own name, whatever id it holds: the file is what
+      // failed, before it was read as a Resource.
+      refusals.push({ kind: error.kind, ...error.at, file: relative(error.path) });
+    }
   }
 
   if (diagnostics.length > 0 || parsedSpaceFile === undefined) {
-    throw new AggregateDirectoryError('parsing', diagnostics);
+    throw new AggregateDirectoryError('parsing', diagnostics, refusals);
   }
 
   const { id, ...document } = parsedSpaceFile;

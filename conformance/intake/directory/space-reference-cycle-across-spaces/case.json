@@ -1,0 +1,13 @@
+{
+  "description": "Two Spaces whose Space Resources reference each other.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "space-reference-cycle",
+        "file": "20000000-0000-4000-8000-000000000002/resources/00000000-0000-4000-8000-000000000104.json",
+        "id": "00000000-0000-4000-8000-000000000104"
+      }
+    ]
+  }
+}

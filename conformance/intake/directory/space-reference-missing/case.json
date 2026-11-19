@@ -1,0 +1,13 @@
+{
+  "description": "A Space Resource referencing a Space the aggregate does not hold.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "space-reference-missing",
+        "file": "10000000-0000-4000-8000-000000000001/resources/00000000-0000-4000-8000-000000000103.json",
+        "id": "00000000-0000-4000-8000-000000000103"
+      }
+    ]
+  }
+}

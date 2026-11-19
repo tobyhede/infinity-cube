@@ -1,0 +1,13 @@
+{
+  "description": "A Markdown Resource whose content its plugin refuses, in a file not named for its id: refused at the file's own name.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "invalid-resource-file",
+        "file": "10000000-0000-4000-8000-000000000001/resources/second.json",
+        "field": "content.url"
+      }
+    ]
+  }
+}

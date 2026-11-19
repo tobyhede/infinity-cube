@@ -1,0 +1,13 @@
+{
+  "description": "A Space Resource referencing the Space holding it.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "space-reference-cycle",
+        "file": "10000000-0000-4000-8000-000000000001/resources/00000000-0000-4000-8000-000000000102.json",
+        "id": "00000000-0000-4000-8000-000000000102"
+      }
+    ]
+  }
+}

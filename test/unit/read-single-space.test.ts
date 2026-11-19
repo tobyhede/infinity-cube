@@ -205,6 +205,36 @@ describe('readSingleSpace', () => {
     expect(thrown.kind).toBe('discovery');
     expect(thrown.diagnostics).toHaveLength(1);
     expect(thrown.diagnostics[0]).toContain(missingInput);
+    // The refusal names it as its other refusals name files: relative to the
+    // directory holding the Space directory, whatever path it was given by.
+    expect(thrown.refusals).toEqual([{ kind: 'unreadable', file: 'missing-talk' }]);
+  });
+
+  it('names a missing space file it was given as its later refusals name it', async () => {
+    const temporaryDirectory = await makeTemporaryDirectory();
+    const missingSpaceFile = join(temporaryDirectory, 'talk', 'space.json');
+
+    const thrown = await captureError(() => readSingleSpace(missingSpaceFile));
+
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
+    expect(thrown.kind).toBe('discovery');
+    expect(thrown.refusals).toEqual([{ kind: 'unreadable', file: 'talk/space.json' }]);
+  });
+
+  it('names a resources/ it could not list relative to the directory holding the Space', async () => {
+    const temporaryDirectory = await makeTemporaryDirectory();
+    const talkDirectory = join(temporaryDirectory, 'talk');
+    await mkdir(talkDirectory);
+    await writeFile(join(talkDirectory, 'space.json'), '{}');
+    await writeFile(join(talkDirectory, 'resources'), 'a file, not a directory');
+
+    const thrown = await captureError(() => readSingleSpace(talkDirectory));
+
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
+    expect(thrown.kind).toBe('discovery');
+    expect(thrown.refusals).toEqual([{ kind: 'unreadable', file: 'talk/resources' }]);
   });
 
   // A directory standing in for `space.json` fails its read as EISDIR for every

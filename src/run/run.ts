@@ -12,6 +12,8 @@ import { exportAggregate } from '../export/export-aggregate';
 import {
   createSpaceHost,
   describeAggregateRefusal,
+  locateAggregateRefusal,
+  type IntakeRefusal,
   type SpaceHostApplication,
   AggregateDirectoryError,
 } from '@project/aggregate';
@@ -59,10 +61,26 @@ export type RunStart =
   | { readonly kind: 'running'; readonly run: Run }
   /** The directory is missing or empty, so there is no aggregate to run; `init` makes one. */
   | { readonly kind: 'empty' }
-  /** The directory could not be read as an Aggregate directory. */
-  | { readonly kind: 'unreadable'; readonly diagnostics: readonly string[] }
-  /** The directory read cleanly, and aggregate intake refused what it holds. */
-  | { readonly kind: 'aggregate-refused'; readonly diagnostics: readonly string[] };
+  /**
+   * The directory could not be read as an Aggregate directory. `diagnostics`
+   * are what the author reads; `refusals` are the kind and place of each
+   * fault (ADR 0156), a separate list rather than one per line. The CLI
+   * prints `diagnostics` alone; `refusals` are what the intake conformance
+   * runner (`test/unit/intake-conformance.test.ts`) holds a directory case to,
+   * through `checkAggregate`, so the answer it checks is the one `cube check`
+   * and a run reach.
+   */
+  | {
+      readonly kind: 'unreadable';
+      readonly diagnostics: readonly string[];
+      readonly refusals: readonly IntakeRefusal[];
+    }
+  /** The directory read cleanly, and aggregate intake refused what it holds; `refusals` as above. */
+  | {
+      readonly kind: 'aggregate-refused';
+      readonly diagnostics: readonly string[];
+      readonly refusals: readonly IntakeRefusal[];
+    };
 
 /**
  * Whether the request being answered is a read: `GET` or `HEAD`, or a product
@@ -225,12 +243,13 @@ const readInto = async (
     imported = await importAggregate(directory, repository, { replace: false, newId });
   } catch (error) {
     if (!(error instanceof AggregateDirectoryError)) throw error;
-    return { kind: 'unreadable', diagnostics: error.diagnostics };
+    return { kind: 'unreadable', diagnostics: error.diagnostics, refusals: error.refusals };
   }
   if (imported.kind === 'aggregate-refused') {
     return {
       kind: 'aggregate-refused',
       diagnostics: describeAggregateRefusal(imported.errors, imported.spaces),
+      refusals: locateAggregateRefusal(imported.errors, imported.spaces),
     };
   }
   if (imported.kind !== 'imported') {

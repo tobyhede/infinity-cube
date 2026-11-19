@@ -1,0 +1,18 @@
+{
+  "description": "An update repeating an Edge in its Graph.",
+  "base": "accepted-ur",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "duplicate-graph-edge",
+        "file": "10000000-0000-4000-8000-000000000001/space.json",
+        "id": "00000000-0000-4000-8000-000000000b01",
+        "edge": {
+          "from": "00000000-0000-4000-8000-000000000101",
+          "to": "00000000-0000-4000-8000-000000000102"
+        }
+      }
+    ]
+  }
+}

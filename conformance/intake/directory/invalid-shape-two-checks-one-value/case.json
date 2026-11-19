@@ -1,0 +1,18 @@
+{
+  "description": "An Edge Title that is neither trimmed nor one line: a value failing two checks is refused twice, at the one field.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "invalid-shape",
+        "file": "10000000-0000-4000-8000-000000000001/space.json",
+        "field": "maps.0.graphs.0.edges.0.title"
+      },
+      {
+        "kind": "invalid-shape",
+        "file": "10000000-0000-4000-8000-000000000001/space.json",
+        "field": "maps.0.graphs.0.edges.0.title"
+      }
+    ]
+  }
+}

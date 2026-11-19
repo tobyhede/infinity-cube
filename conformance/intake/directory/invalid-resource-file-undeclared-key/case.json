@@ -1,0 +1,12 @@
+{
+  "description": "A Resource file whose envelope carries a key its schema does not declare.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "invalid-resource-file",
+        "file": "10000000-0000-4000-8000-000000000001/resources/00000000-0000-4000-8000-000000000102.json"
+      }
+    ]
+  }
+}

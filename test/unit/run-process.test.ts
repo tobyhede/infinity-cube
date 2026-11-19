@@ -13,13 +13,19 @@ describe('a run refusal', () => {
 
   it('lists what made the directory unreadable', () => {
     expect(
-      describeRunRefusal({ kind: 'unreadable', diagnostics: ['first', 'second'] }, '/talk'),
+      describeRunRefusal(
+        { kind: 'unreadable', diagnostics: ['first', 'second'], refusals: [] },
+        '/talk',
+      ),
     ).toBe('/talk is not an Aggregate directory:\nfirst\nsecond\n');
   });
 
   it('lists what aggregate intake refused', () => {
     expect(
-      describeRunRefusal({ kind: 'aggregate-refused', diagnostics: ['refused'] }, '/talk'),
+      describeRunRefusal(
+        { kind: 'aggregate-refused', diagnostics: ['refused'], refusals: [] },
+        '/talk',
+      ),
     ).toBe('Aggregate validation failed:\nrefused\n');
   });
 });

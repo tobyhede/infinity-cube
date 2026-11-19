@@ -1,0 +1,12 @@
+{
+  "description": "A single Space directory, with no aggregate.json above it.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "aggregate-file-missing",
+        "file": "aggregate.json"
+      }
+    ]
+  }
+}

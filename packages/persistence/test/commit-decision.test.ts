@@ -224,6 +224,29 @@ describe('decideCommit', () => {
     ]);
   });
 
+  it('judges a created Space at the position its id sorts to among the stored ones', () => {
+    const LATER_META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000209');
+    const EARLIER_CREATED_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000201');
+    const missingMap = uuidSchema.parse('00000000-0000-4000-8000-0000000002ff');
+    const created: SpaceSnapshot = {
+      id: EARLIER_CREATED_ID,
+      document: { version: 1, title: 'Created', defaultMap: missingMap },
+      resources: [],
+    };
+
+    const refused = expectRefusedAggregate(
+      decideCommit(
+        { changes: [{ kind: 'create', spaceId: EARLIER_CREATED_ID, snapshot: created }] },
+        LATER_META_ID,
+        [{ snapshot: bareSpace(LATER_META_ID, 'Meta'), revision: 0n, exportedRevision: null }],
+      ),
+    );
+
+    expect(refused.errors).toEqual([
+      expect.objectContaining({ kind: 'invalid-space-snapshot', snapshotIndex: 0 }),
+    ]);
+  });
+
   it('judges a corrupt stored Space at the position a sorted read would give it, whatever order stored arrives in', () => {
     const ORDER_META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000101');
     const ORDER_OTHER_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000102');

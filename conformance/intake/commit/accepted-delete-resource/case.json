@@ -1,0 +1,7 @@
+{
+  "description": "An update removing a Resource, its placement and its Edge.",
+  "base": "accepted-ur",
+  "expect": {
+    "outcome": "accepted"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "description": "aggregate.json names no Meta Space.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "invalid-shape",
+        "file": "aggregate.json",
+        "field": "metaSpaceId"
+      }
+    ]
+  }
+}

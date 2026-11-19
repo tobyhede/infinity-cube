@@ -1,0 +1,12 @@
+{
+  "description": "Two files in assets/ of one hash.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "duplicate-asset",
+        "file": "assets/9mUDMxoGVhsG3sZvR47VIFTCbNYlW3ptgdTgjbjcJE8.txt"
+      }
+    ]
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "description": "One Edge twice in one Graph (ADR 0032).",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "duplicate-graph-edge",
+        "file": "10000000-0000-4000-8000-000000000001/space.json",
+        "id": "00000000-0000-4000-8000-000000000b01",
+        "edge": {
+          "from": "00000000-0000-4000-8000-000000000101",
+          "to": "00000000-0000-4000-8000-000000000102"
+        }
+      }
+    ]
+  }
+}

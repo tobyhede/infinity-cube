@@ -1,0 +1,6 @@
+{
+  "description": "A Space with no Map yet: Import does not initialize one.",
+  "expect": {
+    "outcome": "accepted"
+  }
+}

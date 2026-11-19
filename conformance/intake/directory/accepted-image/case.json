@@ -1,0 +1,6 @@
+{
+  "description": "An Image Resource with its natural size, whose bytes are absent (not a refusal).",
+  "expect": {
+    "outcome": "accepted"
+  }
+}

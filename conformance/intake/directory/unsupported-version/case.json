@@ -1,0 +1,13 @@
+{
+  "description": "A space.json of a version this build does not read.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "unsupported-version",
+        "file": "10000000-0000-4000-8000-000000000001/space.json",
+        "field": "version"
+      }
+    ]
+  }
+}

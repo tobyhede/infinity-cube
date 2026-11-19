@@ -1,0 +1,13 @@
+{
+  "description": "A Space Resource selecting a Map its Space does not have.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "space-resource-map-missing",
+        "file": "10000000-0000-4000-8000-000000000001/resources/00000000-0000-4000-8000-000000000103.json",
+        "id": "00000000-0000-4000-8000-000000000103"
+      }
+    ]
+  }
+}

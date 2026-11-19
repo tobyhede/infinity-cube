@@ -11,6 +11,7 @@ import {
 import { parseResourceFiles, type ResourceFile, type ResourceFileError } from './resource-file';
 import { buildSpaceLookup, type SpaceLookup } from './lookup';
 import { validateReferences, type SpaceReferenceError } from './validate';
+import { fieldOf, located, type IntakeLocation } from './intake-location';
 
 /** The intake brand's carrier. See {@link Space} for what it means. */
 declare const SPACE_INTAKE: unique symbol;
@@ -68,18 +69,32 @@ export interface Space {
 }
 
 /** What a document declaring a version this build does not read earns. */
-type UnsupportedVersionError = { kind: 'unsupported-version'; message: string };
+type UnsupportedVersionError = {
+  kind: 'unsupported-version';
+  message: string;
+  at: IntakeLocation;
+};
 
 /**
  * Why a load failed: a bad shape, a resource file that will not parse, or a
- * reference that does not resolve.
+ * reference that does not resolve. `at` is where, which every refusal intake
+ * makes carries; see {@link IntakeLocation}.
  */
 export type SpaceError =
-  | { kind: 'invalid-shape'; message: string }
+  | { kind: 'invalid-shape'; message: string; at: IntakeLocation }
   | UnsupportedVersionError
-  | { kind: 'retired-space-graphs'; message: string }
+  | { kind: 'retired-space-graphs'; message: string; at: IntakeLocation }
   | ResourceFileError
   | SpaceReferenceError;
+
+/** Each member of `E` without its location. */
+type Unlocated<E> = E extends unknown ? Omit<E, 'at'> : never;
+
+/**
+ * A {@link SpaceError} as the HTTP commit refusal carries it: kind, ids and
+ * message, without where intake located it.
+ */
+export type WireSpaceError = Unlocated<SpaceError>;
 
 /**
  * The one error a document of the wrong version earns, or `null` to let the
@@ -106,6 +121,7 @@ function unsupportedDocumentVersion(document: unknown): UnsupportedVersionError 
   return {
     kind: 'unsupported-version',
     message: `Space document version ${declared} is not supported; this build reads version ${SPACE_FILE_VERSION}`,
+    at: { file: 'space.json', field: 'version' },
   };
 }
 
@@ -138,6 +154,7 @@ function retiredSpaceGraphs(document: unknown): SpaceError | null {
     kind: 'retired-space-graphs',
     message:
       'This document carries a space-level `graphs` array, which is retired: a Map owns the Graphs it draws (ADR 0040)',
+    at: { file: 'space.json', field: 'graphs' },
   };
 }
 
@@ -193,6 +210,7 @@ export function loadSpace(input: unknown, resourceFiles: readonly ResourceFile[]
     const errors: SpaceError[] = parsed.error.issues.map((issue) => ({
       kind: 'invalid-shape',
       message: `${issue.path.join('.') || '(root)'}: ${issue.message}`,
+      at: located('space.json', fieldOf(issue.path)),
     }));
     return { ok: false, errors };
   }
@@ -213,6 +231,9 @@ export function loadSpace(input: unknown, resourceFiles: readonly ResourceFile[]
         kind: 'duplicate-resource-id',
         ref: resource.id,
         message: `Duplicate resource id "${resource.id}" in ${seen} and ${path}`,
+        // Located at the file Export writes for it, as every later fault is,
+        // whatever its files are named; the message names the files.
+        at: { file: `resources/${resource.id}.json`, id: resource.id },
       });
       continue;
     }
@@ -249,6 +270,7 @@ export function loadSpaceSnapshot(input: unknown): LoadSpaceSnapshotResult {
       errors: parsed.error.issues.map((issue) => ({
         kind: 'invalid-shape',
         message: `${issue.path.join('.') || '(root)'}: ${issue.message}`,
+        at: locateSnapshotIssue(input, issue.path),
       })),
     };
   }
@@ -299,6 +321,11 @@ function buildSpace(input: {
         {
           kind: 'invalid-shape',
           message: `maps: map "${built.mapWithoutGraph}" owns no graph`,
+          // A shape fault, so located from the file's root as Zod's own are.
+          at: located(
+            'space.json',
+            `maps.${maps.findIndex(({ id }) => id === built.mapWithoutGraph)}.graphs`,
+          ),
         },
       ],
     };
@@ -327,3 +354,39 @@ function buildSpace(input: {
  * asserted is that this value came through intake.
  */
 const intake = (space: Omit<Space, typeof SPACE_INTAKE>): Space => space as Space;
+
+/** The Resource file a stored Resource is written to: its id names it, or its position when it has none. */
+const resourceFileAt = (snapshot: unknown, index: number): string => {
+  const resources =
+    typeof snapshot === 'object' && snapshot !== null && 'resources' in snapshot
+      ? snapshot.resources
+      : undefined;
+  const resource: unknown = Array.isArray(resources) ? resources[index] : undefined;
+  const id =
+    typeof resource === 'object' && resource !== null && 'id' in resource ? resource.id : undefined;
+  return typeof id === 'string' ? `resources/${id}.json` : `resources/[${index}].json`;
+};
+
+/**
+ * Where a Zod issue on a stored Space snapshot (`{ id, document, resources }`)
+ * falls among the Space directory's files: the snapshot's `id` and `document`
+ * are `space.json`, and each of `resources` is its Resource file, whose
+ * `document` is the file's root beside its `id`. A Resource whose id is not a
+ * string is named by its position, `resources/[<index>].json`. A fault in
+ * `resources` itself, missing or not an array, is the Space directory's
+ * `resources` directory.
+ */
+export const locateSnapshotIssue = (
+  snapshot: unknown,
+  path: readonly PropertyKey[],
+): IntakeLocation => {
+  const [head, index, part, ...rest] = path;
+  if (head === 'resources' && index === undefined) return { file: 'resources' };
+  if (head === 'resources' && typeof index === 'number') {
+    const file = resourceFileAt(snapshot, index);
+    if (part === 'document') return located(file, fieldOf(rest));
+    return located(file, fieldOf(part === undefined ? [] : [part, ...rest]));
+  }
+  if (head === 'document') return located('space.json', fieldOf(path.slice(1)));
+  return located('space.json', fieldOf(path));
+};

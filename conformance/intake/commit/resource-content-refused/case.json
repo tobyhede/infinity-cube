@@ -1,0 +1,14 @@
+{
+  "description": "An update whose Markdown Resource's content its plugin refuses.",
+  "base": "accepted-ur",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "invalid-shape",
+        "file": "10000000-0000-4000-8000-000000000001/resources/00000000-0000-4000-8000-000000000103.json",
+        "field": "content.url"
+      }
+    ]
+  }
+}

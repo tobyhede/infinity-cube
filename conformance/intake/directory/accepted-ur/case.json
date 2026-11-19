@@ -1,0 +1,6 @@
+{
+  "description": "Ur Resources with Map content on one Map and Graph.",
+  "expect": {
+    "outcome": "accepted"
+  }
+}

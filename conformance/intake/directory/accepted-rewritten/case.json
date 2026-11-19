@@ -1,0 +1,6 @@
+{
+  "description": "Compact JSON in an order Export does not write: Export rewrites every file, keys in its order, two-space indent, closing newline.",
+  "expect": {
+    "outcome": "accepted"
+  }
+}

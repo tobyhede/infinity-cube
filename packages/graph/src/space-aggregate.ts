@@ -12,7 +12,8 @@ import {
   unrootedSpaces,
   type SpaceReference,
 } from './declared-references';
-import { loadSpaceSnapshot, type Space, type SpaceError } from './space';
+import { compareOrdinal } from './ordinal';
+import { loadSpaceSnapshot, type Space, type SpaceError, type WireSpaceError } from './space';
 
 /** The aggregate intake brand's carrier. */
 const SPACE_AGGREGATE_INTAKE: unique symbol = Symbol('space-aggregate-intake');
@@ -45,11 +46,16 @@ interface SpaceResourceLocation {
 /** Why a Space Resource's selection does not resolve in its target, in the shape its kind's own check answers. */
 type SpaceSelectionProblem = NonNullable<ReturnType<typeof spaceSelectionProblem>>;
 
-export type SpaceAggregateError =
+/**
+ * Why an aggregate was refused. `E` is the form a Space's own refusals take:
+ * located, as intake makes them, or {@link WireSpaceError}, as the HTTP commit
+ * refusal carries them.
+ */
+export type SpaceAggregateError<E extends WireSpaceError = SpaceError> =
   | {
       readonly kind: 'invalid-space-snapshot';
       readonly snapshotIndex: number;
-      readonly errors: readonly SpaceError[];
+      readonly errors: readonly E[];
     }
   | {
       readonly kind: 'duplicate-space-id';
@@ -140,10 +146,18 @@ export function loadSpaceAggregate({
   if (!byId.has(metaSpaceId)) {
     return { ok: false, errors: [{ kind: 'meta-space-missing', metaSpaceId }] };
   }
+  // Which Resource a cycle is reported at depends on the order the walk
+  // follows a Space's Resources, so they are read in code unit order of Title,
+  // then id, which no host's collation changes (`conformance/intake/README.md`).
   const declared = declaredSpaceReferences(
     spaces.map((space) => ({
       id: space.id,
-      resources: space.resources.map((resource) => ({ id: resource.id, document: resource })),
+      resources: [...space.resources]
+        .sort(
+          (left, right) =>
+            compareOrdinal(left.title, right.title) || compareOrdinal(left.id, right.id),
+        )
+        .map((resource) => ({ id: resource.id, document: resource })),
     })),
   );
   const located =

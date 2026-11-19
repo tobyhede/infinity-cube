@@ -1,0 +1,13 @@
+{
+  "description": "A space.json declaring a Space Id other than its directory name.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "space-id-mismatch",
+        "file": "20000000-0000-4000-8000-000000000002/space.json",
+        "field": "id"
+      }
+    ]
+  }
+}

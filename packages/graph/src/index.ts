@@ -72,6 +72,9 @@ export { Placement } from './placement';
 
 export { positionedStrategy } from './positioned';
 
+// Code unit order, the one string order intake, Import and Export decide by.
+export { compareOrdinal } from './ordinal';
+
 // The rules over the references a kind declares (ADR 0128). Intake, the
 // aggregate and `SnapshotEdit` ask them inside this package; the Space Resource
 // lifecycle in `@project/persistence` asks the Space reference graph directly.
@@ -107,8 +110,24 @@ export type { GraphRenderEdge } from './graph-rendering';
 // the checks it composes stay private — a caller that could name them
 // individually could take some and miss others, which is the defect. Its
 // docblock is where that argument lives.
-export { documentRefusal, loadSpace, loadSpaceSnapshot } from './space';
-export type { LoadSpaceResult, LoadSpaceSnapshotResult, Space, SpaceError } from './space';
+// `locateSnapshotIssue` is offered for the parsers that run ahead of intake on
+// a stored snapshot — the commit decoder in `@project/persistence` and
+// `identifySpace` in `@project/aggregate` — so their refusals are located by
+// the rule intake locates its own by (ADR 0156).
+export { documentRefusal, loadSpace, loadSpaceSnapshot, locateSnapshotIssue } from './space';
+
+// Where a refusal is (ADR 0156): the `at` every refusal intake makes carries,
+// and the rule a schema issue is located by, which the directory reader in
+// `@project/aggregate` locates its own parse faults with.
+export { fieldOf, located } from './intake-location';
+export type { IntakeLocation } from './intake-location';
+export type {
+  LoadSpaceResult,
+  LoadSpaceSnapshotResult,
+  Space,
+  SpaceError,
+  WireSpaceError,
+} from './space';
 
 export { loadSpaceAggregate, refusedUnrootedSpaceIds } from './space-aggregate';
 export type {

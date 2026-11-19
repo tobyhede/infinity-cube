@@ -5,13 +5,14 @@ import {
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
+import { compareOrdinal, fieldOf, located } from '@project/graph';
 import type { StoredAsset } from '@project/persistence';
 import type { AggregateSource, DirectoryListing, SourceRead } from './aggregate-source';
 import { describeSchemaFailure, identifySpace, SpaceIdentityError } from './identify-space';
 import { admitAssetFile, assetFileHash, assetPathHash, ASSETS_DIRECTORY_NAME } from './assets';
-import { compareOrdinal } from './ordinal';
 import type { AggregateInput } from './space-repository';
 import { AggregateDirectoryError, parseSingleSpace, refuseSpaceDocument } from './space-directory';
+import { within, type IntakeRefusal } from './intake-refusal';
 
 /** The name of the aggregate file at the root of a canonical aggregate directory. */
 export const AGGREGATE_FILE_NAME = 'aggregate.json';
@@ -22,6 +23,17 @@ export const AGGREGATE_FILE_NAME = 'aggregate.json';
  */
 const joinPath = (directory: string, ...segments: readonly string[]): string =>
   [directory.endsWith('/') ? directory.slice(0, -1) : directory, ...segments].join('/');
+
+/**
+ * A `/`-separated path under `directory`, relative to it again, the form a
+ * refusal names a file in. One outside `directory` is answered as it is.
+ */
+export const relativeTo =
+  (directory: string) =>
+  (path: string): string => {
+    const prefix = joinPath(directory, '');
+    return path.startsWith(prefix) ? path.slice(prefix.length) : path;
+  };
 
 /**
  * Text as a file read as UTF-8 gives it: a malformed sequence becomes U+FFFD
@@ -38,9 +50,11 @@ const textOf = (bytes: Uint8Array): string =>
  * "there is no aggregate.json here" is the sentence that says so.
  */
 const missingAggregateFile = (path: string): AggregateDirectoryError =>
-  new AggregateDirectoryError('discovery', [
-    `${path}: a canonical aggregate directory must contain ${AGGREGATE_FILE_NAME}`,
-  ]);
+  new AggregateDirectoryError(
+    'discovery',
+    [`${path}: a canonical aggregate directory must contain ${AGGREGATE_FILE_NAME}`],
+    [{ kind: 'aggregate-file-missing', file: AGGREGATE_FILE_NAME }],
+  );
 
 /** Parse `aggregate.json`'s text into the Meta Space it names. */
 const parseAggregateFile = (path: string, text: string): UUID => {
@@ -48,14 +62,23 @@ const parseAggregateFile = (path: string, text: string): UUID => {
   try {
     json = JSON.parse(text);
   } catch (error) {
-    throw new AggregateDirectoryError('parsing', [`${path}: ${String(error)}`]);
+    throw new AggregateDirectoryError(
+      'parsing',
+      [`${path}: ${String(error)}`],
+      [{ kind: 'invalid-json', file: AGGREGATE_FILE_NAME }],
+    );
   }
 
   const parsed = aggregateFileSchema.safeParse(json);
   if (!parsed.success) {
-    throw new AggregateDirectoryError('parsing', [
-      `${path}: ${describeSchemaFailure(parsed.error.issues, 'aggregate file')}`,
-    ]);
+    throw new AggregateDirectoryError(
+      'parsing',
+      [`${path}: ${describeSchemaFailure(parsed.error.issues, 'aggregate file')}`],
+      parsed.error.issues.map((issue) => ({
+        kind: 'invalid-shape',
+        ...located(AGGREGATE_FILE_NAME, fieldOf(issue.path)),
+      })),
+    );
   }
   return parsed.data.metaSpaceId;
 };
@@ -101,7 +124,11 @@ const listOrRefuse = async (
   const answer = await source.list(directory);
   if (!answer.ok) {
     const path = directory === '' ? source.name : joinPath(source.name, directory);
-    throw new AggregateDirectoryError('discovery', [`${path}: ${answer.reason}`]);
+    throw new AggregateDirectoryError(
+      'discovery',
+      [`${path}: ${answer.reason}`],
+      [{ kind: 'unreadable', file: directory === '' ? '.' : directory }],
+    );
   }
   return answer.listing;
 };
@@ -121,6 +148,10 @@ const ownedLinks = (
 const linkDiagnostics = (source: AggregateSource, paths: readonly string[]): readonly string[] =>
   [...paths].sort(compareOrdinal).map((path) => `${joinPath(source.name, path)}: ${LINK_REASON}`);
 
+/** A refusal for each of `paths`, in the order {@link linkDiagnostics} names them. */
+const linkRefusals = (paths: readonly string[]): readonly IntakeRefusal[] =>
+  [...paths].sort(compareOrdinal).map((file) => ({ kind: 'symbolic-link', file }));
+
 /**
  * Refuse a directory holding a symbolic link at a path InfinityCube owns: Export
  * does not write or remove through a link, so it could not write that
@@ -128,7 +159,11 @@ const linkDiagnostics = (source: AggregateSource, paths: readonly string[]): rea
  */
 const refuseLinks = (source: AggregateSource, paths: readonly string[]): void => {
   if (paths.length === 0) return;
-  throw new AggregateDirectoryError('discovery', linkDiagnostics(source, paths));
+  throw new AggregateDirectoryError(
+    'discovery',
+    linkDiagnostics(source, paths),
+    linkRefusals(paths),
+  );
 };
 
 /** Whether a file named `name` in `assets/` is one Importing owns and reads. */
@@ -177,16 +212,22 @@ const scanSpaceDirectory = async (
   );
   if (links.includes(`${name}/resources`)) refuseLinks(source, links);
   const listed = await settledListing(listOrRefuse(source, `${name}/resources`));
+  const linked = [
+    ...links,
+    ...(listed.ok
+      ? ownedLinks(`${name}/resources`, listed.value, (entry) => entry.endsWith('.json'))
+      : []),
+  ];
   const diagnostics = [
-    ...linkDiagnostics(source, [
-      ...links,
-      ...(listed.ok
-        ? ownedLinks(`${name}/resources`, listed.value, (entry) => entry.endsWith('.json'))
-        : []),
-    ]),
+    ...linkDiagnostics(source, linked),
     ...(listed.ok ? [] : listed.refusal.diagnostics),
   ];
-  if (diagnostics.length > 0) throw new AggregateDirectoryError('discovery', diagnostics);
+  if (diagnostics.length > 0) {
+    throw new AggregateDirectoryError('discovery', diagnostics, [
+      ...linkRefusals(linked),
+      ...(listed.ok ? [] : listed.refusal.refusals),
+    ]);
+  }
   const resources = listed.ok ? listed.value : { files: [] };
   return {
     name,
@@ -238,6 +279,7 @@ const scanBelowRoot = async (
     throw new AggregateDirectoryError(
       'discovery',
       refusals.flatMap(({ diagnostics }) => diagnostics),
+      refusals.flatMap((refusal) => refusal.refusals),
     );
   }
   const spaces = spaceResults.flatMap((result) => (result.ok ? [result.value] : []));
@@ -334,6 +376,8 @@ export const spaceDirectoryId = (name: string): UUID | undefined => {
 /** One Space directory's bytes, read and identified but not yet minted into. */
 interface SpaceDirectoryRead {
   readonly directory: string;
+  /** The directory's name, relative to the Aggregate directory. */
+  readonly name: string;
   readonly id: UUID;
   readonly input: ImportSpace;
 }
@@ -358,24 +402,29 @@ interface SpaceDirectoryRead {
 const requireSpaceDirectoryId = (directory: string, name: string): UUID => {
   const id = spaceDirectoryId(name);
   if (id === undefined) {
-    throw new AggregateDirectoryError('parsing', [
-      `${directory}: a Space directory must be named for its Space UUID, in lower case`,
-    ]);
+    throw new AggregateDirectoryError(
+      'parsing',
+      [`${directory}: a Space directory must be named for its Space UUID, in lower case`],
+      [{ kind: 'space-directory-name', file: name }],
+    );
   }
   return id;
 };
 
 const agreeingSpaceDirectory = (
   directory: string,
+  name: string,
   id: UUID,
   input: ImportSpace,
 ): SpaceDirectoryRead => {
   if (input.id !== undefined && input.id !== id) {
-    throw new AggregateDirectoryError('parsing', [
-      `${joinPath(directory, 'space.json')}: declares Space ${input.id} inside directory ${id}`,
-    ]);
+    throw new AggregateDirectoryError(
+      'parsing',
+      [`${joinPath(directory, 'space.json')}: declares Space ${input.id} inside directory ${id}`],
+      [{ kind: 'space-id-mismatch', file: `${name}/space.json`, field: 'id' }],
+    );
   }
-  return { directory, id, input };
+  return { directory, name, id, input };
 };
 
 /**
@@ -393,13 +442,18 @@ const duplicateAssetFailures = (
     if (hash === undefined) continue;
     byHash.set(hash, [...(byHash.get(hash) ?? []), path]);
   }
-  const diagnostics = [...byHash.values()]
-    .filter((named) => named.length > 1)
-    .map(
-      (named) =>
-        `${named.map((path) => joinPath(directory, path)).join(', ')}: two files of one hash; keep one`,
-    );
-  return diagnostics.length > 0 ? [new AggregateDirectoryError('parsing', diagnostics)] : [];
+  const repeated = [...byHash.values()].filter((named) => named.length > 1);
+  const diagnostics = repeated.map(
+    (named) =>
+      `${named.map((path) => joinPath(directory, path)).join(', ')}: two files of one hash; keep one`,
+  );
+  // Each file after the first of its hash, in the ordinal order they were scanned in.
+  const refusals = repeated.flatMap((named) =>
+    named.slice(1).map((file): IntakeRefusal => ({ kind: 'duplicate-asset', file })),
+  );
+  return diagnostics.length > 0
+    ? [new AggregateDirectoryError('parsing', diagnostics, refusals)]
+    : [];
 };
 
 /** The Spaces minting completed, beside the failures it gathered on the way. */
@@ -428,13 +482,17 @@ const identifyReadSpaces = (
 ): IdentifiedSpaces => {
   const spaces: SpaceSnapshot[] = [];
   const failures: unknown[] = [];
-  for (const { directory, id, input } of reads) {
+  for (const { directory, name, id, input } of reads) {
     try {
       spaces.push(identifySpace(input, newId, id));
     } catch (error) {
       failures.push(
         error instanceof SpaceIdentityError
-          ? new AggregateDirectoryError('parsing', [`${directory}: ${error.message}`])
+          ? new AggregateDirectoryError(
+              'parsing',
+              [`${directory}: ${error.message}`],
+              error.refusals.map((refusal) => within(name, refusal)),
+            )
           : error,
       );
     }
@@ -483,6 +541,7 @@ const aggregateContents = (
     throw new AggregateDirectoryError(
       fileFailures.some(({ kind }) => kind === 'discovery') ? 'discovery' : 'parsing',
       fileFailures.flatMap(({ diagnostics }) => diagnostics),
+      fileFailures.flatMap(({ refusals }) => refusals),
     );
   }
 
@@ -535,7 +594,11 @@ export const readAggregateFrom = async (
   if (!root.files.includes(AGGREGATE_FILE_NAME)) throw missingAggregateFile(aggregatePath);
   const aggregateRead = await source.read(AGGREGATE_FILE_NAME);
   if (!aggregateRead.ok) {
-    throw new AggregateDirectoryError('discovery', [`${aggregatePath}: ${aggregateRead.reason}`]);
+    throw new AggregateDirectoryError(
+      'discovery',
+      [`${aggregatePath}: ${aggregateRead.reason}`],
+      [{ kind: 'unreadable', file: AGGREGATE_FILE_NAME }],
+    );
   }
   const metaSpaceId = parseAggregateFile(aggregatePath, textOf(aggregateRead.bytes));
 
@@ -551,6 +614,9 @@ export const readAggregateFrom = async (
     const answer = read.get(path);
     return answer?.ok === false ? [`${joinPath(directory, path)}: ${answer.reason}`] : [];
   };
+  const unreadableRefusals = (paths: readonly string[]): IntakeRefusal[] =>
+    paths.filter(isUnreadable).map((file) => ({ kind: 'unreadable', file }));
+  const relative = relativeTo(directory);
 
   const reads: SpaceDirectoryRead[] = [];
   const readFailures: unknown[] = [];
@@ -560,9 +626,8 @@ export const readAggregateFrom = async (
     const spacePath = `${name}/space.json`;
     try {
       const id = requireSpaceDirectoryId(spaceDirectory, name);
-      const readDiagnostics = [spacePath, ...inside.map((file) => `${name}/${file}`)].flatMap(
-        unreadableDiagnostic,
-      );
+      const readPaths = [spacePath, ...inside.map((file) => `${name}/${file}`)];
+      const readDiagnostics = readPaths.flatMap(unreadableDiagnostic);
       if (readDiagnostics.length > 0) {
         // A document refused outright was never going to load, so it is
         // reported as that rather than as the read failure beside it. With
@@ -571,8 +636,13 @@ export const readAggregateFrom = async (
         refuseSpaceDocument(
           spaceFile,
           isUnreadable(spacePath) ? undefined : textOf(bytesOf(spacePath)),
+          relative,
         );
-        throw new AggregateDirectoryError('discovery', readDiagnostics);
+        throw new AggregateDirectoryError(
+          'discovery',
+          readDiagnostics,
+          unreadableRefusals(readPaths),
+        );
       }
       const input = parseSingleSpace({
         spaceFile,
@@ -581,8 +651,9 @@ export const readAggregateFrom = async (
           path: joinPath(spaceDirectory, file),
           text: textOf(bytesOf(`${name}/${file}`)),
         })),
+        relative,
       });
-      reads.push(agreeingSpaceDirectory(spaceDirectory, id, input));
+      reads.push(agreeingSpaceDirectory(spaceDirectory, name, id, input));
     } catch (error) {
       readFailures.push(error);
     }
@@ -614,7 +685,13 @@ export const readAggregateFrom = async (
       ),
       ...duplicateAssetFailures(directory, scanned.assets),
       ...(unreadableAssets.length > 0
-        ? [new AggregateDirectoryError('discovery', unreadableAssets)]
+        ? [
+            new AggregateDirectoryError(
+              'discovery',
+              unreadableAssets,
+              unreadableRefusals(scanned.assets),
+            ),
+          ]
         : []),
     ],
   };

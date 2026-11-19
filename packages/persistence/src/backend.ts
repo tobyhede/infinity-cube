@@ -1,5 +1,5 @@
 import type { SpaceSnapshot, UUID } from '@project/core';
-import type { SpaceAggregateError } from '@project/graph';
+import type { SpaceAggregateError, WireSpaceError } from '@project/graph';
 
 export interface SpaceSummary {
   id: UUID;
@@ -48,15 +48,17 @@ export interface SpaceConflict {
  * is the same vocabulary on either side, so it is written once here rather than
  * restated in each. Declared beside the values it is written in terms of, and
  * below `RepositoryCommitResult` in the import graph, so both can name it.
+ * `E` is the form a Space's refusals take: located on the stored side, as
+ * intake makes them, and {@link WireSpaceError} once they cross HTTP.
  */
-export type CommitOutcome =
+export type CommitOutcome<E extends WireSpaceError = WireSpaceError> =
   | {
       kind: 'committed';
       revisions: readonly CommittedSpaceRevision[];
       deletedSpaceIds: readonly UUID[];
     }
   | { kind: 'conflict'; conflicts: readonly SpaceConflict[] }
-  | { kind: 'aggregate-refused'; errors: readonly SpaceAggregateError[] };
+  | { kind: 'aggregate-refused'; errors: readonly SpaceAggregateError<E>[] };
 
 /**
  * Which expectation a `protocol` failure broke (ADR 0057).
