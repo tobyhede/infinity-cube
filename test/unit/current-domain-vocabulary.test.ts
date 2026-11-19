@@ -693,6 +693,9 @@ const MONOREPO_MANIFEST = /^packages\/[^/]+\/package\.json$/;
 /** A Cargo package's manifest, at any depth. */
 const CARGO_TOML = /(?:^|\/)Cargo\.toml$/;
 
+/** A field or dependency name that does not itself carry the word. */
+const CARGO_KEY = `(?![\\w-]*${RETIRED_LOOSE_NAME})[\\w-]+`;
+
 /**
  * A hit that is a whole line of Cargo's inheritance keys, which take an entry
  * from the root `Cargo.toml`: a field (`edition.<key> = true`), the lint table
@@ -700,7 +703,7 @@ const CARGO_TOML = /(?:^|\/)Cargo\.toml$/;
  * that also names a package or a feature with the word is not one.
  */
 const CARGO_INHERITANCE = new RegExp(
-  `^\\d+: (?:(?:[\\w-]+\\.)?${RETIRED_LOOSE_NAME} = true|[\\w-]+ = \\{ ${RETIRED_LOOSE_NAME} = true(?:, (?!.*${RETIRED_LOOSE_NAME}).*)? \\})$`,
+  `^\\d+: (?:(?:${CARGO_KEY}\\.)?${RETIRED_LOOSE_NAME} = true|${CARGO_KEY} = \\{ ${RETIRED_LOOSE_NAME} = true(?:, (?!.*${RETIRED_LOOSE_NAME}).*)? \\})$`,
   'i',
 );
 
@@ -862,6 +865,12 @@ describe('the vocabulary the loose-name guard reads', () => {
     expect(reportableHits(cargoFile, `${RETIRED_LOOSE_NAME}-sync = { version = "1" }`)).not.toEqual(
       [],
     );
+    expect(
+      reportableHits(cargoFile, `${RETIRED_LOOSE_NAME}-sync = { ${RETIRED_LOOSE_NAME} = true }`),
+    ).not.toEqual([]);
+    expect(
+      reportableHits(cargoFile, `${RETIRED_LOOSE_NAME}-sync.${RETIRED_LOOSE_NAME} = true`),
+    ).not.toEqual([]);
     expect(
       reportableHits(
         cargoFile,
