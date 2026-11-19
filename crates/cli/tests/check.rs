@@ -201,13 +201,14 @@ mod given_a_missing_or_empty_directory {
         for directory in [temporary.path().join("missing"), empty] {
             let output = check(&[directory.to_str().unwrap()]);
             assert_eq!(output.status.code(), Some(1), "{}", directory.display());
+            // A path a shell would split or expand, as a Windows temporary
+            // directory's is, is named in single quotes.
+            let stderr = text(&output.stderr);
+            let shown = directory.display();
             assert!(
-                text(&output.stderr).contains(&format!(
-                    "To create one there: pnpm cube init {}",
-                    directory.display()
-                )),
-                "names init: {}",
-                text(&output.stderr)
+                stderr.contains(&format!("To create one there: pnpm cube init {shown}"))
+                    || stderr.contains(&format!("To create one there: pnpm cube init '{shown}'")),
+                "names init: {stderr}"
             );
         }
     }
