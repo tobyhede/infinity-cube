@@ -1,0 +1,53 @@
+# Asks Claude for a code review of a pull request through the shared workflow in
+# tobyhede/workflows, pinned below by commit. It replaces this repository's own
+# call to the code-review routine.
+#
+# Two kinds of request reach it, and the shared workflow decides each one: a
+# non-draft pull request opened, reopened or marked ready for review, if its
+# author is the repository's owner; and the owner's comment whose first line
+# starts `> orb ponder` (drafts too; the rest of the comment goes to the review
+# as instructions, and the comment gets a 👀 once the request is sent). Nothing
+# is looked up: the event names both the owner and the requester. Drafts (for
+# the first kind), bots and forks are skipped. A failed request shows as an
+# error in the run and never turns the check red. The job is kept out of
+# `ci.yml` so the `ci` gate does not depend on it.
+#
+# Comments run this file from the default branch, so the comment command works
+# only once this file is merged there.
+#
+# Needs, as repository settings:
+#   secret CLAUDE_ROUTINE_TOKEN         the code-review routine's bearer token
+#   variable CLAUDE_ROUTINE_TRIGGER_ID  the routine's trigger id (`trig_…`)
+name: Claude review
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+  # zizmor flags issue_comment because anyone who can comment can start this
+  # workflow. Accepted: the shared workflow acts only on the owner's comment
+  # command, checked by its decide job, and never runs code from the pull request.
+  issue_comment: # zizmor: ignore[dangerous-triggers] only the owner's comment command is acted on
+    types: [created]
+
+permissions: {}
+
+jobs:
+  review:
+    # Saves runners for comments that cannot be a command: only comments on pull
+    # requests that start with `>` and contain `orb` go on. The shared workflow's
+    # owner check is the gate and still checks every rule.
+    if: >-
+      github.event_name != 'issue_comment' || (
+      github.event.issue.pull_request
+      && startsWith(github.event.comment.body, '>')
+      && contains(github.event.comment.body, 'orb')
+      )
+    # The shared workflow's jobs hold no more than this; only its reaction job
+    # uses it, to add 👀 to a comment command.
+    permissions:
+      issues: write
+    uses: tobyhede/workflows/.github/workflows/claude-review.yml@36d5e4d8f64eedd4a5321eba6355b9b28777fe8e # main, PR 1 merged
+    with:
+      routine-trigger-id: ${{ vars.CLAUDE_ROUTINE_TRIGGER_ID }}
+    secrets:
+      CLAUDE_ROUTINE_TOKEN: ${{ secrets.CLAUDE_ROUTINE_TOKEN }}
