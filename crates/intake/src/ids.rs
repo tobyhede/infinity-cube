@@ -50,6 +50,25 @@ impl fmt::Display for Uuid {
     }
 }
 
+impl Uuid {
+    /// The UUID whose 128 bits are `value`, spelled in lower case.
+    #[must_use]
+    pub fn from_u128(value: u128) -> Self {
+        const HEX: &[u8; 16] = b"0123456789abcdef";
+        let mut bytes = [b'-'; 36];
+        let mut digit = 0u32;
+        for (index, byte) in bytes.iter_mut().enumerate() {
+            if matches!(index, 8 | 13 | 18 | 23) {
+                continue;
+            }
+            let nibble = (value >> (124 - 4 * digit)) & 0xf;
+            *byte = HEX.get(nibble as usize).copied().unwrap_or(b'0');
+            digit += 1;
+        }
+        Self(bytes)
+    }
+}
+
 macro_rules! uuid_id {
     ($(#[$doc:meta])* $name:ident) => {
         $(#[$doc])*
@@ -203,6 +222,24 @@ mod tests {
             ] {
                 assert!(Uuid::parse(text).is_none(), "{text:?} should not be a UUID");
             }
+        }
+    }
+
+    mod given_128_bits {
+        use super::*;
+
+        #[test]
+        fn spells_them_in_lower_case_most_significant_first() {
+            assert_eq!(
+                Uuid::from_u128(0xa123_4567_89ab_4cde_8fab_0123_4567_89ab).as_str(),
+                "a1234567-89ab-4cde-8fab-0123456789ab",
+                "every nibble in place"
+            );
+            assert_eq!(
+                Uuid::from_u128(0).as_str(),
+                "00000000-0000-0000-0000-000000000000",
+                "zero"
+            );
         }
     }
 

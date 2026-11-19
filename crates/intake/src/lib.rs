@@ -19,12 +19,12 @@
 //!
 //! # Where it cannot match the TypeScript intake exactly
 //!
-//! - **Strings JavaScript can hold and Rust cannot.** A JSON string escaping a
-//!   lone UTF-16 surrogate (`"\ud800"`) parses in JavaScript; here it is
-//!   refused as [`Refusal::InvalidJson`].
 //! - **Nesting.** Arrays and objects nested deeper than [`json::MAX_DEPTH`]
-//!   are refused as invalid JSON rather than risk the stack, which holds on a
-//!   thread with at least 1 MiB of it.
+//!   are refused as [`Refusal::InvalidJson`] rather than risk the stack, which
+//!   holds on a thread with at least 1 MiB of it; `JSON.parse` reads on. ADR
+//!   0160 keeps this difference. A JSON string escaping a lone UTF-16
+//!   surrogate (`"\ud800"`) is not one: both intakes refuse it as invalid
+//!   JSON (ADR 0160).
 //! - **Key order.** An object keeps its keys in the order written, where
 //!   `JSON.parse` lists integer-like keys first (see [`json::JsonValue`]).
 //!   No answer intake gives depends on it; a writer orders keys itself.

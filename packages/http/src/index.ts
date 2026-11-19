@@ -1,4 +1,4 @@
-import { ASSET_COLLECTION_PATH, uuidSchema, type UUID } from '@project/core';
+import { ASSET_COLLECTION_PATH, parseJsonText, uuidSchema, type UUID } from '@project/core';
 import {
   admitAsset,
   ASSET_TOO_LARGE,
@@ -261,6 +261,28 @@ const requireBoundedCommitBody = createMiddleware(async (context, next) => {
   return next();
 });
 
+/**
+ * The detail Hono's json validator answers a body that is not JSON with, and
+ * the one this application answers a body escaping a lone UTF-16 surrogate
+ * with, which is not JSON a commit may carry (ADR 0160).
+ */
+const MALFORMED_JSON = 'Malformed JSON in request body';
+
+/**
+ * Refuse a commit body `parseJsonText` refuses, before Hono's json validator
+ * reads it: text that is not JSON gets the answer the validator would give, and
+ * a lone surrogate escape, which `JSON.parse` would read, gets that answer too.
+ * The validator parses the text again, from the copy Hono keeps.
+ */
+const refuseIllFormedCommitJson = createMiddleware(async (context, next) => {
+  try {
+    parseJsonText(await context.req.text());
+  } catch {
+    return problem(context, 'invalid-request', MALFORMED_JSON);
+  }
+  return next();
+});
+
 const hasIdentityEncoding = (context: Context): boolean => {
   const contentEncoding = context.req.header('Content-Encoding');
   return contentEncoding === undefined || contentEncoding.trim().toLowerCase() === 'identity';
@@ -463,6 +485,7 @@ export const createSpaceHttpApp = (
       SPACE_COLLECTION_PATH,
       requireSupportedRequestMedia,
       requireBoundedCommitBody,
+      refuseIllFormedCommitJson,
       validateCommitBody,
       async (context) => {
         const commit = context.req.valid('json');

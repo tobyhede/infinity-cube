@@ -4,6 +4,7 @@ import {
   isKindId,
   resourceFileSchema,
   type Resource,
+  parseJsonText,
 } from '@project/core';
 import { fieldOf, located, type IntakeLocation } from './intake-location';
 
@@ -48,7 +49,7 @@ type FileDecoding =
 function decodeFile(file: ResourceFile): FileDecoding {
   let json: unknown;
   try {
-    json = JSON.parse(file.text);
+    json = parseJsonText(file.text);
   } catch (error) {
     return {
       ok: false,

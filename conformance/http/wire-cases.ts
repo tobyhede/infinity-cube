@@ -13,8 +13,10 @@ import {
   decodeStoredAssetUrl,
   encodeCommitRequest,
   MAX_ASSET_BYTES,
+  type SpaceChange,
 } from '@project/persistence';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { contentSecurityPolicy, inlineScriptSources } from '../../packages/app/mount-headers';
 import { FIXTURE, STAND_IN_BUILD } from './fixture';
 import { send, type BuiltApplication, type ConformanceHost } from './host';
@@ -213,6 +215,19 @@ export const describeWireConformance = (options: WireConformanceOptions): void =
         if (method !== 'HEAD') await expectProblem(response, 'method-not-allowed');
       });
 
+      // Hono routes on the path `decodeURI` gives, and decodes a parameter as
+      // `decodeURIComponent` does (`getPath`, `HonoRequest#param`), so an
+      // escaped unreserved character addresses the same resource.
+      it.each(['/api/%73paces', `/api/spaces/%${META.charCodeAt(0).toString(16)}${META.slice(1)}`])(
+        'answers %s as the path it escapes',
+        async (pathname) => {
+          const response = await send(host(), pathname);
+          expect(response.status).toBe(200);
+          expectJson(response);
+          expectApiPolicy(response);
+        },
+      );
+
       it.each(['/api', '/api/nowhere', '/api/spaces/', `/api/spaces/${META}/more`])(
         'answers 404 not-found for %s, which is off the declared API',
         async (pathname) => {
@@ -280,6 +295,51 @@ export const describeWireConformance = (options: WireConformanceOptions): void =
         await expectProblem(await send(host(), `/api/spaces/${NEW_SPACE}`), 'not-found');
       });
 
+      // The memory store keeps the snapshot a commit carried, and the wire
+      // serialises it as kept (`encodeLoadedSpace`): a Map's positions in the
+      // order the commit wrote them, which is not Export's sorted order.
+      it('answers a Space with its positions in the order the commit wrote them', async () => {
+        const loaded = await loadSpace(host(), META);
+        const [map, ...otherMaps] = loaded.snapshot.document.maps ?? [];
+        if (map === undefined) throw new Error('The fixture Meta Space has a Map');
+        const reversed = Object.fromEntries(Object.entries(map.positions).reverse());
+        const order = Object.keys(reversed);
+        expect(order.length).toBeGreaterThan(1);
+        const change: SpaceChange = {
+          kind: 'update',
+          spaceId: META,
+          snapshot: {
+            ...loaded.snapshot,
+            document: {
+              ...loaded.snapshot.document,
+              maps: [{ ...map, positions: reversed }, ...otherMaps],
+            },
+          },
+          expectedRevision: loaded.revision,
+        };
+        const body = JSON.stringify(encodeCommitRequest({ changes: [change] }));
+        expect((await postCommit(host(), body)).status).toBe(200);
+        // The answer read as raw JSON, so its key order is the one sent.
+        const snapshotSchema = z.object({
+          document: z.object({
+            maps: z.array(z.object({ positions: z.record(z.unknown()) })).nonempty(),
+          }),
+        });
+        const loadedSchema = z.object({ snapshot: snapshotSchema });
+        const firstMapPositions = (snapshot: z.infer<typeof snapshotSchema>): string[] =>
+          Object.keys(snapshot.document.maps[0].positions);
+        const answered = loadedSchema.parse(
+          await (await send(host(), `/api/spaces/${META}`)).json(),
+        );
+        expect(firstMapPositions(answered.snapshot)).toEqual(order);
+        const stale = await postCommit(host(), body);
+        expect(stale.status).toBe(COMMIT_OUTCOME_WIRE.conflict.status);
+        const conflict = z
+          .object({ conflicts: z.tuple([z.object({ current: loadedSchema })]) })
+          .parse(await stale.json());
+        expect(firstMapPositions(conflict.conflicts[0].current.snapshot)).toEqual(order);
+      });
+
       it('answers 400 invalid-request for a commit the store will not judge', async () => {
         const loaded = await loadSpace(host(), META);
         const change = renameChange(loaded, 'Twice');
@@ -293,6 +353,19 @@ export const describeWireConformance = (options: WireConformanceOptions): void =
 
       it('answers 400 invalid-request for malformed JSON', async () => {
         await expectProblem(await postCommit(host(), '{'), 'invalid-request');
+      });
+
+      // ADR 0160: a string no UTF-8 file or store can hold is not JSON either.
+      it('answers 400 invalid-request for a lone surrogate escape, as for malformed JSON', async () => {
+        const loaded = await loadSpace(host(), META);
+        const text = renameCommitText(loaded, 'LONE').replace('"LONE"', String.raw`"\ud800x"`);
+        expect(text).toContain(String.raw`\ud800x`);
+        const response = await postCommit(host(), text);
+        await expectProblem(response.clone(), 'invalid-request');
+        expect(z.object({ detail: z.string() }).parse(await response.json()).detail).toBe(
+          'Malformed JSON in request body',
+        );
+        expect((await loadSpace(host(), META)).revision).toBe(loaded.revision);
       });
 
       it('answers 400 invalid-request for a body that is not a commit', async () => {
@@ -341,6 +414,18 @@ export const describeWireConformance = (options: WireConformanceOptions): void =
           host(),
           renameCommitText(loaded, 'Spaced'),
           'application/json ; charset=UTF-8',
+        );
+        expect(response.status).toBe(200);
+      });
+
+      // A header is read as Latin-1 (`Headers#get`), so a quoted parameter
+      // may carry a byte outside ASCII (RFC 9110 obs-text).
+      it('accepts a media type whose quoted parameter carries a Latin-1 byte', async () => {
+        const loaded = await loadSpace(host(), META);
+        const response = await postCommit(
+          host(),
+          renameCommitText(loaded, 'Latin-1'),
+          'application/json; x="\u00e9"',
         );
         expect(response.status).toBe(200);
       });
@@ -406,6 +491,17 @@ export const describeWireConformance = (options: WireConformanceOptions): void =
         expect(response.status).toBe(200);
         expect(response.headers.get('content-type')).toBe('image/png');
         expect((await response.arrayBuffer()).byteLength).toBe(0);
+      });
+
+      it('serves a stored asset at its hash with a character escaped', async () => {
+        const bytes = freshBytes(16);
+        await postAsset(host(), bytes, { 'content-type': 'image/png' });
+        const hash = assetHash(bytes);
+        const escaped = `%${hash.charCodeAt(0).toString(16).toUpperCase()}${hash.slice(1)}`;
+        const response = await send(host(), `/assets/${escaped}`);
+        expect(response.status).toBe(200);
+        expect(response.headers.get(ASSET_MEDIA_TYPE_HEADER)).toBe('image/png');
+        expect(new Uint8Array(await response.arrayBuffer())).toEqual(bytes);
       });
 
       it('answers 404 not-found for a hash no asset is stored at', async () => {
@@ -550,6 +646,19 @@ export const describeWireConformance = (options: WireConformanceOptions): void =
           expect(response.status).toBe(200);
           expect(response.headers.get('content-type')).toBe('image/svg+xml');
           expect(response.headers.get('cache-control')).toBe('no-cache');
+          expect(await response.text()).toBe(STAND_IN_BUILD.icon.text);
+        },
+      );
+
+      // A built file's path is decoded and resolved, then confined to the
+      // build (`src/desktop/static-files.ts`), so an escaped climb that stays
+      // inside it names the file it resolves to.
+      it.skipIf(options.builtApplication !== 'stand-in')(
+        'serves the built file an escaped climb under /assets/ resolves to',
+        async () => {
+          const response = await send(host(), `/assets/..%2F${STAND_IN_BUILD.icon.pathname.slice(1)}`);
+          expect(response.status).toBe(200);
+          expect(response.headers.get('content-type')).toBe('image/svg+xml');
           expect(await response.text()).toBe(STAND_IN_BUILD.icon.text);
         },
       );

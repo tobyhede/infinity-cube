@@ -42,3 +42,4 @@ export {
   type ResourceKind,
   type KindedResource,
 } from './plugin-modules';
+export { parseJsonText } from './json-text';

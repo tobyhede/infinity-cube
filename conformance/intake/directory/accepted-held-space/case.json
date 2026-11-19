@@ -1,0 +1,6 @@
+{
+  "description": "A Space nothing references, held rather than refused while a Resource of a kind no listed plugin draws remains (ADR 0142).",
+  "expect": {
+    "outcome": "accepted"
+  }
+}

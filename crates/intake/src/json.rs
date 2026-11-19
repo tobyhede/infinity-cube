@@ -160,9 +160,10 @@ pub fn decode_text(bytes: &[u8]) -> std::borrow::Cow<'_, str> {
 /// # Errors
 ///
 /// Returns a [`JsonError`] when `text` is not one JSON value surrounded only by
-/// JSON whitespace, when a string escapes a lone UTF-16 surrogate (which a Rust
-/// string cannot hold), or when arrays and objects nest deeper than
-/// [`MAX_DEPTH`].
+/// JSON whitespace, when a string, a key or a value, escapes a lone UTF-16
+/// surrogate (which a Rust string cannot hold, and which the TypeScript intake
+/// refuses too, ADR 0160), or when arrays and objects nest deeper than
+/// [`MAX_DEPTH`] (where `JSON.parse` reads on, a difference ADR 0160 keeps).
 pub fn parse(text: &str) -> Result<JsonValue, JsonError> {
     let mut parser = Parser {
         bytes: text.as_bytes(),
@@ -554,6 +555,29 @@ mod tests {
                 parse("\"a\u{1}\"").is_err(),
                 "a raw control character should be refused"
             );
+        }
+
+        /// ADR 0160: the TypeScript intake refuses each of these too
+        /// (`packages/core/test/json-text.test.ts`).
+        #[test]
+        fn refuses_a_lone_surrogate_wherever_a_string_is() {
+            for text in [
+                r#""a\udbff""#,
+                r#""\udc00b""#,
+                r#""\udc00\ud800""#,
+                r#""\ud800A""#,
+                r#"{"\ud800":1}"#,
+                r#"{"a":{"b":{"\udc00":1}}}"#,
+                r#"{"a":[{"b":["ok","\ud800"]}]}"#,
+            ] {
+                assert!(parse(text).is_err(), "{text} should be refused");
+            }
+        }
+
+        #[test]
+        fn reads_an_escaped_backslash_before_a_surrogate_spelling_as_text() {
+            let parsed = parse(r#""\\ud800""#).unwrap();
+            assert_eq!(parsed.as_str(), Some(r"\ud800"), "a backslash, then text");
         }
     }
 

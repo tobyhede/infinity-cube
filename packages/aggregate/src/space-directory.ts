@@ -3,6 +3,7 @@ import {
   importSpaceSchema,
   type ImportSpace,
   type ImportSpaceFile,
+  parseJsonText,
 } from '@project/core';
 import { documentRefusal, fieldOf, located, parseResourceFiles } from '@project/graph';
 import { spaceErrorRefusal, type IntakeRefusal } from './intake-refusal';
@@ -66,7 +67,7 @@ interface SpaceJson {
 const parseSpaceJson = (spaceFile: string, spaceText: string | undefined): SpaceJson => {
   if (spaceText === undefined) return { json: undefined };
   try {
-    return { json: JSON.parse(spaceText) };
+    return { json: parseJsonText(spaceText) };
   } catch (error) {
     return { json: undefined, diagnostic: `${spaceFile}: ${String(error)}` };
   }
