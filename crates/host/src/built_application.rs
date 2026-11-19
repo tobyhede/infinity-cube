@@ -49,6 +49,14 @@ impl BuiltApplicationDirectory {
     pub fn open(directory: &Path) -> Result<(Bytes, Self), BuiltApplicationError> {
         let root = std::fs::canonicalize(directory)
             .map_err(|error| BuiltApplicationError::Unreadable(directory.to_owned(), error))?;
+        // Asked first, as Windows answers a path below a regular file as not
+        // found, which would read as a directory holding no page.
+        if !root.is_dir() {
+            return Err(BuiltApplicationError::Unreadable(
+                directory.to_owned(),
+                std::io::Error::from(std::io::ErrorKind::NotADirectory),
+            ));
+        }
         let page_path = root.join(PAGE);
         let no_page = || BuiltApplicationError::NoPage(directory.to_owned());
         // A page that is a link out of the directory is no page, as it is no
