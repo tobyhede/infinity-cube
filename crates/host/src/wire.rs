@@ -21,6 +21,7 @@ pub(crate) enum Problem {
     AssetTooLarge,
     NotFound,
     MethodNotAllowed,
+    Forbidden,
     PersistenceUnavailable,
     InternalError,
 }
@@ -36,6 +37,7 @@ impl Problem {
             Self::AssetTooLarge => "asset-too-large",
             Self::NotFound => "not-found",
             Self::MethodNotAllowed => "method-not-allowed",
+            Self::Forbidden => "forbidden",
             Self::PersistenceUnavailable => "persistence-unavailable",
             Self::InternalError => "internal-error",
         }
@@ -51,6 +53,7 @@ impl Problem {
             Self::AssetTooLarge => "Asset too large",
             Self::NotFound => "Not found",
             Self::MethodNotAllowed => "Method not allowed",
+            Self::Forbidden => "Forbidden",
             Self::PersistenceUnavailable => "Persistence unavailable",
             Self::InternalError => "Internal server error",
         }
@@ -59,6 +62,7 @@ impl Problem {
     pub(crate) fn status(self) -> u16 {
         match self {
             Self::InvalidRequest | Self::InvalidSpaceId | Self::InvalidAssetHash => 400,
+            Self::Forbidden => 403,
             Self::NotFound => 404,
             Self::MethodNotAllowed => 405,
             Self::PayloadTooLarge | Self::AssetTooLarge => 413,
@@ -537,71 +541,83 @@ mod tests {
         }
     }
 
-    #[test]
-    fn refuses_malformed_json_as_malformed() {
-        assert_eq!(decode_commit(b"{"), Err(DecodeError::Malformed), "not JSON");
-    }
+    mod given_bytes_that_are_not_a_commit {
+        use super::*;
 
-    #[test]
-    fn refuses_what_is_not_a_commit_by_its_shape() {
-        assert_eq!(
-            message(r#"{"changes":"none"}"#),
-            "commit changes must be an array",
-            "changes"
-        );
-        assert_eq!(
-            message(r#"{"changes":[],"x":1}"#),
-            "commit request has unexpected fields",
-            "keys"
-        );
-        assert_eq!(
-            message(r#"{"changes":[]}"#),
-            "commit changes must be non-empty",
-            "empty"
-        );
-        assert_eq!(
-            message(r#"{"changes":[{"kind":"move"}]}"#),
-            "commit change has an unknown kind",
-            "kind"
-        );
-    }
+        #[test]
+        fn refuses_malformed_json_as_malformed() {
+            assert_eq!(decode_commit(b"{"), Err(DecodeError::Malformed), "not JSON");
+        }
 
-    #[test]
-    fn reads_a_revision_only_in_its_canonical_spelling() {
-        for spelling in ["01", "-1", "1.0", "9223372036854775808", ""] {
-            let body = format!(
-                r#"{{"changes":[{{"kind":"delete","spaceId":"10000000-0000-4000-8000-000000000001","expectedRevision":"{spelling}"}}]}}"#
+        #[test]
+        fn refuses_what_is_not_a_commit_by_its_shape() {
+            assert_eq!(
+                message(r#"{"changes":"none"}"#),
+                "commit changes must be an array",
+                "changes"
             );
-            assert!(
-                decode_commit(body.as_bytes()).is_err(),
-                "{spelling:?} is refused"
+            assert_eq!(
+                message(r#"{"changes":[],"x":1}"#),
+                "commit request has unexpected fields",
+                "keys"
+            );
+            assert_eq!(
+                message(r#"{"changes":[]}"#),
+                "commit changes must be non-empty",
+                "empty"
+            );
+            assert_eq!(
+                message(r#"{"changes":[{"kind":"move"}]}"#),
+                "commit change has an unknown kind",
+                "kind"
             );
         }
-        let body = r#"{"changes":[{"kind":"delete","spaceId":"10000000-0000-4000-8000-000000000001","expectedRevision":"9223372036854775807"}]}"#;
-        assert!(
-            decode_commit(body.as_bytes()).is_ok(),
-            "the ceiling is read"
-        );
     }
 
-    #[test]
-    fn locates_a_refused_snapshot_in_the_space_directory_of_its_change() {
-        let body = r#"{"changes":[{"kind":"create","spaceId":"10000000-0000-4000-8000-000000000001","snapshot":{"id":"10000000-0000-4000-8000-000000000001","document":{"version":1,"title":""},"resources":[]}}]}"#;
-        let Err(DecodeError::Invalid {
-            message,
-            refusals: Some(refusals),
-        }) = decode_commit(body.as_bytes())
-        else {
-            panic!("expected a refused snapshot");
-        };
-        assert!(
-            message.starts_with("create change snapshot is invalid: "),
-            "{message}"
-        );
-        assert_eq!(
-            refusals.as_slice()[0].file(),
-            "10000000-0000-4000-8000-000000000001/space.json",
-            "the Space directory's space.json"
-        );
+    mod given_a_revision {
+        use super::*;
+
+        #[test]
+        fn reads_it_only_in_its_canonical_spelling() {
+            for spelling in ["01", "-1", "1.0", "9223372036854775808", ""] {
+                let body = format!(
+                    r#"{{"changes":[{{"kind":"delete","spaceId":"10000000-0000-4000-8000-000000000001","expectedRevision":"{spelling}"}}]}}"#
+                );
+                assert!(
+                    decode_commit(body.as_bytes()).is_err(),
+                    "{spelling:?} is refused"
+                );
+            }
+            let body = r#"{"changes":[{"kind":"delete","spaceId":"10000000-0000-4000-8000-000000000001","expectedRevision":"9223372036854775807"}]}"#;
+            assert!(
+                decode_commit(body.as_bytes()).is_ok(),
+                "the ceiling is read"
+            );
+        }
+    }
+
+    mod given_a_refused_snapshot {
+        use super::*;
+
+        #[test]
+        fn locates_it_in_the_space_directory_of_its_change() {
+            let body = r#"{"changes":[{"kind":"create","spaceId":"10000000-0000-4000-8000-000000000001","snapshot":{"id":"10000000-0000-4000-8000-000000000001","document":{"version":1,"title":""},"resources":[]}}]}"#;
+            let Err(DecodeError::Invalid {
+                message,
+                refusals: Some(refusals),
+            }) = decode_commit(body.as_bytes())
+            else {
+                panic!("expected a refused snapshot");
+            };
+            assert!(
+                message.starts_with("create change snapshot is invalid: "),
+                "{message}"
+            );
+            assert_eq!(
+                refusals.as_slice()[0].file(),
+                "10000000-0000-4000-8000-000000000001/space.json",
+                "the Space directory's space.json"
+            );
+        }
     }
 }

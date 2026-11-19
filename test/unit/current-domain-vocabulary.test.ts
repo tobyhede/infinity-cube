@@ -660,7 +660,14 @@ const RETIRED_LOOSE_BARE = new RegExp(RETIRED_LOOSE_NAME, 'i');
  * specs, Ladle stories, story fixtures, `styles.css`, the root unit tests and
  * `vitest.setup.ts`, and only the first of those sits under a `src/`.
  */
-const AUTHORED_TREES = ['packages/', 'src/', 'test/', 'scripts/', 'crates/'] as const;
+const AUTHORED_TREES = [
+  'packages/',
+  'src/',
+  'test/',
+  'scripts/',
+  'crates/',
+  'conformance/',
+] as const;
 
 const isAuthoredSource = (file: string): boolean =>
   AUTHORED_TREES.some((tree) => file.startsWith(tree)) ||

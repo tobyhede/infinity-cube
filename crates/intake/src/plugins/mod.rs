@@ -19,10 +19,42 @@ use crate::ids::{GraphId, MapId, ResourceId, SpaceId};
 use crate::json::JsonValue;
 use crate::shape::{Checker, Status};
 
+/// One key of a listed plugin's content, in its schema's order, with the keys
+/// of the object it holds when its schema declares one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ContentKey {
+    /// The key.
+    pub name: &'static str,
+    /// The keys of the object it holds, in its schema's order; empty when it
+    /// holds no object.
+    pub nested: &'static [&'static str],
+}
+
+impl ContentKey {
+    /// A key holding no object.
+    pub(crate) const fn flat(name: &'static str) -> Self {
+        Self { name, nested: &[] }
+    }
+}
+
+/// The names of `keys`, in order, for a schema's check of an object.
+pub(crate) const fn key_names<const N: usize>(keys: &[ContentKey; N]) -> [&'static str; N] {
+    let mut names = [""; N];
+    let mut at = 0;
+    while at < N {
+        names[at] = keys[at].name;
+        at += 1;
+    }
+    names
+}
+
 /// What intake asks of a kind: the rules its plugin's domain half declares.
 pub(crate) trait Plugin: Sync {
     /// The kind it draws.
     fn kind(&self) -> &'static str;
+
+    /// Its content's keys, in its schema's order.
+    fn content_keys(&self) -> &'static [ContentKey];
 
     /// Check a Resource's `content`, raising each issue its schema raises,
     /// relative to the content.
@@ -96,6 +128,14 @@ pub fn is_plugin_kind(kind: &str) -> bool {
     listed(kind).is_some()
 }
 
+/// The keys of the content of the listed plugin that draws `kind`, in its
+/// schema's order, or `None` when no listed plugin draws it: what a writer
+/// orders a Resource's content by (`canonicalResource`).
+#[must_use]
+pub fn plugin_content_keys(kind: &str) -> Option<&'static [ContentKey]> {
+    listed(kind).map(|plugin| plugin.content_keys())
+}
+
 /// Why `plugin` refuses this Map content, in its schema's words, or `None` when it accepts it.
 pub(crate) fn map_content_problem(plugin: &dyn Plugin, value: &JsonValue) -> Option<String> {
     let mut checker = Checker::new();
@@ -138,26 +178,83 @@ pub(crate) fn check_open<'a>(checker: &mut Checker<'a>, value: &'a JsonValue) ->
 mod tests {
     use super::*;
 
-    #[test]
-    fn lists_the_plugins_in_the_typescript_lists_order() {
-        assert_eq!(
-            plugin_kinds(),
-            vec!["markdown", "space", "image", "ur", "reference", "mermaid"],
-            "the order of packages/plugins/src/domain.ts"
-        );
+    mod given_the_plugin_list {
+        use super::*;
+
+        #[test]
+        fn lists_the_plugins_in_the_typescript_lists_order() {
+            assert_eq!(
+                plugin_kinds(),
+                vec!["markdown", "space", "image", "ur", "reference", "mermaid"],
+                "the order of packages/plugins/src/domain.ts"
+            );
+        }
     }
 
-    #[test]
-    fn answers_a_kind_no_plugin_draws_with_the_default_plugin() {
-        assert!(
-            !is_plugin_kind("vnd.acme.widget"),
-            "an unknown kind is listed by none"
-        );
-        let value = crate::json::parse(r#"{"anything": [1]}"#).unwrap();
-        assert_eq!(
-            map_content_problem(plugin_for("vnd.acme.widget"), &value),
-            None,
-            "the default plugin refuses no Map content"
-        );
+    mod given_each_listed_plugin {
+        use super::*;
+
+        #[test]
+        fn declares_its_content_keys_in_its_schemas_order() {
+            let declared = |kind: &str| {
+                plugin_content_keys(kind).map(|keys| {
+                    keys.iter()
+                        .map(|key| (key.name, key.nested))
+                        .collect::<Vec<_>>()
+                })
+            };
+            assert_eq!(declared("ur"), Some(vec![]), "Ur content is empty");
+            assert_eq!(
+                declared("image"),
+                Some(vec![
+                    ("url", &[][..]),
+                    ("naturalSize", &["width", "height"][..])
+                ]),
+                "Image content"
+            );
+            assert_eq!(
+                declared("markdown"),
+                Some(vec![("url", &[][..])]),
+                "Markdown content"
+            );
+            assert_eq!(
+                declared("reference"),
+                Some(vec![("target", &[][..])]),
+                "Reference content"
+            );
+            assert_eq!(
+                declared("space"),
+                Some(vec![
+                    ("spaceId", &[][..]),
+                    ("map", &[][..]),
+                    ("graph", &[][..]),
+                    ("framing", &["centreX", "centreY", "zoom"][..]),
+                ]),
+                "Space content"
+            );
+            assert_eq!(
+                declared("vnd.acme.widget"),
+                None,
+                "a kind no listed plugin draws declares no keys"
+            );
+        }
+    }
+
+    mod given_a_kind_no_plugin_draws {
+        use super::*;
+
+        #[test]
+        fn answers_a_kind_no_plugin_draws_with_the_default_plugin() {
+            assert!(
+                !is_plugin_kind("vnd.acme.widget"),
+                "an unknown kind is listed by none"
+            );
+            let value = crate::json::parse(r#"{"anything": [1]}"#).unwrap();
+            assert_eq!(
+                map_content_problem(plugin_for("vnd.acme.widget"), &value),
+                None,
+                "the default plugin refuses no Map content"
+            );
+        }
     }
 }

@@ -153,51 +153,63 @@ pub struct Asset {
 mod tests {
     use super::*;
 
-    #[test]
-    fn spells_bytes_in_either_base64_as_node_does() {
-        for (bytes, standard, url) in [
-            (&b""[..], "", ""),
-            (b"f", "Zg==", "Zg"),
-            (b"fo", "Zm8=", "Zm8"),
-            (b"foo", "Zm9v", "Zm9v"),
-            (&[0xfb, 0xff, 0xfe][..], "+//+", "-__-"),
-        ] {
-            assert_eq!(
-                encode_base64(bytes, Base64::Standard),
-                standard,
-                "{bytes:?}"
-            );
-            assert_eq!(encode_base64(bytes, Base64::Url), url, "{bytes:?}");
+    mod given_bytes_to_spell {
+        use super::*;
+
+        #[test]
+        fn spells_bytes_in_either_base64_as_node_does() {
+            for (bytes, standard, url) in [
+                (&b""[..], "", ""),
+                (b"f", "Zg==", "Zg"),
+                (b"fo", "Zm8=", "Zm8"),
+                (b"foo", "Zm9v", "Zm9v"),
+                (&[0xfb, 0xff, 0xfe][..], "+//+", "-__-"),
+            ] {
+                assert_eq!(
+                    encode_base64(bytes, Base64::Standard),
+                    standard,
+                    "{bytes:?}"
+                );
+                assert_eq!(encode_base64(bytes, Base64::Url), url, "{bytes:?}");
+            }
         }
     }
 
-    #[test]
-    fn names_zero_bytes_as_the_typescript_host_does() {
-        assert_eq!(
-            asset_hash_of(b""),
-            "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU",
-            "EMPTY_ASSET_HASH"
-        );
-        assert!(
-            is_asset_hash(&asset_hash_of(b"one asset\n")),
-            "every digest spells a hash"
-        );
+    mod given_zero_bytes {
+        use super::*;
+
+        #[test]
+        fn names_zero_bytes_as_the_typescript_host_does() {
+            assert_eq!(
+                asset_hash_of(b""),
+                "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU",
+                "EMPTY_ASSET_HASH"
+            );
+            assert!(
+                is_asset_hash(&asset_hash_of(b"one asset\n")),
+                "every digest spells a hash"
+            );
+        }
     }
 
-    #[test]
-    fn owns_a_file_named_by_a_hash_with_any_extension() {
-        let hash = "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU";
-        assert_eq!(asset_file_hash(hash), Some(hash), "no extension");
-        assert_eq!(
-            asset_file_hash(&format!("{hash}.tar.gz")),
-            Some(hash),
-            "any extension"
-        );
-        assert_eq!(asset_file_hash("notes.md"), None, "a name not a hash");
-        assert_eq!(
-            asset_file_hash("47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFV"),
-            None,
-            "a last character with low bits set is no canonical hash"
-        );
+    mod given_a_file_name {
+        use super::*;
+
+        #[test]
+        fn owns_a_file_named_by_a_hash_with_any_extension() {
+            let hash = "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU";
+            assert_eq!(asset_file_hash(hash), Some(hash), "no extension");
+            assert_eq!(
+                asset_file_hash(&format!("{hash}.tar.gz")),
+                Some(hash),
+                "any extension"
+            );
+            assert_eq!(asset_file_hash("notes.md"), None, "a name not a hash");
+            assert_eq!(
+                asset_file_hash("47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFV"),
+                None,
+                "a last character with low bits set is no canonical hash"
+            );
+        }
     }
 }

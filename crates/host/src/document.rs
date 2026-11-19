@@ -28,7 +28,9 @@ use std::cmp::Ordering;
 
 use intake::json::{JsonObject, JsonValue};
 use intake::text::compare_utf16;
-use intake::{DOCUMENT_VERSION, Edge, Graph, Map, Placement, Resource, SpaceSnapshot};
+use intake::{
+    DOCUMENT_VERSION, Edge, Graph, Map, Placement, Resource, SpaceSnapshot, plugin_content_keys,
+};
 
 fn string(text: &str) -> JsonValue {
     JsonValue::String(text.to_owned())
@@ -131,24 +133,6 @@ fn canonical_object(entries: &JsonObject) -> JsonObject {
         .collect()
 }
 
-/// The keys of a listed plugin's content, in its schema's order, with the
-/// keys of each nested object it declares.
-fn plugin_content_keys(kind: &str) -> Option<&'static [(&'static str, &'static [&'static str])]> {
-    Some(match kind {
-        "ur" => &[],
-        "image" => &[("url", &[]), ("naturalSize", &["width", "height"])],
-        "markdown" => &[("url", &[])],
-        "reference" => &[("target", &[])],
-        "space" => &[
-            ("spaceId", &[]),
-            ("map", &[]),
-            ("graph", &[]),
-            ("framing", &["centreX", "centreY", "zoom"]),
-        ],
-        _ => return None,
-    })
-}
-
 fn ordered(value: &JsonObject, keys: impl IntoIterator<Item = &'static str>) -> JsonObject {
     keys.into_iter()
         .filter_map(|key| {
@@ -168,15 +152,15 @@ fn content(resource: &Resource, order: Order) -> JsonValue {
     match plugin_content_keys(resource.kind.as_str()) {
         Some(keys) => JsonValue::Object(
             keys.iter()
-                .filter_map(|(key, nested)| {
-                    let member = object.get(key)?;
+                .filter_map(|key| {
+                    let member = object.get(key.name)?;
                     let member = match member.as_object() {
-                        Some(inner) if !nested.is_empty() => {
-                            JsonValue::Object(ordered(inner, nested.iter().copied()))
+                        Some(inner) if !key.nested.is_empty() => {
+                            JsonValue::Object(ordered(inner, key.nested.iter().copied()))
                         }
                         _ => member.clone(),
                     };
-                    Some(((*key).to_owned(), member))
+                    Some((key.name.to_owned(), member))
                 })
                 .collect(),
         ),
@@ -336,23 +320,28 @@ mod tests {
     use crate::json_text::compact;
     use intake::json::parse;
 
-    #[test]
-    fn orders_unread_keys_as_a_javascript_object_lists_them() {
-        let value = parse(r#"{"b":1,"10":2,"a":{"z":0,"y":0},"2":3,"02":4,"":5,"😀":6}"#).unwrap();
-        assert_eq!(
-            compact(&canonical_value(&value)),
-            "{\"2\":3,\"10\":2,\"02\":4,\"a\":{\"y\":0,\"z\":0},\"b\":1,\"😀\":6,\"\u{e000}\":5}",
-            "array-index keys first and ascending, then code unit order at every depth"
-        );
-    }
+    mod given_unread_keys {
+        use super::*;
 
-    #[test]
-    fn keeps_unread_keys_on_the_wire_as_a_javascript_object_lists_them() {
-        let value = parse(r#"{"b":1,"10":2,"a":{"z":0,"y":0},"2":3,"02":4,"":5}"#).unwrap();
-        assert_eq!(
-            compact(&javascript_value(&value)),
-            r#"{"2":3,"10":2,"b":1,"a":{"z":0,"y":0},"02":4,"":5}"#,
-            "array-index keys first and ascending, then as first written, at every depth"
-        );
+        #[test]
+        fn orders_them_as_a_javascript_object_lists_them() {
+            let value =
+                parse(r#"{"b":1,"10":2,"a":{"z":0,"y":0},"2":3,"02":4,"":5,"😀":6}"#).unwrap();
+            assert_eq!(
+                compact(&canonical_value(&value)),
+                "{\"2\":3,\"10\":2,\"02\":4,\"a\":{\"y\":0,\"z\":0},\"b\":1,\"😀\":6,\"\u{e000}\":5}",
+                "array-index keys first and ascending, then code unit order at every depth"
+            );
+        }
+
+        #[test]
+        fn keeps_them_on_the_wire_in_javascript_object_order() {
+            let value = parse(r#"{"b":1,"10":2,"a":{"z":0,"y":0},"2":3,"02":4,"":5}"#).unwrap();
+            assert_eq!(
+                compact(&javascript_value(&value)),
+                r#"{"2":3,"10":2,"b":1,"a":{"z":0,"y":0},"02":4,"":5}"#,
+                "array-index keys first and ascending, then as first written, at every depth"
+            );
+        }
     }
 }

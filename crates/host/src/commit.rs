@@ -7,7 +7,7 @@
 
 use std::collections::{BTreeMap, HashSet};
 
-use intake::{Refusal, SpaceId, SpaceSnapshot, load_aggregate, load_space};
+use intake::{Refusal, Refusals, SpaceId, SpaceSnapshot, load_aggregate};
 
 use crate::repository::{
     AggregateRefusal, CommitRefusal, CommitResult, LoadedSpace, Revision, SpaceChange, SpaceCommit,
@@ -20,12 +20,16 @@ use crate::repository::{
 pub enum CommitDecision {
     /// Answer the caller now; nothing is written.
     Answer(CommitResult),
-    /// Write `spaces` in place of everything stored, then answer `result`.
+    /// Store `written` and remove `deleted`, leaving every other stored Space
+    /// as it is, then answer `result`.
     Write {
         /// What to answer once written.
         result: CommitResult,
-        /// Every stored Space once the commit lands, ascending by id.
-        spaces: Vec<LoadedSpace>,
+        /// Each Space the commit creates or updates, as it is stored once the
+        /// commit lands, ascending by id.
+        written: Vec<LoadedSpace>,
+        /// Each Space the commit deletes, in the order the changes name them.
+        deleted: Vec<SpaceId>,
     },
 }
 
@@ -70,7 +74,7 @@ fn request_refusal(request: &SpaceCommit) -> Option<CommitDecision> {
 }
 
 /// A Space of the candidate aggregate, borrowed from the store or from the
-/// change that writes it; only a Write copies it.
+/// change that writes it; only a written one is copied.
 #[derive(Debug, Clone, Copy)]
 struct Candidate<'a> {
     snapshot: &'a SpaceSnapshot,
@@ -98,41 +102,32 @@ impl Candidate<'_> {
     }
 }
 
-/// The snapshots intake reads, ascending by Space id: the one copy each
-/// check needs, since `load_aggregate` takes them by value.
-fn snapshots<'a>(spaces: impl IntoIterator<Item = &'a SpaceSnapshot>) -> Vec<SpaceSnapshot> {
-    spaces.into_iter().cloned().collect()
+/// The Space stage's refusals grouped as the wire carries them: each refused
+/// Space by its position in the candidate aggregate, as intake names it.
+/// `None` when a later stage refused.
+fn space_stage_errors(refusals: &Refusals) -> Option<Vec<AggregateRefusal>> {
+    Some(
+        refusals
+            .space_stage()?
+            .into_iter()
+            .map(
+                |(snapshot_index, errors)| AggregateRefusal::InvalidSpaceSnapshot {
+                    snapshot_index,
+                    errors: errors.to_vec(),
+                },
+            )
+            .collect(),
+    )
 }
 
-/// The refusals of a candidate aggregate grouped as the wire carries them.
+/// The aggregate stage's refusals of a candidate aggregate grouped as the
+/// wire carries them.
 fn grouped(
     refusals: &[Refusal],
     candidate: &BTreeMap<SpaceId, Candidate<'_>>,
 ) -> Vec<AggregateRefusal> {
     let order: Vec<SpaceId> = candidate.keys().copied().collect();
     let position = |id: SpaceId| order.iter().position(|candidate| *candidate == id);
-    // The Space stage refused when any candidate fails its own intake; only
-    // then are the refusals each Space's.
-    let space_stage: Vec<(usize, Vec<Refusal>)> = candidate
-        .values()
-        .enumerate()
-        .filter_map(|(index, space)| {
-            load_space(space.snapshot.clone())
-                .err()
-                .map(|refused| (index, refused.into_vec()))
-        })
-        .collect();
-    if !space_stage.is_empty() {
-        return space_stage
-            .into_iter()
-            .map(
-                |(snapshot_index, errors)| AggregateRefusal::InvalidSpaceSnapshot {
-                    snapshot_index,
-                    errors,
-                },
-            )
-            .collect();
-    }
     let mut errors = Vec::new();
     let mut resources: Vec<intake::ResourceId> = Vec::new();
     for refusal in refusals {
@@ -191,7 +186,7 @@ fn refused(refusals: Vec<Refusal>, candidate: &BTreeMap<SpaceId, Candidate<'_>>)
 /// already held (ADR 0142).
 ///
 /// `stored` is read, not copied: only what the answer carries is, a
-/// conflict's current Space or every Space a Write stores.
+/// conflict's current Space or each Space a Write creates or updates.
 pub fn decide_commit<'a>(
     request: &SpaceCommit,
     meta_space_id: Option<SpaceId>,
@@ -237,10 +232,7 @@ pub fn decide_commit<'a>(
     // refused candidate is forgiven; and those it held while a Resource of a
     // missing kind remained, which only a candidate that still holds such a
     // Resource is also forgiven (ADR 0142).
-    let baseline = load_aggregate(
-        meta_space_id,
-        snapshots(by_id.values().map(|space| &space.snapshot)),
-    );
+    let baseline = load_aggregate(meta_space_id, by_id.values().map(|space| &space.snapshot));
     let (baseline_held, baseline_unreferenced): (&[SpaceId], Vec<SpaceId>) = match &baseline {
         Ok(aggregate) => (aggregate.held_space_ids(), Vec::new()),
         Err(refusals) => (
@@ -285,7 +277,7 @@ pub fn decide_commit<'a>(
         }
     }
 
-    let deleted: HashSet<SpaceId> = request
+    let deleted: Vec<SpaceId> = request
         .changes
         .iter()
         .filter(|change| matches!(change, SpaceChange::Delete { .. }))
@@ -295,9 +287,15 @@ pub fn decide_commit<'a>(
 
     match load_aggregate(
         meta_space_id,
-        snapshots(candidate.values().map(|space| space.snapshot)),
+        candidate.values().map(|space| space.snapshot),
     ) {
         Err(refusals) => {
+            if let Some(errors) = space_stage_errors(&refusals) {
+                return CommitDecision::Answer(CommitResult::AggregateRefused(CommitRefusal {
+                    refusals: refusals.into_vec(),
+                    errors,
+                }));
+            }
             let mut incomplete: Vec<SpaceId> = Vec::new();
             for refusal in refusals.as_slice() {
                 if let Refusal::SpaceReferenceMissing { space, target, .. } = refusal
@@ -355,14 +353,14 @@ pub fn decide_commit<'a>(
                 .filter(|change| !matches!(change, SpaceChange::Delete { .. }))
                 .map(|change| (change.space_id(), committed_revision(change)))
                 .collect(),
-            deleted_space_ids: request
-                .changes
-                .iter()
-                .filter(|change| matches!(change, SpaceChange::Delete { .. }))
-                .map(SpaceChange::space_id)
-                .collect(),
+            deleted_space_ids: deleted.clone(),
         },
-        spaces: candidate.into_values().map(Candidate::to_loaded).collect(),
+        written: candidate
+            .into_iter()
+            .filter(|(id, _)| changed.contains(id))
+            .map(|(_, space)| space.to_loaded())
+            .collect(),
+        deleted,
     }
 }
 

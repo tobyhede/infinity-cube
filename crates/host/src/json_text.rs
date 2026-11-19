@@ -191,68 +191,80 @@ mod tests {
         compact(&JsonValue::Number(value))
     }
 
-    #[test]
-    fn writes_numbers_as_javascript_does() {
-        for (value, expected) in [
-            (0.0, "0"),
-            (-0.0, "0"),
-            (1.0, "1"),
-            (-12.5, "-12.5"),
-            (320.0, "320"),
-            (0.1, "0.1"),
-            (1.0 / 3.0, "0.3333333333333333"),
-            (123_456_789_012_345_680_000.0, "123456789012345680000"),
-            (1e21, "1e+21"),
-            (1.5e21, "1.5e+21"),
-            (0.000_001, "0.000001"),
-            (1e-7, "1e-7"),
-            (-2.5e-8, "-2.5e-8"),
-            (f64::MAX, "1.7976931348623157e+308"),
-            (5e-324, "5e-324"),
-        ] {
-            assert_eq!(number(value), expected, "{value:e} as JavaScript writes it");
+    mod given_a_number {
+        use super::*;
+
+        #[test]
+        fn writes_it_as_javascript_does() {
+            for (value, expected) in [
+                (0.0, "0"),
+                (-0.0, "0"),
+                (1.0, "1"),
+                (-12.5, "-12.5"),
+                (320.0, "320"),
+                (0.1, "0.1"),
+                (1.0 / 3.0, "0.3333333333333333"),
+                (123_456_789_012_345_680_000.0, "123456789012345680000"),
+                (1e21, "1e+21"),
+                (1.5e21, "1.5e+21"),
+                (0.000_001, "0.000001"),
+                (1e-7, "1e-7"),
+                (-2.5e-8, "-2.5e-8"),
+                (f64::MAX, "1.7976931348623157e+308"),
+                (5e-324, "5e-324"),
+            ] {
+                assert_eq!(number(value), expected, "{value:e} as JavaScript writes it");
+            }
+        }
+
+        /// Each value lies exactly between two shortest spellings; each expected
+        /// text is `JSON.stringify(value)` in Node 26.
+        #[test]
+        fn breaks_a_shortest_spelling_tie_to_the_even_digit() {
+            for (value, expected) in [
+                // A whole part and a fraction, each exact, as is their sum.
+                (1e15 + 0.25, "1000000000000000.2"),
+                (1e15 + 0.75, "1000000000000000.8"),
+                (-(871_442_882_650_757.0 + 0.25), "-871442882650757.2"),
+                (268_343_000_470_873.0 + 0.625, "268343000470873.62"),
+                (24_741_265_280_724.0 + 0.8125, "24741265280724.812"),
+                (1_748_830_814_480.0 + 0.781_25, "1748830814480.7812"),
+            ] {
+                assert_eq!(number(value), expected, "{value:e} as JavaScript writes it");
+            }
         }
     }
 
-    /// Each value lies exactly between two shortest spellings; each expected
-    /// text is `JSON.stringify(value)` in Node 26.
-    #[test]
-    fn breaks_a_tie_between_two_shortest_spellings_to_the_even_digit() {
-        for (value, expected) in [
-            // A whole part and a fraction, each exact, as is their sum.
-            (1e15 + 0.25, "1000000000000000.2"),
-            (1e15 + 0.75, "1000000000000000.8"),
-            (-(871_442_882_650_757.0 + 0.25), "-871442882650757.2"),
-            (268_343_000_470_873.0 + 0.625, "268343000470873.62"),
-            (24_741_265_280_724.0 + 0.8125, "24741265280724.812"),
-            (1_748_830_814_480.0 + 0.781_25, "1748830814480.7812"),
-        ] {
-            assert_eq!(number(value), expected, "{value:e} as JavaScript writes it");
+    mod given_a_string {
+        use super::*;
+
+        #[test]
+        fn escapes_it_as_json_stringify_does() {
+            let value = JsonValue::String("q\"b\\\u{8}\u{c}\n\r\t\u{1}/é\u{2028}".into());
+            assert_eq!(
+                compact(&value),
+                r#""q\"b\\\b\f\n\r\t\u0001/é ""#.replace("\\u2028", "\u{2028}"),
+                "only quotes, backslashes and control characters are escaped"
+            );
         }
     }
 
-    #[test]
-    fn escapes_strings_as_json_stringify_does() {
-        let value = JsonValue::String("q\"b\\\u{8}\u{c}\n\r\t\u{1}/é\u{2028}".into());
-        assert_eq!(
-            compact(&value),
-            r#""q\"b\\\b\f\n\r\t\u0001/é ""#.replace("\\u2028", "\u{2028}"),
-            "only quotes, backslashes and control characters are escaped"
-        );
-    }
+    mod given_a_file {
+        use super::*;
 
-    #[test]
-    fn indents_a_file_by_two_spaces_with_a_closing_newline() {
-        let value = parse(r#"{"a":[],"b":{},"c":[1,{"d":true}],"e":null}"#).unwrap();
-        assert_eq!(
-            file_text(&value),
-            "{\n  \"a\": [],\n  \"b\": {},\n  \"c\": [\n    1,\n    {\n      \"d\": true\n    }\n  ],\n  \"e\": null\n}\n",
-            "JSON.stringify(value, null, 2) and a newline"
-        );
-        assert_eq!(
-            compact(&value),
-            r#"{"a":[],"b":{},"c":[1,{"d":true}],"e":null}"#,
-            "JSON.stringify(value)"
-        );
+        #[test]
+        fn indents_it_by_two_spaces_with_a_closing_newline() {
+            let value = parse(r#"{"a":[],"b":{},"c":[1,{"d":true}],"e":null}"#).unwrap();
+            assert_eq!(
+                file_text(&value),
+                "{\n  \"a\": [],\n  \"b\": {},\n  \"c\": [\n    1,\n    {\n      \"d\": true\n    }\n  ],\n  \"e\": null\n}\n",
+                "JSON.stringify(value, null, 2) and a newline"
+            );
+            assert_eq!(
+                compact(&value),
+                r#"{"a":[],"b":{},"c":[1,{"d":true}],"e":null}"#,
+                "JSON.stringify(value)"
+            );
+        }
     }
 }

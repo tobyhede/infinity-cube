@@ -9,8 +9,8 @@ use std::sync::Arc;
 
 use bytes::{Buf as _, Bytes, BytesMut};
 use http::header::{
-    ACCEPT, ALLOW, CACHE_CONTROL, CONTENT_ENCODING, CONTENT_SECURITY_POLICY, CONTENT_TYPE,
-    HeaderName, LOCATION, X_CONTENT_TYPE_OPTIONS,
+    ACCEPT, ALLOW, CACHE_CONTROL, CONTENT_ENCODING, CONTENT_SECURITY_POLICY, CONTENT_TYPE, HOST,
+    HeaderName, LOCATION, ORIGIN, X_CONTENT_TYPE_OPTIONS,
 };
 use http::{HeaderMap, HeaderValue, Method, Request, Response, StatusCode};
 use http_body::Body;
@@ -150,6 +150,42 @@ fn header_text(headers: &HeaderMap, name: &HeaderName) -> Option<String> {
         .map(|value| value.as_bytes().iter().copied().map(char::from).collect())
         .collect();
     (!values.is_empty()).then(|| values.join(", "))
+}
+
+/// The detail of the 403 `forbidden` answer to a cross-site change
+/// (`CROSS_SITE_CHANGE_DETAIL`).
+const CROSS_SITE_CHANGE: &str = "Send a change from the application's own page.";
+
+/// The authority an `Origin` names (`<scheme>://<authority>`), or `None` for
+/// one that names no authority, such as `null`.
+fn origin_authority(origin: &str) -> Option<&str> {
+    let (scheme, authority) = origin.split_once("://")?;
+    let mut scheme_bytes = scheme.bytes();
+    let scheme_ok = scheme_bytes
+        .next()
+        .is_some_and(|byte| byte.is_ascii_alphabetic())
+        && scheme_bytes.all(|byte| byte.is_ascii_alphanumeric() || b"+-.".contains(&byte));
+    let authority_ok = !authority.is_empty() && !authority.contains(['/', '?', '#']);
+    (scheme_ok && authority_ok).then_some(authority)
+}
+
+/// `isCrossSiteChange` (ADR 0161, Storage ST-123): whether a change, a
+/// request that is not a read, comes from a page of another site, as the
+/// browser that sent it says. A `Sec-Fetch-Site` other than `same-origin` or
+/// `none` says so; failing that header, an `Origin` whose authority is not
+/// the `Host` the request names does, `null` included. A request naming no
+/// `Host`, such as the desktop scheme handler's, is not judged by its
+/// `Origin`, and one naming neither header is served.
+fn is_cross_site_change(headers: &HeaderMap) -> bool {
+    if let Some(site) = header_text(headers, &HeaderName::from_static("sec-fetch-site")) {
+        return site != "same-origin" && site != "none";
+    }
+    match (header_text(headers, &ORIGIN), header_text(headers, &HOST)) {
+        (Some(origin), Some(host)) => {
+            origin_authority(&origin).is_none_or(|authority| !authority.eq_ignore_ascii_case(&host))
+        }
+        _ => false,
+    }
 }
 
 fn has_identity_encoding(headers: &HeaderMap) -> bool {
@@ -610,9 +646,15 @@ impl<R: SpaceRepository, I: IdSource, B: BuiltFiles> Application<R, I, B> {
         }
     }
 
-    /// The Space API and the asset store, under the transport policy.
+    /// The Space API and the asset store, under the transport policy, a
+    /// cross-site change refused before its body is read.
     async fn api<T: Body>(&self, request: Request<T>, path: &str) -> Response<Bytes> {
-        let mut response = self.api_route(request, &routing_path(path)).await;
+        let mut response = if !is_read(request.method()) && is_cross_site_change(request.headers())
+        {
+            problem(Problem::Forbidden, CROSS_SITE_CHANGE)
+        } else {
+            self.api_route(request, &routing_path(path)).await
+        };
         if !response.headers().contains_key(CACHE_CONTROL) {
             set(&mut response, CACHE_CONTROL, NO_STORE);
         }
@@ -885,43 +927,51 @@ fn built_file(path: &str, bytes: Bytes, media_type: &str) -> Response<Bytes> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn reads_a_media_type_as_rfc_9110_writes_it() {
-        let parsed = parse_media_type("Application/JSON ; charset=\"UTF-8\"");
-        assert_eq!(
-            parsed,
-            Some((
-                "application/json".to_owned(),
-                vec![("charset".to_owned(), "UTF-8".to_owned())]
-            )),
-            "spaces around the parameter and a quoted value"
-        );
-        assert_eq!(
-            parse_media_type("application/json; x=1; X=2"),
-            None,
-            "repeated name"
-        );
-        assert_eq!(
-            parse_media_type("application/json;"),
-            None,
-            "empty parameter"
-        );
-        assert_eq!(parse_media_type("application"), None, "no subtype");
+    mod given_a_media_type {
+        use super::*;
+
+        #[test]
+        fn reads_it_as_rfc_9110_writes_it() {
+            let parsed = parse_media_type("Application/JSON ; charset=\"UTF-8\"");
+            assert_eq!(
+                parsed,
+                Some((
+                    "application/json".to_owned(),
+                    vec![("charset".to_owned(), "UTF-8".to_owned())]
+                )),
+                "spaces around the parameter and a quoted value"
+            );
+            assert_eq!(
+                parse_media_type("application/json; x=1; X=2"),
+                None,
+                "repeated name"
+            );
+            assert_eq!(
+                parse_media_type("application/json;"),
+                None,
+                "empty parameter"
+            );
+            assert_eq!(parse_media_type("application"), None, "no subtype");
+        }
     }
 
-    #[test]
-    fn trims_a_header_as_string_trim_does() {
-        let encoded = |value: &'static [u8]| {
-            let mut headers = HeaderMap::new();
-            headers.insert(
-                CONTENT_ENCODING,
-                http::HeaderValue::from_bytes(value).unwrap(),
-            );
-            has_identity_encoding(&headers)
-        };
-        assert!(encoded(b"identity\xA0"), "U+00A0 is trimmed");
-        assert!(!encoded(b"identity\x85"), "U+0085 is not");
-        assert!(accepts_html(Some("text/html\u{a0}")), "U+00A0 is trimmed");
-        assert!(!accepts_html(Some("text/html\u{85}")), "U+0085 is not");
+    mod given_a_header_value {
+        use super::*;
+
+        #[test]
+        fn trims_it_as_string_trim_does() {
+            let encoded = |value: &'static [u8]| {
+                let mut headers = HeaderMap::new();
+                headers.insert(
+                    CONTENT_ENCODING,
+                    http::HeaderValue::from_bytes(value).unwrap(),
+                );
+                has_identity_encoding(&headers)
+            };
+            assert!(encoded(b"identity\xA0"), "U+00A0 is trimmed");
+            assert!(!encoded(b"identity\x85"), "U+0085 is not");
+            assert!(accepts_html(Some("text/html\u{a0}")), "U+00A0 is trimmed");
+            assert!(!accepts_html(Some("text/html\u{85}")), "U+0085 is not");
+        }
     }
 }

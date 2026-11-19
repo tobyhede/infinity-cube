@@ -234,11 +234,15 @@ mod tests {
         }
     }
 
-    #[test]
-    fn refuses_an_unknown_verb_and_reads_help_alone() {
-        assert_eq!(parsed(&["serve", "talk"]), None, "unknown verb");
-        assert_eq!(parsed(&[]), None, "nothing");
-        assert_eq!(parsed(&["help"]), Some(Command::Help), "help");
-        assert_eq!(parsed(&["help", "x"]), None, "help with more");
+    mod given_an_unknown_verb_or_help {
+        use super::*;
+
+        #[test]
+        fn refuses_an_unknown_verb_and_reads_help_alone() {
+            assert_eq!(parsed(&["serve", "talk"]), None, "unknown verb");
+            assert_eq!(parsed(&[]), None, "nothing");
+            assert_eq!(parsed(&["help"]), Some(Command::Help), "help");
+            assert_eq!(parsed(&["help", "x"]), None, "help with more");
+        }
     }
 }

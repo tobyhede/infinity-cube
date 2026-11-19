@@ -651,9 +651,9 @@ pub fn read_aggregate(
 ///
 /// let refused = import_aggregate(files, || unreachable!("every id is written down")).unwrap_err();
 /// let refusal = &refused.as_slice()[0];
-/// assert_eq!(refusal.kind(), RefusalKind::UnresolvedDefaultMap);
-/// assert_eq!(refusal.file(), format!("{meta}/space.json"));
-/// assert_eq!(refusal.field().as_deref(), Some("defaultMap"));
+/// assert_eq!(refusal.kind(), RefusalKind::UnresolvedDefaultMap, "the default Map names no Map");
+/// assert_eq!(refusal.file(), format!("{meta}/space.json"), "it is located at the Space file");
+/// assert_eq!(refusal.field().as_deref(), Some("defaultMap"), "it names the defaultMap field");
 /// ```
 pub fn import_aggregate(
     files: AggregateFiles,

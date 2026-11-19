@@ -144,43 +144,55 @@ pub fn served_media_type(media_type: &str) -> &str {
 mod tests {
     use super::*;
 
-    #[test]
-    fn normalizes_a_declared_type_to_its_essence() {
-        for (declared, expected) in [
-            ("image/PNG; charset=x", "image/png"),
-            ("  text/markdown ", "text/markdown"),
-            ("", OCTET_STREAM),
-            ("not a type", OCTET_STREAM),
-            ("a/b/c", OCTET_STREAM),
-            ("image/png\u{85}", OCTET_STREAM),
-            ("\u{feff}image/png", "image/png"),
-        ] {
-            assert_eq!(normalize_media_type(declared), expected, "{declared:?}");
+    mod given_a_declared_media_type {
+        use super::*;
+
+        #[test]
+        fn normalizes_it_to_its_essence() {
+            for (declared, expected) in [
+                ("image/PNG; charset=x", "image/png"),
+                ("  text/markdown ", "text/markdown"),
+                ("", OCTET_STREAM),
+                ("not a type", OCTET_STREAM),
+                ("a/b/c", OCTET_STREAM),
+                ("image/png\u{85}", OCTET_STREAM),
+                ("\u{feff}image/png", "image/png"),
+            ] {
+                assert_eq!(normalize_media_type(declared), expected, "{declared:?}");
+            }
         }
     }
 
-    #[test]
-    fn serves_only_pictures_as_themselves() {
-        assert_eq!(served_media_type("image/gif"), "image/gif", "a picture");
-        assert_eq!(
-            served_media_type("image/svg+xml"),
-            OCTET_STREAM,
-            "SVG runs script"
-        );
-        assert_eq!(
-            served_media_type("text/html"),
-            OCTET_STREAM,
-            "HTML runs script"
-        );
+    mod given_a_stored_media_type {
+        use super::*;
+
+        #[test]
+        fn serves_only_pictures_as_themselves() {
+            assert_eq!(served_media_type("image/gif"), "image/gif", "a picture");
+            assert_eq!(
+                served_media_type("image/svg+xml"),
+                OCTET_STREAM,
+                "SVG runs script"
+            );
+            assert_eq!(
+                served_media_type("text/html"),
+                OCTET_STREAM,
+                "HTML runs script"
+            );
+        }
     }
 
-    #[test]
-    fn names_zero_bytes_by_the_empty_hash() {
-        assert!(AssetHash::of(b"").is_empty_asset(), "the hash of nothing");
-        assert_eq!(
-            StoredAsset::empty().file_name(),
-            format!("{EMPTY_ASSET_HASH}.bin"),
-            "bin"
-        );
+    mod given_zero_bytes {
+        use super::*;
+
+        #[test]
+        fn names_them_by_the_empty_hash() {
+            assert!(AssetHash::of(b"").is_empty_asset(), "the hash of nothing");
+            assert_eq!(
+                StoredAsset::empty().file_name(),
+                format!("{EMPTY_ASSET_HASH}.bin"),
+                "bin"
+            );
+        }
     }
 }

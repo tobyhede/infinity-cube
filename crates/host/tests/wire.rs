@@ -1,7 +1,9 @@
 //! The HTTP conformance cases (`conformance/http/wire-cases.ts` and
 //! `store-condition-cases.ts`) held against the Rust application as a
 //! `Request -> Response` function: one test per case or per table of cases,
-//! each on a fresh Import of the tracked fixture.
+//! each on a fresh Import of the tracked fixture. A test porting a case
+//! carries `// Case: <its name>`, which
+//! `test/unit/http-conformance-rust-ports.test.ts` holds to the case lists.
 
 #![allow(
     clippy::unwrap_used,
@@ -285,9 +287,10 @@ fn revision(loaded: &Value) -> u64 {
     loaded["revision"].as_str().unwrap().parse().unwrap()
 }
 
-mod the_space_api {
+mod given_a_space_api_request {
     use super::*;
 
+    // Case: lists every Space of the directory with its title
     #[tokio::test]
     async fn lists_every_space_of_the_directory_with_its_title() {
         let host = open().await;
@@ -317,6 +320,7 @@ mod the_space_api {
         );
     }
 
+    // Case: answers one Space with its snapshot and revision
     #[tokio::test]
     async fn answers_one_space_with_its_snapshot_and_revision() {
         let host = open().await;
@@ -328,6 +332,7 @@ mod the_space_api {
         );
     }
 
+    // Case: answers the aggregate with its Meta Space and every Space
     #[tokio::test]
     async fn answers_the_aggregate_with_its_meta_space_and_every_space() {
         let host = open().await;
@@ -345,6 +350,7 @@ mod the_space_api {
         );
     }
 
+    // Case: answers 404 not-found for a Space that does not exist
     #[tokio::test]
     async fn answers_404_for_a_space_that_does_not_exist() {
         let host = open().await;
@@ -353,6 +359,7 @@ mod the_space_api {
         not_found(&response);
     }
 
+    // Case: answers 400 invalid-space-id for an id that is not a UUID, whatever the method
     #[tokio::test]
     async fn answers_400_invalid_space_id_whatever_the_method() {
         let host = open().await;
@@ -362,6 +369,7 @@ mod the_space_api {
         }
     }
 
+    // Case: answers 405 to %s %s, allowing %s
     #[tokio::test]
     async fn answers_405_naming_the_methods_a_path_allows() {
         let host = open().await;
@@ -392,8 +400,9 @@ mod the_space_api {
         }
     }
 
+    // Case: answers %s as the path it escapes
     #[tokio::test]
-    async fn answers_a_path_escaping_an_unreserved_character_as_the_path_it_escapes() {
+    async fn answers_an_unreserved_escape_as_the_path_it_escapes() {
         let host = open().await;
         let escaped_id = format!("/api/spaces/%30{}", &META[1..]);
         for path in ["/api/%73paces", escaped_id.as_str()] {
@@ -404,6 +413,7 @@ mod the_space_api {
         }
     }
 
+    // Case: answers 404 not-found for %s, which is off the declared API
     #[tokio::test]
     async fn answers_404_for_a_path_off_the_declared_api() {
         let host = open().await;
@@ -416,9 +426,10 @@ mod the_space_api {
     }
 }
 
-mod commits {
+mod given_a_commit {
     use super::*;
 
+    // Case: answers * committed with each Space's next revision
     #[tokio::test]
     async fn answers_200_committed_with_each_spaces_next_revision() {
         let host = open().await;
@@ -443,8 +454,9 @@ mod commits {
         );
     }
 
+    // Case: answers * conflict with the current Space for a stale revision
     #[tokio::test]
-    async fn answers_409_conflict_with_the_current_space_for_a_stale_revision() {
+    async fn answers_409_with_the_current_space_for_a_stale_revision() {
         let host = open().await;
         let stale = load(&host, META).await;
         let first = post_commit(&host, rename_text(&stale, "First"), "application/json").await;
@@ -466,6 +478,7 @@ mod commits {
         );
     }
 
+    // Case: answers * aggregate-refused for a Space no Space Resource references
     #[tokio::test]
     async fn answers_422_for_a_space_no_space_resource_references() {
         let host = open().await;
@@ -525,8 +538,9 @@ mod commits {
         intake::json::parse(std::str::from_utf8(response.body()).unwrap()).unwrap()
     }
 
+    // Case: answers a Space with its positions in the order the commit wrote them
     #[tokio::test]
-    async fn answers_a_space_with_its_positions_in_the_order_the_commit_wrote_them() {
+    async fn answers_positions_in_the_order_the_commit_wrote_them() {
         let host = open().await;
         let loaded = text_of(&get(&host, &format!("/api/spaces/{META}")).await);
         let loaded = loaded.as_object().unwrap();
@@ -599,6 +613,7 @@ mod commits {
         );
     }
 
+    // Case: answers 400 invalid-request for a commit the store will not judge
     #[tokio::test]
     async fn answers_400_for_a_commit_the_store_will_not_judge() {
         let host = open().await;
@@ -611,6 +626,7 @@ mod commits {
         whole_body_invalid(&response);
     }
 
+    // Case: answers 400 invalid-request for malformed JSON
     #[tokio::test]
     async fn answers_400_for_malformed_json() {
         let host = open().await;
@@ -625,8 +641,9 @@ mod commits {
 
     /// ADR 0160: a lone surrogate escape is refused as malformed JSON and
     /// nothing is stored, as the Node host refuses it.
+    // Case: answers 400 invalid-request for a lone surrogate escape, as for malformed JSON
     #[tokio::test]
-    async fn answers_400_for_a_lone_surrogate_escape_as_for_malformed_json() {
+    async fn answers_400_for_a_lone_surrogate_as_for_malformed_json() {
         let host = open().await;
         let loaded = load(&host, META).await;
         let text = rename_text(&loaded, "LONE").replace("\"LONE\"", r#""\ud800x""#);
@@ -675,7 +692,7 @@ mod commits {
     /// "decodes a body nested deeper than the Rust host reads"), and this one
     /// refuses it as malformed JSON.
     #[tokio::test]
-    async fn commits_a_body_nested_to_the_limit_and_refuses_one_nested_past_it() {
+    async fn commits_nesting_to_the_limit_and_refuses_one_past_it() {
         let host = open().await;
         let mut loaded = load(&host, META).await;
         let response = post_commit(
@@ -731,6 +748,7 @@ mod commits {
         );
     }
 
+    // Case: answers 400 invalid-request for a body that is not a commit
     #[tokio::test]
     async fn answers_400_for_a_body_that_is_not_a_commit() {
         let host = open().await;
@@ -739,6 +757,7 @@ mod commits {
         whole_body_invalid(&response);
     }
 
+    // Case: answers 415 unsupported-media-type for a commit sent with no Content-Type
     #[tokio::test]
     async fn answers_415_for_a_commit_sent_with_no_content_type() {
         let host = open().await;
@@ -759,6 +778,7 @@ mod commits {
         );
     }
 
+    // Case: answers 415 unsupported-media-type for a commit sent as %s
     #[tokio::test]
     async fn answers_415_for_a_commit_sent_as_another_type() {
         let host = open().await;
@@ -772,6 +792,7 @@ mod commits {
         }
     }
 
+    // Case: answers 415 unsupported-media-type for an encoded commit
     #[tokio::test]
     async fn answers_415_for_an_encoded_commit() {
         let host = open().await;
@@ -790,6 +811,7 @@ mod commits {
         unsupported(&response);
     }
 
+    // Case: accepts a media type with spaces around its parameter (RFC 9110)
     #[tokio::test]
     async fn accepts_a_media_type_with_spaces_around_its_parameter() {
         let host = open().await;
@@ -803,8 +825,9 @@ mod commits {
         assert_eq!(response.status(), 200, "RFC 9110 allows the spaces");
     }
 
+    // Case: accepts a media type whose quoted parameter carries a Latin-1 byte
     #[tokio::test]
-    async fn accepts_a_media_type_whose_quoted_parameter_carries_a_latin_1_byte() {
+    async fn accepts_a_quoted_parameter_carrying_a_latin_1_byte() {
         let host = open().await;
         let loaded = load(&host, META).await;
         let request = Request::post("/api/spaces")
@@ -818,6 +841,7 @@ mod commits {
         assert_eq!(response.status(), 200, "committed: {:?}", response.body());
     }
 
+    // Case: commits a body of exactly * bytes
     #[tokio::test]
     async fn commits_a_body_of_exactly_the_limit() {
         let host = open().await;
@@ -832,6 +856,7 @@ mod commits {
         );
     }
 
+    // Case: answers 413 payload-too-large for a body of * bytes
     #[tokio::test]
     async fn answers_413_for_a_body_one_byte_over_the_limit() {
         let host = open().await;
@@ -850,6 +875,8 @@ mod commits {
         );
     }
 
+    // Case: commits a chunked body that declares no length
+    // Case: answers 413 payload-too-large to a chunked body of * bytes that declares no length
     #[tokio::test]
     async fn counts_a_body_that_arrives_in_chunks() {
         let host = open().await;
@@ -886,7 +913,7 @@ mod commits {
     }
 }
 
-mod assets {
+mod given_an_asset_request {
     use super::*;
 
     fn fresh(size: usize, stamp: &str) -> Vec<u8> {
@@ -909,6 +936,7 @@ mod assets {
         format!("/assets/{}", AssetHash::of(bytes).as_str())
     }
 
+    // Case: stores an asset at its hash, 201 the first time and 200 after
     #[tokio::test]
     async fn stores_an_asset_at_its_hash_201_the_first_time_and_200_after() {
         let host = open().await;
@@ -929,6 +957,7 @@ mod assets {
         assert_eq!(json_of(&again), json!({ "url": url }), "the same url");
     }
 
+    // Case: serves a stored picture as itself, immutable and sandboxed
     #[tokio::test]
     async fn serves_a_stored_picture_as_itself_immutable_and_sandboxed() {
         let host = open().await;
@@ -964,6 +993,7 @@ mod assets {
         assert_eq!(response.body().as_ref(), bytes.as_slice(), "its bytes");
     }
 
+    // Case: serves any other stored type as inert bytes, naming the type it was stored as
     #[tokio::test]
     async fn serves_any_other_stored_type_as_inert_bytes() {
         let host = open().await;
@@ -982,6 +1012,7 @@ mod assets {
         );
     }
 
+    // Case: answers HEAD for a stored asset without its bytes
     #[tokio::test]
     async fn answers_head_for_a_stored_asset_without_its_bytes() {
         let host = open().await;
@@ -997,6 +1028,7 @@ mod assets {
         assert!(response.body().is_empty(), "no bytes");
     }
 
+    // Case: serves a stored asset at its hash with a character escaped
     #[tokio::test]
     async fn serves_a_stored_asset_at_its_hash_with_a_character_escaped() {
         let host = open().await;
@@ -1015,12 +1047,14 @@ mod assets {
         assert_eq!(response.body().as_ref(), bytes.as_slice(), "its bytes");
     }
 
+    // Case: answers 404 not-found for a hash no asset is stored at
     #[tokio::test]
     async fn answers_404_for_a_hash_no_asset_is_stored_at() {
         let host = open().await;
         not_found(&get(&host, &format!("/assets/{}", "A".repeat(43))).await);
     }
 
+    // Case: answers 415 unsupported-media-type for an encoded asset
     #[tokio::test]
     async fn answers_415_for_an_encoded_asset() {
         let host = open().await;
@@ -1033,6 +1067,7 @@ mod assets {
         unsupported(&response);
     }
 
+    // Case: stores an asset of exactly * bytes
     #[tokio::test]
     async fn stores_an_asset_of_exactly_the_limit() {
         let host = open().await;
@@ -1068,7 +1103,7 @@ mod assets {
     const DRAINED: usize = MAX_COMMIT_BODY_BYTES * 8;
 
     #[tokio::test]
-    async fn drains_an_oversized_body_no_further_than_the_commit_route_does() {
+    async fn drains_an_oversized_body_no_further_than_commits_do() {
         let host = open().await;
         for (path, limit, content_type) in [
             ("/assets", MAX_ASSET_BYTES, "application/octet-stream"),
@@ -1089,6 +1124,7 @@ mod assets {
         }
     }
 
+    // Case: answers 413 asset-too-large for an asset of * bytes
     #[tokio::test]
     async fn answers_413_for_an_asset_one_byte_over_the_limit() {
         let host = open().await;
@@ -1106,9 +1142,184 @@ mod assets {
     }
 }
 
-mod product_addresses {
+mod given_a_change_from_another_site {
     use super::*;
 
+    /// The `Host` a listener's requests name, and the `Origin` of its own page.
+    const HOST: &str = "127.0.0.1:4173";
+    const OWN_ORIGIN: &str = "http://127.0.0.1:4173";
+    /// `CROSS_SITE_CHANGE_DETAIL` (`packages/http/src/index.ts`).
+    const DETAIL: &str = "Send a change from the application's own page.";
+
+    fn refused(response: &Response<Bytes>) {
+        api_policy(response);
+        problem(response, "forbidden", 403, "Forbidden");
+        assert_eq!(
+            json_of(response)["detail"],
+            DETAIL,
+            "the same detail as the Node host"
+        );
+    }
+
+    fn fresh(stamp: &str) -> Vec<u8> {
+        format!("cross-site {stamp}").into_bytes()
+    }
+
+    /// Send an asset and a commit with `headers`, and expect both refused
+    /// and nothing changed.
+    async fn changes_refused(host: &Host<MemorySpaceRepository>, headers: &[(&str, &str)]) {
+        let bytes = fresh(&format!("{headers:?}"));
+        let path = format!("/assets/{}", AssetHash::of(&bytes).as_str());
+        let mut asset = headers.to_vec();
+        asset.push(("content-type", "text/plain"));
+        refused(&send(host, "POST", "/assets", &asset, bytes).await);
+        not_found(&get(host, &path).await);
+        let loaded = load(host, META).await;
+        let mut commit = headers.to_vec();
+        commit.push(("content-type", "application/json"));
+        let text = rename_text(&loaded, "Cross-site");
+        refused(&send(host, "POST", "/api/spaces", &commit, text).await);
+        assert_eq!(
+            revision(&load(host, META).await),
+            revision(&loaded),
+            "{headers:?}: the Meta Space is unchanged"
+        );
+    }
+
+    // Case: answers 403 forbidden to a change sent with Sec-Fetch-Site: %s, changing nothing
+    #[tokio::test]
+    async fn refuses_a_change_another_site_sends_by_its_sec_fetch_site() {
+        let host = open().await;
+        for site in ["cross-site", "same-site"] {
+            changes_refused(
+                &host,
+                &[
+                    ("host", HOST),
+                    ("origin", OWN_ORIGIN),
+                    ("sec-fetch-site", site),
+                ],
+            )
+            .await;
+        }
+    }
+
+    // Case: answers 403 forbidden to a change whose Origin is %s, changing nothing
+    #[tokio::test]
+    async fn refuses_a_change_whose_origin_is_not_its_host() {
+        let host = open().await;
+        for origin in ["http://attacker.example", "http://127.0.0.1:1", "null"] {
+            changes_refused(&host, &[("host", HOST), ("origin", origin)]).await;
+        }
+    }
+
+    // Case: stores an asset sent with Sec-Fetch-Site: %s from its own origin
+    #[tokio::test]
+    async fn stores_an_asset_sent_from_its_own_origin() {
+        let host = open().await;
+        for site in ["same-origin", "none"] {
+            let response = send(
+                &host,
+                "POST",
+                "/assets",
+                &[
+                    ("content-type", "text/plain"),
+                    ("host", HOST),
+                    ("origin", OWN_ORIGIN),
+                    ("sec-fetch-site", site),
+                ],
+                fresh(site),
+            )
+            .await;
+            assert_eq!(response.status(), 201, "{site}: stored");
+        }
+    }
+
+    #[tokio::test]
+    async fn serves_a_change_without_a_host_whatever_its_origin() {
+        let host = open().await;
+        let response = send(
+            &host,
+            "POST",
+            "/assets",
+            &[
+                ("content-type", "text/plain"),
+                ("origin", "infinitycube://talk"),
+            ],
+            fresh("no host"),
+        )
+        .await;
+        assert_eq!(
+            response.status(),
+            201,
+            "a request naming no Host is not judged by its Origin"
+        );
+    }
+
+    // Case: answers a read whatever site a browser says sent it
+    #[tokio::test]
+    async fn answers_a_read_whatever_site_sent_it() {
+        let host = open().await;
+        let headers = [
+            ("host", HOST),
+            ("origin", "http://attacker.example"),
+            ("sec-fetch-site", "cross-site"),
+        ];
+        let listed = send(&host, "GET", "/api/spaces", &headers, Bytes::new()).await;
+        assert_eq!(listed.status(), 200, "the Spaces are listed");
+        let bytes = fresh("read");
+        let path = format!("/assets/{}", AssetHash::of(&bytes).as_str());
+        let stored = send(
+            &host,
+            "POST",
+            "/assets",
+            &[("content-type", "image/png")],
+            bytes,
+        )
+        .await;
+        assert_eq!(stored.status(), 201, "stored from the page");
+        let read = send(&host, "GET", &path, &headers, Bytes::new()).await;
+        assert_eq!(read.status(), 200, "the asset is served");
+    }
+
+    /// A body that counts every frame read of it, and never ends.
+    struct Counting(Arc<AtomicUsize>);
+
+    impl http_body::Body for Counting {
+        type Data = Bytes;
+        type Error = std::convert::Infallible;
+
+        fn poll_frame(
+            self: Pin<&mut Self>,
+            _: &mut Context<'_>,
+        ) -> Poll<Option<Result<Frame<Bytes>, Self::Error>>> {
+            self.0.fetch_add(1, Ordering::SeqCst);
+            Poll::Ready(Some(Ok(Frame::data(Bytes::from_static(b" ")))))
+        }
+    }
+
+    #[tokio::test]
+    async fn refuses_a_cross_site_change_before_reading_its_body() {
+        let host = open().await;
+        let read = Arc::new(AtomicUsize::new(0));
+        let request = Request::post("/assets")
+            .header("content-type", "text/plain")
+            .header("sec-fetch-site", "cross-site")
+            .body(Counting(Arc::clone(&read)))
+            .unwrap();
+        let response = host.handle(request).await;
+        assert_eq!(response.status(), 403, "refused");
+        assert_eq!(
+            read.load(Ordering::SeqCst),
+            0,
+            "no frame of the body is read"
+        );
+    }
+}
+
+mod given_a_product_address {
+    use super::*;
+
+    // Case: redirects %s / to the Meta Space with 302
     #[tokio::test]
     async fn redirects_get_and_head_of_the_root_to_the_meta_space() {
         let host = open().await;
@@ -1124,7 +1335,7 @@ mod product_addresses {
     }
 
     #[tokio::test]
-    async fn serves_the_meta_space_the_root_redirects_to_whatever_its_first_digit() {
+    async fn serves_the_meta_space_redirected_to_whatever_its_first_digit() {
         let store = MemorySpaceRepository::new();
         let ids = Counted::default();
         let directory = PathBuf::from(concat!(
@@ -1144,6 +1355,7 @@ mod product_addresses {
         assertions::shell(&get(&host, &location).await);
     }
 
+    // Case: answers 405 method-not-allowed to %s by %s, allowing GET and HEAD
     #[tokio::test]
     async fn answers_405_to_a_write_allowing_get_and_head() {
         let host = open().await;
@@ -1163,6 +1375,7 @@ mod product_addresses {
         }
     }
 
+    // Case: answers 400 invalid-request to %s %s, which cannot be read
     #[tokio::test]
     async fn answers_400_to_an_address_that_cannot_be_read() {
         let host = open().await;
@@ -1191,12 +1404,14 @@ mod product_addresses {
         html_problem(&response, 405);
     }
 
+    // Case: answers 404 not-found for an address naming no Space
     #[tokio::test]
     async fn answers_404_for_an_address_naming_no_space() {
         let host = open().await;
         not_found(&get(&host, "/spaces/AAAAAAAAQACAAAAAAADerQ").await);
     }
 
+    // Case: answers its refusals as HTML to a request that accepts it
     #[tokio::test]
     async fn answers_its_refusals_as_html_to_a_request_that_accepts_it() {
         let host = open().await;
@@ -1222,9 +1437,10 @@ mod product_addresses {
     }
 }
 
-mod the_application_shell {
+mod given_a_request_for_the_shell {
     use super::*;
 
+    // Case: serves the shell for a product address that resolves
     #[tokio::test]
     async fn serves_the_shell_for_a_product_address_that_resolves() {
         let host = open().await;
@@ -1232,12 +1448,14 @@ mod the_application_shell {
         assertions::shell(&get(&host, &format!("{META_ADDRESS}/notes")).await);
     }
 
+    // Case: falls back to the shell for an address that is not the application’s
     #[tokio::test]
-    async fn falls_back_to_the_shell_for_an_address_that_is_not_the_applications() {
+    async fn falls_back_to_the_shell_for_an_address_not_the_applications() {
         let host = open().await;
         assertions::shell(&get(&host, "/somewhere/else").await);
     }
 
+    // Case: answers HEAD for the shell without its body
     #[tokio::test]
     async fn answers_head_for_the_shell_without_its_body() {
         let host = open().await;
@@ -1251,14 +1469,16 @@ mod the_application_shell {
         assert!(response.body().is_empty(), "no body");
     }
 
+    // Case: answers 405 to a write to an address that is not the application’s
     #[tokio::test]
-    async fn answers_405_to_a_write_to_an_address_that_is_not_the_applications() {
+    async fn answers_405_to_a_write_to_an_address_not_the_applications() {
         let host = open().await;
         let response = send(&host, "POST", "/somewhere/else", &[], "x").await;
         assert_eq!(response.status(), 405, "refused");
         assert_eq!(header(&response, "allow"), Some("GET, HEAD"), "Allow");
     }
 
+    // Case: serves a content-named built file as immutable
     #[tokio::test]
     async fn serves_a_content_named_built_file_as_immutable() {
         let host = open().await;
@@ -1282,6 +1502,7 @@ mod the_application_shell {
         assert_eq!(response.body(), STAND_IN_SCRIPT.1.as_bytes(), "its text");
     }
 
+    // Case: serves another built file to be revalidated
     #[tokio::test]
     async fn serves_another_built_file_to_be_revalidated() {
         let host = open().await;
@@ -1300,8 +1521,9 @@ mod the_application_shell {
         assert_eq!(response.body(), STAND_IN_ICON.1.as_bytes(), "its text");
     }
 
+    // Case: serves the built file an escaped climb under /assets/ resolves to
     #[tokio::test]
-    async fn serves_the_built_file_an_escaped_climb_under_assets_resolves_to() {
+    async fn serves_the_built_file_an_escaped_assets_climb_resolves_to() {
         let host = open().await;
         let response = get(&host, &format!("/assets/..%2F{}", STAND_IN_ICON.0)).await;
         assert_eq!(response.status(), 200, "served: {:?}", response.body());
@@ -1313,6 +1535,7 @@ mod the_application_shell {
         assert_eq!(response.body(), STAND_IN_ICON.1.as_bytes(), "its text");
     }
 
+    // Case: answers 400 invalid-asset-hash, and no file, for %s
     #[tokio::test]
     async fn answers_400_invalid_asset_hash_and_no_file_under_assets() {
         let host = open().await;
@@ -1449,6 +1672,7 @@ fn over<R: SpaceRepository>(store: R) -> Host<R> {
 mod given_a_store_that_cannot_serve {
     use super::*;
 
+    // Case: answers / with 503 persistence-unavailable while no Meta Space is established
     #[tokio::test]
     async fn answers_the_root_503_while_no_meta_space_is_established() {
         let host = over(MemorySpaceRepository::new());
@@ -1472,6 +1696,7 @@ mod given_a_store_that_cannot_serve {
         );
     }
 
+    // Case: answers 503 persistence-unavailable for every read and write of an unreachable store
     #[tokio::test]
     async fn answers_503_for_every_read_and_write_of_an_unreachable_store() {
         let host = over(Failing(|| {
@@ -1504,6 +1729,7 @@ mod given_a_store_that_cannot_serve {
         );
     }
 
+    // Case: answers 500 internal-error for broken stored state
     #[tokio::test]
     async fn answers_500_for_broken_stored_state() {
         let host = over(Failing(|| {
@@ -1530,6 +1756,7 @@ mod given_a_product_address_over_a_store_that_cannot_serve {
         }
     }
 
+    // Case: answers a product address over a %s store with %s
     #[tokio::test]
     async fn answers_an_unreachable_store_503() {
         let host = over(Failing(|| {
@@ -1544,6 +1771,7 @@ mod given_a_product_address_over_a_store_that_cannot_serve {
         .await;
     }
 
+    // Case: answers a product address over a %s store with %s
     #[tokio::test]
     async fn answers_broken_stored_state_500() {
         let host = over(Failing(|| {
@@ -1553,7 +1781,7 @@ mod given_a_product_address_over_a_store_that_cannot_serve {
     }
 }
 
-mod errors {
+mod given_a_store_that_fails {
     use super::*;
     use std::sync::Mutex;
 
@@ -1606,7 +1834,7 @@ mod errors {
     }
 }
 
-mod edits {
+mod given_an_edit_observer {
     use super::*;
 
     fn counting(
@@ -1621,7 +1849,7 @@ mod edits {
     }
 
     #[tokio::test]
-    async fn an_accepted_commit_is_an_edit() {
+    async fn counts_an_accepted_commit_as_an_edit() {
         let (host, edits) = counting(open().await);
         let loaded = load(&host, META).await;
         post_commit(&host, rename_text(&loaded, "Edited"), "application/json").await;
@@ -1636,7 +1864,7 @@ mod edits {
     }
 
     #[tokio::test]
-    async fn a_working_read_that_initializes_a_space_is_no_edit() {
+    async fn counts_no_edit_for_a_read_that_initializes_a_space() {
         let store = MemorySpaceRepository::new();
         let ids = Counted::default();
         let meta = SpaceId::parse(META).unwrap();

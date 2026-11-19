@@ -172,14 +172,18 @@ mod tests {
         }
     }
 
-    #[test]
-    fn serves_the_placeholder_or_the_embedded_build_without_a_directory() {
-        let (_shell, origin) = load(None).unwrap();
-        let expected = if EMBEDDED.is_some() {
-            Origin::Embedded
-        } else {
-            Origin::Placeholder
-        };
-        assert_eq!(origin, expected, "what the binary carries");
+    mod given_no_built_directory {
+        use super::*;
+
+        #[test]
+        fn serves_the_placeholder_or_the_embedded_build() {
+            let (_shell, origin) = load(None).unwrap();
+            let expected = if EMBEDDED.is_some() {
+                Origin::Embedded
+            } else {
+                Origin::Placeholder
+            };
+            assert_eq!(origin, expected, "what the binary carries");
+        }
     }
 }

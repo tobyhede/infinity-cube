@@ -2,6 +2,7 @@
 //! entities indexed. A [`Space`] exists only as [`load_space`]'s answer, so
 //! every one is consistent by construction.
 
+use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
 
 use crate::ids::{GraphId, MapId, ResourceId, SpaceId};
@@ -82,7 +83,9 @@ impl Space {
 /// as JSON, so a snapshot built in memory is held to the rules a decoded one
 /// met; then its references: every reference resolves, no id repeats, every
 /// Edge is closed over its Map, every placement's Map content is its plugin's,
-/// and no Resource references its own Space.
+/// and no Resource references its own Space. The snapshot is read, not
+/// kept: the [`Space`] holds the snapshot its shape's decoding builds, so a
+/// borrowed one is not copied.
 ///
 /// # Errors
 ///
@@ -107,10 +110,14 @@ impl Space {
 /// let snapshot = decode_space_snapshot(&snapshot, id).unwrap();
 ///
 /// let refused = load_space(snapshot).unwrap_err();
-/// assert_eq!(refused.as_slice()[0].kind(), RefusalKind::MapMemberMissingResource);
+/// assert_eq!(
+///     refused.as_slice()[0].kind(),
+///     RefusalKind::MapMemberMissingResource,
+///     "a Map member naming no Resource is refused"
+/// );
 /// ```
-pub fn load_space(snapshot: SpaceSnapshot) -> Result<Space, Refusals> {
-    let snapshot = checked_shape(&snapshot)?;
+pub fn load_space(snapshot: impl Borrow<SpaceSnapshot>) -> Result<Space, Refusals> {
+    let snapshot = checked_shape(snapshot.borrow())?;
     Refusals::check(reference_refusals(&snapshot))?;
     let resources = snapshot
         .resources

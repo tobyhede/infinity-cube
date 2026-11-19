@@ -258,20 +258,24 @@ mod tests {
         }
     }
 
-    #[test]
-    fn misdirects_with_plain_text_that_is_never_cached() {
-        let response = misdirected();
-        assert_eq!(response.status(), 421, "421");
-        assert_eq!(
-            response.headers()[CONTENT_TYPE],
-            "text/plain; charset=utf-8",
-            "plain text"
-        );
-        assert_eq!(
-            response.headers()[CACHE_CONTROL],
-            "no-store",
-            "never cached"
-        );
+    mod given_a_request_naming_another_host {
+        use super::*;
+
+        #[test]
+        fn misdirects_with_plain_text_that_is_never_cached() {
+            let response = misdirected();
+            assert_eq!(response.status(), 421, "421");
+            assert_eq!(
+                response.headers()[CONTENT_TYPE],
+                "text/plain; charset=utf-8",
+                "plain text"
+            );
+            assert_eq!(
+                response.headers()[CACHE_CONTROL],
+                "no-store",
+                "never cached"
+            );
+        }
     }
 
     mod given_a_listener_on_port_80 {

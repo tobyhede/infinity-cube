@@ -46,13 +46,13 @@ impl Clock for TokioClock {
 }
 
 /// What the writer did, reported as it happens.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
-pub enum RunEvent {
+pub enum RunEvent<'a> {
     /// The directory holds every Edit committed before the write began.
     Written,
     /// A write failed; it is tried again after the quiet period.
-    WriteFailed(ExportError),
+    WriteFailed(&'a ExportError),
 }
 
 /// How a run stopped.
@@ -65,7 +65,7 @@ pub enum RunStopped {
     Unwritten(ExportError),
 }
 
-type Reporter = Arc<dyn Fn(&RunEvent) + Send + Sync>;
+type Reporter = Arc<dyn Fn(&RunEvent<'_>) + Send + Sync>;
 type ErrorReporter = Arc<dyn Fn(&str, &RepositoryError) + Send + Sync>;
 
 /// A run's application: the memory store, the run's ids and the caller's shell.
@@ -78,16 +78,13 @@ pub struct RunBuilder<D, I, C, F = TokioFilesystem> {
     ids: I,
     clock: C,
     fs: F,
-    quiet: Duration,
     report: Option<Reporter>,
     failed: Option<ErrorReporter>,
 }
 
 impl<D, I, C, F> std::fmt::Debug for RunBuilder<D, I, C, F> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("RunBuilder")
-            .field("quiet", &self.quiet)
-            .finish_non_exhaustive()
+        f.debug_struct("RunBuilder").finish_non_exhaustive()
     }
 }
 
@@ -103,7 +100,6 @@ impl<D, I, C, F> RunBuilder<D, I, C, F> {
             ids: self.ids,
             clock: self.clock,
             fs: self.fs,
-            quiet: self.quiet,
             report: self.report,
             failed: self.failed,
         }
@@ -116,7 +112,6 @@ impl<D, I, C, F> RunBuilder<D, I, C, F> {
             ids,
             clock: self.clock,
             fs: self.fs,
-            quiet: self.quiet,
             report: self.report,
             failed: self.failed,
         }
@@ -129,7 +124,6 @@ impl<D, I, C, F> RunBuilder<D, I, C, F> {
             ids: self.ids,
             clock,
             fs: self.fs,
-            quiet: self.quiet,
             report: self.report,
             failed: self.failed,
         }
@@ -142,7 +136,6 @@ impl<D, I, C, F> RunBuilder<D, I, C, F> {
             ids: self.ids,
             clock: self.clock,
             fs,
-            quiet: self.quiet,
             report: self.report,
             failed: self.failed,
         }
@@ -150,7 +143,7 @@ impl<D, I, C, F> RunBuilder<D, I, C, F> {
 
     /// Hear each write and each failed write.
     #[must_use]
-    pub fn on_event(mut self, report: impl Fn(&RunEvent) + Send + Sync + 'static) -> Self {
+    pub fn on_event(mut self, report: impl Fn(&RunEvent<'_>) + Send + Sync + 'static) -> Self {
         self.report = Some(Arc::new(report));
         self
     }
@@ -195,7 +188,6 @@ impl<I: IdSource, C: Clock, F: Filesystem> RunBuilder<PathBuf, I, C, F> {
             fs: self.fs,
             directory: self.directory,
             clock: self.clock,
-            quiet: self.quiet,
             report: self.report,
             edits,
         };
@@ -237,7 +229,6 @@ impl Run<Unset, Unset> {
             ids: Unset,
             clock: Unset,
             fs: TokioFilesystem,
-            quiet: RUN_QUIET_PERIOD,
             report: None,
             failed: None,
         }
@@ -269,13 +260,12 @@ struct Writer<C, F> {
     fs: F,
     directory: PathBuf,
     clock: C,
-    quiet: Duration,
     report: Option<Reporter>,
     edits: Arc<Notify>,
 }
 
 impl<C: Clock, F: Filesystem> Writer<C, F> {
-    fn report(&self, event: &RunEvent) {
+    fn report(&self, event: &RunEvent<'_>) {
         if let Some(report) = &self.report {
             report(event);
         }
@@ -283,20 +273,15 @@ impl<C: Clock, F: Filesystem> Writer<C, F> {
 
     /// One write; `None` when it landed.
     async fn write(&self) -> Option<ExportError> {
-        match export_aggregate(self.repository.as_ref(), &self.fs, &self.directory).await {
-            Ok(_) => {
-                self.report(&RunEvent::Written);
-                None
-            }
-            Err(error) => {
-                let event = RunEvent::WriteFailed(error);
-                self.report(&event);
-                match event {
-                    RunEvent::WriteFailed(error) => Some(error),
-                    RunEvent::Written => None,
-                }
-            }
-        }
+        let failure = export_aggregate(self.repository.as_ref(), &self.fs, &self.directory)
+            .await
+            .err();
+        self.report(
+            &failure
+                .as_ref()
+                .map_or(RunEvent::Written, RunEvent::WriteFailed),
+        );
+        failure
     }
 
     async fn run(self, mut stop: oneshot::Receiver<()>) -> RunStopped {
@@ -315,7 +300,7 @@ impl<C: Clock, F: Filesystem> Writer<C, F> {
                     biased;
                     _ = &mut stop => return self.flush(changed, failure).await,
                     () = self.edits.notified() => {}
-                    () = self.clock.sleep(self.quiet) => break,
+                    () = self.clock.sleep(RUN_QUIET_PERIOD) => break,
                 }
             }
             failure = self.write().await;

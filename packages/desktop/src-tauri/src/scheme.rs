@@ -244,6 +244,10 @@ impl OpenTalks {
     /// Answer one request the window labelled `window` made. With
     /// `INFINITY_CUBE_LOG_ADMISSIONS` set, each change admitted is named on
     /// standard error with the header that admitted it.
+    #[expect(
+        clippy::print_stderr,
+        reason = "the admissions log is written to standard error"
+    )]
     pub async fn answer(&self, window: &str, request: Request<Vec<u8>>) -> Response<Vec<u8>> {
         match self.admit(window, request) {
             Ok(admitted) => {

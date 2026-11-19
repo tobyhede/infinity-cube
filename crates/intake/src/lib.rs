@@ -57,7 +57,7 @@ pub use model::{
     DOCUMENT_VERSION, Edge, Graph, HeadShape, Map, MapKind, Placement, Resource, Size,
     SpaceDocument, SpaceSnapshot,
 };
-pub use plugins::{is_plugin_kind, plugin_kinds};
+pub use plugins::{ContentKey, is_plugin_kind, plugin_content_keys, plugin_kinds};
 pub use refusal::{
     EdgeEnd, EdgeEnds, Refusal, RefusalKind, Refusals, SelectionProblem, ShapeProblem,
 };

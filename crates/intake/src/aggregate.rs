@@ -2,6 +2,7 @@
 //! intake, then the rules only the whole aggregate can answer, a stage at a
 //! time, a stage that refuses stopping intake.
 
+use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
 
 use crate::ids::ResourceId;
@@ -213,6 +214,9 @@ fn cycle_references(
 /// held rather than refused while a Resource of a missing kind remains
 /// (ADR 0142).
 ///
+/// The snapshots are read, not kept: borrowed ones are not copied, since
+/// each Space's intake builds the snapshot it holds from its shape.
+///
 /// Give the snapshots ascending by Space id, as Import and a commit both do:
 /// a repeated Resource is reported in each Space after the first, and the
 /// cycle walk starts from each Space, in the order given.
@@ -220,20 +224,21 @@ fn cycle_references(
 /// # Errors
 ///
 /// Returns the refusals of the first stage that refuses: every Space's
-/// refusals together, or the aggregate stage's.
+/// refusals together, each Space named by its position among `snapshots`
+/// ([`Refusals::space_stage`]), or the aggregate stage's.
 pub fn load_aggregate(
     meta_space_id: SpaceId,
-    snapshots: Vec<SpaceSnapshot>,
+    snapshots: impl IntoIterator<Item = impl Borrow<SpaceSnapshot>>,
 ) -> Result<SpaceAggregate, Refusals> {
-    let mut spaces = Vec::with_capacity(snapshots.len());
-    let mut refusals = Vec::new();
-    for snapshot in snapshots {
+    let mut spaces = Vec::new();
+    let mut refused = Vec::new();
+    for (position, snapshot) in snapshots.into_iter().enumerate() {
         match load_space(snapshot) {
             Ok(space) => spaces.push(space),
-            Err(refused) => refusals.extend(refused),
+            Err(refusals) => refused.push((position, refusals)),
         }
     }
-    Refusals::check(refusals)?;
+    Refusals::check_spaces(refused)?;
 
     Refusals::check(
         repeated(spaces.iter().map(Space::id))

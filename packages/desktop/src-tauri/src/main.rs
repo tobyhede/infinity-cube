@@ -413,6 +413,10 @@ fn stop_server(app: &AppHandle, server: TalkServer, directory: &Path) {
 
 /// Say that `directory`'s last edit may not be on disk, on standard error,
 /// and when `dialog`, in a dialog, returning once it is dismissed.
+#[expect(
+    clippy::print_stderr,
+    reason = "a write that failed is reported on standard error"
+)]
 fn report_unwritten(app: &AppHandle, directory: &Path, reason: &str, dialog: bool) {
     let message = unwritten_message(directory, reason);
     eprintln!("{message}");
@@ -441,6 +445,10 @@ fn show_error(app: &AppHandle, message: &str) {
         .show(|_| {});
 }
 
+#[expect(
+    clippy::print_stderr,
+    reason = "a shell that cannot start, and a write that failed on quitting, are reported on standard error"
+)]
 fn main() {
     let open_talks: SharedTalks = Arc::new(OpenTalks::new(SchemeStyle::CURRENT));
     let scheme_talks = Arc::clone(&open_talks);

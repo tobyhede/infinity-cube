@@ -84,31 +84,35 @@ fn disagreement(case: &Path) -> Option<String> {
     })
 }
 
-#[test]
-fn every_directory_case_of_the_intake_corpus_gets_its_expected_answer() {
-    let mut cases: Vec<_> = fs::read_dir(corpus().join("directory"))
-        .unwrap()
-        .map(|entry| entry.unwrap().path())
-        .filter(|path| path.is_dir())
-        .collect();
-    cases.sort();
-    assert!(
-        cases.len() > 50,
-        "the corpus should hold its directory cases"
-    );
-    let failures: Vec<String> = cases
-        .iter()
-        .filter_map(|case| {
-            disagreement(case)
-                .map(|why| format!("{}:\n{why}", case.file_name().unwrap().to_string_lossy()))
-        })
-        .collect();
-    assert!(
-        failures.is_empty(),
-        "{} cases disagree:\n{}",
-        failures.len(),
-        failures.join("\n\n")
-    );
+mod given_the_intake_corpus {
+    use super::*;
+
+    #[test]
+    fn answers_each_directory_case_as_its_expect_says() {
+        let mut cases: Vec<_> = fs::read_dir(corpus().join("directory"))
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .filter(|path| path.is_dir())
+            .collect();
+        cases.sort();
+        assert!(
+            cases.len() > 50,
+            "the corpus should hold its directory cases"
+        );
+        let failures: Vec<String> = cases
+            .iter()
+            .filter_map(|case| {
+                disagreement(case)
+                    .map(|why| format!("{}:\n{why}", case.file_name().unwrap().to_string_lossy()))
+            })
+            .collect();
+        assert!(
+            failures.is_empty(),
+            "{} cases disagree:\n{}",
+            failures.len(),
+            failures.join("\n\n")
+        );
+    }
 }
 
 mod given_an_accepted_directory {
@@ -209,12 +213,16 @@ mod given_a_missing_or_empty_directory {
     }
 }
 
-#[test]
-fn exits_two_on_a_usage_error() {
-    let output = Command::new(BINARY).args(["check"]).output().unwrap();
-    assert_eq!(output.status.code(), Some(2), "no directory");
-    assert!(
-        text(&output.stderr).starts_with("Usage: infinity-cube"),
-        "usage"
-    );
+mod given_no_directory_argument {
+    use super::*;
+
+    #[test]
+    fn exits_two_on_a_usage_error() {
+        let output = Command::new(BINARY).args(["check"]).output().unwrap();
+        assert_eq!(output.status.code(), Some(2), "no directory");
+        assert!(
+            text(&output.stderr).starts_with("Usage: infinity-cube"),
+            "usage"
+        );
+    }
 }

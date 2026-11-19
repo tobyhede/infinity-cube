@@ -1,3 +1,7 @@
+#[expect(
+    clippy::print_stderr,
+    reason = "a build script reports its failure on standard error"
+)]
 fn main() {
     // `open_talk` and `answer_closing` are the only commands the application
     // defines; declaring them here makes each a permission a capability

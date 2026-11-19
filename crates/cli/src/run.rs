@@ -44,7 +44,7 @@ fn import_refusal(directory: &Path, error: &ImportError) -> String {
     }
 }
 
-fn report(event: &RunEvent) {
+fn report(event: &RunEvent<'_>) {
     if let RunEvent::WriteFailed(error) = event {
         say(&format!("Could not write the directory: {error}"));
     }

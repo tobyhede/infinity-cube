@@ -11,6 +11,7 @@ import {
   type ResourceFile,
 } from '@project/graph';
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import aggregateJsonSchema from '../../docs/schema/aggregate.schema.json';
 import idSchema from '../../docs/schema/id.schema.json';
 import envelopeSchema from '../../docs/schema/resource/envelope.schema.json';
@@ -264,6 +265,24 @@ describe('the Resource file JSON Schema', () => {
       resourceSchema.$defs.builtInKinds.oneOf.map(({ properties }) => properties.kind.const).sort(),
     ).toEqual([...LISTED_KINDS].sort());
   });
+
+  // Both runtimes' corpus runners accept that case and Export it to the bytes
+  // its `export/` records (`conformance/intake/README.md`), so this holds
+  // each runtime to accepting every published example.
+  it.each(LISTED_KINDS)(
+    'carries the published %s example byte for byte in the corpus case accepted-resource-file-examples',
+    (kind) => {
+      const text = readFileSync(join(examples, `${kind}.json`), 'utf8');
+      const { id: exampleId } = z.object({ id: z.string() }).parse(JSON.parse(text));
+      const carried = join(
+        repoRoot,
+        'conformance/intake/directory/accepted-resource-file-examples/aggregate',
+        '10000000-0000-4000-8000-000000000001/resources',
+        `${exampleId}.json`,
+      );
+      expect(readFileSync(carried, 'utf8')).toBe(text);
+    },
+  );
 
   it.each(LISTED_KINDS)('accepts the published %s example', (kind) => {
     const example: unknown = JSON.parse(readFileSync(join(examples, `${kind}.json`), 'utf8'));

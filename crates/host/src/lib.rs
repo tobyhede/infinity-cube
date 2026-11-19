@@ -55,18 +55,9 @@
 //! # }
 //! ```
 
-// `unsafe_code`, `unwrap_used`, `expect_used` and `panic` come from the root
-// `Cargo.toml`'s lint table, which every member inherits; these are this
-// crate's additions.
-#![deny(
-    missing_docs,
-    missing_debug_implementations,
-    clippy::todo,
-    clippy::unimplemented,
-    clippy::dbg_macro,
-    clippy::print_stdout,
-    clippy::print_stderr
-)]
+// The root `Cargo.toml`'s lint table, which every member inherits, sets the
+// rest; these are this crate's additions.
+#![deny(missing_docs, missing_debug_implementations)]
 #![cfg_attr(not(test), deny(clippy::indexing_slicing))]
 
 mod assets;

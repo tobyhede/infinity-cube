@@ -2,7 +2,7 @@
 //! Resource reference, and may not itself be a Target, so referencing is one
 //! hop (ADR 0113). `packages/plugin-reference/src/domain.ts`.
 
-use super::{Plugin, check_open, content_id};
+use super::{ContentKey, Plugin, check_open, content_id, key_names};
 use crate::ids::ResourceId;
 use crate::json::JsonValue;
 use crate::shape::{Checker, Status, Strictness};
@@ -10,9 +10,15 @@ use crate::shape::{Checker, Status, Strictness};
 /// The Reference plugin.
 pub(crate) struct Reference;
 
+const CONTENT_KEYS: [ContentKey; 1] = [ContentKey::flat("target")];
+
 impl Plugin for Reference {
     fn kind(&self) -> &'static str {
         "reference"
+    }
+
+    fn content_keys(&self) -> &'static [ContentKey] {
+        &CONTENT_KEYS
     }
 
     fn check_content<'a>(
@@ -20,7 +26,9 @@ impl Plugin for Reference {
         checker: &mut Checker<'a>,
         content: Option<&'a JsonValue>,
     ) -> Status {
-        let Some(mut object) = checker.object(content, &["target"], Strictness::Strict) else {
+        let Some(mut object) =
+            checker.object(content, &key_names(&CONTENT_KEYS), Strictness::Strict)
+        else {
             return Status::Aborted;
         };
         let target = object.get("target");
