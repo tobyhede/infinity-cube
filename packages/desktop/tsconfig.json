@@ -1,11 +1,14 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    // The desktop package imports nothing of ours: the sidecar it ships is
-    // built from `src/desktop/` by `@project/app`'s build, and the shell is
-    // Rust (`src-tauri/`). Only the build script is TypeScript.
+    // The desktop package imports nothing of ours: the shell is Rust
+    // (`src-tauri/`), serving the browser application `@project/app` builds
+    // through the Rust host. Only the home window's script is checked here.
     "paths": {},
-    "types": ["node"]
+    "allowJs": true,
+    "checkJs": true,
+    // The home window's script is a global script, not a module.
+    "moduleDetection": "auto"
   },
-  "include": ["scripts"]
+  "include": ["ui"]
 }

@@ -252,9 +252,8 @@ export default tseslint.config(
       '**/dist-mount/**',
       // The Cargo workspace's target directory.
       'target/**',
-      // The desktop shell's generated schemas and built sidecar.
+      // The desktop shell's generated schemas.
       'packages/desktop/src-tauri/gen/**',
-      'packages/desktop/src-tauri/binaries/**',
       // `ladle build` output is gitignored, but flat ESLint config does not
       // read `.gitignore` and would otherwise lint the generated bundles.
       'packages/app/build/**',
@@ -438,8 +437,8 @@ export default tseslint.config(
       ],
     },
   },
-  // The desktop shell imports no package of ours: the sidecar it runs is built
-  // from `src/desktop/` by `@project/app`, and its home window is plain script.
+  // The desktop shell imports no package of ours: it is Rust, serving the
+  // browser application `@project/app` builds, and its home window is plain script.
   {
     files: ['packages/desktop/**/*.{ts,tsx,js}'],
     rules: {
@@ -451,7 +450,7 @@ export default tseslint.config(
             {
               group: ['@project/*'],
               message:
-                'The desktop shell imports no package of ours; the sidecar is built from src/desktop/ by @project/app (AGENTS.md).',
+                'The desktop shell imports no package of ours; it serves the browser application @project/app builds (AGENTS.md).',
             },
           ],
         },

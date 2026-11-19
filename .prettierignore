@@ -4,7 +4,6 @@
 **/dist-mount/**
 target/**
 packages/desktop/src-tauri/gen/**
-packages/desktop/src-tauri/binaries/**
 **/node_modules/**
 **/playwright-report/**
 **/test-results/**

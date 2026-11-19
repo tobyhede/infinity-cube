@@ -594,18 +594,20 @@ jobs:
     timeout-minutes: 30
     env:
       NEXTEST_VERSION: 0.9.152
-    # The Cargo workspace at the repository root: `crates/intake`, `crates/host`
-    # and the desktop shell, `packages/desktop/src-tauri`. Its own job because a
+    # The Cargo workspace at the repository root: `crates/intake`, `crates/host`,
+    # `crates/cli` and the desktop shell, `packages/desktop/src-tauri`. Its own job because a
     # Rust toolchain, WebKitGTK and a `target/` directory share nothing with the
     # pnpm jobs but the checkout, and a red clippy is a different diagnosis from
     # a red `tsc`.
     #
     # The shell is built here, not only the crates: its build script demands the
-    # files `tauri.conf.json` names, so `sidecar:build` runs first, which builds
-    # the browser application and the sidecar executable and so needs the pinned
-    # Node (`setup-node` below). The toolchain is whatever `rust-toolchain.toml`
-    # pins; `rustup toolchain install` with no argument reads that file, so the
-    # version lives in one place.
+    # files `tauri.conf.json` names, so the browser application it bundles,
+    # `packages/app/dist`, is built first, which needs the pinned Node
+    # (`setup-node` below); the CLI embeds the same build further down. The
+    # shell serves it through the Rust host, so nothing else is built for it.
+    # The toolchain is whatever `rust-toolchain.toml` pins; `rustup toolchain
+    # install` with no argument reads that file, so the version lives in one
+    # place.
     #
     # `cargo-nextest` is installed with `cargo install --locked` at the version
     # `NEXTEST_VERSION` pins and kept in the cache with the registry and
@@ -648,8 +650,8 @@ jobs:
           restore-keys: cargo-${{ runner.os }}-nextest-${{ env.NEXTEST_VERSION }}-${{ hashFiles('rust-toolchain.toml') }}-
       - name: Install cargo-nextest
         run: command -v cargo-nextest || cargo install cargo-nextest --locked --version "$NEXTEST_VERSION"
-      - name: Build what the shell bundles
-        run: pnpm --filter @project/desktop sidecar:build
+      - name: Build the browser application the shell bundles
+        run: pnpm --filter @project/app exec vite build
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       # nextest runs no doctests, so the examples in the crates' docs run here.
       - run: cargo test --workspace --doc --locked
@@ -657,7 +659,7 @@ jobs:
       # The Rust CLI (`crates/cli`) held to the HTTP conformance suite
       # (`conformance/http/README.md`), the same process cases the `postgres`
       # job runs against the production Node host. Built with the browser
-      # application `sidecar:build` wrote above embedded, as a release is; then
+      # application built above embedded, as a release is; then
       # run twice: carrying that build, and handed the suite's stand-in build
       # through `--built {built}`, which adds the cases that check the built
       # files byte for byte. The intake corpus through `check` is a nextest

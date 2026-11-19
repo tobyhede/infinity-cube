@@ -5,10 +5,9 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "sidecar:build": "node scripts/build-sidecar.ts",
     "tauri": "tauri",
-    "dev": "pnpm sidecar:build && tauri dev",
-    "build": "pnpm sidecar:build && tauri build"
+    "dev": "pnpm --filter @project/app exec vite build && tauri dev",
+    "build": "pnpm --filter @project/app exec vite build && tauri build"
   },
   "devDependencies": {
     "@tauri-apps/cli": "2.12.4"

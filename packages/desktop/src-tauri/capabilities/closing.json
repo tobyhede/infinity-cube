@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "closing",
+  "description": "A close's question window may answer it, and nothing else.",
+  "windows": ["closing-*"],
+  "permissions": ["allow-answer-closing"]
+}

@@ -1,19 +1,22 @@
 # InfinityCube desktop
 
-The desktop application (ADR 0155, first stage): a Tauri shell whose talk windows are each served by a desktop sidecar, the Node host in `src/desktop/` built into a single executable.
+The desktop application (ADR 0155): a Tauri shell that opens each Aggregate directory in a window of its own, served by a run of the Rust host (`crates/host`) in the shell's own process. There is no sidecar and no port: each talk is served through the `infinitycube` URI scheme at an origin of its own (Storage ST-121).
+
+- `src-tauri/src/address.rs` — a talk's origin, `infinitycube://<key>`, where `<key>` is half the SHA-256 of the folder's canonical path: the same on every launch, so the page's `localStorage` (the colour scheme) survives a restart; moving or renaming the folder gives it a new one. On Windows each talk gets a scheme of its own instead (`.scratch/rust-host/issues/13-swap-the-sidecar-for-the-rust-host.md`).
+- `src-tauri/src/scheme.rs` — the scheme handler, a plain `Request -> Response` function: it answers only the talk's own windows, and a change only from the talk's own page, and hands everything else to the host's application unchanged.
+- `src-tauri/src/server.rs` — the seam the window code talks to, and the run behind it. Closing a talk's window waits for the run to write any edit not yet on disk, however long that takes; a failed write is reported in a dialog.
 
 The home window (`ui/`) sits outside UI-1's shadcn-first rule (`docs/requirements/ui.md`): this package imports none of our packages, which its `no-restricted-imports` zone in `eslint.config.js` forbids, and its home page is a static page with one button, not the React application, so its hand-rolled `<button>` and `home.css` record no deviation.
 
 ## Build
 
-Needs Node 26 (the sidecar is a copy of the Node that builds it), pnpm, Rust, and [Tauri's system prerequisites](https://v2.tauri.app/start/prerequisites/).
+Needs Node 26 and pnpm (for the browser application), Rust, and [Tauri's system prerequisites](https://v2.tauri.app/start/prerequisites/).
 
 ```sh
 pnpm install
-pnpm --filter @project/desktop sidecar:build   # browser app + sidecar executable
-pnpm --filter @project/desktop tauri build     # the installable bundle
+pnpm --filter @project/desktop build   # the browser application, then the installable bundle
 ```
 
-For a quick run without bundling: `cargo build -p infinity-cube-desktop` from the repository root, then `target/debug/infinity-cube-desktop <Aggregate directory>` (the Cargo workspace's `target/` is at the root).
+For a quick run without bundling: `pnpm --filter @project/app exec vite build` once, then `cargo build -p infinity-cube-desktop` from the repository root and `target/debug/infinity-cube-desktop <Aggregate directory>` (the Cargo workspace's `target/` is at the root). `cargo test -p infinity-cube-desktop` (or `cargo nextest run`) runs the scheme handler against a copy of `packages/app/fixture` without opening a window.
 
 The first release is unsigned: on macOS, allow it once under System Settings › Privacy & Security › Open Anyway.
