@@ -181,24 +181,28 @@ mod given_a_stale_change {
     }
 }
 
-#[test]
-fn rejects_a_commit_to_a_store_with_no_meta_space() {
-    let result = answer(decide_commit(
-        &commit(vec![update(plain(CHILD, "Renamed"), 3)]),
-        None,
-        &two_spaces(),
-    ));
-    assert!(
-        matches!(result, CommitResult::Rejected { .. }),
-        "got {result:?}"
-    );
+mod given_a_store_with_no_meta_space {
+    use super::*;
+
+    #[test]
+    fn rejects_a_commit() {
+        let result = answer(decide_commit(
+            &commit(vec![update(plain(CHILD, "Renamed"), 3)]),
+            None,
+            &two_spaces(),
+        ));
+        assert!(
+            matches!(result, CommitResult::Rejected { .. }),
+            "got {result:?}"
+        );
+    }
 }
 
 mod given_a_change_that_lands {
     use super::*;
 
     #[test]
-    fn writes_every_space_with_the_next_revision_keeping_its_exported_one() {
+    fn writes_the_changed_space_alone_with_the_next_revision_keeping_its_exported_one() {
         let mut spaces = two_spaces();
         spaces[1].exported_revision = Revision::new(2);
         let decision = decide_commit(
@@ -206,7 +210,12 @@ mod given_a_change_that_lands {
             Some(id(META)),
             &spaces,
         );
-        let CommitDecision::Write { result, spaces } = decision else {
+        let CommitDecision::Write {
+            result,
+            written,
+            deleted,
+        } = decision
+        else {
             panic!("expected a write, got {decision:?}");
         };
         assert_eq!(
@@ -217,21 +226,122 @@ mod given_a_change_that_lands {
             },
             "the next revision"
         );
-        assert_eq!(spaces.len(), 2, "every Space");
         assert_eq!(
-            spaces[1].snapshot.document.title, "Renamed",
+            written
+                .iter()
+                .map(|space| space.snapshot.id)
+                .collect::<Vec<_>>(),
+            vec![id(CHILD)],
+            "only the changed Space is written; the Meta Space stays as stored"
+        );
+        assert_eq!(
+            written[0].snapshot.document.title, "Renamed",
             "the change applied"
         );
         assert_eq!(
-            spaces[1].exported_revision,
+            written[0].revision,
+            Revision::new(4).unwrap(),
+            "next revision"
+        );
+        assert_eq!(
+            written[0].exported_revision,
             Revision::new(2),
             "exported revision kept"
         );
+        assert!(deleted.is_empty(), "nothing deleted");
+    }
+
+    #[test]
+    fn writes_the_referrer_and_names_the_space_it_deletes() {
+        let delete = SpaceChange::Delete {
+            space_id: id(CHILD),
+            expected_revision: Revision::new(3).unwrap(),
+        };
+        let decision = decide_commit(
+            &commit(vec![delete, update(plain(META, "Meta"), 3)]),
+            Some(id(META)),
+            &two_spaces(),
+        );
+        let CommitDecision::Write {
+            result,
+            written,
+            deleted,
+        } = decision
+        else {
+            panic!("expected a write, got {decision:?}");
+        };
+        assert_eq!(
+            result,
+            CommitResult::Committed {
+                revisions: vec![(id(META), Revision::new(4).unwrap())],
+                deleted_space_ids: vec![id(CHILD)],
+            },
+            "the Meta Space's next revision and the deletion"
+        );
+        assert_eq!(
+            written
+                .iter()
+                .map(|space| space.snapshot.id)
+                .collect::<Vec<_>>(),
+            vec![id(META)],
+            "the deleted Space is not written"
+        );
+        assert_eq!(deleted, vec![id(CHILD)], "the deleted Space");
     }
 }
 
 mod given_a_candidate_aggregate_intake_refuses {
     use super::*;
+
+    /// ADR 0159: the candidate is judged ascending by Space id, a created
+    /// Space among the stored ones, so a created Space whose id sorts first
+    /// is the first to hold a Resource id, and the stored Space holding it
+    /// too is the one refused.
+    #[test]
+    fn judges_a_created_space_whose_id_sorts_first_before_the_stored_ones() {
+        const EARLY: &str = "0f000000-0000-4000-8000-000000000004";
+        const SHARED: &str = "00000000-0000-4000-8000-000000000201";
+        let created = snapshot(&format!(
+            r#"{{"id":"{EARLY}","document":{{"version":1,"title":"Early"}},"resources":[{{"id":"{SHARED}","document":{{"title":"Shared","kind":"ur","content":{{}}}}}}]}}"#
+        ));
+        let stored = two_spaces();
+        assert!(
+            stored[0]
+                .snapshot
+                .resources
+                .iter()
+                .any(|resource| resource.id.as_str() == SHARED),
+            "the stored Meta Space holds the shared Resource id"
+        );
+        let result = answer(decide_commit(
+            &commit(vec![SpaceChange::Create {
+                space_id: id(EARLY),
+                snapshot: created,
+            }]),
+            Some(id(META)),
+            &stored,
+        ));
+        let CommitResult::AggregateRefused(refusal) = result else {
+            panic!("expected a refusal, got {result:?}");
+        };
+        let shared = intake::ResourceId::parse(SHARED).unwrap();
+        assert_eq!(
+            refusal.refusals,
+            vec![Refusal::DuplicateResourceId {
+                space: id(META),
+                resource: shared,
+            }],
+            "the stored Meta Space, after the created one by id, holds the repeat"
+        );
+        assert_eq!(
+            refusal.errors,
+            vec![AggregateRefusal::DuplicateResourceId {
+                resource_id: shared,
+                space_ids: vec![id(EARLY), id(META)],
+            }],
+            "each Space holding it, ascending by id"
+        );
+    }
 
     #[test]
     fn refuses_a_created_space_nothing_references() {

@@ -155,68 +155,81 @@ pub(crate) fn resolves(snapshot: &SpaceSnapshot, destination: Destination) -> bo
 mod tests {
     use super::*;
 
-    #[test]
-    fn spells_a_uuid_in_twenty_two_digits_and_reads_it_back() {
-        let id = Uuid::parse("00000000-0000-4000-8000-000000000040").unwrap();
-        let compact = encode_compact(id);
-        assert_eq!(
-            compact, "AAAAAAAAQACAAAAAAAAAQA",
-            "the fixture's Meta Space"
-        );
-        assert_eq!(decode_compact(&compact), Some(id), "read back");
-        assert_eq!(
-            decode_compact("AAAAAAAAQACAAAAAAAAAQB"),
-            None,
-            "unused bits set"
-        );
-        assert_eq!(decode_compact("not-an-id"), None, "too short");
-    }
+    mod given_a_uuid {
+        use super::*;
 
-    #[test]
-    fn reads_back_an_id_whose_first_digit_is_not_zero() {
-        let id = Uuid::parse("a1234567-89ab-4cde-8fab-0123456789ab").unwrap();
-        let compact = encode_compact(id);
-        assert_eq!(
-            compact, "oSNFZ4mrTN6PqwEjRWeJqw",
-            "the top bits are spelled"
-        );
-        assert_eq!(decode_compact(&compact), Some(id), "and read back");
-        let all = Uuid::parse("ffffffff-ffff-4fff-bfff-ffffffffffff").unwrap();
-        assert_eq!(
-            decode_compact(&encode_compact(all)),
-            Some(all),
-            "every bit set"
-        );
-    }
-
-    proptest::proptest! {
         #[test]
-        fn every_id_reads_back_from_its_compact_spelling(value: u128) {
-            let id = Uuid::from_u128(value);
-            proptest::prop_assert_eq!(decode_compact(&encode_compact(id)), Some(id));
+        fn spells_it_in_twenty_two_digits_and_reads_it_back() {
+            let id = Uuid::parse("00000000-0000-4000-8000-000000000040").unwrap();
+            let compact = encode_compact(id);
+            assert_eq!(
+                compact, "AAAAAAAAQACAAAAAAAAAQA",
+                "the fixture's Meta Space"
+            );
+            assert_eq!(decode_compact(&compact), Some(id), "read back");
+            assert_eq!(
+                decode_compact("AAAAAAAAQACAAAAAAAAAQB"),
+                None,
+                "unused bits set"
+            );
+            assert_eq!(decode_compact("not-an-id"), None, "too short");
+        }
+
+        #[test]
+        fn reads_back_one_whose_first_digit_is_not_zero() {
+            let id = Uuid::parse("a1234567-89ab-4cde-8fab-0123456789ab").unwrap();
+            let compact = encode_compact(id);
+            assert_eq!(
+                compact, "oSNFZ4mrTN6PqwEjRWeJqw",
+                "the top bits are spelled"
+            );
+            assert_eq!(decode_compact(&compact), Some(id), "and read back");
+            let all = Uuid::parse("ffffffff-ffff-4fff-bfff-ffffffffffff").unwrap();
+            assert_eq!(
+                decode_compact(&encode_compact(all)),
+                Some(all),
+                "every bit set"
+            );
+        }
+
+        proptest::proptest! {
+            #[test]
+            fn every_id_reads_back_from_its_compact_spelling(value: u128) {
+                let id = Uuid::from_u128(value);
+                proptest::prop_assert_eq!(
+                    decode_compact(&encode_compact(id)),
+                    Some(id),
+                    "{} reads back from its compact spelling",
+                    id
+                );
+            }
         }
     }
 
-    #[test]
-    fn tells_outside_malformed_and_addressed_apart() {
-        assert_eq!(address("/somewhere"), Address::Outside, "not ours");
-        assert_eq!(
-            address("/spaces"),
-            Address::Malformed,
-            "the collection is not addressable"
-        );
-        assert_eq!(address("/spaces/not-an-id"), Address::Malformed, "no id");
-        assert_eq!(
-            address("/spaces/AAAAAAAAQACAAAAAAAAAQA/nowhere"),
-            Address::Malformed,
-            "no such page"
-        );
-        assert!(
-            matches!(
-                address("/spaces/AAAAAAAAQACAAAAAAAAAQA/notes"),
-                Address::Addressed(_, Destination::Notes)
-            ),
-            "notes"
-        );
+    mod given_a_path {
+        use super::*;
+
+        #[test]
+        fn tells_outside_malformed_and_addressed_apart() {
+            assert_eq!(address("/somewhere"), Address::Outside, "not ours");
+            assert_eq!(
+                address("/spaces"),
+                Address::Malformed,
+                "the collection is not addressable"
+            );
+            assert_eq!(address("/spaces/not-an-id"), Address::Malformed, "no id");
+            assert_eq!(
+                address("/spaces/AAAAAAAAQACAAAAAAAAAQA/nowhere"),
+                Address::Malformed,
+                "no such page"
+            );
+            assert!(
+                matches!(
+                    address("/spaces/AAAAAAAAQACAAAAAAAAAQA/notes"),
+                    Address::Addressed(_, Destination::Notes)
+                ),
+                "notes"
+            );
+        }
     }
 }

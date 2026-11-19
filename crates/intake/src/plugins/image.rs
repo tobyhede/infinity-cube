@@ -2,7 +2,7 @@
 //! `http:`, `https:` or a stored asset, with its natural size when known.
 //! `packages/plugin-image/src/domain.ts`.
 
-use super::Plugin;
+use super::{ContentKey, Plugin, key_names};
 use crate::assets::is_asset_ref;
 use crate::json::JsonValue;
 use crate::refusal::ShapeProblem;
@@ -10,6 +10,16 @@ use crate::shape::{Checker, NumberCheck, Parsed, Status, Strictness, optional};
 
 /// The Image plugin.
 pub(crate) struct Image;
+
+const NATURAL_SIZE_KEYS: &[&str] = &["width", "height"];
+
+const CONTENT_KEYS: [ContentKey; 2] = [
+    ContentKey::flat("url"),
+    ContentKey {
+        name: "naturalSize",
+        nested: NATURAL_SIZE_KEYS,
+    },
+];
 
 /// Whether an Image Resource may hold this URL: an asset reference, or a URL
 /// the WHATWG parser accepts whose scheme is `https:` or `http:`.
@@ -21,11 +31,11 @@ pub(crate) fn is_accepted_image_url(url: &str) -> bool {
 }
 
 fn check_natural_size<'a>(checker: &mut Checker<'a>, value: &'a JsonValue) -> Parsed<()> {
-    let Some(mut object) = checker.object(Some(value), &["width", "height"], Strictness::Strict)
+    let Some(mut object) = checker.object(Some(value), NATURAL_SIZE_KEYS, Strictness::Strict)
     else {
         return Parsed::Aborted;
     };
-    for key in ["width", "height"] {
+    for key in NATURAL_SIZE_KEYS {
         let member = object.get(key);
         let parsed = checker.key(key, |c| {
             c.number(member, &[NumberCheck::Positive, NumberCheck::Finite])
@@ -40,12 +50,17 @@ impl Plugin for Image {
         "image"
     }
 
+    fn content_keys(&self) -> &'static [ContentKey] {
+        &CONTENT_KEYS
+    }
+
     fn check_content<'a>(
         &self,
         checker: &mut Checker<'a>,
         content: Option<&'a JsonValue>,
     ) -> Status {
-        let Some(mut object) = checker.object(content, &["url", "naturalSize"], Strictness::Strict)
+        let Some(mut object) =
+            checker.object(content, &key_names(&CONTENT_KEYS), Strictness::Strict)
         else {
             return Status::Aborted;
         };
@@ -82,25 +97,29 @@ impl Plugin for Image {
 mod tests {
     use super::*;
 
-    #[test]
-    fn accepts_web_and_asset_urls_only() {
-        for url in [
-            "https://example.com/a.png",
-            "http://example.com",
-            "HTTPS://EXAMPLE.COM/x",
-            "/assets/n4bQgYhMfWWaL-qgxVrQFaO_TxsrC4Is0V1sFbDwCgg",
-        ] {
-            assert!(is_accepted_image_url(url), "{url} should be accepted");
-        }
-        for url in [
-            "data:image/png;base64,AAAA",
-            "ftp://example.com/a.png",
-            "https://",
-            "//example.com/a.png",
-            "/a.png",
-            "a.png",
-        ] {
-            assert!(!is_accepted_image_url(url), "{url} should be refused");
+    mod given_an_image_url {
+        use super::*;
+
+        #[test]
+        fn accepts_web_and_asset_urls_only() {
+            for url in [
+                "https://example.com/a.png",
+                "http://example.com",
+                "HTTPS://EXAMPLE.COM/x",
+                "/assets/n4bQgYhMfWWaL-qgxVrQFaO_TxsrC4Is0V1sFbDwCgg",
+            ] {
+                assert!(is_accepted_image_url(url), "{url} should be accepted");
+            }
+            for url in [
+                "data:image/png;base64,AAAA",
+                "ftp://example.com/a.png",
+                "https://",
+                "//example.com/a.png",
+                "/a.png",
+                "a.png",
+            ] {
+                assert!(!is_accepted_image_url(url), "{url} should be refused");
+            }
         }
     }
 }

@@ -243,63 +243,75 @@ mod tests {
         located
     }
 
-    #[test]
-    fn decodes_a_whole_snapshot() {
-        let json = parse(
-            r#"{"id": "10000000-0000-4000-8000-000000000001",
-                "document": {"version": 1, "title": "Talk"},
-                "resources": [{"id": "00000000-0000-4000-8000-000000000101",
-                               "document": {"title": "A", "kind": "ur", "content": {}, "stripped": 1}}]}"#,
-        )
-        .unwrap();
-        let directory = SpaceId::parse("10000000-0000-4000-8000-000000000001").unwrap();
-        let snapshot = decode_space_snapshot(&json, directory).expect("the snapshot decodes");
-        assert_eq!(
-            snapshot.resources.len(),
-            1,
-            "its Resource, its unknown key stripped"
-        );
-    }
+    mod given_a_whole_snapshot {
+        use super::*;
 
-    #[test]
-    fn locates_each_fault_in_the_space_directory() {
-        let d = "10000000-0000-4000-8000-000000000001";
-        assert_eq!(
-            located(
-                r#"{"id": "10000000-0000-4000-8000-000000000001",
-                    "document": {"version": 1, "title": "", "id": "x"},
-                    "resources": [{"id": "00000000-0000-4000-8000-000000000101",
-                                   "document": {"title": "A", "kind": "ur", "content": {"x": 1}}},
-                                  {"id": 7, "document": {"title": "B", "kind": "reference", "content": {"target": "no"}}}]}"#
-            ),
-            vec![
-                (
-                    format!("{d}/resources/00000000-0000-4000-8000-000000000101.json"),
-                    Some("content".into())
-                ),
-                (
-                    format!("{d}/resources/[1].json"),
-                    Some("content.target".into())
-                ),
-                (format!("{d}/resources/[1].json"), Some("id".into())),
-                (format!("{d}/space.json"), None),
-                (format!("{d}/space.json"), Some("title".into())),
-            ],
-            "the snapshot's document is space.json, each Resource its own file"
-        );
-    }
-
-    #[test]
-    fn locates_a_fault_in_resources_itself_at_the_resources_directory() {
-        let d = "10000000-0000-4000-8000-000000000001";
-        assert_eq!(
-            located(
+        #[test]
+        fn decodes_a_whole_snapshot() {
+            let json = parse(
                 r#"{"id": "10000000-0000-4000-8000-000000000001",
                     "document": {"version": 1, "title": "Talk"},
-                    "resources": 7}"#
-            ),
-            vec![(format!("{d}/resources"), None)],
-            "no one Resource file is at fault, so the directory is named"
-        );
+                    "resources": [{"id": "00000000-0000-4000-8000-000000000101",
+                                   "document": {"title": "A", "kind": "ur", "content": {}, "stripped": 1}}]}"#,
+            )
+            .unwrap();
+            let directory = SpaceId::parse("10000000-0000-4000-8000-000000000001").unwrap();
+            let snapshot = decode_space_snapshot(&json, directory).expect("the snapshot decodes");
+            assert_eq!(
+                snapshot.resources.len(),
+                1,
+                "its Resource, its unknown key stripped"
+            );
+        }
+    }
+
+    mod given_faults_in_the_space_directory {
+        use super::*;
+
+        #[test]
+        fn locates_each_fault_in_the_space_directory() {
+            let d = "10000000-0000-4000-8000-000000000001";
+            assert_eq!(
+                located(
+                    r#"{"id": "10000000-0000-4000-8000-000000000001",
+                        "document": {"version": 1, "title": "", "id": "x"},
+                        "resources": [{"id": "00000000-0000-4000-8000-000000000101",
+                                       "document": {"title": "A", "kind": "ur", "content": {"x": 1}}},
+                                      {"id": 7, "document": {"title": "B", "kind": "reference", "content": {"target": "no"}}}]}"#
+                ),
+                vec![
+                    (
+                        format!("{d}/resources/00000000-0000-4000-8000-000000000101.json"),
+                        Some("content".into())
+                    ),
+                    (
+                        format!("{d}/resources/[1].json"),
+                        Some("content.target".into())
+                    ),
+                    (format!("{d}/resources/[1].json"), Some("id".into())),
+                    (format!("{d}/space.json"), None),
+                    (format!("{d}/space.json"), Some("title".into())),
+                ],
+                "the snapshot's document is space.json, each Resource its own file"
+            );
+        }
+    }
+
+    mod given_a_fault_in_resources_itself {
+        use super::*;
+
+        #[test]
+        fn locates_it_at_the_resources_directory() {
+            let d = "10000000-0000-4000-8000-000000000001";
+            assert_eq!(
+                located(
+                    r#"{"id": "10000000-0000-4000-8000-000000000001",
+                        "document": {"version": 1, "title": "Talk"},
+                        "resources": 7}"#
+                ),
+                vec![(format!("{d}/resources"), None)],
+                "no one Resource file is at fault, so the directory is named"
+            );
+        }
     }
 }

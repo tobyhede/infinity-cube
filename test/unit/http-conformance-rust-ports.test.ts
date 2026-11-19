@@ -1,0 +1,164 @@
+import { readFileSync } from 'node:fs';
+import ts from 'typescript';
+import { describe, expect, it } from 'vitest';
+
+/*
+ * The HTTP conformance cases are written once, in TypeScript, and ported by
+ * hand to the Rust tests that hold the Rust host's application and run
+ * (`crates/host/tests/`) and the desktop scheme handler
+ * (`packages/desktop/src-tauri/src/scheme/tests.rs`) to them. This holds each
+ * port to the case lists: every case is ported, by a Rust test carrying the
+ * line `// Case: <name>` above it, or exempted below with the reason it cannot
+ * run against that port.
+ *
+ * A case's name is the first argument of its `it`, `it.each(…)` or
+ * `it.skipIf(…)` call, as written: a template literal's substitutions are
+ * each written `*`, and an `it.each` name keeps its `%s`.
+ */
+
+const CASE_FILES = [
+  'conformance/http/wire-cases.ts',
+  'conformance/http/store-condition-cases.ts',
+  'conformance/http/process-cases.ts',
+] as const;
+
+const read = (file: string): string =>
+  readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8');
+
+const isIt = (expression: ts.Expression): boolean =>
+  ts.isIdentifier(expression) && expression.text === 'it';
+
+/** The name a case is written with, or `undefined` for an argument that is not text. */
+const caseName = (argument: ts.Expression | undefined): string | undefined => {
+  if (argument === undefined) return undefined;
+  if (ts.isStringLiteral(argument) || ts.isNoSubstitutionTemplateLiteral(argument)) {
+    return argument.text;
+  }
+  if (ts.isTemplateExpression(argument)) {
+    return (
+      argument.head.text + argument.templateSpans.map((span) => `*${span.literal.text}`).join('')
+    );
+  }
+  return undefined;
+};
+
+/** Every case `file` declares, by name, in the order written. */
+const casesOf = (file: string): string[] => {
+  const source = ts.createSourceFile(file, read(file), ts.ScriptTarget.Latest, true);
+  const names: string[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node)) {
+      const callee = node.expression;
+      const declaresCase =
+        isIt(callee) ||
+        (ts.isCallExpression(callee) &&
+          ts.isPropertyAccessExpression(callee.expression) &&
+          isIt(callee.expression.expression));
+      const name = declaresCase ? caseName(node.arguments[0]) : undefined;
+      if (declaresCase) names.push(name ?? `<unnamed case at ${file}:${String(node.pos)}>`);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return names;
+};
+
+const MARKER = /^\s*\/\/ Case: (.+)$/gmu;
+
+/** The case names a Rust port's files mark. */
+const markedIn = (files: readonly string[]): string[] =>
+  files.flatMap((file) => [...read(file).matchAll(MARKER)].map((match) => match[1] ?? ''));
+
+interface Port {
+  readonly name: string;
+  readonly files: readonly string[];
+  /** Each case that cannot run against the port, with why. */
+  readonly exempt: Readonly<Record<string, string>>;
+}
+
+const LISTENER =
+  "a listener's, and the host library has none: CI's rust job runs process-cases.ts itself against the Rust CLI's listener";
+
+const NO_LOCK =
+  'the scheme handler has no port, Host check or launch secret (Storage ST-121); the window that made a request and its page admit it';
+
+const PORTS: readonly Port[] = [
+  {
+    name: 'the Rust host',
+    files: ['crates/host/tests/wire.rs', 'crates/host/tests/run.rs'],
+    exempt: {
+      'answers 421 to a request naming any Host but its own': LISTENER,
+      'answers 403 to a request without the session cookie, and to a wrong launch secret': LISTENER,
+      'trades the launch secret for an HttpOnly, SameSite=Strict session cookie by a redirect':
+        LISTENER,
+      'refuses a missing directory, announcing why and exiting non-zero': `announcing and exiting are a process's: ${LISTENER}`,
+      'writes an edit not yet written when its standard input closes, and exits zero':
+        'a standard-input protocol is a process’s, and the Rust CLI keeps none; the library stops by `Run::stop`, which the SIGINT cases hold',
+    },
+  },
+  {
+    name: 'the desktop scheme handler',
+    files: ['packages/desktop/src-tauri/src/scheme/tests.rs'],
+    exempt: {
+      'answers / with 503 persistence-unavailable while no Meta Space is established':
+        'a talk is served only once its run has Imported its directory into a memory store, which then holds a valid aggregate with its Meta Space; no store that cannot serve stands behind the scheme handler',
+      'answers 503 persistence-unavailable for every read and write of an unreachable store':
+        'a talk is served from its run’s memory store, which is always reachable',
+      'answers 500 internal-error for broken stored state':
+        'a talk is served from its run’s memory store, which holds only what intake accepted',
+      'answers a product address over a %s store with %s':
+        'a talk is served from its run’s memory store, which can be in neither condition',
+      'answers 421 to a request naming any Host but its own': NO_LOCK,
+      'answers 403 to a request without the session cookie, and to a wrong launch secret': NO_LOCK,
+      'trades the launch secret for an HttpOnly, SameSite=Strict session cookie by a redirect':
+        NO_LOCK,
+      'refuses a missing directory, announcing why and exiting non-zero':
+        'the shell refuses a folder it cannot open before any window or scheme answer exists (`server.rs`, `open_run`)',
+      'answers 403 forbidden to a change whose Origin is %s, changing nothing':
+        'the scheme handler refuses a change whose Origin is not the talk’s itself, in plain text, before the application sees it (`comes_from`, `scheme.rs`), and its requests name no Host for the application to judge an Origin against',
+      'commits a chunked body that declares no length':
+        'the webview hands the scheme handler a whole body, so no transfer encoding reaches it',
+      'answers 413 payload-too-large to a chunked body of * bytes that declares no length':
+        'the webview hands the scheme handler a whole body, so no transfer encoding reaches it',
+      'writes an edit once edits have been quiet, and keeps it on SIGINT':
+        'the scheme handler writes nothing: the shell runs the host’s `Run`, which crates/host/tests/run.rs holds',
+      'writes an edit not yet written when stopped by SIGINT, and exits zero':
+        'the scheme handler writes nothing: the shell runs the host’s `Run`, which crates/host/tests/run.rs holds',
+      'writes an edit not yet written when its standard input closes, and exits zero':
+        'the shell keeps no standard-input protocol',
+      'leaves the directory byte for byte unchanged when opening a Space initializes it (ST-65)':
+        'the scheme handler writes nothing: the shell runs the host’s `Run`, which crates/host/tests/run.rs holds',
+      'initializes the Space again on a second run over the directory the first run left unchanged (ST-65)':
+        'the scheme handler writes nothing: the shell runs the host’s `Run`, which crates/host/tests/run.rs holds',
+      'writes the initialization with the next Edit (ST-65)':
+        'the scheme handler writes nothing: the shell runs the host’s `Run`, which crates/host/tests/run.rs holds',
+    },
+  },
+];
+
+const CASES = CASE_FILES.flatMap(casesOf);
+
+describe('the HTTP conformance cases', () => {
+  it('are each named once, by text', () => {
+    expect(CASES.length).toBeGreaterThan(50);
+    expect(CASES.filter((name) => name.startsWith('<unnamed case'))).toEqual([]);
+    expect(CASES.filter((name, index) => CASES.indexOf(name) !== index)).toEqual([]);
+  });
+});
+
+describe.each(PORTS)('$name', ({ files, exempt }) => {
+  const marked = markedIn(files);
+
+  it('ports every case it does not exempt', () => {
+    expect(CASES.filter((name) => !marked.includes(name) && !(name in exempt))).toEqual([]);
+  });
+
+  it('marks and exempts only cases the lists hold', () => {
+    expect(marked.filter((name) => !CASES.includes(name))).toEqual([]);
+    expect(Object.keys(exempt).filter((name) => !CASES.includes(name))).toEqual([]);
+  });
+
+  it('exempts no case it ports', () => {
+    expect(Object.keys(exempt).filter((name) => marked.includes(name))).toEqual([]);
+  });
+});

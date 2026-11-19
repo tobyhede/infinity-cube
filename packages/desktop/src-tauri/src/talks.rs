@@ -288,21 +288,25 @@ mod tests {
         }
     }
 
-    #[test]
-    fn quitting_takes_every_open_server() {
-        let (mut registry, _) = open("/talks/rust", "first");
-        let second = label_of(registry.reserve(Path::new("/talks/go")));
-        assert_eq!(
-            registry.opened(&second, "second"),
-            Ok(()),
-            "a second directory should open beside the first"
-        );
-        let mut taken: Vec<_> = registry.take_all().into_iter().map(|(_, _, s)| s).collect();
-        taken.sort_unstable();
-        assert_eq!(
-            taken,
-            vec!["first", "second"],
-            "quitting should stop every open talk"
-        );
+    mod given_two_talks_open {
+        use super::*;
+
+        #[test]
+        fn quitting_takes_every_open_server() {
+            let (mut registry, _) = open("/talks/rust", "first");
+            let second = label_of(registry.reserve(Path::new("/talks/go")));
+            assert_eq!(
+                registry.opened(&second, "second"),
+                Ok(()),
+                "a second directory should open beside the first"
+            );
+            let mut taken: Vec<_> = registry.take_all().into_iter().map(|(_, _, s)| s).collect();
+            taken.sort_unstable();
+            assert_eq!(
+                taken,
+                vec!["first", "second"],
+                "quitting should stop every open talk"
+            );
+        }
     }
 }

@@ -59,56 +59,72 @@ fn same(read: &JsonValue, written: &serde_json::Value) -> bool {
     }
 }
 
-proptest! {
-    #[test]
-    fn parses_any_text_without_panicking(text in any::<String>()) {
-        let _ = json::parse(&text);
-    }
+mod given_any_text {
+    use super::*;
 
-    #[test]
-    fn decodes_and_parses_any_bytes_without_panicking(bytes in prop::collection::vec(any::<u8>(), 0..256)) {
-        let _ = json::parse(&json::decode_text(&bytes));
-    }
+    proptest! {
+        #[test]
+        fn parses_any_text_without_panicking(text in any::<String>()) {
+            let _ = json::parse(&text);
+        }
 
-    #[test]
-    fn reads_what_serde_json_writes_as_the_value_written(value in any_json()) {
-        let text = serde_json::to_string(&value).unwrap();
-        let read = json::parse(&text);
-        prop_assert!(read.is_ok(), "{text} should parse: {read:?}");
-        prop_assert!(same(&read.unwrap(), &value), "{text} should read as written");
+        #[test]
+        fn decodes_and_parses_any_bytes_without_panicking(bytes in prop::collection::vec(any::<u8>(), 0..256)) {
+            let _ = json::parse(&json::decode_text(&bytes));
+        }
     }
+}
 
-    #[test]
-    fn reads_what_serde_json_pretty_prints_as_the_value_written(value in any_json()) {
-        let text = serde_json::to_string_pretty(&value).unwrap();
-        let read = json::parse(&text);
-        prop_assert!(read.is_ok(), "{text} should parse: {read:?}");
-        prop_assert!(same(&read.unwrap(), &value), "{text} should read as written");
+mod given_json_serde_json_writes {
+    use super::*;
+
+    proptest! {
+        #[test]
+        fn reads_what_serde_json_writes_as_the_value_written(value in any_json()) {
+            let text = serde_json::to_string(&value).unwrap();
+            let read = json::parse(&text);
+            prop_assert!(read.is_ok(), "{text} should parse: {read:?}");
+            prop_assert!(same(&read.unwrap(), &value), "{text} should read as written");
+        }
+
+        #[test]
+        fn reads_what_serde_json_pretty_prints_as_the_value_written(value in any_json()) {
+            let text = serde_json::to_string_pretty(&value).unwrap();
+            let read = json::parse(&text);
+            prop_assert!(read.is_ok(), "{text} should parse: {read:?}");
+            prop_assert!(same(&read.unwrap(), &value), "{text} should read as written");
+        }
     }
+}
 
-    #[test]
-    fn imports_any_file_bytes_without_panicking(
-        aggregate in prop::collection::vec(any::<u8>(), 0..128),
-        space in prop::collection::vec(any::<u8>(), 0..128),
-        resource in prop::collection::vec(any::<u8>(), 0..128),
-    ) {
-        let mut files = AggregateFiles::new();
-        files.insert_file("aggregate.json", aggregate);
-        files.insert_file(format!("{META}/space.json"), space);
-        files.insert_file(format!("{META}/resources/r.json"), resource);
-        let _ = import_aggregate(files, || intake::Uuid::parse(META).unwrap());
-    }
+mod given_any_aggregate_files {
+    use super::*;
 
-    #[test]
-    fn imports_any_json_in_each_file_without_panicking(
-        space in any_json(),
-        resource in any_json(),
-    ) {
-        let mut files = AggregateFiles::new();
-        files.insert_file("aggregate.json", format!(r#"{{"version": 1, "metaSpaceId": "{META}"}}"#));
-        files.insert_file(format!("{META}/space.json"), serde_json::to_vec(&space).unwrap());
-        files.insert_file(format!("{META}/resources/r.json"), serde_json::to_vec(&resource).unwrap());
-        let _ = import_aggregate(files, || intake::Uuid::parse(META).unwrap());
+    proptest! {
+        #[test]
+        fn imports_any_file_bytes_without_panicking(
+            aggregate in prop::collection::vec(any::<u8>(), 0..128),
+            space in prop::collection::vec(any::<u8>(), 0..128),
+            resource in prop::collection::vec(any::<u8>(), 0..128),
+        ) {
+            let mut files = AggregateFiles::new();
+            files.insert_file("aggregate.json", aggregate);
+            files.insert_file(format!("{META}/space.json"), space);
+            files.insert_file(format!("{META}/resources/r.json"), resource);
+            let _ = import_aggregate(files, || intake::Uuid::parse(META).unwrap());
+        }
+
+        #[test]
+        fn imports_any_json_in_each_file_without_panicking(
+            space in any_json(),
+            resource in any_json(),
+        ) {
+            let mut files = AggregateFiles::new();
+            files.insert_file("aggregate.json", format!(r#"{{"version": 1, "metaSpaceId": "{META}"}}"#));
+            files.insert_file(format!("{META}/space.json"), serde_json::to_vec(&space).unwrap());
+            files.insert_file(format!("{META}/resources/r.json"), serde_json::to_vec(&resource).unwrap());
+            let _ = import_aggregate(files, || intake::Uuid::parse(META).unwrap());
+        }
     }
 }
 
@@ -167,20 +183,24 @@ fn import_on_the_smallest_stack(files: AggregateFiles) -> Result<(), Vec<String>
         .unwrap()
 }
 
-#[test]
-fn imports_content_nested_to_the_limit_on_the_smallest_stack() {
-    assert_eq!(
-        import_on_the_smallest_stack(nested_resource(json::MAX_DEPTH)),
-        Ok(()),
-        "content as deep as the limit allows is carried"
-    );
-}
+mod given_the_smallest_stack {
+    use super::*;
 
-#[test]
-fn refuses_content_nested_past_the_limit_on_the_smallest_stack() {
-    assert_eq!(
-        import_on_the_smallest_stack(nested_resource(json::MAX_DEPTH + 1)),
-        Err(vec!["invalid-json".to_owned()]),
-        "one level more is refused, not read"
-    );
+    #[test]
+    fn carries_content_nested_to_the_limit() {
+        assert_eq!(
+            import_on_the_smallest_stack(nested_resource(json::MAX_DEPTH)),
+            Ok(()),
+            "content as deep as the limit allows is carried"
+        );
+    }
+
+    #[test]
+    fn refuses_content_nested_past_the_limit() {
+        assert_eq!(
+            import_on_the_smallest_stack(nested_resource(json::MAX_DEPTH + 1)),
+            Err(vec!["invalid-json".to_owned()]),
+            "one level more is refused, not read"
+        );
+    }
 }

@@ -223,59 +223,63 @@ async fn edit_and_stop(stop_at: usize) -> Outcome {
     }
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn a_write_that_never_ends_leaves_no_file_part_written() {
-    let fixture = Path::new(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../packages/app/fixture"
-    ));
-    let (before, _) = files(fixture);
-    let finished = edit_and_stop(usize::MAX).await;
-    assert!(!finished.stalled, "with no stall the write ends");
-    let (after, _) = files(&finished.directory);
-    assert_ne!(before, after, "the edit changes the directory");
+mod given_a_write_that_never_ends {
+    use super::*;
 
-    let mut stalled_somewhere = 0;
-    for stop_at in 0.. {
-        let outcome = edit_and_stop(stop_at).await;
-        if !outcome.stalled {
-            break;
-        }
-        stalled_somewhere += 1;
-        let (now, hidden) = files(&outcome.directory);
-        for (path, bytes) in &now {
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn leaves_no_file_part_written() {
+        let fixture = Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../packages/app/fixture"
+        ));
+        let (before, _) = files(fixture);
+        let finished = edit_and_stop(usize::MAX).await;
+        assert!(!finished.stalled, "with no stall the write ends");
+        let (after, _) = files(&finished.directory);
+        assert_ne!(before, after, "the edit changes the directory");
+
+        let mut stalled_somewhere = 0;
+        for stop_at in 0.. {
+            let outcome = edit_and_stop(stop_at).await;
+            if !outcome.stalled {
+                break;
+            }
+            stalled_somewhere += 1;
+            let (now, hidden) = files(&outcome.directory);
+            for (path, bytes) in &now {
+                assert!(
+                    before.get(path) == Some(bytes) || after.get(path) == Some(bytes),
+                    "stalled at change {stop_at}: {} holds bytes neither before nor after the write",
+                    path.display()
+                );
+            }
+            for path in before.keys().filter(|path| after.contains_key(*path)) {
+                assert!(
+                    now.contains_key(path),
+                    "stalled at change {stop_at}: {} is gone",
+                    path.display()
+                );
+            }
+            for path in &hidden {
+                assert!(
+                    path.to_string_lossy().ends_with(".export-write"),
+                    "stalled at change {stop_at}: only Export's own temporary file is left beside, got {}",
+                    path.display()
+                );
+            }
+            let repository = MemorySpaceRepository::new();
             assert!(
-                before.get(path) == Some(bytes) || after.get(path) == Some(bytes),
-                "stalled at change {stop_at}: {} holds bytes neither before nor after the write",
-                path.display()
+                import_directory(
+                    &repository,
+                    &TokioFilesystem,
+                    &outcome.directory,
+                    &RandomIds
+                )
+                .await
+                .is_ok(),
+                "stalled at change {stop_at}: the directory still Imports"
             );
         }
-        for path in before.keys().filter(|path| after.contains_key(*path)) {
-            assert!(
-                now.contains_key(path),
-                "stalled at change {stop_at}: {} is gone",
-                path.display()
-            );
-        }
-        for path in &hidden {
-            assert!(
-                path.to_string_lossy().ends_with(".export-write"),
-                "stalled at change {stop_at}: only Export's own temporary file is left beside, got {}",
-                path.display()
-            );
-        }
-        let repository = MemorySpaceRepository::new();
-        assert!(
-            import_directory(
-                &repository,
-                &TokioFilesystem,
-                &outcome.directory,
-                &RandomIds
-            )
-            .await
-            .is_ok(),
-            "stalled at change {stop_at}: the directory still Imports"
-        );
+        assert!(stalled_somewhere > 0, "the write was stalled at least once");
     }
-    assert!(stalled_somewhere > 0, "the write was stalled at least once");
 }

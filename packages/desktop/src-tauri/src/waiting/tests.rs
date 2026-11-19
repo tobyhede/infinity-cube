@@ -322,7 +322,7 @@ mod given_a_quit {
     }
 }
 
-mod on_the_clock {
+mod given_the_paused_clock {
     use std::time::Duration;
 
     use super::*;

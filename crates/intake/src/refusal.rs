@@ -257,11 +257,11 @@ fn optional_field(field: Option<&str>) -> String {
 /// let space = SpaceId::parse("10000000-0000-4000-8000-000000000001").unwrap();
 /// let refusal = Refusal::RetiredSpaceGraphs { space };
 ///
-/// assert_eq!(refusal.kind(), RefusalKind::RetiredSpaceGraphs);
-/// assert_eq!(refusal.kind().as_str(), "retired-space-graphs");
-/// assert_eq!(refusal.file(), format!("{space}/space.json"));
-/// assert_eq!(refusal.field().as_deref(), Some("graphs"));
-/// assert_eq!(refusal.id(), None);
+/// assert_eq!(refusal.kind(), RefusalKind::RetiredSpaceGraphs, "the refusal is of the retired-graphs kind");
+/// assert_eq!(refusal.kind().as_str(), "retired-space-graphs", "the kind is spelled as the corpus spells it");
+/// assert_eq!(refusal.file(), format!("{space}/space.json"), "it is located at the Space file");
+/// assert_eq!(refusal.field().as_deref(), Some("graphs"), "it names the graphs field");
+/// assert_eq!(refusal.id(), None, "it names no id");
 /// ```
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 #[non_exhaustive]
@@ -819,9 +819,17 @@ impl Refusal {
 /// Every refusal intake gave, in the order it found them; never empty.
 ///
 /// The order carries no meaning: the corpus compares refusals as a multiset.
+/// When [`load_aggregate`](crate::load_aggregate)'s Space stage refused, the
+/// refusals also say which Space each is, by its position among the
+/// snapshots given ([`Refusals::space_stage`]).
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
-#[error("intake refused: {}", summary(.0))]
-pub struct Refusals(Vec<Refusal>);
+#[error("intake refused: {}", summary(.refusals))]
+pub struct Refusals {
+    refusals: Vec<Refusal>,
+    /// For the Space stage, each refused Space's position among the snapshots
+    /// given and how many of `refusals`, in order, are its. Empty otherwise.
+    spaces: Vec<(usize, usize)>,
+}
 
 fn summary(refusals: &[Refusal]) -> String {
     refusals
@@ -835,30 +843,69 @@ impl Refusals {
     /// The refusals, or `None` when there are none.
     #[must_use]
     pub fn new(refusals: Vec<Refusal>) -> Option<Self> {
-        (!refusals.is_empty()).then_some(Self(refusals))
+        (!refusals.is_empty()).then_some(Self {
+            refusals,
+            spaces: Vec::new(),
+        })
     }
 
     /// One refusal alone.
     #[must_use]
     pub fn from_one(refusal: Refusal) -> Self {
-        Self(vec![refusal])
+        Self {
+            refusals: vec![refusal],
+            spaces: Vec::new(),
+        }
     }
 
     /// Each refusal.
     #[must_use]
     pub fn as_slice(&self) -> &[Refusal] {
-        &self.0
+        &self.refusals
     }
 
     /// The refusals, owned.
     #[must_use]
     pub fn into_vec(self) -> Vec<Refusal> {
-        self.0
+        self.refusals
+    }
+
+    /// When the Space stage refused: each refused Space's position among the
+    /// snapshots given, with its own refusals, in the order given. `None` when
+    /// any other stage refused.
+    #[must_use]
+    pub fn space_stage(&self) -> Option<Vec<(usize, &[Refusal])>> {
+        if self.spaces.is_empty() {
+            return None;
+        }
+        let mut start = 0;
+        let mut stage = Vec::with_capacity(self.spaces.len());
+        for (position, count) in &self.spaces {
+            let end = start + count;
+            stage.push((*position, self.refusals.get(start..end).unwrap_or_default()));
+            start = end;
+        }
+        Some(stage)
     }
 
     /// Fail with `refusals` when there are any.
     pub(crate) fn check(refusals: Vec<Refusal>) -> Result<(), Self> {
         Self::new(refusals).map_or(Ok(()), Err)
+    }
+
+    /// Fail with each refused Space's refusals, by its position among the
+    /// snapshots given, when any Space was refused.
+    pub(crate) fn check_spaces(refused: Vec<(usize, Refusals)>) -> Result<(), Self> {
+        if refused.is_empty() {
+            return Ok(());
+        }
+        let mut spaces = Vec::with_capacity(refused.len());
+        let mut refusals = Vec::new();
+        for (position, held) in refused {
+            spaces.push((position, held.refusals.len()));
+            refusals.extend(held.refusals);
+        }
+        Err(Self { refusals, spaces })
     }
 }
 
@@ -867,7 +914,7 @@ impl IntoIterator for Refusals {
     type IntoIter = std::vec::IntoIter<Refusal>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
+        self.refusals.into_iter()
     }
 }
 
@@ -875,80 +922,92 @@ impl IntoIterator for Refusals {
 mod tests {
     use super::*;
 
-    #[test]
-    fn names_every_kind_once_in_the_closed_lists_order() {
-        let names: Vec<_> = RefusalKind::ALL.iter().map(|kind| kind.as_str()).collect();
-        assert_eq!(names.len(), 35, "the closed list has 35 kinds");
-        assert_eq!(names.first(), Some(&"aggregate-file-missing"), "first kind");
-        assert_eq!(
-            names.last(),
-            Some(&"space-resource-graph-outside-map"),
-            "last kind"
-        );
-        for kind in RefusalKind::ALL {
+    mod given_the_closed_list_of_kinds {
+        use super::*;
+
+        #[test]
+        fn names_every_kind_once_in_the_closed_lists_order() {
+            let names: Vec<_> = RefusalKind::ALL.iter().map(|kind| kind.as_str()).collect();
+            assert_eq!(names.len(), 35, "the closed list has 35 kinds");
+            assert_eq!(names.first(), Some(&"aggregate-file-missing"), "first kind");
             assert_eq!(
-                RefusalKind::from_name(kind.as_str()),
-                Some(*kind),
-                "{kind} round-trips"
+                names.last(),
+                Some(&"space-resource-graph-outside-map"),
+                "last kind"
+            );
+            for kind in RefusalKind::ALL {
+                assert_eq!(
+                    RefusalKind::from_name(kind.as_str()),
+                    Some(*kind),
+                    "{kind} round-trips"
+                );
+            }
+        }
+    }
+
+    mod given_an_edge_fault {
+        use super::*;
+
+        #[test]
+        fn locates_an_edge_fault_by_graph_end_and_endpoints() {
+            let space = SpaceId::parse("10000000-0000-4000-8000-000000000001").unwrap();
+            let graph = GraphId::parse("00000000-0000-4000-8000-000000000b01").unwrap();
+            let from = ResourceId::parse("00000000-0000-4000-8000-000000000101").unwrap();
+            let to = ResourceId::parse("00000000-0000-4000-8000-00000000dead").unwrap();
+            let refusal = Refusal::GraphEdgeMissingResource {
+                space,
+                graph,
+                edge: EdgeEnds { from, to },
+                end: EdgeEnd::To,
+            };
+            assert_eq!(
+                refusal.kind(),
+                RefusalKind::GraphEdgeMissingResource,
+                "kind"
+            );
+            assert_eq!(
+                refusal.file(),
+                "10000000-0000-4000-8000-000000000001/space.json",
+                "file"
+            );
+            assert_eq!(
+                refusal.id(),
+                Some(graph.uuid()),
+                "the Graph holds the fault"
+            );
+            assert_eq!(refusal.field().as_deref(), Some("to"), "the end at fault");
+            assert_eq!(
+                refusal.edge(),
+                Some(EdgeEnds { from, to }),
+                "the Edge by its endpoints"
+            );
+            let line = refusal.located();
+            assert!(
+                line.starts_with(&refusal.to_string()),
+                "the message first: {line}"
+            );
+            assert!(
+                line.ends_with(
+                    " (graph-edge-missing-resource at 10000000-0000-4000-8000-000000000001/space.json, \
+                     id 00000000-0000-4000-8000-000000000b01, field to, \
+                     edge 00000000-0000-4000-8000-000000000101 -> 00000000-0000-4000-8000-00000000dead)"
+                ),
+                "then every part of its location: {line}"
             );
         }
     }
 
-    #[test]
-    fn locates_an_edge_fault_by_graph_end_and_endpoints() {
-        let space = SpaceId::parse("10000000-0000-4000-8000-000000000001").unwrap();
-        let graph = GraphId::parse("00000000-0000-4000-8000-000000000b01").unwrap();
-        let from = ResourceId::parse("00000000-0000-4000-8000-000000000101").unwrap();
-        let to = ResourceId::parse("00000000-0000-4000-8000-00000000dead").unwrap();
-        let refusal = Refusal::GraphEdgeMissingResource {
-            space,
-            graph,
-            edge: EdgeEnds { from, to },
-            end: EdgeEnd::To,
-        };
-        assert_eq!(
-            refusal.kind(),
-            RefusalKind::GraphEdgeMissingResource,
-            "kind"
-        );
-        assert_eq!(
-            refusal.file(),
-            "10000000-0000-4000-8000-000000000001/space.json",
-            "file"
-        );
-        assert_eq!(
-            refusal.id(),
-            Some(graph.uuid()),
-            "the Graph holds the fault"
-        );
-        assert_eq!(refusal.field().as_deref(), Some("to"), "the end at fault");
-        assert_eq!(
-            refusal.edge(),
-            Some(EdgeEnds { from, to }),
-            "the Edge by its endpoints"
-        );
-        let line = refusal.located();
-        assert!(
-            line.starts_with(&refusal.to_string()),
-            "the message first: {line}"
-        );
-        assert!(
-            line.ends_with(
-                " (graph-edge-missing-resource at 10000000-0000-4000-8000-000000000001/space.json, \
-                 id 00000000-0000-4000-8000-000000000b01, field to, \
-                 edge 00000000-0000-4000-8000-000000000101 -> 00000000-0000-4000-8000-00000000dead)"
-            ),
-            "then every part of its location: {line}"
-        );
-    }
+    mod given_a_refusal_with_few_parts {
+        use super::*;
 
-    #[test]
-    fn locates_a_refusal_by_only_the_parts_it_has() {
-        assert!(
-            Refusal::AggregateFileMissing
-                .located()
-                .ends_with(" (aggregate-file-missing at aggregate.json)"),
-            "kind and file alone"
-        );
+        #[test]
+        fn locates_a_refusal_by_only_the_parts_it_has() {
+            assert!(
+                Refusal::AggregateFileMissing
+                    .located()
+                    .ends_with(" (aggregate-file-missing at aggregate.json)"),
+                "kind and file alone"
+            );
+        }
     }
 }

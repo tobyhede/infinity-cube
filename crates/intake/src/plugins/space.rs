@@ -2,7 +2,7 @@
 //! Graph of another Space, whose lifetime its one Space reference holds.
 //! `packages/plugin-space/src/domain.ts`.
 
-use super::{Plugin, check_open, content_id};
+use super::{ContentKey, Plugin, check_open, content_id, key_names};
 use crate::ids::{GraphId, MapId, SpaceId};
 use crate::json::JsonValue;
 use crate::shape::{Checker, NumberCheck, Status, Strictness, optional};
@@ -10,12 +10,20 @@ use crate::shape::{Checker, NumberCheck, Status, Strictness, optional};
 /// The Space plugin.
 pub(crate) struct Space;
 
+const FRAMING_KEYS: &[&str] = &["centreX", "centreY", "zoom"];
+
+const CONTENT_KEYS: [ContentKey; 4] = [
+    ContentKey::flat("spaceId"),
+    ContentKey::flat("map"),
+    ContentKey::flat("graph"),
+    ContentKey {
+        name: "framing",
+        nested: FRAMING_KEYS,
+    },
+];
+
 fn check_framing<'a>(checker: &mut Checker<'a>, value: &'a JsonValue) -> Status {
-    let Some(mut object) = checker.object(
-        Some(value),
-        &["centreX", "centreY", "zoom"],
-        Strictness::Strict,
-    ) else {
+    let Some(mut object) = checker.object(Some(value), FRAMING_KEYS, Strictness::Strict) else {
         return Status::Aborted;
     };
     for (key, checks) in [
@@ -35,16 +43,18 @@ impl Plugin for Space {
         "space"
     }
 
+    fn content_keys(&self) -> &'static [ContentKey] {
+        &CONTENT_KEYS
+    }
+
     fn check_content<'a>(
         &self,
         checker: &mut Checker<'a>,
         content: Option<&'a JsonValue>,
     ) -> Status {
-        let Some(mut object) = checker.object(
-            content,
-            &["spaceId", "map", "graph", "framing"],
-            Strictness::Strict,
-        ) else {
+        let Some(mut object) =
+            checker.object(content, &key_names(&CONTENT_KEYS), Strictness::Strict)
+        else {
             return Status::Aborted;
         };
         for key in ["spaceId", "map", "graph"] {

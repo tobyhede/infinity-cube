@@ -112,11 +112,15 @@ pub async fn import_directory<R: SpaceRepository, F: Filesystem, I: IdSource>(
 mod tests {
     use super::*;
 
-    #[test]
-    fn random_ids_are_lower_case_version_4_uuids() {
-        let id = RandomIds.new_id();
-        assert!(id.is_lower_case(), "{id} is lower case");
-        assert_eq!(id.as_str().get(14..15), Some("4"), "{id} is version 4");
-        assert_ne!(RandomIds.new_id(), id, "each id is new");
+    mod given_random_ids {
+        use super::*;
+
+        #[test]
+        fn mints_new_lower_case_version_4_uuids() {
+            let id = RandomIds.new_id();
+            assert!(id.is_lower_case(), "{id} is lower case");
+            assert_eq!(id.as_str().get(14..15), Some("4"), "{id} is version 4");
+            assert_ne!(RandomIds.new_id(), id, "each id is new");
+        }
     }
 }

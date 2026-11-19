@@ -1,7 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { aggregateFileSchema, spaceFileSchema, uuidSchema } from '@project/core';
-import { MAX_COMMIT_BODY_BYTES } from '@project/http';
+import { CROSS_SITE_CHANGE_DETAIL, MAX_COMMIT_BODY_BYTES } from '@project/http';
 import {
   ASSET_MEDIA_TYPE_HEADER,
   COMMIT_OUTCOME_WIRE,
@@ -300,9 +300,9 @@ export const describeWireConformance = (options: WireConformanceOptions): void =
       // order the commit wrote them, which is not Export's sorted order.
       it('answers a Space with its positions in the order the commit wrote them', async () => {
         const loaded = await loadSpace(host(), META);
-        const [map, ...otherMaps] = loaded.snapshot.document.maps ?? [];
-        if (map === undefined) throw new Error('The fixture Meta Space has a Map');
-        const reversed = Object.fromEntries(Object.entries(map.positions).reverse());
+        const [firstMap, ...otherMaps] = loaded.snapshot.document.maps ?? [];
+        if (firstMap === undefined) throw new Error('The fixture Meta Space has a Map');
+        const reversed = Object.fromEntries(Object.entries(firstMap.positions).reverse());
         const order = Object.keys(reversed);
         expect(order.length).toBeGreaterThan(1);
         const change: SpaceChange = {
@@ -312,7 +312,7 @@ export const describeWireConformance = (options: WireConformanceOptions): void =
             ...loaded.snapshot,
             document: {
               ...loaded.snapshot.document,
-              maps: [{ ...map, positions: reversed }, ...otherMaps],
+              maps: [{ ...firstMap, positions: reversed }, ...otherMaps],
             },
           },
           expectedRevision: loaded.revision,
@@ -531,6 +531,83 @@ export const describeWireConformance = (options: WireConformanceOptions): void =
         expectApiPolicy(response);
         await expectProblem(response, 'asset-too-large');
         await expectProblem(await send(host(), `/assets/${assetHash(bytes)}`), 'not-found');
+      });
+    });
+
+    // ADR 0161 (Storage ST-123): the Fetch application refuses a change, any
+    // request but GET or HEAD, that a browser says another site sent, before
+    // its body is read. A request naming neither header is served.
+    describe('cross-site changes', () => {
+      /** The origin of the host's own page, as a browser names it in `Origin`. */
+      const ownOrigin = (): string => new URL(host().origin).origin;
+
+      const expectRefused = async (response: Response): Promise<void> => {
+        expectApiPolicy(response);
+        await expectProblem(response.clone(), 'forbidden');
+        expect(z.object({ detail: z.string() }).parse(await response.json()).detail).toBe(
+          CROSS_SITE_CHANGE_DETAIL,
+        );
+      };
+
+      /** Send an asset and a commit with `headers`, and expect both refused and nothing changed. */
+      const expectChangesRefused = async (
+        headers: Readonly<Record<string, string>>,
+      ): Promise<void> => {
+        const bytes = freshBytes(16);
+        await expectRefused(
+          await postAsset(host(), bytes, { ...headers, 'content-type': 'text/plain' }),
+        );
+        await expectProblem(await send(host(), `/assets/${assetHash(bytes)}`), 'not-found');
+        const loaded = await loadSpace(host(), META);
+        await expectRefused(
+          await send(host(), '/api/spaces', {
+            method: 'POST',
+            headers: { ...headers, 'content-type': 'application/json' },
+            body: renameCommitText(loaded, 'Cross-site'),
+          }),
+        );
+        expect((await loadSpace(host(), META)).revision).toBe(loaded.revision);
+      };
+
+      it.each(['cross-site', 'same-site'])(
+        'answers 403 forbidden to a change sent with Sec-Fetch-Site: %s, changing nothing',
+        async (site) => {
+          await expectChangesRefused({ 'sec-fetch-site': site, origin: ownOrigin() });
+        },
+      );
+
+      /** Another port of the host's own hostname. */
+      const anotherPort = (): string => {
+        const own = new URL(host().origin);
+        return `${own.protocol}//${own.hostname}:${own.port === '1' ? '2' : '1'}`;
+      };
+
+      it.each([
+        ['another site', () => 'http://attacker.example'],
+        ['another port of its host', anotherPort],
+        ['null', () => 'null'],
+      ])('answers 403 forbidden to a change whose Origin is %s, changing nothing', async (_, origin) => {
+        await expectChangesRefused({ origin: origin() });
+      });
+
+      it.each(['same-origin', 'none'])(
+        'stores an asset sent with Sec-Fetch-Site: %s from its own origin',
+        async (site) => {
+          const response = await postAsset(host(), freshBytes(16), {
+            'content-type': 'text/plain',
+            'sec-fetch-site': site,
+            origin: ownOrigin(),
+          });
+          expect(response.status).toBe(201);
+        },
+      );
+
+      it('answers a read whatever site a browser says sent it', async () => {
+        const headers = { 'sec-fetch-site': 'cross-site', origin: 'http://attacker.example' };
+        expect((await send(host(), '/api/spaces', { headers })).status).toBe(200);
+        const bytes = freshBytes(16);
+        expect((await postAsset(host(), bytes, { 'content-type': 'image/png' })).status).toBe(201);
+        expect((await send(host(), `/assets/${assetHash(bytes)}`, { headers })).status).toBe(200);
       });
     });
 

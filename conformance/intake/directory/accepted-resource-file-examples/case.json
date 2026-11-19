@@ -1,0 +1,6 @@
+{
+  "description": "Each Resource file docs/schema/resource/examples publishes, byte for byte, in one Meta Space: the Reference's Target is the Image, and the Space Resource owns a second Space holding the Map and Graph it selects. The Markdown text's asset is not carried, which is not a refusal.",
+  "expect": {
+    "outcome": "accepted"
+  }
+}

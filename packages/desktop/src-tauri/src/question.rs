@@ -65,6 +65,10 @@ pub fn fragment(folders: &[PathBuf]) -> String {
 
 /// Show `wait`'s question naming `folders`, or name them anew where it is
 /// showing: a change of fragment, which the page reads without reloading.
+#[expect(
+    clippy::print_stderr,
+    reason = "a question that cannot be asked is reported on standard error"
+)]
 pub fn ask(app: &AppHandle, wait: WaitId, folders: &[PathBuf]) {
     let label = label_of(wait);
     let fragment = fragment(folders);
@@ -104,39 +108,56 @@ pub fn dismiss(app: &AppHandle, wait: WaitId) {
 mod tests {
     use super::*;
 
-    #[test]
-    fn a_question_window_names_its_wait_and_nothing_else_does() {
-        let wait = WaitId::from_number(7);
-        assert_eq!(wait_of(&label_of(wait)), Some(wait), "its own label");
-        for other in ["home", "talk-0", "closing-", "closing-7a", "closing--1"] {
-            assert_eq!(wait_of(other), None, "{other}");
+    mod given_a_window_label {
+        use super::*;
+
+        #[test]
+        fn only_a_question_window_names_its_wait() {
+            let wait = WaitId::from_number(7);
+            assert_eq!(wait_of(&label_of(wait)), Some(wait), "its own label");
+            for other in ["home", "talk-0", "closing-", "closing-7a", "closing--1"] {
+                assert_eq!(wait_of(other), None, "{other}");
+            }
         }
     }
 
-    #[test]
-    fn only_the_two_answers_are_read() {
-        assert_eq!(choice_named("keep-waiting"), Some(Choice::KeepWaiting));
-        assert_eq!(
-            choice_named("close-without-saving"),
-            Some(Choice::CloseWithoutSaving)
-        );
-        assert_eq!(
-            choice_named("Close without saving"),
-            None,
-            "a label, not a name"
-        );
+    mod given_an_answer_name {
+        use super::*;
+
+        #[test]
+        fn only_the_two_answers_are_read() {
+            assert_eq!(
+                choice_named("keep-waiting"),
+                Some(Choice::KeepWaiting),
+                "keep-waiting is an answer"
+            );
+            assert_eq!(
+                choice_named("close-without-saving"),
+                Some(Choice::CloseWithoutSaving),
+                "close-without-saving is an answer"
+            );
+            assert_eq!(
+                choice_named("Close without saving"),
+                None,
+                "a label, not a name"
+            );
+        }
     }
 
-    #[test]
-    fn the_fragment_escapes_every_separator_a_folder_may_hold() {
-        let folders = [
-            PathBuf::from("/talks/a,b c"),
-            PathBuf::from("/talks/100%#é"),
-        ];
-        assert_eq!(
-            fragment(&folders),
-            "%2Ftalks%2Fa%2Cb%20c,%2Ftalks%2F100%25%23%C3%A9",
-            "one comma between folders, none inside one"
-        );
+    mod given_folders_in_the_fragment {
+        use super::*;
+
+        #[test]
+        fn escapes_every_separator_a_folder_may_hold() {
+            let folders = [
+                PathBuf::from("/talks/a,b c"),
+                PathBuf::from("/talks/100%#é"),
+            ];
+            assert_eq!(
+                fragment(&folders),
+                "%2Ftalks%2Fa%2Cb%20c,%2Ftalks%2F100%25%23%C3%A9",
+                "one comma between folders, none inside one"
+            );
+        }
     }
 }

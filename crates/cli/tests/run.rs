@@ -33,6 +33,16 @@ fn free_port() -> u16 {
         .port()
 }
 
+/// Poll `condition` every 20ms until it holds, failing with `what` after
+/// [`common::PATIENCE`].
+fn wait_until(what: &str, mut condition: impl FnMut() -> bool) {
+    let deadline = std::time::Instant::now() + common::PATIENCE;
+    while !condition() {
+        assert!(std::time::Instant::now() < deadline, "{what}");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+}
+
 mod given_a_directory_it_can_run {
     use super::*;
 
@@ -180,7 +190,13 @@ mod given_a_directory_it_can_run {
             "POST /api/spaces HTTP/1.1\r\nHost: {host}\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n{{"
         )
         .unwrap();
-        std::thread::sleep(Duration::from_millis(200));
+        // The run accepts connections in order, so its answer on a later
+        // connection means it has already accepted the stalled one.
+        assert_eq!(
+            get(port, "/api/spaces").status,
+            200,
+            "a later request is answered once the stalled connection is accepted"
+        );
         let signalled = std::time::Instant::now();
         run.signal("INT");
         let status = run.exited();
@@ -227,11 +243,15 @@ mod given_a_directory_it_can_run {
             "POST /api/spaces HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n{{"
         )
         .unwrap();
-        std::thread::sleep(Duration::from_millis(200));
+        assert_eq!(
+            get(port, "/api/spaces").status,
+            200,
+            "a later request is answered once the slow connection is accepted"
+        );
         run.signal("INT");
         assert!(
             run.still_running_after(Duration::from_millis(300)),
-            "the first signal waits for the request being answered"
+            "the first signal waits for the request being answered (still running after a 300ms window)"
         );
         run.signal("INT");
         assert_eq!(
@@ -275,21 +295,19 @@ mod given_a_directory_it_can_run {
             Some(bin.as_os_str()),
         );
         let _port = quiet.port();
+        // A sleep, not a poll: the assertion is that nothing happens in the window.
         std::thread::sleep(Duration::from_millis(300));
-        assert!(!opened.exists(), "--no-open opens nothing");
+        assert!(
+            !opened.exists(),
+            "--no-open opens nothing within 300ms of listening"
+        );
         drop(quiet);
 
         let run = start_with(&["run", directory.to_str().unwrap()], Some(bin.as_os_str()));
         let port = run.port();
-        let deadline = std::time::Instant::now() + common::PATIENCE;
-        while !opened.exists() {
-            assert!(
-                std::time::Instant::now() < deadline,
-                "the opener should run"
-            );
-            std::thread::sleep(Duration::from_millis(20));
-        }
-        std::thread::sleep(Duration::from_millis(100));
+        wait_until("the opener should run and write the address", || {
+            fs::read_to_string(&opened).is_ok_and(|text| text.ends_with('\n'))
+        });
         assert_eq!(
             fs::read_to_string(&opened).unwrap(),
             format!("http://127.0.0.1:{port}/\n"),
@@ -372,9 +390,13 @@ mod given_a_directory_it_cannot_run {
     }
 }
 
-#[test]
-fn exits_two_on_a_usage_error_announcing_nothing() {
-    let mut run = start(&["run", "--port", "0", "talk"]);
-    assert_eq!(run.announcement, None, "no announcement");
-    assert_eq!(run.exited().code(), Some(2), "a usage error");
+mod given_a_usage_error {
+    use super::*;
+
+    #[test]
+    fn announces_nothing_and_exits_two() {
+        let mut run = start(&["run", "--port", "0", "talk"]);
+        assert_eq!(run.announcement, None, "no announcement");
+        assert_eq!(run.exited().code(), Some(2), "a usage error");
+    }
 }

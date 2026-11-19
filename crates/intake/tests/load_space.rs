@@ -183,6 +183,58 @@ mod given_a_snapshot_built_in_memory {
     }
 }
 
+mod given_an_aggregate_whose_space_stage_refuses {
+    use super::*;
+
+    const OTHER: &str = "10000000-0000-4000-8000-000000000002";
+
+    /// A Space that passes its own intake, under another id.
+    fn accepted_other() -> SpaceSnapshot {
+        let text = format!(
+            r#"{{"id": "{OTHER}", "document": {{"version": 1, "title": "Other"}}, "resources": []}}"#
+        );
+        decode_space_snapshot(&json::parse(&text).unwrap(), SpaceId::parse(OTHER).unwrap()).unwrap()
+    }
+
+    fn refused_snapshot() -> SpaceSnapshot {
+        let mut snapshot = snapshot();
+        for resource in &mut snapshot.resources {
+            resource.content = JsonValue::Null;
+        }
+        snapshot
+    }
+
+    #[test]
+    fn names_each_refused_space_by_its_position_with_its_own_refusals() {
+        let refused = load_aggregate(space(), vec![accepted_other(), refused_snapshot()])
+            .expect_err("the aggregate's second Space should be refused");
+
+        let stage = refused
+            .space_stage()
+            .expect("the Space stage refused, so its refusals are each Space's");
+        let positions: Vec<usize> = stage.iter().map(|(position, _)| *position).collect();
+        assert_eq!(positions, vec![1], "only the second snapshot is refused");
+        let held: Vec<_> = stage
+            .iter()
+            .flat_map(|(_, refusals)| refusals.iter())
+            .collect();
+        let all: Vec<_> = refused.as_slice().iter().collect();
+        assert_eq!(held, all, "the stage holds every refusal, in order");
+    }
+
+    #[test]
+    fn names_no_space_when_a_later_stage_refuses() {
+        let refused = load_aggregate(space(), vec![snapshot(), snapshot()])
+            .expect_err("an aggregate holding one Space twice should be refused");
+
+        assert_eq!(
+            refused.space_stage(),
+            None,
+            "a repeated Space id is the aggregate stage's"
+        );
+    }
+}
+
 mod given_two_snapshots_of_one_space {
     use super::*;
 

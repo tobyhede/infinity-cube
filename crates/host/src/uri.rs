@@ -188,51 +188,59 @@ pub(crate) fn decode_component(text: &str) -> Option<String> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn collapses_dot_segments_as_the_url_standard_does() {
-        for (path, collapsed) in [
-            ("/api/spaces", "/api/spaces"),
-            ("/api/./spaces", "/api/spaces"),
-            ("/api/x/../spaces", "/api/spaces"),
-            ("/api/%2E%2e/api/spaces", "/api/spaces"),
-            ("/a/.", "/a/"),
-            ("/a/b/..", "/a/"),
-            ("/..", "/"),
-            ("/../..", "/"),
-            ("/a//./b", "/a//b"),
-            ("/a.b/.c", "/a.b/.c"),
-            ("*", "*"),
-            ("/api\\spaces", "/api/spaces"),
-            ("/api/x/..\\spaces", "/api/spaces"),
-            ("/a\\..\\b", "/b"),
-        ] {
-            assert_eq!(collapse_dot_segments(path), collapsed, "{path}");
+    mod given_a_request_path {
+        use super::*;
+
+        #[test]
+        fn collapses_dot_segments_as_the_url_standard_does() {
+            for (path, collapsed) in [
+                ("/api/spaces", "/api/spaces"),
+                ("/api/./spaces", "/api/spaces"),
+                ("/api/x/../spaces", "/api/spaces"),
+                ("/api/%2E%2e/api/spaces", "/api/spaces"),
+                ("/a/.", "/a/"),
+                ("/a/b/..", "/a/"),
+                ("/..", "/"),
+                ("/../..", "/"),
+                ("/a//./b", "/a//b"),
+                ("/a.b/.c", "/a.b/.c"),
+                ("*", "*"),
+                ("/api\\spaces", "/api/spaces"),
+                ("/api/x/..\\spaces", "/api/spaces"),
+                ("/a\\..\\b", "/b"),
+            ] {
+                assert_eq!(collapse_dot_segments(path), collapsed, "{path}");
+            }
+        }
+
+        #[test]
+        fn routes_on_decode_uri_with_an_escaped_percent_kept() {
+            for (path, routed) in [
+                ("/api/%73paces", "/api/spaces"),
+                ("/api/spaces%2Fx", "/api/spaces%2Fx"),
+                ("/api/%2f%3B", "/api/%2f%3B"),
+                ("/api/%2530", "/api/%2530"),
+                ("/api/%C3%A9", "/api/é"),
+                ("/api/%E9", "/api/%E9"),
+                ("/api/%zz/%73", "/api/%zz/s"),
+                ("/api/%E9/%73", "/api/%E9/s"),
+                ("/api/%", "/api/%"),
+            ] {
+                assert_eq!(routing_path(path), routed, "{path}");
+            }
         }
     }
 
-    #[test]
-    fn routes_on_decode_uri_with_an_escaped_percent_kept() {
-        for (path, routed) in [
-            ("/api/%73paces", "/api/spaces"),
-            ("/api/spaces%2Fx", "/api/spaces%2Fx"),
-            ("/api/%2f%3B", "/api/%2f%3B"),
-            ("/api/%2530", "/api/%2530"),
-            ("/api/%C3%A9", "/api/é"),
-            ("/api/%E9", "/api/%E9"),
-            ("/api/%zz/%73", "/api/%zz/s"),
-            ("/api/%E9/%73", "/api/%E9/s"),
-            ("/api/%", "/api/%"),
-        ] {
-            assert_eq!(routing_path(path), routed, "{path}");
-        }
-    }
+    mod given_a_parameter {
+        use super::*;
 
-    #[test]
-    fn decodes_a_parameter_as_decode_uri_component() {
-        assert_eq!(parameter("%2Fx%25"), "/x%", "every escape");
-        assert_eq!(parameter("%E9%41"), "%E9%41", "a run that is not UTF-8");
-        assert_eq!(parameter("%E9-%41"), "%E9-A", "each run on its own");
-        assert_eq!(decode_component("%zz"), None, "a malformed escape");
-        assert_eq!(decode_component("%ED%A0%80"), None, "an encoded surrogate");
+        #[test]
+        fn decodes_it_as_decode_uri_component() {
+            assert_eq!(parameter("%2Fx%25"), "/x%", "every escape");
+            assert_eq!(parameter("%E9%41"), "%E9%41", "a run that is not UTF-8");
+            assert_eq!(parameter("%E9-%41"), "%E9-A", "each run on its own");
+            assert_eq!(decode_component("%zz"), None, "a malformed escape");
+            assert_eq!(decode_component("%ED%A0%80"), None, "an encoded surrogate");
+        }
     }
 }

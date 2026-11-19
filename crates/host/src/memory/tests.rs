@@ -125,7 +125,90 @@ mod given_an_initialized_store {
     }
 }
 
-mod assets {
+mod given_a_commit_that_deletes_a_space {
+    use super::*;
+    use crate::repository::{SpaceChange, SpaceCommit};
+
+    const CHILD: &str = "10000000-0000-4000-8000-000000000002";
+
+    fn snapshot(id: &str, json: &str) -> SpaceSnapshot {
+        decode_space_snapshot(&parse(json).unwrap(), SpaceId::parse(id).unwrap()).unwrap()
+    }
+
+    fn child() -> SpaceSnapshot {
+        snapshot(
+            CHILD,
+            &format!(
+                r#"{{"id":"{CHILD}","document":{{"version":1,"title":"Child","maps":[{{"id":"00000000-0000-4000-8000-0000000000a1","title":"M","kind":"positioned","positions":{{}},"graphs":[{{"id":"00000000-0000-4000-8000-0000000000b1","title":"G","edges":[]}}]}}]}},"resources":[]}}"#
+            ),
+        )
+    }
+
+    /// The Meta Space, holding one Space Resource that owns the child.
+    fn meta_holding_child() -> SpaceSnapshot {
+        snapshot(
+            META,
+            &format!(
+                r#"{{"id":"{META}","document":{{"version":1,"title":"Talk"}},"resources":[{{"id":"00000000-0000-4000-8000-000000000101","document":{{"title":"Child","kind":"space","content":{{"spaceId":"{CHILD}","map":"00000000-0000-4000-8000-0000000000a1","graph":"00000000-0000-4000-8000-0000000000b1"}}}}}}]}}"#
+            ),
+        )
+    }
+
+    #[test]
+    fn removes_the_space_and_stores_the_referrer_at_its_next_revision() {
+        run(async {
+            let store = MemorySpaceRepository::new();
+            store
+                .initialize_aggregate(AggregateInput {
+                    meta_space_id: SpaceId::parse(META).unwrap(),
+                    spaces: vec![meta_holding_child(), child()],
+                })
+                .await
+                .unwrap();
+            let result = store
+                .commit(SpaceCommit {
+                    changes: vec![
+                        SpaceChange::Delete {
+                            space_id: SpaceId::parse(CHILD).unwrap(),
+                            expected_revision: Revision::FIRST,
+                        },
+                        SpaceChange::Update {
+                            space_id: SpaceId::parse(META).unwrap(),
+                            snapshot: meta("Talk"),
+                            expected_revision: Revision::FIRST,
+                        },
+                    ],
+                })
+                .await
+                .unwrap();
+            assert!(
+                matches!(result, CommitResult::Committed { .. }),
+                "got {result:?}"
+            );
+            let listed: Vec<SpaceId> = store
+                .list_spaces()
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|summary| summary.id)
+                .collect();
+            assert_eq!(
+                listed,
+                vec![SpaceId::parse(META).unwrap()],
+                "the child is gone"
+            );
+            let held = store
+                .load_space(SpaceId::parse(META).unwrap())
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(held.revision, Revision::new(1).unwrap(), "next revision");
+            assert!(held.snapshot.resources.is_empty(), "the change applied");
+        });
+    }
+}
+
+mod given_an_asset {
     use super::*;
 
     #[test]

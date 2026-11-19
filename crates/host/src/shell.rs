@@ -191,66 +191,78 @@ fn built_path(pathname: &str) -> Option<String> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn hashes_each_inline_script_and_skips_loaded_ones() {
-        let page = "<script type=\"module\" src=\"/a.js\"></script><script>window.a = 1;</script><scripts></scripts>";
-        assert_eq!(
-            inline_script_sources(page),
-            vec!["window.a = 1;".to_owned()],
-            "only the inline script"
-        );
-        // `printf 'window.standIn = true;' | openssl dgst -sha256 -binary | base64`
-        let policy = content_security_policy(&["window.standIn = true;".to_owned()]);
-        assert!(
-            policy.contains(
-                "script-src 'self' 'sha256-PhqNIk+nbvnTgY4TWUCSygYKMiovRbbBV8E7EBCqKHo='; "
-            ),
-            "the hash is admitted: {policy}"
-        );
+    mod given_a_page {
+        use super::*;
+
+        #[test]
+        fn hashes_each_inline_script_and_skips_loaded_ones() {
+            let page = "<script type=\"module\" src=\"/a.js\"></script><script>window.a = 1;</script><scripts></scripts>";
+            assert_eq!(
+                inline_script_sources(page),
+                vec!["window.a = 1;".to_owned()],
+                "only the inline script"
+            );
+            // `printf 'window.standIn = true;' | openssl dgst -sha256 -binary | base64`
+            let policy = content_security_policy(&["window.standIn = true;".to_owned()]);
+            assert!(
+                policy.contains(
+                    "script-src 'self' 'sha256-PhqNIk+nbvnTgY4TWUCSygYKMiovRbbBV8E7EBCqKHo='; "
+                ),
+                "the hash is admitted: {policy}"
+            );
+        }
     }
 
-    #[test]
-    fn names_no_path_outside_the_build() {
-        assert_eq!(
-            built_path("/assets/index.js").as_deref(),
-            Some("assets/index.js"),
-            "inside"
-        );
-        assert_eq!(
-            built_path("/assets/..%2f..%2foutside.txt"),
-            None,
-            "escaped climb"
-        );
-        assert_eq!(
-            built_path("/assets/..%2Ffavicon.svg").as_deref(),
-            Some("favicon.svg"),
-            "an escaped climb that stays inside"
-        );
-        assert_eq!(built_path("/a/./b").as_deref(), Some("a/b"), "a dot");
-        assert_eq!(built_path("/..%2Fb"), None, "a climb out of the build");
-        assert_eq!(built_path("/a/.."), None, "the build itself");
-        assert_eq!(built_path("/a%5cb"), None, "backslash");
-        assert_eq!(built_path("/%zz"), None, "malformed escape");
-        assert_eq!(built_path("/"), None, "the root");
+    mod given_a_request_path {
+        use super::*;
+
+        #[test]
+        fn names_no_path_outside_the_build() {
+            assert_eq!(
+                built_path("/assets/index.js").as_deref(),
+                Some("assets/index.js"),
+                "inside"
+            );
+            assert_eq!(
+                built_path("/assets/..%2f..%2foutside.txt"),
+                None,
+                "escaped climb"
+            );
+            assert_eq!(
+                built_path("/assets/..%2Ffavicon.svg").as_deref(),
+                Some("favicon.svg"),
+                "an escaped climb that stays inside"
+            );
+            assert_eq!(built_path("/a/./b").as_deref(), Some("a/b"), "a dot");
+            assert_eq!(built_path("/..%2Fb"), None, "a climb out of the build");
+            assert_eq!(built_path("/a/.."), None, "the build itself");
+            assert_eq!(built_path("/a%5cb"), None, "backslash");
+            assert_eq!(built_path("/%zz"), None, "malformed escape");
+            assert_eq!(built_path("/"), None, "the root");
+        }
     }
 
-    #[test]
-    fn serves_a_built_file_by_its_extension() {
-        assert_eq!(
-            built_media_type("assets/a.JS"),
-            "text/javascript; charset=utf-8",
-            "js"
-        );
-        assert_eq!(built_media_type("favicon.svg"), "image/svg+xml", "svg");
-        assert_eq!(
-            built_media_type(".hidden"),
-            "application/octet-stream",
-            "dot file"
-        );
-        assert_eq!(
-            built_media_type("README"),
-            "application/octet-stream",
-            "none"
-        );
+    mod given_a_built_file {
+        use super::*;
+
+        #[test]
+        fn serves_it_by_its_extension() {
+            assert_eq!(
+                built_media_type("assets/a.JS"),
+                "text/javascript; charset=utf-8",
+                "js"
+            );
+            assert_eq!(built_media_type("favicon.svg"), "image/svg+xml", "svg");
+            assert_eq!(
+                built_media_type(".hidden"),
+                "application/octet-stream",
+                "dot file"
+            );
+            assert_eq!(
+                built_media_type("README"),
+                "application/octet-stream",
+                "none"
+            );
+        }
     }
 }

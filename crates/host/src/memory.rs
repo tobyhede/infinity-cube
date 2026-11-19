@@ -128,12 +128,11 @@ impl SpaceRepository for MemorySpaceRepository {
         };
         let aggregate = state.aggregate(meta_space_id);
         drop(state);
-        let snapshots = aggregate
-            .spaces
-            .iter()
-            .map(|space| space.snapshot.clone())
-            .collect();
-        load_aggregate(meta_space_id, snapshots).map_err(|_| {
+        load_aggregate(
+            meta_space_id,
+            aggregate.spaces.iter().map(|space| &space.snapshot),
+        )
+        .map_err(|_| {
             RepositoryError::BrokenStoredState(
                 "the stored aggregate violates Meta invariants".to_owned(),
             )
@@ -145,11 +144,17 @@ impl SpaceRepository for MemorySpaceRepository {
         let mut state = self.state();
         match decide_commit(&request, state.meta_space_id, state.spaces.values()) {
             CommitDecision::Answer(result) => Ok(result),
-            CommitDecision::Write { result, spaces } => {
-                state.spaces = spaces
-                    .into_iter()
-                    .map(|space| (space.snapshot.id, space))
-                    .collect();
+            CommitDecision::Write {
+                result,
+                written,
+                deleted,
+            } => {
+                for id in &deleted {
+                    state.spaces.remove(id);
+                }
+                for space in written {
+                    state.spaces.insert(space.snapshot.id, space);
+                }
                 Ok(result)
             }
         }
@@ -176,7 +181,7 @@ impl SpaceRepository for MemorySpaceRepository {
         &self,
         input: AggregateInput,
     ) -> Result<InitializeResult, RepositoryError> {
-        if let Err(refusals) = load_aggregate(input.meta_space_id, input.spaces.clone()) {
+        if let Err(refusals) = load_aggregate(input.meta_space_id, &input.spaces) {
             return Ok(InitializeResult::AggregateRefused(refusals));
         }
         let mut state = self.state();
@@ -213,7 +218,7 @@ impl SpaceRepository for MemorySpaceRepository {
         input: AggregateInput,
         expected_meta_space_id: Option<SpaceId>,
     ) -> Result<ReplaceResult, RepositoryError> {
-        if let Err(refusals) = load_aggregate(input.meta_space_id, input.spaces.clone()) {
+        if let Err(refusals) = load_aggregate(input.meta_space_id, &input.spaces) {
             return Ok(ReplaceResult::AggregateRefused(refusals));
         }
         let mut state = self.state();

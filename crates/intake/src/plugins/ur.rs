@@ -1,7 +1,7 @@
 //! The Ur plugin (ADR 0113, ADR 0121): no content, and the Shape each Map
 //! draws it in as its Map content. `packages/plugin-ur/src/domain.ts`.
 
-use super::Plugin;
+use super::{ContentKey, Plugin};
 use crate::json::JsonValue;
 use crate::shape::{Checker, Status, Strictness};
 
@@ -14,6 +14,10 @@ pub(crate) struct Ur;
 impl Plugin for Ur {
     fn kind(&self) -> &'static str {
         "ur"
+    }
+
+    fn content_keys(&self) -> &'static [ContentKey] {
+        &[]
     }
 
     fn check_content<'a>(

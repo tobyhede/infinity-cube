@@ -167,6 +167,7 @@ The current statement of these decisions is [Storage and hosts](../requirements/
 | [0069](0069-entities-have-durable-web-addresses.md) | Every Space, Card, Graph and Layout has a durable URL built from its Id (ADR 0079 makes the addressable canvas context a Layout). |
 | [0111](0111-presentation-stays-within-one-space-until-cross-space-edges-are-decided.md) | A presentation URL names Space, Map, Graph and Resource only. The cross-Space query value waits for cross-Space Edges to be decided. |
 | [0081](0081-navigation-answers-its-own-address-and-never-learns-what-a-url-is.md) | Navigation answers its own address. Deciding what URL that address deserves stays in `app`. |
+| [0161](0161-both-hosts-refuse-a-cross-site-change.md) | Both hosts refuse a change to the Space API or asset store, before its body is read, when `Sec-Fetch-Site` names another site or, failing it, an `Origin` is not the `Host` the request names (`null` included): 403 `forbidden` in both runtimes; a request naming neither is served, and the memory store's asset count stays uncapped. |
 
 ## Canvas and camera
 

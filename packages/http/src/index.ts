@@ -50,6 +50,9 @@ export type { HttpSpaceBackendOptions } from './backend';
 
 export const MAX_COMMIT_BODY_BYTES = 1_048_576;
 
+/** The detail of the 403 `forbidden` answer to a cross-site change (ADR 0161). */
+export const CROSS_SITE_CHANGE_DETAIL = "Send a change from the application's own page.";
+
 // Named so the route registration and the json validator's explicit path type
 // cannot drift apart; the validator needs the literal to stay in the schema.
 const SPACE_RESOURCE_PATH = '/api/spaces/:id';
@@ -452,6 +455,41 @@ const applyTransportPolicy = createMiddleware(async (context, next) => {
   return;
 });
 
+/** The authority an `Origin` names (`<scheme>://<authority>`), or `undefined` for one naming none, such as `null`. */
+const originAuthority = (origin: string): string | undefined =>
+  /^[A-Za-z][A-Za-z0-9+.-]*:\/\/([^/?#]+)$/.exec(origin)?.[1];
+
+/**
+ * Whether a change, a request that is not a read, comes from a page of
+ * another site, as the browser that sent it says (ADR 0161, Storage ST-123).
+ * A `Sec-Fetch-Site` other than `same-origin` or `none` says so; failing that
+ * header, an `Origin` whose authority is not the `Host` the request names
+ * does, `null` included. A request naming no `Host` is not judged by its
+ * `Origin`, and one naming neither header is served. `is_cross_site_change`
+ * (`crates/host/src/http.rs`) decides the same.
+ */
+const isCrossSiteChange = (headers: Headers): boolean => {
+  const site = headers.get('Sec-Fetch-Site');
+  if (site !== null) return site !== 'same-origin' && site !== 'none';
+  const origin = headers.get('Origin');
+  const host = headers.get('Host');
+  if (origin === null || host === null) return false;
+  return originAuthority(origin)?.toLowerCase() !== host.toLowerCase();
+};
+
+/**
+ * Refuse a cross-site change before anything reads its body: a page of any
+ * site may send a loopback host a request with no preflight, and only the
+ * browser's own headers tell it from the application's page.
+ */
+const refuseCrossSiteChange = createMiddleware(async (context, next) => {
+  const { method } = context.req;
+  if (method !== 'GET' && method !== 'HEAD' && isCrossSiteChange(context.req.raw.headers)) {
+    return problem(context, 'forbidden', CROSS_SITE_CHANGE_DETAIL);
+  }
+  return next();
+});
+
 export const createSpaceHttpApp = (
   repository: StoredSpaceRepository & AssetStore,
   options: SpaceHttpAppOptions,
@@ -460,6 +498,7 @@ export const createSpaceHttpApp = (
   const loadWorkingSpace = createWorkingSpaceLoader(repository, options.newId);
   const app = new Hono()
     .use('*', applyTransportPolicy)
+    .use('*', refuseCrossSiteChange)
     .get(SPACE_COLLECTION_PATH, async (context) => {
       try {
         return context.json(await repository.listSpaces(), 200);
