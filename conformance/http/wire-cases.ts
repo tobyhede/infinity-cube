@@ -351,6 +351,24 @@ export const describeWireConformance = (options: WireConformanceOptions): void =
         await expectProblem(response, 'invalid-request', WHOLE_BODY_INVALID);
       });
 
+      // Import reads a Space directory only by a lower-case name, so a Space
+      // created under an upper-case id would be exported where no run reads it.
+      it('answers 400 invalid-request for a Space named in upper case', async () => {
+        const upper = 'ABCDEF00-0000-4000-8000-00000000000A';
+        const body = JSON.stringify({
+          changes: [
+            {
+              kind: 'create',
+              spaceId: upper,
+              snapshot: { id: upper, document: { version: 1, title: 'Upper' }, resources: [] },
+            },
+          ],
+        });
+        const response = await postCommit(host(), body);
+        expectApiPolicy(response);
+        await expectProblem(response, 'invalid-request', WHOLE_BODY_INVALID);
+      });
+
       it('answers 400 invalid-request for malformed JSON', async () => {
         await expectProblem(await postCommit(host(), '{'), 'invalid-request');
       });

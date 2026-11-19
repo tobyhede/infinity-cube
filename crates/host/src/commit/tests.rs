@@ -123,6 +123,32 @@ mod given_a_change_set_the_store_will_not_judge {
             "got {result:?}"
         );
     }
+
+    /// Import reads a Space directory only by a lower-case name, so a Space
+    /// created under an upper-case id would be exported where no later run
+    /// could read it, even with an owner that makes it a valid aggregate.
+    #[test]
+    fn rejects_a_space_named_in_upper_case() {
+        const UPPER: &str = "ABCDEF00-0000-4000-8000-00000000000A";
+        let created = plain(UPPER, "Upper");
+        let create = SpaceChange::Create {
+            space_id: created.id,
+            snapshot: created,
+        };
+        let owner = update(meta_holding(UPPER, "space"), 3);
+        let result = answer(decide_commit(
+            &commit(vec![owner, create]),
+            Some(id(META)),
+            &[stored(plain(META, "Meta"), 3)],
+        ));
+        let CommitResult::Rejected { message } = result else {
+            panic!("expected a rejection, got {result:?}");
+        };
+        assert_eq!(
+            message,
+            format!("Space {UPPER} must be named in lower case")
+        );
+    }
 }
 
 mod given_a_stale_change {

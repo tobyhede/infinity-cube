@@ -141,6 +141,7 @@ macro_rules! cases {
                 answers_422_for_a_space_no_space_resource_references,
                 answers_positions_in_the_order_the_commit_wrote_them,
                 answers_400_for_a_commit_the_store_will_not_judge,
+                answers_400_for_a_space_named_in_upper_case,
                 answers_400_for_malformed_json,
                 answers_400_for_a_lone_surrogate_as_for_malformed_json,
                 answers_400_for_a_body_that_is_not_a_commit,
