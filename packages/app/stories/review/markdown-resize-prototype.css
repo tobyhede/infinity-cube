@@ -1,0 +1,18 @@
+.prototype-markdown-trials {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: 20px;
+}
+
+.prototype-markdown-trials .prototype-markdown-canvas {
+  width: 100%;
+  height: 440px;
+  border: 1px solid var(--border);
+}
+
+/* Both trials use the shipped editor. Only the explicit-Open trial offers its visibility commands. */
+.prototype-markdown-trials
+  [data-reveal='true']
+  :is([aria-label^='Open Resource '], [aria-label^='Close Resource ']) {
+  display: none;
+}
