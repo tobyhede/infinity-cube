@@ -2,9 +2,13 @@
 
 These are conflicts for [../ui.md](../ui.md) that drafting rules 1–5 and [../DECISIONS.md](../DECISIONS.md) do not settle. Conflict ids are never reused. Paths are relative to `packages/`.
 
-Three conflicts are open: C5, C6 and C7.
-
 ## Open
+
+None.
+
+## Closed
+
+Closed by rulings UI C5, C6 and C7 (maintainer, 20 November 2026), each option (a), as recommended. None changes what an accepted ADR decides, so none is written as an ADR: C5 keeps ADR 0130's one wording and meets ADR 0164 as written; C6 is the application's own sentence (ADR 0057); C7 follows `CONTEXT.md`. UI-89 and UI-111 state them, marked **bug: code differs** until the code changes.
 
 ### C5. What a mounted page's startup failure calls the directory
 
@@ -63,7 +67,6 @@ ADR 0164 is later but does not name 0130, and says nothing of the CLI, whose out
 
 **Recommendation: (a).** Lower-case "space" beside capitalised Resource, Map and Graph reads as a different word from the Space ADR 0164 says a person is shown. Consequence: UI-111 gains a capitalisation clause marked **bug: code differs**.
 
-## Closed
 
 Closed by the rulings of 12 November 2026 (DECISIONS, Checkpoint 3 rulings). The code changes they call for are listed under "Bugs" in [../ui.md](../ui.md). The text below each heading is the conflict as it was raised.
 

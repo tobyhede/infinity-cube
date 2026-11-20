@@ -71,12 +71,9 @@ One agent per topic, each editing only its doc, its `trace/` file and its `confl
 
 Freshness: `origin/main` was still `71b2a14` at the audit, the merge-base. `d461223..origin/main` holds only PR 502's own changes, so the refresh holds if PR 502 merges as it stands.
 
-## Open decisions (for the maintainer)
+## Rulings (20 November 2026)
 
-- **rendering C3:** a Mermaid diagram wider than its rect. Fix the code to clip, as ADR 0149 says (recommended), or write an ADR that makes scaling down an exception.
-- **ui C5:** a mounted page's failure wording. Recommended: Space everywhere, including the CLI (ADR 0164 against ADR 0130's same words).
-- **ui C6:** the `forbidden` sentence should name the cross-site cause (recommended).
-- **ui C7:** sentences an author reads should capitalise Space and Space Resource (recommended).
+The maintainer took the recommended option on all four: rendering C3 (clip), ui C5 (Space at the CLI and on the page), ui C6 (name the cross-site cause) and ui C7 (capitalise Space). None is an ADR; DECISIONS "Refresh rulings" records them, the conflicts are closed, and RD-5, UI-89 and UI-111 mark the code gaps as bug: code differs. The code changes are tickets [01](issues/01-clip-a-wide-mermaid-diagram.md) to [04](issues/04-capitalise-space-in-sentences.md).
 
 ## Workflow impact
 

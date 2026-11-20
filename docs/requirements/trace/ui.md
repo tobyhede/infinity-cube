@@ -460,3 +460,5 @@ Main moved on after the rewrite's baseline (commit `797b2908`). These are the ru
 | `desktop/ui/index.html`, `home.js`: the home window says Space | folded → UI-111 |
 | `app/src/mount/github-source.ts` `describeGitHubSourceFailure`: a truncated tree "so its aggregate cannot be read whole" | → UI-111 (bug: code differs) |
 | `app/src/authoring-refusal.ts`: `describeAggregateRefusal` reads the wire form of intake's errors | dropped: a type change; its sentences and UI-89 are unchanged |
+
+Rulings UI C5, C6 and C7 (20 November 2026), each option (a): the shared refusal says Space at the CLI and on the page → UI-111, ST-90; the `forbidden` sentence names the cross-site cause → UI-89; Space and Space Resource capitalised in sentences → UI-111. Each is bug: code differs; DECISIONS "Refresh rulings".

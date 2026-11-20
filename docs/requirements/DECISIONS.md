@@ -76,3 +76,12 @@ When ruling 8 was reversed, every ruling above that changes what an accepted ADR
 | UI C4. A permanent rejection is a dialog that takes focus | 0042's "None steals focus" for a permanent rejection | ADR 0154 | UI-93 |
 | Storage S2. No compatibility promise for a copy outside the repository | the reason 0054 and 0056 give for rolling forward | ADR 0152 | ST-36 |
 | 8. (reversed) | 0115 | ADR 0145, which supersedes 0115 | `README.md`; every doc's snapshot marker |
+
+## Refresh rulings (20 November 2026)
+
+Ruled by the maintainer on the snapshot refresh against `d461223`, each taking the recommended option. None changes what an accepted ADR decides, so none is recorded as an ADR; each conflict file keeps the disagreement, the options and the evidence.
+
+- **Rendering C3.** An Open Mermaid diagram wider than its rect is clipped, as ADR 0149 states for Open content; a diagram is not the picture 0149 excepts. RD-5 (bug: code differs until the plugin sets `useMaxWidth: false`), SR-67.
+- **UI C5.** The refusal a mount shares with the CLI says Space, on the page and at the CLI, keeping ADR 0130's one wording and meeting ADR 0164. UI-111, ST-90 (bug: code differs).
+- **UI C6.** A save refused `forbidden` names the cross-site cause (ADR 0161), never a permission. UI-89 (bug: code differs).
+- **UI C7.** A sentence an author reads writes Space and Space Resource capitalised, as `CONTEXT.md` does. UI-111 (bug: code differs).

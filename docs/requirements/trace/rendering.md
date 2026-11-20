@@ -454,3 +454,5 @@ Added 20 November 2026, when the doc was reconciled against `d461223`. ADR 0158 
 | 0162 every host locks the directory it runs | reviewed: decides no drawing. Owned by ST |
 | 0163 (proposed) a closing desktop window waits ten seconds, then asks | not incorporated: proposed |
 | 0164 "talk" retired; a person is shown a Space | reviewed: this doc and its trace and conflict files use neither "talk" nor "Aggregate"; nothing to restate |
+
+Ruling Rendering C3 (20 November 2026): clip a wide Mermaid diagram as ADR 0149 states → RD-5 (bug: code differs), SR-67; DECISIONS "Refresh rulings".

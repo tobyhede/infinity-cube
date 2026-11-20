@@ -4,13 +4,18 @@ Conflicts for [../rendering.md](../rendering.md). Conflict ids are never reused.
 
 ## Open
 
+None.
+
+## Closed
+
+Closed by ruling Rendering C3 (maintainer, 20 November 2026): option clip, as recommended. ADR 0149 binds, so no ADR is written; RD-5 stays **bug: code differs** until the plugin clips.
+
 - **C3. ADR 0149 clips an Open Mermaid diagram wider than its rect, and the code scales it down to the rect's width. Should the code be fixed to clip, or should a new ADR make a diagram an exception, as a picture is?** Raised 20 November 2026 in the snapshot refresh against `d461223`.
   - *Competing claims.* ADR 0149: "Open content that does not fit its rect is clipped at the rect on the canvas", with one exception, "A picture still scales down to its rect", and the reason that a fitted drawing "changes scale with the rect", while authored scale "keeps its Titles readable and makes Resize the one way to show more". ADR 0158, written after it, makes the Mermaid Resource "the Markdown Resource in every way but what it draws" and draws the diagram "straight onto the rect with no card of its own", but says nothing about a diagram wider than its rect. A diagram is not an Image Resource, so 0149's one exception does not cover it, and 0149's clip binds; the question is whether a diagram, an SVG holding text, should become a second exception.
   - *What the code does.* `packages/plugin-mermaid/src/mermaid.ts` `MERMAID_SETTINGS` sets `startOnLoad`, `securityLevel` and `suppressErrorRendering` and leaves `useMaxWidth` at Mermaid's default, on (mermaid 11.17.2), which sizes the SVG to the width it is given up to its natural width. `packages/plugin-mermaid/src/view.tsx` `DrawnDiagram` inserts it in a flex container inside the rect, and the host's rect clips what overflows (`packages/ui/src/canvas-resource.css`, `overflow: hidden`). So, as read from the code and not observed in a browser, a wide diagram shrinks to the rect's width and one taller than its rect is clipped. No test asserts either: `packages/app/e2e/mermaid-resource.spec.ts` › "a Mermaid Resource draws its saved source with Mermaid, in the canvas’s colour scheme" asserts only that the page does not grow past its viewport. Opening measures the size hint at the reading width (MG-88), so a diagram is usually given room on Open; the case arises after a Resize narrower than the diagram, or when Mermaid has not drawn within the load wait and no hint is sent.
   - *Recommendation.* Fix the code to clip, as ADR 0149 states: set `useMaxWidth: false` in the plugin's settings, so a diagram keeps the scale its text was laid out at, and Resize stays the one way to show more. Consequence for the author: a narrowed Resource shows part of a diagram rather than all of it smaller. Implementation gap: one setting and an end-to-end test. The other choice, scaling down as a picture does, would need a new ADR refining 0149, because 0149 names the picture as its only exception.
   - *Affects.* RD-5 (bug: code differs for the Mermaid case), space-and-resources.md SR-67 (what the Mermaid Resource draws), maps-and-graphs.md MG-88 (the size hint).
 
-## Closed
 
 Closed by ruling Rendering C1 (DECISIONS, Checkpoint 3 rulings, ruled 12 November 2026), recorded as ADR 0149, which refines 0122.
 
