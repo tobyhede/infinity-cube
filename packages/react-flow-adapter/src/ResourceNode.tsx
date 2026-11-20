@@ -200,6 +200,7 @@ export function ResourceNode({
     resizeOperation.current = resize;
   }, [resize]);
   const resizing = useRef(false);
+  const resizeRatio = useRef<number>();
   const [resizeActive, setResizeActive] = useState(false);
   /*
    * Narrow interactive deviation for cancellation the specialist control does
@@ -252,7 +253,10 @@ export function ResourceNode({
    * its two listeners to the window at `mousedown`. The ref above is what lets
    * a stable callback still reach a replaced capability.
    */
-  const beginResize = useCallback<OnResizeStart>(() => {
+  const beginResize = useCallback<OnResizeStart>((event, start) => {
+    const source: unknown = event.sourceEvent;
+    resizeRatio.current =
+      source instanceof MouseEvent && source.shiftKey ? start.width / start.height : undefined;
     resizing.current = true;
     setResizeActive(true);
     resizeOperation.current?.onResizeStart();
@@ -274,7 +278,19 @@ export function ResourceNode({
    */
   const proposeResize = useCallback<ShouldResize>((_event, next) => {
     if (!resizing.current) return false;
-    resizeOperation.current?.onResize({ width: next.width, height: next.height });
+    const ratio = resizeRatio.current;
+    const operation = resizeOperation.current;
+    if (ratio === undefined || operation === undefined) {
+      operation?.onResize({ width: next.width, height: next.height });
+    } else {
+      const width = Math.max(
+        next.width,
+        next.height * ratio,
+        operation.minWidth,
+        operation.minHeight * ratio,
+      );
+      operation.onResize({ width, height: width / ratio });
+    }
     return false;
   }, []);
   const { zoom } = useViewport();
@@ -374,7 +390,7 @@ export function ResourceNode({
             position="bottom-right"
             minWidth={resize.minWidth}
             minHeight={resize.minHeight}
-            className="rf-resource-node__resize-control"
+            className="rf-resource-node__resize-control nokey"
             onResizeStart={beginResize}
             shouldResize={proposeResize}
           />
