@@ -31,14 +31,14 @@ use http_conformance::support::{fresh, header, json_of};
 
 const WINDOW: &str = "space-0";
 /// One Aggregate open in the window [`WINDOW`], served through the scheme.
-struct Aggregate {
+struct Fixture {
     open_aggregates: OpenAggregates,
     address: AggregateAddress,
     run: Run<host::RandomIds, host::BuiltApplicationDirectory>,
     _temporary: TempDir,
 }
 
-async fn open() -> Aggregate {
+async fn open() -> Fixture {
     let (temporary, directory) = fixture_copy();
     let shell = built_shell(&stand_in_build(&temporary)).unwrap();
     let run = open_run(&directory, shell, |_| {}).await.unwrap();
@@ -46,7 +46,7 @@ async fn open() -> Aggregate {
         AggregateAddress::new(AggregateKey::of(&directory), SchemeStyle::HostPerAggregate);
     let open_aggregates = OpenAggregates::new(SchemeStyle::HostPerAggregate);
     open_aggregates.open(address.clone(), Arc::clone(run.application()), WINDOW);
-    Aggregate {
+    Fixture {
         open_aggregates,
         address,
         run,
@@ -54,7 +54,7 @@ async fn open() -> Aggregate {
     }
 }
 
-impl Aggregate {
+impl Fixture {
     fn url(&self, path: &str) -> String {
         format!("{}{path}", self.address.origin())
     }
@@ -134,19 +134,19 @@ mod given_a_request_at_the_trust_boundary {
 
     #[tokio::test]
     async fn answers_a_read_from_the_aggregates_own_window() {
-        let aggregate = open().await;
-        let response = aggregate.get("/api/spaces").await;
+        let fixture = open().await;
+        let response = fixture.get("/api/spaces").await;
         assert_eq!(
             response.status(),
             200,
             "the Aggregate's window reads its Aggregate"
         );
-        aggregate.stop().await;
+        fixture.stop().await;
     }
 
     #[tokio::test]
     async fn refuses_an_address_naming_no_open_aggregate() {
-        let aggregate = open().await;
+        let fixture = open().await;
         let elsewhere = AggregateAddress::new(
             AggregateKey::of(Path::new("/spaces/not-open")),
             SchemeStyle::HostPerAggregate,
@@ -157,101 +157,98 @@ mod given_a_request_at_the_trust_boundary {
             "/api/spaces".to_owned(),
         ] {
             let request = Request::get(uri.as_str()).body(Vec::new()).unwrap();
-            refused_by_the_scheme(&aggregate.answer(WINDOW, request).await, 404);
+            refused_by_the_scheme(&fixture.answer(WINDOW, request).await, 404);
         }
-        aggregate.stop().await;
+        fixture.stop().await;
     }
 
     #[tokio::test]
     async fn refuses_a_window_that_is_not_the_aggregates() {
-        let aggregate = open().await;
+        let fixture = open().await;
         for window in ["home", "space-1", ""] {
-            let request = Request::get(aggregate.url("/api/spaces"))
+            let request = Request::get(fixture.url("/api/spaces"))
                 .body(Vec::new())
                 .unwrap();
-            refused_by_the_scheme(&aggregate.answer(window, request).await, 403);
+            refused_by_the_scheme(&fixture.answer(window, request).await, 403);
         }
-        aggregate.stop().await;
+        fixture.stop().await;
     }
 
     #[tokio::test]
     async fn admits_a_window_the_aggregates_page_opened() {
-        let aggregate = open().await;
-        let view = aggregate
+        let fixture = open().await;
+        let view = fixture
             .open_aggregates
-            .open_view(aggregate.address.key())
+            .open_view(fixture.address.key())
             .expect("the Aggregate is open");
-        let request = Request::get(aggregate.url(META_ADDRESS))
+        let request = Request::get(fixture.url(META_ADDRESS))
             .body(Vec::new())
             .unwrap();
-        shell(&aggregate.answer(&view, request).await);
-        aggregate.stop().await;
+        shell(&fixture.answer(&view, request).await);
+        fixture.stop().await;
     }
 
     #[tokio::test]
     async fn stops_admitting_a_window_the_aggregates_page_opened_once_it_is_gone() {
-        let aggregate = open().await;
-        let key = aggregate.address.key();
-        let view = aggregate
+        let fixture = open().await;
+        let key = fixture.address.key();
+        let view = fixture
             .open_aggregates
             .open_view(key)
             .expect("the Aggregate is open");
-        aggregate.open_aggregates.forget_view(&view);
+        fixture.open_aggregates.forget_view(&view);
         assert!(
-            !aggregate.open_aggregates.holds_window(key, &view),
+            !fixture.open_aggregates.holds_window(key, &view),
             "a window that is gone"
         );
         assert!(
-            aggregate.open_aggregates.holds_window(key, WINDOW),
+            fixture.open_aggregates.holds_window(key, WINDOW),
             "the Aggregate's own window is still held"
         );
-        aggregate.stop().await;
+        fixture.stop().await;
     }
 
     #[tokio::test]
     async fn names_no_window_twice_when_an_aggregate_is_opened_again() {
-        let aggregate = open().await;
-        let key = aggregate.address.key();
-        let first = aggregate
+        let fixture = open().await;
+        let key = fixture.address.key();
+        let first = fixture
             .open_aggregates
             .open_view(key)
             .expect("the Aggregate is open");
-        let _closed = aggregate.open_aggregates.close(key);
+        let _closed = fixture.open_aggregates.close(key);
         assert!(
-            !aggregate.open_aggregates.holds_window(key, &first),
+            !fixture.open_aggregates.holds_window(key, &first),
             "a closing Aggregate holds no window"
         );
         assert_eq!(
-            aggregate.open_aggregates.open_view(key),
+            fixture.open_aggregates.open_view(key),
             None,
             "a closed Aggregate opens no window"
         );
-        aggregate.open_aggregates.open(
-            aggregate.address.clone(),
-            Arc::clone(aggregate.run.application()),
+        fixture.open_aggregates.open(
+            fixture.address.clone(),
+            Arc::clone(fixture.run.application()),
             WINDOW,
         );
-        let again = aggregate
+        let again = fixture
             .open_aggregates
             .open_view(key)
             .expect("the Aggregate is open again");
         assert_ne!(again, first, "a label Tauri may still hold is not reused");
-        assert!(
-            aggregate.open_aggregates.holds_window(key, &again),
-            "{again}"
-        );
-        aggregate.stop().await;
+        assert!(fixture.open_aggregates.holds_window(key, &again), "{again}");
+        fixture.stop().await;
     }
 
     /// A rename of the Meta Space naming `origins` and `referers`.
     fn change(
-        aggregate: &Aggregate,
+        fixture: &Fixture,
         loaded: &Value,
         origins: &[&str],
         referers: &[&str],
     ) -> Request<Vec<u8>> {
         let mut request =
-            Request::post(aggregate.url("/api/spaces")).header("content-type", "application/json");
+            Request::post(fixture.url("/api/spaces")).header("content-type", "application/json");
         for origin in origins {
             request = request.header("origin", *origin);
         }
@@ -265,17 +262,17 @@ mod given_a_request_at_the_trust_boundary {
 
     #[tokio::test]
     async fn admits_a_change_naming_the_aggregates_own_origin_or_page() {
-        let aggregate = open().await;
-        let own = aggregate.address.origin();
-        let page = aggregate.url(META_ADDRESS);
+        let fixture = open().await;
+        let own = fixture.address.origin();
+        let page = fixture.url(META_ADDRESS);
         for (origins, referers) in [
             (&[own.as_str()][..], &[][..]),
             (&[own.as_str()], &[page.as_str()]),
             (&[], &[page.as_str()]),
         ] {
-            let loaded = aggregate.load(META).await;
-            let response = aggregate
-                .answer(WINDOW, change(&aggregate, &loaded, origins, referers))
+            let loaded = fixture.load(META).await;
+            let response = fixture
+                .answer(WINDOW, change(&fixture, &loaded, origins, referers))
                 .await;
             assert_eq!(
                 response.status(),
@@ -283,23 +280,23 @@ mod given_a_request_at_the_trust_boundary {
                 "Origin {origins:?}, Referer {referers:?} is the Aggregate's own"
             );
         }
-        aggregate.stop().await;
+        fixture.stop().await;
     }
 
     #[tokio::test]
     async fn says_which_header_admitted_a_change_and_none_for_a_read() {
-        let aggregate = open().await;
-        let loaded = aggregate.load(META).await;
-        let own = aggregate.address.origin();
-        let page = aggregate.url(META_ADDRESS);
+        let fixture = open().await;
+        let loaded = fixture.load(META).await;
+        let own = fixture.address.origin();
+        let page = fixture.url(META_ADDRESS);
         for (origins, referers, expected) in [
             (&[own.as_str()][..], &[][..], AdmittedBy::Origin),
             (&[own.as_str()], &[page.as_str()], AdmittedBy::Origin),
             (&[], &[page.as_str()], AdmittedBy::Referer),
         ] {
-            let admitted = aggregate
+            let admitted = fixture
                 .open_aggregates
-                .admit(WINDOW, change(&aggregate, &loaded, origins, referers))
+                .admit(WINDOW, change(&fixture, &loaded, origins, referers))
                 .unwrap();
             assert_eq!(
                 admitted.by(),
@@ -308,26 +305,26 @@ mod given_a_request_at_the_trust_boundary {
             );
             assert_eq!(admitted.named(), "POST /api/spaces", "the request named");
         }
-        let read = aggregate
+        let read = fixture
             .open_aggregates
             .admit(
                 WINDOW,
-                Request::get(aggregate.url("/api/spaces"))
+                Request::get(fixture.url("/api/spaces"))
                     .body(Vec::new())
                     .unwrap(),
             )
             .unwrap();
         assert_eq!(read.by(), None, "a read is admitted by no header");
         drop(read);
-        aggregate.stop().await;
+        fixture.stop().await;
     }
 
     #[tokio::test]
     async fn refuses_a_change_from_anywhere_but_the_aggregates_own_page() {
-        let aggregate = open().await;
-        let loaded = aggregate.load(META).await;
-        let own = aggregate.address.origin();
-        let page = aggregate.url(META_ADDRESS);
+        let fixture = open().await;
+        let loaded = fixture.load(META).await;
+        let own = fixture.address.origin();
+        let page = fixture.url(META_ADDRESS);
         let other = AggregateAddress::new(
             AggregateKey::of(Path::new("/spaces/other")),
             SchemeStyle::HostPerAggregate,
@@ -350,18 +347,18 @@ mod given_a_request_at_the_trust_boundary {
         ];
         for (origins, referers) in cases {
             refused_by_the_scheme(
-                &aggregate
-                    .answer(WINDOW, change(&aggregate, &loaded, origins, referers))
+                &fixture
+                    .answer(WINDOW, change(&fixture, &loaded, origins, referers))
                     .await,
                 403,
             );
         }
         assert_eq!(
-            aggregate.load(META).await["revision"],
+            fixture.load(META).await["revision"],
             loaded["revision"],
             "nothing committed"
         );
-        aggregate.stop().await;
+        fixture.stop().await;
     }
 
     /// Whether a `Referrer-Policy` value, a comma-separated list whose last
@@ -386,29 +383,29 @@ mod given_a_request_at_the_trust_boundary {
     // refuse every Edit 403.
     #[tokio::test]
     async fn nothing_it_is_served_with_suppresses_the_admitting_referer() {
-        let aggregate = open().await;
-        let loaded = aggregate.load(META).await;
+        let fixture = open().await;
+        let loaded = fixture.load(META).await;
         let responses = [
-            ("the root", aggregate.get("/").await),
-            ("the page", aggregate.get(META_ADDRESS).await),
+            ("the root", fixture.get("/").await),
+            ("the page", fixture.get(META_ADDRESS).await),
             (
                 "a built file",
-                aggregate.get(&format!("/{}", STAND_IN_SCRIPT.0)).await,
+                fixture.get(&format!("/{}", STAND_IN_SCRIPT.0)).await,
             ),
-            ("an API read", aggregate.get("/api/spaces").await),
+            ("an API read", fixture.get("/api/spaces").await),
             (
                 "a commit",
-                aggregate
+                fixture
                     .post_commit(rename_text(&loaded, "Referred"), "application/json")
                     .await,
             ),
             (
                 "a refused commit",
-                aggregate.post_commit("{", "application/json").await,
+                fixture.post_commit("{", "application/json").await,
             ),
             (
                 "an asset stored",
-                aggregate
+                fixture
                     .send(
                         "POST",
                         "/assets",
@@ -419,10 +416,10 @@ mod given_a_request_at_the_trust_boundary {
             ),
             (
                 "the scheme's own refusal",
-                aggregate
+                fixture
                     .answer(
                         "space-other",
-                        Request::get(aggregate.url("/")).body(Vec::new()).unwrap(),
+                        Request::get(fixture.url("/")).body(Vec::new()).unwrap(),
                     )
                     .await,
             ),
@@ -452,7 +449,7 @@ mod given_a_request_at_the_trust_boundary {
             !names_no_referrer(&page),
             "the browser application's index.html suppresses the Referer"
         );
-        aggregate.stop().await;
+        fixture.stop().await;
     }
 
     #[test]
@@ -472,39 +469,39 @@ mod given_a_request_at_the_trust_boundary {
 
     #[tokio::test]
     async fn stops_serving_an_aggregate_once_it_is_closed() {
-        let aggregate = open().await;
-        let closed = aggregate.open_aggregates.close(aggregate.address.key());
+        let fixture = open().await;
+        let closed = fixture.open_aggregates.close(fixture.address.key());
         assert_eq!(
             closed.map(|closed| closed.windows),
             Some(vec![WINDOW.to_owned()]),
             "the windows that reached it"
         );
-        refused_by_the_scheme(&aggregate.get("/api/spaces").await, 404);
-        aggregate.stop().await;
+        refused_by_the_scheme(&fixture.get("/api/spaces").await, 404);
+        fixture.stop().await;
     }
 
     #[tokio::test(start_paused = true)]
     async fn a_close_waits_for_a_change_being_answered_and_not_for_a_read() {
-        let aggregate = open().await;
+        let fixture = open().await;
         let request = |method: &str| {
             Request::builder()
                 .method(method)
-                .uri(aggregate.url("/api/spaces"))
-                .header("referer", aggregate.url(META_ADDRESS))
+                .uri(fixture.url("/api/spaces"))
+                .header("referer", fixture.url(META_ADDRESS))
                 .body(Vec::new())
                 .unwrap()
         };
-        let read = aggregate
+        let read = fixture
             .open_aggregates
             .admit(WINDOW, request("GET"))
             .unwrap();
-        let change = aggregate
+        let change = fixture
             .open_aggregates
             .admit(WINDOW, request("POST"))
             .unwrap();
-        let closed = aggregate
+        let closed = fixture
             .open_aggregates
-            .close(aggregate.address.key())
+            .close(fixture.address.key())
             .unwrap();
         let waited = std::time::Duration::from_secs(3600);
         assert!(
@@ -521,13 +518,13 @@ mod given_a_request_at_the_trust_boundary {
             "a read being answered does not"
         );
         drop(read);
-        aggregate.stop().await;
+        fixture.stop().await;
     }
 }
 
 /// The scheme handler as the shared conformance cases reach it: a request
 /// from the Aggregate's own window and page.
-impl http_conformance::Adapter for Aggregate {
+impl http_conformance::Adapter for Fixture {
     async fn open() -> Self {
         open().await
     }
@@ -560,4 +557,4 @@ impl http_conformance::Adapter for Aggregate {
     }
 }
 
-http_conformance::cases!(Aggregate);
+http_conformance::cases!(Fixture);

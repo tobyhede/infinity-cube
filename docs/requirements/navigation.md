@@ -2,7 +2,7 @@
 
 **Purpose:** what changes what is shown without writing the Space: choosing a Map, selection, traversal, product URLs and browser history, Open Spaces, and presenting.
 
-**Snapshot:** checked against `9e9b094` (2026-11-17); incorporates accepted ADRs through 0158, and ADR 0164 (vocabulary). ADRs accepted after it bind where they differ, until this document is updated.
+**Snapshot:** checked against `9e9b094` (2026-11-17); incorporates accepted ADRs through 0164; ADRs 0159 to 0162 decide nothing this document restates. ADRs accepted after it bind where they differ, until this document is updated.
 
 Open conflicts are listed in [conflicts/navigation.md](conflicts/navigation.md). Sources are traced in [trace/navigation.md](trace/navigation.md).
 
@@ -202,7 +202,7 @@ Open conflicts are listed in [conflicts/navigation.md](conflicts/navigation.md).
 
 ### Presentation Notes
 
-- **NV-67** A presentation's notes are found, never stored, in its Presentation Notes Graph, a Graph on the same Map chosen by its title:
+- **NV-67** The presented Graph's notes are found, never stored, in a Presentation Notes Graph, a Graph on the same Map chosen by its own title:
   - titles are compared as words, after NFKC normalisation and case folding, with every run of characters that are neither letters nor digits (Title Line breaks included) counted as one separator;
   - a title matches when it reads as `<presented Graph title> <marker>` or `<marker>` alone;
   - the markers are "Presentation Notes" (or "PresentationNotes"), "Notes", and "Presentation" followed by at least one more word;

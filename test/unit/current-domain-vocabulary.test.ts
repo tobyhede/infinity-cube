@@ -3537,25 +3537,43 @@ describe('the application is named InfinityCube', () => {
 });
 
 /**
- * ADR 0164: the word that stood for an Aggregate directory, a presented Graph
- * and whatever a person had opened names nothing. A person is shown a Space,
- * the desktop application's window is a Space window, source says Aggregate for
- * the directory and its run, and what is presented is a presented Graph.
+ * ADR 0164: the word below names nothing. A person is shown a Space, the
+ * desktop application's window is a Space window, source says Aggregate for the
+ * directory and its run, and what is presented is a presented Graph.
  *
- * The pattern is the bare letters in any casing, so it reads every shape the
- * word was written in: a type's prefix, a snake-case and a camel-case compound,
- * a permission's kebab-case, a fixture's directory and a Title. That also
- * reports the English verb, which this source therefore does not use.
+ * The pattern is the bare letters in any casing, so it reads a type's prefix, a
+ * snake-case and a camel-case compound, a permission's kebab-case, a fixture's
+ * directory and a Title. It also reports the English verb, which this source
+ * therefore does not use.
  *
  * Composed from fragments because this file is scanned.
  */
 const RETIRED_OPENED = ['ta', 'lk'].join('');
 const RETIRED_OPENED_NAME = new RegExp(RETIRED_OPENED, 'i');
 
+const RETIRED_OPENED_TREES = ['plugins/', '.claude-plugin/'] as const;
+const RETIRED_OPENED_LOCKFILES: readonly string[] = [
+  'pnpm-lock.yaml',
+  'Cargo.lock',
+  'skills-lock.json',
+];
+
 describe('the word for what a person opens is gone (ADR 0164)', () => {
-  const authored = scannableFiles().filter(isAuthoredSource);
+  // Wider than `isAuthoredSource`: the rename also crossed the plugin manifests
+  // and the root configuration, which are read by people. The lockfiles hold
+  // other publishers' package names.
+  const authored = scannableFiles().filter(
+    (file) =>
+      isAuthoredSource(file) ||
+      RETIRED_OPENED_TREES.some((tree) => file.startsWith(tree)) ||
+      (!file.includes('/') && !RETIRED_OPENED_LOCKFILES.includes(file)),
+  );
 
   it('reaches the kinds of file the rename actually touched', () => {
+    expect(authored).toContain('wrangler.jsonc');
+    expect(authored).toContain('plugins/infinity-cube/.codex-plugin/plugin.json');
+    expect(authored).toContain('.claude-plugin/marketplace.json');
+    expect(authored).not.toContain('pnpm-lock.yaml');
     expect(authored).toContain('packages/desktop/src-tauri/src/aggregates.rs');
     expect(authored).toContain('packages/desktop/src-tauri/capabilities/home.json');
     expect(authored).toContain('packages/desktop/ui/index.html');
