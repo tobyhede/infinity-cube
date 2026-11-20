@@ -235,6 +235,9 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 | 0142 old content: no versioning of content | folded → ST-36 |
 | 0142 cost: an asset URL inside another asset's bytes is not found, so it is not carried | → ST-60 |
 | 0142 cost and rejected options otherwise | dropped: costs and rejected alternatives |
+| 0155 both hosts share one schema through plain-SQL migrations that every tool applies, held to one schema by a test | → ST-125, as 0165 refines it |
+| 0165 the schema history in two encodings: Prisma Next's packages and one plain-SQL file per package, held to the same statements and schema by tests; a schema change adds both | → ST-125 |
+| 0165 rejected options | dropped: rejected alternatives |
 
 ## 2. Guides
 

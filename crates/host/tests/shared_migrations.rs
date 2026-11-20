@@ -187,8 +187,11 @@ mod given_a_postgresql_server {
                 .connect_with(shared_options.clone())
                 .await
                 .unwrap();
-            shared_migrator("postgres").await.run(&pool).await.unwrap();
+            // Closed before a failure is raised, so no connection is left to
+            // stop the databases being dropped.
+            let migrated = shared_migrator("postgres").await.run(&pool).await;
             pool.close().await;
+            migrated.unwrap();
             (
                 schema(&prisma_options, &[]).await,
                 schema(&shared_options, SQLX_TABLES).await,
