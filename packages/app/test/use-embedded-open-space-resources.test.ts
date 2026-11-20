@@ -8,7 +8,6 @@ import { bareKindData, type ResourceFlowNode } from '@project/react-flow-adapter
 import type { MapEmbedEntry } from '../src/map-embedding/map-embeddings';
 import { createOpenSpaces, type OpenSpace } from '../src/open-spaces';
 import { CANVAS } from '../src/space-authoring';
-import type { SpaceResourceFraming } from '../src/space-resource-framing';
 import {
   useEmbeddedOpenSpaceResources,
   type EmbeddedTargetReader,
@@ -219,44 +218,6 @@ describe('useEmbeddedOpenSpaceResources', () => {
       result.current.reportBodyHeight(HOST, 40);
     });
     expect(result.current.embeddedRequests[0]?.bounds.bottom).toBe(456);
-  });
-
-  it('counts a Resource as editing its portal while its plugin passes a Claim to the embedding', async () => {
-    const spaces = reader(() => Promise.resolve(undefined));
-    const nodes = [spaceResource(HOST, MAP)];
-    const { result, rerender } = renderHook(
-      ({ claimed }) =>
-        useEmbeddedOpenSpaceResources(nodes, publishedEmbeds(nodes, claimed), spaces, NO_DRAG, {
-          spaceId: HOST,
-          mapId: OTHER_MAP,
-          policy: 'authoring',
-        }),
-      { initialProps: { claimed: new Set<string>() } },
-    );
-    await waitFor(() => expect(result.current.embeddedRequests).toHaveLength(1));
-    expect(result.current.editingPortals.has(HOST)).toBe(false);
-    rerender({ claimed: new Set([HOST]) });
-    expect(result.current.editingPortals.has(HOST)).toBe(true);
-    rerender({ claimed: new Set() });
-    expect(result.current.editingPortals.has(HOST)).toBe(false);
-  });
-
-  it('owns the in-flight framing draft', async () => {
-    const spaces = reader(() => Promise.resolve(undefined));
-    const nodes = [spaceResource(HOST, MAP)];
-    const { result } = renderHook(() =>
-      useEmbeddedOpenSpaceResources(nodes, publishedEmbeds(nodes), spaces, NO_DRAG, {
-        spaceId: HOST,
-        mapId: OTHER_MAP,
-        policy: 'authoring',
-      }),
-    );
-    await waitFor(() => expect(result.current.embeddedRequests).toHaveLength(1));
-    const framing: SpaceResourceFraming = { centreX: 200, centreY: 100, zoom: 2 };
-    act(() => {
-      result.current.setPortalDraft(new Map([[HOST, framing]]));
-    });
-    expect(result.current.portalDraft.get(HOST)).toEqual(framing);
   });
 
   it('keeps a failed read for an embedding given no view, and reads it again on resume', async () => {

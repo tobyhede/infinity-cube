@@ -12,16 +12,16 @@ Done flushes the framing, then selects, then forgets, in that order, inside the 
 
 **Blocked by:** 01.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Interface tests, which need no React and no application mount, cover:
+- [x] Interface tests, which need no React and no application mount, cover:
   - a Claim lent while authored and returned on Done;
   - a pending zoom flushed on Done before the commit is withdrawn;
   - selection on Done and on Close only while the Resource is still drawn;
   - no selection when the placement went (Map switched, Resource deleted or unplaced), which is the f1bc4a8 case;
   - the d0eee7d case;
   - a withdrawn embedding's commit forgotten only after its flush has landed.
-- [ ] `dispose()` lands a zoom still pending at unmount, without dropping drafts. A test holds it.
-- [ ] The debounce uses `setTimeout`, and its tests use fake timers. No clock is injected.
-- [ ] The registry's own piece tests are deleted where the new interface tests cover them. Any `rendering.md` citation (RD-60, RD-61) of a moved or renamed test moves with it.
-- [ ] The embedded-Map application mount still passes untouched.
+- [x] `dispose()` lands a zoom still pending at unmount, without dropping drafts. A test holds it.
+- [x] The debounce uses `setTimeout`, and its tests use fake timers. No clock is injected.
+- [x] The registry's own piece tests are deleted where the new interface tests cover them. Any `rendering.md` citation (RD-60, RD-61) of a moved or renamed test moves with it.
+- [x] The embedded-Map application mount still passes untouched.

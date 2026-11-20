@@ -1,13 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-  type Dispatch,
-  type SetStateAction,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { titleName, type ResourceId } from '@project/core';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import {
@@ -20,7 +11,6 @@ import type { EmbeddedPublication } from './embedded-publication';
 import { editingMapEmbeds, type MapEmbedEntry } from './map-embeddings';
 import type { OpenSpace, SpaceHold } from '../open-spaces';
 import { spaceResourceTarget } from '../space-resource-lifecycle';
-import type { SpaceResourceFraming } from '../space-resource-framing';
 
 const EMPTY_ENTRIES = [] as const;
 const emptySubscription = () => () => undefined;
@@ -57,11 +47,6 @@ export interface EmbeddedOpenSpaceResources {
   readonly resumeEmbedded: (spaceId: ResourceId) => Promise<void>;
   readonly publishEmbedded: (id: string, value: EmbeddedPublication | null) => void;
   readonly reportBodyHeight: (id: string, height: number | null) => void;
-  /** The placements whose embedded Map is authored in place, by node id: each passed its Claim to the embedding. */
-  readonly editingPortals: ReadonlySet<string>;
-  /** The framing being drawn on each placement's embedded Map, by node id. */
-  readonly portalDraft: ReadonlyMap<string, SpaceResourceFraming>;
-  readonly setPortalDraft: Dispatch<SetStateAction<ReadonlyMap<string, SpaceResourceFraming>>>;
 }
 
 /**
@@ -98,9 +83,6 @@ export function useEmbeddedOpenSpaceResources(
   const editingKey = [...editingMapEmbeds(embeds)].sort().join();
   // eslint-disable-next-line react-hooks/exhaustive-deps -- membership key, not snapshot identity
   const editingPortals = useMemo(() => editingMapEmbeds(embeds), [editingKey]);
-  const [portalDraft, setPortalDraft] = useState<ReadonlyMap<string, SpaceResourceFraming>>(
-    () => new Map(),
-  );
   const reportBodyHeight = useCallback((id: string, height: number | null) => {
     setBodyHeights((previous) => {
       // A non-positive height is not a measured footer.
@@ -298,8 +280,5 @@ export function useEmbeddedOpenSpaceResources(
     resumeEmbedded,
     publishEmbedded,
     reportBodyHeight,
-    editingPortals,
-    portalDraft,
-    setPortalDraft,
   };
 }
