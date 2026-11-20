@@ -291,3 +291,9 @@ _Avoid_: watching, syncing, live mode, session.
 **Mounting**:
 Working on an Aggregate read from a GitHub location, with edits kept in the browser rather than written back to GitHub.
 _Avoid_: publishing, deploying, hosting, loading; mount in the React sense.
+
+## Distribution
+
+**Preview build**:
+A published, downloadable build of InfinityCube that makes no compatibility promise: an Aggregate directory is read with the preview build that wrote it.
+_Avoid_: release, version, stable build, distribution.
