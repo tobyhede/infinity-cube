@@ -1582,10 +1582,12 @@ describe('no value is bound to a local named after the Map (ADR 0101)', () => {
  * requires either a capital after the retired word, a word boundary before it,
  * or a key's colon after it, and none of the three offers any.
  *
- * **`migrations/` is excluded here and nowhere else.** The files it
- * contributes are `start-contract` / `end-contract` snapshots of a schema that
- * really did have a Card model, and ADR 0085 says migration snapshots are
- * history and are not rewritten. It is scoped to this block rather than added
+ * **`migrations/` and `migrations-sql/` are excluded here and nowhere else.**
+ * The files `migrations/` contributes are `start-contract` / `end-contract`
+ * snapshots of a schema that really did have a Card model, and
+ * `migrations-sql/postgres/` holds the same history's statements as plain SQL
+ * (`test/unit/shared-migrations.test.ts`); ADR 0085 says migration snapshots
+ * are history and are not rewritten. It is scoped to this block rather than added
  * to `HISTORICAL_TREES` because that list feeds `scannableFiles()`, which every
  * other block starts from, and none of them has been asked whether it wants the
  * tree gone. `src/prisma/` stays in scope: `contract.prisma` is authored and the
@@ -1799,10 +1801,12 @@ const RETIRED_RESOURCE_INITIAL_BINDING = new RegExp(
  * this block alone; see the block comment for why it is not a shared historical
  * tree.
  */
-const MIGRATION_SNAPSHOTS = 'migrations/';
+const MIGRATION_SNAPSHOTS = ['migrations/', 'migrations-sql/'] as const;
 
 describe('a Resource is named once (ADR 0085, ADR 0101)', () => {
-  const scanned = scannableFiles().filter((file) => !file.startsWith(MIGRATION_SNAPSHOTS));
+  const scanned = scannableFiles().filter(
+    (file) => !MIGRATION_SNAPSHOTS.some((tree) => file.startsWith(tree)),
+  );
 
   it('reaches the kinds of file this rename actually touched', () => {
     // The domain schema and the authored database contract. A file list that
@@ -1859,14 +1863,16 @@ describe('a Resource is named once (ADR 0085, ADR 0101)', () => {
     expectEachExemptionEarned(FOREIGN_RESOURCE_FILES, FOREIGN_RESOURCE_SPELLINGS);
     expectEachExemptionEarned(FOREIGN_BARE_RESOURCE_FILES, RETIRED_RESOURCE_BARE);
 
-    // And the excluded tree is excluded because it still carries the record it
+    // And each excluded tree is excluded because it still carries the record it
     // is excluded for, rather than out of habit.
-    const snapshots = trackedFiles().filter((file) => file.startsWith(MIGRATION_SNAPSHOTS));
-    expect(snapshots).not.toEqual([]);
-    expect(
-      snapshots.flatMap((file) => hits(readTracked(file) ?? '', RETIRED_RESOURCE_NAME)),
-      'no migration snapshot still records the retired model',
-    ).not.toEqual([]);
+    for (const tree of MIGRATION_SNAPSHOTS) {
+      const snapshots = trackedFiles().filter((file) => file.startsWith(tree));
+      expect(snapshots, `${tree} is excluded but contains no tracked files`).not.toEqual([]);
+      expect(
+        snapshots.flatMap((file) => hits(readTracked(file) ?? '', RETIRED_RESOURCE_NAME)),
+        `no migration snapshot in ${tree} still records the retired model`,
+      ).not.toEqual([]);
+    }
   });
 
   it('still reports a domain compound inside the registry exemption', () => {
@@ -2067,7 +2073,7 @@ const previousResourcePattern = retiredIdentifierPattern(PREVIOUS_RESOURCE);
 const previousMapBare = new RegExp(`\\b${PREVIOUS_MAP}\\b`);
 const previousResourceBare = new RegExp(`\\b${PREVIOUS_RESOURCE}\\b`);
 
-const RETIRED_SCHEMA_TREES = ['migrations/', 'migrations-sqlite/'] as const;
+const RETIRED_SCHEMA_TREES = ['migrations/', 'migrations-sqlite/', 'migrations-sql/'] as const;
 
 const currentVocabularyFiles = (): readonly string[] =>
   scannableFiles().filter((file) => !RETIRED_SCHEMA_TREES.some((tree) => file.startsWith(tree)));
@@ -2119,7 +2125,7 @@ const expectNoRetiredIdentifier = (
  * or a stylesheet carries the domain noun in its path, and every scan above
  * reads only what is *inside* a file. A path holds no foreign sense of either
  * word to protect: the only tracked paths that spell one are in the historical
- * trees and the two migration trees, both already excluded from the list this
+ * trees and the migration trees, both already excluded from the list this
  * reads, so the bare word is enough, in the two cases
  * a kebab-case or PascalCase name writes it in. Spelled rather than read with
  * the `i` flag, which would make `(?![a-z])` reject the capital that follows
