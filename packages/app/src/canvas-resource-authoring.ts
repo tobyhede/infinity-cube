@@ -29,7 +29,11 @@ import type { Embedding } from './plugin-host/claim-chain';
 import type { PluginHost } from './plugin-host/plugin-commits';
 import type { PluginGate } from './plugin-host/plugin-gate';
 import { usePluginGate } from './plugin-host/plugin-gate-context';
-import { useMapEmbeddings, type MapEmbedEntry, type MapEmbeddings } from './map-embedding/map-embeddings';
+import {
+  useMapEmbeddings,
+  type MapEmbedEntry,
+  type MapEmbeddings,
+} from './map-embedding/map-embeddings';
 
 const NO_SUBSCRIPTION = () => () => undefined;
 const NONE_EMBEDDED: ReadonlyMap<string, MapEmbedEntry> = new Map();
