@@ -441,6 +441,10 @@ Main moved on after the rewrite's baseline (commit `797b2908`). These are the ru
 | 0157 WebKit is a supported engine: the end-to-end suite runs in a WebKit project in CI, a failure there fails the change | → UI-110 (not built) |
 | 0157 the desktop application declares a minimum macOS and WebKitGTK version and refuses to install on an older one; Windows needs only WebView2's evergreen runtime | → UI-110 (not built). The platform-floor wording and `AGENTS.md`'s E2E line sent → PROC (build-tooling.md), which ADR 0157 says change with the WebKit project |
 | 0158 a Mermaid Resource offers and runs Edit, Open and Close as a Markdown Resource does, in the host's source editor | → UI-53. What it draws, its size hint and its theme sent → RD; its kind and content sent → SR |
+| 0159 the two intakes report one refusal for one input: order and repeated ids | reviewed: decides nothing in this doc's scope |
+| 0160 JSON text holds no lone surrogate in either runtime | reviewed: decides nothing in this doc's scope |
+| 0161 both hosts refuse a cross-site change | reviewed: the refusal is ED-46 and ST-123; the sentence a person reads for it waits on conflict C6 |
+| 0162 every host locks the Aggregate directory it runs | reviewed: decides nothing in this doc's scope |
 | 0163 (proposed) a desktop close waits ten seconds, then asks "Keep waiting" or "Close without saving", Keep waiting the default and Escape keeping waiting | not incorporated (drafting rule 3). Restated as built, from code and tests, by storage.md ST-122, which owns the desktop windows; the Not here table points there |
 | 0164 what a person reads says Space, never "talk" and never Aggregate; a desktop window on a folder is a Space window; what is presented is a presented Graph, one run through it a presentation | → UI-111. The mounted startup failure's wording, which ADR 0130 ties to the CLI's, is open as C5 |
 | 0164 Aggregate is the name for the directory, its run, its origin and its lock in source and requirements | → UI-111 (the requirement's own wording); the glossary sense is GL (ADR 0088) |

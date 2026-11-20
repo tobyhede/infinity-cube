@@ -47,4 +47,42 @@ One agent per topic, each editing only its doc, its `trace/` file and its `confl
 
 ## Progress
 
-(updated at each checkpoint)
+1. **Inventory and questions.** Seven topic agents, one per doc, wrote their fresh-reader questions (`questions-<topic>.md`) before drafting, then reconciled their doc, `trace/` and `conflicts/` files against `d461223` and ADRs through 0164. None committed.
+2. **Review.** Each diff was read by the coordinating session. Its own changes: the `CONTEXT.md` entries Presented Graph, Presentation and Space window (ADR 0164); pointers from ST-90 to ui C5 and from SR-67 to rendering C3; and the `check-evidence.py` root prefixes (`test/`, `src/`, `crates/`, `conformance/`, `packages/`).
+3. **Independent audit.** A separate agent answered blind questions before reading the authors' expected answers, and found all 21. It then checked coverage, consistency and the mechanical checks. Its findings and their fixes:
+   - RD-5 had softened ADR 0149: the Mermaid case is now **bug: code differs**, not undecided, and rendering C3 asks whether to fix the code or write an ADR.
+   - ST-124's lock release on an Import refusal was marked built with no test. It now cites the test that keeps the lock file and marks the release untested in both runtimes.
+   - navigation.md still listed Presented Graph and Presentation as undefined, citing ADR 0164 for detail 0164 does not state. Both moved to the defined terms.
+   - Trace rows were missing for ADRs the markers call "decide nothing here": navigation 0156, 0159, 0160, 0162; space-and-resources 0157, 0160–0162; ui 0159–0162. Rows were added.
+   - The path rule on the Status line didn't match the citations: navigation and maps-and-graphs now name the root prefixes they cite.
+   - Vocabulary: the policy is that ADR 0164's rename applies to historical records as well as live rules (DECISIONS.md items 4 and S2 swept). maps-and-graphs' "whole Aggregate" is capitalised.
+   - ui C6 asked two questions: it is now split into C6 (the `forbidden` sentence) and C7 (capitalising Space).
+
+## Final validation (working tree after the audit fixes, on source `d461223`)
+
+| Command | Result |
+|---|---|
+| `python3 .scratch/requirements-rewrite/check-evidence.py` | 1,527 titles; 0 missing files; 0 titles not found |
+| `python3 .scratch/requirements-rewrite/check-links.py` | 74 files, 490 links, 0 broken |
+| `python3 .scratch/requirements-rewrite/check-dispositions.py` | 164 ADRs (29 superseded); 0 without a row |
+| `npx prettier --check docs/requirements CONTEXT.md .scratch/requirements-refresh-2026-11-20` | clean |
+| `npx vitest run test/unit/current-domain-vocabulary.test.ts test/unit/adr-status-blocks.test.ts test/unit/docs-agents-citation-accuracy.test.ts` | 3 files, 145 tests passed (Node 22) |
+| `git diff --check` | clean |
+
+Freshness: `origin/main` was still `71b2a14` at the audit, the merge-base. `d461223..origin/main` holds only PR 502's own changes, so the refresh holds if PR 502 merges as it stands.
+
+## Open decisions (for the maintainer)
+
+- **rendering C3:** a Mermaid diagram wider than its rect. Fix the code to clip, as ADR 0149 says (recommended), or write an ADR that makes scaling down an exception.
+- **ui C5:** a mounted page's failure wording. Recommended: Space everywhere, including the CLI (ADR 0164 against ADR 0130's same words).
+- **ui C6:** the `forbidden` sentence should name the cross-site cause (recommended).
+- **ui C7:** sentences an author reads should capitalise Space and Space Resource (recommended).
+
+## Workflow impact
+
+The snapshot model is unchanged. ADRs stay binding and append-only. The reading order in AGENTS.md is unchanged (CONTEXT.md, then the owning doc, then any ADR newer than its marker). Every marker now reads `d461223`, ADRs through 0164. CONTEXT.md gains Presented Graph, Presentation and Space window. No ADR was archived, rewritten or demoted.
+
+## Further limits
+
+- `check-evidence.py` checks TypeScript test titles and file paths. It does not open a Rust test to confirm a cited function name; the audit checked those by hand.
+- `check-dispositions.py` checks that each ADR has a row in some trace, not in every doc whose marker mentions it; the audit checked that per doc.

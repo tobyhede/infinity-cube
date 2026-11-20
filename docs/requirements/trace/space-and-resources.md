@@ -221,6 +221,10 @@ The rule ids in `../space-and-resources.md` are append-only from this version on
 | 0158 drawn in the rect's `color-scheme` (`neutral` light, `dark` dark); a theme the source chooses is kept in either; the source drawn as written, the theme set in Mermaid's settings before each draw; re-read when the document root's attributes or the browser's preference change (amended 17–18 November 2026) | → SR-67 |
 | 0158 stored as `text/vnd.mermaid`, a new file exported as `assets/<hash>.mmd`; the media type stored first stands | → SR-67 (the media type and the new file's name). The extension table and the kept name sent → ST (ST-34) |
 | 0158 rejected options; cost (duplicated edit code, Markdown highlighting, test stand-in); negatives | dropped: rejected alternatives and costs. The negatives (no renderer in the Resource API, never below `strict`) are restated by SR-67 |
+| 0157 WebKit joins Chromium under the browser floor | reviewed: decides nothing in this doc's scope |
+| 0160 JSON text holds no lone surrogate in either runtime | reviewed: decides nothing in this doc's scope |
+| 0161 both hosts refuse a cross-site change | reviewed: decides nothing in this doc's scope |
+| 0162 every host locks the Aggregate directory it runs | reviewed: decides nothing in this doc's scope |
 | 0164 "talk" names nothing; a person is shown a Space; requirements say Aggregate for the directory, its run, origin and lock; a presented Graph | reviewed 20 November 2026: this doc never used "talk". Its prose uses of the Aggregate (SR-6, SR-56, SR-64) now spell the `CONTEXT.md` term with a capital, a wording change. The rest decides nothing here: sent → UI, NV, ST |
 
 ## 2. Guides

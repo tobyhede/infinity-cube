@@ -2,7 +2,7 @@
 
 These are conflicts for [../ui.md](../ui.md) that drafting rules 1–5 and [../DECISIONS.md](../DECISIONS.md) do not settle. Conflict ids are never reused. Paths are relative to `packages/`.
 
-Two conflicts are open: C5 and C6.
+Three conflicts are open: C5, C6 and C7.
 
 ## Open
 
@@ -28,24 +28,40 @@ ADR 0164 is later but does not name 0130, and says nothing of the CLI, whose out
 **Recommendation: (a).** It keeps ADR 0130's one wording and meets ADR 0164 as written, and matches what the desktop shell already says; a developer at the CLI loses nothing by reading "Space directory" or "folder". Consequence: UI-111's mounted case becomes **bug: code differs** until the wording changes.
 
 
-### C6. What a refused save's `forbidden` sentence says, and whether a sentence writes Space capitalised
+### C6. What a refused save's `forbidden` sentence says
 
-**Decision requested (raised 20 November 2026, from the Editing topic's review).** Should the sentence an author reads for a save refused `forbidden` say why such a refusal happens now (the change did not come from the application's own page), and should every sentence an author reads write Space and Space Resource capitalised?
+**Decision requested (raised 20 November 2026, from the Editing topic's review).** Should the sentence an author reads for a save refused `forbidden` say why such a refusal happens now: the change did not come from the application's own page?
 
-**Rules affected:** UI-89 (one sentence per code), UI-93 (the rejection dialog shows "the reason"), UI-111 (what a person reads says Space).
+**Rules affected:** UI-89 (one sentence per code), UI-93 (the rejection dialog shows "the reason").
 
 **The competing claims.**
 - `app/src/authoring-refusal.ts` (`PERSISTENCE_FAILURE_REASONS.forbidden`): "You do not have permission to save this space." InfinityCube has no permissions. Since ADR 0161 the only `forbidden` a host InfinityCube ships answers is the cross-site refusal (Storage ST-123, detail "Send a change from the application's own page."), plus any 403 an intermediary answers, which `httpExceptionProblem` (`http/src/index.ts`) also reads as `forbidden`. ADR 0161, Consequences: "A change the product's page sends from another origin, through a proxy that rewrites `Host` for example, is refused". So the product's own page can meet it behind such a proxy, and the sentence then sends the author to look for a permission that does not exist.
-- ADR 0164: "What a person is shown is a Space. Every control, dialog, message ... says Space." `CONTEXT.md` writes domain terms capitalised ("Capitalised Map names the entity", for Map). The application's refusal and persistence sentences write "space" and "space resource" in lower case: "Two spaces in this edit share one identity.", "A space resource points at a Map that no longer exists.", "A newer version of this space is available. ...", "counting every space it includes", and the `forbidden` sentence. In the same sentences Resource, Map and Graph are capitalised. ADR 0164 decides the word, not its case.
 
-**What the code and tests do.** `app/test/authoring-refusal.test.ts` › "writes its own sentence for a forbidden rejection", `app/test/persistence-control.test.tsx` › "explains a permanent rejection from its code" and `app/e2e/http-persistence.spec.ts` › "a permanent rejection explains the reason and leaves the Space available" assert the `forbidden` sentence word for word. No test asserts a case for "space".
+**What the code and tests do.** `app/test/authoring-refusal.test.ts` › "writes its own sentence for a forbidden rejection", `app/test/persistence-control.test.tsx` › "explains a permanent rejection from its code" and `app/e2e/http-persistence.spec.ts` › "a permanent rejection explains the reason and leaves the Space available" assert the sentence word for word.
 
 **Options.**
-- **(a) Reword and capitalise.** `forbidden` reads, for example, "This change was refused because it did not come from InfinityCube's own page. Open the Space from its own address and try again." Every sentence writes Space and Space Resource as `CONTEXT.md` does. UI-111 then says so explicitly, and the three tests change with the sentence. No ADR needed: a sentence's words are the application's (ADR 0057), and the case follows the glossary.
-- **(b) Reword `forbidden` only.** Leave the case alone as outside ADR 0164.
-- **(c) Leave both.**
+- **(a) Reword.** `forbidden` reads, for example, "This change was refused because it did not come from InfinityCube's own page. Open the Space from its own address and try again." The three tests change with the sentence. No ADR needed: a sentence's words are the application's (ADR 0057).
+- **(b) Leave it.**
 
-**Recommendation: (a).** The current sentence names a cause that cannot occur, and the lower case "space" beside capitalised Resource, Map and Graph reads as a different word from the Space ADR 0164 says a person is shown. Consequence: UI-111 gains a capitalisation clause marked **bug: code differs**, and UI-89 a note that the `forbidden` sentence names the cross-site cause.
+**Recommendation: (a).** The current sentence names a cause that cannot occur. Consequence: UI-89 gains a note that the `forbidden` sentence names the cross-site cause, marked **bug: code differs** until the code changes.
+
+### C7. Whether a sentence an author reads writes Space capitalised
+
+**Decision requested (raised 20 November 2026, from the Editing topic's review; split from C6).** Should every sentence an author reads write Space and Space Resource capitalised, as it writes Resource, Map and Graph?
+
+**Rules affected:** UI-111 (what a person reads says Space).
+
+**The competing claims.**
+- ADR 0164: "What a person is shown is a Space. Every control, dialog, message ... says Space." `CONTEXT.md` writes domain terms capitalised ("Capitalised Map names the entity", for Map). ADR 0164 decides the word, not its case.
+- The application's refusal and persistence sentences write "space" and "space resource" in lower case: "Two spaces in this edit share one identity.", "A space resource points at a Map that no longer exists.", "A newer version of this space is available. ...", "counting every space it includes", and the `forbidden` sentence. In the same sentences Resource, Map and Graph are capitalised.
+
+**What the code and tests do.** No test asserts a case for "space".
+
+**Options.**
+- **(a) Capitalise.** Every sentence writes Space and Space Resource as `CONTEXT.md` does, and UI-111 says so. No ADR needed: the case follows the glossary.
+- **(b) Leave the case alone** as outside ADR 0164.
+
+**Recommendation: (a).** Lower-case "space" beside capitalised Resource, Map and Graph reads as a different word from the Space ADR 0164 says a person is shown. Consequence: UI-111 gains a capitalisation clause marked **bug: code differs**.
 
 ## Closed
 

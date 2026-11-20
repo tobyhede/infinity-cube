@@ -359,6 +359,10 @@ Added 20 November 2026, reconciling against `d461223`. The doc's marker had clai
 | 0157 WebKit joins Chromium; the product-URL codec (0069) needs the native codecs | sent → UI (UI-110). No navigation rule changes: NV-20's spelling is unchanged |
 | 0158 a Mermaid Resource draws its diagram with Mermaid inside its plugin | → NV-61 (Mermaid line and its evidence, added in `b7895fe` after `9e9b094`, with ADR 0158 among its sources) |
 | 0161 both hosts refuse a cross-site change; product addresses, which answer a write 405, are not judged | sent → ST (ST-123). Navigation writes nothing, so no rule here changes |
+| 0156 each runtime has one intake, held to one conformance suite | reviewed: decides nothing in this doc's scope |
+| 0159 the two intakes report one refusal for one input: order and repeated ids | reviewed: decides nothing in this doc's scope |
+| 0160 JSON text holds no lone surrogate in either runtime | reviewed: decides nothing in this doc's scope |
+| 0162 every host locks the Aggregate directory it runs | reviewed: decides nothing in this doc's scope |
 | 0163 (proposed) a closing Space window waits ten seconds for its last write, then asks | not incorporated (proposed). ST-122 restates the built behaviour |
 | 0164 "talk" names nothing | applied throughout: the rename (`fef8de1`, `379608b`) left no occurrence in this doc, its trace or its conflicts |
 | 0164 what a person is shown is a Space; Aggregate never on screen | no rule here: wording is UI's. This doc uses Aggregate only for the directory, its run and its origin (NV-75, "Not here") |

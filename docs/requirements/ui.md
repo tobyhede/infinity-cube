@@ -274,7 +274,8 @@ Conflicts, open and closed, are listed in [conflicts/ui.md](conflicts/ui.md). So
 
 ## Open questions
 
-- **What a refused save's `forbidden` sentence says, and whether sentences write Space capitalised (C6).** The sentence says "You do not have permission to save this space.", but since ADR 0161 a `forbidden` means a change from a page other than the application's own (ST-123), and the refusal and persistence sentences write "space" in lower case beside capitalised Resource, Map and Graph (UI-89, UI-93, UI-111).
+- **What a refused save's `forbidden` sentence says (C6).** The sentence says "You do not have permission to save this space.", but since ADR 0161 a `forbidden` means a change from a page other than the application's own (ST-123) (UI-89, UI-93).
+- **Whether sentences write Space capitalised (C7).** The refusal and persistence sentences write "space" in lower case beside capitalised Resource, Map and Graph (UI-111).
 - **What a mount's startup failure calls the directory (C5).** ADR 0130 has a mount refuse in the CLI's words, which say Aggregate; ADR 0164 keeps Aggregate off screen (UI-111).
 - **Entering a Resource's toolbar.** Which key moves from a selected Resource into its toolbar (UI-18)? Space reads a focused Resource in Full View (UI-105), and Enter is now bound to nothing on the canvas (UI-10).
 

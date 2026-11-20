@@ -447,7 +447,7 @@ Added 20 November 2026, when the doc was reconciled against `d461223`. ADR 0158 
 | 0158 "Diagram" names what Mermaid draws, inside the plugin only | sent → GL (`CONTEXT.md`, Mermaid Resource). This doc does not use the word |
 | 0158 its source stored as `text/vnd.mermaid`, exported as `assets/<hash>.mmd` | sent → ST (ST-34), SR (SR-67) |
 | 0158 "in every way but what it draws" read for what the canvas draws | → RD-2 (an Open Mermaid Resource draws its diagram under its Title), RD-9 (its glyph while Closed). Basis: source-stated by 0158's first paragraph |
-| 0158 silent on a diagram wider than its rect, beside 0149's clip and its picture exception | open → conflict C3. RD-5 marks the Mermaid case undecided |
+| 0158 silent on a diagram wider than its rect, beside 0149's clip and its picture exception | 0149's clip binds, a diagram not being a picture; the code scales down → RD-5 bug: code differs, conflict C3 asks fix or new ADR |
 | 0159 one refusal for one input: repeated ids and code-unit order | reviewed: decides no drawing. Owned by SR and MG |
 | 0160 no lone surrogate in JSON text | reviewed: decides no drawing. Owned by ST |
 | 0161 both hosts refuse a cross-site change | reviewed: decides no drawing. Owned by ST |

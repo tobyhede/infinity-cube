@@ -16,18 +16,16 @@ Open conflicts are listed in [conflicts/navigation.md](conflicts/navigation.md).
 | Drawing the canvas, the camera, Graph emphasis | [rendering.md](rendering.md) |
 | Controls, menus and keys outside presenting, command wording, focus outside presenting, Full View (UI-105, UI-106) and the shortcuts sheet (UI-104) | [ui.md](ui.md) |
 
-**Terms** defined in [`CONTEXT.md`](../../CONTEXT.md) and used here: Active Resource, Aggregate, Entering, Exit, Graph navigation, Meta Space, Notes window, Open Spaces, Opener, Presentation Notes Graph, Presenting, Space window, Stage, Traversal history.
+**Terms** defined in [`CONTEXT.md`](../../CONTEXT.md) and used here: Active Resource, Aggregate, Entering, Exit, Graph navigation, Meta Space, Notes window, Open Spaces, Opener, Presentation, Presentation Notes Graph, Presented Graph, Presenting, Space window, Stage, Traversal history.
 
 **Terms not yet in `CONTEXT.md`** (working definitions until the glossary carries them):
 - **Navigation**: the per-Space state that says what is shown: the selected Map, the Active Graph and, while presenting, the Traversal history. Graph navigation on the canvas keeps no history (NV-13).
 - **Address**: Navigation's position as one value: the selected Map, the Active Graph and the presented Resource (none outside presenting). It is derived from Navigation's state, never stored.
 - **Location**: the browser's current URL. A **product URL** is a location under `/spaces`. "Address" always means Navigation's value, never a URL.
-- **Presented Graph**: the Graph being presented: the Active Graph while presenting (ADR 0164).
-- **Presentation**: one run through a presented Graph, from a start (NV-57) to the next start or the end of presenting. It has an identity and a start time, which a Notes window follows (ADR 0164).
 - **Open Space**: a Space listed in Open Spaces, with its Opener.
 - **Composed Space**: a Space whose session is live because something holds it (its listing, or a drawing of one of its Maps; see NV-81).
 
-**Status:** **built** means code and a named test match the rule. **built (untested)** means code matches and no test covers it. **not built** means the rule is decided and no code implements it. **bug: code differs** means the code does what the note says instead. **undecided (`conflicts/navigation.md` Cn)** means the rule waits on conflict Cn in [conflicts/navigation.md](conflicts/navigation.md), not on a DECISIONS ruling of the same name; the note says what the code does meanwhile. A test is named as `file` › "test name". Paths that start with `test/` are at the repo root; all others are under `packages/`. This document restates the accepted ADRs and decides nothing itself: each rule names its sources, and a rule that disagrees with an accepted ADR is a defect in this document, corrected here, never a reason to set the ADR aside. A rule sourced only from code and tests, an archived guide or a ruling in [DECISIONS.md](DECISIONS.md) says so.
+**Status:** **built** means code and a named test match the rule. **built (untested)** means code matches and no test covers it. **not built** means the rule is decided and no code implements it. **bug: code differs** means the code does what the note says instead. **undecided (`conflicts/navigation.md` Cn)** means the rule waits on conflict Cn in [conflicts/navigation.md](conflicts/navigation.md), not on a DECISIONS ruling of the same name; the note says what the code does meanwhile. A test is named as `file` › "test name". Paths that start with `test/`, `src/`, `crates/`, `conformance/` or `packages/` are at the repo root; all others are under `packages/`. This document restates the accepted ADRs and decides nothing itself: each rule names its sources, and a rule that disagrees with an accepted ADR is a defect in this document, corrected here, never a reason to set the ADR aside. A rule sourced only from code and tests, an archived guide or a ruling in [DECISIONS.md](DECISIONS.md) says so.
 
 ## State: shown, never saved
 
