@@ -73,13 +73,12 @@ import {
   withEmbeddedEdgeTypes,
 } from '../embedded-map';
 import { editingPortalAncestor, reportsBodyHeight } from '../embedded-open-space-resource';
-import { useEmbeddedOpenSpaceResources } from '../map-embedding/use-embedded-open-space-resources';
 import { useOpenSpaces } from '../open-spaces-context';
 import type { OpenSpace } from '../open-spaces';
 import { EmbeddedMapAuthoring } from './EmbeddedMapAuthoring';
 import { drawCanvasMapEmbed } from './map-embed-draws';
 import { MapEmbeddingsProvider, type MapEmbedEntry } from '../map-embedding/map-embeddings';
-import { createMapEmbedding } from '../map-embedding/map-embedding';
+import { createMapEmbedding, drawnEmbeddings } from '../map-embedding/map-embedding';
 import type { Drawing, Embedding } from '../plugin-host/claim-chain';
 import { usePluginGate } from '../plugin-host/plugin-gate-context';
 import { CANVAS_KEYS, FULL_VIEW_KEYS, keyBelongsElsewhere, pressesBinding } from '../key-bindings';
@@ -441,39 +440,39 @@ export function SpaceCanvas({
   // `<Embed space>` publishes what it asks for while it is drawn (ADR 0142).
   // Created once per canvas, with the gate and the selection write it mounted with.
   const [mapEmbedding] = useState(() =>
-    createMapEmbedding({ claims: gate, select: selectResource }),
+    createMapEmbedding({ spaces, claims: gate, select: selectResource }),
   );
   const mapEmbeddings = mapEmbedding.embeddings;
   const embeds = useSyncExternalStore(mapEmbeddings.subscribe, mapEmbeddings.getState);
-  const { editing: editingPortals, drafts: portalDraft } = useSyncExternalStore(
-    mapEmbedding.subscribe,
-    mapEmbedding.getState,
-  );
+  const embedding = useSyncExternalStore(mapEmbedding.subscribe, mapEmbedding.getState);
+  const {
+    editing: editingPortals,
+    drafts: portalDraft,
+    publications: embeddedPublications,
+  } = embedding;
   const publishMapEmbed = useCallback(
     (nodeId: string, resourceId: ResourceId, request: MapEmbedRequest | null, drawing: symbol) =>
       mapEmbeddings.publish(nodeId, resourceId, request, drawing),
     [mapEmbeddings],
   );
-  const {
-    embeddedRequests,
-    embeddedPublications,
-    failedEmbeddings,
-    resumeEmbedded,
-    publishEmbedded,
-    reportBodyHeight,
-  } = useEmbeddedOpenSpaceResources(
-    nodes,
-    embeds,
-    spaces,
-    draggingIds,
-    embeddedRoot,
-    hasResourcesOnCanvas,
+  const { requests: embeddedRequests, failed: failedEmbeddings } = useMemo(
+    () => drawnEmbeddings(embedding, embeds, { nodes, dragging: draggingIds, root: embeddedRoot }),
+    [embedding, embeds, nodes, draggingIds, embeddedRoot],
   );
+  const {
+    resume: resumeEmbedded,
+    publishCanvas: publishEmbedded,
+    reportFooter: reportBodyHeight,
+  } = mapEmbedding;
   // Every commit settles the Map embeddings against what it drew: Done lands
   // its framing, gives its Claim back and selects a Resource still drawn.
   useLayoutEffect(() => {
-    mapEmbedding.drawn({ placements: nodes.map((node) => node.id), requests: embeddedRequests });
-  }, [mapEmbedding, nodes, embeds, embeddedRequests]);
+    mapEmbedding.drawn({
+      placements: nodes.map((node) => node.id),
+      requests: embeddedRequests,
+      ready: hasResourcesOnCanvas,
+    });
+  }, [mapEmbedding, nodes, embeds, embeddedRequests, hasResourcesOnCanvas]);
   useLayoutEffect(
     () => () => {
       mapEmbedding.dispose();

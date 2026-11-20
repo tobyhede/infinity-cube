@@ -31,7 +31,7 @@ const harness = () => {
   });
   const select = vi.fn();
   const commit = vi.fn<Commit>(() => Promise.resolve('completed'));
-  const embedding = createMapEmbedding({ claims: { lend }, select });
+  const embedding = createMapEmbedding({ spaces: null, claims: { lend }, select });
   const drawing = Symbol('drawing');
   /** The plugin's drawing on placement `node` publishes, as `CanvasMapEmbed` does. */
   const publish = (request: MapEmbedRequest | null, node = 'node') =>
@@ -42,6 +42,7 @@ const harness = () => {
       placements,
       requests: placements.map((id) => ({
         parent: { id },
+        spaceId: TARGET,
         mapId: TARGET_MAP,
         graphId: TARGET_GRAPH,
       })),
@@ -191,8 +192,8 @@ describe('the framing authored on a Map embedding', () => {
     embedding.drawn({
       placements: ['first', 'second'],
       requests: [
-        { parent: { id: 'first' }, mapId: OTHER_MAP, graphId: TARGET_GRAPH },
-        { parent: { id: 'second' }, mapId: TARGET_MAP, graphId: TARGET_GRAPH },
+        { parent: { id: 'first' }, spaceId: TARGET, mapId: OTHER_MAP, graphId: TARGET_GRAPH },
+        { parent: { id: 'second' }, spaceId: TARGET, mapId: TARGET_MAP, graphId: TARGET_GRAPH },
       ],
     });
 
