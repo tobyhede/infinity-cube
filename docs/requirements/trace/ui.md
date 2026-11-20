@@ -438,3 +438,21 @@ Main moved on after the rewrite's baseline (commit `797b2908`). These are the ru
 | 0144 r2 the row is withheld while the list holds an unplaced Space Resource framing that Space | → UI-107 |
 | 0144 r3 a Space Resource placed on another Map withholds nothing | → UI-107 |
 | 0144 r4 withholding is decided over the list's source; counts and the empty sentence read the same set | → UI-107 |
+| 0157 WebKit is a supported engine: the end-to-end suite runs in a WebKit project in CI, a failure there fails the change | → UI-110 (not built) |
+| 0157 the desktop application declares a minimum macOS and WebKitGTK version and refuses to install on an older one; Windows needs only WebView2's evergreen runtime | → UI-110 (not built). The platform-floor wording and `AGENTS.md`'s E2E line sent → PROC (build-tooling.md), which ADR 0157 says change with the WebKit project |
+| 0158 a Mermaid Resource offers and runs Edit, Open and Close as a Markdown Resource does, in the host's source editor | → UI-53. What it draws, its size hint and its theme sent → RD; its kind and content sent → SR |
+| 0163 (proposed) a desktop close waits ten seconds, then asks "Keep waiting" or "Close without saving", Keep waiting the default and Escape keeping waiting | not incorporated (drafting rule 3). Restated as built, from code and tests, by storage.md ST-122, which owns the desktop windows; the Not here table points there |
+| 0164 what a person reads says Space, never "talk" and never Aggregate; a desktop window on a folder is a Space window; what is presented is a presented Graph, one run through it a presentation | → UI-111. The mounted startup failure's wording, which ADR 0130 ties to the CLI's, is open as C5 |
+| 0164 Aggregate is the name for the directory, its run, its origin and its lock in source and requirements | → UI-111 (the requirement's own wording); the glossary sense is GL (ADR 0088) |
+| 0164 renames in source (`open_aggregate`, `space-` window labels, the Notes window's `presentedGraph`) and fixtures | dropped: identifiers, not behaviour; the Notes window's end sentence now reads "This is the end of the presentation." (`app/src/components/NotesWindow.tsx`), presenting chrome sent → NV |
+
+### Code since the last marker (`9e9b094`..`d461223`)
+
+| Source | Disposition |
+|---|---|
+| `app/src/components/CommandDock.tsx`, `command-dock.css`: the vertical Dock's width counts one Create per plugin (`--command-dock-creates`) | → removed (drafting rule 6): sizing only. UI-40's Creates are unchanged |
+| `desktop/ui/closing.html`, `closing.js`: the close question window (`role="alertdialog"`, caret on Keep waiting, Escape keeps waiting) | sent → ST (ST-122) |
+| `desktop/src-tauri/src/saving.rs`: a dialog for the first failed write of a streak and for the write that ends it | sent → ST (ST-121) |
+| `desktop/ui/index.html`, `home.js`: the home window says Space | folded → UI-111 |
+| `app/src/mount/github-source.ts` `describeGitHubSourceFailure`: a truncated tree "so its aggregate cannot be read whole" | → UI-111 (bug: code differs) |
+| `app/src/authoring-refusal.ts`: `describeAggregateRefusal` reads the wire form of intake's errors | dropped: a type change; its sentences and UI-89 are unchanged |

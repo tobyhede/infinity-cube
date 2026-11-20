@@ -2,7 +2,7 @@
 
 **Purpose:** the controls an author operates and the keys they press: what each control offers, how it commits and cancels, where focus goes and where an answer shows.
 
-**Snapshot:** checked against `9e9b094` (2026-11-17); incorporates accepted ADRs through 0164; ADRs 0159 to 0162 decide nothing this document restates. ADRs accepted after it bind where they differ, until this document is updated. Proposed ADR 0138 (shortcuts) is not incorporated; the shortcut rules here restate the code and the archived guide.
+**Snapshot:** checked against `d461223` (2026-11-20); incorporates accepted ADRs through 0164; ADRs 0159 to 0162 decide nothing this document restates. ADRs accepted after it bind where they differ, until this document is updated. Proposed ADR 0138 (shortcuts) is not incorporated; the shortcut rules here restate the code and the archived guide. Nor is proposed ADR 0163 (the desktop application's close question), whose question window storage.md ST-122 restates as built.
 
 Conflicts, open and closed, are listed in [conflicts/ui.md](conflicts/ui.md). Sources are traced in [trace/ui.md](trace/ui.md).
 
@@ -13,7 +13,7 @@ Conflicts, open and closed, are listed in [conflicts/ui.md](conflicts/ui.md). So
 | What each Edit writes and refuses, the last Map and Graph, the size floor | [maps-and-graphs.md](maps-and-graphs.md) |
 | Drawing: the Title ladder, handles, the connection drag, its release and preview (RD-55), legend marks, Open content, the Shape frame, camera and double-click zoom (RD-64, RD-66) | [rendering.md](rendering.md) |
 | Selection as state, choosing a Map, activating a Graph (its writes: MG-45, MG-46), arrow-key travel (NV-13), Open Spaces, presenting with its keys, chrome and its accessibility (NV-89–NV-91), what the Stage draws (NV-61) | [navigation.md](navigation.md) |
-| Mounting, the mounted store and what Discard local edits does (ST-96) | [storage.md](storage.md) |
+| Mounting, the mounted store and what Discard local edits does (ST-96); the desktop application's windows and dialogs: a folder it refuses, a save failing and recovering (ST-121), and the close question with its default answer and Escape (ST-122) | [storage.md](storage.md) |
 
 **Terms** defined in [`CONTEXT.md`](../../CONTEXT.md) and used here: Absent, Canvas command.
 
@@ -227,6 +227,7 @@ Conflicts, open and closed, are listed in [conflicts/ui.md](conflicts/ui.md). So
 ## Where answers show
 
 - **UI-89** Every sentence an author reads about a refusal or a persistence failure comes from one application module, keyed by stable code. No surface prints wire prose. *Why:* one place holds every sentence, and `problem.detail` is for diagnostics. Two sentences carry more than a reason: deleting a Resource whose kind no plugin in this build draws, while a Space may depend on it (`missing-plugin-holds-space`, space-and-resources.md SR-64), names that kind and says it cannot be deleted; content a plugin's schema refuses (`resource-content-invalid`) says the Resource cannot hold that content. Sources: ADR 0057. **built**: `app/test/authoring-refusal.test.ts` › "gives every code a sentence of its own", "writes one distinct sentence for every refusal". "No wire prose" is untested.
+- **UI-111** Everything a person reads on screen (a control, dialog, notice, message or accessible name) says Space for what they opened and work in, never the word ADR 0164 retires and never Aggregate, which names the directory, its run, its origin and its lock in source, tests and requirements only. The desktop application's window on a folder is a Space window. What is presented is a presented Graph, and one run through it is a presentation (navigation.md NV-57). *Why:* a person opens a folder and sees a Space; one word for three things left a reader unable to tell which a sentence meant, and Aggregate names how Spaces are stored together, which a person has no need to learn. Sources: ADR 0164, ADR 0088. **undecided (C5)** for the mounted startup failure, which a mount words as the CLI does (ADR 0130) and so says Aggregate: `app/test/mount.test.tsx` › "shows the reader’s diagnostics for a directory that is not an aggregate", "shows Import’s diagnostics for an aggregate that is refused" assert "is not an Aggregate directory:" and "Aggregate validation failed:" on the page. The retired word is **built** out of source: `test/unit/current-domain-vocabulary.test.ts` › "finds the retired word nowhere in the source the repo authors" (it reads no Markdown). Aggregate elsewhere is **bug: code differs**: a GitHub tree listed only in part says "so its aggregate cannot be read whole" (`app/src/mount/github-source.ts` `describeGitHubSourceFailure`, untested), a sentence no CLI shares. The desktop shell's refusals and dialogs say Space and folder (`desktop/src-tauri/src/server.rs` `refusal`, `desktop/ui/closing.js`), untested.
 - **UI-90** A refusal shows on the surface that made the attempt, which keeps its focus and draft:
   - a Title: beside the field (UI-50);
   - the Resources list, a drag from it included: in the list;
@@ -273,6 +274,8 @@ Conflicts, open and closed, are listed in [conflicts/ui.md](conflicts/ui.md). So
 
 ## Open questions
 
+- **What a refused save's `forbidden` sentence says, and whether sentences write Space capitalised (C6).** The sentence says "You do not have permission to save this space.", but since ADR 0161 a `forbidden` means a change from a page other than the application's own (ST-123), and the refusal and persistence sentences write "space" in lower case beside capitalised Resource, Map and Graph (UI-89, UI-93, UI-111).
+- **What a mount's startup failure calls the directory (C5).** ADR 0130 has a mount refuse in the CLI's words, which say Aggregate; ADR 0164 keeps Aggregate off screen (UI-111).
 - **Entering a Resource's toolbar.** Which key moves from a selected Resource into its toolbar (UI-18)? Space reads a focused Resource in Full View (UI-105), and Enter is now bound to nothing on the canvas (UI-10).
 
 ## Bugs
@@ -282,5 +285,6 @@ Each line is a rule the code does not meet, with the change it needs.
 - **UI-85**: Remove from Map, by menu or key and in a drawn Map too, must ask first when it would delete Edges, naming the Graphs that lose them, and remove at once otherwise.
 - **UI-88**: after the stored Space replaces the working one, focus the canvas pane (`.scratch/interaction-draft-invalidation/issues/03-focus-after-space-replacement.md` decides what that means).
 - **UI-99**: the enter, exit and open notices, the `resource-has-references` refusal and the drawn-Space failure notice must quote the short Title, not the bare name.
+- **UI-111**: a GitHub tree listed only in part must be reported without the word aggregate (`describeGitHubSourceFailure`); the mounted startup failure's wording waits on C5.
 
 Not built (decided): UI-110 (WebKit in CI and the minimum systems), UI-18 (keyboard reach to the toolbar), UI-43 ("Edited in this browser"), UI-95 (Discard local edits).

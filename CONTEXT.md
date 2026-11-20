@@ -254,6 +254,14 @@ _Avoid_: deck, slide, step, slideshow, playback, present mode.
 The Resource surface showing the Active Resource's content while Presenting, with no Map and no authoring.
 _Avoid_: slide, viewer, presenter view, canvas.
 
+**Presented Graph**:
+The Graph being presented: the Active Graph while Presenting.
+_Avoid_: talk, deck.
+
+**Presentation**:
+One run through a presented Graph, from a start to the next start or the end of Presenting.
+_Avoid_: talk, show.
+
 **Active Resource**:
 The Resource currently reached while Presenting, whose outgoing Edges in the Active Graph are the available forward moves.
 _Avoid_: current slide, cursor, position, step.
@@ -287,6 +295,10 @@ _Avoid_: loading, restoring, syncing, merging.
 **Running**:
 Working on an existing Aggregate directory with edits exported back to it as the durable copy.
 _Avoid_: watching, syncing, live mode, session.
+
+**Space window**:
+A window the desktop application opens on a folder, showing that folder's Aggregate as its Spaces.
+_Avoid_: talk window.
 
 **Mounting**:
 Working on an Aggregate read from a GitHub location, with edits kept in the browser rather than written back to GitHub.

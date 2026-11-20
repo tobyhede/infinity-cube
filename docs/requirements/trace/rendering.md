@@ -7,7 +7,7 @@ For audit only. Every source rule that feeds `../rendering.md` appears exactly o
 - **sent → DOC**: it belongs to another doc.
 - **→ removed (drafting rule 6)**: presentation, not a requirement.
 
-Where an ADR feeds RD only in part, only the parts the mapping tables send to RD are listed; the rest are traced by the doc named. §3 groups the sends by receiving doc. §3a lists every item other traces send here. §4 lists code-only rules. §5 holds code notes. §6 traces the sources added or changed on main after the baseline (`797b2908`), which the doc was brought up to on 13 November 2026; where §1 or §2 lands a baseline rule on a rule since rewritten or removed, §6 says where it now lands.
+Where an ADR feeds RD only in part, only the parts the mapping tables send to RD are listed; the rest are traced by the doc named. §3 groups the sends by receiving doc. §3a lists every item other traces send here. §4 lists code-only rules. §5 holds code notes. §6 traces the sources added or changed on main after the baseline (`797b2908`), which the doc was brought up to on 13 November 2026; where §1 or §2 lands a baseline rule on a rule since rewritten or removed, §6 says where it now lands. §7 gives one row to each ADR with one disposition throughout. §8 traces the sources added or changed between `3244b74` and `d461223`, which the doc was reconciled against on 20 November 2026.
 
 Abbreviations:
 - "rN" is the Nth rule of an ADR as numbered in the rewrite's mapping tables (`map-*.md`). Those tables were never committed, so a number cannot be looked up, and the numbers do not follow the order of the ADR's text (0028's r1, "activation is not an Edit", is the second rule its text states). Resolve a row by its description, which names the claim, and find that claim in the ADR in `docs/adr/` or `docs/adr/superseded/`. Where a table gave no numbers, rules are named by their first words.
@@ -429,3 +429,28 @@ Added 15 November 2026. These ADRs had no row in any trace. Each has one outcome
 |---|---|
 | 0011 (superseded) opening a card shows its Markdown source | historical: superseded by 0064 (Open expands in place, editing is separate), traced in §1 |
 | 0021 (superseded) routes are authored as React Flow edges with neutral handles | historical: superseded by 0033 (spatial handles in the Active Graph's colour), traced in §1 |
+
+## 8. Sources added or changed since `3244b74`
+
+Added 20 November 2026, when the doc was reconciled against `d461223`. ADR 0158 was restated in RD-6 at `3244b74` but had no row; its rows are here. Code under `react-flow-adapter`, `ui/src` and the canvas parts of `app/src` did not change between the two commits; `app/e2e/editing.spec.ts` changed only in how its tests wait for a persisted revision, and every cited test name still resolves.
+
+| Source | Disposition |
+|---|---|
+| 0157 WebKit is a supported engine; CI runs the end-to-end suite in a WebKit project; a failure there fails the change | sent → UI (UI-110). Status note: `app/e2e/` evidence here was observed in Chromium alone, and the WebKit project is not built |
+| 0157 every behaviour `pnpm e2e` tests must hold in WebKit; the Ladle suite's engine left to the ticket | folded → Status note. The Ladle question stays with UI-110's ticket |
+| 0157 the desktop application declares a minimum operating system | sent → UI (UI-110) |
+| 0158 a Mermaid Resource is the Markdown Resource in every way but what it draws; content, Map content, creation, Edit and Save | sent → SR (SR-67), MG (MG-27), UI (UI-53) |
+| 0158 Open carries a size hint at the reading width, or none where Mermaid has not drawn within the load wait | sent → MG (MG-27, MG-88). RD-3 points there |
+| 0158 the plugin draws with the Mermaid library, a view-half dependency fetched on first draw; no diagram renderer in the Resource API | sent → SR (SR-67). That the diagram is not drawn through the host's Markdown renderer → RD-6 |
+| 0158 the SVG Mermaid answers is inserted into the rect, sanitised by Mermaid at `strict`; error drawing suppressed; undrawable and empty sources draw notes; layout in an unseen element inside the rect | → RD-6 (sanitised by Mermaid, not the host's renderer). The notes, the unseen element and the security level sent → SR (SR-67) |
+| 0158 drawn in the canvas's colour scheme (`neutral` light, `dark` dark), a source's own theme kept, drawn again on a change of scheme | sent → SR (SR-67) |
+| 0158 "Diagram" names what Mermaid draws, inside the plugin only | sent → GL (`CONTEXT.md`, Mermaid Resource). This doc does not use the word |
+| 0158 its source stored as `text/vnd.mermaid`, exported as `assets/<hash>.mmd` | sent → ST (ST-34), SR (SR-67) |
+| 0158 "in every way but what it draws" read for what the canvas draws | → RD-2 (an Open Mermaid Resource draws its diagram under its Title), RD-9 (its glyph while Closed). Basis: source-stated by 0158's first paragraph |
+| 0158 silent on a diagram wider than its rect, beside 0149's clip and its picture exception | open → conflict C3. RD-5 marks the Mermaid case undecided |
+| 0159 one refusal for one input: repeated ids and code-unit order | reviewed: decides no drawing. Owned by SR and MG |
+| 0160 no lone surrogate in JSON text | reviewed: decides no drawing. Owned by ST |
+| 0161 both hosts refuse a cross-site change | reviewed: decides no drawing. Owned by ST |
+| 0162 every host locks the directory it runs | reviewed: decides no drawing. Owned by ST |
+| 0163 (proposed) a closing desktop window waits ten seconds, then asks | not incorporated: proposed |
+| 0164 "talk" retired; a person is shown a Space | reviewed: this doc and its trace and conflict files use neither "talk" nor "Aggregate"; nothing to restate |

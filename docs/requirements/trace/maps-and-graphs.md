@@ -415,3 +415,17 @@ Added 15 November 2026. These ADRs had no row in any trace. Each has one outcome
 | 0022 (superseded) a Layout filters its routes and marks one active | historical: superseded by 0026, which 0040 superseded. 0026 and 0040 (a Map owns its Graphs) are traced in §2 |
 | 0045 (superseded) a View takes Cards and Graphs and returns a Layout | historical: superseded by 0079; the layout strategy contract it described is MG's, from 0079 and 0086 |
 | 0075 (superseded) computed Views are read-only and Create Layout converts | historical: superseded by 0079, which retired computed Views |
+
+## 8. Refresh against `d461223` (20 November 2026)
+
+The doc was reconciled from marker `9e9b094` (ADRs through 0159) to `d461223`. ADRs 0155 to 0158 were proposed or changed after `9e9b094`, and 0159 to 0164 were added. Basis: **source-stated** where an accepted ADR says it, **code** where the doc records what is built. ADRs 0157 (WebKit under the browser floor), 0160 (lone surrogates), 0161 (cross-site changes), 0162 (the directory lock), 0164 (retiring "talk") and proposed 0163 (a closing window's question) decide nothing in this topic; Storage, UI and Navigation own them, and this doc holds no "talk" to retire.
+
+| Source | Disposition |
+|---|---|
+| 0156 each runtime has one intake, held to one conformance corpus by kind and location (accepted 18 November 2026) | retained, source-stated: the intake refusals of MG-2, MG-4, MG-7, MG-22, MG-35, MG-44, MG-50, MG-58, MG-60, MG-73 and MG-86 are built in both runtimes, cited as corpus cases (status paragraph); the Data model note says the codes are both intakes'. The intake itself sent → ST (ST-117, ST-118) |
+| 0156 (code) the Rust intake reads a Map or Graph title as a non-empty string only | MG-8's bug note now names both intakes (`crates/intake/src/schema.rs`) |
+| 0155 a Rust host replaces every server-side host (accepted 18 November 2026) | retained, source-stated: the Rust host's single-Space route runs the first working read → MG-75's "Initializes" list, with evidence on MG-74 and MG-75; its Import and Export initialize nothing → MG-75's "Never initializes", MG-73. Its conflict retry → MG-77, untested in Rust. Hosts, CLI and shell sent → ST |
+| 0158 Mermaid Opens with no size hint where it has not drawn within the load wait (text changed after `9e9b094`) | already held: MG-27 |
+| 0158 Diagram is never a synonym for Map, in the Mermaid plugin or out of it (added after `9e9b094`), with 0101 | wording, presentation-only: MG-1, MG-5, MG-27 and MG-29's *Why* said "diagram" for a Map and now say Map. No rule changes |
+| 0159 (accepted 18 November 2026) | already held: MG-86 (§6) |
+| Code since `9e9b094` in `packages/graph` (located refusals, `compareOrdinal`), `packages/core` (`parseJsonText`), `packages/persistence` (commit decision order, Space id case) and `packages/app` (comment wording) | no Maps and Graphs rule changes; locations and order sent → ST (ST-117), already there. Every bug in the doc's Bugs list was rechecked against `d461223` and still holds: `map-authoring-commands.ts`, `space-resource-planning.ts`, `space-authoring.ts` and `navigation.ts` `activateGraph` are unchanged in behaviour since `9e9b094` |
