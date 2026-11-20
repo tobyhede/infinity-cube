@@ -225,3 +225,58 @@ describe('the framing authored on a Map embedding', () => {
     expect(given).toHaveBeenCalledWith(drawing);
   });
 });
+
+describe('what the canvas says about a Map embedding', () => {
+  it('keeps a notice and rail editing while the embedding stands', () => {
+    const { embedding, publish } = harness();
+    publish(ask());
+
+    embedding.setNotice('node', 'Link copied.');
+    embedding.setRailEditing('node', true);
+
+    expect(embedding.getState().notices.get('node')).toBe('Link copied.');
+    expect(embedding.getState().railEditing.has('node')).toBe(true);
+    embedding.setNotice('node', null);
+    embedding.setRailEditing('node', false);
+    expect(embedding.getState().notices.has('node')).toBe(false);
+    expect(embedding.getState().railEditing.has('node')).toBe(false);
+  });
+
+  it('drops both when the embedding goes, whatever took it down', () => {
+    // The canvas, the plugin's own Map content commit, another author's Edit
+    // or a replacement: each withdraws the embedding, and an Open again starts afresh.
+    const { embedding, publish } = harness();
+    publish(ask());
+    embedding.setNotice('node', 'Link copied.');
+    embedding.setRailEditing('node', true);
+
+    publish(null);
+
+    expect(embedding.getState().notices.has('node')).toBe(false);
+    expect(embedding.getState().railEditing.has('node')).toBe(false);
+    publish(ask());
+    expect(embedding.getState().notices.has('node')).toBe(false);
+  });
+
+  it('says nothing for an answer that lands after its embedding has gone', () => {
+    const { embedding, publish } = harness();
+    publish(ask());
+    publish(null);
+
+    embedding.setNotice('node', 'This choice is no longer offered.');
+
+    expect(embedding.getState().notices.has('node')).toBe(false);
+  });
+
+  it('keeps another placement’s notice when one embedding goes', () => {
+    const { embedding, publish } = harness();
+    publish(ask(), 'first');
+    publish(ask(), 'second');
+    embedding.setNotice('first', 'One.');
+    embedding.setNotice('second', 'Two.');
+
+    publish(null, 'first');
+
+    expect(embedding.getState().notices).toEqual(new Map([['second', 'Two.']]));
+  });
+});

@@ -21,7 +21,16 @@ import {
   type SpaceResourceSelectorsProps,
 } from '@project/ui';
 import type { Claim } from '@project/resource-api/view';
-import { createMapEmbeddings, type MapEmbeddings } from '../src/map-embedding/map-embeddings';
+import type { MapEmbeddings } from '../src/map-embedding/map-embeddings';
+import { createMapEmbedding } from '../src/map-embedding/map-embedding';
+
+/** A canvas's Map embedding, with no Open Spaces, gate or selection to reach. */
+const newMapEmbedding = () =>
+  createMapEmbedding({
+    spaces: null,
+    claims: { lend: () => () => undefined },
+    select: () => undefined,
+  });
 import { CANVAS } from '../src/space-authoring';
 import { canvasAuthoring } from './canvas-authoring';
 import { textAsset } from './markdown-texts';
@@ -484,7 +493,8 @@ describe('canvas Resource authoring Space rail', () => {
 
   const mountRail = (open: boolean, withTarget: boolean, readOnly = false, enabled = true) => {
     // What the drawn plugin publishes: an Open Space Resource embeds its Map.
-    const mapEmbeddings = createMapEmbeddings();
+    const mapEmbedding = newMapEmbedding();
+    const mapEmbeddings = mapEmbedding.embeddings;
     if (open)
       mapEmbeddings.publish(SPACE_RESOURCE_ID, SPACE_RESOURCE_ID, spaceEmbed(), SPACE_DRAWING);
     const loaded = { snapshot, revision: 0n, exportedRevision: null };
@@ -512,7 +522,7 @@ describe('canvas Resource authoring Space rail', () => {
         resourceResize: adapter.getState().resourceResize,
         onSelectResource: () => undefined,
         spaceResourceTargets: withTarget ? new Map([[TARGET_SPACE_ID, target]]) : undefined,
-        mapEmbeddings,
+        mapEmbedding,
       }),
     );
   };
@@ -614,7 +624,8 @@ describe('canvas Resource authoring decoration identity', () => {
     const surfaceAuthoring = canvasAuthoring(authoring);
     const onSelectResource = () => undefined;
     const resourceResize = adapter.getState().resourceResize;
-    const mapEmbeddings = createMapEmbeddings();
+    const mapEmbedding = newMapEmbedding();
+    const mapEmbeddings = mapEmbedding.embeddings;
     publishSpaceEmbed(mapEmbeddings, false);
     const hook = renderHook(
       ({ spaceResourceTargets, portalEditing }: IdentityProps) => {
@@ -643,7 +654,7 @@ describe('canvas Resource authoring decoration identity', () => {
           resourceResize,
           onSelectResource,
           spaceResourceTargets,
-          mapEmbeddings,
+          mapEmbedding,
         });
       },
       {
@@ -1009,7 +1020,8 @@ describe("canvas Resource authoring: an embedding's notice", () => {
   };
 
   const mountEmbedding = (request: MapEmbedRequest) => {
-    const mapEmbeddings = createMapEmbeddings();
+    const mapEmbedding = newMapEmbedding();
+    const mapEmbeddings = mapEmbedding.embeddings;
     mapEmbeddings.publish(UR_ID, UR_ID, request, UR_DRAWING);
     const loaded = { snapshot, revision: 0n, exportedRevision: null };
     const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
@@ -1034,7 +1046,7 @@ describe("canvas Resource authoring: an embedding's notice", () => {
         resourceResize: adapter.getState().resourceResize,
         onSelectResource: () => undefined,
         spaceResourceTargets: new Map([[TARGET_SPACE_ID, target]]),
-        mapEmbeddings,
+        mapEmbedding,
       }),
     );
     const rail = render(

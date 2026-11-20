@@ -4,9 +4,13 @@
 
 **Blocked by:** 02.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] One rule, held by interface tests: notices and rail editing for a Resource die when its drawing on this canvas stops embedding a Space.
-- [ ] If the two trimming passes turn out to cover a case on purpose that this one rule misses, stop and record it as a comment on this ticket rather than merging the passes.
-- [ ] The canvas's Resource authoring no longer reads the registry to trim state.
-- [ ] Existing tests of Close, replacement and another author's Edit taking an embedding down still pass.
+- [x] One rule, held by interface tests: notices and rail editing for a Resource die when its drawing on this canvas stops embedding a Space.
+- [x] If the two trimming passes turn out to cover a case on purpose that this one rule misses, stop and record it as a comment on this ticket rather than merging the passes.
+- [x] The canvas's Resource authoring no longer reads the registry to trim state.
+- [x] Existing tests of Close, replacement and another author's Edit taking an embedding down still pass.
+
+## Comments
+
+- The two trimming passes were one rule. The second (keep a Resource only while a node of this canvas embeds it) already dropped everything the first (keep a Resource only while some placement embeds it) did. Keyed by placement rather than by Resource, the module now drops both the moment the registry no longer holds the placement, and a notice that lands after its embedding has gone is not kept. Each canvas's title editing reads the rail editing of its own placements.

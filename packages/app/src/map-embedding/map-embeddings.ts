@@ -1,4 +1,3 @@
-import { createContext, useContext } from 'react';
 import type { ResourceId } from '@project/core';
 import { createObservableState, type ObserverErrorReporter } from '@project/persistence';
 import type { MapEmbedRequest } from '@project/ui';
@@ -139,11 +138,3 @@ export const editingMapEmbeds = (embeds: ReadonlyMap<string, MapEmbedEntry>): Re
   new Set(
     [...embeds].flatMap(([nodeId, entry]) => (entry.request.claim === undefined ? [] : [nodeId])),
   );
-
-const MapEmbeddingsContext = createContext<MapEmbeddings | null>(null);
-
-/** Where the Map embeddings of the canvas drawing this composition are published. */
-export const MapEmbeddingsProvider = MapEmbeddingsContext.Provider;
-
-/** The Map embeddings of the canvas this is drawn on, or `null` off one. */
-export const useMapEmbeddings = (): MapEmbeddings | null => useContext(MapEmbeddingsContext);

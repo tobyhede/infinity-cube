@@ -29,19 +29,22 @@ import type { Embedding } from './plugin-host/claim-chain';
 import type { PluginHost } from './plugin-host/plugin-commits';
 import type { PluginGate } from './plugin-host/plugin-gate';
 import { usePluginGate } from './plugin-host/plugin-gate-context';
+import type { MapEmbedEntry } from './map-embedding/map-embeddings';
 import {
-  useMapEmbeddings,
-  type MapEmbedEntry,
-  type MapEmbeddings,
-} from './map-embedding/map-embeddings';
+  useMapEmbedding,
+  type MapEmbedding,
+  type MapEmbeddingState,
+} from './map-embedding/map-embedding';
 
 const NO_SUBSCRIPTION = () => () => undefined;
 const NONE_EMBEDDED: ReadonlyMap<string, MapEmbedEntry> = new Map();
 const NO_MAP_EMBEDS = () => NONE_EMBEDDED;
-
-/** The Resources a Map embedding is drawn for on this canvas, in any of their placements. */
-const embeddedResourceIds = (embeds: ReadonlyMap<string, MapEmbedEntry>): ReadonlySet<ResourceId> =>
-  new Set([...embeds.values()].map((entry) => entry.resourceId));
+/** Off a canvas: nothing is said about an embedding, and no rail is editing. */
+const NO_EMBEDDING: Pick<MapEmbeddingState, 'notices' | 'railEditing'> = {
+  notices: new Map(),
+  railEditing: new Set(),
+};
+const NO_EMBEDDING_STATE = () => NO_EMBEDDING;
 
 type Caret = { readonly resourceId: string; readonly field: 'title' } | null;
 
@@ -107,10 +110,10 @@ export interface CanvasResourceAuthoringInput {
   readonly resourceEntityActions?:
     ((resourceId: ResourceId) => readonly EntityActionGroup[]) | undefined;
   /**
-   * The Map embeddings drawn on the canvas this composition draws on; absent,
-   * the ones the canvas around it provides.
+   * The Map embedding of the canvas this composition draws on; absent, the
+   * one the canvas around it provides.
    */
-  readonly mapEmbeddings?: MapEmbeddings | undefined;
+  readonly mapEmbedding?: MapEmbedding | undefined;
   /**
    * A plugin's size hint capped at what this canvas shows. Only the canvas's
    * own Map offers it, because it knows its viewport; absent, a hint is
@@ -148,15 +151,9 @@ export function useCanvasResourceAuthoring({
   resourceEntityActions,
   plugins,
   capSizeHint,
-  mapEmbeddings: ownMapEmbeddings,
+  mapEmbedding: ownMapEmbedding,
 }: CanvasResourceAuthoringInput): CanvasResourceAuthoring {
   const spaces = useOpenSpaces();
-  const [contextEditingIds, setContextEditingIds] = useState<ReadonlySet<ResourceId>>(
-    () => new Set(),
-  );
-  const [contextNotices, setContextNotices] = useState<ReadonlyMap<ResourceId, string>>(
-    () => new Map(),
-  );
   const [caret, setCaret] = useState<Caret>(null);
   const editingTitleResourceId = caret?.field === 'title' ? caret.resourceId : null;
   /**
@@ -183,56 +180,26 @@ export function useCanvasResourceAuthoring({
     const drawing = held.at(-1);
     return drawing !== undefined && !lent.has(drawing.key);
   });
-  // The Map embeddings drawn on this canvas, which a Space Resource's host
-  // chooser writes a choice through (ADR 0142).
-  const providedMapEmbeddings = useMapEmbeddings();
-  const mapEmbeddings = ownMapEmbeddings ?? providedMapEmbeddings;
+  // The Map embedding of the canvas this draws on, which a Space Resource's
+  // host chooser writes a choice through (ADR 0142), and which keeps what the
+  // canvas says about each embedding, and its rail editing, while it stands.
+  const providedMapEmbedding = useMapEmbedding();
+  const mapEmbedding = ownMapEmbedding ?? providedMapEmbedding;
   const mapEmbeds = useSyncExternalStore(
-    mapEmbeddings?.subscribe ?? NO_SUBSCRIPTION,
-    mapEmbeddings?.getState ?? NO_MAP_EMBEDS,
+    mapEmbedding?.embeddings.subscribe ?? NO_SUBSCRIPTION,
+    mapEmbedding?.embeddings.getState ?? NO_MAP_EMBEDS,
   );
-  // What the canvas says about a Map embedding, and its rail editing, go with
-  // the embedding. Every Close takes it down, whoever makes it: the canvas, the
-  // plugin's own Map content commit, another author's Edit or a replacement.
-  // So neither outlives the chooser it belongs to, and a Resource Opened again
-  // starts afresh.
-  const [embedsWere, setEmbedsWere] = useState(mapEmbeds);
-  if (embedsWere !== mapEmbeds) {
-    setEmbedsWere(mapEmbeds);
-    const embedded = embeddedResourceIds(mapEmbeds);
-    setContextNotices((previous) =>
-      [...previous.keys()].every((id) => embedded.has(id))
-        ? previous
-        : new Map([...previous].filter(([id]) => embedded.has(id))),
-    );
-    setContextEditingIds((previous) =>
-      [...previous].every((id) => embedded.has(id))
-        ? previous
-        : new Set([...previous].filter((id) => embedded.has(id))),
-    );
-  }
-
-  // What the canvas says about an embedding, and its rail's editing, last
-  // only while the Resource's drawing here embeds a Space: once its plugin
-  // stops embedding, as a Closed Space Resource does, both go, whatever the
-  // kind, so embedding again starts afresh (ADR 0142).
-  const embeddingKey = nodes
-    .flatMap((node) => (mapEmbeds.has(node.id) ? [node.data.resourceId] : []))
-    .sort()
-    .join(' ');
-  const [embeddingWas, setEmbeddingWas] = useState(embeddingKey);
-  if (embeddingWas !== embeddingKey) {
-    setEmbeddingWas(embeddingKey);
-    const embedding = new Set(embeddingKey.split(' '));
-    setContextNotices((prev) => noticesOf(prev, embedding));
-    setContextEditingIds((prev) => editingOf(prev, embedding));
-  }
+  const { notices: contextNotices, railEditing } = useSyncExternalStore(
+    mapEmbedding?.subscribe ?? NO_SUBSCRIPTION,
+    mapEmbedding?.getState ?? NO_EMBEDDING_STATE,
+  );
+  const contextEditing = nodes.some((node) => railEditing.has(node.id));
 
   useEffect(() => {
     onBodyEditingChange?.(bodyEditing);
   }, [bodyEditing, onBodyEditingChange]);
   useEffect(() => {
-    onTitleEditingChange?.(editingTitleResourceId !== null || contextEditingIds.size > 0);
+    onTitleEditingChange?.(editingTitleResourceId !== null || contextEditing);
     // Returning the Space chrome on unmount is the whole of the safety net,
     // and it is narrower than "a Map change remounts the canvas" would
     // suggest. Only a Map move that drops the projection unmounts this
@@ -245,7 +212,7 @@ export function useCanvasResourceAuthoring({
     // goes away must not leave the chrome withdrawn against an editor no
     // callback will ever settle.
     return () => onTitleEditingChange?.(false);
-  }, [editingTitleResourceId, contextEditingIds, onTitleEditingChange]);
+  }, [editingTitleResourceId, contextEditing, onTitleEditingChange]);
 
   const [canvasAuthoringWasEnabled, setCanvasAuthoringWasEnabled] = useState(
     availability.authorOnCanvas,
@@ -337,30 +304,17 @@ export function useCanvasResourceAuthoring({
   const clearCaret = useCallback(() => {
     setCaret(null);
   }, []);
-  const onContextEditingChange = useCallback((resourceId: ResourceId, editing: boolean) => {
-    setContextEditingIds((prev) => {
-      const has = prev.has(resourceId);
-      if (editing === has) return prev;
-      const next = new Set(prev);
-      if (editing) next.add(resourceId);
-      else next.delete(resourceId);
-      return next;
-    });
-  }, []);
-  const onContextReport = useCallback(
-    (resourceId: ResourceId, message: string | null) => {
-      // A choice whose answer lands after its embedding is gone says nothing.
-      if (message !== null && !embeds(mapEmbeddings, resourceId)) return;
-      setContextNotices((prev) => {
-        const current = prev.get(resourceId) ?? null;
-        if (current === message) return prev;
-        const next = new Map(prev);
-        if (message === null) next.delete(resourceId);
-        else next.set(resourceId, message);
-        return next;
-      });
+  const onContextEditingChange = useCallback(
+    (placement: string, editing: boolean) => {
+      mapEmbedding?.setRailEditing(placement, editing);
     },
-    [mapEmbeddings],
+    [mapEmbedding],
+  );
+  const onContextReport = useCallback(
+    (placement: string, message: string | null) => {
+      mapEmbedding?.setNotice(placement, message);
+    },
+    [mapEmbedding],
   );
 
   const sharedContext = useMemo(
@@ -449,30 +403,7 @@ export function useCanvasResourceAuthoring({
   return {
     nodes: decoratedNodes,
     bodyEditing,
-    titleEditing: editingTitleResourceId !== null || contextEditingIds.size > 0,
+    titleEditing: editingTitleResourceId !== null || contextEditing,
     beginTitleEditing,
   };
-}
-
-/** Whether some drawing on this canvas embeds a Space in a rect of `resourceId`'s. */
-const embeds = (mapEmbeddings: MapEmbeddings | null, resourceId: ResourceId): boolean =>
-  mapEmbeddings !== null &&
-  [...mapEmbeddings.getState().values()].some((entry) => entry.resourceId === resourceId);
-
-/** The notices of the Resources in `embedding`, or `notices` itself where it has no other. */
-function noticesOf(
-  notices: ReadonlyMap<ResourceId, string>,
-  embedding: ReadonlySet<string>,
-): ReadonlyMap<ResourceId, string> {
-  const kept = [...notices].filter(([resourceId]) => embedding.has(resourceId));
-  return kept.length === notices.size ? notices : new Map(kept);
-}
-
-/** The Resources of `editing` in `embedding`, or `editing` itself where it has no other. */
-function editingOf(
-  editing: ReadonlySet<ResourceId>,
-  embedding: ReadonlySet<string>,
-): ReadonlySet<ResourceId> {
-  const kept = [...editing].filter((resourceId) => embedding.has(resourceId));
-  return kept.length === editing.size ? editing : new Set(kept);
 }

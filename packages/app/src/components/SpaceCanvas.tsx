@@ -77,8 +77,12 @@ import { useOpenSpaces } from '../open-spaces-context';
 import type { OpenSpace } from '../open-spaces';
 import { EmbeddedMapAuthoring } from './EmbeddedMapAuthoring';
 import { drawCanvasMapEmbed } from './map-embed-draws';
-import { MapEmbeddingsProvider, type MapEmbedEntry } from '../map-embedding/map-embeddings';
-import { createMapEmbedding, drawnEmbeddings } from '../map-embedding/map-embedding';
+import type { MapEmbedEntry } from '../map-embedding/map-embeddings';
+import {
+  createMapEmbedding,
+  drawnEmbeddings,
+  MapEmbeddingProvider,
+} from '../map-embedding/map-embedding';
 import type { Drawing, Embedding } from '../plugin-host/claim-chain';
 import { usePluginGate } from '../plugin-host/plugin-gate-context';
 import { CANVAS_KEYS, FULL_VIEW_KEYS, keyBelongsElsewhere, pressesBinding } from '../key-bindings';
@@ -643,7 +647,7 @@ export function SpaceCanvas({
     spaceResourceTargets,
     resourceEntityActions: resourceActions,
     capSizeHint,
-    mapEmbeddings,
+    mapEmbedding,
   });
   const { bodyEditing, beginTitleEditing } = resourceAuthoring;
 
@@ -1945,9 +1949,9 @@ export function SpaceCanvas({
   );
   return edgeSurface.provide(
     <GraphConnectionLineHeadShape headShape={preview.headShape}>
-      <MapEmbeddingsProvider value={mapEmbeddings}>
+      <MapEmbeddingProvider value={mapEmbedding}>
         <HostMapProvider draw={drawCanvasMapEmbed}>{canvas}</HostMapProvider>
-      </MapEmbeddingsProvider>
+      </MapEmbeddingProvider>
     </GraphConnectionLineHeadShape>,
   );
 }

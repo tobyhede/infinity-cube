@@ -1,4 +1,4 @@
-import { uuidSchema, type ResourceId, type UUID } from '@project/core';
+import { uuidSchema, type UUID } from '@project/core';
 import { refusalOf } from '@project/resource-api/view';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import { buildSpaceResourceRail } from './build-space-resource-rail';
@@ -29,9 +29,10 @@ export interface EmbedCommandsContext {
   readonly deleteConfirmation: Pick<DeleteConfirmation, 'arm'> | undefined;
   /** The Map embeddings drawn on this canvas, by placement. */
   readonly mapEmbeds: ReadonlyMap<string, MapEmbedEntry>;
-  readonly contextNotices: ReadonlyMap<ResourceId, string>;
-  readonly onContextEditingChange: (resourceId: ResourceId, editing: boolean) => void;
-  readonly onContextReport: (resourceId: ResourceId, message: string | null) => void;
+  /** What the canvas says about each placement's embedding, by node id. */
+  readonly contextNotices: ReadonlyMap<string, string>;
+  readonly onContextEditingChange: (placement: string, editing: boolean) => void;
+  readonly onContextReport: (placement: string, message: string | null) => void;
 }
 
 /**
@@ -85,17 +86,17 @@ export function decorateEmbedCommands(
     complete: (targetMap, graphId) => {
       if (commit === undefined) return null;
       void commit({ ...view, map: targetMap.id, graph: graphId }).then((answer) =>
-        context.onContextReport(resourceId, refusalOf(answer)),
+        context.onContextReport(node.id, refusalOf(answer)),
       );
       return null;
     },
-    onEditingChange: (editing) => context.onContextEditingChange(resourceId, editing),
-    onReport: (message) => context.onContextReport(resourceId, message),
+    onEditingChange: (editing) => context.onContextEditingChange(node.id, editing),
+    onReport: (message) => context.onContextReport(node.id, message),
     context: railContext,
   });
   return withEmbedCommands(node, {
     mapRail,
-    contextNotice: context.contextNotices.get(resourceId),
+    contextNotice: context.contextNotices.get(node.id),
   });
 }
 

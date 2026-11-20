@@ -1,3 +1,4 @@
+import { createContext, useContext } from 'react';
 import { createObservableState, type ObserverErrorReporter } from '@project/persistence';
 import { titleName, type ResourceId } from '@project/core';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
@@ -77,6 +78,10 @@ export interface MapEmbeddingState {
   readonly footers: ReadonlyMap<string, number>;
   /** What the canvas drawn inside each placement's embedding publishes, by node id, while its request stands. */
   readonly publications: ReadonlyMap<string, EmbeddedPublication>;
+  /** What the canvas says about each placement's embedding, by node id, while it stands. */
+  readonly notices: ReadonlyMap<string, string>;
+  /** The placements whose embedding's rail is editing, by node id, while it stands. */
+  readonly railEditing: ReadonlySet<string>;
 }
 
 /**
@@ -111,6 +116,13 @@ export interface MapEmbedding {
   readonly reportFooter: (placement: string, height: number | null) => void;
   /** Reads `spaceId` again for every placement that asked for it and holds nothing, as Resume after Exit does. */
   readonly resume: (spaceId: ResourceId) => Promise<void>;
+  /**
+   * Says `message` about the placement's embedding, or stops saying anything
+   * with `null`. An answer that lands after its embedding has gone says nothing.
+   */
+  readonly setNotice: (placement: string, message: string | null) => void;
+  /** The placement's embedding's rail began or stopped editing. */
+  readonly setRailEditing: (placement: string, editing: boolean) => void;
   /** The canvas goes: every pending zoom lands, drafts kept, every Claim is given back and every Space released. */
   readonly dispose: () => void;
 }
@@ -226,6 +238,8 @@ export function createMapEmbedding({
       failures: new Map(),
       footers: new Map(),
       publications: new Map(),
+      notices: new Map(),
+      railEditing: new Set(),
     },
     reportObserverError,
   );
@@ -289,10 +303,23 @@ export function createMapEmbedding({
   // Which placements author in place is a fact about what the plugins
   // published, so it follows the registry at once rather than at the next
   // settle: nothing is drawn with authoring offered on a Map that left it.
+  // What the canvas says about an embedding, and its rail editing, go with
+  // the embedding the same way, whatever took it down.
   embeddings.subscribe(() => {
-    const editing = editingMapEmbeds(embeddings.getState());
-    const state = observable.getState();
-    if (!sameMembers(editing, state.editing)) observable.publish({ ...state, editing });
+    const entries = embeddings.getState();
+    const editing = editingMapEmbeds(entries);
+    update((state) => {
+      const notices = [...state.notices.keys()].every((id) => entries.has(id))
+        ? state.notices
+        : new Map([...state.notices].filter(([id]) => entries.has(id)));
+      const railEditing = [...state.railEditing].every((id) => entries.has(id))
+        ? state.railEditing
+        : new Set([...state.railEditing].filter((id) => entries.has(id)));
+      const editingChanged = !sameMembers(editing, state.editing);
+      if (!editingChanged && notices === state.notices && railEditing === state.railEditing)
+        return state;
+      return { ...state, editing: editingChanged ? editing : state.editing, notices, railEditing };
+    });
   });
 
   const setDraft = (placement: string, framing: SpaceResourceFraming | undefined): void => {
@@ -450,6 +477,25 @@ export function createMapEmbedding({
         return { ...state, footers };
       });
     },
+    setNotice: (placement, message) => {
+      if (message !== null && !embeddings.getState().has(placement)) return;
+      update((state) => {
+        if ((state.notices.get(placement) ?? null) === message) return state;
+        const notices = new Map(state.notices);
+        if (message === null) notices.delete(placement);
+        else notices.set(placement, message);
+        return { ...state, notices };
+      });
+    },
+    setRailEditing: (placement, editing) => {
+      update((state) => {
+        if (state.railEditing.has(placement) === editing) return state;
+        const railEditing = new Set(state.railEditing);
+        if (editing) railEditing.add(placement);
+        else railEditing.delete(placement);
+        return { ...state, railEditing };
+      });
+    },
     resume: async (spaceId) => {
       await Promise.all(
         [...requested]
@@ -467,3 +513,11 @@ export function createMapEmbedding({
     },
   };
 }
+
+const MapEmbeddingContext = createContext<MapEmbedding | null>(null);
+
+/** Where the Map embedding of the canvas drawing this composition is provided. */
+export const MapEmbeddingProvider = MapEmbeddingContext.Provider;
+
+/** The Map embedding of the canvas this is drawn on, or `null` off one. */
+export const useMapEmbedding = (): MapEmbedding | null => useContext(MapEmbeddingContext);
