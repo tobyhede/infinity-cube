@@ -1331,7 +1331,7 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "host"
-version = "0.0.0"
+version = "0.1.0-preview.1"
 dependencies = [
  "bytes",
  "http",
@@ -1405,7 +1405,7 @@ dependencies = [
 
 [[package]]
 name = "http-conformance"
-version = "0.0.0"
+version = "0.1.0-preview.1"
 dependencies = [
  "bytes",
  "host",
@@ -1657,7 +1657,7 @@ dependencies = [
 
 [[package]]
 name = "infinity-cube"
-version = "0.0.0"
+version = "0.1.0-preview.1"
 dependencies = [
  "anyhow",
  "bytes",
@@ -1675,7 +1675,7 @@ dependencies = [
 
 [[package]]
 name = "infinity-cube-desktop"
-version = "0.0.0"
+version = "0.1.0-preview.1"
 dependencies = [
  "bytes",
  "host",
@@ -1695,7 +1695,7 @@ dependencies = [
 
 [[package]]
 name = "intake"
-version = "0.0.0"
+version = "0.1.0-preview.1"
 dependencies = [
  "proptest",
  "serde_json",

@@ -10,6 +10,9 @@
 //! it reports when it starts: `cargo build`, clippy and the tests need no web
 //! build, and what a binary carries never depends on whether a `dist/`
 //! happens to be lying around.
+//!
+//! It also has Cargo rebuild when `INFINITY_CUBE_COMMIT` changes, the commit
+//! `infinity-cube version` names.
 
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
@@ -62,6 +65,9 @@ fn walk(
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo::rerun-if-env-changed={VARIABLE}");
+    // The commit `version` names, which the release workflow sets; read with
+    // `option_env!` in `src/version.rs`.
+    println!("cargo::rerun-if-env-changed=INFINITY_CUBE_COMMIT");
     let out = PathBuf::from(env::var("OUT_DIR")?).join("built.rs");
     let mut code = String::new();
     match env::var_os(VARIABLE).filter(|value| !value.is_empty()) {

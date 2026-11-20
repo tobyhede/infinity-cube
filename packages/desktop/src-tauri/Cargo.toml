@@ -4,6 +4,7 @@ version.workspace = true
 description = "The InfinityCube desktop application: a Tauri shell over the Rust host"
 edition.workspace = true
 rust-version.workspace = true
+license.workspace = true
 publish.workspace = true
 
 [build-dependencies]

@@ -1,0 +1,198 @@
+# Preview builds of the `infinity-cube` CLI (ADR 0166): one binary per
+# platform with the browser application embedded, packed with
+# `release/README.md` and both licence files, and attached to a draft
+# GitHub pre-release.
+#
+# - A tag `v<version>` pushed on a commit `main` already holds builds,
+#   tests and packages every platform, then creates the draft release with
+#   `SHA256SUMS`. Publishing it is a person's click: nothing here publishes.
+# - A pull request that changes this workflow, `release/` or the CLI builds,
+#   tests and packages the same way and uploads the archives as workflow
+#   artifacts, a dry run with no release.
+# - "Run workflow" does the dry run on any branch.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - release/**
+      - crates/cli/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  version:
+    name: Read the version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.read.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false, fetch-depth: 0 }
+      # The workspace version every crate inherits is the one release names.
+      - name: Read the Cargo workspace version
+        id: read
+        run: |
+          version="$(sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"$/\1/p' Cargo.toml)"
+          if [ -z "$version" ]; then
+            echo "::error::No version in Cargo.toml's [workspace.package]"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      # A tag must name that version and sit on `main`, whose commits CI has
+      # already passed; anything else is refused before a build starts.
+      - name: Hold the tag to the version and to main
+        if: github.ref_type == 'tag'
+        env:
+          VERSION: ${{ steps.read.outputs.version }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if [ "$TAG" != "v$VERSION" ]; then
+            echo "::error::Tag $TAG does not name the Cargo version $VERSION (expected v$VERSION)"
+            exit 1
+          fi
+          case "$VERSION" in
+            *-preview.*) ;;
+            *)
+              echo "::error::$VERSION is not a preview version; a release is a new ADR (ADR 0166)"
+              exit 1
+              ;;
+          esac
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$TAG is not on main"
+            exit 1
+          fi
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: version
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Static, so it runs on any distribution; the tests run natively.
+          - target: x86_64-unknown-linux-musl
+            runner: ubuntu-latest
+          - target: aarch64-apple-darwin
+            runner: macos-latest
+    env:
+      NEXTEST_VERSION: 0.9.152
+      TARGET: ${{ matrix.target }}
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - name: Install the pinned Rust toolchain and the target
+        run: |
+          rustup toolchain install
+          rustup target add "$TARGET"
+      - name: Install musl
+        if: endsWith(matrix.target, '-musl')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends musl-tools
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build the browser application the binary embeds
+        run: pnpm --filter @project/app exec vite build
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/bin/cargo-nextest
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: release-${{ matrix.target }}-nextest-${{ env.NEXTEST_VERSION }}-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: release-${{ matrix.target }}-nextest-${{ env.NEXTEST_VERSION }}-${{ hashFiles('rust-toolchain.toml') }}-
+      - name: Install cargo-nextest
+        run: command -v cargo-nextest || cargo install cargo-nextest --locked --version "$NEXTEST_VERSION"
+      # The crates the binary is made of, on the platform it is built for. On
+      # macOS this is the only run of their tests.
+      - name: Test the CLI and the crates it is built from
+        run: cargo nextest run --locked --no-fail-fast -p intake -p host -p infinity-cube
+      - name: Build the release binary
+        run: cargo build --release --locked -p infinity-cube --target "$TARGET"
+        env:
+          INFINITY_CUBE_BUILT_APPLICATION: packages/app/dist
+          INFINITY_CUBE_COMMIT: ${{ github.sha }}
+      # The binary that ships, run once: it names its version, writes a new
+      # Space, and checks it.
+      - name: Smoke-test the release binary
+        run: |
+          binary="target/$TARGET/release/infinity-cube"
+          shown="$("$binary" --version)"
+          echo "$shown"
+          case "$shown" in
+            "infinity-cube $VERSION ("*) ;;
+            *) echo "::error::--version printed '$shown'"; exit 1 ;;
+          esac
+          space="$RUNNER_TEMP/smoke-space"
+          "$binary" init "$space"
+          "$binary" check "$space"
+      - name: Pack the archive
+        id: pack
+        run: |
+          name="infinity-cube-$VERSION-$TARGET"
+          stage="$RUNNER_TEMP/$name"
+          mkdir -p "$stage"
+          cp "target/$TARGET/release/infinity-cube" release/README.md LICENSE-MIT LICENSE-APACHE "$stage/"
+          tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/$name.tar.gz" "$name"
+          echo "archive=$RUNNER_TEMP/$name.tar.gz" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: infinity-cube-${{ matrix.target }}
+          path: ${{ steps.pack.outputs.archive }}
+          if-no-files-found: error
+
+  release:
+    name: Create the draft release
+    if: github.ref_type == 'tag'
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # The one job that writes: it creates a draft, which a person publishes.
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ github.ref_name }}
+      VERSION: ${{ needs.version.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: infinity-cube-*
+          path: dist
+          merge-multiple: true
+      - name: Write SHA256SUMS
+        working-directory: dist
+        run: sha256sum ./*.tar.gz | sed 's| \./| |' > SHA256SUMS && cat SHA256SUMS
+      - name: Create the draft pre-release
+        run: |
+          cat > notes.md <<EOF
+          **Preview build** of InfinityCube $VERSION. It makes no compatibility promise: a directory it writes may not open in a later preview build, so keep your directory in git and read it with the build that wrote it (ADR 0166).
+
+          Download the archive for your platform, unpack it and follow its README: \`infinity-cube init my-space\`, then \`infinity-cube run my-space\`. On macOS, run \`xattr -d com.apple.quarantine infinity-cube\` once first, because the build is not signed.
+          EOF
+          gh release create "$TAG" dist/*.tar.gz dist/SHA256SUMS \
+            --draft --prerelease --verify-tag \
+            --title "InfinityCube $VERSION (preview)" \
+            --notes-file notes.md

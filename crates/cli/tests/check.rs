@@ -205,7 +205,7 @@ mod given_a_missing_or_empty_directory {
             // path, so the verb and the path are looked for apart.
             let said = text(&output.stderr);
             let (_, command) = said
-                .split_once("To create one there: pnpm cube init ")
+                .split_once("To create one there: infinity-cube init ")
                 .unwrap_or_else(|| panic!("names init: {said}"));
             assert!(
                 command.contains(&directory.display().to_string()),
