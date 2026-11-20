@@ -11,14 +11,14 @@ test(
     const location = page.getByRole('textbox', { name: 'GitHub location' });
     await expect(location).toHaveAttribute('aria-invalid', 'false');
 
-    await location.fill('tobyhede/talk');
+    await location.fill('tobyhede/space');
     await page.getByRole('button', { name: 'Open' }).click();
 
     await expect(page.getByText('a GitHub location begins with github:')).toBeVisible();
     await expect(location).toHaveAttribute('aria-invalid', 'true');
-    await expect(location).toHaveValue('tobyhede/talk');
+    await expect(location).toHaveValue('tobyhede/space');
 
-    await location.fill('github:tobyhede/talk@main/slides');
+    await location.fill('github:tobyhede/space@main/slides');
     await page.getByRole('button', { name: 'Open' }).click();
     await expect(page.getByText('a GitHub location begins with github:')).toHaveCount(0);
     await expect(location).toHaveAttribute('aria-invalid', 'false');

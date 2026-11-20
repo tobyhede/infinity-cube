@@ -1,4 +1,4 @@
-//! Waiting for a closing talk's last write, and asking the presenter
+//! Waiting for a closing Aggregate's last write, and asking the presenter
 //! whether to keep waiting once it has taken too long (Storage ST-122).
 //!
 //! [`Waiting`] is the decision, with no window, thread or clock: it is told
@@ -8,7 +8,7 @@
 //! the shell.
 //!
 //! A window's close is a wait of its own, with a question of its own. A
-//! quit is one wait over every talk still writing, with one question: the
+//! quit is one wait over every Aggregate still writing, with one question: the
 //! waits of windows already closing join it, and their questions go.
 
 use std::collections::BTreeMap;
@@ -51,12 +51,12 @@ pub enum Choice {
 /// What happened.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event<T> {
-    /// A talk's window was asked to close, and its last write began.
-    CloseRequested { talk: T, folder: PathBuf },
-    /// The application was asked to quit, and the last write of each talk
+    /// An Aggregate's window was asked to close, and its last write began.
+    CloseRequested { aggregate: T, folder: PathBuf },
+    /// The application was asked to quit, and the last write of each Aggregate
     /// in `writing`, open until now, began.
     QuitRequested { writing: Vec<(T, PathBuf)> },
-    /// A talk's last write ended, written or failed.
+    /// An Aggregate's last write ended, written or failed.
     WriteFinished(T),
     /// [`ASK_AFTER`] passed since the wait's [`Effect::StartTimer`].
     Elapsed(WaitId),
@@ -74,12 +74,12 @@ pub enum Effect<T> {
     Ask { wait: WaitId, folders: Vec<PathBuf> },
     /// Take the wait's question away, if it is showing.
     Dismiss(WaitId),
-    /// The talk's last write ended: close its window.
+    /// The Aggregate's last write ended: close its window.
     Close(T),
-    /// Close each talk's window without waiting for its last write, which
+    /// Close each Aggregate's window without waiting for its last write, which
     /// is left to end on its own.
     Abandon(Vec<(T, PathBuf)>),
-    /// Every talk the quit waited for is written or abandoned: end the
+    /// Every Aggregate the quit waited for is written or abandoned: end the
     /// application.
     Exit,
 }
@@ -121,37 +121,37 @@ impl<T: Ord + Clone> Waiting<T> {
         id
     }
 
-    fn holding(&self, talk: &T) -> Option<WaitId> {
+    fn holding(&self, aggregate: &T) -> Option<WaitId> {
         self.waits
             .iter()
-            .find(|(_, wait)| wait.writing.contains_key(talk))
+            .find(|(_, wait)| wait.writing.contains_key(aggregate))
             .map(|(id, _)| *id)
     }
 
     /// Decide what `event` calls for.
     pub fn on(&mut self, event: Event<T>) -> Vec<Effect<T>> {
         match event {
-            Event::CloseRequested { talk, folder } => self.close_requested(talk, folder),
+            Event::CloseRequested { aggregate, folder } => self.close_requested(aggregate, folder),
             Event::QuitRequested { writing } => self.quit_requested(writing),
-            Event::WriteFinished(talk) => self.write_finished(&talk),
+            Event::WriteFinished(aggregate) => self.write_finished(&aggregate),
             Event::Elapsed(id) => self.elapsed(id),
             Event::Chose(id, choice) => self.chose(id, choice),
         }
     }
 
-    fn close_requested(&mut self, talk: T, folder: PathBuf) -> Vec<Effect<T>> {
-        if self.holding(&talk).is_some() {
+    fn close_requested(&mut self, aggregate: T, folder: PathBuf) -> Vec<Effect<T>> {
+        if self.holding(&aggregate).is_some() {
             return Vec::new();
         }
         if let Some(quit) = self.quit.and_then(|id| self.waits.get_mut(&id)) {
-            let _joined = quit.writing.insert(talk, folder);
+            let _joined = quit.writing.insert(aggregate, folder);
             return Vec::new();
         }
         let id = self.mint();
         let _new = self.waits.insert(
             id,
             Wait {
-                writing: BTreeMap::from([(talk, folder)]),
+                writing: BTreeMap::from([(aggregate, folder)]),
                 asking: false,
             },
         );
@@ -194,20 +194,20 @@ impl<T: Ord + Clone> Waiting<T> {
         effects
     }
 
-    fn write_finished(&mut self, talk: &T) -> Vec<Effect<T>> {
-        let Some(id) = self.holding(talk) else {
+    fn write_finished(&mut self, aggregate: &T) -> Vec<Effect<T>> {
+        let Some(id) = self.holding(aggregate) else {
             // Abandoned, or never waited for.
             return Vec::new();
         };
         let is_quit = self.quit == Some(id);
         let mut effects = Vec::new();
         if !is_quit {
-            effects.push(Effect::Close(talk.clone()));
+            effects.push(Effect::Close(aggregate.clone()));
         }
         let Some(wait) = self.waits.get_mut(&id) else {
             return effects;
         };
-        let _written = wait.writing.remove(talk);
+        let _written = wait.writing.remove(aggregate);
         if wait.writing.is_empty() {
             if wait.asking {
                 effects.push(Effect::Dismiss(id));

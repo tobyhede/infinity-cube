@@ -35,7 +35,7 @@ const source = resolveMountSource(sourceParameter(window.location.href), buildDe
 
 if (source.kind === 'ask') {
   root.render(
-    <main aria-label="Open a talk" className="flex min-h-dvh items-center">
+    <main aria-label="Open a space" className="flex min-h-dvh items-center">
       <GitHubLocationForm
         navigate={(url) => window.location.assign(url)}
         href={() => window.location.href}

@@ -791,7 +791,7 @@ mod tests {
 
         fn space(maps: &str) -> JsonValue {
             parse(&format!(
-                r#"{{"version": 1, "id": "10000000-0000-4000-8000-000000000001", "title": "Talk", "maps": {maps}}}"#
+                r#"{{"version": 1, "id": "10000000-0000-4000-8000-000000000001", "title": "Space", "maps": {maps}}}"#
             ))
             .unwrap()
         }

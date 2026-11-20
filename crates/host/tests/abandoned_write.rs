@@ -197,7 +197,7 @@ struct Outcome {
 /// never ending change number `stop_at` (`usize::MAX` for none).
 async fn edit_and_stop(stop_at: usize) -> Outcome {
     let temporary = tempfile::tempdir().unwrap();
-    let directory = temporary.path().join("talk");
+    let directory = temporary.path().join("space");
     copy_tree(
         Path::new(concat!(
             env!("CARGO_MANIFEST_DIR"),

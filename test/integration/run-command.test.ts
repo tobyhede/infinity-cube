@@ -85,7 +85,7 @@ afterEach(async () => {
 const newAggregate = async (): Promise<string> => {
   const root = await mkdtemp(join(tmpdir(), 'infinity-cube-run-'));
   roots.push(root);
-  const directory = join(root, 'talk');
+  const directory = join(root, 'space');
   await initAggregate(directory, newUuid);
   return directory;
 };
@@ -186,11 +186,11 @@ describe('pnpm cube init', () => {
       // The real path, which is the directory pnpm records as where it was invoked.
       const root = await realpath(await mkdtemp(join(tmpdir(), 'infinity-cube-init-')));
       roots.push(root);
-      const directory = join(root, 'talk');
+      const directory = join(root, 'space');
 
       const result = await runCommand(
         'pnpm',
-        ['--silent', '--dir', REPOSITORY_ROOT, 'cube', 'init', 'talk'],
+        ['--silent', '--dir', REPOSITORY_ROOT, 'cube', 'init', 'space'],
         { cwd: root, timeoutMs: START_TIMEOUT_MS },
       );
 
@@ -234,7 +234,7 @@ describe('pnpm cube run', () => {
     async () => {
       const root = await mkdtemp(join(tmpdir(), 'infinity-cube-run-'));
       roots.push(root);
-      const directory = join(root, 'talk');
+      const directory = join(root, 'space');
       await initAggregate(directory, newUuid);
       // Held on `localhost`, the address the run's server binds.
       const occupied = createServer();
@@ -280,7 +280,7 @@ describe('pnpm cube run', () => {
     async () => {
       const root = await mkdtemp(join(tmpdir(), 'infinity-cube-run-'));
       roots.push(root);
-      const directory = join(root, 'talk');
+      const directory = join(root, 'space');
       await initAggregate(directory, newUuid);
       const before = await readFile(join(directory, 'aggregate.json'), 'utf8');
       const launcher = spawn(

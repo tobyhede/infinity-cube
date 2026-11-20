@@ -222,7 +222,7 @@ describe('intake locates each refusal', () => {
 
   it('locates a repeated Resource id in loadSpace at the file Export writes, whatever its files are named', () => {
     const file = (name: string, id: string) => ({
-      path: `/talks/demo/resources/${name}.json`,
+      path: `/spaces/demo/resources/${name}.json`,
       text: JSON.stringify({ id, title: name, kind: 'ur', content: {} }),
     });
     const result = loadSpace({ version: 1, id: SPACE_ID, title: 'Files' }, [

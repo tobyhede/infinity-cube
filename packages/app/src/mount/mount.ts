@@ -27,7 +27,7 @@ import type { ImageDisplay } from '@project/ui';
  *
  * Every Edit is committed to that repository and lives as long as the page
  * (ADR 0131): nothing is kept in browser storage and nothing is written back
- * to GitHub, so a reload mounts the talk as it was committed.
+ * to GitHub, so a reload mounts the Space as it was committed.
  */
 
 /** What to mount: an Aggregate directory's source, and what the mount is composed with. */

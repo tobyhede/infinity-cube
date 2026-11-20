@@ -1,20 +1,20 @@
-//! The scheme handler: every request a talk window makes, answered by the
-//! run of the talk its address names, with no port, `Host` check or launch
+//! The scheme handler: every request a Space window makes, answered by the
+//! run of the Aggregate its address names, with no port, `Host` check or launch
 //! secret (ADR 0155, spec decision 4).
 //!
 //! It is the shell's trust boundary, and it admits a request only when
 //!
-//! - its address names a talk that is open ([`TalkAddress::key_of`]);
-//! - the window that made it is one of that talk's own windows, so neither
-//!   the home window nor another talk's window reaches it;
-//! - it is a read (`GET` or `HEAD`), or it comes from the talk's own page:
-//!   its `Origin` is the talk's, or, naming none, its `Referer` is a page of
-//!   the talk, so a page from anywhere else cannot change the talk.
+//! - its address names an Aggregate that is open ([`AggregateAddress::key_of`]);
+//! - the window that made it is one of that Aggregate's own windows, so neither
+//!   the home window nor another Aggregate's window reaches it;
+//! - it is a read (`GET` or `HEAD`), or it comes from the Aggregate's own page:
+//!   its `Origin` is the Aggregate's, or, naming none, its `Referer` is a page of
+//!   the Aggregate, so a page from anywhere else cannot change the Aggregate.
 //!
 //! Everything past that is the host's application, unchanged: the Space API,
 //! assets with their body limits, product addresses and the built
 //! application with its Content Security Policy (Storage ST-115, ST-119).
-//! [`OpenTalks::answer`] is a plain `Request -> Response` function, so it is
+//! [`OpenAggregates::answer`] is a plain `Request -> Response` function, so it is
 //! tested without a window.
 
 use std::collections::{HashMap, HashSet};
@@ -28,33 +28,34 @@ use http_body_util::Full;
 use tokio::sync::Notify;
 use url::Url;
 
-use crate::address::{SchemeStyle, TalkAddress, TalkKey};
+use crate::address::{AggregateAddress, AggregateKey, SchemeStyle};
 
-/// The application a talk's run answers with.
-pub type TalkApplication = host::RunApplication<host::RandomIds, host::BuiltApplicationDirectory>;
+/// The application an Aggregate's run answers with.
+pub type AggregateApplication =
+    host::RunApplication<host::RandomIds, host::BuiltApplicationDirectory>;
 
-/// The prefix of the label of every window a talk's page opens.
+/// The prefix of the label of every window an Aggregate's page opens.
 pub const VIEW_WINDOW_PREFIX: &str = "view-";
 
-/// Every open talk, by the key its address carries.
+/// Every open Aggregate, by the key its address carries.
 #[derive(Debug)]
-pub struct OpenTalks {
+pub struct OpenAggregates {
     style: SchemeStyle,
-    talks: RwLock<HashMap<TalkKey, ServedTalk>>,
-    /// How many windows talks' pages have opened, so no two share a label
-    /// however often a talk is closed and opened again.
+    aggregates: RwLock<HashMap<AggregateKey, ServedAggregate>>,
+    /// How many windows Aggregates' pages have opened, so no two share a label
+    /// however often an Aggregate is closed and opened again.
     views: AtomicU64,
 }
 
 #[derive(Debug)]
-struct ServedTalk {
-    address: TalkAddress,
-    application: Arc<TalkApplication>,
+struct ServedAggregate {
+    address: AggregateAddress,
+    application: Arc<AggregateApplication>,
     windows: HashSet<String>,
     in_flight: Arc<InFlight>,
 }
 
-/// How many of a talk's changes (requests other than `GET` and `HEAD`) are
+/// How many of an Aggregate's changes (requests other than `GET` and `HEAD`) are
 /// being answered.
 #[derive(Debug, Default)]
 pub struct InFlight {
@@ -95,7 +96,7 @@ impl InFlight {
     }
 }
 
-/// A talk the scheme handler no longer serves.
+/// An Aggregate the scheme handler no longer serves.
 #[derive(Debug)]
 pub struct Closed {
     /// The windows that could reach it.
@@ -142,20 +143,20 @@ fn only<'a, B>(request: &'a Request<B>, name: &HeaderName) -> Result<Option<&'a 
     }
 }
 
-/// Which header showed that a change comes from the talk's own page.
+/// Which header showed that a change comes from the Aggregate's own page.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AdmittedBy {
     Origin,
     Referer,
 }
 
-/// Which header shows that a change comes from the talk's own page, or
-/// `None` when it does not: its one `Origin` is the talk's, or, naming no
-/// `Origin`, its one `Referer` is a page of the talk; a request naming
+/// Which header shows that a change comes from the Aggregate's own page, or
+/// `None` when it does not: its one `Origin` is the Aggregate's, or, naming no
+/// `Origin`, its one `Referer` is a page of the Aggregate; a request naming
 /// neither is refused. A page's request to its own origin under a custom
 /// scheme may name no `Origin` (what WebKitGTK sent is recorded in
 /// `.scratch/rust-host/issues/13-swap-the-sidecar-for-the-rust-host.md`).
-fn comes_from<B>(request: &Request<B>, address: &TalkAddress) -> Option<AdmittedBy> {
+fn comes_from<B>(request: &Request<B>, address: &AggregateAddress) -> Option<AdmittedBy> {
     match only(request, &ORIGIN) {
         Ok(Some(origin)) => (origin == address.origin()).then_some(AdmittedBy::Origin),
         Ok(None) => matches!(
@@ -175,31 +176,42 @@ fn log_admissions() -> bool {
     *LOG.get_or_init(|| std::env::var_os("INFINITY_CUBE_LOG_ADMISSIONS").is_some())
 }
 
-impl OpenTalks {
-    /// No talk open yet, addressed as `style` addresses one.
+impl OpenAggregates {
+    /// No Aggregate open yet, addressed as `style` addresses one.
     #[must_use]
     pub fn new(style: SchemeStyle) -> Self {
         Self {
             style,
-            talks: RwLock::new(HashMap::new()),
+            aggregates: RwLock::new(HashMap::new()),
             views: AtomicU64::new(0),
         }
     }
 
-    fn talks(&self) -> std::sync::RwLockReadGuard<'_, HashMap<TalkKey, ServedTalk>> {
-        self.talks.read().unwrap_or_else(PoisonError::into_inner)
+    fn aggregates(&self) -> std::sync::RwLockReadGuard<'_, HashMap<AggregateKey, ServedAggregate>> {
+        self.aggregates
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
     }
 
-    fn talks_mut(&self) -> std::sync::RwLockWriteGuard<'_, HashMap<TalkKey, ServedTalk>> {
-        self.talks.write().unwrap_or_else(PoisonError::into_inner)
+    fn aggregates_mut(
+        &self,
+    ) -> std::sync::RwLockWriteGuard<'_, HashMap<AggregateKey, ServedAggregate>> {
+        self.aggregates
+            .write()
+            .unwrap_or_else(PoisonError::into_inner)
     }
 
-    /// Serve the talk at `address` with `application`, to the window `window`.
-    pub fn open(&self, address: TalkAddress, application: Arc<TalkApplication>, window: &str) {
+    /// Serve the Aggregate at `address` with `application`, to the window `window`.
+    pub fn open(
+        &self,
+        address: AggregateAddress,
+        application: Arc<AggregateApplication>,
+        window: &str,
+    ) {
         let key = address.key().clone();
-        let _replaced = self.talks_mut().insert(
+        let _replaced = self.aggregates_mut().insert(
             key,
-            ServedTalk {
+            ServedAggregate {
                 address,
                 application,
                 windows: HashSet::from([window.to_owned()]),
@@ -208,12 +220,12 @@ impl OpenTalks {
         );
     }
 
-    /// The label of a new window of the talk with `key`, as its page opens
-    /// one, which may reach the talk from now on; `None` when that talk is
+    /// The label of a new window of the Aggregate with `key`, as its page opens
+    /// one, which may reach the Aggregate from now on; `None` when that Aggregate is
     /// not open. No label is answered twice.
-    pub fn open_view(&self, key: &TalkKey) -> Option<String> {
-        let mut talks = self.talks_mut();
-        let served = talks.get_mut(key)?;
+    pub fn open_view(&self, key: &AggregateKey) -> Option<String> {
+        let mut aggregates = self.aggregates_mut();
+        let served = aggregates.get_mut(key)?;
         let label = format!(
             "{VIEW_WINDOW_PREFIX}{}-{}",
             key.as_str(),
@@ -223,27 +235,27 @@ impl OpenTalks {
         Some(label)
     }
 
-    /// Stop admitting the window `label` a talk's page opened, once it is
-    /// gone or could not be built, so a talk holds only the windows it has.
+    /// Stop admitting the window `label` an Aggregate's page opened, once it is
+    /// gone or could not be built, so an Aggregate holds only the windows it has.
     pub fn forget_view(&self, label: &str) {
-        for served in self.talks_mut().values_mut() {
+        for served in self.aggregates_mut().values_mut() {
             let _held = served.windows.remove(label);
         }
     }
 
-    /// Whether the window `window` may reach the talk with `key`: false once
-    /// that talk has begun closing.
-    pub fn holds_window(&self, key: &TalkKey, window: &str) -> bool {
-        self.talks()
+    /// Whether the window `window` may reach the Aggregate with `key`: false once
+    /// that Aggregate has begun closing.
+    pub fn holds_window(&self, key: &AggregateKey, window: &str) -> bool {
+        self.aggregates()
             .get(key)
             .is_some_and(|served| served.windows.contains(window))
     }
 
-    /// Stop serving the talk with `key`: a request made from now on is
+    /// Stop serving the Aggregate with `key`: a request made from now on is
     /// refused, and the answer says which windows could reach it and which
     /// changes are still being answered.
-    pub fn close(&self, key: &TalkKey) -> Option<Closed> {
-        self.talks_mut().remove(key).map(|served| Closed {
+    pub fn close(&self, key: &AggregateKey) -> Option<Closed> {
+        self.aggregates_mut().remove(key).map(|served| Closed {
             windows: served.windows.into_iter().collect(),
             in_flight: served.in_flight,
         })
@@ -271,20 +283,23 @@ impl OpenTalks {
     }
 
     /// Decide whether to answer one request the window labelled `window`
-    /// made, answering the request to hand the talk's application, or the
+    /// made, answering the request to hand the Aggregate's application, or the
     /// refusal.
     ///
     /// # Errors
     ///
     /// The scheme handler's own refusal.
     pub fn admit(&self, window: &str, request: Request<Vec<u8>>) -> Result<Admitted, Refused> {
-        let Some(key) = TalkAddress::key_of(request.uri(), self.style) else {
-            return Err(refuse(StatusCode::NOT_FOUND, "This address names no talk."));
+        let Some(key) = AggregateAddress::key_of(request.uri(), self.style) else {
+            return Err(refuse(
+                StatusCode::NOT_FOUND,
+                "This address names no Space.",
+            ));
         };
         let read = request.method() == Method::GET || request.method() == Method::HEAD;
         // Counted under the lock `close` takes, so a close either sees the
-        // change counted or the change sees the talk closed.
-        let found = self.talks().get(&key).map(|served| {
+        // change counted or the change sees the Aggregate closed.
+        let found = self.aggregates().get(&key).map(|served| {
             (
                 served.windows.contains(window),
                 (!read).then(|| comes_from(&request, &served.address)),
@@ -293,12 +308,12 @@ impl OpenTalks {
             )
         });
         let Some((own_window, by, application, answering)) = found else {
-            return Err(refuse(StatusCode::NOT_FOUND, "This talk is not open."));
+            return Err(refuse(StatusCode::NOT_FOUND, "This Space is not open."));
         };
         if !own_window {
             return Err(refuse(
                 StatusCode::FORBIDDEN,
-                "Only the talk's own windows may reach it.",
+                "Only the Space's own windows may reach it.",
             ));
         }
         let by = match by {
@@ -307,7 +322,7 @@ impl OpenTalks {
             Some(None) => {
                 return Err(refuse(
                     StatusCode::FORBIDDEN,
-                    "A change to a talk must come from the talk's own page.",
+                    "A change to a Space must come from the Space's own page.",
                 ));
             }
         };
@@ -323,7 +338,7 @@ impl OpenTalks {
 /// A request the scheme handler admitted; a change is counted as being
 /// answered until it has been.
 pub struct Admitted {
-    application: Arc<TalkApplication>,
+    application: Arc<AggregateApplication>,
     request: Request<Vec<u8>>,
     by: Option<AdmittedBy>,
     _answering: Option<Answering>,
@@ -351,7 +366,7 @@ impl Admitted {
         format!("{} {}", self.request.method(), self.request.uri().path())
     }
 
-    /// The talk's application's answer.
+    /// The Aggregate's application's answer.
     pub async fn answer(self) -> Response<Vec<u8>> {
         // The webview hands over the whole body; the application still
         // counts it against its limits.

@@ -6,7 +6,7 @@
 
 export const COMMIT = '0123456789abcdef0123456789abcdef01234567';
 export const OWNER = 'tobyhede';
-export const REPO = 'talks';
+export const REPO = 'spaces';
 
 export interface FakeGitHubOptions {
   /** The repository's files at `COMMIT`, by repository-relative path. */

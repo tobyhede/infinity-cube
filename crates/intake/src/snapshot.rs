@@ -250,7 +250,7 @@ mod tests {
         fn decodes_a_whole_snapshot() {
             let json = parse(
                 r#"{"id": "10000000-0000-4000-8000-000000000001",
-                    "document": {"version": 1, "title": "Talk"},
+                    "document": {"version": 1, "title": "Space"},
                     "resources": [{"id": "00000000-0000-4000-8000-000000000101",
                                    "document": {"title": "A", "kind": "ur", "content": {}, "stripped": 1}}]}"#,
             )
@@ -306,7 +306,7 @@ mod tests {
             assert_eq!(
                 located(
                     r#"{"id": "10000000-0000-4000-8000-000000000001",
-                        "document": {"version": 1, "title": "Talk"},
+                        "document": {"version": 1, "title": "Space"},
                         "resources": 7}"#
                 ),
                 vec![(format!("{d}/resources"), None)],

@@ -9,7 +9,7 @@ import { SEEDED_GRAPH_ID, SEEDED_MAP_ID, seedPositionedMap, storeText } from './
 // to the presenting window over `BroadcastChannel`. Each test opens both as
 // pages of one browser context, which is what two windows of one browser are.
 //
-// The tracked fixture has no notes, so each test seeds a talk and its
+// The tracked fixture has no notes, so each test seeds a presentation and its
 // Presentation Notes Graph through the HTTP boundary the browser uses. Every
 // test owns a fresh memory repository, so the seed reaches no other test.
 
@@ -31,15 +31,15 @@ const markdown = (resource: UUID, title: string, url: `/assets/${string}`) =>
   ({ id: resource, document: { title, kind: 'markdown', content: { url } } }) as const;
 
 /**
- * Give the opened Space a Map with a talk that forks after its welcome, and a
+ * Give the opened Space a Map with a presentation that forks after its welcome, and a
  * Presentation Notes Graph naming it: two notes for the welcome, placed one
  * above the other, one for the demo and none for the rest. Answers the
  * Space's id.
  *
- * `seedPositionedMap` writes the Map and its one Graph, the talk. The second
+ * `seedPositionedMap` writes the Map and its one Graph, the presentation. The second
  * commit names that Graph and adds the notes Graph beside it.
  */
-async function seedTalk(page: Page): Promise<UUID> {
+async function seedPresented(page: Page): Promise<UUID> {
   const seeded = await seedPositionedMap(
     page,
     'Launch',
@@ -88,10 +88,10 @@ async function seedTalk(page: Page): Promise<UUID> {
       maps: (seeded.snapshot.document.maps ?? []).map((placed) => ({
         ...placed,
         graphs: [
-          ...placed.graphs.map((graph) => ({ ...graph, title: 'Launch talk' })),
+          ...placed.graphs.map((graph) => ({ ...graph, title: 'Launch demo' })),
           {
             id: ids.notes,
-            title: 'Launch talk Presentation Notes',
+            title: 'Launch demo Presentation Notes',
             edges: [
               { from: ids.welcome, to: ids.thanks },
               { from: ids.welcome, to: ids.outage },
@@ -136,7 +136,7 @@ test(
   'S opens a Notes window that draws the notes in Map order and a preview of every move',
   { tag: '@parity:notes-window-draws-notes-in-map-order-and-every-move' },
   async ({ page }) => {
-    const spaceId = await seedTalk(page);
+    const spaceId = await seedPresented(page);
     await page.goto(presentPath(spaceId, ids.welcome));
     await expect(presentedName(page)).toHaveText('Welcome');
 
@@ -146,7 +146,7 @@ test(
     await expect(notes).toHaveURL(new RegExp(`${notesPath(spaceId)}$`));
 
     await expect(presenting(notes, 'Welcome')).toBeVisible();
-    await expect(notesOf(notes).getByText('From Launch talk Presentation Notes')).toBeVisible();
+    await expect(notesOf(notes).getByText('From Launch demo Presentation Notes')).toBeVisible();
     await expect(noteNames(notes)).toHaveText(['Open with the outage', 'Thank the team']);
     await expect(movesOf(notes).getByRole('button', { name: 'Go to Demo' })).toBeVisible();
     await expect(movesOf(notes).getByRole('button', { name: 'Choose Architecture' })).toBeVisible();
@@ -169,7 +169,7 @@ test(
   'a move pressed in the Notes window, or an arrow key, moves the presentation',
   { tag: '@parity:notes-window-drives-the-presentation' },
   async ({ page }) => {
-    const spaceId = await seedTalk(page);
+    const spaceId = await seedPresented(page);
     await page.goto(presentPath(spaceId, ids.welcome));
     await expect(presentedName(page)).toHaveText('Welcome');
     const notes = await openNotesWindow(page, spaceId);
@@ -197,10 +197,10 @@ test(
 );
 
 test(
-  'the Notes window says when a Resource has no notes and the talk ends',
+  'the Notes window says when a Resource has no notes and the presentation ends',
   { tag: '@parity:notes-window-marks-the-end-and-a-resource-without-notes' },
   async ({ page }) => {
-    const spaceId = await seedTalk(page);
+    const spaceId = await seedPresented(page);
     await page.goto(presentPath(spaceId, ids.welcome));
     await expect(presentedName(page)).toHaveText('Welcome');
     await page.keyboard.press('ArrowRight');
@@ -211,7 +211,7 @@ test(
 
     await expect(presenting(notes, 'Questions')).toBeVisible();
     await expect(notesOf(notes).getByText('No notes for this Resource.')).toBeVisible();
-    await expect(movesOf(notes).getByText('This is the end of the talk.')).toBeVisible();
+    await expect(movesOf(notes).getByText('This is the end of the presentation.')).toBeVisible();
     await movesOf(notes).getByRole('button', { name: 'Back' }).click();
     await expect(presentedName(page)).toHaveText('Demo');
   },
@@ -221,7 +221,7 @@ test(
   'the Notes window waits while nothing presents, and follows a presentation that starts',
   { tag: '@parity:notes-window-waits-while-nothing-presents' },
   async ({ page }) => {
-    const spaceId = await seedTalk(page);
+    const spaceId = await seedPresented(page);
     const notes = await openNotesWindow(page, spaceId);
     await expect(notesWindow(notes).getByText('Not presenting')).toBeVisible();
     await expect(notesWindow(notes).getByRole('button')).toHaveCount(0);
@@ -239,7 +239,7 @@ test(
 test('the Notes window shows "not presenting" when the presenting window crashes', async ({
   page,
 }) => {
-  const spaceId = await seedTalk(page);
+  const spaceId = await seedPresented(page);
   const notes = await openNotesWindow(page, spaceId);
   await page.goto(presentPath(spaceId, ids.welcome));
   await expect(presentedName(page)).toHaveText('Welcome');
@@ -260,7 +260,7 @@ test(
   'N shows the notes under the Stage to rehearse on one screen, and they start hidden every time',
   { tag: '@parity:stage-shows-rehearsal-notes-under-the-chrome' },
   async ({ page }) => {
-    const spaceId = await seedTalk(page);
+    const spaceId = await seedPresented(page);
     await page.goto(presentPath(spaceId, ids.welcome));
     await expect(presentedName(page)).toHaveText('Welcome');
     const rehearsal = stage(page).getByRole('region', { name: 'Rehearsal notes' });
@@ -296,10 +296,10 @@ test(
   },
 );
 
-test('browser Back mid-talk keeps the rehearsal notes shown and the Notes window following', async ({
+test('browser Back mid-presentation keeps the rehearsal notes shown and the Notes window following', async ({
   page,
 }) => {
-  const spaceId = await seedTalk(page);
+  const spaceId = await seedPresented(page);
   await page.goto(presentPath(spaceId, ids.welcome));
   await expect(presentedName(page)).toHaveText('Welcome');
   const notes = await openNotesWindow(page, spaceId);
@@ -313,7 +313,7 @@ test('browser Back mid-talk keeps the rehearsal notes shown and the Notes window
   await expect(rehearsalNames).toHaveText(['Backup video']);
   await expect(presenting(notes, 'Demo')).toBeVisible();
 
-  // Back reopens the talk at the Resource before, which is the same presentation.
+  // Back reopens the presentation at the Resource before, which is the same presentation.
   await page.goBack();
   await expect(presentedName(page)).toHaveText('Welcome');
   await expect(rehearsalNames).toHaveText(['Open with the outage', 'Thank the team']);

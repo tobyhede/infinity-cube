@@ -5,7 +5,7 @@ An **Aggregate directory** is the on-disk form of everything InfinityCube holds:
 The directory is plain files meant for git: JSON in a fixed key order, one JSON Resource file per Resource, and assets (a Markdown Resource's text, a picture) named by their content. Exporting the same content twice writes the same bytes, so a diff shows only what changed.
 
 ```
-my-talk/
+my-space/
   aggregate.json                                 { "version": 1, "metaSpaceId": "2b1c9a40-…" }
   2b1c9a40-0f0e-4c55-9d3a-6f1d2e3a4b5c/          the Meta Space
     space.json
@@ -55,7 +55,7 @@ A child directory without a `space.json` is not a Space and is left alone.
   "maps": [
     {
       "id": "b0000000-0000-4000-8000-000000000001",
-      "title": "Talk",
+      "title": "Space",
       "kind": "positioned",
       "positions": {
         "a0000000-0000-4000-8000-000000000001": {
@@ -148,7 +148,7 @@ The bytes of every stored asset the aggregate's Resources reference ([Storage: F
 
   ```sh
   hash=$(openssl dgst -sha256 -binary picture.png | base64 | tr '+/' '-_' | tr -d '=')
-  cp picture.png "my-talk/assets/$hash.png"   # then use  url: /assets/<hash>  in the Resource
+  cp picture.png "my-space/assets/$hash.png"   # then use  url: /assets/<hash>  in the Resource
   ```
 
   A Markdown Resource's text is added the same way, as `assets/<hash>.md`; through `pnpm cube mcp`, its `write_asset` tool names the bytes and answers the URL.
@@ -209,13 +209,13 @@ Standard output carries the protocol alone, so start it with pnpm's `--silent`, 
   "mcpServers": {
     "infinity-cube": {
       "command": "sh",
-      "args": ["-c", "cd /path/to/infinity-cube && exec pnpm --silent cube mcp /path/to/talk"]
+      "args": ["-c", "cd /path/to/infinity-cube && exec pnpm --silent cube mcp /path/to/space"]
     }
   }
 }
 ```
 
-The server edits files, as an author does: a run serving the same directory writes over what it writes, so stop the run first, and a running talk sees the edits only when it is started again.
+The server edits files, as an author does: a run serving the same directory writes over what it writes, so stop the run first, and a running Space sees the edits only when it is started again.
 
 ## Durable URLs and HTTP resources
 

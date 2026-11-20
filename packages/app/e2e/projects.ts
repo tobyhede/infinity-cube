@@ -71,5 +71,5 @@ export const MOUNT_E2E_PORT = 5282;
  * opening `/` proves the default is pinned to a commit. `test/fake-github.ts`
  * resolves it, and `mount.spec.ts` serves that answer.
  */
-export const MOUNT_DEFAULT_SOURCE = 'github:tobyhede/talks@main';
+export const MOUNT_DEFAULT_SOURCE = 'github:tobyhede/spaces@main';
 import path from 'node:path';

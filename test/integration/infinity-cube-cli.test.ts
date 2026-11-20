@@ -176,7 +176,7 @@ describe('infinity-cube CLI', () => {
     const directory = await makeAggregateDirectory(IMPORTED_SPACE_ID, [
       {
         id: IMPORTED_SPACE_ID,
-        document: { version: 1, title: 'CLI imported talk' },
+        document: { version: 1, title: 'CLI imported space' },
         resources: [],
       },
     ]);
@@ -199,7 +199,7 @@ describe('infinity-cube CLI', () => {
     expect(stored?.revision).toBe(0n);
     expect(stored?.snapshot.document).toEqual({
       version: 1,
-      title: 'CLI imported talk',
+      title: 'CLI imported space',
     });
     expect(stored?.snapshot.resources.map(({ id }) => id)).toEqual([OPENING_ID]);
     expect(stored?.snapshot.resources[0]?.document).toEqual({
@@ -254,7 +254,7 @@ describe('infinity-cube CLI', () => {
       spaces: [
         {
           id: UNRELATED_SPACE_ID,
-          document: { version: 1, title: 'Unrelated talk' },
+          document: { version: 1, title: 'Unrelated space' },
           resources: [],
         },
       ],
@@ -262,7 +262,7 @@ describe('infinity-cube CLI', () => {
     const directory = await makeAggregateDirectory(REFUSED_IMPORT_SPACE_ID, [
       {
         id: REFUSED_IMPORT_SPACE_ID,
-        document: { version: 1, title: 'Fresh imported talk' },
+        document: { version: 1, title: 'Fresh imported space' },
         resources: [],
       },
     ]);
@@ -279,7 +279,7 @@ describe('infinity-cube CLI', () => {
       `The repository is already initialized as Meta Space ${UNRELATED_SPACE_ID}. Re-run with --dangerous-replace to replace it.\n`,
     );
     await expect(repository.listSpaces()).resolves.toEqual([
-      { id: UNRELATED_SPACE_ID, title: 'Unrelated talk' },
+      { id: UNRELATED_SPACE_ID, title: 'Unrelated space' },
     ]);
     await expect(repository.loadSpace(REFUSED_IMPORT_SPACE_ID)).resolves.toBeUndefined();
     await expect(repository.loadAggregate()).resolves.toMatchObject({
@@ -291,7 +291,7 @@ describe('infinity-cube CLI', () => {
   it('exports through the real command and records the projected PostgreSQL revision', async () => {
     const snapshot: SpaceSnapshot = {
       id: IMPORTED_SPACE_ID,
-      document: { version: 1, title: 'CLI exported talk' },
+      document: { version: 1, title: 'CLI exported space' },
       resources: [
         {
           id: EXPORTED_RESOURCE_ID,
@@ -423,7 +423,7 @@ describe('infinity-cube CLI', () => {
     const directory = await makeAggregateDirectory(MALFORMED_SPACE_ID, [
       {
         id: MALFORMED_SPACE_ID,
-        document: { version: 1, title: 'CLI imported talk' },
+        document: { version: 1, title: 'CLI imported space' },
         resources: [],
       },
     ]);

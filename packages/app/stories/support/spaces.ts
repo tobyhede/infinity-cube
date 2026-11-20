@@ -374,7 +374,7 @@ export const storyGraphIds = (): (() => GraphId) => {
  * first it owns. A story therefore calls `present()` and nothing else to be
  * presenting the Graph it is about.
  *
- * The titles are a talk's, not `Resource N`: what the chrome draws is a choice
+ * The titles are a presentation's, not `Resource N`: what the chrome draws is a choice
  * between destinations, and the design pass this catalogue exists for cannot
  * judge a row of choices whose labels are all the same length.
  */
@@ -1139,13 +1139,13 @@ export const stageSnapshot: SpaceSnapshot = {
     maps: [
       {
         id: STAGE_MAP,
-        title: 'Talk',
+        title: 'Demo',
         kind: 'positioned',
         positions: traversalPositions(Object.values(stageIds)),
         graphs: [
           {
             id: stageId(1),
-            title: 'Talk',
+            title: 'Demo',
             edges: [
               { from: stageIds.longRead, to: stageIds.picture },
               { from: stageIds.picture, to: stageIds.titleSlide },
@@ -1182,10 +1182,10 @@ export const stageSpace: Space = loaded(loadSpaceSnapshot(stageSnapshot));
 const notesId = (n: number): UUID =>
   uuidSchema.parse(`00000000-0000-4000-8000-0000000009${n.toString(16).padStart(2, '0')}`);
 
-/** The Resources of the talk the Notes window stories follow, and of its notes. */
+/** The Resources of the presentation the Notes window stories follow, and of its notes. */
 export const notesIds = {
   map: notesId(0),
-  talk: notesId(1),
+  presentedGraph: notesId(1),
   notes: notesId(2),
   welcome: notesId(0x10),
   demo: notesId(0x11),
@@ -1200,7 +1200,7 @@ const markdownResource = (id: UUID, title: string, text: string) =>
   ({ id, document: { title, kind: 'markdown', content: { url: storyText(text) } } }) as const;
 
 /**
- * A talk that forks after its welcome and rejoins for questions, with a
+ * A presentation that forks after its welcome and rejoins for questions, with a
  * Presentation Notes Graph naming it (ADR 0129): two notes for the welcome,
  * placed one above the other, one for the demo, and none for the rest.
  */
@@ -1226,8 +1226,8 @@ export const notesSnapshot: SpaceSnapshot = {
         },
         graphs: [
           {
-            id: notesIds.talk,
-            title: 'Launch talk',
+            id: notesIds.presentedGraph,
+            title: 'Launch demo',
             edges: [
               { from: notesIds.welcome, to: notesIds.demo },
               { from: notesIds.welcome, to: notesIds.architecture },
@@ -1237,7 +1237,7 @@ export const notesSnapshot: SpaceSnapshot = {
           },
           {
             id: notesIds.notes,
-            title: 'Launch talk Presentation Notes',
+            title: 'Launch demo Presentation Notes',
             edges: [
               { from: notesIds.welcome, to: notesIds.thanks },
               { from: notesIds.welcome, to: notesIds.outage },

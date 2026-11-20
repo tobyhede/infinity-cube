@@ -140,6 +140,6 @@ export type {
 
 export { outgoingEdges, graphStartResource } from './traversal';
 
-// The Presentation Notes Graph a talk finds by title, and the notes it holds (ADR 0129).
+// The Presentation Notes Graph a presentation finds by title, and the notes it holds (ADR 0129).
 export { presentationNotes } from './presentation-notes';
 export type { PresentationNotes } from './presentation-notes';

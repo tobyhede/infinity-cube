@@ -155,15 +155,15 @@ describe('readGitHubAggregate', () => {
   });
 
   describe('in a repository holding more than the selected aggregate', () => {
-    const SELECTED = 'talks/pgdu';
+    const SELECTED = 'spaces/pgdu';
     const space = '00000000-0000-4000-8000-000000000040';
     const repository = new Map([
-      ['README.md', text('# Talks')],
+      ['README.md', text('# Spaces')],
       ['package.json', text('{}')],
       ['docs/notes.md', text('notes')],
-      ['talks/README.md', text('# The talks')],
+      ['spaces/README.md', text('# The spaces')],
       // A second, independent aggregate beside the selected one.
-      ...under('talks/other', fixtureFiles),
+      ...under('spaces/other', fixtureFiles),
       ...under(SELECTED, fixtureFiles),
       // Unrelated files inside the selected directory, none of which Importing reads.
       [`${SELECTED}/README.md`, text('# PG Down Under')],
@@ -250,9 +250,9 @@ describe('readGitHubAggregate', () => {
 
     it.each([
       ['the repository root, whose descendants hold one', ''],
-      ['a parent of the aggregate', '/talks'],
-      ['a directory that is not there', '/talks/missing'],
-      ['a directory whose parent is not there', '/talks/missing/deeper'],
+      ['a parent of the aggregate', '/spaces'],
+      ['a directory that is not there', '/spaces/missing'],
+      ['a directory whose parent is not there', '/spaces/missing/deeper'],
       ['a directory inside a file', `/${SELECTED}/aggregate.json/deeper`],
       ['a file rather than a directory', `/${SELECTED}/aggregate.json`],
     ])(
@@ -629,21 +629,21 @@ describe('readGitHubAggregate', () => {
   it('does not fetch a file listed over 25 MiB, reporting its size, and fetches the rest', async () => {
     const size = 25 * 1024 * 1024 + 1;
     const github = fakeGitHub({
-      files: under('talks/pgdu', fixtureFiles),
-      listedSizes: new Map([[`talks/pgdu/${RESOURCE_FILE}`, size]]),
+      files: under('spaces/pgdu', fixtureFiles),
+      listedSizes: new Map([[`spaces/pgdu/${RESOURCE_FILE}`, size]]),
     });
 
     const result = await readGitHubAggregate(
-      `github:${OWNER}/${REPO}@main/talks/pgdu`,
+      `github:${OWNER}/${REPO}@main/spaces/pgdu`,
       github.fetch,
     );
 
     expect((await refusalOf(result)).diagnostics).toEqual([
-      `${PINNED}/talks/pgdu/${RESOURCE_FILE}: ${size} bytes, over the 25 MiB a mounted file may be, so it is not fetched`,
+      `${PINNED}/spaces/pgdu/${RESOURCE_FILE}: ${size} bytes, over the 25 MiB a mounted file may be, so it is not fetched`,
     ]);
     expect(github.rawRequests()).toEqual(
-      sorted(under('talks/pgdu', fixtureFiles).keys()).filter(
-        (path) => path !== `talks/pgdu/${RESOURCE_FILE}`,
+      sorted(under('spaces/pgdu', fixtureFiles).keys()).filter(
+        (path) => path !== `spaces/pgdu/${RESOURCE_FILE}`,
       ),
     );
   });

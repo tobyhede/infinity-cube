@@ -2,7 +2,7 @@
 // by Workers static assets, with no Worker script. Workers Builds runs
 // `pnpm build:mount` as its build command; the build variable
 // VITE_DEFAULT_SPACE_SOURCE names the GitHub location the bare domain opens.
-// How to deploy, and point a domain at a talk: docs/deploy-cloudflare.md.
+// How to deploy, and point a domain at an Aggregate: docs/deploy-cloudflare.md.
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "hyper",

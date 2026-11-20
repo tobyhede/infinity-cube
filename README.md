@@ -1,6 +1,6 @@
 # InfinityCube
 
-InfinityCube is for technical talks and designs whose ideas connect as a graph rather than a single line. You write **Resources** (Markdown, pictures, or whole nested Spaces), place them on a **Map**, and connect them with **Graphs**: named, coloured, directed paths through the same Resources. [React Flow](https://reactflow.dev) draws every Graph at once, each in its own colour, at the positions you chose.
+InfinityCube is for technical ideas that connect as a graph rather than a single line. You write **Resources** (Markdown, pictures, or whole nested Spaces), place them on a **Map**, and connect them with **Graphs**: named, coloured, directed paths through the same Resources. [React Flow](https://reactflow.dev) draws every Graph at once, each in its own colour, at the positions you chose.
 
 **Presenting is traversing a Graph on its own Stage** ([Navigation requirements](docs/requirements/navigation.md)). Present takes the browser fullscreen where it can and draws the Graph's first Resource on a full-window Stage, one 16:9 frame letterboxed over the canvas, which stays behind it untouched ([Navigation requirements](docs/requirements/navigation.md)). Arrow keys follow the Graph's Edges: Right follows the selected one, Left goes back along the path taken, Up and Down choose at a fork. Leaving presenting shows the canvas exactly as it was.
 
@@ -14,14 +14,14 @@ You need Node ≥ 26.8.1 and pnpm 9. Node no longer bundles corepack, so install
 git clone https://github.com/tobyhede/infinity-cube.git
 cd infinity-cube
 pnpm install
-git init ~/talks/rust-async
-pnpm cube init ~/talks/rust-async
-git -C ~/talks/rust-async add -A
-git -C ~/talks/rust-async commit -m "New talk"
-pnpm cube run ~/talks/rust-async
+git init ~/spaces/rust-async
+pnpm cube init ~/spaces/rust-async
+git -C ~/spaces/rust-async add -A
+git -C ~/spaces/rust-async commit -m "New Space"
+pnpm cube run ~/spaces/rust-async
 ```
 
-`init` writes a new aggregate to `~/talks/rust-async`, which must be empty apart from dot-entries such as `.git`, and prints the command that runs it. Committing what it wrote before the first run gives git a revision to restore. `run` prints the address it serves (`http://localhost:4173/` unless that port is taken) and opens it in your browser.
+`init` writes a new aggregate to `~/spaces/rust-async`, which must be empty apart from dot-entries such as `.git`, and prints the command that runs it. Committing what it wrote before the first run gives git a revision to restore. `run` prints the address it serves (`http://localhost:4173/` unless that port is taken) and opens it in your browser.
 
 1. Edit. Pick a Graph in the Command Dock, the toolbar floating over the canvas; every Graph stays drawn, and the one you pick is emphasised. Select a Resource to reveal its toolbar, and use Edit to write its Title and Markdown. Drag a Resource to move it. Drag from one of a Resource's four handles to another Resource to add an Edge to the active Graph; hold Option (macOS) or Alt and drop on empty canvas to create a new Resource and connect it in one go.
 2. Press **Present** to traverse the Graph: `→` follows an Edge, `←` goes back, `↑` / `↓` choose at a fork, `Esc` returns to the Map.
@@ -29,7 +29,7 @@ pnpm cube run ~/talks/rust-async
 4. Commit your work in the directory's own repository:
 
    ```sh
-   cd ~/talks/rust-async
+   cd ~/spaces/rust-async
    git add -A
    git commit -m "First draft"
    ```
@@ -51,7 +51,7 @@ Run `pnpm cube run` from the InfinityCube clone every time, pointing at whicheve
 - **Ports and the browser.** InfinityCube serves on port 4173, or the next free port if that one is taken. `--port <port>` picks the port and fails if it is taken. `--no-open` leaves the browser alone, for running InfinityCube headless or from an agent:
 
   ```sh
-  pnpm cube run ~/talks/rust-async --port 4200 --no-open
+  pnpm cube run ~/spaces/rust-async --port 4200 --no-open
   ```
 
 The file format, including what InfinityCube keeps and removes when it writes, is described in [`docs/aggregate-directory.md`](docs/aggregate-directory.md).
@@ -67,7 +67,7 @@ The other two, `shadcn-first-ui` and `shadcn`, are for developing InfinityCube's
 
 ### Installing the skills elsewhere
 
-A clone of this repository already has the skills. To use them from another directory, such as a talk's own repository, install the plugin from this repository's marketplace, `infinity-cube`. Both products install at user scope, so the skills are available in every project, and cache the plugin by version, so a change reaches installed copies only when the version in all three of `plugins/infinity-cube/plugin.json`, `plugins/infinity-cube/.claude-plugin/plugin.json` and `plugins/infinity-cube/.codex-plugin/plugin.json` is bumped (`test/unit/skills-marketplace.test.ts` holds them equal).
+A clone of this repository already has the skills. To use them from another directory, such as a Space's own repository, install the plugin from this repository's marketplace, `infinity-cube`. Both products install at user scope, so the skills are available in every project, and cache the plugin by version, so a change reaches installed copies only when the version in all three of `plugins/infinity-cube/plugin.json`, `plugins/infinity-cube/.claude-plugin/plugin.json` and `plugins/infinity-cube/.codex-plugin/plugin.json` is bumped (`test/unit/skills-marketplace.test.ts` holds them equal).
 
 Claude Code:
 

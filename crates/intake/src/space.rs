@@ -100,7 +100,7 @@ impl Space {
 ///
 /// let id = SpaceId::parse("10000000-0000-4000-8000-000000000001").unwrap();
 /// let snapshot = json::parse(&format!(
-///     r#"{{"id": "{id}", "document": {{"version": 1, "title": "Talk", "maps": [
+///     r#"{{"id": "{id}", "document": {{"version": 1, "title": "Space", "maps": [
 ///         {{"id": "00000000-0000-4000-8000-000000000a01", "title": "Working", "kind": "positioned",
 ///           "positions": {{"00000000-0000-4000-8000-000000000101": {{"x": 0, "y": 0}}}},
 ///           "graphs": [{{"id": "00000000-0000-4000-8000-000000000b01", "title": "Main", "edges": []}}]}}

@@ -53,7 +53,7 @@ const refuse = async (message: string): Promise<never> => {
  */
 const describeRefusal = (refusal: RunRefusal, directory: string): string => {
   if (refusal.kind === 'empty')
-    return `${directory} holds no talk: the folder is missing or empty. Choose a folder that holds an InfinityCube talk.\n`;
+    return `${directory} holds no Space: the folder is missing or empty. Choose a folder that holds an InfinityCube Space.\n`;
   if (refusal.kind === 'locked')
     return `${directory} is open in another InfinityCube window or run: close it there first.\n`;
   return describeRunRefusal(refusal, directory);

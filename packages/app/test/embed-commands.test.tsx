@@ -284,15 +284,15 @@ const containing: SpaceSnapshot = {
   id: SPACE_ID,
   document: {
     version: 1,
-    title: 'Talk',
+    title: 'Space',
     defaultMap: OTHER_MAP_ID,
     maps: [
       {
         id: OTHER_MAP_ID,
-        title: 'Talk Map',
+        title: 'Space Map',
         kind: 'positioned',
         positions: {},
-        graphs: [{ id: OTHER_GRAPH_ID, title: 'Talk Graph', edges: [] }],
+        graphs: [{ id: OTHER_GRAPH_ID, title: 'Space Graph', edges: [] }],
       },
     ],
   },

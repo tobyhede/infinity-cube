@@ -27,7 +27,7 @@
 //! # async fn example() -> Result<(), host::ImportError> {
 //! let shell = Shell::new("<!doctype html>", BTreeMap::new());
 //! let run = Run::builder()
-//!     .directory("talk")
+//!     .directory("space")
 //!     .ids(RandomIds)
 //!     .clock(TokioClock)
 //!     .start(shell)
@@ -48,7 +48,7 @@
 //! # async fn example() {
 //! let shell = host::Shell::new("<!doctype html>", BTreeMap::new());
 //! let _ = host::Run::builder()
-//!     .directory("talk")
+//!     .directory("space")
 //!     .ids(host::RandomIds)
 //!     .start(shell)
 //!     .await;

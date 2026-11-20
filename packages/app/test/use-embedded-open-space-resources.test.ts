@@ -298,15 +298,15 @@ describe('useEmbeddedOpenSpaceResources', () => {
       id: HOST,
       document: {
         version: 1,
-        title: 'Talk',
+        title: 'Space',
         defaultMap: HOST_MAP,
         maps: [
           {
             id: HOST_MAP,
-            title: 'Talk Map',
+            title: 'Space Map',
             kind: 'positioned',
             positions: {},
-            graphs: [{ id: HOST_GRAPH, title: 'Talk Graph', edges: [] }],
+            graphs: [{ id: HOST_GRAPH, title: 'Space Graph', edges: [] }],
           },
         ],
       },
@@ -373,15 +373,15 @@ describe('useEmbeddedOpenSpaceResources', () => {
       id: HOST,
       document: {
         version: 1,
-        title: 'Talk',
+        title: 'Space',
         defaultMap: HOST_MAP,
         maps: [
           {
             id: HOST_MAP,
-            title: 'Talk Map',
+            title: 'Space Map',
             kind: 'positioned',
             positions: {},
-            graphs: [{ id: HOST_GRAPH, title: 'Talk Graph', edges: [] }],
+            graphs: [{ id: HOST_GRAPH, title: 'Space Graph', edges: [] }],
           },
         ],
       },

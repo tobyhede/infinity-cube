@@ -32,7 +32,7 @@ const uuid = (n: number): UUID =>
 
 const SPACE_ID = uuid(1);
 const MAP_ID = uuid(2);
-const TALK = uuid(3);
+const PRESENTED = uuid(3);
 const ENCORE = uuid(4);
 const OPENING = uuid(10);
 const LEFT = uuid(11);
@@ -42,7 +42,7 @@ const FIRST_PRESENTATION = uuid(100);
 const SECOND_PRESENTATION = uuid(101);
 const THIRD_PRESENTATION = uuid(102);
 
-/** A talk that forks after its opening and rejoins at its close. */
+/** A presentation that forks after its opening and rejoins at its close. */
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: {
@@ -61,8 +61,8 @@ const snapshot: SpaceSnapshot = {
         },
         graphs: [
           {
-            id: TALK,
-            title: 'Talk',
+            id: PRESENTED,
+            title: 'Demo',
             edges: [
               { from: OPENING, to: LEFT },
               { from: OPENING, to: RIGHT },
@@ -279,7 +279,7 @@ describe('the presentation link', () => {
     stage.navigation.advance();
 
     time = 2_000;
-    stage.navigation.openPresentation(MAP_ID, TALK, OPENING);
+    stage.navigation.openPresentation(MAP_ID, PRESENTED, OPENING);
 
     const state = follower.getState();
     expect(state.kind === 'presenting' && state.snapshot.resourceId).toBe(OPENING);
@@ -506,8 +506,8 @@ function namedChannels() {
 }
 
 describe('mounted revisions of one Space on one origin', () => {
-  const FIRST = `github:tobyhede/talk@${'a'.repeat(40)}`;
-  const SECOND = `github:tobyhede/talk@${'b'.repeat(40)}`;
+  const FIRST = `github:tobyhede/space@${'a'.repeat(40)}`;
+  const SECOND = `github:tobyhede/space@${'b'.repeat(40)}`;
 
   /** One window's end of the Space's channel, on an origin whose channels `openChannel` joins. */
   const windowOn = (openChannel: (name: string) => NativeBroadcastChannel, scope: string) =>

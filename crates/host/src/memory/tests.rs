@@ -35,7 +35,7 @@ mod given_an_empty_store {
     fn initializes_every_space_at_revision_zero() {
         run(async {
             let store = MemorySpaceRepository::new();
-            let result = store.initialize_aggregate(input("Talk")).await.unwrap();
+            let result = store.initialize_aggregate(input("Space")).await.unwrap();
             assert!(
                 matches!(result, InitializeResult::Initialized(_)),
                 "got {result:?}"
@@ -51,7 +51,7 @@ mod given_an_empty_store {
     fn will_not_replace_what_is_not_there() {
         run(async {
             let store = MemorySpaceRepository::new();
-            let result = store.replace_aggregate(input("Talk"), None).await.unwrap();
+            let result = store.replace_aggregate(input("Space"), None).await.unwrap();
             assert_eq!(
                 result,
                 ReplaceResult::Uninitialized,
@@ -66,7 +66,7 @@ mod given_an_initialized_store {
 
     async fn store() -> MemorySpaceRepository {
         let store = MemorySpaceRepository::new();
-        store.initialize_aggregate(input("Talk")).await.unwrap();
+        store.initialize_aggregate(input("Space")).await.unwrap();
         store
     }
 
@@ -74,7 +74,7 @@ mod given_an_initialized_store {
     fn answers_existing_for_the_same_aggregate_and_keeps_another() {
         run(async {
             let store = store().await;
-            let same = store.initialize_aggregate(input("Talk")).await.unwrap();
+            let same = store.initialize_aggregate(input("Space")).await.unwrap();
             assert!(
                 matches!(same, InitializeResult::Existing(_)),
                 "got {same:?}"
@@ -149,7 +149,7 @@ mod given_a_commit_that_deletes_a_space {
         snapshot(
             META,
             &format!(
-                r#"{{"id":"{META}","document":{{"version":1,"title":"Talk"}},"resources":[{{"id":"00000000-0000-4000-8000-000000000101","document":{{"title":"Child","kind":"space","content":{{"spaceId":"{CHILD}","map":"00000000-0000-4000-8000-0000000000a1","graph":"00000000-0000-4000-8000-0000000000b1"}}}}}}]}}"#
+                r#"{{"id":"{META}","document":{{"version":1,"title":"Space"}},"resources":[{{"id":"00000000-0000-4000-8000-000000000101","document":{{"title":"Child","kind":"space","content":{{"spaceId":"{CHILD}","map":"00000000-0000-4000-8000-0000000000a1","graph":"00000000-0000-4000-8000-0000000000b1"}}}}}}]}}"#
             ),
         )
     }
@@ -174,7 +174,7 @@ mod given_a_commit_that_deletes_a_space {
                         },
                         SpaceChange::Update {
                             space_id: SpaceId::parse(META).unwrap(),
-                            snapshot: meta("Talk"),
+                            snapshot: meta("Space"),
                             expected_revision: Revision::FIRST,
                         },
                     ],

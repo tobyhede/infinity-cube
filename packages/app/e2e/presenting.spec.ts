@@ -295,7 +295,7 @@ test('a Reference Resource shows its own name over its Target’s content', asyn
 
 /**
  * A Space Resource draws the Map it selects on the Stage, whole and taking no
- * pointer, so a talk can present a diagram kept in a Space of its own.
+ * pointer, so a presentation can present a diagram kept in a Space of its own.
  */
 test('a Space Resource shows the Map it selects', async ({ page }) => {
   await page.goto('/');

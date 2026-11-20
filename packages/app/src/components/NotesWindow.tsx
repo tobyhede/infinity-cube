@@ -47,8 +47,8 @@ export function NotesWindow({
   return (
     <main className="notes-window" aria-label="Notes window">
       <header className="notes-window__header">
-        <h1 className="notes-window__talk">
-          {state.kind === 'presenting' ? titleName(state.view.talk) : 'Notes'}
+        <h1 className="notes-window__presented">
+          {state.kind === 'presenting' ? titleName(state.view.presentedGraph) : 'Notes'}
         </h1>
         {state.kind === 'presenting' ? (
           <div className="notes-window__timer">
@@ -104,7 +104,7 @@ function Presenting({ view, onAdvance, onRetreat, onSelectBranch }: PresentingPr
       <Separator />
       <section className="notes-window__section" aria-label="Moves">
         {view.moves.length === 0 ? (
-          <p className="notes-window__quiet">This is the end of the talk.</p>
+          <p className="notes-window__quiet">This is the end of the presentation.</p>
         ) : (
           <ul className="notes-window__moves">
             {view.moves.map((move, index) => (

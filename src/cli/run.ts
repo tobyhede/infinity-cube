@@ -76,7 +76,7 @@ const check = async (
 /**
  * Serve an existing directory, empty or not, since the client may write an
  * aggregate into it; a missing one is refused, so a mistyped path is not
- * written as a new talk (ADR 0124).
+ * written as a new Space (ADR 0124).
  */
 const mcp = async (
   directory: string,

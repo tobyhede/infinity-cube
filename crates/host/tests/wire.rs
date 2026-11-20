@@ -403,7 +403,7 @@ mod given_a_change_from_another_site {
             "/assets",
             &[
                 ("content-type", "text/plain"),
-                ("origin", "infinitycube://talk"),
+                ("origin", "infinitycube://space"),
             ],
             fresh("no host"),
         )

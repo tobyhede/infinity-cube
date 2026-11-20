@@ -1,4 +1,4 @@
-//! Telling the presenter when a talk's edits stop reaching its folder, and
+//! Telling the presenter when an Aggregate's edits stop reaching its folder, and
 //! when they reach it again (Storage ST-121).
 //!
 //! A run tries a failed write again once edits are quiet, so a failure can
@@ -20,7 +20,7 @@ pub enum SaveNotice {
 }
 
 impl SaveNotice {
-    /// The notice in the presenter's words, naming the talk's folder.
+    /// The notice in the presenter's words, naming the Aggregate's folder.
     #[must_use]
     pub fn message(&self, directory: &Path) -> String {
         let shown = directory.display();
@@ -99,15 +99,15 @@ mod tests {
 
     #[test]
     fn names_the_folder_and_the_reason() {
-        let folder = Path::new("/talks/demo");
+        let folder = Path::new("/spaces/demo");
         let failing = SaveNotice::Failing("disk full".to_owned()).message(folder);
         assert!(
-            failing.contains("/talks/demo") && failing.contains("disk full"),
+            failing.contains("/spaces/demo") && failing.contains("disk full"),
             "{failing}"
         );
         assert_eq!(
             SaveNotice::Recovered.message(folder),
-            "Edits to /talks/demo are saved again.",
+            "Edits to /spaces/demo are saved again.",
             "recovered"
         );
     }

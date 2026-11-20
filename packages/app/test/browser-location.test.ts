@@ -565,7 +565,7 @@ describe('the browser location', () => {
 const COMMIT = 'a'.repeat(40);
 const LATER_COMMIT = 'b'.repeat(40);
 /** A complete resolved GitHub location, as a successful mount writes it. */
-const SOURCE = `github:tobyhede/talk@${COMMIT}/slides`;
+const SOURCE = `github:tobyhede/space@${COMMIT}/slides`;
 const OTHER_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000010');
 const ENTERED_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000011');
 const ENTERED_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000012');
@@ -778,11 +778,11 @@ describe('the mounted source in the address', () => {
   });
 });
 
-const resolved = (sha: string) => ({ owner: 'tobyhede', repo: 'talk', sha, path: 'slides' });
+const resolved = (sha: string) => ({ owner: 'tobyhede', repo: 'space', sha, path: 'slides' });
 
 describe('pinning the mounted source', () => {
   it('replaces a branch location with its commit exactly once', () => {
-    const history = recordingHistory(sourced(mapPath(MAP_ID), 'github:tobyhede/talk@main/slides'));
+    const history = recordingHistory(sourced(mapPath(MAP_ID), 'github:tobyhede/space@main/slides'));
 
     pinSource(history, resolved(COMMIT));
     pinSource(history, resolved(COMMIT));
@@ -792,7 +792,7 @@ describe('pinning the mounted source', () => {
 
   it('keeps the rest of the query as it pins, but not the hash', () => {
     const history = recordingHistory(
-      `${mapPath(MAP_ID)}?utm=feed&source=github:tobyhede/talk@main/slides#notes`,
+      `${mapPath(MAP_ID)}?utm=feed&source=github:tobyhede/space@main/slides#notes`,
     );
 
     pinSource(history, resolved(COMMIT));
@@ -828,7 +828,7 @@ describe('pinning the mounted source', () => {
 
   it('replaces a source that names another commit', () => {
     const history = recordingHistory(
-      sourced(mapPath(MAP_ID), `github:tobyhede/talk@${LATER_COMMIT}/slides`),
+      sourced(mapPath(MAP_ID), `github:tobyhede/space@${LATER_COMMIT}/slides`),
     );
 
     pinSource(history, resolved(COMMIT));

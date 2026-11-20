@@ -27,7 +27,7 @@ const directoryError = async (source: AggregateSource): Promise<AggregateDirecto
 describe('the directory reader locating its own faults', () => {
   it('names the Aggregate directory itself as . when it cannot be listed', async () => {
     const source: AggregateSource = {
-      name: '/talk',
+      name: '/space',
       concurrency: 1,
       list: () => Promise.resolve({ ok: false, reason: 'EACCES: permission denied' }),
       read: () => Promise.resolve({ ok: false, reason: 'never read' }),
@@ -40,7 +40,7 @@ describe('the directory reader locating its own faults', () => {
   });
 
   it('locates an aggregate.json that is not an object at the file, with no field', async () => {
-    const source = mapSource('/talk', new Map([['aggregate.json', encode('[]')]]));
+    const source = mapSource('/space', new Map([['aggregate.json', encode('[]')]]));
 
     const error = await directoryError(source);
 
@@ -50,7 +50,7 @@ describe('the directory reader locating its own faults', () => {
   it('passes on, unchanged, an error identifying a Space raises that is not a refusal', async () => {
     const minting = new Error('the id generator failed');
     const source = mapSource(
-      '/talk',
+      '/space',
       new Map([
         ['aggregate.json', encode(JSON.stringify({ version: 1, metaSpaceId: META }))],
         [
@@ -58,7 +58,7 @@ describe('the directory reader locating its own faults', () => {
           encode(
             JSON.stringify({
               version: 1,
-              title: 'Talk',
+              title: 'Space',
               maps: [
                 {
                   title: 'Working',
@@ -82,7 +82,7 @@ describe('the directory reader locating its own faults', () => {
 
   it('locates a symbolic link at a path it owns at the link', async () => {
     const source = mapSource(
-      '/talk',
+      '/space',
       new Map([['aggregate.json', encode(JSON.stringify({ version: 1, metaSpaceId: META }))]]),
       [`${META}/space.json`],
     );
@@ -95,10 +95,10 @@ describe('the directory reader locating its own faults', () => {
   it('locates an asset over its cap at its file in assets/', async () => {
     const name = `${'A'.repeat(43)}.png`;
     const source = mapSource(
-      '/talk',
+      '/space',
       new Map([
         ['aggregate.json', encode(JSON.stringify({ version: 1, metaSpaceId: META }))],
-        [`${META}/space.json`, encode(JSON.stringify({ version: 1, title: 'Talk' }))],
+        [`${META}/space.json`, encode(JSON.stringify({ version: 1, title: 'Space' }))],
         [`assets/${name}`, new Uint8Array(MAX_ASSET_BYTES + 1)],
       ]),
     );
@@ -110,14 +110,14 @@ describe('the directory reader locating its own faults', () => {
 });
 
 describe('parseSingleSpace', () => {
-  /** The refusals `parseSingleSpace` throws for a version 2 space file at `spaceFile`, under `/talk`. */
+  /** The refusals `parseSingleSpace` throws for a version 2 space file at `spaceFile`, under `/space`. */
   const refusalsOfRefusedDocument = (spaceFile: string) => {
     try {
       parseSingleSpace({
         spaceFile,
-        spaceText: JSON.stringify({ version: 2, title: 'Pre-release talk' }),
+        spaceText: JSON.stringify({ version: 2, title: 'Pre-release space' }),
         resources: [],
-        relative: (path) => path.replace('/talk/', ''),
+        relative: (path) => path.replace('/space/', ''),
       });
     } catch (error) {
       if (error instanceof AggregateDirectoryError) return error.refusals;
@@ -127,13 +127,13 @@ describe('parseSingleSpace', () => {
   };
 
   it('names a refused space file by its path relative to the Aggregate directory', () => {
-    expect(refusalsOfRefusedDocument('/talk/deep-dive/space.json')).toEqual([
+    expect(refusalsOfRefusedDocument('/space/deep-dive/space.json')).toEqual([
       { kind: 'unsupported-version', file: 'deep-dive/space.json', field: 'version' },
     ]);
   });
 
   it('names a refused space file at the root of the Aggregate directory as the file alone', () => {
-    expect(refusalsOfRefusedDocument('/talk/space.json')).toEqual([
+    expect(refusalsOfRefusedDocument('/space/space.json')).toEqual([
       { kind: 'unsupported-version', file: 'space.json', field: 'version' },
     ]);
   });

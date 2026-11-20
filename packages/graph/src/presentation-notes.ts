@@ -4,9 +4,9 @@ import { outgoingEdges } from './traversal';
 /**
  * A presentation's notes, found by convention rather than stored (ADR 0129).
  *
- * The **Presentation Notes Graph** is an ordinary Graph on the talk's Map whose
- * title marks it as notes: the talk Graph's title followed by a marker, or a
- * marker alone. Its Edges run from a Resource of the talk to that Resource's
+ * The **Presentation Notes Graph** is an ordinary Graph on the presentation's Map whose
+ * title marks it as notes: the presented Graph's title followed by a marker, or a
+ * marker alone. Its Edges run from a Resource of the presentation to that Resource's
  * notes, which are ordinary Resources of any kind.
  */
 export interface PresentationNotes {
@@ -39,7 +39,7 @@ const words = (title: string): readonly string[] =>
     .filter((word) => word.length > 0);
 
 /**
- * How strongly the words after the talk's title mark a Graph as notes, lower
+ * How strongly the words after the presentation's title mark a Graph as notes, lower
  * winning, or `undefined` for words that are no marker.
  */
 const markerRank = (marker: readonly string[]): number | undefined => {
@@ -53,7 +53,7 @@ const markerRank = (marker: readonly string[]): number | undefined => {
 
 interface Candidate {
   readonly graph: Graph;
-  /** 0 for a title naming the talk, 1 for a bare marker. */
+  /** 0 for a title naming the presented Graph, 1 for a bare marker. */
   readonly naming: number;
   readonly rank: number;
   readonly order: number;
@@ -62,10 +62,14 @@ interface Candidate {
 const startsWith = (title: readonly string[], prefix: readonly string[]): boolean =>
   prefix.length < title.length && prefix.every((word, index) => title[index] === word);
 
-const candidate = (talk: readonly string[], graph: Graph, order: number): Candidate | undefined => {
+const candidate = (
+  presented: readonly string[],
+  graph: Graph,
+  order: number,
+): Candidate | undefined => {
   const title = words(graph.title);
-  if (talk.length > 0 && startsWith(title, talk)) {
-    const rank = markerRank(title.slice(talk.length));
+  if (presented.length > 0 && startsWith(title, presented)) {
+    const rank = markerRank(title.slice(presented.length));
     if (rank !== undefined) return { graph, naming: 0, rank, order };
   }
   const rank = markerRank(title);
@@ -76,23 +80,23 @@ const byStrength = (a: Candidate, b: Candidate): number =>
   a.naming - b.naming || a.rank - b.rank || a.order - b.order;
 
 /**
- * The Presentation Notes Graph for `talk` on the `shown` Map, the Graphs passed over for
+ * The Presentation Notes Graph for `demo` on the `shown` Map, the Graphs passed over for
  * it, and the notes `resourceId` reaches in it.
  *
- * A title naming the talk beats a bare marker; then "Presentation Notes" beats
+ * A title naming the presented Graph beats a bare marker; then "Presentation Notes" beats
  * "Notes", which beats "Presentation" and more; then the Map's Graph order. The
- * talk is never its own notes. Notes are ordered by their placement, top edge
+ * presented Graph is never its own notes. Notes are ordered by their placement, top edge
  * then left edge, and by Edge order where two sit at the same point.
  */
 export function presentationNotes(
   shown: Map,
-  talk: Graph,
+  presented: Graph,
   resourceId: ResourceId,
 ): PresentationNotes {
-  const talkWords = words(talk.title);
+  const presentedWords = words(presented.title);
   const ranked = shown.graphs
     .flatMap((graph, order) =>
-      graph.id === talk.id ? [] : (candidate(talkWords, graph, order) ?? []),
+      graph.id === presented.id ? [] : (candidate(presentedWords, graph, order) ?? []),
     )
     .sort(byStrength);
   const [chosen, ...passed] = ranked;

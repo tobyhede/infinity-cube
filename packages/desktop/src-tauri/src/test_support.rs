@@ -38,7 +38,7 @@ fn copy_tree(from: &Path, to: &Path) {
 /// A fresh copy of `packages/app/fixture` in a directory of its own.
 pub fn fixture_copy() -> (TempDir, PathBuf) {
     let temporary = tempfile::tempdir().unwrap();
-    let directory = temporary.path().join("talk");
+    let directory = temporary.path().join("space");
     copy_tree(&http_conformance::fixture(), &directory);
     (temporary, directory)
 }

@@ -297,7 +297,7 @@ describe('the P shortcut across open Spaces', () => {
     expect(initial.app.navigation.getState().mode).toBe('overview');
   });
 
-  it('does not start the talk again while it is being presented', async () => {
+  it('does not start the presentation again while it is being presented', async () => {
     const { initial } = await openPresentable();
     await pressP();
     expect(initial.app.navigation.getState().mode).toBe('presenting');

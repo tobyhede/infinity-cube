@@ -75,7 +75,7 @@ afterEach(async () => {
 });
 
 const fixtureCopy = async (): Promise<string> => {
-  const directory = join(await temporaryRoot(), 'talk');
+  const directory = join(await temporaryRoot(), 'space');
   await cp(FIXTURE, directory, { recursive: true });
   return directory;
 };
@@ -147,11 +147,11 @@ const writes = (events: readonly RunEvent[]) => events.filter(({ kind }) => kind
 
 /** Each directory `init` and a run both read as empty, made under `root`. */
 const EMPTY_DIRECTORIES = [
-  ['missing', (root: string) => Promise.resolve(join(root, 'new-talk'))],
+  ['missing', (root: string) => Promise.resolve(join(root, 'new-space'))],
   [
     'empty',
     async (root: string) => {
-      const directory = join(root, 'new-talk');
+      const directory = join(root, 'new-space');
       await mkdir(directory);
       return directory;
     },
@@ -159,7 +159,7 @@ const EMPTY_DIRECTORIES = [
   [
     'dot-entries-only',
     async (root: string) => {
-      const directory = join(root, 'new-talk');
+      const directory = join(root, 'new-space');
       await mkdir(join(directory, '.git'), { recursive: true });
       await writeFile(join(directory, '.git', 'HEAD'), 'ref: refs/heads/main\n');
       await writeFile(join(directory, '.DS_Store'), 'finder\n');
@@ -672,7 +672,7 @@ describe('Initializing an Aggregate directory', () => {
    * leaves them as it found them.
    */
   it('keeps the dot-entries of the directory it writes the new aggregate to', async () => {
-    const directory = join(await temporaryRoot(), 'new-talk');
+    const directory = join(await temporaryRoot(), 'new-space');
     await mkdir(join(directory, '.git'), { recursive: true });
     await writeFile(join(directory, '.git', 'HEAD'), 'ref: refs/heads/main\n');
     await writeFile(join(directory, '.DS_Store'), 'finder\n');
