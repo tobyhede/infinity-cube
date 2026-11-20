@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { ESLint } from 'eslint';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
+import { pluginSourceFiles } from '../support/plugin-packages';
 
 /**
  * ADR 0142: a Resource plugin imports no package of ours but the Resource API,
@@ -28,19 +29,8 @@ const restrictedImportsSchema = z.tuple([
   }),
 ]);
 
-const PLUGIN_FILES = [
-  'packages/plugin-ur/src/domain.ts',
-  'packages/plugin-ur/src/view.tsx',
-  'packages/plugin-markdown/src/domain.ts',
-  'packages/plugin-markdown/src/view.tsx',
-  'packages/plugin-mermaid/src/domain.ts',
-  'packages/plugin-mermaid/src/view.tsx',
-  'packages/plugin-mermaid/src/mermaid.ts',
-  'packages/plugin-space/src/domain.ts',
-  'packages/plugin-space/src/view.tsx',
-  'packages/plugin-default/src/domain.ts',
-  'packages/plugin-default/src/view.tsx',
-];
+/** Every source file of every `packages/plugin-*` package, found by walking the directory. */
+const PLUGIN_FILES = pluginSourceFiles();
 
 describe('Resource plugin import restrictions', () => {
   it.each(

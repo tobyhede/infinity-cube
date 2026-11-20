@@ -3,6 +3,7 @@ import { isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import config from '../../packages/app/http-server-build.config';
+import { type AliasEntry, pluginPackages, resolveAlias } from '../support/plugin-packages';
 
 /**
  * The config is loaded by `pnpm --filter @project/app http-server:build`, whose
@@ -13,18 +14,33 @@ import config from '../../packages/app/http-server-build.config';
 describe('http server build config', () => {
   // SAFETY: Vite's `UserConfig` types `resolve`/`build` far more broadly than
   // this one config file actually uses — `http-server-build.config.ts` is a
-  // literal object naming exactly `resolve.alias` (a plain string map) and
-  // `build.ssr`/`build.outDir` (both strings), so narrowing to just what this
-  // file reads doesn't claim anything the config doesn't provide.
+  // literal object naming exactly `resolve.alias` (an array of `{ find,
+  // replacement }` entries) and `build.ssr`/`build.outDir` (both strings), so
+  // narrowing to just what this file reads doesn't claim anything the config
+  // doesn't provide.
   const resolved = config as {
-    resolve?: { alias?: Record<string, string> };
+    resolve?: { alias?: readonly AliasEntry[] };
     build?: { ssr?: string; outDir?: string };
   };
 
+  /*
+   * A pattern entry's replacement names no file until a specifier fills it, so
+   * each is checked through the plugins it resolves: every `packages/plugin-*`
+   * package, found by walking the directory rather than counted here.
+   */
   it('resolves every `@project/*` alias to a real file regardless of cwd', () => {
-    const alias = resolved.resolve?.alias ?? {};
-    expect(Object.keys(alias)).toHaveLength(14);
-    for (const [name, target] of Object.entries(alias)) {
+    const alias = resolved.resolve?.alias ?? [];
+    const targets = [
+      ...alias.flatMap(({ find, replacement }) =>
+        typeof find === 'string' ? [[find, replacement] as const] : [],
+      ),
+      ...pluginPackages().map((name) => {
+        const specifier = `@project/${name}/domain`;
+        return [specifier, resolveAlias(alias, specifier) ?? ''] as const;
+      }),
+    ];
+    expect(targets.length).toBeGreaterThan(pluginPackages().length);
+    for (const [name, target] of targets) {
       expect(isAbsolute(target), `${name} is absolute`).toBe(true);
       expect(existsSync(target), `${name} -> ${target}`).toBe(true);
     }

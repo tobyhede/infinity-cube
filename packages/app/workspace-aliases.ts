@@ -13,25 +13,36 @@ import { fileURLToPath } from 'node:url';
  * anchor on cwd, which is the app package only for the one filtered script that
  * loads the build config.
  */
-export const workspaceAliases = () => {
+/**
+ * A Resource plugin's domain half, by pattern: `@project/plugin-<name>/domain`
+ * names `packages/plugin-<name>/src/domain.ts`, so adding a plugin package
+ * edits nothing here. Anchored at both ends and needing the hyphen, it cannot
+ * match `@project/plugins/domain`. No server build reaches a view half.
+ */
+const PLUGIN_DOMAIN = /^@project\/(plugin-[^/]+)\/domain$/u;
+
+/** One alias entry, in the array form Vite accepts when an entry is a pattern. */
+export interface WorkspaceAlias {
+  readonly find: string | RegExp;
+  readonly replacement: string;
+}
+
+export const workspaceAliases = (): WorkspaceAlias[] => {
   const here = (path: string): string => fileURLToPath(new URL(path, import.meta.url));
-  return {
-    '@project/aggregate': here('../aggregate/src/index.ts'),
-    '@project/core': here('../core/src/index.ts'),
-    '@project/graph': here('../graph/src/index.ts'),
-    '@project/http': here('../http/src/index.ts'),
-    '@project/persistence': here('../persistence/src/index.ts'),
-    '@project/plugins/domain': here('../plugins/src/domain.ts'),
-    '@project/plugin-default/domain': here('../plugin-default/src/domain.ts'),
-    '@project/plugin-image/domain': here('../plugin-image/src/domain.ts'),
-    '@project/plugin-ur/domain': here('../plugin-ur/src/domain.ts'),
-    '@project/plugin-markdown/domain': here('../plugin-markdown/src/domain.ts'),
-    '@project/plugin-mermaid/domain': here('../plugin-mermaid/src/domain.ts'),
-    '@project/plugin-reference/domain': here('../plugin-reference/src/domain.ts'),
-    '@project/plugin-space/domain': here('../plugin-space/src/domain.ts'),
-    '@project/resource-api/domain': here('../resource-api/src/domain/index.ts'),
-  } satisfies Record<string, string>;
+  return [
+    { find: '@project/aggregate', replacement: here('../aggregate/src/index.ts') },
+    { find: '@project/core', replacement: here('../core/src/index.ts') },
+    { find: '@project/graph', replacement: here('../graph/src/index.ts') },
+    { find: '@project/http', replacement: here('../http/src/index.ts') },
+    { find: '@project/persistence', replacement: here('../persistence/src/index.ts') },
+    { find: '@project/plugins/domain', replacement: here('../plugins/src/domain.ts') },
+    { find: PLUGIN_DOMAIN, replacement: here('../$1/src/domain.ts') },
+    {
+      find: '@project/resource-api/domain',
+      replacement: here('../resource-api/src/domain/index.ts'),
+    },
+  ];
 };
 
 /** The same packages, for the SSR build's `noExternal`. */
-export const workspacePackages = Object.keys(workspaceAliases());
+export const workspacePackages: (string | RegExp)[] = workspaceAliases().map(({ find }) => find);

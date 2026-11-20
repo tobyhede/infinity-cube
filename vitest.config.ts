@@ -16,41 +16,63 @@ export default defineConfig({
      * `…/src/index.ts/test-support`, which resolves to nothing. The subpath must
      * come first. Sorting these keys makes every test that imports the subpath
      * fail to collect.
+     *
+     * A Resource plugin is reached by pattern, so adding a `packages/plugin-*`
+     * package edits nothing here. The expressions are anchored at both ends and
+     * need the hyphen, so neither matches `@project/plugins/…`, and their place
+     * in the list cannot capture another package's subpath.
+     * `test/unit/plugin-aliases.test.ts` resolves every plugin through them.
      */
-    alias: {
-      '@project/aggregate': resolve('./packages/aggregate/src/index.ts'),
-      '@project/core': resolve('./packages/core/src/index.ts'),
-      '@project/graph': resolve('./packages/graph/src/index.ts'),
-      '@project/http': resolve('./packages/http/src/index.ts'),
-      '@project/persistence/test-support': resolve(
-        './packages/persistence/test/backend-contract.ts',
-      ),
-      '@project/persistence': resolve('./packages/persistence/src/index.ts'),
-      '@project/plugins/domain': resolve('./packages/plugins/src/domain.ts'),
-      '@project/plugins/view': resolve('./packages/plugins/src/view.ts'),
-      '@project/plugins/testing': resolve('./packages/plugins/src/testing.ts'),
-      '@project/plugin-default/domain': resolve('./packages/plugin-default/src/domain.ts'),
-      '@project/plugin-image/domain': resolve('./packages/plugin-image/src/domain.ts'),
-      '@project/plugin-default/view': resolve('./packages/plugin-default/src/view.tsx'),
-      '@project/plugin-image/view': resolve('./packages/plugin-image/src/view.tsx'),
-      '@project/plugin-ur/domain': resolve('./packages/plugin-ur/src/domain.ts'),
-      '@project/plugin-markdown/domain': resolve('./packages/plugin-markdown/src/domain.ts'),
-      '@project/plugin-mermaid/domain': resolve('./packages/plugin-mermaid/src/domain.ts'),
-      '@project/plugin-reference/domain': resolve('./packages/plugin-reference/src/domain.ts'),
-      '@project/plugin-space/domain': resolve('./packages/plugin-space/src/domain.ts'),
-      '@project/plugin-ur/view': resolve('./packages/plugin-ur/src/view.tsx'),
-      '@project/plugin-markdown/view': resolve('./packages/plugin-markdown/src/view.tsx'),
-      '@project/plugin-mermaid/view': resolve('./packages/plugin-mermaid/src/view.tsx'),
-      '@project/plugin-reference/view': resolve('./packages/plugin-reference/src/view.tsx'),
-      '@project/plugin-space/view': resolve('./packages/plugin-space/src/view.tsx'),
-      '@project/react-flow-adapter': resolve('./packages/react-flow-adapter/src/index.ts'),
-      '@project/resource-api/domain': resolve('./packages/resource-api/src/domain/index.ts'),
-      '@project/resource-api/view/testing': resolve('./packages/resource-api/src/view/testing.tsx'),
-      '@project/resource-api/view/host': resolve('./packages/resource-api/src/view/host.tsx'),
-      '@project/resource-api/view': resolve('./packages/resource-api/src/view/index.tsx'),
-      '@project/ui/MarkdownSourceEditor': resolve('./packages/ui/src/MarkdownSourceEditor.tsx'),
-      '@project/ui': resolve('./packages/ui/src/index.ts'),
-    },
+    alias: [
+      { find: '@project/aggregate', replacement: resolve('./packages/aggregate/src/index.ts') },
+      { find: '@project/core', replacement: resolve('./packages/core/src/index.ts') },
+      { find: '@project/graph', replacement: resolve('./packages/graph/src/index.ts') },
+      { find: '@project/http', replacement: resolve('./packages/http/src/index.ts') },
+      {
+        find: '@project/persistence/test-support',
+        replacement: resolve('./packages/persistence/test/backend-contract.ts'),
+      },
+      { find: '@project/persistence', replacement: resolve('./packages/persistence/src/index.ts') },
+      { find: '@project/plugins/domain', replacement: resolve('./packages/plugins/src/domain.ts') },
+      { find: '@project/plugins/view', replacement: resolve('./packages/plugins/src/view.ts') },
+      {
+        find: '@project/plugins/testing',
+        replacement: resolve('./packages/plugins/src/testing.ts'),
+      },
+      {
+        find: /^@project\/(plugin-[^/]+)\/domain$/u,
+        replacement: resolve('./packages/$1/src/domain.ts'),
+      },
+      {
+        find: /^@project\/(plugin-[^/]+)\/view$/u,
+        replacement: resolve('./packages/$1/src/view.tsx'),
+      },
+      {
+        find: '@project/react-flow-adapter',
+        replacement: resolve('./packages/react-flow-adapter/src/index.ts'),
+      },
+      {
+        find: '@project/resource-api/domain',
+        replacement: resolve('./packages/resource-api/src/domain/index.ts'),
+      },
+      {
+        find: '@project/resource-api/view/testing',
+        replacement: resolve('./packages/resource-api/src/view/testing.tsx'),
+      },
+      {
+        find: '@project/resource-api/view/host',
+        replacement: resolve('./packages/resource-api/src/view/host.tsx'),
+      },
+      {
+        find: '@project/resource-api/view',
+        replacement: resolve('./packages/resource-api/src/view/index.tsx'),
+      },
+      {
+        find: '@project/ui/MarkdownSourceEditor',
+        replacement: resolve('./packages/ui/src/MarkdownSourceEditor.tsx'),
+      },
+      { find: '@project/ui', replacement: resolve('./packages/ui/src/index.ts') },
+    ],
   },
   test: {
     globals: true,
