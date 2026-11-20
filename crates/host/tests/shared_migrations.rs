@@ -1,8 +1,7 @@
 //! The shared plain-SQL migrations (`migrations-sql/`, ADR 0155), applied by
 //! sqlx's migrator, produce the schema Prisma Next produces from its own
-//! migration packages (`migrations/`, `migrations-sqlite/`), so either host
-//! can serve a database the other migrated. That each package executes its
-//! file's statements is `test/unit/shared-migrations.test.ts`.
+//! migration packages (`migrations/`, `migrations-sqlite/`). That each package
+//! executes its file's statements is `test/unit/shared-migrations.test.ts`.
 //!
 //! Both tests run Prisma Next through `pnpm`, so they need the repository's
 //! `node_modules`, and the PostgreSQL one a server; they are ignored by default
@@ -168,20 +167,23 @@ mod given_a_postgresql_server {
         let prisma = format!("migrations_prisma_{suffix}");
         let shared = format!("migrations_shared_{suffix}");
 
-        let mut admin = PgConnection::connect_with(&server).await.unwrap();
-        for database in [&prisma, &shared] {
-            sqlx::raw_sql(AssertSqlSafe(format!("CREATE DATABASE \"{database}\"")))
-                .execute(&mut admin)
-                .await
-                .unwrap();
-        }
-
-        // On its own task, so that a failure still drops both databases.
+        // On its own task, so that a failure, in creating the databases too,
+        // still drops both.
         let mut prisma_url = url::Url::parse(&url).unwrap();
         prisma_url.set_path(&prisma);
+        let admin_options = server.clone();
+        let databases = [prisma.clone(), shared.clone()];
         let prisma_options = server.clone().database(&prisma);
         let shared_options = server.clone().database(&shared);
         let schemas = tokio::spawn(async move {
+            let mut admin = PgConnection::connect_with(&admin_options).await.unwrap();
+            for database in &databases {
+                sqlx::raw_sql(AssertSqlSafe(format!("CREATE DATABASE \"{database}\"")))
+                    .execute(&mut admin)
+                    .await
+                    .unwrap();
+            }
+            admin.close().await.unwrap();
             prisma_migrate("prisma-next.config.ts", "DATABASE_URL", prisma_url.as_str());
             let pool = PgPoolOptions::new()
                 .connect_with(shared_options.clone())
@@ -198,16 +200,27 @@ mod given_a_postgresql_server {
             )
         })
         .await;
+
+        // `FORCE` ends any connection a panic dropped without closing, and a
+        // failed drop is reported only after the task's own failure.
+        let mut admin = PgConnection::connect_with(&server).await.unwrap();
+        let mut failed_drops = Vec::new();
         for database in [&prisma, &shared] {
-            sqlx::raw_sql(AssertSqlSafe(format!("DROP DATABASE \"{database}\"")))
-                .execute(&mut admin)
-                .await
-                .unwrap();
+            if let Err(error) = sqlx::raw_sql(AssertSqlSafe(format!(
+                "DROP DATABASE IF EXISTS \"{database}\" WITH (FORCE)"
+            )))
+            .execute(&mut admin)
+            .await
+            {
+                failed_drops.push(format!("{database}: {error}"));
+            }
         }
-        admin.close().await.unwrap();
+        let closed = admin.close().await;
 
         let (expected, actual) =
             schemas.unwrap_or_else(|failure| std::panic::resume_unwind(failure.into_panic()));
+        assert!(failed_drops.is_empty(), "dropping {failed_drops:?}");
+        closed.unwrap();
         assert!(
             expected.iter().any(|line| line == "relation spaces r"),
             "Prisma Next migrated {prisma}: {expected:#?}"

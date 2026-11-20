@@ -1582,7 +1582,8 @@ describe('no value is bound to a local named after the Map (ADR 0101)', () => {
  * requires either a capital after the retired word, a word boundary before it,
  * or a key's colon after it, and none of the three offers any.
  *
- * **`migrations/` and `migrations-sql/` are excluded here and nowhere else.**
+ * **`migrations/` is excluded here and nowhere else; `migrations-sql/` is
+ * excluded here and in `RETIRED_SCHEMA_TREES`.**
  * The files `migrations/` contributes are `start-contract` / `end-contract`
  * snapshots of a schema that really did have a Card model, and
  * `migrations-sql/postgres/` holds the same history's statements as plain SQL

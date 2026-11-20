@@ -15,7 +15,7 @@ ADR 0155 says both hosts share one database schema until PostgreSQL moves, throu
 
 ## Why
 
-Either host can serve a database the other migrated, which is what ADR 0155 wants one schema for, and nothing already migrated breaks.
+Both tools produce the same schema, which is what ADR 0155 wants one history for, and nothing already migrated breaks. Neither tool yet records the other's applied migrations, so serving a database the other migrated also needs that record seeded, which the Rust stores (rust-host 15, 16) take on.
 
 ## Rejected
 
