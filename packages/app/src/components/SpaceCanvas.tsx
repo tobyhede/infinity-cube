@@ -72,7 +72,7 @@ import {
   parseEmbeddedNodeId,
   withEmbeddedEdgeTypes,
 } from '../embedded-map';
-import { editingPortalAncestor, reportsBodyHeight } from '../embedded-open-space-resource';
+import { editingPlacementAncestor, reportsBodyHeight } from '../embedded-open-space-resource';
 import { useOpenSpaces } from '../open-spaces-context';
 import type { OpenSpace } from '../open-spaces';
 import { EmbeddedMapAuthoring } from './EmbeddedMapAuthoring';
@@ -450,8 +450,8 @@ export function SpaceCanvas({
   const embeds = useSyncExternalStore(mapEmbeddings.subscribe, mapEmbeddings.getState);
   const embedding = useSyncExternalStore(mapEmbedding.subscribe, mapEmbedding.getState);
   const {
-    editing: editingPortals,
-    drafts: portalDraft,
+    editing: editingPlacements,
+    drafts: placementDrafts,
     publications: embeddedPublications,
   } = embedding;
   const publishMapEmbed = useCallback(
@@ -1109,11 +1109,11 @@ export function SpaceCanvas({
               data: { ...withEmbed.data, onBodyHeightChange: reportBodyHeight },
             }
           : withEmbed;
-        if (!editingPortals.has(withHeight.id) || !authorsEmbeddedMap(withHeight.data)) {
+        if (!editingPlacements.has(withHeight.id) || !authorsEmbeddedMap(withHeight.data)) {
           return withHeight;
         }
         // `nopan` only: an Open Resource does not take `nowheel` (ADR 0064).
-        // Portal wheel is the capture listener below;
+        // The embedded Map's wheel is the capture listener below;
         // `space-resource-embedded-map.test.tsx` ('does not put nowheel on an
         // Open Space Resource in portal Edit, and wheel still authors its framing')
         // holds both that class and that the wheel still frames.
@@ -1126,9 +1126,9 @@ export function SpaceCanvas({
           className: classes.join(' '),
         };
       }),
-    [editableNodes, liveEmbeddings, reportBodyHeight, editingPortals, publishMapEmbed, embeds],
+    [editableNodes, liveEmbeddings, reportBodyHeight, editingPlacements, publishMapEmbed, embeds],
   );
-  const portalNodesById = useMemo(() => {
+  const placementNodesById = useMemo(() => {
     const byId = new Map<string, ResourceFlowNode>();
     for (const node of nodes) byId.set(node.id, node);
     for (const value of liveEmbeddings) {
@@ -1180,11 +1180,11 @@ export function SpaceCanvas({
     [changeNodes, liveEmbeddings],
   );
   const canvasRef = useRef<HTMLDivElement>(null);
-  const portalGestureSnapshot = useRef({
+  const placementGestureSnapshot = useRef({
     embeds,
-    editingPortals,
-    portalNodesById,
-    portalDraft,
+    editingPlacements,
+    placementNodesById,
+    placementDrafts,
     embeddedPublications,
     embeddedRequests,
     screenToFlowPosition,
@@ -1194,11 +1194,11 @@ export function SpaceCanvas({
   // passive effects. Refresh in the synchronous commit phase so the stable
   // listener cannot pan or zoom from the previous gesture-session snapshot.
   useLayoutEffect(() => {
-    portalGestureSnapshot.current = {
+    placementGestureSnapshot.current = {
       embeds,
-      editingPortals,
-      portalNodesById,
-      portalDraft,
+      editingPlacements,
+      placementNodesById,
+      placementDrafts,
       embeddedPublications,
       embeddedRequests,
       screenToFlowPosition,
@@ -1206,9 +1206,9 @@ export function SpaceCanvas({
     };
   }, [
     embeds,
-    editingPortals,
-    portalNodesById,
-    portalDraft,
+    editingPlacements,
+    placementNodesById,
+    placementDrafts,
     embeddedPublications,
     embeddedRequests,
     screenToFlowPosition,
@@ -1221,14 +1221,14 @@ export function SpaceCanvas({
 
     let pan: {
       pointerId: number;
-      portalId: string;
+      placementId: string;
       lastX: number;
       lastY: number;
       framing: SpaceResourceFraming;
     } | null = null;
 
     const framingOf = (parentId: string): SpaceResourceFraming | undefined => {
-      const session = portalGestureSnapshot.current;
+      const session = placementGestureSnapshot.current;
       // Read from the Map embedding itself: wheel events can arrive faster than
       // the canvas renders the last draft.
       const drafted = mapEmbedding.getState().drafts.get(parentId);
@@ -1243,7 +1243,7 @@ export function SpaceCanvas({
       return framingFromFit(published.origin, request.bounds);
     };
 
-    const portalParent = (target: EventTarget | null): ResourceFlowNode | undefined => {
+    const placementParent = (target: EventTarget | null): ResourceFlowNode | undefined => {
       if (!(target instanceof Element)) return undefined;
       if (
         target.closest('.nokey, button, [role="toolbar"], .react-flow__resize-control') !== null
@@ -1254,41 +1254,41 @@ export function SpaceCanvas({
       if (nodeEl === null) return undefined;
       const id = nodeEl.dataset['id'];
       if (id === undefined) return undefined;
-      const node = portalGestureSnapshot.current.portalNodesById.get(id);
+      const node = placementGestureSnapshot.current.placementNodesById.get(id);
       if (node === undefined || node.parentId !== undefined) return undefined;
       if (!authorsEmbeddedMap(node.data)) return undefined;
-      if (!portalGestureSnapshot.current.editingPortals.has(node.id)) return undefined;
+      if (!placementGestureSnapshot.current.editingPlacements.has(node.id)) return undefined;
       return node;
     };
 
-    const portalUnder = (target: EventTarget | null): ResourceFlowNode | undefined => {
+    const placementUnder = (target: EventTarget | null): ResourceFlowNode | undefined => {
       if (!(target instanceof Element)) return undefined;
       const nodeEl = target.closest<HTMLElement>('.react-flow__node[data-id]');
       if (nodeEl === null) return undefined;
       const id = nodeEl.dataset['id'];
       if (id === undefined) return undefined;
-      const session = portalGestureSnapshot.current;
-      return editingPortalAncestor(
-        session.portalNodesById.get(id),
-        session.portalNodesById,
-        session.editingPortals,
+      const session = placementGestureSnapshot.current;
+      return editingPlacementAncestor(
+        session.placementNodesById.get(id),
+        session.placementNodesById,
+        session.editingPlacements,
       );
     };
 
     const onPointerDown = (event: PointerEvent) => {
       if (event.button !== 0) return;
-      if (!portalGestureSnapshot.current.authorOnCanvas) return;
-      const parent = portalParent(event.target);
+      if (!placementGestureSnapshot.current.authorOnCanvas) return;
+      const parent = placementParent(event.target);
       if (parent === undefined) return;
-      const portalId = parent.id;
+      const placementId = parent.id;
       // A pan takes over a zoom still pending, from the draft it left.
-      mapEmbedding.beginPan(portalId);
-      const framing = framingOf(portalId);
+      mapEmbedding.beginPan(placementId);
+      const framing = framingOf(placementId);
       if (framing === undefined) return;
       event.preventDefault();
       pan = {
         pointerId: event.pointerId,
-        portalId,
+        placementId,
         lastX: event.clientX,
         lastY: event.clientY,
         framing,
@@ -1298,36 +1298,36 @@ export function SpaceCanvas({
 
     const onPointerMove = (event: PointerEvent) => {
       if (pan?.pointerId !== event.pointerId) return;
-      const from = portalGestureSnapshot.current.screenToFlowPosition({
+      const from = placementGestureSnapshot.current.screenToFlowPosition({
         x: pan.lastX,
         y: pan.lastY,
       });
-      const to = portalGestureSnapshot.current.screenToFlowPosition({
+      const to = placementGestureSnapshot.current.screenToFlowPosition({
         x: event.clientX,
         y: event.clientY,
       });
       const next = panFraming(pan.framing, { x: to.x - from.x, y: to.y - from.y });
-      const portalId = pan.portalId;
+      const placementId = pan.placementId;
       pan = { ...pan, lastX: event.clientX, lastY: event.clientY, framing: next };
-      mapEmbedding.draft(portalId, next);
+      mapEmbedding.draft(placementId, next);
     };
 
     const onPointerUp = (event: PointerEvent) => {
       if (pan?.pointerId !== event.pointerId) return;
-      mapEmbedding.frame(pan.portalId, pan.framing);
+      mapEmbedding.frame(pan.placementId, pan.framing);
       pan = null;
     };
 
     const onWheel = (event: WheelEvent) => {
-      if (!portalGestureSnapshot.current.authorOnCanvas) return;
-      const parent = portalUnder(event.target);
+      if (!placementGestureSnapshot.current.authorOnCanvas) return;
+      const parent = placementUnder(event.target);
       if (parent === undefined) return;
       event.preventDefault();
       event.stopPropagation();
-      const portalId = parent.id;
-      const current = framingOf(portalId);
+      const placementId = parent.id;
+      const current = framingOf(placementId);
       if (current === undefined) return;
-      mapEmbedding.zoom(portalId, zoomFraming(current, event.deltaY < 0 ? 1.1 : 1 / 1.1));
+      mapEmbedding.zoom(placementId, zoomFraming(current, event.deltaY < 0 ? 1.1 : 1 / 1.1));
     };
 
     root.addEventListener('pointerdown', onPointerDown);
@@ -1890,8 +1890,8 @@ export function SpaceCanvas({
                 availability.authorInEmbeddedMap &&
                 (!embeddedEditing || editingEmbeddingIds.has(request.parent.id))
               }
-              framing={portalDraft.get(request.parent.id) ?? request.framing}
-              embeddedIn={embeddingChainOf(request.parent, portalNodesById, embeds)}
+              framing={placementDrafts.get(request.parent.id) ?? request.framing}
+              embeddedIn={embeddingChainOf(request.parent, placementNodesById, embeds)}
               bounds={request.bounds}
               absolute={request.absolute}
               drawnAbsolute={request.drawnAbsolute}

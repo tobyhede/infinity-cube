@@ -48,7 +48,7 @@ export interface DiscoverEmbeddedOpenSpaceResourcesInput<
 > {
   readonly root: EmbeddedRoot;
   /** The placements whose embedded Map is authored in place, by node id. */
-  readonly editingPortals: ReadonlySet<string>;
+  readonly editingPlacements: ReadonlySet<string>;
   readonly staleSpaces: ReadonlySet<ResourceId>;
   readonly nodes: readonly ResourceFlowNode[];
   /**
@@ -285,7 +285,7 @@ export function discoverEmbeddedOpenSpaceResources<Entry extends { readonly id: 
         (input.publications.has(parent.id) &&
           !input.entries.some((entry) => entry.id === view.spaceId)),
       depth: item.depth,
-      editing: input.editingPortals.has(parent.id),
+      editing: input.editingPlacements.has(parent.id),
     });
     const crossing = `${view.spaceId}:${view.map}`;
     if (path.has(crossing)) continue;
@@ -344,14 +344,14 @@ export function discoverEmbeddedOpenSpaceResources<Entry extends { readonly id: 
   return requests;
 }
 
-export function editingPortalAncestor(
+export function editingPlacementAncestor(
   start: ResourceFlowNode | undefined,
   nodesById: ReadonlyMap<string, ResourceFlowNode>,
-  editingPortals: ReadonlySet<string>,
+  editingPlacements: ReadonlySet<string>,
 ): ResourceFlowNode | undefined {
   let current = start;
   while (current !== undefined) {
-    if (authorsEmbeddedMap(current.data) && editingPortals.has(current.id)) {
+    if (authorsEmbeddedMap(current.data) && editingPlacements.has(current.id)) {
       return current;
     }
     current = current.parentId === undefined ? undefined : nodesById.get(current.parentId);
@@ -359,10 +359,10 @@ export function editingPortalAncestor(
   return undefined;
 }
 
-export function embeddingIsPortalEditing(
+export function embeddingIsEditedInPlace(
   parent: ResourceFlowNode,
   nodesById: ReadonlyMap<string, ResourceFlowNode>,
-  editingPortals: ReadonlySet<string>,
+  editingPlacements: ReadonlySet<string>,
 ): boolean {
-  return editingPortalAncestor(parent, nodesById, editingPortals) !== undefined;
+  return editingPlacementAncestor(parent, nodesById, editingPlacements) !== undefined;
 }

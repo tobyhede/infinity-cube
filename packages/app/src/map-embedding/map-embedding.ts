@@ -165,7 +165,7 @@ export function drawnEmbeddings(
     discoverEmbeddedOpenSpaceResources({
       targetOf,
       root: drawn.root,
-      editingPortals: state.editing,
+      editingPlacements: state.editing,
       embeds,
       staleSpaces: new Set(state.failures.keys()),
       nodes: drawn.nodes,
