@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { newUuid, uuidSchema, type ResourceId, type SpaceSnapshot } from '@project/core';
 import { MemorySpaceBackend } from '@project/persistence';
 import { bareKindData, type ResourceFlowNode } from '@project/react-flow-adapter';
@@ -169,6 +169,32 @@ describe('decorateEmbedCommands', () => {
     );
     expect(screen.getByRole('button', { name: 'Map: Collection 2' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Graph: Detail' })).toBeEnabled();
+  });
+
+  it('answers a choice about the drawing it was made in', async () => {
+    // Closed and opened again before the answer lands, another drawing embeds
+    // there; the answer names its own so it says nothing to the new one.
+    const mapEmbeds = embedded();
+    const drawing = mapEmbeds.get(EMBEDDING_ID)?.drawing;
+    const reports: unknown[][] = [];
+    mountRail(
+      decorateEmbedCommands(
+        node('space'),
+        context({
+          mapEmbeds,
+          onContextReport: (...report) => {
+            reports.push(report);
+          },
+        }),
+      ),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Map: Collection 1' }));
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: /Collection 2/ }));
+
+    await vi.waitFor(() => {
+      expect(reports).toEqual([[EMBEDDING_ID, null, drawing]]);
+    });
   });
 
   it('says the Space is being read in place of the chooser while it is unread', () => {

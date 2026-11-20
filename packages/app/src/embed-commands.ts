@@ -32,7 +32,8 @@ export interface EmbedCommandsContext {
   /** What the canvas says about each placement's embedding, by node id. */
   readonly contextNotices: ReadonlyMap<string, string>;
   readonly onContextEditingChange: (placement: string, editing: boolean) => void;
-  readonly onContextReport: (placement: string, message: string | null) => void;
+  /** Says `message` about the placement's embedding; passed the `drawing` a choice was made in, only while that drawing embeds there. */
+  readonly onContextReport: (placement: string, message: string | null, drawing?: symbol) => void;
 }
 
 /**
@@ -85,8 +86,10 @@ export function decorateEmbedCommands(
     authorsShownSpace: claim !== undefined,
     complete: (targetMap, graphId) => {
       if (commit === undefined) return null;
+      // The answer is about the embedding the choice was made in.
+      const drawing = context.mapEmbeds.get(node.id)?.drawing;
       void commit({ ...view, map: targetMap.id, graph: graphId }).then((answer) =>
-        context.onContextReport(node.id, refusalOf(answer)),
+        context.onContextReport(node.id, refusalOf(answer), drawing),
       );
       return null;
     },

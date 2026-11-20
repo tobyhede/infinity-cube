@@ -151,14 +151,65 @@ describe('the framing authored on a Map embedding', () => {
     drawn('node');
     embedding.zoom('node', FRAMED);
 
+    const order: string[] = [];
+    commit.mockImplementation(() => {
+      order.push('commit');
+      return Promise.resolve('completed');
+    });
+    given.mockImplementation(() => {
+      order.push('give back');
+    });
+
     publish(ask({ commit }));
     drawn('node');
 
-    expect(commit).toHaveBeenCalledOnce();
+    expect(order).toEqual(['commit', 'give back']);
     expect(commit).toHaveBeenCalledWith({ map: TARGET_MAP, graph: TARGET_GRAPH, framing: FRAMED });
-    expect(given).toHaveBeenCalled();
     vi.advanceTimersByTime(1000);
     expect(commit).toHaveBeenCalledOnce();
+  });
+
+  it('lands a zoom pending when the embedding is taken down on the Graph its placement drew', () => {
+    // The plugin passed a Map and no Graph, so the Graph is the one the
+    // placement drew, which the commit that takes it down no longer draws.
+    vi.useFakeTimers();
+    const { embedding, commit, drawing, drawn } = harness();
+    const noGraph: MapEmbedRequest = {
+      ...ask({ commit, claimed: true }),
+      view: { map: TARGET_MAP, graph: undefined },
+    };
+    embedding.embeddings.publish('node', SPACE_RESOURCE, noGraph, drawing);
+    drawn('node', 'other');
+    embedding.zoom('node', FRAMED);
+
+    embedding.embeddings.publish('node', SPACE_RESOURCE, null, drawing);
+    drawn('other');
+
+    expect(commit).toHaveBeenCalledOnce();
+    expect(commit).toHaveBeenCalledWith({ map: TARGET_MAP, graph: TARGET_GRAPH, framing: FRAMED });
+  });
+
+  it('drops a pending zoom rather than land it on a Map chosen since', () => {
+    // The commit writes the Map and Graph with the framing, so landing it now
+    // would either frame the chosen Map with the last one's framing or switch back.
+    vi.useFakeTimers();
+    const { embedding, commit, drawing, drawn } = harness();
+    const OTHER_MAP = uuidSchema.parse('00000000-0000-4000-8000-0000000000e5');
+    embedding.embeddings.publish('node', SPACE_RESOURCE, ask({ commit, claimed: true }), drawing);
+    drawn('node');
+    embedding.zoom('node', FRAMED);
+
+    embedding.embeddings.publish(
+      'node',
+      SPACE_RESOURCE,
+      { ...ask({ commit, claimed: true }), view: { map: OTHER_MAP, graph: TARGET_GRAPH } },
+      drawing,
+    );
+    drawn('node');
+    vi.advanceTimersByTime(1000);
+
+    expect(commit).not.toHaveBeenCalled();
+    expect(embedding.getState().drafts.has('node')).toBe(false);
   });
 
   it('lands a zoom pending when the embedding is taken down, then forgets its commit', () => {
@@ -266,6 +317,22 @@ describe('what the canvas says about a Map embedding', () => {
     embedding.setNotice('node', 'This choice is no longer offered.');
 
     expect(embedding.getState().notices.has('node')).toBe(false);
+  });
+
+  it('says nothing for an answer to a choice made in an embedding since replaced', () => {
+    // Closed and opened again before the choice settled: the answer is about
+    // an embedding no longer drawn, so it neither sets nor clears a notice.
+    const { embedding, publish } = harness();
+    const before = Symbol('before');
+    embedding.embeddings.publish('node', SPACE_RESOURCE, ask(), before);
+    publish(null);
+    publish(ask());
+    embedding.setNotice('node', 'Now.');
+
+    embedding.setNotice('node', 'This choice is no longer offered.', before);
+    expect(embedding.getState().notices.get('node')).toBe('Now.');
+    embedding.setNotice('node', null, before);
+    expect(embedding.getState().notices.get('node')).toBe('Now.');
   });
 
   it('keeps another placement’s notice when one embedding goes', () => {

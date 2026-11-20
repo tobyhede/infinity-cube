@@ -24,7 +24,7 @@ The canvas was the most-changed file in the month before this review. Embedding 
    - framing drafts, the 160ms zoom debounce, and the framing write through the embedding's own `select` commit;
    - Space reads (holds, read failures, Resume after Exit);
    - footer heights;
-   - the lifetime of nested canvases' publications;
+   - the lifetime of each Map embedding's publication;
    - per-embedding notices and rail editing.
 
    The pointer and wheel gestures stay in the canvas. They report drafts to the module.
@@ -33,7 +33,7 @@ The canvas was the most-changed file in the month before this review. Embedding 
 4. **Where it lives.** It lives in one folder in `app` that absorbs the registry, the embedding hook, publication and embed view. It stays host-side (ADR 0142). The canvas and Stage `HostMapProvider` adapters are a real seam with two adapters, so they stay where they are.
 5. **Tests.** Interface tests come first, porting the cases behind f1bc4a8 and d0eee7d. Each ticket deletes the piece tests it replaces. The embedded-Map application mount is trimmed to the cases that need the real canvas.
 6. **Collaborators.** The module calls its collaborators itself, as one operation. It does not return a plan for the canvas to carry out (AGENTS.md, functional core and imperative shell).
-7. **Publications.** The module owns only the lifetime of a nested canvas's publication. The value is opaque to it.
+7. **Publications.** The module owns only the lifetime of each Map embedding's publication. The value is opaque to it.
 8. **Notices and rail editing.** These follow one rule: they die with the embedding. The two trimming passes become one.
 9. **How it lands.** One draft PR, with one commit per ticket. A test that moves takes its `docs/requirements/rendering.md` citation with it (RD-60, RD-61, RD-67). The untested drag gesture and wheel capture named there stay in the canvas and are out of scope.
 10. **Its interface follows the house pattern** of Space Authoring, Edge Authoring and the continuation: one dependency object, collaborators named for their role, and an optional `reportObserverError` with a console default.

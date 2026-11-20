@@ -118,9 +118,11 @@ export interface MapEmbedding {
   readonly resume: (spaceId: ResourceId) => Promise<void>;
   /**
    * Says `message` about the placement's embedding, or stops saying anything
-   * with `null`. An answer that lands after its embedding has gone says nothing.
+   * with `null`. An answer that lands after its embedding has gone says nothing,
+   * and one passed the `drawing` it was asked from says nothing once another
+   * drawing embeds there, as when the embedding is closed and opened again.
    */
-  readonly setNotice: (placement: string, message: string | null) => void;
+  readonly setNotice: (placement: string, message: string | null, drawing?: DrawingKey) => void;
   /** The placement's embedding's rail began or stopped editing. */
   readonly setRailEditing: (placement: string, editing: boolean) => void;
   /** The canvas goes: every pending zoom lands, drafts kept, every Claim is given back and every Space released. */
@@ -297,7 +299,11 @@ export function createMapEmbedding({
   /** The embeddings as the canvas last settled them, which an embedding withdrawn since is still found in. */
   let settled: ReadonlyMap<string, MapEmbedEntry> = embeddings.getState();
   let drawnRequests: readonly MapEmbeddingDrawnRequest[] = [];
-  const pendingZoom = new Map<string, SpaceResourceFraming>();
+  /** Each placement's zoom waiting for the wheel to be still, and the Map and Graph it framed. */
+  const pendingZoom = new Map<
+    string,
+    { readonly framing: SpaceResourceFraming; readonly target: string | undefined }
+  >();
   const zoomTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   // Which placements author in place is a fact about what the plugins
@@ -341,12 +347,28 @@ export function createMapEmbedding({
     const entry = embeddings.getState().get(placement) ?? settled.get(placement);
     const commit = entry?.request.select?.commit;
     if (entry === undefined || commit === undefined) return;
-    const drawn = drawnRequests.find((request) => request.parent.id === placement);
-    const next = framedView(entry.request.view, drawn, framing);
+    const next = framedView(entry.request.view, drawnRequestOf(placement), framing);
     if (next !== undefined) void commit(next);
   };
 
-  const cancelZoom = (placement: string): SpaceResourceFraming | undefined => {
+  const drawnRequestOf = (placement: string): MapEmbeddingDrawnRequest | undefined =>
+    drawnRequests.find((request) => request.parent.id === placement);
+
+  /** The Map and Graph a framing written now for `placement` would land on. */
+  const targetOf = (placement: string): string | undefined => {
+    const entry = embeddings.getState().get(placement) ?? settled.get(placement);
+    const view = framedView(entry?.request.view, drawnRequestOf(placement), {
+      centreX: 0,
+      centreY: 0,
+      zoom: 1,
+    });
+    return view === undefined ? undefined : `${view.map}:${view.graph ?? ''}`;
+  };
+
+  const cancelZoom = (
+    placement: string,
+  ):
+    { readonly framing: SpaceResourceFraming; readonly target: string | undefined } | undefined => {
     const timer = zoomTimers.get(placement);
     if (timer !== undefined) clearTimeout(timer);
     zoomTimers.delete(placement);
@@ -358,8 +380,12 @@ export function createMapEmbedding({
   const flushZoom = (placement: string, dropDraft = true): void => {
     const pending = cancelZoom(placement);
     if (pending === undefined) return;
-    if (dropDraft) setDraft(placement, undefined);
-    write(placement, pending);
+    // A framing lands only on the Map and Graph it framed: the commit writes
+    // them with it, so on a Map chosen since it would frame the wrong Map or
+    // switch back. It is dropped, draft and all.
+    const kept = targetOf(placement) === pending.target;
+    if (dropDraft || !kept) setDraft(placement, undefined);
+    if (kept) write(placement, pending.framing);
   };
 
   /**
@@ -401,7 +427,6 @@ export function createMapEmbedding({
     getState: observable.getState,
     subscribe: observable.subscribe,
     drawn: ({ placements, requests, ready = true }) => {
-      drawnRequests = requests;
       followSpaces();
       settleReads(requests, ready);
       const entries = embeddings.getState();
@@ -422,6 +447,9 @@ export function createMapEmbedding({
         const left = settled.get(nodeId);
         if (left !== undefined && drawnNow.has(nodeId)) select(left.resourceId);
       }
+      // Only after the flushes above, which land a withdrawn embedding's
+      // framing on the Map and Graph it last drew.
+      drawnRequests = requests;
       for (const nodeId of editing) {
         const drawing = entries.get(nodeId)?.drawing;
         if (drawing === undefined || lent.has(nodeId)) continue;
@@ -438,7 +466,7 @@ export function createMapEmbedding({
       write(placement, framing);
     },
     zoom: (placement, framing) => {
-      pendingZoom.set(placement, framing);
+      pendingZoom.set(placement, { framing, target: targetOf(placement) });
       setDraft(placement, framing);
       const timer = zoomTimers.get(placement);
       if (timer !== undefined) clearTimeout(timer);
@@ -477,8 +505,11 @@ export function createMapEmbedding({
         return { ...state, footers };
       });
     },
-    setNotice: (placement, message) => {
-      if (message !== null && !embeddings.getState().has(placement)) return;
+    setNotice: (placement, message, drawing) => {
+      const entry = embeddings.getState().get(placement);
+      if (message !== null && entry === undefined) return;
+      // An answer about an embedding since replaced says nothing to this one.
+      if (drawing !== undefined && entry?.drawing !== drawing) return;
       update((state) => {
         if ((state.notices.get(placement) ?? null) === message) return state;
         const notices = new Map(state.notices);

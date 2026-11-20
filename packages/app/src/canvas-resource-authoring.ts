@@ -311,8 +311,8 @@ export function useCanvasResourceAuthoring({
     [mapEmbedding],
   );
   const onContextReport = useCallback(
-    (placement: string, message: string | null) => {
-      mapEmbedding?.setNotice(placement, message);
+    (placement: string, message: string | null, drawing?: symbol) => {
+      mapEmbedding?.setNotice(placement, message, drawing);
     },
     [mapEmbedding],
   );

@@ -1,6 +1,6 @@
 # 03: Reading an embedded Space runs through the module
 
-**What to build:** Opening a Space Resource reads its Space exactly as today. One hold is taken per drawn request. A Space that cannot be read is announced by the Title the author gave its Resource. Resume after Exit reads it again. A footer's measured height shapes the drawn Map. A nested canvas's publication lasts only while its request stands. The Map embedding module now owns all of this, and the embedded Open Space Resources hook is deleted. The canvas reads one state from the module, not nine values.
+**What to build:** Opening a Space Resource reads its Space exactly as today. One hold is taken per drawn request. A Space that cannot be read is announced by the Title the author gave its Resource. Resume after Exit reads it again. A footer's measured height shapes the drawn Map. A Map embedding's publication lasts only while its request stands. The Map embedding module now owns all of this, and the embedded Open Space Resources hook is deleted. The canvas reads one state from the module, not nine values.
 
 **Blocked by:** 02.
 
