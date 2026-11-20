@@ -2981,6 +2981,8 @@ const FOREIGN_ALIAS_FILES: readonly string[] = [
   'test/unit/http-server-build-config.test.ts',
   'test/unit/plugin-aliases.test.ts',
   'test/support/plugin-packages.ts',
+  // The plugin specifier patterns every path-alias list above shares.
+  'packages/app/plugin-specifiers.ts',
 ];
 
 /**
