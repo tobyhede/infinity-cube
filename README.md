@@ -1,8 +1,8 @@
 # InfinityCube
 
-InfinityCube is for technical ideas that connect as a graph rather than a single line. You write **Resources** (Markdown, pictures, Mermaid diagrams, or whole nested Spaces), place them on a **Map**, and connect them with **Graphs**: named, coloured, directed paths through the same Resources. Every Graph is drawn at once, each in its own colour, at the positions you chose.
+InfinityCube is for technical ideas that connect as a graph rather than a single line. You write **Resources** (Markdown, Image, Mermaid and Space Resources, the last holding a whole nested Space), place them on a **Map**, and connect them with **Graphs**: named, coloured sets of directed Edges between the same Resources. Every Graph is drawn at once, each in its own colour, at the positions you chose.
 
-**Presenting** traverses one Graph on a full-window **Stage**: a 16:9 frame over the canvas, which stays untouched behind it, with Presentation Notes in a second window if you want them. The [Navigation requirements](docs/requirements/navigation.md) hold every presenting key, the Notes window and the product links.
+**Presenting** traverses one Graph on a full-window **Stage**: a 16:9 frame over the canvas, which stays untouched behind it, with the **Notes window** beside it if you want it. The [Navigation requirements](docs/requirements/navigation.md) hold every presenting key, the Notes window and the product links.
 
 Your Space is a directory of plain files, an [Aggregate directory](docs/aggregate-directory.md), kept in its own git repository.
 
@@ -38,7 +38,7 @@ You need Node ≥ 26.8.1 and pnpm 9. Node no longer bundles corepack, so install
 
 5. **Present.** Press **Present**: `→` follows an Edge, `←` goes back, `↑` / `↓` choose at a fork. Done when `Esc` returns you to the Map as you left it.
 
-6. **Stop.** Press Ctrl-C in the terminal. Done when it prints `Stopped; ~/spaces/rust-async holds every edit.` Any other last line means some edits were not written: see [Stopping and lost edits](#stopping-and-lost-edits).
+6. **Stop.** Press Ctrl-C in the terminal. Done when it prints `Stopped; <dir> holds every edit.`, where `<dir>` is the directory's absolute path, such as `/home/you/spaces/rust-async`. Any other last line means some edits were not written: see [Stopping and lost edits](#stopping-and-lost-edits).
 
 7. **Commit.** `git -C ~/spaces/rust-async add -A && git -C ~/spaces/rust-async commit -m "First draft"`. Done when `git -C ~/spaces/rust-async status` is clean.
 
@@ -47,7 +47,7 @@ Run every `pnpm cube` verb from the InfinityCube clone, pointing at whichever di
 ## On the canvas
 
 - **Every place has a link.** The Space, a Map, a Resource, a Graph and each Active Resource reached while Presenting have durable URLs. The Command Dock and the presenting chrome offer **Copy link**, browser Back and Forward follow them, and a pasted link reopens the same place.
-- **A Resource is Closed or Open.** A Closed Markdown Resource shows its Title; Open, it shows its text and may grow to fit. Editing its source is a separate action.
+- **Markdown, Mermaid, Reference and Space Resources are Closed or Open.** A Closed Markdown Resource shows its Title; Open, it shows its text and may grow to fit. Editing its source is a separate action. An Image Resource is always its picture, and an Ur Resource has no Open.
 - **A Resource's size is authored, never measured.** Its default and smallest size is 260×146, and its content adapts to it.
 - **Edges between the same two Resources run in parallel lanes.** In each direction one Edge runs full length, the Active Graph's where it has one there, and the others stop shorter, so switching Graphs changes which Edge leads, never where the Resources sit.
 
@@ -60,13 +60,13 @@ The [Rendering](docs/requirements/rendering.md) and [Maps and Graphs](docs/requi
 - **Edits are written about a second after you stop editing**, so `git status` shows what you changed. InfinityCube writes only the files whose content changed.
 - **Git is your undo and your history.** InfinityCube keeps no history of its own and does not watch the directory. Edit files by hand, `git pull` or check out an earlier version with InfinityCube stopped: its next write replaces what is on disk with what it holds.
 - **One run per directory.** A run locks the directory, through the empty file `.infinity-cube.lock` it leaves there, so a second run of the same directory is refused, naming it, until the first stops. The lock ends when the process does, however it ends. Keep the file out of git with a `.gitignore` entry.
-- **InfinityCube writes only its own files: `aggregate.json`, each Space's `space.json` and Resource files, and `assets/`**, which holds Markdown text and uploaded pictures. Anything else, such as `.git`, a README or `notes/`, and any `*.md` outside `assets/`, is left alone; [`docs/aggregate-directory.md`](docs/aggregate-directory.md) describes the format.
+- **InfinityCube writes only its own files: `aggregate.json`, each Space's `space.json` and Resource files, and `assets/`**, which holds Markdown text and uploaded image files. Anything else, such as `.git`, a README or `notes/`, and any `*.md` outside `assets/`, is left alone; [`docs/aggregate-directory.md`](docs/aggregate-directory.md) describes the format.
 - **Starting.** `run` serves an existing Aggregate directory only. A missing or empty directory is refused, naming the `pnpm cube init` command that creates one, so a mistyped path never becomes a new Space. A directory that is not valid is refused with its problems printed; fix the files and start again. A run with no edits leaves the directory as it was, beside its empty lock file. Opening a Space never writes the directory.
 - **Ports and the browser.** InfinityCube serves on port 4173, or the next free port. `--port <port>` picks the port and fails if it is taken. `--no-open` leaves the browser alone, for running headless or from an agent.
 
 ### Stopping and lost edits
 
-A **stop** (Ctrl-C, closing the terminal, or SIGTERM) writes every pending edit and ends with `Stopped; <dir> holds every edit.` Treat the directory as complete only after that line.
+Stopping (Ctrl-C, closing the terminal, or SIGTERM) writes every pending edit and ends with `Stopped; <dir> holds every edit.` Treat the directory as complete only after that line.
 
 - **A kill loses the last second.** `kill -9`, a power cut, or a second Ctrl-C exits at once, and edits not yet written are lost.
 - **A failed write is retried.** While running, InfinityCube prints `Could not write the directory:` with the reason (a full disk, or a symbolic link it refuses to write through) and tries again a second later.
@@ -78,14 +78,14 @@ A **stop** (Ctrl-C, closing the terminal, or SIGTERM) writes every pending edit 
 - **`pnpm cube check <dir>`** reads a directory as a run would and reports, writing nothing. It is how you or an agent checks files written by hand.
 - **`pnpm cube mcp <dir>`** serves a local MCP server whose tools edit and check the directory's files, for an agent with no shell: see [Editing over MCP](docs/aggregate-directory.md#editing-over-mcp).
 - **The desktop application** opens a directory in a window of its own, with no terminal; [`AGENTS.md`](AGENTS.md) says how to build it.
-- **Mounting** shows a Space read-only on the web, straight from its public GitHub repository: see [Deploying to Cloudflare](docs/deploy-cloudflare.md).
+- **Mounting** opens a Space on the web, straight from its public GitHub repository. You can edit it in the page, but nothing is written back to GitHub, and today a reload loses those edits: see [Deploying to Cloudflare](docs/deploy-cloudflare.md).
 
 ## Using InfinityCube with agents
 
 Two of this repository's agent skills, in [`.agents/skills/`](.agents/skills/) and linked from `.claude/skills/`, are for using InfinityCube. They are also published as the `infinity-cube` plugin, from [`plugins/infinity-cube/`](plugins/infinity-cube/):
 
 - **`infinity-cube-getting-started`**: sets a person up from a fresh clone: checks Node and pnpm, installs, chooses or creates the content directory as its own git repository, and starts a run.
-- **`infinity-cube-authoring`**: writes or changes an Aggregate directory as files: Spaces, Resources, Maps, Graphs, Edges and pictures. It stops the run first, because InfinityCube's next write would replace edits made underneath it.
+- **`infinity-cube-authoring`**: writes or changes an Aggregate directory as files: Spaces, Resources, Maps, Graphs, Edges and Image Resources. It stops the run first, because InfinityCube's next write would replace edits made underneath it.
 
 ### Installing the skills elsewhere
 
@@ -167,7 +167,7 @@ pnpm dev:sqlite                                                            # app
 SQLITE_PATH=/absolute/path/infinity-cube.db pnpm test:integration:sqlite   # migrates that file, then tests against temp files of its own
 ```
 
-- **`SQLITE_PATH` is an absolute path** in a local directory you own; every SQLite command refuses a relative, blank or unwritable one, and `cube import` and `cube export` also refuse a file that does not exist yet, so run `pnpm db:migrate:sqlite` first.
+- **`SQLITE_PATH` is an absolute path** in a local directory you own. Every SQLite command refuses a relative one, or one whose directory is missing or unwritable. The host and `cube import` and `cube export` also refuse an unset or blank one, while `pnpm dev:sqlite` uses `.scratch/sqlite/infinity-cube.db` in the clone instead, for both its migration and its host. `cube import` and `cube export` also refuse a file that does not exist yet, so run `pnpm db:migrate:sqlite` first.
 - **One InfinityCube process per file.** Stop `pnpm dev:sqlite` before running `cube import --store sqlite` or `cube export --store sqlite` on the same file.
 - **To back up**, stop the host and copy the file, or use `sqlite3 infinity-cube.db ".backup copy.db"`.
 

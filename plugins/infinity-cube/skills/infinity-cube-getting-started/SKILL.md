@@ -36,4 +36,4 @@ Work from the root of the InfinityCube clone. With no clone at hand, as when thi
 
 The file format is `docs/aggregate-directory.md`.
 
-To show a Space on the web from its public GitHub repository, read-only and with no server, and to point a domain at it, follow `docs/deploy-cloudflare.md`.
+To show a Space on the web from its public GitHub repository, with no server and with nothing written back to GitHub, and to point a domain at it, follow `docs/deploy-cloudflare.md`.
