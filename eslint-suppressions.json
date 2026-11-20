@@ -89,11 +89,6 @@
       "count": 1
     }
   },
-  "test/unit/http-server-build-config.test.ts": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 1
-    }
-  },
   "test/unit/playwright-flake-policy.test.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 1

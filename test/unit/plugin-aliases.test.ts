@@ -8,6 +8,7 @@ import vitestConfig from '../../vitest.config';
 import { workspaceAliases, workspacePackages } from '../../packages/app/workspace-aliases';
 import {
   type AliasEntry,
+  aliasListSchema,
   PACKAGES_DIRECTORY,
   PLUGIN_HALVES,
   missingPluginHalves,
@@ -25,10 +26,6 @@ import { trackedFiles } from '../support/structural-scan';
 
 /** Names an individual plugin, as opposed to the `plugin-*` pattern or the `plugins` list. */
 const NAMES_A_PLUGIN = /@project\/plugin-(?!\*)[^/]+/u;
-
-const aliasListSchema = z.array(
-  z.object({ find: z.union([z.string(), z.instanceof(RegExp)]), replacement: z.string() }),
-);
 
 const vitestAliases: readonly AliasEntry[] = z
   .object({ resolve: z.object({ alias: aliasListSchema }) })
@@ -121,17 +118,64 @@ describe('resolving a plugin through the aliases', () => {
   });
 });
 
+/** Each tracked tsconfig's `paths` keys, by file. */
+const tsconfigPathKeys = (): ReadonlyMap<string, readonly string[]> =>
+  new Map(
+    trackedFiles()
+      .filter((file) => /(?:^|\/)tsconfig[^/]*\.json$/u.test(file))
+      .map((file) => [
+        file,
+        Object.keys(
+          tsconfigPathsSchema.parse(
+            ts.parseConfigFileTextToJson(file, readFileSync(file, 'utf8')).config,
+          ).compilerOptions?.paths ?? {},
+        ),
+      ]),
+  );
+
+/** The tsconfigs whose `paths` hold `key`, sorted. */
+const tsconfigsWith = (key: string): readonly string[] =>
+  [...tsconfigPathKeys()]
+    .filter(([, keys]) => keys.includes(key))
+    .map(([file]) => file)
+    .toSorted();
+
 describe('the alias lists', () => {
   it('name no individual plugin in any tsconfig', () => {
-    const naming = trackedFiles()
-      .filter((file) => /(?:^|\/)tsconfig[^/]*\.json$/u.test(file))
-      .filter((file) => {
-        const paths = tsconfigPathsSchema.parse(
-          ts.parseConfigFileTextToJson(file, readFileSync(file, 'utf8')).config,
-        ).compilerOptions?.paths;
-        return Object.keys(paths ?? {}).some((key) => NAMES_A_PLUGIN.test(key));
-      });
+    const naming = [...tsconfigPathKeys()]
+      .filter(([, keys]) => keys.some((key) => NAMES_A_PLUGIN.test(key)))
+      .map(([file]) => file);
     expect(naming).toEqual([]);
+  });
+
+  /*
+   * The narrowing, per package: a package resolves a plugin's view half only
+   * where its tsconfig carries the view pattern, so these lists are the
+   * packages that may. Widening one is a boundary decision, not a fix.
+   */
+  it('give the plugin domain pattern to the packages that resolve the plugin list', () => {
+    expect(tsconfigsWith('@project/plugin-*/domain')).toEqual([
+      'packages/aggregate/tsconfig.json',
+      'packages/app/tsconfig.json',
+      'packages/core/tsconfig.json',
+      'packages/graph/tsconfig.json',
+      'packages/http/tsconfig.json',
+      'packages/persistence/tsconfig.json',
+      'packages/plugins/tsconfig.json',
+      'packages/react-flow-adapter/tsconfig.json',
+      'packages/ui/tsconfig.json',
+      'tsconfig.base.json',
+    ]);
+  });
+
+  it('give the plugin view pattern only to the packages that may draw a plugin', () => {
+    expect(tsconfigsWith('@project/plugin-*/view')).toEqual([
+      'packages/app/tsconfig.json',
+      'packages/plugins/tsconfig.json',
+      'packages/react-flow-adapter/tsconfig.json',
+      'packages/ui/tsconfig.json',
+      'tsconfig.base.json',
+    ]);
   });
 
   it('name no individual plugin in Vitest or the server builds', () => {

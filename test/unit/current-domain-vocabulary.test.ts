@@ -676,7 +676,9 @@ const isAuthoredSource = (file: string): boolean =>
 /**
  * The modules that are pnpm's vocabulary rather than ours: the alias table,
  * the shared database Vite config, the mount build's Vite config and the HTTP
- * server and desktop sidecar build configs that import it, and the toolchain check that reads the package list plus its test. Cargo's
+ * server and desktop sidecar build configs that import it, the plugin alias
+ * test and its support module, which import the alias table to resolve every
+ * plugin through it, and the toolchain check that reads the package list plus its test. Cargo's
  * inheritance keys are forgiven by line instead (`CARGO_INHERITANCE`). The two
  * target-specific Vite configs delegate to that one shared owner and carry no
  * exemption.
@@ -690,6 +692,8 @@ const MONOREPO_VOCABULARY: readonly string[] = [
   'packages/app/vite.mount.config.ts',
   'packages/app/http-server-build.config.ts',
   'packages/app/desktop-sidecar-build.config.ts',
+  'test/support/plugin-packages.ts',
+  'test/unit/plugin-aliases.test.ts',
   'scripts/check-typescript-toolchain.ts',
   'test/unit/check-typescript-toolchain.test.ts',
 ];
@@ -2971,10 +2975,12 @@ const FOREIGN_ALIAS_FILES: readonly string[] = [
   'packages/app/components.json',
   'packages/ui/components.json',
   'test/unit/current-domain-vocabulary.test.ts',
-  // Reads the path-alias build config's real, excluded `resolve.alias` output
-  // — a type annotation, an optional-chained read and an object-entries loop,
-  // three shapes no single mask reaches at once.
+  // Read the path-alias configs' real `resolve.alias` output, parse it and
+  // resolve every plugin through it — path aliases throughout, in more shapes
+  // than a mask reaches.
   'test/unit/http-server-build-config.test.ts',
+  'test/unit/plugin-aliases.test.ts',
+  'test/support/plugin-packages.ts',
 ];
 
 /**

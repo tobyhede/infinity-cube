@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
+import { PLUGIN_DOMAIN_SPECIFIER, PLUGIN_VIEW_SPECIFIER } from './packages/app/plugin-specifiers';
 
 const resolve = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 
@@ -17,11 +18,9 @@ export default defineConfig({
      * come first. Sorting these keys makes every test that imports the subpath
      * fail to collect.
      *
-     * A Resource plugin is reached by pattern, so adding a `packages/plugin-*`
-     * package edits nothing here. The expressions are anchored at both ends and
-     * need the hyphen, so neither matches `@project/plugins/…`, and their place
-     * in the list cannot capture another package's subpath.
-     * `test/unit/plugin-aliases.test.ts` resolves every plugin through them.
+     * A Resource plugin is reached by the patterns `plugin-specifiers.ts`
+     * exports, which match no other package's specifier, so their place in this
+     * list captures no other package's subpath.
      */
     alias: [
       { find: '@project/aggregate', replacement: resolve('./packages/aggregate/src/index.ts') },
@@ -40,11 +39,11 @@ export default defineConfig({
         replacement: resolve('./packages/plugins/src/testing.ts'),
       },
       {
-        find: /^@project\/(plugin-[^/]+)\/domain$/u,
+        find: PLUGIN_DOMAIN_SPECIFIER,
         replacement: resolve('./packages/$1/src/domain.ts'),
       },
       {
-        find: /^@project\/(plugin-[^/]+)\/view$/u,
+        find: PLUGIN_VIEW_SPECIFIER,
         replacement: resolve('./packages/$1/src/view.tsx'),
       },
       {

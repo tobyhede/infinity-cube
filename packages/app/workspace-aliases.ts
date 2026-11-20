@@ -1,4 +1,11 @@
 import { fileURLToPath } from 'node:url';
+import { PLUGIN_DOMAIN_SPECIFIER } from './plugin-specifiers';
+
+/** One alias entry, in the array form Vite accepts when an entry is a pattern. */
+export interface WorkspaceAlias {
+  readonly find: string | RegExp;
+  readonly replacement: string;
+}
 
 /**
  * The server module runner's package boundary, shared by the dev/browser config
@@ -13,20 +20,6 @@ import { fileURLToPath } from 'node:url';
  * anchor on cwd, which is the app package only for the one filtered script that
  * loads the build config.
  */
-/**
- * A Resource plugin's domain half, by pattern: `@project/plugin-<name>/domain`
- * names `packages/plugin-<name>/src/domain.ts`, so adding a plugin package
- * edits nothing here. Anchored at both ends and needing the hyphen, it cannot
- * match `@project/plugins/domain`. No server build reaches a view half.
- */
-const PLUGIN_DOMAIN = /^@project\/(plugin-[^/]+)\/domain$/u;
-
-/** One alias entry, in the array form Vite accepts when an entry is a pattern. */
-export interface WorkspaceAlias {
-  readonly find: string | RegExp;
-  readonly replacement: string;
-}
-
 export const workspaceAliases = (): WorkspaceAlias[] => {
   const here = (path: string): string => fileURLToPath(new URL(path, import.meta.url));
   return [
@@ -36,7 +29,7 @@ export const workspaceAliases = (): WorkspaceAlias[] => {
     { find: '@project/http', replacement: here('../http/src/index.ts') },
     { find: '@project/persistence', replacement: here('../persistence/src/index.ts') },
     { find: '@project/plugins/domain', replacement: here('../plugins/src/domain.ts') },
-    { find: PLUGIN_DOMAIN, replacement: here('../$1/src/domain.ts') },
+    { find: PLUGIN_DOMAIN_SPECIFIER, replacement: here('../$1/src/domain.ts') },
     {
       find: '@project/resource-api/domain',
       replacement: here('../resource-api/src/domain/index.ts'),

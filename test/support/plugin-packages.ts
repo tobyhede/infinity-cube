@@ -1,6 +1,9 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { z } from 'zod';
+import type { WorkspaceAlias } from '../../packages/app/workspace-aliases';
+import { trackedFiles } from './structural-scan';
 
 /** The repository's `packages/` directory. */
 export const PACKAGES_DIRECTORY = fileURLToPath(new URL('../../packages/', import.meta.url));
@@ -36,23 +39,19 @@ export const missingPluginHalves = (
       .map((file) => `${name}/${file}`),
   );
 
-/** Every TypeScript source file under each plugin's `src/`, repo-root-relative and sorted. */
-export const pluginSourceFiles = (
-  packagesDirectory: string = PACKAGES_DIRECTORY,
-): readonly string[] =>
-  pluginPackages(packagesDirectory)
-    .flatMap((name) =>
-      readdirSync(join(packagesDirectory, name, 'src'), { recursive: true, encoding: 'utf8' })
-        .filter((file) => /\.tsx?$/u.test(file))
-        .map((file) => `packages/${name}/src/${file.split('\\').join('/')}`),
-    )
-    .sort();
+/** Every tracked TypeScript source file under a plugin package's `src/`, sorted. */
+export const pluginSourceFiles = (): readonly string[] =>
+  trackedFiles()
+    .filter((file) => /^packages\/plugin-[^/]+\/src\/.*\.tsx?$/u.test(file))
+    .toSorted();
 
 /** One Vite or Vitest alias entry, in the array form both accept. */
-export interface AliasEntry {
-  readonly find: string | RegExp;
-  readonly replacement: string;
-}
+export type AliasEntry = WorkspaceAlias;
+
+/** An alias list read from a Vite or Vitest config, parsed rather than asserted. */
+export const aliasListSchema = z.array(
+  z.object({ find: z.union([z.string(), z.instanceof(RegExp)]), replacement: z.string() }),
+);
 
 /**
  * The file `specifier` resolves to through `aliases`, as Vite's alias plugin
