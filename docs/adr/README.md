@@ -52,6 +52,7 @@ The current statement of these decisions is [Space and Resources](../requirement
 | ADR | Binds |
 | --- | --- |
 | [0085](0085-thing-and-diagram-are-the-first-public-names-for-card-and-layout.md) | A Card is a Thing and a Layout is a Diagram. `LayoutStrategy` keeps its name. |
+| [0164](0164-talk-is-retired-and-a-person-is-shown-a-space.md) | "Talk" names nothing: what a person is shown is a Space, a desktop window on a folder is a Space window, source and requirements say Aggregate for the directory and its run, and what is presented is a presented Graph. |
 | [0101](0101-map-and-resource-are-the-first-public-names-for-diagram-and-thing.md) | A Resource is a Thing and a Map is a Diagram, renamed exactly. Space, Resource, Graph and Map are the four nouns. |
 | [0001](0001-recursive-spaces.md) | A Card may hold another Space, so Spaces nest. |
 | [0004](0004-cards-are-the-graph.md) | Cards are the graph. Nothing sits between a Card and its position. |
@@ -142,7 +143,6 @@ The current statement of these decisions is [Editing](../requirements/editing.md
 | [0095](0095-sql-databases-share-one-space-repository.md) | PostgreSQL and SQLite share one Space repository and differ only through a small `SqlStore`; revisions are decimal TEXT on both. |
 | [0096](0096-the-aggregate-lifecycle-decision-stays-inside-each-repository.md) | Initialization and replacement decide their outcome inside each repository; there is no pure lifecycle decision beside `decideCommit`. |
 | [0088](0088-aggregate-names-the-meta-rooted-collection.md) | Aggregate names the complete Meta-rooted collection of Spaces. One Space plus its Things is a snapshot. |
-| [0164](0164-talk-is-retired-and-a-person-is-shown-a-space.md) | "Talk" names nothing: what a person is shown is a Space, a desktop window on a folder is a Space window, source and requirements say Aggregate for the directory and its run, and what is presented is a presented Graph. |
 | [0098](0098-a-commit-outcome-is-named-once-on-both-sides-of-the-seam.md) | `CommitOutcome` is shared by both commit seams, its status codes are one table, and the identity rule is the store's alone. |
 | [0119](0119-export-writes-in-place-and-git-answers-for-a-partial-write.md) | Every Export writes the Aggregate directory in place: only the files Import reads, each changed one replaced by a per-file rename and the rest untouched; the directory is never moved, and git, not Hyper, answers for a write that fails part-way (refines 0030, 0117, 0118). |
 | [0117](0117-running-serves-an-aggregate-directory-as-the-durable-copy.md) | Running an Aggregate directory (`pnpm hyper run <dir>`, ADR 0124) makes the directory the durable copy and discards the memory store, and git answers for history, undo and concurrent writers. Edits are Exported after a quiet period and on stop; a crash before that write loses them. |

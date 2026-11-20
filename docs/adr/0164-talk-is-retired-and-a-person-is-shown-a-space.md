@@ -32,5 +32,5 @@ Related: 0088, 0129, 0130, 0131, 0132, 0155, 0163
 - The sweep is `.scratch/talk-to-space/rename-talk.mjs`, tracked so a branch in flight can replay it. Its header lists what it does not produce.
 - The desktop shell's command is `open_aggregate` and its permission `allow-open-aggregate`; a Space window's label begins `space-`.
 - The Notes window's view names the presented Graph's Title `presentedGraph`.
-- Accepted ADRs keep their wording, their titles and their file names, 0131, 0132 and 0163 among them. Tickets under `.scratch/` and plans under `docs/superpowers/` are history and keep theirs.
+- Accepted ADRs keep their wording, their titles and their file names, 0131, 0132 and 0163 among them. The index in `docs/adr/README.md` is written in current words, so its summaries of 0129 and 0132 say presented Graph and Aggregate while their links keep the file names. Tickets under `.scratch/` and plans under `docs/superpowers/` are history and keep theirs.
 - `test/unit/current-domain-vocabulary.test.ts` holds the word out of authored source. It does not read Markdown, so prose is reviewed.
