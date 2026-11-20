@@ -8,11 +8,12 @@ import { capSizeHint, visibleCanvasCap } from '#src/visible-canvas-cap';
 import { CanvasResourceNodeSpecimen } from '../support/ReactFlowCanvas';
 import { storeStoryText, storyText } from '../support/story-assets';
 import '../support/inventory.css';
+import { EditingComparison } from './MarkdownEditingComparison';
 import './markdown-resize-prototype.css';
 
 export default { title: 'Review/Markdown prototype' };
 
-const note = storyText(`## Walking the ridge
+const noteSource = `## Walking the ridge
 
 Leave the track at the saddle. From here the ridge is wide enough to walk two abreast, and the first cairn is visible against the sky.
 
@@ -20,7 +21,8 @@ At the second cairn, turn east. The creek below is easier to hear than to see. F
 
 ### The return route
 
-Cross the bridge and follow the marked trail through the trees. The last clearing gives you a view back to both cairns.`);
+Cross the bridge and follow the marked trail through the trees. The last clearing gives you a view back to both cairns.`;
+const note = storyText(noteSource);
 
 const mapContent = z.object({ open: z.boolean() });
 const markdownContent = z.object({ url: assetRefSchema });
@@ -115,3 +117,5 @@ export const Comparison: Story = () => {
     </main>
   );
 };
+
+export const EditModes: Story = () => <EditingComparison initial={noteSource} />;
