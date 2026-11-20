@@ -1,6 +1,6 @@
 # The Map embedding as one module
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 Source: architecture review of 2026-11-19 (candidate 1), settled with the user over three rounds of design questions on 2026-11-20.
 
