@@ -16,3 +16,28 @@
   :is([aria-label^='Open Resource '], [aria-label^='Close Resource ']) {
   display: none;
 }
+
+.prototype-markdown-editor {
+  position: fixed;
+  padding: 0;
+  border: 1px solid var(--border);
+  background: var(--background);
+  color: var(--foreground);
+}
+.prototype-markdown-editor[open] {
+  display: flex;
+  flex-direction: column;
+}
+.prototype-markdown-editor[data-overlay='false'] {
+  inset: auto;
+  margin: 0;
+}
+.prototype-markdown-editor[data-overlay='true'] {
+  inset: 0;
+  margin: auto;
+  width: min(48rem, 94vw);
+  height: min(38rem, 85vh);
+}
+.prototype-markdown-editor::backdrop {
+  background: rgb(0 0 0 / 30%);
+}
