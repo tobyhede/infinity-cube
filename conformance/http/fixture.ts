@@ -36,7 +36,7 @@ export const removeTemporaryDirectories = async (): Promise<void> => {
 
 /** A fresh copy of the fixture, in a temporary directory of its own. */
 export const fixtureCopy = async (): Promise<string> => {
-  const directory = join(await temporaryDirectory(), 'talk');
+  const directory = join(await temporaryDirectory(), 'space');
   await cp(FIXTURE, directory, { recursive: true });
   return directory;
 };

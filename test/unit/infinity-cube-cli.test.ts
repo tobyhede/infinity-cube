@@ -54,7 +54,7 @@ const USAGE = 'Usage: cube <init|run|check|mcp|import|export|help> [arguments]\n
 const storedSpace: LoadedSpace = {
   snapshot: {
     id: SPACE_ID,
-    document: { version: 1, title: 'Stored talk' },
+    document: { version: 1, title: 'Stored space' },
     resources: [
       {
         id: RESOURCE_ID,
@@ -92,7 +92,10 @@ const writeAggregate = async (
   writeAggregateInto(await makeTemporaryDirectory(), metaSpaceId, spaces, assets);
 
 /** One Meta Space alone, which is the smallest complete aggregate there is. */
-const writeSingleSpaceAggregate = (id: UUID = SPACE_ID, title = 'Imported talk'): Promise<string> =>
+const writeSingleSpaceAggregate = (
+  id: UUID = SPACE_ID,
+  title = 'Imported space',
+): Promise<string> =>
   writeAggregate(
     id,
     [
@@ -190,7 +193,7 @@ describe('runInfinityCube', () => {
       `${JSON.stringify({ version: 1, metaSpaceId: SPACE_ID }, null, 2)}\n`,
     );
     await expect(readFile(join(destination, SPACE_ID, 'space.json'), 'utf8')).resolves.toBe(
-      `${JSON.stringify({ version: 1, id: SPACE_ID, title: 'Stored talk' }, null, 2)}\n`,
+      `${JSON.stringify({ version: 1, id: SPACE_ID, title: 'Stored space' }, null, 2)}\n`,
     );
     await expect(
       readFile(join(destination, SPACE_ID, 'resources', `${RESOURCE_ID}.json`), 'utf8'),
@@ -474,7 +477,7 @@ describe('runInfinityCube', () => {
       exportedRevision: 0n,
     });
     await expect(readFile(join(destination, SPACE_ID, 'space.json'), 'utf8')).resolves.toContain(
-      '"title": "Stored talk"',
+      '"title": "Stored space"',
     );
   });
 
@@ -513,7 +516,7 @@ describe('runInfinityCube', () => {
     // The whole point of the ordering: the files are complete and valid even
     // though the revision behind them was never written down.
     await expect(readFile(join(destination, SPACE_ID, 'space.json'), 'utf8')).resolves.toContain(
-      '"title": "Stored talk"',
+      '"title": "Stored space"',
     );
     await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
       exportedRevision: null,
@@ -526,7 +529,7 @@ describe('runInfinityCube', () => {
       id: SPACE_ID,
       document: {
         version: 1,
-        title: 'Canonical: talk',
+        title: 'Canonical: space',
         maps: [
           {
             id: OTHER_SPACE_ID,
@@ -695,31 +698,31 @@ describe('runInfinityCube', () => {
     { args: ['init', ''] },
     { args: ['init', 'first', 'second'] },
     { args: ['init', '--no-open'] },
-    { args: ['init', 'talk', '--no-open'] },
-    { args: ['init', 'talk', '--store', 'postgres'] },
-    { args: ['init', 'talk', '--store', 'sqlite'] },
+    { args: ['init', 'space', '--no-open'] },
+    { args: ['init', 'space', '--store', 'postgres'] },
+    { args: ['init', 'space', '--store', 'sqlite'] },
     { args: ['check'] },
     { args: ['check', ''] },
     { args: ['check', 'first', 'second'] },
-    { args: ['check', 'talk', '--no-open'] },
-    { args: ['check', 'talk', '--store', 'sqlite'] },
+    { args: ['check', 'space', '--no-open'] },
+    { args: ['check', 'space', '--store', 'sqlite'] },
     { args: ['mcp'] },
     { args: ['mcp', ''] },
     { args: ['mcp', 'first', 'second'] },
-    { args: ['mcp', 'talk', '--no-open'] },
-    { args: ['mcp', 'talk', '--store', 'sqlite'] },
+    { args: ['mcp', 'space', '--no-open'] },
+    { args: ['mcp', 'space', '--store', 'sqlite'] },
     { args: ['run'] },
     { args: ['run', ''] },
     { args: ['run', 'first', 'second'] },
     { args: ['run', '--no-open'] },
-    { args: ['run', 'talk', '--store', 'postgres'] },
-    { args: ['run', 'talk', '--store', 'sqlite'] },
-    { args: ['run', 'talk', '--dangerous-replace'] },
-    { args: ['run', 'talk', '--port'] },
-    { args: ['run', 'talk', '--port', '0'] },
-    { args: ['run', 'talk', '--port', '65536'] },
-    { args: ['run', 'talk', '--port', 'eighty'] },
-    { args: ['run', 'talk', '--port', '4173', '--port', '4174'] },
+    { args: ['run', 'space', '--store', 'postgres'] },
+    { args: ['run', 'space', '--store', 'sqlite'] },
+    { args: ['run', 'space', '--dangerous-replace'] },
+    { args: ['run', 'space', '--port'] },
+    { args: ['run', 'space', '--port', '0'] },
+    { args: ['run', 'space', '--port', '65536'] },
+    { args: ['run', 'space', '--port', 'eighty'] },
+    { args: ['run', 'space', '--port', '4173', '--port', '4174'] },
   ])('rejects invalid arguments $args without opening a store', async ({ args }) => {
     const output = captureIo();
 
@@ -791,7 +794,7 @@ describe('runInfinityCube', () => {
     const directory = await writeAggregate(SPACE_ID, [
       {
         name: SPACE_ID,
-        spaceFile: JSON.stringify({ version: 1, id: SPACE_ID, title: 'Imported talk' }),
+        spaceFile: JSON.stringify({ version: 1, id: SPACE_ID, title: 'Imported space' }),
         resources: markdownResourceFiles(RESOURCE_ID, 'Opening', 'Hello.\n'),
       },
     ]);
@@ -818,7 +821,7 @@ describe('runInfinityCube', () => {
   });
 
   it('replaces the stored aggregate when --dangerous-replace is given', async () => {
-    const directory = await writeSingleSpaceAggregate(OTHER_SPACE_ID, 'Replacement talk');
+    const directory = await writeSingleSpaceAggregate(OTHER_SPACE_ID, 'Replacement space');
     const output = captureIo();
     const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
 
@@ -835,7 +838,7 @@ describe('runInfinityCube', () => {
     ]);
     expect(output.stderr).toEqual([]);
     await expect(repository.listSpaces()).resolves.toEqual([
-      { id: OTHER_SPACE_ID, title: 'Replacement talk' },
+      { id: OTHER_SPACE_ID, title: 'Replacement space' },
     ]);
   });
 
@@ -848,7 +851,7 @@ describe('runInfinityCube', () => {
    * new.
    */
   it('does not claim the Meta identity moved when replacement conflicts with the same id it expected', async () => {
-    const directory = await writeSingleSpaceAggregate(OTHER_SPACE_ID, 'Replacement talk');
+    const directory = await writeSingleSpaceAggregate(OTHER_SPACE_ID, 'Replacement space');
     const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
     repository.replaceAggregate = () =>
       Promise.resolve({ kind: 'conflict', currentMetaSpaceId: SPACE_ID });
@@ -875,7 +878,7 @@ describe('runInfinityCube', () => {
    * from an exit code.
    */
   it('refuses to import over an initialized repository, naming the flag that would proceed', async () => {
-    const directory = await writeSingleSpaceAggregate(OTHER_SPACE_ID, 'Replacement talk');
+    const directory = await writeSingleSpaceAggregate(OTHER_SPACE_ID, 'Replacement space');
     const output = captureIo();
     const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
 
@@ -890,7 +893,7 @@ describe('runInfinityCube', () => {
     expect(output.stderr.join('')).toContain(SPACE_ID);
     expect(output.stderr.join('')).toContain('--dangerous-replace');
     await expect(repository.listSpaces()).resolves.toEqual([
-      { id: SPACE_ID, title: 'Stored talk' },
+      { id: SPACE_ID, title: 'Stored space' },
     ]);
   });
 
@@ -1024,7 +1027,7 @@ describe('runInfinityCube', () => {
     ]);
     expect(output.stderr).toEqual([]);
     await expect(repository.listSpaces()).resolves.toEqual([
-      { id: SPACE_ID, title: 'Imported talk' },
+      { id: SPACE_ID, title: 'Imported space' },
     ]);
   });
 
@@ -1133,7 +1136,7 @@ describe('runInfinityCube', () => {
   });
 
   it('accepts --store before the directory and beside --dangerous-replace', async () => {
-    const directory = await writeSingleSpaceAggregate(OTHER_SPACE_ID, 'Replacement talk');
+    const directory = await writeSingleSpaceAggregate(OTHER_SPACE_ID, 'Replacement space');
     const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
     const output = captureIo();
 
@@ -1150,7 +1153,7 @@ describe('runInfinityCube', () => {
     expect(output.stderr).toEqual([]);
     expect(exitCode).toBe(0);
     await expect(repository.listSpaces()).resolves.toEqual([
-      { id: OTHER_SPACE_ID, title: 'Replacement talk' },
+      { id: OTHER_SPACE_ID, title: 'Replacement space' },
     ]);
   });
 
@@ -1385,10 +1388,10 @@ describe('runInfinityCube author verbs', () => {
     'init writes a new aggregate to a directory holding $holding, prints the run command and opens no store',
     async ({ make }) => {
       const workingDirectory = await makeTemporaryDirectory();
-      const directory = join(workingDirectory, 'new talk');
+      const directory = join(workingDirectory, 'new space');
       await make(directory);
 
-      const { output, launched, exitCode } = author(['init', 'new talk'], workingDirectory);
+      const { output, launched, exitCode } = author(['init', 'new space'], workingDirectory);
 
       expect(await exitCode).toBe(0);
       expect(output.stderr).toEqual([]);
@@ -1539,12 +1542,12 @@ describe('runInfinityCube author verbs', () => {
 
   it.each([
     {
-      args: ['run', 'talk'],
-      launched: { verb: 'run', directory: '/authors/home/talk', port: undefined, open: true },
+      args: ['run', 'space'],
+      launched: { verb: 'run', directory: '/authors/home/space', port: undefined, open: true },
     },
     {
-      args: ['run', '--no-open', '/elsewhere/talk', '--port', '4180'],
-      launched: { verb: 'run', directory: '/elsewhere/talk', port: 4180, open: false },
+      args: ['run', '--no-open', '/elsewhere/space', '--port', '4180'],
+      launched: { verb: 'run', directory: '/elsewhere/space', port: 4180, open: false },
     },
   ])(
     'run launches $args with the directory resolved, answering the run’s exit code',
@@ -1568,11 +1571,11 @@ describe('runInfinityCube author verbs', () => {
     'mcp serves a directory holding $holding, resolved against the working directory, answering the server’s exit code',
     async ({ make }) => {
       const workingDirectory = await makeTemporaryDirectory();
-      const directory = join(workingDirectory, 'new talk');
+      const directory = join(workingDirectory, 'new space');
       await mkdir(directory);
       await make(directory);
 
-      const { output, launched, served, exitCode } = author(['mcp', 'new talk'], workingDirectory);
+      const { output, launched, served, exitCode } = author(['mcp', 'new space'], workingDirectory);
 
       expect(await exitCode).toBe(5);
       expect(served).toEqual([directory]);
@@ -1598,7 +1601,7 @@ describe('runInfinityCube author verbs', () => {
 
   it('mcp refuses a path that is a file, serving nothing', async () => {
     const workingDirectory = await makeTemporaryDirectory();
-    const file = join(workingDirectory, 'talk.json');
+    const file = join(workingDirectory, 'space.json');
     await writeFile(file, '{}\n');
 
     const { output, served, exitCode } = author(['mcp', file], workingDirectory);
@@ -1649,10 +1652,10 @@ describe('the cube entry point', () => {
     async ({ lifecycleEvent, resolvesIn }) => {
       const invoked = await makeTemporaryDirectory();
       const cwd = await makeTemporaryDirectory();
-      const expected = join(resolvesIn === 'invoked' ? invoked : cwd, 'talk');
-      const unexpected = join(resolvesIn === 'invoked' ? cwd : invoked, 'talk');
+      const expected = join(resolvesIn === 'invoked' ? invoked : cwd, 'space');
+      const unexpected = join(resolvesIn === 'invoked' ? cwd : invoked, 'space');
 
-      const result = await entry(['init', 'talk'], cwd, {
+      const result = await entry(['init', 'space'], cwd, {
         INIT_CWD: invoked,
         npm_lifecycle_event: lifecycleEvent,
       });

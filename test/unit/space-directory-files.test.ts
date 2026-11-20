@@ -17,7 +17,7 @@ const PICTURE_ID = uuidSchema.parse('50000000-0000-4000-8000-000000000006');
 
 const space = (resources: SpaceSnapshot['resources']): SpaceSnapshot => ({
   id: SPACE_ID,
-  document: { version: 1, title: 'Talk' },
+  document: { version: 1, title: 'Space' },
   resources,
 });
 
@@ -124,7 +124,7 @@ describe("a Map entry's content", () => {
     id: SPACE_ID,
     document: {
       version: 1,
-      title: 'Talk',
+      title: 'Space',
       defaultMap: MAP_ID,
       maps: [
         {
@@ -193,7 +193,7 @@ describe("a Map entry's content, however its store ordered it", () => {
         id: SPACE_ID,
         document: {
           version: 1,
-          title: 'Talk',
+          title: 'Space',
           maps: [
             {
               id: MAP_ID,

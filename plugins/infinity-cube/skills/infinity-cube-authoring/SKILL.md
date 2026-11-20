@@ -1,6 +1,6 @@
 ---
 name: infinity-cube-authoring
-description: Write or change an InfinityCube Aggregate directory's files — a talk or design's `aggregate.json`, `space.json` Maps, Graphs and Edges, Resource files and their Markdown, `assets/` — on disk or through a `pnpm cube mcp` server's tools. Use to add, change, connect or remove Resources, Maps, Graphs or Edges by hand, or to fix what `pnpm cube check` or a refused `pnpm cube run` reports. Setting InfinityCube up or starting a run is `infinity-cube-getting-started`.
+description: Write or change an InfinityCube Aggregate directory's files — a Space's `aggregate.json`, `space.json` Maps, Graphs and Edges, Resource files and their Markdown, `assets/` — on disk or through a `pnpm cube mcp` server's tools. Use to add, change, connect or remove Resources, Maps, Graphs or Edges by hand, or to fix what `pnpm cube check` or a refused `pnpm cube run` reports. Setting InfinityCube up or starting a run is `infinity-cube-getting-started`.
 ---
 
 # Authoring an Aggregate directory

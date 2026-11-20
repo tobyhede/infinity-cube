@@ -2523,7 +2523,7 @@ export const spaceRepositoryContract = (
         id,
         document,
       }));
-      const first: SpaceSnapshot = { ...space(SPACE_ID, 'Talk', []), resources: fromFile };
+      const first: SpaceSnapshot = { ...space(SPACE_ID, 'Space', []), resources: fromFile };
       await expect(repository.storeAsset(text)).resolves.toBe('stored');
       await seed(repository, first);
 

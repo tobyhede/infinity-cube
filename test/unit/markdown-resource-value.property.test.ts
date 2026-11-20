@@ -37,7 +37,7 @@ const resourceArb = fc.record({ id: fc.uuid({ version: 4 }), title: titleArb, te
 /** A Space holding `resources`, each stored as its id and its document. */
 const snapshotOf = (resources: readonly Resource[]): SpaceSnapshot => ({
   id: SPACE_ID,
-  document: { version: 1, title: 'Talk' },
+  document: { version: 1, title: 'Space' },
   resources: resources.map(({ id, ...document }) => ({ id, document })),
 });
 

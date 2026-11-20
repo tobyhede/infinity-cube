@@ -196,7 +196,7 @@ describe('importAggregate', () => {
         spaceFile: JSON.stringify({
           version: 2,
           id: META_SPACE_ID,
-          title: 'Pre-release talk',
+          title: 'Pre-release space',
           graphs: [{ id: GRAPH_ID, title: 'Main', edges: [] }],
           maps: [{ id: MAP_ID, title: 'Working', positions: {} }],
         }),
@@ -226,7 +226,7 @@ describe('importAggregate', () => {
         spaceFile: JSON.stringify({
           version: 1,
           id: META_SPACE_ID,
-          title: 'Talk',
+          title: 'Space',
           graphs: [{ id: GRAPH_ID, title: 'Main', edges: [] }],
         }),
       },

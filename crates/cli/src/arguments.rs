@@ -154,9 +154,9 @@ mod tests {
         #[test]
         fn reads_a_directory_alone_as_opening_on_the_default_port() {
             assert_eq!(
-                parsed(&["run", "talk"]),
+                parsed(&["run", "space"]),
                 Some(Command::Run(RunCommand {
-                    directory: PathBuf::from("talk"),
+                    directory: PathBuf::from("space"),
                     port: None,
                     open: true,
                     built: None,
@@ -173,12 +173,12 @@ mod tests {
                     "--no-open",
                     "--port",
                     "5300",
-                    "talk",
+                    "space",
                     "--built",
                     "dist"
                 ]),
                 Some(Command::Run(RunCommand {
-                    directory: PathBuf::from("talk"),
+                    directory: PathBuf::from("space"),
                     port: Some(5300),
                     open: false,
                     built: Some(PathBuf::from("dist")),
@@ -191,13 +191,13 @@ mod tests {
         fn refuses_a_port_outside_one_to_65535() {
             for bad in ["0", "65536", "-1", "80a", "", "999999"] {
                 assert_eq!(
-                    parsed(&["run", "talk", "--port", bad]),
+                    parsed(&["run", "space", "--port", bad]),
                     None,
                     "port {bad:?}"
                 );
             }
             assert!(
-                parsed(&["run", "talk", "--port", "065535"]).is_some(),
+                parsed(&["run", "space", "--port", "065535"]).is_some(),
                 "a leading zero is still a port"
             );
         }
@@ -223,14 +223,14 @@ mod tests {
         #[test]
         fn reads_a_directory_and_json() {
             assert_eq!(
-                parsed(&["check", "--json", "talk"]),
+                parsed(&["check", "--json", "space"]),
                 Some(Command::Check(CheckCommand {
-                    directory: PathBuf::from("talk"),
+                    directory: PathBuf::from("space"),
                     json: true,
                 })),
                 "json"
             );
-            assert_eq!(parsed(&["check", "talk", "--port", "1"]), None, "no port");
+            assert_eq!(parsed(&["check", "space", "--port", "1"]), None, "no port");
         }
     }
 
@@ -239,7 +239,7 @@ mod tests {
 
         #[test]
         fn refuses_an_unknown_verb_and_reads_help_alone() {
-            assert_eq!(parsed(&["serve", "talk"]), None, "unknown verb");
+            assert_eq!(parsed(&["serve", "space"]), None, "unknown verb");
             assert_eq!(parsed(&[]), None, "nothing");
             assert_eq!(parsed(&["help"]), Some(Command::Help), "help");
             assert_eq!(parsed(&["help", "x"]), None, "help with more");

@@ -37,7 +37,7 @@ export interface DesktopHandlerOptions {
 
 /**
  * The session cookie's name for the sidecar answering `host`. A webview keeps
- * one cookie store for every talk window, and scopes a cookie by host, not
+ * one cookie store for every Space window, and scopes a cookie by host, not
  * port (RFC 6265 §8.5), so each sidecar's cookie carries its port.
  */
 export const sessionCookieName = (host: string): string =>
@@ -132,7 +132,7 @@ export const createDesktopHandler = (
     }
     const session = cookieValue(request.headers.get('cookie'), sessionCookieName(host));
     if (session === undefined || !sameSecret(session, options.secret)) {
-      return refused(403, 'Open this talk from InfinityCube.');
+      return refused(403, 'Open this Space from InfinityCube.');
     }
 
     if (isApplicationPath(url.pathname)) return options.host.fetch(request);

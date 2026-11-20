@@ -1,9 +1,9 @@
-//! Tests of a talk's key and its address.
+//! Tests of an Aggregate's key and its address.
 
 use super::*;
 
-fn rust_talk(style: SchemeStyle) -> TalkAddress {
-    TalkAddress::new(TalkKey::of(Path::new("/talks/rust")), style)
+fn rust_aggregate(style: SchemeStyle) -> AggregateAddress {
+    AggregateAddress::new(AggregateKey::of(Path::new("/spaces/rust")), style)
 }
 
 fn url(text: &str) -> Url {
@@ -15,15 +15,15 @@ fn uri(text: &str) -> http::Uri {
         .unwrap_or_else(|error| unreachable!("{text} is a URI: {error}"))
 }
 
-mod given_a_talks_key {
+mod given_an_aggregates_key {
     use super::*;
 
     #[test]
     fn is_the_first_half_of_the_sha256_of_its_folder_path() {
-        // `printf '/talks/rust' | sha256sum | cut -c1-32`
+        // `printf '/spaces/rust' | sha256sum | cut -c1-32`
         assert_eq!(
-            TalkKey::of(Path::new("/talks/rust")).as_str(),
-            "9b684d84a4976d0f4e7893a2dbd4b781",
+            AggregateKey::of(Path::new("/spaces/rust")).as_str(),
+            "b9cf8013ab0bb83fffb617cada9319eb",
             "the key should be the path's hash, so it is the same on every launch"
         );
     }
@@ -31,64 +31,64 @@ mod given_a_talks_key {
     #[test]
     fn differs_between_two_folders() {
         assert_ne!(
-            TalkKey::of(Path::new("/talks/rust")),
-            TalkKey::of(Path::new("/talks/go")),
-            "two talks should have two keys, and so two origins"
+            AggregateKey::of(Path::new("/spaces/rust")),
+            AggregateKey::of(Path::new("/spaces/go")),
+            "two Aggregates should have two keys, and so two origins"
         );
     }
 }
 
-mod given_a_host_per_talk_origin {
+mod given_a_host_per_aggregate_origin {
     use super::*;
 
     #[test]
-    fn a_talk_is_served_from_its_key_under_the_one_scheme() {
-        let address = rust_talk(SchemeStyle::HostPerTalk);
+    fn an_aggregate_is_served_from_its_key_under_the_one_scheme() {
+        let address = rust_aggregate(SchemeStyle::HostPerAggregate);
         assert_eq!(
             address.scheme(),
             "infinitycube",
-            "one scheme for every talk"
+            "one scheme for every Aggregate"
         );
         assert_eq!(
             address.origin(),
-            "infinitycube://9b684d84a4976d0f4e7893a2dbd4b781",
+            "infinitycube://b9cf8013ab0bb83fffb617cada9319eb",
             "the key in the host part"
         );
         assert_eq!(
             address.window_url().ok(),
-            Some(url("infinitycube://9b684d84a4976d0f4e7893a2dbd4b781/")),
+            Some(url("infinitycube://b9cf8013ab0bb83fffb617cada9319eb/")),
             "the window opens at the origin's root"
         );
     }
 
     #[test]
-    fn two_talks_have_two_origins() {
-        let go = TalkAddress::new(
-            TalkKey::of(Path::new("/talks/go")),
-            SchemeStyle::HostPerTalk,
+    fn two_aggregates_have_two_origins() {
+        let go = AggregateAddress::new(
+            AggregateKey::of(Path::new("/spaces/go")),
+            SchemeStyle::HostPerAggregate,
         );
         assert_ne!(
-            rust_talk(SchemeStyle::HostPerTalk).origin(),
+            rust_aggregate(SchemeStyle::HostPerAggregate).origin(),
             go.origin(),
-            "two talks presenting at once should not share an origin"
+            "two Aggregates presenting at once should not share an origin"
         );
     }
 
     #[test]
-    fn a_window_navigates_only_within_its_talk() {
-        let address = rust_talk(SchemeStyle::HostPerTalk);
+    fn a_window_navigates_only_within_its_aggregate() {
+        let address = rust_aggregate(SchemeStyle::HostPerAggregate);
         assert!(
             address.admits(&url(
-                "infinitycube://9b684d84a4976d0f4e7893a2dbd4b781/spaces/x/notes?y#z"
+                "infinitycube://b9cf8013ab0bb83fffb617cada9319eb/spaces/x/notes?y#z"
             )),
-            "its own talk"
+            "its own Aggregate"
         );
         for elsewhere in [
             "https://example.com/",
             "http://127.0.0.1:4173/",
             "infinitycube://1e50ea2898230c692168cebfd93c5959/",
-            "infinitycube://9b684d84a4976d0f4e7893a2dbd4b781:8080/",
-            "infinitycube://user@9b684d84a4976d0f4e7893a2dbd4b781/",
+            "infinitycube://b9cf8013ab0bb83fffb617cada9319eb:8080/",
+            "infinitycube://user@b9cf8013ab0bb83fffb617cada9319eb/",
             "file:///etc/passwd",
             "about:blank",
         ] {
@@ -100,12 +100,12 @@ mod given_a_host_per_talk_origin {
     }
 
     #[test]
-    fn a_request_names_its_talk_by_the_host() {
-        let key = TalkKey::of(Path::new("/talks/rust"));
+    fn a_request_names_its_aggregate_by_the_host() {
+        let key = AggregateKey::of(Path::new("/spaces/rust"));
         assert_eq!(
-            TalkAddress::key_of(
-                &uri("infinitycube://9b684d84a4976d0f4e7893a2dbd4b781/api/spaces"),
-                SchemeStyle::HostPerTalk
+            AggregateAddress::key_of(
+                &uri("infinitycube://b9cf8013ab0bb83fffb617cada9319eb/api/spaces"),
+                SchemeStyle::HostPerAggregate
             ),
             Some(key),
             "the host is the key"
@@ -113,47 +113,47 @@ mod given_a_host_per_talk_origin {
         for other in [
             "infinitycube://localhost/",
             "infinitycube://9B684D84A4976D0F4E7893A2DBD4B781/",
-            "infinitycube://9b684d84a4976d0f4e7893a2dbd4b781:1/",
-            "other://9b684d84a4976d0f4e7893a2dbd4b781/",
+            "infinitycube://b9cf8013ab0bb83fffb617cada9319eb:1/",
+            "other://b9cf8013ab0bb83fffb617cada9319eb/",
             "/api/spaces",
         ] {
             assert_eq!(
-                TalkAddress::key_of(&uri(other), SchemeStyle::HostPerTalk),
+                AggregateAddress::key_of(&uri(other), SchemeStyle::HostPerAggregate),
                 None,
-                "{other} names no talk"
+                "{other} names no Aggregate"
             );
         }
     }
 }
 
-mod given_a_scheme_per_talk_origin {
+mod given_a_scheme_per_aggregate_origin {
     use super::*;
 
     #[test]
-    fn a_talk_has_a_scheme_of_its_own_served_from_localhost() {
-        let address = rust_talk(SchemeStyle::SchemePerTalk);
+    fn an_aggregate_has_a_scheme_of_its_own_served_from_localhost() {
+        let address = rust_aggregate(SchemeStyle::SchemePerAggregate);
         assert_eq!(
             address.scheme(),
-            "infinitycube-9b684d84a4976d0f4e7893a2dbd4b781",
-            "a scheme per talk, named stably from it"
+            "infinitycube-b9cf8013ab0bb83fffb617cada9319eb",
+            "a scheme per Aggregate, named stably from it"
         );
         assert_eq!(
             address.origin(),
-            "http://infinitycube-9b684d84a4976d0f4e7893a2dbd4b781.localhost",
+            "http://infinitycube-b9cf8013ab0bb83fffb617cada9319eb.localhost",
             "the origin Tauri serves that scheme from"
         );
         assert_eq!(
             address.window_url().ok(),
             Some(url(
-                "infinitycube-9b684d84a4976d0f4e7893a2dbd4b781://localhost/"
+                "infinitycube-b9cf8013ab0bb83fffb617cada9319eb://localhost/"
             )),
             "the address Tauri rewrites to that origin"
         );
         assert!(
             address.admits(&url(
-                "http://infinitycube-9b684d84a4976d0f4e7893a2dbd4b781.localhost/spaces/x"
+                "http://infinitycube-b9cf8013ab0bb83fffb617cada9319eb.localhost/spaces/x"
             )),
-            "its own talk, as the webview reports it"
+            "its own Aggregate, as the webview reports it"
         );
         assert!(
             !address.admits(&url("http://infinitycube.localhost/")),
@@ -162,19 +162,19 @@ mod given_a_scheme_per_talk_origin {
     }
 
     #[test]
-    fn a_request_names_its_talk_by_the_scheme() {
+    fn a_request_names_its_aggregate_by_the_scheme() {
         assert_eq!(
-            TalkAddress::key_of(
-                &uri("infinitycube-9b684d84a4976d0f4e7893a2dbd4b781://localhost/api/spaces"),
-                SchemeStyle::SchemePerTalk
+            AggregateAddress::key_of(
+                &uri("infinitycube-b9cf8013ab0bb83fffb617cada9319eb://localhost/api/spaces"),
+                SchemeStyle::SchemePerAggregate
             ),
-            Some(TalkKey::of(Path::new("/talks/rust"))),
+            Some(AggregateKey::of(Path::new("/spaces/rust"))),
             "the scheme carries the key"
         );
         assert_eq!(
-            TalkAddress::key_of(
-                &uri("infinitycube-9b684d84a4976d0f4e7893a2dbd4b781://elsewhere/"),
-                SchemeStyle::SchemePerTalk
+            AggregateAddress::key_of(
+                &uri("infinitycube-b9cf8013ab0bb83fffb617cada9319eb://elsewhere/"),
+                SchemeStyle::SchemePerAggregate
             ),
             None,
             "only localhost"

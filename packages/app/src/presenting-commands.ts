@@ -20,7 +20,7 @@ export interface TraversalCommands {
 export type PresentingCommandId = Extract<CommandId, `presenting.${string}`>;
 
 /**
- * A named move through the talk, answered while the Space on screen presents.
+ * A named move through the presentation, answered while the Space on screen presents.
  *
  * The Canvas commands' interface without a target: a Traversal acts on the
  * presentation, not on something the press is aimed at. What a press can
@@ -39,7 +39,7 @@ export interface PresentingCommand {
  * chrome after a move, is outside the content and goes straight on. Each
  * scrolling ancestor of the press is asked in turn, nearest first, so a code
  * block paged to its end leaves the press to the Resource around it, and only
- * when none has further to scroll does the press move through the talk.
+ * when none has further to scroll does the press move through the presentation.
  */
 function keyScrollsContent(event: KeyboardEvent): boolean {
   const down = event.key === 'PageDown';

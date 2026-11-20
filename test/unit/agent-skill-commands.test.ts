@@ -189,13 +189,13 @@ describe('the infinity-cube-authoring check that nothing is serving the director
   };
 
   it('sees a run holding the physical path when the directory is named through a symlink', () => {
-    const { physical, linked } = spellingsOf('talk-relative');
+    const { physical, linked } = spellingsOf('space-relative');
     const decoy = startRunOn(physical);
     expect(check(linked)).toContain(String(decoy.pid));
   });
 
   it('sees a run started through a symlink when the directory is named by its physical path', () => {
-    const { physical, linked } = spellingsOf('talk-absolute');
+    const { physical, linked } = spellingsOf('space-absolute');
     const decoy = startRunOn(linked);
     expect(check(physical)).toContain(String(decoy.pid));
   });

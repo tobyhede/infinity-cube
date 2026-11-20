@@ -80,7 +80,7 @@ const meta = (
     id: META,
     document: {
       version: 1,
-      title: 'Talk',
+      title: 'Space',
       maps: [
         {
           id: MAP,

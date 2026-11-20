@@ -20,7 +20,7 @@ const uuid = (n: number): UUID =>
 
 const SPACE_ID = uuid(1);
 const MAP_ID = uuid(2);
-const TALK = uuid(3);
+const PRESENTED = uuid(3);
 const ENCORE = uuid(4);
 const OPENING = uuid(10);
 const MIDDLE = uuid(11);
@@ -28,7 +28,7 @@ const CLOSING = uuid(12);
 const FIRST_PRESENTATION = uuid(100);
 const SECOND_PRESENTATION = uuid(101);
 
-/** A talk of three Resources, and an encore Graph over the same Map. */
+/** A presentation of three Resources, and an encore Graph over the same Map. */
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: {
@@ -46,8 +46,8 @@ const snapshot: SpaceSnapshot = {
         },
         graphs: [
           {
-            id: TALK,
-            title: 'Talk',
+            id: PRESENTED,
+            title: 'Demo',
             edges: [
               { from: OPENING, to: MIDDLE },
               { from: MIDDLE, to: CLOSING },
@@ -146,7 +146,7 @@ describe('the presenting window', () => {
     window.commands.advance();
 
     at(2_000);
-    navigation.openPresentation(MAP_ID, TALK, OPENING);
+    navigation.openPresentation(MAP_ID, PRESENTED, OPENING);
 
     expect(window.getState()).toEqual({
       presentation: { id: FIRST_PRESENTATION, startedAt: 1_000 },
@@ -170,7 +170,7 @@ describe('the presenting window', () => {
     });
   });
 
-  it('starts afresh, with the rehearsal notes hidden, when Present restarts the talk', () => {
+  it('starts afresh, with the rehearsal notes hidden, when Present restarts the presentation', () => {
     const { navigation, window, at } = presentingWindow(
       mintingIds(FIRST_PRESENTATION, SECOND_PRESENTATION),
     );
@@ -229,7 +229,7 @@ describe('the presenting window', () => {
     window.present();
     window.commands.toggleNotes();
 
-    navigation.continueInMap(MAP_ID, TALK);
+    navigation.continueInMap(MAP_ID, PRESENTED);
 
     expect(window.getState()).toEqual({
       presentation: { id: FIRST_PRESENTATION, startedAt: 1_000 },

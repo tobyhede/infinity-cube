@@ -7,9 +7,9 @@ import {
 
 describe('parseGitHubLocation', () => {
   it('reads owner, repository, ref and path', () => {
-    expect(parseGitHubLocation('github:tobyhede/infinity-cube@main/talks/pgdu')).toEqual({
+    expect(parseGitHubLocation('github:tobyhede/infinity-cube@main/spaces/pgdu')).toEqual({
       ok: true,
-      location: { owner: 'tobyhede', repo: 'infinity-cube', ref: 'main', path: 'talks/pgdu' },
+      location: { owner: 'tobyhede', repo: 'infinity-cube', ref: 'main', path: 'spaces/pgdu' },
     });
   });
 
@@ -22,23 +22,23 @@ describe('parseGitHubLocation', () => {
       ok: true,
       location: { owner: 'tobyhede', repo: 'infinity-cube', ref: 'v1.0', path: '' },
     });
-    expect(parseGitHubLocation('github:tobyhede/infinity-cube/talks')).toEqual({
+    expect(parseGitHubLocation('github:tobyhede/infinity-cube/spaces')).toEqual({
       ok: true,
-      location: { owner: 'tobyhede', repo: 'infinity-cube', ref: undefined, path: 'talks' },
+      location: { owner: 'tobyhede', repo: 'infinity-cube', ref: undefined, path: 'spaces' },
     });
   });
 
   it('ends a ref at the next slash, so a slashed branch is addressed by SHA or tag', () => {
-    expect(parseGitHubLocation('github:o/r@feature/x/talk')).toEqual({
+    expect(parseGitHubLocation('github:o/r@feature/x/space')).toEqual({
       ok: true,
-      location: { owner: 'o', repo: 'r', ref: 'feature', path: 'x/talk' },
+      location: { owner: 'o', repo: 'r', ref: 'feature', path: 'x/space' },
     });
   });
 
   it('keeps an @ inside a ref, splitting the repository at the first', () => {
-    expect(parseGitHubLocation('github:o/r@release@beta/talk')).toEqual({
+    expect(parseGitHubLocation('github:o/r@release@beta/space')).toEqual({
       ok: true,
-      location: { owner: 'o', repo: 'r', ref: 'release@beta', path: 'talk' },
+      location: { owner: 'o', repo: 'r', ref: 'release@beta', path: 'space' },
     });
   });
 
@@ -54,9 +54,9 @@ describe('parseGitHubLocation', () => {
     ['github:tobyhede/..', 'a dot repository'],
     ['github:tobyhede/infinity-cube@', 'an empty ref'],
     ['github:tobyhede/infinity-cube@main/', 'an empty path segment'],
-    ['github:tobyhede/infinity-cube@main/talks//pgdu', 'an empty path segment'],
+    ['github:tobyhede/infinity-cube@main/spaces//pgdu', 'an empty path segment'],
     ['github:tobyhede/infinity-cube@main/../secrets', 'a parent segment'],
-    ['github:tobyhede/infinity-cube@main/./talks', 'a current-directory segment'],
+    ['github:tobyhede/infinity-cube@main/./spaces', 'a current-directory segment'],
     ['github:tobyhede/infinity-cube@ma in', 'whitespace in the ref'],
     ['github:o/r@@', 'a ref that is exactly @'],
     ['github:o/r@a@{1}', 'a ref containing @{'],
@@ -70,8 +70,8 @@ describe('parseGitHubLocation', () => {
 describe('formatGitHubLocation', () => {
   it('writes a resolved location back in the syntax it is parsed from', () => {
     const sha = 'a'.repeat(40);
-    expect(formatGitHubLocation({ owner: 'o', repo: 'r', sha, path: 'talks/pgdu' })).toBe(
-      `github:o/r@${sha}/talks/pgdu`,
+    expect(formatGitHubLocation({ owner: 'o', repo: 'r', sha, path: 'spaces/pgdu' })).toBe(
+      `github:o/r@${sha}/spaces/pgdu`,
     );
     expect(formatGitHubLocation({ owner: 'o', repo: 'r', sha, path: '' })).toBe(
       `github:o/r@${sha}`,
@@ -84,8 +84,8 @@ describe('formatGivenGitHubLocation', () => {
     for (const input of [
       'github:o/r',
       'github:o/r@main',
-      'github:o/r/talks/pgdu',
-      'github:o/r@release@beta/talks',
+      'github:o/r/spaces/pgdu',
+      'github:o/r@release@beta/spaces',
     ]) {
       const parsed = parseGitHubLocation(input);
       expect(parsed.ok).toBe(true);

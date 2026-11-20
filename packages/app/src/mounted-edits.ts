@@ -5,7 +5,7 @@ import { createObservableState, type ObserverErrorReporter } from '@project/pers
  * (ADR 0131).
  *
  * `quiet` until the reader's first Edit, because nothing can be lost before
- * one and a mounted talk at rest then looks as any session does; `reported`
+ * one and a mounted Space at rest then looks as any session does; `reported`
  * from that Edit; `dismissed` once the reader has put the report away, which
  * lasts for the page because the fact it acknowledges does not change.
  */

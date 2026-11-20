@@ -1,6 +1,6 @@
 ---
 name: infinity-cube-getting-started
-description: Set a person up to run InfinityCube on their own content from a clone of this repository — tools, install, a content directory in its own git repository, `pnpm cube init` and `pnpm cube run`. Use when someone wants to set up, try or run InfinityCube, or open a talk or design directory in it; writing or changing the directory's files by hand is `infinity-cube-authoring`.
+description: Set a person up to run InfinityCube on their own content from a clone of this repository — tools, install, a content directory in its own git repository, `pnpm cube init` and `pnpm cube run`. Use when someone wants to set up, try or run InfinityCube, or open a Space's directory in it; writing or changing the directory's files by hand is `infinity-cube-authoring`.
 ---
 
 # Getting started with InfinityCube
@@ -17,7 +17,7 @@ Work from the root of the InfinityCube clone. With no clone at hand, as when thi
 2. **Install.** Run `pnpm install`.
    Done when it exits zero.
 
-3. **Content directory.** Ask the person where their work lives, or should live. It is any path outside the InfinityCube clone, for example `~/talks/rust-async`.
+3. **Content directory.** Ask the person where their work lives, or should live. It is any path outside the InfinityCube clone, for example `~/spaces/rust-async`.
    - **New work:** run `pnpm cube init <dir>`. The directory must be missing or empty; dot-entries such as `.git` and `.DS_Store` do not count, so a fresh `git init` directory is empty. It writes a new aggregate, prints `Created a new aggregate; run it with: pnpm cube run <dir>` and exits zero without serving. A directory that is not empty is refused and nothing is written: ask the person whether they meant existing work there, or another path.
    - **Existing work:** the directory must hold `aggregate.json` at its top. A directory holding only `space.json` is one Space, not an Aggregate directory, and is refused. One holding `hyper.json` instead of `aggregate.json` is refused too: rename the file with `mv <dir>/hyper.json <dir>/aggregate.json`, which works whether or not the directory is a git repository yet; step 4 then commits the rename before the first run.
 
@@ -43,4 +43,4 @@ Work from the root of the InfinityCube clone. With no clone at hand, as when thi
 
 The full description of Running is the README's "How Running works"; the file format is `docs/aggregate-directory.md`.
 
-To show a talk on the web from its public GitHub repository, read-only and with no server, and to point a domain at it, follow `docs/deploy-cloudflare.md`.
+To show a Space on the web from its public GitHub repository, read-only and with no server, and to point a domain at it, follow `docs/deploy-cloudflare.md`.

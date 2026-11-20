@@ -314,7 +314,7 @@ test('an unknown product URL shows the "not found" destination', async ({ page }
   await expect(page.getByTestId('space-title')).toContainText('Map fixture');
   expect(new URL(page.url()).pathname + new URL(page.url()).search).toBe(unknown);
 
-  await page.goto('/talk');
+  await page.goto('/space');
   await expect(page.getByRole('alert')).toContainText('Destination not found');
 });
 

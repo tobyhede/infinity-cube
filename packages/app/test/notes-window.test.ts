@@ -20,7 +20,7 @@ const uuid = (n: number): UUID =>
 
 const SPACE_ID = uuid(1);
 const MAP_ID = uuid(2);
-const TALK = uuid(3);
+const PRESENTED = uuid(3);
 const NOTES = uuid(4);
 const OPENING = uuid(10);
 const LEFT = uuid(11);
@@ -35,7 +35,7 @@ const markdown = (id: UUID, title: string, text: string) => ({
   document: { title, kind: 'markdown' as const, content: { url: textAsset(text) } },
 });
 
-/** A talk that forks after its opening, with a notes Graph from two of its Resources. */
+/** A presentation that forks after its opening, with a notes Graph from two of its Resources. */
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: {
@@ -56,8 +56,8 @@ const snapshot: SpaceSnapshot = {
         },
         graphs: [
           {
-            id: TALK,
-            title: 'Talk',
+            id: PRESENTED,
+            title: 'Demo',
             edges: [
               { from: OPENING, to: LEFT },
               { from: OPENING, to: RIGHT },
@@ -65,7 +65,7 @@ const snapshot: SpaceSnapshot = {
           },
           {
             id: NOTES,
-            title: 'Talk Notes',
+            title: 'Demo Notes',
             edges: [
               { from: OPENING, to: LOWER_NOTE },
               { from: OPENING, to: UPPER_NOTE },
@@ -87,7 +87,7 @@ const snapshot: SpaceSnapshot = {
   ],
 };
 
-/** The talk after an Edit that adds Further as the one move from Left. */
+/** The presentation after an Edit that adds Further as the one move from Left. */
 const withFurther: SpaceSnapshot = {
   ...snapshot,
   document: {
@@ -96,7 +96,7 @@ const withFurther: SpaceSnapshot = {
       ...m,
       positions: { ...m.positions, [FURTHER]: { x: 600, y: -100 } },
       graphs: m.graphs.map((graph) =>
-        graph.id === TALK
+        graph.id === PRESENTED
           ? { ...graph, edges: [...graph.edges, { from: LEFT, to: FURTHER }] }
           : graph,
       ),
@@ -184,7 +184,7 @@ describe('the Notes window', () => {
 
     const state = notes.getState();
     expect(state.kind === 'presenting' && state.view.presented.title).toBe('Opening');
-    expect(state.kind === 'presenting' && state.view.notesGraph).toBe('Talk Notes');
+    expect(state.kind === 'presenting' && state.view.notesGraph).toBe('Demo Notes');
     expect(titles(notes, 'notes')).toEqual(['First', 'Then']);
   });
 
@@ -222,7 +222,7 @@ describe('the Notes window', () => {
     expect(titles(notes, 'notes')).toEqual([]);
   });
 
-  it('says the talk has no notes Graph when none reads as one', async () => {
+  it('says the presentation has no notes Graph when none reads as one', async () => {
     const join = channelHub();
     const navigation = presentingWindow(join(), mintingIds(uuid(100)));
     const unnoted: SpaceSnapshot = {

@@ -24,7 +24,7 @@ const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
  * The three marker strings, built by repetition rather than written out, so this
  * file holds no marker of its own. That is what lets the scan read it like every
  * other tracked file once it is committed: excluding this path instead would
- * leave the one file that talks about conflict markers as the one file a real
+ * leave the one file that discusses conflict markers as the one file a real
  * conflict could hide in.
  */
 const OPENER = '<'.repeat(7);

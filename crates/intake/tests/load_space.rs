@@ -23,7 +23,7 @@ const REFERENCE: &str = "00000000-0000-4000-8000-000000000102";
 /// one Map, whose one Graph has an Edge between them.
 fn snapshot() -> SpaceSnapshot {
     let text = format!(
-        r#"{{"id": "{SPACE}", "document": {{"version": 1, "title": "Talk", "maps": [
+        r#"{{"id": "{SPACE}", "document": {{"version": 1, "title": "Space", "maps": [
             {{"id": "00000000-0000-4000-8000-000000000a01", "title": "Working", "kind": "positioned",
               "positions": {{"{UR}": {{"x": 0, "y": 0}}, "{REFERENCE}": {{"x": 320, "y": 0}}}},
               "graphs": [{{"id": "00000000-0000-4000-8000-000000000b01", "title": "Main",

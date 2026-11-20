@@ -50,7 +50,7 @@ const meta: SpaceSnapshot = {
         graphs: [
           {
             id: META_GRAPH_ID,
-            title: 'Talk',
+            title: 'Space',
             edges: [{ from: NOTE_ID, to: SPACE_RESOURCE_ID }],
           },
         ],

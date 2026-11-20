@@ -1,18 +1,18 @@
-//! Where a talk is served from: one origin per talk under the application's
-//! URI scheme, the same on every launch of that talk (Storage ST-121).
+//! Where an Aggregate is served from: one origin per Aggregate under the application's
+//! URI scheme, the same on every launch of that Aggregate (Storage ST-121).
 //!
-//! A talk's key is the first 128 bits of the SHA-256 of its canonical folder
+//! An Aggregate's key is the first 128 bits of the SHA-256 of its canonical folder
 //! path, in lower-case hex. It needs no state: the shell already resolves a
 //! folder to its canonical path, so the same folder gives the same key on
 //! every launch, and two folders give two keys. Moving or renaming the folder gives the
-//! talk a new key, and so a new origin, and what the page kept in
+//! Aggregate a new key, and so a new origin, and what the page kept in
 //! `localStorage` under the old one is not carried over. Hex is safe in a
 //! host and in a scheme name, and names nothing of the path.
 //!
 //! On macOS and Linux the scheme is served as `infinitycube://<key>/`, so the
-//! host part sets the origin and one scheme serves every talk. On Windows
+//! host part sets the origin and one scheme serves every Aggregate. On Windows
 //! Tauri serves a scheme from `http://<scheme>.localhost/`, dropping the host
-//! part from the origin, so each talk gets a scheme of its own,
+//! part from the origin, so each Aggregate gets a scheme of its own,
 //! `infinitycube-<key>`, served from `http://infinitycube-<key>.localhost/`.
 
 use std::path::Path;
@@ -20,18 +20,18 @@ use std::path::Path;
 use sha2::{Digest as _, Sha256};
 use url::Url;
 
-/// The scheme every talk is served under, or the prefix of each talk's own
+/// The scheme every Aggregate is served under, or the prefix of each Aggregate's own
 /// scheme where a scheme sets the origin.
 pub const SCHEME: &str = "infinitycube";
 
-/// The key of one talk: 32 lower-case hex digits.
+/// The key of one Aggregate: 32 lower-case hex digits.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct TalkKey(String);
+pub struct AggregateKey(String);
 
 const KEY_LENGTH: usize = 32;
 
-impl TalkKey {
-    /// The key of the talk in `directory`, which should be canonical.
+impl AggregateKey {
+    /// The key of the Aggregate in `directory`, which should be canonical.
     #[must_use]
     pub fn of(directory: &Path) -> Self {
         let digest = Sha256::digest(directory.as_os_str().as_encoded_bytes());
@@ -62,79 +62,81 @@ impl TalkKey {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SchemeStyle {
     /// `scheme://host/`, the host part in the origin: macOS and Linux.
-    HostPerTalk,
+    HostPerAggregate,
     /// `http://<scheme>.localhost/`, the scheme in the origin: Windows.
-    SchemePerTalk,
+    SchemePerAggregate,
 }
 
 impl SchemeStyle {
     /// This platform's.
     pub const CURRENT: Self = if cfg!(windows) {
-        Self::SchemePerTalk
+        Self::SchemePerAggregate
     } else {
-        Self::HostPerTalk
+        Self::HostPerAggregate
     };
 }
 
-/// One talk's address under the scheme.
+/// One Aggregate's address under the scheme.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TalkAddress {
-    key: TalkKey,
+pub struct AggregateAddress {
+    key: AggregateKey,
     style: SchemeStyle,
 }
 
-impl TalkAddress {
-    /// The address of the talk with `key`, as `style` serves it.
+impl AggregateAddress {
+    /// The address of the Aggregate with `key`, as `style` serves it.
     #[must_use]
-    pub fn new(key: TalkKey, style: SchemeStyle) -> Self {
+    pub fn new(key: AggregateKey, style: SchemeStyle) -> Self {
         Self { key, style }
     }
 
-    /// The talk's key.
+    /// The Aggregate's key.
     #[must_use]
-    pub fn key(&self) -> &TalkKey {
+    pub fn key(&self) -> &AggregateKey {
         &self.key
     }
 
-    /// The scheme the talk is served under, which the shell registers.
+    /// The scheme the Aggregate is served under, which the shell registers.
     #[must_use]
     pub fn scheme(&self) -> String {
         match self.style {
-            SchemeStyle::HostPerTalk => SCHEME.to_owned(),
-            SchemeStyle::SchemePerTalk => format!("{SCHEME}-{}", self.key.as_str()),
+            SchemeStyle::HostPerAggregate => SCHEME.to_owned(),
+            SchemeStyle::SchemePerAggregate => format!("{SCHEME}-{}", self.key.as_str()),
         }
     }
 
-    /// The talk's origin as its page and the `Origin` header name it.
+    /// The Aggregate's origin as its page and the `Origin` header name it.
     #[must_use]
     pub fn origin(&self) -> String {
         match self.style {
-            SchemeStyle::HostPerTalk => format!("{SCHEME}://{}", self.key.as_str()),
-            SchemeStyle::SchemePerTalk => format!("http://{}.localhost", self.scheme()),
+            SchemeStyle::HostPerAggregate => format!("{SCHEME}://{}", self.key.as_str()),
+            SchemeStyle::SchemePerAggregate => format!("http://{}.localhost", self.scheme()),
         }
     }
 
-    /// The address a talk window opens at, as the shell hands it to Tauri.
+    /// The address a Space window opens at, as the shell hands it to Tauri.
     ///
     /// # Errors
     ///
     /// None in practice: the key is hex, which every URL admits.
     pub fn window_url(&self) -> Result<Url, url::ParseError> {
         match self.style {
-            SchemeStyle::HostPerTalk => Url::parse(&format!("{}/", self.origin())),
-            SchemeStyle::SchemePerTalk => Url::parse(&format!("{}://localhost/", self.scheme())),
+            SchemeStyle::HostPerAggregate => Url::parse(&format!("{}/", self.origin())),
+            SchemeStyle::SchemePerAggregate => {
+                Url::parse(&format!("{}://localhost/", self.scheme()))
+            }
         }
     }
 
-    /// Whether a window of this talk may navigate to `url`: only within the
-    /// talk's own origin, as the webview reports it.
+    /// Whether a window of this Aggregate may navigate to `url`: only within the
+    /// Aggregate's own origin, as the webview reports it.
     #[must_use]
     pub fn admits(&self, url: &Url) -> bool {
         // A URL of a scheme the URL standard does not know has an opaque
         // origin, which equals no other, so the parts are compared instead.
         let (scheme, host) = match self.style {
-            SchemeStyle::HostPerTalk => (SCHEME.to_owned(), self.key.as_str().to_owned()),
-            SchemeStyle::SchemePerTalk => {
+            SchemeStyle::HostPerAggregate => (SCHEME.to_owned(), self.key.as_str().to_owned()),
+            SchemeStyle::SchemePerAggregate => {
                 ("http".to_owned(), format!("{}.localhost", self.scheme()))
             }
         };
@@ -145,22 +147,22 @@ impl TalkAddress {
             && url.password().is_none()
     }
 
-    /// The key of the talk a request to the scheme handler names, as the
+    /// The key of the Aggregate a request to the scheme handler names, as the
     /// webview hands it over: `infinitycube://<key>/…` where the host sets
     /// the origin, `infinitycube-<key>://localhost/…` where the scheme does.
     #[must_use]
-    pub fn key_of(uri: &http::Uri, style: SchemeStyle) -> Option<TalkKey> {
+    pub fn key_of(uri: &http::Uri, style: SchemeStyle) -> Option<AggregateKey> {
         match style {
-            SchemeStyle::HostPerTalk => {
+            SchemeStyle::HostPerAggregate => {
                 if uri.scheme_str() != Some(SCHEME) || uri.port().is_some() {
                     return None;
                 }
-                TalkKey::parse(uri.host()?)
+                AggregateKey::parse(uri.host()?)
             }
-            SchemeStyle::SchemePerTalk => {
+            SchemeStyle::SchemePerAggregate => {
                 let key = uri.scheme_str()?.strip_prefix(SCHEME)?.strip_prefix('-')?;
                 (uri.host() == Some("localhost") && uri.port().is_none())
-                    .then(|| TalkKey::parse(key))
+                    .then(|| AggregateKey::parse(key))
                     .flatten()
             }
         }

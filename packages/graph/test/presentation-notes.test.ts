@@ -22,9 +22,9 @@ const graph = (
   edges: edges.map(([from, to]) => ({ from, to })),
 });
 
-const talk = graph('Intro Talk', [[slide, next]]);
+const presented = graph('Intro Demo', [[slide, next]]);
 
-/** A Map holding the talk and the given Graphs, in that order, every Resource placed. */
+/** A Map holding the presentation and the given Graphs, in that order, every Resource placed. */
 const mapOf = (
   graphs: readonly Graph[],
   positions: Readonly<Record<string, { x: number; y: number }>> = {},
@@ -40,28 +40,28 @@ const mapOf = (
     [thirdNote]: { x: 0, y: 600 },
     ...positions,
   },
-  graphs: [talk, ...graphs],
+  graphs: [presented, ...graphs],
 });
 
 const notesGraph = (title: string): Graph => graph(title, [[slide, firstNote]]);
 
-/** The title of the Graph chosen as the talk's notes, or null for none. */
+/** The title of the Graph chosen as the presentation's notes, or null for none. */
 const chosen = (titles: readonly string[]): string | null =>
-  presentationNotes(mapOf(titles.map(notesGraph)), talk, slide).graph?.title ?? null;
+  presentationNotes(mapOf(titles.map(notesGraph)), presented, slide).graph?.title ?? null;
 
 describe('presentationNotes: which Graph holds the notes', () => {
   it.each([
-    'Intro Talk Presentation Notes',
-    'Intro Talk Notes',
-    'Intro Talk Presentation Script',
-    'Intro Talk PresentationNotes',
-    'intro talk presentation notes',
-    'INTRO TALK — PRESENTATION NOTES',
-    'intro-talk presentation_notes',
-    'Intro Talk (Presentation Notes)',
-    'Intro Talk: Notes',
-    'Intro Talk\nPresentation Notes',
-    'Ｉｎｔｒｏ Talk Notes',
+    'Intro Demo Presentation Notes',
+    'Intro Demo Notes',
+    'Intro Demo Presentation Script',
+    'Intro Demo PresentationNotes',
+    'intro demo presentation notes',
+    'INTRO DEMO — PRESENTATION NOTES',
+    'intro-demo presentation_notes',
+    'Intro Demo (Presentation Notes)',
+    'Intro Demo: Notes',
+    'Intro Demo\nPresentation Notes',
+    'Ｉｎｔｒｏ Demo Notes',
     'Presentation Notes',
     'Notes',
     'Presentation Script',
@@ -71,14 +71,14 @@ describe('presentationNotes: which Graph holds the notes', () => {
   });
 
   it.each([
-    'Intro Talk',
-    'Intro Talk Presentations',
-    'Intro Talk Notebook',
-    'Intro Talk Presentation',
+    'Intro Demo',
+    'Intro Demo Presentations',
+    'Intro Demo Notebook',
+    'Intro Demo Presentation',
     'Presentation',
     'Intro Notes',
-    'Talk Notes',
-    'Notes Intro Talk',
+    'Demo Notes',
+    'Notes Intro Demo',
     'Release Notes',
     'Speaker Notes',
   ])('rejects %j', (title) => {
@@ -90,13 +90,13 @@ describe('presentationNotes: which Graph holds the notes', () => {
     ['STRASSE', 'Straße Notes'],
     ['STRAẞE', 'STRASSE Notes'],
     ['Σίσυφος', 'ΣΊΣΥΦΟΣ Notes'],
-  ])('case-folds the talk %j to match %j', (talkTitle, title) => {
-    const folded = graph(talkTitle, [[slide, next]]);
+  ])('case-folds the presentation %j to match %j', (presentedTitle, title) => {
+    const folded = graph(presentedTitle, [[slide, next]]);
     expect(presentationNotes(mapOf([notesGraph(title)]), folded, slide).graph?.title).toBe(title);
   });
 
   it('finds none on a Map holding no other Graph', () => {
-    expect(presentationNotes(mapOf([]), talk, slide)).toEqual({
+    expect(presentationNotes(mapOf([]), presented, slide)).toEqual({
       graph: null,
       passedOver: [],
       notes: [],
@@ -108,30 +108,30 @@ describe('presentationNotes: which Graph holds the notes', () => {
     expect(presentationNotes(mapOf([]), notes, slide).graph).toBeNull();
   });
 
-  it('prefers a Graph naming the talk to a bare one, wherever each sits', () => {
-    expect(chosen(['Presentation Notes', 'Intro Talk Presentation Script'])).toBe(
-      'Intro Talk Presentation Script',
+  it('prefers a Graph naming the presentation to a bare one, wherever each sits', () => {
+    expect(chosen(['Presentation Notes', 'Intro Demo Presentation Script'])).toBe(
+      'Intro Demo Presentation Script',
     );
   });
 
   it('prefers "Presentation Notes" to "Notes", and "Notes" to "Presentation" and more', () => {
-    expect(chosen(['Intro Talk Presentation Script', 'Intro Talk Notes'])).toBe('Intro Talk Notes');
-    expect(chosen(['Intro Talk Notes', 'Intro Talk Presentation Notes'])).toBe(
-      'Intro Talk Presentation Notes',
+    expect(chosen(['Intro Demo Presentation Script', 'Intro Demo Notes'])).toBe('Intro Demo Notes');
+    expect(chosen(['Intro Demo Notes', 'Intro Demo Presentation Notes'])).toBe(
+      'Intro Demo Presentation Notes',
     );
     expect(chosen(['Presentation Script', 'Notes'])).toBe('Notes');
   });
 
   it('breaks a remaining tie by the Map’s Graph order', () => {
-    expect(chosen(['Intro Talk Notes', 'intro talk: notes'])).toBe('Intro Talk Notes');
+    expect(chosen(['Intro Demo Notes', 'intro demo: notes'])).toBe('Intro Demo Notes');
   });
 
   it('names every other matching Graph as passed over, in the order it ranked them', () => {
-    const named = notesGraph('Intro Talk Notes');
+    const named = notesGraph('Intro Demo Notes');
     const bare = notesGraph('Notes');
     const unrelated = notesGraph('Backup');
-    const script = notesGraph('Intro Talk Presentation Script');
-    const result = presentationNotes(mapOf([bare, unrelated, script, named]), talk, slide);
+    const script = notesGraph('Intro Demo Presentation Script');
+    const result = presentationNotes(mapOf([bare, unrelated, script, named]), presented, slide);
     expect(result.graph).toBe(named);
     expect(result.passedOver).toEqual([script, bare]);
   });
@@ -143,13 +143,13 @@ describe('presentationNotes: the notes for a Resource', () => {
       [slide, firstNote],
       [next, secondNote],
     ]);
-    expect(presentationNotes(mapOf([notes]), talk, slide).notes).toEqual([firstNote]);
-    expect(presentationNotes(mapOf([notes]), talk, next).notes).toEqual([secondNote]);
+    expect(presentationNotes(mapOf([notes]), presented, slide).notes).toEqual([firstNote]);
+    expect(presentationNotes(mapOf([notes]), presented, next).notes).toEqual([secondNote]);
   });
 
   it('answers none for a Resource the notes Graph does not leave', () => {
     const notes = graph('Notes', [[next, secondNote]]);
-    const result = presentationNotes(mapOf([notes]), talk, slide);
+    const result = presentationNotes(mapOf([notes]), presented, slide);
     expect(result.graph).toBe(notes);
     expect(result.notes).toEqual([]);
   });
@@ -165,7 +165,7 @@ describe('presentationNotes: the notes for a Resource', () => {
       [secondNote]: { x: 100, y: 200 },
       [thirdNote]: { x: 0, y: 100 },
     });
-    expect(presentationNotes(placed, talk, slide).notes).toEqual([
+    expect(presentationNotes(placed, presented, slide).notes).toEqual([
       thirdNote,
       secondNote,
       firstNote,

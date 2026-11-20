@@ -18,10 +18,10 @@ export function PresentedNotesList({ notes: presented }: PresentedNotesListProps
   if (presented.notesGraph === null) {
     return (
       <Alert>
-        <AlertTitle>No notes for {titleName(presented.talk)}</AlertTitle>
+        <AlertTitle>No notes for {titleName(presented.presentedGraph)}</AlertTitle>
         <AlertDescription>
-          Notes come from a Graph on this Map titled “{titleName(presented.talk)} Presentation
-          Notes”, or just “Notes”, with an Edge from each Resource to its notes.
+          Notes come from a Graph on this Map titled “{titleName(presented.presentedGraph)}{' '}
+          Presentation Notes”, or just “Notes”, with an Edge from each Resource to its notes.
         </AlertDescription>
       </Alert>
     );

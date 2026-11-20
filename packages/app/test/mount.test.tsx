@@ -464,7 +464,7 @@ describe('mounting an aggregate in the page', () => {
   it.each([
     ['an unresolved Map', MISSING_MAP_PATH],
     ['a malformed Space', '/spaces/not-a-compact-uuid'],
-    ['a path outside product addressing', '/talk'],
+    ['a path outside product addressing', '/space'],
   ])('answers %s with the Meta Space and the not-found report', async (_, path) => {
     const history = recordingHistory(`${path}?source=${PINNED}`);
 

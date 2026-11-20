@@ -1,6 +1,6 @@
 # Intake conformance corpus
 
-Aggregate directories and commits, each with the answer intake must give it. ADR 0156 has each runtime keep one intake of its own, the TypeScript one (`loadSpace` and the Zod schemas) and the Rust one, and holds the two to each other with this corpus. For a refusal they must agree on **the kind of error and where it is**, never on the wording of its message. For an accepted directory they must also agree on the bytes Export writes, so the first Edit after the Rust host takes over does not rewrite every file of a talk.
+Aggregate directories and commits, each with the answer intake must give it. ADR 0156 has each runtime keep one intake of its own, the TypeScript one (`loadSpace` and the Zod schemas) and the Rust one, and holds the two to each other with this corpus. For a refusal they must agree on **the kind of error and where it is**, never on the wording of its message. For an accepted directory they must also agree on the bytes Export writes, so the first Edit after the Rust host takes over does not rewrite every file of an Aggregate.
 
 This README is the whole format. A runner needs no TypeScript to read it.
 
@@ -79,7 +79,7 @@ A Resource is located in one of two ways. A fault in its file itself, found befo
 1. Copy `aggregate/` to a fresh directory of its own. Never run a case in place.
 2. Import it as `cube check` does: read the files, run intake over each Space, then run intake over the whole aggregate. The cases carry every id, so the runner's id generator must refuse to mint one: reaching it means the runtime minted where the reference implementation did not.
 3. The answer is `accepted`, or `refused` with the refusals intake gave. Compare it with `expect`. Refusals are compared as a multiset: order does not matter, and how many times each one appears does.
-4. For an accepted case, Import a second fresh copy into a fresh memory store and Export the store in place onto that copy, as a run writes a talk back. Compare the whole tree with `export/` if the case has one, and with `aggregate/` if it does not. That second form means "Export writes this directory back unchanged". The trees must hold the same paths, relative to their roots with `/` between segments, and each file the same bytes. Directories are compared only through the files in them.
+4. For an accepted case, Import a second fresh copy into a fresh memory store and Export the store in place onto that copy, as a run writes an Aggregate back. Compare the whole tree with `export/` if the case has one, and with `aggregate/` if it does not. That second form means "Export writes this directory back unchanged". The trees must hold the same paths, relative to their roots with `/` between segments, and each file the same bytes. Directories are compared only through the files in them.
 
 An asset a Resource names whose bytes `assets/` does not carry is not a refusal (`accepted-image`).
 

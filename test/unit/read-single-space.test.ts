@@ -26,7 +26,7 @@ const UR_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const versionTwoDocument = {
   version: 2,
   id: SPACE_ID,
-  title: 'Pre-release talk',
+  title: 'Pre-release space',
   graphs: [{ id: GRAPH_ID, title: 'Main', edges: [] }],
   maps: [{ id: MAP_ID, title: 'Working', positions: {} }],
 };
@@ -39,7 +39,7 @@ const versionTwoDocument = {
 const retiredGraphsDocument = {
   version: 1,
   id: SPACE_ID,
-  title: 'Talk',
+  title: 'Space',
   graphs: [{ id: GRAPH_ID, title: 'Main', edges: [] }],
 };
 
@@ -60,13 +60,13 @@ afterEach(async () => {
 describe('readSingleSpace', () => {
   it('reads a space-file or directory input with globally sorted, non-recursive resources', async () => {
     const temporaryDirectory = await makeTemporaryDirectory();
-    const talkDirectory = join(temporaryDirectory, 'talk');
-    const resourcesDirectory = join(talkDirectory, 'resources');
+    const aggregateDirectory = join(temporaryDirectory, 'space');
+    const resourcesDirectory = join(aggregateDirectory, 'resources');
     await mkdir(join(resourcesDirectory, 'nested'), { recursive: true });
-    await mkdir(join(talkDirectory, 'notes'));
+    await mkdir(join(aggregateDirectory, 'notes'));
 
-    const spaceFile = join(talkDirectory, 'space.json');
-    await writeFile(spaceFile, JSON.stringify({ version: 1, id: SPACE_ID, title: 'Talk' }));
+    const spaceFile = join(aggregateDirectory, 'space.json');
+    await writeFile(spaceFile, JSON.stringify({ version: 1, id: SPACE_ID, title: 'Space' }));
     // Written out of path order, so the expectation shows the sort.
     for (const [name, text] of Object.entries({
       ...resourceFiles({ id: UR_RESOURCE_ID, title: 'Node', kind: 'ur', content: {} }),
@@ -81,11 +81,11 @@ describe('readSingleSpace', () => {
       'not a discovered resource',
     );
     await writeFile(join(resourcesDirectory, 'nested', 'ignored.md'), 'not a discovered resource');
-    await writeFile(join(talkDirectory, 'notes', 'ignored.md'), 'not a discovered resource');
+    await writeFile(join(aggregateDirectory, 'notes', 'ignored.md'), 'not a discovered resource');
 
     const expected = {
       id: SPACE_ID,
-      document: { version: 1, title: 'Talk' },
+      document: { version: 1, title: 'Space' },
       resources: [
         {
           id: ROOT_RESOURCE_ID,
@@ -107,7 +107,7 @@ describe('readSingleSpace', () => {
       ],
     };
 
-    await expect(readSingleSpace(talkDirectory)).resolves.toEqual(expected);
+    await expect(readSingleSpace(aggregateDirectory)).resolves.toEqual(expected);
     await expect(readSingleSpace(spaceFile)).resolves.toEqual(expected);
   });
 
@@ -119,14 +119,14 @@ describe('readSingleSpace', () => {
    */
   it('reads no .md beside space.json or in resources/, and a Resource whose text is not here', async () => {
     const temporaryDirectory = await makeTemporaryDirectory();
-    const talkDirectory = join(temporaryDirectory, 'talk');
-    const resourcesDirectory = join(talkDirectory, 'resources');
+    const aggregateDirectory = join(temporaryDirectory, 'space');
+    const resourcesDirectory = join(aggregateDirectory, 'resources');
     await mkdir(resourcesDirectory, { recursive: true });
     await writeFile(
-      join(talkDirectory, 'space.json'),
-      JSON.stringify({ version: 1, id: SPACE_ID, title: 'Talk' }),
+      join(aggregateDirectory, 'space.json'),
+      JSON.stringify({ version: 1, id: SPACE_ID, title: 'Space' }),
     );
-    await writeFile(join(talkDirectory, 'README.md'), '# Notes\n');
+    await writeFile(join(aggregateDirectory, 'README.md'), '# Notes\n');
     await writeFile(join(resourcesDirectory, `${DETAIL_RESOURCE_ID}.md`), 'Detail body\n');
     for (const [name, text] of Object.entries(
       markdownResourceFiles(ROOT_RESOURCE_ID, 'Root', 'Root body\n'),
@@ -134,9 +134,9 @@ describe('readSingleSpace', () => {
       await writeFile(join(resourcesDirectory, name), text);
     }
 
-    await expect(readSingleSpace(talkDirectory)).resolves.toEqual({
+    await expect(readSingleSpace(aggregateDirectory)).resolves.toEqual({
       id: SPACE_ID,
-      document: { version: 1, title: 'Talk' },
+      document: { version: 1, title: 'Space' },
       resources: [
         {
           id: ROOT_RESOURCE_ID,
@@ -160,15 +160,15 @@ describe('readSingleSpace', () => {
     'settles every file read and reports failures in deterministic path order',
     async () => {
       const temporaryDirectory = await makeTemporaryDirectory();
-      const talkDirectory = join(temporaryDirectory, 'talk');
-      const resourcesDirectory = join(talkDirectory, 'resources');
+      const aggregateDirectory = join(temporaryDirectory, 'space');
+      const resourcesDirectory = join(aggregateDirectory, 'resources');
       await mkdir(resourcesDirectory, { recursive: true });
 
       const rootResource = join(resourcesDirectory, `${ROOT_RESOURCE_ID}.json`);
       const nestedResource = join(resourcesDirectory, `${UR_RESOURCE_ID}.json`);
       await writeFile(
-        join(talkDirectory, 'space.json'),
-        JSON.stringify({ version: 1, title: 'Talk' }),
+        join(aggregateDirectory, 'space.json'),
+        JSON.stringify({ version: 1, title: 'Space' }),
       );
       await writeFile(
         rootResource,
@@ -183,7 +183,7 @@ describe('readSingleSpace', () => {
       await chmod(rootResource, 0o000);
       await chmod(nestedResource, 0o000);
 
-      const thrown = await captureError(() => readSingleSpace(talkDirectory));
+      const thrown = await captureError(() => readSingleSpace(aggregateDirectory));
 
       expect(thrown).toBeInstanceOf(AggregateDirectoryError);
       if (!(thrown instanceof AggregateDirectoryError)) return;
@@ -196,7 +196,7 @@ describe('readSingleSpace', () => {
 
   it('reports a missing input as an absolute discovery diagnostic', async () => {
     const temporaryDirectory = await makeTemporaryDirectory();
-    const missingInput = join(temporaryDirectory, 'missing-talk');
+    const missingInput = join(temporaryDirectory, 'missing-space');
 
     const thrown = await captureError(() => readSingleSpace(relative(process.cwd(), missingInput)));
 
@@ -207,34 +207,34 @@ describe('readSingleSpace', () => {
     expect(thrown.diagnostics[0]).toContain(missingInput);
     // The refusal names it as its other refusals name files: relative to the
     // directory holding the Space directory, whatever path it was given by.
-    expect(thrown.refusals).toEqual([{ kind: 'unreadable', file: 'missing-talk' }]);
+    expect(thrown.refusals).toEqual([{ kind: 'unreadable', file: 'missing-space' }]);
   });
 
   it('names a missing space file it was given as its later refusals name it', async () => {
     const temporaryDirectory = await makeTemporaryDirectory();
-    const missingSpaceFile = join(temporaryDirectory, 'talk', 'space.json');
+    const missingSpaceFile = join(temporaryDirectory, 'space', 'space.json');
 
     const thrown = await captureError(() => readSingleSpace(missingSpaceFile));
 
     expect(thrown).toBeInstanceOf(AggregateDirectoryError);
     if (!(thrown instanceof AggregateDirectoryError)) return;
     expect(thrown.kind).toBe('discovery');
-    expect(thrown.refusals).toEqual([{ kind: 'unreadable', file: 'talk/space.json' }]);
+    expect(thrown.refusals).toEqual([{ kind: 'unreadable', file: 'space/space.json' }]);
   });
 
   it('names a resources/ it could not list relative to the directory holding the Space', async () => {
     const temporaryDirectory = await makeTemporaryDirectory();
-    const talkDirectory = join(temporaryDirectory, 'talk');
-    await mkdir(talkDirectory);
-    await writeFile(join(talkDirectory, 'space.json'), '{}');
-    await writeFile(join(talkDirectory, 'resources'), 'a file, not a directory');
+    const aggregateDirectory = join(temporaryDirectory, 'space');
+    await mkdir(aggregateDirectory);
+    await writeFile(join(aggregateDirectory, 'space.json'), '{}');
+    await writeFile(join(aggregateDirectory, 'resources'), 'a file, not a directory');
 
-    const thrown = await captureError(() => readSingleSpace(talkDirectory));
+    const thrown = await captureError(() => readSingleSpace(aggregateDirectory));
 
     expect(thrown).toBeInstanceOf(AggregateDirectoryError);
     if (!(thrown instanceof AggregateDirectoryError)) return;
     expect(thrown.kind).toBe('discovery');
-    expect(thrown.refusals).toEqual([{ kind: 'unreadable', file: 'talk/resources' }]);
+    expect(thrown.refusals).toEqual([{ kind: 'unreadable', file: 'space/resources' }]);
   });
 
   // A directory standing in for `space.json` fails its read as EISDIR for every
@@ -243,14 +243,14 @@ describe('readSingleSpace', () => {
   // path is read as-is and this needs no root guard.
   it('reports an unreadable space file as an absolute discovery diagnostic', async () => {
     const temporaryDirectory = await makeTemporaryDirectory();
-    const talkDirectory = join(temporaryDirectory, 'talk');
-    await mkdir(talkDirectory);
+    const aggregateDirectory = join(temporaryDirectory, 'space');
+    await mkdir(aggregateDirectory);
 
-    const spaceFile = join(talkDirectory, 'space.json');
+    const spaceFile = join(aggregateDirectory, 'space.json');
     await mkdir(spaceFile);
 
     const thrown = await captureError(() =>
-      readSingleSpace(relative(process.cwd(), talkDirectory)),
+      readSingleSpace(relative(process.cwd(), aggregateDirectory)),
     );
 
     expect(thrown).toBeInstanceOf(AggregateDirectoryError);
@@ -262,11 +262,11 @@ describe('readSingleSpace', () => {
 
   it('reports every malformed file by absolute path through a relative input', async () => {
     const temporaryDirectory = await makeTemporaryDirectory();
-    const talkDirectory = join(temporaryDirectory, 'talk');
-    const resourcesDirectory = join(talkDirectory, 'resources');
+    const aggregateDirectory = join(temporaryDirectory, 'space');
+    const resourcesDirectory = join(aggregateDirectory, 'resources');
     await mkdir(resourcesDirectory, { recursive: true });
 
-    const spaceFile = join(talkDirectory, 'space.json');
+    const spaceFile = join(aggregateDirectory, 'space.json');
     const invalidJsonResource = join(resourcesDirectory, `${ROOT_RESOURCE_ID}.json`);
     const kindlessResource = join(resourcesDirectory, `${UR_RESOURCE_ID}.json`);
     await writeFile(spaceFile, '{ invalid JSON');
@@ -277,7 +277,7 @@ describe('readSingleSpace', () => {
     );
 
     const thrown = await captureError(() =>
-      readSingleSpace(relative(process.cwd(), talkDirectory)),
+      readSingleSpace(relative(process.cwd(), aggregateDirectory)),
     );
 
     expect(thrown).toBeInstanceOf(AggregateDirectoryError);
@@ -290,15 +290,15 @@ describe('readSingleSpace', () => {
 
   it('reports schema-invalid JSON against the absolute space-file path', async () => {
     const temporaryDirectory = await makeTemporaryDirectory();
-    const talkDirectory = join(temporaryDirectory, 'talk');
-    await mkdir(talkDirectory);
+    const aggregateDirectory = join(temporaryDirectory, 'space');
+    await mkdir(aggregateDirectory);
 
-    const spaceFile = join(talkDirectory, 'space.json');
+    const spaceFile = join(aggregateDirectory, 'space.json');
     await writeFile(
       spaceFile,
       JSON.stringify({
         version: 1,
-        title: 'Talk',
+        title: 'Space',
         maps: [
           {
             title: 'Map',
@@ -326,17 +326,17 @@ describe('readSingleSpace', () => {
 
   it('answers a version it cannot read once, ahead of every key that moved', async () => {
     const temporaryDirectory = await makeTemporaryDirectory();
-    const talkDirectory = join(temporaryDirectory, 'talk');
-    await mkdir(talkDirectory);
+    const aggregateDirectory = join(temporaryDirectory, 'space');
+    await mkdir(aggregateDirectory);
 
-    const spaceFile = join(talkDirectory, 'space.json');
+    const spaceFile = join(aggregateDirectory, 'space.json');
     await writeFile(spaceFile, JSON.stringify(versionTwoDocument));
     // A document of a version this build cannot read is not a document to
     // report the files of, either: nothing here is worth saying until the
     // version is.
-    await writeFile(join(talkDirectory, 'broken.md'), 'No Resource file names this.\n');
+    await writeFile(join(aggregateDirectory, 'broken.md'), 'No Resource file names this.\n');
 
-    const thrown = await captureError(() => readSingleSpace(talkDirectory));
+    const thrown = await captureError(() => readSingleSpace(aggregateDirectory));
 
     expect(thrown).toBeInstanceOf(AggregateDirectoryError);
     if (!(thrown instanceof AggregateDirectoryError)) return;
@@ -357,16 +357,16 @@ describe('readSingleSpace', () => {
       // then discovers the document was never going to load anyway, has been
       // sent to do work for nothing.
       const temporaryDirectory = await makeTemporaryDirectory();
-      const talkDirectory = join(temporaryDirectory, 'talk');
-      await mkdir(talkDirectory);
+      const aggregateDirectory = join(temporaryDirectory, 'space');
+      await mkdir(aggregateDirectory);
 
-      const spaceFile = join(talkDirectory, 'space.json');
-      const unreadableResource = join(talkDirectory, 'a.md');
+      const spaceFile = join(aggregateDirectory, 'space.json');
+      const unreadableResource = join(aggregateDirectory, 'a.md');
       await writeFile(spaceFile, JSON.stringify(versionTwoDocument));
       await writeFile(unreadableResource, 'A body\n');
       await chmod(unreadableResource, 0o000);
 
-      const thrown = await captureError(() => readSingleSpace(talkDirectory));
+      const thrown = await captureError(() => readSingleSpace(aggregateDirectory));
 
       expect(thrown).toBeInstanceOf(AggregateDirectoryError);
       if (!(thrown instanceof AggregateDirectoryError)) return;
@@ -381,11 +381,11 @@ describe('readSingleSpace', () => {
     // hoisted above every read: with no space file there is no document, so a
     // read failure is the only available report.
     const temporaryDirectory = await makeTemporaryDirectory();
-    const talkDirectory = join(temporaryDirectory, 'talk');
-    await mkdir(talkDirectory);
-    await mkdir(join(talkDirectory, 'space.json'));
+    const aggregateDirectory = join(temporaryDirectory, 'space');
+    await mkdir(aggregateDirectory);
+    await mkdir(join(aggregateDirectory, 'space.json'));
 
-    const thrown = await captureError(() => readSingleSpace(talkDirectory));
+    const thrown = await captureError(() => readSingleSpace(aggregateDirectory));
 
     expect(thrown).toBeInstanceOf(AggregateDirectoryError);
     if (!(thrown instanceof AggregateDirectoryError)) return;
@@ -398,13 +398,13 @@ describe('readSingleSpace', () => {
     // that matters: a space-level `graphs` carried the whole topology
     // (ADR 0040), and a generic unrecognized-key refusal does not say so.
     const temporaryDirectory = await makeTemporaryDirectory();
-    const talkDirectory = join(temporaryDirectory, 'talk');
-    await mkdir(talkDirectory);
+    const aggregateDirectory = join(temporaryDirectory, 'space');
+    await mkdir(aggregateDirectory);
 
-    const spaceFile = join(talkDirectory, 'space.json');
+    const spaceFile = join(aggregateDirectory, 'space.json');
     await writeFile(spaceFile, JSON.stringify(retiredGraphsDocument));
 
-    const thrown = await captureError(() => readSingleSpace(talkDirectory));
+    const thrown = await captureError(() => readSingleSpace(aggregateDirectory));
 
     expect(thrown).toBeInstanceOf(AggregateDirectoryError);
     if (!(thrown instanceof AggregateDirectoryError)) return;
@@ -425,11 +425,11 @@ describe('readSingleSpace', () => {
     ['a retired space-level graphs key', retiredGraphsDocument],
   ])('says of %s exactly what domain intake says', async (_case, document) => {
     const temporaryDirectory = await makeTemporaryDirectory();
-    const talkDirectory = join(temporaryDirectory, 'talk');
-    await mkdir(talkDirectory);
-    await writeFile(join(talkDirectory, 'space.json'), JSON.stringify(document));
+    const aggregateDirectory = join(temporaryDirectory, 'space');
+    await mkdir(aggregateDirectory);
+    await writeFile(join(aggregateDirectory, 'space.json'), JSON.stringify(document));
 
-    const thrown = await captureError(() => readSingleSpace(talkDirectory));
+    const thrown = await captureError(() => readSingleSpace(aggregateDirectory));
     const intake = loadSpace(document, []);
 
     expect(intake.ok).toBe(false);

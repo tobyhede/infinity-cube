@@ -71,7 +71,7 @@ pub enum Entry {
 /// files.insert_file("aggregate.json", br#"{"version": 1, "metaSpaceId": "10000000-0000-4000-8000-000000000001"}"#);
 /// files.insert_file(
 ///     "10000000-0000-4000-8000-000000000001/space.json",
-///     br#"{"version": 1, "id": "10000000-0000-4000-8000-000000000001", "title": "Talk"}"#,
+///     br#"{"version": 1, "id": "10000000-0000-4000-8000-000000000001", "title": "Space"}"#,
 /// );
 /// let imported = import_aggregate(files, || unreachable!("every id is written down"));
 /// assert!(imported.is_ok());
@@ -646,7 +646,7 @@ pub fn read_aggregate(
 /// files.insert_file("aggregate.json", format!(r#"{{"version": 1, "metaSpaceId": "{meta}"}}"#));
 /// files.insert_file(
 ///     format!("{meta}/space.json"),
-///     format!(r#"{{"version": 1, "id": "{meta}", "title": "Talk", "defaultMap": "00000000-0000-4000-8000-000000000a01"}}"#),
+///     format!(r#"{{"version": 1, "id": "{meta}", "title": "Space", "defaultMap": "00000000-0000-4000-8000-000000000a01"}}"#),
 /// );
 ///
 /// let refused = import_aggregate(files, || unreachable!("every id is written down")).unwrap_err();

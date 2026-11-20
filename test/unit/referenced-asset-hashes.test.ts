@@ -20,7 +20,7 @@ const space: SpaceSnapshot = {
   id: SPACE_ID,
   document: {
     version: 1,
-    title: 'Talk',
+    title: 'Space',
     maps: [
       {
         id: MAP_ID,

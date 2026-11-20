@@ -655,7 +655,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/notes-window.stories.tsx',
     storyExport: 'End',
     claim:
-      'At a Resource with no notes and no moves, the Notes window says there are no notes for it and that the talk ends here, and still offers Back.',
+      'At a Resource with no notes and no moves, the Notes window says there are no notes for it and that the presentation ends here, and still offers Back.',
   },
   {
     id: 'notes-window-waits-while-nothing-presents',

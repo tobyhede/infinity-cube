@@ -1,4 +1,4 @@
-//! Tests of the talk server and its window.
+//! Tests of the Aggregate server and its window.
 
 #![allow(
     clippy::unwrap_used,
@@ -33,30 +33,30 @@ fn snapshot(directory: &Path) -> Vec<(PathBuf, Vec<u8>)> {
     files
 }
 
-/// A talk open in the window `talk-0`, as the shell opens one.
+/// An Aggregate open in the window `space-0`, as the shell opens one.
 async fn open(
     directory: &Path,
     built: &Path,
 ) -> (
-    OpenTalks,
-    TalkKey,
+    OpenAggregates,
+    AggregateKey,
     Run<RandomIds, host::BuiltApplicationDirectory>,
 ) {
     let run = open_run(directory, built_shell(built).unwrap(), |_| {})
         .await
         .unwrap();
-    let key = TalkKey::of(directory);
-    let open_talks = OpenTalks::new(SchemeStyle::HostPerTalk);
-    open_talks.open(
-        TalkAddress::new(key.clone(), SchemeStyle::HostPerTalk),
+    let key = AggregateKey::of(directory);
+    let open_aggregates = OpenAggregates::new(SchemeStyle::HostPerAggregate);
+    open_aggregates.open(
+        AggregateAddress::new(key.clone(), SchemeStyle::HostPerAggregate),
         Arc::clone(run.application()),
-        "talk-0",
+        "space-0",
     );
-    (open_talks, key, run)
+    (open_aggregates, key, run)
 }
 
-fn request(key: &TalkKey, method: &str, path: &str, body: &str) -> http::Request<Vec<u8>> {
-    let origin = TalkAddress::new(key.clone(), SchemeStyle::HostPerTalk).origin();
+fn request(key: &AggregateKey, method: &str, path: &str, body: &str) -> http::Request<Vec<u8>> {
+    let origin = AggregateAddress::new(key.clone(), SchemeStyle::HostPerAggregate).origin();
     http::Request::builder()
         .method(method)
         .uri(format!("{origin}{path}"))
@@ -66,20 +66,20 @@ fn request(key: &TalkKey, method: &str, path: &str, body: &str) -> http::Request
         .unwrap()
 }
 
-mod given_a_talk_closing {
+mod given_an_aggregate_closing {
     use super::*;
 
     #[tokio::test]
     async fn after_an_edit_leaves_the_directory_with_the_edit() {
         let (temporary, directory) = fixture_copy();
-        let (open_talks, key, run) = open(&directory, &stand_in_build(&temporary)).await;
-        let loaded = open_talks
-            .answer("talk-0", request(&key, "GET", &meta_api(), ""))
+        let (open_aggregates, key, run) = open(&directory, &stand_in_build(&temporary)).await;
+        let loaded = open_aggregates
+            .answer("space-0", request(&key, "GET", &meta_api(), ""))
             .await;
         let loaded: serde_json::Value = serde_json::from_slice(loaded.body()).unwrap();
-        let committed = open_talks
+        let committed = open_aggregates
             .answer(
-                "talk-0",
+                "space-0",
                 request(
                     &key,
                     "POST",
@@ -90,8 +90,8 @@ mod given_a_talk_closing {
             .await;
         assert_eq!(committed.status(), 200, "the edit is committed");
         // Closed at once, inside the quiet period: the close writes it.
-        let (windows, stopped) = close_talk(&open_talks, &key, run).await;
-        assert_eq!(windows, vec!["talk-0".to_owned()], "its window");
+        let (windows, stopped) = close_aggregate(&open_aggregates, &key, run).await;
+        assert_eq!(windows, vec!["space-0".to_owned()], "its window");
         assert!(matches!(stopped, RunStopped::Stopped), "{stopped:?}");
         let written = std::fs::read_to_string(directory.join(META).join("space.json")).unwrap();
         assert!(
@@ -104,11 +104,11 @@ mod given_a_talk_closing {
     async fn opened_and_closed_with_no_edit_leaves_the_directory_unchanged() {
         let (temporary, directory) = fixture_copy();
         let before = snapshot(&directory);
-        let (open_talks, key, run) = open(&directory, &stand_in_build(&temporary)).await;
-        // Opening the talk's page reads it, which initializes its Spaces (ST-65).
+        let (open_aggregates, key, run) = open(&directory, &stand_in_build(&temporary)).await;
+        // Opening the Aggregate's page reads it, which initializes its Spaces (ST-65).
         for path in ["/", META_ADDRESS, "/api/spaces", meta_api().as_str()] {
-            let response = open_talks
-                .answer("talk-0", request(&key, "GET", path, ""))
+            let response = open_aggregates
+                .answer("space-0", request(&key, "GET", path, ""))
                 .await;
             assert!(
                 response.status().as_u16() < 400,
@@ -116,7 +116,7 @@ mod given_a_talk_closing {
                 response.status()
             );
         }
-        let (_windows, stopped) = close_talk(&open_talks, &key, run).await;
+        let (_windows, stopped) = close_aggregate(&open_aggregates, &key, run).await;
         assert!(matches!(stopped, RunStopped::Stopped), "{stopped:?}");
         assert!(
             snapshot(&directory) == before,
@@ -130,13 +130,13 @@ mod given_a_talk_closing {
     #[tokio::test(start_paused = true)]
     async fn writes_an_edit_still_being_answered_however_long_it_takes() {
         let (temporary, directory) = fixture_copy();
-        let (open_talks, key, run) = open(&directory, &stand_in_build(&temporary)).await;
-        let loaded = open_talks
-            .answer("talk-0", request(&key, "GET", &meta_api(), ""))
+        let (open_aggregates, key, run) = open(&directory, &stand_in_build(&temporary)).await;
+        let loaded = open_aggregates
+            .answer("space-0", request(&key, "GET", &meta_api(), ""))
             .await;
         let loaded: serde_json::Value = serde_json::from_slice(loaded.body()).unwrap();
-        let Ok(admitted) = open_talks.admit(
-            "talk-0",
+        let Ok(admitted) = open_aggregates.admit(
+            "space-0",
             request(
                 &key,
                 "POST",
@@ -151,7 +151,7 @@ mod given_a_talk_closing {
             admitted.answer().await
         };
         let ((_windows, stopped), committed) =
-            tokio::join!(close_talk(&open_talks, &key, run), answer_late);
+            tokio::join!(close_aggregate(&open_aggregates, &key, run), answer_late);
         assert_eq!(committed.status(), 200, "the page is told the edit landed");
         assert!(matches!(stopped, RunStopped::Stopped), "{stopped:?}");
         let written = std::fs::read_to_string(directory.join(META).join("space.json")).unwrap();
@@ -164,10 +164,10 @@ mod given_a_talk_closing {
     #[tokio::test]
     async fn refuses_a_request_made_once_it_is_closing() {
         let (temporary, directory) = fixture_copy();
-        let (open_talks, key, run) = open(&directory, &stand_in_build(&temporary)).await;
-        let (_windows, _stopped) = close_talk(&open_talks, &key, run).await;
-        let response = open_talks
-            .answer("talk-0", request(&key, "GET", "/api/spaces", ""))
+        let (open_aggregates, key, run) = open(&directory, &stand_in_build(&temporary)).await;
+        let (_windows, _stopped) = close_aggregate(&open_aggregates, &key, run).await;
+        let response = open_aggregates
+            .answer("space-0", request(&key, "GET", "/api/spaces", ""))
             .await;
         assert_eq!(
             response.status(),
@@ -177,34 +177,34 @@ mod given_a_talk_closing {
     }
 }
 
-mod given_a_talk_window {
+mod given_a_space_window {
     use super::*;
 
     #[tokio::test]
     async fn opens_at_the_meta_space_the_root_redirects_to() {
         let (temporary, directory) = fixture_copy();
-        let (open_talks, key, run) = open(&directory, &stand_in_build(&temporary)).await;
+        let (open_aggregates, key, run) = open(&directory, &stand_in_build(&temporary)).await;
         assert_eq!(
             first_address(run.application()).await,
             crate::test_support::META_ADDRESS,
             "the root's redirect, followed by the shell"
         );
-        let (_windows, _stopped) = close_talk(&open_talks, &key, run).await;
+        let (_windows, _stopped) = close_aggregate(&open_aggregates, &key, run).await;
     }
 
-    fn windows() -> (TalkWindows, Url) {
-        let address = TalkAddress::new(
-            TalkKey::of(Path::new("/talks/rust")),
-            SchemeStyle::HostPerTalk,
+    fn windows() -> (SpaceWindows, Url) {
+        let address = AggregateAddress::new(
+            AggregateKey::of(Path::new("/spaces/rust")),
+            SchemeStyle::HostPerAggregate,
         );
         let root = address.window_url().unwrap();
         let first = root.join(crate::test_support::META_ADDRESS).unwrap();
-        let open_talks = Arc::new(OpenTalks::new(SchemeStyle::HostPerTalk));
-        (TalkWindows::new(address, first, open_talks), root)
+        let open_aggregates = Arc::new(OpenAggregates::new(SchemeStyle::HostPerAggregate));
+        (SpaceWindows::new(address, first, open_aggregates), root)
     }
 
     #[test]
-    fn asked_for_the_talks_root_loads_the_address_it_redirects_to() {
+    fn asked_for_the_aggregates_root_loads_the_address_it_redirects_to() {
         let (windows, root) = windows();
         for asked in ["/", "/?reload=1", "/#top"] {
             assert_eq!(
@@ -232,7 +232,7 @@ mod given_a_talk_window {
     }
 
     #[test]
-    fn loads_any_other_address_of_its_talk_and_none_elsewhere() {
+    fn loads_any_other_address_of_its_aggregate_and_none_elsewhere() {
         let (windows, root) = windows();
         assert_eq!(
             windows.navigation(windows.first()),
@@ -242,7 +242,7 @@ mod given_a_talk_window {
         assert_eq!(
             windows.navigation(&root.join("/spaces/AAAAAAAAQACAAAAAAAAAQA/notes").unwrap()),
             Navigation::Load,
-            "another page of the talk"
+            "another page of the Aggregate"
         );
         assert_eq!(
             windows.navigation(&Url::parse("https://example.com/").unwrap()),
@@ -252,7 +252,7 @@ mod given_a_talk_window {
     }
 
     #[tokio::test]
-    async fn a_page_opening_the_talks_root_opens_its_first_address() {
+    async fn a_page_opening_the_aggregates_root_opens_its_first_address() {
         let (windows, root) = windows();
         let (temporary, directory) = fixture_copy();
         let run = open_run(
@@ -262,10 +262,10 @@ mod given_a_talk_window {
         )
         .await
         .unwrap();
-        windows.open_talks.open(
+        windows.open_aggregates.open(
             windows.address.clone(),
             Arc::clone(run.application()),
-            "talk-0",
+            "space-0",
         );
         let opened = windows.open_from_page(&root);
         assert!(
@@ -276,14 +276,14 @@ mod given_a_talk_window {
     }
 }
 
-mod given_a_folder_with_no_talk {
+mod given_a_folder_with_no_aggregate {
     use super::*;
 
     #[test]
     fn is_refused_naming_no_command() {
-        let message = refusal(Path::new("/talks/empty"), &ImportError::Empty).unwrap();
+        let message = refusal(Path::new("/spaces/empty"), &ImportError::Empty).unwrap();
         assert!(
-            message.starts_with("/talks/empty holds no talk"),
+            message.starts_with("/spaces/empty holds no Space"),
             "{message}"
         );
         assert!(

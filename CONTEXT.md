@@ -6,7 +6,7 @@ Graph-native technical content: Resources live in spatial Maps and connect into 
 
 **Space**:
 An authored world of Resources, Maps and the Graphs each Map owns. Its name is independent of the Titles of Space Resources that refer to it.
-_Avoid_: presentation, manifest, deck, document, canvas, board, file, subgraph, workspace.
+_Avoid_: talk, presentation, manifest, deck, document, canvas, board, file, subgraph, workspace.
 
 **Meta Space**:
 The one permanent Space, at the root of Space Resource ownership in an Aggregate.
@@ -17,7 +17,11 @@ Any Space other than the Meta Space.
 
 **Aggregate**:
 All Spaces together, rooted at the Meta Space through Space Resource references.
-_Avoid_: catalog, tree, bundle, collection; aggregate for a single Space.
+_Avoid_: talk, catalog, tree, bundle, collection; aggregate for a single Space; Aggregate in anything a person is shown, which says Space.
+
+**Space window**:
+A window the desktop application opens on an Aggregate directory, showing its Spaces.
+_Avoid_: talk window, Aggregate window.
 
 **Space snapshot**:
 The complete, fully identified form of one Space.
@@ -263,7 +267,7 @@ The ordered Resources visited during a presentation, used to retrace the path ac
 _Avoid_: Walk, route, trail, session, playthrough.
 
 **Presentation Notes Graph**:
-A Graph connecting the Resources of a talk Graph to their notes, which are ordinary Resources.
+A Graph connecting the Resources of a presented Graph to their notes, which are ordinary Resources.
 _Avoid_: speaker notes, notes field, notes Resource as a distinct kind.
 
 **Notes window**:
