@@ -1,6 +1,6 @@
 import { uuidSchema, type SpaceFraming, type SpaceView } from '@project/core';
 import type { EmbedView } from '@project/resource-api/view';
-import type { SpaceResourceTarget } from './space-resource-lifecycle';
+import type { SpaceResourceTarget } from '../space-resource-lifecycle';
 
 /**
  * The Map and Graph a Space embedding draws (ADR 0142): the view a plugin

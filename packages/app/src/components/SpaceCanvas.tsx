@@ -1,4 +1,4 @@
-import type { DrawnClipboardFailure } from '../embedded-publication';
+import type { DrawnClipboardFailure } from '../map-embedding/embedded-publication';
 import { ChromeContinuation } from './ChromeContinuation';
 import { drawnDropRefusal, surfaceAvailability, withSurfacePolicy } from '../map-surface-policy';
 import {
@@ -73,8 +73,8 @@ import {
   withEmbeddedEdgeTypes,
 } from '../embedded-map';
 import { editingPortalAncestor, reportsBodyHeight } from '../embedded-open-space-resource';
-import { framedView } from '../embed-view';
-import { useEmbeddedOpenSpaceResources } from '../use-embedded-open-space-resources';
+import { framedView } from '../map-embedding/embed-view';
+import { useEmbeddedOpenSpaceResources } from '../map-embedding/use-embedded-open-space-resources';
 import { useOpenSpaces } from '../open-spaces-context';
 import type { OpenSpace } from '../open-spaces';
 import { EmbeddedMapAuthoring } from './EmbeddedMapAuthoring';
@@ -84,7 +84,7 @@ import {
   MapEmbeddingsProvider,
   ownMapEmbed,
   type MapEmbedEntry,
-} from '../map-embeddings';
+} from '../map-embedding/map-embeddings';
 import type { Drawing, Embedding } from '../plugin-host/claim-chain';
 import { usePluginGate } from '../plugin-host/plugin-gate-context';
 import { CANVAS_KEYS, FULL_VIEW_KEYS, keyBelongsElsewhere, pressesBinding } from '../key-bindings';

@@ -5,14 +5,14 @@ import { describe, expect, it } from 'vitest';
 import { newUuid, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { MemorySpaceBackend } from '@project/persistence';
 import { bareKindData, type ResourceFlowNode } from '@project/react-flow-adapter';
-import type { MapEmbedEntry } from '../src/map-embeddings';
+import type { MapEmbedEntry } from '../src/map-embedding/map-embeddings';
 import { createOpenSpaces, type OpenSpace } from '../src/open-spaces';
 import { CANVAS } from '../src/space-authoring';
 import type { SpaceResourceFraming } from '../src/space-resource-framing';
 import {
   useEmbeddedOpenSpaceResources,
   type EmbeddedTargetReader,
-} from '../src/use-embedded-open-space-resources';
+} from '../src/map-embedding/use-embedded-open-space-resources';
 import { recordingHistory } from './browser-history';
 import { refusingFullscreen } from './fullscreen';
 import { unlinkedPresentations } from './presentations';

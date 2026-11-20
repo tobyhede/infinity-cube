@@ -15,12 +15,12 @@ import {
   embedSpacesToRead,
   type EmbeddedOpenSpaceResourceRequest,
   type EmbeddedRoot,
-} from './embedded-open-space-resource';
+} from '../embedded-open-space-resource';
 import type { EmbeddedPublication } from './embedded-publication';
 import { editingMapEmbeds, type MapEmbedEntry } from './map-embeddings';
-import type { OpenSpace, SpaceHold } from './open-spaces';
-import { spaceResourceTarget } from './space-resource-lifecycle';
-import type { SpaceResourceFraming } from './space-resource-framing';
+import type { OpenSpace, SpaceHold } from '../open-spaces';
+import { spaceResourceTarget } from '../space-resource-lifecycle';
+import type { SpaceResourceFraming } from '../space-resource-framing';
 
 const EMPTY_ENTRIES = [] as const;
 const emptySubscription = () => () => undefined;

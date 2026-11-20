@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { spaceSelection, uuidSchema, type SpaceView } from '@project/core';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
-import type { MapEmbedEntry } from '../src/map-embeddings';
+import type { MapEmbedEntry } from '../src/map-embedding/map-embeddings';
 
 /** A plugin's Map content while it is Open. */
 const OPEN = z.object({ open: z.literal(true) });

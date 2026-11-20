@@ -12,8 +12,8 @@ import { mapSurfacePolicy, type MapSurfacePolicy } from './map-surface-policy';
 
 import { DRAG_TILT_RADIANS, tiltResourcePosition } from './drag-tilt';
 import type { EmbeddedBounds } from './embedded-map';
-import { resolveEmbedView } from './embed-view';
-import type { MapEmbedEntry } from './map-embeddings';
+import { resolveEmbedView } from './map-embedding/embed-view';
+import type { MapEmbedEntry } from './map-embedding/map-embeddings';
 import type { SpaceResourceTarget } from './space-resource-lifecycle';
 
 /**

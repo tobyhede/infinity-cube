@@ -21,7 +21,7 @@ import {
   type SpaceResourceSelectorsProps,
 } from '@project/ui';
 import type { Claim } from '@project/resource-api/view';
-import { createMapEmbeddings, type MapEmbeddings } from '../src/map-embeddings';
+import { createMapEmbeddings, type MapEmbeddings } from '../src/map-embedding/map-embeddings';
 import { CANVAS } from '../src/space-authoring';
 import { canvasAuthoring } from './canvas-authoring';
 import { textAsset } from './markdown-texts';

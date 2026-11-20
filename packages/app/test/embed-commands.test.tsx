@@ -12,7 +12,7 @@ import {
   READING_SPACE_NOTE,
   type EmbedCommandsContext,
 } from '../src/embed-commands';
-import type { MapEmbedEntry } from '../src/map-embeddings';
+import type { MapEmbedEntry } from '../src/map-embedding/map-embeddings';
 import { createOpenSpaces } from '../src/open-spaces';
 import { RESOURCE_SIZE } from '../src/resource';
 import type { SpaceResourceTarget } from '../src/space-resource-lifecycle';

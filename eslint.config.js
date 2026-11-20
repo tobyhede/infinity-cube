@@ -512,10 +512,10 @@ export default tseslint.config(
       ],
     },
   },
-  // The embed lifecycle hook sits beneath the canvas components and is read by
-  // them, so it reaches nothing in `./components/`.
+  // The Map embedding sits beneath the canvas components and is read by them,
+  // so it reaches nothing in `../components/`.
   {
-    files: ['packages/app/src/use-embedded-open-space-resources.ts'],
+    files: ['packages/app/src/map-embedding/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -525,8 +525,8 @@ export default tseslint.config(
             ESCAPE_PATTERN,
             APP_UI_IMPLEMENTATION_PATTERN,
             {
-              regex: '^\\./components/',
-              message: 'The embed lifecycle hook does not depend on the canvas components.',
+              regex: '^\\.\\./components/',
+              message: 'The Map embedding does not depend on the canvas components.',
             },
           ],
         },

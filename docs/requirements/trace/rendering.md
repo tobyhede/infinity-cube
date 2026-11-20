@@ -377,7 +377,7 @@ Kept under drafting rule 5 (code plus a test, contradicted by nothing):
 - Edge Title fit constants in `ui/src/edge-title-room.ts`: `EDGE_TITLE_CEILING` 224, `EDGE_TITLE_CLEARANCE` 28, `EDGE_TITLE_BOX_CHROME` 26, `EDGE_TITLE_LEAST_TEXT` 34.
 - The URL reveal calls `fitView({ nodes: [node], padding: 0.5, duration: 0 })` with no `maxZoom` (`CanvasContinuation.tsx`).
 - Active Graph fade: content opacity transitions over `--resource-placement-duration * 0.4` (presentation; C2 closed by drafting rule 6).
-- A plugin's drawing is `PluginResource` on a Map and `PresentedPluginResource` on the Stage and in Full View (`ui/src/`); its failure boundary is `ResourceFailureBoundary.tsx`; a Reference's embedding is `ResourceEmbedding.tsx`; an Open Space Resource's Map is drawn over its rect as sibling nodes by `app/src/components/CanvasMapEmbed.tsx`, publishing into `app/src/map-embeddings.ts`.
+- A plugin's drawing is `PluginResource` on a Map and `PresentedPluginResource` on the Stage and in Full View (`ui/src/`); its failure boundary is `ResourceFailureBoundary.tsx`; a Reference's embedding is `ResourceEmbedding.tsx`; an Open Space Resource's Map is drawn over its rect as sibling nodes by `app/src/components/CanvasMapEmbed.tsx`, publishing into `app/src/map-embedding/map-embeddings.ts`.
 
 ## 6. Sources added or changed on main
 

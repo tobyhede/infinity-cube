@@ -4,9 +4,9 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] The four modules and their tests live under one folder, and every import is updated. Imports stay extensionless, and type-only imports use `import type`.
-- [ ] The canvas and Stage `HostMapProvider` adapters stay where they are (spec, decision 4).
-- [ ] No behaviour change. Typecheck, lint and the moved tests pass unchanged.
-- [ ] Any `docs/requirements/` citation that names a moved test file is updated in the same commit.
+- [x] The four modules and their tests live under one folder, and every import is updated. Imports stay extensionless, and type-only imports use `import type`.
+- [x] The canvas and Stage `HostMapProvider` adapters stay where they are (spec, decision 4).
+- [x] No behaviour change. Typecheck, lint and the moved tests pass unchanged.
+- [x] Any `docs/requirements/` citation that names a moved test file is updated in the same commit.

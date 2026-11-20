@@ -16,7 +16,7 @@ import {
   type CommitResult,
 } from '@project/persistence';
 import { NavigationUnavailableError } from '../src/browser-location';
-import { useEmbeddedOpenSpaceResources } from '../src/use-embedded-open-space-resources';
+import { useEmbeddedOpenSpaceResources } from '../src/map-embedding/use-embedded-open-space-resources';
 import { createOpenSpaces } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { unavailable } from './command-dock';
