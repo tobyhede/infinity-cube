@@ -4,7 +4,7 @@ Status: accepted
 Date: 2026-11-20
 Refines: 0122
 
-ADR 0122 gives every selected Resource one bottom-right resize control, with a fixed top-left origin and one Edit on release. An author shaping a diagram also needs to enlarge a rect while keeping its proportions. The control takes Shift when the drag starts to choose that gesture.
+ADR 0122 gives every selected Resource one bottom-right resize control, with a fixed top-left origin and one Edit on release. An author also needs to enlarge a Resource’s rect while keeping its proportions. The control takes Shift when the drag starts to choose that gesture.
 
 Hold Shift when starting Resize to keep the drawn rect’s starting width-to-height ratio for that whole drag. Releasing Shift before the pointer keeps that ratio. A drag started without Shift changes its dimensions independently for its whole duration, even if Shift is pressed later. The ratio is the Resource’s rect on the current Map when the gesture starts.
 
