@@ -69,7 +69,7 @@ One agent per topic, each editing only its doc, its `trace/` file and its `confl
 | `npx vitest run test/unit/current-domain-vocabulary.test.ts test/unit/adr-status-blocks.test.ts test/unit/docs-agents-citation-accuracy.test.ts` | 3 files, 145 tests passed (Node 22) |
 | `git diff --check` | clean |
 
-Freshness: `origin/main` was still `71b2a14` at the audit, the merge-base. `d461223..origin/main` holds only PR 502's own changes, so the refresh holds if PR 502 merges as it stands.
+Freshness: at the audit, `origin/main` was `71b2a14`. By 21 November it was `88ac304`, with ADRs 0165 and 0166 and Storage changes (ST-11, ST-36, ST-70, ST-120, a new ST-125). See "Review fixes (21 November 2026)" below.
 
 ## Rulings (20 November 2026)
 
@@ -83,3 +83,14 @@ The snapshot model is unchanged. ADRs stay binding and append-only. The reading 
 
 - `check-evidence.py` checks TypeScript test titles and file paths. It does not open a Rust test to confirm a cited function name; the audit checked those by hand.
 - `check-dispositions.py` checks that each ADR has a row in some trace, not in every doc whose marker mentions it; the audit checked that per doc.
+
+## Review fixes (21 November 2026)
+
+The feedback on PR 512 was audited in `/mnt/project-files/reviews/pr502-pr512-feedback-audit-2026-11-21.md` (project files) and fixed here:
+
+- **Freshness.** `main` (`88ac304`) was merged into PR 502's branch (`9674ba8`) and from there into this one. Every marker now reads `9674ba8`, ADRs through 0166. Storage incorporates 0165 (ST-125) and 0166 (ST-36). The other six docs record both as deciding nothing, with a trace row each. Storage's SQLite host rules from PR 502 became ST-126 to ST-128, because `main` took ST-125.
+- **Ruling C5's reach.** UI-111, its Bugs line and ticket 02 now list every line both CLIs print that says Aggregate. ST-90 carries a bold bug status.
+- **Traces.** The ui rows for 0161 and 0164 point at the rulings. Trace lines were added for ruling C3 (space-and-resources) and ruling C5 (storage). Maps-and-graphs has a row each for 0157, 0160–0162 and 0164. Rendering and ui have rows for 0155 and 0156.
+- **CONTEXT.md.** The duplicate Space window entry is removed, and Space's _Avoid_ list qualifies "presentation".
+- **ST-124** adds ADR 0162's Rust writer task holding the lock. SR-67 links to RD-5 instead of restating it.
+- **Path rules.** Every doc's Status line roots `test/`, `src/`, `crates/`, `conformance/` and `packages/`, as `check-evidence.py` does. The ui Bugs list is in id order.

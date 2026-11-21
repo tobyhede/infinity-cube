@@ -235,6 +235,9 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 | 0142 old content: no versioning of content | folded → ST-36 |
 | 0142 cost: an asset URL inside another asset's bytes is not found, so it is not carried | → ST-60 |
 | 0142 cost and rejected options otherwise | dropped: costs and rejected alternatives |
+| 0155 both hosts share one schema through plain-SQL migrations that every tool applies, held to one schema by a test | → ST-125, as 0165 refines it |
+| 0165 the schema history in two encodings: Prisma Next's packages and one plain-SQL file per package, held to the same statements and schema by tests; a schema change adds both | → ST-125 |
+| 0165 rejected options | dropped: rejected alternatives |
 
 ## 2. Guides
 
@@ -412,7 +415,7 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 - ST-76: the served-type rule and `X-Asset-Media-Type` come from the guide; the sandboxing Content Security Policy on a served asset is code only.
 - ST-113–ST-116: the desktop sidecar, its announcement, lock-down, routing, fallback and stop. ADR 0155 decides it; the rules restate `src/desktop/` and its tests. ST-63's sentence on the sidecar's stop and five-second kill comes from the same code.
 - ST-117: located refusals, the order a commit's candidate aggregate is judged in, the code unit cycle walk and the intake conformance corpus. ADR 0156 decides the corpus; the rule restates `packages/aggregate/src/intake-refusal.ts`, `packages/graph/src/intake-location.ts`, `decideCommit` and `conformance/intake/README.md`, and their tests.
-- ST-125–ST-127 (added 2026-11-19): the SQLite host's `SQLITE_PATH` refusals, one process per file and its contention outcomes, and its journal settings. ADR 0095 decides the shared repository and its serialising queue; the rules restate `src/sqlite/` and its tests, and were written only in the README before. No ADR decides ST-125's paths or ST-127's journal settings; they are detail no ADR states, recorded here and dated in the rule (workflow, "A ruling is recorded where it belongs"). ST-125 states that `pnpm dev:sqlite` falls back to its default file, which the README's earlier wording had as a refusal.
+- ST-126–ST-128 (added 2026-11-19): the SQLite host's `SQLITE_PATH` refusals, one process per file and its contention outcomes, and its journal settings. ADR 0095 decides the shared repository and its serialising queue; the rules restate `src/sqlite/` and its tests. No ADR decides ST-126's paths or ST-128's journal settings; they are detail no ADR states, recorded here and dated in the rule (workflow, "A ruling is recorded where it belongs").
 
 ## 5. Code notes
 
@@ -451,3 +454,5 @@ Added in the refresh against `d461223`, which advanced the marker from `9e9b094`
 | 0164 "talk" is retired; a person is shown a Space | vocabulary: storage.md, this trace and conflicts/storage.md say Aggregate for the directory, its run, its origin and its lock, and Space for what a person is shown. The refresh replaced the word in closed conflict S2's record. Retained |
 
 Evidence citations corrected in the refresh: the HTTP conformance cases are written in tables under `conformance/http/` (`wire-cases.ts`, `store-condition-cases.ts`, `process-cases.ts`) and run by each host's test file, which holds no titles of its own. ST-65, ST-77, ST-81, ST-114 and ST-123 now name each case and its table rather than citing it with › against a file that does not hold it, and the doc's path rule puts `src/`, `crates/` and `conformance/` at the repository root. ST-81's store-condition case is run by the desktop handler (`test/unit/http-conformance-handler.test.ts`) and the Rust `Application` (`crates/host/tests/wire.rs`), not by the process suite.
+
+Ruling UI C5 (20 November 2026): the refusal a mount shares with the CLI says Space at both → ST-90 (bug: code differs); ui.md UI-111 owns the wording and lists every line. ADR 0162's Rust writer task owning the lock → ST-124.

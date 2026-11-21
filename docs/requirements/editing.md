@@ -2,7 +2,7 @@
 
 **Purpose:** how any Edit is derived, committed and published in the browser, what each outcome means, how a session persists and recovers, how one Edit spans several Spaces, and what withholds authoring, Claims and exclusive work included.
 
-**Snapshot:** checked against `d461223` (2026-11-20); incorporates accepted ADRs through 0164; ADRs 0155 to 0157, 0159, 0160 and 0162 decide nothing this document restates, ADR 0161's refusal reaches a session as ED-46 already has it, and ADR 0164's names are applied. ADRs accepted after it bind where they differ, until this document is updated. Proposed ADR 0163 (waiting on a closing window's last write) is not incorporated.
+**Snapshot:** checked against `9674ba8` (2026-11-21); incorporates accepted ADRs through 0166; ADRs 0155 to 0157, 0159, 0160 and 0162 decide nothing this document restates, ADR 0161's refusal reaches a session as ED-46 already has it, and ADR 0164's names are applied. ADRs accepted after it bind where they differ, until this document is updated. ADRs 0165 (the schema history in two encodings) and 0166 (a preview build is not a release) decide nothing this document restates; storage.md owns both. Proposed ADR 0163 (waiting on a closing window's last write) is not incorporated.
 
 Open conflicts are listed in [conflicts/editing.md](conflicts/editing.md). Sources are traced in [trace/editing.md](trace/editing.md).
 
@@ -28,7 +28,7 @@ Open conflicts are listed in [conflicts/editing.md](conflicts/editing.md). Sourc
 - **Plugin commit**: an Edit a Resource's plugin asks for on its own Resource: its Title, its content or its Map content (space-and-resources.md, maps-and-graphs.md MG-87).
 - **Exclusive work**: work a plugin runs under a Claim that withdraws authoring and navigation everywhere until it settles, such as an Image Resource's Replace (ED-68).
 
-**Status:** **built** means code and a named test match the rule. **built (untested)** means code matches and no test covers it. **not built** means the rule is decided and no code implements it. **bug: code differs** means the code does what the note says instead. **undecided (Cn)** means the rule waits on conflict Cn (none is open in this doc). A test is named as `file` › "test name". Paths that start with `test/` are at the repo root; all others are under `packages/`. This document restates the accepted ADRs and decides nothing itself: each rule names its sources, and a rule that disagrees with an accepted ADR is a defect in this document, corrected here, never a reason to set the ADR aside. A rule sourced only from code and tests, an archived guide or a ruling in [DECISIONS.md](DECISIONS.md) says so.
+**Status:** **built** means code and a named test match the rule. **built (untested)** means code matches and no test covers it. **not built** means the rule is decided and no code implements it. **bug: code differs** means the code does what the note says instead. **undecided (Cn)** means the rule waits on conflict Cn (none is open in this doc). A test is named as `file` › "test name". Paths that start with `test/`, `src/`, `crates/`, `conformance/` or `packages/` are at the repo root; all others are under `packages/`. This document restates the accepted ADRs and decides nothing itself: each rule names its sources, and a rule that disagrees with an accepted ADR is a defect in this document, corrected here, never a reason to set the ADR aside. A rule sourced only from code and tests, an archived guide or a ruling in [DECISIONS.md](DECISIONS.md) says so.
 
 ## Persistence statuses
 

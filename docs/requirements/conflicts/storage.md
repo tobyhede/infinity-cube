@@ -8,6 +8,21 @@ None.
 
 ## Closed
 
+### S3. Closed by ruling S3
+
+Ruled 20 November 2026 by the maintainer: option (a), recorded as ADR 0165, which refines 0155. Prisma Next applies its own packages, `sqlx` applies the plain-SQL files, and tests hold them to the same statements and the same schema. ST-125 states it.
+
+For the record, the conflict as it stood:
+
+- **Rules affected.** ST-125.
+- **Disagreement.** ADR 0155 says "the migrations are plain SQL files that Prisma (PostgreSQL), the SQLite migrator and `sqlx` all apply". Prisma Next applies a migration package's `ops.json`, and the packages already in `migrations/app/` and `migrations-sqlite/app/` are history that is never rewritten (ADR 0085; `test/unit/current-domain-vocabulary.test.ts`). So the plain-SQL files under `migrations-sql/` are applied by `sqlx` alone, and Prisma Next applies the same statements from its packages.
+- **Options.**
+  - (a) Keep both: each package and its file are held to the same statements by `test/unit/shared-migrations.test.ts`, and to the same schema by `crates/host/tests/shared_migrations.rs`. Read the ADR as one schema history in two encodings until Rust owns it.
+  - (b) Rewrite the existing packages so each executes its `.sql` file through `rawSql`, against the rule that history is not rewritten; a database Prisma Next migrated before would no longer match the packages' hashes.
+  - (c) From now on, write each new package's operations as one `rawSql` reading its `.sql` file, leaving the history as in (a).
+- **Recommendation.** (a). Either host can serve a database the other migrated, which is what the ADR wants the shared files for, and nothing already migrated breaks.
+- **Evidence.** `migrations-sql/README.md`; `test/unit/shared-migrations.test.ts`; `crates/host/tests/shared_migrations.rs`; `.scratch/rust-host/issues/14-shared-plain-sql-migrations.md`.
+
 ### S2. Closed by ruling S2
 
 Ruling Storage S2 in `../DECISIONS.md` ("Checkpoint 3 rulings", ruled 12 November 2026), recorded as ADR 0152, which refines 0054 and 0056: option (a), extended to browser-stored copies. The format rolls forward because InfinityCube is unreleased and makes no compatibility promise for any copy outside the repository; an Aggregate directory is recovered from git or read with the build that wrote it, and a browser's stored copy of a mounted Aggregate (not built) may be unreadable after a deploy. ST-36's *Why:* states it; the rule is unchanged.

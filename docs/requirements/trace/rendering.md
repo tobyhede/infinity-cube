@@ -456,3 +456,14 @@ Added 20 November 2026, when the doc was reconciled against `d461223`. ADR 0158 
 | 0164 "talk" retired; a person is shown a Space | reviewed: this doc and its trace and conflict files use neither "talk" nor "Aggregate"; nothing to restate |
 
 Ruling Rendering C3 (20 November 2026): clip a wide Mermaid diagram as ADR 0149 states → RD-5 (bug: code differs), SR-67; DECISIONS "Refresh rulings".
+
+## Refresh to `9674ba8` (21 November 2026)
+
+Merging `main` at `88ac304` brought ADRs 0165 and 0166, both Storage's.
+
+| ADR | Disposition |
+|---|---|
+| 0155 the desktop application and a Rust host that replaces every server-side host | reviewed: decides nothing in this doc's scope; storage.md ST-113–ST-122 |
+| 0156 each runtime has one intake, held to one conformance suite | reviewed: decides nothing in this doc's scope; storage.md ST-117, ST-118 |
+| 0165 Prisma Next and sqlx apply one schema history in two encodings, held equal by tests | reviewed: decides nothing in this doc's scope; storage.md ST-125 |
+| 0166 a preview build is not a release | reviewed: decides nothing in this doc's scope; storage.md ST-36 |

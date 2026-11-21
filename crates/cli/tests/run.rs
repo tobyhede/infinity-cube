@@ -331,8 +331,8 @@ mod given_a_directory_it_cannot_run {
         // Single-quoted where a shell would split or expand it, as on Windows.
         let shown = missing.display();
         assert!(
-            message.contains(&format!("pnpm cube init {shown}"))
-                || message.contains(&format!("pnpm cube init '{shown}'")),
+            message.contains(&format!("infinity-cube init {shown}"))
+                || message.contains(&format!("infinity-cube init '{shown}'")),
             "names init: {message}"
         );
         assert_eq!(run.exited().code(), Some(1), "exits one");

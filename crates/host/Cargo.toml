@@ -4,6 +4,7 @@ description = "The InfinityCube host: serves an Aggregate directory"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+license.workspace = true
 publish.workspace = true
 
 [dependencies]
@@ -22,8 +23,10 @@ uuid = { version = "1", features = ["v4"] }
 http-conformance = { workspace = true }
 proptest = "1"
 serde_json = { workspace = true }
+sqlx = { version = "0.9.1", default-features = false, features = ["migrate", "postgres", "runtime-tokio", "sqlite-bundled"] }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["fs", "macros", "rt", "rt-multi-thread", "sync", "test-util", "time"] }
+url = { workspace = true }
 
 [lints]
 workspace = true

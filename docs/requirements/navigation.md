@@ -2,7 +2,7 @@
 
 **Purpose:** what changes what is shown without writing the Space: choosing a Map, selection, traversal, product URLs and browser history, Open Spaces, and presenting.
 
-**Snapshot:** checked against `d461223` (2026-11-20); incorporates accepted ADRs through 0164. ADRs 0156, 0157 and 0159 to 0162 decide nothing this document restates (0157's WebKit floor is UI-110); proposed ADR 0163 is not incorporated. ADRs accepted after it bind where they differ, until this document is updated.
+**Snapshot:** checked against `9674ba8` (2026-11-21); incorporates accepted ADRs through 0166. ADRs 0156, 0157 and 0159 to 0162 decide nothing this document restates (0157's WebKit floor is UI-110); proposed ADR 0163 is not incorporated. ADRs accepted after it bind where they differ, until this document is updated. ADRs 0165 (the schema history in two encodings) and 0166 (a preview build is not a release) decide nothing this document restates; storage.md owns both.
 
 Open conflicts are listed in [conflicts/navigation.md](conflicts/navigation.md). Sources are traced in [trace/navigation.md](trace/navigation.md).
 

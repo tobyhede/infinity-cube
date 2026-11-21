@@ -393,3 +393,14 @@ Added 15 November 2026. These ADRs had no row in any trace. Each has one outcome
 | 0059 (superseded) a Space Card creates the normal new Space | historical: superseded by 0068, traced in §1 |
 | 0060 (superseded) a nested Space has one owner | historical: superseded by 0068, traced in §1 |
 | 0085 Thing and Diagram are the first-public names for Card and Layout | historical vocabulary: its names were replaced by 0092 (Reference) and 0101 (Resource and Map), and it restates the invariants of earlier ADRs rather than deciding them. What survives is held elsewhere: the names are GL (`CONTEXT.md`), and `LayoutStrategy` keeping its name is the code's (`graph/src/layout.ts`), not a requirement |
+
+## Refresh to `9674ba8` (21 November 2026)
+
+Merging `main` at `88ac304` brought ADRs 0165 and 0166, both Storage's.
+
+| ADR | Disposition |
+|---|---|
+| 0165 Prisma Next and sqlx apply one schema history in two encodings, held equal by tests | reviewed: decides nothing in this doc's scope; storage.md ST-125 |
+| 0166 a preview build is not a release | reviewed: decides nothing in this doc's scope; storage.md ST-36 |
+
+Ruling Rendering C3 (20 November 2026): a wide Mermaid diagram is clipped. Owned by rendering.md RD-5; SR-67 links to it.

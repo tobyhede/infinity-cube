@@ -372,3 +372,12 @@ Added 20 November 2026, reconciling against `d461223`. The doc's marker had clai
 | 0164 the Notes window's view names the presented Graph's Title `presentedGraph` | code note (§6) |
 | 0164 a fixture's presented Graph Title is `demo` | presentation-only: NV-67's example reads "Intro Demo" |
 | Code since `9e9b094`: the Notes window says "This is the end of the presentation." at a Resource with no move | → NV-73 (code only, §5) |
+
+## Refresh to `9674ba8` (21 November 2026)
+
+Merging `main` at `88ac304` brought ADRs 0165 and 0166, both Storage's.
+
+| ADR | Disposition |
+|---|---|
+| 0165 Prisma Next and sqlx apply one schema history in two encodings, held equal by tests | reviewed: decides nothing in this doc's scope; storage.md ST-125 |
+| 0166 a preview build is not a release | reviewed: decides nothing in this doc's scope; storage.md ST-36 |

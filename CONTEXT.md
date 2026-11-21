@@ -6,7 +6,7 @@ Graph-native technical content: Resources live in spatial Maps and connect into 
 
 **Space**:
 An authored world of Resources, Maps and the Graphs each Map owns. Its name is independent of the Titles of Space Resources that refer to it.
-_Avoid_: talk, presentation, manifest, deck, document, canvas, board, file, subgraph, workspace.
+_Avoid_: talk, presentation (one run through a presented Graph, below), manifest, deck, document, canvas, board, file, subgraph, workspace.
 
 **Meta Space**:
 The one permanent Space, at the root of Space Resource ownership in an Aggregate.
@@ -296,10 +296,12 @@ _Avoid_: loading, restoring, syncing, merging.
 Working on an existing Aggregate directory with edits exported back to it as the durable copy.
 _Avoid_: watching, syncing, live mode, session.
 
-**Space window**:
-A window the desktop application opens on a folder, showing that folder's Aggregate as its Spaces.
-_Avoid_: talk window.
-
 **Mounting**:
 Working on an Aggregate read from a GitHub location, with edits kept in the browser rather than written back to GitHub.
 _Avoid_: publishing, deploying, hosting, loading; mount in the React sense.
+
+## Distribution
+
+**Preview build**:
+A published, downloadable build of InfinityCube that makes no compatibility promise: an Aggregate directory is read with the preview build that wrote it.
+_Avoid_: release, version, stable build, distribution.

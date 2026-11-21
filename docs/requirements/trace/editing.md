@@ -396,3 +396,12 @@ The old marker named `d14ff974` and ADRs through 0157, but no row traced 0155–
 | 0164 "talk" is retired; Aggregate in requirements for the directory, run, origin or lock | applied: `../editing.md` used no "talk"; "candidate aggregate" and "stored aggregate" (statuses table, ED-48, ED-58) now read Aggregate, the `CONTEXT.md` term for all Spaces together |
 | Status lines added to 0042 ("Refined by: 0154"), 0126 ("Refined by: 0150") and 0142 ("Refined by: 0158") | dropped: status lines, no rule. 0154 and 0150 were traced by the rewrite (UI-93 holds 0154; ED-72 cites 0150) |
 | `app/src/authoring-refusal.ts` words `forbidden` "You do not have permission to save this space." | not ED's: the wording is UI's (ED-44 points there). Proposed: after 0161 the one way the product's page meets a 403 is a page that is not the product's, and 0164 has a person shown "Space"; returned to the UI owner rather than recorded as a conflict here |
+
+## Refresh to `9674ba8` (21 November 2026)
+
+Merging `main` at `88ac304` brought ADRs 0165 and 0166, both Storage's.
+
+| ADR | Disposition |
+|---|---|
+| 0165 Prisma Next and sqlx apply one schema history in two encodings, held equal by tests | reviewed: decides nothing in this doc's scope; storage.md ST-125 |
+| 0166 a preview build is not a release | reviewed: decides nothing in this doc's scope; storage.md ST-36 |

@@ -428,4 +428,18 @@ The doc was reconciled from marker `9e9b094` (ADRs through 0159) to `d461223`. A
 | 0158 Mermaid Opens with no size hint where it has not drawn within the load wait (text changed after `9e9b094`) | already held: MG-27 |
 | 0158 Diagram is never a synonym for Map, in the Mermaid plugin or out of it (added after `9e9b094`), with 0101 | wording, presentation-only: MG-1, MG-5, MG-27 and MG-29's *Why* said "diagram" for a Map and now say Map. No rule changes |
 | 0159 (accepted 18 November 2026) | already held: MG-86 (§6) |
+| 0157 WebKit joins Chromium under the browser floor | reviewed: decides nothing in this doc's scope; ui.md UI-110 |
+| 0160 JSON text holds no lone surrogate in either runtime | reviewed: decides nothing in this doc's scope; storage.md ST-22, ST-77 |
+| 0161 both hosts refuse a cross-site change | reviewed: decides nothing in this doc's scope; storage.md ST-123 |
+| 0162 every host locks the Aggregate directory it runs | reviewed: decides nothing in this doc's scope; storage.md ST-124 |
+| 0164 "talk" is retired; a person is shown a Space | applied: this doc held no "talk" to retire, and says Aggregate only for the directory and its reads (MG-75) |
 | Code since `9e9b094` in `packages/graph` (located refusals, `compareOrdinal`), `packages/core` (`parseJsonText`), `packages/persistence` (commit decision order, Space id case) and `packages/app` (comment wording) | no Maps and Graphs rule changes; locations and order sent → ST (ST-117), already there. Every bug in the doc's Bugs list was rechecked against `d461223` and still holds: `map-authoring-commands.ts`, `space-resource-planning.ts`, `space-authoring.ts` and `navigation.ts` `activateGraph` are unchanged in behaviour since `9e9b094` |
+
+## Refresh to `9674ba8` (21 November 2026)
+
+Merging `main` at `88ac304` brought ADRs 0165 and 0166, both Storage's.
+
+| ADR | Disposition |
+|---|---|
+| 0165 Prisma Next and sqlx apply one schema history in two encodings, held equal by tests | reviewed: decides nothing in this doc's scope; storage.md ST-125 |
+| 0166 a preview build is not a release | reviewed: decides nothing in this doc's scope; storage.md ST-36 |
