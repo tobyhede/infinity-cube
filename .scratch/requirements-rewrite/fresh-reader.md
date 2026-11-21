@@ -91,3 +91,30 @@ The ADR numbers are from the trace rows (`docs/requirements/trace/`) for each ru
 - Every answer above was checked against the rule text at the time of writing, before the agents realigning the docs on 15 November 2026 had finished. Rerun after the snapshot markers land; a question whose rule changed is reopened.
 
 **Still owed:** an independent reader given only `AGENTS.md` and these questions (the expected answers withheld), with the result recorded here beside this self-check.
+
+## Refresh questions (19 November 2026)
+
+Written for the refresh to `17aab57`, from the ADRs accepted since the previous markers (0157–0162), after the editing edits for 0158 and before the storage reconciliation finished. They cross the topics those ADRs touch.
+
+| # | Question | Expected answer | Source |
+|---|---|---|---|
+| RF-Q1 | While an author edits a Mermaid Resource's source, can they rename another Resource on the canvas? | No. The Mermaid edit holds a Claim on the canvas, exactly as a Markdown text edit does, and one authoring surface runs at a time, so starting a rename is withdrawn until the edit ends. | ADR 0158, 0142, 0064; ED-33, ED-37, ED-80, SR-67 |
+| RF-Q2 | A web page on another site POSTs an image to a running `cube run` on 127.0.0.1. What happens? | It is refused 403 `forbidden` ("Send a change from the application's own page.") before its body is read, because its `Sec-Fetch-Site` is not `same-origin`/`none` or its `Origin` does not name the request's `Host`. A request naming neither header (curl, the MCP server) is served. | ADR 0161; ST-123 |
+| RF-Q3 | I start `pnpm cube run space/` while the desktop application already has `space/` open. What happens? | The second run is refused with the kind `locked` and exits 1, saying the directory is open in another run: every host takes SQLite's exclusive lock on `space/.infinity-cube.lock` before Import and holds it until its last write lands. | ADR 0162; ST-124 |
+| RF-Q4 | A commit body escapes a lone surrogate (`"\ud800"`) in a Title. What does the host answer, and does the browser offer Retry? | 400 `invalid-request`, "Malformed JSON in request body", in both runtimes; the browser reads it as a permanent rejection and offers no Retry (not a size refusal). | ADR 0160, 0042; ST-77, ST-101, ED-46 |
+| RF-Q5 | Does a Space's Map content get checked when the Space has two Resource files with the same id? | The repeat is the one refusal (`duplicate-resource-id`, located at `<space id>/resources/<id>.json`), and Map content kept for that id is judged by no plugin; the rest of the Space's Map content is still judged. | ADR 0159; SR-6, MG-86 |
+
+### Independent run (19 November 2026)
+
+A separate agent, given `AGENTS.md` and the five questions with the expected answers withheld, answered all five through the reading path and matched each expected answer. It found RF-Q4 needs ST-101 to get from 400 to "no Retry", and RF-Q5's expected answer left out that other Map content is still judged; both expected answers above were corrected. It noted that RF-Q2's "the MCP server" comes from ADR 0161, though `cube mcp` makes no HTTP request. The 33 questions above were not rerun independently.
+
+## Refresh questions (21 November 2026)
+
+Written for the refresh to `f6e01b9`, from ADR 0165 and the SQLite rules main merged after `a0f5066`, before the storage edits of this refresh.
+
+| # | Question | Expected answer | Source |
+|---|---|---|---|
+| RF-Q6 | I add a column to the PostgreSQL schema. What do I write? | A new Prisma Next migration package under `migrations/app/` (never a rewrite of an old one) and, in the same change, its plain-SQL file under `migrations-sql/postgres/`, named for the package with the `T` dropped, holding the statements its operations execute in order; `test/unit/shared-migrations.test.ts` fails until they agree, and the Prisma contract changes too. | ADR 0165, ADR 0085; ST-125; `docs/agents/build-tooling.md` |
+| RF-Q7 | I run `pnpm cube import --store sqlite` while `pnpm dev:sqlite` has the file open. What happens? | Unsupported: one process per file. Whichever operation meets the other's lock fails at once, or waits out the driver's busy timeout synchronously and then fails, or succeeds if the lock clears in time; an HTTP request meeting such a failure answers 503 `persistence-unavailable`, never 409, and nothing is left part-written or locked. | ADR 0095; ST-127; `AGENTS.md` |
+
+Self-check only (this run delegated nothing): each expected answer was read back against ST-125 and ST-127 as they stand after this refresh, and matched. No independent reader ran them.

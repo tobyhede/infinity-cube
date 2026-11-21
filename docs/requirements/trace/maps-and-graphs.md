@@ -415,3 +415,29 @@ Added 15 November 2026. These ADRs had no row in any trace. Each has one outcome
 | 0022 (superseded) a Layout filters its routes and marks one active | historical: superseded by 0026, which 0040 superseded. 0026 and 0040 (a Map owns its Graphs) are traced in §2 |
 | 0045 (superseded) a View takes Cards and Graphs and returns a Layout | historical: superseded by 0079; the layout strategy contract it described is MG's, from 0079 and 0086 |
 | 0075 (superseded) computed Views are read-only and Create Layout converts | historical: superseded by 0079, which retired computed Views |
+
+## Refresh to `a0f5066` (21 November 2026)
+
+The snapshot marker moved from `9e9b094` to `a0f5066` and to accepted ADRs through 0166. Each ADR accepted above the old marker was read for rules this doc owns, and the product code merged since `9e9b094` was read for behaviour this doc states. ADR 0163 is proposed and is not incorporated (drafting rule 3).
+
+| Source | Disposition |
+|---|---|
+| 0158 a Mermaid Resource keeps `{ open }` Map content; Opens with a size hint, or none where Mermaid has not drawn within the load wait | → MG-27, which states the size hint (MG-88) and the load-wait exception |
+| 0157 | reviewed, no rule here: WebKit joins Chromium under the browser floor; restated in UI-110 |
+| 0160 | reviewed, no rule here: JSON text holding a lone surrogate is refused at Import and at a commit; restated in Storage (ST-22, ST-77, ST-118, ST-119) |
+| 0161 | reviewed, no rule here: hosts refuse a cross-site change with 403 `forbidden`; restated in ST-123 |
+| 0162 | reviewed, no rule here: every host locks the directory it runs; restated in ST-124 |
+| Code since `9e9b094`: intake refusals carry a location; a repeated Resource id's Map content is judged by no plugin (`graph/src/validate.ts`) | → MG-86, updated with ADR 0159 in the same change. Locations sent → ST (ST-117) |
+| 0164 the word ADR 0164 retires names nothing: a person is shown a Space; the directory, its run, origin and lock are an Aggregate; what is presented is a presented Graph, one run through it a presentation | reviewed, no rule here: this doc used none of the retired word. The terms → GL (`CONTEXT.md`) |
+| 0166 | reviewed, no rule here: a preview build makes no compatibility promise; restated in ST-36 |
+| Code since `17aab57`: PR 504 (ADR 0164's rename sweep) and PR 511 (preview builds, `infinity-cube init`, the release workflow) | no behaviour this doc states |
+| Maintainer ruling, 21 November 2026 (Editing C4, option (b)): a title holding a lone surrogate is refused where it is written | → SR-68 (**not built**), which MG-8, MG-64 point to |
+
+## Refresh to `f6e01b9` (21 November 2026)
+
+The snapshot marker moved from `a0f5066` to `f6e01b9`; the highest accepted ADR is still 0166. Each change main merged between them (PR 506, PR 502) was read for behaviour this doc states.
+
+| Source | Disposition |
+|---|---|
+| 0165 | reviewed, no rule here: Prisma Next and `sqlx` apply one schema history in two encodings, held equal by tests; restated in ST-125 |
+| Code since `a0f5066`: PR 506 (the plain-SQL migrations under `migrations-sql/` and their tests) and PR 502 (the README's Running and SQLite sections, the `infinity-cube` plugin skills, and Storage ST-126–ST-128) | no behaviour this doc states |
