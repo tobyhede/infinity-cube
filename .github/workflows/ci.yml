@@ -598,8 +598,9 @@ jobs:
     # `crates/http-conformance`, `crates/cli` and the desktop shell,
     # `packages/desktop/src-tauri`. Its own job because a
     # Rust toolchain, WebKitGTK and a `target/` directory share nothing with the
-    # pnpm jobs but the checkout, and a red clippy is a different diagnosis from
-    # a red `tsc`.
+    # pnpm jobs but the checkout and install, and a red clippy is a different
+    # diagnosis from a red `tsc`. It also starts PostgreSQL through Compose, for
+    # the shared-migrations test near the end.
     #
     # The shell is built here, not only the crates: its build script demands the
     # files `tauri.conf.json` names, so the browser application it bundles,
@@ -657,6 +658,33 @@ jobs:
       # nextest runs no doctests, so the examples in the crates' docs run here.
       - run: cargo test --workspace --doc --locked
       - run: cargo nextest run --workspace --locked
+      # The shared plain-SQL migrations (`migrations-sql/`) applied by sqlx
+      # produce the schema Prisma Next produces from its own packages, on a
+      # SQLite file and on PostgreSQL (`crates/host/tests/shared_migrations.rs`).
+      # Ignored by the run above because they need Prisma Next through pnpm and
+      # a server. PostgreSQL is started through Compose with a generated
+      # password, as the `postgres` job starts it, on the same image digest.
+      - name: Configure ephemeral PostgreSQL
+        id: postgres-env
+        run: |
+          password="$(openssl rand -hex 32)"
+          database_url="postgresql://infinity_cube_ci:${password}@127.0.0.1:55432/infinity_cube_ci"
+          echo "::add-mask::$password"
+          echo "::add-mask::$database_url"
+          {
+            echo "POSTGRES_DB=infinity_cube_ci"
+            echo "POSTGRES_USER=infinity_cube_ci"
+            echo "POSTGRES_PASSWORD=$password"
+            echo "POSTGRES_PORT=55432"
+            echo "INFINITY_CUBE_MIGRATIONS_DATABASE_URL=$database_url"
+          } >> "$GITHUB_ENV"
+      - name: Start PostgreSQL
+        run: pnpm postgres:up
+      - name: Shared migrations produce the schema Prisma Next produces
+        run: cargo nextest run -p host --test shared_migrations --run-ignored only --locked
+      - name: Stop PostgreSQL
+        if: always() && steps.postgres-env.outcome == 'success'
+        run: pnpm postgres:down
       # The Rust CLI (`crates/cli`) held to the HTTP conformance suite
       # (`conformance/http/README.md`), the same process cases the `postgres`
       # job runs against the production Node host. Built with the browser

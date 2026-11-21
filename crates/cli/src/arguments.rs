@@ -9,6 +9,10 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Command {
     Help,
+    /// `version`: the version, and the commit the binary was built from.
+    Version,
+    /// `init <dir>`: write a new aggregate to a missing or empty directory.
+    Init(PathBuf),
     Run(RunCommand),
     Check(CheckCommand),
 }
@@ -32,15 +36,19 @@ pub(crate) struct CheckCommand {
     pub(crate) json: bool,
 }
 
-pub(crate) const USAGE: &str = "Usage: infinity-cube <run|check|help> [arguments]\n";
+pub(crate) const USAGE: &str = "Usage: infinity-cube <init|run|check|version|help> [arguments]\n";
 
 pub(crate) const HELP: &str = "\
 Usage: infinity-cube <verb> [arguments]
 
+  init <dir>
+      Write a new aggregate to a missing or empty directory
   run <dir> [--port <port>] [--no-open] [--built <dir>]
       Serve an Aggregate directory, writing edits back to it
   check <dir> [--json]
       Import an Aggregate directory as run does, serving and writing nothing
+  version
+      Show the version and the commit this build was made from
   help
       Show this help
 ";
@@ -133,6 +141,11 @@ pub(crate) fn parse(args: &[OsString]) -> Option<Command> {
     let (verb, rest) = args.split_first()?;
     match verb.to_str()? {
         "help" | "--help" => rest.is_empty().then_some(Command::Help),
+        "version" | "--version" => rest.is_empty().then_some(Command::Version),
+        "init" => match rest {
+            [only] => directory(only).map(Command::Init),
+            _ => None,
+        },
         "run" => run(rest).map(Command::Run),
         "check" => check(rest).map(Command::Check),
         _ => None,
@@ -231,6 +244,38 @@ mod tests {
                 "json"
             );
             assert_eq!(parsed(&["check", "space", "--port", "1"]), None, "no port");
+        }
+    }
+
+    mod given_init {
+        use super::*;
+
+        #[test]
+        fn reads_one_directory_and_nothing_else() {
+            assert_eq!(
+                parsed(&["init", "space"]),
+                Some(Command::Init(PathBuf::from("space"))),
+                "a directory"
+            );
+            for args in [
+                &["init"][..],
+                &["init", ""],
+                &["init", "a", "b"],
+                &["init", "--no-open"],
+            ] {
+                assert_eq!(parsed(args), None, "{args:?}");
+            }
+        }
+    }
+
+    mod given_version {
+        use super::*;
+
+        #[test]
+        fn reads_the_verb_and_the_option_alone() {
+            assert_eq!(parsed(&["version"]), Some(Command::Version), "verb");
+            assert_eq!(parsed(&["--version"]), Some(Command::Version), "option");
+            assert_eq!(parsed(&["--version", "x"]), None, "with more");
         }
     }
 

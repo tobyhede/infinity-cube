@@ -4,7 +4,7 @@
 use std::io;
 use std::path::Path;
 
-use intake::{Refusals, Uuid, import_aggregate};
+use intake::{AggregateFiles, Refusals, Uuid, import_aggregate};
 
 use crate::assets::{AssetHash, StoredAsset};
 use crate::directory::{Filesystem, holds_nothing, read_files};
@@ -79,7 +79,17 @@ pub async fn import_directory<R: SpaceRepository, F: Filesystem, I: IdSource>(
     if holds_nothing(fs, directory).await? {
         return Err(ImportError::Empty);
     }
-    let files = read_files(fs, directory).await;
+    import_files(repository, read_files(fs, directory).await, ids).await
+}
+
+/// Import an aggregate's files, already read, into the fresh `repository`:
+/// what [`import_directory`] does once it has read the directory, and what
+/// `init` does with the files of a new aggregate.
+pub(crate) async fn import_files<R: SpaceRepository, I: IdSource>(
+    repository: &R,
+    files: AggregateFiles,
+    ids: &I,
+) -> Result<(), ImportError> {
     let imported = import_aggregate(files, || ids.new_id()).map_err(ImportError::Refused)?;
     let meta_space_id = imported.aggregate.meta_space_id();
     let spaces = imported

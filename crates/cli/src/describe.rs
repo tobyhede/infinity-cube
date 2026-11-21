@@ -26,7 +26,7 @@ pub(crate) fn shell_word(path: &str) -> String {
 pub(crate) fn empty(directory: &Path) -> String {
     let shown = directory.display().to_string();
     format!(
-        "{shown} holds no aggregate: it is missing or empty. To create one there: pnpm cube init {}",
+        "{shown} holds no aggregate: it is missing or empty. To create one there: infinity-cube init {}",
         shell_word(&shown)
     )
 }
@@ -97,7 +97,7 @@ mod tests {
         fn names_pnpm_cube_init_for_an_empty_directory() {
             assert_eq!(
                 empty(Path::new("/tmp/my space")),
-                "/tmp/my space holds no aggregate: it is missing or empty. To create one there: pnpm cube init '/tmp/my space'",
+                "/tmp/my space holds no aggregate: it is missing or empty. To create one there: infinity-cube init '/tmp/my space'",
                 "the init command can be pasted"
             );
         }

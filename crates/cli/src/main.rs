@@ -1,6 +1,7 @@
 //! `infinity-cube`: run or check an Aggregate directory with the Rust host
 //! (ADR 0155), as `pnpm cube run` and `pnpm cube check` do.
 //!
+//! - `init <dir>` writes a new aggregate to a missing or empty directory.
 //! - `run <dir> [--port <port>] [--no-open] [--built <dir>]` serves the
 //!   directory on `127.0.0.1` and writes Edits back to it; it announces
 //!   itself, or why it cannot run, as one JSON line on standard output
@@ -10,6 +11,8 @@
 //!   discarded and exits zero for an accepted one; `--json` writes the answer
 //!   as one object shaped as the intake corpus's `expect`.
 //!
+//! - `version` names the version and the commit the binary was built from.
+//!
 //! A usage error exits two.
 
 mod arguments;
@@ -17,10 +20,12 @@ mod browser;
 mod built;
 mod check;
 mod describe;
+mod init;
 mod listener;
 mod output;
 mod run;
 mod signals;
+mod version;
 
 use std::process::ExitCode;
 
@@ -39,6 +44,15 @@ fn main() -> anyhow::Result<ExitCode> {
             output::answer(HELP.trim_end());
             ExitCode::SUCCESS
         }
+        Command::Version => {
+            output::answer(&version::version());
+            ExitCode::SUCCESS
+        }
+        Command::Init(directory) => tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .context("could not start the async runtime")?
+            .block_on(init::init(&directory)),
         Command::Check(command) => tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
