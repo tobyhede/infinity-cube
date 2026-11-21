@@ -48,7 +48,7 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 | 0162 r5 `cube mcp`, `check`, `init`, `import` and `export` take no lock | → ST-124, ST-111 |
 | 0162 refines 0117: still no fingerprint, change detection or merge; git still answers for other writers | → ST-66 |
 | 0162 known limits (network filesystems, copies, second mounts) | → ST-124 (network filesystems); the rest is the ADR's argument |
-| 0164 "talk" is retired; the directory, its run, origin and lock are an Aggregate, a desktop window is a Space window | → wording across ST-121, ST-122, ST-67 and the Mounting rules, reworded on main (PR 504). The terms → GL (`CONTEXT.md`) |
+| 0164 the word ADR 0164 retires names nothing; the directory, its run, origin and lock are an Aggregate, a desktop window is a Space window | → wording across ST-121, ST-122, ST-67 and the Mounting rules, reworded on main (PR 504). The terms → GL (`CONTEXT.md`) |
 | 0166 a preview build is a published build that makes no compatibility promise; a directory is read with the preview build that wrote it; a preview build says it is one | → ST-36 (restated on main, PR 511). That a preview build says it is one, on its download page and in `infinity-cube --version`: not restated, since it is release packaging rather than behaviour of a host |
 | 0163 (proposed) a close waits ten seconds for its last write, then asks the presenter | dropped: proposed (drafting rule 3); ST-122 restates the rule as built |
 | 0020 r4 default order by Title, then id | sent → SR (SR-10 states it; ST-26 removed as a duplicate) |
@@ -486,3 +486,14 @@ Each behaviour change merged between `9e9b094` and `17aab57` (PRs #481–#500, f
 | #500 Windows Rust test job | correct → ST-124 (Windows evidence) |
 | #498 CI review workflow | CI only; no storage rule |
 | PR 504 (ADR 0164) and PR 511 (ADR 0166, `infinity-cube init`, the release workflow), merged between `17aab57` and `a0f5066` | correct → ST-11, ST-36, ST-70, ST-120 and the reworded rules, edited on main in the same changes; merged here with this refresh's ST-124 edits |
+
+## 8. Refresh to f6e01b9 (21 November 2026)
+
+Each change main merged between `a0f5066` and `f6e01b9` (PRs #506 and #502, first-parent), and where it now lives.
+
+| Source | Disposition |
+|---|---|
+| #506 ADR 0165: the plain-SQL files under `migrations-sql/`, one per Prisma Next package, held to its statements by `test/unit/shared-migrations.test.ts` and to its schema by `crates/host/tests/shared_migrations.rs`, which CI's `rust` job runs against SQLite and PostgreSQL | correct → ST-125 (its rows are in §1); the marker now names ADR 0165 for ST-125, where it had named 0155 and 0156; the unit test's titles cited in this refresh |
+| #506 `migrations-sql/` excluded from the vocabulary guard as history (`test/unit/current-domain-vocabulary.test.ts`) | process only; no storage rule (ADR 0085, ADR 0164) |
+| #502 the SQLite host's rules moved from the README into ST-126–ST-128 | correct → ST-126, ST-127, ST-128 (§4 records them as code only) |
+| #502 the README and the getting-started skill tell a person to add `.infinity-cube.lock` to the content repository's `.gitignore`; the README states the lock and that a run with no Edit leaves the directory unchanged beside the lock file | → ST-124, which now names them; ST-65 already stated the rest |

@@ -2,7 +2,17 @@
 
 This is the durable record of the requirements rewrite (PR 475, https://github.com/tobyhede/infinity-cube/pull/475). It follows the run record in the `requirements-rewrite` skill (`references/evidence.md`). Update it at each checkpoint or handoff.
 
-## Latest checkpoint: merged with main `a0f5066` (21 November 2026)
+## Latest checkpoint: refresh to main `f6e01b9` (21 November 2026)
+
+- **Starting state.** The branch `claude/project-thread-vqr263` was rebased onto main `f6e01b9` as one commit, `495eabb` (the refresh to `a0f5066` and the Editing C4 ruling). Main had merged PR 506 (ADR 0165, the plain-SQL migrations, ST-125) and PR 502 (the README's Running and SQLite sections, ST-126–ST-128, the plugin skills telling a person to ignore `.infinity-cube.lock`). Main's own edits already put ST-125, ST-126–ST-128, the 0165 trace rows and closed conflict Storage S3 in place. A fresh agent reran the skill independently of the previous run.
+- **Freshness.** `git diff a0f5066..f6e01b9` classified: Storage (ADR 0165, `migrations-sql/`, `crates/host/tests/shared_migrations.rs`, the `rust` job's PostgreSQL step, the SQLite rules, the README and skills on the lock file); process only (`current-domain-vocabulary` excludes `migrations-sql/`, `build-tooling.md`); nothing for the other six topics. All seven markers now read `f6e01b9` (2026-11-21), accepted ADRs through 0166; each trace ends with a "Refresh to `f6e01b9`" section (storage: §8) with a 0165 row.
+- **Storage edits.** The marker attributes ST-125 to ADR 0165 (it said 0155 and 0156) and names ST-126–ST-128; ST-124 says the README and the getting-started skill tell the person to add the `.gitignore` entry (the previous checkpoint's open item: resolved on main, though no command writes the entry); ST-125 cites the unit test's two titles.
+- **Re-audit of `495eabb`.** Verified against code at HEAD: ST-124's release on Import refusal and the Rust abandoned-write lock (ADR 0162, `src/run/run.ts`), ST-16's Rust citations, the ST-124/ST-122 Rust test modules, every "restated in" rule id in the refresh rows (each named rule carries that ADR, except as noted). Found and fixed: in six traces the 0166 row and the following code row were fused on one line (`||`), breaking the table; SR-30 lacked ADR 0158 although its trace row sources it; the storage marker misattributed ST-125. ADR 0164: the retired word was still written in `DECISIONS.md` (ruling 4, Storage S2), `conflicts/storage.md` (S2) and each trace's 0164 row; reworded to "mounted Aggregate" and "the word ADR 0164 retires". SR-68 was read against the ruling and C4: consistent.
+- **Open.** `CONTEXT.md` still lists the retired word in three `_Avoid_` entries, the glossary's way of keeping it out; whether ADR 0164's "not written in … guides" covers them is for the maintainer (`docs/requirements/conflicts/space-and-resources.md` C2, open). ST-120's unwatched CI run and `check-dispositions.py` not in CI stand. RF-Q6 and RF-Q7 in `fresh-reader.md` were self-checked only.
+- **Validation (21 November 2026).** See the table under "Validation", last row group.
+- **Next action.** The parent session pushes the branch and watches `CI passed` on the draft PR.
+
+## Earlier checkpoint: merged with main `a0f5066` (21 November 2026)
 
 - Main moved to `a0f5066` (PR 504, ADR 0164 "talk" retired; PR 511, ADR 0166 preview builds). Merged into the branch; ui.md, navigation.md and storage.md conflicted, resolved by a word-level three-way merge of each conflicting rule (keeping main's rewording and this refresh's ST-124 edits) and checked by eye. All seven markers now read `a0f5066` (2026-11-20), accepted ADRs through 0166; each trace's refresh section records 0164 and 0166.
 - **Ruling, 21 November 2026:** the maintainer chose option (b) for Editing C4. Closed C4; new rule SR-68 (**not built**); `DECISIONS.md` "Refresh rulings"; delivery issue `.scratch/title-well-formed/issues/01-refuse-a-title-holding-a-lone-surrogate.md` (ready-for-agent). Recorded as a ruling, not an ADR, because it adds a rule no ADR states and changes nothing 0042 or 0160 decides.
@@ -85,6 +95,8 @@ Run from the repository root.
 | `pnpm exec vitest run test/unit/adr-status-blocks.test.ts test/unit/current-domain-vocabulary.test.ts test/unit/docs-agents-citation-accuracy.test.ts test/unit/agent-skill-commands.test.ts test/unit/check-typescript-toolchain.test.ts` | ADR status blocks, vocabulary, citations in agent docs, skill commands, the toolchain check | 5 files, 180 tests passed (Node 22) |
 | `pnpm exec prettier --check docs/requirements .scratch/requirements-rewrite` | Formatting | all matched files pass. `.prettierignore` excludes `.scratch/**`, so this checks the docs only |
 | CI on PR 475 (`gh pr checks 475 --watch`) | The full bar: `verify:static`, `test:coverage`, `e2e`, `e2e:ladle`, `mount`, the database jobs, gated by `CI passed` | not yet run on the realignment commit |
+
+Results of 21 November 2026, at the refresh to `f6e01b9` (Node 22.23.5, `pnpm install --config.engine-strict=false`): `check-evidence.py` 1,533 titles, 0 missing files, 0 not found; `check-links.py` 74 files, 490 links, 0 broken; `check-dispositions.py` 166 ADRs (29 superseded), 0 without a row; `pnpm exec prettier --check docs/requirements docs/agents` clean; `pnpm exec vitest run` over `adr-status-blocks`, `current-domain-vocabulary`, `docs-agents-citation-accuracy`, `docs-agents-ticket-status` and `conflict-markers`: 5 files, 165 tests passed. CI not run from here (the parent session pushes).
 
 ## Next actions
 

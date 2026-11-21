@@ -391,5 +391,15 @@ The snapshot marker moved from `d14ff974` to `a0f5066` and to accepted ADRs thro
 | 0161 the browser transport already reads 403 `forbidden` as a permanent failure | sent → ST (ST-101 maps the status; ST-123 is the refusal). ED-46 already governs any permanent rejection |
 | 0162 | reviewed, no rule here: every host locks the directory it runs; restated in ST-124 |
 | Code since `d14ff974`: the Mermaid plugin (PRs merged between `d14ff974` and `9e9b094`), its later fixes, and comment pointers in `app/src/space-authoring.ts` re-pointed to ED-31 | Mermaid → ED-24, ED-80 as above. No other editing behaviour changed |
-| 0164 "talk" is retired: a person is shown a Space; the directory, its run, origin and lock are an Aggregate; what is presented is a presented Graph, one run through it a presentation | reviewed, no rule here: this doc used none of the retired word. The terms → GL (`CONTEXT.md`), PROC (vocabulary guard) |
-| 0166 | reviewed, no rule here: a preview build makes no compatibility promise; restated in ST-36 || Code since `17aab57`: PR 504 (ADR 0164's rename sweep) and PR 511 (preview builds, `infinity-cube init`, the release workflow) | no behaviour this doc states |
+| 0164 the word ADR 0164 retires names nothing: a person is shown a Space; the directory, its run, origin and lock are an Aggregate; what is presented is a presented Graph, one run through it a presentation | reviewed, no rule here: this doc used none of the retired word. The terms → GL (`CONTEXT.md`), PROC (vocabulary guard) |
+| 0166 | reviewed, no rule here: a preview build makes no compatibility promise; restated in ST-36 |
+| Code since `17aab57`: PR 504 (ADR 0164's rename sweep) and PR 511 (preview builds, `infinity-cube init`, the release workflow) | no behaviour this doc states |
+
+## Refresh to `f6e01b9` (21 November 2026)
+
+The snapshot marker moved from `a0f5066` to `f6e01b9`; the highest accepted ADR is still 0166. Each change main merged between them (PR 506, PR 502) was read for behaviour this doc states.
+
+| Source | Disposition |
+|---|---|
+| 0165 | reviewed, no rule here: Prisma Next and `sqlx` apply one schema history in two encodings, held equal by tests; restated in ST-125 |
+| Code since `a0f5066`: PR 506 (the plain-SQL migrations under `migrations-sql/` and their tests) and PR 502 (the README's Running and SQLite sections, the `infinity-cube` plugin skills, and Storage ST-126–ST-128) | no behaviour this doc states |

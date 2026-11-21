@@ -107,3 +107,14 @@ Written for the refresh to `17aab57`, from the ADRs accepted since the previous 
 ### Independent run (19 November 2026)
 
 A separate agent, given `AGENTS.md` and the five questions with the expected answers withheld, answered all five through the reading path and matched each expected answer. It found RF-Q4 needs ST-101 to get from 400 to "no Retry", and RF-Q5's expected answer left out that other Map content is still judged; both expected answers above were corrected. It noted that RF-Q2's "the MCP server" comes from ADR 0161, though `cube mcp` makes no HTTP request. The 33 questions above were not rerun independently.
+
+## Refresh questions (21 November 2026)
+
+Written for the refresh to `f6e01b9`, from ADR 0165 and the SQLite rules main merged after `a0f5066`, before the storage edits of this refresh.
+
+| # | Question | Expected answer | Source |
+|---|---|---|---|
+| RF-Q6 | I add a column to the PostgreSQL schema. What do I write? | A new Prisma Next migration package under `migrations/app/` (never a rewrite of an old one) and, in the same change, its plain-SQL file under `migrations-sql/postgres/`, named for the package with the `T` dropped, holding the statements its operations execute in order; `test/unit/shared-migrations.test.ts` fails until they agree, and the Prisma contract changes too. | ADR 0165, ADR 0085; ST-125; `docs/agents/build-tooling.md` |
+| RF-Q7 | I run `pnpm cube import --store sqlite` while `pnpm dev:sqlite` has the file open. What happens? | Unsupported: one process per file. Whichever operation meets the other's lock fails at once, or waits out the driver's busy timeout synchronously and then fails, or succeeds if the lock clears in time; an HTTP request meeting such a failure answers 503 `persistence-unavailable`, never 409, and nothing is left part-written or locked. | ADR 0095; ST-127; `AGENTS.md` |
+
+Self-check only (this run delegated nothing): each expected answer was read back against ST-125 and ST-127 as they stand after this refresh, and matched. No independent reader ran them.

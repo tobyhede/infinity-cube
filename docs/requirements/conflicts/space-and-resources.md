@@ -4,7 +4,15 @@ These are places where the sources and the code disagree, or a source's reason h
 
 ## Open
 
-None.
+### C2. May the glossary list the word ADR 0164 retires as one to avoid?
+
+Opened 21 November 2026, in the refresh to `f6e01b9`. Needs the maintainer.
+
+- **Rules affected.** None in a requirements doc; `CONTEXT.md`'s entries for Space, Aggregate and Space window.
+- **Disagreement.** ADR 0164 says the word "is not written in source, tests, fixtures, requirements, guides, skills or anything a person is shown", and excepts only accepted ADRs, `.scratch/` tickets and `docs/superpowers/` plans. `CONTEXT.md` lists it in three `_Avoid_` entries, which is how the glossary keeps a retired word out (`docs/agents/domain.md`). The requirements and `docs/agents/` no longer write it; trace rows name ADR 0164 instead of quoting it.
+- **Options.** (a) Keep the `_Avoid_` entries: an avoid list names what not to write, and dropping it loses the warning to the next writer. (b) Remove them, reading ADR 0164 literally. (c) Keep them and record in a ruling that an `_Avoid_` entry is not a use of the word.
+- **Recommendation.** (c): it keeps the warning and states the reading once, with no ADR needed, since it settles how 0164 applies without changing what it decides.
+- **Evidence.** `CONTEXT.md` lines 9, 20 and 24; ADR 0164 "The decision" and "Consequences".
 
 ## Closed
 

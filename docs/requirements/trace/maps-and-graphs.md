@@ -428,5 +428,15 @@ The snapshot marker moved from `9e9b094` to `a0f5066` and to accepted ADRs throu
 | 0161 | reviewed, no rule here: hosts refuse a cross-site change with 403 `forbidden`; restated in ST-123 |
 | 0162 | reviewed, no rule here: every host locks the directory it runs; restated in ST-124 |
 | Code since `9e9b094`: intake refusals carry a location; a repeated Resource id's Map content is judged by no plugin (`graph/src/validate.ts`) | → MG-86, updated with ADR 0159 in the same change. Locations sent → ST (ST-117) |
-| 0164 "talk" is retired: a person is shown a Space; the directory, its run, origin and lock are an Aggregate; what is presented is a presented Graph, one run through it a presentation | reviewed, no rule here: this doc used none of the retired word. The terms → GL (`CONTEXT.md`) |
-| 0166 | reviewed, no rule here: a preview build makes no compatibility promise; restated in ST-36 || Code since `17aab57`: PR 504 (ADR 0164's rename sweep) and PR 511 (preview builds, `infinity-cube init`, the release workflow) | no behaviour this doc states |
+| 0164 the word ADR 0164 retires names nothing: a person is shown a Space; the directory, its run, origin and lock are an Aggregate; what is presented is a presented Graph, one run through it a presentation | reviewed, no rule here: this doc used none of the retired word. The terms → GL (`CONTEXT.md`) |
+| 0166 | reviewed, no rule here: a preview build makes no compatibility promise; restated in ST-36 |
+| Code since `17aab57`: PR 504 (ADR 0164's rename sweep) and PR 511 (preview builds, `infinity-cube init`, the release workflow) | no behaviour this doc states |
+
+## Refresh to `f6e01b9` (21 November 2026)
+
+The snapshot marker moved from `a0f5066` to `f6e01b9`; the highest accepted ADR is still 0166. Each change main merged between them (PR 506, PR 502) was read for behaviour this doc states.
+
+| Source | Disposition |
+|---|---|
+| 0165 | reviewed, no rule here: Prisma Next and `sqlx` apply one schema history in two encodings, held equal by tests; restated in ST-125 |
+| Code since `a0f5066`: PR 506 (the plain-SQL migrations under `migrations-sql/` and their tests) and PR 502 (the README's Running and SQLite sections, the `infinity-cube` plugin skills, and Storage ST-126–ST-128) | no behaviour this doc states |

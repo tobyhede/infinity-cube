@@ -2,7 +2,7 @@
 
 **Purpose:** how any Edit is derived, committed and published in the browser, what each outcome means, how a session persists and recovers, how one Edit spans several Spaces, and what withholds authoring, Claims and exclusive work included.
 
-**Snapshot:** checked against `a0f5066` (2026-11-20); incorporates accepted ADRs through 0166. ADRs accepted after it bind where they differ, until this document is updated. Proposed ADR 0163 is not incorporated.
+**Snapshot:** checked against `f6e01b9` (2026-11-21); incorporates accepted ADRs through 0166. ADRs accepted after it bind where they differ, until this document is updated. Proposed ADR 0163 is not incorporated.
 
 Open conflicts are listed in [conflicts/editing.md](conflicts/editing.md). Sources are traced in [trace/editing.md](trace/editing.md).
 
