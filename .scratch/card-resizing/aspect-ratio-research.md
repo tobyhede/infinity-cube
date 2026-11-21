@@ -1,0 +1,23 @@
+# Retaining a Resource’s aspect ratio during Resize
+
+**Recommendation.** Let an author hold Shift before dragging the existing bottom-right handle to preserve the Resource’s current width-to-height ratio for that drag. Keep ordinary dragging free on both axes. Keynote uses Shift-drag for proportional resizing, so the gesture has a precedent in a presentation editor. Sampling Shift when the drag starts is a proposed InfinityCube decision. [Keynote keyboard shortcuts](https://support.apple.com/en-bn/guide/keynote/tanfde4a3e6d/mac)
+
+## Which ratio?
+
+Use the rect drawn on this Map when the gesture starts. A Resource can have a different size on each Map. For example, a 400 × 300 rect dragged proportionally to 600 wide becomes 600 × 450. This works for an Ur Shape, Markdown and an Image through the same control. [Map sizes and Resize, MG-22–26](../../docs/requirements/maps-and-graphs.md)
+
+A picture’s proportions are a separate concern. An Image already draws its whole picture inside the authored rect. If the author has placed a square picture in a wide rect, preserving the rect’s ratio preserves the spare space too. Fitting the rect to the picture would be a separate command with different inputs. The Image contract allows saved files without natural dimensions and calls for retiring their measurement. [Rendering, RD-2–4](../../docs/requirements/rendering.md) · [Image dimensions, SR-26](../../docs/requirements/space-and-resources.md)
+
+## How it fits the current gesture
+
+The current control fixes the top-left corner. During a drag only the subject previews the new size. Release sends one Resize Edit, which also displaces any affected neighbours. Cancellation discards the preview. Proportional resizing can use that same path by changing only the proposed width and height. A transient modifier needs no new stored field. [Resize control, UI-66–70](../../docs/requirements/ui.md#resize-control) · [Resize preview, RD-57](../../docs/requirements/rendering.md) · [Resize and displacement, MG-23–25](../../docs/requirements/maps-and-graphs.md)
+
+React Flow’s existing `NodeResizeControl` accepts `keepAspectRatio`, defaulting to false. In the installed versions (`@xyflow/react` 12.11.2 and `@xyflow/system` 0.0.79), the resizer captures the node’s measured width divided by height at drag start and calculates constrained dimensions before calling `shouldResize`. InfinityCube already takes those dimensions as a proposal and returns false so its own adapter controls the preview. A mode chosen **before** the gesture can therefore reuse the library’s geometry. [React Flow control API](https://reactflow.dev/api-reference/components/node-resize-control) · [React Flow’s installed resize implementation](https://unpkg.com/@xyflow/system@0.0.79/dist/esm/index.mjs) · [InfinityCube control](../../packages/react-flow-adapter/src/ResourceNode.tsx)
+
+The timing matters. Changing the React prop during a gesture reconfigures the drag listeners. InfinityCube specifically keeps its callbacks stable because tearing those listeners down can interrupt touch resizing. For Shift-drag, establish the mode before drag starts and hold it through release or cancellation. A design that lets Shift change the ratio mid-drag would need a different implementation and its own browser proof. [Control lifecycle and cancellation](../../packages/react-flow-adapter/src/ResourceNode.tsx)
+
+## Minimum size and verification
+
+Both dimensions must satisfy the Closed Size of 260 × 146. Scale both axes by one factor, with a minimum of `max(260 / startingWidth, 146 / startingHeight)`. A 400 × 300 rect therefore stops at 260 × 195. A 600 × 200 rect stops at 438 × 146. Independently clamping the two dimensions would distort the rect at the limit. [Minimum dimensions, MG-22 and MG-82](../../docs/requirements/maps-and-graphs.md)
+
+Before adopting the gesture, extend the browser Resize cases with both floor examples, a drag at non-default zoom, release after letting go of Shift, and cancellation. Check the preview and saved rect agree, the top-left stays fixed, and neighbours first move on commit. Retain the free mouse and touch drag cases. The product choice for touch is whether proportional resizing also needs a visible control. Keynote for iCloud offers a “Constrain proportions” option for that interaction. [InfinityCube browser Resize tests](../../packages/app/e2e/editing.spec.ts) · [Keynote for iCloud sizing controls](https://support.apple.com/en-uz/guide/keynote-icloud/gil886163797/icloud)
