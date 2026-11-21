@@ -81,3 +81,4 @@ When ruling 8 was reversed, every ruling above that changes what an accepted ADR
 ## Refresh rulings (21 November 2026)
 
 - **Editing C4.** A title an author writes that holds a lone UTF-16 surrogate is refused where it is written, before anything is committed (option (b)). It adds a rule no ADR states (ADR 0160 decides what the hosts refuse, not where the browser checks first) and fails the ADR test in `docs/agents/workflow.md`, being easy to reverse. SR-68 states it, not built; `conflicts/editing.md` C4 keeps the evidence.
+- **Space and Resources C2.** `CONTEXT.md` keeps the word ADR 0164 retires in its three `_Avoid_` entries (Space, Aggregate, Space window); an `_Avoid_` entry names a word to keep it out and is not a use of it (option (c)). It settles how 0164 applies without changing what it decides. `conflicts/space-and-resources.md` C2 keeps the evidence.

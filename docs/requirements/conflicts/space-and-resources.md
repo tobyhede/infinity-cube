@@ -4,15 +4,7 @@ These are places where the sources and the code disagree, or a source's reason h
 
 ## Open
 
-### C2. May the glossary list the word ADR 0164 retires as one to avoid?
-
-Opened 21 November 2026, in the refresh to `f6e01b9`. Needs the maintainer.
-
-- **Rules affected.** None in a requirements doc; `CONTEXT.md`'s entries for Space, Aggregate and Space window.
-- **Disagreement.** ADR 0164 says the word "is not written in source, tests, fixtures, requirements, guides, skills or anything a person is shown", and excepts only accepted ADRs, `.scratch/` tickets and `docs/superpowers/` plans. `CONTEXT.md` lists it in three `_Avoid_` entries, which is how the glossary keeps a retired word out (`docs/agents/domain.md`). The requirements and `docs/agents/` no longer write it; trace rows name ADR 0164 instead of quoting it.
-- **Options.** (a) Keep the `_Avoid_` entries: an avoid list names what not to write, and dropping it loses the warning to the next writer. (b) Remove them, reading ADR 0164 literally. (c) Keep them and record in a ruling that an `_Avoid_` entry is not a use of the word.
-- **Recommendation.** (c): it keeps the warning and states the reading once, with no ADR needed, since it settles how 0164 applies without changing what it decides.
-- **Evidence.** `CONTEXT.md` lines 9, 20 and 24; ADR 0164 "The decision" and "Consequences".
+None.
 
 ## Closed
 
@@ -26,3 +18,13 @@ Closed by ruling Space and Resources C1 (DECISIONS, Checkpoint 3 rulings, ruled 
 - **Recommended: (b).** A measured field with no reader is a cost on every creation and Replace (an extra load and a timeout) and a schema field to keep honest. Choose (a) only if a reader is planned.
 - **Evidence.** `core/src/kinds/image.ts` (`imageNaturalSizeSchema`: "no size rule reads it"); `app/test/image-replacement.test.ts` › "records no natural size when the new picture does not load", "answers unchanged for the same URL even with a different size"; `app/test/image-creation.test.ts` › "creates one with no size when the picture does not load".
 - **Since the ruling.** The Image kind is now the Image plugin (ADR 0142). The schema is `plugin-image/src/domain.ts` (`imageNaturalSizeSchema`, "no size rule reads it"), a stored file is sized from its header and a pasted URL by loading it where it is drawn, and creation and Replace still write `naturalSize`: `plugin-image/test/creation.test.tsx` › "records the size the surface measures where the picture is drawn from", "creates it unsized where the surface measures nothing". The ruling stands and SR-26 stays **bug: code differs**; the files cited above no longer exist.
+
+### C2. May the glossary list the word ADR 0164 retires as one to avoid?
+
+Opened 21 November 2026, in the refresh to `f6e01b9`. **Closed by the maintainer's ruling of 21 November 2026: option (c).** `CONTEXT.md` keeps the three `_Avoid_` entries, and an `_Avoid_` entry is not a use of the word ADR 0164 retires: it names the word in order to keep it out, as `docs/agents/domain.md` reads an avoid list. No ADR, since the ruling settles how 0164 applies without changing what it decides.
+
+- **Rules affected.** None in a requirements doc; `CONTEXT.md`'s entries for Space, Aggregate and Space window.
+- **Disagreement.** ADR 0164 says the word "is not written in source, tests, fixtures, requirements, guides, skills or anything a person is shown", and excepts only accepted ADRs, `.scratch/` tickets and `docs/superpowers/` plans. `CONTEXT.md` lists it in three `_Avoid_` entries, which is how the glossary keeps a retired word out (`docs/agents/domain.md`). The requirements and `docs/agents/` no longer write it; trace rows name ADR 0164 instead of quoting it.
+- **Options.** (a) Keep the `_Avoid_` entries: an avoid list names what not to write, and dropping it loses the warning to the next writer. (b) Remove them, reading ADR 0164 literally. (c) Keep them and record in a ruling that an `_Avoid_` entry is not a use of the word.
+- **Recommendation.** (c): it keeps the warning and states the reading once, with no ADR needed, since it settles how 0164 applies without changing what it decides.
+- **Evidence.** `CONTEXT.md` lines 9, 20 and 24; ADR 0164 "The decision" and "Consequences".

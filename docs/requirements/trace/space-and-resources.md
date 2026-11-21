@@ -405,3 +405,4 @@ The snapshot marker moved from `a0f5066` to `f6e01b9`; the highest accepted ADR 
 |---|---|
 | 0165 | reviewed, no rule here: Prisma Next and `sqlx` apply one schema history in two encodings, held equal by tests; restated in ST-125 |
 | Code since `a0f5066`: PR 506 (the plain-SQL migrations under `migrations-sql/` and their tests) and PR 502 (the README's Running and SQLite sections, the `infinity-cube` plugin skills, and Storage ST-126–ST-128) | no behaviour this doc states |
+| Maintainer ruling, 21 November 2026 (Space and Resources C2, option (c)): an `_Avoid_` entry in `CONTEXT.md` is not a use of the word ADR 0164 retires | no rule here; `CONTEXT.md` unchanged |
