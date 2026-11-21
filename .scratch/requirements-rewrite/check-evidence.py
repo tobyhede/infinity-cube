@@ -4,8 +4,8 @@
 Finds each citation of the form `path` › "title"[, "title" ...] in
 docs/requirements/*.md and checks that the file exists and contains each title.
 A path that starts with `test/`, `conformance/` or `src/` is at the repository
-root; any other is under `packages/`. A title matches when its text appears in the file after allowing
-for: curly or straight quotes and apostrophes, escaped quotes, `\\n` escapes,
+root; any other is under `packages/`. A title matches when its text appears in
+the file after allowing for: curly or straight quotes and apostrophes, escaped quotes, `\\n` escapes,
 whitespace runs, and template literals (a `${...}` or `%s`-style placeholder in
 the source, or a `<...>` stand-in in the title, matches any text).
 

@@ -416,7 +416,7 @@ Added 15 November 2026. These ADRs had no row in any trace. Each has one outcome
 | 0045 (superseded) a View takes Cards and Graphs and returns a Layout | historical: superseded by 0079; the layout strategy contract it described is MG's, from 0079 and 0086 |
 | 0075 (superseded) computed Views are read-only and Create Layout converts | historical: superseded by 0079, which retired computed Views |
 
-## Refresh to `a0f5066` (20 November 2026)
+## Refresh to `a0f5066` (21 November 2026)
 
 The snapshot marker moved from `9e9b094` to `a0f5066` and to accepted ADRs through 0166. Each ADR accepted above the old marker was read for rules this doc owns, and the product code merged since `9e9b094` was read for behaviour this doc states. ADR 0163 is proposed and is not incorporated (drafting rule 3).
 
@@ -431,6 +431,7 @@ The snapshot marker moved from `9e9b094` to `a0f5066` and to accepted ADRs throu
 | 0164 the word ADR 0164 retires names nothing: a person is shown a Space; the directory, its run, origin and lock are an Aggregate; what is presented is a presented Graph, one run through it a presentation | reviewed, no rule here: this doc used none of the retired word. The terms → GL (`CONTEXT.md`) |
 | 0166 | reviewed, no rule here: a preview build makes no compatibility promise; restated in ST-36 |
 | Code since `17aab57`: PR 504 (ADR 0164's rename sweep) and PR 511 (preview builds, `infinity-cube init`, the release workflow) | no behaviour this doc states |
+| Maintainer ruling, 21 November 2026 (Editing C4, option (b)): a title holding a lone surrogate is refused where it is written | → SR-68 (**not built**), which MG-8, MG-64 point to |
 
 ## Refresh to `f6e01b9` (21 November 2026)
 

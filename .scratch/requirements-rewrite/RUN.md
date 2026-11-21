@@ -14,14 +14,14 @@ This is the durable record of the requirements rewrite (PR 475, https://github.c
 
 ## Earlier checkpoint: merged with main `a0f5066` (21 November 2026)
 
-- Main moved to `a0f5066` (PR 504, ADR 0164 "talk" retired; PR 511, ADR 0166 preview builds). Merged into the branch; ui.md, navigation.md and storage.md conflicted, resolved by a word-level three-way merge of each conflicting rule (keeping main's rewording and this refresh's ST-124 edits) and checked by eye. All seven markers now read `a0f5066` (2026-11-20), accepted ADRs through 0166; each trace's refresh section records 0164 and 0166.
+- Main moved to `a0f5066` (PR 504, ADR 0164 "talk" retired; PR 511, ADR 0166 preview builds). Merged into the branch; ui.md, navigation.md and storage.md conflicted, resolved by a word-level three-way merge of each conflicting rule (keeping main's rewording and this refresh's ST-124 edits) and checked by eye. All seven markers now read `a0f5066` (2026-11-21), accepted ADRs through 0166; each trace's refresh section records 0164 and 0166.
 - **Ruling, 21 November 2026:** the maintainer chose option (b) for Editing C4. Closed C4; new rule SR-68 (**not built**); `DECISIONS.md` "Refresh rulings"; delivery issue `.scratch/title-well-formed/issues/01-refuse-a-title-holding-a-lone-surrogate.md` (ready-for-agent). Recorded as a ruling, not an ADR, because it adds a rule no ADR states and changes nothing 0042 or 0160 decides.
 
 ## Earlier checkpoint: refresh to `17aab57` (19 November 2026)
 
-Read this first; the sections below it record the original rewrite (PR 475).
+The sections below it record the original rewrite (PR 475).
 
-- **Repository** `tobyhede/hyper` (renamed from `tobyhede/infinity-cube`), branch `claude/project-thread-vqr263`, base and target `17aab57` (origin/main, checked 19 November 2026).
+- **Repository** `tobyhede/infinity-cube` (also reached by its earlier name, `tobyhede/hyper`), branch `claude/project-thread-vqr263`, base and target `17aab57` (origin/main, checked 19 November 2026).
 - **Scope.** The maintainer invoked `/skillz:requirements-rewrite` with no further instruction; read as an existing-snapshot refresh. Authorized: edit docs, push the branch, open a draft PR. Not authorized: implementing gaps, marking ready, merging.
 - **Starting state.** Markers: editing `d14ff974`/0157, rendering `3244b74`/0158, navigation and UI `9e9b094`/0158, maps-and-graphs and space-and-resources `9e9b094`/0159, storage `9e9b094`/0162. Checkers at `17aab57`: `check-dispositions.py` 6 ADRs without a row (0157, 0158, 0160–0163); `check-evidence.py` 3 missing files and 5 missing titles (the checker read `conformance/` paths as under `packages/`, and ST-65/ST-114 cited titles that moved to `conformance/http/process-cases.ts`).
 - **What changed.** All seven markers now read `17aab57` (2026-11-19), accepted ADRs through 0162; proposed 0163 is not incorporated (storage ST-122 restates it as built). Every trace ends with a "Refresh to `17aab57`" section recording each ADR above its old marker and the code merged since; trace/storage.md §1 gained rows for 0160–0163. Editing ED-24, ED-33, ED-37 and ED-80 name the Mermaid edit (ADR 0158). Storage: ST-16, ST-111, ST-113–ST-115, ST-119, ST-120, ST-122, ST-124 and the operations index reconciled (a topic agent drafted; the diff was inspected here). `check-evidence.py` resolves `conformance/` and `src/` from the root. `docs/agents/workflow.md` now asks for trace rows with each ADR. New open question: Editing C4 (a Title holding a lone surrogate).

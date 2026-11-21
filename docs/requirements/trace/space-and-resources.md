@@ -377,7 +377,7 @@ Added 15 November 2026. These ADRs had no row in any trace. Each has one outcome
 | 0060 (superseded) a nested Space has one owner | historical: superseded by 0068, traced in §1 |
 | 0085 Thing and Diagram are the first-public names for Card and Layout | historical vocabulary: its names were replaced by 0092 (Reference) and 0101 (Resource and Map), and it restates the invariants of earlier ADRs rather than deciding them. What survives is held elsewhere: the names are GL (`CONTEXT.md`), and `LayoutStrategy` keeping its name is the code's (`graph/src/layout.ts`), not a requirement |
 
-## Refresh to `a0f5066` (20 November 2026)
+## Refresh to `a0f5066` (21 November 2026)
 
 The snapshot marker moved from `9e9b094` to `a0f5066` and to accepted ADRs through 0166. Each ADR accepted above the old marker was read for rules this doc owns, and the product code merged since `9e9b094` was read for behaviour this doc states. ADR 0163 is proposed and is not incorporated (drafting rule 3).
 

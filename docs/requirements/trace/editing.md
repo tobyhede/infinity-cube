@@ -378,7 +378,7 @@ The ADRs below are in `docs/adr/` and bind; this section records where the snaps
 | Code only (drafting rule 5): an asset upload also ends when its answer never finishes arriving; a Replace reads a picture's declared size and loads nothing to measure it | → ED-72 |
 | Code only: a creation that asked to run alone withholds a second press of the same Create, and another kind's stays offered | → ED-33 |
 
-## Refresh to `a0f5066` (20 November 2026)
+## Refresh to `a0f5066` (21 November 2026)
 
 The snapshot marker moved from `d14ff974` to `a0f5066` and to accepted ADRs through 0166. Each ADR accepted above the old marker was read for rules this doc owns, and the product code merged since `d14ff974` was read for behaviour this doc states. ADR 0163 is proposed and is not incorporated (drafting rule 3).
 

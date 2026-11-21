@@ -439,7 +439,7 @@ Main moved on after the rewrite's baseline (commit `797b2908`). These are the ru
 | 0144 r3 a Space Resource placed on another Map withholds nothing | → UI-107 |
 | 0144 r4 withholding is decided over the list's source; counts and the empty sentence read the same set | → UI-107 |
 
-## Refresh to `a0f5066` (20 November 2026)
+## Refresh to `a0f5066` (21 November 2026)
 
 The snapshot marker moved from `9e9b094` to `a0f5066` and to accepted ADRs through 0166. Each ADR accepted above the old marker was read for rules this doc owns, and the product code merged since `9e9b094` was read for behaviour this doc states. ADR 0163 is proposed and is not incorporated (drafting rule 3).
 
@@ -455,6 +455,7 @@ The snapshot marker moved from `9e9b094` to `a0f5066` and to accepted ADRs throu
 | 0164 the word ADR 0164 retires names nothing: a person is shown a Space; the directory, its run, origin and lock are an Aggregate; what is presented is a presented Graph, one run through it a presentation | → UI-95 and the rules PR 504 reworded in the same change on main |
 | 0166 | reviewed, no rule here: a preview build makes no compatibility promise; restated in ST-36 |
 | Code since `17aab57`: PR 504 (ADR 0164's rename sweep) and PR 511 (preview builds, `infinity-cube init`, the release workflow) | wording only here |
+| Maintainer ruling, 21 November 2026 (Editing C4, option (b)): a title holding a lone surrogate is refused where it is written | → SR-68 (**not built**), which UI-50 point to |
 
 ## Refresh to `f6e01b9` (21 November 2026)
 

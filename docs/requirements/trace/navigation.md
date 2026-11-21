@@ -346,7 +346,7 @@ Added 15 November 2026. These ADRs had no row in any trace. Each has one outcome
 | 0072 (superseded) canvas renderer identity is the Space View Id | historical: superseded by 0079, which retired Views |
 | 0071 native `Uint8Array` base64 and hex codecs set the platform floor (Node 26.8.1; ES2025 plus `ESNext.TypedArrays`; no fallback or polyfill) | sent → PROC: an engineering rule, owned by `docs/agents/build-tooling.md`. It refines 0069, whose ids NV states; NV states no codec |
 
-## Refresh to `a0f5066` (20 November 2026)
+## Refresh to `a0f5066` (21 November 2026)
 
 The snapshot marker moved from `9e9b094` to `a0f5066` and to accepted ADRs through 0166. Each ADR accepted above the old marker was read for rules this doc owns, and the product code merged since `9e9b094` was read for behaviour this doc states. ADR 0163 is proposed and is not incorporated (drafting rule 3).
 

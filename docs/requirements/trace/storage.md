@@ -31,26 +31,6 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 | 0020 r1 one Resource, one file; the directory is the inventory | → ST-28, ST-29 |
 | 0020 r2 identity from the file's id, never its path | → ST-29 |
 | 0020 r3 duplicate Resource id is an intake error | → ST-29 |
-| 0159 the cross-Space cycle walk follows Resources by Title, then id, by code unit; a commit's candidate aggregate is judged ascending by Space id, created Spaces among the stored | → ST-117. The repeated Resource id rule sent → SR (SR-6, SR-30) and MG (MG-86) |
-| 0160 r1 JSON text escaping a lone UTF-16 surrogate, in a key or a value at any depth, is not JSON in either runtime; an escaped pair is one character | → ST-22 (TypeScript, `parseJsonText`), ST-118 (Rust intake) |
-| 0160 r2 such a file is refused `invalid-json` located at the file; such a commit body 400 `invalid-request`, "Malformed JSON in request body" | → ST-22, ST-77 (TypeScript), ST-119 (Rust host) |
-| 0160 r3 the intake corpus and the HTTP wire cases hold both runtimes to it; no corpus commit case can carry one | → ST-22, ST-77 evidence (`conformance/intake/directory/invalid-json-lone-surrogate*`, `conformance/http/wire-cases.ts`) |
-| 0160 r4 the 512-level nesting limit stays a known difference, pinned by a test in each runtime | → ST-77, ST-118, ST-119 |
-| 0161 r1 both runtimes' HTTP applications refuse a change (neither `GET` nor `HEAD`) to the Space API or asset store before reading its body, by `Sec-Fetch-Site`, then by `Origin` against `Host` | → ST-123 |
-| 0161 r2 a request naming neither header is served; one naming no `Host` is not judged by its `Origin` | → ST-123 (the scheme handler's own admission is ST-121) |
-| 0161 r3 the refusal is 403 `forbidden` Problem Details, "Send a change from the application's own page." | → ST-123; the transport reads it as permanent (ST-101) |
-| 0161 r4 the conformance suite holds both runtimes to it | → ST-123 evidence |
-| 0161 r5 the memory store's asset count stays uncapped | → ST-123 |
-| 0162 r1 every host that runs a directory locks it with SQLite's exclusive lock on `.infinity-cube.lock` | → ST-124 |
-| 0162 r2 the lock is taken after the missing-or-empty refusal and before Import, and released when the last write lands or fails, or Import refuses; in Rust an abandoned write keeps it | → ST-124; the abandoned write → ST-122 |
-| 0162 r3 a second opener is refused with the kind `locked`, in each host's own way; another failure to lock stops the run as any failure to start | → ST-124 |
-| 0162 r4 the file is never deleted, is a dot-entry, and Import, `check` and Export never open it; a content repository ignores it | → ST-124; a run leaving the directory otherwise unchanged → ST-64 |
-| 0162 r5 `cube mcp`, `check`, `init`, `import` and `export` take no lock | → ST-124, ST-111 |
-| 0162 refines 0117: still no fingerprint, change detection or merge; git still answers for other writers | → ST-66 |
-| 0162 known limits (network filesystems, copies, second mounts) | → ST-124 (network filesystems); the rest is the ADR's argument |
-| 0164 the word ADR 0164 retires names nothing; the directory, its run, origin and lock are an Aggregate, a desktop window is a Space window | → wording across ST-121, ST-122, ST-67 and the Mounting rules, reworded on main (PR 504). The terms → GL (`CONTEXT.md`) |
-| 0166 a preview build is a published build that makes no compatibility promise; a directory is read with the preview build that wrote it; a preview build says it is one | → ST-36 (restated on main, PR 511). That a preview build says it is one, on its download page and in `infinity-cube --version`: not restated, since it is release packaging rather than behaviour of a host |
-| 0163 (proposed) a close waits ten seconds for its last write, then asks the presenter | dropped: proposed (drafting rule 3); ST-122 restates the rule as built |
 | 0020 r4 default order by Title, then id | sent → SR (SR-10 states it; ST-26 removed as a duplicate) |
 | 0020 r5 `loadSpace` takes files as an argument, no I/O | → ST-23 |
 | 0020 r6 no directory per kind | folded → ST-29 (every Resource is in `resources/`) |
@@ -255,8 +235,28 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 | 0142 cost: an asset URL inside another asset's bytes is not found, so it is not carried | → ST-60 |
 | 0142 cost and rejected options otherwise | dropped: costs and rejected alternatives |
 | 0155 both hosts share one schema through plain-SQL migrations that every tool applies, held to one schema by a test | → ST-125, as 0165 refines it |
+| 0159 the cross-Space cycle walk follows Resources by Title, then id, by code unit; a commit's candidate aggregate is judged ascending by Space id, created Spaces among the stored | → ST-117. The repeated Resource id rule sent → SR (SR-6, SR-30) and MG (MG-86) |
+| 0160 r1 JSON text escaping a lone UTF-16 surrogate, in a key or a value at any depth, is not JSON in either runtime; an escaped pair is one character | → ST-22 (TypeScript, `parseJsonText`), ST-118 (Rust intake) |
+| 0160 r2 such a file is refused `invalid-json` located at the file; such a commit body 400 `invalid-request`, "Malformed JSON in request body" | → ST-22, ST-77 (TypeScript), ST-119 (Rust host) |
+| 0160 r3 the intake corpus and the HTTP wire cases hold both runtimes to it; no corpus commit case can carry one | → ST-22, ST-77 evidence (`conformance/intake/directory/invalid-json-lone-surrogate*`, `conformance/http/wire-cases.ts`) |
+| 0160 r4 the 512-level nesting limit stays a known difference, pinned by a test in each runtime | → ST-77, ST-118, ST-119 |
+| 0161 r1 both runtimes' HTTP applications refuse a change (neither `GET` nor `HEAD`) to the Space API or asset store before reading its body, by `Sec-Fetch-Site`, then by `Origin` against `Host` | → ST-123 |
+| 0161 r2 a request naming neither header is served; one naming no `Host` is not judged by its `Origin` | → ST-123 (the scheme handler's own admission is ST-121) |
+| 0161 r3 the refusal is 403 `forbidden` Problem Details, "Send a change from the application's own page." | → ST-123; the transport reads it as permanent (ST-101) |
+| 0161 r4 the conformance suite holds both runtimes to it | → ST-123 evidence |
+| 0161 r5 the memory store's asset count stays uncapped | → ST-123 |
+| 0162 r1 every host that runs a directory locks it with SQLite's exclusive lock on `.infinity-cube.lock` | → ST-124 |
+| 0162 r2 the lock is taken after the missing-or-empty refusal and before Import, and released when the last write lands or fails, or Import refuses; in Rust an abandoned write keeps it | → ST-124; the abandoned write → ST-122 |
+| 0162 r3 a second opener is refused with the kind `locked`, in each host's own way; another failure to lock stops the run as any failure to start | → ST-124 |
+| 0162 r4 the file is never deleted, is a dot-entry, and Import, `check` and Export never open it; a content repository ignores it | → ST-124; a run leaving the directory otherwise unchanged → ST-64 |
+| 0162 r5 `cube mcp`, `check`, `init`, `import` and `export` take no lock | → ST-124, ST-111 |
+| 0162 refines 0117: still no fingerprint, change detection or merge; git still answers for other writers | → ST-66 |
+| 0162 known limits (network filesystems, copies, second mounts) | → ST-124 (network filesystems); the rest is the ADR's argument |
+| 0163 (proposed) a close waits ten seconds for its last write, then asks the presenter | dropped: proposed (drafting rule 3); ST-122 restates the rule as built |
+| 0164 the word ADR 0164 retires names nothing; the directory, its run, origin and lock are an Aggregate, a desktop window is a Space window | → wording across ST-121, ST-122, ST-67 and the Mounting rules, reworded on main (PR 504). The terms → GL (`CONTEXT.md`) |
 | 0165 the schema history in two encodings: Prisma Next's packages and one plain-SQL file per package, held to the same statements and schema by tests; a schema change adds both | → ST-125 |
 | 0165 rejected options | dropped: rejected alternatives |
+| 0166 a preview build is a published build that makes no compatibility promise; a directory is read with the preview build that wrote it; a preview build says it is one | → ST-36 (restated on main, PR 511). That a preview build says it is one in the version it reports → ST-120 (`infinity-cube --version`). That its download page says so: not restated, since it is release packaging rather than behaviour of a host |
 
 ## 2. Guides
 

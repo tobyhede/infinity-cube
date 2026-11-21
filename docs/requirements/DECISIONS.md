@@ -60,10 +60,6 @@ Ruled 12 November 2026, after an independent audit of each recommendation. Code 
 - **UI C3.** Wherever a sentence quotes a Title, it uses the short Title: the first line, plus "…" when more lines follow. This covers questions, notices and Edge labels and their accessible names. Controls, list rows and chrome use the first line alone. Notices that quote the bare name are bugs. Recorded as ADR 0151.
 - **UI C4** (15 November 2026, raised on review). A permanent rejection, and a refused save, is a dialog that takes focus until acknowledged. A retryable failure still takes none.
 
-## Refresh rulings (21 November 2026)
-
-- **Editing C4.** A title an author writes that holds a lone UTF-16 surrogate is refused where it is written, before anything is committed (option (b)). It adds a rule no ADR states and changes nothing ADR 0042 or 0160 decides. SR-68 states it, not built; `conflicts/editing.md` C4 keeps the evidence.
-
 ## Rulings recorded as ADRs (15 November 2026)
 
 When ruling 8 was reversed, every ruling above that changes what an accepted ADR decides became an ADR of its own, so the requirement that states it rests on an ADR rather than on this page. The other rulings choose between sources, fill a gap no ADR decides, or settle a conflict between an ADR and the code without changing the ADR; they stay recorded here and in the conflict files.
@@ -81,3 +77,7 @@ When ruling 8 was reversed, every ruling above that changes what an accepted ADR
 | UI C4. A permanent rejection is a dialog that takes focus | 0042's "None steals focus" for a permanent rejection | ADR 0154 | UI-93 |
 | Storage S2. No compatibility promise for a copy outside the repository | the reason 0054 and 0056 give for rolling forward | ADR 0152 | ST-36 |
 | 8. (reversed) | 0115 | ADR 0145, which supersedes 0115 | `README.md`; every doc's snapshot marker |
+
+## Refresh rulings (21 November 2026)
+
+- **Editing C4.** A title an author writes that holds a lone UTF-16 surrogate is refused where it is written, before anything is committed (option (b)). It adds a rule no ADR states (ADR 0160 decides what the hosts refuse, not where the browser checks first) and fails the ADR test in `docs/agents/workflow.md`, being easy to reverse. SR-68 states it, not built; `conflicts/editing.md` C4 keeps the evidence.

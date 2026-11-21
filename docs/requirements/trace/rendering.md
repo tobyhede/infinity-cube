@@ -430,7 +430,7 @@ Added 15 November 2026. These ADRs had no row in any trace. Each has one outcome
 | 0011 (superseded) opening a card shows its Markdown source | historical: superseded by 0064 (Open expands in place, editing is separate), traced in §1 |
 | 0021 (superseded) routes are authored as React Flow edges with neutral handles | historical: superseded by 0033 (spatial handles in the Active Graph's colour), traced in §1 |
 
-## Refresh to `a0f5066` (20 November 2026)
+## Refresh to `a0f5066` (21 November 2026)
 
 The snapshot marker moved from `3244b74` to `a0f5066` and to accepted ADRs through 0166. Each ADR accepted above the old marker was read for rules this doc owns, and the product code merged since `3244b74` was read for behaviour this doc states. ADR 0163 is proposed and is not incorporated (drafting rule 3).
 
