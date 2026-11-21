@@ -3,8 +3,8 @@
 
 Finds each citation of the form `path` › "title"[, "title" ...] in
 docs/requirements/*.md and checks that the file exists and contains each title.
-A path that starts with `test/` is at the repository root; any other is under
-`packages/`. A title matches when its text appears in the file after allowing
+A path that starts with `test/`, `conformance/` or `src/` is at the repository
+root; any other is under `packages/`. A title matches when its text appears in the file after allowing
 for: curly or straight quotes and apostrophes, escaped quotes, `\\n` escapes,
 whitespace runs, and template literals (a `${...}` or `%s`-style placeholder in
 the source, or a `<...>` stand-in in the title, matches any text).
@@ -64,6 +64,7 @@ def template_pattern(source):
     return re.compile("|".join(alts)) if alts else None
 
 
+ROOT_DIRS = ("test/", "conformance/", "src/")
 checked = 0
 missing_files = []
 missing_titles = []
@@ -72,7 +73,7 @@ for doc in docs:
     for number, line in enumerate(open(doc, encoding="utf8"), 1):
         for m in citation.finditer(line):
             cited = m.group(1)
-            path = cited if cited.startswith("test/") else os.path.join("packages", cited)
+            path = cited if cited.startswith(ROOT_DIRS) else os.path.join("packages", cited)
             if not os.path.exists(path):
                 missing_files.append((doc, number, path))
                 continue

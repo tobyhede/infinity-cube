@@ -429,3 +429,19 @@ Added 15 November 2026. These ADRs had no row in any trace. Each has one outcome
 |---|---|
 | 0011 (superseded) opening a card shows its Markdown source | historical: superseded by 0064 (Open expands in place, editing is separate), traced in §1 |
 | 0021 (superseded) routes are authored as React Flow edges with neutral handles | historical: superseded by 0033 (spatial handles in the Active Graph's colour), traced in §1 |
+
+## Refresh to `a0f5066` (20 November 2026)
+
+The snapshot marker moved from `3244b74` to `a0f5066` and to accepted ADRs through 0166. Each ADR accepted above the old marker was read for rules this doc owns, and the product code merged since `3244b74` was read for behaviour this doc states. ADR 0163 is proposed and is not incorporated (drafting rule 3).
+
+| Source | Disposition |
+|---|---|
+| 0158 an Open Mermaid Resource inserts the SVG Mermaid answers, sanitised by Mermaid at `strict`; it does not draw through the host's Markdown renderer | → RD-6 |
+| 0157 | reviewed, no rule here: WebKit joins Chromium under the browser floor; restated in UI-110 |
+| 0159 | reviewed, no rule here: intake refusals for a repeated Resource id and order-independent answers; restated in SR-6, SR-30, MG-86 and ST-117 |
+| 0160 | reviewed, no rule here: JSON text holding a lone surrogate is refused at Import and at a commit; restated in Storage (ST-22, ST-77, ST-118, ST-119) |
+| 0161 | reviewed, no rule here: hosts refuse a cross-site change with 403 `forbidden`; restated in ST-123 |
+| 0162 | reviewed, no rule here: every host locks the directory it runs; restated in ST-124 |
+| Code since `3244b74`: Mermaid's theme set in Mermaid's settings before each draw rather than appended to the source; no draw while Closed; a failed draw retried on the next Open | → RD-6 and SR-67, updated in the same change (`647232d`) |
+| 0164 "talk" is retired: a person is shown a Space; the directory, its run, origin and lock are an Aggregate; what is presented is a presented Graph, one run through it a presentation | reviewed, no rule here: this doc used none of the retired word. The terms → GL (`CONTEXT.md`) |
+| 0166 | reviewed, no rule here: a preview build makes no compatibility promise; restated in ST-36 || Code since `17aab57`: PR 504 (ADR 0164's rename sweep) and PR 511 (preview builds, `infinity-cube init`, the release workflow) | no behaviour this doc states |

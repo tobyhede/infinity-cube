@@ -345,3 +345,19 @@ Added 15 November 2026. These ADRs had no row in any trace. Each has one outcome
 | 0055 (superseded) name the canvas renderer, not its control | historical: superseded by 0068; the canvas is drawn by the selected Map (0079), so no renderer identity survives |
 | 0072 (superseded) canvas renderer identity is the Space View Id | historical: superseded by 0079, which retired Views |
 | 0071 native `Uint8Array` base64 and hex codecs set the platform floor (Node 26.8.1; ES2025 plus `ESNext.TypedArrays`; no fallback or polyfill) | sent → PROC: an engineering rule, owned by `docs/agents/build-tooling.md`. It refines 0069, whose ids NV states; NV states no codec |
+
+## Refresh to `a0f5066` (20 November 2026)
+
+The snapshot marker moved from `9e9b094` to `a0f5066` and to accepted ADRs through 0166. Each ADR accepted above the old marker was read for rules this doc owns, and the product code merged since `9e9b094` was read for behaviour this doc states. ADR 0163 is proposed and is not incorporated (drafting rule 3).
+
+| Source | Disposition |
+|---|---|
+| 0158 a presented Mermaid Resource is its name and its diagram, drawn by its plugin with no Edit | → NV-61 (the presented Resource list) |
+| 0157 | reviewed, no rule here: WebKit joins Chromium under the browser floor; restated in UI-110 |
+| 0159 | reviewed, no rule here: intake refusals for a repeated Resource id and order-independent answers; restated in SR-6, SR-30, MG-86 and ST-117 |
+| 0160 | reviewed, no rule here: JSON text holding a lone surrogate is refused at Import and at a commit; restated in Storage (ST-22, ST-77, ST-118, ST-119) |
+| 0161 | reviewed, no rule here: hosts refuse a cross-site change with 403 `forbidden`; restated in ST-123 |
+| 0162 | reviewed, no rule here: every host locks the directory it runs; restated in ST-124 |
+| Code since `9e9b094`: `app/e2e/presenting.spec.ts` waits for the Open Edits to persist before measuring | no behaviour change: a test synchronisation fix (PR 490) |
+| 0164 "talk" is retired: a person is shown a Space; the directory, its run, origin and lock are an Aggregate; what is presented is a presented Graph, one run through it a presentation | → the Presentation definition, NV-8, NV-27, NV-57, NV-60, NV-67, NV-68, NV-73, NV-75, reworded in the same change on main (PR 504) |
+| 0166 | reviewed, no rule here: a preview build makes no compatibility promise; restated in ST-36 || Code since `17aab57`: PR 504 (ADR 0164's rename sweep) and PR 511 (preview builds, `infinity-cube init`, the release workflow) | wording only here |

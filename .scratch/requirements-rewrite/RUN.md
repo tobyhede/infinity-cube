@@ -2,6 +2,24 @@
 
 This is the durable record of the requirements rewrite (PR 475, https://github.com/tobyhede/infinity-cube/pull/475). It follows the run record in the `requirements-rewrite` skill (`references/evidence.md`). Update it at each checkpoint or handoff.
 
+## Latest checkpoint: merged with main `a0f5066` (21 November 2026)
+
+- Main moved to `a0f5066` (PR 504, ADR 0164 "talk" retired; PR 511, ADR 0166 preview builds). Merged into the branch; ui.md, navigation.md and storage.md conflicted, resolved by a word-level three-way merge of each conflicting rule (keeping main's rewording and this refresh's ST-124 edits) and checked by eye. All seven markers now read `a0f5066` (2026-11-20), accepted ADRs through 0166; each trace's refresh section records 0164 and 0166.
+- **Ruling, 21 November 2026:** the maintainer chose option (b) for Editing C4. Closed C4; new rule SR-68 (**not built**); `DECISIONS.md` "Refresh rulings"; delivery issue `.scratch/title-well-formed/issues/01-refuse-a-title-holding-a-lone-surrogate.md` (ready-for-agent). Recorded as a ruling, not an ADR, because it adds a rule no ADR states and changes nothing 0042 or 0160 decides.
+
+## Earlier checkpoint: refresh to `17aab57` (19 November 2026)
+
+Read this first; the sections below it record the original rewrite (PR 475).
+
+- **Repository** `tobyhede/hyper` (renamed from `tobyhede/infinity-cube`), branch `claude/project-thread-vqr263`, base and target `17aab57` (origin/main, checked 19 November 2026).
+- **Scope.** The maintainer invoked `/skillz:requirements-rewrite` with no further instruction; read as an existing-snapshot refresh. Authorized: edit docs, push the branch, open a draft PR. Not authorized: implementing gaps, marking ready, merging.
+- **Starting state.** Markers: editing `d14ff974`/0157, rendering `3244b74`/0158, navigation and UI `9e9b094`/0158, maps-and-graphs and space-and-resources `9e9b094`/0159, storage `9e9b094`/0162. Checkers at `17aab57`: `check-dispositions.py` 6 ADRs without a row (0157, 0158, 0160–0163); `check-evidence.py` 3 missing files and 5 missing titles (the checker read `conformance/` paths as under `packages/`, and ST-65/ST-114 cited titles that moved to `conformance/http/process-cases.ts`).
+- **What changed.** All seven markers now read `17aab57` (2026-11-19), accepted ADRs through 0162; proposed 0163 is not incorporated (storage ST-122 restates it as built). Every trace ends with a "Refresh to `17aab57`" section recording each ADR above its old marker and the code merged since; trace/storage.md §1 gained rows for 0160–0163. Editing ED-24, ED-33, ED-37 and ED-80 name the Mermaid edit (ADR 0158). Storage: ST-16, ST-111, ST-113–ST-115, ST-119, ST-120, ST-122, ST-124 and the operations index reconciled (a topic agent drafted; the diff was inspected here). `check-evidence.py` resolves `conformance/` and `src/` from the root. `docs/agents/workflow.md` now asks for trace rows with each ADR. New open question: Editing C4 (a Title holding a lone surrogate).
+- **Independence.** Storage was drafted by a delegated topic agent; a second, separate agent audited the whole diff and ran the five refresh fresh-reader questions with answers withheld (all matched; results in `fresh-reader.md`). Its four findings were applied (C4 opened; ADR 0158 added to ED-33 and ED-37 sources; 0161 trace row re-pointed to ST-101/ST-123; workflow wording).
+- **Validation (19 November 2026).** `check-evidence.py` 1,515 titles, 0 missing; `check-links.py` 74 files, 489 links, 0 broken; `check-dispositions.py` 163 ADRs, 0 without a row; `prettier --check docs/requirements docs/agents` clean; `vitest run` over `adr-status-blocks`, `current-domain-vocabulary`, `docs-agents-citation-accuracy`, `agent-skill-commands` 158 passed (Node 22.23.5, `pnpm install --config.engine-strict=false`; the repository asks for Node 26.8.1). CI on draft PR 503 at `9ca33cf`: `CI passed` green (19 November 2026), with static-checks, coverage, e2e (1–3), ladle, mount, postgres, sqlite, rust and rust-windows each green.
+- **Open.** ADR 0162 says a content repository should ignore `.infinity-cube.lock`, and neither `cube init` nor the getting-started skill adds it. ST-120's note that the `rust` job's CLI conformance run has not been watched was not rechecked (no `gh` here). `check-dispositions.py` is not run in CI. The 33 original fresh-reader questions still lack an independent run.
+- **Next action.** The maintainer reviews PR 503; SR-68 waits on its delivery issue. Then, at the next accepted ADR, follow workflow.md's same-change maintenance and rerun the three checkers.
+
 ## Revisions
 
 | What | Value |

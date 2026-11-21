@@ -60,6 +60,10 @@ Ruled 12 November 2026, after an independent audit of each recommendation. Code 
 - **UI C3.** Wherever a sentence quotes a Title, it uses the short Title: the first line, plus "…" when more lines follow. This covers questions, notices and Edge labels and their accessible names. Controls, list rows and chrome use the first line alone. Notices that quote the bare name are bugs. Recorded as ADR 0151.
 - **UI C4** (15 November 2026, raised on review). A permanent rejection, and a refused save, is a dialog that takes focus until acknowledged. A retryable failure still takes none.
 
+## Refresh rulings (21 November 2026)
+
+- **Editing C4.** A title an author writes that holds a lone UTF-16 surrogate is refused where it is written, before anything is committed (option (b)). It adds a rule no ADR states and changes nothing ADR 0042 or 0160 decides. SR-68 states it, not built; `conflicts/editing.md` C4 keeps the evidence.
+
 ## Rulings recorded as ADRs (15 November 2026)
 
 When ruling 8 was reversed, every ruling above that changes what an accepted ADR decides became an ADR of its own, so the requirement that states it rests on an ADR rather than on this page. The other rulings choose between sources, fill a gap no ADR decides, or settle a conflict between an ADR and the code without changing the ADR; they stay recorded here and in the conflict files.

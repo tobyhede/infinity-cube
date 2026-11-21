@@ -438,3 +438,19 @@ Main moved on after the rewrite's baseline (commit `797b2908`). These are the ru
 | 0144 r2 the row is withheld while the list holds an unplaced Space Resource framing that Space | → UI-107 |
 | 0144 r3 a Space Resource placed on another Map withholds nothing | → UI-107 |
 | 0144 r4 withholding is decided over the list's source; counts and the empty sentence read the same set | → UI-107 |
+
+## Refresh to `a0f5066` (20 November 2026)
+
+The snapshot marker moved from `9e9b094` to `a0f5066` and to accepted ADRs through 0166. Each ADR accepted above the old marker was read for rules this doc owns, and the product code merged since `9e9b094` was read for behaviour this doc states. ADR 0163 is proposed and is not incorporated (drafting rule 3).
+
+| Source | Disposition |
+|---|---|
+| 0157 WebKit is a supported engine; CI runs the end-to-end suite in a WebKit project; the desktop application declares a minimum macOS and WebKitGTK version | → UI-110 (**not built**). Its platform-floor wording sent → PROC (`docs/agents/build-tooling.md`) |
+| 0158 a Mermaid Resource offers and runs Edit, Open and Close exactly as a Markdown Resource does | → UI-53 |
+| 0159 | reviewed, no rule here: intake refusals for a repeated Resource id and order-independent answers; restated in SR-6, SR-30, MG-86 and ST-117 |
+| 0160 | reviewed, no rule here: JSON text holding a lone surrogate is refused at Import and at a commit; restated in Storage (ST-22, ST-77, ST-118, ST-119) |
+| 0161 | reviewed, no rule here: hosts refuse a cross-site change with 403 `forbidden`; restated in ST-123 |
+| 0162 | reviewed, no rule here: every host locks the directory it runs; restated in ST-124 |
+| Code since `9e9b094`: the Dock's vertical column width counts its Creates (`--command-dock-creates` in `CommandDock.tsx`); `describeAggregateRefusal` takes the wire form of a refusal | removed (drafting rule 6): column width is styling; the refusal type change alters no sentence |
+| 0164 "talk" is retired: a person is shown a Space; the directory, its run, origin and lock are an Aggregate; what is presented is a presented Graph, one run through it a presentation | → UI-95 and the rules PR 504 reworded in the same change on main |
+| 0166 | reviewed, no rule here: a preview build makes no compatibility promise; restated in ST-36 || Code since `17aab57`: PR 504 (ADR 0164's rename sweep) and PR 511 (preview builds, `infinity-cube init`, the release workflow) | wording only here |

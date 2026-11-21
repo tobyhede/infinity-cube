@@ -32,6 +32,25 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 | 0020 r2 identity from the file's id, never its path | → ST-29 |
 | 0020 r3 duplicate Resource id is an intake error | → ST-29 |
 | 0159 the cross-Space cycle walk follows Resources by Title, then id, by code unit; a commit's candidate aggregate is judged ascending by Space id, created Spaces among the stored | → ST-117. The repeated Resource id rule sent → SR (SR-6, SR-30) and MG (MG-86) |
+| 0160 r1 JSON text escaping a lone UTF-16 surrogate, in a key or a value at any depth, is not JSON in either runtime; an escaped pair is one character | → ST-22 (TypeScript, `parseJsonText`), ST-118 (Rust intake) |
+| 0160 r2 such a file is refused `invalid-json` located at the file; such a commit body 400 `invalid-request`, "Malformed JSON in request body" | → ST-22, ST-77 (TypeScript), ST-119 (Rust host) |
+| 0160 r3 the intake corpus and the HTTP wire cases hold both runtimes to it; no corpus commit case can carry one | → ST-22, ST-77 evidence (`conformance/intake/directory/invalid-json-lone-surrogate*`, `conformance/http/wire-cases.ts`) |
+| 0160 r4 the 512-level nesting limit stays a known difference, pinned by a test in each runtime | → ST-77, ST-118, ST-119 |
+| 0161 r1 both runtimes' HTTP applications refuse a change (neither `GET` nor `HEAD`) to the Space API or asset store before reading its body, by `Sec-Fetch-Site`, then by `Origin` against `Host` | → ST-123 |
+| 0161 r2 a request naming neither header is served; one naming no `Host` is not judged by its `Origin` | → ST-123 (the scheme handler's own admission is ST-121) |
+| 0161 r3 the refusal is 403 `forbidden` Problem Details, "Send a change from the application's own page." | → ST-123; the transport reads it as permanent (ST-101) |
+| 0161 r4 the conformance suite holds both runtimes to it | → ST-123 evidence |
+| 0161 r5 the memory store's asset count stays uncapped | → ST-123 |
+| 0162 r1 every host that runs a directory locks it with SQLite's exclusive lock on `.infinity-cube.lock` | → ST-124 |
+| 0162 r2 the lock is taken after the missing-or-empty refusal and before Import, and released when the last write lands or fails, or Import refuses; in Rust an abandoned write keeps it | → ST-124; the abandoned write → ST-122 |
+| 0162 r3 a second opener is refused with the kind `locked`, in each host's own way; another failure to lock stops the run as any failure to start | → ST-124 |
+| 0162 r4 the file is never deleted, is a dot-entry, and Import, `check` and Export never open it; a content repository ignores it | → ST-124; a run leaving the directory otherwise unchanged → ST-64 |
+| 0162 r5 `cube mcp`, `check`, `init`, `import` and `export` take no lock | → ST-124, ST-111 |
+| 0162 refines 0117: still no fingerprint, change detection or merge; git still answers for other writers | → ST-66 |
+| 0162 known limits (network filesystems, copies, second mounts) | → ST-124 (network filesystems); the rest is the ADR's argument |
+| 0164 "talk" is retired; the directory, its run, origin and lock are an Aggregate, a desktop window is a Space window | → wording across ST-121, ST-122, ST-67 and the Mounting rules, reworded on main (PR 504). The terms → GL (`CONTEXT.md`) |
+| 0166 a preview build is a published build that makes no compatibility promise; a directory is read with the preview build that wrote it; a preview build says it is one | → ST-36 (restated on main, PR 511). That a preview build says it is one, on its download page and in `infinity-cube --version`: not restated, since it is release packaging rather than behaviour of a host |
+| 0163 (proposed) a close waits ten seconds for its last write, then asks the presenter | dropped: proposed (drafting rule 3); ST-122 restates the rule as built |
 | 0020 r4 default order by Title, then id | sent → SR (SR-10 states it; ST-26 removed as a duplicate) |
 | 0020 r5 `loadSpace` takes files as an argument, no I/O | → ST-23 |
 | 0020 r6 no directory per kind | folded → ST-29 (every Resource is in `resources/`) |
@@ -436,3 +455,34 @@ Added 15 November 2026. These ADRs had no row in any trace. Each has one outcome
 | 0061 TypeScript 7 is the compiler and TypeScript 6 a bridge | sent → PROC: an engineering rule, owned by `docs/agents/build-tooling.md` |
 | 0062 the narrowing assertions we have are the most we will have | sent → PROC: an engineering rule, owned by `docs/agents/anti-slop.md` |
 | 0088 "Aggregate" names the Meta-rooted collection; one Space with its Resources is a Space snapshot | vocabulary → GL (`CONTEXT.md`, "Aggregate" and "Space snapshot"); ST uses both terms as defined (storage.md, Terms) |
+
+## 7. Refresh to 17aab57, then a0f5066 (19–20 November 2026)
+
+Each behaviour change merged between `9e9b094` and `17aab57` (PRs #481–#500, first-parent), and where it now lives. "Correct" means the PR's own edit to storage.md already stated it and this refresh only checked it.
+
+| Source | Disposition |
+|---|---|
+| #481 Mermaid plugin (ADR 0158): `text/vnd.mermaid`, `mmd` assets | correct → ST-34, ST-112 |
+| #482 one Cargo workspace for `crates/` and the desktop shell | build only; no storage rule (AGENTS.md) |
+| #483 located intake refusals and the intake conformance corpus (ADRs 0156, 0159) | correct → ST-117 |
+| #484 black-box HTTP conformance suite against the Node host | correct → ST-113–ST-116, ST-65, ST-81 evidence |
+| #485 the Rust intake crate | correct → ST-118 |
+| #486 the Rust host library; every Edit flushed on stop | correct → ST-119 |
+| #487 the Rust CLI, `infinity-cube run` and `check` | correct → ST-120; locked refusal cross-referenced to ST-124 in this refresh |
+| #488 desktop shell serves the Rust host through the `infinitycube` scheme, replacing the sidecar | correct → ST-121; ST-114's "go when a scheme replaces it" and ST-119's "is to run" made current in this refresh |
+| #490 e2e waits for persisted revisions | test only; no storage rule |
+| #491 cross-site changes refused in both hosts (ADR 0161) | correct → ST-123 |
+| #493 one adapter for a built application directory | correct → ST-119, ST-120 |
+| #494 shared HTTP conformance cases written once for both Rust adapters | correct → ST-119, ST-121, ST-123 evidence |
+| #500 lone surrogate refused in both runtimes (ADR 0160) | correct → ST-22, ST-77, ST-118, ST-119 |
+| #500 every host locks the directory it runs (ADR 0162) | correct → ST-124, ST-64, ST-66; release on Import refusal, the `.gitignore` entry and the no-lock `cube mcp` added in this refresh (ST-124, ST-111); operations index rows now name ST-124 |
+| #500 refuse a Space named in upper case, in both hosts | → ST-16; source and the conformance case's citation corrected in this refresh |
+| #500 judge a change's `Origin` whatever its `Sec-Fetch-Site` says | correct → ST-123 (code now matches ADR 0161's second arm) |
+| #500 serve `index.html` as the page, with its policy, in both hosts; the sidecar reads its page past that refusal | correct → ST-115 (evidence cited by path in this refresh), ST-119 |
+| #500 show a dialog when saving fails and when it recovers | correct → ST-121 |
+| #500 a close waits ten seconds, then asks (proposed ADR 0163) | correct → ST-122, as built; ADR 0162 added to its sources for the abandoned write's lock |
+| #500 a link swapped in after Export's or a built file's check is out of scope | correct → ST-57, ST-119 |
+| #500 a regular file named as `--built` refused before its page is looked for; an unreadable file under `/assets/` | correct → ST-119, ST-120 |
+| #500 Windows Rust test job | correct → ST-124 (Windows evidence) |
+| #498 CI review workflow | CI only; no storage rule |
+| PR 504 (ADR 0164) and PR 511 (ADR 0166, `infinity-cube init`, the release workflow), merged between `17aab57` and `a0f5066` | correct → ST-11, ST-36, ST-70, ST-120 and the reworded rules, edited on main in the same changes; merged here with this refresh's ST-124 edits |

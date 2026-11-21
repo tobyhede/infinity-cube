@@ -376,3 +376,22 @@ Added 15 November 2026. These ADRs had no row in any trace. Each has one outcome
 | 0059 (superseded) a Space Card creates the normal new Space | historical: superseded by 0068, traced in §1 |
 | 0060 (superseded) a nested Space has one owner | historical: superseded by 0068, traced in §1 |
 | 0085 Thing and Diagram are the first-public names for Card and Layout | historical vocabulary: its names were replaced by 0092 (Reference) and 0101 (Resource and Map), and it restates the invariants of earlier ADRs rather than deciding them. What survives is held elsewhere: the names are GL (`CONTEXT.md`), and `LayoutStrategy` keeping its name is the code's (`graph/src/layout.ts`), not a requirement |
+
+## Refresh to `a0f5066` (20 November 2026)
+
+The snapshot marker moved from `9e9b094` to `a0f5066` and to accepted ADRs through 0166. Each ADR accepted above the old marker was read for rules this doc owns, and the product code merged since `9e9b094` was read for behaviour this doc states. ADR 0163 is proposed and is not incorporated (drafting rule 3).
+
+| Source | Disposition |
+|---|---|
+| 0158 a Mermaid Resource is the Markdown Resource in every way but what it draws: `{ url }` content naming an asset, `{ open }` Map content, created empty from the Dock, may be a Target | → SR-67, SR-15 (the build list), SR-36 (created empty), SR-30 (may be a Target), the Content kind definition |
+| 0158 the plugin draws with the `mermaid` library, fetched on first draw, at its `strict` security level, with error drawing suppressed; an empty source is a note; the canvas's colour scheme sets the theme unless the source chooses its own; the source is drawn as written | → SR-67. Sanitising sent → RD (RD-6) |
+| 0158 source stored as `text/vnd.mermaid`, Export writes `assets/<hash>.mmd` | sent → ST (ST-34) |
+| 0158 "Diagram" names what Mermaid draws inside its plugin only, never a Map | sent → GL (`CONTEXT.md`), PROC (vocabulary guard) |
+| 0157 | reviewed, no rule here: WebKit joins Chromium under the browser floor; restated in UI-110 |
+| 0160 | reviewed, no rule here: JSON text holding a lone surrogate is refused at Import and at a commit; restated in Storage (ST-22, ST-77, ST-118, ST-119) |
+| 0161 | reviewed, no rule here: hosts refuse a cross-site change with 403 `forbidden`; restated in ST-123 |
+| 0162 | reviewed, no rule here: every host locks the directory it runs; restated in ST-124 |
+| Code since `9e9b094`: Mermaid draws the source as written with the theme in Mermaid's settings, retries a failed draw on the next Open, and draws nothing while Closed (PR 498's commits `647232d`, `70ed38b`); the plugin's domain comment | → SR-67, which those commits updated in the same change |
+| 0164 "talk" is retired: a person is shown a Space; the directory, its run, origin and lock are an Aggregate; what is presented is a presented Graph, one run through it a presentation | reviewed, no rule here: this doc used none of the retired word. The terms → GL (`CONTEXT.md`) |
+| 0166 | reviewed, no rule here: a preview build makes no compatibility promise; restated in ST-36 || Code since `17aab57`: PR 504 (ADR 0164's rename sweep) and PR 511 (preview builds, `infinity-cube init`, the release workflow) | no behaviour this doc states |
+| Maintainer ruling, 21 November 2026 (Editing C4, option (b)): a title holding a lone surrogate is refused where it is written | → SR-68 (**not built**) |

@@ -377,3 +377,19 @@ The ADRs below are in `docs/adr/` and bind; this section records where the snaps
 | 0126 "Refined by: 0142" and other status lines | dropped: status lines, no rule |
 | Code only (drafting rule 5): an asset upload also ends when its answer never finishes arriving; a Replace reads a picture's declared size and loads nothing to measure it | → ED-72 |
 | Code only: a creation that asked to run alone withholds a second press of the same Create, and another kind's stays offered | → ED-33 |
+
+## Refresh to `a0f5066` (20 November 2026)
+
+The snapshot marker moved from `d14ff974` to `a0f5066` and to accepted ADRs through 0166. Each ADR accepted above the old marker was read for rules this doc owns, and the product code merged since `d14ff974` was read for behaviour this doc states. ADR 0163 is proposed and is not incorporated (drafting rule 3).
+
+| Source | Disposition |
+|---|---|
+| 0158 a Mermaid Resource's Edit is the Markdown Resource's mode, under a Claim, in the host's source editor, Save storing a new asset and committing its URL | → ED-24 (the draft), ED-33 and ED-37 (the Claim withholds other authoring), ED-80 (a Claim). What it stores sent → SR (SR-67); its commands → UI (UI-53) |
+| 0157 | reviewed, no rule here: WebKit joins Chromium under the browser floor; restated in UI-110 |
+| 0159 | reviewed, no rule here: intake refusals for a repeated Resource id and order-independent answers; restated in SR-6, SR-30, MG-86 and ST-117 |
+| 0160 | reviewed, no rule here: JSON text holding a lone surrogate is refused at Import and at a commit; restated in Storage (ST-22, ST-77, ST-118, ST-119). A Title holding a lone surrogate would leave a browser session rejected on every Edit until that Title changes: C4 in `../conflicts/editing.md`, closed by ruling (b) on 21 November 2026 and stated as SR-68 |
+| 0161 the browser transport already reads 403 `forbidden` as a permanent failure | sent → ST (ST-101 maps the status; ST-123 is the refusal). ED-46 already governs any permanent rejection |
+| 0162 | reviewed, no rule here: every host locks the directory it runs; restated in ST-124 |
+| Code since `d14ff974`: the Mermaid plugin (PRs merged between `d14ff974` and `9e9b094`), its later fixes, and comment pointers in `app/src/space-authoring.ts` re-pointed to ED-31 | Mermaid → ED-24, ED-80 as above. No other editing behaviour changed |
+| 0164 "talk" is retired: a person is shown a Space; the directory, its run, origin and lock are an Aggregate; what is presented is a presented Graph, one run through it a presentation | reviewed, no rule here: this doc used none of the retired word. The terms → GL (`CONTEXT.md`), PROC (vocabulary guard) |
+| 0166 | reviewed, no rule here: a preview build makes no compatibility promise; restated in ST-36 || Code since `17aab57`: PR 504 (ADR 0164's rename sweep) and PR 511 (preview builds, `infinity-cube init`, the release workflow) | no behaviour this doc states |
