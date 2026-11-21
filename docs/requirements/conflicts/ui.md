@@ -2,9 +2,71 @@
 
 These are conflicts for [../ui.md](../ui.md) that drafting rules 1–5 and [../DECISIONS.md](../DECISIONS.md) do not settle. Conflict ids are never reused. Paths are relative to `packages/`.
 
-No conflict is open.
+## Open
+
+None.
 
 ## Closed
+
+Closed by rulings UI C5, C6 and C7 (maintainer, 20 November 2026), each option (a), as recommended. None changes what an accepted ADR decides, so none is written as an ADR: C5 keeps ADR 0130's one wording and meets ADR 0164 as written; C6 is the application's own sentence (ADR 0057); C7 follows `CONTEXT.md`. UI-89 and UI-111 state them, marked **bug: code differs** until the code changes.
+
+### C5. What a mounted page's startup failure calls the directory
+
+**Decision requested (raised 20 November 2026).** When a mounted page cannot read the GitHub directory it was given, should its failure say "Space", as ADR 0164 has everything a person reads say, or keep the CLI's words, which say "Aggregate directory", as ADR 0130 has a mount refuse "in the same words"?
+
+**Rules affected:** UI-111; storage.md ST-90 (a mount refuses in the CLI's words).
+
+**The competing claims.**
+- ADR 0130, "The directory reader has a pure core": "Anything the CLI refuses, the browser refuses in the same words."
+- ADR 0164, "The decision": "What a person is shown is a Space. Every control, dialog, message, guide and skill says Space. Aggregate is an internal name: it appears in source, tests, requirements and `aggregate.json`, never in what a person reads on screen."
+
+ADR 0164 is later but does not name 0130, and says nothing of the CLI, whose output a person also reads.
+
+**What the code does.** `describeAggregateReadRefusal` (`aggregate/src/aggregate-refusal.ts`) words a refused directory as "`<name>` is not an Aggregate directory:" or "Aggregate validation failed:", followed by the intake's lines, some of which say "aggregate directory" too. `pnpm cube run`, `pnpm cube import` and a mount (`app/src/mount/mounted-startup.ts`, shown by the application's startup failure) all use it. `app/test/mount.test.tsx` › "shows the reader’s diagnostics for a directory that is not an aggregate", "shows Import’s diagnostics for an aggregate that is refused" assert those words on the page; `test/unit/run-process.test.ts` and `test/unit/infinity-cube-cli.test.ts` › "check refuses a directory that is not an Aggregate directory, naming the file" assert them on the CLI. The desktop shell, which ADR 0164 does cover, words its own refusal "`<folder>` is not a Space InfinityCube can open:" (`desktop/src-tauri/src/server.rs` `refusal`), so the desktop and a mount already disagree.
+
+**Options.**
+- **(a) Space everywhere a person reads it, the CLI included.** Reword `describeAggregateReadRefusal` and the intake lines a person sees, keeping ADR 0130's one wording. The CLI tests and mount tests change together. Needs a new ADR only if the maintainer reads the CLI as outside ADR 0164's "on screen".
+- **(b) Space on the page, the CLI keeps Aggregate.** The mount words its own startup failure, and ADR 0130's "same words" is narrowed by a new ADR to the diagnostics' substance.
+- **(c) Keep Aggregate in both.** Read ADR 0164's "on screen" as excluding a startup diagnostic. Needs a new ADR, since 0164 lists "message" without exception.
+
+**Recommendation: (a).** It keeps ADR 0130's one wording and meets ADR 0164 as written, and matches what the desktop shell already says; a developer at the CLI loses nothing by reading "Space directory" or "folder". Consequence: UI-111's mounted case becomes **bug: code differs** until the wording changes.
+
+
+### C6. What a refused save's `forbidden` sentence says
+
+**Decision requested (raised 20 November 2026, from the Editing topic's review).** Should the sentence an author reads for a save refused `forbidden` say why such a refusal happens now: the change did not come from the application's own page?
+
+**Rules affected:** UI-89 (one sentence per code), UI-93 (the rejection dialog shows "the reason").
+
+**The competing claims.**
+- `app/src/authoring-refusal.ts` (`PERSISTENCE_FAILURE_REASONS.forbidden`): "You do not have permission to save this space." InfinityCube has no permissions. Since ADR 0161 the only `forbidden` a host InfinityCube ships answers is the cross-site refusal (Storage ST-123, detail "Send a change from the application's own page."), plus any 403 an intermediary answers, which `httpExceptionProblem` (`http/src/index.ts`) also reads as `forbidden`. ADR 0161, Consequences: "A change the product's page sends from another origin, through a proxy that rewrites `Host` for example, is refused". So the product's own page can meet it behind such a proxy, and the sentence then sends the author to look for a permission that does not exist.
+
+**What the code and tests do.** `app/test/authoring-refusal.test.ts` › "writes its own sentence for a forbidden rejection", `app/test/persistence-control.test.tsx` › "explains a permanent rejection from its code" and `app/e2e/http-persistence.spec.ts` › "a permanent rejection explains the reason and leaves the Space available" assert the sentence word for word.
+
+**Options.**
+- **(a) Reword.** `forbidden` reads, for example, "This change was refused because it did not come from InfinityCube's own page. Open the Space from its own address and try again." The three tests change with the sentence. No ADR needed: a sentence's words are the application's (ADR 0057).
+- **(b) Leave it.**
+
+**Recommendation: (a).** The current sentence names a cause that cannot occur. Consequence: UI-89 gains a note that the `forbidden` sentence names the cross-site cause, marked **bug: code differs** until the code changes.
+
+### C7. Whether a sentence an author reads writes Space capitalised
+
+**Decision requested (raised 20 November 2026, from the Editing topic's review; split from C6).** Should every sentence an author reads write Space and Space Resource capitalised, as it writes Resource, Map and Graph?
+
+**Rules affected:** UI-111 (what a person reads says Space).
+
+**The competing claims.**
+- ADR 0164: "What a person is shown is a Space. Every control, dialog, message ... says Space." `CONTEXT.md` writes domain terms capitalised ("Capitalised Map names the entity", for Map). ADR 0164 decides the word, not its case.
+- The application's refusal and persistence sentences write "space" and "space resource" in lower case: "Two spaces in this edit share one identity.", "A space resource points at a Map that no longer exists.", "A newer version of this space is available. ...", "counting every space it includes", and the `forbidden` sentence. In the same sentences Resource, Map and Graph are capitalised.
+
+**What the code and tests do.** No test asserts a case for "space".
+
+**Options.**
+- **(a) Capitalise.** Every sentence writes Space and Space Resource as `CONTEXT.md` does, and UI-111 says so. No ADR needed: the case follows the glossary.
+- **(b) Leave the case alone** as outside ADR 0164.
+
+**Recommendation: (a).** Lower-case "space" beside capitalised Resource, Map and Graph reads as a different word from the Space ADR 0164 says a person is shown. Consequence: UI-111 gains a capitalisation clause marked **bug: code differs**.
+
 
 Closed by the rulings of 12 November 2026 (DECISIONS, Checkpoint 3 rulings). The code changes they call for are listed under "Bugs" in [../ui.md](../ui.md). The text below each heading is the conflict as it was raised.
 

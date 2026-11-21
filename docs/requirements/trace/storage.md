@@ -436,3 +436,23 @@ Added 15 November 2026. These ADRs had no row in any trace. Each has one outcome
 | 0061 TypeScript 7 is the compiler and TypeScript 6 a bridge | sent → PROC: an engineering rule, owned by `docs/agents/build-tooling.md` |
 | 0062 the narrowing assertions we have are the most we will have | sent → PROC: an engineering rule, owned by `docs/agents/anti-slop.md` |
 | 0088 "Aggregate" names the Meta-rooted collection; one Space with its Resources is a Space snapshot | vocabulary → GL (`CONTEXT.md`, "Aggregate" and "Space snapshot"); ST uses both terms as defined (storage.md, Terms) |
+
+## 7. Refresh of 20 November 2026
+
+Added in the refresh against `d461223`, which advanced the marker from `9e9b094`. The rules below were written into `storage.md` with the code that built them, between the two markers; the refresh checked each against its ADR and the code at `d461223`. Basis: source-stated unless marked.
+
+| Source | Disposition |
+|---|---|
+| 0155 a Rust host replaces every server-side host; Tauri is the desktop shell | → ST-113–ST-116 (the Node sidecar, kept as the production Node host the HTTP conformance suite holds others to), ST-119 (the host library), ST-120 (the CLI), ST-121 (the shell and its URI scheme), ST-122 (the close question, as built). Retained |
+| 0156 each runtime has one intake, held to one conformance suite | → ST-22 (one intake per runtime), ST-117 (located refusals, the corpus), ST-118 (the Rust intake), ST-39 and ST-90 (agreement by kind and location, not wording). Retained |
+| 0157 WebKit joins Chromium under the browser floor | reviewed, decides nothing here: owned by UI (UI-110) |
+| 0158 a Mermaid Resource draws its diagram inside its plugin | → ST-34 for the asset half only (`mmd`, `text/vnd.mermaid`); the kind and its content are SR's |
+| 0160 JSON text holds no lone surrogate in either runtime | → ST-22 (`parseJsonText`, a file refused `invalid-json`), ST-77 (a commit body 400 `invalid-request`, "Malformed JSON in request body"), ST-118 and ST-119 (the Rust side, and the 512-level nesting limit kept as the one known difference). Retained |
+| 0161 both hosts refuse a cross-site change | → ST-123. Retained. The browser's reading of `forbidden` as permanent is ST-101/ST-102 (already built) |
+| 0162 every host locks the Aggregate directory it runs | → ST-124, refining ST-64 (the lock file beside an unchanged directory) and ST-66 (two runs refused rather than left to git). The refresh added to ST-124 that the lock is released when Import refuses the directory, as the ADR says and `startRun` (`src/run/run.ts`) does. `journal_mode = MEMORY` is code detail, not restated. Retained |
+| 0163 (proposed) a closing Aggregate waits ten seconds, then asks | not incorporated: proposed. ST-122 restates the same rule from code and tests; it cites 0163 once 0163 is accepted |
+| 0164 "talk" is retired; a person is shown a Space | vocabulary: storage.md, this trace and conflicts/storage.md say Aggregate for the directory, its run, its origin and its lock, and Space for what a person is shown. The refresh replaced the word in closed conflict S2's record. Retained |
+
+Evidence citations corrected in the refresh: the HTTP conformance cases are written in tables under `conformance/http/` (`wire-cases.ts`, `store-condition-cases.ts`, `process-cases.ts`) and run by each host's test file, which holds no titles of its own. ST-65, ST-77, ST-81, ST-114 and ST-123 now name each case and its table rather than citing it with › against a file that does not hold it, and the doc's path rule puts `src/`, `crates/` and `conformance/` at the repository root. ST-81's store-condition case is run by the desktop handler (`test/unit/http-conformance-handler.test.ts`) and the Rust `Application` (`crates/host/tests/wire.rs`), not by the process suite.
+
+Ruling UI C5 (20 November 2026): the refusal a mount shares with the CLI says Space at both → ST-90 (bug: code differs); ui.md UI-111 owns the wording and lists every line. ADR 0162's Rust writer task owning the lock → ST-124.

@@ -6,7 +6,7 @@ Graph-native technical content: Resources live in spatial Maps and connect into 
 
 **Space**:
 An authored world of Resources, Maps and the Graphs each Map owns. Its name is independent of the Titles of Space Resources that refer to it.
-_Avoid_: talk, presentation, manifest, deck, document, canvas, board, file, subgraph, workspace.
+_Avoid_: talk, presentation (one run through a presented Graph, below), manifest, deck, document, canvas, board, file, subgraph, workspace.
 
 **Meta Space**:
 The one permanent Space, at the root of Space Resource ownership in an Aggregate.
@@ -253,6 +253,14 @@ _Avoid_: deck, slide, step, slideshow, playback, present mode.
 **Stage**:
 The Resource surface showing the Active Resource's content while Presenting, with no Map and no authoring.
 _Avoid_: slide, viewer, presenter view, canvas.
+
+**Presented Graph**:
+The Graph being presented: the Active Graph while Presenting.
+_Avoid_: talk, deck.
+
+**Presentation**:
+One run through a presented Graph, from a start to the next start or the end of Presenting.
+_Avoid_: talk, show.
 
 **Active Resource**:
 The Resource currently reached while Presenting, whose outgoing Edges in the Active Graph are the available forward moves.

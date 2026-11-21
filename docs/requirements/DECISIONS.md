@@ -18,7 +18,7 @@ These rulings do not bind on their own. ADRs bind (ADR 0145): a ruling that chan
 1. **Switching Graphs is an Edit.** It writes the Map's `activeGraph`. (Code differs today.) Recorded as ADR 0146.
 2. **Deleting a Graph:** the Map's saved Active Graph stays if it survives; otherwise the first survivor in list order becomes active and saved. This applies in every context, embedded included. (Code differs in the embedded case and while decision 1 is unbuilt.)
 3. **Opening a Space never writes the directory.** First-load initialization does not trigger an Export under `run`. (Code differs today.)
-4. **Mounted talks keep their edits across reload in browser storage (0132):** kept, not built. Today edits are lost on reload (0131).
+4. **Mounted Aggregates keep their edits across reload in browser storage (0132):** kept, not built. Today edits are lost on reload (0131).
 5. **Undo:** kept, not built. It reverses one whole Edit, and acts on the selected occurrence's Space (0112). Until it is built, an Edit is reversed only by another Edit.
 6. **Kept as not built:** kinds declare media types (0120); Default Content and CLI hard reset (0077); manual Graph reordering; keyboard access to a Resource's toolbar (0102); Auto-arrange. **Moved to open questions:** Edges between Spaces (0068, deferred by 0111).
 7. **SVG images (0107, proposed):** left out.
@@ -54,7 +54,7 @@ Ruled 12 November 2026, after an independent audit of each recommendation. Code 
 - **Navigation C3.** A `refused` save counts as rejected: Open Spaces marks it and Exit warns. Built.
 - **Rendering C1.** Open content that does not fit is clipped on the canvas. Markdown does not scroll there, and an embedded Map is placed at authored scale from its Resources' top-left, not shrunk to fit. To see more, the author resizes the Resource, or pans and zooms an embedded Map while its Space Resource is in Edit. Presenting still scrolls long Markdown. Recorded as ADR 0149.
 - **Space and Resources C1.** Stop measuring an image's natural size. The `naturalSize` field stays optional in the file format and nothing reads it. It is removed at the next deliberate format change, because the strict schema would otherwise refuse every saved image. Bug: code differs (the code still measures). Recorded as ADR 0150.
-- **Storage S2.** The format rolls forward because InfinityCube is unreleased and makes no compatibility promise for any copy outside the repository. An Aggregate directory is recovered from git or read with the build that wrote it. A browser's stored copy of a mounted talk (not built) may be unreadable after a deploy. Recorded as ADR 0152.
+- **Storage S2.** The format rolls forward because InfinityCube is unreleased and makes no compatibility promise for any copy outside the repository. An Aggregate directory is recovered from git or read with the build that wrote it. A browser's stored copy of a mounted Aggregate (not built) may be unreadable after a deploy. Recorded as ADR 0152.
 - **UI C1 is closed with no ruling.** The code already refuses a connection released on another drawing with wording ("An Edge can connect Resources only within the same drawn Map."), and two end-to-end tests assert it. The ADR and the code agree.
 - **UI C2.** Remove from Map asks first only when it would delete Edges, and the question names the Graphs that lose them. Otherwise it removes at once. This applies from the menu and from the Delete key, embedded drawings included, and overrules the ticket that said Remove from Map is not a deletion. Bug: code differs.
 - **UI C3.** Wherever a sentence quotes a Title, it uses the short Title: the first line, plus "…" when more lines follow. This covers questions, notices and Edge labels and their accessible names. Controls, list rows and chrome use the first line alone. Notices that quote the bare name are bugs. Recorded as ADR 0151.
@@ -77,3 +77,12 @@ When ruling 8 was reversed, every ruling above that changes what an accepted ADR
 | UI C4. A permanent rejection is a dialog that takes focus | 0042's "None steals focus" for a permanent rejection | ADR 0154 | UI-93 |
 | Storage S2. No compatibility promise for a copy outside the repository | the reason 0054 and 0056 give for rolling forward | ADR 0152 | ST-36 |
 | 8. (reversed) | 0115 | ADR 0145, which supersedes 0115 | `README.md`; every doc's snapshot marker |
+
+## Refresh rulings (20 November 2026)
+
+Ruled by the maintainer on the snapshot refresh against `d461223`, each taking the recommended option. None changes what an accepted ADR decides, so none is recorded as an ADR; each conflict file keeps the disagreement, the options and the evidence.
+
+- **Rendering C3.** An Open Mermaid diagram wider than its rect is clipped, as ADR 0149 states for Open content; a diagram is not the picture 0149 excepts. RD-5 (bug: code differs until the plugin sets `useMaxWidth: false`), SR-67.
+- **UI C5.** The refusal a mount shares with the CLI says Space, on the page and at the CLI, keeping ADR 0130's one wording and meeting ADR 0164. UI-111, ST-90 (bug: code differs).
+- **UI C6.** A save refused `forbidden` names the cross-site cause (ADR 0161), never a permission. UI-89 (bug: code differs).
+- **UI C7.** A sentence an author reads writes Space and Space Resource capitalised, as `CONTEXT.md` does. UI-111 (bug: code differs).

@@ -297,7 +297,7 @@ The rule ids in `../navigation.md` are append-only from this version on.
 
 ## 5. Code only (drafting rule 5)
 
-NV-7, NV-9, NV-10, NV-11 (no source names the shared selection beyond 0112's sentence), NV-14, NV-17, NV-18, NV-28, NV-32, NV-33, NV-34, NV-35, NV-37, NV-43–NV-45 (Opener and Meta listing: `CONTEXT.md` and 0112's mention only), NV-56, NV-58, NV-63, NV-64 (chrome contents), NV-65, NV-66, NV-71, NV-73 (moves preview and timer, beyond 0129's "names the chosen Graph"), NV-75, NV-76, NV-89–NV-91, NV-81 (its "opening uses the live session" part), NV-83, NV-85 (the size rejection and blocked recovery), NV-87 (the URL reopening). Since the baseline: NV-65's Page Down, Page Up and Home and NV-91's page keys (no ADR or guide states them), and NV-61's leaving out a first heading that repeats the name.
+NV-7, NV-9, NV-10, NV-11 (no source names the shared selection beyond 0112's sentence), NV-14, NV-17, NV-18, NV-28, NV-32, NV-33, NV-34, NV-35, NV-37, NV-43–NV-45 (Opener and Meta listing: `CONTEXT.md` and 0112's mention only), NV-56, NV-58, NV-63, NV-64 (chrome contents), NV-65, NV-66, NV-71, NV-73 (moves preview and timer, beyond 0129's "names the chosen Graph"), NV-75, NV-76, NV-89–NV-91, NV-81 (its "opening uses the live session" part), NV-83, NV-85 (the size rejection and blocked recovery), NV-87 (the URL reopening). Since the baseline: NV-65's Page Down, Page Up and Home and NV-91's page keys (no ADR or guide states them), and NV-61's leaving out a first heading that repeats the name. Since `9e9b094`: NV-73's notice that the presentation has reached a Resource with no move.
 
 ## 6. Code notes (not requirements)
 
@@ -313,6 +313,8 @@ NV-7, NV-9, NV-10, NV-11 (no source names the shared selection beyond 0112's sen
 - **Stale comment.** `navigation.ts` (`advance`) says presenting admits "a pointer connection". The Stage offers no authoring (NV-60), so the comment predates the Stage.
 - **`continueInMap`'s refusal** throws for a Graph the adopted Map does not draw; no product path reaches it.
 - **`destinationOpening`** opens the Space at its default Map for a `notes` destination; only a caller outside startup reaches it.
+- **Notes window heading.** `NotesWindow.tsx` heads the window with the presented Graph's name, from the view's `presentedGraph` (ADR 0164's rename of `talk`); no test asserts the heading.
+- **Presentation channel.** `browser-presentation-channel.ts` `presentationChannelName` names one `BroadcastChannel` per Space id, with the mounted scope beside it (NV-77). A channel reaches only its own origin, which is what keeps two desktop Aggregates apart (NV-75, ST-121).
 
 ## 7. Sources since the baseline
 
@@ -345,3 +347,37 @@ Added 15 November 2026. These ADRs had no row in any trace. Each has one outcome
 | 0055 (superseded) name the canvas renderer, not its control | historical: superseded by 0068; the canvas is drawn by the selected Map (0079), so no renderer identity survives |
 | 0072 (superseded) canvas renderer identity is the Space View Id | historical: superseded by 0079, which retired Views |
 | 0071 native `Uint8Array` base64 and hex codecs set the platform floor (Node 26.8.1; ES2025 plus `ESNext.TypedArrays`; no fallback or polyfill) | sent → PROC: an engineering rule, owned by `docs/agents/build-tooling.md`. It refines 0069, whose ids NV states; NV states no codec |
+
+## 9. Sources since `9e9b094`
+
+Added 20 November 2026, reconciling against `d461223`. The doc's marker had claimed ADRs through 0164 at `9e9b094` without these rows. Navigation code since `9e9b094` changed only in wording (ADR 0164's sweep: `navigation.ts`, `presenting-window.ts`, `presenting-commands.ts`, `key-bindings.ts`, `notes-window.ts`, `NotesWindow.tsx`, `graph/src/presentation-notes.ts`) and in the Notes window's end notice; `open-spaces.ts`, `browser-location.ts`, `browser-history.ts`, `destination-coordination.ts`, `presentation-link.ts` and `http/src/product-destination.ts` are unchanged, so NV-82's bug stands. Every test this doc cites resolves at `d461223`.
+
+| Source | Disposition |
+|---|---|
+| 0155 the Rust host serves the product addresses (`/` and `/spaces/…`) unchanged on the wire, with the same statuses | → NV-80 (pointer); the host's product resolution is ST-119, its statuses ST-81, ST-82 |
+| 0155 the Tauri application opens one Aggregate directory per window through a custom URI scheme | sent → ST (ST-121). Its consequence here, that a Notes window opens under its Aggregate's origin, → NV-75 (pointer), NV-25 (a Space window opens where `/` redirects) |
+| 0157 WebKit joins Chromium; the product-URL codec (0069) needs the native codecs | sent → UI (UI-110). No navigation rule changes: NV-20's spelling is unchanged |
+| 0158 a Mermaid Resource draws its diagram with Mermaid inside its plugin | → NV-61 (Mermaid line and its evidence, added in `b7895fe` after `9e9b094`, with ADR 0158 among its sources) |
+| 0161 both hosts refuse a cross-site change; product addresses, which answer a write 405, are not judged | sent → ST (ST-123). Navigation writes nothing, so no rule here changes |
+| 0156 each runtime has one intake, held to one conformance suite | reviewed: decides nothing in this doc's scope |
+| 0159 the two intakes report one refusal for one input: order and repeated ids | reviewed: decides nothing in this doc's scope |
+| 0160 JSON text holds no lone surrogate in either runtime | reviewed: decides nothing in this doc's scope |
+| 0162 every host locks the Aggregate directory it runs | reviewed: decides nothing in this doc's scope |
+| 0163 (proposed) a closing Space window waits ten seconds for its last write, then asks | not incorporated (proposed). ST-122 restates the built behaviour |
+| 0164 "talk" names nothing | applied throughout: the rename (`fef8de1`, `379608b`) left no occurrence in this doc, its trace or its conflicts |
+| 0164 what a person is shown is a Space; Aggregate never on screen | no rule here: wording is UI's. This doc uses Aggregate only for the directory, its run and its origin (NV-75, "Not here") |
+| 0164 a window the desktop application opens on a folder is a Space window | → Terms (`CONTEXT.md` defines it), "Not here" (ST-121), NV-25 |
+| 0164 Aggregate for the directory, its run, its origin or its lock; two Aggregates share no origin, two Spaces of one Aggregate do | → NV-75 (a Notes window hears only its own origin), "Not here" ("a mounted Aggregate") |
+| 0164 what is presented is a presented Graph; one run through it is a presentation | → Terms ("Presented Graph", "Presentation"), NV-57, NV-67, NV-68, NV-73 |
+| 0164 the Notes window's view names the presented Graph's Title `presentedGraph` | code note (§6) |
+| 0164 a fixture's presented Graph Title is `demo` | presentation-only: NV-67's example reads "Intro Demo" |
+| Code since `9e9b094`: the Notes window says "This is the end of the presentation." at a Resource with no move | → NV-73 (code only, §5) |
+
+## Refresh to `9674ba8` (21 November 2026)
+
+Merging `main` at `88ac304` brought ADRs 0165 and 0166, both Storage's.
+
+| ADR | Disposition |
+|---|---|
+| 0165 Prisma Next and sqlx apply one schema history in two encodings, held equal by tests | reviewed: decides nothing in this doc's scope; storage.md ST-125 |
+| 0166 a preview build is not a release | reviewed: decides nothing in this doc's scope; storage.md ST-36 |

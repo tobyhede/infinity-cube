@@ -6,7 +6,7 @@ For audit only. Every source rule appears exactly once in §1–§4, with one of
 - **dropped**: with the reason.
 - **sent → DOC**: it belongs to another doc.
 
-§5 groups the sends by receiving doc. §6 lists the code-only rules, §7 holds code notes. §8 traces the sources added or changed on main after the baseline (`797b2908`), which the doc was brought up to on 13 November 2026; image replacement in §1–§4 now lands on the exclusive-work rules, which §8 traces.
+§5 groups the sends by receiving doc. §6 lists the code-only rules, §7 holds code notes. §8 traces the sources added or changed on main after the baseline (`797b2908`), which the doc was brought up to on 13 November 2026; image replacement in §1–§4 now lands on the exclusive-work rules, which §8 traces. §9 records the refresh of 20 November 2026, from the old marker `d14ff974` to `d461223`.
 
 Abbreviations:
 - "EP n" is a bullet of the old guide `docs/adr/archive/agent-guides/editing-and-persistence.md`, by line number.
@@ -377,3 +377,31 @@ The ADRs below are in `docs/adr/` and bind; this section records where the snaps
 | 0126 "Refined by: 0142" and other status lines | dropped: status lines, no rule |
 | Code only (drafting rule 5): an asset upload also ends when its answer never finishes arriving; a Replace reads a picture's declared size and loads nothing to measure it | → ED-72 |
 | Code only: a creation that asked to run alone withholds a second press of the same Create, and another kind's stays offered | → ED-33 |
+
+## 9. Refresh from `d14ff974` to `d461223` (20 November 2026)
+
+The old marker named `d14ff974` and ADRs through 0157, but no row traced 0155–0157; this section reviews them with the ADRs accepted since. 116 commits lie between the two revisions. In this topic's code (`packages/persistence/src/session.ts`, `session-registry.ts`, `packages/app/src/space-authoring.ts`, the plugin host and the authoring callers) they change comments and types only: `CommitOutcome` takes the form of its Space errors as a parameter, and two comments now cite ED-31 and RD-72 in place of retired guides. Every code and test citation in `../editing.md` was re-resolved at `d461223`: the line citations in ED-32, ED-78 and ED-79 still name the code they describe, and `check-evidence.py` finds every test title. No rule's status changes. Basis: source-stated unless the row says proposed.
+
+| Source | Disposition |
+|---|---|
+| 0155 the desktop application on a Node sidecar, then a Rust host serving the same HTTP contract unchanged on the wire; a window Exports before it closes | sent → ST (ST-113–ST-122). Nothing in the browser's Edit lifecycle changes: the browser, its typed client and its sessions are untouched (0155, "The browser, its typed client and the Mount build do not change") |
+| 0156 each runtime has one intake, held to one conformance suite | sent → ST (ST-22, ST-117, ST-118). ED-4's "validates the result through intake" is the browser runtime's intake, which 0156 leaves unchanged |
+| 0157 WebKit joins Chromium under the browser floor | sent → PROC (build-tooling.md) and ST. Decides no Edit behaviour |
+| 0158 a Mermaid Resource's Edit is the Markdown Resource's, under a Claim, in the host's source editor | → ED-80 (one more example of a Claim). The kind itself sent → SR; what it draws → RD |
+| 0159 a commit's candidate is judged ascending by Space id, and repeated ids are one fault | sent → ST (ST-117), SR (SR-6, SR-30), MG (MG-86). ED-59 needs no change: the browser's pre-check calls the same `decideCommit` (`persistence/src/commit-decision.ts`), so its refusal follows the same order |
+| 0160 JSON text holds no lone surrogate in either runtime | sent → ST (ST-22, ST-77, ST-118, ST-119). A commit body refused this way is a 400 `invalid-request`, a permanent `invalid-commit` (ST-101), which ED-46 already covers |
+| 0161 both hosts refuse a cross-site change 403 `forbidden`; "the browser transport already reads `forbidden` as a permanent failure" | rule sent → ST (ST-123). Its effect on a session folded → ED-46: a permanent failure, `rejected`, with no new status or recovery. Evidence: `http/src/backend.ts` maps `forbidden` to `permanent-failure`; `persistence/test/session.test.ts` › "disables retry after permanent failure but allows a later valid submit" drives a `forbidden` failure |
+| 0162 every host locks the Aggregate directory it runs | sent → ST (ST-124, ST-64, ST-66). Decides no Edit behaviour |
+| 0163 (proposed) a closing window waits ten seconds for its last write, then asks | dropped: proposed (drafting rule 3). ST-122 restates what is built |
+| 0164 "talk" is retired; Aggregate in requirements for the directory, run, origin or lock | applied: `../editing.md` used no "talk"; "candidate aggregate" and "stored aggregate" (statuses table, ED-48, ED-58) now read Aggregate, the `CONTEXT.md` term for all Spaces together |
+| Status lines added to 0042 ("Refined by: 0154"), 0126 ("Refined by: 0150") and 0142 ("Refined by: 0158") | dropped: status lines, no rule. 0154 and 0150 were traced by the rewrite (UI-93 holds 0154; ED-72 cites 0150) |
+| `app/src/authoring-refusal.ts` words `forbidden` "You do not have permission to save this space." | not ED's: the wording is UI's (ED-44 points there). Proposed: after 0161 the one way the product's page meets a 403 is a page that is not the product's, and 0164 has a person shown "Space"; returned to the UI owner rather than recorded as a conflict here |
+
+## Refresh to `9674ba8` (21 November 2026)
+
+Merging `main` at `88ac304` brought ADRs 0165 and 0166, both Storage's.
+
+| ADR | Disposition |
+|---|---|
+| 0165 Prisma Next and sqlx apply one schema history in two encodings, held equal by tests | reviewed: decides nothing in this doc's scope; storage.md ST-125 |
+| 0166 a preview build is not a release | reviewed: decides nothing in this doc's scope; storage.md ST-36 |

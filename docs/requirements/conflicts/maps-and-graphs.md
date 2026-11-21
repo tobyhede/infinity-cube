@@ -12,3 +12,5 @@ Every Maps and Graphs conflict is closed by the "Checkpoint 2 rulings" in [../DE
 - **C5. Closed** before checkpoint 2. 0091 ("resulting surviving Graph") with DECISIONS 2 settles it. See MG-56 (bug).
 - **C6. Closed by ruling C6 and drafting rule 5.** The numbering details (MG-10, MG-42), the menu step-off (MG-18) and the colour choice and fallback (MG-48) are confirmed as built, code only. Recolour compares with the drawn colour: MG-49 (bug).
 - **C7. Closed by ruling C7.** An Edit whose own change is nothing is unchanged and writes nothing. See MG-83 (bug).
+
+The refresh against `d461223` (20 November 2026) found no new conflict: the Rust intake and host agree with the TypeScript ones on every rule here, MG-8's gap included, and ADRs 0155 to 0164 change no Maps and Graphs rule.

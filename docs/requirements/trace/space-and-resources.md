@@ -10,7 +10,7 @@ For audit only. Every source rule appears exactly once in §1–§3, with one of
 
 Abbreviations: "rN" is the Nth rule of an ADR as numbered in the rewrite's mapping tables (`map-*.md`). Those tables were never committed, so a number cannot be looked up, and the numbers do not follow the order of the ADR's text (0028's r1, "activation is not an Edit", is the second rule its text states). Resolve a row by its description, which names the claim, and find that claim in the ADR in `docs/adr/` or `docs/adr/superseded/`. "DEC n" is ruling n in `../DECISIONS.md`. A ruling that changes what an accepted ADR decides is recorded as an ADR (DEC 1, C1 and C2 as ADR 0146; C3 as 0147; Navigation C2 as 0148; Rendering C1 as 0149; Space and Resources C1 as 0150; UI C2 as 0153; UI C3 as 0151; UI C4 as 0154; Storage S2 as 0152), and that ADR is what binds; `../DECISIONS.md`, "Rulings recorded as ADRs", lists them. A row below that says a rule was "struck" or "overruled" by a ruling means the ADR that records the ruling refines the source ADR. Docs: MG maps-and-graphs.md, ED editing.md, ST storage.md, RD rendering.md, UI ui.md, NV navigation.md, GL `CONTEXT.md`, PROC process docs. "E&P" is `docs/adr/archive/agent-guides/editing-and-persistence.md`; "ARC" is `docs/adr/archive/agent-guides/authoring-refusal-cascade.md`.
 
-The rule ids in `../space-and-resources.md` are append-only from this version on. The pass that brought this doc up to the InfinityCube code (after ADRs 0136–0144) added SR-62–SR-66 and rewrote SR-8, SR-9, SR-15–SR-22, SR-24–SR-30, SR-33, SR-36, SR-39, SR-49 and SR-52 for the Resource plugins and assets. SR-19 moved from **not built** to **built**.
+The rule ids in `../space-and-resources.md` are append-only from this version on. The pass that brought this doc up to the InfinityCube code (after ADRs 0136–0144) added SR-62–SR-66 and rewrote SR-8, SR-9, SR-15–SR-22, SR-24–SR-30, SR-33, SR-36, SR-39, SR-49 and SR-52 for the Resource plugins and assets. SR-19 moved from **not built** to **built**. The refresh of 20 November 2026, against `d461223`, rewrote SR-15 for ADR 0156 and pointed SR-67 to MG-27 for ADR 0158's size hint; it added and removed no rule.
 
 ## 1. ADRs
 
@@ -210,6 +210,22 @@ The rule ids in `../space-and-resources.md` are append-only from this version on
 | 0144 a Space row authors a new Space Resource framing its Space, never an existing one | → SR-66 |
 | 0144 the list withholds a Space row while an unplaced Space Resource frames that Space; placed elsewhere does not withhold; decided over the source; count and empty sentence | sent → UI |
 | 0144 rejected options; cost | dropped: rejected alternatives and a cost |
+| 0156 each runtime has one intake (TypeScript `loadSpace`, the Rust `intake` crate), held to one conformance corpus by kind and location, not words; refines 0010 | sent → ST (ST-22, ST-39, ST-90, ST-117, ST-118) |
+| 0156 a plugin's Rust module and one entry in the Rust plugin list, beside the one line in each half of `packages/plugins` | → SR-15 (reconciled 20 November 2026 at `d461223`: the Rust intake exists, so the rule no longer waits on it; evidence gains the Rust list-order test) |
+| 0156 the corpus is written against the TypeScript intake first; rejected options | dropped: a delivery order and rejected alternatives |
+| 0158 a Mermaid Resource (`mermaid`) is the Markdown Resource in every way but what it draws: `{ url }` naming an asset, Map content `{ open }`, created empty from the Command Dock, Edit under a Claim in the host's source editor, Save with `\n` endings, may be a Target | → SR-67, SR-15 (the sixth listed plugin), SR-36 (created empty from a press) |
+| 0158 Opening carries a size hint at the reading width, or none where Mermaid has not drawn within the load wait (amended 17–18 November 2026) | sent → MG (MG-27). SR-67 points there |
+| 0158 drawn with the Mermaid library itself, a view-half dependency fetched on first draw; the Resource API gains no diagram renderer | → SR-67 |
+| 0158 the SVG is inserted into the rect: DOMPurify and the `strict` level, set explicitly; error drawing suppressed, a failure said in Mermaid's words; an empty or whitespace-only source is an empty-diagram note naming Edit where offered; laid out in an unseen element inside the rect (amended 17–18 November 2026) | → SR-67. That it does not draw through the host's Markdown renderer sent → RD (RD-6) |
+| 0158 "Diagram" names what Mermaid draws, inside the plugin's package only; the vocabulary guard's exemption | sent → GL (`CONTEXT.md`, Mermaid Resource) and PROC (`test/unit/current-domain-vocabulary.test.ts`) |
+| 0158 drawn in the rect's `color-scheme` (`neutral` light, `dark` dark); a theme the source chooses is kept in either; the source drawn as written, the theme set in Mermaid's settings before each draw; re-read when the document root's attributes or the browser's preference change (amended 17–18 November 2026) | → SR-67 |
+| 0158 stored as `text/vnd.mermaid`, a new file exported as `assets/<hash>.mmd`; the media type stored first stands | → SR-67 (the media type and the new file's name). The extension table and the kept name sent → ST (ST-34) |
+| 0158 rejected options; cost (duplicated edit code, Markdown highlighting, test stand-in); negatives | dropped: rejected alternatives and costs. The negatives (no renderer in the Resource API, never below `strict`) are restated by SR-67 |
+| 0157 WebKit joins Chromium under the browser floor | reviewed: decides nothing in this doc's scope |
+| 0160 JSON text holds no lone surrogate in either runtime | reviewed: decides nothing in this doc's scope |
+| 0161 both hosts refuse a cross-site change | reviewed: decides nothing in this doc's scope |
+| 0162 every host locks the Aggregate directory it runs | reviewed: decides nothing in this doc's scope |
+| 0164 "talk" names nothing; a person is shown a Space; requirements say Aggregate for the directory, its run, origin and lock; a presented Graph | reviewed 20 November 2026: this doc never used "talk". Its prose uses of the Aggregate (SR-6, SR-56, SR-64) now spell the `CONTEXT.md` term with a capital, a wording change. The rest decides nothing here: sent → UI, NV, ST |
 
 ## 2. Guides
 
@@ -363,7 +379,8 @@ Behaviour the code implements and a test asserts, with no source against it (dra
 - **`newSpace`** titles the Space `New space`; Create Space Resource passes `Space N` to `initializeSpace` (`graph/src/new-space.ts`).
 - **Residue name.** `SpaceView`, `selectSpaceView` and `frameSpaceView` in `core` keep the retired Space View term for a Space Resource's selection.
 - **Resource order tie-break.** `graph/src/space.ts` sorts by Title, then id; no test has two equal Titles, so SR-10 states only the Title order.
-- **Starts empty.** Only Markdown and Ur declare starting content (`newContent`), which is what makes them creatable from a press (`core/test/plugin-modules.test.ts` › "are the plugins that declare new content, in list order").
+- **Starts empty.** Markdown, Ur and Mermaid declare starting content (`newContent`), which is what makes them creatable from a press (`core/test/plugin-modules.test.ts` › "are the plugins that declare new content, in list order").
+- **Two orders over a Space's Resources.** SR-10's order is `localeCompare` on Title, then id (`graph/src/space.ts`); the cross-Space cycle walk follows Title, then id, by code unit (`compareOrdinal`, `graph/src/ordinal.ts`; ADR 0159, storage ST-117). ADR 0159 keeps SR-10's order as it is.
 
 ## 8. ADRs with one disposition throughout
 
@@ -376,3 +393,14 @@ Added 15 November 2026. These ADRs had no row in any trace. Each has one outcome
 | 0059 (superseded) a Space Card creates the normal new Space | historical: superseded by 0068, traced in §1 |
 | 0060 (superseded) a nested Space has one owner | historical: superseded by 0068, traced in §1 |
 | 0085 Thing and Diagram are the first-public names for Card and Layout | historical vocabulary: its names were replaced by 0092 (Reference) and 0101 (Resource and Map), and it restates the invariants of earlier ADRs rather than deciding them. What survives is held elsewhere: the names are GL (`CONTEXT.md`), and `LayoutStrategy` keeping its name is the code's (`graph/src/layout.ts`), not a requirement |
+
+## Refresh to `9674ba8` (21 November 2026)
+
+Merging `main` at `88ac304` brought ADRs 0165 and 0166, both Storage's.
+
+| ADR | Disposition |
+|---|---|
+| 0165 Prisma Next and sqlx apply one schema history in two encodings, held equal by tests | reviewed: decides nothing in this doc's scope; storage.md ST-125 |
+| 0166 a preview build is not a release | reviewed: decides nothing in this doc's scope; storage.md ST-36 |
+
+Ruling Rendering C3 (20 November 2026): a wide Mermaid diagram is clipped. Owned by rendering.md RD-5; SR-67 links to it.
