@@ -73,6 +73,7 @@ When ruling 8 was reversed, every ruling above that changes what an accepted ADR
 | Space and Resources C1. Stop measuring an image's natural size | 0106's measurement on set, and 0126's bound on it | ADR 0150 | SR-26 |
 | UI C3. A sentence quotes a Title by its short Title | 0083's "the first line and nothing else" for sentences | ADR 0151 | UI-99 |
 | UI C2. Remove from Map asks first only when Edges would go | 0074's "asks first wherever authored work would be lost" for Remove from Map | ADR 0153 | UI-85 |
+| Storage S3 (20 November 2026). Prisma Next applies its own packages and `sqlx` the plain-SQL files, held equal by tests | 0155's "plain SQL files that Prisma … all apply" | ADR 0165 | ST-125 |
 | UI C4. A permanent rejection is a dialog that takes focus | 0042's "None steals focus" for a permanent rejection | ADR 0154 | UI-93 |
 | Storage S2. No compatibility promise for a copy outside the repository | the reason 0054 and 0056 give for rolling forward | ADR 0152 | ST-36 |
 | 8. (reversed) | 0115 | ADR 0145, which supersedes 0115 | `README.md`; every doc's snapshot marker |
