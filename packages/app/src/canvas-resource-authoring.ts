@@ -30,21 +30,15 @@ import type { PluginHost } from './plugin-host/plugin-commits';
 import type { PluginGate } from './plugin-host/plugin-gate';
 import { usePluginGate } from './plugin-host/plugin-gate-context';
 import type { MapEmbedEntry } from './map-embedding/map-embeddings';
-import {
-  useMapEmbedding,
-  type MapEmbedding,
-  type MapEmbeddingState,
-} from './map-embedding/map-embedding';
+import type { MapEmbedding } from './map-embedding/map-embedding';
+import { useMapEmbedding } from './map-embedding/map-embedding-view';
 
 const NO_SUBSCRIPTION = () => () => undefined;
 const NONE_EMBEDDED: ReadonlyMap<string, MapEmbedEntry> = new Map();
 const NO_MAP_EMBEDS = () => NONE_EMBEDDED;
 /** Off a canvas: nothing is said about an embedding, and no rail is editing. */
-const NO_EMBEDDING: Pick<MapEmbeddingState, 'notices' | 'railEditing'> = {
-  notices: new Map(),
-  railEditing: new Set(),
-};
-const NO_EMBEDDING_STATE = () => NO_EMBEDDING;
+const NO_NOTICES: ReadonlyMap<string, string> = new Map();
+const NO_RAIL_EDITING: ReadonlySet<string> = new Set();
 
 type Caret = { readonly resourceId: string; readonly field: 'title' } | null;
 
@@ -189,9 +183,15 @@ export function useCanvasResourceAuthoring({
     mapEmbedding?.embeddings.subscribe ?? NO_SUBSCRIPTION,
     mapEmbedding?.embeddings.getState ?? NO_MAP_EMBEDS,
   );
-  const { notices: contextNotices, railEditing } = useSyncExternalStore(
+  // Each read on its own, so a framing draft published on every pan move does
+  // not draw this composition again.
+  const contextNotices = useSyncExternalStore(
     mapEmbedding?.subscribe ?? NO_SUBSCRIPTION,
-    mapEmbedding?.getState ?? NO_EMBEDDING_STATE,
+    () => mapEmbedding?.getState().notices ?? NO_NOTICES,
+  );
+  const railEditing = useSyncExternalStore(
+    mapEmbedding?.subscribe ?? NO_SUBSCRIPTION,
+    () => mapEmbedding?.getState().railEditing ?? NO_RAIL_EDITING,
   );
   const contextEditing = nodes.some((node) => railEditing.has(node.id));
 
@@ -305,14 +305,14 @@ export function useCanvasResourceAuthoring({
     setCaret(null);
   }, []);
   const onContextEditingChange = useCallback(
-    (placement: string, editing: boolean) => {
-      mapEmbedding?.setRailEditing(placement, editing);
+    (nodeId: string, editing: boolean) => {
+      mapEmbedding?.setRailEditing(nodeId, editing);
     },
     [mapEmbedding],
   );
   const onContextReport = useCallback(
-    (placement: string, message: string | null, drawing?: symbol) => {
-      mapEmbedding?.setNotice(placement, message, drawing);
+    (nodeId: string, message: string | null, lifetime?: symbol) => {
+      mapEmbedding?.setNotice(nodeId, message, lifetime);
     },
     [mapEmbedding],
   );

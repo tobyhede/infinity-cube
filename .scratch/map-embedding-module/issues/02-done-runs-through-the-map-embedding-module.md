@@ -8,7 +8,7 @@ The module owns:
 - framing drafts and the 160ms zoom debounce;
 - the framing write through the embedding's own `select` commit, including the last-known request at unmount.
 
-Done flushes the framing, then selects, then forgets, in that order, inside the module. The canvas keeps its pan and wheel listeners, which report into the module through `pan`, `panEnd` and `zoom`, and it sends `drawn` from a layout effect. The canvas's layout effects for lend, flush, select and forget, and its framing-flush callback ref, are deleted.
+Done flushes the framing, then selects, then forgets, in that order, inside the module. The canvas keeps its pan and wheel listeners, which report into the module through `beginPan`, `draft`, `frame` and `zoom`, and it sends `drawn` from a layout effect. The canvas's layout effects for lend, flush, select and forget, and its framing-flush callback ref, are deleted.
 
 **Blocked by:** 01.
 

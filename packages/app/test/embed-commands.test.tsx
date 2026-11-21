@@ -99,6 +99,7 @@ const embedded = (request: Partial<MapEmbedRequest> = {}): ReadonlyMap<string, M
       {
         resourceId: EMBEDDING_ID,
         drawing: Symbol('embedding drawing'),
+        lifetime: Symbol('embedding lifetime'),
         request: {
           space: TARGET_SPACE_ID,
           view: choosing,
@@ -171,11 +172,11 @@ describe('decorateEmbedCommands', () => {
     expect(screen.getByRole('button', { name: 'Graph: Detail' })).toBeEnabled();
   });
 
-  it('answers a choice about the drawing it was made in', async () => {
-    // Closed and opened again before the answer lands, another drawing embeds
-    // there; the answer names its own so it says nothing to the new one.
+  it('answers a choice about the embedding it was made in', async () => {
+    // Closed and Opened again before the answer lands, another embedding
+    // stands there; the answer names its own so it says nothing to the new one.
     const mapEmbeds = embedded();
-    const drawing = mapEmbeds.get(EMBEDDING_ID)?.drawing;
+    const lifetime = mapEmbeds.get(EMBEDDING_ID)?.lifetime;
     const reports: unknown[][] = [];
     mountRail(
       decorateEmbedCommands(
@@ -193,7 +194,7 @@ describe('decorateEmbedCommands', () => {
     fireEvent.click(await screen.findByRole('menuitemradio', { name: /Collection 2/ }));
 
     await vi.waitFor(() => {
-      expect(reports).toEqual([[EMBEDDING_ID, null, drawing]]);
+      expect(reports).toEqual([[EMBEDDING_ID, null, lifetime]]);
     });
   });
 

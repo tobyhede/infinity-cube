@@ -27,13 +27,13 @@ export interface EmbedCommandsContext {
   readonly spaces: OpenSpaces | null;
   readonly commandOutcomes: CommandOutcomes | undefined;
   readonly deleteConfirmation: Pick<DeleteConfirmation, 'arm'> | undefined;
-  /** The Map embeddings drawn on this canvas, by placement. */
+  /** The Map embeddings drawn on this canvas, by node. */
   readonly mapEmbeds: ReadonlyMap<string, MapEmbedEntry>;
-  /** What the canvas says about each placement's embedding, by node id. */
+  /** What the canvas says about each node's embedding, by node id. */
   readonly contextNotices: ReadonlyMap<string, string>;
-  readonly onContextEditingChange: (placement: string, editing: boolean) => void;
-  /** Says `message` about the placement's embedding; passed the `drawing` a choice was made in, only while that drawing embeds there. */
-  readonly onContextReport: (placement: string, message: string | null, drawing?: symbol) => void;
+  readonly onContextEditingChange: (nodeId: string, editing: boolean) => void;
+  /** Says `message` about the node's embedding; passed the `lifetime` of the embedding a choice was made in, only while that embedding stands. */
+  readonly onContextReport: (nodeId: string, message: string | null, lifetime?: symbol) => void;
 }
 
 /**
@@ -87,9 +87,9 @@ export function decorateEmbedCommands(
     complete: (targetMap, graphId) => {
       if (commit === undefined) return null;
       // The answer is about the embedding the choice was made in.
-      const drawing = context.mapEmbeds.get(node.id)?.drawing;
+      const lifetime = context.mapEmbeds.get(node.id)?.lifetime;
       void commit({ ...view, map: targetMap.id, graph: graphId }).then((answer) =>
-        context.onContextReport(node.id, refusalOf(answer), drawing),
+        context.onContextReport(node.id, refusalOf(answer), lifetime),
       );
       return null;
     },

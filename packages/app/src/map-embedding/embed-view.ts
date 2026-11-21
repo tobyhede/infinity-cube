@@ -39,7 +39,7 @@ export function resolveEmbedView(
 /**
  * The view a framing is written with (ADR 0142): the plugin's own where it
  * names a Graph, since that is what the embedding draws; otherwise the Map and
- * Graph its placement drew from the shown Space, or the view's Map alone.
+ * Graph its node drew from the shown Space, or the view's Map alone.
  * `undefined` where neither names a Map.
  */
 export function framedView(

@@ -1,17 +1,20 @@
-import { useLayoutEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useLayoutEffect, useState } from 'react';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import type { EmbeddedRoot } from '../src/embedded-open-space-resource';
+import type { EmbeddedTargetReader } from '../src/map-embedding/map-embedding';
 import {
-  createMapEmbedding,
-  drawnEmbeddings,
-  type EmbeddedTargetReader,
-} from '../src/map-embedding/map-embedding';
+  useCanvasMapEmbedding,
+  useDrawnMapEmbeddings,
+} from '../src/map-embedding/map-embedding-view';
 import type { MapEmbedEntry } from '../src/map-embedding/map-embeddings';
 
+const NO_CLAIMS = { lend: () => () => undefined };
+const NO_SELECTION = () => undefined;
+
 /**
- * Draws `nodes` through one Map embedding as the canvas does: each placement's
- * plugin publishes what it asks of its embedding, the drawn embeddings are
- * derived during render, and every commit settles the module against them.
+ * Draws `nodes` through the Map embedding wiring the canvas uses
+ * (`useCanvasMapEmbedding`, `useDrawnMapEmbeddings`), with each node's plugin
+ * publishing what `embeds` asks of its embedding.
  */
 export function useDrawnEmbeddings(
   nodes: readonly ResourceFlowNode[],
@@ -20,15 +23,9 @@ export function useDrawnEmbeddings(
   dragging: ReadonlySet<string>,
   root: EmbeddedRoot,
 ) {
-  const [embedding] = useState(() =>
-    createMapEmbedding({
-      spaces,
-      claims: { lend: () => () => undefined },
-      select: () => undefined,
-    }),
-  );
+  const embedding = useCanvasMapEmbedding({ spaces, claims: NO_CLAIMS, select: NO_SELECTION });
   const registry = embedding.embeddings;
-  // One drawing per placement, as a plugin's drawing keeps its key while it is drawn.
+  // One drawing per node, as a plugin's drawing keeps its key while it is drawn.
   const [drawings] = useState(() => new Map<string, symbol>());
   useLayoutEffect(() => {
     for (const [nodeId, entry] of embeds) {
@@ -39,18 +36,12 @@ export function useDrawnEmbeddings(
     for (const [nodeId, entry] of registry.getState())
       if (!embeds.has(nodeId)) registry.publish(nodeId, entry.resourceId, null, entry.drawing);
   });
-  const published = useSyncExternalStore(registry.subscribe, registry.getState);
-  const state = useSyncExternalStore(embedding.subscribe, embedding.getState);
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- the root is a literal per render in these tests
-  const fixedRoot = useMemo(() => root, []);
-  const { requests, failed } = useMemo(
-    () => drawnEmbeddings(state, published, { nodes, dragging, root: fixedRoot }),
-    [state, published, nodes, dragging, fixedRoot],
-  );
-  useLayoutEffect(() => {
-    embedding.drawn({ placements: nodes.map((node) => node.id), requests });
-  }, [embedding, nodes, published, requests]);
-  useLayoutEffect(() => () => embedding.dispose(), [embedding]);
+  const { requests, failed } = useDrawnMapEmbeddings(embedding, {
+    nodes,
+    dragging,
+    root,
+    ready: true,
+  });
   return {
     embeddedRequests: requests,
     failedEmbeddings: failed,

@@ -918,7 +918,7 @@ describe('the Map an Open Space Resource draws', () => {
   });
 
   /**
-   * Portal Edit keeps `editingPlacements` populated after Present or a chrome
+   * Portal Edit keeps `editingEmbeds` populated after Present or a chrome
    * rename withdraws canvas authoring. Wheel must not keep writing framing.
    */
   it('does not author portal framing from wheel while presenting', async () => {
@@ -1093,7 +1093,7 @@ describe('the Map an Open Space Resource draws', () => {
 
   /**
    * Unmounting while a wheel is still pending must not leave the framing only
-   * in placementDrafts: cleanup flushes what has not landed.
+   * in embedDrafts: cleanup flushes what has not landed.
    */
   it('persists a pending portal zoom when the canvas unmounts before the debounce', async () => {
     const value = home({

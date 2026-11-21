@@ -44,6 +44,7 @@ export const publishedEmbeds = (
           {
             resourceId: node.data.resourceId,
             drawing: Symbol(node.id),
+            lifetime: Symbol(node.id),
             request: {
               space: view.spaceId,
               view: { map: view.map, graph: view.graph, framing: view.framing },

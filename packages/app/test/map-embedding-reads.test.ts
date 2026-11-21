@@ -38,6 +38,7 @@ const viewlessEmbed = (nodes: readonly ResourceFlowNode[]): ReadonlyMap<string, 
       {
         resourceId: node.data.resourceId,
         drawing: Symbol(node.id),
+        lifetime: Symbol(node.id),
         request: { space: TARGET, view: undefined, select: undefined, claim: undefined },
       },
     ]),

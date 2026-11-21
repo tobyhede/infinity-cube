@@ -33,14 +33,14 @@ const harness = () => {
   const commit = vi.fn<Commit>(() => Promise.resolve('completed'));
   const embedding = createMapEmbedding({ spaces: null, claims: { lend }, select });
   const drawing = Symbol('drawing');
-  /** The plugin's drawing on placement `node` publishes, as `CanvasMapEmbed` does. */
+  /** The plugin's drawing on node `node` publishes, as `CanvasMapEmbed` does. */
   const publish = (request: MapEmbedRequest | null, node = 'node') =>
     embedding.embeddings.publish(node, SPACE_RESOURCE, request, drawing);
-  /** The canvas commits with these placements drawn, each drawing its Space's target Map and Graph. */
-  const drawn = (...placements: string[]) =>
+  /** The canvas commits with these nodes drawn, each drawing its Space's target Map and Graph. */
+  const drawn = (...nodeIds: string[]) =>
     embedding.drawn({
-      placements,
-      requests: placements.map((id) => ({
+      nodeIds,
+      requests: nodeIds.map((id) => ({
         parent: { id },
         spaceId: TARGET,
         mapId: TARGET_MAP,
@@ -81,8 +81,8 @@ describe('a Map embedding authored in place', () => {
     expect(select).toHaveBeenCalledWith(SPACE_RESOURCE);
   });
 
-  it('selects nothing when the Edit ended because its placement went', () => {
-    // A Map switch, a delete or an unplace takes the placement down with the
+  it('selects nothing when the Edit ended because its node went', () => {
+    // A Map switch, a delete or an unplace takes the node down with the
     // embedding; selecting its Resource then would select one no longer drawn.
     const { select, given, drawing, publish, drawn } = harness();
     publish(ask({ claimed: true }));
@@ -169,9 +169,9 @@ describe('the framing authored on a Map embedding', () => {
     expect(commit).toHaveBeenCalledOnce();
   });
 
-  it('lands a zoom pending when the embedding is taken down on the Graph its placement drew', () => {
+  it('lands a zoom pending when the embedding is taken down on the Graph its node drew', () => {
     // The plugin passed a Map and no Graph, so the Graph is the one the
-    // placement drew, which the commit that takes it down no longer draws.
+    // node drew, which the commit that takes it down no longer draws.
     vi.useFakeTimers();
     const { embedding, commit, drawing, drawn } = harness();
     const noGraph: MapEmbedRequest = {
@@ -228,8 +228,8 @@ describe('the framing authored on a Map embedding', () => {
     expect(commit).toHaveBeenCalledOnce();
   });
 
-  it('frames the Map and Graph this placement draws where the plugin passed no Graph', () => {
-    // Another placement of the same Resource draws another Map; the framing
+  it('frames the Map and Graph this node draws where the plugin passed no Graph', () => {
+    // Another node of the same Resource draws another Map; the framing
     // must keep to the one drawn here.
     const { embedding, commit } = harness();
     const OTHER_MAP = uuidSchema.parse('00000000-0000-4000-8000-0000000000e5');
@@ -241,7 +241,7 @@ describe('the framing authored on a Map embedding', () => {
     embedding.embeddings.publish('first', SPACE_RESOURCE, noGraph, drawing);
     embedding.embeddings.publish('second', SPACE_RESOURCE, noGraph, Symbol('second'));
     embedding.drawn({
-      placements: ['first', 'second'],
+      nodeIds: ['first', 'second'],
       requests: [
         { parent: { id: 'first' }, spaceId: TARGET, mapId: OTHER_MAP, graphId: TARGET_GRAPH },
         { parent: { id: 'second' }, spaceId: TARGET, mapId: TARGET_MAP, graphId: TARGET_GRAPH },
@@ -319,23 +319,56 @@ describe('what the canvas says about a Map embedding', () => {
     expect(embedding.getState().notices.has('node')).toBe(false);
   });
 
-  it('says nothing for an answer to a choice made in an embedding since replaced', () => {
-    // Closed and opened again before the choice settled: the answer is about
-    // an embedding no longer drawn, so it neither sets nor clears a notice.
+  it('says nothing for an answer to a choice made in an embedding since Closed and Opened again', () => {
+    // A Closed Space Resource stays drawn, so Open again publishes with the
+    // same drawing; the answer is still about the embedding that was Closed.
     const { embedding, publish } = harness();
-    const before = Symbol('before');
-    embedding.embeddings.publish('node', SPACE_RESOURCE, ask(), before);
+    publish(ask());
+    const asked = embedding.embeddings.getState().get('node')?.lifetime;
     publish(null);
     publish(ask());
     embedding.setNotice('node', 'Now.');
 
-    embedding.setNotice('node', 'This choice is no longer offered.', before);
+    embedding.setNotice('node', 'This choice is no longer offered.', asked);
     expect(embedding.getState().notices.get('node')).toBe('Now.');
-    embedding.setNotice('node', null, before);
+    embedding.setNotice('node', null, asked);
     expect(embedding.getState().notices.get('node')).toBe('Now.');
   });
 
-  it('keeps another placement’s notice when one embedding goes', () => {
+  it('answers a choice while the embedding it was made in stands', () => {
+    const { embedding, publish } = harness();
+    publish(ask());
+    const asked = embedding.embeddings.getState().get('node')?.lifetime;
+    publish(ask({ claimed: true }));
+
+    embedding.setNotice('node', 'Refused.', asked);
+
+    expect(embedding.getState().notices.get('node')).toBe('Refused.');
+  });
+
+  it('drops a notice and rail editing when another drawing embeds there, withdrawn or not', () => {
+    const { embedding, publish } = harness();
+    publish(ask());
+    embedding.setNotice('node', 'Link copied.');
+    embedding.setRailEditing('node', true);
+
+    embedding.embeddings.publish('node', SPACE_RESOURCE, ask(), Symbol('another drawing'));
+
+    expect(embedding.getState().notices.has('node')).toBe(false);
+    expect(embedding.getState().railEditing.has('node')).toBe(false);
+  });
+
+  it('keeps no rail editing for a node that embeds nothing', () => {
+    // A rail reporting in the commit that withdrew its embedding would
+    // otherwise hold the canvas's chrome back while nothing is edited.
+    const { embedding } = harness();
+
+    embedding.setRailEditing('node', true);
+
+    expect(embedding.getState().railEditing.has('node')).toBe(false);
+  });
+
+  it('keeps another node’s notice when one embedding goes', () => {
     const { embedding, publish } = harness();
     publish(ask(), 'first');
     publish(ask(), 'second');

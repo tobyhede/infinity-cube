@@ -48,7 +48,7 @@ export interface DiscoverEmbeddedOpenSpaceResourcesInput<
 > {
   readonly root: EmbeddedRoot;
   /** The placements whose embedded Map is authored in place, by node id. */
-  readonly editingPlacements: ReadonlySet<string>;
+  readonly editingEmbeds: ReadonlySet<string>;
   readonly staleSpaces: ReadonlySet<ResourceId>;
   readonly nodes: readonly ResourceFlowNode[];
   /**
@@ -285,7 +285,7 @@ export function discoverEmbeddedOpenSpaceResources<Entry extends { readonly id: 
         (input.publications.has(parent.id) &&
           !input.entries.some((entry) => entry.id === view.spaceId)),
       depth: item.depth,
-      editing: input.editingPlacements.has(parent.id),
+      editing: input.editingEmbeds.has(parent.id),
     });
     const crossing = `${view.spaceId}:${view.map}`;
     if (path.has(crossing)) continue;
@@ -344,14 +344,14 @@ export function discoverEmbeddedOpenSpaceResources<Entry extends { readonly id: 
   return requests;
 }
 
-export function editingPlacementAncestor(
+export function editingEmbedAncestor(
   start: ResourceFlowNode | undefined,
   nodesById: ReadonlyMap<string, ResourceFlowNode>,
-  editingPlacements: ReadonlySet<string>,
+  editingEmbeds: ReadonlySet<string>,
 ): ResourceFlowNode | undefined {
   let current = start;
   while (current !== undefined) {
-    if (authorsEmbeddedMap(current.data) && editingPlacements.has(current.id)) {
+    if (authorsEmbeddedMap(current.data) && editingEmbeds.has(current.id)) {
       return current;
     }
     current = current.parentId === undefined ? undefined : nodesById.get(current.parentId);
@@ -362,7 +362,7 @@ export function editingPlacementAncestor(
 export function embeddingIsEditedInPlace(
   parent: ResourceFlowNode,
   nodesById: ReadonlyMap<string, ResourceFlowNode>,
-  editingPlacements: ReadonlySet<string>,
+  editingEmbeds: ReadonlySet<string>,
 ): boolean {
-  return editingPlacementAncestor(parent, nodesById, editingPlacements) !== undefined;
+  return editingEmbedAncestor(parent, nodesById, editingEmbeds) !== undefined;
 }

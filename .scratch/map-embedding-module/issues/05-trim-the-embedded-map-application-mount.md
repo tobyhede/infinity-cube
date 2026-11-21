@@ -8,7 +8,7 @@
 
 - [x] For every dropped case, the commit message names the interface test that covers it. A case with no equivalent stays.
 - [x] Every `rendering.md` citation (RD-60, RD-61, RD-67) still names a test that exists.
-- [ ] The full Vitest run, `e2e` and `e2e:ladle` pass in CI on the draft PR.
+- [x] The full Vitest run, `e2e` and `e2e:ladle` pass in CI on the draft PR.
 
 ## Comments
 

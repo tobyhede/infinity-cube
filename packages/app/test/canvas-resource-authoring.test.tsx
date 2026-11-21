@@ -572,7 +572,7 @@ describe('canvas Resource authoring decoration identity', () => {
 
   interface IdentityProps {
     readonly spaceResourceTargets: SpaceResourceTargets;
-    readonly portalEditing: ReadonlySet<ResourceId>;
+    readonly embedEditing: ReadonlySet<ResourceId>;
   }
 
   /** The Space Resource's plugin embeds its Map, passing its Claim while it is authored in place. */
@@ -628,13 +628,13 @@ describe('canvas Resource authoring decoration identity', () => {
     const mapEmbeddings = mapEmbedding.embeddings;
     publishSpaceEmbed(mapEmbeddings, false);
     const hook = renderHook(
-      ({ spaceResourceTargets, portalEditing }: IdentityProps) => {
+      ({ spaceResourceTargets, embedEditing }: IdentityProps) => {
         // A rerender naming new editing publishes it, as the plugin passing its Claim does.
         if (
           (mapEmbeddings.getState().get(SPACE_RESOURCE_ID)?.request.claim !== undefined) !==
-          portalEditing.has(SPACE_RESOURCE_ID)
+          embedEditing.has(SPACE_RESOURCE_ID)
         )
-          publishSpaceEmbed(mapEmbeddings, portalEditing.has(SPACE_RESOURCE_ID));
+          publishSpaceEmbed(mapEmbeddings, embedEditing.has(SPACE_RESOURCE_ID));
         return useCanvasResourceAuthoring({
           continuation,
           nodes: projection,
@@ -660,7 +660,7 @@ describe('canvas Resource authoring decoration identity', () => {
       {
         initialProps: {
           spaceResourceTargets: NO_SPACE_RESOURCE_TARGETS,
-          portalEditing: new Set<ResourceId>(),
+          embedEditing: new Set<ResourceId>(),
         },
       },
     );
@@ -679,7 +679,7 @@ describe('canvas Resource authoring decoration identity', () => {
     const mounted = mountIdentity();
     mounted.rerender({
       spaceResourceTargets: new Map([[TARGET_SPACE_ID, target]]),
-      portalEditing: new Set<ResourceId>(),
+      embedEditing: new Set<ResourceId>(),
     });
     const chooser = chooserOf(mounted.result.current.nodes);
     act(() => {
@@ -745,7 +745,7 @@ describe('canvas Resource authoring decoration identity', () => {
 
     rerender({
       spaceResourceTargets: new Map([[TARGET_SPACE_ID, target]]),
-      portalEditing: new Set<ResourceId>(),
+      embedEditing: new Set<ResourceId>(),
     });
 
     expect(dataOf(result.current.nodes, RESOURCE_ID)).toBe(markdownData);
@@ -755,17 +755,17 @@ describe('canvas Resource authoring decoration identity', () => {
     ).toBeDefined();
   });
 
-  it('keeps markdown node.data when only portal editing changes, and the Space Resource keeps its chooser', () => {
+  it('keeps markdown node.data when only Map embedding editing changes, and the Space Resource keeps its chooser', () => {
     const { result, rerender } = mountIdentity();
     rerender({
       spaceResourceTargets: new Map([[TARGET_SPACE_ID, target]]),
-      portalEditing: new Set<ResourceId>(),
+      embedEditing: new Set<ResourceId>(),
     });
     const markdownData = dataOf(result.current.nodes, RESOURCE_ID);
 
     rerender({
       spaceResourceTargets: new Map([[TARGET_SPACE_ID, target]]),
-      portalEditing: new Set([SPACE_RESOURCE_ID]),
+      embedEditing: new Set([SPACE_RESOURCE_ID]),
     });
 
     expect(dataOf(result.current.nodes, RESOURCE_ID)).toBe(markdownData);
@@ -789,7 +789,7 @@ describe('canvas Resource authoring decoration identity', () => {
     const { result, rerender, spaceSession } = mountIdentity();
     rerender({
       spaceResourceTargets: new Map([[TARGET_SPACE_ID, target]]),
-      portalEditing: new Set<ResourceId>(),
+      embedEditing: new Set<ResourceId>(),
     });
     const markdownData = dataOf(result.current.nodes, RESOURCE_ID);
     const spaceData = dataOf(result.current.nodes, SPACE_RESOURCE_ID);
