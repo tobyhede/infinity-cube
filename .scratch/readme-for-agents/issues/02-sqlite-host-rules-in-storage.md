@@ -8,7 +8,7 @@
 
 **Why:** A rule that lives only in a README has no owning doc and no named test, against the repository's rule that a requirement names the test that holds it. Found by the README audit (`../audit/duplication.md`). Read the Workflow doc's section on ADRs and the requirements snapshot first: if a rule is a decision no accepted ADR records, it needs an ADR, not only an ST rule.
 
-- [ ] Each SQLite rule above is an ST rule in Storage, naming the test that holds it, or is recorded as unbuilt with no test
-- [ ] Any rule that is a new decision has an ADR, and Storage's marker is updated in the same change
-- [ ] The README's SQLite section is its commands, one line per rule, the backup tip and a link to the Storage rules that says what they hold
-- [ ] The driver-internal detail (the migration error code, the helper that mints temp files) is gone from the README
+- [x] Each SQLite rule above is an ST rule in Storage, naming the test that holds it, or is recorded as unbuilt with no test
+- [ ] Any rule that is a new decision has an ADR, and Storage's marker is updated in the same change. Decided against: ST-126's paths and ST-128's journal settings are detail no ADR states, so they are dated in the rule and recorded in the trace (`docs/agents/workflow.md`, "A ruling is recorded where it belongs"); ST-127 restates ADR 0095. The rules were renumbered from ST-125–ST-127 when `main` took ST-125 for ADR 0165.
+- [x] The README's SQLite section is its commands, one line per rule, the backup tip and a link to the Storage rules that says what they hold
+- [x] The driver-internal detail (the migration error code, the helper that mints temp files) is gone from the README

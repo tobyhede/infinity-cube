@@ -8,6 +8,6 @@
 
 **Why:** The section restates Storage's import rules ("two doors and no mode parameter", the Meta authorization, the race with a starting host) and repeats the Running section's in-place write and the SQLite path rule, citing Storage four times. Found by the README audit (`../audit/duplication.md` and `../audit/structure.md`).
 
-- [ ] The section keeps the three commands, the cross-database recipe and the started-host warning
-- [ ] The door, authorization and race detail is replaced by one link to Storage that says what it holds
-- [ ] Nothing repeats the Running section or the SQLite section
+- [x] The section keeps the three commands, the cross-database recipe and the started-host warning
+- [x] The door, authorization and race detail is replaced by one link to Storage that says what it holds
+- [x] Nothing repeats the Running section or the SQLite section

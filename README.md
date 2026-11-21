@@ -1,6 +1,6 @@
 # InfinityCube
 
-InfinityCube is for technical ideas that connect as a graph rather than a single line. You write **Resources** (Markdown, Image, Mermaid and Space Resources, the last holding a whole nested Space), place them on a **Map**, and connect them with **Graphs**: named, coloured sets of directed Edges between the same Resources. Every Graph is drawn at once, each in its own colour, at the positions you chose.
+InfinityCube is for technical ideas that connect as a graph rather than a single line. You write **Resources** (Markdown, Image, Mermaid, Reference and Space Resources among them, the last holding a whole nested Space), place them on a **Map**, and connect them with **Graphs**: named, coloured sets of directed Edges between the same Resources. Every Graph is drawn at once, each in its own colour, at the positions you chose.
 
 **Presenting** traverses one Graph on a full-window **Stage**: a 16:9 frame over the canvas, which stays untouched behind it, with the **Notes window** beside it if you want it. The [Navigation requirements](docs/requirements/navigation.md) hold every presenting key, the Notes window and the product links.
 
@@ -55,12 +55,12 @@ The [Rendering](docs/requirements/rendering.md) and [Maps and Graphs](docs/requi
 
 ## Running a Space
 
-`pnpm cube run <dir>` **runs** an Aggregate directory: InfinityCube reads it into memory, serves it, and writes it back as you edit. While it runs, **the directory is your work**; nothing else is kept. The rules are in the [Storage requirements](docs/requirements/storage.md#running).
+`pnpm cube run <dir>` **runs** an Aggregate directory: InfinityCube reads it into memory, serves it, and writes it back as you edit. While it runs, **the directory is your work**; nothing else is kept. The [Storage requirements' Running rules](docs/requirements/storage.md#running) hold every refusal and write rule behind this section.
 
 - **Edits are written about a second after you stop editing**, so `git status` shows what you changed. InfinityCube writes only the files whose content changed.
-- **Git is your undo and your history.** InfinityCube keeps no history of its own and does not watch the directory. Edit files by hand, `git pull` or check out an earlier version with InfinityCube stopped: its next write replaces what is on disk with what it holds.
+- **Git is your undo and your history.** InfinityCube keeps no history of its own and does not watch the directory. Edit files by hand, `git pull` or check out an earlier version with InfinityCube stopped, since a running one's next write replaces what is on disk with what it holds.
 - **One run per directory.** A run locks the directory, through the empty file `.infinity-cube.lock` it leaves there, so a second run of the same directory is refused, naming it, until the first stops. The lock ends when the process does, however it ends. Keep the file out of git with a `.gitignore` entry.
-- **InfinityCube writes only its own files: `aggregate.json`, each Space's `space.json` and Resource files, and `assets/`**, which holds Markdown text and uploaded image files. Anything else, such as `.git`, a README or `notes/`, and any `*.md` outside `assets/`, is left alone; [`docs/aggregate-directory.md`](docs/aggregate-directory.md) describes the format.
+- **InfinityCube writes only its own files: `aggregate.json`, each Space's `space.json` and Resource files, and `assets/`**, which holds the Resources' text (Markdown and Mermaid source) and uploaded image files. Anything else, such as `.git`, a README or `notes/`, and any `*.md` outside `assets/`, is left alone; [`docs/aggregate-directory.md`](docs/aggregate-directory.md) describes the format.
 - **Starting.** `run` serves an existing Aggregate directory only. A missing or empty directory is refused, naming the `pnpm cube init` command that creates one, so a mistyped path never becomes a new Space. A directory that is not valid is refused with its problems printed; fix the files and start again. A run with no edits leaves the directory as it was, beside its empty lock file. Opening a Space never writes the directory.
 - **Ports and the browser.** InfinityCube serves on port 4173, or the next free port. `--port <port>` picks the port and fails if it is taken. `--no-open` leaves the browser alone, for running headless or from an agent.
 
@@ -78,7 +78,7 @@ Stopping (Ctrl-C, closing the terminal, or SIGTERM) writes every pending edit an
 - **`pnpm cube check <dir>`** reads a directory as a run would and reports, writing nothing. It is how you or an agent checks files written by hand.
 - **`pnpm cube mcp <dir>`** serves a local MCP server whose tools edit and check the directory's files, for an agent with no shell: see [Editing over MCP](docs/aggregate-directory.md#editing-over-mcp).
 - **The desktop application** opens a directory in a window of its own, with no terminal; [`AGENTS.md`](AGENTS.md) says how to build it.
-- **Mounting** opens a Space on the web, straight from its public GitHub repository. You can edit it in the page, but nothing is written back to GitHub, and today a reload loses those edits: see [Deploying to Cloudflare](docs/deploy-cloudflare.md).
+- **Mounting** opens a Space on the web, straight from its public GitHub repository. You can edit it in the page, but nothing is written back to GitHub, and today a reload loses those edits. [Deploying to Cloudflare](docs/deploy-cloudflare.md) says how to deploy the page and point a domain at a Space.
 
 ## Using InfinityCube with agents
 
@@ -167,7 +167,7 @@ pnpm dev:sqlite                                                            # app
 SQLITE_PATH=/absolute/path/infinity-cube.db pnpm test:integration:sqlite   # migrates that file, then tests against temp files of its own
 ```
 
-- **`SQLITE_PATH` is an absolute path** in a local directory you own. Every SQLite command refuses a relative one, or one whose directory is missing or unwritable. The host and `cube import` and `cube export` also refuse an unset or blank one, while `pnpm dev:sqlite` uses `.scratch/sqlite/infinity-cube.db` in the clone instead, for both its migration and its host. `cube import` and `cube export` also refuse a file that does not exist yet, so run `pnpm db:migrate:sqlite` first.
+- **`SQLITE_PATH` is an absolute path** to a file in a local directory you own (`pnpm dev:sqlite` has its own default); run `pnpm db:migrate:sqlite` on it before `cube import` or `cube export`.
 - **One InfinityCube process per file.** Stop `pnpm dev:sqlite` before running `cube import --store sqlite` or `cube export --store sqlite` on the same file.
 - **To back up**, stop the host and copy the file, or use `sqlite3 infinity-cube.db ".backup copy.db"`.
 
@@ -183,7 +183,7 @@ pnpm cube import ./my-aggregate                       # initialize an empty repo
 pnpm cube import ./my-aggregate --dangerous-replace   # replace the stored aggregate outright
 ```
 
-Both verbs reach PostgreSQL unless `--store sqlite` names SQLite. `import` initializes an empty repository; an initialized one it refuses, naming `--dangerous-replace`, unless it already holds exactly this aggregate. `--dangerous-replace` replaces whatever is stored, atomically. A host initializes an empty database when it starts, so importing into a database a host has run needs `--dangerous-replace`. The [Storage requirements](docs/requirements/storage.md#import) hold the rules for both verbs.
+Both verbs reach PostgreSQL unless `--store sqlite` names SQLite. A host initializes an empty database when it starts, so importing into a database a host has run needs `--dangerous-replace`. The [Storage requirements' Import rules](docs/requirements/storage.md#import) say when `import` refuses and what replacing does.
 
 An exported directory is the only way to move an aggregate between the two databases:
 
@@ -199,4 +199,5 @@ A pnpm workspace of `@project/*` packages and a Cargo workspace of Rust crates, 
 ## Current limitations
 
 - **Overlay legibility.** Every Graph is drawn at once, at the positions the Map authored. An Edge runs backward wherever its target sits left of its source, which two Graphs disagreeing about the order of Resources they share will force on one of them, and nothing routes an Edge around a Resource.
+- **No Undo or Redo in the application** ([Editing](docs/requirements/editing.md) ED-74, ED-75, not built). Under `pnpm cube run`, git is the undo.
 - **The production bundle is not tuned for size.**

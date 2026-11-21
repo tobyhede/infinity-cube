@@ -8,10 +8,10 @@
 
 **Why:** The getting-started skill names the README's "How Running works" as the full description of Running, so the README's stale claims reach every agent that runs a talk. Found by the README audit (`../audit/staleness.md`). The binding sources are ADR 0162 and Storage ST-31, ST-64, ST-65, ST-66 and ST-124.
 
-- [ ] The README's Running section states the lock, the refusal of a second run and the lock file's place in a `.gitignore`; "does not lock the directory" and "last write wins" between two runs are gone
-- [ ] The README says a run with no Edit leaves the directory unchanged beside its empty lock file
-- [ ] The README says opening a Space never writes the directory
-- [ ] The getting-started skill no longer says a second run overwrites, and says a `*.md` beside `space.json` is left alone
-- [ ] The authoring skill no longer says opening a Space records a `defaultMap` as an edit
-- [ ] The version is bumped equally in all three plugin manifests, and the marketplace test holding them equal passes
-- [ ] Each changed claim matches the Storage rule it restates, checked by reading the rule
+- [x] The README's Running section states the lock, the refusal of a second run and the lock file's place in a `.gitignore`; "does not lock the directory" and "last write wins" between two runs are gone
+- [x] The README says a run with no Edit leaves the directory unchanged beside its empty lock file
+- [x] The README says opening a Space never writes the directory
+- [x] The getting-started skill no longer says a second run overwrites, and says a `*.md` beside `space.json` is left alone
+- [x] The authoring skill no longer says opening a Space records a `defaultMap` as an edit
+- [x] The version is bumped equally in all three plugin manifests, and the marketplace test holding them equal passes
+- [x] Each changed claim matches the Storage rule it restates, checked by reading the rule
