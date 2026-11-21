@@ -438,3 +438,10 @@ Main moved on after the rewrite's baseline (commit `797b2908`). These are the ru
 | 0144 r2 the row is withheld while the list holds an unplaced Space Resource framing that Space | → UI-107 |
 | 0144 r3 a Space Resource placed on another Map withholds nothing | → UI-107 |
 | 0144 r4 withholding is decided over the list's source; counts and the empty sentence read the same set | → UI-107 |
+
+### ADR 0165
+
+| Source | Disposition |
+|---|---|
+| Shift at Resize start keeps the current Map rect’s ratio for the whole drag, with one Edit on release and cancellation discarding the draft | → UI-67 |
+| Both Closed Size floors hold while scaling the rect proportionally | → UI-68 |
