@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema } from '@project/core';
 import type { MapEmbedRequest } from '@project/ui';
-import { createMapEmbeddings, editingMapEmbeds, ownMapEmbed } from '../src/map-embeddings';
+import {
+  createMapEmbeddings,
+  editingMapEmbeds,
+  ownMapEmbed,
+} from '../src/map-embedding/map-embeddings';
 
 const SPACE_RESOURCE = uuidSchema.parse('00000000-0000-4000-8000-0000000000e1');
 const TARGET = uuidSchema.parse('00000000-0000-4000-8000-0000000000e2');

@@ -78,6 +78,10 @@ _Avoid_: view state, placement.
 What hosts a Resource plugin's drawing: a Map, the Stage, or another Resource embedding it. It offers capabilities that are each present or absent.
 _Avoid_: read-only as a mode of a plugin, Resource canvas.
 
+**Map embedding**:
+A Map drawn inside a Resource's rect because its plugin embeds a Space, on a canvas or the Stage. On a canvas it can be authored in place under a Claim lent to it.
+_Avoid_: portal, nested canvas, subspace.
+
 **Claim**:
 A Resource plugin's hold on the interaction while an author works in it. Claims nest through what a plugin embeds, and the deepest holds the keyboard and shows its commands. A Claim may run work exclusively.
 _Avoid_: lock, focus, edit mode.

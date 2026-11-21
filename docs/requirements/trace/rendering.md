@@ -362,7 +362,7 @@ Kept under drafting rule 5 (code plus a test, contradicted by nothing):
 - Receding Edges (ADR 0143): while a Graph is active the others are hairlines, `RECEDING_STROKE_WIDTH = 1` at `OTHER_GRAPH_OPACITY = 0.8`, ending in a `small` head of fixed size; the Active Graph's Edges keep a 3-unit stroke and a `full` head sized in stroke widths; with no Graph active every Edge is a 2-unit line at full strength with a `full` head (`projection.ts`).
 - Head markers: `graphHeadMarkerId` is `graph-head-<graphId>` for a `full` head and `graph-head-<graphId>-small` for a `small` one, unprefixed because a page draws Graph Edges in one `<ReactFlow>`; a second flow drawing Graph Edges would need ids namespaced per flow.
 - Camera numbers: `OVERVIEW_FIT = { padding: 0.2, maxZoom: 1 }`, `MAX_ZOOM = 16`, `minZoom={0.2}` (untested) in `app/src/camera.ts` and `SpaceCanvas.tsx`. `fitView` runs only when the canvas has no opening framing.
-- Framing gestures on a drawn Map in Edit are the portal handlers in `SpaceCanvas.tsx`: pointer drag pans and persists on release; the wheel listener runs in capture, stops propagation and persists after a 160 ms debounce.
+- Framing gestures on a drawn Map in Edit are the Map embedding gesture handlers in `SpaceCanvas.tsx`: pointer drag pans and persists on release; the wheel listener runs in capture, stops propagation and persists after a 160 ms debounce.
 - Camera command sites: `components/cameras.tsx`, `components/CanvasContinuation.tsx`, `react-flow-adapter/src/ZoomSlider.tsx`, and `SpaceCanvas`'s `fitView` prop. `fitView` before `panZoom` exists hangs; nothing calls it that early.
 - Handle geometry: `declaredHandles` and `anchorPoint` both read `AUTHORING_HANDLE_DIAMETER` (24), so an Edge lands on the rim React Flow resolves. An embedded Resource's clip leaves half a handle diameter of slack.
 - React Flow's `connectionRadius` is 20 at the pinned release; `dropTarget` and `newResourceDrop` in `app/src/edge-authoring.ts` compose the connection target with the DOM element.
@@ -377,7 +377,7 @@ Kept under drafting rule 5 (code plus a test, contradicted by nothing):
 - Edge Title fit constants in `ui/src/edge-title-room.ts`: `EDGE_TITLE_CEILING` 224, `EDGE_TITLE_CLEARANCE` 28, `EDGE_TITLE_BOX_CHROME` 26, `EDGE_TITLE_LEAST_TEXT` 34.
 - The URL reveal calls `fitView({ nodes: [node], padding: 0.5, duration: 0 })` with no `maxZoom` (`CanvasContinuation.tsx`).
 - Active Graph fade: content opacity transitions over `--resource-placement-duration * 0.4` (presentation; C2 closed by drafting rule 6).
-- A plugin's drawing is `PluginResource` on a Map and `PresentedPluginResource` on the Stage and in Full View (`ui/src/`); its failure boundary is `ResourceFailureBoundary.tsx`; a Reference's embedding is `ResourceEmbedding.tsx`; an Open Space Resource's Map is drawn over its rect as sibling nodes by `app/src/components/CanvasMapEmbed.tsx`, publishing into `app/src/map-embeddings.ts`.
+- A plugin's drawing is `PluginResource` on a Map and `PresentedPluginResource` on the Stage and in Full View (`ui/src/`); its failure boundary is `ResourceFailureBoundary.tsx`; a Reference's embedding is `ResourceEmbedding.tsx`; an Open Space Resource's Map is drawn over its rect as sibling nodes by `app/src/components/CanvasMapEmbed.tsx`, publishing into `app/src/map-embedding/map-embeddings.ts`.
 
 ## 6. Sources added or changed on main
 

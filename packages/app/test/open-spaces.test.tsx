@@ -16,7 +16,7 @@ import {
   type CommitResult,
 } from '@project/persistence';
 import { NavigationUnavailableError } from '../src/browser-location';
-import { useEmbeddedOpenSpaceResources } from '../src/use-embedded-open-space-resources';
+import { useDrawnEmbeddings } from './drawn-embeddings';
 import { createOpenSpaces } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { unavailable } from './command-dock';
@@ -403,7 +403,7 @@ describe('Open Spaces', () => {
     });
     const { result, rerender, unmount } = renderHook(
       ({ nodes }) =>
-        useEmbeddedOpenSpaceResources(nodes, publishedEmbeds(nodes), openSpaces, new Set(), {
+        useDrawnEmbeddings(nodes, publishedEmbeds(nodes), openSpaces, new Set(), {
           spaceId: META_ID,
           mapId: META_MAP_ID,
           policy: 'authoring',

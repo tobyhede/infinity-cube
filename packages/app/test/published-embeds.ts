@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { spaceSelection, uuidSchema, type SpaceView } from '@project/core';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
-import type { MapEmbedEntry } from '../src/map-embeddings';
+import type { MapEmbedEntry } from '../src/map-embedding/map-embeddings';
 
 /** A plugin's Map content while it is Open. */
 const OPEN = z.object({ open: z.literal(true) });
@@ -44,6 +44,7 @@ export const publishedEmbeds = (
           {
             resourceId: node.data.resourceId,
             drawing: Symbol(node.id),
+            lifetime: Symbol(node.id),
             request: {
               space: view.spaceId,
               view: { map: view.map, graph: view.graph, framing: view.framing },

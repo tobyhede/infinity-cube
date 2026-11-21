@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { newUuid, uuidSchema, type ResourceId, type SpaceSnapshot } from '@project/core';
 import { MemorySpaceBackend } from '@project/persistence';
 import { bareKindData, type ResourceFlowNode } from '@project/react-flow-adapter';
@@ -12,7 +12,7 @@ import {
   READING_SPACE_NOTE,
   type EmbedCommandsContext,
 } from '../src/embed-commands';
-import type { MapEmbedEntry } from '../src/map-embeddings';
+import type { MapEmbedEntry } from '../src/map-embedding/map-embeddings';
 import { createOpenSpaces } from '../src/open-spaces';
 import { RESOURCE_SIZE } from '../src/resource';
 import type { SpaceResourceTarget } from '../src/space-resource-lifecycle';
@@ -99,6 +99,7 @@ const embedded = (request: Partial<MapEmbedRequest> = {}): ReadonlyMap<string, M
       {
         resourceId: EMBEDDING_ID,
         drawing: Symbol('embedding drawing'),
+        lifetime: Symbol('embedding lifetime'),
         request: {
           space: TARGET_SPACE_ID,
           view: choosing,
@@ -169,6 +170,32 @@ describe('decorateEmbedCommands', () => {
     );
     expect(screen.getByRole('button', { name: 'Map: Collection 2' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Graph: Detail' })).toBeEnabled();
+  });
+
+  it('answers a choice about the embedding it was made in', async () => {
+    // Closed and Opened again before the answer lands, another embedding
+    // stands there; the answer names its own so it says nothing to the new one.
+    const mapEmbeds = embedded();
+    const lifetime = mapEmbeds.get(EMBEDDING_ID)?.lifetime;
+    const reports: unknown[][] = [];
+    mountRail(
+      decorateEmbedCommands(
+        node('space'),
+        context({
+          mapEmbeds,
+          onContextReport: (...report) => {
+            reports.push(report);
+          },
+        }),
+      ),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Map: Collection 1' }));
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: /Collection 2/ }));
+
+    await vi.waitFor(() => {
+      expect(reports).toEqual([[EMBEDDING_ID, null, lifetime]]);
+    });
   });
 
   it('says the Space is being read in place of the chooser while it is unread', () => {

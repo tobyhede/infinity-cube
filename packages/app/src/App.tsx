@@ -1,4 +1,4 @@
-import type { DrawnClipboardFailure } from './embedded-publication';
+import type { DrawnClipboardFailure } from './map-embedding/embedded-publication';
 import {
   useCallback,
   useEffect,
