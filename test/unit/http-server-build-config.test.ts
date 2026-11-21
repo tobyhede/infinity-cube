@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import config from '../../packages/app/http-server-build.config';
 import { z } from 'zod';
-import { aliasListSchema, pluginPackages, resolveAlias } from '../support/plugin-packages';
+import { PLUGIN_DOMAIN_SPECIFIER } from '../../packages/app/plugin-specifiers';
+import { aliasListSchema } from '../support/plugin-packages';
 
 /**
  * The config is loaded by `pnpm --filter @project/app http-server:build`, whose
@@ -21,6 +22,25 @@ describe('http server build config', () => {
     .parse(config);
   const alias = resolved.resolve.alias;
 
+  /*
+   * Pinned whole: a package dropped from the list stops being inlined into the
+   * server build, which no check over the remaining entries would notice. The
+   * one pattern is every plugin's domain half, which
+   * `test/unit/plugin-aliases.test.ts` resolves plugin by plugin.
+   */
+  it('aliases exactly the browser-safe packages the server reaches', () => {
+    expect(alias.map(({ find }) => find)).toEqual([
+      '@project/aggregate',
+      '@project/core',
+      '@project/graph',
+      '@project/http',
+      '@project/persistence',
+      '@project/plugins/domain',
+      PLUGIN_DOMAIN_SPECIFIER,
+      '@project/resource-api/domain',
+    ]);
+  });
+
   it('resolves every named `@project/*` alias to a real file regardless of cwd', () => {
     for (const { find, replacement } of alias) {
       if (find instanceof RegExp) continue;
@@ -28,21 +48,6 @@ describe('http server build config', () => {
       expect(existsSync(replacement), `${find} -> ${replacement}`).toBe(true);
     }
   });
-
-  /*
-   * A pattern entry's replacement names no file until a specifier fills it, so
-   * it is checked through every `packages/plugin-*` package, found by walking
-   * the directory rather than counted here.
-   */
-  it.each(pluginPackages())(
-    'resolves the domain half of %s to a real file regardless of cwd',
-    (name) => {
-      const target = resolveAlias(alias, `@project/${name}/domain`);
-      expect(target, `@project/${name}/domain matches an alias`).toBeDefined();
-      expect(isAbsolute(target ?? ''), `${name} is absolute`).toBe(true);
-      expect(existsSync(target ?? ''), `${name} -> ${String(target)}`).toBe(true);
-    },
-  );
 
   it('points its SSR entry at a real module regardless of cwd', () => {
     const entry = resolved.build.ssr;

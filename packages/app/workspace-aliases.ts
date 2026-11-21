@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { PLUGIN_DOMAIN_SPECIFIER } from './plugin-specifiers';
+import { PLUGIN_DOMAIN_SPECIFIER, pluginReplacement } from './plugin-specifiers';
 
 /** One alias entry, in the array form Vite accepts when an entry is a pattern. */
 export interface WorkspaceAlias {
@@ -29,7 +29,7 @@ export const workspaceAliases = (): WorkspaceAlias[] => {
     { find: '@project/http', replacement: here('../http/src/index.ts') },
     { find: '@project/persistence', replacement: here('../persistence/src/index.ts') },
     { find: '@project/plugins/domain', replacement: here('../plugins/src/domain.ts') },
-    { find: PLUGIN_DOMAIN_SPECIFIER, replacement: here('../$1/src/domain.ts') },
+    { find: PLUGIN_DOMAIN_SPECIFIER, replacement: pluginReplacement(here('../'), 'domain') },
     {
       find: '@project/resource-api/domain',
       replacement: here('../resource-api/src/domain/index.ts'),

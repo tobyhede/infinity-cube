@@ -1,17 +1,25 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import ts from 'typescript';
 import { z } from 'zod';
 import vitestConfig from '../../vitest.config';
-import { workspaceAliases, workspacePackages } from '../../packages/app/workspace-aliases';
 import {
-  type AliasEntry,
+  type WorkspaceAlias,
+  workspaceAliases,
+  workspacePackages,
+} from '../../packages/app/workspace-aliases';
+import {
+  PLUGIN_DOMAIN_SPECIFIER,
+  PLUGIN_HALF_FILES,
+  PLUGIN_VIEW_SPECIFIER,
+  pluginReplacement,
+} from '../../packages/app/plugin-specifiers';
+import {
   aliasListSchema,
   PACKAGES_DIRECTORY,
-  PLUGIN_HALVES,
   missingPluginHalves,
+  namesAPlugin,
   pluginPackages,
   resolveAlias,
 } from '../support/plugin-packages';
@@ -24,10 +32,7 @@ import { trackedFiles } from '../support/structural-scan';
  * no list to naming one.
  */
 
-/** Names an individual plugin, as opposed to the `plugin-*` pattern or the `plugins` list. */
-const NAMES_A_PLUGIN = /@project\/plugin-(?!\*)[^/]+/u;
-
-const vitestAliases: readonly AliasEntry[] = z
+const vitestAliases: readonly WorkspaceAlias[] = z
   .object({ resolve: z.object({ alias: aliasListSchema }) })
   .parse(vitestConfig).resolve.alias;
 
@@ -36,29 +41,25 @@ const tsconfigPathsSchema = z.object({
   compilerOptions: z.object({ paths: z.record(z.array(z.string())).optional() }).optional(),
 });
 
-const temporaryDirectories: string[] = [];
-afterEach(() => {
-  for (const directory of temporaryDirectories.splice(0)) {
-    rmSync(directory, { recursive: true, force: true });
-  }
-});
-
-/** A `packages/` directory holding `files`, each created empty. */
-const packagesWith = (files: readonly string[]): string => {
-  const directory = mkdtempSync(join(tmpdir(), 'plugin-packages-'));
-  temporaryDirectories.push(directory);
-  for (const file of files) {
-    mkdirSync(join(directory, file, '..'), { recursive: true });
-    writeFileSync(join(directory, file), '');
-  }
-  return directory;
-};
-
-describe('the plugin package walk', () => {
+describe('the plugin package listing', () => {
+  // Also what keeps every `it.each(pluginPackages())` below from passing
+  // empty, as it would where git lists no files.
   it('finds the plugin packages and not the list', () => {
     const plugins = pluginPackages();
     expect(plugins).toContain('plugin-ur');
     expect(plugins).not.toContain('plugins');
+  });
+
+  it('lists no leftover directory that holds no plugin package', () => {
+    expect(
+      pluginPackages([
+        'packages/plugin-whole/package.json',
+        'packages/plugin-whole/src/domain.ts',
+        'packages/plugin-whole/src/view.tsx',
+        'packages/plugin-leftover/node_modules/.modules.yaml',
+        'packages/plugins/package.json',
+      ]),
+    ).toEqual(['plugin-whole']);
   });
 
   it('finds both halves in every plugin package', () => {
@@ -66,23 +67,47 @@ describe('the plugin package walk', () => {
   });
 
   it('reports a plugin package that lacks a half', () => {
-    const packages = packagesWith([
-      'plugin-whole/src/domain.ts',
-      'plugin-whole/src/view.tsx',
-      'plugin-no-view/src/domain.ts',
-      'plugin-no-domain/src/view.tsx',
-      'plugins/src/domain.ts',
-    ]);
-    expect(missingPluginHalves(packages)).toEqual([
-      'plugin-no-domain/src/domain.ts',
-      'plugin-no-view/src/view.tsx',
-    ]);
+    expect(
+      missingPluginHalves([
+        'packages/plugin-whole/package.json',
+        'packages/plugin-whole/src/domain.ts',
+        'packages/plugin-whole/src/view.tsx',
+        'packages/plugin-no-view/package.json',
+        'packages/plugin-no-view/src/domain.ts',
+        'packages/plugin-no-domain/package.json',
+        'packages/plugin-no-domain/src/view.tsx',
+        'packages/plugins/package.json',
+        'packages/plugins/src/domain.ts',
+      ]),
+    ).toEqual(['plugin-no-domain/src/domain.ts', 'plugin-no-view/src/view.tsx']);
+  });
+});
+
+describe('the plugin specifier patterns', () => {
+  it.each([
+    ['domain', PLUGIN_DOMAIN_SPECIFIER],
+    ['view', PLUGIN_VIEW_SPECIFIER],
+  ] as const)('refuses the plugin list in the %s pattern', (_half, pattern) => {
+    expect(
+      ['@project/plugins/domain', '@project/plugins/view', '@project/plugins/testing'].filter(
+        (specifier) => pattern.test(specifier),
+      ),
+    ).toEqual([]);
+  });
+
+  it('keeps a `$` in the packages directory out of the replacement pattern', () => {
+    const aliases = [
+      { find: PLUGIN_DOMAIN_SPECIFIER, replacement: pluginReplacement('/c/$&$1$$/', 'domain') },
+    ];
+    expect(resolveAlias(aliases, '@project/plugin-ur/domain')).toBe(
+      '/c/$&$1$$/plugin-ur/src/domain.ts',
+    );
   });
 });
 
 describe('resolving a plugin through the aliases', () => {
   it.each(pluginPackages())('resolves both halves of %s through Vitest', (name) => {
-    for (const [half, file] of Object.entries(PLUGIN_HALVES)) {
+    for (const [half, file] of Object.entries(PLUGIN_HALF_FILES)) {
       expect(resolveAlias(vitestAliases, `@project/${name}/${half}`)).toBe(
         join(PACKAGES_DIRECTORY, name, file),
       );
@@ -91,7 +116,7 @@ describe('resolving a plugin through the aliases', () => {
 
   it.each(pluginPackages())('resolves the domain half of %s through the server builds', (name) => {
     expect(resolveAlias(workspaceAliases(), `@project/${name}/domain`)).toBe(
-      join(PACKAGES_DIRECTORY, name, PLUGIN_HALVES.domain),
+      join(PACKAGES_DIRECTORY, name, PLUGIN_HALF_FILES.domain),
     );
   });
 
@@ -118,6 +143,10 @@ describe('resolving a plugin through the aliases', () => {
   });
 });
 
+/** A tracked file's text, read from the repository root whatever the working directory. */
+const readTrackedFile = (file: string): string =>
+  readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8');
+
 /** Each tracked tsconfig's `paths` keys, by file. */
 const tsconfigPathKeys = (): ReadonlyMap<string, readonly string[]> =>
   new Map(
@@ -127,7 +156,7 @@ const tsconfigPathKeys = (): ReadonlyMap<string, readonly string[]> =>
         file,
         Object.keys(
           tsconfigPathsSchema.parse(
-            ts.parseConfigFileTextToJson(file, readFileSync(file, 'utf8')).config,
+            ts.parseConfigFileTextToJson(file, readTrackedFile(file)).config,
           ).compilerOptions?.paths ?? {},
         ),
       ]),
@@ -141,9 +170,17 @@ const tsconfigsWith = (key: string): readonly string[] =>
     .toSorted();
 
 describe('the alias lists', () => {
+  it('see a regular expression that names one plugin, as well as a string', () => {
+    expect(namesAPlugin('@project/plugin-ur/domain')).toBe(true);
+    expect(namesAPlugin(/^@project\/plugin-ur\/domain$/u)).toBe(true);
+    expect(namesAPlugin('@project/plugin-*/domain')).toBe(false);
+    expect(namesAPlugin(PLUGIN_DOMAIN_SPECIFIER)).toBe(false);
+    expect(namesAPlugin('@project/plugins/domain')).toBe(false);
+  });
+
   it('name no individual plugin in any tsconfig', () => {
     const naming = [...tsconfigPathKeys()]
-      .filter(([, keys]) => keys.some((key) => NAMES_A_PLUGIN.test(key)))
+      .filter(([, keys]) => keys.some((key) => namesAPlugin(key)))
       .map(([file]) => file);
     expect(naming).toEqual([]);
   });
@@ -179,8 +216,8 @@ describe('the alias lists', () => {
   });
 
   it('name no individual plugin in Vitest or the server builds', () => {
-    const finds = [...vitestAliases, ...workspaceAliases()].map(({ find }) => String(find));
-    expect(finds.filter((find) => NAMES_A_PLUGIN.test(find))).toEqual([]);
-    expect(workspacePackages.map(String).filter((entry) => NAMES_A_PLUGIN.test(entry))).toEqual([]);
+    const finds = [...vitestAliases, ...workspaceAliases()].map(({ find }) => find);
+    expect(finds.filter((find) => namesAPlugin(find))).toEqual([]);
+    expect(workspacePackages.filter((entry) => namesAPlugin(entry))).toEqual([]);
   });
 });

@@ -29,10 +29,21 @@ const restrictedImportsSchema = z.tuple([
   }),
 ]);
 
-/** Every source file of every `packages/plugin-*` package, found by walking the directory. */
+/** Every tracked source file of every `packages/plugin-*` package. */
 const PLUGIN_FILES = pluginSourceFiles();
 
 describe('Resource plugin import restrictions', () => {
+  // The cases below are built from git's file list, which is empty where git
+  // lists nothing (Stryker's sandbox); this keeps them from passing empty.
+  it('finds plugin sources to lint, the Ur plugin’s two halves among them', () => {
+    expect(PLUGIN_FILES).toEqual(
+      expect.arrayContaining([
+        'packages/plugin-ur/src/domain.ts',
+        'packages/plugin-ur/src/view.tsx',
+      ]),
+    );
+  });
+
   it.each(
     PLUGIN_FILES.flatMap((file) =>
       [

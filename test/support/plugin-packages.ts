@@ -1,52 +1,47 @@
-import { existsSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
+import { PLUGIN_HALF_FILES, PLUGIN_PACKAGE_NAME } from '../../packages/app/plugin-specifiers';
 import type { WorkspaceAlias } from '../../packages/app/workspace-aliases';
 import { trackedFiles } from './structural-scan';
 
 /** The repository's `packages/` directory. */
 export const PACKAGES_DIRECTORY = fileURLToPath(new URL('../../packages/', import.meta.url));
 
+/** A plugin package's `package.json`, capturing the package's directory name. */
+const PLUGIN_PACKAGE_JSON = new RegExp(`^packages/(${PLUGIN_PACKAGE_NAME})/package\\.json$`, 'u');
+
+/** A TypeScript source file under a plugin package's `src/`. */
+const PLUGIN_SOURCE = new RegExp(`^packages/${PLUGIN_PACKAGE_NAME}/src/.*\\.tsx?$`, 'u');
+
 /**
- * The two halves every Resource plugin package exports, by the file its
- * `@project/plugin-<name>/<half>` specifier resolves to. The path aliases in
- * `tsconfig.base.json`, `vitest.config.ts` and `packages/app/workspace-aliases.ts`
- * map a specifier to these files by pattern, naming no plugin.
+ * The plugin packages among `files` (repo-root-relative, the tracked files by
+ * default): each `packages/plugin-*` directory holding a `package.json`,
+ * sorted. Reading tracked files rather than the directory keeps a leftover
+ * directory, such as one holding only `node_modules`, out of the list.
  */
-export const PLUGIN_HALVES = {
-  domain: 'src/domain.ts',
-  view: 'src/view.tsx',
-} as const;
-
-/** The `packages/plugin-*` directory names under `packagesDirectory`, sorted. */
-export const pluginPackages = (packagesDirectory: string = PACKAGES_DIRECTORY): readonly string[] =>
-  readdirSync(packagesDirectory, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && /^plugin-[^/]+$/u.test(entry.name))
-    .map((entry) => entry.name)
-    .sort();
+export const pluginPackages = (files: readonly string[] = trackedFiles()): readonly string[] =>
+  files.flatMap((file) => PLUGIN_PACKAGE_JSON.exec(file)?.slice(1, 2) ?? []).toSorted();
 
 /**
- * Every half a `packages/plugin-*` directory lacks, as `<package>/<file>`. A
+ * Every half a plugin package among `files` lacks, as `<package>/<file>`. A
  * plugin without both cannot be reached through the pattern aliases.
  */
 export const missingPluginHalves = (
-  packagesDirectory: string = PACKAGES_DIRECTORY,
-): readonly string[] =>
-  pluginPackages(packagesDirectory).flatMap((name) =>
-    Object.values(PLUGIN_HALVES)
-      .filter((file) => !existsSync(join(packagesDirectory, name, file)))
+  files: readonly string[] = trackedFiles(),
+): readonly string[] => {
+  const present = new Set(files);
+  return pluginPackages(files).flatMap((name) =>
+    Object.values(PLUGIN_HALF_FILES)
+      .filter((file) => !present.has(`packages/${name}/${file}`))
       .map((file) => `${name}/${file}`),
   );
+};
 
 /** Every tracked TypeScript source file under a plugin package's `src/`, sorted. */
 export const pluginSourceFiles = (): readonly string[] =>
   trackedFiles()
-    .filter((file) => /^packages\/plugin-[^/]+\/src\/.*\.tsx?$/u.test(file))
+    .filter((file) => PLUGIN_SOURCE.test(file))
     .toSorted();
-
-/** One Vite or Vitest alias entry, in the array form both accept. */
-export type AliasEntry = WorkspaceAlias;
 
 /** An alias list read from a Vite or Vitest config, parsed rather than asserted. */
 export const aliasListSchema = z.array(
@@ -60,7 +55,7 @@ export const aliasListSchema = z.array(
  * applied with `String.prototype.replace`. Undefined when nothing matches.
  */
 export const resolveAlias = (
-  aliases: readonly AliasEntry[],
+  aliases: readonly WorkspaceAlias[],
   specifier: string,
 ): string | undefined => {
   for (const { find, replacement } of aliases) {
@@ -73,3 +68,15 @@ export const resolveAlias = (
   }
   return undefined;
 };
+
+/**
+ * Names an individual plugin, as opposed to the `plugin-*` pattern or the
+ * `plugins` list: `@project/plugin-` followed by a name rather than a wildcard
+ * or a group. The slash may be escaped, as it is in a regular expression's
+ * source.
+ */
+const NAMES_A_PLUGIN = /@project\\?\/plugin-(?![*([])/u;
+
+/** Whether an alias list's `find` names one plugin rather than the pattern. */
+export const namesAPlugin = (find: string | RegExp): boolean =>
+  NAMES_A_PLUGIN.test(find instanceof RegExp ? find.source : find);

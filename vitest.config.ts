@@ -1,7 +1,11 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
-import { PLUGIN_DOMAIN_SPECIFIER, PLUGIN_VIEW_SPECIFIER } from './packages/app/plugin-specifiers';
+import {
+  PLUGIN_DOMAIN_SPECIFIER,
+  PLUGIN_VIEW_SPECIFIER,
+  pluginReplacement,
+} from './packages/app/plugin-specifiers';
 
 const resolve = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 
@@ -15,12 +19,13 @@ export default defineConfig({
      * plus a slash, and the first match wins. So `@project/persistence` also
      * matches `@project/persistence/test-support` and rewrites it to
      * `…/src/index.ts/test-support`, which resolves to nothing. The subpath must
-     * come first. Sorting these keys makes every test that imports the subpath
+     * come first. Sorting these entries makes every test that imports the subpath
      * fail to collect.
      *
      * A Resource plugin is reached by the patterns `plugin-specifiers.ts`
-     * exports, which match no other package's specifier, so their place in this
-     * list captures no other package's subpath.
+     * exports, which match no other package's specifier (held where that
+     * module says), so their place in this list captures no other package's
+     * subpath.
      */
     alias: [
       { find: '@project/aggregate', replacement: resolve('./packages/aggregate/src/index.ts') },
@@ -40,11 +45,11 @@ export default defineConfig({
       },
       {
         find: PLUGIN_DOMAIN_SPECIFIER,
-        replacement: resolve('./packages/$1/src/domain.ts'),
+        replacement: pluginReplacement(resolve('./packages/'), 'domain'),
       },
       {
         find: PLUGIN_VIEW_SPECIFIER,
-        replacement: resolve('./packages/$1/src/view.tsx'),
+        replacement: pluginReplacement(resolve('./packages/'), 'view'),
       },
       {
         find: '@project/react-flow-adapter',
