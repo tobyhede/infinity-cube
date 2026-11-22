@@ -70,6 +70,11 @@ export interface HostCommand {
   readonly name: string;
   readonly argv: readonly string[];
   readonly cwd?: string;
+  /**
+   * Variables set in the host's environment, over the suite's own, which the
+   * host otherwise inherits.
+   */
+  readonly env?: Readonly<Record<string, string>>;
   /** Whether closing standard input stops the host as SIGINT does (the desktop sidecar's protocol). */
   readonly stopsOnStdinClose: boolean;
   /**
@@ -208,16 +213,24 @@ export type HostStart =
       readonly stderr: string;
     };
 
-const substitute = (argument: string, values: Readonly<Record<string, string>>): string =>
+const substitute = (
+  argument: string,
+  values: Readonly<Record<string, string | undefined>>,
+): string =>
   argument.replaceAll(
     /\{(directory|port|built)\}/g,
     (whole, name: string) => values[name] ?? whole,
   );
 
-/** Where the host is started, and what fills the command's placeholders. */
+/**
+ * Where the host is started, and what fills the command's placeholders. A host
+ * that runs no directory (a store-backed host, as the SQLite restart proof
+ * starts) is launched with neither, and a placeholder with no value is left as
+ * written.
+ */
 export interface HostLaunch {
-  readonly directory: string;
-  readonly built: string;
+  readonly directory?: string;
+  readonly built?: string;
 }
 
 export interface HostStartOptions {
@@ -260,6 +273,7 @@ export const startHost = async (
   if (program === undefined) throw new Error(`The host command for ${command.name} is empty`);
   const child = spawn(program, args, {
     cwd: command.cwd,
+    env: command.env === undefined ? process.env : { ...process.env, ...command.env },
     stdio: ['pipe', 'pipe', 'pipe'],
   });
   const kill = (): void => {

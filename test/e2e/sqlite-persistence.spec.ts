@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { expect, test, type BrowserContext } from '@playwright/test';
 import { newUuid } from '@project/core';
-import { createServer, type ViteDevServer } from 'vite';
+import { createServer } from 'vite';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import { createSqliteDatabase, requireConfiguredSqlitePath } from '../../src/sqlite/db';
 import { sqliteSqlStore } from '../../src/sqlite/sql-store';
@@ -13,6 +13,12 @@ import {
   openStoredSpace,
   restartProofFixture,
 } from '../support/restart-proof';
+import {
+  RESTART_PROOF_HOST_VARIABLE,
+  restartProofHostFromEnvironment,
+  startCommandHost,
+  type StartedRestartProofHost,
+} from '../support/restart-proof-host';
 import { SQLITE_E2E_PORT } from '../../packages/app/e2e/projects';
 
 const appRoot = fileURLToPath(new URL('../../packages/app', import.meta.url));
@@ -20,7 +26,7 @@ const configFile = fileURLToPath(
   new URL('../../packages/app/vite.sqlite.config.ts', import.meta.url),
 );
 
-const startHost = async (): Promise<{ server: ViteDevServer; baseURL: string }> => {
+const startViteHost = async (): Promise<StartedRestartProofHost> => {
   const server = await createServer({
     root: appRoot,
     configFile,
@@ -34,7 +40,7 @@ const startHost = async (): Promise<{ server: ViteDevServer; baseURL: string }> 
     await server.listen();
     const baseURL = server.resolvedUrls?.local[0];
     if (baseURL === undefined) throw new Error('Vite did not publish a loopback URL');
-    return { server, baseURL };
+    return { baseURL, stop: () => server.close() };
   } catch (error) {
     // The caller only learns of a server it can close on success, so a failure
     // between here and the return would strand one holding the fixed port —
@@ -44,7 +50,14 @@ const startHost = async (): Promise<{ server: ViteDevServer; baseURL: string }> 
   }
 };
 
-test('a SQLite-backed edit survives a fresh Vite host', async ({ browser }) => {
+// The Vite host unless `INFINITY_CUBE_RESTART_PROOF_HOST` names a command
+// (`test/support/restart-proof-host.ts`), so the same proof runs against
+// another runtime's host over the same file.
+const host = restartProofHostFromEnvironment(process.env[RESTART_PROOF_HOST_VARIABLE]);
+const startHost = (): Promise<StartedRestartProofHost> =>
+  host.kind === 'vite' ? startViteHost() : startCommandHost(host.command);
+
+test('a SQLite-backed edit survives a fresh host', async ({ browser }) => {
   // `SQLITE_PATH` as the job (or a developer's own export) provides it —
   // already migrated, by `test:integration:sqlite` in CI or by
   // `pnpm db:migrate:sqlite` locally. `requireConfiguredSqlitePath` is the one
@@ -55,8 +68,8 @@ test('a SQLite-backed edit survives a fresh Vite host', async ({ browser }) => {
   const mapId = newUuid();
   const graphId = newUuid();
   const title = `SQLite restart ${spaceId}`;
-  let firstHost: ViteDevServer | undefined;
-  let secondHost: ViteDevServer | undefined;
+  let firstHost: StartedRestartProofHost | undefined;
+  let secondHost: StartedRestartProofHost | undefined;
   let firstContext: BrowserContext | undefined;
   let secondContext: BrowserContext | undefined;
   let spaceRemains: boolean | undefined;
@@ -96,7 +109,7 @@ test('a SQLite-backed edit survives a fresh Vite host', async ({ browser }) => {
     }
 
     const first = await startHost();
-    firstHost = first.server;
+    firstHost = first;
     const openedFirst = await openStoredSpace(browser, first.baseURL, spaceId, title);
     firstContext = openedFirst.context;
     const durablePosition = await dragResourceAndCapturePosition(
@@ -109,14 +122,15 @@ test('a SQLite-backed edit survives a fresh Vite host', async ({ browser }) => {
 
     await firstContext.close();
     firstContext = undefined;
-    await firstHost.close();
+    await firstHost.stop();
     firstHost = undefined;
 
     // The two hosts run in sequence, never together. Closing the first Vite
     // server does not close its SQLite runtime's database — neither
     // `sqlite-http-runtime.ts` nor `vite-space-http-plugin.ts` has a close
     // hook — so what keeps this safe is that no request is in flight, not that
-    // the handle is gone.
+    // the handle is gone. A host started by command has exited, its process
+    // gone, before `stop` answers.
     const afterFirstDatabase = createSqliteDatabase(path);
     try {
       const stored = await new SqlSpaceRepository(sqliteSqlStore(afterFirstDatabase)).loadSpace(
@@ -128,14 +142,14 @@ test('a SQLite-backed edit survives a fresh Vite host', async ({ browser }) => {
     }
 
     const second = await startHost();
-    secondHost = second.server;
+    secondHost = second;
     const openedSecond = await openStoredSpace(browser, second.baseURL, spaceId, title);
     secondContext = openedSecond.context;
     await expectResourceRestoredAt(openedSecond.page, 'Restart resource', durablePosition, '1');
 
     await secondContext.close();
     secondContext = undefined;
-    await secondHost.close();
+    await secondHost.stop();
     secondHost = undefined;
 
     // Durability is only half of what the aggregate owes; the other half is
@@ -157,8 +171,8 @@ test('a SQLite-backed edit survives a fresh Vite host', async ({ browser }) => {
   } finally {
     await secondContext?.close();
     await firstContext?.close();
-    await secondHost?.close();
-    await firstHost?.close();
+    await secondHost?.stop();
+    await firstHost?.stop();
     // Clean up the Space and Resource this proof minted, as the PostgreSQL proof
     // does — so a rerun against the same `SQLITE_PATH` (a developer iterating
     // without re-migrating) meets an empty file rather than an
