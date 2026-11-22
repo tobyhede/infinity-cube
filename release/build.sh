@@ -210,7 +210,11 @@ if [ "$desktop" = 1 ]; then
 	# appearing shows the bundled host started on this Space.
 	if [ "$target" = "$native" ]; then
 		step "Opening a Space with the desktop application"
+		# Resolved through symlinks: macOS's temporary directory is under /var, a
+		# symlink to /private/var, and Tauri refuses to find its resources, or
+		# check for an update, from an executable whose path holds a symlink.
 		smoke="$(mktemp -d "${TMPDIR:-/tmp}/infinity-cube-smoke.XXXXXX")"
+		smoke="$(cd "$smoke" && pwd -P)"
 		# Installed as a person installs it: copied out of the disk image.
 		hdiutil attach -nobrowse -readonly -mountpoint "$smoke/volume" "$dmg" >/dev/null
 		cp -R "$smoke/volume/InfinityCube.app" "$smoke/InfinityCube.app"
