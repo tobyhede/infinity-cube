@@ -15,7 +15,7 @@ The suite is written in TypeScript and runs under Vitest, but a host under test 
 | The desktop scheme handler (`packages/desktop/src-tauri`), as a `Request -> Response` function, by its Rust port | `cargo nextest run -p infinity-cube-desktop scheme::tests` | `rust` |
 | The Rust CLI (`crates/cli`), as a process | the first command, with `INFINITY_CUBE_HTTP_CONFORMANCE_HOST` naming `target/debug/infinity-cube` as below, once without and once with `"--built", "{built}"` | `rust` |
 
-`INFINITY_CUBE_HTTP_CONFORMANCE_HOST` is JSON naming the host command: `{ "name": string, "argv": string[], "cwd"?: string, "stopsOnStdinClose": boolean, "keepsLock"?: boolean }`, where `keepsLock` (false when absent) says the host keeps the launch lock. For example, a host binary that takes its port and keeps no stdin protocol:
+`INFINITY_CUBE_HTTP_CONFORMANCE_HOST` is JSON naming the host command: `{ "name": string, "argv": string[], "cwd"?: string, "env"?: { [name: string]: string }, "stopsOnStdinClose": boolean, "keepsLock"?: boolean }`, where `env` sets variables over the suite's own environment, which the host otherwise inherits, and `keepsLock` (false when absent) says the host keeps the launch lock. For example, a host binary that takes its port and keeps no stdin protocol:
 
 ```json
 {

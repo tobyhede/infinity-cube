@@ -213,25 +213,28 @@ export type HostStart =
       readonly stderr: string;
     };
 
-const substitute = (
-  argument: string,
-  values: Readonly<Record<string, string | undefined>>,
-): string =>
+const substitute = (argument: string, values: Readonly<Record<string, string>>): string =>
   argument.replaceAll(
     /\{(directory|port|built)\}/g,
     (whole, name: string) => values[name] ?? whole,
   );
 
-/**
- * Where the host is started, and what fills the command's placeholders. A host
- * that runs no directory (a store-backed host, as the SQLite restart proof
- * starts) is launched with neither, and a placeholder with no value is left as
- * written.
- */
+/** Where the host is started, and what fills the command's placeholders. */
 export interface HostLaunch {
-  readonly directory?: string;
-  readonly built?: string;
+  readonly directory: string;
+  readonly built: string;
 }
+
+/**
+ * The launch of a host that runs no directory or build, such as a host over a
+ * store (the SQLite restart proof's, `test/support/restart-proof-host.ts`): its
+ * command names `{port}` alone, and one naming `{directory}` or `{built}` fails
+ * the start before anything is spawned.
+ */
+export const STORE_BACKED_LAUNCH = { kind: 'store-backed' } as const;
+export type StoreBackedLaunch = typeof STORE_BACKED_LAUNCH;
+
+const DIRECTORY_PLACEHOLDER = /\{(directory|built)\}/;
 
 export interface HostStartOptions {
   /**
@@ -261,14 +264,22 @@ const ANNOUNCE_DEADLINE_MS = 30_000;
  */
 export const startHost = async (
   command: HostCommand,
-  launch: HostLaunch,
+  launch: HostLaunch | StoreBackedLaunch,
   options: HostStartOptions = {},
 ): Promise<HostStart> => {
-  const values = {
-    directory: launch.directory,
-    built: launch.built,
-    port: String(await freePort()),
-  };
+  const freeLoopbackPort = String(await freePort());
+  if ('kind' in launch) {
+    const named = command.argv.find((argument) => DIRECTORY_PLACEHOLDER.test(argument));
+    if (named !== undefined) {
+      throw new Error(
+        `${command.name} runs no directory or build, but its command names ${named}`,
+      );
+    }
+  }
+  const values =
+    'kind' in launch
+      ? { port: freeLoopbackPort }
+      : { directory: launch.directory, built: launch.built, port: freeLoopbackPort };
   const [program, ...args] = command.argv.map((argument) => substitute(argument, values));
   if (program === undefined) throw new Error(`The host command for ${command.name} is empty`);
   const child = spawn(program, args, {

@@ -1,11 +1,16 @@
-import { z } from 'zod';
-import { startHost, type HostCommand } from '../../conformance/http/host-process';
+import {
+  startHost,
+  STORE_BACKED_LAUNCH,
+  type HostCommand,
+  type HostStartOptions,
+} from '../../conformance/http/host-process';
+import { hostCommandOf, hostCommandSchema } from '../../conformance/http/node-host';
 
 /**
  * Which host the SQLite restart proof (`test/e2e/sqlite-persistence.spec.ts`)
  * starts, twice in sequence, against the file `SQLITE_PATH` names: the Vite
- * host it has always started, or a host process started by command, so the
- * same proof runs against another runtime's host unchanged.
+ * host by default, or a host process started by command, so the same proof
+ * runs against another runtime's host unchanged.
  */
 
 /**
@@ -15,7 +20,8 @@ import { startHost, type HostCommand } from '../../conformance/http/host-process
  * sets variables over the proof's own environment, which the host otherwise
  * inherits (`SQLITE_PATH` among them). The host announces itself on standard
  * output as the HTTP conformance suite's hosts do
- * (`conformance/http/README.md`), and stops on SIGINT, exiting zero.
+ * (`conformance/http/README.md`), with no launch secret, and stops on SIGINT,
+ * exiting zero.
  */
 export const RESTART_PROOF_HOST_VARIABLE = 'INFINITY_CUBE_RESTART_PROOF_HOST';
 
@@ -25,17 +31,15 @@ export type RestartProofHost =
 /** A placeholder of the conformance suite's other than `{port}`, which a store-backed host has no value for. */
 const UNFILLED_PLACEHOLDER = /\{(directory|built)\}/;
 
-const commandSchema = z.strictObject({
-  name: z.string().min(1),
-  argv: z
-    .array(z.string())
-    .min(1)
-    .refine((argv) => !argv.some((argument) => UNFILLED_PLACEHOLDER.test(argument)), {
-      message: 'A restart proof host command takes only {port}: it runs no directory or build',
-    }),
-  cwd: z.string().optional(),
-  env: z.record(z.string(), z.string()).optional(),
-});
+// The conformance suite's command schema, less the two keys this proof fixes:
+// a key copied from the suite's description (`stopsOnStdinClose`, `keepsLock`)
+// fails rather than being read as doing something here.
+const commandSchema = hostCommandSchema
+  .omit({ stopsOnStdinClose: true, keepsLock: true })
+  .refine((command) => !command.argv.some((argument) => UNFILLED_PLACEHOLDER.test(argument)), {
+    message: 'A restart proof host command takes only {port}: it runs no directory or build',
+    path: ['argv'],
+  });
 
 /** The host the environment names, or the Vite host when it names none. */
 export const restartProofHostFromEnvironment = (variable: string | undefined): RestartProofHost => {
@@ -46,19 +50,13 @@ export const restartProofHostFromEnvironment = (variable: string | undefined): R
   } catch {
     throw new Error(`${RESTART_PROOF_HOST_VARIABLE} is not valid JSON: ${variable}`);
   }
-  // An unknown key fails rather than being dropped, so a key copied from the
-  // conformance suite's description (`stopsOnStdinClose`, `keepsLock`) is not
-  // read as doing something here.
-  const { cwd, env, ...command } = commandSchema.parse(parsed);
   return {
     kind: 'command',
-    command: {
-      ...command,
-      ...(cwd === undefined ? {} : { cwd }),
-      ...(env === undefined ? {} : { env }),
+    command: hostCommandOf({
+      ...commandSchema.parse(parsed),
       stopsOnStdinClose: false,
       keepsLock: false,
-    },
+    }),
   };
 };
 
@@ -79,19 +77,32 @@ const STOP_DEADLINE_MS = 15_000;
 /**
  * Start the host `command` names, through the HTTP conformance suite's driver
  * (`conformance/http/host-process.ts`): spawned with `{port}` filled, found
- * through the line it announces, stopped by SIGINT.
+ * through the line it announces, stopped by SIGINT. `onSpawn` is handed a way
+ * to kill the host as soon as it is spawned, so a proof abandoned while the
+ * host starts can still kill it.
+ *
+ * A host that announces a launch secret is stopped and fails the start: the
+ * driver trades the secret for a session cookie that only its own requests
+ * carry, and the proof's browser would hold none.
  */
 export const startCommandHost = async (
   command: HostCommand,
-  options: { readonly stopDeadlineMs?: number } = {},
+  options: Pick<HostStartOptions, 'onSpawn'> & { readonly stopDeadlineMs?: number } = {},
 ): Promise<StartedRestartProofHost> => {
-  const started = await startHost(command, {});
+  const started = await startHost(command, STORE_BACKED_LAUNCH, options);
   if (started.kind === 'refused') {
     throw new Error(
       `${command.name} refused to start: ${started.message ?? '(no announcement)'} (exit ${String(started.exitCode)})\n${started.stderr}`,
     );
   }
   const { host } = started;
+  if (host.secret !== undefined) {
+    host.kill();
+    await host.exited;
+    throw new Error(
+      `${command.name} announced a launch secret, which the restart proof cannot present: its browser would hold no session cookie`,
+    );
+  }
   const stopDeadlineMs = options.stopDeadlineMs ?? STOP_DEADLINE_MS;
   const stop = async (): Promise<void> => {
     host.signal('SIGINT');

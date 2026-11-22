@@ -19,6 +19,7 @@ import {
   startCommandHost,
   type StartedRestartProofHost,
 } from '../support/restart-proof-host';
+import { runWithCleanup } from '../support/run-with-cleanup';
 import { SQLITE_E2E_PORT } from '../../packages/app/e2e/projects';
 
 const appRoot = fileURLToPath(new URL('../../packages/app', import.meta.url));
@@ -54,8 +55,20 @@ const startViteHost = async (): Promise<StartedRestartProofHost> => {
 // (`test/support/restart-proof-host.ts`), so the same proof runs against
 // another runtime's host over the same file.
 const host = restartProofHostFromEnvironment(process.env[RESTART_PROOF_HOST_VARIABLE]);
+
+// Every host process this test has spawned, killed after it however it ended.
+// A test that times out while a host starts never learns of that host from
+// `startHost`, and its own cleanup may never run, but Playwright still runs
+// `afterEach`; killing a host that has already exited does nothing.
+const spawnedHosts: (() => void)[] = [];
+test.afterEach(() => {
+  for (const kill of spawnedHosts.splice(0)) kill();
+});
+
 const startHost = (): Promise<StartedRestartProofHost> =>
-  host.kind === 'vite' ? startViteHost() : startCommandHost(host.command);
+  host.kind === 'vite'
+    ? startViteHost()
+    : startCommandHost(host.command, { onSpawn: (kill) => spawnedHosts.push(kill) });
 
 test('a SQLite-backed edit survives a fresh host', async ({ browser }) => {
   // `SQLITE_PATH` as the job (or a developer's own export) provides it —
@@ -75,7 +88,7 @@ test('a SQLite-backed edit survives a fresh host', async ({ browser }) => {
   let spaceRemains: boolean | undefined;
   let seeded = false;
 
-  try {
+  const proof = async (): Promise<void> => {
     // Seeded through a connection of its own, closed before either host opens
     // the same file: a second live writer against one SQLite file is
     // unsupported, so this proof never holds more than one connection to
@@ -86,9 +99,9 @@ test('a SQLite-backed edit survives a fresh host', async ({ browser }) => {
       // and for its reason: `initializeAggregate` leaves an initialized
       // repository exactly as it is (ADR 0078), so a file still holding a Space
       // answers `already-initialized`, writes nothing, and sends the drag below
-      // looking for a Resource that was never stored. The outer `finally` handles
-      // this run failing; this handles a run that never reached its `finally` at
-      // all — a killed process, a CI timeout.
+      // looking for a Resource that was never stored. The cleanup that ends this
+      // test handles this run failing; this handles a run that never reached
+      // that cleanup at all — a killed process, a CI timeout.
       await clearSqliteContent(seedDatabase);
       const seedRepository = new SqlSpaceRepository(sqliteSqlStore(seedDatabase));
       // The Map is part of the fixture, and has to be — see the matching
@@ -122,8 +135,10 @@ test('a SQLite-backed edit survives a fresh host', async ({ browser }) => {
 
     await firstContext.close();
     firstContext = undefined;
-    await firstHost.stop();
+    // Cleared before it is stopped, so a stop that fails is not tried again
+    // below on a host that has already exited.
     firstHost = undefined;
+    await first.stop();
 
     // The two hosts run in sequence, never together. Closing the first Vite
     // server does not close its SQLite runtime's database — neither
@@ -149,8 +164,8 @@ test('a SQLite-backed edit survives a fresh host', async ({ browser }) => {
 
     await secondContext.close();
     secondContext = undefined;
-    await secondHost.stop();
     secondHost = undefined;
+    await second.stop();
 
     // Durability is only half of what the aggregate owes; the other half is
     // that it can leave again, at the revision the drag actually reached. An
@@ -168,17 +183,32 @@ test('a SQLite-backed edit survives a fresh host', async ({ browser }) => {
     } finally {
       await exportDatabase.close();
     }
-  } finally {
-    await secondContext?.close();
-    await firstContext?.close();
-    await secondHost?.stop();
-    await firstHost?.stop();
+  };
+
+  // Every step runs whatever failed before it, and the failure reported is the
+  // proof's own or else the first step's (`test/support/run-with-cleanup.ts`):
+  // a host that fails to stop neither hides why the proof failed nor skips the
+  // file's cleanup.
+  await runWithCleanup(proof, [
+    async () => {
+      await secondContext?.close();
+    },
+    async () => {
+      await firstContext?.close();
+    },
+    async () => {
+      await secondHost?.stop();
+    },
+    async () => {
+      await firstHost?.stop();
+    },
     // Clean up the Space and Resource this proof minted, as the PostgreSQL proof
     // does — so a rerun against the same `SQLITE_PATH` (a developer iterating
     // without re-migrating) meets an empty file rather than an
     // already-initialized one. Here, after every host and connection above has
-    // closed, so a failed durability or export step still cleans up.
-    if (seeded) {
+    // closed or failed to, so a failed durability or export step still cleans up.
+    async () => {
+      if (!seeded) return;
       const cleanupDatabase = createSqliteDatabase(path);
       try {
         await clearSqliteContent(cleanupDatabase);
@@ -188,8 +218,8 @@ test('a SQLite-backed edit survives a fresh host', async ({ browser }) => {
       } finally {
         await cleanupDatabase.close();
       }
-    }
-  }
+    },
+  ]);
 
   expect(spaceRemains).toBe(false);
 });
