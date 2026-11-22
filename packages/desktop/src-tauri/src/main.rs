@@ -2,9 +2,11 @@
 //!
 //! A directory named on the command line opens at once; with none named, or
 //! none that opens, the shell asks for one, and File › Open… asks for another
-//! ([`launch`]). Every window is a Space's, a window a Space's page opened,
-//! or a close's question. Each directory opens in a window of its own, served by a run of the Rust host of its own, in this process, through
-//! the application's URI scheme at the Aggregate's own origin; opening it again
+//! ([`launch`]). A folder holding no Space is offered a new one, as File ›
+//! New Space… writes one ([`new_space`]). Every window is a Space's, a window
+//! a Space's page opened, or a close's question. Each directory opens in a
+//! window of its own, served by a run of the Rust host of its own, in this
+//! process, through the application's URI scheme at the Aggregate's own origin; opening it again
 //! focuses that window. A window the Aggregate's page opens (a Resource opened
 //! independently, the Notes window) opens under the same origin. Closing the
 //! Aggregate's window stops its run, which writes any edit not yet on disk first,
@@ -17,6 +19,7 @@
 mod address;
 mod aggregates;
 mod launch;
+mod new_space;
 mod not_opened;
 mod question;
 mod saving;
@@ -33,13 +36,16 @@ use std::sync::mpsc::{Receiver, TryRecvError};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::thread;
 
+use host::{RandomIds, TokioFilesystem};
 use tauri::menu::{IsMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::webview::NewWindowResponse;
 use tauri::{
     AppHandle, Manager, RunEvent, UriSchemeContext, UriSchemeResponder, WebviewUrl,
     WebviewWindowBuilder, WindowEvent, Wry,
 };
-use tauri_plugin_dialog::{DialogExt, MessageDialogBuilder, MessageDialogKind};
+use tauri_plugin_dialog::{
+    DialogExt, MessageDialogBuilder, MessageDialogButtons, MessageDialogKind,
+};
 use tokio::sync::mpsc::{self, UnboundedSender};
 use url::Url;
 
@@ -196,13 +202,15 @@ fn answer_closing(window: tauri::WebviewWindow, choice: String) {
     }
 }
 
-/// The application's menu. File › Open… asks for a folder to open. Its Quit
+/// The application's menu. File › New Space… asks for a folder to write a
+/// new Space to and opens it, and File › Open… asks for a folder to open. Its Quit
 /// asks the application to exit, so a quit waits for each Aggregate's last
 /// write and may ask (the predefined Quit ends the process without asking
 /// the application). On macOS the menu also carries the application, Edit
 /// and Window menus a Mac application has, Edit being what gives a webview
 /// Cut, Copy and Paste there.
 fn app_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
+    let new = MenuItem::with_id(app, NEW_MENU_ITEM, "New Space…", true, Some("CmdOrCtrl+N"))?;
     let open = MenuItem::with_id(app, OPEN_MENU_ITEM, "Open…", true, Some("CmdOrCtrl+O"))?;
     let quit = MenuItem::with_id(
         app,
@@ -224,7 +232,7 @@ fn app_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         app,
         "File",
         true,
-        &[&open, &PredefinedMenuItem::separator(app)?, file_end],
+        &[&new, &open, &PredefinedMenuItem::separator(app)?, file_end],
     )?;
     if !cfg!(target_os = "macos") {
         return Menu::with_items(app, &[&file]);
@@ -270,6 +278,7 @@ fn app_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
 }
 
 /// The menu items the shell answers itself.
+const NEW_MENU_ITEM: &str = "new";
 const OPEN_MENU_ITEM: &str = "open";
 const QUIT_MENU_ITEM: &str = "quit";
 
@@ -293,13 +302,88 @@ fn choose_folder(app: &AppHandle, opening: Opening) {
             // Starting a run reads the whole directory, so it stays off the
             // thread the dialog answered on.
             thread::spawn(move || {
-                if let Err(reason) = open_aggregate_at(&handle, &path)
-                    && reason.tells_the_presenter()
-                {
-                    report_unopened(&handle, opening, &reason.to_string());
+                if let Err(reason) = open_aggregate_at(&handle, &path) {
+                    settle(&handle, opening, reason);
                 }
             });
         });
+}
+
+/// Ask for a folder to write a new Space to, and open it. Cancelling does
+/// nothing; a folder that is not empty, or a Space that could not be
+/// written, is reported.
+fn choose_new_space(app: &AppHandle) {
+    let handle = app.clone();
+    app.dialog()
+        .file()
+        .set_title("New Space: choose an empty folder")
+        .pick_folder(move |folder| {
+            let Some(path) = folder.and_then(|folder| folder.into_path().ok()) else {
+                return;
+            };
+            thread::spawn(move || {
+                if let Err(reason) = create_and_open(&handle, &path) {
+                    settle(&handle, Opening::FromMenu, reason);
+                }
+            });
+        });
+}
+
+/// Write a new Space to `directory` and open it.
+fn create_and_open(app: &AppHandle, directory: &Path) -> Result<(), NotOpened> {
+    tauri::async_runtime::block_on(new_space::create_space(
+        &TokioFilesystem,
+        directory,
+        &RandomIds,
+    ))?;
+    open_aggregate_at(app, directory)
+}
+
+/// Answer a folder asked for `opening` that did not open: offer a new Space
+/// in one that holds none, and otherwise say why, returning once the
+/// presenter has answered. Then, at launch with nothing open, ask for a
+/// folder again ([`launch::after`]).
+fn settle(app: &AppHandle, opening: Opening, reason: NotOpened) {
+    if answer(app, reason) && next(app, opening, Unopened::Failed) == Next::AskAgain {
+        choose_folder(app, Opening::AtLaunch);
+    }
+}
+
+/// Answer why a folder did not open, returning once the presenter has, and
+/// whether it is still unopened. A folder holding no Space is offered a new
+/// one; declining, the folder stays unopened, so at launch the shell asks
+/// for another rather than ending. A close or a quit that took the
+/// Aggregate is not answered.
+fn answer(app: &AppHandle, reason: NotOpened) -> bool {
+    match reason {
+        NotOpened::Empty(directory) => {
+            let create = app
+                .dialog()
+                .message(format!(
+                    "{} holds no Space yet. Create a new Space in it?",
+                    directory.display()
+                ))
+                .title("InfinityCube")
+                .kind(MessageDialogKind::Info)
+                .buttons(MessageDialogButtons::OkCancelCustom(
+                    "Create Space".to_owned(),
+                    "Cancel".to_owned(),
+                ))
+                .blocking_show();
+            if !create {
+                return true;
+            }
+            match create_and_open(app, &directory) {
+                Ok(()) => false,
+                Err(reason) => answer(app, reason),
+            }
+        }
+        reason if reason.tells_the_presenter() => {
+            show_error_and_wait(app, &reason.to_string());
+            true
+        }
+        _ => false,
+    }
 }
 
 /// What comes after a folder question for `opening` that ended `unopened`.
@@ -308,37 +392,20 @@ fn next(app: &AppHandle, opening: Opening, unopened: Unopened) -> Next {
     launch::after(opening, unopened, any_aggregate)
 }
 
-/// Say why a folder did not open, and ask again if nothing else is open.
-fn report_unopened(app: &AppHandle, opening: Opening, message: &str) {
-    match next(app, opening, Unopened::Failed) {
-        Next::AskAgain => {
-            show_error_and_wait(app, message);
-            choose_folder(app, Opening::AtLaunch);
-        }
-        Next::Stay | Next::Exit => show_error(app, message),
-    }
-}
-
-/// Open each folder named on the command line, saying why any did not open,
-/// and asking for one if nothing else is open.
+/// Open each folder named on the command line, then answer each that did
+/// not, asking for one if nothing else is open.
 fn open_from_command_line(app: &AppHandle, folders: &[PathBuf]) {
-    let failed: Vec<String> = folders
+    let unopened: Vec<NotOpened> = folders
         .iter()
         .filter_map(|folder| open_aggregate_at(app, folder).err())
-        .filter(NotOpened::tells_the_presenter)
-        .map(|reason| reason.to_string())
         .collect();
-    let Some((last, others)) = failed.split_last() else {
-        return;
-    };
-    for message in others {
-        if next(app, Opening::AtLaunch, Unopened::Failed) == Next::AskAgain {
-            show_error_and_wait(app, message);
-        } else {
-            show_error(app, message);
-        }
+    let mut still_unopened = false;
+    for reason in unopened {
+        still_unopened |= answer(app, reason);
     }
-    report_unopened(app, Opening::AtLaunch, last);
+    if still_unopened && next(app, Opening::AtLaunch, Unopened::Failed) == Next::AskAgain {
+        choose_folder(app, Opening::AtLaunch);
+    }
 }
 
 /// Open `folder` as an Aggregate in a window of its own, or focus the window
@@ -381,6 +448,7 @@ fn start_aggregate(app: &AppHandle, directory: &Path, label: &str) -> Result<(),
         source,
     };
     let server = match AggregateServer::start(app, directory, label).map_err(could_not)? {
+        Started::Empty => return Err(NotOpened::Empty(directory.to_path_buf())),
         Started::Refused { message } => return Err(NotOpened::Refused(message)),
         Started::Serving(server) => server,
     };
@@ -570,6 +638,8 @@ fn main() {
         .on_menu_event(|app, event| {
             if event.id() == QUIT_MENU_ITEM {
                 app.exit(0);
+            } else if event.id() == NEW_MENU_ITEM {
+                choose_new_space(app);
             } else if event.id() == OPEN_MENU_ITEM {
                 choose_folder(app, Opening::FromMenu);
             }

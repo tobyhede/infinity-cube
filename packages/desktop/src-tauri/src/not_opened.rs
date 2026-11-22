@@ -3,6 +3,8 @@
 
 use std::path::PathBuf;
 
+use host::InitError;
+
 use crate::server::OpenError;
 
 /// Why a folder did not open as an Aggregate. Its text is what the presenter
@@ -12,6 +14,23 @@ pub enum NotOpened {
     /// The run refused the directory, in the intake's words.
     #[error("{0}")]
     Refused(String),
+    /// The folder is missing or holds nothing but dot-entries: the presenter
+    /// is offered a new Space there rather than told why.
+    #[error("{} holds no Space yet.", .0.display())]
+    Empty(PathBuf),
+    /// A new Space was asked for in a folder holding something else.
+    #[error(
+        "{} is not empty. A new Space goes in an empty folder, so nothing was written there.",
+        .0.display()
+    )]
+    NotEmpty(PathBuf),
+    /// A new Space could not be written.
+    #[error("Could not create a Space in {}: {source}", .directory.display())]
+    NotCreated {
+        directory: PathBuf,
+        #[source]
+        source: InitError,
+    },
     /// The directory's last write is still running after a close without
     /// saving (Storage ST-122).
     #[error(
