@@ -13,6 +13,10 @@ http = { workspace = true }
 http-body = "1"
 http-body-util = { workspace = true }
 intake = { workspace = true }
+# Two SQLite clients over one SQLite build: `rusqlite` holds a run's
+# directory lock (`src/lock.rs`), `sqlx` the SQL repository (`src/sql/`).
+# Both link `libsqlite3-sys`, which Cargo admits once (`links = "sqlite3"`),
+# so their versions move together and one bundled SQLite is compiled.
 rusqlite = { version = "0.43", default-features = false, features = ["bundled"] }
 sha2 = { workspace = true }
 sqlx = { version = "0.9.1", default-features = false, features = ["runtime-tokio", "sqlite-bundled"] }
