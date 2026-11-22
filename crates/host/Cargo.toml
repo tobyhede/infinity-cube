@@ -20,6 +20,9 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["fs", "io-util", "macros", "rt", "sync", "time"] }
 uuid = { version = "1", features = ["v4"] }
 
+[target.'cfg(unix)'.dependencies]
+rustix = { version = "1", features = ["fs"] }
+
 [dev-dependencies]
 http-conformance = { workspace = true }
 proptest = "1"

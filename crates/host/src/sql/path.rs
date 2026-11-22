@@ -55,9 +55,7 @@ impl SqlitePath {
             return Err(SqlitePathError::Relative(value.to_owned()));
         }
         let parent = path.parent().unwrap_or(path);
-        let writable = std::fs::metadata(parent)
-            .is_ok_and(|metadata| metadata.is_dir() && !metadata.permissions().readonly());
-        if !writable {
+        if !writable_directory(parent) {
             return Err(SqlitePathError::UnwritableParent(parent.to_path_buf()));
         }
         Ok(Self(path.to_path_buf()))
@@ -68,4 +66,23 @@ impl SqlitePath {
     pub fn as_path(&self) -> &Path {
         &self.0
     }
+}
+
+/// Whether `directory` is a directory this process may write in, asked of
+/// `access(2)` with `W_OK` as `accessSync(parent, constants.W_OK)` asks it: the
+/// running user's permission, not whether any write bit is set, so a
+/// directory only its owner may write is refused to everyone else.
+#[cfg(unix)]
+fn writable_directory(directory: &Path) -> bool {
+    std::fs::metadata(directory).is_ok_and(|metadata| metadata.is_dir())
+        && rustix::fs::access(directory, rustix::fs::Access::WRITE_OK).is_ok()
+}
+
+/// Whether `directory` is a directory. On Windows `accessSync(parent,
+/// constants.W_OK)` asks no more: libuv's `fs__access` answers any directory
+/// as writable, a directory's read-only attribute not being one Windows
+/// honours, so a read-only attribute is not read here either.
+#[cfg(not(unix))]
+fn writable_directory(directory: &Path) -> bool {
+    std::fs::metadata(directory).is_ok_and(|metadata| metadata.is_dir())
 }

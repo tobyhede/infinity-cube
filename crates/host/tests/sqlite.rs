@@ -70,23 +70,57 @@ mod given_a_sqlite_path {
         assert!(!parent.exists(), "nothing is created");
     }
 
+    #[cfg(unix)]
     #[test]
     fn refuses_an_unwritable_parent_naming_it() {
-        use std::os::unix::fs::PermissionsExt;
+        use std::os::unix::fs::PermissionsExt as _;
         let directory = tempfile::tempdir().unwrap();
         let parent = directory.path().join("read-only");
         std::fs::create_dir(&parent).unwrap();
         std::fs::set_permissions(&parent, std::fs::Permissions::from_mode(0o555)).unwrap();
+        // A user the permission bits do not bind (root) can write in it.
+        let writable = std::fs::write(parent.join("probe"), b"").is_ok();
         let file = parent.join("cube.db");
+        let answer = refusal(file.to_str());
+        std::fs::set_permissions(&parent, std::fs::Permissions::from_mode(0o755)).unwrap();
+        if writable {
+            return;
+        }
         assert_eq!(
-            refusal(file.to_str()),
+            answer,
             format!(
                 "SQLite parent directory is missing or unwritable: {}",
                 parent.display()
             ),
             "the parent is named"
         );
-        std::fs::set_permissions(&parent, std::fs::Permissions::from_mode(0o755)).unwrap();
+    }
+
+    // Write bits that are set but bind another user leave the parent
+    // unwritable for this one, as `accessSync(parent, W_OK)` finds it.
+    #[cfg(unix)]
+    #[test]
+    fn refuses_a_parent_only_another_user_may_write_naming_it() {
+        use std::os::unix::fs::MetadataExt as _;
+        let parent = std::path::Path::new("/");
+        let other = std::fs::metadata(parent).unwrap();
+        // A directory this process made is owned by its user.
+        let made = tempfile::tempdir().unwrap();
+        let mine = made.path().metadata().unwrap().uid();
+        // Root, the parent's owner, or anyone if group or others may write,
+        // is not refused by these bits.
+        if mine == 0 || mine == other.uid() || other.mode() & 0o022 != 0 {
+            return;
+        }
+        assert_ne!(other.mode() & 0o200, 0, "its owner may write in it");
+        assert_eq!(
+            refusal(parent.join("cube.db").to_str()),
+            format!(
+                "SQLite parent directory is missing or unwritable: {}",
+                parent.display()
+            ),
+            "the parent is named"
+        );
     }
 
     // ST-126 gives the refusal of a missing file to the CLI alone.
