@@ -45,6 +45,11 @@ default_target() {
 		esac
 		;;
 	Darwin)
+		# As release/install.sh does: a shell running under Rosetta reports
+		# x86_64 on Apple silicon, where the arm64 build is the one installed.
+		if [ "$arch" = x86_64 ] && [ "$(sysctl -n hw.optional.arm64 2>/dev/null || true)" = 1 ]; then
+			arch=arm64
+		fi
 		case "$arch" in
 		arm64 | aarch64) say aarch64-apple-darwin ;;
 		x86_64) say x86_64-apple-darwin ;;
@@ -88,12 +93,14 @@ while [ $# -gt 0 ]; do
 	esac
 done
 
-[ -n "$target" ] || target="$(default_target)"
+native="$(default_target)"
+[ -n "$target" ] || target="$native"
 [ -n "$out" ] || out="$root/target/preview-build"
 mkdir -p "$out"
 out="$(cd "$out" && pwd)"
 
-need node "install the Node version .node-version names ($(cat .node-version))"
+wanted_node="$(cat .node-version)"
+need node "install the Node version .node-version names ($wanted_node)"
 need pnpm "install pnpm 9 (corepack enable, or npm install -g pnpm@9)"
 need cargo "install rustup from https://rustup.rs"
 case "$target" in
@@ -102,7 +109,6 @@ case "$target" in
 	;;
 esac
 
-wanted_node="$(cat .node-version)"
 running_node="$(node --version)"
 if [ "${running_node#v}" != "$wanted_node" ]; then
 	say "release/build.sh: Node is $running_node; .node-version names $wanted_node, which CI uses" >&2
@@ -131,21 +137,25 @@ INFINITY_CUBE_BUILT_APPLICATION=packages/app/dist \
 	cargo build --release --locked -p infinity-cube --target "$target"
 binary="target/$target/release/infinity-cube"
 
+smoke=""
+stage=""
+trap 'rm -rf "$smoke" "$stage"' EXIT
+
 # The binary that ships, run once: it names its version, writes a new Space,
-# and checks it. A binary built for another machine is not run.
-step "Smoke-testing the release binary"
-if shown="$("$binary" --version 2>/dev/null)"; then
+# and checks it. A binary built for another machine's target is not run.
+if [ "$target" = "$native" ]; then
+	step "Smoke-testing the release binary"
+	shown="$("$binary" --version)"
 	say "$shown"
 	case "$shown" in
 	"infinity-cube $version ("*) ;;
 	*) fail "--version printed '$shown'" ;;
 	esac
 	smoke="$(mktemp -d "${TMPDIR:-/tmp}/infinity-cube-smoke.XXXXXX")"
-	trap 'rm -rf "$smoke"' EXIT
 	"$binary" init "$smoke/space"
 	"$binary" check "$smoke/space"
 else
-	say "$binary does not run on this machine, so it is not smoke-tested"
+	say "$target is not this machine's target ($native), so the binary is not smoke-tested"
 fi
 
 # The packed README installs this build, not the newest one, so a tester
@@ -153,7 +163,6 @@ fi
 # release/README.md, read on GitHub, installs the newest.
 step "Packing $name.tar.gz"
 stage="$(mktemp -d "${TMPDIR:-/tmp}/infinity-cube-stage.XXXXXX")"
-trap 'rm -rf "$stage" "${smoke:-}"' EXIT
 mkdir "$stage/$name"
 cp "$binary" LICENSE-MIT LICENSE-APACHE "$stage/$name/"
 sed \
@@ -173,6 +182,3 @@ step "Built $archive"
 cat "$out/SHA256SUMS"
 say "Install it here with:"
 say "  INFINITY_CUBE_DOWNLOAD_URL=file://$out INFINITY_CUBE_VERSION=v$version sh release/install.sh"
-if [ -n "${GITHUB_OUTPUT:-}" ]; then
-	say "archive=$archive" >>"$GITHUB_OUTPUT"
-fi

@@ -99,10 +99,9 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
-      - name: Install the pinned Rust toolchain and the target
-        run: |
-          rustup toolchain install
-          rustup target add "$TARGET"
+      # The toolchain the tests run on; release/build.sh adds the target.
+      - name: Install the pinned Rust toolchain
+        run: rustup toolchain install
       - name: Install musl
         if: endsWith(matrix.target, '-musl')
         run: |
@@ -135,21 +134,19 @@ jobs:
       # archive with a README naming its own version.
       - name: Build, smoke-test and pack the release archive
         id: pack
-        run: sh release/build.sh --target "$TARGET" --out "$RUNNER_TEMP/archive"
+        run: |
+          sh release/build.sh --target "$TARGET" --out "$RUNNER_TEMP/archive"
+          echo "archive=$RUNNER_TEMP/archive/infinity-cube-$VERSION-$TARGET.tar.gz" >> "$GITHUB_OUTPUT"
         env:
           INFINITY_CUBE_COMMIT: ${{ github.sha }}
       # The install script, run as a person runs it but reading this archive
-      # from disk: it installs and runs the binary, replaces it on a second
+      # and the SHA256SUMS release/build.sh wrote beside it from disk: it installs and runs the binary, replaces it on a second
       # run, and installs nothing from an archive SHA256SUMS does not match.
       - name: Install the archive with the install script
         env:
           ARCHIVE: ${{ steps.pack.outputs.archive }}
         run: |
-          served="$RUNNER_TEMP/served"
-          mkdir -p "$served"
-          cp "$ARCHIVE" "$served/"
-          (cd "$served" && shasum -a 256 ./*.tar.gz | sed 's| \./| |' > SHA256SUMS)
-          export INFINITY_CUBE_DOWNLOAD_URL="file://$served"
+          export INFINITY_CUBE_DOWNLOAD_URL="file://$RUNNER_TEMP/archive"
           export INFINITY_CUBE_VERSION="v$VERSION"
           export INFINITY_CUBE_INSTALL_DIR="$RUNNER_TEMP/installed"
           sh release/install.sh
@@ -191,8 +188,8 @@ jobs:
         with: { persist-credentials: false }
       # ShellCheck comes with the runner image. The script is POSIX sh, so it
       # runs under dash, which is Ubuntu's sh, as well as macOS's.
-      - name: ShellCheck the install script
-        run: shellcheck --shell=sh release/install.sh
+      - name: ShellCheck the install and build scripts
+        run: shellcheck --shell=sh release/install.sh release/build.sh
 
   release:
     name: Create the draft release
