@@ -22,14 +22,18 @@ use intake::{SpaceId, SpaceSnapshot, load_aggregate};
 use sqlx::{Database, Transaction};
 
 use crate::assets::{AssetHash, StoredAsset};
-use crate::commit::{CommitDecision, decide_commit};
+use crate::commit::{
+    CommitDecision, SingleSpaceDecision, decide_commit, decide_single_space, single_update_space,
+};
 use crate::memory::authored;
 use crate::repository::{
     AggregateInput, AggregateLoad, AssetStored, CommitResult, InitializeResult, LoadedAggregate,
     LoadedSpace, ReplaceResult, RepositoryError, Revision, SpaceCommit, SpaceRepository,
     SpaceSummary,
 };
-use codec::{ResourceRow, SpaceRow, decode_space, decode_title, encode_revision, encode_space};
+use codec::{
+    ResourceRow, SpaceRow, decode_space, decode_title, encode_revision, encode_space, same_document,
+};
 
 pub use path::{SqlitePath, SqlitePathError};
 pub use sqlite::{ConnectionSettings, SqliteSpaceRepository, SqliteStore};
@@ -94,14 +98,23 @@ pub(crate) trait SqlStore: Send + Sync + 'static {
         id: &str,
     ) -> impl Future<Output = Result<(), sqlx::Error>> + Send;
 
-    /// Delete every Resource row of one Space.
-    fn delete_resources_of(
+    /// Delete every Resource row of one Space whose id `keep` does not name
+    /// (`deleteExcept`).
+    fn delete_resources_except(
         connection: &mut Connection<Self>,
         space_id: &str,
+        keep: &[&str],
     ) -> impl Future<Output = Result<(), sqlx::Error>> + Send;
 
     /// Insert a Resource row.
     fn insert_resource(
+        connection: &mut Connection<Self>,
+        row: &ResourceRow,
+    ) -> impl Future<Output = Result<(), sqlx::Error>> + Send;
+
+    /// Insert a Resource row, or overwrite the document of the one with its
+    /// id, keeping when that row was created (`upsert`).
+    fn upsert_resource(
         connection: &mut Connection<Self>,
         row: &ResourceRow,
     ) -> impl Future<Output = Result<(), sqlx::Error>> + Send;
@@ -151,10 +164,12 @@ pub struct SqlSpaceRepository<S> {
     serial: tokio::sync::Mutex<()>,
 }
 
-/// Why an operation failed: the database, or rows that cannot be read.
+/// Why an operation failed: the database, rows that cannot be read, or rows
+/// this build cannot write.
 enum Failure {
     Database(sqlx::Error),
     Broken(String),
+    Defect(String),
 }
 
 impl From<sqlx::Error> for Failure {
@@ -191,6 +206,7 @@ impl<S> SqlSpaceRepository<S> {
         operation.await.map_err(|failure| match failure {
             Failure::Database(error) => classify(&error),
             Failure::Broken(message) => RepositoryError::BrokenStoredState(message),
+            Failure::Defect(message) => RepositoryError::Unclassified(message),
         })
     }
 }
@@ -219,6 +235,21 @@ impl<S: SqlStore> Rows<S> {
             .collect()
     }
 
+    /// The stored Space with this id, decoded.
+    async fn one_space(
+        connection: &mut Connection<S>,
+        id: SpaceId,
+    ) -> Outcome<Option<LoadedSpace>> {
+        let Some(row) = S::space(connection, id.as_str()).await? else {
+            return Ok(None);
+        };
+        let resources = S::resources_of(connection, id.as_str()).await?;
+        let owned: Vec<&ResourceRow> = resources.iter().collect();
+        decode_space(&row, &owned)
+            .map(Some)
+            .map_err(Failure::Broken)
+    }
+
     async fn stored_meta_space_id(connection: &mut Connection<S>) -> Outcome<Option<SpaceId>> {
         match S::meta_space_id(connection).await? {
             None => Ok(None),
@@ -242,11 +273,59 @@ impl<S: SqlStore> Rows<S> {
         })
     }
 
-    async fn write(connection: &mut Connection<S>, space: &LoadedSpace) -> Outcome<()> {
-        let (row, resources) = encode_space(space);
+    /// Write `space` into a store that holds none of its rows.
+    async fn insert(connection: &mut Connection<S>, space: &LoadedSpace) -> Outcome<()> {
+        let (row, resources) = encode_space(space).map_err(Failure::Defect)?;
         S::write_space(connection, &row).await?;
         for resource in &resources {
             S::insert_resource(connection, resource).await?;
+        }
+        Ok(())
+    }
+
+    /// Remove `deleted` and write `written` as a commit leaves them, writing
+    /// the rows `#writeUpdate` writes: each written Space's row, and only the
+    /// Resource rows it adds or changes, judged against its rows as stored;
+    /// the Resources a written Space drops are deleted first, every written
+    /// Space's before any is written, so a Resource one Space releases and
+    /// another takes is never held twice. The commit was decided against
+    /// these rows inside this transaction, so a Resource a written Space
+    /// does not hold is held by no Space but one it was released from.
+    async fn write_changes(
+        connection: &mut Connection<S>,
+        deleted: &[SpaceId],
+        written: &[LoadedSpace],
+    ) -> Outcome<()> {
+        for id in deleted {
+            S::delete_space(connection, id.as_str()).await?;
+        }
+        let encoded = written
+            .iter()
+            .map(encode_space)
+            .collect::<Result<Vec<_>, String>>()
+            .map_err(Failure::Defect)?;
+        for (row, resources) in &encoded {
+            let keep: Vec<&str> = resources
+                .iter()
+                .map(|resource| resource.id.as_str())
+                .collect();
+            S::delete_resources_except(connection, &row.id, &keep).await?;
+        }
+        for (row, resources) in &encoded {
+            S::write_space(connection, row).await?;
+            let stored: BTreeMap<String, String> = S::resources_of(connection, &row.id)
+                .await?
+                .into_iter()
+                .map(|resource| (resource.id, resource.document))
+                .collect();
+            for resource in resources {
+                let unchanged = stored
+                    .get(&resource.id)
+                    .is_some_and(|document| same_document(document, &resource.document));
+                if !unchanged {
+                    S::upsert_resource(connection, resource).await?;
+                }
+            }
         }
         Ok(())
     }
@@ -268,7 +347,7 @@ impl<S: SqlStore> Rows<S> {
             .collect();
         spaces.sort_by_key(|space| space.snapshot.id);
         for space in &spaces {
-            Rows::<S>::write(connection, space).await?;
+            Rows::<S>::insert(connection, space).await?;
         }
         S::insert_meta_space_id(connection, input.meta_space_id.as_str()).await?;
         Rows::<S>::authoritative(connection, input.meta_space_id).await
@@ -296,16 +375,9 @@ impl<S: SqlStore> SpaceRepository for SqlSpaceRepository<S> {
     async fn load_space(&self, id: SpaceId) -> Result<Option<LoadedSpace>, RepositoryError> {
         self.alone(S::classify, async {
             let mut transaction = self.store.begin_read().await?;
-            let Some(row) = S::space(&mut transaction, id.as_str()).await? else {
-                transaction.commit().await?;
-                return Ok(None);
-            };
-            let resources = S::resources_of(&mut transaction, id.as_str()).await?;
+            let loaded = Rows::<S>::one_space(&mut transaction, id).await;
             transaction.commit().await?;
-            let owned: Vec<&ResourceRow> = resources.iter().collect();
-            decode_space(&row, &owned)
-                .map(Some)
-                .map_err(Failure::Broken)
+            loaded
         })
         .await
     }
@@ -332,6 +404,24 @@ impl<S: SqlStore> SpaceRepository for SqlSpaceRepository<S> {
         self.alone(S::classify, async {
             let mut transaction = self.store.begin_write().await?;
             let meta_space_id = Rows::<S>::stored_meta_space_id(&mut transaction).await?;
+            // A single update is decided against its own Space first, reading
+            // no other (`#commitTopologyPreservingUpdate`), so another stored
+            // Space that cannot be read does not fail it.
+            if let Some(space_id) = single_update_space(&request) {
+                let current = Rows::<S>::one_space(&mut transaction, space_id).await?;
+                match decide_single_space(&request, meta_space_id, current.as_ref()) {
+                    SingleSpaceDecision::Answer(result) => {
+                        transaction.rollback().await?;
+                        return Ok(result);
+                    }
+                    SingleSpaceDecision::Write { result, written } => {
+                        Rows::<S>::write_changes(&mut transaction, &[], &[written]).await?;
+                        transaction.commit().await?;
+                        return Ok(result);
+                    }
+                    SingleSpaceDecision::Aggregate => {}
+                }
+            }
             let stored = Rows::<S>::every_space(&mut transaction).await?;
             match decide_commit(&request, meta_space_id, stored.iter()) {
                 CommitDecision::Answer(result) => {
@@ -343,18 +433,7 @@ impl<S: SqlStore> SpaceRepository for SqlSpaceRepository<S> {
                     written,
                     deleted,
                 } => {
-                    for id in &deleted {
-                        S::delete_space(&mut transaction, id.as_str()).await?;
-                    }
-                    // Every written Space's Resources go first, so a Resource
-                    // one Space releases and another takes is never held twice.
-                    for space in &written {
-                        S::delete_resources_of(&mut transaction, space.snapshot.id.as_str())
-                            .await?;
-                    }
-                    for space in &written {
-                        Rows::<S>::write(&mut transaction, space).await?;
-                    }
+                    Rows::<S>::write_changes(&mut transaction, &deleted, &written).await?;
                     transaction.commit().await?;
                     Ok(result)
                 }

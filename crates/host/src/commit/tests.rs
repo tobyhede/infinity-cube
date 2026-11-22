@@ -534,3 +534,160 @@ mod given_a_commit_removing_the_last_resource_of_a_missing_kind {
         );
     }
 }
+
+/// `decide_single_space` is a shortcut through `decide_commit` and never a
+/// second set of rules: over a stored aggregate that can be read, it answers
+/// as `decide_commit` answers, or hands the commit to it.
+mod given_a_single_update_decided_against_its_own_space {
+    use super::*;
+
+    const UNKNOWN_RESOURCE: &str = "00000000-0000-4000-8000-0000000000ff";
+
+    /// The child as `plain` writes it, with `from` replaced by `to` in its
+    /// JSON text.
+    fn child_with(from: &str, to: &str) -> SpaceSnapshot {
+        let json = format!(
+            r#"{{"id":"{CHILD}","document":{{"version":1,"title":"Child","maps":[{{"id":"00000000-0000-4000-8000-0000000002a1","title":"M","kind":"positioned","positions":{{}},"graphs":[{{"id":"00000000-0000-4000-8000-0000000002b1","title":"G","edges":[]}}]}}]}},"resources":[]}}"#
+        );
+        assert!(json.contains(from), "{from} is in the child");
+        snapshot(&json.replace(from, to))
+    }
+
+    /// The Meta Space selecting `graph` of the child's Map.
+    fn meta_selecting(graph: &str) -> SpaceSnapshot {
+        snapshot(&format!(
+            r#"{{"id":"{META}","document":{{"version":1,"title":"Meta"}},"resources":[{{"id":"00000000-0000-4000-8000-000000000201","document":{{"title":"Child","kind":"space","content":{{"spaceId":"{CHILD}","map":"00000000-0000-4000-8000-0000000002a1","graph":"{graph}"}}}}}}]}}"#
+        ))
+    }
+
+    fn decided(change: SpaceChange, stored: &[LoadedSpace]) -> SingleSpaceDecision {
+        let request = commit(vec![change]);
+        let current = single_update_space(&request)
+            .and_then(|space| stored.iter().find(|loaded| loaded.snapshot.id == space));
+        decide_single_space(&request, Some(id(META)), current)
+    }
+
+    #[test]
+    fn the_fixtures_build_the_stored_spaces() {
+        assert_eq!(
+            child_with("Child", "Child"),
+            plain(CHILD, "Child"),
+            "the child"
+        );
+        assert_eq!(
+            meta_selecting("00000000-0000-4000-8000-0000000002b1"),
+            meta_holding(CHILD, "space"),
+            "the Meta Space"
+        );
+    }
+
+    #[test]
+    fn answers_a_stale_or_missing_space_as_decide_commit_does() {
+        for change in [
+            update(plain(CHILD, "Renamed"), 2),
+            update(plain(OTHER, "Other"), 3),
+        ] {
+            let request = commit(vec![change.clone()]);
+            assert_eq!(
+                decided(change, &two_spaces()),
+                SingleSpaceDecision::Answer(answer(decide_commit(
+                    &request,
+                    Some(id(META)),
+                    &two_spaces()
+                ))),
+                "the conflict decide_commit answers"
+            );
+        }
+    }
+
+    #[test]
+    fn writes_an_update_moving_no_boundary_as_decide_commit_does() {
+        let mut stored = two_spaces();
+        stored[1].exported_revision = Revision::new(2);
+        let change = update(plain(CHILD, "Renamed"), 3);
+        let CommitDecision::Write {
+            result, written, ..
+        } = decide_commit(&commit(vec![change.clone()]), Some(id(META)), &stored)
+        else {
+            panic!("decide_commit writes the rename");
+        };
+        assert_eq!(
+            decided(change, &stored),
+            SingleSpaceDecision::Write {
+                result,
+                written: written[0].clone(),
+            },
+            "the same answer and the same Space written"
+        );
+    }
+
+    #[test]
+    fn hands_on_an_update_moving_a_boundary_or_failing_its_own_intake() {
+        let placed = format!(r#""positions":{{"{UNKNOWN_RESOURCE}":{{"x":0,"y":0}}}}"#);
+        let added = format!(
+            r#""resources":[{{"id":"{UNKNOWN_RESOURCE}","document":{{"title":"Note","kind":"ur","content":{{}}}}}}]"#
+        );
+        for (what, next) in [
+            ("a Map id", child_with("0002a1", "0002a9")),
+            ("a Graph id", child_with("0002b1", "0002b9")),
+            (
+                "the default Map",
+                child_with(
+                    r#""title":"Child","#,
+                    r#""title":"Child","defaultMap":"00000000-0000-4000-8000-0000000002a1","#,
+                ),
+            ),
+            (
+                "a placement of a Resource it does not hold",
+                child_with(r#""positions":{}"#, &placed),
+            ),
+            ("a Resource added", child_with(r#""resources":[]"#, &added)),
+            ("a Resource's kind", meta_holding(CHILD, "unlisted")),
+            (
+                "a Space Resource's selection",
+                meta_selecting("00000000-0000-4000-8000-0000000002b2"),
+            ),
+        ] {
+            assert_eq!(
+                decided(update(next, 3), &two_spaces()),
+                SingleSpaceDecision::Aggregate,
+                "{what}"
+            );
+        }
+    }
+
+    #[test]
+    fn hands_on_any_other_change_set() {
+        for request in [
+            commit(vec![SpaceChange::Create {
+                space_id: id(OTHER),
+                snapshot: plain(OTHER, "Other"),
+            }]),
+            commit(vec![
+                update(plain(CHILD, "Renamed"), 3),
+                update(meta_holding(CHILD, "space"), 3),
+            ]),
+        ] {
+            assert_eq!(single_update_space(&request), None, "no one Space");
+            assert_eq!(
+                decide_single_space(&request, Some(id(META)), Some(&two_spaces()[1])),
+                SingleSpaceDecision::Aggregate,
+                "{request:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn hands_on_a_write_to_a_store_with_no_meta_space() {
+        let stored = two_spaces();
+        assert_eq!(
+            decide_single_space(
+                &commit(vec![update(plain(CHILD, "Renamed"), 3)]),
+                None,
+                Some(&stored[1])
+            ),
+            SingleSpaceDecision::Aggregate,
+            "decide_commit refuses it"
+        );
+    }
+}

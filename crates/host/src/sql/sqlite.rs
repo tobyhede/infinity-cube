@@ -1,15 +1,19 @@
 //! SQLite's store of statements (`src/sqlite/sql-store.ts`), over the schema
 //! `migrations-sql/sqlite/` and Prisma Next's `migrations-sqlite/` both
-//! produce, writing the rows the TypeScript host writes so each runtime reads
-//! the other's (Storage ST-125).
+//! produce (Storage ST-125). It reads the rows the TypeScript host writes
+//! (`tests/sqlite.rs` › `given_rows_the_typescript_host_wrote`) and writes
+//! rows of the same shape (`given_rows_the_typescript_host_reads`).
 //!
 //! The file is opened as ST-128 says: the rollback journal in `delete` mode
 //! and `synchronous=FULL`, set on every connection rather than left to the
 //! driver. Nothing here migrates, and nothing creates a file that does not
-//! exist: one that is missing answers as a store that is not answering.
+//! exist: one that is missing answers as a store that is not answering, where
+//! the TypeScript host's driver creates an empty file and then fails on its
+//! missing tables.
 
 use std::time::Duration;
 
+use intake::json::JsonValue;
 use sqlx::sqlite::{
     SqliteConnectOptions, SqliteConnection, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous,
 };
@@ -19,6 +23,7 @@ use super::codec::{ResourceRow, SpaceRow};
 use super::path::SqlitePath;
 use super::{SqlSpaceRepository, SqlStore};
 use crate::assets::StoredAsset;
+use crate::json_text::compact;
 use crate::repository::RepositoryError;
 
 /// How long an operation waits on a lock another process holds on the file
@@ -64,7 +69,8 @@ impl SqlSpaceRepository<SqliteStore> {
     /// The repository over the file `path` names, waiting at most five
     /// seconds on a lock another process holds. Nothing is opened until the
     /// first operation, and every operation opens the file again if it
-    /// failed to before.
+    /// failed to before (`tests/sqlite.rs` ›
+    /// `opens_the_file_once_it_exists_after_failing_to`).
     #[must_use]
     pub fn open(path: &SqlitePath) -> Self {
         Self::open_with_busy_timeout(path, DEFAULT_BUSY_TIMEOUT)
@@ -244,23 +250,39 @@ impl SqlStore for SqliteStore {
     }
 
     async fn delete_space(connection: &mut SqliteConnection, id: &str) -> Result<(), sqlx::Error> {
-        Self::delete_resources_of(&mut *connection, id).await?;
-        sqlx::query("DELETE FROM spaces WHERE id = $1")
-            .bind(id)
-            .execute(connection)
-            .await
-            .map(drop)
+        for statement in [
+            "DELETE FROM resources WHERE space_id = $1",
+            "DELETE FROM spaces WHERE id = $1",
+        ] {
+            sqlx::query(statement)
+                .bind(id)
+                .execute(&mut *connection)
+                .await?;
+        }
+        Ok(())
     }
 
-    async fn delete_resources_of(
+    async fn delete_resources_except(
         connection: &mut SqliteConnection,
         space_id: &str,
+        keep: &[&str],
     ) -> Result<(), sqlx::Error> {
-        sqlx::query("DELETE FROM resources WHERE space_id = $1")
-            .bind(space_id)
-            .execute(connection)
-            .await
-            .map(drop)
+        // The ids to keep go as one JSON array, so the statement is the same
+        // however many there are.
+        let keep = JsonValue::Array(
+            keep.iter()
+                .map(|id| JsonValue::String((*id).to_owned()))
+                .collect(),
+        );
+        sqlx::query(
+            "DELETE FROM resources WHERE space_id = $1 \
+             AND id NOT IN (SELECT value FROM json_each($2))",
+        )
+        .bind(space_id)
+        .bind(compact(&keep))
+        .execute(connection)
+        .await
+        .map(drop)
     }
 
     async fn insert_resource(
@@ -269,6 +291,23 @@ impl SqlStore for SqliteStore {
     ) -> Result<(), sqlx::Error> {
         sqlx::query(sqlx::AssertSqlSafe(format!(
             "INSERT INTO resources (id, space_id, document, updated_at) VALUES ($1, $2, $3, {NOW})"
+        )))
+        .bind(&row.id)
+        .bind(&row.space_id)
+        .bind(&row.document)
+        .execute(connection)
+        .await
+        .map(drop)
+    }
+
+    async fn upsert_resource(
+        connection: &mut SqliteConnection,
+        row: &ResourceRow,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(sqlx::AssertSqlSafe(format!(
+            "INSERT INTO resources (id, space_id, document, updated_at) VALUES ($1, $2, $3, {NOW}) \
+             ON CONFLICT (id) DO UPDATE SET document = excluded.document, \
+             updated_at = excluded.updated_at"
         )))
         .bind(&row.id)
         .bind(&row.space_id)

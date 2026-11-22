@@ -18,20 +18,7 @@ impl Migrated {
     pub async fn new() -> Self {
         let directory = tempfile::tempdir().unwrap();
         let file = directory.path().join("cube.db");
-        let mut connection = sqlx::sqlite::SqliteConnectOptions::new()
-            .filename(&file)
-            .create_if_missing(true)
-            .connect()
-            .await
-            .unwrap();
-        let migrations = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../migrations-sql/sqlite");
-        sqlx::migrate::Migrator::new(migrations)
-            .await
-            .unwrap()
-            .run(&mut connection)
-            .await
-            .unwrap();
-        sqlx::Connection::close(connection).await.unwrap();
+        migrate(&file).await;
         Self {
             _directory: directory,
             file,
@@ -42,6 +29,24 @@ impl Migrated {
     pub fn path(&self) -> SqlitePath {
         SqlitePath::from_variable(self.file.to_str()).unwrap()
     }
+}
+
+/// Create `file` and migrate it, as `pnpm db:migrate:sqlite` would.
+pub async fn migrate(file: &Path) {
+    let mut connection = sqlx::sqlite::SqliteConnectOptions::new()
+        .filename(file)
+        .create_if_missing(true)
+        .connect()
+        .await
+        .unwrap();
+    let migrations = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../migrations-sql/sqlite");
+    sqlx::migrate::Migrator::new(migrations)
+        .await
+        .unwrap()
+        .run(&mut connection)
+        .await
+        .unwrap();
+    sqlx::Connection::close(connection).await.unwrap();
 }
 
 /// A connection of its own to `file`, outside any repository.

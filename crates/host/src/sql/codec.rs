@@ -1,7 +1,7 @@
-//! A stored Space as rows, the rows the TypeScript SQL repository writes and
-//! reads (`src/persistence/sql-space-repository.ts`): the space document and
-//! each Resource document as JSON text, and revisions as canonical decimal
-//! text (`encodeStoredRevision`).
+//! A stored Space as rows of the shape the TypeScript SQL repository writes
+//! and reads (`src/persistence/sql-space-repository.ts`): the space document
+//! and each Resource document as JSON text, and revisions as canonical
+//! decimal text (`encodeStoredRevision`).
 
 use intake::json::{JsonObject, JsonValue, parse};
 use intake::{SpaceId, SpaceSnapshot, decode_space_snapshot, load_space};
@@ -44,33 +44,68 @@ fn decode_revision(text: &str) -> Option<Revision> {
 }
 
 /// A Space as its rows: the space row, and one row per Resource in the
-/// snapshot's order.
-pub(crate) fn encode_space(space: &LoadedSpace) -> (SpaceRow, Vec<ResourceRow>) {
+/// snapshot's order; or, when its wire form lacks a member it always has, why
+/// not, so a defect fails the write rather than storing a row the decoder
+/// refuses.
+pub(crate) fn encode_space(space: &LoadedSpace) -> Result<(SpaceRow, Vec<ResourceRow>), String> {
     let wire = wire_snapshot(&space.snapshot);
     let id = space.snapshot.id.as_str().to_owned();
+    let missing = |what: &str| format!("Space {id}'s wire form has no {what}");
     let field = |value: &JsonValue, key: &str| value.as_object().and_then(|o| o.get(key)).cloned();
-    let document = field(&wire, "document").map_or_else(String::new, |value| compact(&value));
-    let resources = match field(&wire, "resources") {
-        Some(JsonValue::Array(resources)) => resources
-            .iter()
-            .map(|resource| ResourceRow {
+    let document = field(&wire, "document").ok_or_else(|| missing("document"))?;
+    let Some(JsonValue::Array(resources)) = field(&wire, "resources") else {
+        return Err(missing("Resource list"));
+    };
+    let resources = resources
+        .iter()
+        .map(|resource| {
+            Ok(ResourceRow {
                 id: field(resource, "id")
                     .and_then(|value| value.as_str().map(str::to_owned))
-                    .unwrap_or_default(),
+                    .ok_or_else(|| missing("Resource id"))?,
                 space_id: id.clone(),
-                document: field(resource, "document")
-                    .map_or_else(String::new, |value| compact(&value)),
+                document: compact(
+                    &field(resource, "document").ok_or_else(|| missing("Resource document"))?,
+                ),
             })
-            .collect(),
-        _ => Vec::new(),
-    };
+        })
+        .collect::<Result<Vec<_>, String>>()?;
     let row = SpaceRow {
-        id,
-        document,
+        id: id.clone(),
+        document: compact(&document),
         revision: encode_revision(space.revision),
         exported_revision: space.exported_revision.map(encode_revision),
     };
-    (row, resources)
+    Ok((row, resources))
+}
+
+/// Whether two stored documents hold the same JSON, an object's keys in any
+/// order, as `isDeepStrictEqual` compares the documents `#writeUpdate` reads.
+/// Text that does not parse holds no document another can equal.
+pub(crate) fn same_document(left: &str, right: &str) -> bool {
+    match (parse(left), parse(right)) {
+        (Ok(left), Ok(right)) => same_json(&left, &right),
+        _ => false,
+    }
+}
+
+fn same_json(left: &JsonValue, right: &JsonValue) -> bool {
+    match (left, right) {
+        (JsonValue::Object(left), JsonValue::Object(right)) => {
+            left.len() == right.len()
+                && left
+                    .iter()
+                    .all(|(key, value)| right.get(key).is_some_and(|other| same_json(value, other)))
+        }
+        (JsonValue::Array(left), JsonValue::Array(right)) => {
+            left.len() == right.len()
+                && left
+                    .iter()
+                    .zip(right)
+                    .all(|(value, other)| same_json(value, other))
+        }
+        _ => left == right,
+    }
 }
 
 /// The title a stored space document carries.
@@ -131,6 +166,34 @@ pub(crate) fn decode_space(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    mod given_two_stored_documents {
+        use super::*;
+
+        #[test]
+        fn are_the_same_whatever_order_an_object_s_keys_are_in() {
+            assert!(
+                same_document(
+                    r#"{"a":1,"b":{"c":[1,{"d":2,"e":3}]}}"#,
+                    r#"{"b":{"c":[1,{"e":3,"d":2}]},"a":1}"#
+                ),
+                "keys in another order"
+            );
+        }
+
+        #[test]
+        fn differ_by_a_value_a_key_or_an_array_s_order() {
+            for (left, right) in [
+                (r#"{"a":1}"#, r#"{"a":2}"#),
+                (r#"{"a":1}"#, r#"{"b":1}"#),
+                (r#"{"a":1}"#, r#"{"a":1,"b":1}"#),
+                ("[1,2]", "[2,1]"),
+                ("not json", "not json"),
+            ] {
+                assert!(!same_document(left, right), "{left} and {right}");
+            }
+        }
+    }
 
     mod given_stored_revision_text {
         use super::*;

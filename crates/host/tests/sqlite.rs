@@ -23,7 +23,7 @@ use host::{
 };
 use http_conformance::{Counted, META};
 use intake::SpaceId;
-use sqlite_support::{Migrated, execute, hold_exclusive_lock, on_file};
+use sqlite_support::{Migrated, execute, hold_exclusive_lock, migrate, on_file};
 
 mod given_a_sqlite_path {
     use super::*;
@@ -240,6 +240,26 @@ mod given_a_migrated_file {
             "a file that does not exist is not answering"
         );
         assert!(!file.exists(), "nothing is created");
+    }
+
+    #[tokio::test]
+    async fn opens_the_file_once_it_exists_after_failing_to() {
+        let directory = tempfile::tempdir().unwrap();
+        let file = directory.path().join("cube.db");
+        let store = open(&SqlitePath::from_variable(file.to_str()).unwrap());
+        assert!(
+            matches!(
+                store.load_aggregate().await,
+                Err(RepositoryError::Unavailable(_))
+            ),
+            "not yet answering"
+        );
+        migrate(&file).await;
+        assert_eq!(
+            store.load_aggregate().await,
+            Ok(AggregateLoad::Uninitialized),
+            "the same repository answers once the file is there"
+        );
     }
 }
 
@@ -474,9 +494,9 @@ mod given_the_memory_store_and_a_sqlite_file {
     }
 }
 
-/// The rows each runtime writes are the rows the other reads (ST-125): the
-/// space document and each Resource document as JSON text, the revision as
-/// decimal text.
+/// The rows this repository writes are rows of the shape the TypeScript host
+/// reads (ST-125): the space document and each Resource document as JSON
+/// text, the revision as decimal text.
 mod given_rows_the_typescript_host_reads {
     use super::*;
 
@@ -508,6 +528,184 @@ mod given_rows_the_typescript_host_reads {
             .as_deref(),
             Some(META),
             "the Meta identity as stored"
+        );
+    }
+}
+
+/// Rows the TypeScript host wrote (ST-125), importing the tracked fixture
+/// into a migrated file (`fixtures/typescript-sqlite-rows.sql`, written by
+/// `scripts/sqlite-rows-fixture.ts`), replayed over a freshly migrated file.
+mod given_rows_the_typescript_host_wrote {
+    use super::*;
+
+    async fn replayed() -> (SqliteSpaceRepository, Migrated) {
+        let file = Migrated::new().await;
+        execute(
+            &file.file,
+            include_str!("fixtures/typescript-sqlite-rows.sql"),
+        )
+        .await;
+        (open(&file.path()), file)
+    }
+
+    #[tokio::test]
+    async fn reads_the_aggregate_and_its_assets_as_this_host_imports_them() {
+        let (sqlite, _file) = replayed().await;
+        let memory = seeded(MemorySpaceRepository::new()).await;
+        assert_eq!(
+            sqlite.load_aggregate().await,
+            memory.load_aggregate().await,
+            "the aggregate"
+        );
+        assert_eq!(
+            sqlite.list_spaces().await,
+            memory.list_spaces().await,
+            "the Spaces listed"
+        );
+        let mut assets = 0;
+        for entry in std::fs::read_dir(http_conformance::fixture().join("assets")).unwrap() {
+            let name = entry.unwrap().file_name().into_string().unwrap();
+            let hash = AssetHash::parse(name.split('.').next().unwrap()).unwrap();
+            let stored = sqlite.load_asset(&hash).await.unwrap();
+            assert!(stored.is_some(), "asset {name}");
+            assert_eq!(
+                stored,
+                memory.load_asset(&hash).await.unwrap(),
+                "asset {name}"
+            );
+            assets += 1;
+        }
+        assert!(assets > 0, "the fixture has assets");
+    }
+
+    #[tokio::test]
+    async fn commits_an_edit_over_them() {
+        let (sqlite, _file) = replayed().await;
+        let loaded = sqlite.load_space(meta()).await.unwrap().unwrap();
+        assert_eq!(
+            sqlite.commit(rename(&loaded, "Renamed")).await,
+            Ok(CommitResult::Committed {
+                revisions: vec![(meta(), loaded.revision.next())],
+                deleted_space_ids: vec![],
+            }),
+            "the Edit lands"
+        );
+    }
+}
+
+/// An Edit to one Space (ST-3, `#commitTopologyPreservingUpdate` and
+/// `#writeUpdate` in `src/persistence/sql-space-repository.ts`): decided
+/// against that Space alone when it moves no snapshot boundary, and writing
+/// only the Resource rows it changes.
+mod given_an_edit_to_one_space {
+    use super::*;
+
+    /// A Space of the fixture other than Meta.
+    fn other() -> &'static str {
+        http_conformance::FIXTURE_SPACES
+            .into_iter()
+            .find(|id| *id != META)
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn commits_beside_another_space_that_is_broken() {
+        let file = Migrated::new().await;
+        let store = seeded(open(&file.path())).await;
+        let loaded = store.load_space(meta()).await.unwrap().unwrap();
+        store.close().await;
+        execute(
+            &file.file,
+            &format!(
+                "UPDATE spaces SET document = 'not json' WHERE id = '{}'",
+                other()
+            ),
+        )
+        .await;
+        let store = open(&file.path());
+        assert_eq!(
+            store.commit(rename(&loaded, "Renamed")).await,
+            Ok(CommitResult::Committed {
+                revisions: vec![(meta(), loaded.revision.next())],
+                deleted_space_ids: vec![],
+            }),
+            "the Edit is decided against its own Space"
+        );
+        assert_eq!(
+            store
+                .load_space(meta())
+                .await
+                .unwrap()
+                .map(|space| space.snapshot.document.title),
+            Some("Renamed".to_owned()),
+            "and written"
+        );
+    }
+
+    #[tokio::test]
+    async fn rewrites_only_the_resource_rows_it_changes() {
+        const BEFORE: &str = "2000-01-01T00:00:00.000Z";
+        let file = Migrated::new().await;
+        let store = seeded(open(&file.path())).await;
+        let loaded = store.load_space(meta()).await.unwrap().unwrap();
+        store.close().await;
+        execute(
+            &file.file,
+            &format!("UPDATE resources SET created_at = '{BEFORE}', updated_at = '{BEFORE}'"),
+        )
+        .await;
+        let untouched = format!(
+            "SELECT COUNT(*) || ' of ' || (SELECT COUNT(*) FROM resources) FROM resources \
+             WHERE created_at = '{BEFORE}' AND updated_at = '{BEFORE}'"
+        );
+        let all = on_file(&file.file, &untouched).await.unwrap();
+
+        let store = open(&file.path());
+        store.commit(rename(&loaded, "Renamed")).await.unwrap();
+        assert_eq!(
+            on_file(&file.file, &untouched).await.unwrap(),
+            all,
+            "renaming the Space rewrites no Resource row"
+        );
+
+        let loaded = store.load_space(meta()).await.unwrap().unwrap();
+        let mut retitled = loaded.snapshot.clone();
+        let resource = retitled.resources[0].id;
+        "Retitled".clone_into(&mut retitled.resources[0].title);
+        let committed = store
+            .commit(SpaceCommit {
+                changes: vec![SpaceChange::Update {
+                    space_id: retitled.id,
+                    snapshot: retitled,
+                    expected_revision: loaded.revision,
+                }],
+            })
+            .await
+            .unwrap();
+        assert!(
+            matches!(committed, CommitResult::Committed { .. }),
+            "the retitling lands: {committed:?}"
+        );
+        store.close().await;
+        assert_eq!(
+            on_file(
+                &file.file,
+                &format!(
+                    "SELECT CAST(created_at = '{BEFORE}' AND updated_at <> '{BEFORE}' \
+                     AND json_extract(document, '$.title') = 'Retitled' AS TEXT) \
+                     FROM resources WHERE id = '{resource}'"
+                )
+            )
+            .await
+            .as_deref(),
+            Some("1"),
+            "the retitled Resource's row is updated in place, keeping when it was created"
+        );
+        let (count, total) = all.split_once(" of ").unwrap();
+        assert_eq!(
+            on_file(&file.file, &untouched).await.unwrap(),
+            format!("{} of {total}", count.parse::<u32>().unwrap() - 1),
+            "every other Resource row is left as it was"
         );
     }
 }
