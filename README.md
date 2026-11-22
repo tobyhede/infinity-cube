@@ -55,13 +55,13 @@ This takes you from a fresh clone to the desktop application open on a Space of 
 
    Done when Cargo prints `Finished` and `target/debug/infinity-cube-desktop` exists. After pulling changes, run `pnpm install` and both commands again.
 
-5. **Open the Space.** `target/debug/infinity-cube-desktop ~/spaces/rust-async`. Done when a Space window named after the folder shows the Space's Map with `Resource 1` on it. A small home window opens beside it; its **Open…** button opens another Space's folder.
+5. **Open the Space.** `target/debug/infinity-cube-desktop ~/spaces/rust-async`. Done when one window, named after the folder, shows the Space's Map with `Resource 1` on it. **File › Open…** (Ctrl+O, or Command-O on macOS) opens another Space's folder in a window of its own; started with no folder, the application asks for one.
 
 6. **Edit.** Pick a Graph in the Command Dock, the toolbar floating over the canvas; every Graph stays drawn, and the one you pick is emphasised. Select a Resource to reveal its toolbar, and use Edit to write its Title and Markdown. Drag a Resource to move it. Drag from one of a Resource's four handles to another Resource to add an Edge to the Active Graph; hold Option (macOS) or Alt and drop on empty canvas to create a new Resource and connect it in one go. Done when the save indicator reads `Persisted`.
 
 7. **Present.** Press **Present**: `→` follows an Edge, `←` goes back, `↑` / `↓` choose at a fork. Done when `Esc` returns you to the Map as you left it.
 
-8. **Close the window.** Closing the Space window writes every pending edit. If a write is still running after ten seconds, it asks whether to keep waiting, which is always safe, or close without saving, which loses the edits not yet written. If a write fails, a dialog says why, and those edits are not on disk. Close the home window too to end the application (on macOS, Quit). Don't press Ctrl-C, close the terminal or send a signal while a Space window is open: any of them ends the application at once, and edits not yet written are lost. Done when both windows have closed with no dialog and the terminal has its prompt back.
+8. **Close the window.** Closing the Space window writes every pending edit. If a write is still running after ten seconds, it asks whether to keep waiting, which is always safe, or close without saving, which loses the edits not yet written. If a write fails, a dialog says why, and those edits are not on disk. Closing the last Space window ends the application. Don't press Ctrl-C, close the terminal or send a signal while a Space window is open: any of them ends the application at once, and edits not yet written are lost. Done when the window has closed with no dialog and the terminal has its prompt back.
 
 9. **Commit.** `git -C ~/spaces/rust-async add -A && git -C ~/spaces/rust-async commit -m "First draft"`. Done when `git -C ~/spaces/rust-async status` is clean.
 

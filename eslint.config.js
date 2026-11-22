@@ -756,7 +756,7 @@ export default tseslint.config(
     files: ['**/*.{js,mjs,cjs}'],
     extends: [tseslint.configs.disableTypeChecked],
   },
-  // The desktop shell's home window runs this script in its webview, with no
+  // The desktop shell's close question window runs this script in its webview, with no
   // bundler (packages/desktop/ui/).
   {
     files: ['packages/desktop/ui/**/*.js'],

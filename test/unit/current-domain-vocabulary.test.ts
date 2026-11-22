@@ -3590,8 +3590,8 @@ describe('the word for what a person opens is gone (ADR 0164)', () => {
     expect(authored).toContain('.claude-plugin/marketplace.json');
     expect(authored).not.toContain('pnpm-lock.yaml');
     expect(authored).toContain('packages/desktop/src-tauri/src/aggregates.rs');
-    expect(authored).toContain('packages/desktop/src-tauri/capabilities/home.json');
-    expect(authored).toContain('packages/desktop/ui/index.html');
+    expect(authored).toContain('packages/desktop/src-tauri/capabilities/closing.json');
+    expect(authored).toContain('packages/desktop/ui/closing.html');
     expect(authored).toContain('packages/app/src/components/NotesWindow.tsx');
     expect(authored).toContain('packages/app/src/components/notes-window.css');
     expect(authored).toContain('packages/graph/src/presentation-notes.ts');

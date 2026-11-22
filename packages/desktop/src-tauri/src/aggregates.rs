@@ -287,9 +287,9 @@ mod tests {
         fn a_window_that_is_no_aggregate_closes() {
             let mut registry: Registry<&str> = Registry::default();
             assert_eq!(
-                registry.begin_close("home"),
+                registry.begin_close("closing-0"),
                 Close::NotOpen,
-                "the home window should close at once"
+                "a question window should close at once"
             );
         }
     }

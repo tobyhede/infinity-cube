@@ -3,8 +3,6 @@
 interface Window {
   readonly __TAURI__: {
     readonly core: {
-      // `open_aggregate`, the home window's one command, answers nothing.
-      invoke(command: 'open_aggregate'): Promise<null>;
       // `answer_closing`, a close's question window's one command, answers nothing.
       invoke(
         command: 'answer_closing',

@@ -6,7 +6,9 @@ The desktop application (ADR 0155): a Tauri shell that opens each Aggregate dire
 - `src-tauri/src/scheme.rs` — the scheme handler, a plain `Request -> Response` function: it answers only the Aggregate's own windows, and a change only from the Aggregate's own page, and hands everything else to the host's application unchanged.
 - `src-tauri/src/server.rs` — the seam the window code calls, and the run behind it. Closing an Aggregate's window waits for the run to write any edit not yet on disk; a write still running after ten seconds asks whether to keep waiting or close without saving (Storage ST-122), and a failed write is reported in a dialog.
 
-The home window (`ui/`) sits outside UI-1's shadcn-first rule (`docs/requirements/ui.md`): this package imports none of our packages, which its `no-restricted-imports` zone in `eslint.config.js` forbids, and its home page is a static page with one button, not the React application, so its hand-rolled `<button>` and `home.css` record no deviation.
+- `src-tauri/src/launch.rs` — what opens on starting. There is no home window: every window is a Space's, a window a Space's page opened, or a close's question. A folder named on the command line opens at once; with none named, or none that opens, the shell asks for one, and cancelling ends the application. File › Open… (`CmdOrCtrl+O`) asks for another folder while it runs. `tauri.conf.json` declares no window, so Tauri opens nothing by itself.
+
+The close question window (`ui/closing.html`) sits outside UI-1's shadcn-first rule (`docs/requirements/ui.md`): this package imports none of our packages, which its `no-restricted-imports` zone in `eslint.config.js` forbids, and it is a static page with two buttons, not the React application, so its hand-rolled `<button>`s and `closing.css` record no deviation.
 
 ## Build
 

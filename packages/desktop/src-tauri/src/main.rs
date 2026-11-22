@@ -1,7 +1,8 @@
 //! The InfinityCube desktop application (ADR 0155).
 //!
-//! A home window offers to open an Aggregate directory, and a directory named
-//! on the command line opens at once. Each directory opens in a window of its
+//! A directory named on the command line opens at once; with none named, or
+//! none that opens, the shell asks for one, and File › Open… asks for another
+//! ([`launch`]). There is no window but the Spaces' own. Each directory opens in a window of its
 //! own, served by a run of the Rust host of its own, in this process, through
 //! the application's URI scheme at the Aggregate's own origin; opening it again
 //! focuses that window. A window the Aggregate's page opens (a Resource opened
@@ -15,6 +16,7 @@
 
 mod address;
 mod aggregates;
+mod launch;
 mod question;
 mod saving;
 mod scheme;
@@ -42,6 +44,7 @@ use url::Url;
 
 use crate::address::{AggregateKey, SCHEME, SchemeStyle};
 use crate::aggregates::{Close, Registry, Reserved, SPACE_WINDOW_PREFIX};
+use crate::launch::{Launch, Opening};
 use crate::scheme::{OpenAggregates, VIEW_WINDOW_PREFIX};
 use crate::server::{
     AggregateServer, Navigation, OpenError, RegisteredSchemes, SharedAggregates, SpaceWindows,
@@ -191,11 +194,30 @@ fn answer_closing(window: tauri::WebviewWindow, choice: String) {
     }
 }
 
-/// The application's menu on macOS, whose Quit asks the application to
-/// exit, so a quit waits for each Aggregate's last write and may ask (the
-/// predefined Quit ends the process without asking the application).
-fn mac_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
-    let quit = MenuItem::with_id(app, "quit", "Quit InfinityCube", true, Some("CmdOrCtrl+Q"))?;
+/// The application's menu. File › Open… asks for a folder to open. Its Quit
+/// asks the application to exit, so a quit waits for each Aggregate's last
+/// write and may ask (the predefined Quit ends the process without asking
+/// the application). On macOS the menu also carries the application, Edit
+/// and Window menus a Mac application has, Edit being what gives a webview
+/// Cut, Copy and Paste there.
+fn app_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
+    let open = MenuItem::with_id(app, OPEN_MENU_ITEM, "Open…", true, Some("CmdOrCtrl+O"))?;
+    let quit = MenuItem::with_id(
+        app,
+        QUIT_MENU_ITEM,
+        "Quit InfinityCube",
+        true,
+        Some("CmdOrCtrl+Q"),
+    )?;
+    if !cfg!(target_os = "macos") {
+        let file = Submenu::with_items(
+            app,
+            "File",
+            true,
+            &[&open, &PredefinedMenuItem::separator(app)?, &quit],
+        )?;
+        return Menu::with_items(app, &[&file]);
+    }
     let application = Submenu::with_items(
         app,
         "InfinityCube",
@@ -208,6 +230,16 @@ fn mac_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             &PredefinedMenuItem::show_all(app, None)?,
             &PredefinedMenuItem::separator(app)?,
             &quit,
+        ],
+    )?;
+    let file = Submenu::with_items(
+        app,
+        "File",
+        true,
+        &[
+            &open,
+            &PredefinedMenuItem::separator(app)?,
+            &PredefinedMenuItem::close_window(app, None)?,
         ],
     )?;
     let edit = Submenu::with_items(
@@ -231,38 +263,69 @@ fn mac_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         &[
             &PredefinedMenuItem::minimize(app, None)?,
             &PredefinedMenuItem::maximize(app, None)?,
-            &PredefinedMenuItem::separator(app)?,
-            &PredefinedMenuItem::close_window(app, None)?,
         ],
     )?;
-    Menu::with_items(app, &[&application, &edit, &window])
+    Menu::with_items(app, &[&application, &file, &edit, &window])
 }
 
-/// Ask for a folder, and open it as an Aggregate.
-#[tauri::command]
-fn open_aggregate(app: AppHandle) {
+/// The menu items the shell answers itself.
+const OPEN_MENU_ITEM: &str = "open";
+const QUIT_MENU_ITEM: &str = "quit";
+
+/// Ask for a folder, and open it as an Aggregate. At launch, with no Space
+/// open, cancelling ends the application and a folder that does not open is
+/// reported before asking again, so the application never runs with no
+/// window; from the menu, cancelling does nothing.
+fn choose_folder(app: &AppHandle, opening: Opening) {
     let handle = app.clone();
     app.dialog()
         .file()
-        .set_title("Open")
+        .set_title("Open a Space")
         .pick_folder(move |folder| {
             let Some(path) = folder.and_then(|folder| folder.into_path().ok()) else {
+                if opening == Opening::AtLaunch {
+                    handle.exit(0);
+                }
                 return;
             };
             // Starting a run reads the whole directory, so it stays off the
             // thread the dialog answered on.
             thread::spawn(move || {
-                if let Err(error) = open_aggregate_at(&handle, &path) {
-                    show_error(
-                        &handle,
-                        &format!("Could not open {}: {error}", path.display()),
-                    );
+                if let Err(message) = open_aggregate_at(&handle, &path) {
+                    match opening {
+                        Opening::AtLaunch => {
+                            show_error_and_wait(&handle, &message);
+                            choose_folder(&handle, Opening::AtLaunch);
+                        }
+                        Opening::FromMenu => show_error(&handle, &message),
+                    }
                 }
             });
         });
 }
 
-fn open_aggregate_at(app: &AppHandle, folder: &Path) -> Result<(), OpenError> {
+/// Open each folder named on the command line. If none opens, say why and
+/// ask for one, as a launch naming none does.
+fn open_from_command_line(app: &AppHandle, folders: &[PathBuf]) {
+    let failed: Vec<String> = folders
+        .iter()
+        .filter_map(|folder| open_aggregate_at(app, folder).err())
+        .collect();
+    if failed.len() < folders.len() {
+        for message in &failed {
+            show_error(app, message);
+        }
+        return;
+    }
+    for message in &failed {
+        show_error_and_wait(app, message);
+    }
+    choose_folder(app, Opening::AtLaunch);
+}
+
+/// Open `folder` as an Aggregate in a window of its own, or focus the window
+/// that already has it, answering what to tell the presenter if neither.
+fn open_aggregate_at(app: &AppHandle, folder: &Path) -> Result<(), String> {
     // Two spellings of one directory are one Aggregate; a path that cannot be
     // resolved is passed on as given, for the run to refuse.
     let directory = std::fs::canonicalize(folder).unwrap_or_else(|_| folder.to_path_buf());
@@ -277,35 +340,30 @@ fn open_aggregate_at(app: &AppHandle, folder: &Path) -> Result<(), OpenError> {
             if let Some(window) = app.get_webview_window(&label) {
                 let _ = window.set_focus();
             } else if aggregates.registry().is_closing(&label) {
-                show_error(
-                    app,
-                    &format!(
-                        "{} is still being written. Open it again once that write has ended.",
-                        directory.display()
-                    ),
-                );
+                return Err(format!(
+                    "{} is still being written. Open it again once that write has ended.",
+                    directory.display()
+                ));
             }
             return Ok(());
         }
     };
     let opened = start_aggregate(app, &directory, &label);
-    if !matches!(opened, Ok(true)) {
+    if opened.is_err() {
         let abandoned = aggregates.registry().abandon(&label);
         if let Some(server) = abandoned {
             stop_server(app, server, &directory);
         }
     }
-    opened.map(|_| ())
+    opened
 }
 
 /// Start `directory`'s server and open its window as `label`, answering
-/// whether the Aggregate opened.
-fn start_aggregate(app: &AppHandle, directory: &Path, label: &str) -> Result<bool, OpenError> {
-    let server = match AggregateServer::start(app, directory, label)? {
-        Started::Refused { message } => {
-            show_error(app, &message);
-            return Ok(false);
-        }
+/// what to tell the presenter if the Aggregate did not open.
+fn start_aggregate(app: &AppHandle, directory: &Path, label: &str) -> Result<(), String> {
+    let could_not = |error: OpenError| format!("Could not open {}: {error}", directory.display());
+    let server = match AggregateServer::start(app, directory, label).map_err(could_not)? {
+        Started::Refused { message } => return Err(message),
         Started::Serving(server) => server,
     };
     let url = server.window_url();
@@ -317,10 +375,9 @@ fn start_aggregate(app: &AppHandle, directory: &Path, label: &str) -> Result<boo
     let opened = app.state::<Aggregates>().registry().opened(label, server);
     if let Err(server) = opened {
         stop_server(app, server, directory);
-        return Ok(false);
+        return Err(format!("Could not open {}.", directory.display()));
     }
-    open_window(app, label, url, &title, windows)?;
-    Ok(true)
+    open_window(app, label, url, &title, windows).map_err(|error| could_not(error.into()))
 }
 
 /// Open a window of an Aggregate, held to what `windows` admits.
@@ -451,6 +508,16 @@ fn unwritten_message(directory: &Path, reason: &str) -> String {
     )
 }
 
+/// Show `message` in an error dialog, returning once it is dismissed.
+fn show_error_and_wait(app: &AppHandle, message: &str) {
+    let _dismissed = app
+        .dialog()
+        .message(message)
+        .title("InfinityCube")
+        .kind(MessageDialogKind::Error)
+        .blocking_show();
+}
+
 fn show_error(app: &AppHandle, message: &str) {
     app.dialog()
         .message(message)
@@ -487,10 +554,12 @@ fn main() {
         );
     }
     let app = builder
-        .invoke_handler(tauri::generate_handler![open_aggregate, answer_closing])
+        .invoke_handler(tauri::generate_handler![answer_closing])
         .on_menu_event(|app, event| {
-            if event.id() == "quit" {
+            if event.id() == QUIT_MENU_ITEM {
                 app.exit(0);
+            } else if event.id() == OPEN_MENU_ITEM {
+                choose_folder(app, Opening::FromMenu);
             }
         })
         .setup(move |app| {
@@ -500,21 +569,16 @@ fn main() {
                 timers,
                 move |effect| apply(&handle, effect),
             )));
-            if cfg!(target_os = "macos") {
-                let _previous = app.set_menu(mac_menu(app.handle())?)?;
-            }
+            let _previous = app.set_menu(app_menu(app.handle())?)?;
             // A directory named on the command line opens at once, as one
-            // chosen from the home window would.
-            for folder in std::env::args_os().skip(1).map(PathBuf::from) {
-                let handle = app.handle().clone();
-                thread::spawn(move || {
-                    if let Err(error) = open_aggregate_at(&handle, &folder) {
-                        show_error(
-                            &handle,
-                            &format!("Could not open {}: {error}", folder.display()),
-                        );
-                    }
-                });
+            // chosen from File › Open… would; with none named, the shell
+            // asks for one.
+            match launch::launch(std::env::args_os().skip(1)) {
+                Launch::Choose => choose_folder(app.handle(), Opening::AtLaunch),
+                Launch::Folders(folders) => {
+                    let handle = app.handle().clone();
+                    thread::spawn(move || open_from_command_line(&handle, &folders));
+                }
             }
             Ok(())
         })
