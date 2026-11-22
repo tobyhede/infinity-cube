@@ -94,7 +94,7 @@ mod tests {
     #[tokio::test]
     async fn writes_a_space_to_a_folder_that_is_missing() {
         let parent = tempfile::tempdir().unwrap();
-        let folder = parent.path().join("talk");
+        let folder = parent.path().join("space");
         create(&folder).await.unwrap();
         assert!(folder.join("aggregate.json").is_file());
     }
