@@ -25,6 +25,9 @@
 # installs from (default: tobyhede/infinity-cube).
 
 set -eu
+# A set CDPATH makes `cd` print the directory it moves to, which the
+# command substitutions below would capture.
+unset CDPATH
 
 say() { printf '%s\n' "$*"; }
 step() { printf '\n==> %s\n' "$*"; }
@@ -93,8 +96,14 @@ while [ $# -gt 0 ]; do
 	esac
 done
 
-native="$(default_target)"
-[ -n "$target" ] || target="$native"
+# An explicit --target builds on a machine with no preview build of its own,
+# with no smoke test; without one, such a machine is refused.
+if [ -n "$target" ]; then
+	native="$(default_target 2>/dev/null)" || native=""
+else
+	target="$(default_target)"
+	native="$target"
+fi
 # A relative --out is relative to where the script was run from.
 [ -n "$out" ] || out="$root/target/preview-build"
 mkdir -p "$out"
@@ -161,7 +170,7 @@ if [ "$target" = "$native" ]; then
 	"$binary" init "$smoke/space"
 	"$binary" check "$smoke/space"
 else
-	say "$target is not this machine's target ($native), so the binary is not smoke-tested"
+	say "$target is not this machine's target (${native:-none}), so the binary is not smoke-tested"
 fi
 
 # The packed README installs this build, not the newest one, so a tester
@@ -189,4 +198,7 @@ tar -C "$stage" -czf "$archive" "$name"
 step "Built $archive"
 cat "$out/SHA256SUMS"
 say "Install it here with:"
-say "  INFINITY_CUBE_DOWNLOAD_URL=file://$out INFINITY_CUBE_VERSION=v$version sh release/install.sh"
+# curl reads a file URL, so a space or a percent sign in the folder's name is
+# percent-encoded, and both paths are quoted for the shell.
+url="file://$(printf '%s' "$out" | sed -e 's/%/%25/g' -e 's/ /%20/g')"
+say "  INFINITY_CUBE_DOWNLOAD_URL='$url' INFINITY_CUBE_VERSION=v$version sh '$root/release/install.sh'"
