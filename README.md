@@ -109,6 +109,16 @@ This section is about `pnpm cube run`; the desktop application writes pending ed
 - **The `infinity-cube` command**, a single Rust binary, runs and checks a directory as `pnpm cube` does, with no Node; [`release/README.md`](release/README.md) describes its preview builds.
 - **Mounting** opens a Space on the web, straight from its public GitHub repository. You can edit it in the page, but nothing is written back to GitHub, and today a reload loses those edits. [Deploying to Cloudflare](docs/deploy-cloudflare.md) says how to deploy the page and point a domain at a Space.
 
+## Installing a preview build
+
+To run a Space without a clone, Node or pnpm, install the `infinity-cube` preview build on macOS or Linux:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/tobyhede/infinity-cube/main/release/install.sh | sh
+```
+
+It checks the download and puts `infinity-cube` in `~/.local/bin`; then `infinity-cube init my-space` and `infinity-cube run my-space`. A preview build makes no compatibility promise, so keep your directory in git. [`release/README.md`](release/README.md) covers pinning a version, upgrading and uninstalling.
+
 ## Using InfinityCube with agents
 
 Two of this repository's agent skills, in [`.agents/skills/`](.agents/skills/) and linked from `.claude/skills/`, are for using InfinityCube. They are also published as the `infinity-cube` plugin, from [`plugins/infinity-cube/`](plugins/infinity-cube/):

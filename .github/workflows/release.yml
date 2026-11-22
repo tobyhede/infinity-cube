@@ -1,7 +1,7 @@
 # Preview builds of the `infinity-cube` CLI (ADR 0166): one binary per
 # platform with the browser application embedded, packed with
 # `release/README.md` and both licence files, and attached to a draft
-# GitHub pre-release.
+# GitHub pre-release with `release/install.sh`, which installs one of them.
 #
 # - A tag `v<version>` pushed on a commit `main` already holds builds,
 #   tests and packages every platform, then creates the draft release with
@@ -86,8 +86,12 @@ jobs:
           # Static, so it runs on any distribution; the tests run natively.
           - target: x86_64-unknown-linux-musl
             runner: ubuntu-latest
+          - target: aarch64-unknown-linux-musl
+            runner: ubuntu-24.04-arm
           - target: aarch64-apple-darwin
             runner: macos-latest
+          - target: x86_64-apple-darwin
+            runner: macos-15-intel
     env:
       NEXTEST_VERSION: 0.9.152
       TARGET: ${{ matrix.target }}
@@ -147,25 +151,89 @@ jobs:
           space="$RUNNER_TEMP/smoke-space"
           "$binary" init "$space"
           "$binary" check "$space"
+      # The packed README installs this build, not the newest one, so a
+      # tester following it gets the build that wrote their directory
+      # (ADR 0166); release/README.md, read on GitHub, installs the newest.
       - name: Pack the archive
         id: pack
         run: |
           name="infinity-cube-$VERSION-$TARGET"
           stage="$RUNNER_TEMP/$name"
           mkdir -p "$stage"
-          cp "target/$TARGET/release/infinity-cube" release/README.md LICENSE-MIT LICENSE-APACHE "$stage/"
+          cp "target/$TARGET/release/infinity-cube" LICENSE-MIT LICENSE-APACHE "$stage/"
+          sed \
+            -e "s#from the newest published preview build#from this preview build, v$VERSION#" \
+            -e "s#https://raw.githubusercontent.com/tobyhede/infinity-cube/main/release/install.sh | sh#https://github.com/$GITHUB_REPOSITORY/releases/download/v$VERSION/install.sh | INFINITY_CUBE_VERSION=v$VERSION sh#" \
+            -e 's#^Set `INFINITY_CUBE_VERSION` (say `v0.1.0-preview.1`) on `sh` to install a particular build, and#Change `INFINITY_CUBE_VERSION` to install another build (leave it out for the newest), and set#' \
+            release/README.md > "$stage/README.md"
+          for expected in "from this preview build, v$VERSION" "INFINITY_CUBE_VERSION=v$VERSION sh" 'Change `INFINITY_CUBE_VERSION` to install another build'; do
+            if ! grep -qF "$expected" "$stage/README.md"; then
+              echo "::error::the packed README does not say '$expected'; release/README.md no longer holds the text this step rewrites"
+              exit 1
+            fi
+          done
           tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/$name.tar.gz" "$name"
           echo "archive=$RUNNER_TEMP/$name.tar.gz" >> "$GITHUB_OUTPUT"
+      # The install script, run as a person runs it but reading this archive
+      # from disk: it installs and runs the binary, replaces it on a second
+      # run, and installs nothing from an archive SHA256SUMS does not match.
+      - name: Install the archive with the install script
+        env:
+          ARCHIVE: ${{ steps.pack.outputs.archive }}
+        run: |
+          served="$RUNNER_TEMP/served"
+          mkdir -p "$served"
+          cp "$ARCHIVE" "$served/"
+          (cd "$served" && shasum -a 256 ./*.tar.gz | sed 's| \./| |' > SHA256SUMS)
+          export INFINITY_CUBE_DOWNLOAD_URL="file://$served"
+          export INFINITY_CUBE_VERSION="v$VERSION"
+          export INFINITY_CUBE_INSTALL_DIR="$RUNNER_TEMP/installed"
+          sh release/install.sh
+          sh release/install.sh
+          shown="$("$INFINITY_CUBE_INSTALL_DIR/infinity-cube" --version)"
+          case "$shown" in
+            "infinity-cube $VERSION ("*) ;;
+            *) echo "::error::the installed binary printed '$shown'"; exit 1 ;;
+          esac
+          mismatched="$RUNNER_TEMP/mismatched"
+          mkdir -p "$mismatched"
+          cp "$ARCHIVE" "$mismatched/"
+          printf '%064d  %s\n' 0 "$(basename "$ARCHIVE")" > "$mismatched/SHA256SUMS"
+          if INFINITY_CUBE_DOWNLOAD_URL="file://$mismatched" INFINITY_CUBE_INSTALL_DIR="$RUNNER_TEMP/refused" sh release/install.sh 2> "$RUNNER_TEMP/refused.err"; then
+            echo "::error::the install script installed an archive SHA256SUMS does not match"
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/refused.err"
+          if ! grep -q 'does not match SHA256SUMS' "$RUNNER_TEMP/refused.err"; then
+            echo "::error::the install script failed, but not because the archive did not match SHA256SUMS"
+            exit 1
+          fi
+          if [ -e "$RUNNER_TEMP/refused/infinity-cube" ]; then
+            echo "::error::the install script left a binary behind after refusing"
+            exit 1
+          fi
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: infinity-cube-${{ matrix.target }}
           path: ${{ steps.pack.outputs.archive }}
           if-no-files-found: error
 
+  install-script:
+    name: Check the install script
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      # ShellCheck comes with the runner image. The script is POSIX sh, so it
+      # runs under dash, which is Ubuntu's sh, as well as macOS's.
+      - name: ShellCheck the install script
+        run: shellcheck --shell=sh release/install.sh
+
   release:
     name: Create the draft release
     if: github.ref_type == 'tag'
-    needs: [version, build]
+    needs: [version, build, install-script]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # The one job that writes: it creates a draft, which a person publishes.
@@ -177,6 +245,11 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: release/install.sh
+          sparse-checkout-cone-mode: false
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: infinity-cube-*
@@ -190,9 +263,17 @@ jobs:
           cat > notes.md <<EOF
           **Preview build** of InfinityCube $VERSION. It makes no compatibility promise: a directory it writes may not open in a later preview build, so keep your directory in git and read it with the build that wrote it (ADR 0166).
 
-          Download the archive for your platform, unpack it and follow its README: \`infinity-cube init my-space\`, then \`infinity-cube run my-space\`. On macOS, run \`xattr -d com.apple.quarantine infinity-cube\` once first, because the build is not signed.
+          Install it on macOS or Linux with:
+
+          \`\`\`sh
+          curl -fsSL https://github.com/$GH_REPO/releases/download/$TAG/install.sh | INFINITY_CUBE_VERSION=$TAG sh
+          \`\`\`
+
+          It checks the archive against \`SHA256SUMS\` and puts \`infinity-cube\` in \`~/.local/bin\`. Then run \`infinity-cube init my-space\`, then \`infinity-cube run my-space\`.
+
+          Or download the archive for your platform, unpack it and follow its README. On macOS, run \`xattr -d com.apple.quarantine infinity-cube\` once first, because the build is not signed; the install script needs no such step.
           EOF
-          gh release create "$TAG" dist/*.tar.gz dist/SHA256SUMS \
+          gh release create "$TAG" dist/*.tar.gz dist/SHA256SUMS release/install.sh \
             --draft --prerelease --verify-tag \
             --title "InfinityCube $VERSION (preview)" \
             --notes-file notes.md
