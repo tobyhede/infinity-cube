@@ -8,7 +8,7 @@ Your Space is a directory of plain files, an [Aggregate directory](docs/aggregat
 
 ## Getting started
 
-This takes you from a fresh clone to the desktop application open on a Space of your own, built from source: there is no download yet, and the first build takes a few minutes. It runs on Linux; macOS should work but is untried, and Windows is not built yet.
+This takes you from a fresh clone to the desktop application open on a Space of your own, built from source: there is no download yet, and the first build takes a few minutes. It runs on Linux; it has not been tried on macOS, and Windows is not built yet.
 
 1. **Install the tools.**
    - Node ≥ 26.8.1 and pnpm 9. Node no longer bundles corepack, so install pnpm with `npm install -g pnpm@9` if `pnpm --version` does not print `9.x`.
@@ -61,7 +61,7 @@ This takes you from a fresh clone to the desktop application open on a Space of 
 
 7. **Present.** Press **Present**: `→` follows an Edge, `←` goes back, `↑` / `↓` choose at a fork. Done when `Esc` returns you to the Map as you left it.
 
-8. **Close the window.** Closing the Space window writes every pending edit. If a write is still running after ten seconds, it asks whether to keep waiting, which is always safe, or close without saving, which loses the edits not yet written. If a write fails, a dialog says why, and those edits are not on disk. Close the home window too to end the application (on macOS, Quit). Don't press Ctrl-C in the terminal while a Space window is open: a signal ends the application at once, and edits not yet written are lost. Done when both windows have closed with no dialog and the terminal has its prompt back.
+8. **Close the window.** Closing the Space window writes every pending edit. If a write is still running after ten seconds, it asks whether to keep waiting, which is always safe, or close without saving, which loses the edits not yet written. If a write fails, a dialog says why, and those edits are not on disk. Close the home window too to end the application (on macOS, Quit). Don't press Ctrl-C, close the terminal or send a signal while a Space window is open: any of them ends the application at once, and edits not yet written are lost. Done when both windows have closed with no dialog and the terminal has its prompt back.
 
 9. **Commit.** `git -C ~/spaces/rust-async add -A && git -C ~/spaces/rust-async commit -m "First draft"`. Done when `git -C ~/spaces/rust-async status` is clean.
 
@@ -90,7 +90,7 @@ The desktop application and `pnpm cube run <dir>` both **run** a Space's directo
 - **Git is your undo and your history.** InfinityCube keeps no history of its own and does not watch the directory. Edit files by hand, `git pull` or check out an earlier version with InfinityCube stopped, since a running one's next write replaces what is on disk with what it holds.
 - **One run per directory.** A run locks the directory, through the empty file `.infinity-cube.lock` it leaves there, so a second run of the same directory, from another copy of the desktop application or a terminal, is refused, naming it, until the first stops. The lock ends when the process does, however it ends. Keep the file out of git with a `.gitignore` entry.
 - **InfinityCube writes only its own files: `aggregate.json`, each Space's `space.json` and Resource files, and `assets/`**, which holds the Resources' text (Markdown and Mermaid source) and uploaded image files. Anything else, such as `.git`, a README or `notes/`, and any `*.md` outside `assets/`, is left alone; [`docs/aggregate-directory.md`](docs/aggregate-directory.md) describes the format.
-- **Starting.** Both serve an existing Space directory only. A missing or empty directory is refused (`pnpm cube run` names the `pnpm cube init` command that creates one; the desktop application says why in a dialog), so a mistyped path never becomes a new Space. A directory that is not valid is refused with its problems listed; fix the files and start again. A run with no edits leaves the directory as it was, beside its empty lock file. Opening a Space never writes the directory.
+- **Starting.** Both serve an existing Aggregate directory only, as `cube init` writes it. A missing or empty directory is refused (`pnpm cube run` names the `pnpm cube init` command that creates one; the desktop application says why in a dialog), so a mistyped path never becomes a new Space. A directory that is not valid is refused with its problems listed; fix the files and start again. A run with no edits leaves the directory as it was, beside its empty lock file. Opening a Space never writes the directory.
 - **Ports and the browser.** Under `pnpm cube run`, InfinityCube serves on port 4173, or the next free port. `--port <port>` picks the port and fails if it is taken. `--no-open` leaves the browser alone, for running headless or from an agent.
 
 ### Stopping and lost edits
