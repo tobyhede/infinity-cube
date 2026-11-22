@@ -227,7 +227,12 @@ if [ "$desktop" = 1 ]; then
 				fail "the desktop application exited before opening the Space"
 			fi
 			if [ "$waited" -ge 60 ]; then
+				if [ -n "${INFINITY_CUBE_SCREENSHOT:-}" ]; then
+					screencapture -x "$INFINITY_CUBE_SCREENSHOT" || true
+				fi
 				kill "$pid"
+				cat "$smoke/log" >&2
+				find "$smoke/InfinityCube.app/Contents/Resources" | head -n 40 >&2
 				fail "the desktop application did not open the Space within 60 seconds"
 			fi
 			sleep 1
