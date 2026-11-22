@@ -76,12 +76,6 @@ pub fn launch(arguments: impl IntoIterator<Item = OsString>) -> Launch {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    reason = "a test fails by panicking"
-)]
 mod tests {
     use super::*;
 
@@ -143,8 +137,8 @@ mod tests {
     }
 
     /// Tauri opens every window `tauri.conf.json` declares when it starts,
-    /// which is how a home window came to open beside the Space a command
-    /// line named.
+    /// so the configuration declares none and this module decides what
+    /// opens.
     #[test]
     fn the_configuration_declares_no_window() {
         let config: serde_json::Value = serde_json::from_str(include_str!("../tauri.conf.json"))

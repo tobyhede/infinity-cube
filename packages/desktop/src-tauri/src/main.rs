@@ -2,8 +2,8 @@
 //!
 //! A directory named on the command line opens at once; with none named, or
 //! none that opens, the shell asks for one, and File › Open… asks for another
-//! ([`launch`]). There is no window but the Spaces' own. Each directory opens in a window of its
-//! own, served by a run of the Rust host of its own, in this process, through
+//! ([`launch`]). Every window is a Space's, a window a Space's page opened,
+//! or a close's question. Each directory opens in a window of its own, served by a run of the Rust host of its own, in this process, through
 //! the application's URI scheme at the Aggregate's own origin; opening it again
 //! focuses that window. A window the Aggregate's page opens (a Resource opened
 //! independently, the Notes window) opens under the same origin. Closing the
@@ -38,7 +38,7 @@ use tauri::{
     AppHandle, Manager, RunEvent, UriSchemeContext, UriSchemeResponder, WebviewUrl,
     WebviewWindowBuilder, WindowEvent, Wry,
 };
-use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+use tauri_plugin_dialog::{DialogExt, MessageDialogBuilder, MessageDialogKind};
 use tokio::sync::mpsc::{self, UnboundedSender};
 use url::Url;
 
@@ -508,12 +508,7 @@ fn report_unwritten(app: &AppHandle, directory: &Path, reason: &str, dialog: boo
     let message = unwritten_message(directory, reason);
     eprintln!("{message}");
     if dialog {
-        let _dismissed = app
-            .dialog()
-            .message(message)
-            .title("InfinityCube")
-            .kind(MessageDialogKind::Error)
-            .blocking_show();
+        let _dismissed = error_dialog(app, message).blocking_show();
     }
 }
 
@@ -524,22 +519,21 @@ fn unwritten_message(directory: &Path, reason: &str) -> String {
     )
 }
 
-/// Show `message` in an error dialog, returning once it is dismissed.
-fn show_error_and_wait(app: &AppHandle, message: &str) {
-    let _dismissed = app
-        .dialog()
-        .message(message)
-        .title("InfinityCube")
-        .kind(MessageDialogKind::Error)
-        .blocking_show();
-}
-
-fn show_error(app: &AppHandle, message: &str) {
+/// An error dialog saying `message`.
+fn error_dialog(app: &AppHandle, message: impl Into<String>) -> MessageDialogBuilder<Wry> {
     app.dialog()
         .message(message)
         .title("InfinityCube")
         .kind(MessageDialogKind::Error)
-        .show(|_| {});
+}
+
+/// Show `message` in an error dialog, returning once it is dismissed.
+fn show_error_and_wait(app: &AppHandle, message: &str) {
+    let _dismissed = error_dialog(app, message).blocking_show();
+}
+
+fn show_error(app: &AppHandle, message: &str) {
+    error_dialog(app, message).show(|_| {});
 }
 
 #[expect(
