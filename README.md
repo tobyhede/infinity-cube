@@ -44,7 +44,7 @@ This takes you from a fresh clone to the desktop application open on a Space of 
    git -C ~/spaces/rust-async commit -m "New Space"
    ```
 
-   Done when `init` prints `Created a new aggregate` and the commit succeeds. It also names the browser command; ignore that for now. That commit is the revision git restores if the first write is not what you wanted.
+   Done when `init` prints `Created a new aggregate` and the commit succeeds. It also names the browser command; ignore that unless you are [running it in the browser](#or-run-it-in-the-browser). That commit is the revision git restores if the first write is not what you wanted.
 
 4. **Build the desktop application.** Build the browser application first: the desktop build copies it in, and fails with `resource path '../../app/dist' doesn't exist` without it.
 
@@ -61,7 +61,7 @@ This takes you from a fresh clone to the desktop application open on a Space of 
 
 7. **Present.** Press **Present**: `→` follows an Edge, `←` goes back, `↑` / `↓` choose at a fork. Done when `Esc` returns you to the Map as you left it.
 
-8. **Close the window.** Closing the Space window writes every pending edit; if a write is still running after ten seconds, it asks whether to keep waiting or close without saving. Close the home window too to end the application (on macOS, Quit). Don't press Ctrl-C in the terminal while a Space window is open: a signal ends the application at once, and edits not yet written are lost. Done when the Space window has closed with no dialog.
+8. **Close the window.** Closing the Space window writes every pending edit. If a write is still running after ten seconds, it asks whether to keep waiting, which is always safe, or close without saving, which loses the edits not yet written. If a write fails, a dialog says why, and those edits are not on disk. Close the home window too to end the application (on macOS, Quit). Don't press Ctrl-C in the terminal while a Space window is open: a signal ends the application at once, and edits not yet written are lost. Done when both windows have closed with no dialog and the terminal has its prompt back.
 
 9. **Commit.** `git -C ~/spaces/rust-async add -A && git -C ~/spaces/rust-async commit -m "First draft"`. Done when `git -C ~/spaces/rust-async status` is clean.
 
@@ -69,7 +69,7 @@ To build an installable bundle instead (a `.deb` on Linux), see [`packages/deskt
 
 ### Or run it in the browser
 
-`pnpm cube run ~/spaces/rust-async` serves the same Space in your browser and needs no Rust: install Node and pnpm (the first item of step 1), do steps 2 and 3, then run it. It prints the address it serves and opens your browser. Stop it with Ctrl-C, which writes every pending edit and ends with `Stopped; <dir> holds every edit.`, where `<dir>` is the directory's absolute path. Any other last line means some edits were not written: see [Stopping and lost edits](#stopping-and-lost-edits).
+`pnpm cube run ~/spaces/rust-async` serves the same Space in your browser and needs no Rust: install Node and pnpm (the first item of step 1), do steps 2 and 3, run it, then follow steps 6, 7 and 9. It prints the address it serves and opens your browser. Stop it with Ctrl-C, which writes every pending edit and ends with `Stopped; <dir> holds every edit.`, where `<dir>` is the directory's absolute path. Any other last line means some edits were not written: see [Stopping and lost edits](#stopping-and-lost-edits).
 
 Run every `pnpm cube` verb from the InfinityCube clone, pointing at whichever directory you are working on. A relative path is relative to where you ran pnpm. `pnpm cube help` lists the verbs.
 
