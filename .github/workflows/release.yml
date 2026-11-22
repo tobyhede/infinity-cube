@@ -128,8 +128,8 @@ jobs:
       # macOS this is the only run of their tests.
       - name: Test the CLI and the crates it is built from
         run: cargo nextest run --locked --no-fail-fast -p intake -p host -p infinity-cube
-      # The one build entry point, the same `pnpm release:build` a person runs
-      # on their own machine: it builds the browser application and the
+      # The one build entry point, the script `pnpm release:build` runs on a
+      # person's own machine: it builds the browser application and the
       # release binary embedding it, smoke-tests the binary, and packs the
       # archive with a README naming its own version.
       - name: Build, smoke-test and pack the release archive

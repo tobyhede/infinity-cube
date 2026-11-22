@@ -5,7 +5,7 @@
 # checkout: the browser application, the release binary embedding it, a smoke
 # test of that binary, and the archive the release attaches, with a
 # `SHA256SUMS` beside it. Each build job of .github/workflows/release.yml runs
-# this script, so a build made here is the build CI makes.
+# this script, so a build made here is made the same way as CI's.
 #
 #   pnpm release:build                  # this machine's platform
 #   pnpm release:build --target <triple>
@@ -68,8 +68,8 @@ sha256() {
 	fi
 }
 
-root="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$root"
+script="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+root="$(dirname "$(dirname "$script")")"
 
 target=""
 out=""
@@ -86,7 +86,7 @@ while [ $# -gt 0 ]; do
 		shift 2
 		;;
 	-h | --help)
-		sed -n '4,/^$/s/^# \{0,1\}//p' "$0"
+		sed -n '4,/^$/s/^# \{0,1\}//p' "$script"
 		exit 0
 		;;
 	*) fail "unknown argument $1 (try --help)" ;;
@@ -95,9 +95,11 @@ done
 
 native="$(default_target)"
 [ -n "$target" ] || target="$native"
+# A relative --out is relative to where the script was run from.
 [ -n "$out" ] || out="$root/target/preview-build"
 mkdir -p "$out"
 out="$(cd "$out" && pwd)"
+cd "$root"
 
 wanted_node="$(cat .node-version)"
 need node "install the Node version .node-version names ($wanted_node)"
@@ -143,6 +145,7 @@ binary="$target_dir/$target/release/infinity-cube"
 smoke=""
 stage=""
 trap 'rm -rf "$smoke" "$stage"' EXIT
+trap 'exit 1' HUP INT TERM
 
 # The binary that ships, run once: it names its version, writes a new Space,
 # and checks it. A binary built for another machine's target is not run.
