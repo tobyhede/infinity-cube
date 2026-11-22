@@ -185,8 +185,13 @@ jobs:
           mkdir -p "$mismatched"
           cp "$ARCHIVE" "$mismatched/"
           printf '%064d  %s\n' 0 "$(basename "$ARCHIVE")" > "$mismatched/SHA256SUMS"
-          if INFINITY_CUBE_DOWNLOAD_URL="file://$mismatched" INFINITY_CUBE_INSTALL_DIR="$RUNNER_TEMP/refused" sh release/install.sh; then
+          if INFINITY_CUBE_DOWNLOAD_URL="file://$mismatched" INFINITY_CUBE_INSTALL_DIR="$RUNNER_TEMP/refused" sh release/install.sh 2> "$RUNNER_TEMP/refused.err"; then
             echo "::error::the install script installed an archive SHA256SUMS does not match"
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/refused.err"
+          if ! grep -q 'does not match SHA256SUMS' "$RUNNER_TEMP/refused.err"; then
+            echo "::error::the install script failed, but not because the archive did not match SHA256SUMS"
             exit 1
           fi
           if [ -e "$RUNNER_TEMP/refused/infinity-cube" ]; then
@@ -247,7 +252,7 @@ jobs:
           Install it on macOS or Linux with:
 
           \`\`\`sh
-          curl -fsSL https://raw.githubusercontent.com/$GH_REPO/main/release/install.sh | INFINITY_CUBE_VERSION=$TAG sh
+          curl -fsSL https://github.com/$GH_REPO/releases/download/$TAG/install.sh | INFINITY_CUBE_VERSION=$TAG sh
           \`\`\`
 
           It checks the archive against \`SHA256SUMS\` and puts \`infinity-cube\` in \`~/.local/bin\`. Then run \`infinity-cube init my-space\`, then \`infinity-cube run my-space\`.

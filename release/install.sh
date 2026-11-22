@@ -17,7 +17,8 @@
 #   INFINITY_CUBE_DOWNLOAD_URL  the URL holding the archive and SHA256SUMS,
 #                               in place of the release's; it needs
 #                               INFINITY_CUBE_VERSION. The release workflow
-#                               tests this script with a file:// URL.
+#                               tests this script with a file:// URL, which
+#                               needs curl: wget reads no file:// URL.
 #
 # Uninstall by deleting the binary: rm ~/.local/bin/infinity-cube
 
@@ -77,7 +78,13 @@ fetch() {
 	if command -v curl >/dev/null 2>&1; then
 		curl --proto '=https,file' --proto-redir '=https' --tlsv1.2 -fsSL "$1" -o "$2"
 	elif command -v wget >/dev/null 2>&1; then
-		wget -q -O "$2" "$1"
+		# GNU wget can refuse a redirect to plain http; BusyBox's wget, the
+		# one Alpine has, has no such flag.
+		if wget --help 2>&1 | grep -q -- --https-only; then
+			wget -q --https-only -O "$2" "$1"
+		else
+			wget -q -O "$2" "$1"
+		fi
 	else
 		fail "this script needs curl or wget, and neither is on PATH"
 	fi
@@ -88,8 +95,8 @@ fetch() {
 # is newest first and holds no draft for a request without a token.
 latest_tag() {
 	fetch "https://api.github.com/repos/$1/releases?per_page=1" "$2/releases.json" ||
-		fail "could not ask GitHub for $1's releases"
-	tag="$(sed -n 's/^ *"tag_name": *"\([^"]*\)".*/\1/p' "$2/releases.json" | head -n 1)"
+		fail "could not ask GitHub for $1's releases. GitHub allows 60 such requests an hour from one address; set INFINITY_CUBE_VERSION (say v0.1.0-preview.1) to install a release without asking"
+	tag="$(grep -o '"tag_name" *: *"[^"]*"' "$2/releases.json" | head -n 1 | sed 's/.*"\([^"]*\)"$/\1/')"
 	[ -n "$tag" ] || fail "$1 has no published release yet"
 	say "$tag"
 }
@@ -117,7 +124,8 @@ main() {
 	target="$(detect_target)"
 
 	work="$(mktemp -d "${TMPDIR:-/tmp}/infinity-cube-install.XXXXXX")"
-	trap 'rm -rf "$work"' EXIT
+	staged=""
+	trap 'rm -rf "$work"; [ -z "$staged" ] || rm -f "$staged"' EXIT
 	trap 'exit 1' HUP INT TERM
 
 	if [ -n "$requested" ]; then
@@ -135,7 +143,7 @@ main() {
 
 	say "Installing infinity-cube $version for $target"
 	fetch "$download_url/$archive" "$work/$archive" ||
-		fail "could not download $download_url/$archive"
+		fail "could not download $download_url/$archive; release $tag may have no build for $target"
 	fetch "$download_url/SHA256SUMS" "$work/SHA256SUMS" ||
 		fail "could not download $download_url/SHA256SUMS"
 
