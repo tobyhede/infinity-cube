@@ -4,19 +4,28 @@ The desktop application (ADR 0155): a Tauri shell that opens each Aggregate dire
 
 - `src-tauri/src/address.rs` — an Aggregate's origin, `infinitycube://<key>`, where `<key>` is half the SHA-256 of the folder's canonical path: the same on every launch, so the page's `localStorage` (the colour scheme) survives a restart; moving or renaming the folder gives it a new one. On Windows each Aggregate gets a scheme of its own instead (`.scratch/rust-host/issues/13-swap-the-sidecar-for-the-rust-host.md`).
 - `src-tauri/src/scheme.rs` — the scheme handler, a plain `Request -> Response` function: it answers only the Aggregate's own windows, and a change only from the Aggregate's own page, and hands everything else to the host's application unchanged.
-- `src-tauri/src/server.rs` — the seam the window code calls, and the run behind it. Closing an Aggregate's window waits for the run to write any edit not yet on disk, however long that takes; a failed write is reported in a dialog.
+- `src-tauri/src/server.rs` — the seam the window code calls, and the run behind it. Closing an Aggregate's window waits for the run to write any edit not yet on disk; a write still running after ten seconds asks whether to keep waiting or close without saving (Storage ST-122), and a failed write is reported in a dialog.
 
 The home window (`ui/`) sits outside UI-1's shadcn-first rule (`docs/requirements/ui.md`): this package imports none of our packages, which its `no-restricted-imports` zone in `eslint.config.js` forbids, and its home page is a static page with one button, not the React application, so its hand-rolled `<button>` and `home.css` record no deviation.
 
 ## Build
 
-Needs Node 26 and pnpm (for the browser application), Rust, and [Tauri's system prerequisites](https://v2.tauri.app/start/prerequisites/).
+Needs Node ≥ 26.8.1 and pnpm 9 (for the browser application), Rust, and [Tauri's system prerequisites](https://v2.tauri.app/start/prerequisites/).
 
 ```sh
 pnpm install
-pnpm --filter @project/desktop build   # the browser application, then the installable bundle
+pnpm --filter @project/desktop build   # the browser application, then every bundle for this platform
 ```
+
+On Linux, to build only the `.deb`, build the browser application first, since `tauri build` alone does not:
+
+```sh
+pnpm --filter @project/app exec vite build
+pnpm --filter @project/desktop tauri build --bundles deb
+```
+
+Bundles are written under `target/release/bundle/` at the repository root, such as `target/release/bundle/deb/InfinityCube_0.0.0_amd64.deb`.
 
 For a quick run without bundling: `pnpm --filter @project/app exec vite build` once, then `cargo build -p infinity-cube-desktop` from the repository root and `target/debug/infinity-cube-desktop <Aggregate directory>` (the Cargo workspace's `target/` is at the root). `cargo test -p infinity-cube-desktop` (or `cargo nextest run`) runs the scheme handler against a copy of `packages/app/fixture` without opening a window.
 
-The first release is unsigned: on macOS, allow it once under System Settings › Privacy & Security › Open Anyway.
+There is no published desktop release yet. A bundle you build is unsigned: on macOS, allow it once under System Settings › Privacy & Security › Open Anyway.
