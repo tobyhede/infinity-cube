@@ -85,7 +85,10 @@ impl MemorySpaceRepository {
 /// The input's Spaces, ascending by id, each with its Resources ascending by
 /// id, as JSON with unread keys in one order: equal when the two aggregates
 /// hold the same authored data (`classifyInitializedAggregate`).
-fn authored(meta_space_id: SpaceId, spaces: &[&SpaceSnapshot]) -> (SpaceId, Vec<String>) {
+pub(crate) fn authored(
+    meta_space_id: SpaceId,
+    spaces: &[&SpaceSnapshot],
+) -> (SpaceId, Vec<String>) {
     let mut ordered: Vec<SpaceSnapshot> = spaces.iter().map(|space| (*space).clone()).collect();
     ordered.sort_by_key(|space| space.id);
     let texts = ordered

@@ -15,7 +15,9 @@ use std::io;
 use std::path::Path;
 
 use intake::json::JsonValue;
-use intake::{AGGREGATE_FILE_NAME, AggregateFiles};
+use intake::{AGGREGATE_FILE_NAME, AggregateFiles, Refusals, import_aggregate};
+
+use crate::repository::AggregateInput;
 
 use crate::directory::{Filesystem, holds_nothing};
 use crate::export::{ExportError, export_aggregate};
@@ -84,6 +86,24 @@ fn new_aggregate(title: &str, ids: &impl IdSource) -> AggregateFiles {
         ),
     );
     files
+}
+
+/// The new aggregate as the lifecycle doors take it: the Default Content a
+/// store-backed host initializes an uninitialized store from
+/// (`defaultContentAggregate`, ADR 0077), minting its ids in the same order.
+pub(crate) fn default_content(ids: &impl IdSource) -> Result<AggregateInput, Refusals> {
+    let imported = import_aggregate(new_aggregate(NEW_SPACE_TITLE, ids), || ids.new_id())?;
+    let meta_space_id = imported.aggregate.meta_space_id();
+    let spaces = imported
+        .aggregate
+        .into_spaces()
+        .into_iter()
+        .map(intake::Space::into_snapshot)
+        .collect();
+    Ok(AggregateInput {
+        meta_space_id,
+        spaces,
+    })
 }
 
 /// Write a new aggregate to `directory`, its Meta Space titled `title`, if it

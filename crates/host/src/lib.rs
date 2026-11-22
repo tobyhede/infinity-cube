@@ -5,7 +5,10 @@
 //!
 //! - [`SpaceRepository`] is the storage seam, and [`MemorySpaceRepository`]
 //!   the store a run serves from. Its commits are decided by the pure
-//!   [`decide_commit`], with no IO and no async.
+//!   [`decide_commit`], with no IO and no async. [`SqlSpaceRepository`] is
+//!   the one SQL repository over a database's statements; over a SQLite file
+//!   it is [`SqliteSpaceRepository`], and [`keep_establishing`] is the
+//!   start-up a store-backed host runs.
 //! - [`import_directory`] and [`export_aggregate`] read and write an
 //!   Aggregate directory through the small [`Filesystem`] seam; Export works
 //!   in place and writes the bytes the TypeScript Export writes.
@@ -76,6 +79,8 @@ mod product;
 mod repository;
 mod run;
 mod shell;
+mod sql;
+mod startup;
 mod uri;
 mod wire;
 
@@ -102,4 +107,12 @@ pub use run::{
     Unset,
 };
 pub use shell::{BuiltFiles, Shell};
+pub use sql::{
+    ConnectionSettings, SqlSpaceRepository, SqlitePath, SqlitePathError, SqliteSpaceRepository,
+    SqliteStore,
+};
+pub use startup::{
+    ESTABLISH_RETRY_INITIAL_DELAY, ESTABLISH_RETRY_MAX_DELAY, EstablishError, establish_meta_space,
+    keep_establishing,
+};
 pub use wire::{DecodeError, decode_commit};

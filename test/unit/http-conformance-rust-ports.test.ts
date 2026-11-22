@@ -4,9 +4,10 @@ import { describe, expect, it } from 'vitest';
 
 /*
  * The HTTP conformance cases are written once, in TypeScript, and ported by
- * hand to Rust for two adapters: the Rust host's application and run
- * (`crates/host/tests/`) and the desktop scheme handler
- * (`packages/desktop/src-tauri/src/scheme/tests.rs`). A case both adapters run
+ * hand to Rust for three adapters: the Rust host's application and run
+ * (`crates/host/tests/`), the same application over the SQLite repository
+ * (`crates/host/tests/sqlite_wire.rs`) and the desktop scheme handler
+ * (`packages/desktop/src-tauri/src/scheme/tests.rs`). A case every adapter runs
  * is written once, in the table `crates/http-conformance/src/cases.rs`, which
  * each adapter runs by invoking `http_conformance::cases!`; a case only one
  * runs stays in that adapter's own files. This holds each adapter to the case
@@ -116,6 +117,9 @@ const LISTENER =
 const NO_LOCK =
   'the scheme handler has no port, Host check or launch secret (Storage ST-121); the window that made a request and its page admit it';
 
+const NO_DIRECTORY =
+  'a process case runs a host over a `{directory}` and checks its Export; the SQLite repository serves a store and has neither (rust-host 15), so CI runs no process case against it';
+
 const PORTS: readonly Port[] = [
   {
     name: 'the Rust host',
@@ -166,6 +170,26 @@ const PORTS: readonly Port[] = [
         'the scheme handler writes nothing: the shell runs the host’s `Run`, which crates/host/tests/run.rs holds',
       'writes the initialization with the next Edit (ST-65)':
         'the scheme handler writes nothing: the shell runs the host’s `Run`, which crates/host/tests/run.rs holds',
+    },
+  },
+  {
+    name: 'the Rust host over the SQLite repository',
+    files: ['crates/host/tests/sqlite_wire.rs'],
+    exempt: {
+      'answers 421 to a request naming any Host but its own': NO_DIRECTORY,
+      'answers 403 to a request without the session cookie, and to a wrong launch secret':
+        NO_DIRECTORY,
+      'trades the launch secret for an HttpOnly, SameSite=Strict session cookie by a redirect':
+        NO_DIRECTORY,
+      'refuses a missing directory, announcing why and exiting non-zero': NO_DIRECTORY,
+      'writes an edit once edits have been quiet, and keeps it on SIGINT': NO_DIRECTORY,
+      'writes an edit not yet written when stopped by SIGINT, and exits zero': NO_DIRECTORY,
+      'writes an edit not yet written when its standard input closes, and exits zero': NO_DIRECTORY,
+      'leaves the directory byte for byte unchanged when opening a Space initializes it (ST-65)':
+        NO_DIRECTORY,
+      'initializes the Space again on a second run over the directory the first run left unchanged (ST-65)':
+        NO_DIRECTORY,
+      'writes the initialization with the next Edit (ST-65)': NO_DIRECTORY,
     },
   },
 ];

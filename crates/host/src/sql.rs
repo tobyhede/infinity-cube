@@ -1,0 +1,499 @@
+//! The one SQL repository (Storage ST-3, `src/persistence/sql-space-repository.ts`):
+//! every [`SpaceRepository`] method written once, over a database's own small
+//! store of statements ([`SqlStore`]), deciding each commit by the same
+//! [`decide_commit`] the memory store does. SQLite's statements are
+//! [`SqliteStore`]; a second database adds a second store, not a second
+//! repository.
+//!
+//! Every operation runs alone in the process (ST-127): one at a time, behind
+//! one lock, inside one transaction, so overlapping Edits to one Space meet
+//! as a stale revision and nothing waits on the database's own locks for
+//! another operation of this process.
+
+mod codec;
+mod path;
+mod sqlite;
+
+use std::collections::BTreeMap;
+use std::future::Future;
+use std::marker::PhantomData;
+
+use intake::{SpaceId, SpaceSnapshot, load_aggregate};
+use sqlx::{Database, Transaction};
+
+use crate::assets::{AssetHash, StoredAsset};
+use crate::commit::{CommitDecision, decide_commit};
+use crate::memory::authored;
+use crate::repository::{
+    AggregateInput, AggregateLoad, AssetStored, CommitResult, InitializeResult, LoadedAggregate,
+    LoadedSpace, ReplaceResult, RepositoryError, Revision, SpaceCommit, SpaceRepository,
+    SpaceSummary,
+};
+use codec::{ResourceRow, SpaceRow, decode_space, decode_title, encode_revision, encode_space};
+
+pub use path::{SqlitePath, SqlitePathError};
+pub use sqlite::{ConnectionSettings, SqliteSpaceRepository, SqliteStore};
+
+/// A connection of `S`'s database, as a transaction lends it.
+type Connection<S> = <<S as SqlStore>::Database as Database>::Connection;
+
+/// What a database supplies the one SQL repository: how to open a
+/// transaction, each statement the repository runs, and what a failure means.
+/// Each statement runs on the connection of the transaction the repository
+/// opened, and none decides anything.
+pub(crate) trait SqlStore: Send + Sync + 'static {
+    /// The `sqlx` database.
+    type Database: Database;
+
+    /// A transaction that only reads.
+    fn begin_read(
+        &self,
+    ) -> impl Future<Output = Result<Transaction<'static, Self::Database>, sqlx::Error>> + Send;
+
+    /// A transaction that writes, holding the database's write lock from its start.
+    fn begin_write(
+        &self,
+    ) -> impl Future<Output = Result<Transaction<'static, Self::Database>, sqlx::Error>> + Send;
+
+    /// The stored Meta identity, as text.
+    fn meta_space_id(
+        connection: &mut Connection<Self>,
+    ) -> impl Future<Output = Result<Option<String>, sqlx::Error>> + Send;
+
+    /// Every Space row, ascending by id.
+    fn spaces(
+        connection: &mut Connection<Self>,
+    ) -> impl Future<Output = Result<Vec<SpaceRow>, sqlx::Error>> + Send;
+
+    /// The Space row with this id.
+    fn space(
+        connection: &mut Connection<Self>,
+        id: &str,
+    ) -> impl Future<Output = Result<Option<SpaceRow>, sqlx::Error>> + Send;
+
+    /// Every Resource row, ascending by id.
+    fn resources(
+        connection: &mut Connection<Self>,
+    ) -> impl Future<Output = Result<Vec<ResourceRow>, sqlx::Error>> + Send;
+
+    /// The Resource rows of one Space, ascending by id.
+    fn resources_of(
+        connection: &mut Connection<Self>,
+        space_id: &str,
+    ) -> impl Future<Output = Result<Vec<ResourceRow>, sqlx::Error>> + Send;
+
+    /// Insert a Space row, or overwrite the one with its id.
+    fn write_space(
+        connection: &mut Connection<Self>,
+        row: &SpaceRow,
+    ) -> impl Future<Output = Result<(), sqlx::Error>> + Send;
+
+    /// Delete a Space row and its Resource rows.
+    fn delete_space(
+        connection: &mut Connection<Self>,
+        id: &str,
+    ) -> impl Future<Output = Result<(), sqlx::Error>> + Send;
+
+    /// Delete every Resource row of one Space.
+    fn delete_resources_of(
+        connection: &mut Connection<Self>,
+        space_id: &str,
+    ) -> impl Future<Output = Result<(), sqlx::Error>> + Send;
+
+    /// Insert a Resource row.
+    fn insert_resource(
+        connection: &mut Connection<Self>,
+        row: &ResourceRow,
+    ) -> impl Future<Output = Result<(), sqlx::Error>> + Send;
+
+    /// Delete the Meta identity, every Resource row and every Space row.
+    fn clear(
+        connection: &mut Connection<Self>,
+    ) -> impl Future<Output = Result<(), sqlx::Error>> + Send;
+
+    /// Store the Meta identity.
+    fn insert_meta_space_id(
+        connection: &mut Connection<Self>,
+        id: &str,
+    ) -> impl Future<Output = Result<(), sqlx::Error>> + Send;
+
+    /// Set one Space's exported revision, answering whether a row held it.
+    fn set_exported_revision(
+        connection: &mut Connection<Self>,
+        id: &str,
+        revision: &str,
+    ) -> impl Future<Output = Result<bool, sqlx::Error>> + Send;
+
+    /// Insert an asset unless its hash is stored, answering whether it was inserted.
+    fn insert_asset(
+        connection: &mut Connection<Self>,
+        asset: &StoredAsset,
+    ) -> impl Future<Output = Result<bool, sqlx::Error>> + Send;
+
+    /// The media type and bytes stored under a hash.
+    fn asset(
+        connection: &mut Connection<Self>,
+        hash: &str,
+    ) -> impl Future<Output = Result<Option<(String, Vec<u8>)>, sqlx::Error>> + Send;
+
+    /// What a failure of this database means to a caller.
+    fn classify(error: &sqlx::Error) -> RepositoryError;
+}
+
+/// The one SQL repository over the store of statements `S`.
+///
+/// A database's own repository is this over its store: SQLite's is
+/// [`SqliteSpaceRepository`].
+#[derive(Debug)]
+pub struct SqlSpaceRepository<S> {
+    store: S,
+    // Held across each whole operation, so the process runs one at a time.
+    serial: tokio::sync::Mutex<()>,
+}
+
+/// Why an operation failed: the database, or rows that cannot be read.
+enum Failure {
+    Database(sqlx::Error),
+    Broken(String),
+}
+
+impl From<sqlx::Error> for Failure {
+    fn from(error: sqlx::Error) -> Self {
+        Self::Database(error)
+    }
+}
+
+type Outcome<T> = Result<T, Failure>;
+
+fn broken(message: impl Into<String>) -> Failure {
+    Failure::Broken(message.into())
+}
+
+impl<S> SqlSpaceRepository<S> {
+    pub(crate) fn over(store: S) -> Self {
+        Self {
+            store,
+            serial: tokio::sync::Mutex::new(()),
+        }
+    }
+
+    pub(crate) fn store(&self) -> &S {
+        &self.store
+    }
+
+    /// Run `operation` alone in the process, naming its failure by `classify`.
+    async fn alone<T>(
+        &self,
+        classify: fn(&sqlx::Error) -> RepositoryError,
+        operation: impl Future<Output = Outcome<T>>,
+    ) -> Result<T, RepositoryError> {
+        let _alone = self.serial.lock().await;
+        operation.await.map_err(|failure| match failure {
+            Failure::Database(error) => classify(&error),
+            Failure::Broken(message) => RepositoryError::BrokenStoredState(message),
+        })
+    }
+}
+
+/// What the repository composes from a store's statements.
+struct Rows<S>(PhantomData<S>);
+
+impl<S: SqlStore> Rows<S> {
+    /// Every stored Space, decoded, ascending by id.
+    async fn every_space(connection: &mut Connection<S>) -> Outcome<Vec<LoadedSpace>> {
+        let spaces = S::spaces(connection).await?;
+        let resources = S::resources(connection).await?;
+        let mut by_space: BTreeMap<&str, Vec<&ResourceRow>> = BTreeMap::new();
+        for resource in &resources {
+            by_space
+                .entry(&resource.space_id)
+                .or_default()
+                .push(resource);
+        }
+        spaces
+            .iter()
+            .map(|row| {
+                let owned = by_space.get(row.id.as_str()).map_or(&[][..], Vec::as_slice);
+                decode_space(row, owned).map_err(Failure::Broken)
+            })
+            .collect()
+    }
+
+    async fn stored_meta_space_id(connection: &mut Connection<S>) -> Outcome<Option<SpaceId>> {
+        match S::meta_space_id(connection).await? {
+            None => Ok(None),
+            Some(text) => SpaceId::parse(&text)
+                .map(Some)
+                .ok_or_else(|| broken("the stored Meta identity is not a UUID")),
+        }
+    }
+
+    /// The stored aggregate, checked by intake (`#authoritativeAggregate`).
+    async fn authoritative(
+        connection: &mut Connection<S>,
+        meta_space_id: SpaceId,
+    ) -> Outcome<LoadedAggregate> {
+        let spaces = Rows::<S>::every_space(connection).await?;
+        load_aggregate(meta_space_id, spaces.iter().map(|space| &space.snapshot))
+            .map_err(|_| broken("the stored aggregate violates Meta invariants"))?;
+        Ok(LoadedAggregate {
+            meta_space_id,
+            spaces,
+        })
+    }
+
+    async fn write(connection: &mut Connection<S>, space: &LoadedSpace) -> Outcome<()> {
+        let (row, resources) = encode_space(space);
+        S::write_space(connection, &row).await?;
+        for resource in &resources {
+            S::insert_resource(connection, resource).await?;
+        }
+        Ok(())
+    }
+
+    /// Empty the store and write `input` as the whole aggregate.
+    async fn install(
+        connection: &mut Connection<S>,
+        input: AggregateInput,
+    ) -> Outcome<LoadedAggregate> {
+        S::clear(connection).await?;
+        let mut spaces: Vec<LoadedSpace> = input
+            .spaces
+            .into_iter()
+            .map(|snapshot| LoadedSpace {
+                snapshot,
+                revision: Revision::FIRST,
+                exported_revision: None,
+            })
+            .collect();
+        spaces.sort_by_key(|space| space.snapshot.id);
+        for space in &spaces {
+            Rows::<S>::write(connection, space).await?;
+        }
+        S::insert_meta_space_id(connection, input.meta_space_id.as_str()).await?;
+        Rows::<S>::authoritative(connection, input.meta_space_id).await
+    }
+}
+
+impl<S: SqlStore> SpaceRepository for SqlSpaceRepository<S> {
+    async fn list_spaces(&self) -> Result<Vec<SpaceSummary>, RepositoryError> {
+        self.alone(S::classify, async {
+            let mut transaction = self.store.begin_read().await?;
+            let rows = S::spaces(&mut transaction).await?;
+            transaction.commit().await?;
+            rows.iter()
+                .map(|row| {
+                    let id = SpaceId::parse(&row.id)
+                        .ok_or_else(|| broken(format!("stored Space {} has no UUID", row.id)))?;
+                    let title = decode_title(row).map_err(Failure::Broken)?;
+                    Ok(SpaceSummary { id, title })
+                })
+                .collect()
+        })
+        .await
+    }
+
+    async fn load_space(&self, id: SpaceId) -> Result<Option<LoadedSpace>, RepositoryError> {
+        self.alone(S::classify, async {
+            let mut transaction = self.store.begin_read().await?;
+            let Some(row) = S::space(&mut transaction, id.as_str()).await? else {
+                transaction.commit().await?;
+                return Ok(None);
+            };
+            let resources = S::resources_of(&mut transaction, id.as_str()).await?;
+            transaction.commit().await?;
+            let owned: Vec<&ResourceRow> = resources.iter().collect();
+            decode_space(&row, &owned)
+                .map(Some)
+                .map_err(Failure::Broken)
+        })
+        .await
+    }
+
+    async fn load_aggregate(&self) -> Result<AggregateLoad, RepositoryError> {
+        self.alone(S::classify, async {
+            let mut transaction = self.store.begin_read().await?;
+            let loaded = match Rows::<S>::stored_meta_space_id(&mut transaction).await? {
+                Some(meta_space_id) => AggregateLoad::Loaded(
+                    Rows::<S>::authoritative(&mut transaction, meta_space_id).await?,
+                ),
+                None if S::spaces(&mut transaction).await?.is_empty() => {
+                    AggregateLoad::Uninitialized
+                }
+                None => return Err(broken("stored Spaces exist without a Meta Space")),
+            };
+            transaction.commit().await?;
+            Ok(loaded)
+        })
+        .await
+    }
+
+    async fn commit(&self, request: SpaceCommit) -> Result<CommitResult, RepositoryError> {
+        self.alone(S::classify, async {
+            let mut transaction = self.store.begin_write().await?;
+            let meta_space_id = Rows::<S>::stored_meta_space_id(&mut transaction).await?;
+            let stored = Rows::<S>::every_space(&mut transaction).await?;
+            match decide_commit(&request, meta_space_id, stored.iter()) {
+                CommitDecision::Answer(result) => {
+                    transaction.rollback().await?;
+                    Ok(result)
+                }
+                CommitDecision::Write {
+                    result,
+                    written,
+                    deleted,
+                } => {
+                    for id in &deleted {
+                        S::delete_space(&mut transaction, id.as_str()).await?;
+                    }
+                    // Every written Space's Resources go first, so a Resource
+                    // one Space releases and another takes is never held twice.
+                    for space in &written {
+                        S::delete_resources_of(&mut transaction, space.snapshot.id.as_str())
+                            .await?;
+                    }
+                    for space in &written {
+                        Rows::<S>::write(&mut transaction, space).await?;
+                    }
+                    transaction.commit().await?;
+                    Ok(result)
+                }
+            }
+        })
+        .await
+    }
+
+    async fn store_asset(&self, asset: StoredAsset) -> Result<AssetStored, RepositoryError> {
+        if asset.hash.is_empty_asset() {
+            return Ok(AssetStored::Existing);
+        }
+        self.alone(S::classify, async {
+            let mut transaction = self.store.begin_write().await?;
+            let inserted = S::insert_asset(&mut transaction, &asset).await?;
+            transaction.commit().await?;
+            Ok(if inserted {
+                AssetStored::Stored
+            } else {
+                AssetStored::Existing
+            })
+        })
+        .await
+    }
+
+    async fn load_asset(&self, hash: &AssetHash) -> Result<Option<StoredAsset>, RepositoryError> {
+        let held = self
+            .alone(S::classify, async {
+                let mut transaction = self.store.begin_read().await?;
+                let row = S::asset(&mut transaction, hash.as_str()).await?;
+                transaction.commit().await?;
+                Ok(row.map(|(media_type, bytes)| StoredAsset {
+                    hash: hash.clone(),
+                    media_type,
+                    bytes: bytes.into(),
+                }))
+            })
+            .await?;
+        Ok(held.or_else(|| hash.is_empty_asset().then(StoredAsset::empty)))
+    }
+
+    async fn initialize_aggregate(
+        &self,
+        input: AggregateInput,
+    ) -> Result<InitializeResult, RepositoryError> {
+        if let Err(refusals) = load_aggregate(input.meta_space_id, &input.spaces) {
+            return Ok(InitializeResult::AggregateRefused(refusals));
+        }
+        self.alone(S::classify, async {
+            let mut transaction = self.store.begin_write().await?;
+            let Some(meta_space_id) = Rows::<S>::stored_meta_space_id(&mut transaction).await?
+            else {
+                if !S::spaces(&mut transaction).await?.is_empty() {
+                    return Err(broken("stored Spaces exist without a Meta Space"));
+                }
+                let installed = Rows::<S>::install(&mut transaction, input).await?;
+                transaction.commit().await?;
+                return Ok(InitializeResult::Initialized(installed));
+            };
+            let existing = Rows::<S>::authoritative(&mut transaction, meta_space_id).await?;
+            transaction.rollback().await?;
+            let held: Vec<&SpaceSnapshot> = existing
+                .spaces
+                .iter()
+                .map(|space| &space.snapshot)
+                .collect();
+            let given: Vec<&SpaceSnapshot> = input.spaces.iter().collect();
+            Ok(
+                if authored(meta_space_id, &held) == authored(input.meta_space_id, &given) {
+                    InitializeResult::Existing(existing)
+                } else {
+                    InitializeResult::AlreadyInitialized(existing)
+                },
+            )
+        })
+        .await
+    }
+
+    async fn load_meta_space_id(&self) -> Result<Option<SpaceId>, RepositoryError> {
+        self.alone(S::classify, async {
+            let mut transaction = self.store.begin_read().await?;
+            let meta_space_id = Rows::<S>::stored_meta_space_id(&mut transaction).await?;
+            transaction.commit().await?;
+            Ok(meta_space_id)
+        })
+        .await
+    }
+
+    async fn replace_aggregate(
+        &self,
+        input: AggregateInput,
+        expected_meta_space_id: Option<SpaceId>,
+    ) -> Result<ReplaceResult, RepositoryError> {
+        if let Err(refusals) = load_aggregate(input.meta_space_id, &input.spaces) {
+            return Ok(ReplaceResult::AggregateRefused(refusals));
+        }
+        self.alone(S::classify, async {
+            let mut transaction = self.store.begin_write().await?;
+            let meta_space_id = Rows::<S>::stored_meta_space_id(&mut transaction).await?;
+            // Rows are counted, not read: replacement replaces stored state
+            // whether or not it parses (ADR 0094).
+            let stored = S::spaces(&mut transaction).await?;
+            let answer = if meta_space_id.is_none() && stored.is_empty() {
+                ReplaceResult::Uninitialized
+            } else if meta_space_id != expected_meta_space_id {
+                ReplaceResult::Conflict {
+                    current_meta_space_id: meta_space_id,
+                }
+            } else {
+                let installed = Rows::<S>::install(&mut transaction, input).await?;
+                transaction.commit().await?;
+                return Ok(ReplaceResult::Replaced(installed));
+            };
+            transaction.rollback().await?;
+            Ok(answer)
+        })
+        .await
+    }
+
+    async fn mark_exported(&self, id: SpaceId, revision: Revision) -> Result<(), RepositoryError> {
+        let held = self
+            .alone(S::classify, async {
+                let mut transaction = self.store.begin_write().await?;
+                let held = S::set_exported_revision(
+                    &mut transaction,
+                    id.as_str(),
+                    &encode_revision(revision),
+                )
+                .await?;
+                transaction.commit().await?;
+                Ok(held)
+            })
+            .await?;
+        if held {
+            Ok(())
+        } else {
+            Err(RepositoryError::Unclassified(format!(
+                "Space {id} does not exist"
+            )))
+        }
+    }
+}
