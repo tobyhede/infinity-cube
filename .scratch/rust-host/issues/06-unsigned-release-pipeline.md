@@ -14,3 +14,5 @@
 
 The box stays unticked until a build installed from one tag is watched updating to the next.
 
+
+**2026-11-22, the bundle opens a Space in CI.** On PR #522 at `5960a54`, the `desktop` job on `macos-latest` built the bundle, the `.dmg`, the signed `.app.tar.gz` and its `.sig` (so the updater secrets are set), installed the `.app` from the `.dmg`, passed `codesign --verify --deep --strict`, and opened a Space with it until its run took the directory's lock. The first runs timed out because the smoke test ran the app from macOS's temporary directory under `/var`, a symlink to `/private/var`: Tauri refuses to find its resources, or check for an update, from an executable whose path holds a symlink. The smoke test now resolves that path first; an app in `/Applications` is not affected. The update itself is still unwatched.
