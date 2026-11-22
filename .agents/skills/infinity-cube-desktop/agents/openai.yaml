@@ -1,0 +1,3 @@
+interface:
+  display_name: "InfinityCube Desktop"
+  short_description: "Maintain the InfinityCube Tauri desktop shell"
