@@ -132,10 +132,13 @@ if command -v rustup >/dev/null 2>&1; then
 	rustup toolchain install
 	rustup target add "$target"
 fi
+# Named explicitly so the binary packed is the one just built, wherever
+# CARGO_TARGET_DIR points.
+target_dir="${CARGO_TARGET_DIR:-$root/target}"
 INFINITY_CUBE_BUILT_APPLICATION=packages/app/dist \
 	INFINITY_CUBE_COMMIT="$commit" \
-	cargo build --release --locked -p infinity-cube --target "$target"
-binary="target/$target/release/infinity-cube"
+	cargo build --release --locked -p infinity-cube --target "$target" --target-dir "$target_dir"
+binary="$target_dir/$target/release/infinity-cube"
 
 smoke=""
 stage=""
@@ -176,7 +179,9 @@ for expected in "from this preview build, v$version" "INFINITY_CUBE_VERSION=v$ve
 done
 archive="$out/$name.tar.gz"
 tar -C "$stage" -czf "$archive" "$name"
-(cd "$out" && sha256 "$name.tar.gz" >SHA256SUMS)
+# Every archive in the folder, so one built earlier for another target or
+# version still installs from it.
+(cd "$out" && for packed in infinity-cube-*.tar.gz; do sha256 "$packed"; done >SHA256SUMS)
 
 step "Built $archive"
 cat "$out/SHA256SUMS"
