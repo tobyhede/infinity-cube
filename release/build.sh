@@ -198,7 +198,9 @@ tar -C "$stage" -czf "$archive" "$name"
 step "Built $archive"
 cat "$out/SHA256SUMS"
 say "Install it here with:"
-# curl reads a file URL, so a space or a percent sign in the folder's name is
-# percent-encoded, and both paths are quoted for the shell.
-url="file://$(printf '%s' "$out" | sed -e 's/%/%25/g' -e 's/ /%20/g')"
-say "  INFINITY_CUBE_DOWNLOAD_URL='$url' INFINITY_CUBE_VERSION=v$version sh '$root/release/install.sh'"
+# curl reads a file URL, so a percent sign, space, `#` or `?` in the folder's
+# name is percent-encoded, and both values are quoted for the shell, a single
+# quote in either included.
+quote() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
+url="file://$(printf '%s' "$out" | sed -e 's/%/%25/g' -e 's/ /%20/g' -e 's/#/%23/g' -e 's/?/%3F/g')"
+say "  INFINITY_CUBE_DOWNLOAD_URL=$(quote "$url") INFINITY_CUBE_VERSION=v$version sh $(quote "$root/release/install.sh")"
