@@ -46,7 +46,7 @@ This takes you from a fresh clone to the desktop application open on a Space of 
 
    Done when `init` prints `Created a new aggregate` and the commit succeeds. It also names the browser command; ignore that unless you are [running it in the browser](#or-run-it-in-the-browser). That commit is the revision git restores if the first write is not what you wanted.
 
-4. **Build the desktop application.** Build the browser application first: the desktop build copies it in, and fails with `resource path '../../app/dist' doesn't exist` without it.
+4. **Build the desktop application.** Build the browser application first: the desktop build copies it in, and fails with ``resource path `../../app/dist` doesn't exist`` without it.
 
    ```sh
    pnpm --filter @project/app exec vite build
