@@ -331,13 +331,22 @@ fn choose_new_space(app: &AppHandle) {
 
 /// Write a new Space to `directory` and open it.
 fn create_and_open(app: &AppHandle, directory: &Path) -> Result<(), NotOpened> {
-    tauri::async_runtime::block_on(new_space::create_space(
-        &TokioFilesystem,
-        directory,
-        &RandomIds,
-    ))?;
+    {
+        // One Space is written at a time, so two asked for at once cannot
+        // both find a folder empty and both write to it: the second finds
+        // the first's files and is refused.
+        let _creating = lock(&CREATING);
+        tauri::async_runtime::block_on(new_space::create_space(
+            &TokioFilesystem,
+            directory,
+            &RandomIds,
+        ))?;
+    }
     open_aggregate_at(app, directory)
 }
+
+/// Held while a new Space is written ([`create_and_open`]).
+static CREATING: Mutex<()> = Mutex::new(());
 
 /// Answer a folder asked for `opening` that did not open: offer a new Space
 /// in one that holds none, and otherwise say why, returning once the
@@ -418,6 +427,8 @@ fn open_aggregate_at(app: &AppHandle, folder: &Path) -> Result<(), NotOpened> {
     let reserved = aggregates.registry().reserve(&directory);
     let label = match reserved {
         Reserved::New(label) => label,
+        // A quit has begun: say nothing, as for any open a quit overtakes.
+        Reserved::Quitting => return Err(NotOpened::Abandoned(directory)),
         Reserved::Existing(label) => {
             // Still starting, there is no window yet, and it shows when it
             // opens. Closing without saving, its window is gone while its
