@@ -1,6 +1,6 @@
 # 15 — The Rust SQLite store
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 **Category:** enhancement
 
@@ -9,6 +9,8 @@
 **What to build:** One SQL repository over `sqlx` implementing the storage trait, with SQLite first. The TypeScript SQLite host is not a CLI verb but `pnpm dev:sqlite` (`scripts/dev-sqlite.ts`, through Vite): the Rust binary gains a `serve --store sqlite` verb that serves the file `SQLITE_PATH` names, as `pnpm dev:sqlite` does. The SQLite restart proof (`test/e2e/sqlite-persistence.spec.ts`, `pnpm e2e:sqlite`) starts its two hosts with Vite's `createServer` today; it gains a way to start a host by command instead (the command and its environment given to the spec), so the same spec runs against the Rust binary unchanged. The HTTP conformance suite (08) holds it through the Rust port's wire and store-condition cases, as the Agent Brief below sets out.
 
 The acceptance criteria are the Agent Brief's, below; they replace the two this ticket was written with.
+
+Resolved by #519 (restart proof hosts by command), #520 (the SQL repository and its conformance) and #521 (`serve --store sqlite`, the CI proof and the docs).
 
 ## Comments
 
@@ -37,12 +39,18 @@ The acceptance criteria are the Agent Brief's, below; they replace the two this 
 - `test/unit/http-conformance-rust-ports.test.ts` knows the new adapter, so a case without a SQLite port fails unless exempted with why.
 
 **Acceptance criteria:**
-- [ ] Every wire case and store-condition case passes against `Application` over the SQLite repository in CI's `rust` job, and the ports test covers that adapter.
-- [ ] Rust tests hold ST-126's host refusals, ST-128's pragmas, ST-127's conflict and busy-file answers, and ST-10's initialize-once, never-reseed, bounded back-off and confirmed stop, with the host announcing before the store is reachable.
-- [ ] The SQLite restart proof passes in CI's `sqlite` job both on the Vite host (unchanged default) and on `infinity-cube serve --store sqlite`.
-- [ ] A file migrated by `pnpm db:migrate:sqlite` is served by `serve --store sqlite` with no Rust migration step.
-- [ ] `sqlx` becomes a dependency of `host` (not only a dev-dependency); `cargo clippy` and `cargo nextest` stay green with the workspace lints.
-- [ ] Storage requirements (the SQLite host section and the Operations index) and the `AGENTS.md` Commands section name `serve --store sqlite` beside `pnpm dev:sqlite`.
+- [x] Every wire case and store-condition case passes against `Application` over the SQLite repository in CI's `rust` job, and the ports test covers that adapter.
+  Evidence: `crates/host/tests/sqlite_wire.rs` (`http_conformance::cases!` plus the store-condition cases) and the SQLite port in `test/unit/http-conformance-rust-ports.test.ts`; CI `rust` job green on #520 at 16d8265.
+- [x] Rust tests hold ST-126's host refusals, ST-128's pragmas, ST-127's conflict and busy-file answers, and ST-10's initialize-once, never-reseed, bounded back-off and confirmed stop, with the host announcing before the store is reachable.
+  Evidence: `crates/host/tests/sqlite.rs` (`given_a_sqlite_path`, `writes_in_rollback_journal_delete_mode_with_synchronous_full`, `given_contention`, `given_broken_stored_state`) and `crates/host/tests/startup.rs` (`backs_off_up_to_a_bound_it_then_holds`, `stops_once_a_second_retry_confirms_it`), in #520; `crates/cli/tests/serve.rs` › `announces_before_the_store_answers_and_initializes_it_once_released`, in #521.
+- [x] The SQLite restart proof passes in CI's `sqlite` job both on the Vite host (unchanged default) and on `infinity-cube serve --store sqlite`.
+  Evidence: CI `sqlite` job on #521 ran "Prove a SQLite edit survives a fresh host" (Vite) and "Prove a SQLite edit survives a fresh Rust host" (`infinity-cube serve --store sqlite --built packages/app/dist`), both green; the command host comes from #519.
+- [x] A file migrated by `pnpm db:migrate:sqlite` is served by `serve --store sqlite` with no Rust migration step.
+  Evidence: the `sqlite` job migrates its file with Prisma Next (`pnpm db:migrate:sqlite`) and the Rust proof serves it with no Rust migration; the file afterwards holds no `_sqlx_migrations` table (#521).
+- [x] `sqlx` becomes a dependency of `host` (not only a dev-dependency); `cargo clippy` and `cargo nextest` stay green with the workspace lints.
+  Evidence: `crates/host/Cargo.toml` depends on `sqlx` (declared once in `[workspace.dependencies]`, #521); `cargo clippy -D warnings` and `cargo nextest` green in CI `rust` and `rust-windows`.
+- [x] Storage requirements (the SQLite host section and the Operations index) and the `AGENTS.md` Commands section name `serve --store sqlite` beside `pnpm dev:sqlite`.
+  Evidence: `docs/requirements/storage.md` ST-126 (The SQLite host) and the Operations index row for `infinity-cube serve --store sqlite`; `AGENTS.md` Commands (Dev, E2E, Rust), in #521.
 
 **Out of scope:**
 - PostgreSQL, `serve --store postgres`, and the `migrate` verb (16).
