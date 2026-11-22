@@ -141,6 +141,35 @@ describe('release/install.sh', () => {
     expect(run.stdout).toContain(`Installed infinity-cube ${version} (test)`);
   });
 
+  it('skips a release whose tag is not a version, such as the desktop update endpoint', async () => {
+    const root = await temporaryDirectory();
+    const served = await fakeRelease(root, targets);
+    const tools = join(root, 'tools');
+    await mkdir(tools);
+    await executable(
+      tools,
+      'curl',
+      [
+        'while [ $# -gt 0 ]; do case "$1" in -o) out="$2"; shift 2 ;; -*) shift ;; *) url="$1"; shift ;; esac; done',
+        'case "$url" in',
+        `https://api.github.com/repos/owner/repo/releases*) printf '%s' '[{"tag_name":"desktop-updates","prerelease":true},{"tag_name":"v${version}","prerelease":true}]' > "$out" ;;`,
+        `https://github.com/owner/repo/releases/download/v${version}/*) cp "${served}/\${url##*/}" "$out" ;;`,
+        '*) exit 22 ;;',
+        'esac',
+      ].join('\n'),
+    );
+    const installDir = join(root, 'bin');
+
+    const run = install(`${tools}:${realPath}`, root, {
+      INFINITY_CUBE_REPO: 'owner/repo',
+      INFINITY_CUBE_INSTALL_DIR: installDir,
+    });
+
+    expect(run.stderr).toBe('');
+    expect(run.status).toBe(0);
+    expect(run.stdout).toContain(`Installed infinity-cube ${version} (test)`);
+  });
+
   it('names INFINITY_CUBE_VERSION when the GitHub API refuses to list the releases', async () => {
     const root = await temporaryDirectory();
     const tools = join(root, 'tools');

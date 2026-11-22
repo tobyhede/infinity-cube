@@ -77,17 +77,19 @@ fetch() {
 	curl --proto '=https,file' --proto-redir '=https' --tlsv1.2 -fsSL "$1" -o "$2"
 }
 
-# The tag of the newest published release. /releases/latest answers "the most
-# recent non-prerelease, non-draft release", and every preview build is a
-# pre-release, so this reads the first entry of the list instead. GitHub's docs
+# The tag of the newest published release whose tag is a version. /releases/latest
+# answers "the most recent non-prerelease, non-draft release", and every
+# preview build is a pre-release, so this reads the list instead, skipping the
+# `desktop-updates` release, which holds the desktop application's update
+# manifest and no build (.github/workflows/desktop-updates.yml). GitHub's docs
 # state no order for the list; the first entry is taken as the newest. A
 # request without a token lists no draft: "Only users with push access will
 # receive listings for draft releases"
 # (https://docs.github.com/en/rest/releases/releases).
 latest_tag() {
-	fetch "https://api.github.com/repos/$1/releases?per_page=1" "$2/releases.json" ||
+	fetch "https://api.github.com/repos/$1/releases?per_page=10" "$2/releases.json" ||
 		fail "could not ask GitHub for $1's releases. GitHub allows 60 such requests an hour from one address; set INFINITY_CUBE_VERSION (say v0.1.0-preview.1) to install a release without asking"
-	tag="$(grep -o '"tag_name" *: *"[^"]*"' "$2/releases.json" | head -n 1 | sed 's/.*"\([^"]*\)"$/\1/')"
+	tag="$(grep -o '"tag_name" *: *"v[^"]*"' "$2/releases.json" | head -n 1 | sed 's/.*"\([^"]*\)"$/\1/')"
 	[ -n "$tag" ] || fail "$1 has no published release yet"
 	say "$tag"
 }

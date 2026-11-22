@@ -129,6 +129,8 @@ pnpm release:build
 
 It installs the JavaScript dependencies, builds the browser application, builds the release `infinity-cube` binary with that application embedded, runs it once (`--version`, `init`, `check`), and packs `target/preview-build/infinity-cube-<version>-<target>.tar.gz` with a `SHA256SUMS`. It needs Node (the version in `.node-version`), pnpm 9 and [rustup](https://rustup.rs); on Linux it builds the static musl binary, which needs `musl-gcc` (`apt-get install musl-tools`). `--target <triple>` picks another target and `--out <dir>` another folder. It prints the line that installs the archive with the install script; the binary alone is `target/<target>/release/infinity-cube`. Each build job in `.github/workflows/release.yml` runs this same script (`release/build.sh`).
 
+On a Mac, `pnpm release:build --desktop` builds the desktop application instead: `InfinityCube-<version>-<target>.dmg`, ad-hoc signed, which it installs from the disk image and opens once with a Space. With the updater's key in `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` it also writes the signed update bundle and the `latest.json` that offers it. The release workflow's `desktop` job runs the same command.
+
 ## Using InfinityCube with agents
 
 Two of this repository's agent skills, in [`.agents/skills/`](.agents/skills/) and linked from `.claude/skills/`, are for using InfinityCube. They are also published as the `infinity-cube` plugin, from [`plugins/infinity-cube/`](plugins/infinity-cube/):

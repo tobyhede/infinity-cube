@@ -9,7 +9,8 @@
 #
 #   pnpm release:build                  # this machine's platform
 #   pnpm release:build --target <triple>
-#   sh release/build.sh [--target <triple>] [--out <dir>]
+#   pnpm release:build --desktop        # the desktop application, on macOS
+#   sh release/build.sh [--desktop] [--target <triple>] [--out <dir>]
 #
 # The target defaults to the one release/install.sh installs on this machine:
 # `<arch>-unknown-linux-musl` on Linux (which needs `musl-gcc`, from Debian's
@@ -17,6 +18,14 @@
 # lands in `target/preview-build/`, or `--out`, and installs with
 #
 #   INFINITY_CUBE_DOWNLOAD_URL=file://<out> INFINITY_CUBE_VERSION=v<version> sh release/install.sh
+#
+# `--desktop` builds the desktop application (rust-host issue 06) instead,
+# on macOS only: an ad-hoc signed `InfinityCube-<version>-<target>.dmg`, opened
+# once on this machine with a Space, and, when `TAURI_SIGNING_PRIVATE_KEY`
+# (and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`) hold the updater's key, the signed
+# `InfinityCube-<version>-<target>.app.tar.gz` the updater installs and the
+# `latest.json` that offers it. `INFINITY_CUBE_SCREENSHOT` names a PNG file
+# the screen is captured to while that Space is open.
 #
 # It needs Node (the version `.node-version` names), pnpm, and rustup, which
 # installs the toolchain `rust-toolchain.toml` pins on first use.
@@ -76,12 +85,17 @@ root="$(dirname "$(dirname "$script")")"
 
 target=""
 out=""
+desktop=0
 while [ $# -gt 0 ]; do
 	case "$1" in
 	--target)
 		[ $# -ge 2 ] || fail "--target needs a target triple"
 		target="$2"
 		shift 2
+		;;
+	--desktop)
+		desktop=1
+		shift
 		;;
 	--out)
 		[ $# -ge 2 ] || fail "--out needs a directory"
@@ -104,6 +118,10 @@ else
 	target="$(default_target)"
 	native="$target"
 fi
+case "$desktop:$target" in
+1:*-apple-darwin | 0:*) ;;
+*) fail "the desktop application is built for macOS only, not $target; Linux and Windows are rust-host issues 23 and 22" ;;
+esac
 # A relative --out is relative to where the script was run from.
 [ -n "$out" ] || out="$root/target/preview-build"
 mkdir -p "$out"
@@ -129,7 +147,11 @@ version="$(sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"$/\1/p' Ca
 [ -n "$version" ] || fail "no version in Cargo.toml's [workspace.package]"
 commit="${INFINITY_CUBE_COMMIT:-$(git rev-parse HEAD 2>/dev/null || say unknown)}"
 repository="${GITHUB_REPOSITORY:-tobyhede/infinity-cube}"
-name="infinity-cube-$version-$target"
+if [ "$desktop" = 1 ]; then
+	name="InfinityCube-$version-$target"
+else
+	name="infinity-cube-$version-$target"
+fi
 say "Building $name (commit $commit) into $out"
 
 step "Installing JavaScript dependencies"
@@ -138,23 +160,128 @@ pnpm install --frozen-lockfile
 step "Building the browser application the binary embeds"
 pnpm --filter @project/app exec vite build
 
-step "Building the release binary for $target"
 if command -v rustup >/dev/null 2>&1; then
 	rustup toolchain install
 	rustup target add "$target"
 fi
-# Named explicitly so the binary packed is the one just built, wherever
+# Named explicitly so what is packed is what was just built, wherever
 # CARGO_TARGET_DIR points.
 target_dir="${CARGO_TARGET_DIR:-$root/target}"
-INFINITY_CUBE_BUILT_APPLICATION=packages/app/dist \
-	INFINITY_CUBE_COMMIT="$commit" \
-	cargo build --release --locked -p infinity-cube --target "$target" --target-dir "$target_dir"
-binary="$target_dir/$target/release/infinity-cube"
 
 smoke=""
 stage=""
 trap 'rm -rf "$smoke" "$stage"' EXIT
 trap 'exit 1' HUP INT TERM
+
+# Every archive and bundle in the folder, so one built earlier for another
+# target or version still installs from it.
+write_sums() {
+	(
+		cd "$out"
+		for packed in infinity-cube-*.tar.gz InfinityCube-*.dmg InfinityCube-*.app.tar.gz; do
+			if [ -e "$packed" ]; then
+				sha256 "$packed"
+			fi
+		done >SHA256SUMS
+	)
+}
+
+if [ "$desktop" = 1 ]; then
+	step "Building the desktop application for $target"
+	# The updater's files are made only where the key that signs them is set:
+	# a build without it installs and runs, and offers no update.
+	set -- --target "$target" --bundles app,dmg
+	if [ -n "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
+		set -- "$@" --config '{"bundle":{"createUpdaterArtifacts":true}}'
+	else
+		say "TAURI_SIGNING_PRIVATE_KEY is not set, so no signed update is made"
+	fi
+	CARGO_TARGET_DIR="$target_dir" pnpm --filter @project/desktop exec tauri build "$@"
+	bundle="$target_dir/$target/release/bundle"
+	app="$bundle/macos/InfinityCube.app"
+	[ -d "$app" ] || fail "tauri build made no $app"
+	dmg="$(find "$bundle/dmg" -name "InfinityCube_${version}_*.dmg" | head -n 1)"
+	[ -n "$dmg" ] || fail "tauri build made no InfinityCube_${version}_*.dmg in $bundle/dmg"
+	shown="$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$app/Contents/Info.plist")"
+	[ "$shown" = "$version" ] || fail "the application names version $shown, not $version"
+
+	# The disk image that ships, installed and opened once with a Space: its run takes the
+	# directory's lock before it Imports (Storage ST-124), so the lock file
+	# appearing shows the bundled host started on this Space.
+	if [ "$target" = "$native" ]; then
+		step "Opening a Space with the desktop application"
+		smoke="$(mktemp -d "${TMPDIR:-/tmp}/infinity-cube-smoke.XXXXXX")"
+		# Installed as a person installs it: copied out of the disk image.
+		hdiutil attach -nobrowse -readonly -mountpoint "$smoke/volume" "$dmg" >/dev/null
+		cp -R "$smoke/volume/InfinityCube.app" "$smoke/InfinityCube.app"
+		hdiutil detach "$smoke/volume" >/dev/null
+		codesign --verify --deep --strict "$smoke/InfinityCube.app"
+		executable="$(find "$smoke/InfinityCube.app/Contents/MacOS" -type f -perm -u+x | head -n 1)"
+		cp -R conformance/init/expected "$smoke/space"
+		"$executable" "$smoke/space" >"$smoke/log" 2>&1 &
+		pid=$!
+		waited=0
+		until [ -e "$smoke/space/.infinity-cube.lock" ]; do
+			if ! kill -0 "$pid" 2>/dev/null; then
+				cat "$smoke/log" >&2
+				fail "the desktop application exited before opening the Space"
+			fi
+			if [ "$waited" -ge 60 ]; then
+				kill "$pid"
+				fail "the desktop application did not open the Space within 60 seconds"
+			fi
+			sleep 1
+			waited=$((waited + 1))
+		done
+		say "It opened the Space after ${waited}s"
+		if [ -n "${INFINITY_CUBE_SCREENSHOT:-}" ]; then
+			sleep 5
+			screencapture -x "$INFINITY_CUBE_SCREENSHOT"
+		fi
+		kill -0 "$pid" 2>/dev/null || fail "the desktop application exited after opening the Space"
+		kill "$pid"
+		wait "$pid" 2>/dev/null || true
+	else
+		say "$target is not this machine's target (${native:-none}), so the application is not opened"
+	fi
+
+	step "Packing $name"
+	cp "$dmg" "$out/$name.dmg"
+	if [ -e "$bundle/macos/InfinityCube.app.tar.gz.sig" ]; then
+		cp "$bundle/macos/InfinityCube.app.tar.gz" "$out/$name.app.tar.gz"
+		cp "$bundle/macos/InfinityCube.app.tar.gz.sig" "$out/$name.app.tar.gz.sig"
+		case "$target" in
+		aarch64-*) platform=darwin-aarch64 ;;
+		*) platform=darwin-x86_64 ;;
+		esac
+		# The updater's static manifest (rust-host issue 06): the release
+		# attaches it, and publishing the release makes it the one the
+		# endpoint in tauri.conf.json serves.
+		cat >"$out/latest.json" <<EOF
+{
+  "version": "$version",
+  "notes": "InfinityCube $version (preview)",
+  "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "platforms": {
+    "$platform": {
+      "signature": "$(cat "$out/$name.app.tar.gz.sig")",
+      "url": "https://github.com/$repository/releases/download/v$version/$name.app.tar.gz"
+    }
+  }
+}
+EOF
+	fi
+	write_sums
+	step "Built $out/$name.dmg"
+	cat "$out/SHA256SUMS"
+	exit 0
+fi
+
+step "Building the release binary for $target"
+INFINITY_CUBE_BUILT_APPLICATION=packages/app/dist \
+	INFINITY_CUBE_COMMIT="$commit" \
+	cargo build --release --locked -p infinity-cube --target "$target" --target-dir "$target_dir"
+binary="$target_dir/$target/release/infinity-cube"
 
 # The binary that ships, run once: it names its version, writes a new Space,
 # and checks it. A binary built for another machine's target is not run.
@@ -191,9 +318,7 @@ for expected in "from this preview build, v$version" "INFINITY_CUBE_VERSION=v$ve
 done
 archive="$out/$name.tar.gz"
 tar -C "$stage" -czf "$archive" "$name"
-# Every archive in the folder, so one built earlier for another target or
-# version still installs from it.
-(cd "$out" && for packed in infinity-cube-*.tar.gz; do sha256 "$packed"; done >SHA256SUMS)
+write_sums
 
 step "Built $archive"
 cat "$out/SHA256SUMS"
