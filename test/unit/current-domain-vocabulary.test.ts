@@ -3420,8 +3420,9 @@ const PRODUCT_HISTORY_TREES = ['migrations/', 'migrations-sqlite/'] as const;
  * - The root file ADR 0136 renamed is named where an author or operator is
  *   told to move a directory that still holds it.
  * - A Rust HTTP crate the desktop shell's Tauri runtime depends on shares the
- *   earlier name, and Cargo's lockfile names it and its utility crate; the
- *   crates' names are their publisher's.
+ *   earlier name, and Cargo's lockfile names it, its utility crate and the TLS
+ *   connector the desktop shell's updater fetches through; the crates' names
+ *   are their publisher's.
  * - The Rust CLI (`crates/cli`) serves HTTP through those same two crates,
  *   named as its dependencies in its manifest and, in Rust source alone
  *   (`PRODUCT_KEPT_IN_RUST`), by path.
@@ -3433,7 +3434,7 @@ const PRODUCT_KEPT_SPELLINGS: readonly RegExp[] = [
   new RegExp(`"name": "${RETIRED_PRODUCT}"`, 'g'),
   new RegExp(`\`wrangler\\.jsonc\`'s \`${RETIRED_PRODUCT}\``, 'g'),
   new RegExp(`\\b${RETIRED_PRODUCT}\\.json\\b`, 'g'),
-  new RegExp(`(?:name = |(?<=^|\\n) )"${RETIRED_PRODUCT}(?:-util)?"`, 'g'),
+  new RegExp(`(?:name = |(?<=^|\\n) )"${RETIRED_PRODUCT}(?:-util|-rustls)?"`, 'g'),
   new RegExp(`(?<=^|\\n)${RETIRED_PRODUCT}(?:-util)? = \\{`, 'g'),
 ];
 
