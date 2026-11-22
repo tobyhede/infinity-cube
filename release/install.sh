@@ -75,7 +75,7 @@ detect_target() {
 # fetch <url> <file>
 fetch() {
 	if command -v curl >/dev/null 2>&1; then
-		curl --proto '=https,file' --tlsv1.2 -fsSL "$1" -o "$2"
+		curl --proto '=https,file' --proto-redir '=https' --tlsv1.2 -fsSL "$1" -o "$2"
 	elif command -v wget >/dev/null 2>&1; then
 		wget -q -O "$2" "$1"
 	else
