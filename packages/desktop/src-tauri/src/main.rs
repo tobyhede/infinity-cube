@@ -17,6 +17,7 @@
 mod address;
 mod aggregates;
 mod launch;
+mod not_opened;
 mod question;
 mod saving;
 mod scheme;
@@ -32,7 +33,7 @@ use std::sync::mpsc::{Receiver, TryRecvError};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::thread;
 
-use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
+use tauri::menu::{IsMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::webview::NewWindowResponse;
 use tauri::{
     AppHandle, Manager, RunEvent, UriSchemeContext, UriSchemeResponder, WebviewUrl,
@@ -45,6 +46,7 @@ use url::Url;
 use crate::address::{AggregateKey, SCHEME, SchemeStyle};
 use crate::aggregates::{Close, Registry, Reserved, SPACE_WINDOW_PREFIX};
 use crate::launch::{Launch, Next, Opening, Unopened};
+use crate::not_opened::NotOpened;
 use crate::scheme::{OpenAggregates, VIEW_WINDOW_PREFIX};
 use crate::server::{
     AggregateServer, Navigation, OpenError, RegisteredSchemes, SharedAggregates, SpaceWindows,
@@ -209,13 +211,22 @@ fn app_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         true,
         Some("CmdOrCtrl+Q"),
     )?;
+    // File ends with Close Window on macOS, whose application menu holds
+    // Quit, and with Quit elsewhere, where File is the only menu.
+    let close_window;
+    let file_end: &dyn IsMenuItem<Wry> = if cfg!(target_os = "macos") {
+        close_window = PredefinedMenuItem::close_window(app, None)?;
+        &close_window
+    } else {
+        &quit
+    };
+    let file = Submenu::with_items(
+        app,
+        "File",
+        true,
+        &[&open, &PredefinedMenuItem::separator(app)?, file_end],
+    )?;
     if !cfg!(target_os = "macos") {
-        let file = Submenu::with_items(
-            app,
-            "File",
-            true,
-            &[&open, &PredefinedMenuItem::separator(app)?, &quit],
-        )?;
         return Menu::with_items(app, &[&file]);
     }
     let application = Submenu::with_items(
@@ -230,16 +241,6 @@ fn app_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             &PredefinedMenuItem::show_all(app, None)?,
             &PredefinedMenuItem::separator(app)?,
             &quit,
-        ],
-    )?;
-    let file = Submenu::with_items(
-        app,
-        "File",
-        true,
-        &[
-            &open,
-            &PredefinedMenuItem::separator(app)?,
-            &PredefinedMenuItem::close_window(app, None)?,
         ],
     )?;
     let edit = Submenu::with_items(
@@ -292,8 +293,10 @@ fn choose_folder(app: &AppHandle, opening: Opening) {
             // Starting a run reads the whole directory, so it stays off the
             // thread the dialog answered on.
             thread::spawn(move || {
-                if let Err(Some(message)) = open_aggregate_at(&handle, &path) {
-                    report_unopened(&handle, opening, &message);
+                if let Err(reason) = open_aggregate_at(&handle, &path)
+                    && reason.tells_the_presenter()
+                {
+                    report_unopened(&handle, opening, &reason.to_string());
                 }
             });
         });
@@ -321,7 +324,9 @@ fn report_unopened(app: &AppHandle, opening: Opening, message: &str) {
 fn open_from_command_line(app: &AppHandle, folders: &[PathBuf]) {
     let failed: Vec<String> = folders
         .iter()
-        .filter_map(|folder| open_aggregate_at(app, folder).err().flatten())
+        .filter_map(|folder| open_aggregate_at(app, folder).err())
+        .filter(NotOpened::tells_the_presenter)
+        .map(|reason| reason.to_string())
         .collect();
     let Some((last, others)) = failed.split_last() else {
         return;
@@ -337,9 +342,8 @@ fn open_from_command_line(app: &AppHandle, folders: &[PathBuf]) {
 }
 
 /// Open `folder` as an Aggregate in a window of its own, or focus the window
-/// that already has it, answering what to tell the presenter if neither, or
-/// nothing when a close or a quit took the Aggregate while it was starting.
-fn open_aggregate_at(app: &AppHandle, folder: &Path) -> Result<(), Option<String>> {
+/// that already has it, answering why if neither.
+fn open_aggregate_at(app: &AppHandle, folder: &Path) -> Result<(), NotOpened> {
     // Two spellings of one directory are one Aggregate; a path that cannot be
     // resolved is passed on as given, for the run to refuse.
     let directory = std::fs::canonicalize(folder).unwrap_or_else(|_| folder.to_path_buf());
@@ -354,10 +358,7 @@ fn open_aggregate_at(app: &AppHandle, folder: &Path) -> Result<(), Option<String
             if let Some(window) = app.get_webview_window(&label) {
                 let _ = window.set_focus();
             } else if aggregates.registry().is_closing(&label) {
-                return Err(Some(format!(
-                    "{} is still being written. Open it again once that write has ended.",
-                    directory.display()
-                )));
+                return Err(NotOpened::StillWriting(directory));
             }
             return Ok(());
         }
@@ -372,14 +373,15 @@ fn open_aggregate_at(app: &AppHandle, folder: &Path) -> Result<(), Option<String
     opened
 }
 
-/// Start `directory`'s server and open its window as `label`, answering
-/// what to tell the presenter if the Aggregate did not open, or nothing when
-/// a close or a quit took it while it was starting.
-fn start_aggregate(app: &AppHandle, directory: &Path, label: &str) -> Result<(), Option<String>> {
-    let could_not =
-        |error: OpenError| Some(format!("Could not open {}: {error}", directory.display()));
+/// Start `directory`'s server and open its window as `label`, answering why
+/// if the Aggregate did not open.
+fn start_aggregate(app: &AppHandle, directory: &Path, label: &str) -> Result<(), NotOpened> {
+    let could_not = |source: OpenError| NotOpened::Failed {
+        directory: directory.to_path_buf(),
+        source,
+    };
     let server = match AggregateServer::start(app, directory, label).map_err(could_not)? {
-        Started::Refused { message } => return Err(Some(message)),
+        Started::Refused { message } => return Err(NotOpened::Refused(message)),
         Started::Serving(server) => server,
     };
     let url = server.window_url();
@@ -391,7 +393,7 @@ fn start_aggregate(app: &AppHandle, directory: &Path, label: &str) -> Result<(),
     let opened = app.state::<Aggregates>().registry().opened(label, server);
     if let Err(server) = opened {
         stop_server(app, server, directory);
-        return Err(None);
+        return Err(NotOpened::Abandoned(directory.to_path_buf()));
     }
     open_window(app, label, url, &title, windows).map_err(|error| could_not(error.into()))
 }

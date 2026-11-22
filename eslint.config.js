@@ -438,7 +438,7 @@ export default tseslint.config(
     },
   },
   // The desktop shell imports no package of ours: it is Rust, serving the
-  // browser application `@project/app` builds, and its home window is plain script.
+  // browser application `@project/app` builds, and its close question window is plain script.
   {
     files: ['packages/desktop/**/*.{ts,tsx,js}'],
     rules: {
