@@ -190,6 +190,24 @@ describe('release/install.sh', () => {
     expect(await readFile(join(installDir, 'infinity-cube'), 'utf8')).toBe(working);
   });
 
+  it('refuses a directory where the binary would go, and puts nothing inside it', async () => {
+    const root = await temporaryDirectory();
+    const served = await fakeRelease(root, targets);
+    const installDir = join(root, 'bin');
+    await mkdir(join(installDir, 'infinity-cube'), { recursive: true });
+
+    const run = install(realPath, root, {
+      INFINITY_CUBE_DOWNLOAD_URL: `file://${served}`,
+      INFINITY_CUBE_VERSION: version,
+      INFINITY_CUBE_INSTALL_DIR: installDir,
+    });
+
+    expect(run.status).not.toBe(0);
+    expect(run.stderr).toMatch(/is a directory/);
+    expect(await readdir(installDir)).toEqual(['infinity-cube']);
+    expect(await readdir(join(installDir, 'infinity-cube'))).toEqual([]);
+  });
+
   it('installs to, and names, the absolute folder a relative INFINITY_CUBE_INSTALL_DIR means', async () => {
     const root = await temporaryDirectory();
     const served = await fakeRelease(root, targets);

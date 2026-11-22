@@ -153,6 +153,9 @@ main() {
 	# from any directory.
 	install_dir="$(CDPATH="" cd -- "$install_dir" && pwd)"
 	destination="$install_dir/infinity-cube"
+	# mv would put the binary inside a directory of that name, not replace it.
+	[ ! -d "$destination" ] ||
+		fail "$destination is a directory; move it aside or set INFINITY_CUBE_INSTALL_DIR to another folder. Nothing was installed"
 	previous=""
 	if [ -x "$destination" ]; then
 		previous="$("$destination" --version 2>/dev/null || true)"
