@@ -18,6 +18,7 @@
     "prebuild": "pnpm contract:emit",
     "build": "pnpm --filter @project/app build",
     "build:mount": "pnpm --filter @project/app build:mount",
+    "release:build": "sh release/build.sh",
     "http-server:build": "pnpm --filter @project/app http-server:build",
     "desktop-sidecar:build": "pnpm --filter @project/app desktop-sidecar:build",
     "contract:emit": "prisma-next contract emit",

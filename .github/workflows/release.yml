@@ -113,9 +113,6 @@ jobs:
         with:
           node-version-file: .node-version
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Build the browser application the binary embeds
-        run: pnpm --filter @project/app exec vite build
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -132,48 +129,15 @@ jobs:
       # macOS this is the only run of their tests.
       - name: Test the CLI and the crates it is built from
         run: cargo nextest run --locked --no-fail-fast -p intake -p host -p infinity-cube
-      - name: Build the release binary
-        run: cargo build --release --locked -p infinity-cube --target "$TARGET"
-        env:
-          INFINITY_CUBE_BUILT_APPLICATION: packages/app/dist
-          INFINITY_CUBE_COMMIT: ${{ github.sha }}
-      # The binary that ships, run once: it names its version, writes a new
-      # Space, and checks it.
-      - name: Smoke-test the release binary
-        run: |
-          binary="target/$TARGET/release/infinity-cube"
-          shown="$("$binary" --version)"
-          echo "$shown"
-          case "$shown" in
-            "infinity-cube $VERSION ("*) ;;
-            *) echo "::error::--version printed '$shown'"; exit 1 ;;
-          esac
-          space="$RUNNER_TEMP/smoke-space"
-          "$binary" init "$space"
-          "$binary" check "$space"
-      # The packed README installs this build, not the newest one, so a
-      # tester following it gets the build that wrote their directory
-      # (ADR 0166); release/README.md, read on GitHub, installs the newest.
-      - name: Pack the archive
+      # The one build entry point, the same `pnpm release:build` a person runs
+      # on their own machine: it builds the browser application and the
+      # release binary embedding it, smoke-tests the binary, and packs the
+      # archive with a README naming its own version.
+      - name: Build, smoke-test and pack the release archive
         id: pack
-        run: |
-          name="infinity-cube-$VERSION-$TARGET"
-          stage="$RUNNER_TEMP/$name"
-          mkdir -p "$stage"
-          cp "target/$TARGET/release/infinity-cube" LICENSE-MIT LICENSE-APACHE "$stage/"
-          sed \
-            -e "s#from the newest published preview build#from this preview build, v$VERSION#" \
-            -e "s#https://raw.githubusercontent.com/tobyhede/infinity-cube/main/release/install.sh | sh#https://github.com/$GITHUB_REPOSITORY/releases/download/v$VERSION/install.sh | INFINITY_CUBE_VERSION=v$VERSION sh#" \
-            -e 's#^Set `INFINITY_CUBE_VERSION` (say `v0.1.0-preview.1`) on `sh` to install a particular build, and#Change `INFINITY_CUBE_VERSION` to install another build (leave it out for the newest), and set#' \
-            release/README.md > "$stage/README.md"
-          for expected in "from this preview build, v$VERSION" "INFINITY_CUBE_VERSION=v$VERSION sh" 'Change `INFINITY_CUBE_VERSION` to install another build'; do
-            if ! grep -qF "$expected" "$stage/README.md"; then
-              echo "::error::the packed README does not say '$expected'; release/README.md no longer holds the text this step rewrites"
-              exit 1
-            fi
-          done
-          tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/$name.tar.gz" "$name"
-          echo "archive=$RUNNER_TEMP/$name.tar.gz" >> "$GITHUB_OUTPUT"
+        run: sh release/build.sh --target "$TARGET" --out "$RUNNER_TEMP/archive"
+        env:
+          INFINITY_CUBE_COMMIT: ${{ github.sha }}
       # The install script, run as a person runs it but reading this archive
       # from disk: it installs and runs the binary, replaces it on a second
       # run, and installs nothing from an archive SHA256SUMS does not match.
