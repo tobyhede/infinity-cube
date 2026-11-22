@@ -44,7 +44,7 @@ use url::Url;
 
 use crate::address::{AggregateKey, SCHEME, SchemeStyle};
 use crate::aggregates::{Close, Registry, Reserved, SPACE_WINDOW_PREFIX};
-use crate::launch::{Launch, Opening};
+use crate::launch::{Launch, Next, Opening, Unopened};
 use crate::scheme::{OpenAggregates, VIEW_WINDOW_PREFIX};
 use crate::server::{
     AggregateServer, Navigation, OpenError, RegisteredSchemes, SharedAggregates, SpaceWindows,
@@ -272,10 +272,11 @@ fn app_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
 const OPEN_MENU_ITEM: &str = "open";
 const QUIT_MENU_ITEM: &str = "quit";
 
-/// Ask for a folder, and open it as an Aggregate. At launch, with no Space
+/// Ask for a folder, and open it as an Aggregate. At launch, with nothing
 /// open, cancelling ends the application and a folder that does not open is
 /// reported before asking again, so the application never runs with no
-/// window; from the menu, cancelling does nothing.
+/// window; from the menu, or once a Space has opened meanwhile, cancelling
+/// does nothing and a failure is reported alone ([`launch::after`]).
 fn choose_folder(app: &AppHandle, opening: Opening) {
     let handle = app.clone();
     app.dialog()
@@ -283,7 +284,7 @@ fn choose_folder(app: &AppHandle, opening: Opening) {
         .set_title("Open a Space")
         .pick_folder(move |folder| {
             let Some(path) = folder.and_then(|folder| folder.into_path().ok()) else {
-                if opening == Opening::AtLaunch {
+                if next(&handle, opening, Unopened::Cancelled) == Next::Exit {
                     handle.exit(0);
                 }
                 return;
@@ -291,41 +292,54 @@ fn choose_folder(app: &AppHandle, opening: Opening) {
             // Starting a run reads the whole directory, so it stays off the
             // thread the dialog answered on.
             thread::spawn(move || {
-                if let Err(message) = open_aggregate_at(&handle, &path) {
-                    match opening {
-                        Opening::AtLaunch => {
-                            show_error_and_wait(&handle, &message);
-                            choose_folder(&handle, Opening::AtLaunch);
-                        }
-                        Opening::FromMenu => show_error(&handle, &message),
-                    }
+                if let Err(Some(message)) = open_aggregate_at(&handle, &path) {
+                    report_unopened(&handle, opening, &message);
                 }
             });
         });
 }
 
-/// Open each folder named on the command line. If none opens, say why and
-/// ask for one, as a launch naming none does.
+/// What comes after a folder question for `opening` that ended `unopened`.
+fn next(app: &AppHandle, opening: Opening, unopened: Unopened) -> Next {
+    let any_aggregate = !app.state::<Aggregates>().registry().is_empty();
+    launch::after(opening, unopened, any_aggregate)
+}
+
+/// Say why a folder did not open, and ask again if nothing else is open.
+fn report_unopened(app: &AppHandle, opening: Opening, message: &str) {
+    match next(app, opening, Unopened::Failed) {
+        Next::AskAgain => {
+            show_error_and_wait(app, message);
+            choose_folder(app, Opening::AtLaunch);
+        }
+        Next::Stay | Next::Exit => show_error(app, message),
+    }
+}
+
+/// Open each folder named on the command line, saying why any did not open,
+/// and asking for one if nothing else is open.
 fn open_from_command_line(app: &AppHandle, folders: &[PathBuf]) {
     let failed: Vec<String> = folders
         .iter()
-        .filter_map(|folder| open_aggregate_at(app, folder).err())
+        .filter_map(|folder| open_aggregate_at(app, folder).err().flatten())
         .collect();
-    if failed.len() < folders.len() {
-        for message in &failed {
+    let Some((last, others)) = failed.split_last() else {
+        return;
+    };
+    for message in others {
+        if next(app, Opening::AtLaunch, Unopened::Failed) == Next::AskAgain {
+            show_error_and_wait(app, message);
+        } else {
             show_error(app, message);
         }
-        return;
     }
-    for message in &failed {
-        show_error_and_wait(app, message);
-    }
-    choose_folder(app, Opening::AtLaunch);
+    report_unopened(app, Opening::AtLaunch, last);
 }
 
 /// Open `folder` as an Aggregate in a window of its own, or focus the window
-/// that already has it, answering what to tell the presenter if neither.
-fn open_aggregate_at(app: &AppHandle, folder: &Path) -> Result<(), String> {
+/// that already has it, answering what to tell the presenter if neither, or
+/// nothing when a close or a quit took the Aggregate while it was starting.
+fn open_aggregate_at(app: &AppHandle, folder: &Path) -> Result<(), Option<String>> {
     // Two spellings of one directory are one Aggregate; a path that cannot be
     // resolved is passed on as given, for the run to refuse.
     let directory = std::fs::canonicalize(folder).unwrap_or_else(|_| folder.to_path_buf());
@@ -340,10 +354,10 @@ fn open_aggregate_at(app: &AppHandle, folder: &Path) -> Result<(), String> {
             if let Some(window) = app.get_webview_window(&label) {
                 let _ = window.set_focus();
             } else if aggregates.registry().is_closing(&label) {
-                return Err(format!(
+                return Err(Some(format!(
                     "{} is still being written. Open it again once that write has ended.",
                     directory.display()
-                ));
+                )));
             }
             return Ok(());
         }
@@ -359,11 +373,13 @@ fn open_aggregate_at(app: &AppHandle, folder: &Path) -> Result<(), String> {
 }
 
 /// Start `directory`'s server and open its window as `label`, answering
-/// what to tell the presenter if the Aggregate did not open.
-fn start_aggregate(app: &AppHandle, directory: &Path, label: &str) -> Result<(), String> {
-    let could_not = |error: OpenError| format!("Could not open {}: {error}", directory.display());
+/// what to tell the presenter if the Aggregate did not open, or nothing when
+/// a close or a quit took it while it was starting.
+fn start_aggregate(app: &AppHandle, directory: &Path, label: &str) -> Result<(), Option<String>> {
+    let could_not =
+        |error: OpenError| Some(format!("Could not open {}: {error}", directory.display()));
     let server = match AggregateServer::start(app, directory, label).map_err(could_not)? {
-        Started::Refused { message } => return Err(message),
+        Started::Refused { message } => return Err(Some(message)),
         Started::Serving(server) => server,
     };
     let url = server.window_url();
@@ -375,7 +391,7 @@ fn start_aggregate(app: &AppHandle, directory: &Path, label: &str) -> Result<(),
     let opened = app.state::<Aggregates>().registry().opened(label, server);
     if let Err(server) = opened {
         stop_server(app, server, directory);
-        return Err(format!("Could not open {}.", directory.display()));
+        return Err(None);
     }
     open_window(app, label, url, &title, windows).map_err(|error| could_not(error.into()))
 }

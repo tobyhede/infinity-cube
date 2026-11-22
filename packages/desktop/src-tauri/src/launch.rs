@@ -29,6 +29,41 @@ pub enum Opening {
     FromMenu,
 }
 
+/// How a folder question that opened no Space ends.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Unopened {
+    /// The presenter cancelled it.
+    Cancelled,
+    /// The folder chosen did not open, for a reason the presenter is told.
+    Failed,
+}
+
+/// What comes after a folder question that opened no Space.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Next {
+    /// End the application: nothing is open and the presenter wants nothing.
+    Exit,
+    /// Say why the folder did not open, and wait for that to be read before
+    /// asking again: nothing else is open.
+    AskAgain,
+    /// Leave the open Spaces as they are, saying why a folder did not open
+    /// if it failed.
+    Stay,
+}
+
+/// What comes after a folder question asked for `opening` that ended
+/// `unopened`, while `any_aggregate` (one open, starting or closing). A
+/// Space opened meanwhile from File › Open… makes a launch question into
+/// one asked from the menu.
+#[must_use]
+pub fn after(opening: Opening, unopened: Unopened, any_aggregate: bool) -> Next {
+    match (opening, unopened, any_aggregate) {
+        (Opening::FromMenu, _, _) | (Opening::AtLaunch, _, true) => Next::Stay,
+        (Opening::AtLaunch, Unopened::Cancelled, false) => Next::Exit,
+        (Opening::AtLaunch, Unopened::Failed, false) => Next::AskAgain,
+    }
+}
+
 /// What to open, given the arguments after the program's name.
 #[must_use]
 pub fn launch(arguments: impl IntoIterator<Item = OsString>) -> Launch {
@@ -61,6 +96,50 @@ mod tests {
             launch([OsString::from("/a"), OsString::from("b")]),
             Launch::Folders(vec![PathBuf::from("/a"), PathBuf::from("b")]),
         );
+    }
+
+    mod given_a_folder_question_that_opened_nothing {
+        use super::*;
+
+        #[test]
+        fn a_launch_question_cancelled_with_nothing_open_ends_the_application() {
+            assert_eq!(
+                after(Opening::AtLaunch, Unopened::Cancelled, false),
+                Next::Exit
+            );
+        }
+
+        #[test]
+        fn a_launch_question_that_failed_with_nothing_open_asks_again() {
+            assert_eq!(
+                after(Opening::AtLaunch, Unopened::Failed, false),
+                Next::AskAgain
+            );
+        }
+
+        #[test]
+        fn a_launch_question_leaves_a_space_opened_meanwhile_from_the_menu() {
+            for unopened in [Unopened::Cancelled, Unopened::Failed] {
+                assert_eq!(
+                    after(Opening::AtLaunch, unopened, true),
+                    Next::Stay,
+                    "{unopened:?} with a Space open"
+                );
+            }
+        }
+
+        #[test]
+        fn a_menu_question_changes_nothing_else() {
+            for unopened in [Unopened::Cancelled, Unopened::Failed] {
+                for any_aggregate in [false, true] {
+                    assert_eq!(
+                        after(Opening::FromMenu, unopened, any_aggregate),
+                        Next::Stay,
+                        "{unopened:?}, any Aggregate {any_aggregate}"
+                    );
+                }
+            }
+        }
     }
 
     /// Tauri opens every window `tauri.conf.json` declares when it starts,

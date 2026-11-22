@@ -144,6 +144,12 @@ impl<S> Registry<S> {
 
     /// Begin closing every open Aggregate, answering each window's label, its
     /// directory and its server.
+    /// Whether no Aggregate is starting, open or closing.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.aggregates.is_empty()
+    }
+
     pub fn take_all(&mut self) -> Vec<(String, PathBuf, S)> {
         let mut taken = Vec::new();
         for (label, aggregate) in &mut self.aggregates {
@@ -281,6 +287,21 @@ mod tests {
             assert!(registry.is_closing(&label), "its server is being stopped");
             registry.closed(&label);
             assert!(!registry.is_closing(&label), "a closed Aggregate is gone");
+        }
+
+        #[test]
+        fn holds_an_aggregate_from_starting_until_it_has_closed() {
+            let mut registry: Registry<&str> = Registry::default();
+            assert!(registry.is_empty(), "nothing is open at first");
+            let Reserved::New(label) = registry.reserve(Path::new("/spaces/rust")) else {
+                panic!("a new directory should be reserved");
+            };
+            assert!(!registry.is_empty(), "a starting Aggregate counts");
+            registry.opened(&label, "server").unwrap();
+            let _ = registry.begin_close(&label);
+            assert!(!registry.is_empty(), "a closing Aggregate counts");
+            registry.closed(&label);
+            assert!(registry.is_empty(), "a closed Aggregate is gone");
         }
 
         #[test]
