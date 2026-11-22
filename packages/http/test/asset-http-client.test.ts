@@ -50,9 +50,8 @@ const backendOverHost = (sent?: (init: RequestInit | undefined) => void) => {
 
 describe('the asset client over HTTP', () => {
   it('sends the bytes from memory, never the Blob itself', async () => {
-    // A File picked in WebKitGTK is backed by its file on disk, and sending
-    // one as a custom URI scheme's request body was seen to end the desktop
-    // shell's process (issue 04's Evidence).
+    // A File picked in WebKitGTK is backed by its file on disk; storeAsset
+    // reads it into memory before sending.
     const bodies: unknown[] = [];
     const { backend } = backendOverHost((init) => bodies.push(init?.body));
 

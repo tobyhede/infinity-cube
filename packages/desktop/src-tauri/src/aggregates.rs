@@ -142,14 +142,14 @@ impl<S> Registry<S> {
             .is_some_and(|aggregate| matches!(aggregate.state, State::Closing))
     }
 
-    /// Begin closing every open Aggregate, answering each window's label, its
-    /// directory and its server.
     /// Whether no Aggregate is starting, open or closing.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.aggregates.is_empty()
     }
 
+    /// Begin closing every open Aggregate, answering each window's label, its
+    /// directory and its server.
     pub fn take_all(&mut self) -> Vec<(String, PathBuf, S)> {
         let mut taken = Vec::new();
         for (label, aggregate) in &mut self.aggregates {

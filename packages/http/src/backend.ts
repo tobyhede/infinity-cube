@@ -125,10 +125,11 @@ export class HttpSpaceBackend implements SpaceBackend {
    * only refuse them after reading all of them. Throws when the host cannot be
    * reached or answers anything else.
    *
-   * The bytes are read into memory and sent from there, never as the Blob: a
-   * File picked in WebKitGTK is backed by its file on disk, and sending one as
-   * a custom URI scheme's request body was seen to end the desktop shell's
-   * process (`asset-http-client.test.ts` holds the body to memory).
+   * The bytes are read into memory and sent from there, never as the Blob,
+   * because a File picked in WebKitGTK is backed by its file on disk and the
+   * desktop shell answers requests through a custom URI scheme
+   * (`asset-http-client.test.ts`, "sends the bytes from memory, never the Blob
+   * itself").
    */
   storeAsset(bytes: Blob): Promise<AssetRef | AssetRefusal> {
     if (bytes.size > MAX_ASSET_BYTES) return Promise.resolve({ refused: ASSET_TOO_LARGE });
