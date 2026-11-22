@@ -1,6 +1,7 @@
 # A shortcut is a key bound to a named command, and a reader's remapping stays in their browser
 
 Status: accepted
+Refined by: 0167
 
 > ADR 0142, accepted since, makes every Open a Resource plugin's Map content, so the canvas binds neither Enter nor Shift+Enter: the Enter and Shift+Enter commands named below have no binding. Read them against ADR 0142.
 

@@ -2,6 +2,7 @@
 
 Status: accepted
 Date: 2026-11-20
+Refined by: 0167
 Related: 0088, 0129, 0130, 0131, 0132, 0155, 0163
 
 "Talk" was never a term in `CONTEXT.md`. It entered as prose in ADRs 0129 to 0132 and became structural with the desktop application (ADR 0155), whose requirements and source named its windows, origins and registry for it. By then it stood for three different things: the Aggregate directory a host runs, the Graph being presented, and whatever a person had opened. InfinityCube is not a tool for talks, and none of the three is one.

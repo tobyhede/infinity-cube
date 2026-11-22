@@ -4,13 +4,13 @@
 
 **Blocked by:** 04.
 
-**As built.** The New Talk action is File › New Space… (`CmdOrCtrl+N`), since there is no home window to hold a button: it asks for a folder, writes a new Space there through the host's `init_directory` (the Rust `init`, whose Export is the only writer), and opens it (`packages/desktop/src-tauri/src/new_space.rs`). Opening a missing or empty folder, from the command line, the launch question or File › Open…, asks "<folder> holds no Space yet. Create a new Space in it?" with Create Space and Cancel; Cancel leaves it unwritten, and at launch with nothing open asks for another folder. The run's refusal for an empty folder is now an offer (`server.rs` `unrun`, `Started::Empty`), so no `pnpm` text reaches a presenter; the CLIs' refusal text does not change.
+**As built.** The New Space action is File › New Space… (`CmdOrCtrl+N`), since there is no home window to hold a button: it asks for a folder, writes a new Space there through the host's `init_directory` (the Rust `init`, whose Export is the only writer), and opens it (`packages/desktop/src-tauri/src/new_space.rs`). Opening a missing or empty folder, from the command line, the launch question or File › Open…, asks "<folder> holds no Space yet. Create a new Space in it?" with Create Space and Cancel; Cancel leaves it unwritten, and at launch with nothing open asks for another folder. The run's refusal for an empty folder is now an offer (`server.rs` `unrun`, `Started::Empty`), so no `pnpm` text reaches a presenter; the CLIs' refusal text does not change.
 
 **What to build:** A presenter has no pnpm, yet the desktop application refuses a missing or empty folder with text naming `pnpm cube init <dir>` (`describeRunRefusal`, `src/cli/run-refusal.ts`, which the sidecar announces). Add a New Talk action beside Open Folder: pick or create an empty folder, write a new aggregate there through Export as `init` does (Storage, "Nothing writes an Aggregate directory except Export"), then open it in its own window. Opening an empty or missing folder offers the same instead of the `pnpm` text; the CLI's refusal text does not change. A separate ticket rather than a box on 04 because it is a new action with its own write path, not a check of what 04 built.
 
-- [x] New Talk on an empty folder opens a talk that `pnpm cube check` accepts; closing it leaves the folder as `init` would have written it, plus any edit.
+- [x] New Space on an empty folder opens a Space that `pnpm cube check` accepts; closing it leaves the folder as `init` would have written it, plus any edit.
 - [x] Opening an empty or missing folder never shows `pnpm` text; a non-empty folder that is not an aggregate is still refused with the intake's errors.
-- [x] New Talk refuses a folder that is not empty, and writes nothing there.
+- [x] New Space refuses a folder that is not empty, and writes nothing there.
 
 ## Comments
 
