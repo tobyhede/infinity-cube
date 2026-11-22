@@ -21,6 +21,7 @@ mod scheme;
 mod server;
 #[cfg(test)]
 mod test_support;
+mod update;
 mod waiting;
 
 use std::collections::{HashMap, HashSet};
@@ -468,6 +469,8 @@ fn main() {
     let scheme_aggregates = Arc::clone(&open_aggregates);
     let (events, received) = mpsc::unbounded_channel();
     let timers = events.clone();
+    let context = tauri::generate_context!();
+    let updates = update::configured(context.config());
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(Aggregates::default())
@@ -477,6 +480,9 @@ fn main() {
         })
         .manage(open_aggregates)
         .manage(RegisteredSchemes::default());
+    if updates {
+        builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+    }
     if SchemeStyle::CURRENT == SchemeStyle::HostPerAggregate {
         // One scheme serves every Aggregate, each at the origin its key names.
         builder = builder.register_asynchronous_uri_scheme_protocol(
@@ -502,6 +508,11 @@ fn main() {
             )));
             if cfg!(target_os = "macos") {
                 let _previous = app.set_menu(mac_menu(app.handle())?)?;
+            }
+            if updates {
+                drop(tauri::async_runtime::spawn(update::offer(
+                    app.handle().clone(),
+                )));
             }
             // A directory named on the command line opens at once, as one
             // chosen from the home window would.
@@ -559,7 +570,7 @@ fn main() {
                 }
             }
         })
-        .build(tauri::generate_context!());
+        .build(context);
     let app = match app {
         Ok(app) => app,
         Err(error) => {
