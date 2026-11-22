@@ -117,6 +117,9 @@ const LISTENER =
 const NO_LOCK =
   'the scheme handler has no port, Host check or launch secret (Storage ST-121); the window that made a request and its page admit it';
 
+const NO_SQLITE_LISTENER =
+  "a listener's, and the host library has none; no verb serves the SQLite repository behind one yet (rust-host 15), so CI runs no process case against it";
+
 const NO_DIRECTORY =
   'a process case runs a host over a `{directory}` and checks its Export; the SQLite repository serves a store and has neither (rust-host 15), so CI runs no process case against it';
 
@@ -176,11 +179,11 @@ const PORTS: readonly Port[] = [
     name: 'the Rust host over the SQLite repository',
     files: ['crates/host/tests/sqlite_wire.rs'],
     exempt: {
-      'answers 421 to a request naming any Host but its own': NO_DIRECTORY,
+      'answers 421 to a request naming any Host but its own': NO_SQLITE_LISTENER,
       'answers 403 to a request without the session cookie, and to a wrong launch secret':
-        NO_DIRECTORY,
+        NO_SQLITE_LISTENER,
       'trades the launch secret for an HttpOnly, SameSite=Strict session cookie by a redirect':
-        NO_DIRECTORY,
+        NO_SQLITE_LISTENER,
       'refuses a missing directory, announcing why and exiting non-zero': NO_DIRECTORY,
       'writes an edit once edits have been quiet, and keeps it on SIGINT': NO_DIRECTORY,
       'writes an edit not yet written when stopped by SIGINT, and exits zero': NO_DIRECTORY,
