@@ -119,6 +119,16 @@ curl -fsSL https://raw.githubusercontent.com/tobyhede/infinity-cube/main/release
 
 It checks the download and puts `infinity-cube` in `~/.local/bin`; then `infinity-cube init my-space` and `infinity-cube run my-space`. A preview build makes no compatibility promise, so keep your directory in git. [`release/README.md`](release/README.md) covers pinning a version, upgrading and uninstalling.
 
+### Building a preview build yourself
+
+From a clone, one command builds the archive for this machine's platform, the same way the release workflow builds the ones it attaches:
+
+```sh
+pnpm release:build
+```
+
+It installs the JavaScript dependencies, builds the browser application, builds the release `infinity-cube` binary with that application embedded, runs it once (`--version`, `init`, `check`), and packs `target/preview-build/infinity-cube-<version>-<target>.tar.gz` with a `SHA256SUMS`. It needs Node (the version in `.node-version`), pnpm 9 and [rustup](https://rustup.rs); on Linux it builds the static musl binary, which needs `musl-gcc` (`apt-get install musl-tools`). `--target <triple>` picks another target and `--out <dir>` another folder. It prints the line that installs the archive with the install script; the binary alone is `target/<target>/release/infinity-cube`. Each build job in `.github/workflows/release.yml` runs this same script (`release/build.sh`).
+
 ## Using InfinityCube with agents
 
 Two of this repository's agent skills, in [`.agents/skills/`](.agents/skills/) and linked from `.claude/skills/`, are for using InfinityCube. They are also published as the `infinity-cube` plugin, from [`plugins/infinity-cube/`](plugins/infinity-cube/):
