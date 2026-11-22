@@ -10,6 +10,7 @@ use std::future::Future;
 use intake::{Refusal, Refusals, SpaceId, SpaceSnapshot};
 
 use crate::assets::{AssetHash, StoredAsset};
+use crate::document::wire_snapshot;
 
 /// A Space's revision: 0 when stored, one more for each change committed to
 /// it, never above 2⁶³ − 1.
@@ -343,4 +344,24 @@ pub trait SpaceRepository: Send + Sync + 'static {
         id: SpaceId,
         revision: Revision,
     ) -> impl Future<Output = Result<(), RepositoryError>> + Send;
+}
+
+/// The input's Spaces, ascending by id, each with its Resources ascending by
+/// id, as JSON with unread keys in one order: equal when the two aggregates
+/// hold the same authored data (`classifyInitializedAggregate`). Every store
+/// classifies an initialization over an initialized store by it.
+pub(crate) fn authored(
+    meta_space_id: SpaceId,
+    spaces: &[&SpaceSnapshot],
+) -> (SpaceId, Vec<String>) {
+    let mut ordered: Vec<SpaceSnapshot> = spaces.iter().map(|space| (*space).clone()).collect();
+    ordered.sort_by_key(|space| space.id);
+    let texts = ordered
+        .iter_mut()
+        .map(|space| {
+            space.resources.sort_by_key(|resource| resource.id);
+            crate::json_text::compact(&crate::document::canonical_value(&wire_snapshot(space)))
+        })
+        .collect();
+    (meta_space_id, texts)
 }

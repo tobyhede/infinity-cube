@@ -9,11 +9,10 @@ use intake::{SpaceId, SpaceSnapshot, load_aggregate};
 
 use crate::assets::{AssetHash, StoredAsset};
 use crate::commit::{CommitDecision, decide_commit};
-use crate::document::wire_snapshot;
 use crate::repository::{
     AggregateInput, AggregateLoad, AssetStored, CommitResult, InitializeResult, LoadedAggregate,
     LoadedSpace, ReplaceResult, RepositoryError, Revision, SpaceCommit, SpaceRepository,
-    SpaceSummary,
+    SpaceSummary, authored,
 };
 
 #[derive(Debug, Default)]
@@ -80,25 +79,6 @@ impl MemorySpaceRepository {
         // poisoned lock still guards consistent state.
         self.state.lock().unwrap_or_else(PoisonError::into_inner)
     }
-}
-
-/// The input's Spaces, ascending by id, each with its Resources ascending by
-/// id, as JSON with unread keys in one order: equal when the two aggregates
-/// hold the same authored data (`classifyInitializedAggregate`).
-pub(crate) fn authored(
-    meta_space_id: SpaceId,
-    spaces: &[&SpaceSnapshot],
-) -> (SpaceId, Vec<String>) {
-    let mut ordered: Vec<SpaceSnapshot> = spaces.iter().map(|space| (*space).clone()).collect();
-    ordered.sort_by_key(|space| space.id);
-    let texts = ordered
-        .iter_mut()
-        .map(|space| {
-            space.resources.sort_by_key(|resource| resource.id);
-            crate::json_text::compact(&crate::document::canonical_value(&wire_snapshot(space)))
-        })
-        .collect();
-    (meta_space_id, texts)
 }
 
 impl SpaceRepository for MemorySpaceRepository {

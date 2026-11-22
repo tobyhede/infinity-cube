@@ -842,6 +842,32 @@ mod given_broken_stored_state {
     }
 
     #[tokio::test]
+    async fn fails_initializing_over_spaces_without_a_meta_identity_as_broken() {
+        let file = Migrated::new().await;
+        let store = seeded(open(&file.path())).await;
+        let AggregateLoad::Loaded(loaded) = store.load_aggregate().await.unwrap() else {
+            panic!("the seeded store holds an aggregate");
+        };
+        let input = AggregateInput {
+            meta_space_id: loaded.meta_space_id,
+            spaces: loaded
+                .spaces
+                .into_iter()
+                .map(|space| space.snapshot)
+                .collect(),
+        };
+        store.close().await;
+        execute(&file.file, "DELETE FROM repository_state").await;
+        let store = open(&file.path());
+        let answer = store.initialize_aggregate(input).await;
+        assert!(
+            matches!(answer, Err(RepositoryError::BrokenStoredState(ref message))
+                if message == "stored Spaces exist without a Meta Space"),
+            "a valid input over Spaces with no Meta identity: {answer:?}"
+        );
+    }
+
+    #[tokio::test]
     async fn fails_a_document_that_is_not_json_or_a_revision_that_is_not_canonical() {
         for statement in [
             format!("UPDATE spaces SET document = 'not json' WHERE id = '{META}'"),
