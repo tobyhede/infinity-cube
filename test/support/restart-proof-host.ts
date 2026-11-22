@@ -71,7 +71,7 @@ export interface StartedRestartProofHost {
   readonly stop: () => Promise<void>;
 }
 
-/** Long enough for a host to write and close its file, and well inside the proof's timeout. */
+/** How long a host is given to exit on SIGINT before it is killed: well inside the proof's 120s timeout (`playwright.sqlite.config.ts`). */
 const STOP_DEADLINE_MS = 15_000;
 
 /**

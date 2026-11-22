@@ -145,7 +145,8 @@ test('a SQLite-backed edit survives a fresh host', async ({ browser }) => {
     // `sqlite-http-runtime.ts` nor `vite-space-http-plugin.ts` has a close
     // hook — so what keeps this safe is that no request is in flight, not that
     // the handle is gone. A host started by command has exited, its process
-    // gone, before `stop` answers.
+    // gone, before `stop` answers (`test/unit/restart-proof-host.test.ts`,
+    // "serves at the port it announced ... and stops on SIGINT").
     const afterFirstDatabase = createSqliteDatabase(path);
     try {
       const stored = await new SqlSpaceRepository(sqliteSqlStore(afterFirstDatabase)).loadSpace(
