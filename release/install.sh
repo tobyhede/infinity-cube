@@ -5,8 +5,8 @@
 #
 # It picks the archive for this platform from a published GitHub release,
 # checks it against the release's SHA256SUMS, and puts the binary in
-# ~/.local/bin, replacing any copy already there. It needs no sudo and edits
-# no shell configuration.
+# ~/.local/bin, replacing any copy already there. It needs curl, needs no
+# sudo and edits no shell configuration.
 #
 # Settings, all optional:
 #   INFINITY_CUBE_VERSION       the release to install, `v0.1.0-preview.1` or
@@ -17,8 +17,7 @@
 #   INFINITY_CUBE_DOWNLOAD_URL  the URL holding the archive and SHA256SUMS,
 #                               in place of the release's; it needs
 #                               INFINITY_CUBE_VERSION. The release workflow
-#                               tests this script with a file:// URL, which
-#                               needs curl: wget reads no file:// URL.
+#                               tests this script with a file:// URL.
 #
 # Uninstall by deleting the binary: rm ~/.local/bin/infinity-cube
 
@@ -75,24 +74,16 @@ detect_target() {
 
 # fetch <url> <file>
 fetch() {
-	if command -v curl >/dev/null 2>&1; then
-		curl --proto '=https,file' --proto-redir '=https' --tlsv1.2 -fsSL "$1" -o "$2"
-	elif command -v wget >/dev/null 2>&1; then
-		# GNU wget can refuse a redirect to plain http; BusyBox's wget, the
-		# one Alpine has, has no such flag.
-		if wget --help 2>&1 | grep -q -- --https-only; then
-			wget -q --https-only -O "$2" "$1"
-		else
-			wget -q -O "$2" "$1"
-		fi
-	else
-		fail "this script needs curl or wget, and neither is on PATH"
-	fi
+	curl --proto '=https,file' --proto-redir '=https' --tlsv1.2 -fsSL "$1" -o "$2"
 }
 
-# The tag of the newest published release. GitHub's /releases/latest skips
-# pre-releases, and every preview build is one, so this reads the list, which
-# is newest first and holds no draft for a request without a token.
+# The tag of the newest published release. /releases/latest answers "the most
+# recent non-prerelease, non-draft release", and every preview build is a
+# pre-release, so this reads the first entry of the list instead. GitHub's docs
+# state no order for the list; the first entry is taken as the newest. A
+# request without a token lists no draft: "Only users with push access will
+# receive listings for draft releases"
+# (https://docs.github.com/en/rest/releases/releases).
 latest_tag() {
 	fetch "https://api.github.com/repos/$1/releases?per_page=1" "$2/releases.json" ||
 		fail "could not ask GitHub for $1's releases. GitHub allows 60 such requests an hour from one address; set INFINITY_CUBE_VERSION (say v0.1.0-preview.1) to install a release without asking"
@@ -112,6 +103,7 @@ sha256_of() {
 }
 
 main() {
+	need curl
 	need uname
 	need tar
 	need mktemp
@@ -156,24 +148,28 @@ main() {
 	tar -xzf "$work/$archive" -C "$work"
 	[ -f "$work/$name/infinity-cube" ] || fail "$archive holds no $name/infinity-cube"
 
+	mkdir -p "$install_dir"
+	# Absolute, so the folder named below and in the PATH line is the same
+	# from any directory.
+	install_dir="$(CDPATH="" cd -- "$install_dir" && pwd)"
 	destination="$install_dir/infinity-cube"
 	previous=""
 	if [ -x "$destination" ]; then
 		previous="$("$destination" --version 2>/dev/null || true)"
 	fi
 
-	mkdir -p "$install_dir"
-	# Copied beside the destination and renamed over it, so a running copy is
-	# never written into and an interrupted install leaves the old one.
+	# Copied beside the destination, run, and only then renamed over it, so a
+	# running copy is never written into, and a failed or interrupted install,
+	# or a binary that does not run here, leaves the old one.
 	staged="$install_dir/.infinity-cube.$$"
 	cp "$work/$name/infinity-cube" "$staged"
 	chmod 755 "$staged"
 	if [ "$(uname -s)" = Darwin ]; then
 		xattr -d com.apple.quarantine "$staged" 2>/dev/null || true
 	fi
+	installed="$("$staged" --version)" ||
+		fail "the downloaded $name/infinity-cube does not run on this machine; nothing was installed"
 	mv -f "$staged" "$destination"
-
-	installed="$("$destination" --version)" || fail "the installed $destination does not run"
 	say "Installed $installed to $destination"
 
 	if [ -n "$previous" ] && [ "$previous" != "$installed" ]; then
