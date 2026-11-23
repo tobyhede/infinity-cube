@@ -1,9 +1,13 @@
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import type { HostCommand } from '../../conformance/http/host-process';
-import { restartProofHostFromEnvironment, startCommandHost } from '../support/restart-proof-host';
+import {
+  restartProofHostFromEnvironment,
+  startCommandHost,
+  type StartedRestartProofHost,
+} from '../support/restart-proof-host';
 
 const temporaryDirectories: string[] = [];
 afterAll(async () => {
@@ -128,9 +132,28 @@ const isAlive = (pid: number): boolean => {
   }
 };
 
+// Every host a test spawns is killed after it, passed or failed, so a failed
+// assertion ahead of a test's own `stop` leaves no stand-in running.
+const spawnedHostKills: (() => void)[] = [];
+afterEach(() => {
+  for (const kill of spawnedHostKills.splice(0)) kill();
+});
+
+/** `startCommandHost`, with the host's kill registered for after the test. */
+const startTestHost = (
+  command: HostCommand,
+  options: { readonly stopDeadlineMs?: number } = {},
+): Promise<StartedRestartProofHost> =>
+  startCommandHost(command, {
+    ...options,
+    onSpawn: (kill) => {
+      spawnedHostKills.push(kill);
+    },
+  });
+
 describe('starting a restart proof host by command', () => {
   it('serves at the port it announced, with the environment the command names, and stops on SIGINT', async () => {
-    const host = await startCommandHost(
+    const host = await startTestHost(
       nodeHost({ answer: '`${process.env.GREETING} ${process.pid}`', env: { GREETING: 'hello' } }),
     );
     const [greeting, pid] = (await (await fetch(host.baseURL)).text()).split(' ');
@@ -142,7 +165,7 @@ describe('starting a restart proof host by command', () => {
   });
 
   it('fails a stop the host answers with a non-zero exit, naming what it wrote', async () => {
-    const host = await startCommandHost(
+    const host = await startTestHost(
       nodeHost({
         answer: "'up'",
         onSigint: "console.error('the last write failed'); process.exit(1)",
@@ -152,7 +175,7 @@ describe('starting a restart proof host by command', () => {
   });
 
   it('kills a host that does not exit on SIGINT, and fails the stop', async () => {
-    const host = await startCommandHost(
+    const host = await startTestHost(
       nodeHost({ answer: '`${process.pid}`', onSigint: 'setInterval(() => undefined, 1000)' }),
       {
         stopDeadlineMs: 500,
@@ -165,7 +188,7 @@ describe('starting a restart proof host by command', () => {
 
   it('fails a host that refuses to start, with its refusal', async () => {
     await expect(
-      startCommandHost({
+      startTestHost({
         name: 'refusing host',
         argv: [
           process.execPath,
@@ -191,9 +214,23 @@ describe('starting a restart proof host by command', () => {
       answer: `(() => { response.statusCode = 302; response.setHeader('set-cookie', 'session=1'); return ''; })()`,
       announced: `(require('node:fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid)), { secret: 'launch' })`,
     });
-    await expect(startCommandHost(command)).rejects.toThrow(
-      /stand-in host announced a launch secret/,
+    await expect(startTestHost(command)).rejects.toThrow(/stand-in host announced a launch secret/);
+    const pid = Number(await readFile(pidFile, 'utf8'));
+    expect(isAlive(pid)).toBe(false);
+  });
+
+  it('fails a host that refuses its own launch secret only once the host has exited', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'restart-proof-host-'));
+    temporaryDirectories.push(directory);
+    const pidFile = join(directory, 'pid');
+    const command = nodeHost({
+      answer: "'no cookie'",
+      announced: `(require('node:fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid)), { secret: 'launch' })`,
+    });
+    await expect(startTestHost(command)).rejects.toThrow(
+      /stand-in host answered 200 to its own launch secret/,
     );
+    // Checked at once, with no wait: the proof opens the SQLite file next.
     const pid = Number(await readFile(pidFile, 'utf8'));
     expect(isAlive(pid)).toBe(false);
   });
@@ -202,6 +239,7 @@ describe('starting a restart proof host by command', () => {
     let kill: (() => void) | undefined;
     const host = await startCommandHost(nodeHost({ answer: '`${process.pid}`' }), {
       onSpawn: (spawnedKill) => {
+        spawnedHostKills.push(spawnedKill);
         kill = spawnedKill;
       },
     });

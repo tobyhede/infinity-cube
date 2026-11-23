@@ -261,7 +261,8 @@ const ANNOUNCE_DEADLINE_MS = 30_000;
  * request through `exchange`, beside the `Host` the host expects.
  *
  * A host that cannot be spawned, does not announce within the deadline, or
- * cannot be unlocked within it fails the start, and is killed first.
+ * cannot be unlocked within it fails the start, and is killed first; one that
+ * cannot be unlocked has exited before the start fails.
  */
 export const startHost = async (
   command: HostCommand,
@@ -381,7 +382,9 @@ export const startHost = async (
         );
       }
     } catch (error) {
+      // A host that announced was spawned, so it emits 'exit' once killed.
       kill();
+      await exited;
       throw error;
     } finally {
       clearTimeout(launchTimer);
