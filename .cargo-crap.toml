@@ -24,16 +24,14 @@ exclude = ["**/tests.rs", "build.rs"]
 # `test/unit/crap-score.test.ts` fails when a free function an entry names is
 # defined more than once there.
 allow = [
-    # crates/host/src/wire.rs: the JSON body of an intake refusal, which no
-    # test makes the host answer.
+    # crates/host/src/wire.rs: the JSON body of an intake refusal.
     "space_error",
-    # crates/host/src/wire.rs: the JSON body of an aggregate refusal; no test
-    # reaches its arms past the first.
+    # crates/host/src/wire.rs: the JSON body of an aggregate refusal.
     "aggregate_error",
     # crates/host/src/product.rs: whether a product destination resolves in a
-    # snapshot; most of its arms are untested.
+    # snapshot.
     "resolves",
-    # crates/host/src/product.rs: the product-URL grammar, partly tested.
+    # crates/host/src/product.rs: the product-URL grammar.
     "parse_destination",
     # crates/intake/src/refusal.rs: one match arm per refusal kind, so its
     # complexity alone is over the threshold.
