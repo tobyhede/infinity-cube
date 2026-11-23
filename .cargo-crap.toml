@@ -1,0 +1,46 @@
+# `cargo crap`: the CRAP (Change Risk Anti-Patterns) gate over the Rust crates.
+#
+#     CRAP = CC^2 * (1 - coverage)^3 + CC      (CC = cyclomatic complexity)
+#
+# A simple or fully covered function scores about its complexity; a complex,
+# untested one scores into the hundreds. `pnpm crap:rust` scores `intake`,
+# `host` and `infinity-cube` from the LCOV `pnpm crap:rust:coverage` writes;
+# the `crap-rust` CI job runs both. The TypeScript gate is `crap.config.ts`, at
+# the same threshold. Config discovery walks up from the working directory, so
+# this root file applies to every crate.
+
+# The Crap4J default: a CC-10 function needs about 42% coverage to fall below
+# it, a CC-15 one about 59%, and anything above CC 30 fails however well it is
+# tested.
+threshold = 30
+
+# A function with complexity and no coverage data scores as 0% covered rather
+# than being skipped: code the coverage run never saw is risk too.
+missing = "pessimistic"
+
+# Relative to each crate's root, beside the built-in `tests/**`, `benches/**`
+# and `examples/**`: unit-test modules, and the CLI's build script, which no
+# test runs.
+exclude = ["**/tests.rs", "build.rs"]
+
+# Functions already over the threshold when the gate was added. They are left
+# out of the report and the gate. This list only shrinks: when one comes under
+# the threshold, delete its entry. Do not add an entry to get a change past the
+# gate. `cargo crap` matches by function name, not file.
+allow = [
+    # crates/host/src/wire.rs: the JSON body of an intake refusal. No test
+    # makes the host answer one (0% covered).
+    "space_error",
+    # crates/host/src/wire.rs: the JSON body of an aggregate refusal, which
+    # calls `space_error`; only its first arm is reached.
+    "aggregate_error",
+    # crates/host/src/product.rs: whether a product destination resolves in a
+    # snapshot; about a quarter covered.
+    "resolves",
+    # crates/host/src/product.rs: the product-URL grammar (CC 24), about two
+    # thirds covered.
+    "parse_destination",
+    # crates/intake/src/refusal.rs: one match arm per refusal kind (CC 37),
+    # fully covered; it fails on complexity alone.
+    "Refusal::kind",
+]
