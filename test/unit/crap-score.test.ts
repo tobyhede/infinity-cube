@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { crapConfig } from '../../crap.config';
@@ -242,5 +243,33 @@ describe('crap.config.ts', () => {
   it('holds the threshold .cargo-crap.toml holds, so the two gates agree', () => {
     const rust = /^threshold = (\d+)$/m.exec(readFileSync('.cargo-crap.toml', 'utf8'))?.[1];
     expect(Number(rust)).toBe(crapConfig.threshold);
+  });
+});
+
+describe('.cargo-crap.toml', () => {
+  // `cargo crap` matches an allow entry by the name it reports, which leaves a
+  // free function unqualified, so an entry would also let past any function of
+  // that name in another crate. Each bare entry must name exactly one.
+  it('names each free function it allows exactly once across the gated crates', () => {
+    const allowList = /^allow = \[([\s\S]*?)^\]/m.exec(
+      readFileSync('.cargo-crap.toml', 'utf8'),
+    )?.[1];
+    const bare = [...(allowList ?? '').matchAll(/^\s*"([^"]+)",/gm)]
+      .map(([, name]) => name ?? '')
+      .filter((name) => !name.includes('::'));
+    expect(bare).not.toEqual([]);
+    const sources = execFileSync(
+      'git',
+      ['ls-files', '-z', 'crates/intake/src', 'crates/host/src', 'crates/cli/src'],
+      { encoding: 'utf8' },
+    )
+      .split('\0')
+      .filter((file) => file.endsWith('.rs') && !file.endsWith('/tests.rs'))
+      .map((file) => readFileSync(file, 'utf8'));
+    for (const name of bare) {
+      const definition = new RegExp(`\\bfn ${name}\\b`, 'g');
+      const count = sources.reduce((sum, text) => sum + (text.match(definition)?.length ?? 0), 0);
+      expect(count, name).toBe(1);
+    }
   });
 });

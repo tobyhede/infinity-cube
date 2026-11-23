@@ -21,6 +21,8 @@ exclude = ["**/tests.rs", "build.rs"]
 # the gate. `cargo crap` matches the name it reports, which qualifies a method
 # by its type (`Refusal::kind`) and a free function by nothing, so an entry
 # covers every function of that name in the three crates.
+# `test/unit/crap-score.test.ts` fails when a free function an entry names is
+# defined more than once there.
 allow = [
     # crates/host/src/wire.rs: the JSON body of an intake refusal, which no
     # test makes the host answer.
