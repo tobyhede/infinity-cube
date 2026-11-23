@@ -15,4 +15,15 @@
 - [ ] Space windows still hold no IPC permission; the Start window's capability names only its label.
 - [ ] `cargo test --locked -j 2 -p infinity-cube-desktop -- launch new_space` passes with a case for each launch outcome; ST-131 and ST-121 updated to **built** with evidence, seen in a live webview on Linux (WebKitGTK) and, if run, macOS.
 
+## Components (from the design audit of the review stories)
+
+The review stories are the layout reference, not the component reference. Build with:
+
+- `StatusBusy` for "Opening…", not the stories' hand-made spinner and status (UI-92: one labelled status, announced once). If the folder line must be announced, give `StatusBusy` a slot for it.
+- shadcn's `item` for Recent entries (`ItemGroup`, `Item` rendered as a button, `ItemContent`, `ItemTitle`, `ItemDescription`, `ItemActions`), added to `@project/ui` through `shadcn-first-ui` step 3, instead of the stories' ghost `Button` with layout overrides. A gone or failed entry's reason goes in `ItemDescription`, with no arbitrary icon selectors.
+- A folder glyph (lucide `FolderOpen`) added to `icons.tsx` for Open Folder….
+- Headings on the chrome type scale, or a recorded heading token, not `text-lg`.
+- Retry's accessible name contains its visible text ("Try again", WCAG 2.5.3), and the list's hint is wired with `aria-describedby` or dropped.
+- The project `Button` has no icon gap or `data-icon`; decide whether to add one before spacing icons by hand.
+
 ## Comments
