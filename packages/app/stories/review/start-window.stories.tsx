@@ -10,7 +10,7 @@ import {
 } from './StartWindowPrototype';
 
 /**
- * The desktop application's Start window (ADR 0170), staged for design review
+ * The desktop application's Start window (ADR 0171), staged for design review
  * by `.scratch/start-window/issues/01-design-the-start-window.md`. Each story
  * fills the frame at the size the shell would open the window; nothing here is
  * production code or a parity claim.

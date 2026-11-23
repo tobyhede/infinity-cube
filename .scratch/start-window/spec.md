@@ -2,7 +2,7 @@
 
 **Goal:** a person downloads the desktop application, runs it, and is presenting from a new Space without knowing what an Aggregate directory is.
 
-**Decision:** [ADR 0170](../../docs/adr/0170-the-desktop-application-opens-to-a-start-window-and-reopens-recent-spaces.md), restated as Storage ST-131 (**not built**). `CONTEXT.md` names the **Start window**.
+**Decision:** [ADR 0171](../../docs/adr/0171-the-desktop-application-opens-to-a-start-window-and-reopens-recent-spaces.md), restated as Storage ST-131 (**not built**). `CONTEXT.md` names the **Start window**.
 
 ## What was settled (grilled 2026-11-23/24)
 

@@ -3,7 +3,7 @@
 Status: accepted
 Date: 2026-11-23
 Refines: 0124, 0138, 0155, 0164
-Refined by: 0168, 0170
+Refined by: 0168, 0171
 Related: 0018, 0162
 
 ADR 0155 makes the desktop application a Tauri shell that runs an Aggregate directory as Running does, and ADR 0164 names its command `open_aggregate`, which a home window called. A desktop application whose first window is a page holding an Open button, beside the windows of the Spaces it opens, is not how a desktop application behaves: a person expects to open a folder from File › Open… and to have nothing open but what they opened. A presenter also has no `pnpm`, so a refusal that points at `pnpm cube init` leaves them with no way to start.

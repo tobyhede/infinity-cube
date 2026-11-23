@@ -1,5 +1,5 @@
 /**
- * A throwaway drawing of the desktop application's Start window (ADR 0170,
+ * A throwaway drawing of the desktop application's Start window (ADR 0171,
  * Storage ST-131) for design review: plain props in, callbacks out, no shell,
  * no commands. `.scratch/start-window/issues/02-build-the-start-window.md`
  * rebuilds the accepted design through `shadcn-first-ui`; nothing here is

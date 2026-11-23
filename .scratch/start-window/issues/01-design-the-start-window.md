@@ -4,7 +4,7 @@
 
 **Blocked by:** nothing.
 
-**What to build:** Designs for every screen and state of the Start window (ADR 0170, Storage ST-131), reviewed before any implementation. This is a prototype and design ticket: it produces review stories and a clickable prototype, not shipped code.
+**What to build:** Designs for every screen and state of the Start window (ADR 0171, Storage ST-131), reviewed before any implementation. This is a prototype and design ticket: it produces review stories and a clickable prototype, not shipped code.
 
 **Where the designs live:** Ladle review stories in `packages/app/stories/review/start-window.stories.tsx`, one story per state, drawn with the real `@project/ui` components and the application's tokens, so what is approved is what 02 builds. `stories/review` is staged work, not catalogue evidence (`shadcn-first-ui`, step 1); the catalogue check excludes it (`packages/app/stories/design-system-inventory.ts`), so these stories carry no parity claims or tagged tests. Their screenshots, light and dark, are published side by side on a canvas for review without running `pnpm ladle`.
 
@@ -35,6 +35,6 @@
 
 - [ ] A review story for every state above, in `packages/app/stories/review/`, and their light and dark screenshots published on a canvas for review.
 - [ ] A clickable prototype of the first-launch → New Space → Space flow, as an interactive review story.
-- [ ] The user has accepted the design; its decisions on layout and controls are added to UI as a rule (the UI trace's 0170 row says none exists until then).
+- [ ] The user has accepted the design; its decisions on layout and controls are added to UI as a rule (the UI trace's 0171 row says none exists until then).
 
 ## Comments

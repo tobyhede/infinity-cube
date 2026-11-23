@@ -257,8 +257,8 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 | 0165 the schema history in two encodings: Prisma Next's packages and one plain-SQL file per package, held to the same statements and schema by tests; a schema change adds both | → ST-125 |
 | 0165 rejected options | dropped: rejected alternatives |
 | 0166 a preview build is a published build that makes no compatibility promise; a directory is read with the preview build that wrote it; a preview build says it is one | → ST-36 (restated on main, PR 511). That a preview build says it is one in the version it reports → ST-120 (`infinity-cube --version`). That its download page says so: not restated, since it is release packaging rather than behaviour of a host |
-| 0170 the Start window (New Space, Open Folder…, recent Spaces), New Space as a name-and-location form whose name is the Meta Space's Title and must be one folder name, reopening the Spaces open when the last quit began, Recent as a separate history of Spaces opened, both kept in the application's data directory, the last window (Space or Start) closing per platform, the Start window built from `@project/ui` holding its own commands | → ST-131 (**not built**); ST-121 points to it. The Start window's layout → UI once `.scratch/start-window/issues/01-design-the-start-window.md` is accepted |
-| 0170 rejected options | dropped: rejected alternatives |
+| 0171 the Start window (New Space, Open Folder…, recent Spaces), New Space as a name-and-location form whose name is the Meta Space's Title and must be one folder name, reopening the Spaces open when the last quit began, Recent as a separate history of Spaces opened, both kept in the application's data directory, the last window (Space or Start) closing per platform, the Start window built from `@project/ui` holding its own commands | → ST-131 (**not built**); ST-121 points to it. The Start window's layout → UI once `.scratch/start-window/issues/01-design-the-start-window.md` is accepted |
+| 0171 rejected options | dropped: rejected alternatives |
 
 ## 2. Guides
 
