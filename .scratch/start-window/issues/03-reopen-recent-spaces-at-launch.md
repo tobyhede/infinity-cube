@@ -1,6 +1,6 @@
 # 03 — Reopen recent Spaces at launch
 
-**Status:** needs-triage
+**Status:** ready-for-agent
 
 **Blocked by:** 02 (the Start window's recent entries).
 
