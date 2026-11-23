@@ -1,11 +1,13 @@
 # Preview builds of the `infinity-cube` CLI (ADR 0166): one binary per
 # platform with the browser application embedded, packed with
 # `release/README.md` and both licence files, and attached to a draft
-# GitHub pre-release with `release/install.sh`, which installs one of them.
+# GitHub release with `release/install.sh`, which installs one of them. The
+# release is a normal one marked latest, not a pre-release (ADR 0169).
 # Beside them, the desktop application for Apple silicon (rust-host issue
 # 06): an ad-hoc signed disk image and, when the updater's key is a secret,
-# the signed update bundle and the `latest.json` that offers it, which
-# desktop-updates.yml serves once the release is published.
+# the signed update bundle and the `latest.json` that offers it, which an
+# installed application reads at releases/latest once the release is
+# published.
 #
 # - A tag `v<version>` pushed on a commit `main` already holds builds,
 #   tests and packages every platform, then creates the draft release with
@@ -287,7 +289,7 @@ jobs:
       - name: Write SHA256SUMS
         working-directory: dist
         run: sha256sum ./*.tar.gz ./*.dmg | sed 's| \./| |' > SHA256SUMS && cat SHA256SUMS
-      - name: Create the draft pre-release
+      - name: Create the draft release
         run: |
           cat > notes.md <<EOF
           **Preview build** of InfinityCube $VERSION. It makes no compatibility promise: a directory it writes may not open in a later preview build, so keep your directory in git and read it with the build that wrote it (ADR 0166).
@@ -307,6 +309,6 @@ jobs:
           Download \`InfinityCube-$VERSION-aarch64-apple-darwin.dmg\`, open it and drag InfinityCube to Applications. It is not signed with an Apple Developer ID, so the first time you open it macOS refuses: open **System Settings → Privacy & Security**, choose **Open Anyway** beside the message about InfinityCube, and confirm. Or run \`xattr -dr com.apple.quarantine /Applications/InfinityCube.app\` once. After that it opens as any application does, and it offers each newer preview build when one is published.
           EOF
           gh release create "$TAG" dist/*.tar.gz dist/*.dmg dist/*.sig dist/latest.json dist/SHA256SUMS release/install.sh \
-            --draft --prerelease --verify-tag \
+            --draft --latest --verify-tag \
             --title "InfinityCube $VERSION (preview)" \
             --notes-file notes.md
