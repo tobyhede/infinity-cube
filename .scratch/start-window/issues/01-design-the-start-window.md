@@ -4,7 +4,17 @@
 
 **Blocked by:** nothing.
 
-**What to build:** Designs, on a canvas the user reviews, for every screen and state of the Start window (ADR 0170, Storage ST-131), before any implementation. This is a prototype and design ticket: it produces pictures and a clickable prototype, not shipped code.
+**What to build:** Designs for every screen and state of the Start window (ADR 0170, Storage ST-131), reviewed before any implementation. This is a prototype and design ticket: it produces review stories and a clickable prototype, not shipped code.
+
+**Where the designs live:** Ladle review stories in `packages/app/stories/review/start-window.stories.tsx`, one story per state, drawn with the real `@project/ui` components and the application's tokens, so what is approved is what 02 builds. `stories/review` is staged work, not catalogue evidence (`shadcn-first-ui`, step 1); the catalogue check excludes it (`packages/app/stories/design-system-inventory.ts`), so these stories carry no parity claims or tagged tests. Their screenshots, light and dark, are published side by side on a canvas for review without running `pnpm ladle`.
+
+**Skills, in order:**
+
+1. `mattpocock-skills:prototype` runs the ticket: a throwaway prototype answering a design question.
+2. `shadcn-first-ui`, step 1 only: read the catalogue and name the closest `@project/ui` parts. Its remaining steps are 02's, which rebuilds the chosen design through them.
+3. `shadcn` to search the registry for what the catalogue lacks (a recent-items list, an empty state).
+4. `design:ux-copy` for the labels, the empty state and the refusal messages.
+5. `design:design-critique` and `design:accessibility-review` as a pass before review.
 
 **Why:** the home window ADR 0167 removed was built without a design and was half-baked. The Start window is the first thing a person who downloads InfinityCube sees, so its layout is agreed before it is built.
 
@@ -23,8 +33,8 @@
 - Uses the application's tokens and colour schemes, so it reads as the same product as a Space window.
 - Native menus are not part of the design; they stay as ADRs 0167 and 0168 decide.
 
-- [ ] A canvas design covering every state above, published for review.
-- [ ] A clickable prototype of the first-launch → New Space → Space flow.
+- [ ] A review story for every state above, in `packages/app/stories/review/`, and their light and dark screenshots published on a canvas for review.
+- [ ] A clickable prototype of the first-launch → New Space → Space flow, as an interactive review story.
 - [ ] The user has accepted the design; its decisions on layout and controls are added to UI as a rule (the UI trace's 0170 row says none exists until then).
 
 ## Comments
