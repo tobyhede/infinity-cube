@@ -5,26 +5,23 @@
  * the files, prints and exits.
  *
  *     pnpm crap:ts                     # the gate: fails on a gated function over the threshold
- *     pnpm crap:ts --report            # every package, worst first; never fails
- *     pnpm crap:ts --format github     # one `::error` annotation per failure, for CI
- *     pnpm crap:ts --summary <file>    # also append a Markdown table to <file>
+ *     pnpm crap:ts --report            # every package's worst, worst first; never fails
+ *     pnpm crap:ts --format github     # one `::error` annotation per problem, for CI
+ *     pnpm crap:ts --summary <file>    # also append the verdict and worst functions to <file>
+ *     pnpm crap:ts --coverage <file>   # read another coverage-final.json
  */
 import { appendFileSync, readFileSync } from 'node:fs';
-import { dirname, relative, resolve } from 'node:path';
+import { dirname, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { z } from 'zod';
 import { crapConfig } from '../crap.config';
-import {
-  functionComplexities,
-  functionKey,
-  isGated,
-  judgeCrap,
-  scoreFunctions,
-  type ScoredFunction,
-} from './crap/score';
+import { functionComplexities, judgeCrap, scoreFunctions, type ScoredFunction } from './crap/score';
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+
+/** How many of the worst functions a report and the CI summary list. */
+const TOP = 20;
 
 /**
  * The part of Istanbul's `coverage-final.json` this reads: each file's
@@ -54,7 +51,8 @@ const lineHitsOf = (entry: CoverageFile[string]): ReadonlyMap<number, number> =>
 
 const scoreAll = (coverage: CoverageFile): readonly ScoredFunction[] =>
   Object.values(coverage).flatMap((entry) => {
-    const file = relative(repositoryRoot, entry.path);
+    // Forward slashes on every platform, as `crap.config.ts` writes its keys.
+    const file = relative(repositoryRoot, entry.path).split(sep).join('/');
     const functions = functionComplexities(file, readFileSync(entry.path, 'utf8'));
     return scoreFunctions(file, functions, lineHitsOf(entry));
   });
@@ -77,6 +75,40 @@ const markdownTable = (title: string, functions: readonly ScoredFunction[]): str
     '',
   ].join('\n');
 
+/** One reason the gate fails, printed as a CI annotation or a line of text. */
+interface Problem {
+  readonly file: string;
+  readonly line: number | null;
+  readonly title: string;
+  readonly message: string;
+}
+
+const problemsOf = (
+  failures: readonly ScoredFunction[],
+  staleAllowances: readonly string[],
+): readonly Problem[] => [
+  ...failures.map((fn) => ({
+    file: fn.file,
+    line: fn.startLine,
+    title: `CRAP above ${crapConfig.threshold}`,
+    message: `${fn.name} has CRAP score ${fn.crap.toFixed(1)} (CC=${fn.complexity}, cov=${percent(fn.coverage)})`,
+  })),
+  ...staleAllowances.map((key) => ({
+    file: 'crap.config.ts',
+    line: null,
+    title: 'Stale CRAP allowance',
+    message: `${key} names no function above ${crapConfig.threshold}; delete its entry`,
+  })),
+];
+
+const printProblem = (problem: Problem, format: string): void => {
+  const at = problem.line === null ? problem.file : `${problem.file}:${problem.line}`;
+  if (format === 'github') {
+    const line = problem.line === null ? '' : `,line=${problem.line}`;
+    console.log(`::error file=${problem.file}${line},title=${problem.title}::${problem.message}`);
+  } else console.log(`✗ ${problem.message} (${at})`);
+};
+
 const main = (): number => {
   const { values } = parseArgs({
     options: {
@@ -84,7 +116,6 @@ const main = (): number => {
       format: { type: 'string', default: 'text' },
       report: { type: 'boolean', default: false },
       summary: { type: 'string' },
-      top: { type: 'string', default: '20' },
     },
   });
   const coveragePath = resolve(process.cwd(), values.coverage);
@@ -99,64 +130,41 @@ const main = (): number => {
   const scored = [...scoreAll(coverageFileSchema.parse(JSON.parse(coverageText)))].sort(
     (a, b) => b.crap - a.crap,
   );
-  const top = Number.parseInt(values.top, 10);
+  const worst = scored.slice(0, TOP);
   const { threshold } = crapConfig;
 
   if (values.report) {
     console.log(`  CRAP   CC  Cover.  Function  Location`);
-    for (const fn of scored.slice(0, top)) console.log(row(fn));
+    for (const fn of worst) console.log(row(fn));
     const over = scored.filter((fn) => fn.crap > threshold).length;
     console.log(`\n${scored.length} function(s) scored; ${over} above ${threshold}.`);
-    if (values.summary !== undefined)
-      appendFileSync(
-        values.summary,
-        markdownTable(`TypeScript CRAP: worst ${top}`, scored.slice(0, top)),
-      );
     return 0;
   }
 
-  const gated = scored.filter((fn) => isGated(crapConfig, fn.file));
-  const { failures, staleAllowances } = judgeCrap(crapConfig, scored);
+  const { gated, failures, allowed, staleAllowances } = judgeCrap(crapConfig, scored);
+  const problems = problemsOf(failures, staleAllowances);
+  const passed = problems.length === 0;
+  for (const problem of problems) printProblem(problem, values.format);
 
-  if (values.format === 'github') {
-    for (const fn of failures)
-      console.log(
-        `::error file=${fn.file},line=${fn.startLine},title=CRAP (${fn.crap.toFixed(1)} > ${threshold})::${fn.name} has CRAP score ${fn.crap.toFixed(1)} (CC=${fn.complexity}, cov=${percent(fn.coverage)})`,
-      );
-    for (const key of staleAllowances)
-      console.log(
-        `::error file=crap.config.ts,title=Stale CRAP allowance::${key} names no function above ${threshold}; delete its entry`,
-      );
-  } else {
-    for (const fn of failures) console.log(`✗ ${row(fn)}`);
-    for (const key of staleAllowances)
-      console.log(
-        `✗ ${key} names no function above ${threshold}; delete its entry in crap.config.ts`,
-      );
-  }
-
-  if (values.summary !== undefined) {
-    const worst = gated.slice(0, top);
+  if (values.summary !== undefined)
     appendFileSync(
       values.summary,
-      markdownTable(
-        failures.length === 0 && staleAllowances.length === 0
-          ? `TypeScript CRAP gate passed (threshold ${threshold})`
-          : `TypeScript CRAP gate failed (threshold ${threshold})`,
-        worst,
-      ),
+      [
+        `## TypeScript CRAP gate ${passed ? 'passed' : 'failed'} (threshold ${threshold})`,
+        '',
+        failures.length === 0 ? '' : markdownTable('Gated functions over the threshold', failures),
+        markdownTable(`Worst ${TOP}, every package (only gated packages fail)`, worst),
+      ].join('\n'),
     );
-  }
 
-  if (failures.length > 0 || staleAllowances.length > 0) {
+  if (!passed) {
     console.log(
       `\n${failures.length} gated function(s) above CRAP ${threshold}; ${staleAllowances.length} stale allowance(s). Add tests or simplify; do not add to the allow-list to pass.`,
     );
     return 1;
   }
-  const allowed = gated.filter((fn) => Object.hasOwn(crapConfig.allow, functionKey(fn))).length;
   console.log(
-    `✓ ${gated.length} gated function(s) scored; none above CRAP ${threshold} (${allowed} allowed).`,
+    `✓ ${gated.length} gated function(s) scored; none above CRAP ${threshold} (${allowed.length} allowed).`,
   );
   return 0;
 };

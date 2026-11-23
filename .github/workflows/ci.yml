@@ -67,8 +67,8 @@ jobs:
     #     typecheck:packages    ~6s      format:check     ~11s
     #     ui:catalog:check      ~3s      test:coverage   ~106s
     #
-    # (The ninth, `crap:ts`, was added after this table was measured; it
-    # parses the coverage the eighth writes and takes ~2s on a laptop.)
+    # The ninth, `crap:ts`, is not in the table: it parses the coverage the
+    # eighth writes, ~2s on a laptop.
     #
     # Coverage is over half of it, which is the one place a split pays: the
     # seven commands here are ~87s and `coverage` below is ~106s, and each job
@@ -162,20 +162,12 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - id: test-coverage
-        run: pnpm test:coverage
-      # The CRAP gate over the TypeScript (`crap.config.ts`), scored from the
-      # `coverage/coverage-final.json` the step above wrote, so it costs a
-      # parse and no second test run. It is the last command of `pnpm verify`.
-      # One `::error` annotation per failing function, and the gated
-      # packages' worst functions in the job summary.
+      - run: pnpm test:coverage
+      # The CRAP gate (`crap.config.ts`), scored from the coverage the step
+      # above wrote: one `::error` per problem, and the verdict and worst
+      # functions in the job summary, written whether or not it passes.
       - name: CRAP gate (TypeScript)
         run: pnpm crap:ts --format github --summary "$GITHUB_STEP_SUMMARY"
-      # Every package's worst functions, gated or not, whether or not the gate
-      # passed.
-      - name: CRAP report (TypeScript)
-        if: ${{ !cancelled() && steps.test-coverage.outcome == 'success' }}
-        run: pnpm crap:ts --report --summary "$GITHUB_STEP_SUMMARY"
 
   postgres:
     needs: reuse-pr-ci
@@ -736,20 +728,13 @@ jobs:
       NEXTEST_VERSION: 0.9.152
       CARGO_LLVM_COV_VERSION: 0.9.1
       CARGO_CRAP_VERSION: 0.8.0
-    # The CRAP gate over the Rust crates (`.cargo-crap.toml`): the intake, the
-    # host and the CLI run under `cargo llvm-cov`, then `cargo crap` scores
-    # them. Its own job rather than steps in `rust`, because the instrumented
-    # build shares nothing with that job's `target/` and a red score is a
-    # different diagnosis from a red test. The crates are the ones
-    # `rust-windows` runs, so no WebKitGTK and no browser build: the desktop
-    # shell is left out, and `http-conformance` runs only as the cases the host
-    # tests share, which `cargo crap` does not score. The commands are the
+    # The CRAP gate over the Rust crates (`.cargo-crap.toml`), run by the
     # `crap:rust:*` scripts in `package.json`, which need pnpm and Node but no
-    # install.
-    #
-    # The three tools are installed at the versions pinned above and kept in
-    # the cache with the registry and `target/`, keyed as `rust` keys its own.
-    # A version bump in `cargo-llvm-cov` or `cargo-crap` can move scores.
+    # install. Its own job because the instrumented build shares nothing with
+    # `rust`'s `target/`, and a red score is a different diagnosis from a red
+    # test. It runs the crates `rust-windows` runs, so it needs no WebKitGTK
+    # and leaves out the desktop shell. The tools are cached as `rust` caches
+    # nextest; a bump of `cargo-llvm-cov` or `cargo-crap` can move scores.
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }

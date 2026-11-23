@@ -5,10 +5,9 @@
  *
  * CC is a function's cyclomatic complexity and coverage the fraction of its
  * lines a test reached. A simple or fully covered function scores about its
- * complexity; a complex, untested one scores into the hundreds. The Rust crates
- * are scored by `cargo crap` against `.cargo-crap.toml`; this is the same
- * formula and threshold over Vitest's coverage, because no maintained tool
- * scores TypeScript from it.
+ * complexity; a complex, untested one scores into the hundreds. `cargo crap`
+ * scores the Rust crates by the same formula; nothing maintained scores
+ * TypeScript from Vitest's coverage, so this does.
  *
  * Everything here is pure: complexity from source text, coverage from the hit
  * counts Vitest records per line, and a verdict from both. `scripts/crap.ts` is
@@ -47,12 +46,16 @@ export interface CrapConfig {
   readonly allow: Readonly<Record<string, string>>;
 }
 
-export type CrapVerdict = {
+export interface CrapVerdict {
+  /** Every function in a gated package. */
+  readonly gated: readonly ScoredFunction[];
   /** Gated functions over the threshold and not allowed. */
   readonly failures: readonly ScoredFunction[];
+  /** Gated functions over the threshold that the allow-list names. */
+  readonly allowed: readonly ScoredFunction[];
   /** Allow-list entries that no longer name a function over the threshold. */
   readonly staleAllowances: readonly string[];
-};
+}
 
 /** The score: CC² × (1 − coverage)³ + CC. */
 export const crapScore = (complexity: number, coverage: number): number =>
@@ -93,11 +96,13 @@ const isDecisionPoint = (node: ts.Node): boolean => {
   if (ts.isBinaryExpression(node)) return LOGICAL_OPERATORS.has(node.operatorToken.kind);
   // A default value is a branch: the caller passed one or did not.
   if (ts.isParameter(node) || ts.isBindingElement(node)) return node.initializer !== undefined;
-  // `a?.b` and `f?.()`: each `?.` short-circuits or does not.
-  if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node))
-    return node.questionDotToken !== undefined;
-  if (ts.isCallExpression(node)) return node.questionDotToken !== undefined;
-  return false;
+  // `a?.b`, `a?.[k]` and `f?.()`: each `?.` short-circuits or does not.
+  return (
+    (ts.isPropertyAccessExpression(node) ||
+      ts.isElementAccessExpression(node) ||
+      ts.isCallExpression(node)) &&
+    node.questionDotToken !== undefined
+  );
 };
 
 const isFunctionLike = (node: ts.Node): node is ts.FunctionLikeDeclaration =>
@@ -125,23 +130,23 @@ const ownerName = (node: ts.Node, source: ts.SourceFile): string | null => {
   return null;
 };
 
+/** `Owner.name` when `holder` sits in a class or a named object literal, else `name`. */
+const qualified = (own: string, holder: ts.Node, source: ts.SourceFile): string => {
+  const owner = ownerName(holder, source);
+  return owner === null ? own : `${owner}.${own}`;
+};
+
 /** The name a report shows for a function, from its declaration or what it is assigned to. */
 const functionName = (node: ts.FunctionLikeDeclaration, source: ts.SourceFile): string => {
   if (ts.isConstructorDeclaration(node))
     return `${ownerName(node, source) ?? '<class>'}.constructor`;
-  if (node.name !== undefined && !ts.isFunctionExpression(node)) {
-    const own = nameText(node.name, source);
-    const owner = ownerName(node, source);
-    return owner === null ? own : `${owner}.${own}`;
-  }
+  if (node.name !== undefined && !ts.isFunctionExpression(node))
+    return qualified(nameText(node.name, source), node, source);
   const parent = node.parent;
   if (ts.isVariableDeclaration(parent) || ts.isPropertyDeclaration(parent))
     return nameText(parent.name, source);
-  if (ts.isPropertyAssignment(parent)) {
-    const own = nameText(parent.name, source);
-    const owner = ownerName(parent, source);
-    return owner === null ? own : `${owner}.${own}`;
-  }
+  if (ts.isPropertyAssignment(parent))
+    return qualified(nameText(parent.name, source), parent, source);
   if (node.name !== undefined) return nameText(node.name, source);
   // `const onDrop = useCallback(() => …)`: the callback takes the name it is held by.
   if (ts.isCallExpression(parent) && ts.isVariableDeclaration(parent.parent))
@@ -170,7 +175,9 @@ export const functionComplexities = (
   const lineOf = (position: number): number =>
     source.getLineAndCharacterOfPosition(position).line + 1;
 
-  const countWithin = (root: ts.FunctionLikeDeclaration): number => {
+  // Counts `root`'s own decision points, recording each function inside it as
+  // an entry of its own rather than counting into it.
+  const countWithin = (root: ts.Node): number => {
     let count = 1;
     const visit = (node: ts.Node): void => {
       if (node !== root && isFunctionLike(node)) {
@@ -195,14 +202,7 @@ export const functionComplexities = (
     });
   };
 
-  const visitTop = (node: ts.Node): void => {
-    if (isFunctionLike(node)) {
-      record(node);
-      return;
-    }
-    ts.forEachChild(node, visitTop);
-  };
-  ts.forEachChild(source, visitTop);
+  countWithin(source);
   return found.sort((a, b) => a.startLine - b.startLine);
 };
 
@@ -218,27 +218,23 @@ export const scoreFunctions = (
   functions: readonly FunctionComplexity[],
   lineHits: ReadonlyMap<number, number>,
 ): readonly ScoredFunction[] => {
-  const owned = new Map<FunctionComplexity, { lines: number; hit: number }>();
-  for (const fn of functions) owned.set(fn, { lines: 0, hit: 0 });
+  const lines = functions.map(() => 0);
+  const hit = functions.map(() => 0);
+  const span = (fn: FunctionComplexity): number => fn.endLine - fn.startLine;
   for (const [line, hits] of lineHits) {
-    let innermost: FunctionComplexity | null = null;
-    for (const fn of functions) {
-      if (line < fn.startLine || line > fn.endLine) continue;
-      if (
-        innermost === null ||
-        fn.endLine - fn.startLine <= innermost.endLine - innermost.startLine
-      )
-        innermost = fn;
-    }
-    if (innermost === null) continue;
-    const tally = owned.get(innermost);
-    if (tally === undefined) continue;
-    tally.lines += 1;
-    if (hits > 0) tally.hit += 1;
+    let innermost = -1;
+    functions.forEach((fn, index) => {
+      if (line < fn.startLine || line > fn.endLine) return;
+      const current = functions[innermost];
+      if (current === undefined || span(fn) <= span(current)) innermost = index;
+    });
+    if (innermost < 0) continue;
+    lines[innermost] = (lines[innermost] ?? 0) + 1;
+    if (hits > 0) hit[innermost] = (hit[innermost] ?? 0) + 1;
   }
-  return functions.map((fn) => {
-    const tally = owned.get(fn);
-    const coverage = tally === undefined || tally.lines === 0 ? 0 : tally.hit / tally.lines;
+  return functions.map((fn, index) => {
+    const owned = lines[index] ?? 0;
+    const coverage = owned === 0 ? 0 : (hit[index] ?? 0) / owned;
     return { ...fn, file, coverage, crap: crapScore(fn.complexity, coverage) };
   });
 };
@@ -253,10 +249,14 @@ export const isGated = (config: CrapConfig, file: string): boolean =>
  * it any more, which fails too, so the list only shrinks.
  */
 export const judgeCrap = (config: CrapConfig, scored: readonly ScoredFunction[]): CrapVerdict => {
-  const over = scored.filter((fn) => isGated(config, fn.file) && fn.crap > config.threshold);
+  const gated = scored.filter((fn) => isGated(config, fn.file));
+  const over = gated.filter((fn) => fn.crap > config.threshold);
+  const isAllowed = (fn: ScoredFunction): boolean => Object.hasOwn(config.allow, functionKey(fn));
   const overKeys = new Set(over.map(functionKey));
   return {
-    failures: over.filter((fn) => !Object.hasOwn(config.allow, functionKey(fn))),
+    gated,
+    failures: over.filter((fn) => !isAllowed(fn)),
+    allowed: over.filter(isAllowed),
     staleAllowances: Object.keys(config.allow).filter((key) => !overKeys.has(key)),
   };
 };

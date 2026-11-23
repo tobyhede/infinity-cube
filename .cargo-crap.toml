@@ -1,17 +1,9 @@
-# `cargo crap`: the CRAP (Change Risk Anti-Patterns) gate over the Rust crates.
-#
-#     CRAP = CC^2 * (1 - coverage)^3 + CC      (CC = cyclomatic complexity)
-#
-# A simple or fully covered function scores about its complexity; a complex,
-# untested one scores into the hundreds. `pnpm crap:rust` scores `intake`,
-# `host` and `infinity-cube` from the LCOV `pnpm crap:rust:coverage` writes;
-# the `crap-rust` CI job runs both. The TypeScript gate is `crap.config.ts`, at
-# the same threshold. Config discovery walks up from the working directory, so
-# this root file applies to every crate.
-
-# The Crap4J default: a CC-10 function needs about 42% coverage to fall below
-# it, a CC-15 one about 59%, and anything above CC 30 fails however well it is
-# tested.
+# `cargo crap`: the CRAP gate over the Rust crates (`pnpm crap:rust`, the
+# `crap-rust` CI job). The formula is in `scripts/crap/score.ts`, which scores
+# the TypeScript, and the threshold's rationale in `crap.config.ts`, whose
+# threshold this matches (`test/unit/crap-score.test.ts`). Config discovery
+# walks up from the working directory, so this root file applies to every
+# crate.
 threshold = 30
 
 # A function with complexity and no coverage data scores as 0% covered rather

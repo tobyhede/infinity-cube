@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { crapConfig } from '../../crap.config';
 import {
@@ -164,5 +165,18 @@ describe('crap.config.ts', () => {
   it('allows only functions in packages the gate holds', () => {
     for (const key of Object.keys(crapConfig.allow))
       expect(isGated(crapConfig, key), key).toBe(true);
+  });
+
+  it('gates exactly the packages whose coverage vitest.config.ts gates', () => {
+    const thresholdKeys = [
+      ...readFileSync('vitest.config.ts', 'utf8').matchAll(/'(packages\/[\w-]+\/src\/)\*\*':/g),
+    ].map(([, prefix]) => prefix);
+    expect(thresholdKeys).not.toEqual([]);
+    expect([...crapConfig.gated].sort()).toEqual(thresholdKeys.sort());
+  });
+
+  it('holds the threshold .cargo-crap.toml holds, so the two gates agree', () => {
+    const rust = /^threshold = (\d+)$/m.exec(readFileSync('.cargo-crap.toml', 'utf8'))?.[1];
+    expect(Number(rust)).toBe(crapConfig.threshold);
   });
 });

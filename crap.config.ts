@@ -1,8 +1,9 @@
 import type { CrapConfig } from './scripts/crap/score';
 
 /**
- * The CRAP gate over the TypeScript (`pnpm crap:ts`, `scripts/crap.ts`). The
- * Rust crates have their own, `.cargo-crap.toml`, at the same threshold.
+ * The CRAP gate over the TypeScript (`pnpm crap:ts`; the metric is in
+ * `scripts/crap/score.ts`). The Rust gate, `.cargo-crap.toml`, keeps the same
+ * threshold, which `test/unit/crap-score.test.ts` holds.
  */
 export const crapConfig = {
   /*
@@ -12,10 +13,9 @@ export const crapConfig = {
    */
   threshold: 30,
   /*
-   * The packages whose coverage `vitest.config.ts` already gates, for the
-   * reason it gives there: they are the pure domain and transport logic, where
-   * unit coverage is the whole measure. React components are reached by the
-   * Playwright suites, which record no coverage, so their scores are reported
+   * The packages whose coverage `vitest.config.ts` gates, for the reason it
+   * gives there; `test/unit/crap-score.test.ts` holds the two lists equal.
+   * React reached only by Playwright records no coverage, so it is reported
    * (`pnpm crap:ts --report`) but not gated.
    */
   gated: [
