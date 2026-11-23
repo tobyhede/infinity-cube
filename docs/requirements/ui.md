@@ -2,7 +2,7 @@
 
 **Purpose:** the controls an author operates and the keys they press: what each control offers, how it commits and cancels, where focus goes and where an answer shows.
 
-**Snapshot:** checked against `f6e01b9` (2026-11-21); incorporates accepted ADRs through 0166, and ADR 0167 where UI-8 restates it. ADRs accepted after it bind where they differ, until this document is updated. Proposed ADRs 0138 (shortcuts) and 0163 are not incorporated; the shortcut rules here restate the code and the archived guide.
+**Snapshot:** checked against `f6e01b9` (2026-11-21); incorporates accepted ADRs through 0166, and ADRs 0167 and 0168 where UI-8 restates them. ADRs accepted after it bind where they differ, until this document is updated. Proposed ADRs 0138 (shortcuts) and 0163 are not incorporated; the shortcut rules here restate the code and the archived guide.
 
 Conflicts, open and closed, are listed in [conflicts/ui.md](conflicts/ui.md). Sources are traced in [trace/ui.md](trace/ui.md).
 
@@ -63,7 +63,7 @@ Conflicts, open and closed, are listed in [conflicts/ui.md](conflicts/ui.md). So
 ## Keys
 
 - **UI-7** Every application shortcut is declared once, with its keys, its `aria-keyshortcuts` and a description, and everything that answers, announces or lists a key reads it from that declaration by the command's id. *Why:* one table is the only place a binding can be checked against the others. Sources: archived guide `ui.md` (no ADR). **built**: `test/unit/key-bindings.test.ts` › "names every live binding once and no binding that has disappeared"; `app/test/key-bindings.test.tsx` › "announces a non-empty shortcut and description for every binding"; `app/test/command-ids.test.tsx` › "gives each command its own binding".
-- **UI-8** No application shortcut answers under Ctrl, Meta or Alt, and a plain binding takes no Shift. An editor's own keys are not application shortcuts: the Markdown editor's `Mod-Enter` Save is UI-56 and UI-64. The rule governs the keys the page answers; a native integration follows the platform's conventions instead, so the desktop application's menus carry the platform's accelerators (`CmdOrCtrl+N`, `CmdOrCtrl+O`, `CmdOrCtrl+Q`; Storage ST-121). *Why:* modified keys belong to the browser and the system, and a native menu is the system's. Sources: archived guide `ui.md`; ADR 0167. **built**: `app/test/key-bindings.test.tsx` › "tells a Shift binding from the plain one on the same key"; `app/test/SpaceCanvas.test.tsx` › "ignores a modified press and a key repeat".
+- **UI-8** No application shortcut answers under Ctrl, Meta or Alt, and a plain binding takes no Shift. An editor's own keys are not application shortcuts: the Markdown editor's `Mod-Enter` Save is UI-56 and UI-64. The rule governs the keys the page answers; a native integration follows the platform's conventions instead, so the desktop application's menus carry the platform's accelerators (`CmdOrCtrl+N`, `CmdOrCtrl+O`, `CmdOrCtrl+W`, `CmdOrCtrl+Q`, and full screen on `F11` on Linux and Windows and the platform's own on macOS; Storage ST-121). *Why:* modified keys belong to the browser and the system, and a native menu is the system's. Sources: archived guide `ui.md`; ADR 0167; ADR 0168. **built**: `app/test/key-bindings.test.tsx` › "tells a Shift binding from the plain one on the same key"; `app/test/SpaceCanvas.test.tsx` › "ignores a modified press and a key repeat".
 - **UI-9** A key belongs to the focused control in these cases:
 
   | Focused control | Keys it keeps |

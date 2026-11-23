@@ -3,6 +3,8 @@
     reason = "a build script reports its failure on standard error"
 )]
 fn main() {
+    // About names the commit the release workflow built from.
+    println!("cargo::rerun-if-env-changed=INFINITY_CUBE_COMMIT");
     // `answer_closing` is the only command the application defines; declaring
     // it here makes it a permission a capability grants (to a close's question
     // window), so no other window, and no page a Space window loads, can
