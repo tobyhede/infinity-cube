@@ -21,40 +21,28 @@
 //! commit is already in the file, so the host closes it and exits zero. Any
 //! signal after the first exits at once, one.
 
-use std::path::Path;
 use std::process::ExitCode;
 use std::sync::Arc;
 
 use host::{Application, RandomIds, SqlitePath, SqliteSpaceRepository, TokioClock};
 
 use crate::arguments::{ServeCommand, Store};
-use crate::built::{self, Origin};
+use crate::built;
 use crate::listener::{self, bind, own_host, serve as serve_on};
-use crate::output::{announce_listening, announce_refused, say};
+use crate::output::{announce_listening, refuse, say};
 use crate::signals::Signals;
-
-/// Announce why the store cannot be served, say so in full, and exit one.
-fn refuse(message: &str) -> ExitCode {
-    say(message);
-    announce_refused(message);
-    ExitCode::FAILURE
-}
 
 /// The file `SQLITE_PATH` names, by the host's rules, which must exist: the
 /// CLI's rule, in the TypeScript CLI's words (`src/sqlite/db.ts`).
 fn sqlite_file(value: Option<&str>) -> Result<SqlitePath, String> {
     let path = SqlitePath::from_variable(value).map_err(|error| error.to_string())?;
     if !matches!(path.as_path().try_exists(), Ok(true)) {
-        return Err(missing(path.as_path()));
+        return Err(format!(
+            "SQLite database file does not exist: {}. Run pnpm db:migrate:sqlite first.",
+            path.as_path().display()
+        ));
     }
     Ok(path)
-}
-
-fn missing(file: &Path) -> String {
-    format!(
-        "SQLite database file does not exist: {}. Run pnpm db:migrate:sqlite first.",
-        file.display()
-    )
 }
 
 /// Serve the store `command` names until a stop signal, answering the exit code.
@@ -83,10 +71,7 @@ pub(crate) async fn serve(command: ServeCommand) -> ExitCode {
     let listener = match bind(command.port).await {
         Ok(listener) => listener,
         Err(error) => {
-            let tried = match command.port {
-                Some(port) => format!("port {port}"),
-                None => format!("a port from {} up", listener::DEFAULT_PORT),
-            };
+            let tried = listener::ports_tried(command.port);
             return refuse(&format!("Could not serve {file} on {tried}: {error}"));
         }
     };
@@ -106,13 +91,7 @@ pub(crate) async fn serve(command: ServeCommand) -> ExitCode {
     );
     announce_listening(port);
     let own = own_host(port);
-    if origin == Origin::Placeholder {
-        say(
-            "This binary carries no built application, so it serves a placeholder page: \
-             rebuild it with INFINITY_CUBE_BUILT_APPLICATION naming the directory `pnpm build` \
-             writes, or pass --built <dir>.",
-        );
-    }
+    built::say_if_placeholder(&origin);
     say(&format!(
         "Serving {file} at http://{own}/\nPress Ctrl-C to stop."
     ));

@@ -87,6 +87,14 @@ pub(crate) async fn bind(port: Option<u16>) -> io::Result<TcpListener> {
     ))
 }
 
+/// The port or ports [`bind`] tries for `port`, as a refusal names them.
+pub(crate) fn ports_tried(port: Option<u16>) -> String {
+    match port {
+        Some(port) => format!("port {port}"),
+        None => format!("a port from {DEFAULT_PORT} up"),
+    }
+}
+
 /// The `Host` every request must name: `127.0.0.1:<port>`.
 pub(crate) fn own_host(port: u16) -> String {
     format!("{}:{port}", Ipv4Addr::LOCALHOST)

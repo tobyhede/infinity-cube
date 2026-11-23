@@ -8,6 +8,8 @@ use std::path::{Path, PathBuf};
 use bytes::Bytes;
 use host::{BuiltApplicationDirectory, BuiltApplicationError, BuiltFiles, Shell};
 
+use crate::output::say;
+
 include!(concat!(env!("OUT_DIR"), "/built.rs"));
 
 const PAGE: &str = "index.html";
@@ -72,6 +74,18 @@ pub(crate) fn load(
                 Origin::Placeholder,
             ))
         }
+    }
+}
+
+/// Say, for a binary carrying no built application, that it serves the
+/// placeholder page and how to serve the real one.
+pub(crate) fn say_if_placeholder(origin: &Origin) {
+    if *origin == Origin::Placeholder {
+        say(
+            "This binary carries no built application, so it serves a placeholder page: \
+             rebuild it with INFINITY_CUBE_BUILT_APPLICATION naming the directory `pnpm build` \
+             writes, or pass --built <dir>.",
+        );
     }
 }
 

@@ -79,6 +79,11 @@ impl Migrated {
         });
         migrated
     }
+
+    /// A migrated file holding the tracked fixture.
+    fn fixture() -> Self {
+        Self::seeded_from(&common::repository().join("packages/app/fixture"))
+    }
 }
 
 /// `serve --store sqlite` with `SQLITE_PATH` set to `path`, or unset for `None`.
@@ -198,7 +203,7 @@ mod given_a_file_seeded_with_the_fixture {
 
     #[test]
     fn serves_it_without_reseeding() {
-        let migrated = Migrated::seeded_from(&common::repository().join("packages/app/fixture"));
+        let migrated = Migrated::fixture();
         let started = serve_file(&migrated.file);
         let answer = get(started.port(), "/api/aggregate");
         assert_eq!(answer.status, 200, "the aggregate is read");
@@ -255,7 +260,7 @@ mod given_a_file_seeded_with_the_fixture {
 
     #[test]
     fn answers_421_to_a_request_naming_any_host_but_its_own() {
-        let migrated = Migrated::seeded_from(&common::repository().join("packages/app/fixture"));
+        let migrated = Migrated::fixture();
         let started = serve_file(&migrated.file);
         let port = started.port();
         for other in [
@@ -276,7 +281,7 @@ mod given_a_file_seeded_with_the_fixture {
 
     #[test]
     fn serves_the_built_application_built_names_around_the_api() {
-        let migrated = Migrated::seeded_from(&common::repository().join("packages/app/fixture"));
+        let migrated = Migrated::fixture();
         let built = tempfile::tempdir().unwrap();
         std::fs::write(built.path().join("index.html"), "<p>built page</p>").unwrap();
         let started = start_in(
@@ -296,14 +301,14 @@ mod given_a_file_seeded_with_the_fixture {
 
     #[test]
     fn takes_the_default_port_or_the_next_free_one_without_port() {
-        let migrated = Migrated::seeded_from(&common::repository().join("packages/app/fixture"));
+        let migrated = Migrated::fixture();
         let started = serve_file(&migrated.file);
         assert!(started.port() >= 4173, "from 4173 up: {}", started.port());
     }
 
     #[test]
     fn exits_zero_on_sigint_sigterm_or_sighup() {
-        let migrated = Migrated::seeded_from(&common::repository().join("packages/app/fixture"));
+        let migrated = Migrated::fixture();
         for signal in ["INT", "TERM", "HUP"] {
             let mut started = serve_file(&migrated.file);
             assert_eq!(get(started.port(), "/api/spaces").status, 200, "serving");
