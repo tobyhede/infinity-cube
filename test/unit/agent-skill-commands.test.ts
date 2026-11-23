@@ -91,6 +91,16 @@ describe('commands in the InfinityCube getting-started and authoring skills', ()
   });
 });
 
+describe('commands in the infinity-cube-desktop skill', () => {
+  it('names only root scripts the repository can run', () => {
+    const named = namedRootScripts(readSkill('infinity-cube-desktop'));
+    const availableScripts = new Set(Object.keys(rootPackage.scripts ?? {}));
+
+    expect(named).toContain('release:build');
+    expect(named.filter((script) => !availableScripts.has(script))).toEqual([]);
+  });
+});
+
 // `infinity-cube-authoring` is installed outside this repository too (Claude.ai,
 // a content repository, Codex), where a repository-relative link leads nowhere.
 describe('links in the infinity-cube-authoring skill', () => {

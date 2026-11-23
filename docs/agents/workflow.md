@@ -171,10 +171,10 @@ The plugin is published from this repository's marketplace, `infinity-cube`: `.c
 
 Tracking both paths is deliberate. An ordinary `git worktree add` populates only tracked files, so an ignored skill is missing from every worktree — and tracking just one of the two locations fixes just one of the two harnesses.
 
-There are four, and only one is vendored:
+The repository owns its contributor and authoring skills, with one vendored exception:
 
 - **`shadcn`** is vendored from `shadcn/ui` and pinned by `skills-lock.json`, which records its upstream path and the content hash of the files as they stand here. It is **patched locally**, so the hash is not upstream's.
-- **`shadcn-first-ui`**, **`infinity-cube-authoring`** and **`infinity-cube-getting-started`** are owned here. They are reviewed like any other repository document, and the lock does not pin them.
+- **`infinity-cube-desktop`**, **`shadcn-first-ui`**, **`infinity-cube-authoring`** and **`infinity-cube-getting-started`** are owned here. They are reviewed like any other repository document, and the lock does not pin them.
 
 ### The `shadcn` patch
 
