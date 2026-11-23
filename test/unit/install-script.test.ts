@@ -141,7 +141,7 @@ describe('release/install.sh', () => {
     expect(run.stdout).toContain(`Installed infinity-cube ${version} (test)`);
   });
 
-  it('skips a release whose tag is not a version, such as the desktop update endpoint', async () => {
+  it('skips a release whose tag is not a version', async () => {
     const root = await temporaryDirectory();
     const served = await fakeRelease(root, targets);
     const tools = join(root, 'tools');
@@ -152,7 +152,7 @@ describe('release/install.sh', () => {
       [
         'while [ $# -gt 0 ]; do case "$1" in -o) out="$2"; shift 2 ;; -*) shift ;; *) url="$1"; shift ;; esac; done',
         'case "$url" in',
-        `https://api.github.com/repos/owner/repo/releases*) printf '%s' '[{"tag_name":"desktop-updates","prerelease":true},{"tag_name":"v${version}","prerelease":true}]' > "$out" ;;`,
+        `https://api.github.com/repos/owner/repo/releases*) printf '%s' '[{"tag_name":"nightly","prerelease":true},{"tag_name":"v${version}","prerelease":true}]' > "$out" ;;`,
         `https://github.com/owner/repo/releases/download/v${version}/*) cp "${served}/\${url##*/}" "$out" ;;`,
         '*) exit 22 ;;',
         'esac',

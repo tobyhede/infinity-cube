@@ -77,11 +77,10 @@ fetch() {
 	curl --proto '=https,file' --proto-redir '=https' --tlsv1.2 -fsSL "$1" -o "$2"
 }
 
-# The tag of the newest published release whose tag is a version. /releases/latest
-# answers "the most recent non-prerelease, non-draft release", and every
-# preview build is a pre-release, so this reads the list instead, skipping the
-# `desktop-updates` release, which holds the desktop application's update
-# manifest and no build (.github/workflows/desktop-updates.yml). GitHub's docs
+# The tag of the newest published release whose tag is a version. It reads the
+# list rather than /releases/latest, which answers "the most recent
+# non-prerelease, non-draft release", so a release published as a pre-release
+# still installs; a release whose tag is not a version is skipped. GitHub's docs
 # state no order for the list; the first entry is taken as the newest. A
 # request without a token lists no draft: "Only users with push access will
 # receive listings for draft releases"
