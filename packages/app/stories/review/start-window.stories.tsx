@@ -23,9 +23,9 @@ const DEFAULT_FORM: NewSpaceForm = { name: 'Untitled Space', location: DOCUMENTS
 
 const RECENTS: readonly RecentSpace[] = [
   { id: 'q3', title: 'Quarterly review', folder: '~/Documents/Quarterly review' },
-  { id: 'arch', title: 'Platform architecture', folder: '~/Projects/platform/talks/architecture' },
+  { id: 'arch', title: 'Platform architecture', folder: '~/Projects/platform/decks/architecture' },
   { id: 'onboard', title: 'Onboarding walkthrough', folder: '~/Documents/Onboarding walkthrough' },
-  { id: 'notes', title: 'Talk notes', folder: '~/Desktop/Talk notes' },
+  { id: 'notes', title: 'Meeting notes', folder: '~/Desktop/Meeting notes' },
 ];
 
 const WITH_PROBLEMS: readonly RecentSpace[] = [
@@ -125,12 +125,12 @@ export const NewSpaceFolderNotEmpty: Story = () => (
       view={{
         screen: 'new',
         form: {
-          name: 'Talk notes',
+          name: 'Meeting notes',
           location: '~/Desktop',
           refusal: {
             of: 'folder',
             message:
-              'There are already files in ~/Desktop/Talk notes. Choose another name or location.',
+              'There are already files in ~/Desktop/Meeting notes. Choose another name or location.',
           },
         },
       }}
@@ -204,8 +204,8 @@ export const OpeningTheNewSpace: Story = () => (
 OpeningTheNewSpace.meta = { iframed: true };
 
 /** Folders the prototype treats as already holding files. */
-const NOT_EMPTY = new Set(['~/Desktop/Talk notes', '~/Documents/Quarterly review']);
-const LOCATIONS = [DOCUMENTS, '~/Desktop', '~/Projects/talks'];
+const NOT_EMPTY = new Set(['~/Desktop/Meeting notes', '~/Documents/Quarterly review']);
+const LOCATIONS = [DOCUMENTS, '~/Desktop', '~/Projects/decks'];
 
 /** Names the platforms refuse as a folder name (Windows' device names). */
 const RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/iu;
@@ -248,7 +248,7 @@ const firstFreeName = (location: string, taken: ReadonlySet<string>): string => 
 /**
  * Clickable: first launch → New Space → Create, ending on the opening state.
  * Browse… steps through a few locations in place of the platform's chooser;
- * "Talk notes" on the Desktop, or "Quarterly review" in Documents, is refused.
+ * "Meeting notes" on the Desktop, or "Quarterly review" in Documents, is refused.
  */
 export const ClickThrough: Story = () => {
   const [view, setView] = useState<StartWindowView>({ screen: 'start' });
