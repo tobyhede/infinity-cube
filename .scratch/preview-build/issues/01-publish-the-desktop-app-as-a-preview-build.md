@@ -21,3 +21,5 @@ Blocked by: testers' feedback on the CLI preview build
 - The desktop application has been run by hand on Linux only (Storage ST-121, ST-124); macOS has not been run.
 
 ## Comments
+
+**2026-11-23, the first preview release is published.** `v0.1.0-preview.1` (tag on `8c80439`) is published with the four CLI archives and the macOS Apple silicon `.dmg`, update bundle, signature and `latest.json` (rust-host issue 06 built the desktop half). `curl -fsSL https://raw.githubusercontent.com/tobyhede/infinity-cube/main/release/install.sh | sh` on Linux x86_64 installed it, `--version` named `0.1.0-preview.1 (8c80439…)`, and `init`, `check` and a `run` that served the Space and wrote on SIGINT all worked. The blocker, testers' feedback on the CLI build, can now be gathered.
