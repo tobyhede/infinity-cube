@@ -13,7 +13,7 @@
 - [ ] Closing the Start window with no Space window open ends the application on Linux and Windows and leaves it running with no window on macOS; while the Start window is open, closing the last Space window does not end it.
 - [ ] File › New Space… shows the form while Spaces are open; File › Open… still shows the platform's chooser.
 - [ ] Space windows still hold no IPC permission; the Start window's capability names only its label.
-- [ ] `cargo test --locked -j 2 -p infinity-cube-desktop -- launch new_space` passes with a case for each launch outcome; ST-131 and ST-121 updated to **built** with evidence, seen in a live webview on Linux (WebKitGTK) and, if run, macOS.
+- [ ] `cargo test --locked -j 2 -p infinity-cube-desktop -- launch new_space` passes with a case for each launch outcome; ST-121 updated, and ST-131 split so its Start window and New Space parts are marked **built** with evidence while reopening and Recent stay **not built** until 03, seen in a live webview on Linux (WebKitGTK) and, if run, macOS.
 
 ## Components (from the design audit of the review stories)
 

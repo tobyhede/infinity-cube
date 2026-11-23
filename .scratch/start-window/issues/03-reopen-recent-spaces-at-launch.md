@@ -4,7 +4,7 @@
 
 **Blocked by:** 02 (the Start window's recent entries).
 
-**What to build:** The shell keeps two things in its own data directory (ST-131), its only state across launches: the set to reopen, the Spaces open when its last quit began, including the one whose window's close began it; and Recent, the Spaces opened by any route, most recent first, ten at most, which the Start window lists. A launch naming no folder reopens each Space in the set still present, skipping one that is gone or does not open; if none opens, the Start window shows, with a skipped Space's reason on its Recent entry. A folder named on the command line opens alone and reopens nothing.
+**What to build:** The shell keeps two things in its own data directory (ST-131), the only state the shell itself keeps across launches: the set to reopen, the Spaces open when its last quit began, including the one whose window's close began it; and Recent, the Spaces opened by any route, most recent first, ten at most, which the Start window lists. A launch naming no folder reopens each Space in the set still present, skipping one that is gone or does not open; if none opens, the Start window shows, with a skipped Space's reason on its Recent entry. A folder named on the command line opens alone and reopens nothing.
 
 - [ ] Quit with two Spaces open, relaunch with no folder: both reopen, no Start window.
 - [ ] On Linux, close the only Space window (which quits), relaunch: that Space reopens.
