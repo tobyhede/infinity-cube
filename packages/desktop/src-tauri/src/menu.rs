@@ -1,4 +1,4 @@
-//! The application's menus (ADR 0167, Storage ST-121), laid out as data.
+//! The application's menus (ADRs 0167 and 0168, Storage ST-121), laid out as data.
 //!
 //! [`layout`] decides which menus each platform gets and what is in them; the
 //! shell draws that layout with Tauri's menu types and answers the
