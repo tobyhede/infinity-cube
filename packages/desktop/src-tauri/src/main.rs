@@ -272,10 +272,14 @@ fn draw_item(app: &AppHandle, item: menu::Item) -> tauri::Result<Box<dyn IsMenuI
     })
 }
 
+/// The line About describes InfinityCube with.
+const COMMENTS: &str = "Graph-native technical presentations";
+
 /// What About says: the version, the commit the release workflow built from
 /// (or that it is a local build), the licence and the website. macOS shows
 /// `Version <short_version> (<version>)`, so there the commit is the version;
-/// GTK and Windows show the version alone.
+/// GTK and Windows show the version alone. macOS shows neither comments,
+/// licence nor website, so there they are the credits instead.
 fn about(app: &AppHandle) -> AboutMetadata<'_> {
     let commit = option_env!("INFINITY_CUBE_COMMIT")
         .filter(|commit| !commit.is_empty())
@@ -290,10 +294,17 @@ fn about(app: &AppHandle) -> AboutMetadata<'_> {
         name: Some("InfinityCube".to_owned()),
         version: Some(version),
         short_version,
-        comments: Some("Graph-native technical presentations".to_owned()),
+        comments: Some(COMMENTS.to_owned()),
         license: Some(env!("CARGO_PKG_LICENSE").to_owned()),
         website: Some(menu::WEBSITE.to_owned()),
         website_label: Some("InfinityCube on GitHub".to_owned()),
+        credits: cfg!(target_os = "macos").then(|| {
+            format!(
+                "{COMMENTS}\nLicence: {}\n{}",
+                env!("CARGO_PKG_LICENSE"),
+                menu::WEBSITE
+            )
+        }),
         icon: app.default_window_icon().cloned(),
         ..AboutMetadata::default()
     }
