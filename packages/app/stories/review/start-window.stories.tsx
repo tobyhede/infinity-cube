@@ -225,11 +225,11 @@ const nameRefusal = (raw: string): string | null => {
   return null;
 };
 
-const refusalFor = (form: NewSpaceForm): NewSpaceForm['refusal'] => {
+const refusalFor = (form: NewSpaceForm, taken: ReadonlySet<string>): NewSpaceForm['refusal'] => {
   const message = nameRefusal(form.name);
   if (message !== null) return { of: 'name', message };
   const folder = newSpaceFolder(form);
-  if (NOT_EMPTY.has(folder))
+  if (taken.has(folder))
     return {
       of: 'folder',
       message: `There are already files in ${folder}. Choose another name or location.`,
@@ -290,7 +290,10 @@ export const ClickThrough: Story = () => {
         }
         onCancel={() => setView({ screen: 'start' })}
         onCreate={() => {
-          const refusal = refusalFor(form);
+          const refusal = refusalFor(
+            form,
+            new Set([...NOT_EMPTY, ...recents.map((recent) => recent.folder)]),
+          );
           if (refusal !== null) {
             setView({ screen: 'new', form: { ...form, refusal } });
             return;
