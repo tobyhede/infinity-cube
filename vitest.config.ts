@@ -120,7 +120,8 @@ export default defineConfig({
       // Source only. Tests, fixtures and config would otherwise inflate every
       // number and hide exactly the gaps this is here to show.
       include: ['packages/*/src/**/*.{ts,tsx}'],
-      reporter: ['text', 'html'],
+      // `json` writes `coverage/coverage-final.json`, which `pnpm crap:ts` scores.
+      reporter: ['text', 'html', 'json'],
       /*
        * Per-package, pinned at what already holds — a ratchet, not an ambition.
        *
