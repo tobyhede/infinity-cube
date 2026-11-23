@@ -21,10 +21,10 @@
 **States to show**, each in light and dark, at the window size the shell opens:
 
 - First launch: no recent Spaces, New Space the obvious action, Open Folder… beside it.
-- With recent Spaces: the list (each entry the Space's Title and its folder), most recent first, and how one is opened.
+- With recent Spaces: the history (each entry the Space's Title and its folder), most recent first, ten at most, and how one is opened; an entry already open in a window shown as open.
 - A recent Space that is gone, and one that did not open, each with its reason and Remove.
 - The New Space form: Name ("Untitled Space"), Location (Documents) with Browse…, Create and Cancel; the folder it will write shown before Create.
-- The New Space form refusing a folder that is not empty, the message beside the field.
+- The New Space form refusing a name that is not one folder name (for example `a/b`), and a folder that is not empty, each message beside its field.
 - File › New Space… chosen while Spaces are open: the Start window over or beside them.
 
 **Constraints:**
