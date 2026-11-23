@@ -2,7 +2,7 @@
 
 **Purpose:** the controls an author operates and the keys they press: what each control offers, how it commits and cancels, where focus goes and where an answer shows.
 
-**Snapshot:** checked against `f6e01b9` (2026-11-21); incorporates accepted ADRs through 0166, and ADRs 0167 and 0168 where UI-8 restates them. ADRs accepted after it bind where they differ, until this document is updated. Proposed ADRs 0138 (shortcuts) and 0163 are not incorporated; the shortcut rules here restate the code and the archived guide.
+**Snapshot:** checked against `f6e01b9` (2026-11-21); incorporates accepted ADRs through 0166, and ADRs 0167 and 0168 where UI-8 restates them; ADR 0170 owns no rule here until its design is accepted ([trace](trace/ui.md)), and is appended rather than reconciled, so the marker does not move. ADRs accepted after it bind where they differ, until this document is updated. Proposed ADRs 0138 (shortcuts) and 0163 are not incorporated; the shortcut rules here restate the code and the archived guide.
 
 Conflicts, open and closed, are listed in [conflicts/ui.md](conflicts/ui.md). Sources are traced in [trace/ui.md](trace/ui.md).
 

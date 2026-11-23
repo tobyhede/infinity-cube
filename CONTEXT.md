@@ -24,7 +24,7 @@ A window the desktop application opens on an Aggregate directory, showing its Sp
 _Avoid_: talk window, Aggregate window.
 
 **Start window**:
-The desktop application's window for creating a new Space, opening a folder, or reopening a recent Space, shown when no Space window is open or when a new Space is asked for.
+The desktop application's window for creating a new Space, opening a folder, or reopening a recent Space, shown at launch when nothing else opens, and when a new Space is asked for.
 _Avoid_: home window, launcher, welcome window.
 
 **Space snapshot**:

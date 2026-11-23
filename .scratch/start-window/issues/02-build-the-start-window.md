@@ -8,6 +8,7 @@
 
 - [ ] A launch naming no folder, with no recent Space, shows the Start window and no folder chooser.
 - [ ] New Space with the defaults writes `~/Documents/Untitled Space`, which `pnpm cube check` accepts, its Meta Space titled "Untitled Space", and opens it; the Start window closes.
+- [ ] With `~/Documents/Untitled Space` already a Space, New Space's default name is `Untitled Space 2`, and accepting it writes and opens that.
 - [ ] New Space refuses beside the field, writing nothing, a folder that is not empty and a name that is empty, `.`, `..`, holds `/` or `\`, or that the platform forbids (decided by a pure function with a case for each).
 - [ ] Closing the Start window with no Space window open ends the application on Linux and Windows and leaves it running with no window on macOS; while the Start window is open, closing the last Space window does not end it.
 - [ ] File › New Space… shows the form while Spaces are open; File › Open… still shows the platform's chooser.
