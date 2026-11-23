@@ -4,7 +4,7 @@
 
 **Blocked by:** nothing.
 
-**What to build:** A spike that answers one question and records the answer, so 02 can be built. ADR 0171 says the Start window is product UI from `@project/ui` (React). Today the shell serves only plain HTML of its own from `frontendDist` (`packages/desktop/ui`, the close question), `packages/desktop` may import no package of ours (the `eslint.config.js` zone), and the infinitycube scheme answers only an Aggregate's own windows (ST-121). The Start window has no Aggregate.
+**What to build:** A spike that answers one question and records the answer, so 02 can be built. ADR 0171 says the Start window is product UI from `@project/ui` (React). Today the shell serves only plain HTML of its own from `frontendDist` (`packages/desktop/ui`, the close question), and the infinitycube scheme answers only an Aggregate's own windows (ST-121). The Start window has no Aggregate, so the open question is how it is served. The `eslint.config.js` zone that keeps `packages/desktop` from importing `@project/*` is not in the way of a page built in `packages/app`; it only rules out writing the page inside `packages/desktop`.
 
 Find and prove one way to build a React page from `@project/ui` and serve it to a window the shell opens with no Aggregate, under the shell's CSP (`script-src 'self'`). Candidates to weigh, not a list to pick from blindly:
 
@@ -14,7 +14,7 @@ Find and prove one way to build a React page from `@project/ui` and serve it to 
 The answer keeps Space windows holding no IPC permission and gives the Start window's capability its label alone.
 
 - [ ] A throwaway Start window showing one `@project/ui` `Button` that calls one invoke command, seen in a live webview on Linux (WebKitGTK), on a branch.
-- [ ] The answer recorded: a short ADR if it changes a boundary (the desktop lint zone, `frontendDist`, the scheme, or what `pnpm --filter @project/desktop tauri build` builds first), otherwise a comment here; and 02's "What to build" updated to name it.
+- [ ] The answer recorded: a short ADR if it changes a boundary (`frontendDist`, the scheme, or what `pnpm --filter @project/desktop tauri build` builds first), otherwise a comment here; and 02's "What to build" updated to name it.
 - [ ] `pnpm release:build --desktop` and the `rust` CI job still find what they bundle.
 
 ## Comments
