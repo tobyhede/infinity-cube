@@ -17,13 +17,12 @@ use std::path::Path;
 use intake::json::JsonValue;
 use intake::{AGGREGATE_FILE_NAME, AggregateFiles, Refusals, import_aggregate};
 
-use crate::repository::AggregateInput;
-
 use crate::directory::{Filesystem, holds_nothing};
 use crate::export::{ExportError, export_aggregate};
 use crate::import::{IdSource, ImportError, import_files};
 use crate::json_text::compact;
 use crate::memory::MemorySpaceRepository;
+use crate::repository::AggregateInput;
 
 /// The asset an empty Markdown Resource's text is: the SHA-256 of no bytes,
 /// as `newEmptyResourceDocument` names it.

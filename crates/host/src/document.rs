@@ -182,14 +182,16 @@ pub(crate) fn resource_file(resource: &Resource) -> JsonValue {
 fn wire_resource(resource: &Resource) -> JsonValue {
     object([
         ("id", Some(string(resource.id.as_str()))),
-        (
-            "document",
-            Some(object([
-                ("title", Some(string(&resource.title))),
-                ("kind", Some(string(resource.kind.as_str()))),
-                ("content", Some(content(resource, Order::Wire))),
-            ])),
-        ),
+        ("document", Some(wire_resource_document(resource))),
+    ])
+}
+
+/// A Resource's document as a snapshot carries it: `{ title, kind, content }`.
+pub(crate) fn wire_resource_document(resource: &Resource) -> JsonValue {
+    object([
+        ("title", Some(string(&resource.title))),
+        ("kind", Some(string(resource.kind.as_str()))),
+        ("content", Some(content(resource, Order::Wire))),
     ])
 }
 
@@ -299,12 +301,17 @@ pub(crate) fn space_file(snapshot: &SpaceSnapshot) -> JsonValue {
     space_document(snapshot, Order::Export)
 }
 
+/// The space document as a snapshot carries it, with no `id`.
+pub(crate) fn wire_space_document(snapshot: &SpaceSnapshot) -> JsonValue {
+    space_document(snapshot, Order::Wire)
+}
+
 /// The snapshot the HTTP application answers and a commit carries:
 /// `{ id, document, resources: [{ id, document }] }`.
 pub(crate) fn wire_snapshot(snapshot: &SpaceSnapshot) -> JsonValue {
     object([
         ("id", Some(string(snapshot.id.as_str()))),
-        ("document", Some(space_document(snapshot, Order::Wire))),
+        ("document", Some(wire_space_document(snapshot))),
         (
             "resources",
             Some(JsonValue::Array(

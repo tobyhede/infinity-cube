@@ -6,7 +6,7 @@
 use intake::json::{JsonObject, JsonValue, parse};
 use intake::{SpaceId, SpaceSnapshot, decode_space_snapshot, load_space};
 
-use crate::document::wire_snapshot;
+use crate::document::{wire_resource_document, wire_space_document};
 use crate::json_text::compact;
 use crate::repository::{LoadedSpace, Revision};
 
@@ -44,39 +44,26 @@ fn decode_revision(text: &str) -> Option<Revision> {
 }
 
 /// A Space as its rows: the space row, and one row per Resource in the
-/// snapshot's order; or, when its wire form lacks a member it always has, why
-/// not, so a defect fails the write rather than storing a row the decoder
-/// refuses.
-pub(crate) fn encode_space(space: &LoadedSpace) -> Result<(SpaceRow, Vec<ResourceRow>), String> {
-    let wire = wire_snapshot(&space.snapshot);
-    let id = space.snapshot.id.as_str().to_owned();
-    let missing = |what: &str| format!("Space {id}'s wire form has no {what}");
-    let field = |value: &JsonValue, key: &str| value.as_object().and_then(|o| o.get(key)).cloned();
-    let document = field(&wire, "document").ok_or_else(|| missing("document"))?;
-    let Some(JsonValue::Array(resources)) = field(&wire, "resources") else {
-        return Err(missing("Resource list"));
-    };
-    let resources = resources
+/// snapshot's order, each document as the snapshot carries it.
+pub(crate) fn encode_space(space: &LoadedSpace) -> (SpaceRow, Vec<ResourceRow>) {
+    let id = space.snapshot.id.as_str();
+    let resources = space
+        .snapshot
+        .resources
         .iter()
-        .map(|resource| {
-            Ok(ResourceRow {
-                id: field(resource, "id")
-                    .and_then(|value| value.as_str().map(str::to_owned))
-                    .ok_or_else(|| missing("Resource id"))?,
-                space_id: id.clone(),
-                document: compact(
-                    &field(resource, "document").ok_or_else(|| missing("Resource document"))?,
-                ),
-            })
+        .map(|resource| ResourceRow {
+            id: resource.id.as_str().to_owned(),
+            space_id: id.to_owned(),
+            document: compact(&wire_resource_document(resource)),
         })
-        .collect::<Result<Vec<_>, String>>()?;
+        .collect();
     let row = SpaceRow {
-        id: id.clone(),
-        document: compact(&document),
+        id: id.to_owned(),
+        document: compact(&wire_space_document(&space.snapshot)),
         revision: encode_revision(space.revision),
         exported_revision: space.exported_revision.map(encode_revision),
     };
-    Ok((row, resources))
+    (row, resources)
 }
 
 /// Whether two stored documents hold the same JSON, an object's keys in any

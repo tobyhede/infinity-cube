@@ -162,12 +162,10 @@ pub struct SqlSpaceRepository<S> {
     serial: tokio::sync::Mutex<()>,
 }
 
-/// Why an operation failed: the database, rows that cannot be read, or rows
-/// this build cannot write.
+/// Why an operation failed: the database, or rows that cannot be read.
 enum Failure {
     Database(sqlx::Error),
     Broken(String),
-    Defect(String),
 }
 
 impl From<sqlx::Error> for Failure {
@@ -207,7 +205,6 @@ impl<S> SqlSpaceRepository<S> {
         operation.await.map_err(|failure| match failure {
             Failure::Database(error) => S::classify(&error),
             Failure::Broken(message) => RepositoryError::BrokenStoredState(message),
-            Failure::Defect(message) => RepositoryError::Unclassified(message),
         })
     }
 }
@@ -286,7 +283,7 @@ async fn authoritative<S: SqlStore>(
 
 /// Write `space` into a store that holds none of its rows.
 async fn insert<S: SqlStore>(connection: &mut Connection<S>, space: &LoadedSpace) -> Outcome<()> {
-    let (row, resources) = encode_space(space).map_err(Failure::Defect)?;
+    let (row, resources) = encode_space(space);
     S::write_space(connection, &row).await?;
     for resource in &resources {
         S::insert_resource(connection, resource).await?;
@@ -310,11 +307,7 @@ async fn write_changes<S: SqlStore>(
     for id in deleted {
         S::delete_space(connection, id.as_str()).await?;
     }
-    let encoded = written
-        .iter()
-        .map(encode_space)
-        .collect::<Result<Vec<_>, String>>()
-        .map_err(Failure::Defect)?;
+    let encoded: Vec<_> = written.iter().map(encode_space).collect();
     for (row, resources) in &encoded {
         let keep: Vec<&str> = resources
             .iter()
@@ -537,8 +530,8 @@ impl<S: SqlStore> SpaceRepository for SqlSpaceRepository<S> {
         self.alone(async {
             let mut transaction = self.store.begin_write().await?;
             let meta_space_id = stored_meta_space_id::<S>(&mut transaction).await?;
-            // Rows are counted, not read: replacement replaces stored state
-            // whether or not it parses (ADR 0094).
+            // Rows are read raw, not decoded: replacement replaces stored
+            // state whether or not it parses (ADR 0094).
             let stored = S::spaces(&mut transaction).await?;
             let answer = if meta_space_id.is_none() && stored.is_empty() {
                 ReplaceResult::Uninitialized
