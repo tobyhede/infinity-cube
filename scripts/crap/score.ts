@@ -90,15 +90,47 @@ const BRANCHING_KINDS = new Set([
 ]);
 
 /**
+ * Whether `node` is the target of a destructuring assignment, or an element
+ * nested in one: `[a, b]` in `[a, b] = pair`, or in `for ([a, b] of pairs)`.
+ */
+const isAssignmentTarget = (node: ts.Node): boolean => {
+  const parent = node.parent;
+  if (ts.isBinaryExpression(parent))
+    return parent.left === node && parent.operatorToken.kind === ts.SyntaxKind.EqualsToken;
+  if (ts.isForOfStatement(parent) || ts.isForInStatement(parent))
+    return parent.initializer === node;
+  if (ts.isArrayLiteralExpression(parent) || ts.isSpreadElement(parent))
+    return isAssignmentTarget(parent);
+  if (ts.isPropertyAssignment(parent) || ts.isSpreadAssignment(parent))
+    return isAssignmentTarget(parent.parent);
+  return false;
+};
+
+/**
+ * `a = 1` in `[a = 1] = xs` or `({ k: a = 1 } = o)`: a default in a
+ * destructuring assignment, where the parser writes an assignment expression
+ * rather than an initializer. A plain assignment is not a default.
+ */
+const isDefaultInAssignmentTarget = (node: ts.Node): boolean => {
+  if (!ts.isBinaryExpression(node) || node.operatorToken.kind !== ts.SyntaxKind.EqualsToken)
+    return false;
+  const parent = node.parent;
+  if (ts.isArrayLiteralExpression(parent)) return isAssignmentTarget(parent);
+  return ts.isPropertyAssignment(parent) && isAssignmentTarget(parent.parent);
+};
+
+/**
  * Whether a node adds a path through the function that holds it: the decision
  * points ESLint's `complexity` rule counts. Only the node itself is judged;
  * its children are visited separately.
  */
 const isDecisionPoint = (node: ts.Node): boolean => {
   if (BRANCHING_KINDS.has(node.kind)) return true;
-  if (ts.isBinaryExpression(node)) return LOGICAL_OPERATORS.has(node.operatorToken.kind);
   // A default value is a branch: the caller passed one or did not.
   if (ts.isParameter(node) || ts.isBindingElement(node)) return node.initializer !== undefined;
+  if (ts.isShorthandPropertyAssignment(node)) return node.objectAssignmentInitializer !== undefined;
+  if (isDefaultInAssignmentTarget(node)) return true;
+  if (ts.isBinaryExpression(node)) return LOGICAL_OPERATORS.has(node.operatorToken.kind);
   // `a?.b`, `a?.[k]` and `f?.()`: each `?.` short-circuits or does not.
   return (
     (ts.isPropertyAccessExpression(node) ||
@@ -116,6 +148,14 @@ const isFunctionLike = (node: ts.Node): node is ts.FunctionLikeDeclaration =>
   ts.isConstructorDeclaration(node) ||
   ts.isGetAccessorDeclaration(node) ||
   ts.isSetAccessorDeclaration(node);
+
+const childrenOf = (node: ts.Node): readonly ts.Node[] => {
+  const children: ts.Node[] = [];
+  ts.forEachChild(node, (child) => {
+    children.push(child);
+  });
+  return children;
+};
 
 const nameText = (name: ts.PropertyName | ts.BindingName, source: ts.SourceFile): string =>
   ts.isIdentifier(name) || ts.isPrivateIdentifier(name) || ts.isStringLiteral(name)
@@ -167,7 +207,9 @@ const functionName = (node: ts.FunctionLikeDeclaration, source: ts.SourceFile): 
 
 /**
  * Every function in a source file with its own complexity. A nested function
- * is its own entry, and its decision points count toward it alone.
+ * is its own entry, and its decision points count toward it alone. A class
+ * static block and a field initializer are entries of their own too, as
+ * ESLint scores them: each runs apart from the code around it.
  */
 export const functionComplexities = (
   fileName: string,
@@ -178,36 +220,50 @@ export const functionComplexities = (
   const lineOf = (position: number): number =>
     source.getLineAndCharacterOfPosition(position).line + 1;
 
-  // Counts `root`'s own decision points, recording each function inside it as
-  // an entry of its own rather than counting into it.
-  const countWithin = (root: ts.Node): number => {
+  // Counts the decision points under `roots`, recording each function, static
+  // block and field initializer among them as an entry of its own rather than
+  // counting into it.
+  const countWithin = (roots: readonly ts.Node[]): number => {
     let count = 1;
     const visit = (node: ts.Node): void => {
-      if (node !== root && isFunctionLike(node)) {
-        record(node);
+      if (isFunctionLike(node)) {
+        // An overload signature or abstract member declares no body to run.
+        if (node.body !== undefined) record(functionName(node, source), node, childrenOf(node));
         return;
       }
-      if (node !== root && isDecisionPoint(node)) count += 1;
+      if (ts.isClassStaticBlockDeclaration(node)) {
+        record(qualified('<static block>', node, source), node, [node.body]);
+        return;
+      }
+      // A field holding a function is that function, named for the field.
+      if (
+        ts.isPropertyDeclaration(node) &&
+        node.initializer !== undefined &&
+        !isFunctionLike(node.initializer)
+      ) {
+        const name = qualified(`<${nameText(node.name, source)} initializer>`, node, source);
+        record(name, node.initializer, [node.initializer]);
+        return;
+      }
+      if (isDecisionPoint(node)) count += 1;
       ts.forEachChild(node, visit);
     };
-    ts.forEachChild(root, visit);
+    roots.forEach(visit);
     return count;
   };
 
-  const record = (node: ts.FunctionLikeDeclaration): void => {
-    // An overload signature or abstract member declares no body to run.
-    if (node.body === undefined) return;
+  const record = (name: string, node: ts.Node, roots: readonly ts.Node[]): void => {
     const start = source.getLineAndCharacterOfPosition(node.getStart(source));
     found.push({
-      name: functionName(node, source),
+      name,
       startLine: start.line + 1,
       startColumn: start.character,
       endLine: lineOf(node.getEnd()),
-      complexity: countWithin(node),
+      complexity: countWithin(roots),
     });
   };
 
-  countWithin(source);
+  countWithin(childrenOf(source));
   return found.sort((a, b) => a.startLine - b.startLine);
 };
 

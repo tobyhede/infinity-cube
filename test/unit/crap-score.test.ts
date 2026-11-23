@@ -83,6 +83,38 @@ describe('functionComplexities', () => {
     ]);
   });
 
+  it('counts a default in a destructuring assignment, and not a plain assignment', () => {
+    const source = `
+      function unpack(o: { a?: number; b?: number }, xs: number[], k: number) {
+        let a = 0, b = 0, c = 0, d = 0;
+        ({ a = 1, b: b = 2 } = o);
+        [c = 3, d] = xs;
+        for ([d = 4] of [xs]) {}
+        k = 5;
+        const ys = [(c = 6)];
+        return a + b + c + d + k + ys.length;
+      }`;
+    // 1 + three defaults + for-of + a fourth default
+    expect(complexityOf(source).get('unpack')).toBe(6);
+  });
+
+  it('scores a static block and a field initializer apart from the code around them', () => {
+    const source = `
+      function make(flag: boolean) {
+        if (flag) return null;
+        return class Box {
+          size = flag ? 1 : 2;
+          onOpen = () => (flag ? 3 : 4);
+          static { if (flag) {} }
+        };
+      }`;
+    const found = complexityOf(source);
+    expect(found.get('make')).toBe(2);
+    expect(found.get('Box.<size initializer>')).toBe(2);
+    expect(found.get('onOpen')).toBe(2);
+    expect(found.get('Box.<static block>')).toBe(2);
+  });
+
   it('skips an overload signature, which has no body', () => {
     const source = `
       function pick(a: string): string;
