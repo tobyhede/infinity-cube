@@ -2,7 +2,7 @@
 
 **Purpose:** the controls an author operates and the keys they press: what each control offers, how it commits and cancels, where focus goes and where an answer shows.
 
-**Snapshot:** checked against `f6e01b9` (2026-11-21); incorporates accepted ADRs through 0166, and ADRs 0167 and 0168 where UI-8 restates them; ADR 0171 owns no rule here until its design is accepted ([trace](trace/ui.md)), and is appended rather than reconciled, so the marker does not move. ADRs accepted after it bind where they differ, until this document is updated. Proposed ADRs 0138 (shortcuts) and 0163 are not incorporated; the shortcut rules here restate the code and the archived guide.
+**Snapshot:** checked against `f6e01b9` (2026-11-21); incorporates accepted ADRs through 0166, and ADRs 0167 and 0168 where UI-8 restates them; ADR 0171 is restated by UI-111, from its accepted design, as **not built** ([trace](trace/ui.md)), and is appended rather than reconciled, so the marker does not move. ADRs accepted after it bind where they differ, until this document is updated. Proposed ADRs 0138 (shortcuts) and 0163 are not incorporated; the shortcut rules here restate the code and the archived guide.
 
 Conflicts, open and closed, are listed in [conflicts/ui.md](conflicts/ui.md). Sources are traced in [trace/ui.md](trace/ui.md).
 
@@ -50,6 +50,7 @@ Conflicts, open and closed, are listed in [conflicts/ui.md](conflicts/ui.md). So
 | Delete question | dialog | Delete | Cancel, Escape | UI-83–UI-85 |
 | Notice | top end of the canvas | — | dismiss, next press | UI-42, UI-90, UI-94 |
 | Persistence report | beside the Dock; dialogs | Retry, a dialog's choice | — | UI-93, UI-97, UI-98, UI-100 |
+| Start window (desktop) | its own window | New Space, Open Folder…, a Recent entry; Create Space | Cancel, Escape | UI-111 (**not built**) |
 
 ## Foundation
 
@@ -271,8 +272,13 @@ Conflicts, open and closed, are listed in [conflicts/ui.md](conflicts/ui.md). So
 
 - **UI-99** Wherever a sentence quotes a Title, it uses the short Title: the first Title Line, plus "…" when more lines follow. This covers questions, notices, and Edge labels and their accessible names. Controls, list rows and chrome use the first line alone (Effects "Names"). *Why:* a part of the Title must never read as the whole of it. Sources: ADR 0083, ADR 0151. **bug: code differs**: three notices quote the bare name: "X could not be entered", "… exited" and "… opened" (`app/src/resource-rail-actions.tsx` `subject: titleName(…)`, `app/src/command-outcomes.ts` `space-enter`, `space-exit`, `space-open`); the `resource-has-references` refusal (`graph/src/snapshot-edits.ts` `referenceTitles`, `app/src/authoring-refusal.ts`); and the drawn-Space failure notice "Title: message" (`app/src/use-embedded-open-space-resources.ts` `failedEmbeddings`). Built where the short Title is used (`core/src/title.ts` `shortTitle`): the Delete Resource, Delete Graph and Delete Map questions (`app/src/resource-deletion.ts`, `app/src/graph-authoring-commands.ts`, `app/src/map-authoring-commands.ts`) and the Edge label and its name (`app/src/edge-authoring.ts`, `app/src/edge-authoring-react.tsx`): `app/test/DeleteResourceConfirmation.test.tsx` › "names a Resource whose Title spans several lines by its first line and an ellipsis"; `app/test/resource-rail-actions.test.tsx` › "names the Resource in the question by its short Title and not by its whole Title".
 
+## Start window
+
+- **UI-111** The desktop application's Start window (ST-131) has two screens, drawn from `@project/ui` in the application's tokens and colour schemes. The start screen puts the product's name, one line saying what it is for, New Space (the default button, so the obvious action) and Open Folder… (secondary) in a fixed column at the start edge, and Recent Spaces beside it. Recent lists each entry's Title over its folder, most recent first, and selecting one opens it; an entry open in a window carries an Open badge and its name says choosing it shows that window. An entry that is gone or did not open shows its Title muted, its reason beside an alert mark, Remove, and Try again for one that did not open. With no recent Space the list is an empty state saying Spaces made or opened will be listed there. New Space replaces the start screen with the New Space form, also what File › New Space… opens, with Name (focused and selected) and Location (read-only, with Browse…), a line under Location naming the folder Create Space will make, and Cancel and Create Space, Create Space the default; Escape is Cancel. A refusal shows beside Name and describes it, as a refused Title's reason does (UI-50); while the name is refused the folder line asks for a name instead of naming a folder. After Create Space the window shows one status, Opening the Space's Title, until the Space's window opens (UI-92). *Why:* the window a person who downloads the application sees first is designed before it is built, and seeing the name and the folder before anything is written keeps a mistyped path from becoming a Space unasked (ADR 0124). Sources: ADR 0171, the accepted design (`packages/app/stories/review/start-window.stories.tsx`). **not built**.
+
 ## Open questions
 
+- **The Start window's details.** Whether gone and failed Recent entries keep muted titles; the window's native title; whether a minimum window size or stacked columns answers 200% zoom; whether Remove, Try again and Browse… grow from about 28px for touch (UI-111).
 - **Entering a Resource's toolbar.** Which key moves from a selected Resource into its toolbar (UI-18)? Space reads a focused Resource in Full View (UI-105), and Enter is now bound to nothing on the canvas (UI-10).
 
 ## Bugs

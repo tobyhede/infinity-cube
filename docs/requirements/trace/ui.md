@@ -465,4 +465,4 @@ The snapshot marker moved from `a0f5066` to `f6e01b9`; the highest accepted ADR 
 |---|---|
 | 0165 | reviewed, no rule here: Prisma Next and `sqlx` apply one schema history in two encodings, held equal by tests; restated in ST-125 |
 | Code since `a0f5066`: PR 506 (the plain-SQL migrations under `migrations-sql/` and their tests) and PR 502 (the README's Running and SQLite sections, the `infinity-cube` plugin skills, and Storage ST-126–ST-128) | no behaviour this doc states |
-| 0171 the desktop application's Start window | owns no UI rule yet: its layout and controls wait on the design in `.scratch/start-window/issues/01-design-the-start-window.md`; its behaviour → ST-131 (**not built**) |
+| 0171 the desktop application's Start window | → UI-111 (**not built**), its layout and controls from the design accepted in `.scratch/start-window/issues/01-design-the-start-window.md`; its open details → Open questions; its behaviour → ST-131 (**not built**) |

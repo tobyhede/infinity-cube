@@ -1,6 +1,6 @@
 # 01 — Design the Start window
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Blocked by:** nothing.
 
@@ -33,8 +33,8 @@
 - Uses the application's tokens and colour schemes, so it reads as the same product as a Space window.
 - Native menus are not part of the design; they stay as ADRs 0167 and 0168 decide.
 
-- [ ] A review story for every state above, in `packages/app/stories/review/`, and their light and dark screenshots published on a canvas for review.
-- [ ] A clickable prototype of the first-launch → New Space → Space flow, as an interactive review story.
-- [ ] The user has accepted the design; its decisions on layout and controls are added to UI as a rule (the UI trace's 0171 row says none exists until then).
+- [x] A review story for every state above, in `packages/app/stories/review/`, and their light and dark screenshots published on a canvas for review.
+- [x] A clickable prototype of the first-launch → New Space → Space flow, as an interactive review story.
+- [x] The user has accepted the design; its decisions on layout and controls are added to UI as a rule (UI-111).
 
 ## Comments
