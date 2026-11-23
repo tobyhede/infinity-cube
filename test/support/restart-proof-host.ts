@@ -1,4 +1,5 @@
 import {
+  DIRECTORY_PLACEHOLDER,
   startHost,
   STORE_BACKED_LAUNCH,
   type HostCommand,
@@ -28,15 +29,12 @@ export const RESTART_PROOF_HOST_VARIABLE = 'INFINITY_CUBE_RESTART_PROOF_HOST';
 export type RestartProofHost =
   { readonly kind: 'vite' } | { readonly kind: 'command'; readonly command: HostCommand };
 
-/** A placeholder of the conformance suite's other than `{port}`, which a store-backed host has no value for. */
-const UNFILLED_PLACEHOLDER = /\{(directory|built)\}/;
-
 // The conformance suite's command schema, less the two keys this proof fixes:
 // a key copied from the suite's description (`stopsOnStdinClose`, `keepsLock`)
 // fails rather than being read as doing something here.
 const commandSchema = hostCommandSchema
   .omit({ stopsOnStdinClose: true, keepsLock: true })
-  .refine((command) => !command.argv.some((argument) => UNFILLED_PLACEHOLDER.test(argument)), {
+  .refine((command) => !command.argv.some((argument) => DIRECTORY_PLACEHOLDER.test(argument)), {
     message: 'A restart proof host command takes only {port}: it runs no directory or build',
     path: ['argv'],
   });

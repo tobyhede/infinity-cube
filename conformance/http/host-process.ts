@@ -234,7 +234,8 @@ export interface HostLaunch {
 export const STORE_BACKED_LAUNCH = { kind: 'store-backed' } as const;
 export type StoreBackedLaunch = typeof STORE_BACKED_LAUNCH;
 
-const DIRECTORY_PLACEHOLDER = /\{(directory|built)\}/;
+/** A placeholder a store-backed launch has no value for. */
+export const DIRECTORY_PLACEHOLDER = /\{(directory|built)\}/;
 
 export interface HostStartOptions {
   /**
