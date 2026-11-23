@@ -23,6 +23,10 @@ _Avoid_: talk, catalog, tree, bundle, collection; aggregate for a single Space; 
 A window the desktop application opens on an Aggregate directory, showing its Spaces.
 _Avoid_: talk window, Aggregate window.
 
+**Start window**:
+The desktop application's window for creating a new Space, opening a folder, or reopening a recent Space, shown when no Space window is open or when a new Space is asked for.
+_Avoid_: home window, launcher, welcome window.
+
 **Space snapshot**:
 The complete, fully identified form of one Space.
 _Avoid_: aggregate.
