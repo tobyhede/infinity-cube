@@ -116,6 +116,14 @@ describe('functionComplexities', () => {
     expect(found.get('Box.<static block>')).toBe(2);
   });
 
+  it('counts a computed field name toward the code that defines the class', () => {
+    const source = `
+      function make(flag: boolean) {
+        return class { [flag ? 'a' : 'b'] = flag ? 1 : 2; };
+      }`;
+    expect(complexityOf(source).get('make')).toBe(2);
+  });
+
   it('skips an overload signature, which has no body', () => {
     const source = `
       function pick(a: string): string;
@@ -254,10 +262,12 @@ describe('.cargo-crap.toml', () => {
     const allowList = /^allow = \[([\s\S]*?)^\]/m.exec(
       readFileSync('.cargo-crap.toml', 'utf8'),
     )?.[1];
-    const bare = [...(allowList ?? '').matchAll(/^\s*"([^"]+)",/gm)]
+    if (allowList === undefined) throw new Error('.cargo-crap.toml has no allow list');
+    // Every quoted entry, with or without a trailing comma, once comments are gone.
+    const bare = [...allowList.replace(/#.*$/gm, '').matchAll(/"([^"]*)"/g)]
       .map(([, name]) => name ?? '')
       .filter((name) => !name.includes('::'));
-    expect(bare).not.toEqual([]);
+    for (const name of bare) expect(name, 'a Rust identifier').toMatch(/^\w+$/);
     const sources = execFileSync(
       'git',
       ['ls-files', '-z', 'crates/intake/src', 'crates/host/src', 'crates/cli/src'],
@@ -265,7 +275,8 @@ describe('.cargo-crap.toml', () => {
     )
       .split('\0')
       .filter((file) => file.endsWith('.rs') && !file.endsWith('/tests.rs'))
-      .map((file) => readFileSync(file, 'utf8'));
+      // A comment quoting a declaration is not one.
+      .map((file) => readFileSync(file, 'utf8').replace(/\/\/.*$/gm, ''));
     for (const name of bare) {
       const definition = new RegExp(`\\bfn ${name}\\b`, 'g');
       const count = sources.reduce((sum, text) => sum + (text.match(definition)?.length ?? 0), 0);

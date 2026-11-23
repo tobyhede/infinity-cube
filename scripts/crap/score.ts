@@ -243,6 +243,8 @@ export const functionComplexities = (
       ) {
         const name = qualified(`<${nameText(node.name, source)} initializer>`, node, source);
         record(name, node.initializer, [node.initializer]);
+        // A computed name runs when the class is defined, in the code around it.
+        if (ts.isComputedPropertyName(node.name)) visit(node.name);
         return;
       }
       if (isDecisionPoint(node)) count += 1;
