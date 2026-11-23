@@ -196,7 +196,9 @@ if [ "$desktop" = 1 ]; then
 	else
 		say "TAURI_SIGNING_PRIVATE_KEY is not set, so no signed update is made"
 	fi
-	CARGO_TARGET_DIR="$target_dir" pnpm --filter @project/desktop exec tauri build "$@"
+	# About names the commit, as the binary's `--version` does.
+	CARGO_TARGET_DIR="$target_dir" INFINITY_CUBE_COMMIT="$commit" \
+		pnpm --filter @project/desktop exec tauri build "$@"
 	bundle="$target_dir/$target/release/bundle"
 	app="$bundle/macos/InfinityCube.app"
 	[ -d "$app" ] || fail "tauri build made no $app"

@@ -12,13 +12,16 @@
 //! Aggregate's window stops its run, which writes any edit not yet on disk first,
 //! and says so in a dialog if that write failed. A write still running ten
 //! seconds after a close, or a quit, asks whether to keep waiting
-//! ([`waiting`], [`question`]).
+//! ([`waiting`], [`question`]). The menus follow each platform's
+//! conventions ([`menu`]), and Help opens InfinityCube's pages in the system
+//! browser, never in a window of the shell's.
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod address;
 mod aggregates;
 mod launch;
+mod menu;
 mod new_space;
 mod not_opened;
 mod question;
@@ -38,7 +41,8 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::thread;
 
 use host::{RandomIds, TokioFilesystem};
-use tauri::menu::{IsMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
+use menu::{Command, Platform, Predefined};
+use tauri::menu::{AboutMetadata, IsMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::webview::NewWindowResponse;
 use tauri::{
     AppHandle, Manager, RunEvent, UriSchemeContext, UriSchemeResponder, WebviewUrl,
@@ -47,6 +51,7 @@ use tauri::{
 use tauri_plugin_dialog::{
     DialogExt, MessageDialogBuilder, MessageDialogButtons, MessageDialogKind,
 };
+use tauri_plugin_opener::OpenerExt;
 use tokio::sync::mpsc::{self, UnboundedSender};
 use url::Url;
 
@@ -203,85 +208,142 @@ fn answer_closing(window: tauri::WebviewWindow, choice: String) {
     }
 }
 
-/// The application's menu. File › New Space… asks for a folder to write a
-/// new Space to and opens it, and File › Open… asks for a folder to open. Its Quit
-/// asks the application to exit, so a quit waits for each Aggregate's last
-/// write and may ask (the predefined Quit ends the process without asking
-/// the application). On macOS the menu also carries the application, Edit
-/// and Window menus a Mac application has, Edit being what gives a webview
-/// Cut, Copy and Paste there.
-fn app_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
-    let new = MenuItem::with_id(app, NEW_MENU_ITEM, "New Space…", true, Some("CmdOrCtrl+N"))?;
-    let open = MenuItem::with_id(app, OPEN_MENU_ITEM, "Open…", true, Some("CmdOrCtrl+O"))?;
-    let quit = MenuItem::with_id(
-        app,
-        QUIT_MENU_ITEM,
-        "Quit InfinityCube",
-        true,
-        Some("CmdOrCtrl+Q"),
-    )?;
-    // File ends with Close Window on macOS, whose application menu holds
-    // Quit, and with Quit elsewhere, where File is the only menu.
-    let close_window;
-    let file_end: &dyn IsMenuItem<Wry> = if cfg!(target_os = "macos") {
-        close_window = PredefinedMenuItem::close_window(app, None)?;
-        &close_window
-    } else {
-        &quit
-    };
-    let file = Submenu::with_items(
-        app,
-        "File",
-        true,
-        &[&new, &open, &PredefinedMenuItem::separator(app)?, file_end],
-    )?;
-    if !cfg!(target_os = "macos") {
-        return Menu::with_items(app, &[&file]);
-    }
-    let application = Submenu::with_items(
-        app,
-        "InfinityCube",
-        true,
-        &[
-            &PredefinedMenuItem::about(app, None, None)?,
-            &PredefinedMenuItem::separator(app)?,
-            &PredefinedMenuItem::hide(app, None)?,
-            &PredefinedMenuItem::hide_others(app, None)?,
-            &PredefinedMenuItem::show_all(app, None)?,
-            &PredefinedMenuItem::separator(app)?,
-            &quit,
-        ],
-    )?;
-    let edit = Submenu::with_items(
-        app,
-        "Edit",
-        true,
-        &[
-            &PredefinedMenuItem::undo(app, None)?,
-            &PredefinedMenuItem::redo(app, None)?,
-            &PredefinedMenuItem::separator(app)?,
-            &PredefinedMenuItem::cut(app, None)?,
-            &PredefinedMenuItem::copy(app, None)?,
-            &PredefinedMenuItem::paste(app, None)?,
-            &PredefinedMenuItem::select_all(app, None)?,
-        ],
-    )?;
-    let window = Submenu::with_items(
-        app,
-        "Window",
-        true,
-        &[
-            &PredefinedMenuItem::minimize(app, None)?,
-            &PredefinedMenuItem::maximize(app, None)?,
-        ],
-    )?;
-    Menu::with_items(app, &[&application, &file, &edit, &window])
+/// The application's menus, drawn from [`menu::layout`].
+fn app_menu(app: &AppHandle, updates: bool) -> tauri::Result<Menu<Wry>> {
+    let menus = menu::layout(Platform::CURRENT, updates)
+        .into_iter()
+        .map(|submenu| draw_submenu(app, submenu))
+        .collect::<tauri::Result<Vec<_>>>()?;
+    let items: Vec<&dyn IsMenuItem<Wry>> = menus
+        .iter()
+        .map(|submenu| submenu as &dyn IsMenuItem<Wry>)
+        .collect();
+    Menu::with_items(app, &items)
 }
 
-/// The menu items the shell answers itself.
-const NEW_MENU_ITEM: &str = "new";
-const OPEN_MENU_ITEM: &str = "open";
-const QUIT_MENU_ITEM: &str = "quit";
+fn draw_submenu(app: &AppHandle, submenu: menu::Submenu) -> tauri::Result<Submenu<Wry>> {
+    let items = submenu
+        .items
+        .into_iter()
+        .map(|item| draw_item(app, item))
+        .collect::<tauri::Result<Vec<_>>>()?;
+    let items: Vec<&dyn IsMenuItem<Wry>> = items.iter().map(AsRef::as_ref).collect();
+    let drawn = Submenu::with_items(app, submenu.title, true, &items)?;
+    #[cfg(target_os = "macos")]
+    match submenu.role {
+        Some(menu::Role::Window) => drawn.set_as_windows_menu_for_nsapp()?,
+        Some(menu::Role::Help) => drawn.set_as_help_menu_for_nsapp()?,
+        None => {}
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = submenu.role;
+    Ok(drawn)
+}
+
+fn draw_item(app: &AppHandle, item: menu::Item) -> tauri::Result<Box<dyn IsMenuItem<Wry>>> {
+    Ok(match item {
+        menu::Item::Command(command) => Box::new(MenuItem::with_id(
+            app,
+            command.id(),
+            command.label(),
+            true,
+            command.accelerator(),
+        )?),
+        menu::Item::Separator => Box::new(PredefinedMenuItem::separator(app)?),
+        menu::Item::Predefined(predefined) => Box::new(match predefined {
+            Predefined::About => {
+                PredefinedMenuItem::about(app, Some("About InfinityCube"), Some(about(app)))?
+            }
+            Predefined::Hide => PredefinedMenuItem::hide(app, None)?,
+            Predefined::HideOthers => PredefinedMenuItem::hide_others(app, None)?,
+            Predefined::ShowAll => PredefinedMenuItem::show_all(app, None)?,
+            Predefined::Undo => PredefinedMenuItem::undo(app, None)?,
+            Predefined::Redo => PredefinedMenuItem::redo(app, None)?,
+            Predefined::Cut => PredefinedMenuItem::cut(app, None)?,
+            Predefined::Copy => PredefinedMenuItem::copy(app, None)?,
+            Predefined::Paste => PredefinedMenuItem::paste(app, None)?,
+            Predefined::SelectAll => PredefinedMenuItem::select_all(app, None)?,
+            Predefined::FullScreen => PredefinedMenuItem::fullscreen(app, None)?,
+            Predefined::Minimize => PredefinedMenuItem::minimize(app, None)?,
+            Predefined::Zoom => PredefinedMenuItem::maximize(app, None)?,
+            Predefined::CloseWindow => PredefinedMenuItem::close_window(app, None)?,
+            Predefined::RaiseAll => PredefinedMenuItem::bring_all_to_front(app, None)?,
+        }),
+    })
+}
+
+/// What About says: the version, the commit the release workflow built from
+/// (or that it is a local build), the licence and the website. macOS shows
+/// `Version <short_version> (<version>)`, so there the commit is the version;
+/// GTK and Windows show the version alone.
+fn about(app: &AppHandle) -> AboutMetadata<'_> {
+    let commit = option_env!("INFINITY_CUBE_COMMIT")
+        .filter(|commit| !commit.is_empty())
+        .unwrap_or("local build");
+    let number = app.package_info().version.to_string();
+    let (version, short_version) = if cfg!(target_os = "macos") {
+        (commit.to_owned(), Some(number))
+    } else {
+        (format!("{number} ({commit})"), None)
+    };
+    AboutMetadata {
+        name: Some("InfinityCube".to_owned()),
+        version: Some(version),
+        short_version,
+        comments: Some("Graph-native technical presentations".to_owned()),
+        license: Some(env!("CARGO_PKG_LICENSE").to_owned()),
+        website: Some(menu::WEBSITE.to_owned()),
+        website_label: Some("InfinityCube on GitHub".to_owned()),
+        icon: app.default_window_icon().cloned(),
+        ..AboutMetadata::default()
+    }
+}
+
+/// Answers a menu item the shell drew itself.
+fn answer_menu(app: &AppHandle, command: Command) {
+    match command {
+        Command::Quit => app.exit(0),
+        Command::NewSpace => choose_new_space(app),
+        Command::Open => choose_folder(app, Opening::FromMenu),
+        // Closed as its own control closes it, so a Space window's close
+        // waits for its last write.
+        Command::CloseWindow => {
+            if let Some(window) = focused_window(app)
+                && let Err(error) = window.close()
+            {
+                show_error(app, &format!("Could not close the window: {error}"));
+            }
+        }
+        Command::FullScreen => {
+            if let Some(window) = focused_window(app) {
+                let full = window.is_fullscreen().unwrap_or(false);
+                if let Err(error) = window.set_fullscreen(!full) {
+                    show_error(app, &format!("Could not change full screen: {error}"));
+                }
+            }
+        }
+        Command::Help | Command::ReportIssue => {
+            if let Some(address) = command.address()
+                && let Err(error) = app.opener().open_url(address, None::<&str>)
+            {
+                show_error(app, &format!("Could not open {address}: {error}"));
+            }
+        }
+        Command::CheckForUpdates => {
+            drop(tauri::async_runtime::spawn(update::offer(
+                app.clone(),
+                update::Checking::FromMenu,
+            )));
+        }
+    }
+}
+
+/// The window the person is using, which a menu item acts on.
+fn focused_window(app: &AppHandle) -> Option<tauri::WebviewWindow> {
+    app.webview_windows()
+        .into_values()
+        .find(|window| window.is_focused().unwrap_or(false))
+}
 
 /// Ask for a folder, and open it as an Aggregate. At launch, with nothing
 /// open, cancelling ends the application and a folder that does not open is
@@ -631,6 +693,7 @@ fn main() {
     let updates = update::configured(context.config());
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .manage(Aggregates::default())
         .manage(Closings {
             events,
@@ -653,12 +716,8 @@ fn main() {
     let app = builder
         .invoke_handler(tauri::generate_handler![answer_closing])
         .on_menu_event(|app, event| {
-            if event.id() == QUIT_MENU_ITEM {
-                app.exit(0);
-            } else if event.id() == NEW_MENU_ITEM {
-                choose_new_space(app);
-            } else if event.id() == OPEN_MENU_ITEM {
-                choose_folder(app, Opening::FromMenu);
+            if let Some(command) = Command::named(event.id().as_ref()) {
+                answer_menu(app, command);
             }
         })
         .setup(move |app| {
@@ -668,10 +727,11 @@ fn main() {
                 timers,
                 move |effect| apply(&handle, effect),
             )));
-            let _previous = app.set_menu(app_menu(app.handle())?)?;
+            let _previous = app.set_menu(app_menu(app.handle(), updates)?)?;
             if updates {
                 drop(tauri::async_runtime::spawn(update::offer(
                     app.handle().clone(),
+                    update::Checking::AtLaunch,
                 )));
             }
             // A directory named on the command line opens at once, as one
