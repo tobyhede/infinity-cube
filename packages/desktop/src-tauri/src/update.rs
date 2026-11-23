@@ -11,8 +11,15 @@
 //! write (Storage ST-122). A failed check or install is reported on standard
 //! error and changes nothing; asked from the menu, a dialog also says so, or
 //! says this build is the newest.
+//!
+//! One check runs at a time, from the check through the offer to the install
+//! ([`Updating`]): a check asked for while one runs, or once a newer build is
+//! installed (the running build still being the old one), starts nothing,
+//! and from the menu says why.
 
-use tauri::{AppHandle, Config};
+use std::sync::{Mutex, PoisonError};
+
+use tauri::{AppHandle, Config, Manager};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use tauri_plugin_updater::{Update, UpdaterExt};
 
@@ -33,16 +40,100 @@ pub enum Checking {
     FromMenu,
 }
 
-/// Asks the endpoint for a newer build and, if there is one, offers it.
+/// Where the application's one check stands, managed by the shell.
+#[derive(Debug, Default)]
+pub struct Updating(Mutex<Phase>);
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+enum Phase {
+    #[default]
+    Idle,
+    /// Checking, offering or installing.
+    Busy,
+    /// This version is installed and opens at the next launch.
+    Installed(String),
+}
+
+/// What asking for a check did.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum Begun {
+    Started,
+    AlreadyRunning,
+    AlreadyInstalled(String),
+}
+
+impl Phase {
+    fn begin(&mut self) -> Begun {
+        match self {
+            Self::Idle => {
+                *self = Self::Busy;
+                Begun::Started
+            }
+            Self::Busy => Begun::AlreadyRunning,
+            Self::Installed(version) => Begun::AlreadyInstalled(version.clone()),
+        }
+    }
+
+    /// Ends the running check, with the version it installed, if any.
+    fn end(&mut self, installed: Option<String>) {
+        *self = installed.map_or(Self::Idle, Self::Installed);
+    }
+}
+
+impl Updating {
+    fn begin(&self) -> Begun {
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .begin()
+    }
+
+    fn end(&self, installed: Option<String>) {
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .end(installed);
+    }
+}
+
+fn end(app: &AppHandle, installed: Option<String>) {
+    app.state::<Updating>().end(installed);
+}
+
+/// Asks the endpoint for a newer build and, if there is one, offers it,
+/// unless a check is already running or a newer build is installed.
 #[expect(
     clippy::print_stderr,
     reason = "a check for an update that fails is reported on standard error and changes nothing"
 )]
 pub async fn offer(app: AppHandle, checking: Checking) {
+    match app.state::<Updating>().begin() {
+        Begun::Started => {}
+        Begun::AlreadyRunning => {
+            if checking == Checking::FromMenu {
+                tell(
+                    &app,
+                    "InfinityCube is already checking for, or installing, a newer build."
+                        .to_owned(),
+                    MessageDialogKind::Info,
+                );
+            }
+            return;
+        }
+        Begun::AlreadyInstalled(version) => {
+            if checking == Checking::FromMenu {
+                tell(&app, installed_message(&version), MessageDialogKind::Info);
+            }
+            return;
+        }
+    }
     let found = match app.updater() {
         Ok(updater) => updater.check().await,
         Err(error) => Err(error),
     };
+    if !matches!(found, Ok(Some(_))) {
+        end(&app, None);
+    }
     match found {
         Ok(Some(update)) => ask(app, update),
         Ok(None) => {
@@ -93,6 +184,8 @@ fn ask(app: AppHandle, update: Update) {
         .show(move |install| {
             if install {
                 drop(tauri::async_runtime::spawn(self::install(app, update)));
+            } else {
+                end(&app, None);
             }
         });
 }
@@ -100,16 +193,63 @@ fn ask(app: AppHandle, update: Update) {
 async fn install(app: AppHandle, update: Update) {
     let version = update.version.clone();
     let (message, kind) = match update.download_and_install(|_, _| {}, || {}).await {
-        Ok(()) => (
-            format!(
-                "InfinityCube {version} is installed. It opens the next time you open InfinityCube."
-            ),
-            MessageDialogKind::Info,
-        ),
-        Err(error) => (
-            format!("Could not install InfinityCube {version}: {error}"),
-            MessageDialogKind::Error,
-        ),
+        Ok(()) => {
+            end(&app, Some(version.clone()));
+            (installed_message(&version), MessageDialogKind::Info)
+        }
+        Err(error) => {
+            end(&app, None);
+            (
+                format!("Could not install InfinityCube {version}: {error}"),
+                MessageDialogKind::Error,
+            )
+        }
     };
     tell(&app, message, kind);
+}
+
+fn installed_message(version: &str) -> String {
+    format!("InfinityCube {version} is installed. It opens the next time you open InfinityCube.")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn starts_a_check_when_none_is_running() {
+        let mut phase = Phase::Idle;
+        assert_eq!(phase.begin(), Begun::Started);
+        assert_eq!(phase, Phase::Busy);
+    }
+
+    mod given_a_check_running {
+        use super::*;
+
+        #[test]
+        fn starts_no_second_check() {
+            let mut phase = Phase::Busy;
+            assert_eq!(phase.begin(), Begun::AlreadyRunning);
+            assert_eq!(phase, Phase::Busy);
+        }
+
+        #[test]
+        fn another_may_start_once_it_ends_with_nothing_installed() {
+            let mut phase = Phase::Busy;
+            phase.end(None);
+            assert_eq!(phase.begin(), Begun::Started);
+        }
+    }
+
+    mod given_a_newer_build_installed {
+        use super::*;
+
+        #[test]
+        fn starts_no_check_and_names_the_installed_version() {
+            let mut phase = Phase::Busy;
+            phase.end(Some("0.2.0".to_owned()));
+            assert_eq!(phase.begin(), Begun::AlreadyInstalled("0.2.0".to_owned()));
+            assert_eq!(phase.begin(), Begun::AlreadyInstalled("0.2.0".to_owned()));
+        }
+    }
 }

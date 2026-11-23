@@ -306,7 +306,7 @@ fn answer_menu(app: &AppHandle, command: Command) {
         Command::NewSpace => choose_new_space(app),
         Command::Open => choose_folder(app, Opening::FromMenu),
         // Closed as its own control closes it, so a Space window's close
-        // waits for its last write.
+        // waits for its last write, and a close's question keeps waiting.
         Command::CloseWindow => {
             if let Some(window) = focused_window(app)
                 && let Err(error) = window.close()
@@ -314,8 +314,11 @@ fn answer_menu(app: &AppHandle, command: Command) {
                 show_error(app, &format!("Could not close the window: {error}"));
             }
         }
+        // A close's question stays the small window it is.
         Command::FullScreen => {
-            if let Some(window) = focused_window(app) {
+            if let Some(window) =
+                focused_window(app).filter(|window| question::wait_of(window.label()).is_none())
+            {
                 let full = window.is_fullscreen().unwrap_or(false);
                 if let Err(error) = window.set_fullscreen(!full) {
                     show_error(app, &format!("Could not change full screen: {error}"));
@@ -693,7 +696,14 @@ fn main() {
     let updates = update::configured(context.config());
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_opener::init())
+        // Only the shell opens an address (Help, Report an Issue…), so the
+        // plugin's script that sends a page's link clicks to it is left out.
+        .plugin(
+            tauri_plugin_opener::Builder::new()
+                .open_js_links_on_click(false)
+                .build(),
+        )
+        .manage(update::Updating::default())
         .manage(Aggregates::default())
         .manage(Closings {
             events,
