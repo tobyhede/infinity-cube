@@ -57,7 +57,7 @@ jobs:
     if: ${{ !cancelled() && needs.reuse-pr-ci.outputs.should_skip != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # `pnpm verify` is one serial chain of eight commands with very uneven
+    # `pnpm verify` is one serial chain of nine commands with very uneven
     # costs, and with `e2e` sharded it is the whole of this workflow's wall
     # clock. Measured on CI, where the chain takes 193s against 69s on a
     # laptop — about 2.8x:
@@ -66,6 +66,9 @@ jobs:
     #     typecheck             ~3s      lint:anti-slop    ~3s
     #     typecheck:packages    ~6s      format:check     ~11s
     #     ui:catalog:check      ~3s      test:coverage   ~106s
+    #
+    # The ninth, `crap:ts`, is not in the table: it runs no tests, only
+    # parses the coverage the eighth writes.
     #
     # Coverage is over half of it, which is the one place a split pays: the
     # seven commands here are ~87s and `coverage` below is ~106s, and each job
@@ -81,9 +84,11 @@ jobs:
     # restore. That is the shape of every further split — the cap belongs to
     # coverage until coverage itself gets cheaper.
     #
-    # **The eight commands are listed in `package.json` and nowhere else.**
+    # **The nine commands are listed in `package.json` and nowhere else.**
     # This job runs `verify:static`, which is the first seven in order;
-    # `coverage` runs the eighth; and `pnpm verify` is defined as those two, so
+    # `coverage` runs the last two, `test:coverage` and the CRAP gate
+    # `crap:ts` that scores what it wrote; and `pnpm verify` is defined as
+    # those, so
     # a developer's one command and CI's two cannot drift apart. That is also
     # what keeps `typecheck:toolchain` first — it sits at the head of
     # `verify:static`, because a typecheck against the wrong compiler still
@@ -132,7 +137,7 @@ jobs:
     if: ${{ !cancelled() && needs.reuse-pr-ci.outputs.should_skip != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # The eighth command of `pnpm verify`, and the whole of this job. Read
+    # The last two commands of `pnpm verify`, and the whole of this job. Read
     # `static-checks` above for the split, the measured costs behind it, and
     # why it is two jobs and not three. `test:coverage` is ~106s of the chain's
     # 193s, so this job — not that one, and no further split of it — is the
@@ -158,6 +163,11 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:coverage
+      # The CRAP gate (`crap.config.ts`), scored from the coverage the step
+      # above wrote: one `::error` per problem, and the verdict and worst
+      # functions in the job summary, written whether or not it passes.
+      - name: CRAP gate (TypeScript)
+        run: pnpm crap:ts --format github --summary "$GITHUB_STEP_SUMMARY"
 
   postgres:
     needs: reuse-pr-ci
@@ -707,6 +717,63 @@ jobs:
               pnpm exec vitest run --config vitest.integration.config.ts test/integration/http-conformance.test.ts
           done
 
+  crap-rust:
+    needs: reuse-pr-ci
+    # Same condition as `rust`, so a push to `main` still fills this job's
+    # cache.
+    if: ${{ !cancelled() && (github.event_name == 'push' || needs.reuse-pr-ci.outputs.should_skip != 'true') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NEXTEST_VERSION: 0.9.152
+      CARGO_LLVM_COV_VERSION: 0.9.1
+      CARGO_CRAP_VERSION: 0.8.0
+    # The CRAP gate over the Rust crates (`.cargo-crap.toml`), run by the
+    # `crap:rust:*` scripts in `package.json`, which need pnpm and Node but no
+    # install. Its own job because the instrumented build shares nothing with
+    # `rust`'s `target/`, and a red score is a different diagnosis from a red
+    # test. It runs the crates `rust-windows` runs, so it needs no WebKitGTK
+    # and leaves out the desktop shell. The tools are cached as `rust` caches
+    # nextest; a bump of `cargo-llvm-cov` or `cargo-crap` can move scores.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - name: Install the pinned Rust toolchain and llvm-tools
+        run: |
+          rustup toolchain install
+          rustup component add llvm-tools-preview
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/bin/cargo-nextest
+            ~/.cargo/bin/cargo-llvm-cov
+            ~/.cargo/bin/cargo-crap
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: cargo-${{ runner.os }}-crap-${{ env.NEXTEST_VERSION }}-${{ env.CARGO_LLVM_COV_VERSION }}-${{ env.CARGO_CRAP_VERSION }}-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-crap-${{ env.NEXTEST_VERSION }}-${{ env.CARGO_LLVM_COV_VERSION }}-${{ env.CARGO_CRAP_VERSION }}-${{ hashFiles('rust-toolchain.toml') }}-
+      - name: Install cargo-nextest, cargo-llvm-cov and cargo-crap
+        run: |
+          command -v cargo-nextest || cargo install cargo-nextest --locked --version "$NEXTEST_VERSION"
+          command -v cargo-llvm-cov || cargo install cargo-llvm-cov --locked --version "$CARGO_LLVM_COV_VERSION"
+          command -v cargo-crap || cargo install cargo-crap --locked --version "$CARGO_CRAP_VERSION"
+      - id: rust-coverage
+        name: Run the crates' tests under coverage
+        run: pnpm crap:rust:coverage
+      - name: CRAP gate (Rust)
+        run: pnpm crap:rust:report --fail-above --format github
+      # The summary is written whether or not the gate passed, so a failing
+      # pull request still shows which functions are over and by how much.
+      - name: CRAP report (Rust)
+        if: ${{ !cancelled() && steps.rust-coverage.outcome == 'success' }}
+        run: pnpm crap:rust:report --format pr-comment --output "$GITHUB_STEP_SUMMARY"
+
   rust-windows:
     needs: reuse-pr-ci
     # Same condition as `rust`, so a push to `main` still fills this job's
@@ -755,7 +822,8 @@ jobs:
 
   ci:
     name: CI passed
-    needs: [reuse-pr-ci, static-checks, coverage, postgres, sqlite, e2e, ladle, mount, rust]
+    needs:
+      [reuse-pr-ci, static-checks, coverage, postgres, sqlite, e2e, ladle, mount, rust, crap-rust]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -785,13 +853,14 @@ jobs:
           LADLE: ${{ needs.ladle.result }}
           MOUNT: ${{ needs.mount.result }}
           RUST: ${{ needs.rust.result }}
+          CRAP_RUST: ${{ needs.crap-rust.result }}
         run: |
           if [ "$REUSED" = "true" ]; then
             echo "All CI gates were reused from a successful run for the same Git tree."
             exit 0
           fi
 
-          for result in "$STATIC_CHECKS" "$COVERAGE" "$POSTGRES" "$SQLITE" "$E2E" "$LADLE" "$MOUNT" "$RUST"; do
+          for result in "$STATIC_CHECKS" "$COVERAGE" "$POSTGRES" "$SQLITE" "$E2E" "$LADLE" "$MOUNT" "$RUST" "$CRAP_RUST"; do
             if [ "$result" != "success" ]; then
               echo "A required CI job did not succeed: $result"
               exit 1

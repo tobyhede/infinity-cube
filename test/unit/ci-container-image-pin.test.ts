@@ -92,10 +92,10 @@ describe('ci.yml container jobs', () => {
   it('overlay the repository Node pin without replacing the Playwright image', () => {
     const nodeVersionConsumers = workflow.match(/node-version-file: \.node-version/g) ?? [];
 
-    // static-checks, coverage, postgres, sqlite, e2e, ladle, mount and rust each consume
-    // the one exact runtime pin. The first two are the halves `pnpm verify` is
+    // static-checks, coverage, postgres, sqlite, e2e, ladle, mount, rust and crap-rust
+    // each consume the one exact runtime pin. The first two are the halves `pnpm verify` is
     // split into for CI, so splitting it added a consumer rather than moving one.
-    expect(nodeVersionConsumers).toHaveLength(8);
+    expect(nodeVersionConsumers).toHaveLength(9);
     expect(workflow).not.toContain("The image's Node must satisfy .node-version");
   });
 

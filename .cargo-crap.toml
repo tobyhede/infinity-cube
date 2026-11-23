@@ -1,0 +1,39 @@
+# `cargo crap`: the CRAP gate over the Rust crates (`pnpm crap:rust`, the
+# `crap-rust` CI job). The formula is in `scripts/crap/score.ts`, which scores
+# the TypeScript, and the threshold's rationale in `crap.config.ts`, whose
+# threshold this matches (`test/unit/crap-score.test.ts`). Config discovery
+# walks up from the working directory, so this root file applies to every
+# crate.
+threshold = 30
+
+# A function with complexity and no coverage data scores as 0% covered rather
+# than being skipped: code the coverage run never saw is risk too.
+missing = "pessimistic"
+
+# Relative to each crate's root, beside the built-in `tests/**`, `benches/**`
+# and `examples/**`: unit-test modules, and the CLI's build script, which no
+# test runs.
+exclude = ["**/tests.rs", "build.rs"]
+
+# Functions over the threshold that the gate lets past, each with why. They are
+# left out of the report and the gate. This list only shrinks: when one comes
+# under the threshold, delete its entry. Do not add an entry to get a change past
+# the gate. `cargo crap` matches the name it reports, which qualifies a method
+# by its type (`Refusal::kind`) and a free function by nothing, so an entry
+# covers every function of that name in the three crates.
+# `test/unit/crap-score.test.ts` fails when a free function an entry names is
+# defined more than once there.
+allow = [
+    # crates/host/src/wire.rs: the JSON body of an intake refusal.
+    "space_error",
+    # crates/host/src/wire.rs: the JSON body of an aggregate refusal.
+    "aggregate_error",
+    # crates/host/src/product.rs: whether a product destination resolves in a
+    # snapshot.
+    "resolves",
+    # crates/host/src/product.rs: the product-URL grammar.
+    "parse_destination",
+    # crates/intake/src/refusal.rs: one match arm per refusal kind, so its
+    # complexity alone is over the threshold.
+    "Refusal::kind",
+]

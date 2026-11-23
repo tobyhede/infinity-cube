@@ -41,6 +41,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "crap:ts": "tsx scripts/crap.ts",
+    "crap:rust": "pnpm crap:rust:coverage && pnpm crap:rust:report --fail-above",
+    "crap:rust:coverage": "cargo llvm-cov nextest -p intake -p host -p http-conformance -p infinity-cube --locked --lcov --output-path target/rust-lcov.info",
+    "crap:rust:report": "cargo crap -p intake -p host -p infinity-cube --lcov target/rust-lcov.info",
     "mutate:session": "stryker run --mutate packages/persistence/src/session.ts --testFiles packages/persistence/test/session.test.ts",
     "mutate:graph": "stryker run --mutate packages/graph/src/space.ts --testFiles packages/graph/test/space-intake.test.ts,packages/graph/test/space.test.ts,packages/graph/test/space.property.test.ts,packages/graph/test/graph.property.test.ts,packages/graph/test/space-snapshot.test.ts",
     "e2e": "playwright test",
@@ -58,8 +62,8 @@
     "test:integration:sqlite": "pnpm contract:emit:sqlite && pnpm db:migrate:sqlite && vitest run --config vitest.sqlite.config.ts",
     "dev:sqlite": "tsx scripts/dev-sqlite.ts",
     "verify:static": "pnpm typecheck:toolchain && pnpm typecheck && pnpm typecheck:packages && pnpm ui:catalog:check && pnpm lint && pnpm lint:anti-slop && pnpm format:check",
-    "verify": "pnpm verify:static && pnpm test:coverage",
-    "verify:local": "pnpm verify:static && pnpm test:coverage --maxWorkers=2 --minWorkers=1"
+    "verify": "pnpm verify:static && pnpm test:coverage && pnpm crap:ts",
+    "verify:local": "pnpm verify:static && pnpm test:coverage --maxWorkers=2 --minWorkers=1 && pnpm crap:ts"
   },
   "pnpm": {
     "overrides": {
