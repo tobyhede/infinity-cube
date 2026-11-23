@@ -92,8 +92,16 @@ pub fn ask(app: &AppHandle, wait: WaitId, folders: &[PathBuf]) {
     .center()
     .focused(true)
     .build();
-    if let Err(error) = built {
-        eprintln!("Could not ask whether to keep waiting for the last write: {error}");
+    match built {
+        // Off macOS the application's menu is set on every window; the
+        // question answers its own two buttons and Escape, and nothing else.
+        Ok(window) if !cfg!(target_os = "macos") => {
+            let _ = window.remove_menu();
+        }
+        Ok(_) => {}
+        Err(error) => {
+            eprintln!("Could not ask whether to keep waiting for the last write: {error}");
+        }
     }
 }
 
@@ -115,7 +123,7 @@ mod tests {
         fn only_a_question_window_names_its_wait() {
             let wait = WaitId::from_number(7);
             assert_eq!(wait_of(&label_of(wait)), Some(wait), "its own label");
-            for other in ["home", "space-0", "closing-", "closing-7a", "closing--1"] {
+            for other in ["space-0", "closing-", "closing-7a", "closing--1"] {
                 assert_eq!(wait_of(other), None, "{other}");
             }
         }

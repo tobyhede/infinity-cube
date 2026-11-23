@@ -276,23 +276,38 @@ mod given_a_space_window {
     }
 }
 
+/// What a presenter reads for a folder refused for `error`.
+fn refusal(directory: &Path, error: &ImportError) -> String {
+    match unrun(directory, error) {
+        Some(Started::Refused { message }) => message,
+        other => panic!("{error:?} should be refused, but is {other:?}"),
+    }
+}
+
 mod given_a_folder_with_no_aggregate {
     use super::*;
 
     #[test]
-    fn is_refused_naming_no_command() {
-        let message = refusal(Path::new("/spaces/empty"), &ImportError::Empty).unwrap();
+    fn is_offered_a_new_space_rather_than_refused() {
+        let unrun = unrun(Path::new("/spaces/empty"), &ImportError::Empty);
+        assert!(matches!(unrun, Some(Started::Empty)), "{unrun:?}");
+    }
+
+    #[tokio::test]
+    async fn is_empty_when_it_holds_only_dot_entries() {
+        let temporary = tempfile::tempdir().unwrap();
+        let directory = temporary.path().join("space");
+        std::fs::create_dir_all(directory.join(".git")).unwrap();
+        let error = open_run(
+            &directory,
+            built_shell(&stand_in_build(&temporary)).unwrap(),
+            |_| {},
+        )
+        .await
+        .unwrap_err();
         assert!(
-            message.starts_with("/spaces/empty holds no Space"),
-            "{message}"
-        );
-        assert!(
-            !message.contains("pnpm"),
-            "a presenter has no pnpm: {message}"
-        );
-        assert!(
-            !message.contains("aggregate.json"),
-            "a folder holding files but no aggregate.json is refused by intake, not as empty: {message}"
+            matches!(unrun(&directory, &error), Some(Started::Empty)),
+            "{error:?}"
         );
     }
 }
@@ -317,7 +332,7 @@ mod given_a_folder_another_run_holds {
         )
         .await
         .unwrap_err();
-        let message = refusal(&directory, &error).unwrap();
+        let message = refusal(&directory, &error);
         assert_eq!(
             message,
             format!(
@@ -344,7 +359,7 @@ mod given_a_folder_intake_refuses {
         )
         .await
         .unwrap_err();
-        let message = refusal(&directory, &error).unwrap();
+        let message = refusal(&directory, &error);
         assert!(
             message.contains("(aggregate-file-missing at aggregate.json)"),
             "each refusal names its kind and file: {message}"

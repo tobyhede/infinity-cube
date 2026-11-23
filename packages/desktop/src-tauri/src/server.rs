@@ -57,6 +57,9 @@ pub fn built_shell(
 pub enum Started {
     /// The Aggregate is served; open its window at [`AggregateServer::window_url`].
     Serving(AggregateServer),
+    /// The folder is missing or holds nothing but dot-entries: there is no
+    /// Space to run, and a new one can be written there.
+    Empty,
     /// The folder cannot be run; `message` says why, in the author's words.
     Refused { message: String },
 }
@@ -161,26 +164,28 @@ fn notify_in_dialog(
     }
 }
 
-/// What a presenter reads when a folder cannot be opened, or `None` when
-/// the failure is not the folder's.
-fn refusal(directory: &Path, error: &ImportError) -> Option<String> {
+/// Why a folder was not run, in what a presenter is offered or reads, or
+/// `None` when the failure is not the folder's.
+fn unrun(directory: &Path, error: &ImportError) -> Option<Started> {
     let shown = directory.display();
-    match error {
-        // A presenter has no `pnpm cube init`, so no command is named.
-        ImportError::Empty => Some(format!("{shown} holds no Space: it is missing or empty.")),
-        ImportError::Locked => Some(format!(
-            "{shown} is open in another InfinityCube window or run: close it there first."
-        )),
+    let message = match error {
+        // A presenter has no `pnpm cube init`: the shell offers to write a
+        // new Space there instead.
+        ImportError::Empty => return Some(Started::Empty),
+        ImportError::Locked => {
+            format!("{shown} is open in another InfinityCube window or run: close it there first.")
+        }
         ImportError::Refused(refusals) => {
             let mut message = format!("{shown} is not a Space InfinityCube can open:");
             for refusal in refusals.as_slice() {
                 message.push_str("\n- ");
                 message.push_str(&refusal.located());
             }
-            Some(message)
+            message
         }
-        _ => None,
-    }
+        _ => return None,
+    };
+    Some(Started::Refused { message })
 }
 
 /// An Aggregate served by the Rust host in this process.
@@ -343,10 +348,7 @@ impl AggregateServer {
         let run = match tauri::async_runtime::block_on(open_run(directory, shell, notify)) {
             Ok(run) => run,
             Err(error) => {
-                return match refusal(directory, &error) {
-                    Some(message) => Ok(Started::Refused { message }),
-                    None => Err(OpenError::Import(error)),
-                };
+                return unrun(directory, &error).ok_or(OpenError::Import(error));
             }
         };
         let address = AggregateAddress::new(AggregateKey::of(directory), SchemeStyle::CURRENT);

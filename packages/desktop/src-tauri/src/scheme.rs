@@ -6,7 +6,7 @@
 //!
 //! - its address names an Aggregate that is open ([`AggregateAddress::key_of`]);
 //! - the window that made it is one of that Aggregate's own windows, so neither
-//!   the home window nor another Aggregate's window reaches it;
+//!   a close's question window nor another Aggregate's window reaches it;
 //! - it is a read (`GET` or `HEAD`), or it comes from the Aggregate's own page:
 //!   its `Origin` is the Aggregate's, or, naming none, its `Referer` is a page of
 //!   the Aggregate, so a page from anywhere else cannot change the Aggregate.

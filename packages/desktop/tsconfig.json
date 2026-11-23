@@ -3,11 +3,11 @@
   "compilerOptions": {
     // The desktop package imports nothing of ours: the shell is Rust
     // (`src-tauri/`), serving the browser application `@project/app` builds
-    // through the Rust host. Only the home window's script is checked here.
+    // through the Rust host. Only the close question window's script is checked here.
     "paths": {},
     "allowJs": true,
     "checkJs": true,
-    // The home window's script is a global script, not a module.
+    // The question window's script is a global script, not a module.
     "moduleDetection": "auto"
   },
   "include": ["ui"]

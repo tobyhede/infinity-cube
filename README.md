@@ -34,7 +34,7 @@ This takes you from a fresh clone to the desktop application open on a Space of 
 
    Done when `pnpm install` exits zero.
 
-3. **Create a Space in its own repository.** The desktop application opens existing Spaces only, so create one first. The directory must be empty apart from dot-entries such as `.git`.
+3. **Create a Space in its own repository.** The directory must be empty apart from dot-entries such as `.git`. The desktop application can write the Space instead of `pnpm cube init` (step 5), but run `git init` and commit either way, so git can restore the Space as it was first written.
 
    ```sh
    git init ~/spaces/rust-async
@@ -55,13 +55,13 @@ This takes you from a fresh clone to the desktop application open on a Space of 
 
    Done when Cargo prints `Finished` and `target/debug/infinity-cube-desktop` exists. After pulling changes, run `pnpm install` and both commands again.
 
-5. **Open the Space.** `target/debug/infinity-cube-desktop ~/spaces/rust-async`. Done when a Space window named after the folder shows the Space's Map with `Resource 1` on it. A small home window opens beside it; its **Open…** button opens another Space's folder.
+5. **Open the Space.** `target/debug/infinity-cube-desktop ~/spaces/rust-async`. Done when one window, named after the folder, shows the Space's Map with `Resource 1` on it. **File › Open…** (Ctrl+O, or Command-O on macOS) opens another Space's folder in a window of its own; started with no folder, the application asks for one. A folder that holds no Space yet is offered **Create Space**, which writes a new Space there as `pnpm cube init` does and opens it, and **File › New Space…** (Ctrl+N, or Command-N) asks for an empty folder to do the same; a folder holding anything else is refused and nothing is written there.
 
 6. **Edit.** Pick a Graph in the Command Dock, the toolbar floating over the canvas; every Graph stays drawn, and the one you pick is emphasised. Select a Resource to reveal its toolbar, and use Edit to write its Title and Markdown. Drag a Resource to move it. Drag from one of a Resource's four handles to another Resource to add an Edge to the Active Graph; hold Option (macOS) or Alt and drop on empty canvas to create a new Resource and connect it in one go. Done when the save indicator reads `Persisted`.
 
 7. **Present.** Press **Present**: `→` follows an Edge, `←` goes back, `↑` / `↓` choose at a fork. Done when `Esc` returns you to the Map as you left it.
 
-8. **Close the window.** Closing the Space window writes every pending edit. If a write is still running after ten seconds, it asks whether to keep waiting, which is always safe, or close without saving, which loses the edits not yet written. If a write fails, a dialog says why, and those edits are not on disk. Close the home window too to end the application (on macOS, Quit). Don't press Ctrl-C, close the terminal or send a signal while a Space window is open: any of them ends the application at once, and edits not yet written are lost. Done when both windows have closed with no dialog and the terminal has its prompt back.
+8. **Close the window.** Closing the Space window writes every pending edit. If a write is still running after ten seconds, it asks whether to keep waiting, which is always safe, or close without saving, which loses the edits not yet written. If a write fails, a dialog says why, and those edits are not on disk. Closing the last Space window ends the application. Don't press Ctrl-C, close the terminal or send a signal while a Space window is open: any of them ends the application at once, and edits not yet written are lost. Done when the window has closed with no dialog and the terminal has its prompt back.
 
 9. **Commit.** `git -C ~/spaces/rust-async add -A && git -C ~/spaces/rust-async commit -m "First draft"`. Done when `git -C ~/spaces/rust-async status` is clean.
 
@@ -90,7 +90,7 @@ The desktop application and `pnpm cube run <dir>` both **run** a Space's directo
 - **Git is your undo and your history.** InfinityCube keeps no history of its own and does not watch the directory. Edit files by hand, `git pull` or check out an earlier version with InfinityCube stopped, since a running one's next write replaces what is on disk with what it holds.
 - **One run per directory.** A run locks the directory, through the empty file `.infinity-cube.lock` it leaves there, so a second run of the same directory, from another copy of the desktop application or a terminal, is refused, naming it, until the first stops. The lock ends when the process does, however it ends. Keep the file out of git with a `.gitignore` entry.
 - **InfinityCube writes only its own files: `aggregate.json`, each Space's `space.json` and Resource files, and `assets/`**, which holds the Resources' text (Markdown and Mermaid source) and uploaded image files. Anything else, such as `.git`, a README or `notes/`, and any `*.md` outside `assets/`, is left alone; [`docs/aggregate-directory.md`](docs/aggregate-directory.md) describes the format.
-- **Starting.** Both serve an existing Aggregate directory only, as `cube init` writes it. A missing or empty directory is refused (`pnpm cube run` names the `pnpm cube init` command that creates one; the desktop application says why in a dialog), so a mistyped path never becomes a new Space. A directory that is not valid is refused with its problems listed; fix the files and start again. A run with no edits leaves the directory as it was, beside its empty lock file. Opening a Space never writes the directory.
+- **Starting.** Both serve an existing Aggregate directory only, as `cube init` writes it. A missing or empty directory is never made a Space unasked: `pnpm cube run` refuses it, naming the `pnpm cube init` command that creates one, and the desktop application asks whether to create a Space there, writing nothing unless you choose Create Space. A directory that is not valid is refused with its problems listed; fix the files and start again. A run with no edits leaves the directory as it was, beside its empty lock file. Opening a Space never writes the directory.
 - **Ports and the browser.** Under `pnpm cube run`, InfinityCube serves on port 4173, or the next free port. `--port <port>` picks the port and fails if it is taken. `--no-open` leaves the browser alone, for running headless or from an agent.
 
 ### Stopping and lost edits

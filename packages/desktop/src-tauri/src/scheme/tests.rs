@@ -165,7 +165,7 @@ mod given_a_request_at_the_trust_boundary {
     #[tokio::test]
     async fn refuses_a_window_that_is_not_the_aggregates() {
         let fixture = open().await;
-        for window in ["home", "space-1", ""] {
+        for window in ["closing-0", "space-1", ""] {
             let request = Request::get(fixture.url("/api/spaces"))
                 .body(Vec::new())
                 .unwrap();

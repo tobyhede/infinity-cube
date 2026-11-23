@@ -23,7 +23,7 @@ const text = new TextEncoder().encode('hello');
 const TEXT_URL = '/assets/LPJNul-wow4m6DsqxbninhsWHlwfp0JecwQzYpOLmCQ';
 
 /** The real Fetch application over an in-memory store, reached as the browser reaches it. */
-const backendOverHost = () => {
+const backendOverHost = (sent?: (init: RequestInit | undefined) => void) => {
   const assets = new Map<AssetHash, StoredAsset>();
   const readsSpace = () => Promise.reject(new Error('An asset request read a Space'));
   const store: StoredSpaceRepository & AssetStore = {
@@ -40,12 +40,30 @@ const backendOverHost = () => {
   };
   const app = createSpaceHttpApp(store, { newId: mintsNothing });
   const backend = new HttpSpaceBackend('http://example.test', {
-    fetch: async (input, init) => app.fetch(new Request(input, init)),
+    fetch: async (input, init) => {
+      sent?.(init);
+      return app.fetch(new Request(input, init));
+    },
   });
   return { backend, assets };
 };
 
 describe('the asset client over HTTP', () => {
+  it('sends the bytes from memory, never the Blob itself', async () => {
+    // A File picked in WebKitGTK is backed by its file on disk; storeAsset
+    // reads it into memory before sending.
+    const bodies: unknown[] = [];
+    const { backend } = backendOverHost((init) => bodies.push(init?.body));
+
+    await expect(
+      httpAssetClient(backend).store(new Blob([png], { type: 'image/png' })),
+    ).resolves.toBe(PNG_URL);
+    expect(bodies).toHaveLength(1);
+    const [body] = bodies;
+    expect(body).not.toBeInstanceOf(Blob);
+    expect(body).toBeInstanceOf(ArrayBuffer);
+  });
+
   it('stores bytes under the Blob type, answering the same reference every time', async () => {
     const { backend, assets } = backendOverHost();
     const client = httpAssetClient(backend);

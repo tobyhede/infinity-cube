@@ -16,6 +16,7 @@ pub const SPACE_WINDOW_PREFIX: &str = "space-";
 pub struct Registry<S> {
     aggregates: HashMap<String, Aggregate<S>>,
     next: u64,
+    quitting: bool,
 }
 
 #[derive(Debug)]
@@ -39,6 +40,8 @@ pub enum Reserved {
     /// The window with this label already has the directory, or is starting
     /// or closing it.
     Existing(String),
+    /// The application is quitting: open nothing more.
+    Quitting,
 }
 
 /// What a request to close a window came to.
@@ -58,6 +61,7 @@ impl<S> Default for Registry<S> {
         Self {
             aggregates: HashMap::new(),
             next: 0,
+            quitting: false,
         }
     }
 }
@@ -66,8 +70,12 @@ impl<S> Registry<S> {
     /// Claim `directory` for a new Space window, unless a window already has it.
     ///
     /// `directory` should be canonical, so two spellings of one directory are
-    /// one Aggregate.
+    /// one Aggregate. Once [`Self::take_all`] has been called, nothing more
+    /// is reserved.
     pub fn reserve(&mut self, directory: &Path) -> Reserved {
+        if self.quitting {
+            return Reserved::Quitting;
+        }
         if let Some((label, _)) = self
             .aggregates
             .iter()
@@ -91,10 +99,11 @@ impl<S> Registry<S> {
     ///
     /// # Errors
     ///
-    /// Hands `server` back if `label` is not an Aggregate still starting.
+    /// Hands `server` back if `label` is not an Aggregate still starting, or
+    /// once [`Self::take_all`] has been called.
     pub fn opened(&mut self, label: &str, server: S) -> Result<(), S> {
         match self.aggregates.get_mut(label) {
-            Some(aggregate) if matches!(aggregate.state, State::Starting) => {
+            Some(aggregate) if !self.quitting && matches!(aggregate.state, State::Starting) => {
                 aggregate.state = State::Open(server);
                 Ok(())
             }
@@ -142,9 +151,17 @@ impl<S> Registry<S> {
             .is_some_and(|aggregate| matches!(aggregate.state, State::Closing))
     }
 
+    /// Whether no Aggregate is starting, open or closing.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.aggregates.is_empty()
+    }
+
     /// Begin closing every open Aggregate, answering each window's label, its
-    /// directory and its server.
+    /// directory and its server. A quit calls it, and from then on nothing
+    /// opens, so nothing opens that the quit does not wait for.
     pub fn take_all(&mut self) -> Vec<(String, PathBuf, S)> {
+        self.quitting = true;
         let mut taken = Vec::new();
         for (label, aggregate) in &mut self.aggregates {
             if matches!(aggregate.state, State::Open(_))
@@ -164,6 +181,7 @@ mod tests {
     fn label_of(reserved: Reserved) -> String {
         match reserved {
             Reserved::New(label) | Reserved::Existing(label) => label,
+            Reserved::Quitting => panic!("nothing has quit"),
         }
     }
 
@@ -284,12 +302,27 @@ mod tests {
         }
 
         #[test]
+        fn holds_an_aggregate_from_starting_until_it_has_closed() {
+            let mut registry: Registry<&str> = Registry::default();
+            assert!(registry.is_empty(), "nothing is open at first");
+            let Reserved::New(label) = registry.reserve(Path::new("/spaces/rust")) else {
+                panic!("a new directory should be reserved");
+            };
+            assert!(!registry.is_empty(), "a starting Aggregate counts");
+            registry.opened(&label, "server").unwrap();
+            let _ = registry.begin_close(&label);
+            assert!(!registry.is_empty(), "a closing Aggregate counts");
+            registry.closed(&label);
+            assert!(registry.is_empty(), "a closed Aggregate is gone");
+        }
+
+        #[test]
         fn a_window_that_is_no_aggregate_closes() {
             let mut registry: Registry<&str> = Registry::default();
             assert_eq!(
-                registry.begin_close("home"),
+                registry.begin_close("closing-0"),
                 Close::NotOpen,
-                "the home window should close at once"
+                "a question window should close at once"
             );
         }
     }
@@ -312,6 +345,33 @@ mod tests {
                 taken,
                 vec!["first", "second"],
                 "quitting should stop every open Aggregate"
+            );
+        }
+    }
+
+    mod given_a_quit_begun {
+        use super::*;
+
+        #[test]
+        fn opening_another_directory_is_refused() {
+            let (mut registry, _label) = open("/spaces/rust", "first");
+            let _taken = registry.take_all();
+            assert_eq!(
+                registry.reserve(Path::new("/spaces/go")),
+                Reserved::Quitting,
+                "a directory opened once a quit has collected the open Aggregates would not be waited for"
+            );
+        }
+
+        #[test]
+        fn an_aggregate_still_starting_does_not_open() {
+            let mut registry = Registry::default();
+            let label = label_of(registry.reserve(Path::new("/spaces/rust")));
+            let _taken = registry.take_all();
+            assert_eq!(
+                registry.opened(&label, "late"),
+                Err("late"),
+                "an Aggregate that finished starting after the quit collected the open ones would not be waited for"
             );
         }
     }
