@@ -28,4 +28,4 @@ Bundles are written under `target/release/bundle/` at the repository root, such 
 
 For a quick run without bundling: `pnpm --filter @project/app exec vite build` once, then `cargo build -p infinity-cube-desktop` from the repository root and `target/debug/infinity-cube-desktop <Aggregate directory>` (the Cargo workspace's `target/` is at the root). `cargo test -p infinity-cube-desktop` (or `cargo nextest run`) runs the scheme handler against a copy of `packages/app/fixture` without opening a window.
 
-There is no published desktop release yet. A bundle you build is unsigned: on macOS, allow it once under System Settings › Privacy & Security › Open Anyway.
+Each preview release attaches a macOS build for Apple silicon, made by `pnpm release:build --desktop` (Storage ST-130). On macOS a bundle is ad-hoc signed, not signed with a Developer ID or notarized, so allow it once under System Settings › Privacy & Security › Open Anyway.

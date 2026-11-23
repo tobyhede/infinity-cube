@@ -19,7 +19,7 @@ Accepted ADRs in [`docs/adr/`](docs/adr/README.md) are binding and append-only. 
 | Change a control, menu, editor, key, focus, announcement, confirmation or notice | [UI](docs/requirements/ui.md) |
 | Change selection, Graph navigation, product URLs, browser history, Open Spaces or presenting | [Navigation](docs/requirements/navigation.md) |
 | Record a decision, or change what an accepted ADR decides | [Workflow](docs/agents/workflow.md#when-to-write-an-adr), [ADR index](docs/adr/README.md), [Domain docs](docs/agents/domain.md) |
-| Change the Tauri shell, Space window lifecycle, native permissions or desktop release | [Desktop contributor skill](.agents/skills/infinity-cube-desktop/SKILL.md) |
+| Change the desktop app in `packages/desktop`: Space windows, the `infinitycube` scheme, invoke permissions, bundling or updates | [Desktop contributor skill](.agents/skills/infinity-cube-desktop/SKILL.md) |
 | Change cross-module coordination, comments, domain vocabulary or a tracked skill | [Workflow](docs/agents/workflow.md) |
 | Change assertions, parsing, mocks, injected ids, reflective access or anti-slop suppressions | [Anti-slop](docs/agents/anti-slop.md) |
 | Change TypeScript, Vite configuration, formatting or a spike harness | [Build and tooling](docs/agents/build-tooling.md) |

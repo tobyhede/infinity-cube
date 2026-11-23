@@ -1,3 +1,4 @@
 interface:
   display_name: "InfinityCube Desktop"
-  short_description: "Maintain the InfinityCube Tauri desktop shell"
+  short_description: "Change the InfinityCube Tauri desktop app"
+  default_prompt: "Use $infinity-cube-desktop to change the desktop app's Space windows, scheme, permissions or builds."
