@@ -7,6 +7,7 @@ import {
   isGated,
   judgeCrap,
   scoreFunctions,
+  startKey,
   type CrapConfig,
   type ScoredFunction,
 } from '../../scripts/crap/score';
@@ -102,24 +103,46 @@ describe('scoreFunctions', () => {
   ].join('\n');
   const functions = functionComplexities('f.ts', source);
 
-  it('attributes each line to the innermost function that spans it', () => {
+  const allRun = new Map([1, 2, 3, 4, 5, 6].map((line) => [line, 1]));
+  const noCalls = new Map<string, number>();
+
+  it('gives a callback its own lines, and the line that passes it to its caller', () => {
+    // The outer ran and passed the callback on line 3; the callback never ran.
     const hits = new Map([
       [1, 1],
       [2, 1],
-      [3, 0],
+      [3, 1],
       [4, 0],
       [5, 0],
       [6, 1],
     ]);
-    const [outer, callback] = scoreFunctions('f.ts', functions, hits);
-    // outer owns lines 1, 2 and 6; the callback owns 3 to 5.
+    const [outer, callback] = scoreFunctions('f.ts', functions, hits, noCalls);
+    // outer owns lines 1, 2, 3 and 6; the callback owns 4 and 5.
     expect(outer?.coverage).toBe(1);
     expect(callback?.coverage).toBe(0);
     expect(callback?.crap).toBe(crapScore(2, 0));
   });
 
-  it('scores a function with no instrumented line as uncovered', () => {
-    const [outer] = scoreFunctions('f.ts', functions, new Map());
+  it('scores a function Istanbul counted no calls of as uncovered, whatever its lines say', () => {
+    const callback = functions[1];
+    if (callback === undefined) throw new Error('the fixture declares a callback');
+    const calls = new Map([[startKey(callback.startLine, callback.startColumn), 0]]);
+    const [, scored] = scoreFunctions('f.ts', functions, allRun, calls);
+    expect(scored?.coverage).toBe(0);
+  });
+
+  it('scores a one-line callback by its call count, having no line of its own', () => {
+    const oneLine = functionComplexities('g.ts', 'const f = (xs: number[]) => xs.map((x) => -x);');
+    const callback = oneLine[1];
+    if (callback === undefined) throw new Error('the fixture declares a callback');
+    const key = startKey(callback.startLine, callback.startColumn);
+    const hits = new Map([[1, 1]]);
+    expect(scoreFunctions('g.ts', oneLine, hits, new Map([[key, 3]]))[1]?.coverage).toBe(1);
+    expect(scoreFunctions('g.ts', oneLine, hits, new Map([[key, 0]]))[1]?.coverage).toBe(0);
+  });
+
+  it('scores a function with no instrumented line and no call count as uncovered', () => {
+    const [outer] = scoreFunctions('f.ts', functions, new Map(), noCalls);
     expect(outer?.coverage).toBe(0);
   });
 });
@@ -132,6 +155,7 @@ describe('judgeCrap', () => {
     complexity: 10,
     coverage: 0,
     startLine: 1,
+    startColumn: 0,
     endLine: 2,
   });
   const config: CrapConfig = {
@@ -158,6 +182,14 @@ describe('judgeCrap', () => {
   it('fails an allowance that names nothing over the threshold, so the list only shrinks', () => {
     const verdict = judgeCrap(config, [scored('packages/core/src/a.ts', 'known', 99)]);
     expect(verdict.staleAllowances).toEqual(['packages/core/src/a.ts:gone']);
+  });
+
+  it('fails an allowance whose key names two functions, which would let both past', () => {
+    const verdict = judgeCrap(config, [
+      scored('packages/core/src/a.ts', 'known', 99),
+      scored('packages/core/src/a.ts', 'known', 5),
+    ]);
+    expect(verdict.ambiguousAllowances).toEqual(['packages/core/src/a.ts:known']);
   });
 });
 

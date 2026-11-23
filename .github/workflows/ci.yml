@@ -67,8 +67,8 @@ jobs:
     #     typecheck:packages    ~6s      format:check     ~11s
     #     ui:catalog:check      ~3s      test:coverage   ~106s
     #
-    # The ninth, `crap:ts`, is not in the table: it parses the coverage the
-    # eighth writes, ~2s on a laptop.
+    # The ninth, `crap:ts`, is not in the table: it runs no tests, only
+    # parses the coverage the eighth writes.
     #
     # Coverage is over half of it, which is the one place a split pays: the
     # seven commands here are ~87s and `coverage` below is ~106s, and each job

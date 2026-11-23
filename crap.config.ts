@@ -26,13 +26,13 @@ export const crapConfig = {
     'packages/persistence/src/',
   ],
   /*
-   * `<file>:<function>` of each function already over the threshold when the
-   * gate was added. This list only shrinks: an entry that no longer names a
+   * `<file>:<function>` of each function over the threshold that the gate
+   * lets past, with why. This list only shrinks: an entry that no longer names a
    * function over the threshold fails the gate until it is deleted, and a new
    * entry is not the way past a failure.
    */
   allow: {
     'packages/http/src/product-destination.ts:parseProductDestination':
-      'The product-URL grammar, one branch per path shape (CC 38). Fully covered; it fails on complexity alone.',
+      'The product-URL grammar: one branch per path shape, so its complexity alone is over the threshold.',
   },
 } satisfies CrapConfig;

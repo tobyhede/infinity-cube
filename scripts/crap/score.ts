@@ -6,11 +6,10 @@
  * CC is a function's cyclomatic complexity and coverage the fraction of its
  * lines a test reached. A simple or fully covered function scores about its
  * complexity; a complex, untested one scores into the hundreds. `cargo crap`
- * scores the Rust crates by the same formula; nothing maintained scores
- * TypeScript from Vitest's coverage, so this does.
+ * scores the Rust crates by the same formula.
  *
  * Everything here is pure: complexity from source text, coverage from the hit
- * counts Vitest records per line, and a verdict from both. `scripts/crap.ts` is
+ * counts Vitest records per line and per function, and a verdict from both. `scripts/crap.ts` is
  * the shell that reads the files and prints.
  */
 import ts from 'typescript';
@@ -21,6 +20,8 @@ export interface FunctionComplexity {
   readonly name: string;
   /** 1-based line the function starts on. */
   readonly startLine: number;
+  /** 0-based column it starts at, as Istanbul's `fnMap` records it. */
+  readonly startColumn: number;
   /** 1-based line the function ends on. */
   readonly endLine: number;
   /** McCabe cyclomatic complexity, counted as ESLint's `complexity` rule counts it. */
@@ -55,6 +56,8 @@ export interface CrapVerdict {
   readonly allowed: readonly ScoredFunction[];
   /** Allow-list entries that no longer name a function over the threshold. */
   readonly staleAllowances: readonly string[];
+  /** Allow-list entries whose key names more than one gated function. */
+  readonly ambiguousAllowances: readonly string[];
 }
 
 /** The score: CC² × (1 − coverage)³ + CC. */
@@ -194,9 +197,11 @@ export const functionComplexities = (
   const record = (node: ts.FunctionLikeDeclaration): void => {
     // An overload signature or abstract member declares no body to run.
     if (node.body === undefined) return;
+    const start = source.getLineAndCharacterOfPosition(node.getStart(source));
     found.push({
       name: functionName(node, source),
-      startLine: lineOf(node.getStart(source)),
+      startLine: start.line + 1,
+      startColumn: start.character,
       endLine: lineOf(node.getEnd()),
       complexity: countWithin(node),
     });
@@ -206,35 +211,68 @@ export const functionComplexities = (
   return found.sort((a, b) => a.startLine - b.startLine);
 };
 
+/** The key Istanbul's call counts are looked up by: where a function starts. */
+export const startKey = (line: number, column: number): string => `${line}:${column}`;
+
 /**
- * The coverage of each function, from the hit count of each line Vitest
- * instrumented. A line belongs to the innermost function that spans it, so a
- * nested callback's lines count toward the callback and not the function that
- * declares it. A function with no instrumented line of its own scores as
- * uncovered: code the coverage run never saw is risk too.
+ * Which function a line's hit count belongs to: the innermost one that spans
+ * it and started on an earlier line. The line a function starts on holds the
+ * statement that declares or passes it, which runs whether or not the function
+ * is ever called, so it belongs to the enclosing function. A line no function
+ * started before goes to the outermost function starting on it.
+ */
+const ownerOfLine = (functions: readonly FunctionComplexity[], line: number): number => {
+  const span = (fn: FunctionComplexity): number => fn.endLine - fn.startLine;
+  let inner = -1;
+  let outerStartingHere = -1;
+  functions.forEach((fn, index) => {
+    if (line < fn.startLine || line > fn.endLine) return;
+    if (fn.startLine < line) {
+      const current = functions[inner];
+      if (current === undefined || span(fn) <= span(current)) inner = index;
+    } else {
+      const current = functions[outerStartingHere];
+      if (current === undefined || span(fn) > span(current)) outerStartingHere = index;
+    }
+  });
+  return inner >= 0 ? inner : outerStartingHere;
+};
+
+/**
+ * The coverage of each function: the fraction of the instrumented lines it
+ * owns (`ownerOfLine`) that a test reached. Istanbul's call count overrides
+ * that where it has one for the function: never called is 0% covered, and a
+ * function with no line of its own is 100% if it was called. Otherwise a
+ * function with no line of its own takes its first line's hit, and with no
+ * hit recorded either scores as uncovered: code the coverage run never saw is
+ * risk too.
  */
 export const scoreFunctions = (
   file: string,
   functions: readonly FunctionComplexity[],
   lineHits: ReadonlyMap<number, number>,
+  callCounts: ReadonlyMap<string, number>,
 ): readonly ScoredFunction[] => {
   const lines = functions.map(() => 0);
   const hit = functions.map(() => 0);
-  const span = (fn: FunctionComplexity): number => fn.endLine - fn.startLine;
   for (const [line, hits] of lineHits) {
-    let innermost = -1;
-    functions.forEach((fn, index) => {
-      if (line < fn.startLine || line > fn.endLine) return;
-      const current = functions[innermost];
-      if (current === undefined || span(fn) <= span(current)) innermost = index;
-    });
-    if (innermost < 0) continue;
-    lines[innermost] = (lines[innermost] ?? 0) + 1;
-    if (hits > 0) hit[innermost] = (hit[innermost] ?? 0) + 1;
+    const owner = ownerOfLine(functions, line);
+    if (owner < 0) continue;
+    lines[owner] = (lines[owner] ?? 0) + 1;
+    if (hits > 0) hit[owner] = (hit[owner] ?? 0) + 1;
   }
   return functions.map((fn, index) => {
     const owned = lines[index] ?? 0;
-    const coverage = owned === 0 ? 0 : (hit[index] ?? 0) / owned;
+    const calls = callCounts.get(startKey(fn.startLine, fn.startColumn));
+    const firstLineHit = (lineHits.get(fn.startLine) ?? 0) > 0;
+    const coverage =
+      calls === 0
+        ? 0
+        : owned > 0
+          ? (hit[index] ?? 0) / owned
+          : calls !== undefined || firstLineHit
+            ? 1
+            : 0;
     return { ...fn, file, coverage, crap: crapScore(fn.complexity, coverage) };
   });
 };
@@ -245,18 +283,26 @@ export const isGated = (config: CrapConfig, file: string): boolean =>
 
 /**
  * The gate's verdict: each gated function over the threshold that the
- * allow-list does not name, and each allow-list entry that names nothing over
- * it any more, which fails too, so the list only shrinks.
+ * allow-list does not name; each allow-list entry that names nothing over it
+ * any more, which fails too, so the list only shrinks; and each entry whose
+ * key names more than one function, which fails because it would let every
+ * function of that name past.
  */
 export const judgeCrap = (config: CrapConfig, scored: readonly ScoredFunction[]): CrapVerdict => {
   const gated = scored.filter((fn) => isGated(config, fn.file));
   const over = gated.filter((fn) => fn.crap > config.threshold);
   const isAllowed = (fn: ScoredFunction): boolean => Object.hasOwn(config.allow, functionKey(fn));
   const overKeys = new Set(over.map(functionKey));
+  const gatedKeyCounts = new Map<string, number>();
+  for (const fn of gated)
+    gatedKeyCounts.set(functionKey(fn), (gatedKeyCounts.get(functionKey(fn)) ?? 0) + 1);
   return {
     gated,
     failures: over.filter((fn) => !isAllowed(fn)),
     allowed: over.filter(isAllowed),
     staleAllowances: Object.keys(config.allow).filter((key) => !overKeys.has(key)),
+    ambiguousAllowances: Object.keys(config.allow).filter(
+      (key) => (gatedKeyCounts.get(key) ?? 0) > 1,
+    ),
   };
 };

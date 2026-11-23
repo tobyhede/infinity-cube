@@ -15,24 +15,25 @@ missing = "pessimistic"
 # test runs.
 exclude = ["**/tests.rs", "build.rs"]
 
-# Functions already over the threshold when the gate was added. They are left
-# out of the report and the gate. This list only shrinks: when one comes under
-# the threshold, delete its entry. Do not add an entry to get a change past the
-# gate. `cargo crap` matches by function name, not file.
+# Functions over the threshold that the gate lets past, each with why. They are
+# left out of the report and the gate. This list only shrinks: when one comes
+# under the threshold, delete its entry. Do not add an entry to get a change past
+# the gate. `cargo crap` matches the name it reports, which qualifies a method
+# by its type (`Refusal::kind`) and a free function by nothing, so an entry
+# covers every function of that name in the three crates.
 allow = [
-    # crates/host/src/wire.rs: the JSON body of an intake refusal. No test
-    # makes the host answer one (0% covered).
+    # crates/host/src/wire.rs: the JSON body of an intake refusal, which no
+    # test makes the host answer.
     "space_error",
-    # crates/host/src/wire.rs: the JSON body of an aggregate refusal, which
-    # calls `space_error`; only its first arm is reached.
+    # crates/host/src/wire.rs: the JSON body of an aggregate refusal; no test
+    # reaches its arms past the first.
     "aggregate_error",
     # crates/host/src/product.rs: whether a product destination resolves in a
-    # snapshot; about a quarter covered.
+    # snapshot; most of its arms are untested.
     "resolves",
-    # crates/host/src/product.rs: the product-URL grammar (CC 24), about two
-    # thirds covered.
+    # crates/host/src/product.rs: the product-URL grammar, partly tested.
     "parse_destination",
-    # crates/intake/src/refusal.rs: one match arm per refusal kind (CC 37),
-    # fully covered; it fails on complexity alone.
+    # crates/intake/src/refusal.rs: one match arm per refusal kind, so its
+    # complexity alone is over the threshold.
     "Refusal::kind",
 ]

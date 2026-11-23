@@ -16,7 +16,14 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { z } from 'zod';
 import { crapConfig } from '../crap.config';
-import { functionComplexities, judgeCrap, scoreFunctions, type ScoredFunction } from './crap/score';
+import {
+  functionComplexities,
+  judgeCrap,
+  scoreFunctions,
+  startKey,
+  type CrapVerdict,
+  type ScoredFunction,
+} from './crap/score';
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -34,6 +41,11 @@ const coverageFileSchema = z.record(
     path: z.string(),
     statementMap: z.record(z.string(), z.object({ start: z.object({ line: z.number() }) })),
     s: z.record(z.string(), z.number()),
+    fnMap: z.record(
+      z.string(),
+      z.object({ loc: z.object({ start: z.object({ line: z.number(), column: z.number() }) }) }),
+    ),
+    f: z.record(z.string(), z.number()),
   }),
 );
 
@@ -49,12 +61,21 @@ const lineHitsOf = (entry: CoverageFile[string]): ReadonlyMap<number, number> =>
   return hits;
 };
 
+/** Each function Istanbul counted calls of, by where it starts. */
+const callCountsOf = (entry: CoverageFile[string]): ReadonlyMap<string, number> =>
+  new Map(
+    Object.entries(entry.fnMap).map(([id, fn]) => [
+      startKey(fn.loc.start.line, fn.loc.start.column),
+      entry.f[id] ?? 0,
+    ]),
+  );
+
 const scoreAll = (coverage: CoverageFile): readonly ScoredFunction[] =>
   Object.values(coverage).flatMap((entry) => {
     // Forward slashes on every platform, as `crap.config.ts` writes its keys.
     const file = relative(repositoryRoot, entry.path).split(sep).join('/');
     const functions = functionComplexities(file, readFileSync(entry.path, 'utf8'));
-    return scoreFunctions(file, functions, lineHitsOf(entry));
+    return scoreFunctions(file, functions, lineHitsOf(entry), callCountsOf(entry));
   });
 
 const percent = (fraction: number): string => `${(fraction * 100).toFixed(1)}%`;
@@ -83,10 +104,11 @@ interface Problem {
   readonly message: string;
 }
 
-const problemsOf = (
-  failures: readonly ScoredFunction[],
-  staleAllowances: readonly string[],
-): readonly Problem[] => [
+const problemsOf = ({
+  failures,
+  staleAllowances,
+  ambiguousAllowances,
+}: CrapVerdict): readonly Problem[] => [
   ...failures.map((fn) => ({
     file: fn.file,
     line: fn.startLine,
@@ -98,6 +120,12 @@ const problemsOf = (
     line: null,
     title: 'Stale CRAP allowance',
     message: `${key} names no function above ${crapConfig.threshold}; delete its entry`,
+  })),
+  ...ambiguousAllowances.map((key) => ({
+    file: 'crap.config.ts',
+    line: null,
+    title: 'Ambiguous CRAP allowance',
+    message: `${key} names more than one function, so it would let them all past; rename one`,
   })),
 ];
 
@@ -119,17 +147,19 @@ const main = (): number => {
     },
   });
   const coveragePath = resolve(process.cwd(), values.coverage);
-  let coverageText: string;
+  // Any failure to read or score is exit 2, so it is never mistaken for the
+  // gate's own failure, exit 1.
+  let scored: ScoredFunction[];
   try {
-    coverageText = readFileSync(coveragePath, 'utf8');
+    const coverage = coverageFileSchema.parse(JSON.parse(readFileSync(coveragePath, 'utf8')));
+    scored = [...scoreAll(coverage)].sort((a, b) => b.crap - a.crap);
   } catch (error) {
-    console.error(`crap: cannot read ${coveragePath}; run \`pnpm test:coverage\` first.`);
+    console.error(
+      `crap: cannot score ${coveragePath}; run \`pnpm test:coverage\` to write it afresh.`,
+    );
     console.error(error);
     return 2;
   }
-  const scored = [...scoreAll(coverageFileSchema.parse(JSON.parse(coverageText)))].sort(
-    (a, b) => b.crap - a.crap,
-  );
   const worst = scored.slice(0, TOP);
   const { threshold } = crapConfig;
 
@@ -141,8 +171,9 @@ const main = (): number => {
     return 0;
   }
 
-  const { gated, failures, allowed, staleAllowances } = judgeCrap(crapConfig, scored);
-  const problems = problemsOf(failures, staleAllowances);
+  const verdict = judgeCrap(crapConfig, scored);
+  const { gated, failures, allowed, staleAllowances, ambiguousAllowances } = verdict;
+  const problems = problemsOf(verdict);
   const passed = problems.length === 0;
   for (const problem of problems) printProblem(problem, values.format);
 
@@ -159,7 +190,7 @@ const main = (): number => {
 
   if (!passed) {
     console.log(
-      `\n${failures.length} gated function(s) above CRAP ${threshold}; ${staleAllowances.length} stale allowance(s). Add tests or simplify; do not add to the allow-list to pass.`,
+      `\n${failures.length} gated function(s) above CRAP ${threshold}; ${staleAllowances.length} stale and ${ambiguousAllowances.length} ambiguous allowance(s). Add tests or simplify; do not add to the allow-list to pass.`,
     );
     return 1;
   }
