@@ -5,8 +5,9 @@ The desktop application (ADR 0155): a Tauri shell that opens each Aggregate dire
 - `src-tauri/src/address.rs` — an Aggregate's origin, `infinitycube://<key>`, where `<key>` is half the SHA-256 of the folder's canonical path: the same on every launch, so the page's `localStorage` (the colour scheme) survives a restart; moving or renaming the folder gives it a new one. On Windows each Aggregate gets a scheme of its own instead (`.scratch/rust-host/issues/13-swap-the-sidecar-for-the-rust-host.md`).
 - `src-tauri/src/scheme.rs` — the scheme handler, a plain `Request -> Response` function: it answers only the Aggregate's own windows, and a change only from the Aggregate's own page, and hands everything else to the host's application unchanged.
 - `src-tauri/src/server.rs` — the seam the window code calls, and the run behind it. Closing an Aggregate's window waits for the run to write any edit not yet on disk; a write still running after ten seconds asks whether to keep waiting or close without saving (Storage ST-122), and a failed write is reported in a dialog.
-- `src-tauri/src/launch.rs` — what opens on starting. There is no home window: every window is a Space's, a window a Space's page opened, or a close's question. A folder named on the command line opens at once; with none named, or none that opens, the shell asks for one, and cancelling ends the application. File › Open… (`CmdOrCtrl+O`) asks for another folder while it runs. `tauri.conf.json` declares no window, so Tauri opens nothing by itself.
-- `src-tauri/src/new_space.rs` — a new Space written from the application, through the host's `init_directory`, as `init` writes it: File › New Space… (`CmdOrCtrl+N`) asks for an empty folder, and opening a missing or empty folder offers Create Space rather than naming `pnpm cube init`, which a presenter does not have. A folder holding anything but dot-entries is refused and nothing is written there.
+- `src-tauri/src/launch.rs` — what opens on starting, and what the last window closing does (Storage ST-131). A folder named on the command line opens at once; with none named, or none that opens, the Start window shows. Every other window is a Space's, a window a Space's page opened, or a close's question. File › Open… (`CmdOrCtrl+O`) asks for another folder with the platform's chooser while it runs. When the last window closes, macOS runs on with no window, and Linux and Windows end. `tauri.conf.json` declares no window, so Tauri opens nothing by itself.
+- `src-tauri/src/start.rs` — the Start window (Storage ST-131, UI-111), whose page is `packages/app/start.html` in the shell's own build (ADR 0172): New Space, Open Folder… and Recent (empty until the shell keeps a history). New Space, and File › New Space… (`CmdOrCtrl+N`), show a form asking for a Name (default `Untitled Space`, or the first free `Untitled Space 2`, …) and a Location (default Documents, with Browse…), and Create Space writes `<Location>/<Name>` through the host's `init_directory` and opens it, closing the Start window. A name that is not one folder name, or a folder holding anything but dot-entries, is refused beside the field with nothing written. The window holds the only invoke commands it calls, in `capabilities/start.json`, which names its label alone.
+- `src-tauri/src/new_space.rs` — a new Space written from the application, as `init` writes it, for New Space and for the offer made when a folder opened by Open Folder…, File › Open… or the command line is missing or empty: the shell offers Create Space there rather than naming `pnpm cube init`, which a presenter does not have. A folder holding anything but dot-entries is refused and nothing is written there.
 - `src-tauri/src/menu.rs` — the menus as data, per platform (ADR 0167, Storage ST-121): macOS gets the application, File, Edit, View, Window and Help menus; Linux and Windows get File, View and Help. Help › InfinityCube Help and Report an Issue… open the repository in the system browser, About names the version and commit, and Check for Updates… asks the updater on demand.
 
 The close question window (`ui/closing.html`) sits outside UI-1's shadcn-first rule (`docs/requirements/ui.md`): this package imports none of our packages, which its `no-restricted-imports` zone in `eslint.config.js` forbids, and it is a static page with two buttons, not the React application, so its hand-rolled `<button>`s and `closing.css` record no deviation.
@@ -17,18 +18,19 @@ Needs Node ≥ 26.8.1 and pnpm 9 (for the browser application), Rust, and [Tauri
 
 ```sh
 pnpm install
-pnpm --filter @project/desktop build   # the browser application, then every bundle for this platform
+pnpm --filter @project/desktop build   # the browser application and the shell's own pages, then every bundle for this platform
 ```
 
-On Linux, to build only the `.deb`, build the browser application first, since `tauri build` alone does not:
+On Linux, to build only the `.deb`, build the browser application and the shell's own pages first (ADR 0172), since `tauri build` alone does not:
 
 ```sh
 pnpm --filter @project/app exec vite build
+pnpm --filter @project/app desktop-shell:build
 pnpm --filter @project/desktop tauri build --bundles deb
 ```
 
 Bundles are written under `target/release/bundle/` at the repository root, such as `target/release/bundle/deb/InfinityCube_0.0.0_amd64.deb`.
 
-For a quick run without bundling: `pnpm --filter @project/app exec vite build` once, then `cargo build -p infinity-cube-desktop` from the repository root and `target/debug/infinity-cube-desktop <Aggregate directory>` (the Cargo workspace's `target/` is at the root). `cargo test -p infinity-cube-desktop` (or `cargo nextest run`) runs the scheme handler against a copy of `packages/app/fixture` without opening a window.
+For a quick run without bundling: `pnpm --filter @project/app exec vite build` and `pnpm --filter @project/app desktop-shell:build` once, then `cargo build -p infinity-cube-desktop` from the repository root and `target/debug/infinity-cube-desktop <Aggregate directory>` (the Cargo workspace's `target/` is at the root). `cargo test -p infinity-cube-desktop` (or `cargo nextest run`) runs the scheme handler against a copy of `packages/app/fixture` without opening a window.
 
 Each preview release attaches a macOS build for Apple silicon, made by `pnpm release:build --desktop` (Storage ST-130). On macOS a bundle is ad-hoc signed, not signed with a Developer ID or notarized, so allow it once under System Settings › Privacy & Security › Open Anyway.

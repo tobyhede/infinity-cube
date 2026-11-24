@@ -3,7 +3,7 @@
 Status: accepted
 Date: 2026-11-18
 Refines: 0030, 0034, 0095, 0117, 0119, 0124
-Refined by: 0165, 0167
+Refined by: 0165, 0167, 0172
 Related: 0071, 0078, 0109, 0130, 0141, 0156, 0157
 
 InfinityCube is to be installed and run by presenters who are not its developers: a desktop application they download, open an Aggregate directory in, and edit. Today every server-side host is TypeScript on Node 26.8.1 (ADR 0071), and Running serves through Vite's development server, so it needs a clone of the repository, Node and pnpm. ADR 0034 already makes the HTTP application Fetch-native and calls the Node and Vite wiring "prototype composition, not architectural constraints". The maintainer decided on 16 November 2026 to move the server side to Rust and to ship the desktop application with Tauri, and on 17 November 2026 that the desktop application ships first on the existing Node host rather than waiting for Rust: working code before the port. The research behind this is `.scratch/desktop-app/research.md`; the plan is `.scratch/rust-host/spec.md`.

@@ -4,7 +4,7 @@
 
 use std::process::ExitCode;
 
-use host::{Initialized, RandomIds, TokioFilesystem, init_directory};
+use host::{Initialized, NEW_SPACE_TITLE, RandomIds, TokioFilesystem, init_directory};
 
 use crate::describe::shell_word;
 use crate::output::{answer, say};
@@ -14,7 +14,7 @@ use crate::output::{answer, say};
 pub(crate) async fn init(directory: &std::path::Path) -> ExitCode {
     let directory = std::path::absolute(directory).unwrap_or_else(|_| directory.to_path_buf());
     let shown = directory.display().to_string();
-    match init_directory(&TokioFilesystem, &directory, &RandomIds).await {
+    match init_directory(&TokioFilesystem, &directory, NEW_SPACE_TITLE, &RandomIds).await {
         Ok(Initialized::Written) => {
             answer(&format!(
                 "Created a new aggregate; run it with: infinity-cube run {}",

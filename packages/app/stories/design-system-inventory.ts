@@ -50,6 +50,11 @@ export const uncataloguedComponents = [
       'The mount entry point (ADR 0130): one `createRoot` call and the mount composition, rendering `GitHubLocationForm` when the page has no location to mount.',
   },
   {
+    module: 'packages/app/src/start-main.tsx',
+    reason:
+      "The desktop shell's Start window entry point (`start.html`): one `createRoot` call rendering `StartPage` over the shell's invoke commands, which only the desktop shell answers; `Components/Start Window` renders `StartPage` itself.",
+  },
+  {
     module: 'packages/resource-api/src/view/testing.tsx',
     reason:
       "The Resource API's test host (ADR 0142): `renderPlugin` draws a plugin's view in a plugin's own tests, and the lint zone keeps it out of every plugin's source, so no production surface or story renders it.",

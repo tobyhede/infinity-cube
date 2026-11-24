@@ -165,6 +165,7 @@ export {
   ShowTitleIcon,
   EntityActionsIcon,
   FitViewIcon,
+  FolderOpenIcon,
   GraphIcon,
   ImageIcon,
   MapIcon,
@@ -276,6 +277,18 @@ export {
   FieldTitle,
 } from './components/field';
 export { Input } from './components/input';
+export {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemFooter,
+  ItemGroup,
+  ItemHeader,
+  ItemMedia,
+  ItemSeparator,
+  ItemTitle,
+} from './components/item';
 export {
   InputGroup,
   InputGroupAddon,
