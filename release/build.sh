@@ -159,6 +159,10 @@ pnpm install --frozen-lockfile
 
 step "Building the browser application the binary embeds"
 pnpm --filter @project/app exec vite build
+if [ "$desktop" = 1 ]; then
+	step "Building the desktop shell's own pages (the Start window, the close question)"
+	pnpm --filter @project/app desktop-shell:build
+fi
 
 if command -v rustup >/dev/null 2>&1; then
 	rustup toolchain install

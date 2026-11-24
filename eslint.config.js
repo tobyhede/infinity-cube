@@ -249,6 +249,7 @@ export default tseslint.config(
       '**/dist/**',
       '**/dist-http/**',
       '**/dist-desktop-sidecar/**',
+      '**/dist-desktop-shell/**',
       '**/dist-mount/**',
       // The Cargo workspace's target directory.
       'target/**',

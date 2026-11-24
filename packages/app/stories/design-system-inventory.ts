@@ -50,6 +50,16 @@ export const uncataloguedComponents = [
       'The mount entry point (ADR 0130): one `createRoot` call and the mount composition, rendering `GitHubLocationForm` when the page has no location to mount.',
   },
   {
+    module: 'packages/app/src/start-main.tsx',
+    reason:
+      "The desktop shell's Start window entry point (`start.html`): one `createRoot` call rendering `StartPage`.",
+  },
+  {
+    module: 'packages/app/src/components/StartPage.tsx',
+    reason:
+      'A throwaway: the spike in `.scratch/start-window/issues/05` proving the Start window is served from this build, one Button invoking one shell command, which only the desktop shell can answer. Ticket 02 replaces it with the Start window ST-131 states, catalogued.',
+  },
+  {
     module: 'packages/resource-api/src/view/testing.tsx',
     reason:
       "The Resource API's test host (ADR 0142): `renderPlugin` draws a plugin's view in a plugin's own tests, and the lint zone keeps it out of every plugin's source, so no production surface or story renders it.",

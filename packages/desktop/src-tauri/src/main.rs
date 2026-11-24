@@ -36,6 +36,7 @@ mod question;
 mod saving;
 mod scheme;
 mod server;
+mod start;
 #[cfg(test)]
 mod test_support;
 mod update;
@@ -743,7 +744,10 @@ fn main() {
         );
     }
     let app = builder
-        .invoke_handler(tauri::generate_handler![answer_closing])
+        .invoke_handler(tauri::generate_handler![
+            answer_closing,
+            start::start_window_ping
+        ])
         .on_menu_event(|app, event| {
             if let Some(command) = Command::named(event.id().as_ref()) {
                 answer_menu(app, command);
@@ -766,6 +770,12 @@ fn main() {
             // A directory named on the command line opens at once, as one
             // chosen from File › Open… would; with none named, the shell
             // asks for one.
+            // The spike's Start window (`start.rs`), in a debug build asked
+            // for it, in place of everything a launch would open.
+            if start::opens_at_launch(std::env::var_os(start::SPIKE_VARIABLE).as_deref()) {
+                start::open(app.handle())?;
+                return Ok(());
+            }
             match launch::launch(std::env::args_os().skip(1)) {
                 Launch::Choose => choose_folder(app.handle(), Opening::AtLaunch),
                 Launch::Folders(folders) => {
