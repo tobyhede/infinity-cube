@@ -465,4 +465,17 @@ The snapshot marker moved from `a0f5066` to `f6e01b9`; the highest accepted ADR 
 |---|---|
 | 0165 | reviewed, no rule here: Prisma Next and `sqlx` apply one schema history in two encodings, held equal by tests; restated in ST-125 |
 | Code since `a0f5066`: PR 506 (the plain-SQL migrations under `migrations-sql/` and their tests) and PR 502 (the README's Running and SQLite sections, the `infinity-cube` plugin skills, and Storage ST-126–ST-128) | no behaviour this doc states |
+
+## Refresh to `3f6aa29` (24 November 2026)
+
+The snapshot marker moved from `f6e01b9` to `3f6aa29` and to accepted ADRs through 0172; no ADR 0170 is on main at that commit. Each ADR accepted above the old marker was read for rules this doc owns, and each change main merged since `f6e01b9`'s refresh (PR 503) was read for behaviour this doc states. The 0171 row was recorded under the previous refresh when PR 527 restated it, and is moved here.
+
+| Source | Disposition |
+|---|---|
+| 0167 the page's no-modifier rule and ADR 0138's keymap govern the keys the page answers, not a native menu's accelerators, which are the platform's (`CmdOrCtrl+N`, `CmdOrCtrl+O`, `CmdOrCtrl+Q`) | → UI-8. The menus themselves → ST (ST-121) |
+| 0167 no home window; creating a Space only when asked | reviewed, no rule here: windows and creation → ST (ST-121, ST-131) |
+| 0168 `CmdOrCtrl+W` and, on Linux and Windows, `F11` | → UI-8. The menus, Help and Check for Updates… → ST (ST-121) |
+| 0169 | reviewed, no rule here: a preview build is a normal release the updater finds at `releases/latest`; restated in ST-130 |
 | 0171 the desktop application's Start window | → UI-111 (**built**, but Recent's entries until ST-131 keeps a history), its layout and controls from the design accepted in `.scratch/start-window/issues/01-design-the-start-window.md`; its open details → Open questions; a write failing after Create Space → UI-111 (the form kept, ticket 02); its behaviour → ST-131 (the Start window and New Space **built**, reopening and Recent **not built**) |
+| 0172 | reviewed, no rule here: the Start window's page is an entry of the shell's own build; restated in ST-131. UI-111's components from `@project/ui` are unchanged by where the page is built |
+| Code since PR 503: PR 517 and PR 524 (the native menus' accelerators), PR 527 (the Start window's page, `app/src/start-refusal.ts`, and `@project/ui`'s `Item` components and `FolderOpenIcon`) | → UI-8 and UI-111, reconciled on main with each PR; no other UI behaviour changed |

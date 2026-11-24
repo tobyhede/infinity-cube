@@ -2,7 +2,7 @@
 
 **Purpose:** what the canvas draws and its geometry: what the host draws around a Resource and what its plugin draws inside its rect, Resources Closed and Open, Title Lines, Shapes, Graph colour and receding, Edges (anchors, facing side, lanes, head shapes), the Edge-drawing gesture as drawn, drawn Maps, the camera, and the rules for React Flow.
 
-**Snapshot:** checked against `f6e01b9` (2026-11-21); incorporates accepted ADRs through 0166. ADRs accepted after it bind where they differ, until this document is updated. Proposed ADR 0163 is not incorporated.
+**Snapshot:** checked against `3f6aa29` (2026-11-24); incorporates accepted ADRs through 0172 (no ADR 0170 is on main at that commit). ADRs accepted after it bind where they differ, until this document is updated. Proposed ADR 0163 is not incorporated.
 
 Conflicts, open and closed, are listed in [conflicts/rendering.md](conflicts/rendering.md). Sources are traced in [trace/rendering.md](trace/rendering.md).
 

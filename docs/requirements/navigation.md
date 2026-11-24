@@ -2,7 +2,7 @@
 
 **Purpose:** what changes what is shown without writing the Space: choosing a Map, selection, traversal, product URLs and browser history, Open Spaces, and presenting.
 
-**Snapshot:** checked against `f6e01b9` (2026-11-21); incorporates accepted ADRs through 0166. ADRs accepted after it bind where they differ, until this document is updated. Proposed ADR 0163 is not incorporated.
+**Snapshot:** checked against `3f6aa29` (2026-11-24); incorporates accepted ADRs through 0172 (no ADR 0170 is on main at that commit). ADRs accepted after it bind where they differ, until this document is updated. Proposed ADR 0163 is not incorporated.
 
 Open conflicts are listed in [conflicts/navigation.md](conflicts/navigation.md). Sources are traced in [trace/navigation.md](trace/navigation.md).
 

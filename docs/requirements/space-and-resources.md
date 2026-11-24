@@ -2,7 +2,7 @@
 
 **Purpose:** what a Space and a Resource are, what a kind and its plugin are, what each kind holds, how Resources and Spaces are created and deleted, what a Space Resource and a Reference Resource point at, and what happens to a Resource whose kind no plugin in the build draws.
 
-**Snapshot:** checked against `f6e01b9` (2026-11-21); incorporates accepted ADRs through 0166. ADRs accepted after it bind where they differ, until this document is updated. Proposed ADR 0163 is not incorporated.
+**Snapshot:** checked against `3f6aa29` (2026-11-24); incorporates accepted ADRs through 0172 (no ADR 0170 is on main at that commit). ADRs accepted after it bind where they differ, until this document is updated. Proposed ADR 0163 is not incorporated.
 
 Conflicts, open and closed, are listed in [conflicts/space-and-resources.md](conflicts/space-and-resources.md). Sources are traced in [trace/space-and-resources.md](trace/space-and-resources.md).
 

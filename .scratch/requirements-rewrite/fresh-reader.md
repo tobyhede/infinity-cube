@@ -118,3 +118,13 @@ Written for the refresh to `f6e01b9`, from ADR 0165 and the SQLite rules main me
 | RF-Q7 | I run `pnpm cube import --store sqlite` while `pnpm dev:sqlite` has the file open. What happens? | Unsupported: one process per file. Whichever operation meets the other's lock fails at once, or waits out the driver's busy timeout synchronously and then fails, or succeeds if the lock clears in time; an HTTP request meeting such a failure answers 503 `persistence-unavailable`, never 409, and nothing is left part-written or locked. | ADR 0095; ST-127; `AGENTS.md` |
 
 Self-check only (this run delegated nothing): each expected answer was read back against ST-125 and ST-127 as they stand after this refresh, and matched. No independent reader ran them.
+
+## Refresh questions (24 November 2026)
+
+Written for the refresh to `3f6aa29`, from ADRs 0167–0169, 0171 and 0172, before this refresh's edits.
+
+| # | Question | Expected answer | Source |
+|---|---|---|---|
+| RF-Q8 | A person launches the desktop application with no folder named, after quitting with a Space open. What opens, and is that built? | The decided behaviour is that the Spaces open when the last quit began reopen, each still present, and the Start window shows only if none opens. Reopening is **not built** (ticket 03): the shell keeps no set to reopen yet, so the Start window shows, with an empty Recent. | ADR 0171; ST-131, ST-121 |
+| RF-Q9 | Which releases does an installed desktop build offer as an update, and where does it look? | It reads `releases/latest/download/latest.json`, the manifest attached to the newest published release, which is created as a draft marked latest and not a pre-release; a draft, a pre-release or a release not marked latest is offered to no installed build. | ADR 0169; ST-130 |
+| RF-Q10 | I want a Space window's page to call a new Tauri command. May it, and which pages may invoke commands? | No: Space windows hold no IPC permission. Only the shell's own pages may, each served from the shell's own build (`packages/app/dist-desktop-shell`, the `frontendDist`), never from `dist`, which the host serves to Space windows, and each granted by a capability naming its window's label alone (the Start window's `capabilities/start.json`; the close question answers its own question). | ADR 0171, 0172; ST-121, ST-131, ST-122 |

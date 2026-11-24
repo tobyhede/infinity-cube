@@ -371,3 +371,16 @@ The snapshot marker moved from `a0f5066` to `f6e01b9`; the highest accepted ADR 
 |---|---|
 | 0165 | reviewed, no rule here: Prisma Next and `sqlx` apply one schema history in two encodings, held equal by tests; restated in ST-125 |
 | Code since `a0f5066`: PR 506 (the plain-SQL migrations under `migrations-sql/` and their tests) and PR 502 (the README's Running and SQLite sections, the `infinity-cube` plugin skills, and Storage ST-126–ST-128) | no behaviour this doc states |
+
+## Refresh to `3f6aa29` (24 November 2026)
+
+The snapshot marker moved from `f6e01b9` to `3f6aa29` and to accepted ADRs through 0172; no ADR 0170 is on main at that commit. Each ADR accepted above the old marker was read for rules this doc owns, and each change main merged since `f6e01b9`'s refresh (PR 503) was read for behaviour this doc states.
+
+| Source | Disposition |
+|---|---|
+| 0167 | reviewed, no rule here: the desktop application has no home window, opens folders from native menus and creates a Space only when asked; restated in ST-121 and UI-8 |
+| 0168 | reviewed, no rule here: each platform's standard menus, Help in the system browser, one update check at a time; restated in ST-121 and UI-8 |
+| 0169 | reviewed, no rule here: a preview build is a normal release the updater finds at `releases/latest`; restated in ST-129 and ST-130 |
+| 0171 | reviewed, no rule here: the desktop application's Start window, New Space, reopening and Recent; restated in ST-131 and UI-111 |
+| 0172 | reviewed, no rule here: the shell's own pages are a second build of the browser application; restated in ST-131 |
+| Code since PR 503: PRs 513, 516, 522 and 526 (the install script, the preview builds and the updater), 517 and 524 (the desktop shell's windows and menus), 527 (the Start window, its page and `@project/ui`'s `Item`), 525 (the CRAP gate), and 514, 523 and 515 (documentation) | no behaviour this doc states |
