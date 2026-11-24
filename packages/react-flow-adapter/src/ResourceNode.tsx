@@ -22,6 +22,7 @@ import { AUTHORING_HANDLE_DIAMETER } from './authoring-handle';
 import { useConnectionEndEligible } from './connection-end-eligibility';
 import { useConnectionTargetProximity } from './connection-target-proximity';
 import { offersConnectionEnd } from './connection-target-reveal';
+import { proportionalSize, type ResizeSize } from './proportional-resize';
 
 /**
  * React Flow custom node: a drawn Resource with one Edge anchor on each of its four
@@ -200,7 +201,7 @@ export function ResourceNode({
     resizeOperation.current = resize;
   }, [resize]);
   const resizing = useRef(false);
-  const resizeRatio = useRef<number>();
+  const resizeStart = useRef<ResizeSize>();
   const [resizeActive, setResizeActive] = useState(false);
   /*
    * Narrow interactive deviation for cancellation the specialist control does
@@ -255,8 +256,10 @@ export function ResourceNode({
    */
   const beginResize = useCallback<OnResizeStart>((event, start) => {
     const source: unknown = event.sourceEvent;
-    resizeRatio.current =
-      source instanceof MouseEvent && source.shiftKey ? start.width / start.height : undefined;
+    resizeStart.current =
+      source instanceof MouseEvent && source.shiftKey
+        ? { width: start.width, height: start.height }
+        : undefined;
     resizing.current = true;
     setResizeActive(true);
     resizeOperation.current?.onResizeStart();
@@ -278,18 +281,14 @@ export function ResourceNode({
    */
   const proposeResize = useCallback<ShouldResize>((_event, next) => {
     if (!resizing.current) return false;
-    const ratio = resizeRatio.current;
+    const start = resizeStart.current;
     const operation = resizeOperation.current;
-    if (ratio === undefined || operation === undefined) {
+    if (start === undefined || operation === undefined) {
       operation?.onResize({ width: next.width, height: next.height });
     } else {
-      const width = Math.max(
-        next.width,
-        next.height * ratio,
-        operation.minWidth,
-        operation.minHeight * ratio,
+      operation.onResize(
+        proportionalSize(start, next, { width: operation.minWidth, height: operation.minHeight }),
       );
-      operation.onResize({ width, height: width / ratio });
     }
     return false;
   }, []);
@@ -386,6 +385,14 @@ export function ResourceNode({
             }}
             aria-hidden="true"
           />
+          {/*
+            `nokey` is what lets a proportional Resize start at all. Shift is
+            React Flow's selection key, and while it is held the pane's
+            capture-phase `pointerdown` begins a selection box and stops the
+            event before the control sees it, unless the target sits inside a
+            `.nokey`. Without it every Shift-drag test in
+            `app/e2e/aspect-ratio-resizing.spec.ts` fails with the rect unchanged.
+          */}
           <NodeResizeControl
             position="bottom-right"
             minWidth={resize.minWidth}

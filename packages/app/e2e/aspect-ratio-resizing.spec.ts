@@ -95,6 +95,9 @@ for (const example of [
     await resource.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
+    const status = page.getByTestId('persistence-status');
+    await expect(status).toHaveText('Persisted');
+    const revision = Number(await status.getAttribute('data-revision'));
     const handle = await boxOf(
       resource.locator('.react-flow__resize-control.handle.bottom.right'),
       'resize control',
@@ -107,7 +110,10 @@ for (const example of [
     await expect(resource).toHaveCSS('height', `${example.floorHeight}px`);
     await page.mouse.up();
     await page.keyboard.up('Shift');
-    await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+    // The seed already reads Persisted, so only the revision moving shows the
+    // Resize Edit has landed before the reload.
+    await expect(status).toHaveAttribute('data-revision', String(revision + 1));
+    await expect(status).toHaveText('Persisted');
     await page.reload();
     await expect(nodeByTitle(page, 'A').first()).toHaveCSS('width', `${example.floorWidth}px`);
     await expect(nodeByTitle(page, 'A').first()).toHaveCSS('height', `${example.floorHeight}px`);
@@ -149,6 +155,8 @@ test('pressing Shift after a free Resize starts keeps that drag free', async ({ 
   await selectCanvas(page, 'Collection 1');
   const resource = nodeByTitle(page, 'A').first();
   await selectResource(resource);
+  const status = page.getByTestId('persistence-status');
+  const revision = Number(await status.getAttribute('data-revision'));
   const before = await resource.evaluate((element) => ({
     width: Number.parseFloat(getComputedStyle(element).width),
     height: Number.parseFloat(getComputedStyle(element).height),
@@ -165,7 +173,7 @@ test('pressing Shift after a free Resize starts keeps that drag free', async ({ 
   await page.mouse.move(handle.x + 184, handle.y + 44, { steps: 3 });
   await page.mouse.up();
   await page.keyboard.up('Shift');
-  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+  await expect(status).toHaveAttribute('data-revision', String(revision + 1));
   const after = await resource.evaluate((element) => ({
     width: Number.parseFloat(getComputedStyle(element).width),
     height: Number.parseFloat(getComputedStyle(element).height),

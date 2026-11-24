@@ -467,7 +467,7 @@ The snapshot marker moved from `a0f5066` to `f6e01b9`; the highest accepted ADR 
 | Code since `a0f5066`: PR 506 (the plain-SQL migrations under `migrations-sql/` and their tests) and PR 502 (the README's Running and SQLite sections, the `infinity-cube` plugin skills, and Storage ST-126–ST-128) | no behaviour this doc states |
 | 0171 the desktop application's Start window | → UI-111 (**built**, but Recent's entries until ST-131 keeps a history), its layout and controls from the design accepted in `.scratch/start-window/issues/01-design-the-start-window.md`; its open details → Open questions; a write failing after Create Space → UI-111 (the form kept, ticket 02); its behaviour → ST-131 (the Start window and New Space **built**, reopening and Recent **not built**) |
 
-### ADR 0165
+### ADR 0173
 
 | Source | Disposition |
 |---|---|

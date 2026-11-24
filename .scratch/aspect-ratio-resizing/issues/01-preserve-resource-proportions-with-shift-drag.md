@@ -17,4 +17,4 @@
 
 Shift held when the drag starts preserves the Resource’s current Map rect ratio through release. The existing control bypasses React Flow’s Shift-selection interception. Its stable proposal callback scales both dimensions together while respecting the Closed Size floor.
 
-The browser specification proves proportional preview and persistence, the fixed top-left origin, neighbour positions during preview, both floor examples, and cancellation. The existing mouse and touch Resize proofs exercise ordinary drags. ADR 0165 refines ADR 0122, and UI-67 and UI-68 carry the current gesture and minimum-size requirements.
+The browser specification proves proportional preview and persistence, the fixed top-left origin, neighbour positions during preview, both floor examples, and cancellation. The existing mouse and touch Resize proofs exercise ordinary drags. ADR 0173 refines ADR 0122, and UI-67 and UI-68 carry the current gesture and minimum-size requirements.
