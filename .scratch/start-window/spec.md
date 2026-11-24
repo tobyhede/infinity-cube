@@ -23,4 +23,4 @@
 2. [Build the Start window](issues/02-build-the-start-window.md): blocked by 04 and 05.
 3. [Reopen recent Spaces at launch](issues/03-reopen-recent-spaces-at-launch.md): blocked by 02 for the Start window's entries.
 4. [New Space's folder rules and Title in the host](issues/04-new-space-folder-rules-in-the-host.md): no blocker.
-5. [Decide how the Start window's React page is built and served](issues/05-serve-the-start-windows-react-page.md): a spike, no blocker.
+5. [Serve the Start window's React page from the app's build](issues/05-serve-the-start-windows-react-page.md): a spike, no blocker.

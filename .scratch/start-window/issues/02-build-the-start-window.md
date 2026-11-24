@@ -2,7 +2,7 @@
 
 **Status:** ready-for-agent
 
-**Blocked by:** 04 (the folder rules and Title), 05 (how its page is built and served). 01 is done.
+**Blocked by:** 04 (the folder rules and Title), 05 (its page served from the app's build). 01 is done.
 
 **What to build:** The Start window as ST-131 states it, to the design 01 accepts: a window the shell opens itself (`tauri.conf.json` still declares none), drawn by a React entry built from `@project/ui`, holding the only invoke commands it calls (create, open, browse, the recent list) in a capability naming its label alone. It shows at launch when nothing else opens and for File › New Space…, and closes when a Space window opens from it. New Space writes `<location>/<name>` through the host's `init_directory` with the Title, and refuses and defaults its name, by 04's functions. Its page is built and served as 05 decides. The launch decision in `launch.rs` moves from asking for a folder to showing the Start window, and the last-window rule (macOS runs on, Linux and Windows end) is decided there too.
 
