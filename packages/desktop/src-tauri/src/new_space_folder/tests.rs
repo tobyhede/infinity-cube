@@ -16,21 +16,28 @@ use super::*;
 
 /// Folders by path, each with the names it holds; a path not listed is missing.
 #[derive(Default)]
-struct Folders(BTreeMap<PathBuf, Vec<&'static str>>);
+struct Folders(BTreeMap<PathBuf, Vec<String>>);
 
 impl Folders {
-    fn with(mut self, folder: &str, names: &[&'static str]) -> Self {
-        self.0.insert(PathBuf::from(folder), names.to_vec());
+    /// `folder` holding `names`, and listed in its parent, as on a disk.
+    fn with(mut self, folder: &str, names: &[&str]) -> Self {
+        let folder = PathBuf::from(folder);
+        if let (Some(parent), Some(name)) = (folder.parent(), folder.file_name()) {
+            let siblings = self.0.entry(parent.to_path_buf()).or_default();
+            let name = name.to_string_lossy().into_owned();
+            if !siblings.contains(&name) {
+                siblings.push(name);
+            }
+        }
+        let held = self.0.entry(folder).or_default();
+        held.extend(names.iter().map(|&name| name.to_owned()));
         self
     }
 }
 
 impl Listing for Folders {
     fn names(&self, folder: &Path) -> io::Result<Option<Vec<String>>> {
-        Ok(self
-            .0
-            .get(folder)
-            .map(|names| names.iter().map(|name| (*name).to_owned()).collect()))
+        Ok(self.0.get(folder).cloned())
     }
 }
 

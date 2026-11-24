@@ -23,22 +23,12 @@ use tokio::sync::oneshot;
 use crate::launch::{self, Opening};
 use crate::new_space;
 use crate::new_space_folder::{
-    FolderListing, Listing, Platform, Refused, default_name, is_free, new_space_folder,
+    FolderListing, Listing, Platform, Refused, UNTITLED, default_name, is_free, new_space_folder,
 };
 use crate::not_opened::NotOpened;
 
 /// The Start window's label, the one its capability names.
 pub const START_WINDOW_LABEL: &str = "start";
-
-/// The platform whose folder names New Space holds a name to.
-const PLATFORM: Platform = if cfg!(windows) {
-    Platform::Windows
-} else {
-    Platform::Unix
-};
-
-/// The name New Space offers when none can be worked out.
-const UNTITLED: &str = "Untitled Space";
 
 /// Which screen the Start window opens on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -364,7 +354,8 @@ fn location_here(app: &AppHandle) -> PathBuf {
 
 /// What the page draws first: the recent Spaces, and the form's defaults.
 /// Nothing is kept across launches yet (ticket 03), so Recent is empty.
-#[tauri::command]
+/// Async, so listing Documents runs off the main thread.
+#[tauri::command(async)]
 pub fn start_window_view(app: AppHandle) -> Value {
     json!({
         "recents": [],
@@ -398,19 +389,14 @@ pub async fn start_browse(app: AppHandle, location: String) -> Option<Value> {
 #[tauri::command]
 pub async fn start_create_space(app: AppHandle, location: String, name: String) -> Option<Value> {
     let created = tauri::async_runtime::spawn_blocking(move || {
-        let written = {
-            // One Space is written at a time: `CREATING` is held here and by
-            // `crate::create_and_open`.
-            let _creating = crate::lock(&crate::CREATING);
-            tauri::async_runtime::block_on(create_new_space(
-                &FolderListing,
-                &TokioFilesystem,
-                &RandomIds,
-                Path::new(&location),
-                &name,
-                PLATFORM,
-            ))
-        }?;
+        let written = crate::one_write_at_a_time(create_new_space(
+            &FolderListing,
+            &TokioFilesystem,
+            &RandomIds,
+            Path::new(&location),
+            &name,
+            Platform::CURRENT,
+        ))?;
         match crate::open_aggregate_at(&app, &written) {
             Ok(opened) if launch::closes_start(Opening::StartWindow, opened) => {
                 close(&app);

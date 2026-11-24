@@ -4,6 +4,7 @@
 //! default name it offers. The decisions are pure; what a folder holds is
 //! asked of a [`Listing`], which a test fakes.
 
+use std::collections::HashSet;
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -45,8 +46,18 @@ pub enum Platform {
     Windows,
 }
 
-/// Why New Space would write nothing for a name. Its text is shown beside
-/// the field.
+impl Platform {
+    /// The platform this build runs on.
+    pub const CURRENT: Self = if cfg!(windows) {
+        Self::Windows
+    } else {
+        Self::Unix
+    };
+}
+
+/// Why New Space would write nothing for a name. The page words each name
+/// refusal itself, by code (`packages/app/src/start-refusal.ts`); this text
+/// is shown only for [`Refused::Unlisted`].
 #[derive(Debug, thiserror::Error)]
 pub enum Refused {
     /// Empty, `.` or `..`, or holding a path separator.
@@ -132,16 +143,16 @@ pub fn new_space_folder(
     if matches!(name, "" | "." | "..") || name.contains(['/', '\\']) {
         return Err(Refused::NotAFolderName);
     }
-    if platform == Platform::Windows
-        && let Some(forbidden) = name.chars().find(|c| WINDOWS_FORBIDDEN.contains(c))
-    {
-        return Err(Refused::ForbiddenCharacter(forbidden));
-    }
-    if platform == Platform::Windows && is_reserved_on_windows(name) {
-        return Err(Refused::Reserved);
-    }
-    if platform == Platform::Windows && name.ends_with(['.', ' ']) {
-        return Err(Refused::TrailingDotOrSpace);
+    if platform == Platform::Windows {
+        if let Some(forbidden) = name.chars().find(|c| WINDOWS_FORBIDDEN.contains(c)) {
+            return Err(Refused::ForbiddenCharacter(forbidden));
+        }
+        if is_reserved_on_windows(name) {
+            return Err(Refused::Reserved);
+        }
+        if name.ends_with(['.', ' ']) {
+            return Err(Refused::TrailingDotOrSpace);
+        }
     }
     let folder = location.join(name);
     match is_free(listing, &folder) {
@@ -170,12 +181,19 @@ pub fn new_space_folder(
 /// be listed. The location is listed first, so a location that is a file is
 /// refused rather than passed over name after name.
 pub fn default_name(listing: &impl Listing, location: &Path) -> Result<String, Refused> {
-    listing
+    let taken: HashSet<String> = listing
         .names(location)
-        .map_err(|source| unlisted(location, source))?;
+        .map_err(|source| unlisted(location, source))?
+        .unwrap_or_default()
+        .into_iter()
+        .collect();
     let mut name = String::from(UNTITLED);
     let mut number: u64 = 1;
     loop {
+        // A name the location does not list is free without looking.
+        if !taken.contains(&name) {
+            return Ok(name);
+        }
         let candidate = location.join(&name);
         match listing.names(&candidate) {
             Ok(names) if holds_nothing(names.as_deref()) => return Ok(name),
@@ -188,8 +206,9 @@ pub fn default_name(listing: &impl Listing, location: &Path) -> Result<String, R
     }
 }
 
-/// The default name's stem.
-const UNTITLED: &str = "Untitled Space";
+/// The default name's stem, and the name offered when none can be worked
+/// out.
+pub const UNTITLED: &str = "Untitled Space";
 
 #[cfg(test)]
 mod tests;

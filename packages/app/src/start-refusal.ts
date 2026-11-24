@@ -1,4 +1,4 @@
-import type { NotCreated } from './start-shell';
+import type { NewSpaceDefaults, NotCreated } from './start-shell';
 
 /**
  * Every sentence the Start window's New Space form shows about a Create
@@ -24,13 +24,6 @@ export interface StartRefusalWords {
   readonly detail: string | null;
   /** The folder Open Folder… opens: a Space written and not opened. */
   readonly openFolder: string | null;
-}
-
-/** What the form sent when Create Space was pressed. */
-export interface CreateSpaceAttempt {
-  readonly location: string;
-  readonly separator: string;
-  readonly name: string;
 }
 
 /**
@@ -101,7 +94,7 @@ function nameSentence(
 /** The sentence for `notCreated`, worded from the attempt that met it, and where it shows. */
 export function describeNotCreated(
   notCreated: NotCreated,
-  attempt: CreateSpaceAttempt,
+  attempt: NewSpaceDefaults,
 ): StartRefusalWords {
   const location = lastFolder(attempt.location, attempt.separator);
   switch (notCreated.of) {

@@ -385,52 +385,41 @@ fn choose_folder(app: &AppHandle, opening: Opening) {
 
 /// Open `folder`, asked for from `opening`, offering a new Space in one that
 /// holds none and saying why one did not open, returning once the presenter
-/// has answered, and whether a Space opened. A Space window that shows
-/// from the Start window closes it ([`launch::closes_start`]); at launch
-/// with nothing open, a folder that did not open shows it
-/// ([`launch::after`]).
-fn open_from(app: &AppHandle, folder: &Path, opening: Opening) -> bool {
+/// has answered. A Space window that shows from the Start window closes it
+/// ([`launch::closes_start`]). Only a launch is left with no window, and a
+/// launch opens through [`open_from_command_line`], so a folder that did
+/// not open here leaves the windows as they are.
+fn open_from(app: &AppHandle, folder: &Path, opening: Opening) {
     let opened = match open_aggregate_at(app, folder) {
         Ok(opened) => Some(opened),
         Err(reason) => answer(app, reason),
     };
-    match opened {
-        Some(opened) => {
-            if launch::closes_start(opening, opened) {
-                start::close(app);
-            }
-            true
-        }
-        None => {
-            if next(app, opening) == Next::ShowStart {
-                start::show(app, start::Screen::Start);
-            }
-            false
-        }
+    if opened.is_some_and(|opened| launch::closes_start(opening, opened)) {
+        start::close(app);
     }
 }
 
 /// Write a new Space, titled as `init` titles one, to `directory` and open
 /// it: the offer made for a folder that holds no Space.
 fn create_and_open(app: &AppHandle, directory: &Path) -> Result<Opened, NotOpened> {
-    {
-        // One Space is written at a time, so two asked for at once cannot
-        // both find a folder empty and both write to it: the second finds
-        // the first's files and is refused.
-        let _creating = lock(&CREATING);
-        tauri::async_runtime::block_on(new_space::create_space(
-            &TokioFilesystem,
-            directory,
-            NEW_SPACE_TITLE,
-            &RandomIds,
-        ))?;
-    }
+    one_write_at_a_time(new_space::create_space(
+        &TokioFilesystem,
+        directory,
+        NEW_SPACE_TITLE,
+        &RandomIds,
+    ))?;
     open_aggregate_at(app, directory)
 }
 
-/// Held while a new Space is written ([`create_and_open`], and the Start
-/// window's New Space).
-static CREATING: Mutex<()> = Mutex::new(());
+/// Run `write`, a new Space's write, to its end on this thread, one at a
+/// time: two asked for at once cannot both find a folder empty and both
+/// write to it, since the second finds the first's files and is refused.
+/// Held by [`create_and_open`] and the Start window's New Space.
+fn one_write_at_a_time<T>(write: impl Future<Output = T>) -> T {
+    static CREATING: Mutex<()> = Mutex::new(());
+    let _creating = lock(&CREATING);
+    tauri::async_runtime::block_on(write)
+}
 
 /// Answer why a folder did not open, returning once the presenter has, with
 /// how it came to open after all, or `None` while it is still unopened. A folder holding no Space is offered a new
