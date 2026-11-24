@@ -24,16 +24,21 @@ function fakeShell(
     readonly defaults?: NewSpaceDefaults;
     readonly create?: (location: string, name: string) => NotCreated | null;
     readonly browse?: NewSpaceDefaults | null;
+    /** Hold each answer to `view` until `answerView` gives it. */
+    readonly holdViews?: boolean;
   } = {},
 ) {
   const asked: Asked[] = [];
   let finishCreate: ((answer: NotCreated | null) => void) | undefined;
+  const view = { recents: options.recents ?? [], newSpace: options.defaults ?? DOCUMENTS };
+  const heldViews: (() => void)[] = [];
   const shell: StartShell = {
     view: () =>
-      Promise.resolve({
-        recents: options.recents ?? [],
-        newSpace: options.defaults ?? DOCUMENTS,
-      }),
+      options.holdViews === true
+        ? new Promise((resolve) => {
+            heldViews.push(() => resolve(view));
+          })
+        : Promise.resolve(view),
     browse: (location) => {
       asked.push({ kind: 'browse', location });
       return Promise.resolve(options.browse ?? null);
@@ -49,7 +54,18 @@ function fakeShell(
     openRecent: (folder) => asked.push({ kind: 'open-recent', folder }),
     close: () => asked.push({ kind: 'close' }),
   };
-  return { shell, asked, finishCreate: (answer: NotCreated | null) => finishCreate?.(answer) };
+  return {
+    shell,
+    asked,
+    finishCreate: (answer: NotCreated | null) => finishCreate?.(answer),
+    /** Give the oldest held answer to `view`, or the newest. */
+    answerView: async (which: 'oldest' | 'newest' = 'oldest') => {
+      await act(async () => {
+        (which === 'oldest' ? heldViews.shift() : heldViews.pop())?.();
+        await Promise.resolve();
+      });
+    },
+  };
 }
 
 const nameField = () => screen.getByRole('textbox', { name: 'Name' });
@@ -248,6 +264,38 @@ describe('New Space', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
     expect(asked).toEqual([{ kind: 'close' }]);
+  });
+
+  it('draws no form from a late answer once Cancel has returned to the start screen', async () => {
+    const { shell, answerView } = fakeShell({ holdViews: true });
+    render(<StartPage shell={shell} />);
+    await answerView();
+    const newSpace = await screen.findByRole('button', { name: 'New Space' });
+
+    fireEvent.click(newSpace);
+    fireEvent.click(newSpace);
+    await answerView('newest');
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
+    await answerView();
+
+    expect(screen.queryByRole('form')).toBeNull();
+    expect(screen.getByRole('button', { name: 'New Space' })).toBeTruthy();
+  });
+
+  it('draws no form from a late answer once Create Space shows the opening status', async () => {
+    const { shell, answerView } = fakeShell({ holdViews: true });
+    render(<StartPage shell={shell} />);
+    await answerView();
+    const newSpace = await screen.findByRole('button', { name: 'New Space' });
+
+    fireEvent.click(newSpace);
+    fireEvent.click(newSpace);
+    await answerView('newest');
+    fireEvent.click(await screen.findByRole('button', { name: 'Create Space' }));
+    await answerView();
+
+    expect(screen.queryByRole('form')).toBeNull();
+    expect(screen.getByRole('status').textContent).toContain('Opening Untitled Space…');
   });
 
   it('moves to the form when the shell asks for it while the start screen shows', async () => {

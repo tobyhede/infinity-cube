@@ -46,14 +46,22 @@ export function StartPage({ shell }: { readonly shell: StartShell }) {
   const cancelCloses = useRef(asksForForm());
   // Whether the person has typed a name, which Browse… then keeps.
   const nameTyped = useRef(false);
+  // The latest request for the form. A newer request, Cancel and Create
+  // Space each move it on, so an answer to an earlier one draws no form.
+  const formRequest = useRef(0);
+  const forgetFormRequests = (): void => {
+    formRequest.current += 1;
+  };
 
   /** Ask the shell what to draw, and draw the form with its defaults when `form`. */
   const load = useCallback(
     async (form: boolean): Promise<void> => {
+      formRequest.current += 1;
+      const request = formRequest.current;
       try {
         const answer = await shell.view();
         setLoaded({ state: 'ready', recents: answer.recents });
-        if (form) {
+        if (form && request === formRequest.current) {
           nameTyped.current = false;
           setView({ screen: 'new', form: formFrom(answer.newSpace) });
         }
@@ -103,6 +111,7 @@ export function StartPage({ shell }: { readonly shell: StartShell }) {
   };
 
   const cancel = (): void => {
+    forgetFormRequests();
     if (cancelCloses.current) {
       shell.close();
       return;
@@ -137,6 +146,7 @@ export function StartPage({ shell }: { readonly shell: StartShell }) {
 
   const create = (): void => {
     if (form === null) return;
+    forgetFormRequests();
     const kept: NewSpaceForm = { ...form, refusal: null, failure: null };
     setView({ screen: 'opening', title: form.name, folder: newSpaceFolder(form) });
     void shell.createSpace(form.location, form.name).then((refused) => {
