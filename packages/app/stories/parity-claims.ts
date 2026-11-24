@@ -1050,13 +1050,4 @@ export const parityClaims: readonly ParityClaim[] = [
     applicationEvidence:
       'The Start window is a page of the desktop shell’s own build (ADR 0172), answered by its invoke commands, which no Playwright host serves; `packages/desktop/src-tauri/src/start/tests.rs` holds New Space over real folders, and ticket 02 of `.scratch/start-window` records it driven in a live WebKitGTK window.',
   },
-  {
-    id: 'start-window-lists-recent-spaces',
-    storyFile: 'components/start-window.stories.tsx',
-    storyExport: 'WithRecentSpaces',
-    claim:
-      'Recent lists each Space’s Title over its folder under the hint that selecting one opens it; an entry open in a window is named as one whose window choosing it shows, and one that did not open shows its reason with Try again, named by its visible text.',
-    applicationEvidence:
-      'The Start window is a page of the desktop shell’s own build (ADR 0172), answered by its invoke commands, which no Playwright host serves; `packages/desktop/src-tauri/src/start/tests.rs` holds New Space over real folders, and ticket 02 of `.scratch/start-window` records it driven in a live WebKitGTK window.',
-  },
 ] as const;

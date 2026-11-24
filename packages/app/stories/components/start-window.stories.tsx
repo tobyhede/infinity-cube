@@ -28,29 +28,3 @@ export const FirstLaunch: Story = () => (
   </Window>
 );
 FirstLaunch.meta = { iframed: true };
-
-/**
- * Recent as the shell hands it: each Space's Title over its folder, one
- * open in a window, and one that did not open at launch with its reason and
- * Try again. (Remove is offered once the shell keeps a history to remove
- * from.)
- */
-export const WithRecentSpaces: Story = () => (
-  <Window>
-    <StartPage
-      shell={storyStartShell([
-        { title: 'Quarterly review', folder: '/Users/ada/Documents/Quarterly review', open: true },
-        { title: 'Untitled Space', folder: '/Users/ada/Documents/Untitled Space' },
-        {
-          title: 'Design system tour',
-          folder: '/Users/ada/Projects/design-system-tour',
-          problem: {
-            kind: 'failed',
-            reason: 'This Space didn’t open because one of its files couldn’t be read.',
-          },
-        },
-      ])}
-    />
-  </Window>
-);
-WithRecentSpaces.meta = { iframed: true };

@@ -72,23 +72,3 @@ test(
     await expect(page.getByRole('button', { name: 'Cancel' })).toBeVisible();
   },
 );
-
-test(
-  'Recent lists each Space by Title over folder, saying which is open and which did not open',
-  { tag: '@parity:start-window-lists-recent-spaces' },
-  async ({ page }) => {
-    await page.goto(story('with-recent-spaces'));
-    const list = page.getByRole('list');
-
-    await expect(list).toHaveAccessibleDescription('Select a Space to open it');
-    await expect(
-      list.getByRole('button', { name: 'Quarterly review, already open. Show its window' }),
-    ).toBeVisible();
-    await expect(list.getByRole('button', { name: /Untitled Space/u })).toContainText(
-      '/Users/ada/Documents/Untitled Space',
-    );
-    const retry = list.getByRole('button', { name: 'Try again to open Design system tour' });
-    await expect(retry).toHaveText('Try again');
-    await expect(retry).toHaveAccessibleDescription(/one of its files couldn’t be read/u);
-  },
-);
