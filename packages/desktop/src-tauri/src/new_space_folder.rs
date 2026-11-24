@@ -50,7 +50,7 @@ pub enum Platform {
 #[derive(Debug, thiserror::Error)]
 pub enum Refused {
     /// Empty, `.` or `..`, or holding a path separator.
-    #[error("A name is one folder name: not empty, `.` or `..`, and with no `/` or `\\`.")]
+    #[error("A name is one folder name: it can’t be empty, . or .., or hold / or \\.")]
     NotAFolderName,
     /// A character Windows forbids in a folder name.
     #[error("A folder name on Windows cannot hold {0}.")]

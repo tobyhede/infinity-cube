@@ -33,7 +33,7 @@ import {
   StatusFailure,
 } from '@project/ui';
 import { newSpaceFolder, type NewSpaceForm } from './start-form';
-import type { RecentSpace } from './start-shell';
+import type { RecentSpace } from '../start-shell';
 
 /**
  * The desktop application's Start window (Storage ST-131, UI-111), drawn

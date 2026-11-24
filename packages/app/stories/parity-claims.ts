@@ -1023,4 +1023,40 @@ export const parityClaims: readonly ParityClaim[] = [
     claim:
       '`?` while presenting opens the keyboard shortcuts sheet listing the keys a presentation answers, and Escape closes the sheet alone.',
   },
+  {
+    id: 'start-window-makes-a-new-space-from-the-defaults',
+    storyFile: 'components/start-window.stories.tsx',
+    storyExport: 'FirstLaunch',
+    claim:
+      'The desktop Start window with nothing recent offers New Space and Open Folder… beside Recent’s empty state; New Space replaces it with the form, Name focused on its default and Location read-only, naming the folder Create Space makes, and Create Space shows one status naming the Space until its window opens; Escape returns to the start screen.',
+    applicationEvidence:
+      'The Start window is a page of the desktop shell’s own build (ADR 0172), answered by its invoke commands, which no Playwright host serves; `packages/desktop/src-tauri/src/start/tests.rs` holds New Space over real folders, and ticket 02 of `.scratch/start-window` records it driven in a live WebKitGTK window.',
+  },
+  {
+    id: 'start-window-refuses-a-name-beside-the-field',
+    storyFile: 'components/start-window.stories.tsx',
+    storyExport: 'FirstLaunch',
+    claim:
+      'New Space refuses a name that is not one folder name beside Name, the field marked invalid and described by the reason, keeping the draft, and the folder line asks for a name instead of naming a folder; typing clears the refusal.',
+    applicationEvidence:
+      'The Start window is a page of the desktop shell’s own build (ADR 0172), answered by its invoke commands, which no Playwright host serves; `packages/desktop/src-tauri/src/start/tests.rs` holds New Space over real folders, and ticket 02 of `.scratch/start-window` records it driven in a live WebKitGTK window.',
+  },
+  {
+    id: 'start-window-keeps-the-form-when-the-write-fails',
+    storyFile: 'components/start-window.stories.tsx',
+    storyExport: 'FirstLaunch',
+    claim:
+      'A write that fails after Create Space is announced as an alert whose detail is reachable by keyboard, and the form comes back with the name and Location kept, so the person can try again or cancel.',
+    applicationEvidence:
+      'The Start window is a page of the desktop shell’s own build (ADR 0172), answered by its invoke commands, which no Playwright host serves; `packages/desktop/src-tauri/src/start/tests.rs` holds New Space over real folders, and ticket 02 of `.scratch/start-window` records it driven in a live WebKitGTK window.',
+  },
+  {
+    id: 'start-window-lists-recent-spaces',
+    storyFile: 'components/start-window.stories.tsx',
+    storyExport: 'WithRecentSpaces',
+    claim:
+      'Recent lists each Space’s Title over its folder under the hint that selecting one opens it; an entry open in a window is named as one whose window choosing it shows, and one that did not open shows its reason with Try again, named by its visible text.',
+    applicationEvidence:
+      'The Start window is a page of the desktop shell’s own build (ADR 0172), answered by its invoke commands, which no Playwright host serves; `packages/desktop/src-tauri/src/start/tests.rs` holds New Space over real folders, and ticket 02 of `.scratch/start-window` records it driven in a live WebKitGTK window.',
+  },
 ] as const;

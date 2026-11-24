@@ -1,6 +1,6 @@
 import type { JsonValue } from '@project/core';
 import { describe, expect, it } from 'vitest';
-import { tauriStartShell, type TauriInvoke } from '../src/components/start-shell';
+import { tauriStartShell, type TauriInvoke } from '../src/start-shell';
 
 /** An invoke that answers each command as told, recording each call. */
 function invoking(answers: Record<string, () => Promise<JsonValue>>) {

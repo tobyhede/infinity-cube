@@ -1,12 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { StartPage } from '../src/components/StartPage';
-import type {
-  NewSpaceDefaults,
-  NotCreated,
-  RecentSpace,
-  StartShell,
-} from '../src/components/start-shell';
+import type { NewSpaceDefaults, NotCreated, RecentSpace, StartShell } from '../src/start-shell';
 
 const DOCUMENTS: NewSpaceDefaults = {
   location: '/home/ada/Documents',

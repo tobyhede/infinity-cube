@@ -1,7 +1,7 @@
 import { createRoot } from 'react-dom/client';
 import './tailwind.css';
 import { StartPage } from './components/StartPage';
-import { tauriStartShell, type TauriInvoke } from './components/start-shell';
+import { tauriStartShell, type TauriInvoke } from './start-shell';
 
 // The desktop shell's Start window (`start.html`, built by
 // `desktop-shell-build.config.ts`), answered by the shell through the global

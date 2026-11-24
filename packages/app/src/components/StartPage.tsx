@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { StatusFailure } from '@project/ui';
 import { StartWindow, type StartScreen } from './StartWindow';
 import { newSpaceFolder, type NewSpaceForm } from './start-form';
-import type { NewSpaceDefaults, RecentSpace, StartShell } from './start-shell';
+import type { NewSpaceDefaults, RecentSpace, StartShell } from '../start-shell';
 
 /**
  * The desktop shell's Start window page (`start.html`, Storage ST-131): it
