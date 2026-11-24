@@ -11,6 +11,7 @@ import {
   ExternalLink,
   Eye,
   EyeOff,
+  FolderOpen,
   Image as ImageGlyph,
   LayoutGrid,
   Link2Off,
@@ -342,6 +343,12 @@ export const AlertIcon = () => <CircleAlert />;
 
 /** Close the surface that contains the control. */
 export const CloseIcon = () => <X size={14} strokeWidth={3} />;
+
+/**
+ * Open a folder from disk: the desktop Start window's Open Folder…, which
+ * asks with the platform's folder chooser.
+ */
+export const FolderOpenIcon = () => <FolderOpen size={14} />;
 
 /**
  * Open an entity's actions menu, where the menu does not primarily serve one action.

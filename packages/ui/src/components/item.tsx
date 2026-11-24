@@ -1,0 +1,201 @@
+import { mergeProps } from '@base-ui/react/merge-props';
+import { useRender } from '@base-ui/react/use-render';
+import { cva, type VariantProps } from 'class-variance-authority';
+
+import { cn } from '#lib/utils';
+import { Separator } from '#components/separator';
+
+/*
+ * The registry's `base-nova` item, written out by hand: `shadcn add item`
+ * could not reach the registry from the machine that added it (the proxy
+ * refused `ui.shadcn.com`), so this is the registry's structure and class
+ * lists as recalled, not as fetched. Run
+ * `pnpm dlx shadcn@4.18.0 add item --diff components/item.tsx -c packages/ui`
+ * where the registry is reachable and take the registry's text, keeping only
+ * the recorded extensions below.
+ *
+ * Extensions: the item, title and description draw on the chrome type scale
+ * (`text-chrome-sm`, `text-chrome-xs`), as the rest of the chrome does, not
+ * the registry's `text-sm`; an item rendered as a `button` (the Start
+ * window's recent Spaces) takes the pointer, start-aligned text and the
+ * quiet controls' `bg-secondary` hover, as the registry gives an `a` its
+ * hover; and `size="xs"` is a tight row for a list in a narrow pane.
+ */
+
+function ItemGroup({ className, ...props }: React.ComponentProps<'div'>) {
+  return (
+    <div
+      role="list"
+      data-slot="item-group"
+      className={cn('group/item-group flex flex-col', className)}
+      {...props}
+    />
+  );
+}
+
+function ItemSeparator({ className, ...props }: React.ComponentProps<typeof Separator>) {
+  return (
+    <Separator
+      data-slot="item-separator"
+      orientation="horizontal"
+      className={cn('my-0', className)}
+      {...props}
+    />
+  );
+}
+
+const itemVariants = cva(
+  'group/item flex flex-wrap items-center rounded-md border border-transparent text-chrome-sm transition-colors duration-100 outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 [a]:transition-colors [a]:hover:bg-accent/50 [button]:cursor-pointer [button]:text-left [button]:hover:bg-secondary',
+  {
+    variants: {
+      variant: {
+        default: 'bg-transparent',
+        outline: 'border-border',
+        muted: 'bg-muted/50',
+      },
+      size: {
+        default: 'gap-4 p-4',
+        sm: 'gap-2.5 px-4 py-3',
+        xs: 'gap-2 px-2 py-2',
+      },
+    },
+    defaultVariants: {
+      variant: 'default',
+      size: 'default',
+    },
+  },
+);
+
+function Item({
+  className,
+  variant = 'default',
+  size = 'default',
+  render,
+  ...props
+}: useRender.ComponentProps<'div'> & VariantProps<typeof itemVariants>) {
+  return useRender({
+    defaultTagName: 'div',
+    props: mergeProps<'div'>(
+      {
+        className: cn(itemVariants({ variant, size }), className),
+      },
+      props,
+    ),
+    render,
+    state: {
+      slot: 'item',
+      variant,
+      size,
+    },
+  });
+}
+
+const itemMediaVariants = cva(
+  'flex shrink-0 items-center justify-center gap-2 group-has-[[data-slot=item-description]]/item:translate-y-0.5 group-has-[[data-slot=item-description]]/item:self-start [&_svg]:pointer-events-none',
+  {
+    variants: {
+      variant: {
+        default: 'bg-transparent',
+        icon: "size-8 rounded-sm border bg-muted [&_svg:not([class*='size-'])]:size-4",
+        image: 'size-10 overflow-hidden rounded-sm [&_img]:size-full [&_img]:object-cover',
+      },
+    },
+    defaultVariants: {
+      variant: 'default',
+    },
+  },
+);
+
+function ItemMedia({
+  className,
+  variant = 'default',
+  ...props
+}: React.ComponentProps<'div'> & VariantProps<typeof itemMediaVariants>) {
+  return (
+    <div
+      data-slot="item-media"
+      data-variant={variant}
+      className={cn(itemMediaVariants({ variant, className }))}
+      {...props}
+    />
+  );
+}
+
+function ItemContent({ className, ...props }: React.ComponentProps<'div'>) {
+  return (
+    <div
+      data-slot="item-content"
+      className={cn(
+        'flex min-w-0 flex-1 flex-col gap-1 [&+[data-slot=item-content]]:flex-none',
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+function ItemTitle({ className, ...props }: React.ComponentProps<'div'>) {
+  return (
+    <div
+      data-slot="item-title"
+      className={cn(
+        'flex w-fit max-w-full items-center gap-2 text-chrome-sm leading-snug font-medium',
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+function ItemDescription({ className, ...props }: React.ComponentProps<'p'>) {
+  return (
+    <p
+      data-slot="item-description"
+      className={cn(
+        'line-clamp-2 text-chrome-xs leading-normal font-normal text-balance text-muted-foreground',
+        '[&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-primary',
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+function ItemActions({ className, ...props }: React.ComponentProps<'div'>) {
+  return (
+    <div data-slot="item-actions" className={cn('flex items-center gap-2', className)} {...props} />
+  );
+}
+
+function ItemHeader({ className, ...props }: React.ComponentProps<'div'>) {
+  return (
+    <div
+      data-slot="item-header"
+      className={cn('flex basis-full items-center justify-between gap-2', className)}
+      {...props}
+    />
+  );
+}
+
+function ItemFooter({ className, ...props }: React.ComponentProps<'div'>) {
+  return (
+    <div
+      data-slot="item-footer"
+      className={cn('flex basis-full items-center justify-between gap-2', className)}
+      {...props}
+    />
+  );
+}
+
+export {
+  Item,
+  ItemMedia,
+  ItemContent,
+  ItemActions,
+  ItemGroup,
+  ItemSeparator,
+  ItemTitle,
+  ItemDescription,
+  ItemHeader,
+  ItemFooter,
+};
