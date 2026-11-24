@@ -60,7 +60,7 @@ use url::Url;
 
 use crate::address::{AggregateKey, SCHEME, SchemeStyle};
 use crate::aggregates::{Close, Registry, Reserved, SPACE_WINDOW_PREFIX};
-use crate::launch::{LastWindow, Launch, Next, Opening};
+use crate::launch::{LastWindow, Launch, Next, Opened, Opening};
 use crate::not_opened::NotOpened;
 use crate::scheme::{OpenAggregates, VIEW_WINDOW_PREFIX};
 use crate::server::{
@@ -385,26 +385,34 @@ fn choose_folder(app: &AppHandle, opening: Opening) {
 
 /// Open `folder`, asked for from `opening`, offering a new Space in one that
 /// holds none and saying why one did not open, returning once the presenter
-/// has answered, and whether a Space opened. From the Start window, a Space
-/// that opened closes it; at launch with nothing open, one that did not
-/// shows it ([`launch::after`]).
+/// has answered, and whether a Space opened. A Space window that shows
+/// from the Start window closes it ([`launch::closes_start`]); at launch
+/// with nothing open, a folder that did not open shows it
+/// ([`launch::after`]).
 fn open_from(app: &AppHandle, folder: &Path, opening: Opening) -> bool {
     let opened = match open_aggregate_at(app, folder) {
-        Ok(()) => true,
-        Err(reason) => !answer(app, reason),
+        Ok(opened) => Some(opened),
+        Err(reason) => answer(app, reason),
     };
-    if opened && opening == Opening::StartWindow {
-        start::close(app);
+    match opened {
+        Some(opened) => {
+            if launch::closes_start(opening, opened) {
+                start::close(app);
+            }
+            true
+        }
+        None => {
+            if next(app, opening) == Next::ShowStart {
+                start::show(app, start::Screen::Start);
+            }
+            false
+        }
     }
-    if !opened && next(app, opening) == Next::ShowStart {
-        start::show(app, start::Screen::Start);
-    }
-    opened
 }
 
 /// Write a new Space, titled as `init` titles one, to `directory` and open
 /// it: the offer made for a folder that holds no Space.
-fn create_and_open(app: &AppHandle, directory: &Path) -> Result<(), NotOpened> {
+fn create_and_open(app: &AppHandle, directory: &Path) -> Result<Opened, NotOpened> {
     {
         // One Space is written at a time, so two asked for at once cannot
         // both find a folder empty and both write to it: the second finds
@@ -424,11 +432,11 @@ fn create_and_open(app: &AppHandle, directory: &Path) -> Result<(), NotOpened> {
 /// window's New Space).
 static CREATING: Mutex<()> = Mutex::new(());
 
-/// Answer why a folder did not open, returning once the presenter has, and
-/// whether it is still unopened. A folder holding no Space is offered a new
+/// Answer why a folder did not open, returning once the presenter has, with
+/// how it came to open after all, or `None` while it is still unopened. A folder holding no Space is offered a new
 /// one; declining, the folder stays unopened. A close or a quit that took
 /// the Aggregate is not answered.
-fn answer(app: &AppHandle, reason: NotOpened) -> bool {
+fn answer(app: &AppHandle, reason: NotOpened) -> Option<Opened> {
     match reason {
         NotOpened::Empty(directory) => {
             let create = app
@@ -445,18 +453,20 @@ fn answer(app: &AppHandle, reason: NotOpened) -> bool {
                 ))
                 .blocking_show();
             if !create {
-                return true;
+                return None;
             }
             match create_and_open(app, &directory) {
-                Ok(()) => false,
+                Ok(opened) => Some(opened),
                 Err(reason) => answer(app, reason),
             }
         }
         reason if reason.tells_the_presenter() => {
             show_error_and_wait(app, &reason.to_string());
-            true
+            None
         }
-        _ => false,
+        // A close or a quit took it: nothing to answer, and nothing more for
+        // the Start window to stay open for.
+        _ => Some(Opened::Shown),
     }
 }
 
@@ -475,7 +485,7 @@ fn open_from_command_line(app: &AppHandle, folders: &[PathBuf]) {
         .collect();
     let mut still_unopened = false;
     for reason in unopened {
-        still_unopened |= answer(app, reason);
+        still_unopened |= answer(app, reason).is_none();
     }
     if still_unopened && next(app, Opening::CommandLine) == Next::ShowStart {
         start::show(app, start::Screen::Start);
@@ -483,8 +493,8 @@ fn open_from_command_line(app: &AppHandle, folders: &[PathBuf]) {
 }
 
 /// Open `folder` as an Aggregate in a window of its own, or focus the window
-/// that already has it, answering why if neither.
-fn open_aggregate_at(app: &AppHandle, folder: &Path) -> Result<(), NotOpened> {
+/// that already has it, answering how it opened, or why it did not.
+fn open_aggregate_at(app: &AppHandle, folder: &Path) -> Result<Opened, NotOpened> {
     // Two spellings of one directory are one Aggregate; a path that cannot be
     // resolved is passed on as given, for the run to refuse.
     let directory = std::fs::canonicalize(folder).unwrap_or_else(|_| folder.to_path_buf());
@@ -500,13 +510,15 @@ fn open_aggregate_at(app: &AppHandle, folder: &Path) -> Result<(), NotOpened> {
             // last write runs on.
             if let Some(window) = app.get_webview_window(&label) {
                 let _ = window.set_focus();
-            } else if aggregates.registry().is_closing(&label) {
+                return Ok(Opened::Shown);
+            }
+            if aggregates.registry().is_closing(&label) {
                 return Err(NotOpened::StillWriting(directory));
             }
-            return Ok(());
+            return Ok(Opened::Starting);
         }
     };
-    let opened = start_aggregate(app, &directory, &label);
+    let opened = start_aggregate(app, &directory, &label).map(|()| Opened::Shown);
     if opened.is_err() {
         let abandoned = aggregates.registry().abandon(&label);
         if let Some(server) = abandoned {

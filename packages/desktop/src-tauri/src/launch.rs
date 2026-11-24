@@ -51,6 +51,27 @@ pub fn after(opening: Opening, any_aggregate: bool) -> Next {
     }
 }
 
+/// How a folder that opened came to: its window shows, or another request
+/// is still starting it and opens its window when it has.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Opened {
+    /// Its Space window shows: opened now, or already open and focused.
+    Shown,
+    /// Another request (a File › Open… of the same folder, say) is still
+    /// starting it, so no window shows yet, and that start may yet fail.
+    Starting,
+}
+
+/// Whether the Start window closes once a folder asked for from `opening`
+/// has `opened`. It closes when a Space window opens from it (ST-131); a
+/// folder another request is still starting has no window yet, and leaves
+/// the Start window showing, so a start that fails leaves the person a
+/// window to go on from.
+#[must_use]
+pub fn closes_start(opening: Opening, opened: Opened) -> bool {
+    opening == Opening::StartWindow && opened == Opened::Shown
+}
+
 /// What to open, given the arguments after the program's name.
 #[must_use]
 pub fn launch(arguments: impl IntoIterator<Item = OsString>) -> Launch {
@@ -114,6 +135,29 @@ mod tests {
                 launch([OsString::from("/a"), OsString::from("b")]),
                 Launch::Folders(vec![PathBuf::from("/a"), PathBuf::from("b")]),
             );
+        }
+    }
+
+    mod given_a_folder_that_opened {
+        use super::*;
+
+        #[test]
+        fn the_start_window_closes_once_a_space_window_shows_from_it() {
+            assert!(closes_start(Opening::StartWindow, Opened::Shown));
+        }
+
+        #[test]
+        fn the_start_window_stays_while_another_request_still_starts_the_folder() {
+            assert!(!closes_start(Opening::StartWindow, Opened::Starting));
+        }
+
+        #[test]
+        fn a_folder_from_elsewhere_leaves_the_start_window_as_it_is() {
+            for opening in [Opening::CommandLine, Opening::Menu] {
+                for opened in [Opened::Shown, Opened::Starting] {
+                    assert!(!closes_start(opening, opened), "{opening:?} {opened:?}");
+                }
+            }
         }
     }
 

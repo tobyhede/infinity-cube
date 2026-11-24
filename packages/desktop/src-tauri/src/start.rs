@@ -19,7 +19,7 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_dialog::DialogExt;
 use tokio::sync::oneshot;
 
-use crate::launch::Opening;
+use crate::launch::{self, Opening};
 use crate::new_space;
 use crate::new_space_folder::{
     FolderListing, Listing, Platform, Refused, default_name, new_space_folder,
@@ -234,7 +234,7 @@ pub async fn start_browse(app: AppHandle, location: String) -> Option<Value> {
 }
 
 /// New Space's Create Space: write `<location>/<name>` and open it, closing
-/// the Start window once its window has opened. Answers nothing then, or
+/// the Start window once its window shows ([`launch::closes_start`]). Answers nothing then, or
 /// why not ([`NotCreated`], as the page reads it): a refusal is an answer
 /// the page draws, not a failed invoke.
 #[tauri::command]
@@ -253,8 +253,10 @@ pub async fn start_create_space(app: AppHandle, location: String, name: String) 
             ))
         }?;
         match crate::open_aggregate_at(&app, &written) {
-            Ok(()) => {
-                close(&app);
+            Ok(opened) => {
+                if launch::closes_start(Opening::StartWindow, opened) {
+                    close(&app);
+                }
                 Ok(())
             }
             Err(reason) if reason.tells_the_presenter() => Err(NotCreated::Failed {
