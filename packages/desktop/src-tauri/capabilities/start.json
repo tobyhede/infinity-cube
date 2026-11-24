@@ -1,7 +1,14 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "start",
-  "description": "The Start window may ping the shell, and nothing else (the spike in .scratch/start-window/issues/05).",
+  "description": "The Start window (Storage ST-131) may call its own commands, and nothing else.",
   "windows": ["start"],
-  "permissions": ["allow-start-window-ping"]
+  "permissions": [
+    "allow-start-browse",
+    "allow-start-close",
+    "allow-start-create-space",
+    "allow-start-open-folder",
+    "allow-start-open-recent",
+    "allow-start-window-view"
+  ]
 }

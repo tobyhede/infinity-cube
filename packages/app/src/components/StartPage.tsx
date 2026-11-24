@@ -1,45 +1,170 @@
-import { useState } from 'react';
-import { Button } from '@project/ui';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { StatusFailure } from '@project/ui';
+import { StartWindow, type StartScreen } from './StartWindow';
+import { newSpaceFolder, type NewSpaceForm } from './start-form';
+import type { NewSpaceDefaults, RecentSpace, StartShell } from '../start-shell';
 
 /**
- * The Start window's page, a throwaway for the spike in
- * `.scratch/start-window/issues/05-serve-the-start-windows-react-page.md`:
- * one `@project/ui` Button invoking the one command the Start window's
- * capability allows (`packages/desktop/src-tauri/capabilities/start.json`).
- * Ticket 02 replaces it with the Start window ST-131 states.
+ * The desktop shell's Start window page (`start.html`, Storage ST-131): it
+ * asks the shell for the recent Spaces and New Space's defaults, and hands
+ * it New Space, Open Folder…, Browse…, a recent Space, and Cancel on a form
+ * File › New Space… opened.
+ *
+ * The shell asks for the form with the fragment `#new-space`: at load (a
+ * window opened by File › New Space…, whose Cancel closes it), or later by
+ * setting it (File › New Space… while the start screen shows).
  */
 
-/** What the page reads of the global Tauri exposes (`app.withGlobalTauri`). */
-interface TauriGlobal {
-  readonly core: {
-    invoke(command: 'start_window_ping'): Promise<string>;
+/** The fragment that asks for the New Space form. */
+export const NEW_SPACE_FRAGMENT = '#new-space';
+
+const formFrom = (defaults: NewSpaceDefaults): NewSpaceForm => ({
+  ...defaults,
+  refusal: null,
+  failure: null,
+});
+
+const asksForForm = (): boolean => window.location.hash === NEW_SPACE_FRAGMENT;
+
+/** Forget the fragment, so the shell setting it again is a change the page hears. */
+const forgetFragment = (): void => {
+  if (window.location.hash !== '') {
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  }
+};
+
+type Loaded =
+  | { readonly state: 'loading' }
+  | { readonly state: 'failed'; readonly reason: string }
+  | { readonly state: 'ready'; readonly recents: readonly RecentSpace[] };
+
+export function StartPage({ shell }: { readonly shell: StartShell }) {
+  const [loaded, setLoaded] = useState<Loaded>({ state: 'loading' });
+  const [view, setView] = useState<StartScreen>({ screen: 'start' });
+  // A form the window opened on closes the window on Cancel; one reached
+  // from the start screen returns to it.
+  const cancelCloses = useRef(asksForForm());
+  // Whether the person has typed a name, which Browse… then keeps.
+  const nameTyped = useRef(false);
+
+  /** Ask the shell what to draw, and draw the form with its defaults when `form`. */
+  const load = useCallback(
+    async (form: boolean): Promise<void> => {
+      try {
+        const answer = await shell.view();
+        setLoaded({ state: 'ready', recents: answer.recents });
+        if (form) {
+          nameTyped.current = false;
+          setView({ screen: 'new', form: formFrom(answer.newSpace) });
+        }
+      } catch (error) {
+        setLoaded({ state: 'failed', reason: String(error) });
+      }
+    },
+    [shell],
+  );
+  const showForm = useCallback(() => void load(true), [load]);
+
+  useEffect(() => {
+    void load(cancelCloses.current);
+  }, [load]);
+
+  // What the hash listener reads, kept current after each render.
+  const shown = useRef(view);
+  useEffect(() => {
+    shown.current = view;
+  }, [view]);
+
+  useEffect(() => {
+    const heard = (): void => {
+      if (asksForForm() && shown.current.screen === 'start') showForm();
+    };
+    window.addEventListener('hashchange', heard);
+    return () => window.removeEventListener('hashchange', heard);
+  }, [showForm]);
+
+  if (loaded.state === 'loading') return null;
+  if (loaded.state === 'failed') {
+    return (
+      <main className="flex min-h-screen bg-card">
+        <StatusFailure
+          title="The Start window could not load"
+          detail={loaded.reason}
+          detailLabel="Why the Start window could not load"
+          className="w-full"
+        />
+      </main>
+    );
+  }
+
+  const form = view.screen === 'new' ? view.form : null;
+  const editForm = (next: Partial<NewSpaceForm>): void => {
+    if (form !== null) setView({ screen: 'new', form: { ...form, ...next } });
   };
-}
 
-const tauri = (): TauriGlobal | undefined =>
-  // SAFETY: the shell sets `window.__TAURI__` to Tauri's global API when
-  // `app.withGlobalTauri` is on (`tauri.conf.json`), and leaves it unset
-  // elsewhere, which the caller checks for.
-  (window as Window & { readonly __TAURI__?: TauriGlobal }).__TAURI__;
-
-export function StartPage() {
-  const [reply, setReply] = useState('Not asked yet.');
-  const ping = () => {
-    const global = tauri();
-    if (global === undefined) {
-      setReply('No Tauri here: this page is served outside the shell.');
+  const cancel = (): void => {
+    if (cancelCloses.current) {
+      shell.close();
       return;
     }
-    global.core.invoke('start_window_ping').then(
-      (answer) => setReply(`The shell answered: ${answer}`),
-      () => setReply('The shell refused the ping.'),
+    forgetFragment();
+    setView({ screen: 'start' });
+  };
+
+  const browse = (): void => {
+    if (form === null) return;
+    shell.browse(form.location).then(
+      (chosen) => {
+        if (chosen === null) return;
+        setView((current) =>
+          current.screen === 'new'
+            ? {
+                screen: 'new',
+                form: {
+                  ...current.form,
+                  location: chosen.location,
+                  separator: chosen.separator,
+                  name: nameTyped.current ? current.form.name : chosen.name,
+                  refusal: null,
+                },
+              }
+            : current,
+        );
+      },
+      () => undefined,
     );
   };
+
+  const create = (): void => {
+    if (form === null) return;
+    const kept: NewSpaceForm = { ...form, refusal: null, failure: null };
+    setView({ screen: 'opening', title: form.name, folder: newSpaceFolder(form) });
+    void shell.createSpace(form.location, form.name).then((refused) => {
+      if (refused === null) return;
+      setView({
+        screen: 'new',
+        form:
+          refused.of === 'failed'
+            ? { ...kept, failure: refused.message }
+            : { ...kept, refusal: { of: refused.of, message: refused.message } },
+      });
+    });
+  };
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-4">
-      <h1 className="text-base font-semibold">InfinityCube Start window (spike)</h1>
-      <Button onClick={ping}>Ping the shell</Button>
-      <p role="status">{reply}</p>
-    </main>
+    <StartWindow
+      view={view}
+      recents={loaded.recents}
+      onNewSpace={showForm}
+      onOpenFolder={() => shell.openFolder()}
+      onOpenRecent={(recent) => shell.openRecent(recent.folder)}
+      onNameChange={(name) => {
+        nameTyped.current = true;
+        editForm({ name, refusal: null });
+      }}
+      onBrowse={browse}
+      onCreate={create}
+      onCancel={cancel}
+    />
   );
 }

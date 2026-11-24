@@ -1,17 +1,17 @@
 //! A new Space written to a missing or empty folder from the application, as
-//! `init` writes it (Storage ST-11, ST-70), through the host's
-//! `init_directory`, whose Export is the only writer of an Aggregate
+//! `init` writes it (Storage ST-11, ST-70) but titled as asked, through the
+//! host's `init_directory`, whose Export is the only writer of an Aggregate
 //! directory. A folder holding anything but dot-entries is refused and
 //! nothing is written to it.
 
 use std::path::Path;
 
-use host::{Filesystem, IdSource, Initialized, NEW_SPACE_TITLE, init_directory};
+use host::{Filesystem, IdSource, Initialized, init_directory};
 
 use crate::not_opened::NotOpened;
 
 /// Write a new Space to `directory`, missing or holding nothing but
-/// dot-entries.
+/// dot-entries, its Meta Space titled `title`.
 ///
 /// # Errors
 ///
@@ -21,9 +21,10 @@ use crate::not_opened::NotOpened;
 pub async fn create_space<F: Filesystem, I: IdSource>(
     fs: &F,
     directory: &Path,
+    title: &str,
     ids: &I,
 ) -> Result<(), NotOpened> {
-    match init_directory(fs, directory, NEW_SPACE_TITLE, ids).await {
+    match init_directory(fs, directory, title, ids).await {
         Ok(Initialized::Written) => Ok(()),
         Ok(_) => Err(NotOpened::NotEmpty(directory.to_path_buf())),
         Err(source) => Err(NotOpened::NotCreated {
@@ -37,12 +38,14 @@ pub async fn create_space<F: Filesystem, I: IdSource>(
 mod tests {
     use std::fs;
 
-    use host::{MemorySpaceRepository, RandomIds, TokioFilesystem, import_directory};
+    use host::{
+        MemorySpaceRepository, NEW_SPACE_TITLE, RandomIds, TokioFilesystem, import_directory,
+    };
 
     use super::*;
 
     async fn create(directory: &Path) -> Result<(), NotOpened> {
-        create_space(&TokioFilesystem, directory, &RandomIds).await
+        create_space(&TokioFilesystem, directory, NEW_SPACE_TITLE, &RandomIds).await
     }
 
     /// What `directory` holds, by relative path, with each file's bytes.

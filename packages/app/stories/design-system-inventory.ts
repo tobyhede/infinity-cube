@@ -52,12 +52,7 @@ export const uncataloguedComponents = [
   {
     module: 'packages/app/src/start-main.tsx',
     reason:
-      "The desktop shell's Start window entry point (`start.html`): one `createRoot` call rendering `StartPage`.",
-  },
-  {
-    module: 'packages/app/src/components/StartPage.tsx',
-    reason:
-      'A throwaway: the spike in `.scratch/start-window/issues/05` proving the Start window is served from this build, one Button invoking one shell command, which only the desktop shell can answer. Ticket 02 replaces it with the Start window ST-131 states, catalogued.',
+      "The desktop shell's Start window entry point (`start.html`): one `createRoot` call rendering `StartPage` over the shell's invoke commands, which only the desktop shell answers; `Components/Start Window` renders `StartPage` itself.",
   },
   {
     module: 'packages/resource-api/src/view/testing.tsx',

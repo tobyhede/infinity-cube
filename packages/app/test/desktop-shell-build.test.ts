@@ -64,4 +64,15 @@ describe('the desktop shell’s frontend build', () => {
     expect(page).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/);
     expect(page).not.toMatch(/<style\b/);
   }, 60_000);
+
+  // The packages the page draws from declare `sideEffects: ["*.css"]`, so
+  // the plugin catalogue `@project/ui`'s index reaches leaves no lazy chunk
+  // (Mermaid, KaTeX, CodeMirror) the page never loads in the shell's binary.
+  it('carries the Start page as one script and one stylesheet, and no lazy chunk', async () => {
+    const assets = [...(await shell()).keys()].filter((name) => name.startsWith('assets/'));
+
+    expect(assets.filter((name) => name.endsWith('.js'))).toHaveLength(1);
+    expect(assets.filter((name) => name.endsWith('.css'))).toHaveLength(1);
+    expect(assets).toHaveLength(2);
+  }, 60_000);
 });
