@@ -79,11 +79,22 @@ pub enum Refused {
 /// Whether `folder` is missing or holds nothing but dot-entries, as
 /// `init_directory` decides.
 fn is_free(listing: &impl Listing, folder: &Path) -> Result<bool, Refused> {
-    let names = listing.names(folder).map_err(|source| Refused::Unlisted {
+    let names = listing
+        .names(folder)
+        .map_err(|source| unlisted(folder, source))?;
+    Ok(holds_nothing(names.as_deref()))
+}
+
+/// Whether a listing is of nothing there, or of nothing but dot-entries.
+fn holds_nothing(names: Option<&[String]>) -> bool {
+    names.is_none_or(|names| names.iter().all(|name| name.starts_with('.')))
+}
+
+fn unlisted(folder: &Path, source: io::Error) -> Refused {
+    Refused::Unlisted {
         folder: folder.to_path_buf(),
         source,
-    })?;
-    Ok(names.is_none_or(|names| names.iter().all(|name| name.starts_with('.'))))
+    }
 }
 
 /// The characters Windows forbids in a folder name, past the separators.
@@ -134,19 +145,31 @@ pub fn new_space_folder(
 
 /// The name New Space offers in `location`: `Untitled Space`, or the first of
 /// `Untitled Space 2`, `Untitled Space 3`, … whose folder is free, free as
-/// [`new_space_folder`] decides it.
+/// [`new_space_folder`] decides it. A file holding a candidate's name takes
+/// that name, as a folder holding something does.
 ///
 /// # Errors
 ///
-/// [`Refused::Unlisted`]: a folder it looked at could not be listed.
+/// [`Refused::Unlisted`]: the location, or a folder it looked at, could not
+/// be listed. The location is listed first, so a location that is a file is
+/// refused rather than passed over name after name.
 pub fn default_name(listing: &impl Listing, location: &Path) -> Result<String, Refused> {
+    listing
+        .names(location)
+        .map_err(|source| unlisted(location, source))?;
     let mut name = String::from(UNTITLED);
     let mut number: u64 = 1;
-    while !is_free(listing, &location.join(&name))? {
+    loop {
+        let candidate = location.join(&name);
+        match listing.names(&candidate) {
+            Ok(names) if holds_nothing(names.as_deref()) => return Ok(name),
+            Ok(_) => {}
+            Err(error) if error.kind() == io::ErrorKind::NotADirectory => {}
+            Err(source) => return Err(unlisted(&candidate, source)),
+        }
         number += 1;
         name = format!("{UNTITLED} {number}");
     }
-    Ok(name)
 }
 
 /// The default name's stem.

@@ -10,6 +10,7 @@
 - [ ] New Space with the defaults writes `~/Documents/Untitled Space`, which `pnpm cube check` accepts, its Meta Space titled "Untitled Space", and opens it; the Start window closes.
 - [ ] With `~/Documents/Untitled Space` already a Space, New Space's default name is `Untitled Space 2`, and accepting it writes and opens that.
 - [ ] New Space refuses beside the field, writing nothing, every case 04 decides.
+- [ ] A write that fails after Create Space (the name and Location accepted) announces the failure (UI-92) and returns to the form with the name and Location kept, so the person can try again or cancel; UI-111 states this outcome, and its Open question is closed.
 - [ ] Closing the Start window with no Space window open ends the application on Linux and Windows and leaves it running with no window on macOS; while the Start window is open, closing the last Space window does not end it.
 - [ ] File › New Space… shows the form while Spaces are open; File › Open… still shows the platform's chooser.
 - [ ] Space windows still hold no IPC permission; the Start window's capability names only its label.

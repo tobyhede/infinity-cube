@@ -278,7 +278,7 @@ Conflicts, open and closed, are listed in [conflicts/ui.md](conflicts/ui.md). So
 
 ## Open questions
 
-- **The Start window's details.** Whether gone and failed Recent entries keep muted titles; the window's native title; whether a minimum window size or stacked columns answers 200% zoom; whether Remove, Try again and Browse… grow from about 28px for touch (UI-111).
+- **The Start window's details.** What the window shows when Create Space's write fails after the name and Location are accepted, beyond UI-92's announced alert: the proposed answer is the form again, with the name and Location kept (ticket 02); the window's native title; whether a minimum window size or stacked columns answers 200% zoom; whether Remove, Try again and Browse… grow from about 28px for touch (UI-111).
 - **Entering a Resource's toolbar.** Which key moves from a selected Resource into its toolbar (UI-18)? Space reads a focused Resource in Full View (UI-105), and Enter is now bound to nothing on the canvas (UI-10).
 
 ## Bugs

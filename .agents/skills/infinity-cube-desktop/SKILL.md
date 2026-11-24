@@ -9,7 +9,7 @@ Start by naming the window that makes the request and who owns the result. There
 
 A defect visible on both desktop and web belongs to the shared application or host contract: reproduce it there before changing the shell. For the React application inside a Space window, use the `shadcn-first-ui` skill.
 
-The shell's build script and its tests need the browser application built first: `pnpm --filter @project/app exec vite build`. To try a change on a folder, `cargo build -p infinity-cube-desktop`, then `target/debug/infinity-cube-desktop <folder>`.
+The shell's build script and its tests need the browser application and the shell's own pages built first: `pnpm --filter @project/app exec vite build`, then `pnpm --filter @project/app desktop-shell:build` (ADR 0172). To try a change on a folder, `cargo build -p infinity-cube-desktop`, then `target/debug/infinity-cube-desktop <folder>`.
 
 Report evidence by tier: a build, a Rust test, or a live webview, naming engine and platform for a live webview. A change to what the webview sends or shows (a request header, a window, a dialog) is proven only in a live webview; without one, say which engine and platform have not been run, as ST-121 does.
 

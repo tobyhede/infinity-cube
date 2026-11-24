@@ -17,18 +17,19 @@ Needs Node ≥ 26.8.1 and pnpm 9 (for the browser application), Rust, and [Tauri
 
 ```sh
 pnpm install
-pnpm --filter @project/desktop build   # the browser application, then every bundle for this platform
+pnpm --filter @project/desktop build   # the browser application and the shell's own pages, then every bundle for this platform
 ```
 
-On Linux, to build only the `.deb`, build the browser application first, since `tauri build` alone does not:
+On Linux, to build only the `.deb`, build the browser application and the shell's own pages first (ADR 0172), since `tauri build` alone does not:
 
 ```sh
 pnpm --filter @project/app exec vite build
+pnpm --filter @project/app desktop-shell:build
 pnpm --filter @project/desktop tauri build --bundles deb
 ```
 
 Bundles are written under `target/release/bundle/` at the repository root, such as `target/release/bundle/deb/InfinityCube_0.0.0_amd64.deb`.
 
-For a quick run without bundling: `pnpm --filter @project/app exec vite build` once, then `cargo build -p infinity-cube-desktop` from the repository root and `target/debug/infinity-cube-desktop <Aggregate directory>` (the Cargo workspace's `target/` is at the root). `cargo test -p infinity-cube-desktop` (or `cargo nextest run`) runs the scheme handler against a copy of `packages/app/fixture` without opening a window.
+For a quick run without bundling: `pnpm --filter @project/app exec vite build` and `pnpm --filter @project/app desktop-shell:build` once, then `cargo build -p infinity-cube-desktop` from the repository root and `target/debug/infinity-cube-desktop <Aggregate directory>` (the Cargo workspace's `target/` is at the root). `cargo test -p infinity-cube-desktop` (or `cargo nextest run`) runs the scheme handler against a copy of `packages/app/fixture` without opening a window.
 
 Each preview release attaches a macOS build for Apple silicon, made by `pnpm release:build --desktop` (Storage ST-130). On macOS a bundle is ad-hoc signed, not signed with a Developer ID or notarized, so allow it once under System Settings › Privacy & Security › Open Anyway.

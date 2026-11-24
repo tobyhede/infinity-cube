@@ -144,6 +144,27 @@ mod the_default_name {
             .with("/home/ada/Documents/Untitled Space 2", &["notes.md"]);
         assert_eq!(default(&folders), "Untitled Space 3");
     }
+
+    #[test]
+    fn is_untitled_space_2_when_a_file_holds_the_name_untitled_space() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::write(root.path().join("Untitled Space"), "mine\n").unwrap();
+        assert_eq!(
+            default_name(&FolderListing, root.path()).unwrap(),
+            "Untitled Space 2"
+        );
+    }
+
+    #[test]
+    fn refuses_a_location_that_is_a_file_naming_it() {
+        let root = tempfile::tempdir().unwrap();
+        let location = root.path().join("notes.md");
+        std::fs::write(&location, "mine\n").unwrap();
+        assert!(matches!(
+            default_name(&FolderListing, &location),
+            Err(Refused::Unlisted { folder, .. }) if folder == location
+        ));
+    }
 }
 
 mod given_a_folder_that_holds_something {
