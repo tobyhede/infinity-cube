@@ -23,6 +23,14 @@ mod aggregates;
 mod launch;
 mod menu;
 mod new_space;
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "the Start window's New Space form (issue 02) calls it"
+    )
+)]
+mod new_space_folder;
 mod not_opened;
 mod question;
 mod saving;

@@ -89,7 +89,7 @@ pub use directory::{EntryKind, Filesystem, TokioFilesystem};
 pub use export::{ExportError, Exported, absent_assets, export_aggregate};
 pub use http::{Application, MAX_COMMIT_BODY_BYTES};
 pub use import::{IdSource, ImportError, RandomIds, import_directory};
-pub use init::{InitError, Initialized, init_directory};
+pub use init::{InitError, Initialized, NEW_SPACE_TITLE, init_directory};
 pub use lock::LOCK_FILE_NAME;
 pub use memory::MemorySpaceRepository;
 pub use repository::{

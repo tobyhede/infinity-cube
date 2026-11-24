@@ -6,7 +6,7 @@
 
 use std::path::Path;
 
-use host::{Filesystem, IdSource, Initialized, init_directory};
+use host::{Filesystem, IdSource, Initialized, NEW_SPACE_TITLE, init_directory};
 
 use crate::not_opened::NotOpened;
 
@@ -23,7 +23,7 @@ pub async fn create_space<F: Filesystem, I: IdSource>(
     directory: &Path,
     ids: &I,
 ) -> Result<(), NotOpened> {
-    match init_directory(fs, directory, ids).await {
+    match init_directory(fs, directory, NEW_SPACE_TITLE, ids).await {
         Ok(Initialized::Written) => Ok(()),
         Ok(_) => Err(NotOpened::NotEmpty(directory.to_path_buf())),
         Err(source) => Err(NotOpened::NotCreated {
