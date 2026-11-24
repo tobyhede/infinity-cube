@@ -10,6 +10,7 @@
 //! its Meta Space titled with the name, refusing a name and defaulting one by
 //! [`crate::new_space_folder`]'s rules.
 
+use std::io;
 use std::path::{Path, PathBuf};
 use std::thread;
 
@@ -22,7 +23,7 @@ use tokio::sync::oneshot;
 use crate::launch::{self, Opening};
 use crate::new_space;
 use crate::new_space_folder::{
-    FolderListing, Listing, Platform, Refused, default_name, new_space_folder,
+    FolderListing, Listing, Platform, Refused, default_name, is_free, new_space_folder,
 };
 use crate::not_opened::NotOpened;
 
@@ -101,43 +102,147 @@ pub fn default_location(documents: Option<PathBuf>, home: Option<PathBuf>) -> Pa
         .unwrap_or_else(|| PathBuf::from("."))
 }
 
+/// Where a Create Space that failed can be fixed, by what the system said
+/// (UI-111). The page words each one (`packages/app/src/start-refusal.ts`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Cause {
+    /// The Location may not be written to: shown on Location.
+    NoPermission,
+    /// The Location's disk is read-only: shown on Location.
+    ReadOnly,
+    /// The Location is not there, or is not a folder: shown on Location.
+    LocationGone,
+    /// The disk, or the person's share of it, is full: a notice.
+    DiskFull,
+    /// Anything else: a notice.
+    Other,
+}
+
+impl Cause {
+    /// Its stable code, as the page reads it.
+    #[must_use]
+    pub fn code(self) -> &'static str {
+        match self {
+            Self::NoPermission => "no-permission",
+            Self::ReadOnly => "read-only",
+            Self::LocationGone => "location-gone",
+            Self::DiskFull => "disk-full",
+            Self::Other => "failed",
+        }
+    }
+
+    /// Whether it is fixed by choosing another Location, and shown there.
+    #[must_use]
+    pub fn is_in_the_location(self) -> bool {
+        matches!(
+            self,
+            Self::NoPermission | Self::ReadOnly | Self::LocationGone
+        )
+    }
+
+    fn of_kind(kind: io::ErrorKind) -> Self {
+        match kind {
+            io::ErrorKind::PermissionDenied => Self::NoPermission,
+            io::ErrorKind::ReadOnlyFilesystem => Self::ReadOnly,
+            io::ErrorKind::NotFound | io::ErrorKind::NotADirectory => Self::LocationGone,
+            io::ErrorKind::StorageFull | io::ErrorKind::QuotaExceeded => Self::DiskFull,
+            _ => Self::Other,
+        }
+    }
+}
+
+/// The cause of `error`, by the first [`io::Error`] in its chain of sources,
+/// `error` itself first. A Location that is not there is
+/// [`Cause::LocationGone`] whatever the system said, since the write makes a
+/// missing Location and only fails to when it cannot; a failure with no
+/// system error beneath it is [`Cause::Other`].
+#[must_use]
+pub fn cause_of(error: &(dyn std::error::Error + 'static), location_present: bool) -> Cause {
+    let mut next = Some(error);
+    while let Some(current) = next {
+        if let Some(system) = current.downcast_ref::<io::Error>() {
+            return if location_present {
+                Cause::of_kind(system.kind())
+            } else {
+                Cause::LocationGone
+            };
+        }
+        next = current.source();
+    }
+    Cause::Other
+}
+
 /// Why New Space wrote nothing, or opened nothing, as the page shows it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NotCreated {
     /// The name is not one folder name on the platform: shown beside Name.
     Name { message: String },
-    /// The folder `<location>/<name>` holds something, or cannot be looked
-    /// in: shown beside Name.
-    Folder { message: String },
-    /// The name and Location were accepted and the write, or opening what
-    /// it wrote, failed: announced, with the form kept (UI-92).
-    Failed { message: String },
+    /// The folder `<location>/<name>` holds something: shown beside Name,
+    /// worded by the page from the name and Location it sent.
+    Folder,
+    /// The name and Location were accepted, and listing the folder or the
+    /// write failed: shown where [`Cause`] says, with the system's words in
+    /// `detail`, and whether anything was left in the folder (`kept`).
+    Failed {
+        cause: Cause,
+        detail: String,
+        kept: bool,
+    },
+    /// The Space was written to `folder` and did not open: a notice
+    /// offering to open the folder.
+    NotOpened { folder: PathBuf, detail: String },
 }
 
 impl NotCreated {
-    /// As the page reads it: `{ of, message }`.
+    /// As the page reads it: `{ of }`, with `message` for a name, `detail`
+    /// for a failure, `kept` for a failure no field fixes, and `folder` for
+    /// a Space written and not opened.
     #[must_use]
     pub fn to_page(&self) -> Value {
-        let (of, message) = match self {
-            Self::Name { message } => ("name", message),
-            Self::Folder { message } => ("folder", message),
-            Self::Failed { message } => ("failed", message),
-        };
-        json!({ "of": of, "message": message })
+        match self {
+            Self::Name { message } => json!({ "of": "name", "message": message }),
+            Self::Folder => json!({ "of": "folder" }),
+            Self::Failed {
+                cause,
+                detail,
+                kept,
+            } => {
+                if cause.is_in_the_location() {
+                    json!({ "of": cause.code(), "detail": detail })
+                } else {
+                    json!({ "of": cause.code(), "detail": detail, "kept": kept })
+                }
+            }
+            Self::NotOpened { folder, detail } => json!({
+                "of": "not-opened",
+                "folder": folder.display().to_string(),
+                "detail": detail,
+            }),
+        }
     }
 }
 
-impl From<Refused> for NotCreated {
-    fn from(refused: Refused) -> Self {
-        let message = refused.to_string();
-        match refused {
-            Refused::NotAFolderName
-            | Refused::ForbiddenCharacter(_)
-            | Refused::Reserved
-            | Refused::TrailingDotOrSpace => Self::Name { message },
-            Refused::NotEmpty(_) | Refused::Unlisted { .. } => Self::Folder { message },
-        }
+/// Why nothing was written, from New Space's folder rules.
+fn refused(listing: &impl Listing, location: &Path, refused: Refused) -> NotCreated {
+    match refused {
+        Refused::NotAFolderName
+        | Refused::ForbiddenCharacter(_)
+        | Refused::Reserved
+        | Refused::TrailingDotOrSpace => NotCreated::Name {
+            message: refused.to_string(),
+        },
+        Refused::NotEmpty(_) => NotCreated::Folder,
+        Refused::Unlisted { ref source, .. } => NotCreated::Failed {
+            cause: cause_of(source, location_present(listing, location)),
+            detail: refused.to_string(),
+            kept: false,
+        },
     }
+}
+
+/// Whether `location` is there: a listing that fails says something is.
+fn location_present(listing: &impl Listing, location: &Path) -> bool {
+    !matches!(listing.names(location), Ok(None))
 }
 
 /// Write a new Space to `<location>/<name>`, its Meta Space titled `name`,
@@ -155,15 +260,28 @@ pub async fn create_new_space<L: Listing, F: Filesystem, I: IdSource>(
     name: &str,
     platform: Platform,
 ) -> Result<PathBuf, NotCreated> {
-    let folder = new_space_folder(listing, location, name, platform)?;
-    match new_space::create_space(fs, &folder, name, ids).await {
-        Ok(()) => Ok(folder),
+    let folder = new_space_folder(listing, location, name, platform)
+        .map_err(|refusal| refused(listing, location, refusal))?;
+    let reason = match new_space::create_space(fs, &folder, name, ids).await {
+        Ok(()) => return Ok(folder),
         // Filled between the check and the write.
-        Err(NotOpened::NotEmpty(_)) => Err(Refused::NotEmpty(folder).into()),
-        Err(reason) => Err(NotCreated::Failed {
-            message: reason.to_string(),
-        }),
-    }
+        Err(NotOpened::NotEmpty(_)) => return Err(NotCreated::Folder),
+        Err(reason) => reason,
+    };
+    let (cause, detail) = match &reason {
+        // The folder is named once, in the system's words beneath.
+        NotOpened::NotCreated { source, .. } => (
+            cause_of(source, location_present(listing, location)),
+            source.to_string(),
+        ),
+        other => (Cause::Other, other.to_string()),
+    };
+    Err(NotCreated::Failed {
+        cause,
+        detail,
+        // A folder that cannot be listed is not said to hold nothing.
+        kept: !is_free(listing, &folder).unwrap_or(false),
+    })
 }
 
 /// Show the Start window on `screen`: open it, or bring forward the one
@@ -259,8 +377,9 @@ pub async fn start_create_space(app: AppHandle, location: String, name: String) 
                 }
                 Ok(())
             }
-            Err(reason) if reason.tells_the_presenter() => Err(NotCreated::Failed {
-                message: reason.to_string(),
+            Err(reason) if reason.tells_the_presenter() => Err(NotCreated::NotOpened {
+                detail: reason.to_string(),
+                folder: written,
             }),
             // A quit took it: nothing more to say.
             Err(_) => Ok(()),
@@ -271,7 +390,10 @@ pub async fn start_create_space(app: AppHandle, location: String, name: String) 
         Ok(result) => result.err().map(|refused| refused.to_page()),
         Err(error) => Some(
             NotCreated::Failed {
-                message: format!("Could not create the Space: {error}"),
+                cause: Cause::Other,
+                detail: format!("Could not create the Space: {error}"),
+                // A task that ended part-way may have written some files.
+                kept: true,
             }
             .to_page(),
         ),
@@ -284,7 +406,9 @@ pub fn start_open_folder(app: AppHandle) {
     crate::choose_folder(&app, Opening::StartWindow);
 }
 
-/// Open a recent Space's folder, as Open Folder… would.
+/// Open a recent Space's folder, or the folder of a new Space that was
+/// written and did not open ([`NotCreated::NotOpened`]), as Open Folder…
+/// would.
 #[tauri::command]
 pub fn start_open_recent(app: AppHandle, folder: String) {
     let _opening = thread::spawn(move || {

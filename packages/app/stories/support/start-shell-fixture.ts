@@ -21,7 +21,7 @@ export function storyStartShell(recents: readonly RecentSpace[]): StartShell {
   return {
     view: () => Promise.resolve({ recents, newSpace: documents }),
     browse: () => Promise.resolve({ ...documents, location: '/Users/ada/Desktop' }),
-    createSpace: (_location, name): Promise<NotCreated | null> => {
+    createSpace: (location, name): Promise<NotCreated | null> => {
       if (name === '' || name.includes('/') || name.includes('\\')) {
         return Promise.resolve({
           of: 'name',
@@ -30,8 +30,9 @@ export function storyStartShell(recents: readonly RecentSpace[]): StartShell {
       }
       if (name === 'Disk full') {
         return Promise.resolve({
-          of: 'failed',
-          message: `Could not create a Space in /Users/ada/Documents/${name}: No space left on device (os error 28)`,
+          of: 'disk-full',
+          detail: `${location}/${name}: No space left on device (os error 28)`,
+          kept: false,
         });
       }
       return new Promise(() => undefined);

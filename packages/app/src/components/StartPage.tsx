@@ -20,8 +20,7 @@ export const NEW_SPACE_FRAGMENT = '#new-space';
 
 const formFrom = (defaults: NewSpaceDefaults): NewSpaceForm => ({
   ...defaults,
-  refusal: null,
-  failure: null,
+  notCreated: null,
 });
 
 const asksForForm = (): boolean => window.location.hash === NEW_SPACE_FRAGMENT;
@@ -137,7 +136,7 @@ export function StartPage({ shell }: { readonly shell: StartShell }) {
                   location: chosen.location,
                   separator: chosen.separator,
                   name: nameTyped.current ? current.form.name : chosen.name,
-                  refusal: null,
+                  notCreated: null,
                 },
               }
             : current,
@@ -150,17 +149,10 @@ export function StartPage({ shell }: { readonly shell: StartShell }) {
   const create = (): void => {
     if (form === null) return;
     forgetFormRequests();
-    const kept: NewSpaceForm = { ...form, refusal: null, failure: null };
     setView({ screen: 'opening', title: form.name, folder: newSpaceFolder(form) });
-    void shell.createSpace(form.location, form.name).then((refused) => {
-      if (refused === null) return;
-      setView({
-        screen: 'new',
-        form:
-          refused.of === 'failed'
-            ? { ...kept, failure: refused.message }
-            : { ...kept, refusal: { of: refused.of, message: refused.message } },
-      });
+    void shell.createSpace(form.location, form.name).then((notCreated) => {
+      if (notCreated === null) return;
+      setView({ screen: 'new', form: { ...form, notCreated } });
     });
   };
 
@@ -173,9 +165,10 @@ export function StartPage({ shell }: { readonly shell: StartShell }) {
       onOpenRecent={(recent) => shell.openRecent(recent.folder)}
       onNameChange={(name) => {
         nameTyped.current = true;
-        editForm({ name, refusal: null });
+        editForm({ name, notCreated: null });
       }}
       onBrowse={browse}
+      onOpenCreated={(folder) => shell.openRecent(folder)}
       onCreate={create}
       onCancel={cancel}
     />

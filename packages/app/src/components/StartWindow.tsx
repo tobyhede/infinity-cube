@@ -1,8 +1,13 @@
-import { useEffect, useId, useRef, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import {
+  Alert,
+  AlertDescription,
   AlertIcon,
   Badge,
   Button,
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
   Empty,
   EmptyDescription,
   EmptyHeader,
@@ -30,9 +35,9 @@ import {
   Separator,
   SpaceIcon,
   StatusBusy,
-  StatusFailure,
 } from '@project/ui';
 import { newSpaceFolder, type NewSpaceForm } from './start-form';
+import { describeNotCreated } from '../start-refusal';
 import type { RecentSpace } from '../start-shell';
 
 /**
@@ -57,6 +62,8 @@ export interface StartWindowProps {
   readonly onRemoveRecent?: ((recent: RecentSpace) => void) | undefined;
   readonly onNameChange: (name: string) => void;
   readonly onBrowse: () => void;
+  /** Open Folder… on a Space written and not opened: its folder. */
+  readonly onOpenCreated: (folder: string) => void;
   readonly onCreate: () => void;
   readonly onCancel: () => void;
 }
@@ -71,6 +78,7 @@ export function StartWindow(props: StartWindowProps) {
           form={view.form}
           onNameChange={props.onNameChange}
           onBrowse={props.onBrowse}
+          onOpenCreated={props.onOpenCreated}
           onCreate={props.onCreate}
           onCancel={props.onCancel}
         />
@@ -251,12 +259,14 @@ function NewSpaceScreen({
   form,
   onNameChange,
   onBrowse,
+  onOpenCreated,
   onCreate,
   onCancel,
 }: {
   form: NewSpaceForm;
   onNameChange: (name: string) => void;
   onBrowse: () => void;
+  onOpenCreated: (folder: string) => void;
   onCreate: () => void;
   onCancel: () => void;
 }) {
@@ -264,9 +274,14 @@ function NewSpaceScreen({
   const nameId = useId();
   const nameErrorId = useId();
   const locationId = useId();
+  const locationErrorId = useId();
   const folderId = useId();
   const nameInput = useRef<HTMLInputElement>(null);
-  const refused = form.refusal !== null;
+  const words = form.notCreated === null ? null : describeNotCreated(form.notCreated, form);
+  const onName = words?.place === 'name' ? words : null;
+  const onLocation = words?.place === 'location' ? words : null;
+  const notice = words?.place === 'notice' ? words : null;
+  const openFolder = notice?.openFolder ?? null;
 
   useEffect(() => {
     nameInput.current?.focus();
@@ -278,6 +293,13 @@ function NewSpaceScreen({
     onCreate();
   };
 
+  const nameDescribedBy = [
+    onName === null ? null : nameErrorId,
+    onLocation === null ? folderId : null,
+  ]
+    .filter((id) => id !== null)
+    .join(' ');
+
   return (
     <form
       aria-labelledby={headingId}
@@ -286,7 +308,7 @@ function NewSpaceScreen({
       onKeyDown={(event) => {
         if (event.key === 'Escape') onCancel();
       }}
-      className="mx-auto flex w-full max-w-md flex-col justify-center gap-6 p-8"
+      className="m-auto flex w-full max-w-md flex-col gap-5 px-8 py-6"
     >
       <div className="flex flex-col gap-1">
         <h1 id={headingId} className="text-chrome-sm font-semibold text-foreground">
@@ -296,18 +318,8 @@ function NewSpaceScreen({
           Give it a name and choose where to keep it. You can rename it later.
         </p>
       </div>
-      {form.failure === null ? null : (
-        <StatusFailure
-          title="The Space could not be created"
-          description="Nothing was opened. Try again, choose another name or Location, or cancel."
-          detail={form.failure}
-          detailLabel="Why the Space could not be created"
-          className="p-0"
-          boundedDetail
-        />
-      )}
       <FieldGroup>
-        <Field data-invalid={refused}>
+        <Field data-invalid={onName !== null}>
           <FieldLabel htmlFor={nameId}>Name</FieldLabel>
           <Input
             ref={nameInput}
@@ -315,36 +327,77 @@ function NewSpaceScreen({
             value={form.name}
             autoComplete="off"
             spellCheck={false}
-            aria-invalid={refused}
-            aria-describedby={refused ? `${nameErrorId} ${folderId}` : folderId}
+            aria-invalid={onName !== null}
+            aria-describedby={nameDescribedBy === '' ? undefined : nameDescribedBy}
             onChange={(event) => onNameChange(event.target.value)}
           />
-          {refused ? <FieldError id={nameErrorId}>{form.refusal.message}</FieldError> : null}
+          {onName === null ? null : <FieldError id={nameErrorId}>{onName.sentence}</FieldError>}
         </Field>
-        <Field>
+        <Field data-invalid={onLocation !== null}>
           <FieldLabel htmlFor={locationId}>Location</FieldLabel>
           <InputGroup>
-            <InputGroupInput id={locationId} value={form.location} readOnly />
+            <InputGroupInput
+              id={locationId}
+              value={form.location}
+              readOnly
+              aria-invalid={onLocation !== null}
+              aria-describedby={onLocation === null ? folderId : locationErrorId}
+            />
             <InputGroupAddon align="inline-end">
-              <InputGroupButton variant="secondary" onClick={onBrowse}>
+              {/* The fix for a cause on Location, so it is the button to press. */}
+              <InputGroupButton
+                variant={onLocation === null ? 'secondary' : 'default'}
+                aria-describedby={onLocation === null ? undefined : locationErrorId}
+                onClick={onBrowse}
+              >
                 Browse…
               </InputGroupButton>
             </InputGroupAddon>
           </InputGroup>
-          <FieldDescription id={folderId}>
-            {form.refusal?.of === 'name' ? (
-              'Choose a name to see the folder it creates.'
-            ) : (
-              <>
-                Creates the folder{' '}
-                <span className="font-medium break-all text-foreground">
-                  {newSpaceFolder(form)}
-                </span>
-              </>
-            )}
-          </FieldDescription>
+          {onLocation === null ? (
+            <FieldDescription id={folderId}>
+              {form.notCreated?.of === 'name' ? (
+                'Choose a name to see the folder it creates.'
+              ) : (
+                <>
+                  Creates the folder{' '}
+                  <span className="font-medium break-all text-foreground">
+                    {newSpaceFolder(form)}
+                  </span>
+                </>
+              )}
+            </FieldDescription>
+          ) : (
+            <WithDetails detail={onLocation.detail}>
+              <FieldError id={locationErrorId} className="inline">
+                {onLocation.sentence}
+              </FieldError>
+            </WithDetails>
+          )}
         </Field>
       </FieldGroup>
+      {notice === null ? null : (
+        <Alert variant="destructive">
+          <AlertIcon />
+          <WithDetails
+            detail={notice.detail}
+            action={
+              openFolder === null ? null : (
+                <Button
+                  variant="ghost"
+                  size="compact"
+                  className={IN_LINE}
+                  onClick={() => onOpenCreated(openFolder)}
+                >
+                  Open Folder…
+                </Button>
+              )
+            }
+          >
+            <AlertDescription className="inline">{notice.sentence}</AlertDescription>
+          </WithDetails>
+        </Alert>
+      )}
       <Separator />
       <div className="flex justify-end gap-2">
         <Button type="button" variant="ghost" onClick={onCancel}>
@@ -355,5 +408,53 @@ function NewSpaceScreen({
         </Button>
       </div>
     </form>
+  );
+}
+
+/**
+ * A command set in a sentence's line, after it: a ghost button with no box of
+ * its own, in the sentence's colour and underlined, as the approved design
+ * draws Details and Open Folder…, so a failure takes no row more than its
+ * sentence and Create Space stays in view at the window's size.
+ */
+const IN_LINE =
+  'ml-1.5 h-auto p-0 align-baseline text-inherit underline underline-offset-2 hover:border-transparent hover:bg-transparent hover:text-inherit hover:decoration-2 aria-expanded:bg-transparent aria-expanded:text-inherit';
+
+/**
+ * A sentence, set inline, with the system's words behind a Details toggle
+ * after it, closed until pressed (UI-111), and any `action` before the
+ * toggle; with no detail, the sentence alone.
+ */
+function WithDetails({
+  detail,
+  action,
+  children,
+}: {
+  detail: string | null;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  if (detail === null) return children;
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} className="flex min-w-0 flex-col gap-1.5">
+      <div className="text-sm">
+        {children}
+        {action}
+        <CollapsibleTrigger render={<Button variant="ghost" size="compact" className={IN_LINE} />}>
+          {open ? 'Hide details' : 'Details'}
+        </CollapsibleTrigger>
+      </div>
+      <CollapsibleContent>
+        <pre
+          role="region"
+          tabIndex={0}
+          aria-label="What the system said"
+          className="max-h-20 overflow-auto rounded-md bg-muted px-2 py-1 font-mono text-chrome-xs break-all whitespace-pre-wrap text-muted-foreground"
+        >
+          {detail}
+        </pre>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }

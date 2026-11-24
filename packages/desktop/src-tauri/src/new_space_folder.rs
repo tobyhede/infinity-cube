@@ -78,7 +78,11 @@ pub enum Refused {
 
 /// Whether `folder` is missing or holds nothing but dot-entries, as
 /// `init_directory` decides.
-fn is_free(listing: &impl Listing, folder: &Path) -> Result<bool, Refused> {
+///
+/// # Errors
+///
+/// [`Refused::Unlisted`]: what `folder` holds could not be listed.
+pub fn is_free(listing: &impl Listing, folder: &Path) -> Result<bool, Refused> {
     let names = listing
         .names(folder)
         .map_err(|source| unlisted(folder, source))?;

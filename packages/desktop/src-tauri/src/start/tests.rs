@@ -11,6 +11,7 @@
 use std::fs;
 use std::io;
 use std::path::Path;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use host::{
     EntryKind, Filesystem, MemorySpaceRepository, RandomIds, TokioFilesystem, import_directory,
@@ -164,10 +165,7 @@ mod given_a_name_refused {
 
         let refused = create(documents.path(), "Meeting notes").await.unwrap_err();
 
-        assert!(
-            matches!(&refused, NotCreated::Folder { message } if message.contains("Meeting notes")),
-            "{refused:?}"
-        );
+        assert_eq!(refused, NotCreated::Folder);
         assert_eq!(
             fs::read_dir(&notes).unwrap().count(),
             1,
@@ -176,10 +174,42 @@ mod given_a_name_refused {
     }
 }
 
-/// The real filesystem, but no file can be created.
-struct Unwritable;
+/// The real filesystem, but a file or a folder fails as told: each
+/// `create_new` past the first `files` fails with `file_kind`, and
+/// `create_dir_all` fails with `folder_kind` when one is given.
+struct Failing {
+    files: usize,
+    file_kind: io::ErrorKind,
+    folder_kind: Option<io::ErrorKind>,
+    created: AtomicUsize,
+}
 
-impl Filesystem for Unwritable {
+impl Failing {
+    /// No file can be created: each fails with `kind`.
+    fn files(kind: io::ErrorKind) -> Self {
+        Self::after(0, kind)
+    }
+
+    /// The first `files` files are created, and every one after fails with `kind`.
+    fn after(files: usize, kind: io::ErrorKind) -> Self {
+        Self {
+            files,
+            file_kind: kind,
+            folder_kind: None,
+            created: AtomicUsize::new(0),
+        }
+    }
+
+    /// No folder can be created: each fails with `kind`.
+    fn folders(kind: io::ErrorKind) -> Self {
+        Self {
+            folder_kind: Some(kind),
+            ..Self::files(io::ErrorKind::Other)
+        }
+    }
+}
+
+impl Filesystem for Failing {
     async fn list(&self, directory: &Path) -> io::Result<Vec<(String, EntryKind)>> {
         TokioFilesystem.list(directory).await
     }
@@ -190,13 +220,20 @@ impl Filesystem for Unwritable {
         TokioFilesystem.read(path).await
     }
     async fn create_dir_all(&self, directory: &Path) -> io::Result<()> {
-        TokioFilesystem.create_dir_all(directory).await
+        match self.folder_kind {
+            Some(kind) => Err(io::Error::new(kind, "the system refused the folder")),
+            None => TokioFilesystem.create_dir_all(directory).await,
+        }
     }
-    async fn create_new(&self, _path: &Path, _bytes: &[u8]) -> io::Result<()> {
-        Err(io::Error::new(
-            io::ErrorKind::StorageFull,
-            "the disk is full",
-        ))
+    async fn create_new(&self, path: &Path, bytes: &[u8]) -> io::Result<()> {
+        if self.created.fetch_add(1, Ordering::SeqCst) < self.files {
+            TokioFilesystem.create_new(path, bytes).await
+        } else {
+            Err(io::Error::new(
+                self.file_kind,
+                "the system refused the file",
+            ))
+        }
     }
     async fn rename(&self, from: &Path, to: &Path) -> io::Result<()> {
         TokioFilesystem.rename(from, to).await
@@ -209,27 +246,166 @@ impl Filesystem for Unwritable {
     }
 }
 
+/// Create Space for `Untitled Space` in `location` over `fs`, which fails.
+async fn create_failing(fs: &Failing, location: &Path) -> NotCreated {
+    create_new_space(
+        &FolderListing,
+        fs,
+        &RandomIds,
+        location,
+        "Untitled Space",
+        Platform::Unix,
+    )
+    .await
+    .unwrap_err()
+}
+
 mod given_a_write_that_fails {
     use super::*;
 
     #[tokio::test]
-    async fn answers_why_in_words_naming_the_folder() {
+    async fn answers_a_full_disk_in_the_system_s_words_with_nothing_kept_when_no_folder_was_made() {
         let documents = tempfile::tempdir().unwrap();
-        let refused = create_new_space(
-            &FolderListing,
-            &Unwritable,
-            &RandomIds,
+        let refused = create_failing(
+            &Failing::folders(io::ErrorKind::StorageFull),
             documents.path(),
-            "Untitled Space",
-            Platform::Unix,
         )
-        .await
-        .unwrap_err();
+        .await;
         assert!(
-            matches!(&refused, NotCreated::Failed { message }
-                if message.contains("Untitled Space") && message.contains("the disk is full")),
+            matches!(&refused, NotCreated::Failed { cause: Cause::DiskFull, detail, kept: false }
+                if detail.contains("the system refused the folder")),
             "{refused:?}"
         );
+        assert_eq!(fs::read_dir(documents.path()).unwrap().count(), 0);
+    }
+
+    #[tokio::test]
+    async fn says_something_was_kept_when_the_folder_holds_what_was_made_before_it_failed() {
+        // Export makes the Space's folders before its files, and leaves them.
+        for fs in [
+            Failing::files(io::ErrorKind::StorageFull),
+            Failing::after(1, io::ErrorKind::StorageFull),
+        ] {
+            let documents = tempfile::tempdir().unwrap();
+            let refused = create_failing(&fs, documents.path()).await;
+            assert!(
+                matches!(&refused, NotCreated::Failed { cause: Cause::DiskFull, detail, kept: true }
+                    if detail.contains("the system refused the file")),
+                "{refused:?}"
+            );
+            assert_eq!(
+                create(documents.path(), "Untitled Space")
+                    .await
+                    .unwrap_err(),
+                NotCreated::Folder,
+                "what was kept takes the name"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn answers_a_folder_the_system_will_not_make_as_no_permission_in_the_location() {
+        let documents = tempfile::tempdir().unwrap();
+        let refused = create_failing(
+            &Failing::folders(io::ErrorKind::PermissionDenied),
+            documents.path(),
+        )
+        .await;
+        assert!(
+            matches!(
+                &refused,
+                NotCreated::Failed {
+                    cause: Cause::NoPermission,
+                    ..
+                }
+            ),
+            "{refused:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn answers_a_location_that_is_missing_and_cannot_be_made_as_gone() {
+        let parent = tempfile::tempdir().unwrap();
+        let refused = create_failing(
+            &Failing::folders(io::ErrorKind::PermissionDenied),
+            &parent.path().join("USB Stick").join("Slides"),
+        )
+        .await;
+        assert!(
+            matches!(
+                &refused,
+                NotCreated::Failed {
+                    cause: Cause::LocationGone,
+                    ..
+                }
+            ),
+            "{refused:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn answers_a_location_that_is_a_file_as_gone_writing_nothing() {
+        let file = tempfile::NamedTempFile::new().unwrap();
+        let refused = create(file.path(), "Untitled Space").await.unwrap_err();
+        assert!(
+            matches!(&refused, NotCreated::Failed { cause: Cause::LocationGone, detail, kept: false }
+                if !detail.is_empty()),
+            "{refused:?}"
+        );
+    }
+}
+
+mod given_a_failure_s_cause {
+    use host::{ExportError, InitError};
+
+    use super::*;
+    use crate::not_opened::NotOpened;
+
+    fn of_kind(kind: io::ErrorKind) -> Cause {
+        cause_of(&io::Error::from(kind), true)
+    }
+
+    #[test]
+    fn names_where_each_kind_the_system_reports_can_be_fixed() {
+        for (kind, cause) in [
+            (io::ErrorKind::PermissionDenied, Cause::NoPermission),
+            (io::ErrorKind::ReadOnlyFilesystem, Cause::ReadOnly),
+            (io::ErrorKind::NotFound, Cause::LocationGone),
+            (io::ErrorKind::NotADirectory, Cause::LocationGone),
+            (io::ErrorKind::StorageFull, Cause::DiskFull),
+            (io::ErrorKind::QuotaExceeded, Cause::DiskFull),
+            (io::ErrorKind::Interrupted, Cause::Other),
+            (io::ErrorKind::Other, Cause::Other),
+        ] {
+            assert_eq!(of_kind(kind), cause, "{kind:?}");
+        }
+    }
+
+    #[test]
+    fn finds_the_system_s_error_beneath_the_ones_that_wrap_it() {
+        let reason = NotOpened::NotCreated {
+            directory: PathBuf::from("/Volumes/Archive/Untitled Space"),
+            source: InitError::Export(ExportError::Io {
+                path: PathBuf::from("/Volumes/Archive/Untitled Space/aggregate.json"),
+                source: io::Error::from(io::ErrorKind::ReadOnlyFilesystem),
+            }),
+        };
+        assert_eq!(cause_of(&reason, true), Cause::ReadOnly);
+        let listed = InitError::Io(io::Error::from(io::ErrorKind::PermissionDenied));
+        assert_eq!(cause_of(&listed, true), Cause::NoPermission);
+    }
+
+    #[test]
+    fn names_a_location_that_is_not_there_as_gone_whatever_the_system_said() {
+        let denied = io::Error::from(io::ErrorKind::PermissionDenied);
+        assert_eq!(cause_of(&denied, false), Cause::LocationGone);
+    }
+
+    #[test]
+    fn names_a_failure_with_no_system_error_beneath_it_as_other() {
+        let reason = NotOpened::Refused("holds no Space".to_owned());
+        assert_eq!(cause_of(&reason, true), Cause::Other);
+        assert_eq!(cause_of(&reason, false), Cause::Other);
     }
 }
 
@@ -237,25 +413,67 @@ mod given_the_page {
     use super::*;
 
     #[test]
-    fn a_refusal_reaches_the_page_as_what_it_refused_and_why() {
-        let as_json = |refused: NotCreated| refused.to_page();
+    fn a_refusal_reaches_the_page_as_what_it_refused() {
         assert_eq!(
-            as_json(NotCreated::Name {
+            NotCreated::Name {
                 message: "m".to_owned()
-            }),
+            }
+            .to_page(),
             serde_json::json!({ "of": "name", "message": "m" })
         );
         assert_eq!(
-            as_json(NotCreated::Folder {
-                message: "m".to_owned()
-            }),
-            serde_json::json!({ "of": "folder", "message": "m" })
+            NotCreated::Folder.to_page(),
+            serde_json::json!({ "of": "folder" })
         );
+    }
+
+    #[test]
+    fn a_failure_in_the_location_reaches_the_page_by_its_code_with_the_system_s_words() {
+        for (cause, of) in [
+            (Cause::NoPermission, "no-permission"),
+            (Cause::ReadOnly, "read-only"),
+            (Cause::LocationGone, "location-gone"),
+        ] {
+            assert_eq!(
+                NotCreated::Failed {
+                    cause,
+                    detail: "d".to_owned(),
+                    kept: false
+                }
+                .to_page(),
+                serde_json::json!({ "of": of, "detail": "d" })
+            );
+        }
+    }
+
+    #[test]
+    fn a_failure_with_no_field_to_fix_reaches_the_page_saying_whether_files_were_kept() {
+        for (cause, of) in [(Cause::DiskFull, "disk-full"), (Cause::Other, "failed")] {
+            assert_eq!(
+                NotCreated::Failed {
+                    cause,
+                    detail: "d".to_owned(),
+                    kept: true
+                }
+                .to_page(),
+                serde_json::json!({ "of": of, "detail": "d", "kept": true })
+            );
+        }
+    }
+
+    #[test]
+    fn a_space_written_and_not_opened_reaches_the_page_naming_its_folder() {
         assert_eq!(
-            as_json(NotCreated::Failed {
-                message: "m".to_owned()
-            }),
-            serde_json::json!({ "of": "failed", "message": "m" })
+            NotCreated::NotOpened {
+                folder: PathBuf::from("/home/ada/Documents/Deck"),
+                detail: "d".to_owned()
+            }
+            .to_page(),
+            serde_json::json!({
+                "of": "not-opened",
+                "folder": "/home/ada/Documents/Deck",
+                "detail": "d",
+            })
         );
     }
 

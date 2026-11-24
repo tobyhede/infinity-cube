@@ -32,15 +32,27 @@ const startWindowViewSchema = z.object({
   newSpace: newSpaceDefaultsSchema,
 });
 
-const notCreatedSchema = z.object({
-  /**
-   * `name`: not one folder name; `folder`: `<location>/<name>` holds
-   * something or cannot be looked in (both shown beside Name); `failed`: the
-   * write, or opening what it wrote, failed after both were accepted.
-   */
-  of: z.enum(['name', 'folder', 'failed']),
-  message: z.string(),
-});
+/**
+ * Why Create Space wrote nothing, or opened nothing, by stable code
+ * (`NotCreated::to_page` in `start.rs`). The page words each code
+ * (`start-refusal.ts`); `detail` is the system's own words, shown only behind
+ * Details.
+ */
+const notCreatedSchema = z.union([
+  /** Not one folder name, in the shell's sentence: shown on Name. */
+  z.object({ of: z.literal('name'), message: z.string() }),
+  /** `<location>/<name>` holds something: shown on Name. */
+  z.object({ of: z.literal('folder') }),
+  /** Fixed by choosing another Location: shown on Location. */
+  z.object({
+    of: z.enum(['no-permission', 'read-only', 'location-gone']),
+    detail: z.string(),
+  }),
+  /** No field fixes it: a notice, saying whether anything was left in the folder. */
+  z.object({ of: z.enum(['disk-full', 'failed']), detail: z.string(), kept: z.boolean() }),
+  /** Written to `folder` and not opened: a notice offering to open it. */
+  z.object({ of: z.literal('not-opened'), folder: z.string(), detail: z.string() }),
+]);
 
 export type NewSpaceDefaults = z.infer<typeof newSpaceDefaultsSchema>;
 export type RecentSpace = z.infer<typeof recentSpaceSchema>;
@@ -59,7 +71,7 @@ export interface StartShell {
   createSpace(location: string, name: string): Promise<NotCreated | null>;
   /** Open Folder…: the platform's folder chooser, as File › Open… asks. */
   openFolder(): void;
-  /** Open a recent Space's folder. */
+  /** Open a recent Space's folder, or a new Space's that did not open. */
   openRecent(folder: string): void;
   /** Close the Start window. */
   close(): void;
@@ -90,8 +102,13 @@ export function tauriStartShell(tauri: TauriInvoke): StartShell {
           .nullable()
           .parse(await tauri.invoke('start_create_space', { location, name }));
       } catch (error) {
-        // Refused by the shell, which rejects with its reason in words.
-        return { of: 'failed', message: error instanceof Error ? error.message : String(error) };
+        // Refused by the shell before the command ran, which rejects with its
+        // reason in words; the command answers rather than rejects.
+        return {
+          of: 'failed',
+          detail: error instanceof Error ? error.message : String(error),
+          kept: false,
+        };
       }
     },
     openFolder: () => fire('start_open_folder'),

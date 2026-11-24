@@ -205,20 +205,101 @@ describe('New Space', () => {
     expect(nameField().getAttribute('aria-invalid')).toBe('false');
   });
 
-  it('refuses a folder that holds something beside the name, still naming the folder', async () => {
+  it('refuses a folder that holds something on Name, naming the Location and the name, still naming the folder', async () => {
+    await openForm(fakeShell({ create: () => ({ of: 'folder' }) }).shell);
+
+    fireEvent.click(createButton());
+
+    const reason = await screen.findByText(
+      'Documents already has a folder called Untitled Space with files in it. Choose another name.',
+    );
+    expect(nameField().getAttribute('aria-invalid')).toBe('true');
+    expect(nameField().getAttribute('aria-describedby')).toContain(reason.id);
+    expect(screen.getByText('/home/ada/Documents/Untitled Space')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Details' })).toBeNull();
+  });
+
+  it('shows a cause another Location fixes on Location, its system words behind a closed Details', async () => {
+    const { shell, finishCreate } = fakeShell();
+    await openForm(shell);
+    fireEvent.change(nameField(), { target: { value: 'Board deck' } });
+
+    fireEvent.click(createButton());
+    await screen.findByRole('status');
+    act(() =>
+      finishCreate({ of: 'no-permission', detail: 'Permission denied (os error 13): /home/ada' }),
+    );
+
+    const reason = await screen.findByText(
+      'You don’t have permission to create folders in Documents. Choose another Location.',
+    );
+    expect(locationField().getAttribute('aria-invalid')).toBe('true');
+    expect(locationField().getAttribute('aria-describedby')).toContain(reason.id);
+    expect(screen.getByRole('button', { name: 'Browse…' }).getAttribute('aria-describedby')).toBe(
+      reason.id,
+    );
+    expect(nameField().getAttribute('aria-invalid')).toBe('false');
+    expect(screen.queryByText(/Creates the folder/u)).toBeNull();
+    expect(nameField()).toHaveProperty('value', 'Board deck');
+    expect(createButton()).toBeTruthy();
+
+    const details = screen.getByRole('button', { name: 'Details' });
+    expect(details.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByText('Permission denied (os error 13): /home/ada')).toBeNull();
+    fireEvent.click(details);
+    expect(await screen.findByText('Permission denied (os error 13): /home/ada')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Hide details' }).getAttribute('aria-expanded')).toBe(
+      'true',
+    );
+  });
+
+  it('words each cause another Location fixes, naming the Location’s last folder', async () => {
+    const cases: readonly [NotCreated, string][] = [
+      [
+        { of: 'read-only', detail: 'Read-only file system (os error 30)' },
+        'Documents is read-only, so nothing can be created there. Choose another Location.',
+      ],
+      [
+        { of: 'location-gone', detail: 'Not a directory (os error 20)' },
+        'Documents can’t be found. It may have been moved, or its disk removed. Choose another Location.',
+      ],
+    ];
+    for (const [answer, sentence] of cases) {
+      const { unmount } = render(<StartPage shell={fakeShell({ create: () => answer }).shell} />);
+      fireEvent.click(await screen.findByRole('button', { name: 'New Space' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Create Space' }));
+      const reason = await screen.findByText(sentence);
+      expect(locationField().getAttribute('aria-describedby')).toContain(reason.id);
+      unmount();
+    }
+  });
+
+  it('clears a Location cause when a new Location is chosen with Browse…, and a notice when the name changes', async () => {
+    const answers: NotCreated[] = [
+      { of: 'read-only', detail: 'Read-only file system (os error 30)' },
+      { of: 'disk-full', detail: 'No space left on device (os error 28)', kept: false },
+    ];
     await openForm(
       fakeShell({
-        create: () => ({ of: 'folder', message: 'That folder is not empty.' }),
+        create: () => answers.shift() ?? null,
+        browse: { location: '/srv/decks', name: 'Untitled Space', separator: '/' },
       }).shell,
     );
 
     fireEvent.click(createButton());
+    await screen.findByText(/is read-only/u);
+    fireEvent.click(screen.getByRole('button', { name: 'Browse…' }));
+    await waitFor(() => expect(locationField()).toHaveProperty('value', '/srv/decks'));
+    expect(screen.queryByText(/is read-only/u)).toBeNull();
+    expect(locationField().getAttribute('aria-invalid')).toBe('false');
 
-    expect(await screen.findByText('That folder is not empty.')).toBeTruthy();
-    expect(screen.getByText('/home/ada/Documents/Untitled Space')).toBeTruthy();
+    fireEvent.click(createButton());
+    await screen.findByText(/There isn’t enough space on the disk/u);
+    fireEvent.change(nameField(), { target: { value: 'Smaller deck' } });
+    expect(screen.queryByText(/There isn’t enough space on the disk/u)).toBeNull();
   });
 
-  it('announces a write that failed and returns to the form with the name and Location kept', async () => {
+  it('shows a failure no field fixes as a notice above the buttons, the form kept', async () => {
     const { shell, finishCreate } = fakeShell({
       browse: { location: '/srv/decks', name: 'Untitled Space', separator: '/' },
     });
@@ -229,13 +310,65 @@ describe('New Space', () => {
 
     fireEvent.click(createButton());
     await screen.findByRole('status');
-    act(() => finishCreate({ of: 'failed', message: 'Could not create a Space: disk full' }));
+    act(() =>
+      finishCreate({
+        of: 'disk-full',
+        detail: 'No space left on device (os error 28)',
+        kept: false,
+      }),
+    );
 
-    const alert = await screen.findByRole('alert');
-    expect(alert.textContent).toContain('Could not create a Space: disk full');
+    const notice = await screen.findByRole('alert');
+    expect(notice.textContent).toContain(
+      'There isn’t enough space on the disk to create the Space. Nothing was kept.',
+    );
+    expect(nameField().getAttribute('aria-invalid')).toBe('false');
+    expect(locationField().getAttribute('aria-invalid')).toBe('false');
+    expect(within(notice).queryByText('No space left on device (os error 28)')).toBeNull();
+    fireEvent.click(within(notice).getByRole('button', { name: 'Details' }));
+    expect(await within(notice).findByText('No space left on device (os error 28)')).toBeTruthy();
     expect(nameField()).toHaveProperty('value', 'Board deck');
     expect(locationField()).toHaveProperty('value', '/srv/decks');
     expect(createButton()).toBeTruthy();
+  });
+
+  it('says anything else failed in a notice, and that part was left only when it was', async () => {
+    await openForm(
+      fakeShell({
+        create: () => ({ of: 'failed', detail: 'Input/output error (os error 5)', kept: true }),
+      }).shell,
+    );
+
+    fireEvent.click(createButton());
+
+    const notice = await screen.findByRole('alert');
+    expect(notice.textContent).toContain(
+      'The Space couldn’t be created, and part of it was left in the folder Untitled Space. Choose another name or Location.',
+    );
+    expect(within(notice).getByRole('button', { name: 'Details' })).toBeTruthy();
+  });
+
+  it('offers to open the folder of a Space written and not opened', async () => {
+    const { shell, asked } = fakeShell({
+      create: () => ({
+        of: 'not-opened',
+        folder: '/home/ada/Documents/Untitled Space',
+        detail: 'Could not open it',
+      }),
+    });
+    await openForm(shell);
+
+    fireEvent.click(createButton());
+
+    const notice = await screen.findByRole('alert');
+    expect(notice.textContent).toContain(
+      'The Space was created but couldn’t be opened. Its folder is kept.',
+    );
+    fireEvent.click(within(notice).getByRole('button', { name: 'Open Folder…' }));
+    expect(asked.at(-1)).toEqual({
+      kind: 'open-recent',
+      folder: '/home/ada/Documents/Untitled Space',
+    });
   });
 
   it('takes the defaults of a Location chosen with Browse…, keeping a name already typed', async () => {

@@ -1,3 +1,5 @@
+import type { NotCreated } from '../start-shell';
+
 /** The Start window's New Space form (UI-111), as the person has it. */
 
 export interface NewSpaceForm {
@@ -7,13 +9,11 @@ export interface NewSpaceForm {
   /** The platform's path separator, for naming `<location>/<name>`. */
   readonly separator: string;
   /**
-   * Why Create Space was refused, shown beside Name: `name`, not one folder
-   * name, so no folder is named; `folder`, `<location>/<name>` holds
-   * something.
+   * Why the last Create Space wrote or opened nothing, shown where it can be
+   * fixed (`describeNotCreated`), until the name changes or Browse… chooses
+   * a Location.
    */
-  readonly refusal: { readonly of: 'name' | 'folder'; readonly message: string } | null;
-  /** Why the write failed after the name and Location were accepted. */
-  readonly failure: string | null;
+  readonly notCreated: NotCreated | null;
 }
 
 /** The folder Create Space makes: `<location>/<name>`. */

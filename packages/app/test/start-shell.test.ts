@@ -40,22 +40,32 @@ describe('the Start window’s shell over invoke', () => {
     ]);
   });
 
-  it('answers the shell’s refusal as it was given', async () => {
-    const { shell } = invoking({
-      start_create_space: () => Promise.resolve({ of: 'folder', message: 'Not empty.' }),
-    });
-
-    expect(await shell.createSpace('/x', 'y')).toEqual({ of: 'folder', message: 'Not empty.' });
+  it('answers each refusal and failure the shell gives by its code', async () => {
+    const answers: readonly JsonValue[] = [
+      { of: 'name', message: 'A name is one folder name.' },
+      { of: 'folder' },
+      { of: 'no-permission', detail: 'Permission denied (os error 13)' },
+      { of: 'read-only', detail: 'Read-only file system (os error 30)' },
+      { of: 'location-gone', detail: 'Not a directory (os error 20)' },
+      { of: 'disk-full', detail: 'No space left on device (os error 28)', kept: false },
+      { of: 'failed', detail: 'Input/output error (os error 5)', kept: true },
+      { of: 'not-opened', folder: '/home/ada/Documents/Deck', detail: 'Could not open it' },
+    ];
+    for (const answer of answers) {
+      const { shell } = invoking({ start_create_space: () => Promise.resolve(answer) });
+      expect(await shell.createSpace('/x', 'y')).toEqual(answer);
+    }
   });
 
-  it('answers an invoke the shell refused as a failed write, in its words', async () => {
+  it('answers an invoke the shell refused as a failure, its words the detail', async () => {
     const { shell } = invoking({
       start_create_space: () => Promise.reject(new Error('command start_create_space not allowed')),
     });
 
     expect(await shell.createSpace('/x', 'y')).toEqual({
       of: 'failed',
-      message: 'command start_create_space not allowed',
+      detail: 'command start_create_space not allowed',
+      kept: false,
     });
   });
 
