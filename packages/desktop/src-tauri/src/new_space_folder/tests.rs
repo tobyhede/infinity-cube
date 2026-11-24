@@ -44,17 +44,17 @@ mod given_a_name_that_is_free {
     #[test]
     fn answers_the_folder_of_that_name_in_the_location() {
         assert_eq!(
-            folder(&Folders::default(), "Talk", Platform::Unix).unwrap(),
-            PathBuf::from("/home/ada/Documents/Talk")
+            folder(&Folders::default(), "Deck", Platform::Unix).unwrap(),
+            PathBuf::from("/home/ada/Documents/Deck")
         );
     }
 
     #[test]
     fn answers_a_folder_that_holds_only_dot_entries() {
-        let folders = Folders::default().with("/home/ada/Documents/Talk", &[".git", ".DS_Store"]);
+        let folders = Folders::default().with("/home/ada/Documents/Deck", &[".git", ".DS_Store"]);
         assert_eq!(
-            folder(&folders, "Talk", Platform::Unix).unwrap(),
-            PathBuf::from("/home/ada/Documents/Talk")
+            folder(&folders, "Deck", Platform::Unix).unwrap(),
+            PathBuf::from("/home/ada/Documents/Deck")
         );
     }
 }
@@ -72,9 +72,9 @@ mod given_a_folder_that_cannot_be_listed {
 
     #[test]
     fn refuses_it_naming_the_folder() {
-        let refused = folder_in(&Unreadable, "Talk").unwrap_err();
+        let refused = folder_in(&Unreadable, "Deck").unwrap_err();
         assert!(
-            matches!(&refused, Refused::Unlisted { folder, .. } if folder == Path::new("/home/ada/Documents/Talk")),
+            matches!(&refused, Refused::Unlisted { folder, .. } if folder == Path::new("/home/ada/Documents/Deck")),
             "{refused:?}"
         );
     }
@@ -151,10 +151,10 @@ mod given_a_folder_that_holds_something {
 
     #[test]
     fn refuses_it_naming_the_folder() {
-        let folders = Folders::default().with("/home/ada/Documents/Talk", &[".git", "notes.md"]);
-        let refused = folder(&folders, "Talk", Platform::Unix).unwrap_err();
+        let folders = Folders::default().with("/home/ada/Documents/Deck", &[".git", "notes.md"]);
+        let refused = folder(&folders, "Deck", Platform::Unix).unwrap_err();
         assert!(
-            matches!(&refused, Refused::NotEmpty(at) if at == Path::new("/home/ada/Documents/Talk")),
+            matches!(&refused, Refused::NotEmpty(at) if at == Path::new("/home/ada/Documents/Deck")),
             "{refused:?}"
         );
     }
@@ -166,7 +166,7 @@ mod given_a_name_that_is_not_one_folder_name {
     #[test]
     fn refuses_it_on_every_platform() {
         for platform in [Platform::Unix, Platform::Windows] {
-            for name in ["", ".", "..", "Talks/Q3", "Talks\\Q3", "/", "\\"] {
+            for name in ["", ".", "..", "Decks/Q3", "Decks\\Q3", "/", "\\"] {
                 let refused = folder(&Folders::default(), name, platform).unwrap_err();
                 assert!(
                     matches!(refused, Refused::NotAFolderName),
@@ -244,7 +244,7 @@ mod given_a_name_windows_reserves {
 
     #[test]
     fn accepts_a_name_that_only_begins_like_one_for_windows() {
-        for name in ["CONSOLE", "COM10", "LPT0x", "nul-talk", "Auxiliary"] {
+        for name in ["CONSOLE", "COM10", "LPT0x", "nul-deck", "Auxiliary"] {
             assert!(
                 folder(&Folders::default(), name, Platform::Windows).is_ok(),
                 "{name:?}"
@@ -256,7 +256,7 @@ mod given_a_name_windows_reserves {
 mod given_a_name_ending_in_a_dot_or_a_space {
     use super::*;
 
-    const NAMES: [&str; 3] = ["Talk.", "Talk ", "Talk. "];
+    const NAMES: [&str; 3] = ["Deck.", "Deck ", "Deck. "];
 
     #[test]
     fn refuses_it_for_windows() {
