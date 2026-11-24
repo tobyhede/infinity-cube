@@ -1459,6 +1459,28 @@ describe('ResourceNode Open Resource', () => {
     expect(onResize).toHaveBeenLastCalledWith({ width: 260, height: 195 });
   });
 
+  it('takes the proportions from the rect stored on this Map, not the size React Flow measured', () => {
+    const onResize = vi.fn();
+    const resize = {
+      minWidth: 260,
+      minHeight: 146,
+      onResizeStart: () => undefined,
+      onResize,
+      onResizeEnd: () => undefined,
+      onResizeCancel: () => undefined,
+    };
+    // The mocked control reports a measured 400 × 300; the Placement is 600 × 200.
+    render(
+      <ResourceNode {...props({ open: true, selected: true, resize })} width={600} height={200} />,
+    );
+    const control = screen.getByTestId('resize-control');
+
+    fireEvent.mouseDown(control, { shiftKey: true, clientX: 500, clientY: 400 });
+    fireEvent.mouseMove(control, { shiftKey: true, clientX: 800, clientY: 400 });
+
+    expect(onResize).toHaveBeenLastCalledWith({ width: 900, height: 300 });
+  });
+
   it('keeps proportions for a touch drag started with Shift held', () => {
     const onResize = vi.fn();
     const resize = {

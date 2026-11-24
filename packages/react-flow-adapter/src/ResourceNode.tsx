@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from 'react';
 import {
   Handle,
   NodeResizeControl,
@@ -38,6 +46,11 @@ function gesturePoint(source: Event): GesturePoint | undefined {
     return touch === undefined ? undefined : { x: touch.clientX, y: touch.clientY };
   }
   return undefined;
+}
+
+/** Ends a click where it lands, before React Flow's node click handler sees it. */
+function stopClick(event: ReactMouseEvent): void {
+  event.stopPropagation();
 }
 
 /** Whether Shift was held for the mouse or touch event that began a resize gesture. */
@@ -227,6 +240,13 @@ export function ResourceNode({
   const resizing = useRef(false);
   /* The rect and pointer a proportional Resize started from; none for a free one. */
   const resizeStart = useRef<{ size: ResizeSize; pointer: GesturePoint }>();
+  /* The stored rect, which a proportional Resize takes its ratio from (ADR 0173):
+     React Flow's start is the measured DOM box, which can differ from it. */
+  const placedSize = useRef(size);
+  useEffect(() => {
+    placedSize.current =
+      width !== undefined && height !== undefined ? { width, height } : undefined;
+  }, [width, height]);
   const [resizeActive, setResizeActive] = useState(false);
   const { zoom } = useViewport();
   const zoomRef = useRef(zoom);
@@ -290,7 +310,7 @@ export function ResourceNode({
     const pointer = source instanceof Event ? gesturePoint(source) : undefined;
     resizeStart.current =
       pointer !== undefined && source instanceof Event && startedWithShift(source)
-        ? { size: { width: start.width, height: start.height }, pointer }
+        ? { size: placedSize.current ?? { width: start.width, height: start.height }, pointer }
         : undefined;
     resizing.current = true;
     setResizeActive(true);
@@ -418,8 +438,18 @@ export function ResourceNode({
         those handles would be invisible to that rule; anything before the Resource
         is harmless to it.
       */}
+      {/*
+        The wrapper keeps a press on the control from reaching the node's own
+        click, which with Shift held, the multi-selection key, would deselect
+        this Resource and take the control away. A drag that moves raises no
+        click; a Shift-press that does not move does.
+        `app/e2e/aspect-ratio-resizing.spec.ts` › "a Shift-click on the resize
+        control keeps the Resource selected and makes no Edit" fails without it.
+        `display: contents` gives it no box, so what it holds is placed and
+        painted as before.
+      */}
       {!data.readOnly && visuallySelected && resize !== undefined && (
-        <>
+        <span style={{ display: 'contents' }} onClick={stopClick}>
           {data.shape !== 'rectangle' && (
             <span className="rf-resource-node__resize-frame" aria-hidden="true" />
           )}
@@ -448,7 +478,7 @@ export function ResourceNode({
             onResizeStart={beginResize}
             shouldResize={proposeResize}
           />
-        </>
+        </span>
       )}
       {/*
         Every Resource is drawn by its plugin's host (ADR 0142), which keeps

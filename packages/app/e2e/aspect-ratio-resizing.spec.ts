@@ -150,6 +150,38 @@ test('cancelling a proportional Resize discards its preview', async ({ page }) =
   );
 });
 
+test('a Shift-click on the resize control keeps the Resource selected and makes no Edit', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  const resource = nodeByTitle(page, 'A').first();
+  await selectResource(resource);
+  const revision = await page.getByTestId('persistence-status').getAttribute('data-revision');
+  const before = await resource.evaluate((element) => ({
+    width: getComputedStyle(element).width,
+    height: getComputedStyle(element).height,
+  }));
+  const control = resource.locator('.react-flow__resize-control.handle.bottom.right');
+  const handle = await boxOf(control, 'resize control');
+  // Shift is also the canvas's multi-selection key (Navigation NV-9).
+  await page.keyboard.down('Shift');
+  await page.mouse.click(handle.x + handle.width / 2, handle.y + handle.height / 2);
+  await page.keyboard.up('Shift');
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
+
+  await expect(resource).toHaveClass(/\bselected\b/);
+  await expect(control).toBeVisible();
+  await expect(resource).toHaveCSS('width', before.width);
+  await expect(resource).toHaveCSS('height', before.height);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute(
+    'data-revision',
+    revision ?? '',
+  );
+});
+
 test('pressing Shift after a free Resize starts keeps that drag free', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');

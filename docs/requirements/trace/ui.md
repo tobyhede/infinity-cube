@@ -473,3 +473,4 @@ The snapshot marker moved from `a0f5066` to `f6e01b9`; the highest accepted ADR 
 |---|---|
 | Shift at Resize start keeps the current Map rect’s ratio for the whole drag, with one Edit on release and cancellation discarding the draft | → UI-67 |
 | Both Closed Size floors hold while scaling the rect proportionally | → UI-68 |
+| The ratio is the stored Map rect, and Shift on the control never changes selection | → UI-67 |
