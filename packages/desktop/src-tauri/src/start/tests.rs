@@ -281,26 +281,27 @@ mod given_a_write_that_fails {
 
     #[tokio::test]
     async fn says_something_was_kept_when_the_folder_holds_what_was_made_before_it_failed() {
-        // Export makes the Space's folders before its files, and leaves them.
-        for fs in [
-            Failing::files(io::ErrorKind::StorageFull),
-            Failing::after(1, io::ErrorKind::StorageFull),
-        ] {
-            let documents = tempfile::tempdir().unwrap();
-            let refused = create_failing(&fs, documents.path()).await;
-            assert!(
-                matches!(&refused, NotCreated::Failed { cause: Cause::DiskFull, detail, kept: true }
-                    if detail.contains("the system refused the file")),
-                "{refused:?}"
-            );
-            assert_eq!(
-                create(documents.path(), "Untitled Space")
-                    .await
-                    .unwrap_err(),
-                NotCreated::Folder,
-                "what was kept takes the name"
-            );
-        }
+        // Export writes in path order, leaving what it made before a failure.
+        // With no file written, whether a Space's folder came first depends
+        // on its random id, so the first file is let through.
+        let documents = tempfile::tempdir().unwrap();
+        let refused = create_failing(
+            &Failing::after(1, io::ErrorKind::StorageFull),
+            documents.path(),
+        )
+        .await;
+        assert!(
+            matches!(&refused, NotCreated::Failed { cause: Cause::DiskFull, detail, kept: true }
+                if detail.contains("the system refused the file")),
+            "{refused:?}"
+        );
+        assert_eq!(
+            create(documents.path(), "Untitled Space")
+                .await
+                .unwrap_err(),
+            NotCreated::Folder,
+            "what was kept takes the name"
+        );
     }
 
     #[tokio::test]
