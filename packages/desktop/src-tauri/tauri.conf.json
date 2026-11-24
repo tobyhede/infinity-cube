@@ -3,7 +3,7 @@
   "productName": "InfinityCube",
   "identifier": "dev.infinitycube.desktop",
   "build": {
-    "frontendDist": "../ui"
+    "frontendDist": "../../app/dist-desktop-shell"
   },
   "app": {
     "withGlobalTauri": true,

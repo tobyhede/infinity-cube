@@ -4,6 +4,8 @@ dist/
 /target/
 packages/app/dist-http/
 packages/app/dist-desktop-sidecar/
+# The desktop shell's own frontend: the Start page and the close question.
+packages/app/dist-desktop-shell/
 # `pnpm build:mount`'s static application for Mounting (ADR 0130).
 packages/app/dist-mount/
 # `ladle build`'s static output — the surface inventory as a hostable site.

@@ -616,7 +616,8 @@ jobs:
     # files `tauri.conf.json` names, so the browser application it bundles,
     # `packages/app/dist`, is built first, which needs the pinned Node
     # (`setup-node` below); the CLI embeds the same build further down. The
-    # shell serves it through the Rust host, so nothing else is built for it.
+    # shell serves it through the Rust host; its own pages (`frontendDist`, the
+    # Start window and the close question) are a second build beside it.
     # The toolchain is whatever `rust-toolchain.toml` pins; `rustup toolchain
     # install` with no argument reads that file, so the version lives in one
     # place.
@@ -664,6 +665,9 @@ jobs:
         run: command -v cargo-nextest || cargo install cargo-nextest --locked --version "$NEXTEST_VERSION"
       - name: Build the browser application the shell bundles
         run: pnpm --filter @project/app exec vite build
+      # The shell's own pages (`frontendDist`): the Start window and the close question.
+      - name: Build the desktop shell's frontend
+        run: pnpm --filter @project/app desktop-shell:build
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       # nextest runs no doctests, so the examples in the crates' docs run here.
       - run: cargo test --workspace --doc --locked

@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "start",
+  "description": "The Start window may ping the shell, and nothing else (the spike in .scratch/start-window/issues/05).",
+  "windows": ["start"],
+  "permissions": ["allow-start-window-ping"]
+}
