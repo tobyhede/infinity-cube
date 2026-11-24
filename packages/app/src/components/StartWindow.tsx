@@ -288,9 +288,11 @@ function NewSpaceScreen({
     nameInput.current?.select();
   }, []);
 
+  // While a cause shows on Location, Browse… is the default button and its
+  // click asks for a Location; the submit it also makes creates nothing.
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
-    onCreate();
+    if (onLocation === null) onCreate();
   };
 
   const nameDescribedBy = [
@@ -345,7 +347,10 @@ function NewSpaceScreen({
             />
             <InputGroupAddon align="inline-end">
               {/* The fix for a cause on Location, so it is the button to press. */}
+              {/* Enter submits the form through its default button, its first
+                  submit button, which Browse… is while a cause shows here. */}
               <InputGroupButton
+                type={onLocation === null ? 'button' : 'submit'}
                 variant={onLocation === null ? 'secondary' : 'default'}
                 aria-describedby={onLocation === null ? undefined : locationErrorId}
                 onClick={onBrowse}
@@ -356,7 +361,7 @@ function NewSpaceScreen({
           </InputGroup>
           {onLocation === null ? (
             <FieldDescription id={folderId}>
-              {form.notCreated?.of === 'name' ? (
+              {onName !== null ? (
                 'Choose a name to see the folder it creates.'
               ) : (
                 <>
@@ -384,9 +389,9 @@ function NewSpaceScreen({
             action={
               openFolder === null ? null : (
                 <Button
-                  variant="ghost"
+                  variant="link"
                   size="compact"
-                  className={IN_LINE}
+                  className="ml-1.5"
                   onClick={() => onOpenCreated(openFolder)}
                 >
                   Open Folder…
@@ -403,22 +408,17 @@ function NewSpaceScreen({
         <Button type="button" variant="ghost" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" variant="default">
+        <Button
+          type={onLocation === null ? 'submit' : 'button'}
+          variant={onLocation === null ? 'default' : 'secondary'}
+          onClick={onLocation === null ? undefined : onCreate}
+        >
           Create Space
         </Button>
       </div>
     </form>
   );
 }
-
-/**
- * A command set in a sentence's line, after it: a ghost button with no box of
- * its own, in the sentence's colour and underlined, as the approved design
- * draws Details and Open Folder…, so a failure takes no row more than its
- * sentence and Create Space stays in view at the window's size.
- */
-const IN_LINE =
-  'ml-1.5 h-auto p-0 align-baseline text-inherit underline underline-offset-2 hover:border-transparent hover:bg-transparent hover:text-inherit hover:decoration-2 aria-expanded:bg-transparent aria-expanded:text-inherit';
 
 /**
  * A sentence, set inline, with the system's words behind a Details toggle
@@ -441,7 +441,7 @@ function WithDetails({
       <div className="text-sm">
         {children}
         {action}
-        <CollapsibleTrigger render={<Button variant="ghost" size="compact" className={IN_LINE} />}>
+        <CollapsibleTrigger render={<Button variant="link" size="compact" className="ml-1.5" />}>
           {open ? 'Hide details' : 'Details'}
         </CollapsibleTrigger>
       </div>

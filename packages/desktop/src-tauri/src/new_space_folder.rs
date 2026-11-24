@@ -67,6 +67,9 @@ pub enum Refused {
         .0.display()
     )]
     NotEmpty(PathBuf),
+    /// A file, not a folder, holds the name in a location that is a folder.
+    #[error("{} is a file. A new Space goes in a folder.", .0.display())]
+    IsAFile(PathBuf),
     /// What the folder holds could not be listed.
     #[error("Could not look in {}: {source}", .folder.display())]
     Unlisted {
@@ -141,10 +144,19 @@ pub fn new_space_folder(
         return Err(Refused::TrailingDotOrSpace);
     }
     let folder = location.join(name);
-    if !is_free(listing, &folder)? {
-        return Err(Refused::NotEmpty(folder));
+    match is_free(listing, &folder) {
+        Ok(true) => Ok(folder),
+        Ok(false) => Err(Refused::NotEmpty(folder)),
+        // Listing `<location>/<name>` also fails so when the location is a
+        // file, which the location's own listing tells apart.
+        Err(Refused::Unlisted { source, .. })
+            if source.kind() == io::ErrorKind::NotADirectory
+                && matches!(listing.names(location), Ok(Some(_))) =>
+        {
+            Err(Refused::IsAFile(folder))
+        }
+        Err(refused) => Err(refused),
     }
-    Ok(folder)
 }
 
 /// The name New Space offers in `location`: `Untitled Space`, or the first of

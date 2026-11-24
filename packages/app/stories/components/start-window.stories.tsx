@@ -65,13 +65,7 @@ const Refused = ({
 
 /** 1 · A name that is not one folder name, on Name. */
 export const NameNotAFolderName: Story = () => (
-  <Refused
-    name="Q3/Q4 review"
-    notCreated={{
-      of: 'name',
-      message: 'A name is one folder name: it can’t be empty, . or .., or hold / or \\.',
-    }}
-  />
+  <Refused name="Q3/Q4 review" notCreated={{ of: 'name', rule: 'not-a-folder-name' }} />
 );
 
 /** 2 · A folder by that name already holds files, on Name. */

@@ -23,10 +23,7 @@ export function storyStartShell(recents: readonly RecentSpace[]): StartShell {
     browse: () => Promise.resolve({ ...documents, location: '/Users/ada/Desktop' }),
     createSpace: (location, name): Promise<NotCreated | null> => {
       if (name === '' || name.includes('/') || name.includes('\\')) {
-        return Promise.resolve({
-          of: 'name',
-          message: 'A name is one folder name: it can’t be empty, . or .., or hold / or \\.',
-        });
+        return Promise.resolve({ of: 'name', rule: 'not-a-folder-name' });
       }
       if (name === 'Disk full') {
         return Promise.resolve({

@@ -42,7 +42,7 @@ describe('the Start window’s shell over invoke', () => {
 
   it('answers each refusal and failure the shell gives by its code', async () => {
     const answers: readonly JsonValue[] = [
-      { of: 'name', message: 'A name is one folder name.' },
+      { of: 'name', rule: 'taken-by-a-file' },
       { of: 'folder' },
       { of: 'no-permission', detail: 'Permission denied (os error 13)' },
       { of: 'read-only', detail: 'Read-only file system (os error 30)' },
@@ -50,6 +50,19 @@ describe('the Start window’s shell over invoke', () => {
       { of: 'disk-full', detail: 'No space left on device (os error 28)', kept: false },
       { of: 'failed', detail: 'Input/output error (os error 5)', kept: true },
       { of: 'not-opened', folder: '/home/ada/Documents/Deck', detail: 'Could not open it' },
+    ];
+    for (const answer of answers) {
+      const { shell } = invoking({ start_create_space: () => Promise.resolve(answer) });
+      expect(await shell.createSpace('/x', 'y')).toEqual(answer);
+    }
+  });
+
+  it('answers each name refusal by its stable code, with the character a forbidden one names', async () => {
+    const answers: readonly JsonValue[] = [
+      { of: 'name', rule: 'not-a-folder-name' },
+      { of: 'name', rule: 'forbidden-character', character: ':' },
+      { of: 'name', rule: 'reserved' },
+      { of: 'name', rule: 'trailing-dot-or-space' },
     ];
     for (const answer of answers) {
       const { shell } = invoking({ start_create_space: () => Promise.resolve(answer) });

@@ -172,11 +172,41 @@ pub fn cause_of(error: &(dyn std::error::Error + 'static), location_present: boo
     Cause::Other
 }
 
+/// Which of New Space's rules for a name refused it. The page words each
+/// one by its code (`packages/app/src/start-refusal.ts`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NameRule {
+    /// Empty, `.` or `..`, or holding a path separator.
+    NotAFolderName,
+    /// Holding a character Windows forbids in a folder name.
+    ForbiddenCharacter(char),
+    /// A name Windows reserves for a device.
+    Reserved,
+    /// Ending in a dot or a space, which Windows drops.
+    TrailingDotOrSpace,
+    /// A file, not a folder, holds the name in the Location.
+    TakenByAFile,
+}
+
+impl NameRule {
+    /// Its stable code, as the page reads it.
+    #[must_use]
+    pub fn code(self) -> &'static str {
+        match self {
+            Self::NotAFolderName => "not-a-folder-name",
+            Self::ForbiddenCharacter(_) => "forbidden-character",
+            Self::Reserved => "reserved",
+            Self::TrailingDotOrSpace => "trailing-dot-or-space",
+            Self::TakenByAFile => "taken-by-a-file",
+        }
+    }
+}
+
 /// Why New Space wrote nothing, or opened nothing, as the page shows it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NotCreated {
-    /// The name is not one folder name on the platform: shown beside Name.
-    Name { message: String },
+    /// The name breaks one of New Space's rules: shown beside Name.
+    Name { rule: NameRule },
     /// The folder `<location>/<name>` holds something: shown beside Name,
     /// worded by the page from the name and Location it sent.
     Folder,
@@ -194,13 +224,21 @@ pub enum NotCreated {
 }
 
 impl NotCreated {
-    /// As the page reads it: `{ of }`, with `message` for a name, `detail`
+    /// As the page reads it: `{ of }`, with `rule` (and a forbidden
+    /// `character`) for a name, `detail`
     /// for a failure, `kept` for a failure no field fixes, and `folder` for
     /// a Space written and not opened.
     #[must_use]
     pub fn to_page(&self) -> Value {
         match self {
-            Self::Name { message } => json!({ "of": "name", "message": message }),
+            Self::Name {
+                rule: NameRule::ForbiddenCharacter(character),
+            } => json!({
+                "of": "name",
+                "rule": NameRule::ForbiddenCharacter(*character).code(),
+                "character": character.to_string(),
+            }),
+            Self::Name { rule } => json!({ "of": "name", "rule": rule.code() }),
             Self::Folder => json!({ "of": "folder" }),
             Self::Failed {
                 cause,
@@ -224,13 +262,13 @@ impl NotCreated {
 
 /// Why nothing was written, from New Space's folder rules.
 fn refused(listing: &impl Listing, location: &Path, refused: Refused) -> NotCreated {
+    let name = |rule| NotCreated::Name { rule };
     match refused {
-        Refused::NotAFolderName
-        | Refused::ForbiddenCharacter(_)
-        | Refused::Reserved
-        | Refused::TrailingDotOrSpace => NotCreated::Name {
-            message: refused.to_string(),
-        },
+        Refused::NotAFolderName => name(NameRule::NotAFolderName),
+        Refused::ForbiddenCharacter(character) => name(NameRule::ForbiddenCharacter(character)),
+        Refused::Reserved => name(NameRule::Reserved),
+        Refused::TrailingDotOrSpace => name(NameRule::TrailingDotOrSpace),
+        Refused::IsAFile(_) => name(NameRule::TakenByAFile),
         Refused::NotEmpty(_) => NotCreated::Folder,
         Refused::Unlisted { ref source, .. } => NotCreated::Failed {
             cause: cause_of(source, location_present(listing, location)),
@@ -352,14 +390,17 @@ pub async fn start_browse(app: AppHandle, location: String) -> Option<Value> {
 }
 
 /// New Space's Create Space: write `<location>/<name>` and open it, closing
-/// the Start window once its window shows ([`launch::closes_start`]). Answers nothing then, or
-/// why not ([`NotCreated`], as the page reads it): a refusal is an answer
-/// the page draws, not a failed invoke.
+/// the Start window once its window shows ([`launch::closes_start`]).
+/// Answers nothing then, or why not ([`NotCreated`], as the page reads it):
+/// a refusal is an answer the page draws, not a failed invoke. A folder
+/// another request is still starting has no window to close on, so it comes
+/// back as written and not opened, which the page offers to open again.
 #[tauri::command]
 pub async fn start_create_space(app: AppHandle, location: String, name: String) -> Option<Value> {
     let created = tauri::async_runtime::spawn_blocking(move || {
         let written = {
-            // One Space is written at a time (`crate::create_and_open`).
+            // One Space is written at a time: `CREATING` is held here and by
+            // `crate::create_and_open`.
             let _creating = crate::lock(&crate::CREATING);
             tauri::async_runtime::block_on(create_new_space(
                 &FolderListing,
@@ -371,12 +412,17 @@ pub async fn start_create_space(app: AppHandle, location: String, name: String) 
             ))
         }?;
         match crate::open_aggregate_at(&app, &written) {
-            Ok(opened) => {
-                if launch::closes_start(Opening::StartWindow, opened) {
-                    close(&app);
-                }
+            Ok(opened) if launch::closes_start(Opening::StartWindow, opened) => {
+                close(&app);
                 Ok(())
             }
+            Ok(_still_starting) => Err(NotCreated::NotOpened {
+                detail: format!(
+                    "{} is still being opened by another request.",
+                    written.display()
+                ),
+                folder: written,
+            }),
             Err(reason) if reason.tells_the_presenter() => Err(NotCreated::NotOpened {
                 detail: reason.to_string(),
                 folder: written,

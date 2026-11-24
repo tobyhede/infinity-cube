@@ -39,8 +39,17 @@ const startWindowViewSchema = z.object({
  * Details.
  */
 const notCreatedSchema = z.union([
-  /** Not one folder name, in the shell's sentence: shown on Name. */
-  z.object({ of: z.literal('name'), message: z.string() }),
+  /** The name breaks one of New Space's rules: shown on Name. */
+  z.object({
+    of: z.literal('name'),
+    rule: z.enum(['not-a-folder-name', 'reserved', 'trailing-dot-or-space', 'taken-by-a-file']),
+  }),
+  /** The name holds `character`, which Windows forbids: shown on Name. */
+  z.object({
+    of: z.literal('name'),
+    rule: z.literal('forbidden-character'),
+    character: z.string(),
+  }),
   /** `<location>/<name>` holds something: shown on Name. */
   z.object({ of: z.literal('folder') }),
   /** Fixed by choosing another Location: shown on Location. */
@@ -88,8 +97,9 @@ export interface TauriInvoke {
 
 /** The shell's answers to the Start window, through `invoke`. */
 export function tauriStartShell(tauri: TauriInvoke): StartShell {
-  const fire = (command: string, args?: Record<string, string>): void => {
-    // The shell says why a folder did not open in a dialog of its own.
+  const invokeIgnoringRefusal = (command: string, args?: Record<string, string>): void => {
+    // These commands answer nothing the page draws, and the page has nowhere
+    // to show an invoke the shell refused, so a refusal is dropped.
     tauri.invoke(command, args).catch(() => undefined);
   };
   return {
@@ -102,8 +112,8 @@ export function tauriStartShell(tauri: TauriInvoke): StartShell {
           .nullable()
           .parse(await tauri.invoke('start_create_space', { location, name }));
       } catch (error) {
-        // Refused by the shell before the command ran, which rejects with its
-        // reason in words; the command answers rather than rejects.
+        // An invoke the shell refused, or an answer the schema does not
+        // read: either way nothing the page can place on a field.
         return {
           of: 'failed',
           detail: error instanceof Error ? error.message : String(error),
@@ -111,8 +121,8 @@ export function tauriStartShell(tauri: TauriInvoke): StartShell {
         };
       }
     },
-    openFolder: () => fire('start_open_folder'),
-    openRecent: (folder) => fire('start_open_recent', { folder }),
-    close: () => fire('start_close'),
+    openFolder: () => invokeIgnoringRefusal('start_open_folder'),
+    openRecent: (folder) => invokeIgnoringRefusal('start_open_recent', { folder }),
+    close: () => invokeIgnoringRefusal('start_close'),
   };
 }

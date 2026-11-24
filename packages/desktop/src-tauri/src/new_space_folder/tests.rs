@@ -300,3 +300,27 @@ mod given_a_name_ending_in_a_dot_or_a_space {
         }
     }
 }
+
+mod given_a_file_on_disk {
+    use super::*;
+
+    #[test]
+    fn refuses_a_file_holding_the_name_as_a_file() {
+        let documents = tempfile::tempdir().unwrap();
+        std::fs::write(documents.path().join("Deck"), "mine\n").unwrap();
+        let refused =
+            new_space_folder(&FolderListing, documents.path(), "Deck", Platform::Unix).unwrap_err();
+        assert!(
+            matches!(&refused, Refused::IsAFile(at) if *at == documents.path().join("Deck")),
+            "{refused:?}"
+        );
+    }
+
+    #[test]
+    fn refuses_a_location_that_is_a_file_as_unlisted() {
+        let file = tempfile::NamedTempFile::new().unwrap();
+        let refused =
+            new_space_folder(&FolderListing, file.path(), "Deck", Platform::Unix).unwrap_err();
+        assert!(matches!(&refused, Refused::Unlisted { .. }), "{refused:?}");
+    }
+}

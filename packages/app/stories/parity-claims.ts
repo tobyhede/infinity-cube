@@ -1055,7 +1055,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/start-window.stories.tsx',
     storyExport: 'NameNotAFolderName',
     claim:
-      'A name that is not one folder name shows on Name, the field marked invalid and described by the shell’s sentence, with no Details.',
+      'A name that is not one folder name shows on Name, the field marked invalid and described by the page’s sentence for the shell’s code, with no Details.',
     applicationEvidence:
       'The Start window is a page of the desktop shell’s own build (ADR 0172), answered by its invoke commands, which no Playwright host serves; `packages/desktop/src-tauri/src/start/tests.rs` holds New Space over real folders, and ticket 02 of `.scratch/start-window` records it driven in a live WebKitGTK window.',
   },

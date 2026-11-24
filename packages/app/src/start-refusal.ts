@@ -66,6 +66,26 @@ const notice = (sentence: string, detail: string): StartRefusalWords => ({
   openFolder: null,
 });
 
+/** The sentence for a name the shell refused by one of its rules, on Name. */
+function nameSentence(
+  refused: Extract<NotCreated, { of: 'name' }>,
+  location: string,
+  name: string,
+): string {
+  switch (refused.rule) {
+    case 'not-a-folder-name':
+      return 'A name is one folder name: it can’t be empty, . or .., or hold / or \\. Try a dash instead.';
+    case 'forbidden-character':
+      return `A folder name on Windows can’t hold ${refused.character}. Remove it, or try a dash instead.`;
+    case 'reserved':
+      return `Windows keeps ${name} as the name of a device. Add a word to it, or choose another name.`;
+    case 'trailing-dot-or-space':
+      return 'A folder name on Windows can’t end in a dot or a space. Remove it from the end.';
+    case 'taken-by-a-file':
+      return `${location} already has a file called ${name}. Choose another name.`;
+  }
+}
+
 /** The sentence for `notCreated`, worded from the attempt that met it, and where it shows. */
 export function describeNotCreated(
   notCreated: NotCreated,
@@ -74,7 +94,7 @@ export function describeNotCreated(
   const location = lastFolder(attempt.location, attempt.separator);
   switch (notCreated.of) {
     case 'name':
-      return onName(notCreated.message);
+      return onName(nameSentence(notCreated, location, attempt.name));
     case 'folder':
       return onName(
         `${location} already has a folder called ${attempt.name} with files in it. Choose another name.`,

@@ -6,20 +6,20 @@ import { cn } from '#lib/utils';
 import { Separator } from '#components/separator';
 
 /*
- * The registry's `base-nova` item, written out by hand: `shadcn add item`
- * could not reach the registry from the machine that added it (the proxy
- * refused `ui.shadcn.com`), so this is the registry's structure and class
- * lists as recalled, not as fetched. Run
- * `pnpm dlx shadcn@4.18.0 add item --diff components/item.tsx -c packages/ui`
- * where the registry is reachable and take the registry's text, keeping only
- * the recorded extensions below.
+ * The registry's `base-nova` item, written out by hand: its structure, slots
+ * and exports are the registry's, its class lists are not yet base-nova
+ * 4.18.0's (`.scratch/start-window/issues/02-build-the-start-window.md` lists
+ * where they differ). Reconcile with
+ * `pnpm dlx shadcn@4.18.0 add item --diff components/item.tsx -c packages/ui`,
+ * keeping only the recorded extensions below.
  *
  * Extensions: the item, title and description draw on the chrome type scale
  * (`text-chrome-sm`, `text-chrome-xs`), as the rest of the chrome does, not
- * the registry's `text-sm`; an item rendered as a `button` (the Start
+ * the registry's `text-sm`; and an item rendered as a `button` (the Start
  * window's recent Spaces) takes the pointer, start-aligned text and the
  * quiet controls' `bg-secondary` hover, as the registry gives an `a` its
- * hover; and `size="xs"` is a tight row for a list in a narrow pane.
+ * hover. The registry's own `size="xs"` is the tight row for a list in a
+ * narrow pane.
  */
 
 function ItemGroup({ className, ...props }: React.ComponentProps<'div'>) {

@@ -63,6 +63,11 @@ const buttonVariants = cva(
         receded: `border-transparent bg-transparent text-[color-mix(in_oklab,var(--muted-foreground)_72%,transparent)] ${quietFeedback}`,
         commit:
           'border-chrome-accent border-transparent border-b-primary bg-transparent text-foreground hover:border-primary disabled:opacity-50',
+        // A command set in a sentence's line, after it: no box of its own, in
+        // the sentence's colour and underlined, so it takes no row more than
+        // the sentence it follows. Its padding is taken away below, whatever
+        // the size, so it sits on the sentence's baseline.
+        link: 'h-auto border-transparent bg-transparent align-baseline text-inherit underline underline-offset-2 hover:decoration-2 disabled:opacity-50',
       },
       size: {
         default: 'px-[0.8rem] py-[0.4rem]',
@@ -76,6 +81,7 @@ const buttonVariants = cva(
         icon: 'size-7 p-0',
       },
     },
+    compoundVariants: [{ variant: 'link', className: 'p-0' }],
     defaultVariants: {
       variant: 'secondary',
       size: 'default',

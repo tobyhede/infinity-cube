@@ -1,17 +1,61 @@
+import type { JsonValue } from '@project/core';
 import { describe, expect, it } from 'vitest';
 import { describeNotCreated } from '../src/start-refusal';
-import type { NotCreated } from '../src/start-shell';
+import { tauriStartShell, type NotCreated } from '../src/start-shell';
 
 const AT = { location: '/Users/ada/Documents', separator: '/', name: 'Untitled Space' };
 
+/** `answer` as the page reads it from the shell's Create Space. */
+async function fromShell(answer: JsonValue): Promise<NotCreated> {
+  const read = await tauriStartShell({ invoke: () => Promise.resolve(answer) }).createSpace(
+    AT.location,
+    AT.name,
+  );
+  if (read === null) throw new Error('the shell answered that the Space opened');
+  return read;
+}
+
 describe('the Start window’s sentences for Create Space', () => {
-  it('shows a name that is not one folder name on Name, in the shell’s sentence', () => {
-    expect(describeNotCreated({ of: 'name', message: 'A name is one folder name.' }, AT)).toEqual({
+  it('shows a file holding the name on Name, naming the Location’s last folder and the name', () => {
+    expect(describeNotCreated({ of: 'name', rule: 'taken-by-a-file' }, AT)).toEqual({
       place: 'name',
-      sentence: 'A name is one folder name.',
+      sentence: 'Documents already has a file called Untitled Space. Choose another name.',
       detail: null,
       openFolder: null,
     });
+  });
+
+  it('words each name refusal the shell codes on Name, saying what to do, in no words of the shell’s', async () => {
+    expect(
+      describeNotCreated(await fromShell({ of: 'name', rule: 'not-a-folder-name' }), AT),
+    ).toEqual({
+      place: 'name',
+      sentence:
+        'A name is one folder name: it can’t be empty, . or .., or hold / or \\. Try a dash instead.',
+      detail: null,
+      openFolder: null,
+    });
+    const windows: readonly JsonValue[] = [
+      { of: 'name', rule: 'forbidden-character', character: ':' },
+      { of: 'name', rule: 'reserved' },
+      { of: 'name', rule: 'trailing-dot-or-space' },
+    ];
+    const sentences = new Set<string>();
+    for (const answer of windows) {
+      const words = describeNotCreated(await fromShell(answer), AT);
+      expect(words.place).toBe('name');
+      expect(words.detail).toBeNull();
+      // A reason, then what to do: a sentence of its own after it.
+      expect(words.sentence).toMatch(/\. \p{Lu}[^.]*\.$/u);
+      sentences.add(words.sentence);
+    }
+    expect(sentences.size).toBe(windows.length);
+    expect(
+      describeNotCreated(
+        await fromShell({ of: 'name', rule: 'forbidden-character', character: ':' }),
+        AT,
+      ).sentence,
+    ).toContain(':');
   });
 
   it('shows a folder that holds files on Name, naming the Location’s last folder and the name', () => {

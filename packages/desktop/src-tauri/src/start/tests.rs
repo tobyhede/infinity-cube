@@ -122,10 +122,7 @@ mod given_a_name_refused {
     use super::*;
 
     fn refused_as_name(refused: NotCreated) {
-        assert!(
-            matches!(refused, NotCreated::Name { ref message } if !message.is_empty()),
-            "{refused:?}"
-        );
+        assert!(matches!(refused, NotCreated::Name { .. }), "{refused:?}");
     }
 
     #[tokio::test]
@@ -170,6 +167,64 @@ mod given_a_name_refused {
             fs::read_dir(&notes).unwrap().count(),
             1,
             "nothing is written there"
+        );
+    }
+
+    #[tokio::test]
+    async fn refuses_a_name_whose_folder_is_a_file_on_name_writing_nothing() {
+        let documents = tempfile::tempdir().unwrap();
+        fs::write(documents.path().join("Untitled Space"), "mine\n").unwrap();
+
+        let refused = create(documents.path(), "Untitled Space")
+            .await
+            .unwrap_err();
+
+        assert!(
+            matches!(refused, NotCreated::Name { .. } | NotCreated::Folder),
+            "a file holding the name takes it, as `default_name` decides; the Location is there: {refused:?}"
+        );
+        assert_eq!(
+            fs::read_to_string(documents.path().join("Untitled Space")).unwrap(),
+            "mine\n"
+        );
+    }
+
+    /// What the page reads for `name` refused on `platform`.
+    async fn page_of(name: &str, platform: Platform) -> serde_json::Value {
+        let documents = tempfile::tempdir().unwrap();
+        create_new_space(
+            &FolderListing,
+            &TokioFilesystem,
+            &RandomIds,
+            documents.path(),
+            name,
+            platform,
+        )
+        .await
+        .unwrap_err()
+        .to_page()
+    }
+
+    #[tokio::test]
+    async fn a_name_refusal_reaches_the_page_by_a_stable_code_and_no_sentence() {
+        for name in ["", ".", "..", "Q3/Q4", "a\\b"] {
+            assert_eq!(
+                page_of(name, Platform::Unix).await,
+                serde_json::json!({ "of": "name", "rule": "not-a-folder-name" }),
+                "{name:?}"
+            );
+        }
+        assert_eq!(
+            page_of("a:b", Platform::Windows).await,
+            serde_json::json!({ "of": "name", "rule": "forbidden-character", "character": ":" })
+        );
+        assert_eq!(
+            page_of("CON", Platform::Windows).await,
+            serde_json::json!({ "of": "name", "rule": "reserved" })
+        );
+        assert_eq!(
+            page_of("trailing.", Platform::Windows).await,
+            serde_json::json!({ "of": "name", "rule": "trailing-dot-or-space" })
         );
     }
 }
@@ -417,10 +472,10 @@ mod given_the_page {
     fn a_refusal_reaches_the_page_as_what_it_refused() {
         assert_eq!(
             NotCreated::Name {
-                message: "m".to_owned()
+                rule: NameRule::TakenByAFile
             }
             .to_page(),
-            serde_json::json!({ "of": "name", "message": "m" })
+            serde_json::json!({ "of": "name", "rule": "taken-by-a-file" })
         );
         assert_eq!(
             NotCreated::Folder.to_page(),

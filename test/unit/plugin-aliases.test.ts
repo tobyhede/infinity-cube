@@ -221,3 +221,31 @@ describe('the alias lists', () => {
     expect(workspacePackages.filter((entry) => namesAPlugin(entry))).toEqual([]);
   });
 });
+
+/** The part of a package's `package.json` the build reads for tree-shaking. */
+const sideEffectsSchema = z.object({ sideEffects: z.unknown().optional() });
+
+/** Whether a `package.json`'s text declares its CSS, and nothing else, as having side effects. */
+const declaresOnlyCssSideEffects = (packageJson: string): boolean => {
+  const { sideEffects } = sideEffectsSchema.parse(JSON.parse(packageJson));
+  return Array.isArray(sideEffects) && sideEffects.length === 1 && sideEffects[0] === '*.css';
+};
+
+/*
+ * The desktop shell's Start page draws from `@project/ui`, whose plugin
+ * catalogue reaches every plugin; Rollup drops what the page does not use
+ * only from a package declaring `sideEffects: ["*.css"]`
+ * (`packages/app/test/desktop-shell-build.test.ts` holds the build's size).
+ */
+describe('a plugin package’s side effects', () => {
+  it('sees a manifest that leaves `sideEffects` out or widens it', () => {
+    expect(declaresOnlyCssSideEffects('{"sideEffects":["*.css"]}')).toBe(true);
+    expect(declaresOnlyCssSideEffects('{"name":"@project/plugin-new"}')).toBe(false);
+    expect(declaresOnlyCssSideEffects('{"sideEffects":true}')).toBe(false);
+    expect(declaresOnlyCssSideEffects('{"sideEffects":["*.css","src/view.tsx"]}')).toBe(false);
+  });
+
+  it.each(pluginPackages())('declares only its CSS as having side effects in %s', (name) => {
+    expect(declaresOnlyCssSideEffects(readTrackedFile(`packages/${name}/package.json`))).toBe(true);
+  });
+});

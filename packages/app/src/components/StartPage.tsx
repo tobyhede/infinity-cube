@@ -142,6 +142,7 @@ export function StartPage({ shell }: { readonly shell: StartShell }) {
             : current,
         );
       },
+      // An invoke the shell refused chose no Location: the form stays as it is.
       () => undefined,
     );
   };

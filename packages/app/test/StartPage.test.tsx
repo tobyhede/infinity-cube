@@ -187,25 +187,25 @@ describe('New Space', () => {
   it('refuses a name beside the field, keeping the draft, and asks for a name in the folder line', async () => {
     await openForm(
       fakeShell({
-        create: () => ({ of: 'name', message: 'A name is one folder name.' }),
+        create: () => ({ of: 'name', rule: 'not-a-folder-name' }),
       }).shell,
     );
 
     fireEvent.change(nameField(), { target: { value: 'Q3/Q4' } });
     fireEvent.click(createButton());
 
-    const reason = await screen.findByText('A name is one folder name.');
+    const reason = await screen.findByText(/^A name is one folder name:/u);
     expect(nameField()).toHaveProperty('value', 'Q3/Q4');
     expect(nameField().getAttribute('aria-invalid')).toBe('true');
     expect(nameField().getAttribute('aria-describedby')).toContain(reason.id);
     expect(screen.getByText('Choose a name to see the folder it creates.')).toBeTruthy();
 
     fireEvent.change(nameField(), { target: { value: 'Q3 review' } });
-    expect(screen.queryByText('A name is one folder name.')).toBeNull();
+    expect(screen.queryByText(/^A name is one folder name:/u)).toBeNull();
     expect(nameField().getAttribute('aria-invalid')).toBe('false');
   });
 
-  it('refuses a folder that holds something on Name, naming the Location and the name, still naming the folder', async () => {
+  it('refuses a folder that holds something on Name, naming the Location and the name, and asks for a name in the folder line', async () => {
     await openForm(fakeShell({ create: () => ({ of: 'folder' }) }).shell);
 
     fireEvent.click(createButton());
@@ -215,7 +215,8 @@ describe('New Space', () => {
     );
     expect(nameField().getAttribute('aria-invalid')).toBe('true');
     expect(nameField().getAttribute('aria-describedby')).toContain(reason.id);
-    expect(screen.getByText('/home/ada/Documents/Untitled Space')).toBeTruthy();
+    expect(screen.getByText('Choose a name to see the folder it creates.')).toBeTruthy();
+    expect(screen.queryByText(/Creates the folder/u)).toBeNull();
     expect(screen.queryByRole('button', { name: 'Details' })).toBeNull();
   });
 
@@ -251,6 +252,27 @@ describe('New Space', () => {
     expect(screen.getByRole('button', { name: 'Hide details' }).getAttribute('aria-expanded')).toBe(
       'true',
     );
+  });
+
+  it('makes Browse… the default button after a cause on Location, so Enter chooses a Location rather than creating again', async () => {
+    const { shell, asked } = fakeShell({
+      create: () => ({ of: 'no-permission', detail: 'Permission denied (os error 13)' }),
+    });
+    await openForm(shell);
+    fireEvent.click(createButton());
+    await screen.findByText(/You don’t have permission/u);
+
+    // Enter in a field activates the form's default button: its first submit
+    // button in tree order (HTML's implicit submission).
+    const form = screen.getByRole('form', { name: 'New Space' });
+    const defaultButton = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+    expect(defaultButton?.textContent).toBe('Browse…');
+    if (defaultButton !== null) fireEvent.click(defaultButton);
+
+    await waitFor(() =>
+      expect(asked.at(-1)).toEqual({ kind: 'browse', location: '/home/ada/Documents' }),
+    );
+    expect(asked.filter((each) => each.kind === 'create')).toHaveLength(1);
   });
 
   it('words each cause another Location fixes, naming the Location’s last folder', async () => {
