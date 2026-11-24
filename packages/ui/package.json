@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "sideEffects": [
+    "*.css"
+  ],
   "imports": {
     "#components/*": "./src/components/*.tsx",
     "#hooks/*": "./src/hooks/*.ts",
