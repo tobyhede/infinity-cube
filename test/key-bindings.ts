@@ -227,6 +227,14 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     behaviour: 'return focus from the Edge chrome to the Edge',
   },
   {
+    module: 'packages/app/src/components/StartWindow.tsx',
+    sourceKey: 'Escape',
+    occurrence: 1,
+    key: 'Escape',
+    surface: "Start window's New Space form",
+    behaviour: 'cancel the form and return to the start screen, writing nothing (UI-111)',
+  },
+  {
     module: 'packages/plugin-image/src/view.tsx',
     sourceKey: 'Escape',
     occurrence: 1,
