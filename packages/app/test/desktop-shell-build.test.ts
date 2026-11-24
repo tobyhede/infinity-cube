@@ -23,9 +23,9 @@ const builtShell = async (): Promise<Map<string, Uint8Array>> => {
       const bytes =
         file.type === 'chunk'
           ? new TextEncoder().encode(file.code)
-          : typeof file.source === 'string'
-            ? new TextEncoder().encode(file.source)
-            : file.source;
+          : file.source instanceof Uint8Array
+            ? file.source
+            : new TextEncoder().encode(file.source);
       files.set(file.fileName, bytes);
     }
   }

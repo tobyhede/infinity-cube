@@ -17,6 +17,9 @@ interface TauriGlobal {
 }
 
 const tauri = (): TauriGlobal | undefined =>
+  // SAFETY: the shell sets `window.__TAURI__` to Tauri's global API when
+  // `app.withGlobalTauri` is on (`tauri.conf.json`), and leaves it unset
+  // elsewhere, which the caller checks for.
   (window as Window & { readonly __TAURI__?: TauriGlobal }).__TAURI__;
 
 export function StartPage() {
@@ -29,7 +32,7 @@ export function StartPage() {
     }
     global.core.invoke('start_window_ping').then(
       (answer) => setReply(`The shell answered: ${answer}`),
-      (error: unknown) => setReply(`The shell refused: ${String(error)}`),
+      () => setReply('The shell refused the ping.'),
     );
   };
   return (
