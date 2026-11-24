@@ -24,6 +24,30 @@ import { useConnectionTargetProximity } from './connection-target-proximity';
 import { offersConnectionEnd } from './connection-target-reveal';
 import { proportionalSize, type ResizeSize } from './proportional-resize';
 
+type GesturePoint = { readonly x: number; readonly y: number };
+
+/**
+ * Where a resize gesture's pointer is, in screen pixels, read from the mouse or
+ * touch event d3-drag started it from; none for any other event. A browser with
+ * no touch support defines no `TouchEvent`, hence the guard.
+ */
+function gesturePoint(source: Event): GesturePoint | undefined {
+  if (source instanceof MouseEvent) return { x: source.clientX, y: source.clientY };
+  if ('TouchEvent' in window && source instanceof TouchEvent) {
+    const touch = source.touches[0] ?? source.changedTouches[0];
+    return touch === undefined ? undefined : { x: touch.clientX, y: touch.clientY };
+  }
+  return undefined;
+}
+
+/** Whether Shift was held for the mouse or touch event that began a resize gesture. */
+function startedWithShift(source: Event): boolean {
+  return (
+    (source instanceof MouseEvent || ('TouchEvent' in window && source instanceof TouchEvent)) &&
+    source.shiftKey
+  );
+}
+
 /**
  * React Flow custom node: a drawn Resource with one Edge anchor on each of its four
  * sides.
@@ -201,8 +225,14 @@ export function ResourceNode({
     resizeOperation.current = resize;
   }, [resize]);
   const resizing = useRef(false);
-  const resizeStart = useRef<ResizeSize>();
+  /* The rect and pointer a proportional Resize started from; none for a free one. */
+  const resizeStart = useRef<{ size: ResizeSize; pointer: GesturePoint }>();
   const [resizeActive, setResizeActive] = useState(false);
+  const { zoom } = useViewport();
+  const zoomRef = useRef(zoom);
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
   /*
    * Narrow interactive deviation for cancellation the specialist control does
    * not expose:
@@ -255,10 +285,12 @@ export function ResourceNode({
    * a stable callback still reach a replaced capability.
    */
   const beginResize = useCallback<OnResizeStart>((event, start) => {
+    // Shift is read from the event that began the gesture, mouse or touch.
     const source: unknown = event.sourceEvent;
+    const pointer = source instanceof Event ? gesturePoint(source) : undefined;
     resizeStart.current =
-      source instanceof MouseEvent && source.shiftKey
-        ? { width: start.width, height: start.height }
+      pointer !== undefined && source instanceof Event && startedWithShift(source)
+        ? { size: { width: start.width, height: start.height }, pointer }
         : undefined;
     resizing.current = true;
     setResizeActive(true);
@@ -279,20 +311,35 @@ export function ResourceNode({
    * what keeps the Resource the author sees — back at its authored rect, controls
    * returned — the same fact as the draft the adapter holds.
    */
-  const proposeResize = useCallback<ShouldResize>((_event, next) => {
+  /*
+   * A proportional Resize reads the pointer rather than `next`, because React
+   * Flow floors each axis of `next` before asking: a drag far past the width
+   * floor would otherwise read as a smaller width change than it is, and let
+   * the other axis drive the size.
+   */
+  const proposeResize = useCallback<ShouldResize>((event, next) => {
     if (!resizing.current) return false;
     const start = resizeStart.current;
     const operation = resizeOperation.current;
-    if (start === undefined || operation === undefined) {
+    const source: unknown = event.sourceEvent;
+    const pointer = source instanceof Event ? gesturePoint(source) : undefined;
+    if (start === undefined || operation === undefined || pointer === undefined) {
       operation?.onResize({ width: next.width, height: next.height });
     } else {
+      const scale = zoomRef.current;
+      const dragged = {
+        width: start.size.width + (pointer.x - start.pointer.x) / scale,
+        height: start.size.height + (pointer.y - start.pointer.y) / scale,
+      };
       operation.onResize(
-        proportionalSize(start, next, { width: operation.minWidth, height: operation.minHeight }),
+        proportionalSize(start.size, dragged, {
+          width: operation.minWidth,
+          height: operation.minHeight,
+        }),
       );
     }
     return false;
   }, []);
-  const { zoom } = useViewport();
   const resizeScale = Math.max(1 / zoom, 1);
 
   /**
