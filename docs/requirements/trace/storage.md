@@ -271,7 +271,8 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 | 0171 the Start window (New Space, Open Folder…, recent Spaces), New Space as a name-and-location form whose name is the Meta Space's Title and must be one folder name, reopening the Spaces open when the last quit began, Recent as a separate history of Spaces opened, both kept in the application's data directory, the last window (Space or Start) closing per platform, the Start window built from `@project/ui` holding its own commands | → ST-131 (the Start window, New Space and the last window closing **built**, ticket 02; reopening and Recent **not built**, ticket 03); ST-121 points to it. The Start window's layout → UI-111 |
 | 0171 rejected options | dropped: rejected alternatives |
 | 0171 `init_directory` takes the Title of the Space it writes; the CLI's `init` still writes `New space` | → ST-11 |
-| 0172 the shell's `frontendDist` is `packages/app/dist-desktop-shell`, a second Vite build of `packages/app` whose entry is `start.html`, apart from `dist`, which the host serves to Space windows; the close question's files are copied into it; a window of the shell's own opens by label with a capability naming that label alone | → ST-131 (the Start window's page, build and capability), ST-122 (the close question's one permission), ST-121 (Space windows hold no IPC permission) |
+| 0171 opening a recent Space from the Start window is held to the same refusals as File › Open… | → ST-131 (**not built** with Recent, ticket 03; the shell already routes it through File › Open…'s path) |
+| 0172 the shell's `frontendDist` is `packages/app/dist-desktop-shell`, a second Vite build of `packages/app` whose entry is `start.html`, apart from `dist`, which the host serves to Space windows; the close question's files are copied into it; a window of the shell's own opens by label with a capability naming that label alone | → ST-131 (the Start window's page, build and capability, and every page holding an IPC permission served from that build, never from `dist`), ST-122 (the close question's one permission), ST-121 (Space windows hold no IPC permission) |
 | 0172 every build of the shell builds both first (the `rust` CI job, the desktop package's scripts, `release/build.sh --desktop`); a bare `cargo build` builds neither | process only → `AGENTS.md` (Rust), `docs/agents/build-tooling.md`; no storage rule |
 | 0172 rejected options | dropped: rejected alternatives |
 
@@ -531,6 +532,7 @@ Each change main merged between `f6e01b9`'s refresh (PR #503, merged as `46b0999
 | #527 the Start window, New Space's folder rules and refusal codes, `init_directory` taking a Title, the shell's own build (ADRs 0171 and 0172) | → ST-131 and ST-121, added on main with it; ST-11 states the Title `init_directory` takes (this refresh) |
 | #514, #523, #515 the README, the desktop contributor skill and a getting-started ticket | no storage rule; documentation only |
 | #525 the CRAP gate in CI | process only → `AGENTS.md` (CRAP) |
+| #517 also sent a picked file's bytes from memory rather than as the Blob (`packages/http/src/backend.ts`) | already in ST-121's evidence; no rule changes |
 | ST-121's sources named ADR 0168 twice and not 0171, whose Start window it points to | corrected (this refresh) |
 | The operations index's Desktop shell row named File › New Space… writing a Space and not the Start window's form or its refusals | corrected → ST-131 (this refresh) |
 
