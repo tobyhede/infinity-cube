@@ -1,6 +1,6 @@
 # 04 — New Space's folder rules and Title in the host
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Blocked by:** nothing.
 
@@ -14,7 +14,7 @@
 - [x] `init_directory` writes the Title it is given; `conformance/init/` still passes for the CLI's `New space`.
 - [x] A case for each refusal above, and for an accepted name, in the shell's tests; the Windows-only refusals are tested on every platform as data, whatever the build target.
 - [x] A case for `Untitled Space` free, taken, and `Untitled Space 2` also taken.
-- [ ] `cargo fmt`, `clippy -D warnings` and `cargo nextest run -p host -p infinity-cube-desktop` pass, `-j 2`.
+- [x] `cargo fmt`, `clippy -D warnings` and `cargo nextest run -p host -p infinity-cube-desktop` pass, `-j 2`. (The `rust` CI job, which runs nextest over the workspace, passed on PR #527 at `da700d54`.)
 
 ## Comments
 

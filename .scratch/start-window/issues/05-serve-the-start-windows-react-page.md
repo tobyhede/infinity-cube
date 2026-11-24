@@ -23,7 +23,7 @@ Settle in the spike:
 
 - [x] A throwaway Start window showing one `@project/ui` `Button` that calls one invoke command, seen in a live webview on Linux (WebKitGTK), on a branch.
 - [ ] The close question still opens and answers. (Opens and draws from the new `frontendDist`, seen under Xvfb; answering was not driven through a real close, see Comments.)
-- [ ] Space windows still hold no IPC permission; the `rust` CI job and the desktop build pass. (No capability names a Space window, held by a test; a Space window opened and drew under Xvfb; `tauri build --bundles deb` passed locally. CI not run: the branch is not pushed.)
+- [x] Space windows still hold no IPC permission; the `rust` CI job and the desktop build pass. (No capability names a Space window, held by a test; a Space window opened and drew under Xvfb; `tauri build --bundles deb` passed locally; the `rust` job and "Build the desktop application" passed on PR #527 at `da700d54`.)
 - [x] A short ADR if it changes a boundary (`frontendDist`, or what the desktop build builds first), otherwise a comment here; 02's "What to build" updated to name the approach. (ADR 0172.)
 - [x] A follow-up ticket to rebuild the close question from `@project/ui` in the same build. (06.)
 
