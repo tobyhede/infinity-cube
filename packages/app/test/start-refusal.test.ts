@@ -19,22 +19,35 @@ describe('the Start window’s sentences for Create Space', () => {
   it('shows a file holding the name on Name, naming the Location’s last folder and the name', () => {
     expect(describeNotCreated({ of: 'name', rule: 'taken-by-a-file' }, AT)).toEqual({
       place: 'name',
-      sentence: 'Documents already has a file called Untitled Space. Choose another name.',
+      sentence: 'Documents already has a file called “Untitled Space”. Choose another name.',
       detail: null,
       openFolder: null,
     });
   });
 
-  it('words each name refusal the shell codes on Name, saying what to do, in no words of the shell’s', async () => {
-    expect(
-      describeNotCreated(await fromShell({ of: 'name', rule: 'not-a-folder-name' }), AT),
-    ).toEqual({
-      place: 'name',
-      sentence:
-        'A name is one folder name: it can’t be empty, . or .., or hold / or \\. Try a dash instead.',
-      detail: null,
-      openFolder: null,
-    });
+  it('words a name that is not one folder name by the case the name meets, on Name', async () => {
+    const refused = await fromShell({ of: 'name', rule: 'not-a-folder-name' });
+    const cases: readonly [string, string][] = [
+      ['', 'Give your Space a name.'],
+      ['.', 'A name can’t be only dots. Add a word.'],
+      ['..', 'A name can’t be only dots. Add a word.'],
+      ['Q3/Q4 review', 'A name can’t hold “/”, because it separates folders. Try a dash instead.'],
+      [
+        'Q3\\Q4 review',
+        'A name can’t hold “\\”, because it separates folders. Try a dash instead.',
+      ],
+    ];
+    for (const [name, sentence] of cases) {
+      expect(describeNotCreated(refused, { ...AT, name })).toEqual({
+        place: 'name',
+        sentence,
+        detail: null,
+        openFolder: null,
+      });
+    }
+  });
+
+  it('words each Windows name rule on Name, quoting what was typed, then what to do', async () => {
     const windows: readonly JsonValue[] = [
       { of: 'name', rule: 'forbidden-character', character: ':' },
       { of: 'name', rule: 'reserved' },
@@ -55,14 +68,18 @@ describe('the Start window’s sentences for Create Space', () => {
         await fromShell({ of: 'name', rule: 'forbidden-character', character: ':' }),
         AT,
       ).sentence,
-    ).toContain(':');
+    ).toBe('A name can’t hold “:” on Windows. Remove it, or try a dash instead.');
+    expect(
+      describeNotCreated(await fromShell({ of: 'name', rule: 'reserved' }), { ...AT, name: 'CON' })
+        .sentence,
+    ).toBe('Windows keeps “CON” for a device. Add a word to it, or choose another name.');
   });
 
   it('shows a folder that holds files on Name, naming the Location’s last folder and the name', () => {
     expect(describeNotCreated({ of: 'folder' }, AT)).toEqual({
       place: 'name',
       sentence:
-        'Documents already has a folder called Untitled Space with files in it. Choose another name.',
+        'Documents already has a folder called “Untitled Space” with files in it. Choose another name.',
       detail: null,
       openFolder: null,
     });
@@ -73,17 +90,17 @@ describe('the Start window’s sentences for Create Space', () => {
     const cases: readonly [NotCreated, string, string][] = [
       [
         { of: 'no-permission', detail: 'Permission denied (os error 13)' },
-        'You don’t have permission to create folders in Archive. Choose another Location.',
+        'You can’t create folders in Archive. Choose another location.',
         'Permission denied (os error 13)',
       ],
       [
         { of: 'read-only', detail: 'Read-only file system (os error 30)' },
-        'Archive is read-only, so nothing can be created there. Choose another Location.',
+        'Archive is read-only. Choose another location.',
         'Read-only file system (os error 30)',
       ],
       [
         { of: 'location-gone', detail: 'Not a directory (os error 20)' },
-        'Archive can’t be found. It may have been moved, or its disk removed. Choose another Location.',
+        'Archive can’t be found. It may have been moved, or its disk removed. Choose another location.',
         'Not a directory (os error 20)',
       ],
     ];
@@ -103,28 +120,28 @@ describe('the Start window’s sentences for Create Space', () => {
         { of: 'read-only', detail: 'd' },
         { location: 'C:\\', separator: '\\', name: 'Deck' },
       ).sentence,
-    ).toBe('C:\\ is read-only, so nothing can be created there. Choose another Location.');
+    ).toBe('C:\\ is read-only. Choose another location.');
   });
 
-  it('says nothing was kept only when nothing was', () => {
+  it('says part of the Space is left in its folder only when it is, and what to do either way', () => {
     const notice = (notCreated: NotCreated) => describeNotCreated(notCreated, AT);
     expect(notice({ of: 'disk-full', detail: 'No space left', kept: false })).toEqual({
       place: 'notice',
-      sentence: 'There isn’t enough space on the disk to create the Space. Nothing was kept.',
+      sentence: 'The disk is full, so the Space wasn’t created. Free up some space and try again.',
       detail: 'No space left',
       openFolder: null,
     });
     expect(notice({ of: 'disk-full', detail: 'No space left', kept: true }).sentence).toBe(
-      'There isn’t enough space on the disk to create the Space. Part of it was left in the folder Untitled Space.',
+      'The disk is full, so the Space wasn’t finished. Part of it is in the folder “Untitled Space”. Free up some space and choose another name.',
     );
     expect(notice({ of: 'failed', detail: 'Input/output error', kept: false })).toEqual({
       place: 'notice',
-      sentence: 'The Space couldn’t be created. Try again, or choose another name or Location.',
+      sentence: 'The Space couldn’t be created. Try again, or choose another name or location.',
       detail: 'Input/output error',
       openFolder: null,
     });
     expect(notice({ of: 'failed', detail: 'Input/output error', kept: true }).sentence).toBe(
-      'The Space couldn’t be created, and part of it was left in the folder Untitled Space. Choose another name or Location.',
+      'The Space couldn’t be finished. Part of it is in the folder “Untitled Space”. Choose another name or location.',
     );
   });
 
@@ -140,7 +157,7 @@ describe('the Start window’s sentences for Create Space', () => {
       ),
     ).toEqual({
       place: 'notice',
-      sentence: 'The Space was created but couldn’t be opened. Its folder is kept.',
+      sentence: 'The Space was created but couldn’t be opened.',
       detail: 'Could not open it',
       openFolder: '/Users/ada/Documents/Untitled Space',
     });

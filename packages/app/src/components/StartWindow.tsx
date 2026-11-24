@@ -277,16 +277,28 @@ function NewSpaceScreen({
   const locationErrorId = useId();
   const folderId = useId();
   const nameInput = useRef<HTMLInputElement>(null);
+  const browseButton = useRef<HTMLButtonElement>(null);
   const words = form.notCreated === null ? null : describeNotCreated(form.notCreated, form);
   const onName = words?.place === 'name' ? words : null;
   const onLocation = words?.place === 'location' ? words : null;
   const notice = words?.place === 'notice' ? words : null;
   const openFolder = notice?.openFolder ?? null;
 
+  // Focus goes where the next keystroke makes the fix: Browse… for a cause
+  // on Location, otherwise the name, selected. A reason cleared by editing
+  // moves nothing, so a draft being typed keeps its caret.
+  const causeOnLocation = onLocation !== null;
+  const focused = useRef(false);
   useEffect(() => {
+    if (focused.current && form.notCreated === null) return;
+    focused.current = true;
+    if (causeOnLocation) {
+      browseButton.current?.focus();
+      return;
+    }
     nameInput.current?.focus();
     nameInput.current?.select();
-  }, []);
+  }, [form.notCreated, causeOnLocation]);
 
   // While a cause shows on Location, Browse… is the default button and its
   // click asks for a Location; the submit it also makes creates nothing.
@@ -317,7 +329,7 @@ function NewSpaceScreen({
           New Space
         </h1>
         <p className="text-chrome-xs text-muted-foreground">
-          Give it a name and choose where to keep it. You can rename it later.
+          Name your Space and choose where to keep it. You can rename it later.
         </p>
       </div>
       <FieldGroup>
@@ -350,6 +362,7 @@ function NewSpaceScreen({
               {/* Enter submits the form through its default button, its first
                   submit button, which Browse… is while a cause shows here. */}
               <InputGroupButton
+                ref={browseButton}
                 type={onLocation === null ? 'button' : 'submit'}
                 variant={onLocation === null ? 'secondary' : 'default'}
                 aria-describedby={onLocation === null ? undefined : locationErrorId}

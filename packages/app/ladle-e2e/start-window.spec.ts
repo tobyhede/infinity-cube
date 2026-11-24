@@ -44,7 +44,9 @@ test(
     await page.getByRole('button', { name: 'Create Space' }).click();
 
     await expect(name).toHaveAttribute('aria-invalid', 'true');
-    await expect(name).toHaveAccessibleDescription(/A name is one folder name/u);
+    await expect(name).toHaveAccessibleDescription(
+      /A name can’t hold “\/”, because it separates folders\. Try a dash instead\./u,
+    );
     await expect(name).toHaveValue('Q3/Q4');
     await expect(page.getByText('Choose a name to see the folder it creates.')).toBeVisible();
 
@@ -69,7 +71,7 @@ test(
 
     const notice = page.getByRole('alert');
     await expect(notice).toHaveText(
-      /There isn’t enough space on the disk to create the Space\. Nothing was kept\./u,
+      /The disk is full, so the Space wasn’t created\. Free up some space and try again\./u,
     );
     const detail = page.getByRole('region', { name: 'What the system said' });
     await expect(detail).toHaveCount(0);
@@ -91,7 +93,9 @@ test(
     await page.goto(story('name-not-a-folder-name'));
     const name = page.getByRole('textbox', { name: 'Name' });
     await expect(name).toHaveAttribute('aria-invalid', 'true');
-    await expect(name).toHaveAccessibleDescription(/A name is one folder name/u);
+    await expect(name).toHaveAccessibleDescription(
+      /A name can’t hold “\/”, because it separates folders\. Try a dash instead\./u,
+    );
     await expect(page.getByRole('button', { name: 'Details' })).toHaveCount(0);
   },
 );
@@ -104,14 +108,15 @@ test(
     const name = page.getByRole('textbox', { name: 'Name' });
     await expect(name).toHaveAttribute('aria-invalid', 'true');
     await expect(name).toHaveAccessibleDescription(
-      /Documents already has a folder called Untitled Space with files in it\. Choose another name\./u,
+      /Documents already has a folder called “Untitled Space” with files in it\. Choose another name\./u,
     );
     await expect(page.getByRole('button', { name: 'Details' })).toHaveCount(0);
   },
 );
 
-/** A cause on Location: the field invalid and described by it, Browse… too, Details closed. */
+/** A cause on Location: the field invalid and described by it, Browse… too and focused, Details closed. */
 async function expectOnLocation(page: Page, sentence: RegExp, detail: string): Promise<void> {
+  await expect(page.getByRole('button', { name: 'Browse…' })).toBeFocused();
   const location = page.getByRole('textbox', { name: 'Location' });
   await expect(location).toHaveAttribute('aria-invalid', 'true');
   await expect(location).toHaveAccessibleDescription(sentence);
@@ -132,7 +137,7 @@ test(
     await page.goto(story('location-no-permission'));
     await expectOnLocation(
       page,
-      /You don’t have permission to create folders in Documents\. Choose another Location\./u,
+      /You can’t create folders in Documents\. Choose another location\./u,
       'Permission denied (os error 13)',
     );
   },
@@ -145,7 +150,7 @@ test(
     await page.goto(story('location-read-only'));
     await expectOnLocation(
       page,
-      /Archive is read-only, so nothing can be created there\. Choose another Location\./u,
+      /Archive is read-only\. Choose another location\./u,
       'Read-only file system (os error 30)',
     );
   },
@@ -158,7 +163,7 @@ test(
     await page.goto(story('location-gone'));
     await expectOnLocation(
       page,
-      /Slides can’t be found\. It may have been moved, or its disk removed\. Choose another Location\./u,
+      /Slides can’t be found\. It may have been moved, or its disk removed\. Choose another location\./u,
       'Not a directory (os error 20)',
     );
   },
@@ -190,7 +195,7 @@ test(
     await page.goto(story('disk-full'));
     await expectNotice(
       page,
-      /There isn’t enough space on the disk to create the Space\. Nothing was kept\./u,
+      /The disk is full, so the Space wasn’t created\. Free up some space and try again\./u,
       'No space left on device (os error 28)',
     );
   },
@@ -203,7 +208,7 @@ test(
     await page.goto(story('created-not-opened'));
     const notice = await expectNotice(
       page,
-      /The Space was created but couldn’t be opened\. Its folder is kept\./u,
+      /The Space was created but couldn’t be opened\./u,
       'the window could not be built',
     );
     await expect(notice.getByRole('button', { name: 'Open Folder…' })).toBeVisible();
@@ -217,7 +222,7 @@ test(
     await page.goto(story('anything-else'));
     await expectNotice(
       page,
-      /The Space couldn’t be created\. Try again, or choose another name or Location\./u,
+      /The Space couldn’t be created\. Try again, or choose another name or location\./u,
       'Input/output error (os error 5)',
     );
   },

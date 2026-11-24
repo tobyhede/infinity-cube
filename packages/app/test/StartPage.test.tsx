@@ -194,14 +194,16 @@ describe('New Space', () => {
     fireEvent.change(nameField(), { target: { value: 'Q3/Q4' } });
     fireEvent.click(createButton());
 
-    const reason = await screen.findByText(/^A name is one folder name:/u);
+    const reason = await screen.findByText(
+      'A name can’t hold “/”, because it separates folders. Try a dash instead.',
+    );
     expect(nameField()).toHaveProperty('value', 'Q3/Q4');
     expect(nameField().getAttribute('aria-invalid')).toBe('true');
     expect(nameField().getAttribute('aria-describedby')).toContain(reason.id);
     expect(screen.getByText('Choose a name to see the folder it creates.')).toBeTruthy();
 
     fireEvent.change(nameField(), { target: { value: 'Q3 review' } });
-    expect(screen.queryByText(/^A name is one folder name:/u)).toBeNull();
+    expect(screen.queryByText(/^A name can’t hold/u)).toBeNull();
     expect(nameField().getAttribute('aria-invalid')).toBe('false');
   });
 
@@ -211,7 +213,7 @@ describe('New Space', () => {
     fireEvent.click(createButton());
 
     const reason = await screen.findByText(
-      'Documents already has a folder called Untitled Space with files in it. Choose another name.',
+      'Documents already has a folder called “Untitled Space” with files in it. Choose another name.',
     );
     expect(nameField().getAttribute('aria-invalid')).toBe('true');
     expect(nameField().getAttribute('aria-describedby')).toContain(reason.id);
@@ -232,7 +234,7 @@ describe('New Space', () => {
     );
 
     const reason = await screen.findByText(
-      'You don’t have permission to create folders in Documents. Choose another Location.',
+      'You can’t create folders in Documents. Choose another location.',
     );
     expect(locationField().getAttribute('aria-invalid')).toBe('true');
     expect(locationField().getAttribute('aria-describedby')).toContain(reason.id);
@@ -254,13 +256,48 @@ describe('New Space', () => {
     );
   });
 
+  it('moves focus to Browse… after a cause on Location, so typing cannot replace the name', async () => {
+    const { shell, finishCreate } = fakeShell();
+    await openForm(shell);
+    fireEvent.change(nameField(), { target: { value: 'Board deck' } });
+
+    fireEvent.click(createButton());
+    await screen.findByRole('status');
+    act(() => finishCreate({ of: 'read-only', detail: 'Read-only file system (os error 30)' }));
+
+    await screen.findByText(/is read-only/u);
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Browse…' }));
+    expect(nameField()).toHaveProperty('value', 'Board deck');
+  });
+
+  it('focuses and selects the name after a refusal on Name, and leaves a draft being edited alone', async () => {
+    const { shell, finishCreate } = fakeShell();
+    await openForm(shell);
+    fireEvent.change(nameField(), { target: { value: 'Q3/Q4' } });
+
+    fireEvent.click(createButton());
+    await screen.findByRole('status');
+    act(() => finishCreate({ of: 'name', rule: 'not-a-folder-name' }));
+
+    await screen.findByText(/^A name can’t hold/u);
+    const field = nameField();
+    if (!(field instanceof HTMLInputElement)) throw new Error('Name is not an input');
+    expect(document.activeElement).toBe(field);
+    expect([field.selectionStart, field.selectionEnd]).toEqual([0, 'Q3/Q4'.length]);
+
+    field.setSelectionRange(5, 5);
+    fireEvent.change(field, { target: { value: 'Q3-Q4' } });
+    expect(document.activeElement).toBe(field);
+    expect(field.selectionStart).toBe(field.selectionEnd);
+  });
+
   it('makes Browse… the default button after a cause on Location, so Enter chooses a Location rather than creating again', async () => {
     const { shell, asked } = fakeShell({
       create: () => ({ of: 'no-permission', detail: 'Permission denied (os error 13)' }),
     });
     await openForm(shell);
     fireEvent.click(createButton());
-    await screen.findByText(/You don’t have permission/u);
+    await screen.findByText(/You can’t create folders/u);
 
     // Enter in a field activates the form's default button: its first submit
     // button in tree order (HTML's implicit submission).
@@ -279,11 +316,11 @@ describe('New Space', () => {
     const cases: readonly [NotCreated, string][] = [
       [
         { of: 'read-only', detail: 'Read-only file system (os error 30)' },
-        'Documents is read-only, so nothing can be created there. Choose another Location.',
+        'Documents is read-only. Choose another location.',
       ],
       [
         { of: 'location-gone', detail: 'Not a directory (os error 20)' },
-        'Documents can’t be found. It may have been moved, or its disk removed. Choose another Location.',
+        'Documents can’t be found. It may have been moved, or its disk removed. Choose another location.',
       ],
     ];
     for (const [answer, sentence] of cases) {
@@ -316,9 +353,9 @@ describe('New Space', () => {
     expect(locationField().getAttribute('aria-invalid')).toBe('false');
 
     fireEvent.click(createButton());
-    await screen.findByText(/There isn’t enough space on the disk/u);
+    await screen.findByText(/The disk is full/u);
     fireEvent.change(nameField(), { target: { value: 'Smaller deck' } });
-    expect(screen.queryByText(/There isn’t enough space on the disk/u)).toBeNull();
+    expect(screen.queryByText(/The disk is full/u)).toBeNull();
   });
 
   it('shows a failure no field fixes as a notice above the buttons, the form kept', async () => {
@@ -342,7 +379,7 @@ describe('New Space', () => {
 
     const notice = await screen.findByRole('alert');
     expect(notice.textContent).toContain(
-      'There isn’t enough space on the disk to create the Space. Nothing was kept.',
+      'The disk is full, so the Space wasn’t created. Free up some space and try again.',
     );
     expect(nameField().getAttribute('aria-invalid')).toBe('false');
     expect(locationField().getAttribute('aria-invalid')).toBe('false');
@@ -365,7 +402,7 @@ describe('New Space', () => {
 
     const notice = await screen.findByRole('alert');
     expect(notice.textContent).toContain(
-      'The Space couldn’t be created, and part of it was left in the folder Untitled Space. Choose another name or Location.',
+      'The Space couldn’t be finished. Part of it is in the folder “Untitled Space”. Choose another name or location.',
     );
     expect(within(notice).getByRole('button', { name: 'Details' })).toBeTruthy();
   });
@@ -383,9 +420,8 @@ describe('New Space', () => {
     fireEvent.click(createButton());
 
     const notice = await screen.findByRole('alert');
-    expect(notice.textContent).toContain(
-      'The Space was created but couldn’t be opened. Its folder is kept.',
-    );
+    expect(notice.textContent).toContain('The Space was created but couldn’t be opened.');
+    expect(notice.textContent).not.toContain('kept');
     fireEvent.click(within(notice).getByRole('button', { name: 'Open Folder…' }));
     expect(asked.at(-1)).toEqual({
       kind: 'open-recent',
@@ -475,7 +511,7 @@ describe('New Space', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
     await failView();
 
-    expect(screen.queryByText('The Start window could not load')).toBeNull();
+    expect(screen.queryByText('The Start window couldn’t load')).toBeNull();
     expect(screen.getByRole('button', { name: 'New Space' })).toBeTruthy();
   });
 
@@ -491,7 +527,7 @@ describe('New Space', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Create Space' }));
     await failView();
 
-    expect(screen.queryByText('The Start window could not load')).toBeNull();
+    expect(screen.queryByText('The Start window couldn’t load')).toBeNull();
     expect(screen.getByRole('status').textContent).toContain('Opening Untitled Space…');
   });
 

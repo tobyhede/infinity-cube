@@ -98,7 +98,7 @@ export function StartPage({ shell }: { readonly shell: StartShell }) {
     return (
       <main className="flex min-h-screen bg-card">
         <StatusFailure
-          title="The Start window could not load"
+          title="The Start window couldn’t load"
           detail={loaded.reason}
           detailLabel="Why the Start window could not load"
           className="w-full"

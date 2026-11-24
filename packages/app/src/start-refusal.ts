@@ -66,6 +66,18 @@ const notice = (sentence: string, detail: string): StartRefusalWords => ({
   openFolder: null,
 });
 
+/**
+ * The sentence for a name that is not one folder name, by the case the name
+ * meets: empty, only dots, or holding a separator (`new_space_folder`'s
+ * `NotAFolderName`).
+ */
+function notAFolderName(name: string): string {
+  if (name === '') return 'Give your Space a name.';
+  if (name === '.' || name === '..') return 'A name can’t be only dots. Add a word.';
+  const separator = name.includes('/') ? '/' : '\\';
+  return `A name can’t hold “${separator}”, because it separates folders. Try a dash instead.`;
+}
+
 /** The sentence for a name the shell refused by one of its rules, on Name. */
 function nameSentence(
   refused: Extract<NotCreated, { of: 'name' }>,
@@ -74,15 +86,15 @@ function nameSentence(
 ): string {
   switch (refused.rule) {
     case 'not-a-folder-name':
-      return 'A name is one folder name: it can’t be empty, . or .., or hold / or \\. Try a dash instead.';
+      return notAFolderName(name);
     case 'forbidden-character':
-      return `A folder name on Windows can’t hold ${refused.character}. Remove it, or try a dash instead.`;
+      return `A name can’t hold “${refused.character}” on Windows. Remove it, or try a dash instead.`;
     case 'reserved':
-      return `Windows keeps ${name} as the name of a device. Add a word to it, or choose another name.`;
+      return `Windows keeps “${name}” for a device. Add a word to it, or choose another name.`;
     case 'trailing-dot-or-space':
-      return 'A folder name on Windows can’t end in a dot or a space. Remove it from the end.';
+      return 'A name can’t end in a dot or a space on Windows. Remove it.';
     case 'taken-by-a-file':
-      return `${location} already has a file called ${name}. Choose another name.`;
+      return `${location} already has a file called “${name}”. Choose another name.`;
   }
 }
 
@@ -97,41 +109,38 @@ export function describeNotCreated(
       return onName(nameSentence(notCreated, location, attempt.name));
     case 'folder':
       return onName(
-        `${location} already has a folder called ${attempt.name} with files in it. Choose another name.`,
+        `${location} already has a folder called “${attempt.name}” with files in it. Choose another name.`,
       );
     case 'no-permission':
       return onLocation(
-        `You don’t have permission to create folders in ${location}. Choose another Location.`,
+        `You can’t create folders in ${location}. Choose another location.`,
         notCreated.detail,
       );
     case 'read-only':
-      return onLocation(
-        `${location} is read-only, so nothing can be created there. Choose another Location.`,
-        notCreated.detail,
-      );
+      return onLocation(`${location} is read-only. Choose another location.`, notCreated.detail);
     case 'location-gone':
       return onLocation(
-        `${location} can’t be found. It may have been moved, or its disk removed. Choose another Location.`,
+        `${location} can’t be found. It may have been moved, or its disk removed. Choose another location.`,
         notCreated.detail,
       );
     case 'disk-full':
       return notice(
         notCreated.kept
-          ? `There isn’t enough space on the disk to create the Space. Part of it was left in the folder ${attempt.name}.`
-          : 'There isn’t enough space on the disk to create the Space. Nothing was kept.',
+          ? `The disk is full, so the Space wasn’t finished. Part of it is in the folder “${attempt.name}”. Free up some space and choose another name.`
+          : 'The disk is full, so the Space wasn’t created. Free up some space and try again.',
         notCreated.detail,
       );
     case 'failed':
       return notice(
         notCreated.kept
-          ? `The Space couldn’t be created, and part of it was left in the folder ${attempt.name}. Choose another name or Location.`
-          : 'The Space couldn’t be created. Try again, or choose another name or Location.',
+          ? `The Space couldn’t be finished. Part of it is in the folder “${attempt.name}”. Choose another name or location.`
+          : 'The Space couldn’t be created. Try again, or choose another name or location.',
         notCreated.detail,
       );
     case 'not-opened':
       return {
         place: 'notice',
-        sentence: 'The Space was created but couldn’t be opened. Its folder is kept.',
+        sentence: 'The Space was created but couldn’t be opened.',
         detail: notCreated.detail,
         openFolder: notCreated.folder,
       };
