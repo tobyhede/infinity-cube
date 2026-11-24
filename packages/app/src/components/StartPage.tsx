@@ -66,6 +66,9 @@ export function StartPage({ shell }: { readonly shell: StartShell }) {
           setView({ screen: 'new', form: formFrom(answer.newSpace) });
         }
       } catch (error) {
+        // A request for the form that Cancel, Create Space or a newer request
+        // has passed over fails as quietly as it would have answered.
+        if (form && request !== formRequest.current) return;
         setLoaded({ state: 'failed', reason: String(error) });
       }
     },

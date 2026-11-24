@@ -31,12 +31,15 @@ function fakeShell(
   const asked: Asked[] = [];
   let finishCreate: ((answer: NotCreated | null) => void) | undefined;
   const view = { recents: options.recents ?? [], newSpace: options.defaults ?? DOCUMENTS };
-  const heldViews: (() => void)[] = [];
+  const heldViews: { readonly answer: () => void; readonly fail: () => void }[] = [];
   const shell: StartShell = {
     view: () =>
       options.holdViews === true
-        ? new Promise((resolve) => {
-            heldViews.push(() => resolve(view));
+        ? new Promise((resolve, reject) => {
+            heldViews.push({
+              answer: () => resolve(view),
+              fail: () => reject(new Error('The shell could not answer')),
+            });
           })
         : Promise.resolve(view),
     browse: (location) => {
@@ -61,7 +64,14 @@ function fakeShell(
     /** Give the oldest held answer to `view`, or the newest. */
     answerView: async (which: 'oldest' | 'newest' = 'oldest') => {
       await act(async () => {
-        (which === 'oldest' ? heldViews.shift() : heldViews.pop())?.();
+        (which === 'oldest' ? heldViews.shift() : heldViews.pop())?.answer();
+        await Promise.resolve();
+      });
+    },
+    /** Fail the oldest held request to `view`. */
+    failView: async () => {
+      await act(async () => {
+        heldViews.shift()?.fail();
         await Promise.resolve();
       });
     },
@@ -295,6 +305,38 @@ describe('New Space', () => {
     await answerView();
 
     expect(screen.queryByRole('form')).toBeNull();
+    expect(screen.getByRole('status').textContent).toContain('Opening Untitled Space…');
+  });
+
+  it('shows no failure from a late refusal once Cancel has returned to the start screen', async () => {
+    const { shell, answerView, failView } = fakeShell({ holdViews: true });
+    render(<StartPage shell={shell} />);
+    await answerView();
+    const newSpace = await screen.findByRole('button', { name: 'New Space' });
+
+    fireEvent.click(newSpace);
+    fireEvent.click(newSpace);
+    await answerView('newest');
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
+    await failView();
+
+    expect(screen.queryByText('The Start window could not load')).toBeNull();
+    expect(screen.getByRole('button', { name: 'New Space' })).toBeTruthy();
+  });
+
+  it('shows no failure from a late refusal once Create Space shows the opening status', async () => {
+    const { shell, answerView, failView } = fakeShell({ holdViews: true });
+    render(<StartPage shell={shell} />);
+    await answerView();
+    const newSpace = await screen.findByRole('button', { name: 'New Space' });
+
+    fireEvent.click(newSpace);
+    fireEvent.click(newSpace);
+    await answerView('newest');
+    fireEvent.click(await screen.findByRole('button', { name: 'Create Space' }));
+    await failView();
+
+    expect(screen.queryByText('The Start window could not load')).toBeNull();
     expect(screen.getByRole('status').textContent).toContain('Opening Untitled Space…');
   });
 
