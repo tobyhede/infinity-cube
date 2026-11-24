@@ -6,7 +6,7 @@
 
 **What to build:** Designs for every screen and state of the Start window (ADR 0171, Storage ST-131), reviewed before any implementation. This is a prototype and design ticket: it produces review stories and a clickable prototype, not shipped code.
 
-**Where the designs live:** Ladle review stories in `packages/app/stories/review/start-window.stories.tsx`, one story per state, drawn with the real `@project/ui` components and the application's tokens, so what is approved is what 02 builds. `stories/review` is staged work, not catalogue evidence (`shadcn-first-ui`, step 1); the catalogue check excludes it (`packages/app/stories/design-system-inventory.ts`), so these stories carry no parity claims or tagged tests. Their screenshots, light and dark, are published side by side on a canvas for review without running `pnpm ladle`.
+**Where the designs live:** Ladle review stories in `packages/app/stories/review/start-window.stories.tsx`, one story per state, drawn with the real `@project/ui` components and the application's tokens, so what is approved is what 02 builds. `stories/review` is staged work, not catalogue evidence (`shadcn-first-ui`, step 1); the catalogue check excludes it (`packages/app/stories/design-system-inventory.ts`), so these stories carry no parity claims or tagged tests. Their screenshots, light and dark, are published side by side on a canvas for review without running `pnpm ladle`. Once 02 built the window from `@project/ui`, the review stories and their `StartWindowPrototype.tsx` were deleted (2026-11-24) so the two could not drift; they stand at commit c0773b97 and its successors on the branch, and the built window's own stories are `packages/app/stories/components/start-window.stories.tsx`.
 
 **Skills, in order:**
 
