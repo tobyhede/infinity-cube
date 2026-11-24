@@ -180,8 +180,13 @@ mod given_a_name_refused {
             .unwrap_err();
 
         assert!(
-            matches!(refused, NotCreated::Name { .. } | NotCreated::Folder),
-            "a file holding the name takes it, as `default_name` decides; the Location is there: {refused:?}"
+            matches!(
+                refused,
+                NotCreated::Name {
+                    rule: NameRule::TakenByAFile
+                }
+            ),
+            "a file holding the name is refused as one, not as a folder; the Location is there: {refused:?}"
         );
         assert_eq!(
             fs::read_to_string(documents.path().join("Untitled Space")).unwrap(),
