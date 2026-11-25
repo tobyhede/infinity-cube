@@ -15,7 +15,7 @@ const initialMap = () => ({
 });
 
 export function EditingComparison({ initial }: { initial: string }) {
-  const name = 'Temporary resize with optional Focus';
+  const name = 'Temporary resize';
   const [map, setMap] = useState<'A' | 'B'>('A');
   const [maps, setMaps] = useState({ A: initialMap(), B: initialMap() });
   const current = maps[map];
@@ -23,7 +23,6 @@ export function EditingComparison({ initial }: { initial: string }) {
     setMaps((previous) => ({ ...previous, [map]: { ...previous[map], ...next } }));
   const [url, setUrl] = useState(() => storyText(initial));
   const [editing, setEditing] = useState(false);
-  const [focus, setFocus] = useState(false);
   const beforeOpen = useRef(false);
   const openForEdit = useRef<boolean | null>(null);
   const operations: PluginOperations = {
@@ -47,7 +46,6 @@ export function EditingComparison({ initial }: { initial: string }) {
           if (openForEdit.current !== null) patch({ open: openForEdit.current });
           openForEdit.current = null;
           setEditing(false);
-          setFocus(false);
         },
         exclusively: (work) => work({ content: operations.commitContent, store: storeStoryText }),
         unmount: () => undefined,
@@ -57,7 +55,6 @@ export function EditingComparison({ initial }: { initial: string }) {
   return (
     <section
       className="p-4"
-      data-focus={focus}
       aria-label={name}
       onPointerDownCapture={() => {
         if (!editing) beforeOpen.current = current.open;
@@ -78,15 +75,10 @@ export function EditingComparison({ initial }: { initial: string }) {
           Switch Map
         </Button>
         <output>
-          Map {map} · Canvas {current.size.width} × {current.size.height} · Focus{' '}
+          Map {map} · Canvas {current.size.width} × {current.size.height} · Edit{' '}
           {current.editSize.width} × {current.editSize.height} · {current.open ? 'Full' : 'Title'}
         </output>
       </div>
-      {editing && (
-        <Button className="prototype-focus-toggle" onClick={() => setFocus(!focus)}>
-          {focus ? 'Return to canvas' : 'Focus editor'}
-        </Button>
-      )}
       <CanvasResourceNodeSpecimen
         selected
         zoom={1}
