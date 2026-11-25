@@ -422,11 +422,11 @@ The snapshot marker moved from `f6e01b9` to `3f6aa29` and to accepted ADRs throu
 
 ## Refresh to `343a66c` (25 November 2026)
 
-The snapshot marker moved from `3f6aa29` to `343a66c` and to accepted ADRs through 0173; two accepted ADRs carry that number at that commit, and no ADR 0170 is on main. Each was read for rules this doc owns, and each change main merged since `3f6aa29` (PRs 508, 509, 518 and 519) was read for behaviour this doc states.
+The snapshot marker moved from `3f6aa29` to `343a66c` and to accepted ADRs through 0174; at that commit both 0173 and 0174 (sqlx is the only migrator) carried the number 0173, and the later was renumbered 0174 on 25 November 2026; no ADR 0170 is on main. Each was read for rules this doc owns, and each change main merged since `3f6aa29` (PRs 508, 509, 518 and 519) was read for behaviour this doc states.
 
 | Source | Disposition |
 |---|---|
-| 0173 (sqlx is the only migrator) | reviewed, no rule here: from rust-host 16 `sqlx` is the only migrator, run by `infinity-cube migrate`, and no database Prisma Next migrated is adopted; restated in ST-125, ST-126 and ST-120 |
+| 0174 (sqlx is the only migrator) | reviewed, no rule here: from rust-host 16 `sqlx` is the only migrator, run by `infinity-cube migrate`, and no database Prisma Next migrated is adopted; restated in ST-125, ST-126 and ST-120 |
 | 0173 (Shift at Resize start keeps the Resource's proportions) | reviewed, no rule here: the host resizes every Resource alike (SR-18), and the gesture changes how, not who; restated in RD-2, UI-67 and UI-68 |
-| "Refined by: 0173" added to the status lines of ADRs 0122, 0155 and 0165 | no rule here; none of the three sources a rule in this doc that the refinement changes |
-| Code since `3f6aa29`: PRs 508 and 509 (proportional Resize in `react-flow-adapter`), 518 (ADR 0173, rust-host 15 and 16 triage, the mise ticket) and 519 (the SQLite restart proof's host started by command, `env` in the HTTP conformance host's JSON) | no behaviour this doc states |
+| "Refined by" added to the status lines of ADRs 0122 (0173) and 0155 and 0165 (0174) | no rule here; none of the three sources a rule in this doc that the refinement changes |
+| Code since `3f6aa29`: PRs 508 and 509 (proportional Resize in `react-flow-adapter`), 518 (ADR 0174, then numbered 0173, rust-host 15 and 16 triage, the mise ticket) and 519 (the SQLite restart proof's host started by command, `env` in the HTTP conformance host's JSON) | no behaviour this doc states |

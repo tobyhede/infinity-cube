@@ -2,7 +2,7 @@
 
 **Purpose:** what changes what is shown without writing the Space: choosing a Map, selection, traversal, product URLs and browser history, Open Spaces, and presenting.
 
-**Snapshot:** checked against `343a66c` (2026-11-25); incorporates accepted ADRs through 0173. Two accepted ADRs carry 0173 at that commit, [Shift at Resize start keeps the Resource’s proportions](../adr/0173-shift-at-resize-start-keeps-the-resources-proportions.md) and [sqlx is the only migrator once PostgreSQL moves to Rust](../adr/0173-sqlx-is-the-only-migrator-once-postgresql-moves-to-rust.md), and both are incorporated; no ADR 0170 is on main at that commit. ADRs accepted after it bind where they differ, until this document is updated. Proposed ADR 0163 is not incorporated.
+**Snapshot:** checked against `343a66c` (2026-11-25); incorporates accepted ADRs through 0174; no ADR 0170 is on main at that commit. At `343a66c` both 0173 and 0174 carried the number 0173; the later, sqlx is the only migrator, was renumbered 0174 on 25 November 2026. ADRs accepted after it bind where they differ, until this document is updated. Proposed ADR 0163 is not incorporated.
 
 Open conflicts are listed in [conflicts/navigation.md](conflicts/navigation.md). Sources are traced in [trace/navigation.md](trace/navigation.md).
 

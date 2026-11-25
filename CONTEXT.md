@@ -28,7 +28,7 @@ The desktop application's window for creating a new Space, opening a folder, or 
 _Avoid_: home window, launcher, welcome window.
 
 **Recent**:
-The desktop application's history of the Spaces opened by any route, which the Start window lists. It is distinct from the set to reopen, the Spaces open when the last quit began, which a launch reopens.
+The desktop application's history of the Spaces opened by any route, which the Start window lists. It is distinct from the set to reopen, the Spaces open when the last quit began, which a launch naming no folder reopens.
 _Avoid_: recent files, history, the set to reopen.
 
 **Space snapshot**:
