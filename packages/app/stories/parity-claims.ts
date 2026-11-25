@@ -1023,4 +1023,103 @@ export const parityClaims: readonly ParityClaim[] = [
     claim:
       '`?` while presenting opens the keyboard shortcuts sheet listing the keys a presentation answers, and Escape closes the sheet alone.',
   },
+  {
+    id: 'start-window-makes-a-new-space-from-the-defaults',
+    storyFile: 'components/start-window.stories.tsx',
+    storyExport: 'FirstLaunch',
+    claim:
+      'The desktop Start window with nothing recent offers New Space and Open Folder… beside Recent’s empty state; New Space replaces it with the form, Name focused on its default and Location read-only, naming the folder Create Space makes, and Create Space shows one status naming the Space until its window opens; Escape returns to the start screen.',
+    applicationEvidence:
+      'The Start window is a page of the desktop shell’s own build (ADR 0172), answered by its invoke commands, which no Playwright host serves; `packages/desktop/src-tauri/src/start/tests.rs` holds New Space over real folders, and ticket 02 of `.scratch/start-window` records it driven in a live WebKitGTK window.',
+  },
+  {
+    id: 'start-window-refuses-a-name-beside-the-field',
+    storyFile: 'components/start-window.stories.tsx',
+    storyExport: 'FirstLaunch',
+    claim:
+      'New Space refuses a name that is not one folder name beside Name, the field marked invalid and described by the reason, keeping the draft, and the folder line asks for a name instead of naming a folder; typing clears the refusal.',
+    applicationEvidence:
+      'The Start window is a page of the desktop shell’s own build (ADR 0172), answered by its invoke commands, which no Playwright host serves; `packages/desktop/src-tauri/src/start/tests.rs` holds New Space over real folders, and ticket 02 of `.scratch/start-window` records it driven in a live WebKitGTK window.',
+  },
+  {
+    id: 'start-window-keeps-the-form-when-the-write-fails',
+    storyFile: 'components/start-window.stories.tsx',
+    storyExport: 'FirstLaunch',
+    claim:
+      'A write that fails after Create Space because the disk is full is a notice above the buttons in one sentence, the system’s words behind a Details toggle that opens by keyboard, and the form comes back with the name and Location kept and Create Space in view, so the person can try again or cancel.',
+    applicationEvidence:
+      'The Start window is a page of the desktop shell’s own build (ADR 0172), answered by its invoke commands, which no Playwright host serves; `packages/desktop/src-tauri/src/start/tests.rs` holds New Space over real folders, and ticket 02 of `.scratch/start-window` records it driven in a live WebKitGTK window.',
+  },
+  {
+    id: 'start-window-shows-a-name-refusal-on-name',
+    storyFile: 'components/start-window.stories.tsx',
+    storyExport: 'NameNotAFolderName',
+    claim:
+      'A name that is not one folder name shows on Name, the field marked invalid and described by the page’s sentence for the shell’s code, with no Details.',
+    applicationEvidence:
+      'The Start window is a page of the desktop shell’s own build (ADR 0172), answered by its invoke commands, which no Playwright host serves; `packages/desktop/src-tauri/src/start/tests.rs` holds New Space over real folders, and ticket 02 of `.scratch/start-window` records it driven in a live WebKitGTK window.',
+  },
+  {
+    id: 'start-window-shows-a-folder-with-files-on-name',
+    storyFile: 'components/start-window.stories.tsx',
+    storyExport: 'NameFolderHoldsFiles',
+    claim:
+      'A folder by the chosen name that already holds files shows on Name, naming the Location’s last folder and the name and asking for another name, with no Details.',
+    applicationEvidence:
+      'The Start window is a page of the desktop shell’s own build (ADR 0172), answered by its invoke commands, which no Playwright host serves; `packages/desktop/src-tauri/src/start/tests.rs` holds New Space over real folders, and ticket 02 of `.scratch/start-window` records it driven in a live WebKitGTK window.',
+  },
+  {
+    id: 'start-window-shows-no-permission-on-location',
+    storyFile: 'components/start-window.stories.tsx',
+    storyExport: 'LocationNoPermission',
+    claim:
+      'No permission to create folders in the Location shows on Location in place of the folder line, the field and Browse… described by it, the system’s words behind a closed Details, Create Space in view.',
+    applicationEvidence:
+      'The Start window is a page of the desktop shell’s own build (ADR 0172), answered by its invoke commands, which no Playwright host serves; `packages/desktop/src-tauri/src/start/tests.rs` holds New Space over real folders, and ticket 02 of `.scratch/start-window` records it driven in a live WebKitGTK window.',
+  },
+  {
+    id: 'start-window-shows-a-read-only-location-on-location',
+    storyFile: 'components/start-window.stories.tsx',
+    storyExport: 'LocationReadOnly',
+    claim:
+      'A read-only Location shows on Location in place of the folder line, the field and Browse… described by it, the system’s words behind a closed Details, Create Space in view.',
+    applicationEvidence:
+      'The Start window is a page of the desktop shell’s own build (ADR 0172), answered by its invoke commands, which no Playwright host serves; `packages/desktop/src-tauri/src/start/tests.rs` holds New Space over real folders, and ticket 02 of `.scratch/start-window` records it driven in a live WebKitGTK window.',
+  },
+  {
+    id: 'start-window-shows-a-location-gone-on-location',
+    storyFile: 'components/start-window.stories.tsx',
+    storyExport: 'LocationGone',
+    claim:
+      'A Location that cannot be found shows on Location in place of the folder line, the field and Browse… described by it, the system’s words behind a closed Details, Create Space in view.',
+    applicationEvidence:
+      'The Start window is a page of the desktop shell’s own build (ADR 0172), answered by its invoke commands, which no Playwright host serves; `packages/desktop/src-tauri/src/start/tests.rs` holds New Space over real folders, and ticket 02 of `.scratch/start-window` records it driven in a live WebKitGTK window.',
+  },
+  {
+    id: 'start-window-shows-a-full-disk-as-a-notice',
+    storyFile: 'components/start-window.stories.tsx',
+    storyExport: 'DiskFull',
+    claim:
+      'A full disk is a notice above the buttons in one sentence, neither field marked invalid, the system’s words behind a closed Details, Create Space in view.',
+    applicationEvidence:
+      'The Start window is a page of the desktop shell’s own build (ADR 0172), answered by its invoke commands, which no Playwright host serves; `packages/desktop/src-tauri/src/start/tests.rs` holds New Space over real folders, and ticket 02 of `.scratch/start-window` records it driven in a live WebKitGTK window.',
+  },
+  {
+    id: 'start-window-offers-the-folder-of-a-space-not-opened',
+    storyFile: 'components/start-window.stories.tsx',
+    storyExport: 'CreatedNotOpened',
+    claim:
+      'A Space written and not opened is a notice saying its folder is kept, offering Open Folder… beside a closed Details, Create Space in view.',
+    applicationEvidence:
+      'The Start window is a page of the desktop shell’s own build (ADR 0172), answered by its invoke commands, which no Playwright host serves; `packages/desktop/src-tauri/src/start/tests.rs` holds New Space over real folders, and ticket 02 of `.scratch/start-window` records it driven in a live WebKitGTK window.',
+  },
+  {
+    id: 'start-window-shows-anything-else-as-a-notice',
+    storyFile: 'components/start-window.stories.tsx',
+    storyExport: 'AnythingElse',
+    claim:
+      'Any other failure is a notice above the buttons asking the person to try again or choose another name or Location, the system’s words behind a closed Details, Create Space in view.',
+    applicationEvidence:
+      'The Start window is a page of the desktop shell’s own build (ADR 0172), answered by its invoke commands, which no Playwright host serves; `packages/desktop/src-tauri/src/start/tests.rs` holds New Space over real folders, and ticket 02 of `.scratch/start-window` records it driven in a live WebKitGTK window.',
+  },
 ] as const;

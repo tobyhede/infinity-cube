@@ -3,6 +3,7 @@
 Status: accepted
 Date: 2026-11-20
 Refines: 0155
+Refined by: 0174
 Related: 0030, 0085, 0095
 
 ADR 0155 says both hosts share one database schema until PostgreSQL moves, through "plain SQL files that Prisma (PostgreSQL), the SQLite migrator and `sqlx` all apply, held to one schema by a test". Prisma Next applies a migration package's `ops.json`, not a SQL file, and the packages already in `migrations/app/` and `migrations-sqlite/app/` are history that is never rewritten (ADR 0085): a rewritten package passes against a database migrated from it and fails against a fresh one, and its hash no longer matches what Prisma Next recorded in a database it migrated. The maintainer ruled on 20 November 2026 (conflict Storage S3) that the history is kept in two encodings and held equal by tests.

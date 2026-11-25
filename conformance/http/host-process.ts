@@ -70,6 +70,11 @@ export interface HostCommand {
   readonly name: string;
   readonly argv: readonly string[];
   readonly cwd?: string;
+  /**
+   * Variables set in the host's environment, over the suite's own, which the
+   * host otherwise inherits.
+   */
+  readonly env?: Readonly<Record<string, string>>;
   /** Whether closing standard input stops the host as SIGINT does (the desktop sidecar's protocol). */
   readonly stopsOnStdinClose: boolean;
   /**
@@ -220,6 +225,18 @@ export interface HostLaunch {
   readonly built: string;
 }
 
+/**
+ * The launch of a host that runs no directory or build, such as a host over a
+ * store (the SQLite restart proof's, `test/support/restart-proof-host.ts`): its
+ * command names `{port}` alone, and one naming `{directory}` or `{built}` fails
+ * the start before anything is spawned.
+ */
+export const STORE_BACKED_LAUNCH = { kind: 'store-backed' } as const;
+export type StoreBackedLaunch = typeof STORE_BACKED_LAUNCH;
+
+/** A placeholder a store-backed launch has no value for. */
+export const DIRECTORY_PLACEHOLDER = /\{(directory|built)\}/;
+
 export interface HostStartOptions {
   /**
    * How long the host has to announce itself, and then to answer its own
@@ -244,22 +261,32 @@ const ANNOUNCE_DEADLINE_MS = 30_000;
  * request through `exchange`, beside the `Host` the host expects.
  *
  * A host that cannot be spawned, does not announce within the deadline, or
- * cannot be unlocked within it fails the start, and is killed first.
+ * cannot be unlocked within it fails the start, and is killed first; one that
+ * cannot be unlocked has exited before the start fails.
  */
 export const startHost = async (
   command: HostCommand,
-  launch: HostLaunch,
+  launch: HostLaunch | StoreBackedLaunch,
   options: HostStartOptions = {},
 ): Promise<HostStart> => {
-  const values = {
-    directory: launch.directory,
-    built: launch.built,
-    port: String(await freePort()),
-  };
+  const freeLoopbackPort = String(await freePort());
+  if ('kind' in launch) {
+    const named = command.argv.find((argument) => DIRECTORY_PLACEHOLDER.test(argument));
+    if (named !== undefined) {
+      throw new Error(
+        `${command.name} runs no directory or build, but its command names ${named}`,
+      );
+    }
+  }
+  const values =
+    'kind' in launch
+      ? { port: freeLoopbackPort }
+      : { directory: launch.directory, built: launch.built, port: freeLoopbackPort };
   const [program, ...args] = command.argv.map((argument) => substitute(argument, values));
   if (program === undefined) throw new Error(`The host command for ${command.name} is empty`);
   const child = spawn(program, args, {
     cwd: command.cwd,
+    env: command.env === undefined ? process.env : { ...process.env, ...command.env },
     stdio: ['pipe', 'pipe', 'pipe'],
   });
   const kill = (): void => {
@@ -355,7 +382,9 @@ export const startHost = async (
         );
       }
     } catch (error) {
+      // A host that announced was spawned, so it emits 'exit' once killed.
       kill();
+      await exited;
       throw error;
     } finally {
       clearTimeout(launchTimer);

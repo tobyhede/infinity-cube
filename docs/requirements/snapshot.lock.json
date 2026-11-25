@@ -1,0 +1,451 @@
+{
+  "version": 1,
+  "script_version": "0.6.0",
+  "adr_glob": "docs/adr/[0-9]*.md",
+  "requirements_glob": "docs/requirements/*.md",
+  "superseded_glob": "docs/adr/superseded/[0-9]*.md",
+  "adrs": {
+    "docs/adr/0001-recursive-spaces.md": {
+      "sha256": "faf0bb3ceb44c162b4e08e37f09ff26f48c5e52471fd8a6717dae940948efbcb"
+    },
+    "docs/adr/0002-layout-view-separation.md": {
+      "sha256": "57e183b7e96c06112e3811c2242b94b6686b6a5e4269eb9477a8a69d93687117"
+    },
+    "docs/adr/0003-routes-may-conflict.md": {
+      "sha256": "e9ba84f83442e76114aa95f28789de4877c7c05a27fc422ca04279887f43298a"
+    },
+    "docs/adr/0004-cards-are-the-graph.md": {
+      "sha256": "c03e3e021bbfaf682db8a6aeb301fe8e46d7a03623255a9178e81e362b50bd4a"
+    },
+    "docs/adr/0005-layout-is-a-strategy.md": {
+      "sha256": "56e1f67e5239f228584cf295f17d9d05794ad12e8efffa28dbfef487c035c5b0"
+    },
+    "docs/adr/0007-routes-are-the-only-structure.md": {
+      "sha256": "a2a30420bda8574280000979f73bfde2b49423838f72c892984b396e1de428f7"
+    },
+    "docs/adr/0009-alias-resolution-is-lazy-and-single-hop.md": {
+      "sha256": "3bf6d7bf917ed2c748f7a8ca806f702baa6fa796b9873a30485da59fc67af1c3"
+    },
+    "docs/adr/0010-space-is-the-root-loaded-by-loadspace.md": {
+      "sha256": "7e7df44653a4611e323c091ae15ee342854b26733a77a7a79f971a731e3c3725"
+    },
+    "docs/adr/0014-layout-is-the-authored-data-strategy-is-the-behaviour.md": {
+      "sha256": "8649a70e0e50ed22d3900b6ad389dd996ae1c95b627e201b0a0973ea00328d4f"
+    },
+    "docs/adr/0015-a-space-may-have-no-routes.md": {
+      "sha256": "ef095e1a095746d931a282eaa7cf7530361c4863f2036ad5f2b4374259b0f01b"
+    },
+    "docs/adr/0016-every-entity-carries-a-durable-uuid-beside-its-authored-id.md": {
+      "sha256": "0d65a44707e944af68b46104ca5b964904ff90859a994d5470d233b7ae415a01"
+    },
+    "docs/adr/0018-a-new-space-is-a-single-centered-card.md": {
+      "sha256": "72c6df6b34b1a0f1063495d336f2954778728a503165a240819f208a20b38770"
+    },
+    "docs/adr/0020-a-card-is-a-markdown-file-with-frontmatter.md": {
+      "sha256": "f66c8dc9267cae744fbfa57aa992d571725c58dc2761b2db56e1c27ce82fa07e"
+    },
+    "docs/adr/0024-presenting-is-traversing-a-route.md": {
+      "sha256": "002e22310ef1070df8884ba8c75affdb40bc2df904662ea03140937f84b83cc0"
+    },
+    "docs/adr/0028-activating-a-route-is-not-an-edit.md": {
+      "sha256": "eee80d1e537b692ac2e86768f0d92291f713b30707dc3a3772c26ab53357f256"
+    },
+    "docs/adr/0030-postgres-is-the-live-write-model.md": {
+      "sha256": "b8f793d91c75a94c28fce486f4fb61ffe99735395745bfcefc98d505a2b546d8"
+    },
+    "docs/adr/0032-routes-may-contain-cycles.md": {
+      "sha256": "459e23d40e7efb8c12dcebd92cf1eb5c561a40f27ba0d57e63133ad407d2c7e4"
+    },
+    "docs/adr/0033-route-authoring-uses-spatial-route-coloured-handles.md": {
+      "sha256": "3feae48012e3f28786e9591bc2fa234aa0be0a021106ffd6d28b99a121f04855"
+    },
+    "docs/adr/0034-the-http-application-is-fetch-native.md": {
+      "sha256": "d67c2556717ab75149cbc02a5f55b52e21f34b618a647a6cea380f724f6a4a30"
+    },
+    "docs/adr/0035-space-authoring-owns-the-edit-lifecycle.md": {
+      "sha256": "34f9b8f94658aaf190424ba1d573224e4961c851fcfc0f65f9c2499e7f9bfc2e"
+    },
+    "docs/adr/0036-a-card-selects-on-click-and-no-click-opens-it.md": {
+      "sha256": "00f971d412512205180e26b9a115b0a8a7ec44eb90d0e582659818fb75112f42"
+    },
+    "docs/adr/0038-a-point-has-one-type.md": {
+      "sha256": "951bbd07c3083ca37733fde958e1095ebdca087e113db0cc68a4bfc4fb22ecfb",
+      "na": "engineering rule owned by docs/agents/ (trace: sent to PROC)"
+    },
+    "docs/adr/0039-an-alias-delegates-content-authoring-to-its-target.md": {
+      "sha256": "b301cd395d4ed519a6c58e9401ac2620e3232f0bdb54025c230efd5f4bb27be5"
+    },
+    "docs/adr/0040-layouts-own-card-membership-and-routes.md": {
+      "sha256": "46acf62c3d6be28c02b733152516ae7de4a26f7038fd1b1a8a1e39edac3b18b8"
+    },
+    "docs/adr/0041-graph-is-the-first-public-name-for-route.md": {
+      "sha256": "7660ce30e349266a034d23bb8f16cd7b11781966561c8d05d1fed610891c0eda"
+    },
+    "docs/adr/0042-interaction-drafts-stay-local-and-space-replacement-invalidates-them.md": {
+      "sha256": "afeac004543dc21a59e43ba1483259b31e43bb9bf5d16778697f31bb770a55d6"
+    },
+    "docs/adr/0043-a-camera-command-is-issued-never-awaited.md": {
+      "sha256": "136785e6c505b5195a109e0dfd89abe08da6bf5b791ad6182c8944acee10b4be"
+    },
+    "docs/adr/0046-an-occurrence-authors-its-own-title-and-target.md": {
+      "sha256": "47085ff90ccc5cce93c55fb37474f3101f4e6504985e26e5cdf1effab4e631b8"
+    },
+    "docs/adr/0047-a-shadcn-component-is-the-default-and-a-hand-roll-is-a-deviation.md": {
+      "sha256": "a8d4987ac3320613101a5d4b61d4eecf3da16761e35c1e59ef0abac123521fc0"
+    },
+    "docs/adr/0048-escape-and-commit-are-decided-by-the-surface-not-the-field.md": {
+      "sha256": "6674652d8e827a28640e6e8bc8aca631db956b9197889b0b02ae5c31f32d43d9"
+    },
+    "docs/adr/0050-base-ui-and-lucide-are-the-ui-foundation.md": {
+      "sha256": "97762c763b3a30ad0d6619e66eb737840023a7deb262c4c41aa533f70db5726c"
+    },
+    "docs/adr/0051-card-kinds-own-everything-beyond-the-title.md": {
+      "sha256": "b0de4e764aa472ad63d71afe622d318596bcf1942aec68883ccad1c61f92e1d6"
+    },
+    "docs/adr/0052-stable-ladle-stories-are-production-parity-evidence.md": {
+      "sha256": "b2ec6ab6f0ee6e152b9fe0cd0e3057b5b535f8804507de917a3b046786fc6091",
+      "na": "engineering rule on story evidence, owned by docs/agents/"
+    },
+    "docs/adr/0054-the-unreleased-prototype-rolls-forward.md": {
+      "sha256": "a2d41f66508779d62e2c0ac957adbda80bbc4229d7d30eb297a310691635c687"
+    },
+    "docs/adr/0056-the-repository-is-the-only-source-of-state.md": {
+      "sha256": "e786838e578026629cdb9a9b98ce6a80359dfbab6222eab380f7965b2d476d1e"
+    },
+    "docs/adr/0057-errors-cross-seams-as-stable-identities.md": {
+      "sha256": "ddc1aa444c056fbf5a68077f437c1347253bb0b9b0b634f7a1a9bb0b7d6d827f"
+    },
+    "docs/adr/0061-typescript-7-is-the-compiler-and-typescript-6-is-a-bridge.md": {
+      "sha256": "4587a4a33edceca6e4192d4396e938568150ff66fb412487bfc83c900151a8b2",
+      "na": "engineering rule owned by docs/agents/build-tooling.md"
+    },
+    "docs/adr/0062-the-narrowing-assertions-we-have-are-the-most-we-will-have.md": {
+      "sha256": "76aed74ff76f7e967513de4d55cd37a619a9eb36b4ad61aa5af9b471afc0c20d",
+      "na": "engineering rule owned by docs/agents/anti-slop.md"
+    },
+    "docs/adr/0063-markdown-source-editing-uses-codemirror-behind-a-hyper-owned-component.md": {
+      "sha256": "007c14253b9bc067be615e07796ca3d8a73333fa1f2d40a1e9b2c0c6533c704c"
+    },
+    "docs/adr/0064-opening-a-card-expands-it-in-place.md": {
+      "sha256": "48b1530118879cb0dcae44966417dba5eeea0f1c998f5e30a92e47b6d13e0999"
+    },
+    "docs/adr/0065-a-card-title-edits-on-one-activation.md": {
+      "sha256": "c5bb30ccf975c881c15aa8d3b09f422162812d23cf532e988aa858489cb1b071"
+    },
+    "docs/adr/0067-ui-owns-the-markdown-editor-lazy-boundary.md": {
+      "sha256": "36ae8a44e623d42217f6089fee321b3234a469393131d37daf779e3d89144c9c"
+    },
+    "docs/adr/0068-a-space-card-shows-a-space-view.md": {
+      "sha256": "9166e09a1ba3247145586660e43d417b30c1c834ef5f66de43b56bee2034e56d"
+    },
+    "docs/adr/0069-entities-have-durable-web-addresses.md": {
+      "sha256": "02188b373813947bfd8364e847c05028897e0c6ea929116c5f57400935a44786"
+    },
+    "docs/adr/0070-an-open-alias-shows-immutable-target-content-read-only.md": {
+      "sha256": "58736d7394e4ebbb4219ac83455c5601dbacef047736f9e61eeb7764bf794f93"
+    },
+    "docs/adr/0071-native-typed-array-codecs-set-the-platform-floor.md": {
+      "sha256": "926e8d2866ef20f824bdaacda63682dfaa2951fbc348677f80a92d8ca101bce3"
+    },
+    "docs/adr/0073-a-card-rail-is-a-toolbar.md": {
+      "sha256": "c908c5f8048dd7af10575974f0f0e708e7916efcce982c86ff401308ff7753f9"
+    },
+    "docs/adr/0074-space-card-references-own-the-target-space.md": {
+      "sha256": "0bfe55b5600c90dd7f343467a92a15084b50810c51d0f10d4c85a89fa7e9d080"
+    },
+    "docs/adr/0076-multi-space-edits-coordinate-per-space-sessions-behind-space-card-lifecycle.md": {
+      "sha256": "46e7af32df7cb7edaebd2d94cb3ff0bc1617722e3c91c73a43ac847001bdce16"
+    },
+    "docs/adr/0077-the-meta-space-starts-from-one-replaceable-default-aggregate.md": {
+      "sha256": "4fcce6dd923f9ebb36f749301ecfad435be52f534ce304a9c6bfbe34738797d0"
+    },
+    "docs/adr/0078-the-server-side-repository-owns-meta-lifecycle.md": {
+      "sha256": "ffe14264d64340403880de08e1b919ba8651194a686c4af07e23b11e2d3c30b0"
+    },
+    "docs/adr/0079-v1-exposes-only-layouts-and-first-open-initializes-one.md": {
+      "sha256": "5a09772d7fedf09803f632418000334de0e2420fcdca70bae1fed3bf5caa95c5"
+    },
+    "docs/adr/0080-new-spaces-start-complete-and-layoutless-stored-spaces-are-repaired.md": {
+      "sha256": "e2a7b8a7fb3399fbfc7163f3a670ac4ebd12e0b586735f8de640d6725da790d7"
+    },
+    "docs/adr/0081-navigation-answers-its-own-address-and-never-learns-what-a-url-is.md": {
+      "sha256": "2fd015124da08167a2614d8d0642a894c1a9f259116d1ae94e489f857625a26e"
+    },
+    "docs/adr/0082-the-space-command-surface-is-bound-by-what-it-owes-not-where-it-sits.md": {
+      "sha256": "576689f614d598bba34056d63fa936bf59ec6184a0c43fed28c5869db2828a1f"
+    },
+    "docs/adr/0083-a-card-title-is-title-lines.md": {
+      "sha256": "c296929b7f2b75f5baa34bb52d7be43b63476907139507bdb49347a71620e43c"
+    },
+    "docs/adr/0084-displacement-is-applied-by-the-edit-that-causes-it.md": {
+      "sha256": "a4ec4e21a2c6e5a59fc3ad6fd91e5f440070e102ef707add19a4f117b21f5c18"
+    },
+    "docs/adr/0085-thing-and-diagram-are-the-first-public-names-for-card-and-layout.md": {
+      "sha256": "6ae74f75fed6c4634576da88e1bff370e8ab3c2063b58eb36d7ebd911194b58b",
+      "na": "historical vocabulary, replaced by ADRs 0092 and 0101"
+    },
+    "docs/adr/0086-automatic-arrangement-is-an-edit-not-a-render-path.md": {
+      "sha256": "ec3dfd876ea423c6709141dfb63070197ef48cc836db69061912bc696e7123b9"
+    },
+    "docs/adr/0087-an-edge-attaches-to-the-anchor-that-faces-its-neighbour.md": {
+      "sha256": "94d44f6e3a4853dff972ec6d88dbe2762a92f7b79d8591f66fd157ef30462b03"
+    },
+    "docs/adr/0088-aggregate-names-the-meta-rooted-collection.md": {
+      "sha256": "f90ee37a34b3409f1b2a33a36b8b26bdf156ed22c5a3b8b8b3a6ce4c4b302eeb",
+      "na": "vocabulary owned by CONTEXT.md"
+    },
+    "docs/adr/0089-creating-a-thing-completes-on-activation.md": {
+      "sha256": "6e2589a2191ad4b58421aa0d3024c751140783869c2af339e9f92c8ed0e31cbc"
+    },
+    "docs/adr/0090-seeking-handles-reveal-by-proximity-and-eligibility.md": {
+      "sha256": "f8992136bd81f28ac0f54c4903f13effcd9991b4ffc433277ec5059ab0ee5ae2"
+    },
+    "docs/adr/0091-context-deletion-relocates-every-space-thing.md": {
+      "sha256": "9a96a1fbf078c5c1bf3d8eac6440747ea1ba5c6f2b1490ad2e070e23fc2b35a9"
+    },
+    "docs/adr/0092-reference-thing-is-the-first-public-name-for-alias.md": {
+      "sha256": "cc5bdba23017583f182e38971aed77fd76849417eefc9445074a116b5afed3c9"
+    },
+    "docs/adr/0093-a-thing-makes-room-on-one-axis-once-clear-of-the-collapsed-subject.md": {
+      "sha256": "f4380e1eb9cf206b90152bee36f205cc78807cc4fdb47420342806c6154dafa9"
+    },
+    "docs/adr/0094-dangerous-truncate-replaces-whatever-is-stored.md": {
+      "sha256": "10de2977ae2e001dff2c715e098c2287f76eea39997df879baca7779c55d4a83"
+    },
+    "docs/adr/0095-sql-databases-share-one-space-repository.md": {
+      "sha256": "864e6c80b84ff0bb64033d2b8838b3fc51ae2431f67c6f0b8dba640a0a6cd051"
+    },
+    "docs/adr/0096-the-aggregate-lifecycle-decision-stays-inside-each-repository.md": {
+      "sha256": "d179bf58d47a939919211606d456baf2b061efd12437dda05dfdff6d9646972f"
+    },
+    "docs/adr/0097-a-multi-space-edit-is-judged-against-what-it-commits.md": {
+      "sha256": "c0209cdf235bbf12cac5c93bdb27d01bb7e6f0db498cfb95249fdedcaec749bd"
+    },
+    "docs/adr/0098-a-commit-outcome-is-named-once-on-both-sides-of-the-seam.md": {
+      "sha256": "c20a84879233e8f7e47fd7a283afaaaf15ad82d9a59e082c4d5e5d74bf3ab693"
+    },
+    "docs/adr/0099-the-barrier-waits-only-for-commits-in-flight.md": {
+      "sha256": "f8f7efc61cf30ee7c8973b9307bfee024ad22b5a07c3d8b1e76399604eb89c0e"
+    },
+    "docs/adr/0100-graphs-sharing-a-pair-of-things-run-in-parallel-lanes.md": {
+      "sha256": "8921751144258c19d6d4b811f67dc3be61f354e0291bfb47508ba772ba804687"
+    },
+    "docs/adr/0101-map-and-resource-are-the-first-public-names-for-diagram-and-thing.md": {
+      "sha256": "bffd84cfbde04fdc5f4313d31da6854799bf099440dafc053a59860a84837358"
+    },
+    "docs/adr/0102-a-resources-commands-float-in-react-flows-node-toolbar.md": {
+      "sha256": "3371bef98a036c399244cf354437b8044f66e250544f003a98f6ee3d27961808"
+    },
+    "docs/adr/0103-a-lane-is-offset-along-its-curve.md": {
+      "sha256": "28e17a86382e9f2aa79d0aa78ec165cab050b4242e272d676e3d84f0f853e723"
+    },
+    "docs/adr/0104-an-edge-may-carry-a-title.md": {
+      "sha256": "ea494ee9929ceebfe4f178a0c672dc47d49229da67b0160cc36b1c418424a7ba"
+    },
+    "docs/adr/0105-a-graphs-edges-share-one-head-shape.md": {
+      "sha256": "17a0f4cbb9c6833ac2eb2699add6b8d00fb55f1d8a1bd29769d6ae6d2010a7ed"
+    },
+    "docs/adr/0106-an-image-resource-owns-a-url-not-bytes.md": {
+      "sha256": "05947984edea55409871dabc625cddeef2e2d0cbbe87eb2f1c454b7534a5bab5"
+    },
+    "docs/adr/0108-graph-identity-is-unique-within-the-space.md": {
+      "sha256": "0548c88cb607efdcb72d81ed6dc625406e38c015bbc7efcc7800b9b265a76512"
+    },
+    "docs/adr/0109-nondeterminism-is-injected-once-at-composition.md": {
+      "sha256": "79ecb4fe363d3e3447d5997348e83ff5e4d2a3cb94e258875cb11648038a02e6"
+    },
+    "docs/adr/0110-an-edge-faces-across-the-larger-gap-between-two-resources.md": {
+      "sha256": "7c190c310f8dd8a4830238288dbe756af1b59fb8372f18078a134b161ab3423a"
+    },
+    "docs/adr/0111-presentation-stays-within-one-space-until-cross-space-edges-are-decided.md": {
+      "sha256": "afb176a65890f074f267c73870856aec8e48bd97af2ab83398070590deff819d"
+    },
+    "docs/adr/0112-a-map-behaves-the-same-wherever-it-is-drawn.md": {
+      "sha256": "5b23001cb714a78221996c068bc0080ed67bf94555fc00f2e2ba029b39bfec50"
+    },
+    "docs/adr/0113-every-capability-is-a-resources-and-an-ur-resource-has-no-content.md": {
+      "sha256": "2aa81134acd8dc47df59716ec0135917a982d02604c32abfd66fad87bf52da08"
+    },
+    "docs/adr/0114-a-reference-resource-takes-its-targets-geometry-and-withholds-only-content-actions.md": {
+      "sha256": "4f78a8386b78bca41730a7306b1010e867517f90977d35b2d5201927ea1183fd"
+    },
+    "docs/adr/0116-only-an-edit-on-the-canvas-moves-where-a-space-opens.md": {
+      "sha256": "21d9e6c3c552673af80fb81ebd6c54617a06454bb7934fc6207e196683154115"
+    },
+    "docs/adr/0117-running-serves-an-aggregate-directory-as-the-durable-copy.md": {
+      "sha256": "66daa4a4a5c7cbfb8cb163376f404adb7eb6f42673501bae899a7c3c54dd81ca"
+    },
+    "docs/adr/0118-an-aggregate-directory-carries-stored-image-bytes.md": {
+      "sha256": "88dcfb27c30adb27c6e0cd6fffe0479832a1c138fb124607f4c8fdee198649c2"
+    },
+    "docs/adr/0119-export-writes-in-place-and-git-answers-for-a-partial-write.md": {
+      "sha256": "3476142be0dfeb5bdb1517be2b06081c2210b418ab964b0f4122ac441cb540ab"
+    },
+    "docs/adr/0120-a-kind-is-a-behaviour-and-a-media-type-is-its-contents-format.md": {
+      "sha256": "c09e97cca9f85857bba60ec542c3af222c1f0bda7b08470675955df5c395a15c"
+    },
+    "docs/adr/0121-a-shape-is-a-maps-and-an-ur-resource-draws-it-open-and-closed.md": {
+      "sha256": "c94b7c5035e3b8f2c2205e893a8d8faa0ab754b6f8780fc76727b4a5cfec0e56"
+    },
+    "docs/adr/0122-a-resources-size-is-independent-of-open.md": {
+      "sha256": "07c37cd915ee26fbda355e1bae7abd13abaca5f560bd4e98af20129e6284fefa"
+    },
+    "docs/adr/0123-presenting-draws-on-its-own-stage-not-on-the-canvas.md": {
+      "sha256": "730e53f226128a93ba211c3211cea12dcf6ce56e2bdaa651fe7ec52c6f42db97"
+    },
+    "docs/adr/0124-one-hyper-cli.md": {
+      "sha256": "42b4e36938ab03f1993854403faf5fd25afff117640756206793f8216523840b"
+    },
+    "docs/adr/0125-the-resource-has-no-front.md": {
+      "sha256": "fccc21fb3e25a9587cdab352b00ec547632079d15bdb39002234d4fbce064134",
+      "na": "vocabulary owned by CONTEXT.md; Open and Closed are MG-27"
+    },
+    "docs/adr/0126-an-image-replacement-is-the-application-s-exclusive-operation-wherever-it-runs.md": {
+      "sha256": "aefadbc2ffed55f74d9f7bdb358278576394ffc9abf52798be1dcef7fcc35e53"
+    },
+    "docs/adr/0127-resource-file-frontmatter-is-strict-and-a-missing-kind-is-ur.md": {
+      "sha256": "3dd3b7f273850058b985ab98347497df4ee8ef909682ce5e65121e4ec957e064"
+    },
+    "docs/adr/0128-every-resource-kind-is-a-module-and-a-resource-file-is-json.md": {
+      "sha256": "21852b7ef104f6ee29ce16d8643fd3018f3127aa4c1bf724d6d36dfe6b61eda3"
+    },
+    "docs/adr/0129-presentation-notes-are-a-graph-found-by-its-title.md": {
+      "sha256": "e8113de87a5fbde730823f340e482013989fd77ddea2d91ed70a6760b0efe888"
+    },
+    "docs/adr/0130-mounting-reads-an-aggregate-from-github-into-a-read-only-page.md": {
+      "sha256": "c1fb9d605b16aa176f7432b092b2a4cced3eab0de8172858b1f9a9e59858321c"
+    },
+    "docs/adr/0131-a-mounted-talk-is-editable-in-memory.md": {
+      "sha256": "48d844d0fd8de30a50a88f438ff74bcbea2922818a587a9c2c8138d35a2cf24e"
+    },
+    "docs/adr/0132-a-mounted-talk-keeps-its-edits-in-the-browser.md": {
+      "sha256": "31178185a4382756a18f80b0cad0428fa551be839147f39db67854e7b1bb71b8"
+    },
+    "docs/adr/0133-the-aggregate-reader-pulls-from-a-source.md": {
+      "sha256": "91c7d09de8c77e20102346a4330da8facaf569c27f99745a866fb4429c69df3f"
+    },
+    "docs/adr/0134-a-path-hyper-owns-is-never-a-symbolic-link.md": {
+      "sha256": "fd9322221ffa4d17e0f29e2dcaa5968f387e4892c40e509ed762f826cf9fd4ea"
+    },
+    "docs/adr/0135-a-resource-is-drawn-in-the-colour-of-its-graph.md": {
+      "sha256": "52f649e46a48144f064a7ad8bc5d28b73827bee84cd1d0628c4690e7e8a1ee3f"
+    },
+    "docs/adr/0136-an-aggregate-directory-is-rooted-at-aggregate-json.md": {
+      "sha256": "d3061f211d3aa2f470bec3b8505ffd43b70f8d2409957db10c7fb1c214865e00"
+    },
+    "docs/adr/0139-a-selected-resource-is-ringed-in-its-own-border-colour.md": {
+      "sha256": "4d80d0c6cd7966034f3c6318ccc5a18b91137d548c22a31ffb3c144eb9524681"
+    },
+    "docs/adr/0140-a-presented-space-resource-draws-its-map.md": {
+      "sha256": "4b0bd63b0986e54fb08911583b596c55e7ec9c8e10921c5cec65ec82d04293e5"
+    },
+    "docs/adr/0141-an-agent-authors-a-running-aggregate-through-space-authoring.md": {
+      "sha256": "df1105233e97dea4daa8152f817383c65929cbd06a45cce3909d9d6852ae9e22",
+      "na": "proposed, binds nothing"
+    },
+    "docs/adr/0142-a-resource-plugin-owns-everything-inside-its-rect.md": {
+      "sha256": "684f82c0aea33cf74edc1311c47f7dcac7f641bb8205f359192414ea48379173"
+    },
+    "docs/adr/0143-lanes-are-laid-out-from-the-centre-out.md": {
+      "sha256": "3cd42da3c2edaeb59bacf72bac8b2de36d0faae4205654fdfe33da4c6101a061"
+    },
+    "docs/adr/0144-a-space-row-frames-its-space-with-a-new-space-resource.md": {
+      "sha256": "372d4ee74a62734bd3e70111d022c280e41fe05c8f3344252463cb43d3a3631e"
+    },
+    "docs/adr/0145-the-requirements-are-a-snapshot-of-the-accepted-adrs.md": {
+      "sha256": "089aafb9a9b078a371e483599241732b110dceef8a469da463ea6b1f3902d975",
+      "na": "process: how the requirements are kept, owned by docs/agents/workflow.md"
+    },
+    "docs/adr/0146-switching-graphs-is-an-edit.md": {
+      "sha256": "c241a4b1af6cd6d4a8e2aee37e1175ddfec39158bfa424d9e5408b6cc5166107"
+    },
+    "docs/adr/0147-drawing-an-edge-the-graph-already-holds-is-refused.md": {
+      "sha256": "6afa9d52c0e4c203e2b9153410f9b1356d129f82017164d5afebcbb665f0716d"
+    },
+    "docs/adr/0148-graph-navigation-on-the-canvas-keeps-no-history.md": {
+      "sha256": "1d19c6dea0be461b736f7ffb994f6063f9c9a733040e09a3751d703c8b0a228b"
+    },
+    "docs/adr/0149-open-content-is-clipped-on-the-canvas.md": {
+      "sha256": "5cfabc48a977309c81827e097a02677ad4f9d3c3149ca181b070736041142aba"
+    },
+    "docs/adr/0150-an-image-s-natural-size-is-not-measured.md": {
+      "sha256": "56cb10fd78479099c04705be9ebb804c5b69ba386a36719160cb9deabfeab37c"
+    },
+    "docs/adr/0151-a-sentence-quotes-a-title-by-its-short-title.md": {
+      "sha256": "962055a9948700e95165db21a419711154131a0225730fe76c0942be9c5d4740"
+    },
+    "docs/adr/0152-no-compatibility-promise-for-a-copy-outside-the-repository.md": {
+      "sha256": "a4c72baff57c91a4b54ab2afa6015675c2c65e5fcf336e2448a8fbfaa4fa18cf"
+    },
+    "docs/adr/0153-remove-from-map-asks-first-only-when-edges-would-go.md": {
+      "sha256": "7c3be76cf099f3da5cce72a08bb366de699972de22baa7cf23c84a9f8586261f"
+    },
+    "docs/adr/0154-a-permanent-rejection-is-a-dialog-that-takes-focus.md": {
+      "sha256": "1e1d70c8aaa04109c694e7a6f1ba1973a7918b50161cd79ce3de847c5f4d285c"
+    },
+    "docs/adr/0155-a-rust-host-replaces-every-server-side-host-and-tauri-is-the-desktop-shell.md": {
+      "sha256": "813afe4c330401dac1de1e163df974523df6f303e107d1dd053cf9914a628242"
+    },
+    "docs/adr/0156-each-runtime-has-one-intake-held-to-one-conformance-suite.md": {
+      "sha256": "a50a3c79ea5733f14f83e5451d840c9add85110b4ca8429b2736c4a3648ba669"
+    },
+    "docs/adr/0157-webkit-joins-chromium-under-the-browser-floor.md": {
+      "sha256": "d16e6c78460cb2c97342ffd6fd6febbfd6abc9a6fb7fe2c858c87b77f5ba3b46"
+    },
+    "docs/adr/0158-a-mermaid-resource-draws-its-diagram-with-mermaid-inside-its-plugin.md": {
+      "sha256": "e9a579242f8ebb78f33e87305768632cdbc5a868a32423c4ca3b7d5943e88906"
+    },
+    "docs/adr/0159-the-two-intakes-report-one-refusal-for-one-input-order-and-repeated-ids.md": {
+      "sha256": "a051f27889f74a8523ce5abb4ab99a7c2ba35fcef92a08ac4b075a363fac14a9"
+    },
+    "docs/adr/0160-json-text-holds-no-lone-surrogate-in-either-runtime.md": {
+      "sha256": "fced2f0cc1689b40da663427340931efe4c0dd62cb8bc3380bbf7890b360d3aa"
+    },
+    "docs/adr/0161-both-hosts-refuse-a-cross-site-change.md": {
+      "sha256": "c83344dd78d150ec34e4c0740fd1a8b3624ef0037c05049338cdbd2f578c08ab"
+    },
+    "docs/adr/0162-every-host-locks-the-directory-it-runs.md": {
+      "sha256": "bb5bcb520757cd50fd8933258e01d1fb7e1a503b67a380d26fea65abbdcf4485"
+    },
+    "docs/adr/0163-a-closing-talk-waits-ten-seconds-then-asks.md": {
+      "sha256": "f466b2b455218dd12994283c083a38f7ec791208d6a3b1d03bd01986d4f2cf6f",
+      "na": "proposed, binds nothing"
+    },
+    "docs/adr/0164-talk-is-retired-and-a-person-is-shown-a-space.md": {
+      "sha256": "690c93a0645e94ebd185307e46a032d339476b839f71e0cb72f1cc826f465905",
+      "na": "vocabulary owned by CONTEXT.md"
+    },
+    "docs/adr/0165-prisma-next-and-sqlx-apply-one-schema-history-in-two-encodings.md": {
+      "sha256": "57ed339daffc6fa5e8c18a7d2699499941d941d7823a898c6fecb675a54cf8d2"
+    },
+    "docs/adr/0166-a-preview-build-is-not-a-release.md": {
+      "sha256": "e60279e12f2ac429f6f9f71ff9756a1c4864929e256df826e5add68a68f45829"
+    },
+    "docs/adr/0167-the-desktop-application-opens-from-native-menus-and-creates-a-space-it-is-asked-for.md": {
+      "sha256": "ead4a76731f6da4626a32fa543f39ef5198db129306d23b93898179684cd98fd"
+    },
+    "docs/adr/0168-the-desktop-application-carries-each-platforms-standard-menus-and-opens-its-help-in-the-browser.md": {
+      "sha256": "343ed0fd43ae062828228b57311261f1e6f67f20ec425d340fd53d1c405dbc97"
+    },
+    "docs/adr/0169-a-preview-build-is-a-normal-github-release-and-the-updater-reads-the-latest.md": {
+      "sha256": "0e53edf9300ce544bffc546cfa01a05a28cdcb9b2af9a43039f70393d8d3b802"
+    },
+    "docs/adr/0171-the-desktop-application-opens-to-a-start-window-and-reopens-recent-spaces.md": {
+      "sha256": "51959e202ce30a7e9cc1a22ae14f58eff5df1a6ddc44c4092aef9a08b8a23f8a"
+    },
+    "docs/adr/0172-the-desktop-shells-own-pages-are-a-second-build-of-the-browser-application.md": {
+      "sha256": "e1486264db6933deb9f62319b6d48bbc8545c5d49a8661c9c74343d731a6a376"
+    },
+    "docs/adr/0173-shift-at-resize-start-keeps-the-resources-proportions.md": {
+      "sha256": "ae57b723f012da4a6c85c4069576b896d4ff867a9774d3eefd017ddbcc6ddf02"
+    },
+    "docs/adr/0174-sqlx-is-the-only-migrator-once-postgresql-moves-to-rust.md": {
+      "sha256": "f02c516bd53d8b8e99d17aa6d46eb32862165296d4e31bd2f45b20d0adcc69c2"
+    },
+    "docs/adr/0175-a-lock-file-records-which-adrs-the-requirements-restate.md": {
+      "sha256": "4f92c83d8cc5c8651a2f46e726bb3f7eacb2304a138e3d680807c59620f9b40c",
+      "na": "process: how the requirements are kept, owned by docs/agents/workflow.md"
+    }
+  },
+  "superseded": {}
+}

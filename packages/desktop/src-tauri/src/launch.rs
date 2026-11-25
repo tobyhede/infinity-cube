@@ -1,67 +1,75 @@
-//! What the shell opens when it starts. Every window it has is a Space's
-//! (or a window a Space's page opened, or a close's question): there is no
-//! home window. A directory named on the command line opens at once; with
-//! none named, the shell asks for a folder, and File › Open… asks for
-//! another while the application runs. `tauri.conf.json` declares no
-//! window, so Tauri opens nothing by itself.
+//! What the shell opens when it starts, and what it does when its last
+//! window closes (Storage ST-131). A directory named on the command line
+//! opens at once; with none named, or none that opens, the Start window
+//! shows. `tauri.conf.json` declares no window, so Tauri opens nothing by
+//! itself.
 
 use std::ffi::OsString;
 use std::path::PathBuf;
 
+use crate::menu::Platform;
+
 /// What to open on starting.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Launch {
-    /// No directory was named: ask for a folder.
-    Choose,
-    /// Open each of these directories, and ask for a folder only if none of
-    /// them opens.
+    /// No directory was named: show the Start window.
+    Start,
+    /// Open each of these directories, and show the Start window only if
+    /// none of them opens.
     Folders(Vec<PathBuf>),
 }
 
-/// Why a folder is being asked for, which decides what cancelling, or a
-/// folder that does not open, comes to.
+/// Where a folder that did not open was asked for, which decides what comes
+/// after it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Opening {
-    /// At launch, with no Space open: cancelling ends the application, and
-    /// a folder that does not open is reported before asking again.
-    AtLaunch,
-    /// From File › Open…: cancelling does nothing.
-    FromMenu,
+    /// Named on the command line.
+    CommandLine,
+    /// From the Start window's Open Folder… or a recent Space.
+    StartWindow,
+    /// From File › Open….
+    Menu,
 }
 
-/// How a folder question that opened no Space ends.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Unopened {
-    /// The presenter cancelled it.
-    Cancelled,
-    /// The folder chosen did not open, for a reason the presenter is told.
-    Failed,
-}
-
-/// What comes after a folder question that opened no Space.
+/// What comes after a folder that did not open.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Next {
-    /// End the application: nothing is open and the presenter wants nothing.
-    Exit,
-    /// Say why the folder did not open, and wait for that to be read before
-    /// asking again: nothing else is open.
-    AskAgain,
-    /// Leave the open Spaces as they are, saying why a folder did not open
-    /// if it failed.
+    /// Show the Start window: nothing else is open.
+    ShowStart,
+    /// Leave the windows as they are, having said why the folder did not open.
     Stay,
 }
 
-/// What comes after a folder question asked for `opening` that ended
-/// `unopened`, while `any_aggregate` (one open, starting or closing). A
-/// Space opened meanwhile from File › Open… makes a launch question into
-/// one asked from the menu.
+/// What comes after a folder asked for from `opening` that did not open,
+/// while `any_aggregate` (one open, starting or closing). Only a launch can
+/// be left with no window, so only a launch shows the Start window.
 #[must_use]
-pub fn after(opening: Opening, unopened: Unopened, any_aggregate: bool) -> Next {
-    match (opening, unopened, any_aggregate) {
-        (Opening::FromMenu, _, _) | (Opening::AtLaunch, _, true) => Next::Stay,
-        (Opening::AtLaunch, Unopened::Cancelled, false) => Next::Exit,
-        (Opening::AtLaunch, Unopened::Failed, false) => Next::AskAgain,
+pub fn after(opening: Opening, any_aggregate: bool) -> Next {
+    match (opening, any_aggregate) {
+        (Opening::CommandLine, false) => Next::ShowStart,
+        (Opening::CommandLine, true) | (Opening::StartWindow | Opening::Menu, _) => Next::Stay,
     }
+}
+
+/// How a folder that opened came to: its window shows, or another request
+/// is still starting it and opens its window when it has.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Opened {
+    /// Its Space window shows: opened now, or already open and focused.
+    Shown,
+    /// Another request (a File › Open… of the same folder, say) is still
+    /// starting it, so no window shows yet, and that start may yet fail.
+    Starting,
+}
+
+/// Whether the Start window closes once a folder asked for from `opening`
+/// has `opened`. It closes when a Space window opens from it (ST-131); a
+/// folder another request is still starting has no window yet, and leaves
+/// the Start window showing, so a start that fails leaves the person a
+/// window to go on from.
+#[must_use]
+pub fn closes_start(opening: Opening, opened: Opened) -> bool {
+    opening == Opening::StartWindow && opened == Opened::Shown
 }
 
 /// What to open, given the arguments after the program's name.
@@ -69,70 +77,143 @@ pub fn after(opening: Opening, unopened: Unopened, any_aggregate: bool) -> Next 
 pub fn launch(arguments: impl IntoIterator<Item = OsString>) -> Launch {
     let folders: Vec<PathBuf> = arguments.into_iter().map(PathBuf::from).collect();
     if folders.is_empty() {
-        Launch::Choose
+        Launch::Start
     } else {
         Launch::Folders(folders)
     }
+}
+
+/// What the application does when its last window, a Space window or the
+/// Start window, has closed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LastWindow {
+    /// macOS: keep running with no window.
+    RunOn,
+    /// Linux and Windows: end, which is a quit (Storage ST-122).
+    Quit,
+}
+
+/// What the application does on `platform` when its last window has closed.
+#[must_use]
+pub fn last_window_closed(platform: Platform) -> LastWindow {
+    match platform {
+        Platform::MacOs => LastWindow::RunOn,
+        Platform::Other => LastWindow::Quit,
+    }
+}
+
+/// Whether activating the application (its Dock icon on macOS) shows the
+/// Start window: only with no window showing; otherwise the platform brings
+/// the open windows forward itself.
+#[must_use]
+#[cfg_attr(
+    all(not(test), not(target_os = "macos")),
+    expect(
+        dead_code,
+        reason = "only macOS activates an application with no window"
+    )
+)]
+pub fn activating_shows_start(any_window_showing: bool) -> bool {
+    !any_window_showing
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn asks_for_a_folder_when_none_is_named() {
-        assert_eq!(launch(Vec::new()), Launch::Choose);
-    }
-
-    #[test]
-    fn opens_each_named_directory() {
-        assert_eq!(
-            launch([OsString::from("/a"), OsString::from("b")]),
-            Launch::Folders(vec![PathBuf::from("/a"), PathBuf::from("b")]),
-        );
-    }
-
-    mod given_a_folder_question_that_opened_nothing {
+    mod given_a_launch {
         use super::*;
 
         #[test]
-        fn a_launch_question_cancelled_with_nothing_open_ends_the_application() {
-            assert_eq!(
-                after(Opening::AtLaunch, Unopened::Cancelled, false),
-                Next::Exit
-            );
+        fn shows_the_start_window_when_no_folder_is_named() {
+            assert_eq!(launch(Vec::new()), Launch::Start);
         }
 
         #[test]
-        fn a_launch_question_that_failed_with_nothing_open_asks_again() {
+        fn opens_each_named_directory() {
             assert_eq!(
-                after(Opening::AtLaunch, Unopened::Failed, false),
-                Next::AskAgain
+                launch([OsString::from("/a"), OsString::from("b")]),
+                Launch::Folders(vec![PathBuf::from("/a"), PathBuf::from("b")]),
             );
+        }
+    }
+
+    mod given_a_folder_that_opened {
+        use super::*;
+
+        #[test]
+        fn the_start_window_closes_once_a_space_window_shows_from_it() {
+            assert!(closes_start(Opening::StartWindow, Opened::Shown));
         }
 
         #[test]
-        fn a_launch_question_leaves_a_space_opened_meanwhile_from_the_menu() {
-            for unopened in [Unopened::Cancelled, Unopened::Failed] {
+        fn the_start_window_stays_while_another_request_still_starts_the_folder() {
+            assert!(!closes_start(Opening::StartWindow, Opened::Starting));
+        }
+
+        #[test]
+        fn a_folder_from_elsewhere_leaves_the_start_window_as_it_is() {
+            for opening in [Opening::CommandLine, Opening::Menu] {
+                for opened in [Opened::Shown, Opened::Starting] {
+                    assert!(!closes_start(opening, opened), "{opening:?} {opened:?}");
+                }
+            }
+        }
+    }
+
+    mod given_a_folder_that_did_not_open {
+        use super::*;
+
+        #[test]
+        fn a_folder_named_at_launch_with_nothing_open_shows_the_start_window() {
+            assert_eq!(after(Opening::CommandLine, false), Next::ShowStart);
+        }
+
+        #[test]
+        fn a_folder_named_at_launch_leaves_a_space_that_did_open() {
+            assert_eq!(after(Opening::CommandLine, true), Next::Stay);
+        }
+
+        #[test]
+        fn a_folder_from_the_start_window_leaves_it_showing() {
+            for any_aggregate in [false, true] {
                 assert_eq!(
-                    after(Opening::AtLaunch, unopened, true),
+                    after(Opening::StartWindow, any_aggregate),
                     Next::Stay,
-                    "{unopened:?} with a Space open"
+                    "any Aggregate {any_aggregate}"
                 );
             }
         }
 
         #[test]
-        fn a_menu_question_changes_nothing_else() {
-            for unopened in [Unopened::Cancelled, Unopened::Failed] {
-                for any_aggregate in [false, true] {
-                    assert_eq!(
-                        after(Opening::FromMenu, unopened, any_aggregate),
-                        Next::Stay,
-                        "{unopened:?}, any Aggregate {any_aggregate}"
-                    );
-                }
+        fn a_folder_from_the_menu_changes_nothing_else() {
+            for any_aggregate in [false, true] {
+                assert_eq!(
+                    after(Opening::Menu, any_aggregate),
+                    Next::Stay,
+                    "any Aggregate {any_aggregate}"
+                );
             }
+        }
+    }
+
+    mod given_the_last_window_closed {
+        use super::*;
+
+        #[test]
+        fn macos_runs_on_with_no_window() {
+            assert_eq!(last_window_closed(Platform::MacOs), LastWindow::RunOn);
+        }
+
+        #[test]
+        fn linux_and_windows_quit() {
+            assert_eq!(last_window_closed(Platform::Other), LastWindow::Quit);
+        }
+
+        #[test]
+        fn activating_shows_the_start_window_only_with_no_window_showing() {
+            assert!(activating_shows_start(false));
+            assert!(!activating_shows_start(true));
         }
     }
 

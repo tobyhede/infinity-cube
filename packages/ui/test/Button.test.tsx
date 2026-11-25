@@ -69,6 +69,24 @@ describe('Button', () => {
     expect(ref.current).toBeInstanceOf(HTMLButtonElement);
   });
 
+  it('draws a link in its sentence’s line, with no box or padding at any size', () => {
+    render(
+      <Button variant="link" size="compact">
+        Details
+      </Button>,
+    );
+
+    const link = screen.getByRole('button', { name: 'Details' });
+    expect(link).toHaveClass(
+      'underline',
+      'text-inherit',
+      'bg-transparent',
+      'p-0',
+      'align-baseline',
+    );
+    expect(link.className).not.toMatch(/(^| )p[xy]-/u);
+  });
+
   it('keeps a visible keyboard focus indicator in every variant', () => {
     render(<Button>Focusable</Button>);
 

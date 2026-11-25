@@ -14,7 +14,9 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use host::{Initialized, TokioFilesystem, import_directory, init_directory};
+use host::{
+    Initialized, NEW_SPACE_TITLE as NEW_SPACE, TokioFilesystem, import_directory, init_directory,
+};
 use http_conformance::Counted;
 
 fn expected() -> PathBuf {
@@ -55,9 +57,10 @@ mod given_a_missing_directory {
         let root = tempfile::tempdir().unwrap();
         let directory = root.path().join("space");
 
-        let initialized = init_directory(&TokioFilesystem, &directory, &Counted::default())
-            .await
-            .unwrap();
+        let initialized =
+            init_directory(&TokioFilesystem, &directory, NEW_SPACE, &Counted::default())
+                .await
+                .unwrap();
 
         assert_eq!(initialized, Initialized::Written, "init writes");
         assert_eq!(
@@ -71,7 +74,7 @@ mod given_a_missing_directory {
     async fn writes_an_aggregate_a_run_imports() {
         let root = tempfile::tempdir().unwrap();
         let directory = root.path().join("space");
-        init_directory(&TokioFilesystem, &directory, &host::RandomIds)
+        init_directory(&TokioFilesystem, &directory, NEW_SPACE, &host::RandomIds)
             .await
             .unwrap();
 
@@ -91,9 +94,14 @@ mod given_a_directory_holding_only_dot_entries {
         fs::create_dir(root.path().join(".git")).unwrap();
         fs::write(root.path().join(".git/HEAD"), "ref: refs/heads/main\n").unwrap();
 
-        let initialized = init_directory(&TokioFilesystem, root.path(), &Counted::default())
-            .await
-            .unwrap();
+        let initialized = init_directory(
+            &TokioFilesystem,
+            root.path(),
+            NEW_SPACE,
+            &Counted::default(),
+        )
+        .await
+        .unwrap();
 
         assert_eq!(
             initialized,
@@ -120,9 +128,14 @@ mod given_a_directory_holding_content {
         let root = tempfile::tempdir().unwrap();
         fs::write(root.path().join("notes.md"), "mine\n").unwrap();
 
-        let initialized = init_directory(&TokioFilesystem, root.path(), &Counted::default())
-            .await
-            .unwrap();
+        let initialized = init_directory(
+            &TokioFilesystem,
+            root.path(),
+            NEW_SPACE,
+            &Counted::default(),
+        )
+        .await
+        .unwrap();
 
         assert_eq!(initialized, Initialized::NotEmpty, "init refuses");
         assert_eq!(
@@ -130,5 +143,35 @@ mod given_a_directory_holding_content {
             1,
             "nothing but the file that was there"
         );
+    }
+}
+
+mod given_a_title {
+    use super::*;
+
+    #[tokio::test]
+    async fn titles_the_meta_space_with_it_as_written() {
+        let root = tempfile::tempdir().unwrap();
+        let directory = root.path().join("space");
+        let title = r#"Q3 "review" \ notes"#;
+
+        init_directory(&TokioFilesystem, &directory, title, &Counted::default())
+            .await
+            .unwrap();
+
+        let aggregate: serde_json::Value =
+            serde_json::from_slice(&fs::read(directory.join("aggregate.json")).unwrap()).unwrap();
+        let meta = aggregate["metaSpaceId"].as_str().unwrap();
+        let space: serde_json::Value =
+            serde_json::from_slice(&fs::read(directory.join(meta).join("space.json")).unwrap())
+                .unwrap();
+        assert_eq!(
+            space["title"], title,
+            "the Meta Space bears the Title given"
+        );
+        let store = host::MemorySpaceRepository::new();
+        import_directory(&store, &TokioFilesystem, &directory, &host::RandomIds)
+            .await
+            .expect("an aggregate with that Title imports");
     }
 }

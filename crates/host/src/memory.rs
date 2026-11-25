@@ -9,11 +9,10 @@ use intake::{SpaceId, SpaceSnapshot, load_aggregate};
 
 use crate::assets::{AssetHash, StoredAsset};
 use crate::commit::{CommitDecision, decide_commit};
-use crate::document::wire_snapshot;
 use crate::repository::{
     AggregateInput, AggregateLoad, AssetStored, CommitResult, InitializeResult, LoadedAggregate,
     LoadedSpace, ReplaceResult, RepositoryError, Revision, SpaceCommit, SpaceRepository,
-    SpaceSummary,
+    SpaceSummary, authored, checked_input,
 };
 
 #[derive(Debug, Default)]
@@ -82,22 +81,6 @@ impl MemorySpaceRepository {
     }
 }
 
-/// The input's Spaces, ascending by id, each with its Resources ascending by
-/// id, as JSON with unread keys in one order: equal when the two aggregates
-/// hold the same authored data (`classifyInitializedAggregate`).
-fn authored(meta_space_id: SpaceId, spaces: &[&SpaceSnapshot]) -> (SpaceId, Vec<String>) {
-    let mut ordered: Vec<SpaceSnapshot> = spaces.iter().map(|space| (*space).clone()).collect();
-    ordered.sort_by_key(|space| space.id);
-    let texts = ordered
-        .iter_mut()
-        .map(|space| {
-            space.resources.sort_by_key(|resource| resource.id);
-            crate::json_text::compact(&crate::document::canonical_value(&wire_snapshot(space)))
-        })
-        .collect();
-    (meta_space_id, texts)
-}
-
 impl SpaceRepository for MemorySpaceRepository {
     async fn list_spaces(&self) -> Result<Vec<SpaceSummary>, RepositoryError> {
         Ok(self
@@ -144,6 +127,7 @@ impl SpaceRepository for MemorySpaceRepository {
         let mut state = self.state();
         match decide_commit(&request, state.meta_space_id, state.spaces.values()) {
             CommitDecision::Answer(result) => Ok(result),
+            CommitDecision::Fail(failure) => Err(failure),
             CommitDecision::Write {
                 result,
                 written,
@@ -181,9 +165,10 @@ impl SpaceRepository for MemorySpaceRepository {
         &self,
         input: AggregateInput,
     ) -> Result<InitializeResult, RepositoryError> {
-        if let Err(refusals) = load_aggregate(input.meta_space_id, &input.spaces) {
-            return Ok(InitializeResult::AggregateRefused(refusals));
-        }
+        let input = match checked_input(&input) {
+            Ok(input) => input,
+            Err(refusals) => return Ok(InitializeResult::AggregateRefused(refusals)),
+        };
         let mut state = self.state();
         if state.meta_space_id.is_none() && state.spaces.is_empty() {
             return Ok(InitializeResult::Initialized(state.install(input)));
@@ -218,9 +203,10 @@ impl SpaceRepository for MemorySpaceRepository {
         input: AggregateInput,
         expected_meta_space_id: Option<SpaceId>,
     ) -> Result<ReplaceResult, RepositoryError> {
-        if let Err(refusals) = load_aggregate(input.meta_space_id, &input.spaces) {
-            return Ok(ReplaceResult::AggregateRefused(refusals));
-        }
+        let input = match checked_input(&input) {
+            Ok(input) => input,
+            Err(refusals) => return Ok(ReplaceResult::AggregateRefused(refusals)),
+        };
         let mut state = self.state();
         if state.meta_space_id.is_none() && state.spaces.is_empty() {
             return Ok(ReplaceResult::Uninitialized);

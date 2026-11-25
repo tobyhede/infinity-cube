@@ -9,7 +9,7 @@ For audit only. Every source rule appears exactly once in §1 or §2, with one o
 §3 groups the sends by receiving doc, so each doc can check them off. §4 holds code notes. §6 traces the sources added or changed on main after the baseline (`797b2908`), which the doc was brought up to on 13 November 2026; where §1 or §2 lands a baseline rule on a rule since rewritten, §6 says what the rule now holds.
 
 Abbreviations:
-- "R" and "A" are ids in the old contract `docs/adr/archive/agent-guides/maps-and-graphs.md`.
+- "R" and "A" are ids in the old contract `docs/agents/maps-and-graphs.md` at `797b2908`.
 - "rN" is the Nth rule of an ADR as numbered in the rewrite's mapping tables (`map-*.md`). Those tables were never committed, so a number cannot be looked up, and the numbers do not follow the order of the ADR's text (0028's r1, "activation is not an Edit", is the second rule its text states). Resolve a row by its description, which names the claim, and find that claim in the ADR in `docs/adr/` or `docs/adr/superseded/`.
 - "DEC n" is ruling n in `../DECISIONS.md`. A ruling that changes what an accepted ADR decides is recorded as an ADR (DEC 1, C1 and C2 as ADR 0146; C3 as 0147; Navigation C2 as 0148; Rendering C1 as 0149; Space and Resources C1 as 0150; UI C2 as 0153; UI C3 as 0151; UI C4 as 0154; Storage S2 as 0152), and that ADR is what binds; `../DECISIONS.md`, "Rulings recorded as ADRs", lists them. A row below that says a rule was "struck" or "overruled" by a ruling means the ADR that records the ruling refines the source ADR.
 - Docs: SR is space-and-resources.md, ED editing.md, ST storage.md, RD rendering.md, UI ui.md, NV navigation.md, GL `CONTEXT.md`, PROC is process docs (AGENTS.md, workflow.md, anti-slop.md).
@@ -362,7 +362,7 @@ The rule ids in `../maps-and-graphs.md` are append-only from this version on.
 
 ## 6. Sources added or changed on main
 
-The ADRs below are in `docs/adr/` and bind; this section records where the snapshot restates them. "R′" and "A′" are rows of main's old contract (`docs/adr/archive/agent-guides/maps-and-graphs.md`) as main left it; "CAS′" is main's `docs/adr/archive/agent-guides/authoring-refusal-cascade.md`.
+The ADRs below are in `docs/adr/` and bind; this section records where the snapshot restates them. "R′" and "A′" are rows of main's old contract (`docs/agents/maps-and-graphs.md`) as main left it, at `d14ff974`; "CAS′" is main's `docs/agents/authoring-refusal-cascade.md` at `d14ff974`.
 
 | Source | Disposition |
 |---|---|
@@ -441,3 +441,35 @@ The snapshot marker moved from `a0f5066` to `f6e01b9`; the highest accepted ADR 
 |---|---|
 | 0165 | reviewed, no rule here: Prisma Next and `sqlx` apply one schema history in two encodings, held equal by tests; restated in ST-125 |
 | Code since `a0f5066`: PR 506 (the plain-SQL migrations under `migrations-sql/` and their tests) and PR 502 (the README's Running and SQLite sections, the `infinity-cube` plugin skills, and Storage ST-126–ST-128) | no behaviour this doc states |
+
+## Refresh to `3f6aa29` (24 November 2026)
+
+The snapshot marker moved from `f6e01b9` to `3f6aa29` and to accepted ADRs through 0172; no ADR 0170 is on main at that commit. Each ADR accepted above the old marker was read for rules this doc owns, and each change main merged since `f6e01b9`'s refresh (PR 503) was read for behaviour this doc states.
+
+| Source | Disposition |
+|---|---|
+| 0167 | reviewed, no rule here: the desktop application has no home window, opens folders from native menus and creates a Space only when asked; restated in ST-121 and UI-8 |
+| 0168 | reviewed, no rule here: each platform's standard menus, Help in the system browser, one update check at a time; restated in ST-121 and UI-8 |
+| 0169 | reviewed, no rule here: a preview build is a normal release the updater finds at `releases/latest`; restated in ST-129 and ST-130 |
+| 0171 | reviewed, no rule here: the desktop application's Start window, New Space, reopening and Recent; restated in ST-131 and UI-111 |
+| 0172 | reviewed, no rule here: the shell's own pages are a second build of the browser application; restated in ST-131 |
+| Code since PR 503: PRs 513, 516, 522 and 526 (the install script, the preview builds and the updater), 517 and 524 (the desktop shell's windows and menus, and the asset client sending a picked file's bytes from memory, already in ST-121's evidence), 527 (the Start window, its page, and `@project/ui`'s `Item`, an icon and `Button`'s `link` variant), 525 (the CRAP gate), and 514, 523 and 515 (documentation) | no behaviour this doc states |
+
+## Refresh to `343a66c` (25 November 2026)
+
+The snapshot marker moved from `3f6aa29` to `343a66c` and to accepted ADRs through 0174: [Shift at Resize start keeps the Resource’s proportions](../../adr/0173-shift-at-resize-start-keeps-the-resources-proportions.md) (0173) and [sqlx is the only migrator once PostgreSQL moves to Rust](../../adr/0174-sqlx-is-the-only-migrator-once-postgresql-moves-to-rust.md), which also carried 0173 at that commit and was renumbered 0174 on 25 November 2026, called here 0173 (Shift at Resize start) and 0174 (sqlx); no ADR 0170 is on main. Each ADR accepted or amended above the old marker was read for rules this doc owns, and each change main merged since `3f6aa29` (PRs 508, 509, 518 and 519) was read for behaviour this doc states.
+
+| Source | Disposition |
+|---|---|
+| 0173 (Shift at Resize start): a proportional gesture makes the same Resize Edit, top-left fixed and displacement on release, and stores no proportion | → MG-23 (amended: points to UI-67 and says the entry stores no proportion); the floors → UI-68 through MG-82, unchanged; displacement → MG-24, unchanged |
+| 0174 (sqlx) | reviewed, no rule here: `sqlx` is the only migrator once PostgreSQL moves to Rust, and the Prisma Next migration packages go; restated in ST-125 and ST-126 |
+| 0122, 0155 and 0165, amended status blocks | reviewed, no rule here: each gained only a `Refined by` entry, 0122's for 0173 (Shift at Resize start) and 0155's and 0165's for 0174 (sqlx); no decision changed |
+| Code since `3f6aa29`: PRs 508 and 509 (proportional Resize: `react-flow-adapter/src/proportional-resize.ts`, `ResourceNode.tsx`, their tests and `app/e2e/aspect-ratio-resizing.spec.ts`), 518 (triage of rust-host 15 and 16, 0174 (sqlx) and the mise ticket) and 519 (the SQLite restart proof starting its hosts by command: `test/support/restart-proof-host.ts`, `test/e2e/sqlite-persistence.spec.ts`, `conformance/http/host-process.ts`) | 508 and 509 → MG-23 (a proportional Resize commits through the free Resize's `onResize` and `onResizeEnd`); 518 and 519: no behaviour this doc states |
+
+## Independent rerun at `343a66c` (25 November 2026)
+
+An independent rerun of the snapshot refresh rechecked this topic against main `343a66c` (main had not moved) and both ADRs numbered 0173 at that commit. The marker is unchanged: no rule changed meaning.
+
+| Source | Disposition |
+|---|---|
+| This doc's "Terms not yet in `CONTEXT.md`" working definitions | moved to `CONTEXT.md` as glossary entries (Working Space, Working read, Intake; unchanged and refused point to Completion outcome, and Space Resource to its existing entry); the doc's Terms line now points to them, and `check-glossary.py` holds every term it names to an entry. Some definitions were shortened as they moved; each clause left out is stated by a rule (a refused attempt's refusal code: the Map table and MG-8). Where two docs defined a term differently, the entry states both docs' meaning |

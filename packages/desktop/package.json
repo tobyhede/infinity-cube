@@ -6,8 +6,8 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "tauri": "tauri",
-    "dev": "pnpm --filter @project/app exec vite build && tauri dev",
-    "build": "pnpm --filter @project/app exec vite build && tauri build"
+    "dev": "pnpm --filter @project/app exec vite build && pnpm --filter @project/app desktop-shell:build && tauri dev",
+    "build": "pnpm --filter @project/app exec vite build && pnpm --filter @project/app desktop-shell:build && tauri build"
   },
   "devDependencies": {
     "@tauri-apps/cli": "2.12.4"

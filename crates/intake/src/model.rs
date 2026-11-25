@@ -55,6 +55,13 @@ impl Resource {
         self.plugin().space_references(&self.content)
     }
 
+    /// The Map and the Graph its content selects in the Space it references,
+    /// when its plugin declares a selection (ADR 0068, `spaceSelection`).
+    #[must_use]
+    pub fn selection(&self) -> Option<(MapId, GraphId)> {
+        self.plugin().selection(&self.content)
+    }
+
     /// The Spaces whose lifetime it holds (ADR 0074).
     #[must_use]
     pub fn lifetime_space_references(&self) -> Vec<SpaceId> {

@@ -7,6 +7,7 @@
 //! the directory is the record.
 
 use std::io;
+use std::process::ExitCode;
 
 use serde_json::json;
 
@@ -32,4 +33,11 @@ pub(crate) fn announce_listening(port: u16) {
 /// `{"kind":"refused","message":…}`, before the binary exits non-zero.
 pub(crate) fn announce_refused(message: &str) {
     answer(&json!({ "kind": "refused", "message": message }).to_string());
+}
+
+/// Announce why the binary cannot serve, say so in full, and exit one.
+pub(crate) fn refuse(message: &str) -> ExitCode {
+    say(message);
+    announce_refused(message);
+    ExitCode::FAILURE
 }

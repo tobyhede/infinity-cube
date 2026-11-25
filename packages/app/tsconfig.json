@@ -42,6 +42,7 @@
     "vite-space-http-plugin.ts",
     "http-server-build.config.ts",
     "desktop-sidecar-build.config.ts",
+    "desktop-shell-build.config.ts",
     "ladle-vite.config.ts"
   ]
 }

@@ -1,6 +1,7 @@
 //! The command line: one directory, never an option or the empty string,
 //! each option that takes a value at most once, `--json` at most once, and
-//! any number of `--no-open`, or a usage error.
+//! any number of `--no-open`, or a usage error. `serve` takes no directory
+//! and requires `--store`.
 
 use std::ffi::{OsStr, OsString};
 use std::path::PathBuf;
@@ -15,6 +16,24 @@ pub(crate) enum Command {
     Init(PathBuf),
     Run(RunCommand),
     Check(CheckCommand),
+    Serve(ServeCommand),
+}
+
+/// The store `serve --store` names. PostgreSQL is not yet one (rust-host 16).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Store {
+    /// The SQLite file `SQLITE_PATH` names.
+    Sqlite,
+}
+
+/// `serve --store sqlite [--port <port>] [--built <dir>]`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ServeCommand {
+    pub(crate) store: Store,
+    /// The port `--port` names; without one the host takes the default or the next free one.
+    pub(crate) port: Option<u16>,
+    /// A built application to serve from disk in place of the one embedded.
+    pub(crate) built: Option<PathBuf>,
 }
 
 /// `run <dir> [--port <port>] [--no-open] [--built <dir>]`.
@@ -36,7 +55,8 @@ pub(crate) struct CheckCommand {
     pub(crate) json: bool,
 }
 
-pub(crate) const USAGE: &str = "Usage: infinity-cube <init|run|check|version|help> [arguments]\n";
+pub(crate) const USAGE: &str =
+    "Usage: infinity-cube <init|run|check|serve|version|help> [arguments]\n";
 
 pub(crate) const HELP: &str = "\
 Usage: infinity-cube <verb> [arguments]
@@ -47,6 +67,8 @@ Usage: infinity-cube <verb> [arguments]
       Serve an Aggregate directory, writing edits back to it
   check <dir> [--json]
       Import an Aggregate directory as run does, serving and writing nothing
+  serve --store sqlite [--port <port>] [--built <dir>]
+      Serve the migrated SQLite file SQLITE_PATH names
   version
       Show the version and the commit this build was made from
   help
@@ -135,6 +157,44 @@ fn check(args: &[OsString]) -> Option<CheckCommand> {
     })
 }
 
+fn serve(args: &[OsString]) -> Option<ServeCommand> {
+    let mut store = None;
+    let mut chosen_port = None;
+    let mut built = None;
+    let mut rest = args.iter();
+    while let Some(argument) = rest.next() {
+        match argument.to_str()? {
+            "--store" => {
+                if store.is_some() {
+                    return None;
+                }
+                store = match rest.next()?.to_str()? {
+                    "sqlite" => Some(Store::Sqlite),
+                    _ => return None,
+                };
+            }
+            "--port" => {
+                if chosen_port.is_some() {
+                    return None;
+                }
+                chosen_port = Some(port(rest.next())?);
+            }
+            "--built" => {
+                if built.is_some() {
+                    return None;
+                }
+                built = Some(directory(rest.next()?)?);
+            }
+            _ => return None,
+        }
+    }
+    Some(ServeCommand {
+        store: store?,
+        port: chosen_port,
+        built,
+    })
+}
+
 /// The command a command line (without the program's name) names, or
 /// `None` for a usage error.
 pub(crate) fn parse(args: &[OsString]) -> Option<Command> {
@@ -148,6 +208,7 @@ pub(crate) fn parse(args: &[OsString]) -> Option<Command> {
         },
         "run" => run(rest).map(Command::Run),
         "check" => check(rest).map(Command::Check),
+        "serve" => serve(rest).map(Command::Serve),
         _ => None,
     }
 }
@@ -279,12 +340,62 @@ mod tests {
         }
     }
 
+    mod given_serve {
+        use super::*;
+
+        #[test]
+        fn reads_the_sqlite_store_alone_as_serving_on_the_default_port() {
+            assert_eq!(
+                parsed(&["serve", "--store", "sqlite"]),
+                Some(Command::Serve(ServeCommand {
+                    store: Store::Sqlite,
+                    port: None,
+                    built: None,
+                })),
+                "the store alone"
+            );
+        }
+
+        #[test]
+        fn reads_every_option_in_any_order() {
+            assert_eq!(
+                parsed(&[
+                    "serve", "--built", "dist", "--port", "5300", "--store", "sqlite"
+                ]),
+                Some(Command::Serve(ServeCommand {
+                    store: Store::Sqlite,
+                    port: Some(5300),
+                    built: Some(PathBuf::from("dist")),
+                })),
+                "every option"
+            );
+        }
+
+        #[test]
+        fn refuses_no_store_another_store_a_directory_or_a_repeated_option() {
+            for args in [
+                &["serve"][..],
+                &["serve", "--store"],
+                &["serve", "--store", "postgres"],
+                &["serve", "--store", "memory"],
+                &["serve", "--store", "sqlite", "--store", "sqlite"],
+                &["serve", "--store", "sqlite", "space"],
+                &["serve", "--store", "sqlite", "--port", "0"],
+                &["serve", "--store", "sqlite", "--port", "1", "--port", "2"],
+                &["serve", "--store", "sqlite", "--no-open"],
+                &["serve", "--store", "sqlite", "--built"],
+            ] {
+                assert_eq!(parsed(args), None, "{args:?}");
+            }
+        }
+    }
+
     mod given_an_unknown_verb_or_help {
         use super::*;
 
         #[test]
         fn refuses_an_unknown_verb_and_reads_help_alone() {
-            assert_eq!(parsed(&["serve", "space"]), None, "unknown verb");
+            assert_eq!(parsed(&["publish", "space"]), None, "unknown verb");
             assert_eq!(parsed(&[]), None, "nothing");
             assert_eq!(parsed(&["help"]), Some(Command::Help), "help");
             assert_eq!(parsed(&["help", "x"]), None, "help with more");

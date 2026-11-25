@@ -665,6 +665,26 @@ export async function settled(page: Page): Promise<void> {
 }
 
 /**
+ * Press a canvas zoom control and wait for the camera to come to rest.
+ *
+ * The controls animate the camera, so a box read straight after the press is
+ * read part-way through the move and is stale by the time the mouse arrives.
+ * The camera is let come to rest first as well, so the change the poll waits
+ * for is the press's own and not the tail of an earlier move.
+ */
+export async function zoomCamera(page: Page, control: 'Zoom in' | 'Zoom out'): Promise<void> {
+  await settled(page);
+  const before = await viewportTransform(page);
+  await page.getByRole('button', { name: control, exact: true }).click();
+  await expect
+    .poll(() => viewportTransform(page), {
+      message: `${control} moves the camera (it does not at the zoom limit)`,
+    })
+    .not.toBe(before);
+  await settled(page);
+}
+
+/**
  * The box of an element the test requires, waited for and named.
  *
  * `(await locator.boundingBox())!` is null whenever the element is absent or not

@@ -7,9 +7,10 @@
 use std::fmt;
 use std::future::Future;
 
-use intake::{Refusal, Refusals, SpaceId, SpaceSnapshot};
+use intake::{Refusal, Refusals, SpaceId, SpaceSnapshot, load_aggregate};
 
 use crate::assets::{AssetHash, StoredAsset};
+use crate::document::wire_snapshot;
 
 /// A Space's revision: 0 when stored, one more for each change committed to
 /// it, never above 2⁶³ − 1.
@@ -343,4 +344,41 @@ pub trait SpaceRepository: Send + Sync + 'static {
         id: SpaceId,
         revision: Revision,
     ) -> impl Future<Output = Result<(), RepositoryError>> + Send;
+}
+
+/// `input` as intake reads it, each Space normalized as its decoding
+/// normalizes it (a Title, ADR 0083), or why intake refuses it. A store
+/// installs and compares this, so an input replayed with an unnormalized Title
+/// is the aggregate it installed (ST-9), and every store holds what its own
+/// read would answer.
+pub(crate) fn checked_input(input: &AggregateInput) -> Result<AggregateInput, Refusals> {
+    let checked = load_aggregate(input.meta_space_id, &input.spaces)?;
+    Ok(AggregateInput {
+        meta_space_id: input.meta_space_id,
+        spaces: checked
+            .into_spaces()
+            .into_iter()
+            .map(intake::Space::into_snapshot)
+            .collect(),
+    })
+}
+
+/// The input's Spaces, ascending by id, each with its Resources ascending by
+/// id, as JSON with unread keys in one order: equal when the two aggregates
+/// hold the same authored data (`classifyInitializedAggregate`). Every store
+/// classifies an initialization over an initialized store by it.
+pub(crate) fn authored(
+    meta_space_id: SpaceId,
+    spaces: &[&SpaceSnapshot],
+) -> (SpaceId, Vec<String>) {
+    let mut ordered: Vec<SpaceSnapshot> = spaces.iter().map(|space| (*space).clone()).collect();
+    ordered.sort_by_key(|space| space.id);
+    let texts = ordered
+        .iter_mut()
+        .map(|space| {
+            space.resources.sort_by_key(|resource| resource.id);
+            crate::json_text::compact(&crate::document::canonical_value(&wire_snapshot(space)))
+        })
+        .collect();
+    (meta_space_id, texts)
 }

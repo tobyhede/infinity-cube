@@ -1,10 +1,11 @@
 //! The InfinityCube desktop application (ADR 0155).
 //!
 //! A directory named on the command line opens at once; with none named, or
-//! none that opens, the shell asks for one, and File › Open… asks for another
-//! ([`launch`]). A folder holding no Space is offered a new one, as File ›
-//! New Space… writes one ([`new_space`]). Every window is a Space's, a window
-//! a Space's page opened, or a close's question. Each directory opens in a
+//! none that opens, the Start window shows ([`launch`], [`start`]), which
+//! offers New Space, Open Folder… and the recent Spaces, and File › Open…
+//! asks for another folder. A folder holding no Space is offered a new one
+//! ([`new_space`]). Every window is the Start window, a Space's, a window a
+//! Space's page opened, or a close's question. Each directory opens in a
 //! window of its own, served by a run of the Rust host of its own, in this
 //! process, through the application's URI scheme at the Aggregate's own origin; opening it again
 //! focuses that window. A window the Aggregate's page opens (a Resource opened
@@ -23,11 +24,13 @@ mod aggregates;
 mod launch;
 mod menu;
 mod new_space;
+mod new_space_folder;
 mod not_opened;
 mod question;
 mod saving;
 mod scheme;
 mod server;
+mod start;
 #[cfg(test)]
 mod test_support;
 mod update;
@@ -40,7 +43,7 @@ use std::sync::mpsc::{Receiver, TryRecvError};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::thread;
 
-use host::{RandomIds, TokioFilesystem};
+use host::{NEW_SPACE_TITLE, RandomIds, TokioFilesystem};
 use menu::{Command, Platform, Predefined};
 use tauri::menu::{AboutMetadata, IsMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::webview::NewWindowResponse;
@@ -57,7 +60,7 @@ use url::Url;
 
 use crate::address::{AggregateKey, SCHEME, SchemeStyle};
 use crate::aggregates::{Close, Registry, Reserved, SPACE_WINDOW_PREFIX};
-use crate::launch::{Launch, Next, Opening, Unopened};
+use crate::launch::{LastWindow, Launch, Next, Opened, Opening};
 use crate::not_opened::NotOpened;
 use crate::scheme::{OpenAggregates, VIEW_WINDOW_PREFIX};
 use crate::server::{
@@ -314,8 +317,8 @@ fn about(app: &AppHandle) -> AboutMetadata<'_> {
 fn answer_menu(app: &AppHandle, command: Command) {
     match command {
         Command::Quit => app.exit(0),
-        Command::NewSpace => choose_new_space(app),
-        Command::Open => choose_folder(app, Opening::FromMenu),
+        Command::NewSpace => start::show(app, start::Screen::NewSpace),
+        Command::Open => choose_folder(app, Opening::Menu),
         // Closed as its own control closes it, so a Space window's close
         // waits for its last write, and a close's question keeps waiting.
         Command::CloseWindow => {
@@ -359,11 +362,10 @@ fn focused_window(app: &AppHandle) -> Option<tauri::WebviewWindow> {
         .find(|window| window.is_focused().unwrap_or(false))
 }
 
-/// Ask for a folder, and open it as an Aggregate. At launch, with nothing
-/// open, cancelling ends the application and a folder that does not open is
-/// reported before asking again, so the application never runs with no
-/// window; from the menu, or once a Space has opened meanwhile, cancelling
-/// does nothing and a failure is reported alone ([`launch::after`]).
+/// Ask for a folder with the platform's chooser, and open it as an
+/// Aggregate. Cancelling does nothing; a folder that does not open is said
+/// why. One asked for from the Start window closes it once its Space window
+/// opens ([`open_from`]).
 fn choose_folder(app: &AppHandle, opening: Opening) {
     let handle = app.clone();
     app.dialog()
@@ -371,76 +373,59 @@ fn choose_folder(app: &AppHandle, opening: Opening) {
         .set_title("Open a Space")
         .pick_folder(move |folder| {
             let Some(path) = folder.and_then(|folder| folder.into_path().ok()) else {
-                if next(&handle, opening, Unopened::Cancelled) == Next::Exit {
-                    handle.exit(0);
-                }
                 return;
             };
             // Starting a run reads the whole directory, so it stays off the
             // thread the dialog answered on.
             thread::spawn(move || {
-                if let Err(reason) = open_aggregate_at(&handle, &path) {
-                    settle(&handle, opening, reason);
-                }
+                open_from(&handle, &path, opening);
             });
         });
 }
 
-/// Ask for a folder to write a new Space to, and open it. Cancelling does
-/// nothing; a folder that is not empty, or a Space that could not be
-/// written, is reported.
-fn choose_new_space(app: &AppHandle) {
-    let handle = app.clone();
-    app.dialog()
-        .file()
-        .set_title("New Space: choose an empty folder")
-        .pick_folder(move |folder| {
-            let Some(path) = folder.and_then(|folder| folder.into_path().ok()) else {
-                return;
-            };
-            thread::spawn(move || {
-                if let Err(reason) = create_and_open(&handle, &path) {
-                    settle(&handle, Opening::FromMenu, reason);
-                }
-            });
-        });
-}
-
-/// Write a new Space to `directory` and open it.
-fn create_and_open(app: &AppHandle, directory: &Path) -> Result<(), NotOpened> {
-    {
-        // One Space is written at a time, so two asked for at once cannot
-        // both find a folder empty and both write to it: the second finds
-        // the first's files and is refused.
-        let _creating = lock(&CREATING);
-        tauri::async_runtime::block_on(new_space::create_space(
-            &TokioFilesystem,
-            directory,
-            &RandomIds,
-        ))?;
+/// Open `folder`, asked for from `opening`, offering a new Space in one that
+/// holds none and saying why one did not open, returning once the presenter
+/// has answered. A Space window that shows from the Start window closes it
+/// ([`launch::closes_start`]). Only a launch is left with no window, and a
+/// launch opens through [`open_from_command_line`], so a folder that did
+/// not open here leaves the windows as they are.
+fn open_from(app: &AppHandle, folder: &Path, opening: Opening) {
+    let opened = match open_aggregate_at(app, folder) {
+        Ok(opened) => Some(opened),
+        Err(reason) => answer(app, reason),
+    };
+    if opened.is_some_and(|opened| launch::closes_start(opening, opened)) {
+        start::close(app);
     }
+}
+
+/// Write a new Space, titled as `init` titles one, to `directory` and open
+/// it: the offer made for a folder that holds no Space.
+fn create_and_open(app: &AppHandle, directory: &Path) -> Result<Opened, NotOpened> {
+    one_write_at_a_time(new_space::create_space(
+        &TokioFilesystem,
+        directory,
+        NEW_SPACE_TITLE,
+        &RandomIds,
+    ))?;
     open_aggregate_at(app, directory)
 }
 
-/// Held while a new Space is written ([`create_and_open`]).
-static CREATING: Mutex<()> = Mutex::new(());
-
-/// Answer a folder asked for `opening` that did not open: offer a new Space
-/// in one that holds none, and otherwise say why, returning once the
-/// presenter has answered. Then, at launch with nothing open, ask for a
-/// folder again ([`launch::after`]).
-fn settle(app: &AppHandle, opening: Opening, reason: NotOpened) {
-    if answer(app, reason) && next(app, opening, Unopened::Failed) == Next::AskAgain {
-        choose_folder(app, Opening::AtLaunch);
-    }
+/// Run `write`, a new Space's write, to its end on this thread, one at a
+/// time: two asked for at once cannot both find a folder empty and both
+/// write to it, since the second finds the first's files and is refused.
+/// Held by [`create_and_open`] and the Start window's New Space.
+fn one_write_at_a_time<T>(write: impl Future<Output = T>) -> T {
+    static CREATING: Mutex<()> = Mutex::new(());
+    let _creating = lock(&CREATING);
+    tauri::async_runtime::block_on(write)
 }
 
-/// Answer why a folder did not open, returning once the presenter has, and
-/// whether it is still unopened. A folder holding no Space is offered a new
-/// one; declining, the folder stays unopened, so at launch the shell asks
-/// for another rather than ending. A close or a quit that took the
-/// Aggregate is not answered.
-fn answer(app: &AppHandle, reason: NotOpened) -> bool {
+/// Answer why a folder did not open, returning once the presenter has, with
+/// how it came to open after all, or `None` while it is still unopened. A folder holding no Space is offered a new
+/// one; declining, the folder stays unopened. A close or a quit that took
+/// the Aggregate is not answered.
+fn answer(app: &AppHandle, reason: NotOpened) -> Option<Opened> {
     match reason {
         NotOpened::Empty(directory) => {
             let create = app
@@ -457,29 +442,31 @@ fn answer(app: &AppHandle, reason: NotOpened) -> bool {
                 ))
                 .blocking_show();
             if !create {
-                return true;
+                return None;
             }
             match create_and_open(app, &directory) {
-                Ok(()) => false,
+                Ok(opened) => Some(opened),
                 Err(reason) => answer(app, reason),
             }
         }
         reason if reason.tells_the_presenter() => {
             show_error_and_wait(app, &reason.to_string());
-            true
+            None
         }
-        _ => false,
+        // A close or a quit took it: nothing to answer, and nothing more for
+        // the Start window to stay open for.
+        _ => Some(Opened::Shown),
     }
 }
 
-/// What comes after a folder question for `opening` that ended `unopened`.
-fn next(app: &AppHandle, opening: Opening, unopened: Unopened) -> Next {
+/// What comes after a folder asked for from `opening` that did not open.
+fn next(app: &AppHandle, opening: Opening) -> Next {
     let any_aggregate = !app.state::<Aggregates>().registry().is_empty();
-    launch::after(opening, unopened, any_aggregate)
+    launch::after(opening, any_aggregate)
 }
 
 /// Open each folder named on the command line, then answer each that did
-/// not, asking for one if nothing else is open.
+/// not, showing the Start window if nothing else is open.
 fn open_from_command_line(app: &AppHandle, folders: &[PathBuf]) {
     let unopened: Vec<NotOpened> = folders
         .iter()
@@ -487,16 +474,16 @@ fn open_from_command_line(app: &AppHandle, folders: &[PathBuf]) {
         .collect();
     let mut still_unopened = false;
     for reason in unopened {
-        still_unopened |= answer(app, reason);
+        still_unopened |= answer(app, reason).is_none();
     }
-    if still_unopened && next(app, Opening::AtLaunch, Unopened::Failed) == Next::AskAgain {
-        choose_folder(app, Opening::AtLaunch);
+    if still_unopened && next(app, Opening::CommandLine) == Next::ShowStart {
+        start::show(app, start::Screen::Start);
     }
 }
 
 /// Open `folder` as an Aggregate in a window of its own, or focus the window
-/// that already has it, answering why if neither.
-fn open_aggregate_at(app: &AppHandle, folder: &Path) -> Result<(), NotOpened> {
+/// that already has it, answering how it opened, or why it did not.
+fn open_aggregate_at(app: &AppHandle, folder: &Path) -> Result<Opened, NotOpened> {
     // Two spellings of one directory are one Aggregate; a path that cannot be
     // resolved is passed on as given, for the run to refuse.
     let directory = std::fs::canonicalize(folder).unwrap_or_else(|_| folder.to_path_buf());
@@ -512,13 +499,15 @@ fn open_aggregate_at(app: &AppHandle, folder: &Path) -> Result<(), NotOpened> {
             // last write runs on.
             if let Some(window) = app.get_webview_window(&label) {
                 let _ = window.set_focus();
-            } else if aggregates.registry().is_closing(&label) {
+                return Ok(Opened::Shown);
+            }
+            if aggregates.registry().is_closing(&label) {
                 return Err(NotOpened::StillWriting(directory));
             }
-            return Ok(());
+            return Ok(Opened::Starting);
         }
     };
-    let opened = start_aggregate(app, &directory, &label);
+    let opened = start_aggregate(app, &directory, &label).map(|()| Opened::Shown);
     if opened.is_err() {
         let abandoned = aggregates.registry().abandon(&label);
         if let Some(server) = abandoned {
@@ -735,7 +724,15 @@ fn main() {
         );
     }
     let app = builder
-        .invoke_handler(tauri::generate_handler![answer_closing])
+        .invoke_handler(tauri::generate_handler![
+            answer_closing,
+            start::start_window_view,
+            start::start_browse,
+            start::start_create_space,
+            start::start_open_folder,
+            start::start_open_recent,
+            start::start_close,
+        ])
         .on_menu_event(|app, event| {
             if let Some(command) = Command::named(event.id().as_ref()) {
                 answer_menu(app, command);
@@ -757,9 +754,9 @@ fn main() {
             }
             // A directory named on the command line opens at once, as one
             // chosen from File › Open… would; with none named, the shell
-            // asks for one.
+            // shows the Start window.
             match launch::launch(std::env::args_os().skip(1)) {
-                Launch::Choose => choose_folder(app.handle(), Opening::AtLaunch),
+                Launch::Start => start::show(app.handle(), start::Screen::Start),
                 Launch::Folders(folders) => {
                     let handle = app.handle().clone();
                     thread::spawn(move || open_from_command_line(&handle, &folders));
@@ -817,7 +814,7 @@ fn main() {
         }
     };
     app.run(|app, event| match event {
-        RunEvent::ExitRequested { api, .. } => {
+        RunEvent::ExitRequested { api, code, .. } => {
             // A quit waits for each Aggregate's last write, and asks once
             // whether to keep waiting if one takes too long; the
             // close-wait decision ends the application when it may.
@@ -826,6 +823,13 @@ fn main() {
                 return;
             }
             api.prevent_exit();
+            // No code: the last window closed, which on macOS leaves the
+            // application running with no window (Storage ST-131). Each
+            // Space window's close has already waited for its last write.
+            if code.is_none() && launch::last_window_closed(Platform::CURRENT) == LastWindow::RunOn
+            {
+                return;
+            }
             let open = app.state::<Aggregates>().registry().take_all();
             let mut writing = Vec::with_capacity(open.len());
             for (label, directory, server) in open {
@@ -863,6 +867,17 @@ fn main() {
             }
             for stop in stopping {
                 let _ = stop.join();
+            }
+        }
+        // Activating the application (its Dock icon) with no window showing
+        // shows the Start window; with windows, macOS brings them forward.
+        #[cfg(target_os = "macos")]
+        RunEvent::Reopen {
+            has_visible_windows,
+            ..
+        } => {
+            if launch::activating_shows_start(has_visible_windows) {
+                start::show(app, start::Screen::Start);
             }
         }
         _ => {}
