@@ -21,6 +21,7 @@
 //! commit is already in the file, so the host closes it and exits zero. Any
 //! signal after the first exits at once, one.
 
+use std::ffi::OsStr;
 use std::process::ExitCode;
 use std::sync::Arc;
 
@@ -32,17 +33,30 @@ use crate::listener::{self, bind, own_host, serve as serve_on};
 use crate::output::{announce_listening, refuse, say};
 use crate::signals::Signals;
 
-/// The file `SQLITE_PATH` names, by the host's rules, which must exist: the
-/// CLI's rule, in the TypeScript CLI's words (`src/sqlite/db.ts`).
-fn sqlite_file(value: Option<&str>) -> Result<SqlitePath, String> {
+/// The file `SQLITE_PATH` names, by the host's rules, which must exist and be
+/// a regular file: the CLI's rules, a missing file in the TypeScript CLI's
+/// words (`src/sqlite/db.ts`). A value that is not UTF-8 is refused rather
+/// than read lossily, which could name another file.
+fn sqlite_file(value: Option<&OsStr>) -> Result<SqlitePath, String> {
+    let value = value
+        .map(|value| {
+            value
+                .to_str()
+                .ok_or_else(|| format!("SQLITE_PATH must be UTF-8: {}", value.display()))
+        })
+        .transpose()?;
     let path = SqlitePath::from_variable(value).map_err(|error| error.to_string())?;
-    if !matches!(path.as_path().try_exists(), Ok(true)) {
-        return Err(format!(
+    match std::fs::metadata(path.as_path()) {
+        Ok(metadata) if metadata.is_file() => Ok(path),
+        Ok(_) => Err(format!(
+            "SQLITE_PATH must name a regular file: {}",
+            path.as_path().display()
+        )),
+        Err(_) => Err(format!(
             "SQLite database file does not exist: {}. Run pnpm db:migrate:sqlite first.",
             path.as_path().display()
-        ));
+        )),
     }
-    Ok(path)
 }
 
 /// Serve the store `command` names until a stop signal, answering the exit code.
@@ -53,12 +67,7 @@ pub(crate) async fn serve(command: ServeCommand) -> ExitCode {
         Err(error) => return refuse(&format!("Could not take the stop signals: {error}")),
     };
     let variable = std::env::var_os("SQLITE_PATH");
-    let path = match sqlite_file(
-        variable
-            .as_deref()
-            .map(|value| value.to_string_lossy())
-            .as_deref(),
-    ) {
+    let path = match sqlite_file(variable.as_deref()) {
         Ok(path) => path,
         Err(message) => return refuse(&message),
     };

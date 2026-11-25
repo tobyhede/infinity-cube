@@ -127,6 +127,7 @@ impl SpaceRepository for MemorySpaceRepository {
         let mut state = self.state();
         match decide_commit(&request, state.meta_space_id, state.spaces.values()) {
             CommitDecision::Answer(result) => Ok(result),
+            CommitDecision::Fail(failure) => Err(failure),
             CommitDecision::Write {
                 result,
                 written,

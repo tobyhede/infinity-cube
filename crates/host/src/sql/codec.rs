@@ -100,19 +100,17 @@ fn same_json(left: &JsonValue, right: &JsonValue) -> bool {
     }
 }
 
-/// The title a stored space document carries. Only the title is read: one
-/// Space whose document fails intake is listed beside the others, and fails
-/// when it is opened (`tests/sqlite.rs` ›
-/// `lists_a_space_that_fails_intake_beside_the_others`).
-pub(crate) fn decode_title(row: &SpaceRow) -> Result<String, String> {
-    let document = parse(&row.document)
-        .map_err(|error| format!("stored Space {} does not parse: {error}", row.id))?;
-    document
-        .as_object()
-        .and_then(|object| object.get("title"))
-        .and_then(JsonValue::as_str)
+/// The title a stored space document carries, if it is JSON holding a string
+/// `title`. Only the title is read: a Space whose document fails intake is
+/// listed beside the others, and fails when it is opened (`tests/sqlite.rs` ›
+/// `lists_a_broken_space_beside_the_others`).
+pub(crate) fn decode_title(row: &SpaceRow) -> Option<String> {
+    parse(&row.document)
+        .ok()?
+        .as_object()?
+        .get("title")?
+        .as_str()
         .map(str::to_owned)
-        .ok_or_else(|| format!("stored Space {} has no title", row.id))
 }
 
 /// A stored Space from its rows, through the one Space intake

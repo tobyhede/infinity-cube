@@ -65,6 +65,7 @@ fn answer(decision: CommitDecision) -> CommitResult {
         CommitDecision::Write { result, .. } => {
             panic!("expected an answer, got a write of {result:?}")
         }
+        CommitDecision::Fail(failure) => panic!("expected an answer, got {failure:?}"),
     }
 }
 
@@ -708,25 +709,41 @@ mod given_a_space_at_the_revision_ceiling {
     }
 
     #[test]
-    fn refuses_an_update_on_either_path_rather_than_holding_the_revision() {
-        let refused = CommitResult::Rejected {
-            message: format!("Space {CHILD} is at the highest revision a store keeps"),
-        };
+    fn fails_an_update_on_either_path_rather_than_holding_the_revision() {
+        let failed = RepositoryError::BrokenStoredState(format!(
+            "Space {CHILD} is at the highest revision a store keeps"
+        ));
         let change = update(plain(CHILD, "Renamed"), CEILING);
         assert_eq!(
-            answer(decide_commit(
-                &commit(vec![change.clone()]),
-                Some(id(META)),
-                &at(CEILING)
-            )),
-            refused,
+            decide_commit(&commit(vec![change.clone()]), Some(id(META)), &at(CEILING)),
+            CommitDecision::Fail(failed.clone()),
             "the complete decision"
         );
         assert_eq!(
             single(change, &at(CEILING)),
-            SingleSpaceDecision::Answer(refused),
+            SingleSpaceDecision::Fail(failed),
             "the single-Space decision"
         );
+    }
+
+    #[test]
+    fn commits_a_delete_of_it() {
+        let deleted = CommitResult::Committed {
+            revisions: vec![(id(META), Revision::new(4).unwrap())],
+            deleted_space_ids: vec![id(CHILD)],
+        };
+        let delete = SpaceChange::Delete {
+            space_id: id(CHILD),
+            expected_revision: Revision::new(CEILING).unwrap(),
+        };
+        let CommitDecision::Write { result, .. } = decide_commit(
+            &commit(vec![delete, update(plain(META, "Meta"), 3)]),
+            Some(id(META)),
+            &at(CEILING),
+        ) else {
+            panic!("a delete writes no next revision");
+        };
+        assert_eq!(result, deleted, "the Space is deleted");
     }
 
     #[test]

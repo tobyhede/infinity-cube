@@ -174,6 +174,35 @@ mod given_a_sqlite_path_it_cannot_serve {
             "nothing is created beside it"
         );
     }
+
+    #[test]
+    fn refuses_a_path_that_is_not_a_regular_file() {
+        let directory = tempfile::tempdir().unwrap();
+        let folder = directory.path().join("cube.db");
+        std::fs::create_dir(&folder).unwrap();
+        assert_eq!(
+            refusal(serve_file(&folder)),
+            format!("SQLITE_PATH must name a regular file: {}", folder.display()),
+            "a directory"
+        );
+    }
+
+    // Read lossily, the value would name the file of the mangled name beside it.
+    #[test]
+    fn refuses_a_path_that_is_not_utf8_beside_a_file_of_its_lossy_name() {
+        use std::os::unix::ffi::OsStrExt as _;
+        let migrated = Migrated::new();
+        let directory = migrated.file.parent().unwrap();
+        let mangled = directory.join("cube\u{fffd}.db");
+        std::fs::copy(&migrated.file, &mangled).unwrap();
+        let mut given = directory.as_os_str().as_bytes().to_vec();
+        given.extend_from_slice(b"/cube\xff.db");
+        let message = refusal(serve(Some(OsStr::from_bytes(&given))));
+        assert!(
+            message.starts_with("SQLITE_PATH must be UTF-8: "),
+            "a value that is not UTF-8: {message}"
+        );
+    }
 }
 
 mod given_a_migrated_file_holding_nothing {

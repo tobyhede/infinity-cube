@@ -11,6 +11,7 @@
 //! the TypeScript host's driver creates an empty file and then fails on its
 //! missing tables.
 
+use std::path::PathBuf;
 use std::time::Duration;
 
 use intake::json::JsonValue;
@@ -35,6 +36,37 @@ const DEFAULT_BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 #[derive(Debug)]
 pub struct SqliteStore {
     pool: Pool<Sqlite>,
+    path: PathBuf,
+    // The file the path named when the repository first found it there,
+    // which every operation after must find there still (ST-126).
+    opened: std::sync::Mutex<Option<FileIdentity>>,
+}
+
+/// Which file a path names: its device and inode on Unix. Elsewhere a file
+/// is not told from another put in its place.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FileIdentity {
+    device: u64,
+    inode: u64,
+}
+
+impl FileIdentity {
+    #[cfg(unix)]
+    fn of(metadata: &std::fs::Metadata) -> Self {
+        use std::os::unix::fs::MetadataExt as _;
+        Self {
+            device: metadata.dev(),
+            inode: metadata.ino(),
+        }
+    }
+
+    #[cfg(not(unix))]
+    fn of(_metadata: &std::fs::Metadata) -> Self {
+        Self {
+            device: 0,
+            inode: 0,
+        }
+    }
 }
 
 /// The one SQL repository over a SQLite file.
@@ -97,7 +129,11 @@ impl SqlSpaceRepository<SqliteStore> {
             .idle_timeout(None)
             .max_lifetime(None)
             .connect_lazy_with(options);
-        Self::over(SqliteStore { pool })
+        Self::over(SqliteStore {
+            pool,
+            path: path.as_path().to_path_buf(),
+            opened: std::sync::Mutex::new(None),
+        })
     }
 
     /// The settings the repository's own connection has, read through it.
@@ -120,7 +156,10 @@ impl SqlSpaceRepository<SqliteStore> {
             })
         };
         let _alone = self.serial.lock().await;
-        read.await.map_err(|error| SqliteStore::classify(&error))
+        if let Some(reason) = self.store().file_replaced() {
+            return Err(RepositoryError::Unavailable(reason));
+        }
+        read.await.map_err(|error| self.store().classify(&error))
     }
 
     /// Close the file once every operation under way has finished.
@@ -135,10 +174,31 @@ const SQLITE_BUSY: i64 = 5;
 const SQLITE_LOCKED: i64 = 6;
 const SQLITE_CANTOPEN: i64 = 14;
 
+/// A row's document stored as something other than text, a BLOB among them,
+/// which the TypeScript host also fails to read: broken stored state.
+#[derive(Debug, thiserror::Error)]
+#[error("stored {table} row {id} holds a document that is not text")]
+struct NotText {
+    table: &'static str,
+    id: String,
+}
+
+/// A row's document, failing as [`NotText`] unless SQLite stores it as text.
+fn document(row: &sqlx::sqlite::SqliteRow, table: &'static str) -> Result<String, sqlx::Error> {
+    let stored_as: String = row.try_get("document_type")?;
+    if stored_as != "text" {
+        return Err(sqlx::Error::Decode(Box::new(NotText {
+            table,
+            id: row.try_get("id")?,
+        })));
+    }
+    row.try_get("document")
+}
+
 fn space_row(row: &sqlx::sqlite::SqliteRow) -> Result<SpaceRow, sqlx::Error> {
     Ok(SpaceRow {
         id: row.try_get("id")?,
-        document: row.try_get("document")?,
+        document: document(row, "spaces")?,
         revision: row.try_get("revision")?,
         exported_revision: row.try_get("exported_revision")?,
     })
@@ -148,7 +208,7 @@ fn resource_row(row: &sqlx::sqlite::SqliteRow) -> Result<ResourceRow, sqlx::Erro
     Ok(ResourceRow {
         id: row.try_get("id")?,
         space_id: row.try_get("space_id")?,
-        document: row.try_get("document")?,
+        document: document(row, "resources")?,
     })
 }
 
@@ -178,7 +238,7 @@ impl SqlStore for SqliteStore {
 
     async fn spaces(connection: &mut SqliteConnection) -> Result<Vec<SpaceRow>, sqlx::Error> {
         sqlx::query(
-            "SELECT id, CAST(document AS TEXT) AS document, revision, exported_revision \
+            "SELECT id, document, typeof(document) AS document_type, revision, exported_revision \
              FROM spaces ORDER BY id",
         )
         .fetch_all(connection)
@@ -193,7 +253,7 @@ impl SqlStore for SqliteStore {
         id: &str,
     ) -> Result<Option<SpaceRow>, sqlx::Error> {
         sqlx::query(
-            "SELECT id, CAST(document AS TEXT) AS document, revision, exported_revision \
+            "SELECT id, document, typeof(document) AS document_type, revision, exported_revision \
              FROM spaces WHERE id = $1",
         )
         .bind(id)
@@ -206,7 +266,7 @@ impl SqlStore for SqliteStore {
 
     async fn resources(connection: &mut SqliteConnection) -> Result<Vec<ResourceRow>, sqlx::Error> {
         sqlx::query(
-            "SELECT id, space_id, CAST(document AS TEXT) AS document FROM resources ORDER BY id",
+            "SELECT id, space_id, document, typeof(document) AS document_type FROM resources ORDER BY id",
         )
         .fetch_all(connection)
         .await?
@@ -220,7 +280,7 @@ impl SqlStore for SqliteStore {
         space_id: &str,
     ) -> Result<Vec<ResourceRow>, sqlx::Error> {
         sqlx::query(
-            "SELECT id, space_id, CAST(document AS TEXT) AS document FROM resources \
+            "SELECT id, space_id, document, typeof(document) AS document_type FROM resources \
              WHERE space_id = $1 ORDER BY id",
         )
         .bind(space_id)
@@ -383,13 +443,57 @@ impl SqlStore for SqliteStore {
             .await
     }
 
-    fn classify(error: &sqlx::Error) -> RepositoryError {
+    async fn tables(connection: &mut SqliteConnection) -> Result<Vec<String>, sqlx::Error> {
+        sqlx::query_scalar("SELECT name FROM sqlite_schema WHERE type = 'table'")
+            .fetch_all(connection)
+            .await
+    }
+
+    fn file_replaced(&self) -> Option<String> {
+        let found = match std::fs::metadata(&self.path) {
+            Ok(metadata) => Some(FileIdentity::of(&metadata)),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            // Asked again of SQLite, which answers why it cannot open it.
+            Err(_) => return None,
+        };
+        let mut opened = self
+            .opened
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        match (*opened, found) {
+            (None, found) => {
+                *opened = found;
+                None
+            }
+            (Some(_), None) => Some(format!(
+                "the SQLite file {} was deleted after it was opened",
+                self.path.display()
+            )),
+            (Some(before), Some(now)) if before != now => Some(format!(
+                "the SQLite file {} was replaced after it was opened",
+                self.path.display()
+            )),
+            (Some(_), Some(_)) => None,
+        }
+    }
+
+    fn classify(&self, error: &sqlx::Error) -> RepositoryError {
+        if let sqlx::Error::Decode(cause) = error
+            && let Some(not_text) = cause.downcast_ref::<NotText>()
+        {
+            return RepositoryError::BrokenStoredState(not_text.to_string());
+        }
         let unavailable = match error {
             sqlx::Error::Database(database) => database
                 .code()
                 .and_then(|code| code.parse::<i64>().ok())
-                .is_some_and(|code| {
-                    matches!(code & 0xff, SQLITE_BUSY | SQLITE_LOCKED | SQLITE_CANTOPEN)
+                .is_some_and(|code| match code & 0xff {
+                    SQLITE_BUSY | SQLITE_LOCKED => true,
+                    // A file that does not exist is not answering yet; one
+                    // that exists and still cannot be opened, a directory or
+                    // a file this process may not read, is a defect.
+                    SQLITE_CANTOPEN => !matches!(self.path.try_exists(), Ok(true)),
+                    _ => false,
                 }),
             sqlx::Error::Io(_)
             | sqlx::Error::PoolTimedOut
