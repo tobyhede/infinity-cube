@@ -149,10 +149,10 @@ Generated at `fdb63a1` by `node .scratch/rust-postgresql-store/case-map.mjs <fil
 
 | Line | Case | Ticket |
 | --- | --- | --- |
-| 29 | names the root .env from the bundled runtime and from the source alike | exempt: environment only (Q7) |
-| 45 | prefers the nearest .env above the starting directory | exempt: environment only (Q7) |
-| 55 | answers undefined rather than a path no file sits at | exempt: environment only (Q7) |
-| 67 | starts from this module’s own directory when given no starting point | exempt: environment only (Q7) |
+| 29 | names the root .env from the bundled runtime and from the source alike | accepted difference: Rust searches from the current directory, having no module directory (Q7) |
+| 45 | prefers the nearest .env above the starting directory | 05 |
+| 55 | answers undefined rather than a path no file sits at | 05 |
+| 67 | starts from this module’s own directory when given no starting point | accepted difference: Rust starts from the current directory (Q7) |
 
 ## `test/support/fast-path-races.ts`
 

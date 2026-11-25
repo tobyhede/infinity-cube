@@ -457,8 +457,12 @@ Where the live Aggregate is kept: PostgreSQL, SQLite or memory. Also called a st
 A Repository's stored Aggregate contradicting itself, such as Meta naming a Space the Repository does not hold. Asking again cannot clear it.
 _Avoid_: corruption, unavailable.
 
+**Unreachable**:
+Of a Repository: unable to answer for now, so asking again may succeed. A Repository waiting too long for a free connection is Unreachable too.
+_Avoid_: unavailable (a command state), down, offline.
+
 **Unclassified failure**:
-A Repository failure known to be neither an Invariant failure nor the Repository being unreachable for now. Nothing is known about whether asking again would clear it.
+A Repository failure known to be neither an Invariant failure nor Unreachable. Nothing is known about whether asking again would clear it.
 _Avoid_: internal error, unknown error.
 
 **Default Content**:
