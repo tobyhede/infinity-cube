@@ -27,16 +27,16 @@ Confirmed by the user, 2026-11-24.
 - **Glossary:** three terms for store failures go into `CONTEXT.md` (02): **Invariant failure** (stored state contradicts itself; answered 500; start-up stops once a retry confirms it), **Unavailable** (the store cannot answer now; answered 503; start-up keeps retrying) and **Unclassified failure** (any other store failure; answered 500).
 - **No coverage floor.** The `crap-rust` CI job already measures Rust coverage with `cargo llvm-cov`; the ports test is the parity table.
 
-## Open questions
+## Settled questions
 
-Low-severity differences the review found that no decision covers yet. Each needs the user's answer, accepted with a reason or made a defect, before 05 or 11 closes.
+Low-severity differences the review found, answered by the user on 2026-11-25.
 
-- `list_spaces` still lists a Space whose document fails intake; TypeScript's `listSpaces` fails for every Space.
-- A document stored as a BLOB is read by Rust and refused by TypeScript.
-- Replacing an Aggregate deletes orphan Resource rows in Rust and leaves them in TypeScript.
-- Rust holds one connection for the process lifetime; TypeScript opens one per operation.
-- `SQLITE_PATH`: Rust reads it only from the environment (no `.env`), refuses `x/missing/../y.db` and a parent that is a regular file where TypeScript accepts both, and mangles a non-UTF-8 path.
-- Invalid Default Content: Rust stops at once; TypeScript waits one retry first.
+- **A Space whose document fails intake stays listed.** `list_spaces` lists it, as Rust does today; TypeScript's `listSpaces` failing for every Space is not followed. One broken Space must not hide every other Space from `GET /api/spaces` and the picker that links an existing Space. Opening or linking the broken one answers broken stored state, which names it. Held by a test in 05.
+- **A document stored as a BLOB is broken stored state.** Rust refuses it as TypeScript does. A defect, fixed in 01.
+- **Replacing an Aggregate deletes orphan Resource rows.** Accepted: Rust's behaviour is the requirement.
+- **Rust holds one connection for the process lifetime.** Accepted.
+- **`SQLITE_PATH`.** Reading it only from the environment (no `.env`) and refusing `x/missing/../y.db` and a parent that is a regular file are accepted. A path that is not valid UTF-8 is a defect: `serve` refuses it with a message naming `SQLITE_PATH`, before it takes a port. Fixed in 01.
+- **Invalid Default Content stops start-up at once.** Accepted: no confirming retry.
 
 ## Not in scope
 

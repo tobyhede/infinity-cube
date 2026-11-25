@@ -9,4 +9,4 @@
 - [ ] An unclassified failure, code 14 among them (01), stops start-up after the confirming retry.
 - [ ] A one-off invariant failure that the second attempt does not confirm does not stop it.
 - [ ] Forty unavailable attempts in a row keep retrying at the cap.
-- [ ] Invalid Default Content stops start-up, and the spec's open question on its timing is answered and held.
+- [ ] Invalid Default Content stops start-up at once, with no confirming retry (the spec's Settled questions).
