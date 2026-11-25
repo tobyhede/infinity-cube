@@ -440,7 +440,12 @@ interface CanvasResourceNodeSpecimenBaseProps {
    */
   readonly mapContent?: JsonValue | undefined;
   readonly commitMap?: ((next: JsonValue) => Promise<Answer>) | undefined;
-  readonly operations?: PluginOperations;
+  /**
+   * The whole operations a Markdown fixture's plugin is given, in place of the
+   * ones this specimen builds from `open` and `onOpenChange`. `commitMap` and
+   * `commitTitle` still apply on top of it, each replacing its own commit.
+   */
+  readonly operations?: PluginOperations | undefined;
   readonly commitTitle?: ((next: string) => Promise<Answer>) | undefined;
 }
 

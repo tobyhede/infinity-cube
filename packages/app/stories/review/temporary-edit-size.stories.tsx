@@ -1,7 +1,7 @@
 import type { Story } from '@ladle/react';
 import '../support/inventory.css';
-import { EditingComparison } from './MarkdownEditingComparison';
-import './markdown-resize-prototype.css';
+import { TemporaryEditSizeSpecimen } from './TemporaryEditSize';
+import './temporary-edit-size.css';
 
 export default { title: 'Review/Markdown prototype' };
 
@@ -14,4 +14,4 @@ At the second cairn, turn east. The creek below is easier to hear than to see. F
 ### The return route
 
 Cross the bridge and follow the marked trail through the trees. The last clearing gives you a view back to both cairns.`;
-export const TemporaryEditSize: Story = () => <EditingComparison initial={noteSource} />;
+export const TemporaryEditSize: Story = () => <TemporaryEditSizeSpecimen initial={noteSource} />;

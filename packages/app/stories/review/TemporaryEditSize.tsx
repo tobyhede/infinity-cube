@@ -8,21 +8,42 @@ import { storyText, storeStoryText } from '../support/story-assets';
 
 const contentSchema = z.object({ url: assetRefSchema });
 const mapSchema = z.object({ open: z.boolean() });
+
 interface MapSettings {
   readonly size: ResourceSize;
-  readonly editSize: ResourceSize;
+  /** Absent, the editor draws at `size` (spec.md, The edit size is Map content). */
+  readonly editSize?: ResourceSize | undefined;
   readonly open: boolean;
 }
-const initialMap = (): MapSettings => ({
-  size: COLLAPSED_RESOURCE_SIZE,
-  editSize: { width: 640, height: 360 },
-  open: false,
+
+// Map A has an edit size remembered and Map B has none, so the story shows
+// both the remembered size and the default.
+const initialMaps = (): Record<'A' | 'B', MapSettings> => ({
+  A: { size: COLLAPSED_RESOURCE_SIZE, editSize: { width: 640, height: 360 }, open: false },
+  B: { size: COLLAPSED_RESOURCE_SIZE, open: false },
 });
 
-export function EditingComparison({ initial }: { initial: string }) {
+const sizeLabel = (size: ResourceSize) => `${size.width} × ${size.height}`;
+
+/**
+ * A stand-in for the interaction spec.md describes, not a model of it. This
+ * harness does not show two things the design changes:
+ *
+ * - The Markdown plugin still commits Open before an Edit from Closed begins
+ *   (UI-54; `plugin-markdown/test/markdown-plugin.test.tsx` › "offers Edit
+ *   when Closed, which Opens it and then begins editing"), with its size hint
+ *   ("Opens with one Map content commit carrying a size hint at least the
+ *   reading width"), which `commitMap` here drops. The harness
+ *   puts the earlier Open or Closed state back when the Claim is released, a
+ *   second commit a real host would count as its own Edit. The spec has Edit
+ *   commit nothing (open question 3).
+ * - If the text cannot be read, the plugin takes no Claim, so nothing here
+ *   restores the earlier state and the Resource stays Open.
+ */
+export function TemporaryEditSizeSpecimen({ initial }: { initial: string }) {
   const name = 'Temporary edit size';
   const [shownMap, setShownMap] = useState<'A' | 'B'>('A');
-  const [maps, setMaps] = useState({ A: initialMap(), B: initialMap() });
+  const [maps, setMaps] = useState(initialMaps);
   const current = maps[shownMap];
   const patch = (next: Partial<MapSettings>) =>
     setMaps((previous) => ({ ...previous, [shownMap]: { ...previous[shownMap], ...next } }));
@@ -42,8 +63,8 @@ export function EditingComparison({ initial }: { initial: string }) {
     },
     commitStore: storeStoryText,
     claim: () => {
-      // A Closed edit first commits Open. That commit and its Claim share the
-      // preceding visibility, which is restored when the edit ends.
+      // Whatever Open the plugin committed on its way here, the state recorded
+      // before the press is the one to put back.
       openForEdit.current = beforeOpen.current;
       setEditing(true);
       return {
@@ -57,6 +78,7 @@ export function EditingComparison({ initial }: { initial: string }) {
       };
     },
   };
+  const editorSize = current.editSize ?? current.size;
   return (
     <section
       className="p-4"
@@ -81,8 +103,9 @@ export function EditingComparison({ initial }: { initial: string }) {
           Switch Map
         </Button>
         <output>
-          Map {shownMap} · Canvas {current.size.width} × {current.size.height} · Edit{' '}
-          {current.editSize.width} × {current.editSize.height} · {current.open ? 'Full' : 'Title'}
+          Map {shownMap} · Canvas {sizeLabel(current.size)} · Edit{' '}
+          {current.editSize === undefined ? 'none (canvas size)' : sizeLabel(current.editSize)} ·{' '}
+          {current.open ? 'Open' : 'Closed'}
         </output>
       </div>
       <CanvasResourceNodeSpecimen
@@ -90,8 +113,8 @@ export function EditingComparison({ initial }: { initial: string }) {
         zoom={1}
         title="Ridge walk"
         open={current.open || editing}
-        nodeSize={editing ? current.editSize : current.size}
-        stageClassName="inv-resource-node-stage--large prototype-markdown-canvas"
+        nodeSize={editing ? editorSize : current.size}
+        stageClassName="inv-resource-node-stage--large temporary-edit-size-canvas"
         content={{ kind: 'markdown', via: 'self', content: { url } }}
         operations={operations}
         onResize={(size: ResourceSize) => patch(editing ? { editSize: size } : { size })}
