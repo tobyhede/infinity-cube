@@ -67,7 +67,9 @@ pub struct ConnectionSettings {
 
 impl SqlSpaceRepository<SqliteStore> {
     /// The repository over the file `path` names, waiting at most five
-    /// seconds on a lock another process holds. Nothing is opened until the
+    /// seconds on a lock another process holds. A second repository over the
+    /// same file, in this process or another, is such a holder: the
+    /// serialization ST-127 asks of one process is each repository's own. Nothing is opened until the
     /// first operation, and every operation opens the file again if it
     /// failed to before (`tests/sqlite.rs` ›
     /// `opens_the_file_once_it_exists_after_failing_to`).

@@ -691,3 +691,74 @@ mod given_a_single_update_decided_against_its_own_space {
         );
     }
 }
+
+mod given_a_space_at_the_revision_ceiling {
+    use super::*;
+
+    const CEILING: u64 = Revision::CEILING;
+
+    fn at(revision: u64) -> Vec<LoadedSpace> {
+        let mut stored = two_spaces();
+        stored[1].revision = Revision::new(revision).unwrap();
+        stored
+    }
+
+    fn single(change: SpaceChange, stored: &[LoadedSpace]) -> SingleSpaceDecision {
+        decide_single_space(&commit(vec![change]), Some(id(META)), Some(&stored[1]))
+    }
+
+    #[test]
+    fn refuses_an_update_on_either_path_rather_than_holding_the_revision() {
+        let refused = CommitResult::Rejected {
+            message: format!("Space {CHILD} is at the highest revision a store keeps"),
+        };
+        let change = update(plain(CHILD, "Renamed"), CEILING);
+        assert_eq!(
+            answer(decide_commit(
+                &commit(vec![change.clone()]),
+                Some(id(META)),
+                &at(CEILING)
+            )),
+            refused,
+            "the complete decision"
+        );
+        assert_eq!(
+            single(change, &at(CEILING)),
+            SingleSpaceDecision::Answer(refused),
+            "the single-Space decision"
+        );
+    }
+
+    #[test]
+    fn commits_the_update_that_reaches_it() {
+        let change = update(plain(CHILD, "Renamed"), CEILING - 1);
+        let reached = CommitResult::Committed {
+            revisions: vec![(id(CHILD), Revision::new(CEILING).unwrap())],
+            deleted_space_ids: vec![],
+        };
+        let CommitDecision::Write { result, .. } = decide_commit(
+            &commit(vec![change.clone()]),
+            Some(id(META)),
+            &at(CEILING - 1),
+        ) else {
+            panic!("the complete decision writes it");
+        };
+        assert_eq!(result, reached, "the complete decision");
+        let SingleSpaceDecision::Write { result, .. } = single(change, &at(CEILING - 1)) else {
+            panic!("the single-Space decision writes it");
+        };
+        assert_eq!(result, reached, "the single-Space decision");
+    }
+
+    #[test]
+    fn answers_a_stale_update_as_a_conflict_first() {
+        let change = update(plain(CHILD, "Renamed"), CEILING);
+        assert!(
+            matches!(
+                answer(decide_commit(&commit(vec![change]), Some(id(META)), &at(3))),
+                CommitResult::Conflict(_)
+            ),
+            "expecting the ceiling when the store holds another revision"
+        );
+    }
+}

@@ -123,6 +123,19 @@ mod given_a_sqlite_path {
         );
     }
 
+    // As `resolve` reads it before `requireWritableParent` asks of the parent.
+    #[test]
+    fn reads_dot_and_dot_dot_before_asking_of_the_parent() {
+        let directory = tempfile::tempdir().unwrap();
+        let given = directory.path().join("missing/.././cube.db");
+        let path = SqlitePath::from_variable(given.to_str()).unwrap();
+        assert_eq!(
+            path.as_path(),
+            directory.path().join("cube.db"),
+            "the file the path names, through a directory that does not exist"
+        );
+    }
+
     // ST-126 gives the refusal of a missing file to the CLI alone.
     #[test]
     fn accepts_a_file_that_does_not_exist_and_creates_nothing() {
@@ -240,6 +253,28 @@ mod given_a_migrated_file {
             "a file that does not exist is not answering"
         );
         assert!(!file.exists(), "nothing is created");
+    }
+
+    // ST-17: a malformed request is refused whether or not the store answers.
+    #[tokio::test]
+    async fn rejects_a_malformed_commit_without_reaching_a_file_that_does_not_exist() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = SqlitePath::from_variable(directory.path().join("cube.db").to_str()).unwrap();
+        let store = open(&path);
+        assert!(
+            matches!(
+                store.load_aggregate().await,
+                Err(RepositoryError::Unavailable(_))
+            ),
+            "the store does not answer"
+        );
+        assert_eq!(
+            store.commit(SpaceCommit { changes: vec![] }).await,
+            Ok(CommitResult::Rejected {
+                message: "A commit requires at least one change".to_owned()
+            }),
+            "an empty change set"
+        );
     }
 
     #[tokio::test]
@@ -465,6 +500,43 @@ mod given_the_memory_store_and_a_sqlite_file {
             sqlite.mark_exported(unknown, revision).await,
             memory.mark_exported(unknown, revision).await,
             "marking a Space no store holds"
+        );
+    }
+
+    // ST-9: sameness is authored meaning, and a Title's trailing whitespace is
+    // not authored (ADR 0083).
+    #[tokio::test]
+    async fn answer_an_initialization_replayed_with_an_unnormalized_title_as_existing() {
+        let (memory, _, _file) = both().await;
+        let mut input = aggregate_of(&memory).await;
+        let resource = input
+            .spaces
+            .iter_mut()
+            .find_map(|space| space.resources.first_mut())
+            .expect("the fixture holds a Resource");
+        resource.title.push(' ');
+        let file = Migrated::new().await;
+        let store = open(&file.path());
+        assert!(
+            matches!(
+                store.initialize_aggregate(input.clone()).await,
+                Ok(InitializeResult::Initialized(_))
+            ),
+            "the first initialization installs it"
+        );
+        assert!(
+            matches!(
+                store.initialize_aggregate(input.clone()).await,
+                Ok(InitializeResult::Existing(_))
+            ),
+            "the same input again is existing"
+        );
+        assert!(
+            matches!(
+                memory.initialize_aggregate(input).await,
+                Ok(InitializeResult::Existing(_))
+            ),
+            "as the memory store answers it"
         );
     }
 
@@ -725,6 +797,8 @@ mod given_contention {
             let commit = rename(&loaded, &format!("Edit {index}"));
             tokio::spawn(async move { store.commit(commit).await })
         });
+        // Every edit is spawned before the first is awaited, so they overlap.
+        let edits: Vec<_> = edits.collect();
         let mut committed = 0;
         let mut conflicts = 0;
         for edit in edits {
@@ -864,6 +938,26 @@ mod given_broken_stored_state {
             matches!(answer, Err(RepositoryError::BrokenStoredState(ref message))
                 if message == "stored Spaces exist without a Meta Space"),
             "a valid input over Spaces with no Meta identity: {answer:?}"
+        );
+    }
+
+    // As `listSpaces` parses the document with `spaceDocumentSchema`: the
+    // listing names no Space its own load cannot decode.
+    #[tokio::test]
+    async fn fails_listing_a_space_document_the_space_document_shape_refuses() {
+        let file = Migrated::new().await;
+        let store = seeded(open(&file.path())).await;
+        store.close().await;
+        execute(
+            &file.file,
+            &format!(r#"UPDATE spaces SET document = '{{"version":2,"title":"Draft"}}' WHERE id = '{META}'"#),
+        )
+        .await;
+        let store = open(&file.path());
+        let answer = store.list_spaces().await;
+        assert!(
+            matches!(answer, Err(RepositoryError::BrokenStoredState(_))),
+            "a document with a title but an unknown version: {answer:?}"
         );
     }
 

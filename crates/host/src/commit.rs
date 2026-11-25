@@ -36,8 +36,12 @@ pub enum CommitDecision {
     },
 }
 
+fn rejection(message: String) -> CommitResult {
+    CommitResult::Rejected { message }
+}
+
 fn rejected(message: String) -> CommitDecision {
-    CommitDecision::Answer(CommitResult::Rejected { message })
+    CommitDecision::Answer(rejection(message))
 }
 
 /// The revision a created or updated Space carries once the commit lands.
@@ -60,28 +64,51 @@ fn committed_revision(change: &SpaceChange) -> Revision {
 /// A Space's id is its directory's name, which Import reads only in lower
 /// case, so a Space created under an upper-case id would be exported to a
 /// directory no later run can read.
-fn request_refusal(request: &SpaceCommit) -> Option<CommitDecision> {
+///
+/// It reads nothing stored, so a store asks it before opening a transaction:
+/// a malformed request is refused whether or not the store answers (Storage
+/// ST-17), as `#commitUnserialised` refuses it first.
+pub(crate) fn request_refusal(request: &SpaceCommit) -> Option<CommitResult> {
     if request.changes.is_empty() {
-        return Some(rejected("A commit requires at least one change".to_owned()));
+        return Some(rejection(
+            "A commit requires at least one change".to_owned(),
+        ));
     }
     let mut ids = HashSet::new();
     for change in &request.changes {
         let id = change.space_id();
         if !ids.insert(id) {
-            return Some(rejected(format!("Space {id} is named more than once")));
+            return Some(rejection(format!("Space {id} is named more than once")));
         }
         if !id.uuid().is_lower_case() {
-            return Some(rejected(format!("Space {id} must be named in lower case")));
+            return Some(rejection(format!("Space {id} must be named in lower case")));
         }
         if let Some(snapshot) = change.snapshot()
             && snapshot.id != id
         {
-            return Some(rejected(format!(
+            return Some(rejection(format!(
                 "Change Space id {id} does not match its snapshot"
             )));
         }
     }
     None
+}
+
+/// Refuse an update to a Space already at [`Revision::CEILING`], whose next
+/// revision no store can keep: holding it there would let two Edits commit at
+/// one revision, the second overwriting the first without a conflict. Asked
+/// only once every expected revision matches the stored one.
+fn ceiling_refusal(request: &SpaceCommit) -> Option<CommitDecision> {
+    request.changes.iter().find_map(|change| match change {
+        SpaceChange::Update {
+            space_id,
+            expected_revision,
+            ..
+        } if expected_revision.get() == Revision::CEILING => Some(rejected(format!(
+            "Space {space_id} is at the highest revision a store keeps"
+        ))),
+        _ => None,
+    })
 }
 
 /// A Space of the candidate aggregate, borrowed from the store or from the
@@ -204,7 +231,7 @@ pub fn decide_commit<'a>(
     stored: impl IntoIterator<Item = &'a LoadedSpace>,
 ) -> CommitDecision {
     if let Some(refusal) = request_refusal(request) {
-        return refusal;
+        return CommitDecision::Answer(refusal);
     }
     let by_id: BTreeMap<SpaceId, &LoadedSpace> = stored
         .into_iter()
@@ -233,6 +260,9 @@ pub fn decide_commit<'a>(
         .collect();
     if !conflicts.is_empty() {
         return CommitDecision::Answer(CommitResult::Conflict(conflicts));
+    }
+    if let Some(refusal) = ceiling_refusal(request) {
+        return refusal;
     }
 
     let Some(meta_space_id) = meta_space_id else {
@@ -481,6 +511,9 @@ pub(crate) fn decide_single_space(
             current: current.cloned(),
         }]));
     };
+    if let Some(CommitDecision::Answer(result)) = ceiling_refusal(request) {
+        return SingleSpaceDecision::Answer(result);
+    }
     if load_space(snapshot).is_err()
         || !preserves_snapshot_boundary(&current.snapshot, snapshot)
         || meta_space_id.is_none()

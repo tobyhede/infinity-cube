@@ -7,7 +7,7 @@
 use std::fmt;
 use std::future::Future;
 
-use intake::{Refusal, Refusals, SpaceId, SpaceSnapshot};
+use intake::{Refusal, Refusals, SpaceId, SpaceSnapshot, load_aggregate};
 
 use crate::assets::{AssetHash, StoredAsset};
 use crate::document::wire_snapshot;
@@ -344,6 +344,23 @@ pub trait SpaceRepository: Send + Sync + 'static {
         id: SpaceId,
         revision: Revision,
     ) -> impl Future<Output = Result<(), RepositoryError>> + Send;
+}
+
+/// `input` as intake reads it, each Space normalized as its decoding
+/// normalizes it (a Title, ADR 0083), or why intake refuses it. A store
+/// installs and compares this, so an input replayed with an unnormalized Title
+/// is the aggregate it installed (ST-9), and every store holds what its own
+/// read would answer.
+pub(crate) fn checked_input(input: &AggregateInput) -> Result<AggregateInput, Refusals> {
+    let checked = load_aggregate(input.meta_space_id, &input.spaces)?;
+    Ok(AggregateInput {
+        meta_space_id: input.meta_space_id,
+        spaces: checked
+            .into_spaces()
+            .into_iter()
+            .map(intake::Space::into_snapshot)
+            .collect(),
+    })
 }
 
 /// The input's Spaces, ascending by id, each with its Resources ascending by

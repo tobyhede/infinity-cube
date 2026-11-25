@@ -2,7 +2,7 @@
 //! `configuredSqlitePath` in `src/sqlite/db.ts` reads it for a host, with the
 //! same refusals in the same words.
 
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 /// Why `SQLITE_PATH` names no file a host can serve, each in the words the
 /// TypeScript host uses.
@@ -50,15 +50,16 @@ impl SqlitePath {
         if value.is_empty() {
             return Err(SqlitePathError::Unset);
         }
-        let path = Path::new(value);
-        if !path.is_absolute() {
+        let given = Path::new(value);
+        if !given.is_absolute() {
             return Err(SqlitePathError::Relative(value.to_owned()));
         }
-        let parent = path.parent().unwrap_or(path);
+        let path = lexically_normal(given);
+        let parent = path.parent().unwrap_or(&path);
         if !writable_directory(parent) {
             return Err(SqlitePathError::UnwritableParent(parent.to_path_buf()));
         }
-        Ok(Self(path.to_path_buf()))
+        Ok(Self(path))
     }
 
     /// The file.
@@ -66,6 +67,23 @@ impl SqlitePath {
     pub fn as_path(&self) -> &Path {
         &self.0
     }
+}
+
+/// `path` with each `.` dropped and each `..` taking the name before it away,
+/// reading no file, as `resolve` normalizes an absolute path: the file named
+/// need not exist, and a `..` at the root stays at the root.
+fn lexically_normal(path: &Path) -> PathBuf {
+    let mut normal = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                normal.pop();
+            }
+            other => normal.push(other),
+        }
+    }
+    normal
 }
 
 /// Whether `directory` is a directory this process may write in, asked of

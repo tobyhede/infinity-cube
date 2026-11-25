@@ -3,6 +3,8 @@
 //! and each Resource document as JSON text, and revisions as canonical
 //! decimal text (`encodeStoredRevision`).
 
+use std::collections::HashMap;
+
 use intake::json::{JsonObject, JsonValue, parse};
 use intake::{SpaceId, SpaceSnapshot, decode_space_snapshot, load_space};
 
@@ -79,6 +81,9 @@ pub(crate) fn same_document(left: &str, right: &str) -> bool {
 fn same_json(left: &JsonValue, right: &JsonValue) -> bool {
     match (left, right) {
         (JsonValue::Object(left), JsonValue::Object(right)) => {
+            // Indexed once, so an object of many keys compares in linear time:
+            // `JsonObject::get` scans its entries.
+            let right: HashMap<&str, &JsonValue> = right.iter().collect();
             left.len() == right.len()
                 && left
                     .iter()
@@ -95,16 +100,27 @@ fn same_json(left: &JsonValue, right: &JsonValue) -> bool {
     }
 }
 
-/// The title a stored space document carries.
+/// The Title a stored space document carries, once the document holds to the
+/// space document's shape (`spaceDocumentSchema`), as `listSpaces` reads it:
+/// a Space the listing names is one its own load can decode. Its Resources
+/// are not read.
 pub(crate) fn decode_title(row: &SpaceRow) -> Result<String, String> {
-    let document = parse(&row.document)
-        .map_err(|error| format!("stored Space {} does not parse: {error}", row.id))?;
-    document
-        .as_object()
-        .and_then(|object| object.get("title"))
-        .and_then(JsonValue::as_str)
-        .map(str::to_owned)
-        .ok_or_else(|| format!("stored Space {} has no title", row.id))
+    let broken = |what: &str| format!("stored Space {} {what}", row.id);
+    let id = SpaceId::parse(&row.id).ok_or_else(|| broken("has an id that is not a UUID"))?;
+    let document =
+        parse(&row.document).map_err(|error| broken(&format!("does not parse: {error}")))?;
+    let json = JsonValue::Object(JsonObject::from_iter([
+        ("id".to_owned(), JsonValue::String(row.id.clone())),
+        ("document".to_owned(), document),
+        ("resources".to_owned(), JsonValue::Array(Vec::new())),
+    ]));
+    decode_space_snapshot(&json, id)
+        .map(|snapshot| snapshot.document.title)
+        .map_err(|refusals| {
+            broken(&format!(
+                "holds a space document that is refused: {refusals}"
+            ))
+        })
 }
 
 /// A stored Space from its rows, through the one Space intake

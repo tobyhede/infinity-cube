@@ -292,10 +292,15 @@ mod given_stored_state_that_cannot_be_read {
 
     #[tokio::test]
     async fn counts_no_outage_between_two_failures_as_confirming_either() {
-        let store = Scripted::new([broken(), unavailable(), broken(), broken()]);
+        // A counted failure, then an outage, then another counted failure: the
+        // outage must reset the count, or the second stops establishment.
+        let store = Scripted::new([unavailable(), broken(), unavailable(), broken()]);
         let clock = Recorded::default();
         let (reported, answer) = kept(&store, &clock).await;
-        assert!(answer.is_err(), "stopped: {answer:?}");
+        assert!(
+            answer.is_ok(),
+            "established once the store answers: {answer:?}"
+        );
         assert_eq!(reported.len(), 4, "the outage reset the count");
     }
 

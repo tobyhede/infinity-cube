@@ -22,12 +22,13 @@ use sqlx::{Database, Transaction};
 
 use crate::assets::{AssetHash, StoredAsset};
 use crate::commit::{
-    CommitDecision, SingleSpaceDecision, decide_commit, decide_single_space, single_update_space,
+    CommitDecision, SingleSpaceDecision, decide_commit, decide_single_space, request_refusal,
+    single_update_space,
 };
 use crate::repository::{
     AggregateInput, AggregateLoad, AssetStored, CommitResult, InitializeResult, LoadedAggregate,
     LoadedSpace, ReplaceResult, RepositoryError, Revision, SpaceCommit, SpaceRepository,
-    SpaceSummary, authored,
+    SpaceSummary, authored, checked_input,
 };
 use codec::{
     ResourceRow, SpaceRow, decode_space, decode_title, encode_revision, encode_space, same_document,
@@ -401,6 +402,9 @@ impl<S: SqlStore> SpaceRepository for SqlSpaceRepository<S> {
     }
 
     async fn commit(&self, request: SpaceCommit) -> Result<CommitResult, RepositoryError> {
+        if let Some(refusal) = request_refusal(&request) {
+            return Ok(refusal);
+        }
         self.alone(async {
             let mut transaction = self.store.begin_write().await?;
             let meta_space_id = stored_meta_space_id::<S>(&mut transaction).await?;
@@ -479,9 +483,10 @@ impl<S: SqlStore> SpaceRepository for SqlSpaceRepository<S> {
         &self,
         input: AggregateInput,
     ) -> Result<InitializeResult, RepositoryError> {
-        if let Err(refusals) = load_aggregate(input.meta_space_id, &input.spaces) {
-            return Ok(InitializeResult::AggregateRefused(refusals));
-        }
+        let input = match checked_input(&input) {
+            Ok(input) => input,
+            Err(refusals) => return Ok(InitializeResult::AggregateRefused(refusals)),
+        };
         self.alone(async {
             let mut transaction = self.store.begin_write().await?;
             let Some(meta_space_id) = established_meta_space_id::<S>(&mut transaction).await?
@@ -524,9 +529,10 @@ impl<S: SqlStore> SpaceRepository for SqlSpaceRepository<S> {
         input: AggregateInput,
         expected_meta_space_id: Option<SpaceId>,
     ) -> Result<ReplaceResult, RepositoryError> {
-        if let Err(refusals) = load_aggregate(input.meta_space_id, &input.spaces) {
-            return Ok(ReplaceResult::AggregateRefused(refusals));
-        }
+        let input = match checked_input(&input) {
+            Ok(input) => input,
+            Err(refusals) => return Ok(ReplaceResult::AggregateRefused(refusals)),
+        };
         self.alone(async {
             let mut transaction = self.store.begin_write().await?;
             let meta_space_id = stored_meta_space_id::<S>(&mut transaction).await?;

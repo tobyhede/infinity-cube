@@ -12,7 +12,7 @@ use crate::commit::{CommitDecision, decide_commit};
 use crate::repository::{
     AggregateInput, AggregateLoad, AssetStored, CommitResult, InitializeResult, LoadedAggregate,
     LoadedSpace, ReplaceResult, RepositoryError, Revision, SpaceCommit, SpaceRepository,
-    SpaceSummary, authored,
+    SpaceSummary, authored, checked_input,
 };
 
 #[derive(Debug, Default)]
@@ -164,9 +164,10 @@ impl SpaceRepository for MemorySpaceRepository {
         &self,
         input: AggregateInput,
     ) -> Result<InitializeResult, RepositoryError> {
-        if let Err(refusals) = load_aggregate(input.meta_space_id, &input.spaces) {
-            return Ok(InitializeResult::AggregateRefused(refusals));
-        }
+        let input = match checked_input(&input) {
+            Ok(input) => input,
+            Err(refusals) => return Ok(InitializeResult::AggregateRefused(refusals)),
+        };
         let mut state = self.state();
         if state.meta_space_id.is_none() && state.spaces.is_empty() {
             return Ok(InitializeResult::Initialized(state.install(input)));
@@ -201,9 +202,10 @@ impl SpaceRepository for MemorySpaceRepository {
         input: AggregateInput,
         expected_meta_space_id: Option<SpaceId>,
     ) -> Result<ReplaceResult, RepositoryError> {
-        if let Err(refusals) = load_aggregate(input.meta_space_id, &input.spaces) {
-            return Ok(ReplaceResult::AggregateRefused(refusals));
-        }
+        let input = match checked_input(&input) {
+            Ok(input) => input,
+            Err(refusals) => return Ok(ReplaceResult::AggregateRefused(refusals)),
+        };
         let mut state = self.state();
         if state.meta_space_id.is_none() && state.spaces.is_empty() {
             return Ok(ReplaceResult::Uninitialized);
