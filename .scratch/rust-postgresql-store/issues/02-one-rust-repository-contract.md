@@ -1,6 +1,6 @@
 # 02 — One Rust repository contract, run by every store
 
-**Status:** ready-for-agent once 01 lands (Q1 answered yes)
+**Status:** ready-for-agent once rust-host/15 and 01 land (Q1 answered yes)
 
 **Blocked by:** rust-host/15, 01.
 **Waits on:** #520 and #521 (rust-host 15) and #528's 01 merging. Lands **instead of** the SQLite-only ports #528's 04, 05, 06 and 12 describe, and before #528's 03 and 13, which this rewrites in its first commit: #528's 03 reads the table file as part of the SQLite adapter, its pending exemptions name this ticket for every contract case, and #528's 13 keeps only the races that are not table cases.

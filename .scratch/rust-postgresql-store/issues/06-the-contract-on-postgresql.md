@@ -1,6 +1,6 @@
 # 06 — The repository contract on PostgreSQL
 
-**Status:** ready-for-agent once 05 lands
+**Status:** ready-for-agent once 03 and 05 land
 
 **Blocked by:** 03, 05.
 

@@ -1,6 +1,6 @@
 # 08 — Port classification, outages and start-up on PostgreSQL
 
-**Status:** ready-for-agent once 05 lands
+**Status:** ready-for-agent once 03 and 05 land
 
 **Blocked by:** 03, 05.
 
@@ -8,9 +8,10 @@
 
 - [ ] A Rust stand-in server, as `test/support/refusing-postgres-server.ts` is in TypeScript: it refuses connections, closes one mid-conversation with a FIN and with an RST, or answers the startup handshake with a chosen SQLSTATE (`28P01`, `3D000`, `53300`, `57P03`), so the cases run against the real driver and pool, not a hand-built error value.
 - [ ] Each case asserts the repository's answer and, where TypeScript does, the HTTP status through `Application` (503 `persistence-unavailable` for a refused connection, 500 `internal-error` for a wrong password, `postgres-unreachable.test.ts:243,255`); a refused connection answers within the pool's acquire timeout plus a margin (Q8).
+- [ ] **Each connect-time case runs twice**, because `sqlx`'s pool retries a refused connection, `53300` and `57P03` until its acquire timeout and then answers only `PoolTimedOut` (`sqlx-core-0.9.1/src/pool/inner.rs:390-401`; `sqlx-postgres-0.9.1/src/error.rs:193-204`), while every other connect error (`28P01`, `3D000`, a reset, `UnexpectedEof`, TLS) surfaces at once. Through the repository and its pool, the case asserts the answer TypeScript's case asserts (Unreachable, 503, within the acquire timeout plus a margin, for those three; the classified answer at once for the rest). Over one direct `PgConnection::connect_with` to the same stand-in server, outside the pool, it hands the driver's own error to `classify` and asserts the class, so a connect-time SQLSTATE port (`sql-connection-failure.test.ts:126`, `:98`'s connect-time values) observes the code itself. The direct run kills "a refused connection classified unclassified" and the `53300`/`57P03` mutants; the pooled run kills a pool built without the acquire timeout.
 - [ ] "reaches the database on the next read rather than repeating the first failure" (`:133`) against a server that resets the first connection and serves the next.
 - [ ] The cause-chain cases (`sql-connection-failure.test.ts:162`, `:175`) are ported as what they guard in Rust: a `40001` or `40P01` raised at `COMMIT`, and one behind a failed rollback, are still classified by SQLSTATE.
 - [ ] Start-up over PostgreSQL: a wrong password stops after the confirming retry (`database-startup.test.ts:455`); too many connections keeps waiting past the confirming limit (`:477`); an unmigrated database stops as Q6 decides.
 - [ ] Rust tests pin the resolver difference (Q5) and `\u0000` answering unclassified by `22P05` (Q11).
 
-**Named mutants (each killed by this ticket's tests):** a refused connection classified unclassified; a connection closed mid-conversation (`UnexpectedEof`) classified unclassified; a wrong password classified unavailable; start-up counting `53300` toward giving up; start-up not stopping on a confirmed `28P01`; a classification that reads the message instead of the code (port of `:179`, a code named only in prose); `COMMIT`-time `40001` left unclassified.
+**Named mutants (each killed by this ticket's tests):** a refused connection classified unclassified; a connection closed mid-conversation (`UnexpectedEof`) classified unclassified; a wrong password classified Unreachable; start-up counting `53300` toward giving up; start-up not stopping on a confirmed `28P01`; a classification that reads the message instead of the code (port of `:179`, a code named only in prose); `COMMIT`-time `40001` left unclassified.

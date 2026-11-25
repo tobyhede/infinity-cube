@@ -1,6 +1,6 @@
 # 09 — The HTTP cases and `serve --store postgres`
 
-**Status:** ready-for-agent once 06 lands
+**Status:** ready-for-agent once 06 and 08 land
 
 **Blocked by:** 06, 08.
 
