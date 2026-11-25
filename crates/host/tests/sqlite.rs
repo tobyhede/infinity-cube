@@ -1301,10 +1301,9 @@ mod given_a_space_at_the_revision_ceiling {
     }
 }
 
-/// Rows changed under a commit by a writer that does not decide through
-/// this repository, as a trigger stands in for one: the store refuses what
-/// the TypeScript host refuses rather than overwriting it (rust-store-gaps
-/// issues 01 and 02).
+/// Rows changed under a write by a writer that does not decide through
+/// this repository, as a trigger stands in for one: the write fails or is
+/// refused rather than overwriting what that writer left (ST-4, ST-20).
 mod given_a_row_changed_outside_the_decision {
     use super::*;
 
@@ -1330,6 +1329,7 @@ mod given_a_row_changed_outside_the_decision {
 
     const OWNER: &str = "10000000-0000-4000-8000-000000000001";
     const CHILD: &str = "10000000-0000-4000-8000-000000000002";
+    const CHILD_RESOURCE: &str = "10000000-0000-4000-8000-0000000000d1";
 
     fn snapshot(json: &str, id: &str) -> intake::SpaceSnapshot {
         let value = intake::json::parse(json).unwrap();
@@ -1358,7 +1358,7 @@ mod given_a_row_changed_outside_the_decision {
     fn child() -> intake::SpaceSnapshot {
         snapshot(
             &format!(
-                r#"{{"id":"{CHILD}","document":{{"version":1,"title":"Child","maps":[{{"id":"10000000-0000-4000-8000-0000000000a1","title":"M","kind":"positioned","positions":{{}},"graphs":[{{"id":"10000000-0000-4000-8000-0000000000b1","title":"G","edges":[]}}]}}]}},"resources":[{{"id":"10000000-0000-4000-8000-0000000000d1","document":{{"title":"Note","kind":"ur","content":{{}}}}}}]}}"#
+                r#"{{"id":"{CHILD}","document":{{"version":1,"title":"Child","maps":[{{"id":"10000000-0000-4000-8000-0000000000a1","title":"M","kind":"positioned","positions":{{}},"graphs":[{{"id":"10000000-0000-4000-8000-0000000000b1","title":"G","edges":[]}}]}}]}},"resources":[{{"id":"{CHILD_RESOURCE}","document":{{"title":"Note","kind":"ur","content":{{}}}}}}]}}"#
             ),
             CHILD,
         )
@@ -1387,8 +1387,6 @@ mod given_a_row_changed_outside_the_decision {
         .await;
     }
 
-    // TypeScript's `#createStoredSpace` inserts, so a row already there
-    // fails on `spaces_pkey` and escapes unclassified.
     #[tokio::test]
     async fn fails_an_initialization_meeting_a_space_row_already_written() {
         let file = Migrated::new().await;
@@ -1412,7 +1410,6 @@ mod given_a_row_changed_outside_the_decision {
         );
     }
 
-    // A created Space is written by `#createStoredSpace` too.
     #[tokio::test]
     async fn fails_a_commit_creating_a_space_whose_row_is_already_written() {
         let file = Migrated::new().await;
@@ -1454,8 +1451,6 @@ mod given_a_row_changed_outside_the_decision {
         );
     }
 
-    // TypeScript checks that a deleted Space's row was removed, and throws
-    // when it was not.
     #[tokio::test]
     async fn fails_a_commit_deleting_a_space_whose_row_is_already_gone() {
         let file = Migrated::new().await;
@@ -1508,8 +1503,111 @@ mod given_a_row_changed_outside_the_decision {
         );
     }
 
-    // TypeScript's `#upsertResources` reads back the row's owner and refuses
-    // as `invalid-commit` (`ResourceOwnershipError`).
+    #[tokio::test]
+    async fn refuses_a_commit_creating_a_space_whose_resource_row_is_already_written() {
+        let file = Migrated::new().await;
+        let store = open(&file.path());
+        let Ok(InitializeResult::Initialized(before)) = store
+            .initialize_aggregate(AggregateInput {
+                meta_space_id: owner_id(),
+                spaces: vec![owner(false)],
+            })
+            .await
+        else {
+            panic!("the owner alone is initialized");
+        };
+        // Once the owner's row is written, a row holding the child's
+        // Resource is there, owned by the owner, before the child is.
+        execute(
+            &file.file,
+            &format!(
+                "CREATE TRIGGER claimed AFTER UPDATE ON spaces WHEN NEW.id = '{OWNER}' \
+                 BEGIN INSERT INTO resources (id, space_id, document, updated_at) \
+                 VALUES ('{CHILD_RESOURCE}', '{OWNER}', '{{}}', datetime('now')); END;"
+            ),
+        )
+        .await;
+
+        assert_eq!(
+            store
+                .commit(SpaceCommit {
+                    changes: vec![
+                        SpaceChange::Update {
+                            space_id: owner_id(),
+                            snapshot: owner(true),
+                            expected_revision: Revision::FIRST,
+                        },
+                        SpaceChange::Create {
+                            space_id: child_id(),
+                            snapshot: child(),
+                        },
+                    ],
+                })
+                .await,
+            Ok(CommitResult::Rejected {
+                message: format!("Resource {CHILD_RESOURCE} already belongs to another space")
+            }),
+            "the created Space's Resource is not written over the row already there"
+        );
+        assert_eq!(
+            store.load_aggregate().await,
+            Ok(AggregateLoad::Loaded(before)),
+            "nothing the commit wrote is kept"
+        );
+    }
+
+    #[tokio::test]
+    async fn fails_a_commit_updating_a_space_whose_row_is_already_gone() {
+        let file = Migrated::new().await;
+        let store = open(&file.path());
+        let Ok(InitializeResult::Initialized(before)) = store
+            .initialize_aggregate(AggregateInput {
+                meta_space_id: owner_id(),
+                spaces: vec![owner(true), child()],
+            })
+            .await
+        else {
+            panic!("the owner and child are initialized");
+        };
+        // Once the child's Resource row is deleted, its Space row is gone
+        // too, before this store writes it.
+        execute(
+            &file.file,
+            &format!(
+                "CREATE TRIGGER vanished AFTER DELETE ON resources WHEN OLD.space_id = '{CHILD}' \
+                 BEGIN DELETE FROM spaces WHERE id = '{CHILD}'; END;"
+            ),
+        )
+        .await;
+        let mut emptied = child();
+        emptied.resources.clear();
+
+        assert_eq!(
+            store
+                .commit(SpaceCommit {
+                    changes: vec![SpaceChange::Update {
+                        space_id: child_id(),
+                        snapshot: emptied,
+                        expected_revision: Revision::FIRST,
+                    }],
+                })
+                .await,
+            Err(RepositoryError::Unclassified(format!(
+                "Space {CHILD} disappeared under its row lock"
+            ))),
+            "the Space is not written back"
+        );
+        assert_eq!(
+            store.load_aggregate().await,
+            Ok(AggregateLoad::Loaded(before)),
+            "nothing the commit wrote is kept"
+        );
+    }
+
+    // As TypeScript's `#upsertResources` refuses one in
+    // `test/support/repository-contract.ts` › "writes a moved Resource
+    // through the ownership check, which refuses it before its Space
+    // releases it".
     #[tokio::test]
     async fn refuses_an_update_writing_a_resource_another_space_owns() {
         let file = Migrated::new().await;

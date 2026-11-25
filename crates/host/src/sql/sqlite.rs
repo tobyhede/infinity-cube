@@ -316,24 +316,21 @@ impl SqlStore for SqliteStore {
         .map(drop)
     }
 
-    async fn write_space(
+    async fn update_space(
         connection: &mut SqliteConnection,
         row: &SpaceRow,
-    ) -> Result<(), sqlx::Error> {
-        sqlx::query(sqlx::AssertSqlSafe(format!(
-            "INSERT INTO spaces (id, document, revision, exported_revision, updated_at) \
-             VALUES ($1, $2, $3, $4, {NOW}) \
-             ON CONFLICT (id) DO UPDATE SET document = excluded.document, \
-             revision = excluded.revision, exported_revision = excluded.exported_revision, \
-             updated_at = excluded.updated_at"
+    ) -> Result<bool, sqlx::Error> {
+        let updated = sqlx::query(sqlx::AssertSqlSafe(format!(
+            "UPDATE spaces SET document = $2, revision = $3, exported_revision = $4, \
+             updated_at = {NOW} WHERE id = $1"
         )))
         .bind(&row.id)
         .bind(&row.document)
         .bind(&row.revision)
         .bind(&row.exported_revision)
         .execute(connection)
-        .await
-        .map(drop)
+        .await?;
+        Ok(updated.rows_affected() > 0)
     }
 
     async fn delete_space(
