@@ -6,7 +6,7 @@
 
 **Blocked by:** 15.
 
-**What to build:** The same SQL repository on PostgreSQL, `serve --store postgres`, and the move of migration to Rust that ADR 0173 decides. The acceptance criteria are the Agent Brief's, below; they replace the two this ticket was written with.
+**What to build:** The same SQL repository on PostgreSQL, `serve --store postgres`, and the move of migration to Rust that ADR 0174 decides. The acceptance criteria are the Agent Brief's, below; they replace the two this ticket was written with.
 
 ## Comments
 
@@ -14,7 +14,7 @@
 
 ### Triage notes (2026-11-22)
 
-Superseded by the Agent Brief below, which records the maintainer's answers (ADR 0173).
+Superseded by the Agent Brief below, which records the maintainer's answers (ADR 0174).
 
 **Why it is waiting:** it is blocked on a maintainer decision, not on work only a person can do, so it is `needs-info`. *Whether* Rust owns the migration history is decided: ADR 0155 says ownership moves to Rust when PostgreSQL does, and ST-125 restates it; ADR 0165 keeps a Prisma Next package and its plain-SQL file added together until then. What is open is how to carry that out while `pnpm dev`, the TypeScript suites and `pnpm e2e:postgres` still migrate through Prisma Next until 19, given that each tool's applied-migration record (`_sqlx_migrations`, Prisma Next's marker and ledger) must be seeded before it can follow a database the other migrated. 15 leaves that seeding, for SQLite too, to this ticket. The maintainer needs to decide:
 
@@ -29,16 +29,16 @@ The answer refines ADR 0155 and ADR 0165 in a new ADR, and ST-125 with it.
 ### Agent Brief (grilled with the maintainer, 2026-11-24)
 
 **Category:** enhancement
-**Summary:** PostgreSQL as a second store beneath 15's SQL repository, served by `infinity-cube serve --store postgres`, and `sqlx` as the only migrator for both databases through `infinity-cube migrate`, as ADR 0173 decides.
+**Summary:** PostgreSQL as a second store beneath 15's SQL repository, served by `infinity-cube serve --store postgres`, and `sqlx` as the only migrator for both databases through `infinity-cube migrate`, as ADR 0174 decides.
 
 **Current behavior:** After 15, the Rust host has one SQL repository with a SQLite store and `serve --store sqlite`, which does not migrate. Both databases are migrated by Prisma Next (`pnpm db:migrate`, `pnpm db:migrate:sqlite`), whose packages under `migrations/app/` and `migrations-sqlite/app/` are held to the plain-SQL files under `migrations-sql/` by `test/unit/shared-migrations.test.ts` and `crates/host/tests/shared_migrations.rs` (ST-125). The TypeScript hosts serve `pnpm dev`, `pnpm dev:sqlite` and both restart proofs, querying through the Prisma Next contract.
 
 **Desired behavior:**
 - **The PostgreSQL store** is a second small store of statements beneath 15's one SQL repository (ST-3), answering every `SpaceRepository` method as the SQLite and memory stores do, through the same `decide_commit`; PostgreSQL's concurrency answers are the TypeScript PostgreSQL store's, as Storage states them.
 - **`infinity-cube serve --store postgres [--port <port>]`** serves the database `DATABASE_URL` names, with 15's listener, `Host` check, announcement, signals and start-up (ST-10: serve at once, establish the Meta Space in the background, back off, stop on a confirmed failure). It does not migrate. An unset or blank `DATABASE_URL` is refused before anything is served.
-- **`infinity-cube migrate --store <postgres|sqlite>`** applies the plain-SQL files with `sqlx`'s migrator to the database `DATABASE_URL` or the file `SQLITE_PATH` names, and exits zero when every file is applied. For SQLite it refuses a relative path, a missing or unwritable parent and a blank or unset `SQLITE_PATH`, and creates a missing file (ST-126 as ADR 0173 amends it). A database holding tables but no `_sqlx_migrations` (one Prisma Next migrated) is refused, exiting non-zero with a message saying to reset it; nothing adopts it.
+- **`infinity-cube migrate --store <postgres|sqlite>`** applies the plain-SQL files with `sqlx`'s migrator to the database `DATABASE_URL` or the file `SQLITE_PATH` names, and exits zero when every file is applied. For SQLite it refuses a relative path, a missing or unwritable parent and a blank or unset `SQLITE_PATH`, and creates a missing file (ST-126 as ADR 0174 amends it). A database holding tables but no `_sqlx_migrations` (one Prisma Next migrated) is refused, exiting non-zero with a message saying to reset it; nothing adopts it.
 - **Prisma Next stops migrating.** The migration packages, `shared-migrations.test.ts`, `shared_migrations.rs` and the `db:migrate` and `db:migrate:sqlite` scripts are deleted, with the migration settings of the `prisma-next.config*.ts` files that only they read. Every caller runs `cargo run -p infinity-cube --locked -q -- migrate --store …` instead: `test:integration:postgres`, `test:integration:sqlite`, `scripts/dev-sqlite.ts`, the CI jobs, and the messages and docs that name `pnpm db:migrate:sqlite` (the TypeScript CLI's missing-file refusal among them). The Prisma Next contract and its `contract:emit` scripts stay, for the TypeScript runtime's queries, until 20.
-- **CI holds the contract to the schema.** The `postgres` and `sqlite` jobs install the pinned toolchain (`rust-toolchain.toml`) with the Cargo cache the `rust` job uses, migrate with the Rust binary, then run `prisma-next db verify --schema-only` against the migrated database before the integration suites and the restart proof run on it: the `postgres` job with the default `prisma-next.config.ts`, the `sqlite` job with `--config prisma-next.config.sqlite.ts`, as `main`'s jobs do today. Not `--strict`, which fails on any table the contract does not declare, `_sqlx_migrations` among them (ADR 0173).
+- **CI holds the contract to the schema.** The `postgres` and `sqlite` jobs install the pinned toolchain (`rust-toolchain.toml`) with the Cargo cache the `rust` job uses, migrate with the Rust binary, then run `prisma-next db verify --schema-only` against the migrated database before the integration suites and the restart proof run on it: the `postgres` job with the default `prisma-next.config.ts`, the `sqlite` job with `--config prisma-next.config.sqlite.ts`, as `main`'s jobs do today. Not `--strict`, which fails on any table the contract does not declare, `_sqlx_migrations` among them (ADR 0174).
 - **The PostgreSQL restart proof** (`pnpm e2e:postgres`) starts its hosts by command as 15 makes the SQLite one do, and passes on both the Vite host and `serve --store postgres`.
 - **A schema change is a new plain-SQL file** in each of `migrations-sql/postgres/` and `migrations-sql/sqlite/`; `AGENTS.md`, Storage, `migrations-sql/README.md` and `docs/agents/build-tooling.md` say so, and the last two no longer describe the deleted packages or their equality test, while keeping the contract and `contract:emit` guidance for the TypeScript runtime's queries.
 
@@ -54,5 +54,5 @@ The answer refines ADR 0155 and ADR 0165 in a new ADR, and ST-125 with it.
 
 **Out of scope:**
 - `import` and `export` against a store, and `init` (17); the development and test hosts' defaults moving to Rust (19); retiring the Prisma Next contract with the TypeScript server (20).
-- Adopting or preserving any database Prisma Next migrated (ADR 0173).
+- Adopting or preserving any database Prisma Next migrated (ADR 0174).
 - Adopting mise or any other task runner or toolchain manager.

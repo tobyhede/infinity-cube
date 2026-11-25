@@ -460,4 +460,4 @@ The snapshot marker moved from `a0f5066` to `f6e01b9`; the highest accepted ADR 
 
 | Source | Disposition |
 |---|---|
-| Shift at Resize start keeps the current Map rect’s ratio for one gesture, which stores no proportion | → RD-2 (no drawing constraint); the gesture → UI-67 |
+| 0173 Shift at Resize start keeps the current Map rect’s ratio for one gesture, which stores no proportion | → RD-2 (no drawing constraint); the gesture → UI-67 |
