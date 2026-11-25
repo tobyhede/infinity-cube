@@ -1,6 +1,6 @@
 # 00 — A cold, independent audit of this plan
 
-**Status:** ready-for-agent
+**Status:** done (2026-11-25; reports in the project's `reviews/rust-postgresql-plan-audit-2026-11-25/`, applied to this folder)
 
 **Blocked by:** None. Runs before any other ticket here, and before the user's answers are applied, so its findings can change the questions.
 

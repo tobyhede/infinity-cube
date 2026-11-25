@@ -6,7 +6,9 @@
 
 **What to build:** A cold review, by agents given only the code at that commit and the TypeScript tests, none of this plan's reports, of whether the Rust PostgreSQL store reaches test parity. Its report goes to the project's `reviews/`, with evidence.
 
-- [ ] A case map built independently from the TypeScript files (not from `case-map.md`), each case marked ported (with the Rust test's `file:line`), exempt (with the exemption's reason, judged true or not) or missing.
-- [ ] A fresh set of hand mutants of `sql/postgres.rs` and the concurrency seam, none taken from the catalogue, run against the PostgreSQL oracle, with each survivor.
-- [ ] Every claim in Storage's PostgreSQL host section and in the ADR checked against code and tests.
+- [ ] A case map built independently from the TypeScript files (not from `case-map.md`), each case marked ported (with the Rust test's `file:line`), exempt (with the reason, judged true or not) or missing.
+- [ ] A fresh set of hand mutants of `sql/postgres.rs` and the concurrency seam, none taken from 13's catalogue, run against every PostgreSQL test, with each survivor.
+- [ ] Every claim in Storage's PostgreSQL host section and in 01's ADR checked against code and tests.
 - [ ] Findings become tickets; this plan is closed only when none is a correctness gap.
+
+**Named mutants:** none of its own; it makes fresh ones by design.

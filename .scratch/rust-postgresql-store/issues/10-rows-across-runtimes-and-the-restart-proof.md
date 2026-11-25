@@ -2,11 +2,14 @@
 
 **Status:** ready-for-agent once 09 lands
 
-**Blocked by:** 09; #528's 08 (its fixture scripts and currency checks, which this extends to PostgreSQL).
+**Blocked by:** 09; #528's 08 (its fixture scripts and currency checks, which this extends to PostgreSQL). Edits CI's `postgres` job as rust-host 16 does; rebase on whichever lands first.
 
-**What to build:** Checks that a PostgreSQL database written by either runtime reads correctly in the other, in both directions, and the PostgreSQL restart proof run on `serve --store postgres`.
+**What to build:** Checks that a PostgreSQL database written by either runtime reads correctly in the other, in both directions, and the PostgreSQL restart proof on `serve --store postgres`.
 
-- [ ] A Rust test replays a checked-in dump of rows the TypeScript repository wrote to PostgreSQL (written by a script, as `scripts/sqlite-rows-fixture.ts` writes SQLite's), and asserts `load_aggregate`, `list_spaces` and `load_asset` absolutely; a check regenerates the dump and fails CI, naming the command, when it is stale.
-- [ ] A test in `pnpm test:integration:postgres` loads a dump the Rust repository wrote (by the same script of commits #528's 08 runs: initialize from Default Content, store an asset, create and link a Space, delete a Space, edit a Resource) and compares what TypeScript reads with the same script run on the TypeScript memory store, with the same currency check.
+- [ ] A Rust test replays a checked-in dump of rows the TypeScript repository wrote to PostgreSQL (written by a script, as `scripts/sqlite-rows-fixture.ts` writes SQLite's) and asserts `load_aggregate`, `list_spaces` and `load_asset` absolutely; a check regenerates the dump and fails CI, naming the command, when it is stale.
+- [ ] A test in `pnpm test:integration:postgres` loads a dump the Rust repository wrote (by the script of commits #528's 08 runs) and compares what TypeScript reads with the same script run on the TypeScript memory store, with the same currency check.
 - [ ] Both dumps hold a Resource of a kind no plugin lists, an Ur and a Mermaid Resource, an Edge with no Title drawn, and content whose keys `jsonb` reorders.
-- [ ] `pnpm e2e:postgres` starts its hosts by command as the SQLite proof does (`test/support/restart-proof-host.ts`), and CI's `postgres` job runs it on the Vite host and on `serve --store postgres` built in that job.
+- [ ] `pnpm e2e:postgres` (`test/e2e/postgres-persistence.spec.ts:46`, ported here) starts its hosts by command as the SQLite proof does (`test/support/restart-proof-host.ts`), and CI's `postgres` job runs it on the Vite host and on `serve --store postgres` built in that job.
+- [ ] `AGENTS.md` (E2E) and Storage's restart-proof text say the PostgreSQL proof runs on both hosts.
+
+**Named mutants (each killed by this ticket's tests):** Rust writing a document key TypeScript does not read; Rust writing `revision` as a number rather than text; the restart proof's command host ignored (still starting Vite).
