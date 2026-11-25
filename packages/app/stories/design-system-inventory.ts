@@ -170,6 +170,16 @@ export const handRolledStyles = [
  */
 export const interactiveDeviations = [
   {
+    subject: 'Resource resize with Shift held at start',
+    existingInfinityCubeComponentConsidered: 'ResourceNode with the existing NodeResizeControl',
+    shadcnOrBaseUiConsidered: 'React Flow NodeResizeControl',
+    productRequirement: 'Preserve the starting rect proportions for a complete Shift-drag',
+    whyCompositionIsInsufficient: 'Changing keepAspectRatio during a drag tears down its listeners',
+    customBehaviour:
+      'Capture the starting ratio and constrain proposals through the stable callback',
+    tests: 'aspect-ratio-resizing browser specification',
+  },
+  {
     subject: 'packages/plugin-image/src/view.tsx — dropping a file on the picture',
     existingInfinityCubeComponentConsidered:
       'The plugin draws inside its own rect with `@project/resource-api` alone (ADR 0142), so no `@project/ui` component is reachable from it; Replace itself is a rail command, which the host draws.',
