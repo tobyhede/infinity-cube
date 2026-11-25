@@ -1,6 +1,6 @@
 # 01 — Record the PostgreSQL decisions
 
-**Status:** ready-for-agent (the user answered every question on 2026-11-26)
+**Status:** ready-for-agent (the user answered every question on 2026-11-25)
 
 **Blocked by:** nothing. It extends #528's 02 (its ADR) rather than repeating it; whichever lands second rebases onto the other.
 

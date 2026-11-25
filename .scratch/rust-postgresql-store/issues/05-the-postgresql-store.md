@@ -2,7 +2,7 @@
 
 **Status:** ready-for-agent once 04 lands (Q3–Q10, Q14 and Q15 answered)
 
-**Blocked by:** 04.
+**Blocked by:** 03, 04 (03's PostgreSQL adapter must exist to count this ticket's `// Case:` ports).
 
 **What to build:** `crates/host/src/sql/postgres.rs`: PostgreSQL's `SqlStore` beneath the one SQL repository (ST-3), over the schema `migrations-sql/postgres/` produces, and the test support every later ticket uses.
 
