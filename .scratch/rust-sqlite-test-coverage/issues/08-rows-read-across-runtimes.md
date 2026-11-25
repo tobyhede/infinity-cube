@@ -9,4 +9,4 @@
 - [ ] A check regenerates the TypeScript-written dump by its own script, normalises timestamps, compares it with the checked-in copy, and fails CI naming the command that regenerates it.
 - [ ] A Rust test runs a script on a migrated file (initialize from Default Content, store an asset, create and link a Space, delete a Space, edit a Resource) and writes the rows to a checked-in dump, with the same currency check.
 - [ ] A test in `pnpm test:integration:sqlite` loads that Rust-written dump into a migrated file and compares `loadAggregate`, `listSpaces` and `loadAsset` with the same script run on the TypeScript memory store.
-- [ ] Both dumps cover a Resource of a kind no plugin lists, an Ur and a Mermaid Resource, and an Edge with no Title drawn.
+- [ ] Both dumps cover a Resource of a kind no plugin lists, an Ur and a Mermaid Resource, and an Edge with no Title drawn. The shared fixture has none of these, so the script commits them itself rather than changing the fixture.

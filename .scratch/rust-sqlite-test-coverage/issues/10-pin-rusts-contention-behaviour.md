@@ -6,6 +6,5 @@
 
 **What to build:** Tests of how the Rust SQLite repository answers another process's lock, holding the behaviour ST-127 allows and 02 records, not TypeScript's.
 
-- [ ] For a shared, a reserved and an exclusive lock held by a second process, `load_space`, `commit` and `replace_aggregate` each answer as Rust does today: a write against a reserved lock waits out the busy timeout, then answers unavailable (503) and leaves no partial write; the others as ST-127 says.
-- [ ] Each timing assertion uses a margin wide enough for a loaded CI runner, or paused time where the wait is Rust's own.
-- [ ] One test shows a `replace_aggregate` and a commit in the same process are serialised: neither sees the other half-done.
+- [ ] For a shared, a reserved and an exclusive lock held by a second process, `load_space`, `commit` and `replace_aggregate` each answer as Rust does today: each answer and whether it waits out the busy timeout or fails at once is asserted, not left to ST-127, which allows both; a write against a reserved lock waits out the busy timeout, then answers unavailable (503) and leaves no partial write, and a read beside a shared or reserved lock succeeds without waiting.
+- [ ] Each timing assertion sets a short busy timeout of its own and allows at least ten times it, or uses paused time where the wait is Rust's own. One test pins the default busy timeout (5 s) by reading the connection's setting, not by waiting.
