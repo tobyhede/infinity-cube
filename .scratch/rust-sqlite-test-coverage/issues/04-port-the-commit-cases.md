@@ -8,8 +8,8 @@
 
 No SQLite test today commits through the aggregate write path (the `CommitDecision::Write` branch of `commit` in `crates/host/src/sql.rs`); aborting there leaves every Rust test green. These ports are what reach it.
 
-- [ ] Each commit case 03 lists for this ticket has a port, and its pending exemption is deleted.
-- [ ] Replacing the `CommitDecision::Write` branch with `std::process::abort()` fails at least one port, and so does each of: deleting no Space row, deleting no dropped Resource row, ignoring the expected revision on that path, not advancing the revision on that path, and running a commit's deletes after its first write. The PR description records each mutant and the port that kills it.
+- [ ] Each commit case 03 lists for this ticket has a port, and its pending exemption is deleted. The revision-ceiling case's port is 01's test. A commit creating a Space already stored answers a conflict on SQLite, asserted as an absolute answer, not only against the memory store.
+- [ ] Replacing the `CommitDecision::Write` branch with `std::process::abort()` fails at least one port in the `host` crate (not only `crates/cli/tests/serve.rs`, which already fails on it), and so does each of: deleting no Space row, deleting no dropped Resource row, ignoring the expected revision on that path, not advancing the revision on that path, and running a commit's deletes after its first write. The PR description records each mutant and the port that kills it.
 - [ ] A Rust test, not a port, holds the change-order decision: a Resource move listing the receiving Space first commits on the memory store and on SQLite, with the same end state, the Resource's row naming the receiving Space, as the same move listing the releasing Space first. Both directions between a lower and a higher Space id.
 - [ ] A Rust test holds that a Space's exported revision survives a commit that rewrites that Space's row on the aggregate write path (mark it exported, commit a multi-Space change touching it, reopen, read the exported revision).
 - [ ] `replace_aggregate` over stored Spaces the input drops leaves none of them, read back after a reopen.
