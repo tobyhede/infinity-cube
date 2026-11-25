@@ -262,8 +262,8 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 | 0169 a preview build is a normal GitHub release, marked latest, and an installed build's updater reads the newest published release's `latest.json` | → ST-130, restated after the marker's check |
 | 0171 the Start window (New Space, Open Folder…, recent Spaces), New Space as a name-and-location form whose name is the Meta Space's Title and must be one folder name, reopening the Spaces open when the last quit began, Recent as a separate history of Spaces opened, both kept in the application's data directory, the last window (Space or Start) closing per platform, the Start window built from `@project/ui` holding its own commands | → ST-131 (the Start window, New Space and the last window closing **built**, ticket 02; reopening and Recent **not built**, ticket 03); ST-121 points to it. The Start window's layout → UI-111 |
 | 0171 rejected options | dropped: rejected alternatives |
-| 0173 from rust-host 16, `sqlx` is the only migrator for both databases, through `infinity-cube migrate`; the Prisma Next packages and the two equality tests are deleted; a database Prisma Next migrated is refused, not adopted; CI holds the contract to each migrated database with `prisma-next db verify --schema-only`; `migrate --store sqlite` refuses a blank `SQLITE_PATH` | → ST-125 and ST-126, as not built |
-| 0173 rejected options | dropped: rejected alternatives |
+| 0174 from rust-host 16, `sqlx` is the only migrator for both databases, through `infinity-cube migrate`; the Prisma Next packages and the two equality tests are deleted; a database Prisma Next migrated is refused, not adopted; CI holds the contract to each migrated database with `prisma-next db verify --schema-only`; `migrate --store sqlite` refuses a blank `SQLITE_PATH` | → ST-125 and ST-126, as not built |
+| 0174 rejected options | dropped: rejected alternatives |
 
 ## 2. Guides
 
