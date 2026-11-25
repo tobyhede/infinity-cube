@@ -14,7 +14,7 @@ The rule ids in `../navigation.md` are append-only from this version on.
 
 ## 1. Old guides
 
-### `docs/adr/archive/agent-guides/navigation.md`
+### `docs/agents/navigation.md` at `797b2908`
 
 | Source | Disposition |
 |---|---|
@@ -47,7 +47,7 @@ The rule ids in `../navigation.md` are append-only from this version on.
 | A promise answers later; late `false` holds while no later traversal kept | folded → NV-35 |
 | Entry numbering (`infinityCubeHistoryIndex`), fragment entries, uncounted foreign `pushState` | §6 code note |
 
-### `docs/adr/archive/agent-guides/rendering.md` (Stage and presenting parts only; the rest is RD's)
+### `docs/agents/rendering.md` at `797b2908` (Stage and presenting parts only; the rest is RD's)
 
 | Source | Disposition |
 |---|---|
@@ -316,7 +316,7 @@ NV-7, NV-9, NV-10, NV-11 (no source names the shared selection beyond 0112's sen
 
 ## 7. Sources since the baseline
 
-Main moved on after the rewrite's baseline (commit `797b2908`). The archived guide `docs/adr/archive/agent-guides/navigation.md` is main's version; its one change since the baseline renames the history index (`infinityCubeHistoryIndex`, §6). These are the rules main's later ADRs and glossary add or change that feed this doc.
+Main moved on after the rewrite's baseline (commit `797b2908`). Main's version of the guide, `docs/agents/navigation.md` at `d14ff974` (the copy the rewrite archived), differs from the baseline's; its one change since the baseline renames the history index (`infinityCubeHistoryIndex`, §6). These are the rules main's later ADRs and glossary add or change that feed this doc.
 
 | Source | Disposition |
 |---|---|
@@ -371,3 +371,35 @@ The snapshot marker moved from `a0f5066` to `f6e01b9`; the highest accepted ADR 
 |---|---|
 | 0165 | reviewed, no rule here: Prisma Next and `sqlx` apply one schema history in two encodings, held equal by tests; restated in ST-125 |
 | Code since `a0f5066`: PR 506 (the plain-SQL migrations under `migrations-sql/` and their tests) and PR 502 (the README's Running and SQLite sections, the `infinity-cube` plugin skills, and Storage ST-126–ST-128) | no behaviour this doc states |
+
+## Refresh to `3f6aa29` (24 November 2026)
+
+The snapshot marker moved from `f6e01b9` to `3f6aa29` and to accepted ADRs through 0172; no ADR 0170 is on main at that commit. Each ADR accepted above the old marker was read for rules this doc owns, and each change main merged since `f6e01b9`'s refresh (PR 503) was read for behaviour this doc states.
+
+| Source | Disposition |
+|---|---|
+| 0167 | reviewed, no rule here: the desktop application has no home window, opens folders from native menus and creates a Space only when asked; restated in ST-121 and UI-8 |
+| 0168 | reviewed, no rule here: each platform's standard menus, Help in the system browser, one update check at a time; restated in ST-121 and UI-8 |
+| 0169 | reviewed, no rule here: a preview build is a normal release the updater finds at `releases/latest`; restated in ST-129 and ST-130 |
+| 0171 | reviewed, no rule here: the desktop application's Start window, New Space, reopening and Recent; restated in ST-131 and UI-111 |
+| 0172 | reviewed, no rule here: the shell's own pages are a second build of the browser application; restated in ST-131 |
+| Code since PR 503: PRs 513, 516, 522 and 526 (the install script, the preview builds and the updater), 517 and 524 (the desktop shell's windows and menus, and the asset client sending a picked file's bytes from memory, already in ST-121's evidence), 527 (the Start window, its page, and `@project/ui`'s `Item`, an icon and `Button`'s `link` variant), 525 (the CRAP gate), and 514, 523 and 515 (documentation) | no behaviour this doc states |
+
+## Refresh to `343a66c` (25 November 2026)
+
+The snapshot marker moved from `3f6aa29` to `343a66c` and to accepted ADRs through 0174: [Shift at Resize start keeps the Resource’s proportions](../../adr/0173-shift-at-resize-start-keeps-the-resources-proportions.md) (0173) and [sqlx is the only migrator once PostgreSQL moves to Rust](../../adr/0174-sqlx-is-the-only-migrator-once-postgresql-moves-to-rust.md), which also carried 0173 at that commit and was renumbered 0174 on 25 November 2026, called here 0173 (Shift at Resize start) and 0174 (sqlx); no ADR 0170 is on main. Each ADR accepted or amended above the old marker was read for rules this doc owns, and each change main merged since `3f6aa29` (PRs 508, 509, 518 and 519) was read for behaviour this doc states.
+
+| Source | Disposition |
+|---|---|
+| 0173 (Shift at Resize start): Shift on the resize control chooses the gesture and never changes selection, although Shift is the multi-selection key | → NV-9 (amended: points to UI-67, with the Shift-click e2e as evidence) |
+| 0174 (sqlx) | reviewed, no rule here: `sqlx` is the only migrator once PostgreSQL moves to Rust, and the Prisma Next migration packages go; restated in ST-125 and ST-126 |
+| 0122, 0155 and 0165, amended status blocks | reviewed, no rule here: each gained only a `Refined by` entry, 0122's for 0173 (Shift at Resize start) and 0155's and 0165's for 0174 (sqlx); no decision changed |
+| Code since `3f6aa29`: PRs 508 and 509 (proportional Resize: `react-flow-adapter/src/proportional-resize.ts`, `ResourceNode.tsx`, their tests and `app/e2e/aspect-ratio-resizing.spec.ts`), 518 (triage of rust-host 15 and 16, 0174 (sqlx) and the mise ticket) and 519 (the SQLite restart proof starting its hosts by command: `test/support/restart-proof-host.ts`, `test/e2e/sqlite-persistence.spec.ts`, `conformance/http/host-process.ts`) | 508 and 509 → NV-9; 518 and 519: no behaviour this doc states |
+
+## Independent rerun at `343a66c` (25 November 2026)
+
+An independent rerun of the snapshot refresh rechecked this topic against main `343a66c` (main had not moved) and both ADRs numbered 0173 at that commit. The marker is unchanged: no rule changed meaning.
+
+| Source | Disposition |
+|---|---|
+| This doc's "Terms not yet in `CONTEXT.md`" working definitions | moved to `CONTEXT.md` as glossary entries (Navigation, Address, Location, Product URL, Presentation, Open Space, Composed Space); the doc's Terms line now points to them, and `check-glossary.py` holds every term it names to an entry. No definition changed meaning; where two docs defined a term differently, the entry states both docs' meaning |

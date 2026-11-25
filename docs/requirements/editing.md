@@ -2,7 +2,7 @@
 
 **Purpose:** how any Edit is derived, committed and published in the browser, what each outcome means, how a session persists and recovers, how one Edit spans several Spaces, and what withholds authoring, Claims and exclusive work included.
 
-**Snapshot:** checked against `f6e01b9` (2026-11-21); incorporates accepted ADRs through 0166. ADRs accepted after it bind where they differ, until this document is updated. Proposed ADR 0163 is not incorporated.
+**Snapshot:** checked against `343a66c` (2026-11-25); incorporates accepted ADRs through 0174; no ADR 0170 is on main at that commit. At `343a66c` both 0173 and 0174 carried the number 0173; the later, sqlx is the only migrator, was renumbered 0174 on 25 November 2026. ADRs accepted after it bind where they differ, until this document is updated. Proposed ADR 0163 is not incorporated.
 
 Open conflicts are listed in [conflicts/editing.md](conflicts/editing.md). Sources are traced in [trace/editing.md](trace/editing.md).
 
@@ -14,19 +14,7 @@ Open conflicts are listed in [conflicts/editing.md](conflicts/editing.md). Sourc
 | The keys and gestures that commit or cancel, where a refusal or notice shows, focus, the persistence report and its words, confirmation dialogs | [ui.md](ui.md) |
 | Selection, Traversal history, choosing a Map, switching and exiting Open Spaces, what a replacement clears in navigation, navigation held during exclusive work | [navigation.md](navigation.md) |
 
-**Terms** defined in [`CONTEXT.md`](../../CONTEXT.md) and used here: Interaction draft, Replacement epoch, Claim.
-
-**Terms not yet in `CONTEXT.md`** (working definitions until the glossary carries them):
-- **Space Authoring**: the one module that derives, validates and installs every single-Space Edit.
-- **Completion**: the completed fact a surface reports to Space Authoring, such as "this Resource settled at this point". It carries identities and settled values, never a snapshot or plan.
-- **Session**: one Space's working Space, the revision last acknowledged and its persistence status.
-- **Coordinated Edit**: one atomic Edit over several Spaces' sessions, made by the Space Resource lifecycle. Each Space it changes is a **participant**.
-- **Coordination turn**: one coordinated Edit's run from start to the repository's answer. Only one runs at a time, behind the **barrier**, which pauses every session's commits.
-- **Recovery replay**: Retry or Keep local on a failed coordinated Edit, which resends it as a new coordination turn. Accept stored is not a replay: it installs the stored Spaces in every participant at once and resends nothing.
-- **Canvas Edit** and **drawn Edit**: an Edit made through the canvas Map, or through a Map drawn inside an Open Space Resource (see maps-and-graphs.md, Terms).
-- **Composed Space**: a Space the browser holds, listed in Open Spaces or only drawn.
-- **Plugin commit**: an Edit a Resource's plugin asks for on its own Resource: its Title, its content or its Map content (space-and-resources.md, maps-and-graphs.md MG-87).
-- **Exclusive work**: work a plugin runs under a Claim that withdraws authoring and navigation everywhere until it settles, such as an Image Resource's Replace (ED-68).
+**Terms** defined in [`CONTEXT.md`](../../CONTEXT.md) and used here: Interaction draft, Replacement epoch, Claim, Space Authoring, Completion, Session, Coordinated Edit, Participant, Coordination turn, Barrier, Recovery replay, Canvas Edit, Drawn Edit, Composed Space, Plugin commit, Exclusive work.
 
 **Status:** **built** means code and a named test match the rule. **built (untested)** means code matches and no test covers it. **not built** means the rule is decided and no code implements it. **bug: code differs** means the code does what the note says instead. **undecided (Cn)** means the rule waits on conflict Cn (none is open in this doc). A test is named as `file` › "test name". Paths that start with `test/` are at the repo root; all others are under `packages/`. This document restates the accepted ADRs and decides nothing itself: each rule names its sources, and a rule that disagrees with an accepted ADR is a defect in this document, corrected here, never a reason to set the ADR aside. A rule sourced only from code and tests, an archived guide or a ruling in [DECISIONS.md](DECISIONS.md) says so.
 

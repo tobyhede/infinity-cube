@@ -24,16 +24,34 @@ A window the desktop application opens on an Aggregate directory, showing its Sp
 _Avoid_: talk window, Aggregate window.
 
 **Start window**:
-The desktop application's window for creating a new Space, opening a folder, or reopening a recent Space, shown at launch when nothing else opens, and when a new Space is asked for.
+The desktop application's window for creating a new Space, opening a folder, or reopening a recent Space, for when no Space window is open or a new Space is asked for; it is not a Space window.
 _Avoid_: home window, launcher, welcome window.
 
 **Recent**:
-The desktop application's history of the Spaces opened by any route, most recent first, ten at most, which the Start window lists. It is kept apart from the set to reopen, the Spaces open when the last quit began, which a launch naming no folder reopens.
+The desktop application's history of the Spaces opened by any route, which the Start window lists. It is distinct from the set to reopen, the Spaces open when the last quit began, which a launch naming no folder reopens.
 _Avoid_: recent files, history, the set to reopen.
 
 **Space snapshot**:
 The complete, fully identified form of one Space.
 _Avoid_: aggregate.
+
+**Working Space**:
+A Space opened for authoring, as the browser holds it.
+
+**Working read**:
+A read of one Space for authoring, which loads a Working Space.
+
+**Working-space loader**:
+What answers a Working read, running a Space's first working read when the Space needs one.
+
+**Composed Space**:
+A Space the browser holds live, because Open Spaces lists it or one of its Maps is drawn.
+
+**Resource N**:
+A neutral Title for a new Resource, numbered one past the highest already used.
+
+**Space N**:
+A neutral name for a new Space, numbered one past the highest already used.
 
 **Id**:
 The durable identifier of a Space, Resource, Map or Graph. Space and Resource Ids are global; Map and Graph Ids are scoped to their owning Space.
@@ -45,6 +63,16 @@ _Avoid_: generation, timestamp, replacement epoch.
 
 **Door**:
 Any place a Resource enters a Space: intake of a file or stored snapshot, an Edit, or Importing.
+
+**Intake**:
+The check every stored or imported Space, and every Aggregate, passes before it loads.
+
+**Aggregate intake**:
+The part of Intake that checks a set of Spaces together: the references between them, and that each is rooted at the Meta Space.
+
+**Lifecycle door**:
+One of a Repository's two operations on a whole Aggregate: initializing it, or replacing it.
+_Avoid_: Door (where a Resource enters a Space).
 
 ## Resources
 
@@ -63,9 +91,18 @@ The first Title Line, followed by “…” when more lines follow, used when a 
 What a Resource's content is and does, and the name that selects its Resource plugin. Six are bundled: Markdown, Mermaid, Image, Space, Reference and Ur. A content kind adds content of its own: Markdown, Mermaid or Image.
 _Avoid_: MIME type, content type, file type, format; a bare "kind" where another sort of kind could be meant.
 
+**Content kind**:
+A Resource kind whose Resource content names bytes: Markdown, Mermaid or Image. Ur, Reference and Space are kinds but not content kinds.
+
+**Missing kind**:
+A well-formed Resource kind that no Resource plugin in this build draws. Its Resources are drawn by the Default plugin.
+
 **Resource plugin**:
 The module that makes a Resource kind what it is: its content and how it is kept, what it draws inside the rect it is given, and every way its content is authored. Plugins are compiled into the application and listed once.
 _Avoid_: kind for the module, extension, add-on; plugin for code loaded at runtime.
+
+**Plugin list**:
+The build's list of Resource plugins, naming each once, in the order every choice among Resource kinds is offered in. The Default plugin is kept apart from it.
 
 **Resource API**:
 Everything the application offers a Resource plugin, and all a plugin may reach. Every plugin uses the same one.
@@ -82,17 +119,29 @@ What a Resource plugin keeps for a Resource, the same on every Map.
 What a Resource plugin keeps for one Resource on one Map, beside the position and size the canvas owns, such as an Ur Resource's Shape or a Markdown Resource's Open or Closed state.
 _Avoid_: view state, placement.
 
+**Plugin commit**:
+An Edit a Resource plugin asks for on its own Resource: its Title, its Resource content or its Map content.
+
 **Resource surface**:
 What hosts a Resource plugin's drawing: a Map, the Stage, or another Resource embedding it. It offers capabilities that are each present or absent.
 _Avoid_: read-only as a mode of a plugin, Resource canvas.
+
+**Host**:
+The application around a Resource plugin: it draws the Resource's rect, border, selection ring and toolbar. In Storage, a host is instead a server that serves the application, such as the Rust host.
 
 **Claim**:
 A Resource plugin's hold on the interaction while an author works in it. Claims nest through what a plugin embeds, and the deepest holds the keyboard and shows its commands. A Claim may run work exclusively.
 _Avoid_: lock, focus, edit mode.
 
+**Exclusive work**:
+Work a Resource plugin runs under a Claim that withholds authoring and navigation everywhere until it settles, such as replacing an image.
+
 **Asset**:
 Bytes with a media type, named by their content, that a Resource reaches by a URL in its Resource content or Map content. Every file a Resource uses is one, a picture or Markdown text alike.
 _Avoid_: sidecar, attachment; asset as a name for an Image Resource. "Sidecar" names only the production Node host, `src/desktop/` (Storage ST-113), never an Asset.
+
+**Asset store**:
+Where an Aggregate's Assets are kept.
 
 **Content action**:
 What a Resource plugin lets an author do to its Resource's content, such as editing Markdown, replacing an image or authoring the Map inside a Space Resource.
@@ -116,12 +165,21 @@ _Avoid_: node, vertex, atom, plain, bare, base, stub, placeholder, empty Resourc
 A Resource referring to another Space and showing its selected Map and Graph. Space Resources referring to a Space jointly own its lifetime.
 _Avoid_: subspace, portal, link, nested space.
 
+**Target Space**:
+The Space a Space Resource references.
+
+**Selection**:
+Of a Space Resource: the Map and Graph of its Target Space that it shows. It is distinct from the canvas selection, the Selected Resources or Selected Edge that an authoring gesture acts on.
+
 **Space Resource Framing**:
 The view of a target Map authored on a Space Resource: which part is visible and at what scale.
 
 **Reference Resource**:
 A Resource showing the content of another Resource, its immutable Target, read-only. It has its own Title; its Target is any Resource kind except Reference.
 _Avoid_: alias, link, copy, transclusion, mirror; Reference as a family that includes Space Resource.
+
+**Target**:
+The Resource a Reference Resource shows.
 
 ## Maps and Graphs
 
@@ -135,12 +193,24 @@ The Map a Space's own canvas draws, and the Map an Edit made there changes.
 **Drawn Map**:
 A Map drawn inside an Open Space Resource. An Edit made through it changes that Map in its own Space, the Space Resource's target Space.
 
+**Occurrence**:
+One drawing of a Map, named by the chain of Open Space Resources that draws it, starting from the Canvas Map.
+
+**Canvas**:
+The surface that draws a Space's Canvas Map.
+
+**Camera command**:
+A command that moves the canvas's view: centring on a point, fitting a set of Resources or bounds in view, or zooming.
+
 **Starting Map**:
 A Map with no Resources that owns one empty Graph, which is its Active Graph: what a Space's first working read and Add Map create.
 
 **Placement**:
 The mapping of Resources to their positions, sizes and Map content within a Map. A Resource absent from this mapping is absent from that Map.
 _Avoid_: arrangement, layer.
+
+**Rect**:
+A Resource's drawn box on a Map: its stored position and its size, the Closed Size when none is stored.
 
 **Closed Size**:
 The size a Resource takes in a Map that stores no size for it, and the least size it may take there.
@@ -151,6 +221,9 @@ A size a Resource's plugin asks for with a Map content Edit made on an author's 
 **Shape**:
 An Ur Resource's outline in a Map, kept as its Map content: rectangle, pill, ellipse or diamond.
 _Avoid_: head shape, node shape, symbol, figure, border, frame; Shape as a Resource kind.
+
+**Outline**:
+The shape a Resource plugin declares its Resource has inside its rect; the rectangle unless the plugin says otherwise. An Ur Resource's Shape is its outline.
 
 **Layout strategy**:
 A way to arrange Resources: an automatic strategy computes placement, while a positioned strategy reads a Map's authored placement.
@@ -175,6 +248,12 @@ _Avoid_: marker, end marker, arrowhead.
 A directed connection in one Graph from a tail Resource to a head Resource, optionally bearing a one-line Title. Its identity is the pair of endpoints within that Graph.
 _Avoid_: link, connection, transition, arrow, step, relationship; label for its Title.
 
+**Anchor**:
+One of a Resource's four Edge attachment points, at the midpoint of each side of its rect.
+
+**Handle**:
+An Anchor offered as a place to start or end drawing an Edge.
+
 **Lane**:
 The path one of several Edges joining the same two Resources takes beside the others.
 
@@ -193,6 +272,12 @@ To be drawn at reduced strength while staying fully interactive.
 **Authoring**:
 Interacting with a Space in a way that may change its Resources, Maps or Graphs, including attempts that produce no change.
 
+**Space Authoring**:
+The one module that derives, validates and installs every Edit to a single Space.
+
+**Session**:
+One Space's Working Space, the Revision last acknowledged, and its persistence status.
+
 **Interaction draft**:
 The transient value of an unfinished authoring interaction, such as changed text awaiting confirmation. It is separate from a completed Edit.
 _Avoid_: Draft Space, pending Edit, unsaved Edit, working copy.
@@ -200,9 +285,45 @@ _Avoid_: Draft Space, pending Edit, unsaved Edit, working copy.
 **Edit**:
 A validated change to the authored Space, potentially changing several parts together as one operation.
 
+**Canvas Edit**:
+An Edit made through the Canvas Map.
+
+**Drawn Edit**:
+An Edit made through a Drawn Map, changing that Map in its own Space.
+
+**Coordinated Edit**:
+One atomic Edit over several Spaces' Sessions, made by the Space Resource lifecycle.
+
+**Participant**:
+A Space a Coordinated Edit changes.
+
+**Coordination turn**:
+One Coordinated Edit's run from its start to the repository's answer. Only one runs at a time, behind the Barrier.
+
+**Barrier**:
+What pauses every Session's commits while a Coordination turn runs.
+
+**Recovery replay**:
+Retry or Keep local on a failed Coordinated Edit, which sends it again as a new Coordination turn. Accept stored is not a replay: it installs the stored Spaces in every Participant at once and sends nothing.
+
 **Completion outcome**:
 The result of an authoring attempt: completed (an Edit), unchanged (no change) or refused (an anticipated refusal with no Edit). Queued means waiting rather than completed; any refusal arrives when the queue drains.
 _Avoid_: error, failure, exception, validation error for these outcomes.
+
+**Completion**:
+The completed fact a Surface reports to Space Authoring, such as a Resource settling at a point. It carries identities and settled values, never a Space or a plan.
+_Avoid_: Completion outcome (the result of an authoring attempt).
+
+**Surface**:
+The control conducting an interaction, such as a Title field, an Open Markdown body, a menu or a list. It decides commit and Escape.
+_Avoid_: Resource surface (what hosts a Resource plugin's drawing).
+
+**Editing**:
+An authoring interaction in progress: a Title being written, or work a Resource plugin holds a Claim for. It ends in an Edit or in nothing.
+_Avoid_: edit mode.
+
+**Continue at**:
+Where the caret and selection land after an Edit completes.
 
 **Availability**:
 Whether an authoring operation may start, given the interactions already in progress. A withheld operation has not been attempted and therefore has no refusal.
@@ -210,6 +331,9 @@ _Avoid_: eligibility, permission, enabled, disabled, refusal, mode.
 
 **Absent**:
 Of a command: not offered for a target at all, and so not drawn. An absent command differs from an unavailable one, which is drawn in place and refuses to run.
+
+**Unavailable**:
+Of a command: drawn in place, focusable, and refusing to run because Availability withholds it. Nothing was attempted, so it is not a refusal.
 
 **Replacement epoch**:
 The identity of the working Space against which local drafts and pending work were made, invalidated by accepting the stored Space. A coordinated Accept stored replaces every Space the save covered, advancing each one's epoch and discarding its drafts and pending work.
@@ -226,6 +350,16 @@ _Avoid_: Active Edge (Active Graph names the Graph; Active Resource names Presen
 **Canvas command**:
 A named action on the canvas, reached by a key, by an item on a Resource's toolbar or menu, or by both, which can be available, unavailable with a reason, or absent for a target.
 _Avoid_: shortcut (the key bound to it), action (the toolbar's word for its items), Command Dock, handler, hotkey.
+
+**Toolbar**:
+A Selected Resource's commands, floated beside it. The host draws it; the commands in its kind group are the Resource plugin's.
+_Avoid_: rail, except as the code's name for it.
+
+**Command Dock**:
+A Space's one command surface, floating over its canvas.
+
+**Notice**:
+A standing report in the canvas's one notice area, dismissible, and cleared by the next press of the command it reports.
 
 ## Opening and navigating
 
@@ -244,6 +378,9 @@ The action that closes one open Space.
 The Spaces open at once in a session, and the surface that lists them.
 _Avoid_: rail, tab, stack, breadcrumb, switcher.
 
+**Open Space**:
+A Space listed in Open Spaces.
+
 **Opener**:
 The Space from which an open Space was Entered, or none when opened directly. It records navigation history rather than ownership.
 _Avoid_: parent step, depth, step back.
@@ -252,15 +389,37 @@ _Avoid_: parent step, depth, step back.
 Moving the selection on the canvas to the Active Graph neighbour in the arrow's direction, along an Edge either way. It keeps no traversal history.
 _Avoid_: overview traversal, browsing, walking.
 
+**Navigation**:
+A Space's state saying what is shown: the selected Map, the Active Graph and, while Presenting, the Traversal history.
+_Avoid_: Graph navigation (moving along Edges).
+
+**Address**:
+Navigation's position as one value: the selected Map, the Active Graph and the presented Resource, none outside Presenting. It is derived from Navigation, never stored.
+_Avoid_: URL, Location.
+
+**Location**:
+The browser's current URL.
+_Avoid_: Address (Navigation's value).
+
+**Product URL**:
+A Location under the application's Space paths, which opens what it names.
+
 ## Presenting
 
 **Presenting**:
 Traversing a Graph for an audience, one Resource at a time on the Stage.
 _Avoid_: deck, slide, step, slideshow, playback, present mode.
 
+**Presentation**:
+One run through a presented Graph, from a start to the next start or the end of Presenting. A Notes window follows it.
+_Avoid_: Space (a Presentation is a run, never what is presented).
+
 **Stage**:
 The Resource surface showing the Active Resource's content while Presenting, with no Map and no authoring.
 _Avoid_: slide, viewer, presenter view, canvas.
+
+**Full View**:
+Reading one Resource on the Stage over the canvas, without Presenting.
 
 **Active Resource**:
 The Resource currently reached while Presenting, whose outgoing Edges in the Active Graph are the available forward moves.
@@ -283,6 +442,15 @@ _Avoid_: presenter view, speaker view, speaker window, console.
 **Aggregate directory**:
 The on-disk form of an Aggregate, suitable for review, version control and sharing.
 _Avoid_: catalog, bundle, export root.
+
+**Repository**:
+Where the live Aggregate is kept: PostgreSQL, SQLite or memory. Also called a store.
+
+**Default Content**:
+The generated Aggregate a new Repository, or a new Aggregate directory, starts from.
+
+**Source**:
+What the directory reader reads an Aggregate directory's files from: the filesystem, files held in memory, or GitHub. A source names itself, lists one directory and reads one file.
 
 **Exporting**:
 Writing a complete Aggregate into an Aggregate directory.

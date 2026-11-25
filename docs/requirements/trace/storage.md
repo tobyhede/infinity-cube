@@ -11,7 +11,7 @@ For audit only. Every source rule appears exactly once in §1 or §2, with one o
 Abbreviations:
 - "rN" is the Nth rule of an ADR as numbered in the rewrite's mapping tables (`map-*.md`). Those tables were never committed, so a number cannot be looked up, and the numbers do not follow the order of the ADR's text (0028's r1, "activation is not an Edit", is the second rule its text states). Resolve a row by its description, which names the claim, and find that claim in the ADR in `docs/adr/` or `docs/adr/superseded/`.
 - "DR n" is drafting rule n and "DEC n" ruling n in `../DECISIONS.md`. A ruling that changes what an accepted ADR decides is recorded as an ADR (DEC 1, C1 and C2 as ADR 0146; C3 as 0147; Navigation C2 as 0148; Rendering C1 as 0149; Space and Resources C1 as 0150; UI C2 as 0153; UI C3 as 0151; UI C4 as 0154; Storage S2 as 0152), and that ADR is what binds; `../DECISIONS.md`, "Rulings recorded as ADRs", lists them. A row below that says a rule was "struck" or "overruled" by a ruling means the ADR that records the ruling refines the source ADR.
-- "R" ids are the old contract `docs/adr/archive/agent-guides/maps-and-graphs.md`, received through `trace/maps-and-graphs.md` §3.
+- "R" ids are the old contract `docs/agents/maps-and-graphs.md` at `797b2908`, received through `trace/maps-and-graphs.md` §3.
 - Docs: SR space-and-resources.md, MG maps-and-graphs.md, ED editing.md, RD rendering.md, UI ui.md, NV navigation.md, GL `CONTEXT.md`, PROC process docs (AGENTS.md, workflow.md, anti-slop.md, build-tooling.md).
 
 The rule ids in `../storage.md` are append-only from this version on. ST-99 was added after ST-11 to keep one behaviour per id. The revision after the CODE and SCOPE audits added ST-100–ST-108 and removed ST-26 (see SR-10), ST-38 (see ST-24) and ST-93 (see NV-39). The reconciliation pass removed ST-100 (see ED-1). The pass that brought this doc up to the InfinityCube code (after ADRs 0136–0144) added ST-109–ST-112 and rewrote ST-24, ST-25, ST-27, ST-30, ST-31, ST-34, ST-35, ST-39, ST-40, ST-42, ST-49, ST-60, ST-61, ST-68, ST-69, ST-74–ST-76 and ST-91 for `aggregate.json`, assets, the Resource plugins and the `cube` CLI.
@@ -257,13 +257,32 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 | 0165 the schema history in two encodings: Prisma Next's packages and one plain-SQL file per package, held to the same statements and schema by tests; a schema change adds both | → ST-125 |
 | 0165 rejected options | dropped: rejected alternatives |
 | 0166 a preview build is a published build that makes no compatibility promise; a directory is read with the preview build that wrote it; a preview build says it is one | → ST-36 (restated on main, PR 511). That a preview build says it is one in the version it reports → ST-120 (`infinity-cube --version`). That its download page says so: not restated, since it is release packaging rather than behaviour of a host |
-| 0167 the desktop application has no home window: it opens a folder named on the command line or chosen from File › Open…, and offers a new Space for a missing or empty folder, as File › New Space… writes one | → ST-121, restated after the marker's check |
-| 0168 the desktop application carries each platform's standard menus and opens its Help in the browser | → ST-121, restated after the marker's check; its menu shortcuts → UI-8 |
-| 0169 a preview build is a normal GitHub release, marked latest, and an installed build's updater reads the newest published release's `latest.json` | → ST-130, restated after the marker's check |
+| 0167 the desktop application has no home window: every window is a Space window, a window its page opened, or a close's question; a folder opens from the command line, File › Open… or the launch question; `open_aggregate`, its permission and the home window's capability are removed | → ST-121 (the windows it opens; `tauri.conf.json` declares no window). The launch question → ST-131, since 0171 replaces it with the Start window |
+| 0167 the shell creates a Space only when asked: File › New Space…, or the offer for a missing or empty folder opened by any route; declining writes nothing; the CLI's `run` still refuses a missing or empty directory, naming `init` | → ST-121 (the offer and the one-at-a-time write), ST-131 (New Space… shows the form), ST-67 and ST-70 (the CLI unchanged) |
+| 0167 a native menu follows the platform's conventions, with its accelerators, outside the page's no-modifier rule and ADR 0138's keymap | → ST-121 (the menus); the keys → UI-8 |
+| 0167 rejected options; a Resource opened in its own window left as two browser tabs are | dropped: rejected alternatives; the open question is the ADR's and states no rule |
+| 0168 each platform's standard menus (macOS application, File, Edit, View, Window and Help; Linux and Windows File, View and Help, with no Edit menu), `CmdOrCtrl+W` and `F11` | → ST-121; the accelerators → UI-8 |
+| 0168 Help opens fixed addresses in the system browser from the shell; no window navigates to a remote origin and no page holds the opener | → ST-121 |
+| 0168 Close Window and Quit go through the close wait | → ST-121 (Close Window), ST-122 (a quit) |
+| 0168 one update check at a time; a check asked for while one runs, or once a newer build is installed, starts nothing and says why | → ST-121 (Check for Updates…), ST-130 (the launch check) |
+| 0168 reaching into the page from a menu is not decided; rejected options | dropped: undecided, and rejected alternatives |
+| 0169 a preview build is a normal GitHub release, created as a draft marked latest, not a pre-release; an installed build reads `releases/latest/download/latest.json` and offers the build it names when newer | → ST-130; the install script reading the list, so a release published as a pre-release still installs → ST-129 |
+| 0169 rejected options | dropped: rejected alternatives |
 | 0171 the Start window (New Space, Open Folder…, recent Spaces), New Space as a name-and-location form whose name is the Meta Space's Title and must be one folder name, reopening the Spaces open when the last quit began, Recent as a separate history of Spaces opened, both kept in the application's data directory, the last window (Space or Start) closing per platform, the Start window built from `@project/ui` holding its own commands | → ST-131 (the Start window, New Space and the last window closing **built**, ticket 02; reopening and Recent **not built**, ticket 03); ST-121 points to it. The Start window's layout → UI-111 |
 | 0171 rejected options | dropped: rejected alternatives |
-| 0174 from rust-host 16, `sqlx` is the only migrator for both databases, through `infinity-cube migrate`; the Prisma Next packages and the two equality tests are deleted; a database Prisma Next migrated is refused, not adopted; CI holds the contract to each migrated database with `prisma-next db verify --schema-only`; `migrate --store sqlite` refuses a blank `SQLITE_PATH` | → ST-125 and ST-126, as not built |
-| 0174 rejected options | dropped: rejected alternatives |
+| 0171 `init_directory` takes the Title of the Space it writes; the CLI's `init` still writes `New space` | → ST-11 |
+| 0171 opening a recent Space from the Start window is held to the same refusals as File › Open… | → ST-131 (**not built** with Recent, ticket 03; the shell already routes it through File › Open…'s path) |
+| 0172 the shell's `frontendDist` is `packages/app/dist-desktop-shell`, a second Vite build of `packages/app` whose entry is `start.html`, apart from `dist`, which the host serves to Space windows; the close question's files are copied into it; a window of the shell's own opens by label with a capability naming that label alone | → ST-131 (the Start window's page, build and capability, and every page holding an IPC permission served from that build, never from `dist`), ST-122 (the close question's one permission), ST-121 (Space windows hold no IPC permission) |
+| 0172 every build of the shell builds both first (the `rust` CI job, the desktop package's scripts, `release/build.sh --desktop`); a bare `cargo build` builds neither | process only → `AGENTS.md` (Rust), `docs/agents/build-tooling.md`; no storage rule |
+| 0172 rejected options | dropped: rejected alternatives |
+| 0174 (sqlx is the only migrator) from rust-host 16, `sqlx` is the only migrator, for PostgreSQL and SQLite together; the plain-SQL files are the history and a schema change is a new file; the Prisma Next migration packages and the two equality tests are deleted | → ST-125, as **not built** (rust-host 16) |
+| 0174 (sqlx is the only migrator) `infinity-cube migrate --store <postgres\|sqlite>`, reaching `DATABASE_URL` or `SQLITE_PATH`, is run by every caller, the TypeScript databases' included; no host migrates on start | → ST-125 (the rule), ST-120 (the verb), the operations index; **not built** |
+| 0174 (sqlx is the only migrator) a database holding tables but no `_sqlx_migrations` is refused, saying to reset it; no database is adopted and no record seeded | → ST-125, **not built** |
+| 0174 (sqlx is the only migrator) the TypeScript runtime keeps its Prisma Next contract for queries until rust-host 20; CI holds it to each `sqlx`-migrated database with `prisma-next db verify --schema-only`, not `--strict`; the TypeScript integration suites are the second net | → ST-125, **not built** (CI today runs `prisma-next db verify` after Prisma Next migrates) |
+| 0174 (sqlx is the only migrator) `migrate --store sqlite` keeps ST-126's relative-path and parent rules, creates a missing file and refuses a blank `SQLITE_PATH` | → ST-126, **not built** |
+| 0174 (sqlx is the only migrator) consequences: contributors and the `postgres` and `sqlite` CI jobs need the Rust toolchain to migrate; `db:migrate`, `db:migrate:sqlite` and the `prisma-next.config*.ts` migration settings go unless a script stays as a thin name for the verb | → ST-125 (the scripts); the toolchain is process only → `AGENTS.md` when rust-host 16 lands. Which command ST-126's missing-file refusal names after 16 is open → conflicts/storage.md |
+| 0174 (sqlx is the only migrator) rejected options: two migrators seeding each other, PostgreSQL moving alone, `serve` migrating on start, adopting Prisma Next's databases, a test comparing the contract with `sqlx`'s schema | dropped: rejected alternatives |
+| 0173 (Shift at Resize start keeps the Resource's proportions) | reviewed, no rule here: a Resize gesture's ratio and floors; its one Resize Edit commits as any other (ST-16). Restated in RD-2, UI-67 and UI-68 |
 
 ## 2. Guides
 
@@ -276,7 +295,7 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 | Commands › Run: `pnpm cube mcp <dir>` serves a stdio MCP server over the directory's files; start it with `--silent` | → ST-111. The `--silent` advice dropped: operator guidance in `docs/aggregate-directory.md` |
 | Commands › every verb is `pnpm cube <verb>` | → ST-68 |
 
-**`docs/adr/archive/agent-guides/editing-and-persistence.md`** (by section and bullet)
+**`docs/agents/editing-and-persistence.md` at `797b2908`** (by section and bullet)
 
 | Source | Disposition |
 |---|---|
@@ -447,7 +466,7 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 ## 5. Code notes
 
 - **ST-65 (fixed).** Under Running, a commit made while answering a `GET` or `HEAD` request, such as the initialization the page's first working read makes (MG-74), is not an Edit and schedules no Export (`readsMarked`, `src/run/run.ts`). The initialization stays in the memory store, and the next Export an Edit triggers writes it. Held by three tests in `test/unit/run.test.ts`: "writes nothing when opening a Space initializes it and nothing is edited (ST-65)", "writes the initialization with the next Edit (ST-65)" and "initializes a Space with no Map when it is read, and writes those same ids with the next Edit (ST-65)".
-- **Two doors, one intake.** 0010 says `loadSpace` is the only intake. `loadSpaceSnapshot` (`graph/src/space.ts`) builds a Space from a stored snapshot; both go through `buildSpace` and `documentRefusal`, so ST-22 states one intake and names no function. `docs/adr/archive/agent-guides/editing-and-persistence.md` repeats "the one intake" for `loadSpace` alone.
+- **Two doors, one intake.** 0010 says `loadSpace` is the only intake. `loadSpaceSnapshot` (`graph/src/space.ts`) builds a Space from a stored snapshot; both go through `buildSpace` and `documentRefusal`, so ST-22 states one intake and names no function. `docs/agents/editing-and-persistence.md` (at `797b2908` and `d14ff974`) repeats "the one intake" for `loadSpace` alone.
 - **Strictness split.** `spaceFileObjectSchema` is a `strictObject`, and `.omit()`/`.extend()` carry it to the stored document, snapshot and import variants. Only the Resource envelope differs: `resourceFileSchema` is `.strict()`, `resourceDocumentSchema` is not. Each kind's content schema is strict at every door (`core/test/resource-document-equality.test.ts`). This answers audit-split §3 item 10.
 - **Stale comment.** `core/src/schema.ts` says of `maps` that "a Space with no Maps … is what a new Space is"; a new Space has a Map (see SR).
 - **Space directory names.** A Space directory's name is its identity (ST-27, ST-44), unlike a Resource file's (ST-29). No ADR states the Space half; `docs/aggregate-directory.md` does, and the reader enforces it.
@@ -505,3 +524,46 @@ Each change main merged between `a0f5066` and `f6e01b9` (PRs #506 and #502, firs
 | #506 `migrations-sql/` excluded from the vocabulary guard as history (`test/unit/current-domain-vocabulary.test.ts`) | process only; no storage rule (ADR 0085, ADR 0164) |
 | #502 the SQLite host's rules moved from the README into ST-126–ST-128 | correct → ST-126, ST-127, ST-128 (§4 records them as code only) |
 | #502 the README and the getting-started skill tell a person to add `.infinity-cube.lock` to the content repository's `.gitignore`; the README states the lock and that a run with no Edit leaves the directory unchanged beside the lock file | → ST-124, which now names them; ST-65 already stated the rest |
+
+## 9. Refresh to 3f6aa29 (24 November 2026)
+
+Each change main merged between `f6e01b9`'s refresh (PR #503, merged as `46b0999`) and `3f6aa29` (PRs #514, #513, #516, #522, #523, #517, #524, #526, #525, #515 and #527, first-parent), and where it now lives. The ADRs among them have their rows in §1.
+
+| Source | Disposition |
+|---|---|
+| #513 the install script (`release/install.sh`), its tests and the release workflow's install checks | → ST-129, added on main with it |
+| #516 `release/build.sh`, the one build of a preview build | → ST-129 (the workflow's build jobs), ST-130 |
+| #522 the ad-hoc signed macOS preview build, the update bundle and the updater | → ST-130, added on main with it |
+| #517 one window per Space, File › Open…, the offer to create a Space and File › New Space… (ADR 0167) | → ST-121, reconciled on main with it |
+| #524 the platforms' menus, Help, View, About and Check for Updates… (ADR 0168) | → ST-121, reconciled on main with it |
+| #526 preview builds as normal releases, the updater at `releases/latest` (ADR 0169) | → ST-130; ST-129 now also sources 0169, which changed what the script reads (this refresh) |
+| #527 the Start window, New Space's folder rules and refusal codes, `init_directory` taking a Title, the shell's own build (ADRs 0171 and 0172) | → ST-131 and ST-121, added on main with it; ST-11 states the Title `init_directory` takes (this refresh) |
+| #514, #523, #515 the README, the desktop contributor skill and a getting-started ticket | no storage rule; documentation only |
+| #525 the CRAP gate in CI | process only → `AGENTS.md` (CRAP) |
+| #517 also sent a picked file's bytes from memory rather than as the Blob (`packages/http/src/backend.ts`) | already in ST-121's evidence; no rule changes |
+| ST-121's sources named ADR 0168 twice and not 0171, whose Start window it points to | corrected (this refresh) |
+| The operations index's Desktop shell row named File › New Space… writing a Space and not the Start window's form or its refusals | corrected → ST-131 (this refresh) |
+
+## 10. Refresh to 343a66c (25 November 2026)
+
+The snapshot marker moved from `3f6aa29` to `343a66c` and to accepted ADRs through 0174; at that commit both 0173 and 0174 (sqlx is the only migrator) carried the number 0173, and the later was renumbered 0174 on 25 November 2026. Each change main merged between them (PRs #508, #509, #518 and #519, first-parent) was read for behaviour this doc states. The ADRs among them have their rows in §1; main had appended 0174 (sqlx is the only migrator) to ST-125 and ST-126 and duplicate rows for 0167–0171 here without moving the marker, and this refresh reconciled both.
+
+| Source | Disposition |
+|---|---|
+| 0174 (sqlx is the only migrator) | → ST-125, ST-126, ST-120 and the operations index, as **not built** (§1). ST-125 now separates the two encodings, built, from the single migrator, not built, and states the rules main's restatement left out: every caller runs `migrate`, no host migrates on start, the contract is kept for queries until rust-host 20, and the scripts go with the packages (this refresh) |
+| 0173 (Shift at Resize start keeps the Resource's proportions) | reviewed, no rule here (§1) |
+| "Refined by" added to the status lines of ADRs 0122 (0173) and 0155 and 0165 (0174) | no rule changes: each refinement is restated where its ADR is (ST-125, ST-126; 0122's in Rendering, UI and Maps and Graphs (MG-23)) |
+| #508, #509 proportional Resize (ADR 0173, Shift at Resize start): `packages/react-flow-adapter/src/proportional-resize.ts`, `ResourceNode.tsx`, an E2E spec and a story inventory entry | no storage rule; the release writes one ordinary Resize commit |
+| #518 ADR 0174 (sqlx is the only migrator), triage of rust-host 15 and 16, the mise ticket (`.scratch/toolchain/issues/01-adopt-mise.md`) | ADR → ST-125, ST-126 (§1); the tickets and the toolchain proposal are process only, and rust-host 15 restates ST-126's path rules for a Rust host without changing them |
+| #519 the SQLite restart proof's host started by command (`INFINITY_CUBE_RESTART_PROOF_HOST`, `test/support/restart-proof-host.ts`, `test/support/run-with-cleanup.ts`), and `env` in the HTTP conformance host's JSON (`conformance/http/README.md`, `host-process.ts`, `node-host.ts`) | process only → `AGENTS.md` (E2E) and `conformance/http/README.md`; no storage rule names the test harness's host description, and ST-126–ST-128 hold for whichever host the proof starts |
+| `AGENTS.md` between the two commits | changed only in the E2E paragraph (#519, above) |
+| Duplicate §1 rows for 0167, 0168, 0169 and 0171 that main appended "restated after the marker's check" | removed: superseded by the detailed rows above them (this refresh) |
+
+## Independent rerun at `343a66c` (25 November 2026)
+
+An independent rerun of the snapshot refresh rechecked this topic against main `343a66c` (main had not moved) and both ADRs numbered 0173 at that commit. The marker is unchanged: no rule changed meaning.
+
+| Source | Disposition |
+|---|---|
+| This doc's "Terms not yet in `CONTEXT.md`" working definitions | moved to `CONTEXT.md` as glossary entries (Asset store, Repository, Lifecycle door, Intake, Default Content, Source, Working read, Working-space loader; Import and Export point to Importing and Exporting); the doc's Terms line now points to them, and `check-glossary.py` holds every term it names to an entry. No definition changed meaning; where two docs defined a term differently, the entry states both docs' meaning |
+| ST-120's "no CI run of it has been watched yet" | stale: the `rust` job's step "HTTP conformance suite against the Rust CLI" passed on main `343a66c` (CI run 45531570866); evidence updated, rule unchanged |

@@ -14,8 +14,8 @@ These seven documents restate InfinityCube's accepted ADRs in current words, as 
 
 [CONTEXT.md](../../CONTEXT.md) defines names. [AGENTS.md](../../AGENTS.md) routes implementation tasks and links engineering guidance.
 
-Read a document in this order: [CONTEXT.md](../../CONTEXT.md) for terms, the owning document, then any ADR numbered above its marker. Open an older ADR for the full argument, a rejected alternative or the history.
+Read a document in this order: [CONTEXT.md](../../CONTEXT.md) for terms, the owning document, then any ADR accepted or amended since its marker's commit, whatever its number (the highest number a marker names is a navigation aid; [workflow](../agents/workflow.md#adrs-and-the-requirements-snapshot) says how to list them). Open an older ADR for the full argument, a rejected alternative or the history.
 
-[Trace files](trace/) record the sources and disposition of old rules. [Conflict records](conflicts/) and [rewrite decisions](DECISIONS.md) preserve the rewrite’s rulings; a ruling that changes what an accepted ADR decides is recorded as a new ADR. The product guides these documents replaced are kept, as history, under [`docs/adr/archive/agent-guides/`](../adr/archive/agent-guides/).
+[Trace files](trace/) record the sources and disposition of old rules. [Conflict records](conflicts/) and [rewrite decisions](DECISIONS.md) preserve the rewrite’s rulings; a ruling that changes what an accepted ADR decides is recorded as a new ADR. The product guides these documents replaced are kept, as history, under [`docs/adr/archive/agent-guides/`](../adr/archive/agent-guides/) until that archive is deleted; the traces cite each by its original path, `docs/agents/<name>.md`, at the commit they read it at, so `git show <commit>:docs/agents/<name>.md` recovers it.
 
 Rule identifiers are append-only. Keep removed rules as tombstones and never renumber surviving rules. Each document lists known implementation gaps under Bugs or marks them not built; those gaps do not weaken its requirements.

@@ -2,7 +2,9 @@
 
 These are conflicts for [../ui.md](../ui.md) that drafting rules 1–5 and [../DECISIONS.md](../DECISIONS.md) do not settle. Conflict ids are never reused. Paths are relative to `packages/`.
 
-No conflict is open.
+## Open
+
+None.
 
 ## Closed
 
@@ -34,7 +36,7 @@ Closed by the rulings of 12 November 2026 (DECISIONS, Checkpoint 3 rulings). The
 
 **Rules affected:** UI-85; UI-83.
 
-**The disagreement.** 0074: "a destructive Card action states whether it affects one Layout or the whole Space, and asks first wherever authored work would be lost." Remove from Map removes every Edge touching the Resource in that Map's Graphs and forgets its size, Shape and Open state; re-adding restores none of them (MG-16, MG-19). The code never asks: neither the actions menu row nor Delete/Backspace on the canvas raises a question, while Delete from Space, Delete Map, Delete Graph and Delete Edge all do. The old guide itself says "removing a Resource from a Map or deleting an Edge cannot be undone" (`docs/adr/archive/agent-guides/ui.md`, key-bindings bullet), and Undo is not built (DECISIONS 5).
+**The disagreement.** 0074: "a destructive Card action states whether it affects one Layout or the whole Space, and asks first wherever authored work would be lost." Remove from Map removes every Edge touching the Resource in that Map's Graphs and forgets its size, Shape and Open state; re-adding restores none of them (MG-16, MG-19). The code never asks: neither the actions menu row nor Delete/Backspace on the canvas raises a question, while Delete from Space, Delete Map, Delete Graph and Delete Edge all do. The old guide itself says "removing a Resource from a Map or deleting an Edge cannot be undone" (`docs/agents/ui.md` at `797b2908`, key-bindings bullet), and Undo is not built (DECISIONS 5).
 
 **Options.**
 - **(a) Ask when Edges would go.** Remove from Map asks first, naming the Map and the Edges it removes, whenever the Resource is an endpoint of an Edge in that Map; otherwise it runs at once. The common case stays one press.
@@ -78,3 +80,17 @@ Raised on review, 15 November 2026.
 **Recommendation: (a).** Unlike a retryable failure, a rejection has no Retry for a standing alert to offer, only an explanation to read; and the code and its tests already do this.
 
 **Evidence.** `docs/adr/0042-interaction-drafts-stay-local-and-space-replacement-invalidates-them.md:46`; `app/ladle-e2e/command-dock.spec.ts` › "a permanent rejection explains itself and can be acknowledged", "a refused aggregate explains itself as one sentence and can be acknowledged"; `trace/ui.md` (the 0042 r6 row).
+
+### C5. Whether a proportional Resize keeps the ratio exactly or to within a canvas unit
+
+**Closed by ruling UI C5 (25 November 2026), recorded in DECISIONS, not as an ADR.** A proportional Resize stores whole canvas units, so the ratio holds to within a unit (option (a)). UI-67 is built as it stands.
+
+Raised 25 November 2026 by the independent rerun of the snapshot refresh to `343a66c`. Basis: proposed.
+
+- **Rules affected.** UI-67 (built): "preserves the starting width-to-height ratio of the rect stored on this Map, to within a canvas unit of rounding", and "both dimensions are whole canvas units".
+- **Disagreement.** ADR 0173 says Shift at Resize start keeps "the drawn rect's starting width-to-height ratio for that whole drag" and states no rounding; its two floor examples (260 × 195, 438 × 146) keep the ratio exactly. The code rounds both dimensions to whole canvas units (`react-flow-adapter/src/proportional-resize.ts` `proportionalSize`: "rounding and the floors can move the ratio by under one unit"), and delivery issue `.scratch/aspect-ratio-resizing/issues/01-preserve-resource-proportions-with-shift-drag.md` says "the saved rect is whole canvas units". The stored size admits any finite number (`core/src/schema.ts` `resourceSizeSchema`), so no accepted rule forces whole units. Main's text of UI-67 said whole canvas units; the refresh added "to within a canvas unit of rounding", which qualifies what 0173 decides.
+- **Options.**
+  - (a) **Whole units are detail no ADR states.** Record a dated ruling that a proportional Resize stores whole canvas units, so the ratio holds to within a unit; it changes nothing 0173 decides, because keeping a ratio for a rect measured in whole units is what 0173 asks. Changes an ADR? No. UI-67 stays as written and cites the ruling.
+  - (b) **0173 asks for the exact ratio.** Then whole-unit rounding is a narrowing: either a refining ADR records it, or UI-67 drops the qualification and the rounding is **bug: code differs**.
+- **Recommendation: (a).** The ADR's own examples are whole units, the delivery issue the maintainer resolved says the saved rect is whole canvas units, and a fractional stored size would show no difference an author can see. Until a ruling, the qualification in UI-67 is **undecided (C5)**; what the code does meanwhile is (a).
+- **Evidence.** `docs/adr/0173-shift-at-resize-start-keeps-the-resources-proportions.md`; `react-flow-adapter/test/proportional-resize.test.ts` › "never answers a size under either floor, or a fractional one"; `app/e2e/aspect-ratio-resizing.spec.ts` › "proportional Resize of 600 by 200 stops at both floors".

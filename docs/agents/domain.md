@@ -8,7 +8,7 @@ This is a **single-context** repo: one `CONTEXT.md`, one `docs/requirements/` an
 
 1. **`CONTEXT.md`** at the repo root, for terms.
 2. **The owning requirements doc** in `docs/requirements/`, chosen from the task table in `AGENTS.md`. It restates the accepted ADRs for its topic in current words, with each rule's reason, build status and evidence. Near its top, a snapshot marker names the commit it was checked against and the highest ADR it incorporates.
-3. **Any ADR in `docs/adr/` numbered above that marker.** ADRs accepted after the snapshot bind where they differ from the requirement, until the requirement is updated.
+3. **Any ADR in `docs/adr/` accepted or amended since that marker's commit, whatever its number** (`git log --name-status <marker commit>..origin/main -- docs/adr/` lists them). ADRs accepted after the snapshot bind where they differ from the requirement, until the requirement is updated.
 4. **Older ADRs in the area**, when you need the full argument, a rejected alternative or the history, or when you are about to change what one decides.
 
 The seven topics with requirements, and the rules for keeping them current, are listed in [`workflow.md`](workflow.md#adrs-and-the-requirements-snapshot). A topic not on that list is read through its ADRs and the engineering guides in `docs/agents/`.

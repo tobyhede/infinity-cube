@@ -118,3 +118,48 @@ Written for the refresh to `f6e01b9`, from ADR 0165 and the SQLite rules main me
 | RF-Q7 | I run `pnpm cube import --store sqlite` while `pnpm dev:sqlite` has the file open. What happens? | Unsupported: one process per file. Whichever operation meets the other's lock fails at once, or waits out the driver's busy timeout synchronously and then fails, or succeeds if the lock clears in time; an HTTP request meeting such a failure answers 503 `persistence-unavailable`, never 409, and nothing is left part-written or locked. | ADR 0095; ST-127; `AGENTS.md` |
 
 Self-check only (this run delegated nothing): each expected answer was read back against ST-125 and ST-127 as they stand after this refresh, and matched. No independent reader ran them.
+
+## Refresh questions (24 November 2026)
+
+Written for the refresh to `3f6aa29`, from ADRs 0167–0169, 0171 and 0172, before this refresh's edits.
+
+| # | Question | Expected answer | Source |
+|---|---|---|---|
+| RF-Q8 | A person launches the desktop application with no folder named, after quitting with a Space open. What opens, and is that built? | The decided behaviour is that the Spaces open when the last quit began reopen, each still present, and the Start window shows only if none opens. Reopening is **not built** (ticket 03): the shell keeps no set to reopen yet, so the Start window shows, with an empty Recent. | ADR 0171; ST-131, ST-121 |
+| RF-Q9 | Which releases does an installed desktop build offer as an update, and where does it look? | It reads `releases/latest/download/latest.json`, the manifest attached to the newest published release, which is created as a draft marked latest and not a pre-release; a draft, a pre-release or a release not marked latest is offered to no installed build. | ADR 0169; ST-130 |
+| RF-Q10 | I want a Space window's page to call a new Tauri command. May it, and which pages may invoke commands? | No: Space windows hold no IPC permission. Only the shell's own pages may, each served from the shell's own build (`packages/app/dist-desktop-shell`, the `frontendDist`), never from `dist`, which the host serves to Space windows, and each granted by a capability naming its window's label alone (the Start window's `capabilities/start.json`; the close question answers its own question). | ADR 0171, 0172; ST-121, ST-131, ST-122 |
+
+### Independent run (24 November 2026)
+
+A separate agent, given `AGENTS.md` and the three questions with the expected answers withheld, answered through the reading path and matched all three. For RF-Q10 it first found the close question's permission only in the desktop skill, having missed ST-122's sentence because its search broke over the doc's long lines; it also noted that the expected answer generalised ADR 0172 beyond what ST-131 then stated, so ST-131 now states that every page holding an IPC permission is served from the shell's own build. No baseline run against the reading path before the edits was made.
+
+
+## Refresh questions (25 November 2026)
+
+Written for the refresh to `343a66c`, from ADR 0173 (Shift at Resize start keeps the Resource's proportions) and ADR 0174 (sqlx is the only migrator once PostgreSQL moves to Rust; numbered 0173 at `343a66c`, renumbered 25 November 2026), by the topic agents before their edits.
+
+| # | Question | Expected answer | Source |
+|---|---|---|---|
+| RF-Q11 | An author starts a Resize drag without Shift, then presses Shift part-way. What happens, and what if they start with Shift and release it? | A drag started without Shift stays free for its whole duration; one started with Shift keeps the stored Map rect's starting ratio for the whole drag, even after Shift is released. Either way release writes one Resize Edit (size and displacement), cancellation writes nothing, and no proportion is stored. **built**. | ADR 0173 (Resize); UI-67, MG-23, ED-24 |
+| RF-Q12 | A 600 × 200 Resource is resized proportionally inward as far as it goes. Where does it stop, and do neighbours move during the drag? | At 438 × 146, when the height reaches the Closed Size floor; the top-left stays fixed, and neighbours stay where they are stored until release, when displacement is written. | ADR 0173 (Resize); UI-68, RD-57, MG-24 |
+| RF-Q13 | A Shift-click on a selected Resource's resize control, with no movement. Does it change the selection? | No: Shift on the control chooses the gesture, never the selection; the Resource stays selected and no Edit is made. | ADR 0173 (Resize); NV-9, UI-67 |
+| RF-Q14 | After rust-host 16, I run `infinity-cube migrate --store postgres` on a database Prisma Next migrated. What happens, and is the verb built today? | It is refused, the message saying to reset the database: it holds tables but no `_sqlx_migrations`, and no database is adopted. Not built: today the CLI has no `migrate` verb (a usage error), and Prisma Next still migrates. | ADR 0174 (sqlx); ST-125, ST-120 |
+| RF-Q15 | After rust-host 16, who migrates the database the TypeScript host uses, and what holds its Prisma Next contract to the schema? | No host migrates on start; every caller runs `infinity-cube migrate --store <postgres|sqlite>`. CI runs `prisma-next db verify --schema-only` (without `--strict`, which would fail on `_sqlx_migrations`) against each `sqlx`-migrated database, and the TypeScript integration suites are the second net. Not built. | ADR 0174 (sqlx); ST-125, ST-126 |
+
+### Independent run (25 November 2026)
+
+A separate agent, given `AGENTS.md` and the five questions with the expected answers withheld, answered through the reading path and matched all five; for RF-Q11 it did not need ED-24. Its audit then found the marker wording differing in Storage and Space and Resources, and four precision points (ST-125's `--strict` sentence, ST-126's pointer to S4, UI-67's rounding, MG-23's evidence), all applied.
+
+## Independent rerun questions (25 November 2026)
+
+Written by the independent rerun of the refresh to `343a66c` before its edits, from ADR 0145, ADR 0173 and the workflow guide. No delegation tool was available to this rerun, so these were answered by the agent that wrote them: a self-check, not an independent run.
+
+| # | Question | Expected answer | Source |
+|---|---|---|---|
+| RF-Q16 | Next week an ADR numbered 0170 (the number left free at `343a66c`) is accepted and changes a Storage rule. A reader opens `storage.md`, whose marker names "accepted ADRs through 0174". Must they read 0170? | Yes. An ADR accepted after the marker's commit binds where it differs, whatever its number; the highest number a marker names is a navigation aid. `git log --name-status 343a66c..origin/main -- docs/adr/` lists it. | ADR 0145 ("accepted after the marker"); `workflow.md` reading order |
+| RF-Q17 | A requirements doc uses "Occurrence" and "Coordination turn". Where is each defined? | In `CONTEXT.md`, which each doc's Terms line points to; no requirements doc defines a term of its own. | ADR 0145 (`CONTEXT.md` stays the glossary); `workflow.md` same-change maintenance |
+| RF-Q18 | A proportional Resize of a 401 × 300 rect lands on whole canvas units. Is a ratio off by under one unit a defect? | Not decided: UI-67's "to within a canvas unit of rounding" is undecided (conflicts/ui.md C5); the code rounds, and C5 recommends a ruling that whole units are detail no ADR states. | ADR 0173; UI-67; conflicts/ui.md C5 |
+
+**Baseline against the old reading path (before the edits).** RF-Q16: `domain.md`, `workflow.md` and `docs/requirements/README.md` said "any ADR numbered above that marker", so a reader following them skips 0170: discovery fails, and the expected answer comes from ADR 0145's own words. RF-Q17: each term had a working definition in a "Terms not yet in `CONTEXT.md`" block of the requirements doc (Composed Space in two docs, worded differently), not in the glossary. RF-Q18: UI-67 stated the rounding as a requirement with no conflict.
+
+**After the edits (self-check).** RF-Q16: `workflow.md` and `docs/requirements/README.md` give the expected answer; `docs/agents/domain.md` still says "numbered above" (outside this rerun's authorized files; recommended to the maintainer). RF-Q17 and RF-Q18 match.

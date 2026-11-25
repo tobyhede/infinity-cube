@@ -2,7 +2,7 @@
 
 **Purpose:** what Maps, Map entries, Graphs and Edges hold, and what each Edit does to them.
 
-**Snapshot:** checked against `f6e01b9` (2026-11-21); incorporates accepted ADRs through 0166. ADRs accepted after it bind where they differ, until this document is updated. Proposed ADR 0163 is not incorporated.
+**Snapshot:** checked against `343a66c` (2026-11-25); incorporates accepted ADRs through 0174; no ADR 0170 is on main at that commit. At `343a66c` both 0173 and 0174 carried the number 0173; the later, sqlx is the only migrator, was renumbered 0174 on 25 November 2026. ADRs accepted after it bind where they differ, until this document is updated. Proposed ADR 0163 is not incorporated.
 
 Open conflicts are listed in [conflicts/maps-and-graphs.md](conflicts/maps-and-graphs.md). Sources are traced in [trace/maps-and-graphs.md](trace/maps-and-graphs.md).
 
@@ -15,13 +15,7 @@ Open conflicts are listed in [conflicts/maps-and-graphs.md](conflicts/maps-and-g
 | Controls, menus, keys: when a command is offered, the resize control, the connection modifier, the Connect list | [ui.md](ui.md) |
 | Choosing a Map, selection, traversal, URLs, presenting | [navigation.md](navigation.md) |
 
-**Terms** defined in [`CONTEXT.md`](../../CONTEXT.md) and used here: Canvas Map, Drawn Map, Saved Active Graph, Starting Map, Closed Size, Map content, Size hint.
-
-**Terms not yet in `CONTEXT.md`** (working definitions until the glossary carries them):
-- **Working Space**: a Space opened for authoring. A **working read** loads one.
-- **Intake**: the validation every stored or imported Space passes before it loads.
-- **Unchanged** and **refused**: an attempt that produces no Edit. An unchanged attempt is silent. A refused attempt carries a refusal code.
-- **Space Resource**: a Resource that shows another Space's Map and Graph (its selection), optionally with a **framing** (a saved camera).
+**Terms** defined in [`CONTEXT.md`](../../CONTEXT.md) and used here: Canvas Map, Drawn Map, Saved Active Graph, Starting Map, Closed Size, Map content, Size hint, Working Space, Working read, Intake, Completion outcome, Space Resource, Space Resource Framing.
 
 **Status:** **built** means code and a named test match the rule. **built (untested)** means code matches and no test covers it. **not built** means the rule is decided and no code implements it. **bug: code differs** means the code does what the note says instead. **undecided (Cn)** means the rule waits on conflict Cn (none is open in this doc). A test is named as `file` › "test name". Paths that start with `test/` are at the repo root; all others are under `packages/`. This document restates the accepted ADRs and decides nothing itself: each rule names its sources, and a rule that disagrees with an accepted ADR is a defect in this document, corrected here, never a reason to set the ADR aside. A rule sourced only from code and tests, an archived guide or a ruling in [DECISIONS.md](DECISIONS.md) says so.
 
@@ -116,7 +110,7 @@ Every completion first asks the exclusive gate (editing.md ED-82), then runs the
 ## Size and displacement
 
 - **MG-22** An entry's size is optional, and with none stored the Resource is the Closed Size, 260×146. No size is below the Closed Size on either axis for any kind, Open or Closed, and intake refuses one that is. No kind has a size of its own, and no Edit writes a size on a Resource's behalf except a plugin's size hint, which the canvas floors, caps and applies or ignores (MG-88). *Why:* one floor for every kind, and the canvas keeps the veto over every rect. What Open content draws when it does not fit is rendering.md RD-5. Sources: ADR 0051, ADR 0083, ADR 0122, ADR 0142. **built**: `graph/test/space-intake.test.ts` › "loads an entry with no size stored"; `core/test/schema.test.ts` › "reads an entry with none as the Closed Size", "refuses a size below the Closed Size on either axis".
-- **MG-23** Resize writes a new size on a Resource of any kind, Open or Closed, and keeps its Map content. Resizing to the size it already draws at is unchanged, so resizing an entry that stores no size to the Closed Size is unchanged. A Resize back to the Closed Size leaves an Open Resource Open. *Why:* a bigger Resource is one gesture, and Closing is never a side effect of a size. Sources: ADR 0122. **built**: `graph/test/snapshot-edits.property.test.ts` › "resizes, writing the size and keeping Map content and every Edge", "answers unchanged for a Resize to the Closed Size of an entry storing none"; `app/test/space-authoring-operations.test.ts` › "stays Open when resized back to the Closed Size".
+- **MG-23** Resize writes a new size on a Resource of any kind, Open or Closed, and keeps its Map content. Resizing to the size it already draws at is unchanged, so resizing an entry that stores no size to the Closed Size is unchanged. A Resize back to the Closed Size leaves an Open Resource Open. A Resize whose gesture kept the rect's proportions (ui.md UI-67) is the same Edit, and the entry stores no proportion. *Why:* a bigger Resource is one gesture, Closing is never a side effect of a size, and keeping proportions is a choice for one gesture, not an authored fact. Sources: ADR 0122, [ADR 0173](../adr/0173-shift-at-resize-start-keeps-the-resources-proportions.md). **built**: `graph/test/snapshot-edits.property.test.ts` › "resizes, writing the size and keeping Map content and every Edge", "answers unchanged for a Resize to the Closed Size of an entry storing none"; `app/test/space-authoring-operations.test.ts` › "stays Open when resized back to the Closed Size"; `app/e2e/aspect-ratio-resizing.spec.ts` › "Shift at resize start preserves the rect proportions after Shift is released"; that the entry has nowhere to store a proportion is its strict schema, `core/test/schema.test.ts` › "refuses a value JSON cannot carry, and the retired shape and open keys".
 - **MG-24** Let the subject sit at (sx, sy) with size (w, h) before the Resize, and change by (Δw, Δh). For every other Resource at (x, y):
   - if `x ≥ sx + w`, it moves by Δw on `x` only;
   - otherwise, if `y ≥ sy + h`, it moves by Δh on `y` only;
