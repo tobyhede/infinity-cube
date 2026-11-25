@@ -9,7 +9,7 @@
 - The Rust SQL repository (`crates/host/src/sql.rs` › `write_changes`) deletes every Resource row a written Space drops before it writes any, so it commits in either order.
 - The TypeScript SQL repository (`src/persistence/sql-space-repository.ts`) writes each Space in change order. Listing B first, it writes B's Resource row while A still owns it, the ownership check refuses it, and the whole commit rolls back as `invalid-commit`. `test/support/repository-contract.ts` › "writes a moved Resource through the ownership check, which refuses it before its Space releases it" holds that behaviour today.
 
-So the same request succeeds on one host and is refused on the other, which ST-4 rules out: a commit is judged by the state it leaves, not the order of its changes.
+So the same request succeeds on one host and is refused on the other. ST-4 calls a repository that answers differently defective, and ST-18 judges a commit by the Aggregate it leaves, not by the order of its changes.
 
 **What to build:**
 
