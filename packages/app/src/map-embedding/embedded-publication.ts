@@ -1,14 +1,14 @@
 import type { ResourceId, MapPosition } from '@project/core';
-import type { ResourcePlacementCommands } from './resource-placement';
+import type { ResourcePlacementCommands } from '../resource-placement';
 import type { Edge, NodeChange } from '@xyflow/react';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import type { GraphAppearance } from '@project/ui';
-import type { EmbeddedPublicationSnapshot } from './embedded-open-space-resource';
-import type { OpenSpace } from './open-spaces';
-import type { MapSurface } from './map-surface';
-import type { CanvasResourceAuthoring } from './canvas-resource-authoring';
-import type { EdgeAuthoringSurface } from './edge-authoring-react';
-import type { AuthoringAvailability } from './authoring-availability';
+import type { EmbeddedPublicationSnapshot } from '../embedded-open-space-resource';
+import type { OpenSpace } from '../open-spaces';
+import type { MapSurface } from '../map-surface';
+import type { CanvasResourceAuthoring } from '../canvas-resource-authoring';
+import type { EdgeAuthoringSurface } from '../edge-authoring-react';
+import type { AuthoringAvailability } from '../authoring-availability';
 
 /**
  * The live publication an embedding writes: the discovery snapshot plus the

@@ -12,8 +12,8 @@ import { mapSurfacePolicy, type MapSurfacePolicy } from './map-surface-policy';
 
 import { DRAG_TILT_RADIANS, tiltResourcePosition } from './drag-tilt';
 import type { EmbeddedBounds } from './embedded-map';
-import { resolveEmbedView } from './embed-view';
-import type { MapEmbedEntry } from './map-embeddings';
+import { resolveEmbedView } from './map-embedding/embed-view';
+import type { MapEmbedEntry } from './map-embedding/map-embeddings';
 import type { SpaceResourceTarget } from './space-resource-lifecycle';
 
 /**
@@ -47,12 +47,12 @@ export interface DiscoverEmbeddedOpenSpaceResourcesInput<
   Entry extends { readonly id: ResourceId },
 > {
   readonly root: EmbeddedRoot;
-  /** The placements whose embedded Map is authored in place, by node id. */
-  readonly editingPortals: ReadonlySet<string>;
+  /** The nodes whose embedded Map is authored in place, by node id. */
+  readonly editingEmbeds: ReadonlySet<string>;
   readonly staleSpaces: ReadonlySet<ResourceId>;
   readonly nodes: readonly ResourceFlowNode[];
   /**
-   * The Map embeddings drawn, by the placement whose rect each is drawn in: a
+   * The Map embeddings drawn, by the node whose rect each is drawn in: a
    * plugin's `<Embed space>` publishes one while it is drawn, so a Closed Space
    * Resource requests nothing (ADR 0142).
    */
@@ -285,7 +285,7 @@ export function discoverEmbeddedOpenSpaceResources<Entry extends { readonly id: 
         (input.publications.has(parent.id) &&
           !input.entries.some((entry) => entry.id === view.spaceId)),
       depth: item.depth,
-      editing: input.editingPortals.has(parent.id),
+      editing: input.editingEmbeds.has(parent.id),
     });
     const crossing = `${view.spaceId}:${view.map}`;
     if (path.has(crossing)) continue;
@@ -344,14 +344,14 @@ export function discoverEmbeddedOpenSpaceResources<Entry extends { readonly id: 
   return requests;
 }
 
-export function editingPortalAncestor(
+export function editingEmbedAncestor(
   start: ResourceFlowNode | undefined,
   nodesById: ReadonlyMap<string, ResourceFlowNode>,
-  editingPortals: ReadonlySet<string>,
+  editingEmbeds: ReadonlySet<string>,
 ): ResourceFlowNode | undefined {
   let current = start;
   while (current !== undefined) {
-    if (authorsEmbeddedMap(current.data) && editingPortals.has(current.id)) {
+    if (authorsEmbeddedMap(current.data) && editingEmbeds.has(current.id)) {
       return current;
     }
     current = current.parentId === undefined ? undefined : nodesById.get(current.parentId);
@@ -359,10 +359,10 @@ export function editingPortalAncestor(
   return undefined;
 }
 
-export function embeddingIsPortalEditing(
+export function embeddingIsEditedInPlace(
   parent: ResourceFlowNode,
   nodesById: ReadonlyMap<string, ResourceFlowNode>,
-  editingPortals: ReadonlySet<string>,
+  editingEmbeds: ReadonlySet<string>,
 ): boolean {
-  return editingPortalAncestor(parent, nodesById, editingPortals) !== undefined;
+  return editingEmbedAncestor(parent, nodesById, editingEmbeds) !== undefined;
 }

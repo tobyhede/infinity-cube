@@ -4,7 +4,7 @@ import { titleName, uuidSchema, type GraphId, type MapId, type UUID } from '@pro
 import type { EmbedView } from '@project/resource-api/view';
 import { edgeTypes, GraphHeadMarkers, nodeTypes } from '@project/react-flow-adapter';
 import { Empty, EmptyHeader, EmptyTitle, HostMapProvider } from '@project/ui';
-import { resolveEmbedView } from '../embed-view';
+import { resolveEmbedView } from '../map-embedding/embed-view';
 import { createMapSurface } from '../map-surface';
 import { withSurfacePolicy } from '../map-surface-policy';
 import type { OpenSpace } from '../open-spaces';

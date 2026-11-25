@@ -1,6 +1,6 @@
 import { uuidSchema, type SpaceFraming, type SpaceView } from '@project/core';
 import type { EmbedView } from '@project/resource-api/view';
-import type { SpaceResourceTarget } from './space-resource-lifecycle';
+import type { SpaceResourceTarget } from '../space-resource-lifecycle';
 
 /**
  * The Map and Graph a Space embedding draws (ADR 0142): the view a plugin
@@ -39,7 +39,7 @@ export function resolveEmbedView(
 /**
  * The view a framing is written with (ADR 0142): the plugin's own where it
  * names a Graph, since that is what the embedding draws; otherwise the Map and
- * Graph its placement drew from the shown Space, or the view's Map alone.
+ * Graph its node drew from the shown Space, or the view's Map alone.
  * `undefined` where neither names a Map.
  */
 export function framedView(

@@ -1,18 +1,17 @@
-import { createContext, useContext } from 'react';
 import type { ResourceId } from '@project/core';
 import { createObservableState, type ObserverErrorReporter } from '@project/persistence';
 import type { MapEmbedRequest } from '@project/ui';
 
 /**
  * The Map embeddings drawn on one canvas (ADR 0142): what each asks for, by
- * the placement whose rect it is drawn in. A plugin's `<Embed space>` publishes
+ * the node whose rect it is drawn in. A plugin's `<Embed space>` publishes
  * here while it is drawn, and nothing else does, so a Closed Space Resource
  * requests nothing. The canvas draws each request's Map over its rect, the
  * drawing whose Claim is passed authors it in place, and the host's chooser,
  * offered where the request passes a commit, writes a choice through it.
  *
- * A placement is one drawing on this canvas: a Resource drawn twice, as two
- * embeddings of one Map draw it, is two placements, each with its own entry
+ * A node is one drawing on this canvas: a Resource drawn twice, as two
+ * embeddings of one Map draw it, is two nodes, each with its own entry
  * and its own drawing key, so nothing here is looked up by Resource.
  */
 
@@ -25,13 +24,20 @@ export interface MapEmbedEntry {
   readonly resourceId: ResourceId;
   readonly drawing: symbol;
   readonly request: MapEmbedRequest;
+  /**
+   * This embedding's own: minted when it is first published, and again when
+   * another drawing embeds in the rect, so an embedding withdrawn and
+   * published again, as a Closed Space Resource Opened again is, has a new one
+   * though its drawing is the same.
+   */
+  readonly lifetime: symbol;
 }
 
 export interface MapEmbeddings {
   readonly getState: () => ReadonlyMap<string, MapEmbedEntry>;
   readonly subscribe: (listener: () => void) => () => void;
   /**
-   * The embedding in placement `nodeId`'s rect, drawn by `drawing`, asks for
+   * The embedding in `nodeId`'s rect, drawn by `drawing`, asks for
    * `request`, or is gone (`null`).
    */
   readonly publish: (
@@ -41,9 +47,9 @@ export interface MapEmbeddings {
     drawing: symbol,
   ) => void;
   /**
-   * Placement `nodeId`'s withdrawn embedding needs its latest commit no
+   * `nodeId`'s withdrawn embedding needs its latest commit no
    * longer, as once a framing pending when it was taken down has landed. A
-   * placement still drawing an embedding keeps it.
+   * node still drawing an embedding keeps it.
    */
   readonly forget: (nodeId: string) => void;
 }
@@ -61,14 +67,15 @@ const sameAsk = (a: MapEmbedRequest, b: MapEmbedRequest): boolean =>
   (a.select?.commit === undefined) === (b.select?.commit === undefined) &&
   a.claim === b.claim;
 
-const reportToConsole: ObserverErrorReporter = (error) =>
+/** Where a Map embedding's observer failures go unless a reporter is given. */
+export const reportToConsole: ObserverErrorReporter = (error) =>
   console.error('A Map embedding observer failed', error);
 
 export function createMapEmbeddings(
   reportObserverError: ObserverErrorReporter = reportToConsole,
 ): MapEmbeddings {
   const observable = createObservableState(NONE, reportObserverError);
-  /** The request each placement last published, whose `select` the stored one forwards to. */
+  /** The request each node last published, whose `select` the stored one forwards to. */
   const latest = new Map<string, MapEmbedRequest>();
   /**
    * The request as it is stored: its choice forwards to the latest one
@@ -119,7 +126,10 @@ export function createMapEmbeddings(
       }
       const next = new Map(state);
       if (request === null) next.delete(nodeId);
-      else next.set(nodeId, { resourceId, drawing, request: stored(nodeId, request) });
+      else {
+        const lifetime = current?.drawing === drawing ? current.lifetime : Symbol(nodeId);
+        next.set(nodeId, { resourceId, drawing, request: stored(nodeId, request), lifetime });
+      }
       observable.publish(next);
     },
     forget: (nodeId) => {
@@ -128,22 +138,14 @@ export function createMapEmbeddings(
   };
 }
 
-/** The entry drawn for placement `nodeId`'s own rect, where its plugin embeds a Map it may choose for. */
+/** The entry drawn for `nodeId`'s own rect, where its plugin embeds a Map it may choose for. */
 export const ownMapEmbed = (
   embeds: ReadonlyMap<string, MapEmbedEntry>,
   nodeId: string,
 ): MapEmbedEntry | undefined => embeds.get(nodeId);
 
-/** The placements whose embedded Map is authored in place: each drawing passed its Claim to the embedding. */
+/** The nodes whose embedded Map is authored in place: each drawing passed its Claim to the embedding. */
 export const editingMapEmbeds = (embeds: ReadonlyMap<string, MapEmbedEntry>): ReadonlySet<string> =>
   new Set(
     [...embeds].flatMap(([nodeId, entry]) => (entry.request.claim === undefined ? [] : [nodeId])),
   );
-
-const MapEmbeddingsContext = createContext<MapEmbeddings | null>(null);
-
-/** Where the Map embeddings of the canvas drawing this composition are published. */
-export const MapEmbeddingsProvider = MapEmbeddingsContext.Provider;
-
-/** The Map embeddings of the canvas this is drawn on, or `null` off one. */
-export const useMapEmbeddings = (): MapEmbeddings | null => useContext(MapEmbeddingsContext);

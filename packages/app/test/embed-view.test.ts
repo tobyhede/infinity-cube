@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { uuidSchema } from '@project/core';
-import { framedView, resolveEmbedView } from '../src/embed-view';
+import { framedView, resolveEmbedView } from '../src/map-embedding/embed-view';
 import type { SpaceResourceTarget } from '../src/space-resource-lifecycle';
 
 const SPACE = uuidSchema.parse('00000000-0000-4000-8000-000000000020');
