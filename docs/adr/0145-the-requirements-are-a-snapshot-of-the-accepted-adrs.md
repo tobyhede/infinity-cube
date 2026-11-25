@@ -4,6 +4,7 @@ Status: accepted
 Date: 2026-11-15
 Supersedes: 0115
 Related: 0116
+Refined by: 0175
 
 ADR 0115 adopted current contracts in `docs/agents/`: one topic's accepted design in current words, kept beside the ADRs, with build status left to delivery issues. The requirements rewrite replaced those contracts and the overlapping product guides with seven requirements documents in `docs/requirements/` (Space and Resources, Maps and Graphs, Editing, Storage and hosts, Rendering, UI, Navigation), which also keep build status beside each rule. A first draft of that rewrite archived every ADR as history and made the requirements the binding record. The maintainer chose otherwise on 15 November 2026: the ADRs stay binding, and the requirements restate them.
 

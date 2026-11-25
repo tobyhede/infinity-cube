@@ -281,17 +281,20 @@ reviews:
         ADRs are binding and append-only. Accepted and superseded ADR bodies
         keep their original wording as provenance — do not suggest rewriting
         them to current vocabulary. A changed decision is a new ADR plus
-        status links in both directions, not an edit to the old one, and the
-        change that accepts an ADR also updates the owning requirements doc in
-        `docs/requirements/` and its snapshot marker. `docs/adr/archive/` holds
+        status links in both directions, not an edit to the old one. Accepting an
+        ADR edits no requirements doc (ADR 0175): `python3
+        scripts/adr_snapshot.py check` lists it as pending until a later
+        refresh restates it and runs `stamp`. `docs/adr/archive/` holds
         retired product guides, kept as history; do not review it for
         currency.
 
     - path: 'docs/requirements/**'
       instructions: >-
         The seven requirements docs restate the accepted ADRs in current words
-        as a snapshot; each opens with a marker naming the commit it was
-        checked against and the highest ADR it incorporates. A requirement
+        as a snapshot; each opens with a line linking `snapshot.lock.json`,
+        which `scripts/adr_snapshot.py` writes and nobody edits by hand. An
+        accepted ADR that `check` lists as pending binds where it differs
+        until the next refresh; a proposed one binds nothing. A requirement
         that disagrees with an accepted ADR is a defect in the requirement, so
         flag it. A new or changed rule needs its reason, its source ADRs and
         its status (built, built (untested), not built, or bug: code differs)
@@ -364,9 +367,9 @@ reviews:
         mode: 'warning'
         instructions: >-
           A change that contradicts, supersedes or extends an accepted ADR must
-          add a new ADR under `docs/adr/` with status links in both directions,
-          and update the owning requirements doc in `docs/requirements/` and
-          its snapshot marker in the same change. A behaviour change that an
+          add a new ADR under `docs/adr/` with status links in both directions;
+          the requirements docs are refreshed later, with the new ADR pending
+          until then (ADR 0175). A behaviour change that an
           accepted ADR already covers updates the owning requirement's status
           and evidence. Silent divergence from an accepted ADR or a requirement
           fails this check. Ordinary changes that implement an

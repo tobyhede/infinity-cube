@@ -1,6 +1,6 @@
 # Navigation & Browser History
 
-This topic's rules are in the requirements docs below, which restate the accepted ADRs as a snapshot; ADRs newer than a doc's snapshot marker bind where they differ ([workflow](workflow.md#adrs-and-the-requirements-snapshot)). This page only forwards existing citations of its old path.
+This topic's rules are in the requirements docs below; [workflow](workflow.md#adrs-and-the-requirements-snapshot) says how they relate to the ADRs. This page only forwards existing citations of its old path.
 
 - [Navigation and presenting](../requirements/navigation.md)
 
