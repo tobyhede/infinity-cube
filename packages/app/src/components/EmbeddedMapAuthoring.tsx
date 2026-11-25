@@ -27,7 +27,7 @@ import {
 import type { OpenSpace } from '../open-spaces';
 import { useSpaceResourceTargets } from '../space-resource-targets';
 import { removeFromMapReportedBy } from '../canvas-commands';
-import type { EmbeddedPublication } from '../embedded-publication';
+import type { EmbeddedPublication } from '../map-embedding/embedded-publication';
 import { authoredFromDrawn, type SpaceResourceFraming } from '../space-resource-framing';
 import { spaceResourceEmbedCamera } from '../camera';
 import { CanvasContinuation } from './CanvasContinuation';

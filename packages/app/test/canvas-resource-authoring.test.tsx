@@ -21,10 +21,21 @@ import {
   type SpaceResourceSelectorsProps,
 } from '@project/ui';
 import type { Claim } from '@project/resource-api/view';
-import { createMapEmbeddings, type MapEmbeddings } from '../src/map-embeddings';
+import type { MapEmbeddings } from '../src/map-embedding/map-embeddings';
+import { createMapEmbedding } from '../src/map-embedding/map-embedding';
+import { manualSchedule } from './manual-schedule';
 import { CANVAS } from '../src/space-authoring';
 import { canvasAuthoring } from './canvas-authoring';
 import { textAsset } from './markdown-texts';
+
+/** A canvas's Map embedding, with no Open Spaces, gate or selection to reach, and a schedule nothing advances. */
+const newMapEmbedding = () =>
+  createMapEmbedding({
+    spaces: null,
+    claims: { lend: () => () => undefined },
+    select: () => undefined,
+    schedule: manualSchedule().schedule,
+  });
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -484,7 +495,8 @@ describe('canvas Resource authoring Space rail', () => {
 
   const mountRail = (open: boolean, withTarget: boolean, readOnly = false, enabled = true) => {
     // What the drawn plugin publishes: an Open Space Resource embeds its Map.
-    const mapEmbeddings = createMapEmbeddings();
+    const mapEmbedding = newMapEmbedding();
+    const mapEmbeddings = mapEmbedding.embeddings;
     if (open)
       mapEmbeddings.publish(SPACE_RESOURCE_ID, SPACE_RESOURCE_ID, spaceEmbed(), SPACE_DRAWING);
     const loaded = { snapshot, revision: 0n, exportedRevision: null };
@@ -512,7 +524,7 @@ describe('canvas Resource authoring Space rail', () => {
         resourceResize: adapter.getState().resourceResize,
         onSelectResource: () => undefined,
         spaceResourceTargets: withTarget ? new Map([[TARGET_SPACE_ID, target]]) : undefined,
-        mapEmbeddings,
+        mapEmbedding,
       }),
     );
   };
@@ -562,7 +574,7 @@ describe('canvas Resource authoring decoration identity', () => {
 
   interface IdentityProps {
     readonly spaceResourceTargets: SpaceResourceTargets;
-    readonly portalEditing: ReadonlySet<ResourceId>;
+    readonly embedEditing: ReadonlySet<ResourceId>;
   }
 
   /** The Space Resource's plugin embeds its Map, passing its Claim while it is authored in place. */
@@ -614,16 +626,17 @@ describe('canvas Resource authoring decoration identity', () => {
     const surfaceAuthoring = canvasAuthoring(authoring);
     const onSelectResource = () => undefined;
     const resourceResize = adapter.getState().resourceResize;
-    const mapEmbeddings = createMapEmbeddings();
+    const mapEmbedding = newMapEmbedding();
+    const mapEmbeddings = mapEmbedding.embeddings;
     publishSpaceEmbed(mapEmbeddings, false);
     const hook = renderHook(
-      ({ spaceResourceTargets, portalEditing }: IdentityProps) => {
+      ({ spaceResourceTargets, embedEditing }: IdentityProps) => {
         // A rerender naming new editing publishes it, as the plugin passing its Claim does.
         if (
           (mapEmbeddings.getState().get(SPACE_RESOURCE_ID)?.request.claim !== undefined) !==
-          portalEditing.has(SPACE_RESOURCE_ID)
+          embedEditing.has(SPACE_RESOURCE_ID)
         )
-          publishSpaceEmbed(mapEmbeddings, portalEditing.has(SPACE_RESOURCE_ID));
+          publishSpaceEmbed(mapEmbeddings, embedEditing.has(SPACE_RESOURCE_ID));
         return useCanvasResourceAuthoring({
           continuation,
           nodes: projection,
@@ -643,13 +656,13 @@ describe('canvas Resource authoring decoration identity', () => {
           resourceResize,
           onSelectResource,
           spaceResourceTargets,
-          mapEmbeddings,
+          mapEmbedding,
         });
       },
       {
         initialProps: {
           spaceResourceTargets: NO_SPACE_RESOURCE_TARGETS,
-          portalEditing: new Set<ResourceId>(),
+          embedEditing: new Set<ResourceId>(),
         },
       },
     );
@@ -668,7 +681,7 @@ describe('canvas Resource authoring decoration identity', () => {
     const mounted = mountIdentity();
     mounted.rerender({
       spaceResourceTargets: new Map([[TARGET_SPACE_ID, target]]),
-      portalEditing: new Set<ResourceId>(),
+      embedEditing: new Set<ResourceId>(),
     });
     const chooser = chooserOf(mounted.result.current.nodes);
     act(() => {
@@ -734,7 +747,7 @@ describe('canvas Resource authoring decoration identity', () => {
 
     rerender({
       spaceResourceTargets: new Map([[TARGET_SPACE_ID, target]]),
-      portalEditing: new Set<ResourceId>(),
+      embedEditing: new Set<ResourceId>(),
     });
 
     expect(dataOf(result.current.nodes, RESOURCE_ID)).toBe(markdownData);
@@ -744,17 +757,17 @@ describe('canvas Resource authoring decoration identity', () => {
     ).toBeDefined();
   });
 
-  it('keeps markdown node.data when only portal editing changes, and the Space Resource keeps its chooser', () => {
+  it('keeps markdown node.data when only Map embedding editing changes, and the Space Resource keeps its chooser', () => {
     const { result, rerender } = mountIdentity();
     rerender({
       spaceResourceTargets: new Map([[TARGET_SPACE_ID, target]]),
-      portalEditing: new Set<ResourceId>(),
+      embedEditing: new Set<ResourceId>(),
     });
     const markdownData = dataOf(result.current.nodes, RESOURCE_ID);
 
     rerender({
       spaceResourceTargets: new Map([[TARGET_SPACE_ID, target]]),
-      portalEditing: new Set([SPACE_RESOURCE_ID]),
+      embedEditing: new Set([SPACE_RESOURCE_ID]),
     });
 
     expect(dataOf(result.current.nodes, RESOURCE_ID)).toBe(markdownData);
@@ -778,7 +791,7 @@ describe('canvas Resource authoring decoration identity', () => {
     const { result, rerender, spaceSession } = mountIdentity();
     rerender({
       spaceResourceTargets: new Map([[TARGET_SPACE_ID, target]]),
-      portalEditing: new Set<ResourceId>(),
+      embedEditing: new Set<ResourceId>(),
     });
     const markdownData = dataOf(result.current.nodes, RESOURCE_ID);
     const spaceData = dataOf(result.current.nodes, SPACE_RESOURCE_ID);
@@ -1009,7 +1022,8 @@ describe("canvas Resource authoring: an embedding's notice", () => {
   };
 
   const mountEmbedding = (request: MapEmbedRequest) => {
-    const mapEmbeddings = createMapEmbeddings();
+    const mapEmbedding = newMapEmbedding();
+    const mapEmbeddings = mapEmbedding.embeddings;
     mapEmbeddings.publish(UR_ID, UR_ID, request, UR_DRAWING);
     const loaded = { snapshot, revision: 0n, exportedRevision: null };
     const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
@@ -1034,7 +1048,7 @@ describe("canvas Resource authoring: an embedding's notice", () => {
         resourceResize: adapter.getState().resourceResize,
         onSelectResource: () => undefined,
         spaceResourceTargets: new Map([[TARGET_SPACE_ID, target]]),
-        mapEmbeddings,
+        mapEmbedding,
       }),
     );
     const rail = render(

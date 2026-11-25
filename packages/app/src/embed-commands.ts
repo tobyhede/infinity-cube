@@ -1,12 +1,12 @@
-import { uuidSchema, type ResourceId, type UUID } from '@project/core';
+import { uuidSchema, type UUID } from '@project/core';
 import { refusalOf } from '@project/resource-api/view';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import { buildSpaceResourceRail } from './build-space-resource-rail';
 import type { CommandOutcomes } from './command-outcomes';
 import type { Continuation } from './continuation';
 import type { DeleteConfirmation } from './delete-confirmation';
-import { resolveEmbedView } from './embed-view';
-import { ownMapEmbed, type MapEmbedEntry } from './map-embeddings';
+import { resolveEmbedView } from './map-embedding/embed-view';
+import { ownMapEmbed, type MapEmbedEntry } from './map-embedding/map-embeddings';
 import type { OpenSpaces } from './open-spaces';
 import type { SpaceResourceRailContext } from './space-resource-context-commands';
 import type { SpaceResourceTargets } from './space-resource-targets';
@@ -27,11 +27,13 @@ export interface EmbedCommandsContext {
   readonly spaces: OpenSpaces | null;
   readonly commandOutcomes: CommandOutcomes | undefined;
   readonly deleteConfirmation: Pick<DeleteConfirmation, 'arm'> | undefined;
-  /** The Map embeddings drawn on this canvas, by placement. */
+  /** The Map embeddings drawn on this canvas, by node. */
   readonly mapEmbeds: ReadonlyMap<string, MapEmbedEntry>;
-  readonly contextNotices: ReadonlyMap<ResourceId, string>;
-  readonly onContextEditingChange: (resourceId: ResourceId, editing: boolean) => void;
-  readonly onContextReport: (resourceId: ResourceId, message: string | null) => void;
+  /** What the canvas says about each node's embedding, by node id. */
+  readonly contextNotices: ReadonlyMap<string, string>;
+  readonly onContextEditingChange: (nodeId: string, editing: boolean) => void;
+  /** Says `message` about the node's embedding, only while the embedding of `lifetime`, the one the rail was drawn for, stands. */
+  readonly onContextReport: (nodeId: string, message: string | null, lifetime: symbol) => void;
 }
 
 /**
@@ -77,6 +79,10 @@ export function decorateEmbedCommands(
         };
   const chooses =
     commit !== undefined && context.authorOnCanvas && context.editableResourceIds.has(resourceId);
+  // Every answer the rail gives is about the embedding it was drawn for, so
+  // one that lands after the Resource is Closed and Opened again says nothing
+  // to the embedding drawn then.
+  const lifetime = embed.lifetime;
   const mapRail = buildSpaceResourceRail({
     target,
     selection,
@@ -85,17 +91,17 @@ export function decorateEmbedCommands(
     complete: (targetMap, graphId) => {
       if (commit === undefined) return null;
       void commit({ ...view, map: targetMap.id, graph: graphId }).then((answer) =>
-        context.onContextReport(resourceId, refusalOf(answer)),
+        context.onContextReport(node.id, refusalOf(answer), lifetime),
       );
       return null;
     },
-    onEditingChange: (editing) => context.onContextEditingChange(resourceId, editing),
-    onReport: (message) => context.onContextReport(resourceId, message),
+    onEditingChange: (editing) => context.onContextEditingChange(node.id, editing),
+    onReport: (message) => context.onContextReport(node.id, message, lifetime),
     context: railContext,
   });
   return withEmbedCommands(node, {
     mapRail,
-    contextNotice: context.contextNotices.get(resourceId),
+    contextNotice: context.contextNotices.get(node.id),
   });
 }
 

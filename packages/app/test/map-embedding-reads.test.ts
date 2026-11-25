@@ -5,14 +5,11 @@ import { describe, expect, it } from 'vitest';
 import { newUuid, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { MemorySpaceBackend } from '@project/persistence';
 import { bareKindData, type ResourceFlowNode } from '@project/react-flow-adapter';
-import type { MapEmbedEntry } from '../src/map-embeddings';
+import type { MapEmbedEntry } from '../src/map-embedding/map-embeddings';
 import { createOpenSpaces, type OpenSpace } from '../src/open-spaces';
 import { CANVAS } from '../src/space-authoring';
-import type { SpaceResourceFraming } from '../src/space-resource-framing';
-import {
-  useEmbeddedOpenSpaceResources,
-  type EmbeddedTargetReader,
-} from '../src/use-embedded-open-space-resources';
+import type { EmbeddedTargetReader } from '../src/map-embedding/map-embedding';
+import { useDrawnEmbeddings } from './drawn-embeddings';
 import { recordingHistory } from './browser-history';
 import { refusingFullscreen } from './fullscreen';
 import { unlinkedPresentations } from './presentations';
@@ -41,6 +38,7 @@ const viewlessEmbed = (nodes: readonly ResourceFlowNode[]): ReadonlyMap<string, 
       {
         resourceId: node.data.resourceId,
         drawing: Symbol(node.id),
+        lifetime: Symbol(node.id),
         request: { space: TARGET, view: undefined, select: undefined, claim: undefined },
       },
     ]),
@@ -79,7 +77,7 @@ const reader = (
   },
 });
 
-describe('useEmbeddedOpenSpaceResources', () => {
+describe('reading the Space a Map embedding draws', () => {
   it('asks for each visible embedding once, and again only when the Map changes', async () => {
     const asked: (typeof TARGET)[] = [];
     const spaces = reader((spaceId) => {
@@ -88,7 +86,7 @@ describe('useEmbeddedOpenSpaceResources', () => {
     });
     const { rerender } = renderHook(
       ({ nodes }) =>
-        useEmbeddedOpenSpaceResources(nodes, publishedEmbeds(nodes), spaces, NO_DRAG, {
+        useDrawnEmbeddings(nodes, publishedEmbeds(nodes), spaces, NO_DRAG, {
           spaceId: HOST,
           mapId: OTHER_MAP,
           policy: 'authoring',
@@ -128,7 +126,7 @@ describe('useEmbeddedOpenSpaceResources', () => {
     };
     const { rerender } = renderHook(
       ({ nodes }) =>
-        useEmbeddedOpenSpaceResources(nodes, publishedEmbeds(nodes), spaces, NO_DRAG, {
+        useDrawnEmbeddings(nodes, publishedEmbeds(nodes), spaces, NO_DRAG, {
           spaceId: HOST,
           mapId: OTHER_MAP,
           policy: 'authoring',
@@ -150,7 +148,7 @@ describe('useEmbeddedOpenSpaceResources', () => {
       return Promise.resolve(undefined);
     });
     const { result } = renderHook(() =>
-      useEmbeddedOpenSpaceResources(
+      useDrawnEmbeddings(
         [spaceResource(HOST, MAP)],
         publishedEmbeds([spaceResource(HOST, MAP)]),
         spaces,
@@ -181,7 +179,7 @@ describe('useEmbeddedOpenSpaceResources', () => {
     );
     const { result, rerender } = renderHook(
       ({ nodes }) =>
-        useEmbeddedOpenSpaceResources(nodes, publishedEmbeds(nodes), spaces, NO_DRAG, {
+        useDrawnEmbeddings(nodes, publishedEmbeds(nodes), spaces, NO_DRAG, {
           spaceId: HOST,
           mapId: OTHER_MAP,
           policy: 'authoring',
@@ -201,7 +199,7 @@ describe('useEmbeddedOpenSpaceResources', () => {
   it('measures the title footer into embed bounds', async () => {
     const spaces = reader(() => Promise.resolve(undefined));
     const { result } = renderHook(() =>
-      useEmbeddedOpenSpaceResources(
+      useDrawnEmbeddings(
         [spaceResource(HOST, MAP)],
         publishedEmbeds([spaceResource(HOST, MAP)]),
         spaces,
@@ -221,44 +219,6 @@ describe('useEmbeddedOpenSpaceResources', () => {
     expect(result.current.embeddedRequests[0]?.bounds.bottom).toBe(456);
   });
 
-  it('counts a Resource as editing its portal while its plugin passes a Claim to the embedding', async () => {
-    const spaces = reader(() => Promise.resolve(undefined));
-    const nodes = [spaceResource(HOST, MAP)];
-    const { result, rerender } = renderHook(
-      ({ claimed }) =>
-        useEmbeddedOpenSpaceResources(nodes, publishedEmbeds(nodes, claimed), spaces, NO_DRAG, {
-          spaceId: HOST,
-          mapId: OTHER_MAP,
-          policy: 'authoring',
-        }),
-      { initialProps: { claimed: new Set<string>() } },
-    );
-    await waitFor(() => expect(result.current.embeddedRequests).toHaveLength(1));
-    expect(result.current.editingPortals.has(HOST)).toBe(false);
-    rerender({ claimed: new Set([HOST]) });
-    expect(result.current.editingPortals.has(HOST)).toBe(true);
-    rerender({ claimed: new Set() });
-    expect(result.current.editingPortals.has(HOST)).toBe(false);
-  });
-
-  it('owns the in-flight framing draft', async () => {
-    const spaces = reader(() => Promise.resolve(undefined));
-    const nodes = [spaceResource(HOST, MAP)];
-    const { result } = renderHook(() =>
-      useEmbeddedOpenSpaceResources(nodes, publishedEmbeds(nodes), spaces, NO_DRAG, {
-        spaceId: HOST,
-        mapId: OTHER_MAP,
-        policy: 'authoring',
-      }),
-    );
-    await waitFor(() => expect(result.current.embeddedRequests).toHaveLength(1));
-    const framing: SpaceResourceFraming = { centreX: 200, centreY: 100, zoom: 2 };
-    act(() => {
-      result.current.setPortalDraft(new Map([[HOST, framing]]));
-    });
-    expect(result.current.portalDraft.get(HOST)).toEqual(framing);
-  });
-
   it('keeps a failed read for an embedding given no view, and reads it again on resume', async () => {
     let fail = true;
     let asked = 0;
@@ -270,7 +230,7 @@ describe('useEmbeddedOpenSpaceResources', () => {
     const nodes = [spaceResource(HOST, MAP)];
     const embeds = viewlessEmbed(nodes);
     const { result } = renderHook(() =>
-      useEmbeddedOpenSpaceResources(nodes, embeds, spaces, NO_DRAG, {
+      useDrawnEmbeddings(nodes, embeds, spaces, NO_DRAG, {
         spaceId: HOST,
         mapId: OTHER_MAP,
         policy: 'authoring',
@@ -351,7 +311,7 @@ describe('useEmbeddedOpenSpaceResources', () => {
     const nodes = [spaceResource(HOST, MAP)];
     const embeds = viewlessEmbed(nodes);
     const { result, rerender } = renderHook(() =>
-      useEmbeddedOpenSpaceResources(nodes, embeds, spaces, NO_DRAG, {
+      useDrawnEmbeddings(nodes, embeds, spaces, NO_DRAG, {
         spaceId: HOST,
         mapId: OTHER_MAP,
         policy: 'authoring',
@@ -428,7 +388,7 @@ describe('useEmbeddedOpenSpaceResources', () => {
     const nodes = [spaceResource(HOST, MAP)];
     const embeds = viewlessEmbed(nodes);
     const { result } = renderHook(() =>
-      useEmbeddedOpenSpaceResources(nodes, embeds, spaces, NO_DRAG, {
+      useDrawnEmbeddings(nodes, embeds, spaces, NO_DRAG, {
         spaceId: HOST,
         mapId: OTHER_MAP,
         policy: 'authoring',
@@ -436,5 +396,38 @@ describe('useEmbeddedOpenSpaceResources', () => {
     );
     expect(result.current.embeddedRequests).toHaveLength(0);
     await waitFor(() => expect(result.current.embeddedRequests[0]?.mapId).toBe(MAP));
+  });
+});
+
+describe('the Spaces a canvas holds for its Map embeddings', () => {
+  it('releases every Space it holds when the canvas goes', async () => {
+    let released = 0;
+    const spaces: EmbeddedTargetReader = {
+      getState: () => ({ composed: [] }),
+      subscribe: () => () => undefined,
+      hold: () =>
+        Promise.resolve({
+          release: () => {
+            released += 1;
+            return Promise.resolve();
+          },
+        }),
+    };
+    const nodes = [spaceResource(HOST, MAP)];
+    const { unmount } = renderHook(() =>
+      useDrawnEmbeddings(nodes, publishedEmbeds(nodes), spaces, NO_DRAG, {
+        spaceId: HOST,
+        mapId: OTHER_MAP,
+        policy: 'authoring',
+      }),
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(released).toBe(0);
+
+    unmount();
+
+    expect(released).toBe(1);
   });
 });

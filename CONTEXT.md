@@ -130,6 +130,10 @@ _Avoid_: read-only as a mode of a plugin, Resource canvas.
 The application around a Resource plugin: it draws the Resource's rect, border, selection ring and toolbar.
 _Avoid_: Host for a server that serves the application; Storage calls that an HTTP host, or names it (the Rust host, the desktop sidecar).
 
+**Map embedding**:
+A Map drawn inside a Resource's rect because its plugin embeds a Space, on a canvas or the Stage. On a canvas it can be authored in place under a Claim lent to it.
+_Avoid_: portal, nested canvas, subspace.
+
 **Claim**:
 A Resource plugin's hold on the interaction while an author works in it. Claims nest through what a plugin embeds, and the deepest holds the keyboard and shows its commands. A Claim may run work exclusively.
 _Avoid_: lock, focus, edit mode.
