@@ -1,6 +1,6 @@
 # 10 — Rows read across runtimes, and the restart proof on Rust
 
-**Status:** ready-for-agent once 09 lands
+**Status:** ready-for-agent
 
 **Blocked by:** 09.
 **Waits on:** #528's 08 (its fixture scripts and currency checks, which this extends to PostgreSQL). Edits CI's `postgres` job as rust-host 16 does; rebase on whichever lands first.

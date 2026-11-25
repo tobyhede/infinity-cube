@@ -1,6 +1,6 @@
 # 12 — Port the fast-path races and the concurrent operations
 
-**Status:** ready-for-agent once 07 lands
+**Status:** ready-for-agent
 
 **Blocked by:** 07.
 

@@ -1,6 +1,6 @@
 # 04 — The SQL repository's concurrency seam, and its test instrumentation
 
-**Status:** ready-for-agent once 02 lands (Q2, Q3 and Q16 answered)
+**Status:** ready-for-agent
 
 **Blocked by:** 02 (so SQLite's table cases guard the refactor).
 

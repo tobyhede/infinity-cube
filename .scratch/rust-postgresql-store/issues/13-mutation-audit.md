@@ -1,6 +1,6 @@
 # 13 — The mutation audit
 
-**Status:** ready-for-agent once every one of 05–12 lands
+**Status:** ready-for-agent
 
 **Blocked by:** 05–12.
 

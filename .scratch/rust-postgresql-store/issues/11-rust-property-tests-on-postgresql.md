@@ -1,6 +1,6 @@
 # 11 — Property tests on PostgreSQL
 
-**Status:** ready-for-agent once 06 lands
+**Status:** ready-for-agent
 
 **Blocked by:** 06.
 **Waits on:** #528's 07 (its generators), which this reuses.

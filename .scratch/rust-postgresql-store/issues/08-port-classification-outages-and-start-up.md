@@ -1,6 +1,6 @@
 # 08 — Port classification, outages and start-up on PostgreSQL
 
-**Status:** ready-for-agent once 03 and 05 land
+**Status:** ready-for-agent
 
 **Blocked by:** 03, 05.
 

@@ -1,6 +1,6 @@
 # 14 — An independent parity audit after the last ticket
 
-**Status:** ready-for-agent once 13 lands
+**Status:** ready-for-agent
 
 **Blocked by:** 13.
 

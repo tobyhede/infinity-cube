@@ -1,6 +1,6 @@
 # 07 — Port the PostgreSQL concurrency and schema cases
 
-**Status:** ready-for-agent once 06 lands
+**Status:** ready-for-agent
 
 **Blocked by:** 06.
 

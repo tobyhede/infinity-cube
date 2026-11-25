@@ -2,7 +2,7 @@
 
 **Status:** decided. 00, the cold audit, ran on 2026-11-25 and this version is corrected from it (Audit, below). The user settled every question on 2026-11-25 (Decisions for PostgreSQL, below); 01 records them in an ADR and Storage before any code.
 
-**Why:** rust-host 15 (PRs #520 and #521, open) builds the Rust SQLite store with far less coverage than the TypeScript side, and three reviews and PR #528's thirteen tickets were needed to plan the way back. Rust-host 16 (`.scratch/rust-host/issues/16-rust-postgresql-store.md`) is next and has the same shape: its acceptance criteria name the HTTP wire and store-condition cases, `migrate` and the restart proof, and nothing about the repository contract, PostgreSQL's concurrency or failure classification. This plan front-loads what the SQLite effort learned, so the PostgreSQL store reaches at least test parity with the TypeScript PostgreSQL store as it lands, not after.
+**Why:** rust-host 15 (PRs #520 and #521, merged) built the Rust SQLite store with far less coverage than the TypeScript side, and three reviews and PR #528's thirteen tickets were needed to plan the way back. Rust-host 16 (`.scratch/rust-host/issues/16-rust-postgresql-store.md`) is next and has the same shape: its acceptance criteria name the HTTP wire and store-condition cases, `migrate` and the restart proof, and nothing about the repository contract, PostgreSQL's concurrency or failure classification. This plan front-loads what the SQLite effort learned, so the PostgreSQL store reaches at least test parity with the TypeScript PostgreSQL store as it lands, not after.
 
 **Lessons it builds in (from #528 and its reviews, in the project's `reviews/rust-sqlite-*`):**
 
@@ -34,7 +34,7 @@ Decided for SQLite (#528's `spec.md`, Decisions and Settled questions); they app
 - **The glossary terms** Invariant failure and Unclassified failure, now in `CONTEXT.md`, and **Unreachable** for what #528 calls Unavailable (Q17): `CONTEXT.md` already defines Unavailable as a command state, so #528's 02 uses Unreachable too.
 - **No coverage floor.**
 
-Settled by rust-host 16's Agent Brief (2026-11-24) and not reopened: `serve --store postgres` refuses an unset or blank `DATABASE_URL` before it serves (TypeScript falls back to the driver's defaults, `src/prisma/db.ts:68-74`); `serve` does not migrate; `sqlx` becomes the only migrator through `infinity-cube migrate` (ADR 0173 on `main`, renumbered 0174 by #533); a database Prisma Next migrated is refused, never adopted.
+Settled by rust-host 16's Agent Brief (2026-11-24) and not reopened: `serve --store postgres` refuses an unset or blank `DATABASE_URL` before it serves (TypeScript falls back to the driver's defaults, `src/prisma/db.ts:68-74`); `serve` does not migrate; `sqlx` becomes the only migrator through `infinity-cube migrate` (ADR 0174); a database Prisma Next migrated is refused, never adopted.
 
 ## Does not apply on PostgreSQL
 
