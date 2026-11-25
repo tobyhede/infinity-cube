@@ -2,7 +2,7 @@
 
 **Status:** ready-for-agent
 
-**Blocked by:** `rust-host/issues/15` (PRs #520, #521) merging to `main`, with 01.
+**Blocked by:** 03.
 
 **What to build:** The remaining gaps in how `infinity-cube serve --store sqlite` is tested as a process, and the stale reason in the HTTP ports test.
 

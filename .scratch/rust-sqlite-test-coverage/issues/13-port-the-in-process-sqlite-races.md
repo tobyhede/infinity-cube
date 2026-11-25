@@ -2,7 +2,7 @@
 
 **Status:** ready-for-agent
 
-**Blocked by:** `rust-host/issues/15` (PRs #520, #521) merging to `main`.
+**Blocked by:** 03.
 
 **What to build:** Rust tests of concurrent operations on one SQLite repository in one process, the races `test/integration/sqlite-fast-path-races.test.ts` and `test/integration/sqlite-contention.test.ts` hold for TypeScript beyond the same-Space race Rust already tests (`crates/host/tests/sqlite.rs`, `given_contention`).
 

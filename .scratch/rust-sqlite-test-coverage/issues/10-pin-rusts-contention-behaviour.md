@@ -2,7 +2,7 @@
 
 **Status:** ready-for-agent
 
-**Blocked by:** `rust-host/issues/15` (PRs #520, #521) merging to `main`, with 02.
+**Blocked by:** 02, 03.
 
 **What to build:** Tests of how the Rust SQLite repository answers another process's lock, holding the behaviour ST-127 allows and 02 records, not TypeScript's.
 

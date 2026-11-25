@@ -2,11 +2,11 @@
 
 **Status:** ready-for-agent
 
-**Blocked by:** `rust-host/issues/15` (PRs #520, #521) merging to `main`, with 01, and 02 (the ADR its exemptions cite).
+**Blocked by:** 02 (the ADR its exemptions cite).
 
 **What to build:** A unit test, shaped as `test/unit/http-conformance-rust-ports.test.ts` is, that reads the cases of the TypeScript repository contract (`test/support/repository-contract.ts`) and fails for any case with no Rust test carrying its `// Case:` line in the Rust SQLite repository's test files (`crates/host/tests/sqlite*.rs`, `crates/host/tests/startup.rs`, `crates/host/src/**` unit tests and `crates/cli/tests/serve.rs`, listed in the test), unless the test exempts it with its reason. TypeScript's contract is not changed. The test reads, the same way, the `it` cases of the TypeScript SQLite files outside the contract: `test/integration/sqlite-space-repository.test.ts` beyond its contract call, `sqlite-contention.test.ts`, `sqlite-fast-path-races.test.ts` with `test/support/fast-path-races.ts`, and `sqlite-http-runtime.test.ts`.
 
-- [ ] Case names come from each `it` call's first argument: the leading `${name} ` (the harness's store name) is dropped and any other substitution is written `*`, which gives 73 names. Three of them are written once and run for two values each (the loops at lines 530, 889 and 2444 today, 76 runs in all); the ports test lists each such name's values, and one Rust test per value carries `// Case: <name> (<value>)`.
+- [ ] Case names come from each `it` call's first argument: the leading `${name} ` (the harness's store name) is dropped and any other substitution is written `*`. The contract gives 73 names (the four further files add their own, which the test counts per file rather than to a fixed total). Three of the contract's are written once and run for two values each (the loops at lines 530, 889 and 2444 today, 76 runs in all); the ports test lists each such name's values, and one Rust test per value carries `// Case: <name> (<value>)`.
 - [ ] The test fails on a case with neither a port nor an exemption, on an exemption or port naming no case, and on a case both ported and exempt, as the HTTP ports test's `exemptAndPorted` does.
 - [ ] "writes a moved Resource through the ownership check, which refuses it before its Space releases it" is exempt, naming the spec's decision on change order.
 - [ ] "names a broken stored document broken stored state on the single-Space fast path, and leaves loadSpace's answer narrower" is **ported**, not exempt: the Rust port asserts the fast-path half as the case does, and asserts Rust's `load_space` answers broken stored state, with a comment naming ST-7 (02) for why Rust's answer is not TypeScript's narrower one.

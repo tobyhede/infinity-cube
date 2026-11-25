@@ -4,7 +4,7 @@
 
 **Blocked by:** 03.
 
-**What to build:** A Rust port, on a SQLite file reopened between write and read, of each contract case about commits that 03 lists for this ticket: successful Space creation and deletion, linking, dropping Resources, Resource ownership and moves, id order with unsorted input, large revisions and the revision ceiling, and the lifecycle doors (`initialize_aggregate`, `replace_aggregate`, `mark_exported`), concurrent first initialization among them. Each port carries its `// Case:` line and asserts what the contract asserts, as absolute values read back from the reopened file, not only as agreement with the memory store.
+**What to build:** A Rust port, on a SQLite file reopened between write and read, of each contract case about commits that 03 lists for this ticket: successful Space creation and deletion, a Space Resource referencing a new Space, dropping Resources, Resource ownership and moves, id order with unsorted input, large revisions and the revision ceiling, and the lifecycle doors (`initialize_aggregate`, `replace_aggregate`, `mark_exported`), concurrent first initialization among them. Each port carries its `// Case:` line and asserts what the contract asserts, as absolute values read back from the reopened file, not only as agreement with the memory store.
 
 No SQLite test today commits through the aggregate write path (the `CommitDecision::Write` branch of `commit` in `crates/host/src/sql.rs`); aborting there leaves every Rust test green. These ports are what reach it.
 
