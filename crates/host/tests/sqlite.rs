@@ -680,6 +680,46 @@ mod given_an_edit_to_one_space {
             .unwrap()
     }
 
+    // One damaged Space does not hide the others: it is listed by its title
+    // and fails only when it is opened.
+    #[tokio::test]
+    async fn lists_a_space_that_fails_intake_beside_the_others() {
+        let file = Migrated::new().await;
+        let store = seeded(open(&file.path())).await;
+        let listed = store.list_spaces().await.unwrap();
+        store.close().await;
+        execute(
+            &file.file,
+            &format!(
+                r#"UPDATE spaces SET document = '{{"version":2,"title":"Draft"}}' WHERE id = '{}'"#,
+                other()
+            ),
+        )
+        .await;
+        let store = open(&file.path());
+        let ids = |summaries: Vec<host::SpaceSummary>| {
+            summaries
+                .into_iter()
+                .map(|summary| summary.id)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            ids(store.list_spaces().await.unwrap()),
+            ids(listed),
+            "every Space is listed, the damaged one included"
+        );
+        assert!(
+            store.load_space(meta()).await.unwrap().is_some(),
+            "the healthy Space opens"
+        );
+        let other = SpaceId::parse(other()).unwrap();
+        let answer = store.load_space(other).await;
+        assert!(
+            matches!(answer, Err(RepositoryError::BrokenStoredState(_))),
+            "opening the damaged one fails: {answer:?}"
+        );
+    }
+
     #[tokio::test]
     async fn commits_beside_another_space_that_is_broken() {
         let file = Migrated::new().await;
@@ -938,26 +978,6 @@ mod given_broken_stored_state {
             matches!(answer, Err(RepositoryError::BrokenStoredState(ref message))
                 if message == "stored Spaces exist without a Meta Space"),
             "a valid input over Spaces with no Meta identity: {answer:?}"
-        );
-    }
-
-    // As `listSpaces` parses the document with `spaceDocumentSchema`: the
-    // listing names no Space its own load cannot decode.
-    #[tokio::test]
-    async fn fails_listing_a_space_document_the_space_document_shape_refuses() {
-        let file = Migrated::new().await;
-        let store = seeded(open(&file.path())).await;
-        store.close().await;
-        execute(
-            &file.file,
-            &format!(r#"UPDATE spaces SET document = '{{"version":2,"title":"Draft"}}' WHERE id = '{META}'"#),
-        )
-        .await;
-        let store = open(&file.path());
-        let answer = store.list_spaces().await;
-        assert!(
-            matches!(answer, Err(RepositoryError::BrokenStoredState(_))),
-            "a document with a title but an unknown version: {answer:?}"
         );
     }
 

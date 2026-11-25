@@ -100,27 +100,19 @@ fn same_json(left: &JsonValue, right: &JsonValue) -> bool {
     }
 }
 
-/// The Title a stored space document carries, once the document holds to the
-/// space document's shape (`spaceDocumentSchema`), as `listSpaces` reads it:
-/// a Space the listing names is one its own load can decode. Its Resources
-/// are not read.
+/// The title a stored space document carries. Only the title is read: one
+/// Space whose document fails intake is listed beside the others, and fails
+/// when it is opened (`tests/sqlite.rs` ›
+/// `lists_a_space_that_fails_intake_beside_the_others`).
 pub(crate) fn decode_title(row: &SpaceRow) -> Result<String, String> {
-    let broken = |what: &str| format!("stored Space {} {what}", row.id);
-    let id = SpaceId::parse(&row.id).ok_or_else(|| broken("has an id that is not a UUID"))?;
-    let document =
-        parse(&row.document).map_err(|error| broken(&format!("does not parse: {error}")))?;
-    let json = JsonValue::Object(JsonObject::from_iter([
-        ("id".to_owned(), JsonValue::String(row.id.clone())),
-        ("document".to_owned(), document),
-        ("resources".to_owned(), JsonValue::Array(Vec::new())),
-    ]));
-    decode_space_snapshot(&json, id)
-        .map(|snapshot| snapshot.document.title)
-        .map_err(|refusals| {
-            broken(&format!(
-                "holds a space document that is refused: {refusals}"
-            ))
-        })
+    let document = parse(&row.document)
+        .map_err(|error| format!("stored Space {} does not parse: {error}", row.id))?;
+    document
+        .as_object()
+        .and_then(|object| object.get("title"))
+        .and_then(JsonValue::as_str)
+        .map(str::to_owned)
+        .ok_or_else(|| format!("stored Space {} has no title", row.id))
 }
 
 /// A stored Space from its rows, through the one Space intake
