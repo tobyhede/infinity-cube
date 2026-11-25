@@ -8,19 +8,24 @@ import { storyText, storeStoryText } from '../support/story-assets';
 
 const contentSchema = z.object({ url: assetRefSchema });
 const mapSchema = z.object({ open: z.boolean() });
-const initialMap = () => ({
+interface MapSettings {
+  readonly size: ResourceSize;
+  readonly editSize: ResourceSize;
+  readonly open: boolean;
+}
+const initialMap = (): MapSettings => ({
   size: COLLAPSED_RESOURCE_SIZE,
   editSize: { width: 640, height: 360 },
   open: false,
 });
 
 export function EditingComparison({ initial }: { initial: string }) {
-  const name = 'Temporary resize';
-  const [map, setMap] = useState<'A' | 'B'>('A');
+  const name = 'Temporary edit size';
+  const [shownMap, setShownMap] = useState<'A' | 'B'>('A');
   const [maps, setMaps] = useState({ A: initialMap(), B: initialMap() });
-  const current = maps[map];
-  const patch = (next: Partial<typeof current>) =>
-    setMaps((previous) => ({ ...previous, [map]: { ...previous[map], ...next } }));
+  const current = maps[shownMap];
+  const patch = (next: Partial<MapSettings>) =>
+    setMaps((previous) => ({ ...previous, [shownMap]: { ...previous[shownMap], ...next } }));
   const [url, setUrl] = useState(() => storyText(initial));
   const [editing, setEditing] = useState(false);
   const beforeOpen = useRef(false);
@@ -68,14 +73,15 @@ export function EditingComparison({ initial }: { initial: string }) {
         <Button
           disabled={editing}
           onClick={() => {
-            setMap(map === 'A' ? 'B' : 'A');
-            beforeOpen.current = maps[map === 'A' ? 'B' : 'A'].open;
+            const other = shownMap === 'A' ? 'B' : 'A';
+            setShownMap(other);
+            beforeOpen.current = maps[other].open;
           }}
         >
           Switch Map
         </Button>
         <output>
-          Map {map} · Canvas {current.size.width} × {current.size.height} · Edit{' '}
+          Map {shownMap} · Canvas {current.size.width} × {current.size.height} · Edit{' '}
           {current.editSize.width} × {current.editSize.height} · {current.open ? 'Full' : 'Title'}
         </output>
       </div>
