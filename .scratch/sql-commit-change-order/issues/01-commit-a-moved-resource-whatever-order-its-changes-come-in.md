@@ -4,7 +4,7 @@
 
 **Blocked by:** None.
 
-**Why it waits:** the SQLite test-coverage effort freezes TypeScript's behaviour (its spec's Decisions, "TypeScript is frozen"). Until that decision is lifted, or the TypeScript server is retired, this stays a recorded divergence, which that effort writes into the Storage requirements.
+**Why it waits:** the user decided on 24 November 2026 that the SQLite test-coverage effort changes no TypeScript behaviour. That decision is recorded as "TypeScript is frozen" in `.scratch/rust-sqlite-test-coverage/spec.md`, on the branch `claude/project-thread-pzxhvd-test-coverage` until it reaches `main`. Triage decides whether this fix waits for that effort to finish or lands on its own.
 
 **What's wrong:** one commit that moves a Resource from Space A to Space B updates both Spaces: A without the Resource, B with it. The finished Aggregate passes intake either way, but the two SQL hosts answer it differently by the order the changes come in.
 

@@ -42,8 +42,10 @@ pub struct SqliteStore {
     opened: std::sync::Mutex<Option<FileIdentity>>,
 }
 
-/// Which file a path names: its device and inode on Unix. Elsewhere a file
-/// is not told from another put in its place.
+/// Which file a path names: its device and inode on Unix. Elsewhere every
+/// file has the same identity, so only a deleted file is noticed: Windows
+/// refuses to replace or delete a file SQLite holds open, and the standard
+/// library's file index there is not yet stable.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct FileIdentity {
     device: u64,
@@ -246,6 +248,12 @@ impl SqlStore for SqliteStore {
         .iter()
         .map(space_row)
         .collect()
+    }
+
+    async fn holds_spaces(connection: &mut SqliteConnection) -> Result<bool, sqlx::Error> {
+        sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM spaces)")
+            .fetch_one(connection)
+            .await
     }
 
     async fn space(

@@ -68,6 +68,11 @@ pub(crate) trait SqlStore: Send + Sync + 'static {
         connection: &mut Connection<Self>,
     ) -> impl Future<Output = Result<Vec<SpaceRow>, sqlx::Error>> + Send;
 
+    /// Whether any Space row is stored, reading no document.
+    fn holds_spaces(
+        connection: &mut Connection<Self>,
+    ) -> impl Future<Output = Result<bool, sqlx::Error>> + Send;
+
     /// The Space row with this id.
     fn space(
         connection: &mut Connection<Self>,
@@ -331,7 +336,7 @@ async fn established_meta_space_id<S: SqlStore>(
     connection: &mut Connection<S>,
 ) -> Outcome<Option<SpaceId>> {
     let meta_space_id = stored_meta_space_id::<S>(connection).await?;
-    if meta_space_id.is_none() && !S::spaces(connection).await?.is_empty() {
+    if meta_space_id.is_none() && S::holds_spaces(connection).await? {
         return Err(broken("stored Spaces exist without a Meta Space"));
     }
     Ok(meta_space_id)
@@ -615,10 +620,10 @@ impl<S: SqlStore> SpaceRepository for SqlSpaceRepository<S> {
         self.alone(async {
             let mut transaction = self.begin_write().await?;
             let meta_space_id = stored_meta_space_id::<S>(&mut transaction).await?;
-            // Rows are read raw, not decoded: replacement replaces stored
-            // state whether or not it parses (ADR 0094).
-            let stored = S::spaces(&mut transaction).await?;
-            let answer = if meta_space_id.is_none() && stored.is_empty() {
+            // No document is read: replacement replaces stored state
+            // whether or not it can be read (ADR 0094).
+            let holds_spaces = S::holds_spaces(&mut transaction).await?;
+            let answer = if meta_space_id.is_none() && !holds_spaces {
                 ReplaceResult::Uninitialized
             } else if meta_space_id != expected_meta_space_id {
                 ReplaceResult::Conflict {

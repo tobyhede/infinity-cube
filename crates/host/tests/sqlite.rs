@@ -1153,6 +1153,29 @@ mod given_a_file_that_is_not_the_database {
         }
     }
 
+    // ADR 0094: replacement replaces stored state whatever it holds.
+    #[tokio::test]
+    async fn replaces_spaces_whose_documents_are_stored_as_blobs() {
+        let (file, _, input) = seeded_file().await;
+        execute(
+            &file.file,
+            "UPDATE spaces SET document = CAST(document AS BLOB)",
+        )
+        .await;
+        let store = open(&file.path());
+        assert!(
+            matches!(
+                store.replace_aggregate(input, Some(meta())).await,
+                Ok(ReplaceResult::Replaced(_))
+            ),
+            "the BLOB documents are replaced"
+        );
+        assert!(
+            matches!(store.load_aggregate().await, Ok(AggregateLoad::Loaded(_))),
+            "and the aggregate reads again"
+        );
+    }
+
     #[tokio::test]
     async fn answers_a_directory_at_the_path_as_unclassified() {
         let directory = tempfile::tempdir().unwrap();
