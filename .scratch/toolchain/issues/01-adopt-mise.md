@@ -4,7 +4,7 @@
 
 **Category:** enhancement
 
-**Blocked by:** rust-host 16, which removes the `db:migrate*` scripts and adds the `migrate` verb this ticket makes a task.
+**Blocked by:** rust-host/16, which removes the `db:migrate*` scripts and adds the `migrate` verb this ticket makes a task.
 
 **What to build:** Bring in [mise](https://mise.jdx.dev/) repo-wide: one `mise.toml` pinning Node and pnpm and defining the repository's tasks that have no pnpm script, used both locally, by agents, and in CI. The acceptance criteria are the Agent Brief's, below.
 
