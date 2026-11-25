@@ -54,8 +54,23 @@ def glossary_terms(root):
     return terms
 
 
+def pointer_names(listed, glossary):
+    """Split a Terms pointer list: comma-separated, ending at the first sentence end.
+
+    " and " separates only the final two items, and not where the final item
+    is itself a glossary entry (such as "Maps and Graphs").
+    """
+    listed = re.split(r"\.(?:\s|$)", listed.strip(), maxsplit=1)[0]
+    names = [n.strip() for n in listed.split(",") if n.strip()]
+    if names and names[-1].lower() not in glossary and " and " in names[-1]:
+        head, _, tail = names[-1].rpartition(" and ")
+        names[-1:] = [head.strip(), tail.strip()]
+    return [n for n in names if n]
+
+
 def extract(root):
     """Answer (path, line, term, how) for every term the requirements name."""
+    glossary = glossary_terms(root)
     found = []
     for path in sorted(glob.glob(os.path.join(root, "docs/requirements/*.md"))):
         rel = os.path.relpath(path, root)
@@ -69,11 +84,8 @@ def extract(root):
                 lead = BOLD.match(text)
                 if lead and lead.group(1).startswith("Terms"):
                     if "used here:" in text:
-                        listed = text.split("used here:", 1)[1].strip().rstrip(".")
-                        for name in re.split(r",\s*|\s+and\s+", listed):
-                            name = name.strip()
-                            if name:
-                                found.append((rel, number, name, "pointer"))
+                        for name in pointer_names(text.split("used here:", 1)[1], glossary):
+                            found.append((rel, number, name, "pointer"))
                     else:
                         in_definitions = True
                     continue
@@ -106,9 +118,12 @@ def run(root):
 
 
 def self_test():
-    context = "# G\n\n**Space**:\nA world.\n\n**Resource plugin**:\nDraws a kind.\n\nA **Mention** is not an entry.\n"
+    context = (
+        "# G\n\n**Space**:\nA world.\n\n**Resource plugin**:\nDraws a kind.\n\n"
+        "**Maps and Graphs**:\nA term containing and.\n\nA **Mention** is not an entry.\n"
+    )
     passing = (
-        "# R\n\n**Purpose:** a doc.\n\n**Terms** defined in [`CONTEXT.md`](../../CONTEXT.md) and used here: Space, Resource plugin.\n\n"
+        "# R\n\n**Purpose:** a doc.\n\n**Terms** defined in [`CONTEXT.md`](../../CONTEXT.md) and used here: Space, Resource plugin, Maps and Graphs. Code calls them x.\n\n"
         "## Bugs\n\n- **A refusal changes nothing**: a rule summary, not a term.\n- **AB-1** A rule.\n"
     )
     failing = passing + (

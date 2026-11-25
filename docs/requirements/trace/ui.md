@@ -500,5 +500,5 @@ An independent rerun of the snapshot refresh rechecked this topic against main `
 
 | Source | Disposition |
 |---|---|
-| This doc's "Terms not yet in `CONTEXT.md`" working definitions | moved to `CONTEXT.md` as glossary entries (Toolbar, Command Dock, Surface, Unavailable, Editing, Full View, Notice, Continue at); the doc's Terms line now points to them, and `check-glossary.py` holds every term it names to an entry. No definition changed meaning; where two docs defined a term differently, the entry states both docs' meaning |
+| This doc's "Terms not yet in `CONTEXT.md`" working definitions | moved to `CONTEXT.md` as glossary entries (Toolbar, Command Dock, Surface, Unavailable, Editing, Full View, Notice, Continue at); the doc's Terms line now points to them, and `check-glossary.py` holds every term it names to an entry. Some definitions were shortened as they moved; each clause left out is stated by a rule. Where two docs defined a term differently, the entry states both docs' meaning |
 | Clause "to within a canvas unit of rounding" in UI-67, added by the refresh to `343a66c` | qualifies 0173 (Shift at Resize start), which states no rounding → conflict [C5](../conflicts/ui.md), closed by ruling UI C5 (25 November 2026, DECISIONS): whole canvas units are detail 0173 does not state; UI-67 built |

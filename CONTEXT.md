@@ -24,7 +24,7 @@ A window the desktop application opens on an Aggregate directory, showing its Sp
 _Avoid_: talk window, Aggregate window.
 
 **Start window**:
-The desktop application's window for creating a new Space, opening a folder, or reopening a recent Space, for when no Space window is open or a new Space is asked for; it is not a Space window.
+The desktop application's window for creating a new Space, opening a folder, or reopening a recent Space, shown at launch when nothing else opens, and when a new Space is asked for. It is not a Space window.
 _Avoid_: home window, launcher, welcome window.
 
 **Recent**:
@@ -127,7 +127,8 @@ What hosts a Resource plugin's drawing: a Map, the Stage, or another Resource em
 _Avoid_: read-only as a mode of a plugin, Resource canvas.
 
 **Host**:
-The application around a Resource plugin: it draws the Resource's rect, border, selection ring and toolbar. In Storage, a host is instead a server that serves the application, such as the Rust host.
+The application around a Resource plugin: it draws the Resource's rect, border, selection ring and toolbar.
+_Avoid_: Host for a server that serves the application; Storage calls that an HTTP host, or names it (the Rust host, the desktop sidecar).
 
 **Claim**:
 A Resource plugin's hold on the interaction while an author works in it. Claims nest through what a plugin embeds, and the deepest holds the keyboard and shows its commands. A Claim may run work exclusively.
@@ -168,8 +169,9 @@ _Avoid_: subspace, portal, link, nested space.
 **Target Space**:
 The Space a Space Resource references.
 
-**Selection**:
-Of a Space Resource: the Map and Graph of its Target Space that it shows. It is distinct from the canvas selection, the Selected Resources or Selected Edge that an authoring gesture acts on.
+**Space Resource Selection**:
+The Map and Graph of its Target Space that a Space Resource shows.
+_Avoid_: Selection alone, which means the canvas selection: the Selected Resources or Selected Edge an authoring gesture acts on.
 
 **Space Resource Framing**:
 The view of a target Map authored on a Space Resource: which part is visible and at what scale.
@@ -275,8 +277,9 @@ Interacting with a Space in a way that may change its Resources, Maps or Graphs,
 **Space Authoring**:
 The one module that derives, validates and installs every Edit to a single Space.
 
-**Session**:
-One Space's Working Space, the Revision last acknowledged, and its persistence status.
+**Space session**:
+One Space's Working Space, the Revision last acknowledged, and its persistence status. A Replacement epoch, the Traversal history and Running are not one.
+_Avoid_: session alone where a page's lifetime could be meant.
 
 **Interaction draft**:
 The transient value of an unfinished authoring interaction, such as changed text awaiting confirmation. It is separate from a completed Edit.
@@ -375,7 +378,7 @@ _Avoid_: drilling in, zooming in, descending, push, pop.
 The action that closes one open Space.
 
 **Open Spaces**:
-The Spaces open at once in a session, and the surface that lists them.
+The Spaces open at once in one page, until it reloads, and the surface that lists them.
 _Avoid_: rail, tab, stack, breadcrumb, switcher.
 
 **Open Space**:

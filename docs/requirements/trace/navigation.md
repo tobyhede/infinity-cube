@@ -402,4 +402,4 @@ An independent rerun of the snapshot refresh rechecked this topic against main `
 
 | Source | Disposition |
 |---|---|
-| This doc's "Terms not yet in `CONTEXT.md`" working definitions | moved to `CONTEXT.md` as glossary entries (Navigation, Address, Location, Product URL, Presentation, Open Space, Composed Space); the doc's Terms line now points to them, and `check-glossary.py` holds every term it names to an entry. No definition changed meaning; where two docs defined a term differently, the entry states both docs' meaning |
+| This doc's "Terms not yet in `CONTEXT.md`" working definitions | moved to `CONTEXT.md` as glossary entries (Navigation, Address, Location, Product URL, Presentation, Open Space, Composed Space); the doc's Terms line now points to them, and `check-glossary.py` holds every term it names to an entry. Some definitions were shortened as they moved; each clause left out is stated by a rule (a Presentation's identity and start time: NV-57 and NV-73). Where two docs defined a term differently, the entry states both docs' meaning |
