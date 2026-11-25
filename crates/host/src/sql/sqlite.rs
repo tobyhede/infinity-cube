@@ -299,6 +299,23 @@ impl SqlStore for SqliteStore {
         .collect()
     }
 
+    async fn insert_space(
+        connection: &mut SqliteConnection,
+        row: &SpaceRow,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(sqlx::AssertSqlSafe(format!(
+            "INSERT INTO spaces (id, document, revision, exported_revision, updated_at) \
+             VALUES ($1, $2, $3, $4, {NOW})"
+        )))
+        .bind(&row.id)
+        .bind(&row.document)
+        .bind(&row.revision)
+        .bind(&row.exported_revision)
+        .execute(connection)
+        .await
+        .map(drop)
+    }
+
     async fn write_space(
         connection: &mut SqliteConnection,
         row: &SpaceRow,
@@ -319,17 +336,19 @@ impl SqlStore for SqliteStore {
         .map(drop)
     }
 
-    async fn delete_space(connection: &mut SqliteConnection, id: &str) -> Result<(), sqlx::Error> {
-        for statement in [
-            "DELETE FROM resources WHERE space_id = $1",
-            "DELETE FROM spaces WHERE id = $1",
-        ] {
-            sqlx::query(statement)
-                .bind(id)
-                .execute(&mut *connection)
-                .await?;
-        }
-        Ok(())
+    async fn delete_space(
+        connection: &mut SqliteConnection,
+        id: &str,
+    ) -> Result<bool, sqlx::Error> {
+        sqlx::query("DELETE FROM resources WHERE space_id = $1")
+            .bind(id)
+            .execute(&mut *connection)
+            .await?;
+        let removed = sqlx::query("DELETE FROM spaces WHERE id = $1")
+            .bind(id)
+            .execute(connection)
+            .await?;
+        Ok(removed.rows_affected() > 0)
     }
 
     async fn delete_resources_except(
@@ -373,18 +392,17 @@ impl SqlStore for SqliteStore {
     async fn upsert_resource(
         connection: &mut SqliteConnection,
         row: &ResourceRow,
-    ) -> Result<(), sqlx::Error> {
-        sqlx::query(sqlx::AssertSqlSafe(format!(
+    ) -> Result<String, sqlx::Error> {
+        sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
             "INSERT INTO resources (id, space_id, document, updated_at) VALUES ($1, $2, $3, {NOW}) \
              ON CONFLICT (id) DO UPDATE SET document = excluded.document, \
-             updated_at = excluded.updated_at"
+             updated_at = excluded.updated_at RETURNING space_id"
         )))
         .bind(&row.id)
         .bind(&row.space_id)
         .bind(&row.document)
-        .execute(connection)
+        .fetch_one(connection)
         .await
-        .map(drop)
     }
 
     async fn clear(connection: &mut SqliteConnection) -> Result<(), sqlx::Error> {
