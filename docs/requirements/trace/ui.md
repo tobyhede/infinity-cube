@@ -10,7 +10,7 @@ For audit only. Every source rule appears exactly once in §1 or §2, with one o
 §3 checks off what maps-and-graphs sent here. §4 groups this doc's sends by receiving doc. §5 lists code-only rules. §6 holds code notes.
 
 Abbreviations:
-- "G n" is the bullet that starts on line n of the old guide as it stood at the rewrite's baseline, commit `797b2908` (`git show 797b2908:docs/agents/ui.md`). The archived copy at `docs/adr/archive/agent-guides/ui.md` is main's later version, whose line numbers differ after line 12.
+- "G n" is the bullet that starts on line n of the old guide as it stood at the rewrite's baseline, commit `797b2908` (`git show 797b2908:docs/agents/ui.md`). Main's later version, `docs/agents/ui.md` at `d14ff974` (the copy the rewrite archived), numbers its lines differently after line 12.
 - "M n" is the bullet of that later archived guide that starts on line n; §7 traces the bullets main added or changed.
 - "rN" is the Nth rule of an ADR as numbered in the rewrite's mapping tables (`map-*.md`). Those tables were never committed, so a number cannot be looked up, and the numbers do not follow the order of the ADR's text (0028's r1, "activation is not an Edit", is the second rule its text states). Resolve a row by its description, which names the claim, and find that claim in the ADR in `docs/adr/` or `docs/adr/superseded/`.
 - "DEC n" is ruling n in `../DECISIONS.md`. A ruling that changes what an accepted ADR decides is recorded as an ADR (DEC 1, C1 and C2 as ADR 0146; C3 as 0147; Navigation C2 as 0148; Rendering C1 as 0149; Space and Resources C1 as 0150; UI C2 as 0153; UI C3 as 0151; UI C4 as 0154; Storage S2 as 0152), and that ADR is what binds; `../DECISIONS.md`, "Rulings recorded as ADRs", lists them. A row below that says a rule was "struck" or "overruled" by a ruling means the ADR that records the ruling refines the source ADR.
@@ -18,7 +18,7 @@ Abbreviations:
 
 The rule ids in `../ui.md` are append-only from this version on.
 
-## 1. Old guide (`docs/adr/archive/agent-guides/ui.md`)
+## 1. Old guide (`docs/agents/ui.md` at `797b2908`)
 
 | Source | Disposition |
 |---|---|
@@ -312,7 +312,7 @@ The rule ids in `../ui.md` are append-only from this version on.
 - 0102 kind glyph placement; G18 Shape glyph geometry and no glyph on Ur.
 - 0105 legend mark, markers, connection preview.
 - 0036 handle reveal on selection; 0033 gesture.
-- `docs/adr/archive/agent-guides/rendering.md`'s Edge-chrome bullet is RD's source; RD should point here for the Edge controls (UI-78–UI-82).
+- `docs/agents/rendering.md`'s Edge-chrome bullet (at `797b2908`) is RD's source; RD should point here for the Edge controls (UI-78–UI-82).
 
 **navigation.md (NV):**
 - Presenting chrome accessibility, received from NV and returned (NV-89–NV-91).
@@ -343,7 +343,7 @@ Rules no source states, kept under drafting rule 5 (code plus a test, contradict
 - UI-40: Image's press opens a file picker (the four peers are G21's).
 - UI-41: search over every Title Line, kind and Spaces filters.
 - UI-62: the image-replacement running shape.
-- UI-78, UI-80: Edge focus and the Enter/Escape reach (stated only in `docs/adr/archive/agent-guides/rendering.md`, RD's source).
+- UI-78, UI-80: Edge focus and the Enter/Escape reach (stated only in `docs/agents/rendering.md` at `797b2908`, RD's source).
 - UI-86: a keyboard Add from the Resources list keeps the caret there.
 - UI-94: the notice area's placement above the Dock and its dismissal (0112 states one notice area only).
 - UI-96: the zoom control (RD sent it; no ADR states it).
@@ -375,7 +375,7 @@ Rules no source states, kept under drafting rule 5 (code plus a test, contradict
 
 ## 7. Sources since the baseline
 
-Main moved on after the rewrite's baseline (commit `797b2908`). These are the rules main's later ADRs and guide add or change that feed this doc. "M n" is a bullet of the archived guide `docs/adr/archive/agent-guides/ui.md` as main left it.
+Main moved on after the rewrite's baseline (commit `797b2908`). These are the rules main's later ADRs and guide add or change that feed this doc. "M n" is a bullet of `docs/agents/ui.md` as main left it, at `d14ff974`.
 
 ### Guide bullets main added or changed
 
@@ -465,12 +465,40 @@ The snapshot marker moved from `a0f5066` to `f6e01b9`; the highest accepted ADR 
 |---|---|
 | 0165 | reviewed, no rule here: Prisma Next and `sqlx` apply one schema history in two encodings, held equal by tests; restated in ST-125 |
 | Code since `a0f5066`: PR 506 (the plain-SQL migrations under `migrations-sql/` and their tests) and PR 502 (the README's Running and SQLite sections, the `infinity-cube` plugin skills, and Storage ST-126–ST-128) | no behaviour this doc states |
-| 0171 the desktop application's Start window | → UI-111 (**built**, but Recent's entries until ST-131 keeps a history), its layout and controls from the design accepted in `.scratch/start-window/issues/01-design-the-start-window.md`; its open details → Open questions; a write failing after Create Space → UI-111 (the form kept, ticket 02); its behaviour → ST-131 (the Start window and New Space **built**, reopening and Recent **not built**) |
 
-### ADR 0173
+## Refresh to `3f6aa29` (24 November 2026)
+
+The snapshot marker moved from `f6e01b9` to `3f6aa29` and to accepted ADRs through 0172; no ADR 0170 is on main at that commit. Each ADR accepted above the old marker was read for rules this doc owns, and each change main merged since `f6e01b9`'s refresh (PR 503) was read for behaviour this doc states. The 0171 row was recorded under the previous refresh when PR 527 restated it, and is moved here.
 
 | Source | Disposition |
 |---|---|
-| 0173 Shift at Resize start keeps the current Map rect’s ratio for the whole drag, with one Edit on release and cancellation discarding the draft | → UI-67 |
-| Both Closed Size floors hold while scaling the rect proportionally | → UI-68 |
-| The ratio is the stored Map rect, and Shift on the control never changes selection | → UI-67 |
+| 0167 the page's no-modifier rule and ADR 0138's keymap govern the keys the page answers, not a native menu's accelerators, which are the platform's (`CmdOrCtrl+N`, `CmdOrCtrl+O`, `CmdOrCtrl+Q`) | → UI-8. The menus themselves → ST (ST-121) |
+| 0167 no home window; creating a Space only when asked | reviewed, no rule here: windows and creation → ST (ST-121, ST-131) |
+| 0168 `CmdOrCtrl+W` and, on Linux and Windows, `F11` | → UI-8. The menus, Help and Check for Updates… → ST (ST-121) |
+| 0169 | reviewed, no rule here: a preview build is a normal release the updater finds at `releases/latest`; restated in ST-130 |
+| 0171 the desktop application's Start window | → UI-111 (**built**, but Recent's entries until ST-131 keeps a history), its layout and controls from the design accepted in `.scratch/start-window/issues/01-design-the-start-window.md`; its open details → Open questions; a write failing after Create Space → UI-111 (the form kept, ticket 02); its behaviour → ST-131 (the Start window and New Space **built**, reopening and Recent **not built**) |
+| 0172 | reviewed, no rule here: the Start window's page is an entry of the shell's own build; restated in ST-131. UI-111's components from `@project/ui` are unchanged by where the page is built |
+| Code since PR 503: PR 517 and PR 524 (the native menus' accelerators), PR 527 (the Start window's page, `app/src/start-refusal.ts`, and `@project/ui`'s `Item` components, `FolderOpenIcon` and `Button`'s `link` variant) | → UI-8 and UI-111, reconciled on main with each PR; no other UI behaviour changed |
+
+## Refresh to `343a66c` (25 November 2026)
+
+The snapshot marker moved from `3f6aa29` to `343a66c` and to accepted ADRs through 0174: [Shift at Resize start keeps the Resource’s proportions](../../adr/0173-shift-at-resize-start-keeps-the-resources-proportions.md) (0173) and [sqlx is the only migrator once PostgreSQL moves to Rust](../../adr/0174-sqlx-is-the-only-migrator-once-postgresql-moves-to-rust.md), which also carried 0173 at that commit and was renumbered 0174 on 25 November 2026, called here 0173 (Shift at Resize start) and 0174 (sqlx); no ADR 0170 is on main. Each ADR accepted or amended above the old marker was read for rules this doc owns, and each change main merged since `3f6aa29` (PRs 508, 509, 518 and 519) was read for behaviour this doc states.
+
+| Source | Disposition |
+|---|---|
+| 0173 (Shift at Resize start): Shift at Resize start keeps the current Map rect's ratio for the whole drag, Shift pressed later does not, and the top-left stays fixed | → UI-67, where main's PR 509 restated it |
+| 0173 (Shift at Resize start): release writes the previewed size and its displacement in one Resize Edit, and cancellation discards the draft | → UI-67 (amended: the Edit is named a Resize Edit writing size and displacement, pointing to MG-23 and MG-24) |
+| 0173 (Shift at Resize start): both Closed Size floors hold while scaling proportionally (400 × 300 → 260 × 195, 600 × 200 → 438 × 146) | → UI-68, where main's PR 509 restated it |
+| 0173 (Shift at Resize start): the ratio is the stored Map rect, and Shift on the control never changes selection | → UI-67; the selection side → NV-9 (amended to point here) |
+| 0174 (sqlx) | reviewed, no rule here: `sqlx` is the only migrator once PostgreSQL moves to Rust, and the Prisma Next migration packages go; restated in ST-125 and ST-126 |
+| 0122, 0155 and 0165, amended status blocks | reviewed, no rule here: each gained only a `Refined by` entry, 0122's for 0173 (Shift at Resize start) and 0155's and 0165's for 0174 (sqlx); no decision changed |
+| Code since `3f6aa29`: PRs 508 and 509 (proportional Resize: `react-flow-adapter/src/proportional-resize.ts`, `ResourceNode.tsx`, their tests and `app/e2e/aspect-ratio-resizing.spec.ts`), 518 (triage of rust-host 15 and 16, 0174 (sqlx) and the mise ticket) and 519 (the SQLite restart proof starting its hosts by command: `test/support/restart-proof-host.ts`, `test/e2e/sqlite-persistence.spec.ts`, `conformance/http/host-process.ts`) | 508 and 509 → UI-67 and UI-68; the axis-driven size and whole canvas units in UI-67 restate `proportionalSize`, not the ADR; the interactive deviation PR 509 records in `app/stories/design-system-inventory.ts` is an engineering record under the `shadcn-first-ui` skill, no rule. 518 and 519: no behaviour this doc states; 519's restart proof addresses the chrome through `test/support/restart-proof.ts`, which it did not change |
+
+## Independent rerun at `343a66c` (25 November 2026)
+
+An independent rerun of the snapshot refresh rechecked this topic against main `343a66c` (main had not moved) and both ADRs numbered 0173 at that commit. The marker is unchanged: no rule changed meaning.
+
+| Source | Disposition |
+|---|---|
+| This doc's "Terms not yet in `CONTEXT.md`" working definitions | moved to `CONTEXT.md` as glossary entries (Toolbar, Command Dock, Surface, Unavailable, Editing, Full View, Notice, Continue at); the doc's Terms line now points to them, and `check-glossary.py` holds every term it names to an entry. No definition changed meaning; where two docs defined a term differently, the entry states both docs' meaning |
+| Clause "to within a canvas unit of rounding" in UI-67, added by the refresh to `343a66c` | qualifies 0173 (Shift at Resize start), which states no rounding → conflict [C5](../conflicts/ui.md), closed by ruling UI C5 (25 November 2026, DECISIONS): whole canvas units are detail 0173 does not state; UI-67 built |

@@ -2,7 +2,7 @@
 
 **Purpose:** what a Space and a Resource are, what a kind and its plugin are, what each kind holds, how Resources and Spaces are created and deleted, what a Space Resource and a Reference Resource point at, and what happens to a Resource whose kind no plugin in the build draws.
 
-**Snapshot:** checked against `f6e01b9` (2026-11-21); incorporates accepted ADRs through 0166. ADRs accepted after it bind where they differ, until this document is updated. Proposed ADR 0163 is not incorporated.
+**Snapshot:** checked against `343a66c` (2026-11-25); incorporates accepted ADRs through 0174, neither 0173 nor 0174 owning a rule here; no ADR 0170 is on main at that commit. At `343a66c` both 0173 and 0174 carried the number 0173; the later, sqlx is the only migrator, was renumbered 0174 on 25 November 2026. ADRs accepted after it bind where they differ, until this document is updated. Proposed ADR 0163 is not incorporated.
 
 Conflicts, open and closed, are listed in [conflicts/space-and-resources.md](conflicts/space-and-resources.md). Sources are traced in [trace/space-and-resources.md](trace/space-and-resources.md).
 
@@ -15,17 +15,7 @@ Conflicts, open and closed, are listed in [conflicts/space-and-resources.md](con
 | Controls: which creation commands are offered, caret into the Title, Title editing keys, the Markdown source editor, destructive confirmation, where notices show, the continuation, the short Title | [ui.md](ui.md) |
 | Entering, Open Spaces and Exit, holds on a composed Space (NV-81), the selection per occurrence, product URLs, presenting | [navigation.md](navigation.md) |
 
-**Terms** defined in [`CONTEXT.md`](../../CONTEXT.md) and used here: Ordinary Space, Door, Map content, Content action.
-
-**Terms not yet in `CONTEXT.md`** (working definitions until the glossary carries them):
-- **Aggregate intake**: the check that a whole set of Spaces is valid together (references between Spaces, rooting).
-- **Target**: the Resource a Reference Resource shows. **Target Space**: the Space a Space Resource references.
-- **Selection**: the Map and Graph a Space Resource shows. **Framing**: its saved centre and zoom.
-- **Plugin** (Resource plugin): what draws and authors a kind's Resources inside their rect. A **kind** is the name in a Resource's `kind` that selects its plugin. The build's **plugin list** names every plugin once, and separately the **default plugin**.
-- **Missing kind**: a well-formed kind that no plugin in this build's list draws. Its Resources are drawn by the default plugin.
-- **Content kind**: a kind whose content names bytes (Markdown, Mermaid, Image). Ur, Reference and Space are kinds but not content kinds.
-- **Drawn Map**: a Map drawn inside an Open Space Resource. **Occurrence**: one drawing of a Map, named by the path of drawing Resources from the canvas's own Map to it.
-- **Resource N**, **Space N**: a neutral title, numbered one past the highest already used.
+**Terms** defined in [`CONTEXT.md`](../../CONTEXT.md) and used here: Ordinary Space, Door, Map content, Content action, Aggregate intake, Target, Target Space, Selection, Space Resource Framing, Resource kind, Resource plugin, Plugin list, Default plugin, Missing kind, Content kind, Drawn Map, Occurrence, Resource N, Space N.
 
 **Status:** **built** means code and a named test match the rule. **built (untested)** means code matches and no test covers it. **not built** means the rule is decided and no code implements it. **bug: code differs** means the code does what the note says instead. **undecided (Cn)** means the rule waits on conflict Cn; the note says what the code does meanwhile. A test is named as `file` › "test name". Paths that start with `test/` are at the repo root; all others are under `packages/`. This document restates the accepted ADRs and decides nothing itself: each rule names its sources, and a rule that disagrees with an accepted ADR is a defect in this document, corrected here, never a reason to set the ADR aside. A rule sourced only from code and tests, an archived guide or a ruling in [DECISIONS.md](DECISIONS.md) says so.
 
