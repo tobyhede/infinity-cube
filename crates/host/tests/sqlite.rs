@@ -680,44 +680,58 @@ mod given_an_edit_to_one_space {
             .unwrap()
     }
 
-    // One damaged Space does not hide the others: it is listed by its title
-    // and fails only when it is opened.
+    // One broken Space does not hide the others (ST-7): it is listed, by its
+    // title while its document is JSON holding a string one and by its id
+    // otherwise, and fails only when it is opened.
     #[tokio::test]
-    async fn lists_a_space_that_fails_intake_beside_the_others() {
-        let file = Migrated::new().await;
-        let store = seeded(open(&file.path())).await;
-        let listed = store.list_spaces().await.unwrap();
-        store.close().await;
-        execute(
-            &file.file,
-            &format!(
-                r#"UPDATE spaces SET document = '{{"version":2,"title":"Draft"}}' WHERE id = '{}'"#,
-                other()
+    async fn lists_a_broken_space_beside_the_others() {
+        let other_id = SpaceId::parse(other()).unwrap();
+        for (shape, document, title) in [
+            ("fails intake", r#"{"version":2,"title":"Draft"}"#, "Draft"),
+            ("has no string title", r#"{"version":1,"title":7}"#, other()),
+            ("is not JSON", "not json", other()),
+            (
+                "holds a lone surrogate",
+                r#"{"version":1,"title":"\ud800"}"#,
+                other(),
             ),
-        )
-        .await;
-        let store = open(&file.path());
-        let ids = |summaries: Vec<host::SpaceSummary>| {
-            summaries
-                .into_iter()
-                .map(|summary| summary.id)
-                .collect::<Vec<_>>()
-        };
-        assert_eq!(
-            ids(store.list_spaces().await.unwrap()),
-            ids(listed),
-            "every Space is listed, the damaged one included"
-        );
-        assert!(
-            store.load_space(meta()).await.unwrap().is_some(),
-            "the healthy Space opens"
-        );
-        let other = SpaceId::parse(other()).unwrap();
-        let answer = store.load_space(other).await;
-        assert!(
-            matches!(answer, Err(RepositoryError::BrokenStoredState(_))),
-            "opening the damaged one fails: {answer:?}"
-        );
+        ] {
+            let file = Migrated::new().await;
+            let store = seeded(open(&file.path())).await;
+            let listed = store.list_spaces().await.unwrap();
+            store.close().await;
+            execute(
+                &file.file,
+                &format!(
+                    "UPDATE spaces SET document = '{document}' WHERE id = '{}'",
+                    other()
+                ),
+            )
+            .await;
+            let store = open(&file.path());
+            let now = store.list_spaces().await.unwrap();
+            assert_eq!(
+                now.iter().map(|summary| summary.id).collect::<Vec<_>>(),
+                listed.iter().map(|summary| summary.id).collect::<Vec<_>>(),
+                "a Space that {shape}: every Space is listed, the broken one included"
+            );
+            assert_eq!(
+                now.iter()
+                    .find(|summary| summary.id == other_id)
+                    .map(|summary| summary.title.as_str()),
+                Some(title),
+                "a Space that {shape} is listed by"
+            );
+            assert!(
+                store.load_space(meta()).await.unwrap().is_some(),
+                "a Space that {shape}: the healthy Space opens"
+            );
+            let answer = store.load_space(other_id).await;
+            assert!(
+                matches!(answer, Err(RepositoryError::BrokenStoredState(_))),
+                "a Space that {shape}: opening it fails: {answer:?}"
+            );
+        }
     }
 
     #[tokio::test]
@@ -1002,5 +1016,287 @@ mod given_broken_stored_state {
                 );
             }
         }
+    }
+}
+
+/// A file that is no longer the database a repository can serve: one SQLite
+/// cannot open although it exists (ST-126), one missing a table or holding a
+/// document that is not text (ST-7), and one replaced or deleted under the
+/// repository (ST-126).
+mod given_a_file_that_is_not_the_database {
+    use super::*;
+
+    /// Every repository operation, each answer stripped to its error.
+    async fn every_operation(
+        store: &SqliteSpaceRepository,
+        loaded: &LoadedSpace,
+        input: &AggregateInput,
+    ) -> Vec<(&'static str, Result<(), RepositoryError>)> {
+        let asset = StoredAsset {
+            hash: AssetHash::of(b"picture"),
+            media_type: "image/png".to_owned(),
+            bytes: bytes::Bytes::from_static(b"picture"),
+        };
+        vec![
+            ("load_aggregate", store.load_aggregate().await.map(drop)),
+            ("load_space", store.load_space(meta()).await.map(drop)),
+            ("list_spaces", store.list_spaces().await.map(drop)),
+            (
+                "commit",
+                store.commit(rename(loaded, "Renamed")).await.map(drop),
+            ),
+            (
+                "initialize_aggregate",
+                store.initialize_aggregate(input.clone()).await.map(drop),
+            ),
+            (
+                "load_meta_space_id",
+                store.load_meta_space_id().await.map(drop),
+            ),
+            (
+                "replace_aggregate",
+                store
+                    .replace_aggregate(input.clone(), Some(meta()))
+                    .await
+                    .map(drop),
+            ),
+            (
+                "mark_exported",
+                store.mark_exported(meta(), loaded.revision).await,
+            ),
+            (
+                "store_asset",
+                store.store_asset(asset.clone()).await.map(drop),
+            ),
+            ("load_asset", store.load_asset(&asset.hash).await.map(drop)),
+        ]
+    }
+
+    /// A seeded file, its Meta Space as loaded and its aggregate as input.
+    async fn seeded_file() -> (Migrated, LoadedSpace, AggregateInput) {
+        let file = Migrated::new().await;
+        let store = seeded(open(&file.path())).await;
+        let loaded = store.load_space(meta()).await.unwrap().unwrap();
+        let AggregateLoad::Loaded(aggregate) = store.load_aggregate().await.unwrap() else {
+            panic!("the seeded store holds an aggregate");
+        };
+        let input = AggregateInput {
+            meta_space_id: aggregate.meta_space_id,
+            spaces: aggregate
+                .spaces
+                .into_iter()
+                .map(|space| space.snapshot)
+                .collect(),
+        };
+        store.close().await;
+        (file, loaded, input)
+    }
+
+    #[tokio::test]
+    async fn fails_every_operation_as_broken_when_a_table_is_missing() {
+        for table in ["spaces", "resources", "repository_state", "assets"] {
+            let (file, loaded, input) = seeded_file().await;
+            execute(
+                &file.file,
+                &format!("PRAGMA foreign_keys = OFF; DROP TABLE {table};"),
+            )
+            .await;
+            let store = open(&file.path());
+            for (operation, answer) in every_operation(&store, &loaded, &input).await {
+                assert!(
+                    matches!(answer, Err(RepositoryError::BrokenStoredState(_))),
+                    "{operation} with {table} dropped: {answer:?}"
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn fails_every_operation_on_an_empty_file_as_broken() {
+        let (_seeded, loaded, input) = seeded_file().await;
+        let directory = tempfile::tempdir().unwrap();
+        let file = directory.path().join("cube.db");
+        std::fs::write(&file, b"").unwrap();
+        let store = open(&SqlitePath::from_variable(file.to_str()).unwrap());
+        for (operation, answer) in every_operation(&store, &loaded, &input).await {
+            assert!(
+                matches!(answer, Err(RepositoryError::BrokenStoredState(_))),
+                "{operation} on a 0-byte file: {answer:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn fails_a_document_stored_as_a_blob_as_broken() {
+        for table in ["spaces", "resources"] {
+            let (file, _, _) = seeded_file().await;
+            execute(
+                &file.file,
+                &format!("UPDATE {table} SET document = CAST(document AS BLOB)"),
+            )
+            .await;
+            let store = open(&file.path());
+            for (what, answer) in [
+                ("the aggregate", store.load_aggregate().await.map(drop)),
+                ("the Space", store.load_space(meta()).await.map(drop)),
+                ("the list", store.list_spaces().await.map(drop)),
+            ] {
+                if table == "resources" && what == "the list" {
+                    // Listing reads no Resource.
+                    continue;
+                }
+                assert!(
+                    matches!(answer, Err(RepositoryError::BrokenStoredState(_))),
+                    "{what} with {table} documents stored as BLOBs: {answer:?}"
+                );
+            }
+        }
+    }
+
+    // ADR 0094: replacement replaces stored state whatever it holds.
+    #[tokio::test]
+    async fn replaces_spaces_whose_documents_are_stored_as_blobs() {
+        let (file, _, input) = seeded_file().await;
+        execute(
+            &file.file,
+            "UPDATE spaces SET document = CAST(document AS BLOB)",
+        )
+        .await;
+        let store = open(&file.path());
+        assert!(
+            matches!(
+                store.replace_aggregate(input, Some(meta())).await,
+                Ok(ReplaceResult::Replaced(_))
+            ),
+            "the BLOB documents are replaced"
+        );
+        assert!(
+            matches!(store.load_aggregate().await, Ok(AggregateLoad::Loaded(_))),
+            "and the aggregate reads again"
+        );
+    }
+
+    #[tokio::test]
+    async fn answers_a_directory_at_the_path_as_unclassified() {
+        let directory = tempfile::tempdir().unwrap();
+        let folder = directory.path().join("cube.db");
+        std::fs::create_dir(&folder).unwrap();
+        let store = open(&SqlitePath::from_variable(folder.to_str()).unwrap());
+        let answer = store.load_aggregate().await;
+        assert!(
+            matches!(answer, Err(RepositoryError::Unclassified(_))),
+            "a directory no wait makes a database: {answer:?}"
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    #[expect(clippy::print_stderr, reason = "a skipped test says so")]
+    async fn answers_a_file_it_may_not_read_as_unclassified() {
+        use std::os::unix::fs::PermissionsExt as _;
+        let file = Migrated::new().await;
+        std::fs::set_permissions(&file.file, std::fs::Permissions::from_mode(0o000)).unwrap();
+        if std::fs::File::open(&file.file).is_ok() {
+            eprintln!("skipped: this process reads a file whatever its mode, as root does");
+            return;
+        }
+        let store = open(&file.path());
+        let answer = store.load_aggregate().await;
+        assert!(
+            matches!(answer, Err(RepositoryError::Unclassified(_))),
+            "a file this process may not read: {answer:?}"
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn answers_unavailable_once_the_file_is_replaced_touching_neither() {
+        let (file, loaded, _) = seeded_file().await;
+        let store = open(&file.path());
+        store.load_aggregate().await.unwrap();
+        let other = Migrated::new().await;
+        let replacement = std::fs::read(&other.file).unwrap();
+        let first = std::fs::read(&file.file).unwrap();
+        let aside = file.file.with_extension("first");
+        std::fs::rename(&file.file, &aside).unwrap();
+        std::fs::rename(&other.file, &file.file).unwrap();
+        for (what, answer) in [
+            ("a read", store.load_aggregate().await.map(drop)),
+            (
+                "a write",
+                store.commit(rename(&loaded, "Renamed")).await.map(drop),
+            ),
+        ] {
+            assert!(
+                matches!(answer, Err(RepositoryError::Unavailable(_))),
+                "{what} after the file is replaced: {answer:?}"
+            );
+        }
+        store.close().await;
+        assert_eq!(std::fs::read(&aside).unwrap(), first, "the first file");
+        assert_eq!(
+            std::fs::read(&file.file).unwrap(),
+            replacement,
+            "the file put in its place"
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn answers_unavailable_once_the_file_is_deleted_creating_nothing() {
+        let (file, loaded, _) = seeded_file().await;
+        let store = open(&file.path());
+        store.load_aggregate().await.unwrap();
+        std::fs::remove_file(&file.file).unwrap();
+        for (what, answer) in [
+            ("a read", store.load_aggregate().await.map(drop)),
+            (
+                "a write",
+                store.commit(rename(&loaded, "Renamed")).await.map(drop),
+            ),
+        ] {
+            assert!(
+                matches!(answer, Err(RepositoryError::Unavailable(_))),
+                "{what} after the file is deleted: {answer:?}"
+            );
+        }
+        store.close().await;
+        assert!(!file.file.exists(), "nothing is created in its place");
+    }
+}
+
+/// ST-6: each update adds one to the revision, so a Space stored at the
+/// ceiling can be deleted but not updated.
+mod given_a_space_at_the_revision_ceiling {
+    use super::*;
+
+    const CEILING: &str = "9223372036854775807";
+
+    // Case: refuses to store a revision above the 2^63-1 ceiling
+    #[tokio::test]
+    async fn fails_each_update_as_broken_and_keeps_what_it_held() {
+        let file = Migrated::new().await;
+        let store = seeded(open(&file.path())).await;
+        store.close().await;
+        execute(
+            &file.file,
+            &format!("UPDATE spaces SET revision = '{CEILING}' WHERE id = '{META}'"),
+        )
+        .await;
+        let store = open(&file.path());
+        let loaded = store.load_space(meta()).await.unwrap().unwrap();
+        assert_eq!(loaded.revision.get(), Revision::CEILING, "at the ceiling");
+        for title in ["First", "Second"] {
+            let answer = store.commit(rename(&loaded, title)).await;
+            assert!(
+                matches!(answer, Err(RepositoryError::BrokenStoredState(_))),
+                "the edit to {title} at one expected revision: {answer:?}"
+            );
+        }
+        assert_eq!(
+            store.load_space(meta()).await.unwrap(),
+            Some(loaded),
+            "the Space stands as it was"
+        );
     }
 }

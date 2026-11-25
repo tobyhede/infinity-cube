@@ -68,6 +68,11 @@ pub(crate) trait SqlStore: Send + Sync + 'static {
         connection: &mut Connection<Self>,
     ) -> impl Future<Output = Result<Vec<SpaceRow>, sqlx::Error>> + Send;
 
+    /// Whether any Space row is stored, reading no document.
+    fn holds_spaces(
+        connection: &mut Connection<Self>,
+    ) -> impl Future<Output = Result<bool, sqlx::Error>> + Send;
+
     /// The Space row with this id.
     fn space(
         connection: &mut Connection<Self>,
@@ -148,9 +153,24 @@ pub(crate) trait SqlStore: Send + Sync + 'static {
         hash: &str,
     ) -> impl Future<Output = Result<Option<(String, Vec<u8>)>, sqlx::Error>> + Send;
 
+    /// The name of every table the database holds.
+    fn tables(
+        connection: &mut Connection<Self>,
+    ) -> impl Future<Output = Result<Vec<String>, sqlx::Error>> + Send;
+
+    /// Why the database is no longer the one first opened, if it is not: its
+    /// file was replaced or deleted. Asked before each operation, which then
+    /// reads and writes nothing.
+    fn file_replaced(&self) -> Option<String>;
+
     /// What a failure of this database means to a caller.
-    fn classify(error: &sqlx::Error) -> RepositoryError;
+    fn classify(&self, error: &sqlx::Error) -> RepositoryError;
 }
+
+/// The tables a migrated database holds, every one of which each operation
+/// needs: a database missing any is broken stored state, however few it
+/// reads (ST-7).
+const TABLES: [&str; 4] = ["spaces", "resources", "repository_state", "assets"];
 
 /// The one SQL repository over the store of statements `S`.
 ///
@@ -163,10 +183,12 @@ pub struct SqlSpaceRepository<S> {
     serial: tokio::sync::Mutex<()>,
 }
 
-/// Why an operation failed: the database, or rows that cannot be read.
+/// Why an operation failed: the database, rows that cannot be read, or an
+/// answer decided before the database was asked.
 enum Failure {
     Database(sqlx::Error),
     Broken(String),
+    Answered(RepositoryError),
 }
 
 impl From<sqlx::Error> for Failure {
@@ -204,9 +226,61 @@ impl<S> SqlSpaceRepository<S> {
     {
         let _alone = self.serial.lock().await;
         operation.await.map_err(|failure| match failure {
-            Failure::Database(error) => S::classify(&error),
+            Failure::Database(error) => self.store.classify(&error),
             Failure::Broken(message) => RepositoryError::BrokenStoredState(message),
+            Failure::Answered(error) => error,
         })
+    }
+
+    /// A transaction that only reads, over the file first opened, holding
+    /// every table.
+    async fn begin_read(&self) -> Outcome<Transaction<'static, S::Database>>
+    where
+        S: SqlStore,
+    {
+        self.unreplaced()?;
+        let mut transaction = self.store.begin_read().await?;
+        every_table::<S>(&mut transaction).await?;
+        Ok(transaction)
+    }
+
+    /// A transaction that writes, over the file first opened, holding every
+    /// table.
+    async fn begin_write(&self) -> Outcome<Transaction<'static, S::Database>>
+    where
+        S: SqlStore,
+    {
+        self.unreplaced()?;
+        let mut transaction = self.store.begin_write().await?;
+        every_table::<S>(&mut transaction).await?;
+        Ok(transaction)
+    }
+
+    fn unreplaced(&self) -> Outcome<()>
+    where
+        S: SqlStore,
+    {
+        match self.store.file_replaced() {
+            Some(reason) => Err(Failure::Answered(RepositoryError::Unavailable(reason))),
+            None => Ok(()),
+        }
+    }
+}
+
+/// Fail as broken stored state unless the database holds every table.
+async fn every_table<S: SqlStore>(connection: &mut Connection<S>) -> Outcome<()> {
+    let held = S::tables(connection).await?;
+    let missing: Vec<&str> = TABLES
+        .into_iter()
+        .filter(|table| !held.iter().any(|name| name == table))
+        .collect();
+    if missing.is_empty() {
+        Ok(())
+    } else {
+        Err(broken(format!(
+            "the database is missing the table {}",
+            missing.join(", ")
+        )))
     }
 }
 
@@ -262,7 +336,7 @@ async fn established_meta_space_id<S: SqlStore>(
     connection: &mut Connection<S>,
 ) -> Outcome<Option<SpaceId>> {
     let meta_space_id = stored_meta_space_id::<S>(connection).await?;
-    if meta_space_id.is_none() && !S::spaces(connection).await?.is_empty() {
+    if meta_space_id.is_none() && S::holds_spaces(connection).await? {
         return Err(broken("stored Spaces exist without a Meta Space"));
     }
     Ok(meta_space_id)
@@ -361,14 +435,16 @@ async fn install<S: SqlStore>(
 impl<S: SqlStore> SpaceRepository for SqlSpaceRepository<S> {
     async fn list_spaces(&self) -> Result<Vec<SpaceSummary>, RepositoryError> {
         self.alone(async {
-            let mut transaction = self.store.begin_read().await?;
+            let mut transaction = self.begin_read().await?;
             let rows = S::spaces(&mut transaction).await?;
             transaction.commit().await?;
             rows.iter()
                 .map(|row| {
                     let id = SpaceId::parse(&row.id)
                         .ok_or_else(|| broken(format!("stored Space {} has no UUID", row.id)))?;
-                    let title = decode_title(row).map_err(Failure::Broken)?;
+                    // A document with no title it can read is listed by
+                    // the Space's id (ST-7).
+                    let title = decode_title(row).unwrap_or_else(|| row.id.clone());
                     Ok(SpaceSummary { id, title })
                 })
                 .collect()
@@ -378,7 +454,7 @@ impl<S: SqlStore> SpaceRepository for SqlSpaceRepository<S> {
 
     async fn load_space(&self, id: SpaceId) -> Result<Option<LoadedSpace>, RepositoryError> {
         self.alone(async {
-            let mut transaction = self.store.begin_read().await?;
+            let mut transaction = self.begin_read().await?;
             let loaded = one_space::<S>(&mut transaction, id).await;
             transaction.commit().await?;
             loaded
@@ -388,7 +464,7 @@ impl<S: SqlStore> SpaceRepository for SqlSpaceRepository<S> {
 
     async fn load_aggregate(&self) -> Result<AggregateLoad, RepositoryError> {
         self.alone(async {
-            let mut transaction = self.store.begin_read().await?;
+            let mut transaction = self.begin_read().await?;
             let loaded = match established_meta_space_id::<S>(&mut transaction).await? {
                 Some(meta_space_id) => AggregateLoad::Loaded(
                     authoritative::<S>(&mut transaction, meta_space_id).await?,
@@ -406,7 +482,7 @@ impl<S: SqlStore> SpaceRepository for SqlSpaceRepository<S> {
             return Ok(refusal);
         }
         self.alone(async {
-            let mut transaction = self.store.begin_write().await?;
+            let mut transaction = self.begin_write().await?;
             let meta_space_id = stored_meta_space_id::<S>(&mut transaction).await?;
             // A single update is decided against its own Space first, reading
             // no other (`#commitTopologyPreservingUpdate`), so another stored
@@ -423,6 +499,10 @@ impl<S: SqlStore> SpaceRepository for SqlSpaceRepository<S> {
                         transaction.commit().await?;
                         return Ok(result);
                     }
+                    SingleSpaceDecision::Fail(failure) => {
+                        transaction.rollback().await?;
+                        return Err(Failure::Answered(failure));
+                    }
                     SingleSpaceDecision::Aggregate => {}
                 }
             }
@@ -431,6 +511,10 @@ impl<S: SqlStore> SpaceRepository for SqlSpaceRepository<S> {
                 CommitDecision::Answer(result) => {
                     transaction.rollback().await?;
                     Ok(result)
+                }
+                CommitDecision::Fail(failure) => {
+                    transaction.rollback().await?;
+                    Err(Failure::Answered(failure))
                 }
                 CommitDecision::Write {
                     result,
@@ -451,7 +535,7 @@ impl<S: SqlStore> SpaceRepository for SqlSpaceRepository<S> {
             return Ok(AssetStored::Existing);
         }
         self.alone(async {
-            let mut transaction = self.store.begin_write().await?;
+            let mut transaction = self.begin_write().await?;
             let inserted = S::insert_asset(&mut transaction, &asset).await?;
             transaction.commit().await?;
             Ok(if inserted {
@@ -466,7 +550,7 @@ impl<S: SqlStore> SpaceRepository for SqlSpaceRepository<S> {
     async fn load_asset(&self, hash: &AssetHash) -> Result<Option<StoredAsset>, RepositoryError> {
         let held = self
             .alone(async {
-                let mut transaction = self.store.begin_read().await?;
+                let mut transaction = self.begin_read().await?;
                 let row = S::asset(&mut transaction, hash.as_str()).await?;
                 transaction.commit().await?;
                 Ok(row.map(|(media_type, bytes)| StoredAsset {
@@ -488,7 +572,7 @@ impl<S: SqlStore> SpaceRepository for SqlSpaceRepository<S> {
             Err(refusals) => return Ok(InitializeResult::AggregateRefused(refusals)),
         };
         self.alone(async {
-            let mut transaction = self.store.begin_write().await?;
+            let mut transaction = self.begin_write().await?;
             let Some(meta_space_id) = established_meta_space_id::<S>(&mut transaction).await?
             else {
                 let installed = install::<S>(&mut transaction, input).await?;
@@ -516,7 +600,7 @@ impl<S: SqlStore> SpaceRepository for SqlSpaceRepository<S> {
 
     async fn load_meta_space_id(&self) -> Result<Option<SpaceId>, RepositoryError> {
         self.alone(async {
-            let mut transaction = self.store.begin_read().await?;
+            let mut transaction = self.begin_read().await?;
             let meta_space_id = stored_meta_space_id::<S>(&mut transaction).await?;
             transaction.commit().await?;
             Ok(meta_space_id)
@@ -534,12 +618,12 @@ impl<S: SqlStore> SpaceRepository for SqlSpaceRepository<S> {
             Err(refusals) => return Ok(ReplaceResult::AggregateRefused(refusals)),
         };
         self.alone(async {
-            let mut transaction = self.store.begin_write().await?;
+            let mut transaction = self.begin_write().await?;
             let meta_space_id = stored_meta_space_id::<S>(&mut transaction).await?;
-            // Rows are read raw, not decoded: replacement replaces stored
-            // state whether or not it parses (ADR 0094).
-            let stored = S::spaces(&mut transaction).await?;
-            let answer = if meta_space_id.is_none() && stored.is_empty() {
+            // No document is read: replacement replaces stored state
+            // whether or not it can be read (ADR 0094).
+            let holds_spaces = S::holds_spaces(&mut transaction).await?;
+            let answer = if meta_space_id.is_none() && !holds_spaces {
                 ReplaceResult::Uninitialized
             } else if meta_space_id != expected_meta_space_id {
                 ReplaceResult::Conflict {
@@ -559,7 +643,7 @@ impl<S: SqlStore> SpaceRepository for SqlSpaceRepository<S> {
     async fn mark_exported(&self, id: SpaceId, revision: Revision) -> Result<(), RepositoryError> {
         let held = self
             .alone(async {
-                let mut transaction = self.store.begin_write().await?;
+                let mut transaction = self.begin_write().await?;
                 let held = S::set_exported_revision(
                     &mut transaction,
                     id.as_str(),

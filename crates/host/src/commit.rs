@@ -13,8 +13,8 @@ use intake::{
 };
 
 use crate::repository::{
-    AggregateRefusal, CommitRefusal, CommitResult, LoadedSpace, Revision, SpaceChange, SpaceCommit,
-    SpaceConflict,
+    AggregateRefusal, CommitRefusal, CommitResult, LoadedSpace, RepositoryError, Revision,
+    SpaceChange, SpaceCommit, SpaceConflict,
 };
 
 /// What a store does next with a commit.
@@ -34,6 +34,8 @@ pub enum CommitDecision {
         /// Each Space the commit deletes, in the order the changes name them.
         deleted: Vec<SpaceId>,
     },
+    /// Fail the commit as a broken invariant; nothing is written.
+    Fail(RepositoryError),
 }
 
 fn rejection(message: String) -> CommitResult {
@@ -94,19 +96,23 @@ pub(crate) fn request_refusal(request: &SpaceCommit) -> Option<CommitResult> {
     None
 }
 
-/// Refuse an update to a Space already at [`Revision::CEILING`], whose next
-/// revision no store can keep: holding it there would let two Edits commit at
-/// one revision, the second overwriting the first without a conflict. Asked
-/// only once every expected revision matches the stored one.
-fn ceiling_refusal(request: &SpaceCommit) -> Option<CommitDecision> {
+/// Fail an update to a Space already at [`Revision::CEILING`], whose next
+/// revision no store can keep, as an invariant failure (ST-6): holding it
+/// there would let two Edits commit at one revision, the second overwriting
+/// the first without a conflict. Asked only once every expected revision
+/// matches the stored one. A delete writes no next revision, so it is not
+/// failed.
+fn ceiling_failure(request: &SpaceCommit) -> Option<RepositoryError> {
     request.changes.iter().find_map(|change| match change {
         SpaceChange::Update {
             space_id,
             expected_revision,
             ..
-        } if expected_revision.get() == Revision::CEILING => Some(rejected(format!(
-            "Space {space_id} is at the highest revision a store keeps"
-        ))),
+        } if expected_revision.get() == Revision::CEILING => {
+            Some(RepositoryError::BrokenStoredState(format!(
+                "Space {space_id} is at the highest revision a store keeps"
+            )))
+        }
         _ => None,
     })
 }
@@ -261,8 +267,8 @@ pub fn decide_commit<'a>(
     if !conflicts.is_empty() {
         return CommitDecision::Answer(CommitResult::Conflict(conflicts));
     }
-    if let Some(refusal) = ceiling_refusal(request) {
-        return refusal;
+    if let Some(failure) = ceiling_failure(request) {
+        return CommitDecision::Fail(failure);
     }
 
     let Some(meta_space_id) = meta_space_id else {
@@ -421,6 +427,8 @@ pub(crate) enum SingleSpaceDecision {
         /// The updated Space, as it is stored once the commit lands.
         written: LoadedSpace,
     },
+    /// Fail the commit as a broken invariant; nothing is written.
+    Fail(RepositoryError),
     /// Read every stored Space and decide by [`decide_commit`].
     Aggregate,
 }
@@ -511,8 +519,8 @@ pub(crate) fn decide_single_space(
             current: current.cloned(),
         }]));
     };
-    if let Some(CommitDecision::Answer(result)) = ceiling_refusal(request) {
-        return SingleSpaceDecision::Answer(result);
+    if let Some(failure) = ceiling_failure(request) {
+        return SingleSpaceDecision::Fail(failure);
     }
     if load_space(snapshot).is_err()
         || !preserves_snapshot_boundary(&current.snapshot, snapshot)

@@ -19,7 +19,7 @@ intake = { workspace = true }
 # so their versions move together and one bundled SQLite is compiled.
 rusqlite = { version = "0.43", default-features = false, features = ["bundled"] }
 sha2 = { workspace = true }
-sqlx = { version = "0.9.1", default-features = false, features = ["runtime-tokio", "sqlite-bundled"] }
+sqlx = { workspace = true, features = ["runtime-tokio", "sqlite-bundled"] }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["fs", "io-util", "macros", "rt", "sync", "time"] }
 uuid = { version = "1", features = ["v4"] }
@@ -31,7 +31,7 @@ rustix = { version = "1", features = ["fs"] }
 http-conformance = { workspace = true }
 proptest = "1"
 serde_json = { workspace = true }
-sqlx = { version = "0.9.1", default-features = false, features = ["migrate", "postgres", "runtime-tokio", "sqlite-bundled"] }
+sqlx = { workspace = true, features = ["migrate", "postgres", "runtime-tokio", "sqlite-bundled"] }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["fs", "macros", "rt", "rt-multi-thread", "sync", "test-util", "time"] }
 url = { workspace = true }

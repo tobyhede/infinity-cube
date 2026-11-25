@@ -160,14 +160,26 @@ impl Drop for Started {
 /// Start the binary with `args` and `path` as its `PATH` when given, and
 /// wait for its announcement.
 pub fn start_with(args: &[&str], path: Option<&std::ffi::OsStr>) -> Started {
+    match path {
+        Some(path) => start_in(args, &[("PATH", Some(path))]),
+        None => start_in(args, &[]),
+    }
+}
+
+/// Start the binary with `args`, each variable of `environment` set to its
+/// value or, for `None`, removed, and wait for its announcement.
+pub fn start_in(args: &[&str], environment: &[(&str, Option<&std::ffi::OsStr>)]) -> Started {
     let mut command = Command::new(BINARY);
     command
         .args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    if let Some(path) = path {
-        command.env("PATH", path);
+    for (name, value) in environment {
+        match value {
+            Some(value) => command.env(name, value),
+            None => command.env_remove(name),
+        };
     }
     let mut child = command.spawn().unwrap();
     let stdout = child.stdout.take().unwrap();

@@ -10,6 +10,9 @@
 //! - `check <dir> [--json]` Imports the directory into a store that is then
 //!   discarded and exits zero for an accepted one; `--json` writes the answer
 //!   as one object shaped as the intake corpus's `expect`.
+//! - `serve --store sqlite [--port <port>] [--built <dir>]` serves the
+//!   migrated SQLite file `SQLITE_PATH` names on `127.0.0.1`, announcing
+//!   itself as `run` does; it Imports, Exports and migrates nothing.
 //!
 //! - `version` names the version and the commit the binary was built from.
 //!
@@ -24,6 +27,7 @@ mod init;
 mod listener;
 mod output;
 mod run;
+mod serve;
 mod signals;
 mod version;
 
@@ -63,5 +67,10 @@ fn main() -> anyhow::Result<ExitCode> {
             .build()
             .context("could not start the async runtime")?
             .block_on(run::run(command)),
+        Command::Serve(command) => tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .context("could not start the async runtime")?
+            .block_on(serve::serve(command)),
     })
 }

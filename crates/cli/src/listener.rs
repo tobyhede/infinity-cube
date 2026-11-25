@@ -1,4 +1,4 @@
-//! The loopback listener a run serves on: `127.0.0.1` only, the `Host` check
+//! The loopback listener `run` and `serve` serve on: `127.0.0.1` only, the `Host` check
 //! before anything else (Storage ST-114), and the host's `Request ->
 //! Response` function behind it, each request body streamed into it.
 
@@ -21,11 +21,10 @@ use hyper_util::server::graceful::GracefulShutdown;
 use tokio::net::TcpListener;
 use tokio::task::JoinSet;
 
+use host::{Application, IdSource, SpaceRepository};
+
 use crate::built::Files;
 use crate::output::say;
-
-/// The application a run serves.
-pub(crate) type RunApplication = host::RunApplication<host::RandomIds, Files>;
 
 /// The port a run takes without `--port` (Storage ST-120).
 pub(crate) const DEFAULT_PORT: u16 = 4173;
@@ -88,6 +87,14 @@ pub(crate) async fn bind(port: Option<u16>) -> io::Result<TcpListener> {
     ))
 }
 
+/// The port or ports [`bind`] tries for `port`, as a refusal names them.
+pub(crate) fn ports_tried(port: Option<u16>) -> String {
+    match port {
+        Some(port) => format!("port {port}"),
+        None => format!("a port from {DEFAULT_PORT} up"),
+    }
+}
+
 /// The `Host` every request must name: `127.0.0.1:<port>`.
 pub(crate) fn own_host(port: u16) -> String {
     format!("{}:{port}", Ipv4Addr::LOCALHOST)
@@ -131,12 +138,12 @@ pub(crate) fn misdirected() -> Response<Full<Bytes>> {
     response
 }
 
-/// Serve `application` on `listener` until `stop` resolves, then stop
-/// accepting. Answers the connections still open, which
+/// Serve `application`, over whichever store, on `listener` until `stop`
+/// resolves, then stop accepting. Answers the connections still open, which
 /// [`Draining::finish`] lets finish the request each is answering.
-pub(crate) async fn serve(
+pub(crate) async fn serve<R: SpaceRepository, I: IdSource>(
     listener: TcpListener,
-    application: Arc<RunApplication>,
+    application: Arc<Application<R, I, Files>>,
     own: String,
     stop: impl Future<Output = ()>,
 ) -> Draining {

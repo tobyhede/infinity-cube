@@ -141,15 +141,17 @@ async fn unavailable() -> (Over, sqlx::SqliteConnection) {
     (Over::new(file, store), holder)
 }
 
-/// The application over a file whose Meta Space's document is not JSON and
-/// which no Meta identity names: stored state no aggregate can be read from.
+/// The application over a file whose Meta Space's document is stored as a
+/// BLOB and which no Meta identity names: stored state no aggregate can be
+/// read from, and no Space listed from (a document that is text but not JSON
+/// is still listed, `tests/sqlite.rs` › `lists_a_broken_space_beside_the_others`).
 async fn broken() -> Over {
     let file = Migrated::new().await;
     execute(
         &file.file,
         &format!(
             "INSERT INTO spaces (id, document, revision, updated_at) \
-             VALUES ('{META}', 'not json', '0', '2026-11-22T00:00:00.000Z')"
+             VALUES ('{META}', CAST('not json' AS BLOB), '0', '2026-11-22T00:00:00.000Z')"
         ),
     )
     .await;

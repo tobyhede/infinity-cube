@@ -22,19 +22,12 @@ use std::sync::Arc;
 use host::{ImportError, RandomIds, Run, RunEvent, RunStopped, TokioClock};
 
 use crate::arguments::RunCommand;
-use crate::built::{self, Origin};
+use crate::built;
 use crate::describe::{empty, locked, refused};
 use crate::listener::{bind, own_host, serve};
-use crate::output::{announce_listening, announce_refused, say};
+use crate::output::{announce_listening, refuse, say};
 use crate::signals::Signals;
 use crate::{browser, listener};
-
-/// Announce why the directory cannot run, say so in full, and exit one.
-fn refuse(message: &str) -> ExitCode {
-    say(message);
-    announce_refused(message);
-    ExitCode::FAILURE
-}
 
 fn import_refusal(directory: &Path, error: &ImportError) -> String {
     match error {
@@ -85,10 +78,7 @@ pub(crate) async fn run(command: RunCommand) -> ExitCode {
     let listener = match bind(command.port).await {
         Ok(listener) => listener,
         Err(error) => {
-            let tried = match command.port {
-                Some(port) => format!("port {port}"),
-                None => format!("a port from {} up", listener::DEFAULT_PORT),
-            };
+            let tried = listener::ports_tried(command.port);
             // Nothing can have been committed, so the stop writes nothing.
             let _stopped = run.stop().await;
             return refuse(&format!(
@@ -115,13 +105,7 @@ pub(crate) async fn run(command: RunCommand) -> ExitCode {
     announce_listening(port);
     let own = own_host(port);
     let url = format!("http://{own}/");
-    if origin == Origin::Placeholder {
-        say(
-            "This binary carries no built application, so it serves a placeholder page: \
-             rebuild it with INFINITY_CUBE_BUILT_APPLICATION naming the directory `pnpm build` \
-             writes, or pass --built <dir>.",
-        );
-    }
+    built::say_if_placeholder(&origin);
     say(&format!(
         "Running {} at {url}\nPress Ctrl-C to stop.",
         directory.display()
