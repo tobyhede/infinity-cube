@@ -8,7 +8,7 @@ Your Space is a directory of plain files, an [Aggregate directory](docs/aggregat
 
 ## Getting started
 
-This takes you from a fresh clone to the desktop application open on a Space of your own, built from source: there is no download yet, and the first build takes a few minutes. It runs on Linux; it has not been tried on macOS, and Windows is not built yet.
+This takes you from a fresh clone to the desktop application open on a Space of your own, built from source; the first build takes a few minutes. These steps have been followed on Linux, not yet on macOS, and Windows is not built yet. To skip the build, [install a preview build](#installing-a-preview-build): the `infinity-cube` command on macOS or Linux, or the desktop application on a Mac with Apple silicon.
 
 1. **Install the tools.**
    - Node ≥ 26.8.1 and pnpm 9. Node no longer bundles corepack, so install pnpm with `npm install -g pnpm@9` if `pnpm --version` does not print `9.x`.
@@ -46,22 +46,23 @@ This takes you from a fresh clone to the desktop application open on a Space of 
 
    Done when `init` prints `Created a new aggregate` and the commit succeeds. It also names the browser command; ignore that unless you are [running it in the browser](#or-run-it-in-the-browser). That commit is the revision git restores if the first write is not what you wanted.
 
-4. **Build the desktop application.** Build the browser application first: the desktop build copies it in, and fails with ``resource path `../../app/dist` doesn't exist`` without it.
+4. **Build the desktop application.** Build the browser application and the desktop application's own pages (the Start window and the close question) first: the desktop build copies both in, and fails without them.
 
    ```sh
    pnpm --filter @project/app exec vite build
+   pnpm --filter @project/app desktop-shell:build
    cargo build -p infinity-cube-desktop
    ```
 
-   Done when Cargo prints `Finished` and `target/debug/infinity-cube-desktop` exists. After pulling changes, run `pnpm install` and both commands again.
+   Done when Cargo prints `Finished` and `target/debug/infinity-cube-desktop` exists. After pulling changes, run `pnpm install` and all three commands again.
 
-5. **Open the Space.** `target/debug/infinity-cube-desktop ~/spaces/rust-async`. Done when one window, named after the folder, shows the Space's Map with `Resource 1` on it. **File › Open…** (Ctrl+O, or Command-O on macOS) opens another Space's folder in a window of its own; started with no folder, the application asks for one. A folder that holds no Space yet is offered **Create Space**, which writes a new Space there as `pnpm cube init` does and opens it, and **File › New Space…** (Ctrl+N, or Command-N) asks for an empty folder to do the same; a folder holding anything else is refused and nothing is written there.
+5. **Open the Space.** `target/debug/infinity-cube-desktop ~/spaces/rust-async`. Done when one window, named after the folder, shows the Space's Map with `Resource 1` on it. **File › Open…** (Ctrl+O, or Command-O on macOS) opens another Space's folder in a window of its own. Started with no folder, the application shows the **Start window**, with **New Space** and **Open Folder…**. A folder that holds no Space yet is offered **Create Space**, which writes a new Space there as `pnpm cube init` does and opens it. **New Space**, or **File › New Space…** (Ctrl+N, or Command-N), asks for a name and a location, `Untitled Space` in Documents unless you change them, and writes and opens a new Space in that folder; a folder holding anything but dot-entries is refused and nothing is written there.
 
 6. **Edit.** Pick a Graph in the Command Dock, the toolbar floating over the canvas; every Graph stays drawn, and the one you pick is emphasised. Select a Resource to reveal its toolbar, and use Edit to write its Title and Markdown. Drag a Resource to move it. Drag from one of a Resource's four handles to another Resource to add an Edge to the Active Graph; hold Option (macOS) or Alt and drop on empty canvas to create a new Resource and connect it in one go. Done when the save indicator reads `Persisted`.
 
 7. **Present.** Press **Present**: `→` follows an Edge, `←` goes back, `↑` / `↓` choose at a fork. Done when `Esc` returns you to the Map as you left it.
 
-8. **Close the window.** Closing the Space window writes every pending edit. If a write is still running after ten seconds, it asks whether to keep waiting, which is always safe, or close without saving, which loses the edits not yet written. If a write fails, a dialog says why, and those edits are not on disk. Closing the last Space window ends the application. Don't press Ctrl-C, close the terminal or send a signal while a Space window is open: any of them ends the application at once, and edits not yet written are lost. Done when the window has closed with no dialog and the terminal has its prompt back.
+8. **Close the window.** Closing the Space window writes every pending edit. If a write is still running after ten seconds, it asks whether to keep waiting, which is always safe, or close without saving, which loses the edits not yet written. If a write fails, a dialog says why, and those edits are not on disk. On Linux, closing the last window ends the application; on macOS it keeps running with no window until you quit it. Don't press Ctrl-C, close the terminal or send a signal while a Space window is open: any of them ends the application at once, and edits not yet written are lost. Done when the window has closed with no dialog and, on Linux, the terminal has its prompt back.
 
 9. **Commit.** `git -C ~/spaces/rust-async add -A && git -C ~/spaces/rust-async commit -m "First draft"`. Done when `git -C ~/spaces/rust-async status` is clean.
 
@@ -111,13 +112,19 @@ This section is about `pnpm cube run`; the desktop application writes pending ed
 
 ## Installing a preview build
 
-To run a Space without a clone, Node or pnpm, install the `infinity-cube` preview build on macOS or Linux:
+Each preview build on the [releases page](https://github.com/tobyhede/infinity-cube/releases) ships the `infinity-cube` command for Linux (x86_64 and arm64) and macOS (Apple silicon and Intel), and the desktop application for macOS on Apple silicon. There is no Windows build, and no desktop download for Linux: build that from source, as in [Getting started](#getting-started).
+
+To run a Space without a clone, Node or pnpm, install the `infinity-cube` command on macOS or Linux:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/tobyhede/infinity-cube/main/release/install.sh | sh
 ```
 
 It checks the download and puts `infinity-cube` in `~/.local/bin`; then `infinity-cube init my-space` and `infinity-cube run my-space`. A preview build makes no compatibility promise, so keep your directory in git. [`release/README.md`](release/README.md) covers pinning a version, upgrading and uninstalling.
+
+### The desktop application on macOS
+
+Download `InfinityCube-<version>-aarch64-apple-darwin.dmg` from the newest release, open it and drag InfinityCube to Applications. It is not signed with an Apple Developer ID, so macOS refuses it the first time: open **System Settings › Privacy & Security**, choose **Open Anyway** beside the message about InfinityCube, and confirm, or run `xattr -dr com.apple.quarantine /Applications/InfinityCube.app` once. After that it opens as any application does, and offers each newer preview build when one is published. Make a Space with **New Space** in its Start window, keep its folder in git as [Getting started](#getting-started) step 3 does (without `pnpm cube init`, which the application has done), and carry on from step 6.
 
 ### Building a preview build yourself
 
