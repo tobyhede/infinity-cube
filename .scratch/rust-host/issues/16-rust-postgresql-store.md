@@ -49,7 +49,7 @@ The answer refines ADR 0155 and ADR 0165 in a new ADR, and ST-125 with it.
 - [ ] `migrate` is tested for each store: a fresh database or missing SQLite file migrated to the latest file; a second run applies nothing and exits zero; a database with tables and no `_sqlx_migrations` refused with the reset message; ST-126's SQLite refusals, a blank `SQLITE_PATH` among them.
 - [ ] The `postgres` and `sqlite` jobs migrate with the Rust binary and pass `prisma-next db verify --schema-only` on the result, each with its own config; their integration suites and restart proofs pass on those databases.
 - [ ] The PostgreSQL restart proof passes on both the Vite host and `serve --store postgres` in the `postgres` job.
-- [ ] No Prisma Next migration package, `db:migrate*` script or `shared_migrations` test remains, and no file names `pnpm db:migrate` or `pnpm db:migrate:sqlite`.
+- [ ] No Prisma Next migration package, `db:migrate*` script or `shared_migrations` test remains, and no CI config, script, source message or active doc outside `.scratch/` names `pnpm db:migrate` or `pnpm db:migrate:sqlite`.
 - [ ] Storage (ST-125 and ST-126 marked built, the Operations index, the PostgreSQL host) and `AGENTS.md` (Commands, E2E, PostgreSQL integration, the Rust section's `shared_migrations` paragraph) describe the Rust verbs and the one migrator.
 
 **Out of scope:**
