@@ -1,147 +1,103 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
+import { z } from 'zod';
 import { COLLAPSED_RESOURCE_SIZE, type ResourceSize } from '@project/core';
-import { Button, PresentedResource } from '@project/ui';
+import { assetRefSchema } from '@project/resource-api/domain';
+import { Button, type PluginOperations } from '@project/ui';
 import { CanvasResourceNodeSpecimen } from '../support/ReactFlowCanvas';
-import { storyText } from '../support/story-assets';
+import { storyText, storeStoryText } from '../support/story-assets';
 
-function EditTrial({ initial, overlay }: { initial: string; overlay: boolean }) {
-  const [size, setSize] = useState<ResourceSize>(COLLAPSED_RESOURCE_SIZE);
-  const [open, setOpen] = useState(false);
-  const [saved, setSaved] = useState(initial);
-  const [draft, setDraft] = useState<string | null>(null);
-  const [preview, setPreview] = useState(false);
-  const canvas = useRef<HTMLDivElement>(null);
-  const dialog = useRef<HTMLDialogElement>(null);
-  const editor = useRef<HTMLTextAreaElement>(null);
-  const trigger = useRef<HTMLButtonElement>(null);
-  const editing = draft !== null;
-  useLayoutEffect(() => {
-    if (!editing) return;
-    const modal = dialog.current;
-    const origin = trigger.current;
-    modal?.showModal();
-    editor.current?.focus();
-    return () => {
-      modal?.close();
-      origin?.focus();
-    };
-  }, [editing]);
-
-  const start = () => {
-    const rect = canvas.current?.querySelector('.react-flow__node')?.getBoundingClientRect();
-    if (!overlay && rect && dialog.current) {
-      Object.assign(dialog.current.style, {
-        left: `${rect.left}px`,
-        top: `${rect.top}px`,
-        width: `${rect.width}px`,
-        height: `${rect.height}px`,
-      });
-    }
-    setPreview(false);
-    setDraft(saved);
-  };
-  const save = () => {
-    if (draft !== null) setSaved(draft);
-    setDraft(null);
-  };
-  const name = overlay ? 'Focused overlay' : 'Edit in place';
-  const title = 'Ridge walk';
-  return (
-    <section aria-label={name}>
-      <h2 className="mb-2 text-lg font-semibold">{name}</h2>
-      <div className="mb-2 flex items-center gap-3">
-        <Button ref={trigger} onClick={start}>
-          Edit note
-        </Button>
-        <output>
-          {size.width} × {size.height} · {open ? 'Showing content' : 'Title only'}
-        </output>
-      </div>
-      <div ref={canvas}>
-        <CanvasResourceNodeSpecimen
-          selected
-          zoom={1}
-          title={title}
-          open={open}
-          nodeSize={size}
-          stageClassName="prototype-markdown-canvas"
-          content={{ kind: 'markdown', via: 'self', content: { url: storyText(saved) } }}
-          onResize={setSize}
-          onOpenChange={(next) => {
-            setOpen(next);
-            return 'completed';
-          }}
-        />
-      </div>
-      <dialog
-        ref={dialog}
-        className="prototype-markdown-editor"
-        data-overlay={overlay}
-        aria-label={name + ' — ' + title}
-        onCancel={(event) => {
-          event.preventDefault();
-          setDraft(null);
-        }}
-        onKeyDown={(event) => {
-          if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-            event.preventDefault();
-            save();
-          }
-        }}
-      >
-        {draft !== null && (
-          <>
-            <div className="flex items-center gap-1 border-b p-1">
-              {overlay && (
-                <Button size="compact" aria-pressed={preview} onClick={() => setPreview(!preview)}>
-                  {preview ? 'Source' : 'Preview'}
-                </Button>
-              )}
-              <Button size="compact" onClick={save}>
-                Save
-              </Button>
-              <Button size="compact" onClick={() => setDraft(null)}>
-                Cancel
-              </Button>
-            </div>
-            <div className="min-h-0 flex-1 overflow-auto">
-              {preview ? (
-                <PresentedResource
-                  title={title}
-                  content={{ kind: 'markdown', via: 'self', content: { url: storyText(draft) } }}
-                />
-              ) : (
-                <textarea
-                  className="block h-full w-full resize-none p-3 font-mono text-sm"
-                  ref={editor}
-                  value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
-                  aria-label="Markdown source"
-                />
-              )}
-            </div>
-          </>
-        )}
-      </dialog>
-    </section>
-  );
-}
+const contentSchema = z.object({ url: assetRefSchema });
+const mapSchema = z.object({ open: z.boolean() });
+const initialMap = () => ({
+  size: COLLAPSED_RESOURCE_SIZE,
+  editSize: { width: 640, height: 360 },
+  open: false,
+});
 
 export function EditingComparison({ initial }: { initial: string }) {
-  const [round, reset] = useState(0);
+  const name = 'Temporary resize with optional Focus';
+  const [map, setMap] = useState<'A' | 'B'>('A');
+  const [maps, setMaps] = useState({ A: initialMap(), B: initialMap() });
+  const current = maps[map];
+  const patch = (next: Partial<typeof current>) =>
+    setMaps((previous) => ({ ...previous, [map]: { ...previous[map], ...next } }));
+  const [url, setUrl] = useState(() => storyText(initial));
+  const [editing, setEditing] = useState(false);
+  const [focus, setFocus] = useState(false);
+  const beforeOpen = useRef(false);
+  const openForEdit = useRef<boolean | null>(null);
+  const operations: PluginOperations = {
+    kind: 'markdown',
+    commitMap: (next) => {
+      patch({ open: mapSchema.parse(next).open });
+      return Promise.resolve('completed');
+    },
+    commitContent: (next) => {
+      setUrl(contentSchema.parse(next).url);
+      return Promise.resolve('completed');
+    },
+    commitStore: storeStoryText,
+    claim: () => {
+      // A Closed edit first commits Open. That commit and its Claim share the
+      // preceding visibility, which is restored when the edit ends.
+      openForEdit.current = beforeOpen.current;
+      setEditing(true);
+      return {
+        release: () => {
+          if (openForEdit.current !== null) patch({ open: openForEdit.current });
+          openForEdit.current = null;
+          setEditing(false);
+          setFocus(false);
+        },
+        exclusively: (work) => work({ content: operations.commitContent, store: storeStoryText }),
+        unmount: () => undefined,
+      };
+    },
+  };
   return (
-    <main className="p-4">
-      <div className="mb-4 flex flex-wrap items-center gap-4">
-        <Button onClick={() => reset(round + 1)}>Reset both notes</Button>
-        <p>
-          Use the note’s Open or Close control to change its display. Drag its bottom-right corner
-          to resize.
-        </p>
+    <section
+      className="p-4"
+      data-focus={focus}
+      aria-label={name}
+      onPointerDownCapture={() => {
+        if (!editing) beforeOpen.current = current.open;
+      }}
+      onKeyDownCapture={() => {
+        if (!editing) beforeOpen.current = current.open;
+      }}
+    >
+      <h2 className="mb-2 text-lg font-semibold">{name}</h2>
+      <div className="mb-3 flex items-center gap-3">
+        <Button
+          disabled={editing}
+          onClick={() => {
+            setMap(map === 'A' ? 'B' : 'A');
+            beforeOpen.current = maps[map === 'A' ? 'B' : 'A'].open;
+          }}
+        >
+          Switch Map
+        </Button>
+        <output>
+          Map {map} · Canvas {current.size.width} × {current.size.height} · Focus{' '}
+          {current.editSize.width} × {current.editSize.height} · {current.open ? 'Full' : 'Title'}
+        </output>
       </div>
-      <div key={round} className="prototype-markdown-trials">
-        <EditTrial initial={initial} overlay={false} />
-        <EditTrial initial={initial} overlay />
-      </div>
-    </main>
+      {editing && (
+        <Button className="prototype-focus-toggle" onClick={() => setFocus(!focus)}>
+          {focus ? 'Return to canvas' : 'Focus editor'}
+        </Button>
+      )}
+      <CanvasResourceNodeSpecimen
+        selected
+        zoom={1}
+        title="Ridge walk"
+        open={current.open || editing}
+        nodeSize={editing ? current.editSize : current.size}
+        stageClassName="inv-resource-node-stage--large prototype-markdown-canvas"
+        content={{ kind: 'markdown', via: 'self', content: { url } }}
+        operations={operations}
+        onResize={(size: ResourceSize) => patch(editing ? { editSize: size } : { size })}
+      />
+    </section>
   );
 }
