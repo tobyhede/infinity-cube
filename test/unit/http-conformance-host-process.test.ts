@@ -9,6 +9,7 @@ import {
   readJsonAnnouncement,
   sendOnWire,
   startHost,
+  STORE_BACKED_LAUNCH,
 } from '../../conformance/http/host-process';
 import { hostCommandFromEnvironment } from '../../conformance/http/node-host';
 import { sidecarAnnouncementSchema } from '../../src/desktop/announcement';
@@ -81,6 +82,23 @@ describe('starting a host', () => {
     ).rejects.toThrow(/ENOENT/);
     expect(Date.now() - started).toBeLessThan(10_000);
   });
+
+  it.each(['{directory}', '--built={built}'])(
+    'refuses to start a store-backed host whose command names %s, which it has no value for',
+    async (argument) => {
+      await expect(
+        startHost(
+          {
+            name: 'store host',
+            argv: ['host', argument],
+            stopsOnStdinClose: false,
+            keepsLock: false,
+          },
+          STORE_BACKED_LAUNCH,
+        ),
+      ).rejects.toThrow(`store host runs no directory or build, but its command names ${argument}`);
+    },
+  );
 
   it('kills a host whose launch secret cannot be presented', async () => {
     const directory = await temporaryDirectory();
@@ -199,6 +217,18 @@ describe('naming the host command', () => {
       JSON.stringify({ name: 'Rust CLI', argv: ['infinity-cube'], stopsOnStdinClose: false }),
     );
     expect(command.keepsLock).toBe(false);
+  });
+
+  it('reads the variables a command sets in its environment', () => {
+    const command = hostCommandFromEnvironment(
+      JSON.stringify({
+        name: 'Rust CLI',
+        argv: ['infinity-cube'],
+        stopsOnStdinClose: false,
+        env: { RUST_LOG: 'debug' },
+      }),
+    );
+    expect(command.env).toEqual({ RUST_LOG: 'debug' });
   });
 
   it('holds the production Node host to the launch lock', () => {

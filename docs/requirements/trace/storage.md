@@ -276,6 +276,14 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 | 0172 every build of the shell builds both first (the `rust` CI job, the desktop package's scripts, `release/build.sh --desktop`); a bare `cargo build` builds neither | process only → `AGENTS.md` (Rust), `docs/agents/build-tooling.md`; no storage rule |
 | 0172 rejected options | dropped: rejected alternatives |
 
+| 0167 the desktop application has no home window: it opens a folder named on the command line or chosen from File › Open…, and offers a new Space for a missing or empty folder, as File › New Space… writes one | → ST-121, restated after the marker's check |
+| 0168 the desktop application carries each platform's standard menus and opens its Help in the browser | → ST-121, restated after the marker's check; its menu shortcuts → UI-8 |
+| 0169 a preview build is a normal GitHub release, marked latest, and an installed build's updater reads the newest published release's `latest.json` | → ST-130, restated after the marker's check |
+| 0171 the Start window (New Space, Open Folder…, recent Spaces), New Space as a name-and-location form whose name is the Meta Space's Title and must be one folder name, reopening the Spaces open when the last quit began, Recent as a separate history of Spaces opened, both kept in the application's data directory, the last window (Space or Start) closing per platform, the Start window built from `@project/ui` holding its own commands | → ST-131 (the Start window, New Space and the last window closing **built**, ticket 02; reopening and Recent **not built**, ticket 03); ST-121 points to it. The Start window's layout → UI-111 |
+| 0171 rejected options | dropped: rejected alternatives |
+| 0173 from rust-host 16, `sqlx` is the only migrator for both databases, through `infinity-cube migrate`; the Prisma Next packages and the two equality tests are deleted; a database Prisma Next migrated is refused, not adopted; CI holds the contract to each migrated database with `prisma-next db verify --schema-only`; `migrate --store sqlite` refuses a blank `SQLITE_PATH` | → ST-125 and ST-126, as not built |
+| 0173 rejected options | dropped: rejected alternatives |
+
 ## 2. Guides
 
 **AGENTS.md** (source for one CLI detail)

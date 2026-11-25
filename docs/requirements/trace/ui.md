@@ -479,3 +479,12 @@ The snapshot marker moved from `f6e01b9` to `3f6aa29` and to accepted ADRs throu
 | 0171 the desktop application's Start window | → UI-111 (**built**, but Recent's entries until ST-131 keeps a history), its layout and controls from the design accepted in `.scratch/start-window/issues/01-design-the-start-window.md`; its open details → Open questions; a write failing after Create Space → UI-111 (the form kept, ticket 02); its behaviour → ST-131 (the Start window and New Space **built**, reopening and Recent **not built**) |
 | 0172 | reviewed, no rule here: the Start window's page is an entry of the shell's own build; restated in ST-131. UI-111's components from `@project/ui` are unchanged by where the page is built |
 | Code since PR 503: PR 517 and PR 524 (the native menus' accelerators), PR 527 (the Start window's page, `app/src/start-refusal.ts`, and `@project/ui`'s `Item` components, `FolderOpenIcon` and `Button`'s `link` variant) | → UI-8 and UI-111, reconciled on main with each PR; no other UI behaviour changed |
+
+
+### ADR 0173
+
+| Source | Disposition |
+|---|---|
+| Shift at Resize start keeps the current Map rect’s ratio for the whole drag, with one Edit on release and cancellation discarding the draft | → UI-67 |
+| Both Closed Size floors hold while scaling the rect proportionally | → UI-68 |
+| The ratio is the stored Map rect, and Shift on the control never changes selection | → UI-67 |

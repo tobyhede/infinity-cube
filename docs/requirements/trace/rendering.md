@@ -468,3 +468,9 @@ The snapshot marker moved from `f6e01b9` to `3f6aa29` and to accepted ADRs throu
 | 0171 | reviewed, no rule here: the desktop application's Start window, New Space, reopening and Recent; restated in ST-131 and UI-111 |
 | 0172 | reviewed, no rule here: the shell's own pages are a second build of the browser application; restated in ST-131 |
 | Code since PR 503: PRs 513, 516, 522 and 526 (the install script, the preview builds and the updater), 517 and 524 (the desktop shell's windows and menus, and the asset client sending a picked file's bytes from memory, already in ST-121's evidence), 527 (the Start window, its page, and `@project/ui`'s `Item`, an icon and `Button`'s `link` variant), 525 (the CRAP gate), and 514, 523 and 515 (documentation) | no behaviour this doc states |
+
+### ADR 0173
+
+| Source | Disposition |
+|---|---|
+| Shift at Resize start keeps the current Map rect’s ratio for one gesture, which stores no proportion | → RD-2 (no drawing constraint); the gesture → UI-67 |

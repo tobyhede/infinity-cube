@@ -64,12 +64,25 @@ type MockResizeControlProps = {
   minHeight?: number;
   className?: string;
   children?: ReactNode;
-  onResizeStart?: () => void;
+  onResizeStart?: (
+    event: { sourceEvent: Event },
+    start: { x: number; y: number; width: number; height: number },
+  ) => void;
   shouldResize?: (
-    event: MouseEvent,
+    event: { sourceEvent: Event },
     size: { width: number; height: number },
   ) => boolean | undefined;
 };
+
+/**
+ * What the stood-in resize control reports: the rect a drag starts from, and
+ * the size React Flow proposes on each move, which it has already clamped to
+ * the control's floors.
+ */
+const resizeGesture = vi.hoisted(() => ({
+  start: { x: 0, y: 0, width: 400, height: 300 },
+  proposed: { width: 620, height: 440 },
+}));
 
 /** The ids of the Resources the stood-in flow store holds selected. */
 const flow = vi.hoisted(() => {
@@ -149,8 +162,20 @@ vi.mock('@xyflow/react', async (importOriginal) => {
         data-testid="resize-control"
         data-min-width={String(minWidth)}
         data-min-height={String(minHeight)}
-        onMouseDown={onResizeStart}
-        onMouseMove={() => shouldResize?.(new MouseEvent('mousemove'), { width: 620, height: 440 })}
+        // React Flow hands both callbacks d3-drag's event, whose `sourceEvent`
+        // is the pointer event underneath.
+        onMouseDown={(event) =>
+          onResizeStart?.({ sourceEvent: event.nativeEvent }, resizeGesture.start)
+        }
+        onMouseMove={(event) =>
+          shouldResize?.({ sourceEvent: event.nativeEvent }, resizeGesture.proposed)
+        }
+        onTouchStart={(event) =>
+          onResizeStart?.({ sourceEvent: event.nativeEvent }, resizeGesture.start)
+        }
+        onTouchMove={(event) =>
+          shouldResize?.({ sourceEvent: event.nativeEvent }, resizeGesture.proposed)
+        }
       >
         {children}
       </div>
@@ -1409,6 +1434,70 @@ describe('ResourceNode Open Resource', () => {
     fireEvent.mouseMove(screen.getByTestId('resize-control'));
 
     expect(onResize).toHaveBeenCalledWith({ width: 620, height: 440 });
+  });
+
+  it('drives a proportional Resize from the pointer, not the size React Flow already floored', () => {
+    const onResize = vi.fn();
+    const resize = {
+      minWidth: 260,
+      minHeight: 146,
+      onResizeStart: () => undefined,
+      onResize,
+      onResizeEnd: () => undefined,
+      onResizeCancel: () => undefined,
+    };
+    render(<ResourceNode {...props({ open: true, selected: true, resize })} />);
+    const control = screen.getByTestId('resize-control');
+
+    // 400 × 300, dragged 300 left and 110 down: React Flow floors the width at
+    // 260 before asking, so its proposal reads as a larger change in height.
+    resizeGesture.proposed = { width: 260, height: 410 };
+    fireEvent.mouseDown(control, { shiftKey: true, clientX: 500, clientY: 400 });
+    fireEvent.mouseMove(control, { shiftKey: true, clientX: 200, clientY: 510 });
+    resizeGesture.proposed = { width: 620, height: 440 };
+
+    expect(onResize).toHaveBeenLastCalledWith({ width: 260, height: 195 });
+  });
+
+  it('takes the proportions from the rect stored on this Map, not the size React Flow measured', () => {
+    const onResize = vi.fn();
+    const resize = {
+      minWidth: 260,
+      minHeight: 146,
+      onResizeStart: () => undefined,
+      onResize,
+      onResizeEnd: () => undefined,
+      onResizeCancel: () => undefined,
+    };
+    // The mocked control reports a measured 400 × 300; the Placement is 600 × 200.
+    render(
+      <ResourceNode {...props({ open: true, selected: true, resize })} width={600} height={200} />,
+    );
+    const control = screen.getByTestId('resize-control');
+
+    fireEvent.mouseDown(control, { shiftKey: true, clientX: 500, clientY: 400 });
+    fireEvent.mouseMove(control, { shiftKey: true, clientX: 800, clientY: 400 });
+
+    expect(onResize).toHaveBeenLastCalledWith({ width: 900, height: 300 });
+  });
+
+  it('keeps proportions for a touch drag started with Shift held', () => {
+    const onResize = vi.fn();
+    const resize = {
+      minWidth: 260,
+      minHeight: 146,
+      onResizeStart: () => undefined,
+      onResize,
+      onResizeEnd: () => undefined,
+      onResizeCancel: () => undefined,
+    };
+    render(<ResourceNode {...props({ open: true, selected: true, resize })} />);
+    const control = screen.getByTestId('resize-control');
+
+    fireEvent.touchStart(control, { shiftKey: true, touches: [{ clientX: 500, clientY: 400 }] });
+    fireEvent.touchMove(control, { shiftKey: true, touches: [{ clientX: 700, clientY: 410 }] });
+
+    expect(onResize).toHaveBeenLastCalledWith({ width: 600, height: 450 });
   });
 
   it('finishes the active draft on pointer release', () => {
