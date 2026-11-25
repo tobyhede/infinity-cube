@@ -567,3 +567,12 @@ An independent rerun of the snapshot refresh rechecked this topic against main `
 |---|---|
 | This doc's "Terms not yet in `CONTEXT.md`" working definitions | moved to `CONTEXT.md` as glossary entries (Asset store, Repository, Lifecycle door, Intake, Default Content, Source, Working read, Working-space loader; Import and Export point to Importing and Exporting); the doc's Terms line now points to them, and `check-glossary.py` holds every term it names to an entry. Some definitions were shortened as they moved; each clause left out is stated by a rule (the Asset store's SHA-256 naming and `assets/<hash>.<ext>` layout: ST-34 and ST-76). Where two docs defined a term differently, the entry states both docs' meaning |
 | ST-120's "no CI run of it has been watched yet" | stale: the `rust` job's step "HTTP conformance suite against the Rust CLI" passed on main `343a66c` (CI run 45531570866); evidence updated, rule unchanged |
+
+## The lock replaces the marker (25 November 2026)
+
+Each document's snapshot marker became one line linking [snapshot.lock.json](../snapshot.lock.json), which `python3 scripts/adr_snapshot.py stamp` wrote against main `b6f342a`.
+
+| Source | Disposition |
+|---|---|
+| [0175](../../adr/0175-a-lock-file-records-which-adrs-the-requirements-restate.md) (a lock file records which ADRs the requirements restate) | reviewed, no rule here: it decides how the requirements are kept, which `docs/agents/workflow.md` owns; the lock records it as `na` |
+| 0107 and 0138 | left pending in the lock: each carries `Status: accepted` while this refresh's traces drop it as proposed, so the next refresh decides which holds |

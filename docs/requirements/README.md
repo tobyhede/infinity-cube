@@ -1,6 +1,6 @@
 # Requirements
 
-These seven documents restate InfinityCube's accepted ADRs in current words, as a snapshot. They decide nothing themselves: [ADRs](../adr/README.md) are binding and append-only, and a requirement that disagrees with an accepted ADR is a defect in the requirement. Each document opens with a snapshot marker naming the commit it was checked against, the date, and the highest ADR it incorporates; an ADR accepted after that marker binds where it differs, until the document is updated. Accepting an ADR updates the owning document and its marker in the same change, and a behaviour change updates its document in the same commit ([workflow](../agents/workflow.md#adrs-and-the-requirements-snapshot)). Status and evidence distinguish the intended behaviour from what is built. Presentation-only detail is left out (drafting rule 6 in [DECISIONS.md](DECISIONS.md)), but where an accepted ADR decides it, that ADR still binds.
+These seven documents restate InfinityCube's accepted ADRs in current words, as a snapshot. They decide nothing themselves: [ADRs](../adr/README.md) are binding and append-only, and a requirement that disagrees with an accepted ADR is a defect in the requirement. Which ADRs they restate is recorded in [snapshot.lock.json](snapshot.lock.json), which `python3 scripts/adr_snapshot.py` writes and checks; an accepted ADR it lists as pending binds where it differs, until the next refresh, and a proposed one binds nothing. Accepting an ADR edits no document here, and a behaviour change updates its document in the same commit ([workflow](../agents/workflow.md#adrs-and-the-requirements-snapshot)). Status and evidence distinguish the intended behaviour from what is built. Presentation-only detail is left out (drafting rule 6 in [DECISIONS.md](DECISIONS.md)), but where an accepted ADR decides it, that ADR still binds.
 
 | Task | Read |
 | --- | --- |
@@ -14,7 +14,7 @@ These seven documents restate InfinityCube's accepted ADRs in current words, as 
 
 [CONTEXT.md](../../CONTEXT.md) defines names. [AGENTS.md](../../AGENTS.md) routes implementation tasks and links engineering guidance.
 
-Read a document in this order: [CONTEXT.md](../../CONTEXT.md) for terms, the owning document, then any ADR accepted or amended since its marker's commit, whatever its number (the highest number a marker names is a navigation aid; [workflow](../agents/workflow.md#adrs-and-the-requirements-snapshot) says how to list them). Open an older ADR for the full argument, a rejected alternative or the history.
+Read a document in this order: [CONTEXT.md](../../CONTEXT.md) for terms, the owning document, then any ADR that `python3 scripts/adr_snapshot.py check` lists as pending. Open an older ADR for the full argument, a rejected alternative or the history.
 
 [Trace files](trace/) record the sources and disposition of old rules. [Conflict records](conflicts/) and [rewrite decisions](DECISIONS.md) preserve the rewrite’s rulings; a ruling that changes what an accepted ADR decides is recorded as a new ADR. The product guides these documents replaced are kept, as history, under [`docs/adr/archive/agent-guides/`](../adr/archive/agent-guides/) until that archive is deleted; the traces cite each by its original path, `docs/agents/<name>.md`, at the commit they read it at, so `git show <commit>:docs/agents/<name>.md` recovers it.
 

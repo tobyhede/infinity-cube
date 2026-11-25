@@ -7,10 +7,11 @@ the document.
 **ADRs are binding and append-only.** A new decision, or a change to what an
 accepted ADR decides, is a new ADR. The seven
 [requirements documents](../requirements/README.md) restate the accepted ADRs in
-current words as a snapshot: each names the commit it was checked against and
-the highest ADR it incorporates. Read the owning requirements document first;
-then read any ADR newer than its snapshot marker, which binds where the two
-differ. A requirement that disagrees with an accepted ADR is a defect in the
+current words as a snapshot, and
+[`snapshot.lock.json`](../requirements/snapshot.lock.json) records which ADRs
+they restate. Read the owning requirements document first; then read any ADR
+that `python3 scripts/adr_snapshot.py check` lists as pending, which binds where
+the two differ if it is accepted; a proposed ADR binds nothing. A requirement that disagrees with an accepted ADR is a defect in the
 requirement. Open an ADR when you need the full argument, a rejected
 alternative or the history, or when you are about to change what it binds.
 
@@ -240,4 +241,5 @@ How the requirements and ADRs are kept is in [Workflow](../agents/workflow.md).
 
 | ADR | Binds |
 | --- | --- |
-| [0145](0145-the-requirements-are-a-snapshot-of-the-accepted-adrs.md) | The seven requirements documents restate the accepted ADRs as a snapshot with a marker naming the commit and the highest ADR incorporated; ADRs stay binding and append-only, a requirement that disagrees with one is a defect, and accepting an ADR updates the owning requirement in the same change (supersedes 0115). |
+| [0145](0145-the-requirements-are-a-snapshot-of-the-accepted-adrs.md) | The seven requirements documents restate the accepted ADRs as a snapshot with a marker naming the commit and the highest ADR incorporated; ADRs stay binding and append-only, a requirement that disagrees with one is a defect, and accepting an ADR updates the owning requirement in the same change (supersedes 0115; refined by 0175, which replaces the marker and that same-change rule with a checked lock file). |
+| [0175](0175-a-lock-file-records-which-adrs-the-requirements-restate.md) | `docs/requirements/snapshot.lock.json`, written and checked by `scripts/adr_snapshot.py`, records by hash which ADRs the requirements restate and replaces the snapshot markers; accepting an ADR edits no requirements document, and CI fails only on a mechanically wrong lock, never on a pending ADR (refines 0145). |

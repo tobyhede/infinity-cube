@@ -113,6 +113,12 @@ jobs:
         # out of `.git/config` into one of their own — and this setting is what
         # makes that irrelevant rather than merely less bad.
         with: { persist-credentials: false }
+      # ADR 0175. Fails only on a mechanical fault in the requirements lock;
+      # an ADR the requirements have not yet restated is a warning
+      # annotation, never a failure, so an ADR pull request edits no
+      # requirements doc. It needs nothing installed, so it runs first.
+      - name: Check requirements snapshot
+        run: python3 scripts/adr_snapshot.py check --github
       # No `version:` input on purpose — the action then reads `packageManager`
       # from package.json, so the pin cannot drift between here and a laptop.
       # Still true in v6, and still `action-setup`: its successor `pnpm/setup`

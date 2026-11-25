@@ -210,6 +210,17 @@ const isMarkdownDocument = (file: string): boolean =>
   file.endsWith('.md') && !SPACE_CONTENT_TREES.some((tree) => file.startsWith(tree));
 
 /**
+ * The requirements lock (ADR 0175) is written by `scripts/adr_snapshot.py`, never
+ * by hand, and names each ADR by its file. An ADR's file name is as fixed as its
+ * text, so the lock repeats whatever word an ADR's title retires. Those paths are
+ * masked; the rest of the lock, its `na` reasons included, is scanned.
+ */
+const REQUIREMENTS_LOCK = 'docs/requirements/snapshot.lock.json';
+const ADR_PATH = /"docs\/adr\/(?:superseded\/)?\d{4}-[^"]+\.md"/g;
+const withoutAdrPaths = (file: string, source: string): string =>
+  file === REQUIREMENTS_LOCK ? source.replace(ADR_PATH, '"adr"') : source;
+
+/**
  * Every tracked file the historical trees do not account for, bar prose
  * documents — what every block below starts from, and the reason none of them
  * writes the exclusion out again.
@@ -241,7 +252,7 @@ const readTracked = (file: string): string | null => {
   const absolute = join(repoRoot, file);
   // A tracked file deleted in the working tree is still an index entry, and
   // what it no longer contains cannot reach a commit.
-  return existsSync(absolute) ? readFileSync(absolute, 'utf8') : null;
+  return existsSync(absolute) ? withoutAdrPaths(file, readFileSync(absolute, 'utf8')) : null;
 };
 
 /**
@@ -3339,6 +3350,14 @@ describe('the Resource has no front (ADR 0125)', () => {
     });
 
     expect(found).toEqual([]);
+  });
+
+  it("masks the requirements lock's ADR paths only while one of them carries the retired word", () => {
+    const raw = readFileSync(join(repoRoot, REQUIREMENTS_LOCK), 'utf8');
+    expect(hits(withoutFenceWord(raw), RETIRED_SIDE_SPELLINGS)).not.toEqual([]);
+    expect(
+      hits(withoutFenceWord(readTracked(REQUIREMENTS_LOCK) ?? ''), RETIRED_SIDE_SPELLINGS),
+    ).toEqual([]);
   });
 
   it('keeps no mask that has stopped earning itself', () => {
