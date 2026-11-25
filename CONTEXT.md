@@ -453,6 +453,14 @@ _Avoid_: catalog, bundle, export root.
 **Repository**:
 Where the live Aggregate is kept: PostgreSQL, SQLite or memory. Also called a store.
 
+**Invariant failure**:
+A Repository's stored Aggregate contradicting itself, such as Meta naming a Space the Repository does not hold. Asking again cannot clear it.
+_Avoid_: corruption, unavailable.
+
+**Unclassified failure**:
+A Repository failure known to be neither an Invariant failure nor the Repository being unreachable for now. Nothing is known about whether asking again would clear it.
+_Avoid_: internal error, unknown error.
+
 **Default Content**:
 The generated Aggregate a new Repository, or a new Aggregate directory, starts from.
 
