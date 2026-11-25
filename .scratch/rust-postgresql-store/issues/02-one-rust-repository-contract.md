@@ -2,7 +2,8 @@
 
 **Status:** ready-for-agent once 01 lands (Q1 answered yes)
 
-**Blocked by:** rust-host 15 (#520, #521) and #528's 01 merging; 01. Lands **instead of** the SQLite-only ports #528's 04, 05, 06 and 12 describe, and before #528's 03 and 13, which this rewrites in its first commit: #528's 03 reads the table file as part of the SQLite adapter, its pending exemptions name this ticket for every contract case, and #528's 13 keeps only the races that are not table cases.
+**Blocked by:** rust-host/15, 01.
+**Waits on:** #520 and #521 (rust-host 15) and #528's 01 merging. Lands **instead of** the SQLite-only ports #528's 04, 05, 06 and 12 describe, and before #528's 03 and 13, which this rewrites in its first commit: #528's 03 reads the table file as part of the SQLite adapter, its pending exemptions name this ticket for every contract case, and #528's 13 keeps only the races that are not table cases.
 
 **What to build:** The Rust counterpart of `spaceRepositoryContract` (`test/support/repository-contract.ts:347`): the contract's cases written once in `crates/host/tests/repository_contract/`, generated per store by a `repository_cases!(harness)` macro, as `http_conformance::cases!` generates the HTTP cases per adapter. Each case asserts the contract's absolute answers (values read back after a reopen), never agreement with another store.
 

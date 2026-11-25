@@ -2,7 +2,8 @@
 
 **Status:** ready-for-agent once 06 lands
 
-**Blocked by:** 06; #528's 07 (its generators), which this reuses.
+**Blocked by:** 06.
+**Waits on:** #528's 07 (its generators), which this reuses.
 
 **What to build:** #528's 07's generated commit sequences against PostgreSQL too, and the port of `aggregate-commit-differential.test.ts:21` ("gives memory and PostgreSQL the same public outcome over generated aggregate changes"). They compare stores, so they come after the table's absolute assertions and cannot replace them.
 

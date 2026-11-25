@@ -2,7 +2,8 @@
 
 **Status:** ready-for-agent once 02 lands
 
-**Blocked by:** 02, and #528's 03 (the repository ports test), which this extends.
+**Blocked by:** 02.
+**Waits on:** #528's 03 (the repository ports test), which this extends.
 
 **What to build:** A PostgreSQL adapter in the repository ports test #528's 03 writes, shaped as `test/unit/http-conformance-rust-ports.test.ts` holds its adapters (`PORTS`, `:126-198`): the table plus PostgreSQL's own files. Each later ticket adds the files it creates to the adapter's list in the same commit (`crates/host/tests/postgres*.rs` from 05, `crates/cli/tests/serve_postgres.rs` from 09), and 06 adds the check that a PostgreSQL test binary invokes `repository_cases!(`; until then the adapter's files are the table alone and every case is a pending exemption, so the test is green from its first commit.
 

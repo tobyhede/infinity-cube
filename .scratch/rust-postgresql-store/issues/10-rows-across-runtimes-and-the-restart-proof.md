@@ -2,7 +2,8 @@
 
 **Status:** ready-for-agent once 09 lands
 
-**Blocked by:** 09; #528's 08 (its fixture scripts and currency checks, which this extends to PostgreSQL). Edits CI's `postgres` job as rust-host 16 does; rebase on whichever lands first.
+**Blocked by:** 09.
+**Waits on:** #528's 08 (its fixture scripts and currency checks, which this extends to PostgreSQL). Edits CI's `postgres` job as rust-host 16 does; rebase on whichever lands first.
 
 **What to build:** Checks that a PostgreSQL database written by either runtime reads correctly in the other, in both directions, and the PostgreSQL restart proof on `serve --store postgres`.
 
