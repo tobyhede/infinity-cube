@@ -133,3 +133,15 @@ Written for the refresh to `3f6aa29`, from ADRs 0167–0169, 0171 and 0172, befo
 
 A separate agent, given `AGENTS.md` and the three questions with the expected answers withheld, answered through the reading path and matched all three. For RF-Q10 it first found the close question's permission only in the desktop skill, having missed ST-122's sentence because its search broke over the doc's long lines; it also noted that the expected answer generalised ADR 0172 beyond what ST-131 then stated, so ST-131 now states that every page holding an IPC permission is served from the shell's own build. No baseline run against the reading path before the edits was made.
 
+
+## Refresh questions (25 November 2026)
+
+Written for the refresh to `343a66c`, from the two accepted ADRs numbered 0173 (Shift at Resize start keeps the Resource's proportions; sqlx is the only migrator once PostgreSQL moves to Rust), by the topic agents before their edits.
+
+| # | Question | Expected answer | Source |
+|---|---|---|---|
+| RF-Q11 | An author starts a Resize drag without Shift, then presses Shift part-way. What happens, and what if they start with Shift and release it? | A drag started without Shift stays free for its whole duration; one started with Shift keeps the stored Map rect's starting ratio for the whole drag, even after Shift is released. Either way release writes one Resize Edit (size and displacement), cancellation writes nothing, and no proportion is stored. **built**. | ADR 0173 (Resize); UI-67, MG-23, ED-24 |
+| RF-Q12 | A 600 × 200 Resource is resized proportionally inward as far as it goes. Where does it stop, and do neighbours move during the drag? | At 438 × 146, when the height reaches the Closed Size floor; the top-left stays fixed, and neighbours stay where they are stored until release, when displacement is written. | ADR 0173 (Resize); UI-68, RD-57, MG-24 |
+| RF-Q13 | A Shift-click on a selected Resource's resize control, with no movement. Does it change the selection? | No: Shift on the control chooses the gesture, never the selection; the Resource stays selected and no Edit is made. | ADR 0173 (Resize); NV-9, UI-67 |
+| RF-Q14 | After rust-host 16, I run `infinity-cube migrate --store postgres` on a database Prisma Next migrated. What happens, and is the verb built today? | It is refused, the message saying to reset the database: it holds tables but no `_sqlx_migrations`, and no database is adopted. Not built: today the CLI has no `migrate` verb (a usage error), and Prisma Next still migrates. | ADR 0173 (sqlx); ST-125, ST-120 |
+| RF-Q15 | After rust-host 16, who migrates the database the TypeScript host uses, and what holds its Prisma Next contract to the schema? | No host migrates on start; every caller runs `infinity-cube migrate --store <postgres|sqlite>`. CI runs `prisma-next db verify --schema-only` (without `--strict`, which would fail on `_sqlx_migrations`) against each `sqlx`-migrated database, and the TypeScript integration suites are the second net. Not built. | ADR 0173 (sqlx); ST-125, ST-126 |

@@ -2,7 +2,7 @@
 
 **Purpose:** how any Edit is derived, committed and published in the browser, what each outcome means, how a session persists and recovers, how one Edit spans several Spaces, and what withholds authoring, Claims and exclusive work included.
 
-**Snapshot:** checked against `3f6aa29` (2026-11-24); incorporates accepted ADRs through 0172 (no ADR 0170 is on main at that commit). ADRs accepted after it bind where they differ, until this document is updated. Proposed ADR 0163 is not incorporated.
+**Snapshot:** checked against `343a66c` (2026-11-25); incorporates accepted ADRs through 0173. Two accepted ADRs carry 0173 at that commit, [Shift at Resize start keeps the Resource’s proportions](../adr/0173-shift-at-resize-start-keeps-the-resources-proportions.md) and [sqlx is the only migrator once PostgreSQL moves to Rust](../adr/0173-sqlx-is-the-only-migrator-once-postgresql-moves-to-rust.md), and both are incorporated; no ADR 0170 is on main at that commit. ADRs accepted after it bind where they differ, until this document is updated. Proposed ADR 0163 is not incorporated.
 
 Open conflicts are listed in [conflicts/editing.md](conflicts/editing.md). Sources are traced in [trace/editing.md](trace/editing.md).
 

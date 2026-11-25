@@ -2,7 +2,7 @@
 
 **Purpose:** what a Space and a Resource are, what a kind and its plugin are, what each kind holds, how Resources and Spaces are created and deleted, what a Space Resource and a Reference Resource point at, and what happens to a Resource whose kind no plugin in the build draws.
 
-**Snapshot:** checked against `3f6aa29` (2026-11-24); incorporates accepted ADRs through 0172 (no ADR 0170 is on main at that commit). ADRs accepted after it bind where they differ, until this document is updated. Proposed ADR 0163 is not incorporated.
+**Snapshot:** checked against `343a66c` (2026-11-25); incorporates accepted ADRs through 0173: two accepted ADRs carry that number at that commit, 0173 (sqlx is the only migrator) and 0173 (Shift at Resize start keeps the Resource's proportions), neither owning a rule here, and no ADR 0170 is on main. ADRs accepted after it bind where they differ, until this document is updated. Proposed ADR 0163 is not incorporated.
 
 Conflicts, open and closed, are listed in [conflicts/space-and-resources.md](conflicts/space-and-resources.md). Sources are traced in [trace/space-and-resources.md](trace/space-and-resources.md).
 

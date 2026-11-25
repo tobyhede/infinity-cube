@@ -480,11 +480,16 @@ The snapshot marker moved from `f6e01b9` to `3f6aa29` and to accepted ADRs throu
 | 0172 | reviewed, no rule here: the Start window's page is an entry of the shell's own build; restated in ST-131. UI-111's components from `@project/ui` are unchanged by where the page is built |
 | Code since PR 503: PR 517 and PR 524 (the native menus' accelerators), PR 527 (the Start window's page, `app/src/start-refusal.ts`, and `@project/ui`'s `Item` components, `FolderOpenIcon` and `Button`'s `link` variant) | → UI-8 and UI-111, reconciled on main with each PR; no other UI behaviour changed |
 
+## Refresh to `343a66c` (25 November 2026)
 
-### ADR 0173
+The snapshot marker moved from `3f6aa29` to `343a66c` and to accepted ADRs through 0173; two accepted ADRs carry 0173 at that commit, [Shift at Resize start keeps the Resource’s proportions](../../adr/0173-shift-at-resize-start-keeps-the-resources-proportions.md) and [sqlx is the only migrator once PostgreSQL moves to Rust](../../adr/0173-sqlx-is-the-only-migrator-once-postgresql-moves-to-rust.md), called here 0173 (Shift at Resize start) and 0173 (sqlx); no ADR 0170 is on main. Each ADR accepted or amended above the old marker was read for rules this doc owns, and each change main merged since `3f6aa29` (PRs 508, 509, 518 and 519) was read for behaviour this doc states.
 
 | Source | Disposition |
 |---|---|
-| Shift at Resize start keeps the current Map rect’s ratio for the whole drag, with one Edit on release and cancellation discarding the draft | → UI-67 |
-| Both Closed Size floors hold while scaling the rect proportionally | → UI-68 |
-| The ratio is the stored Map rect, and Shift on the control never changes selection | → UI-67 |
+| 0173 (Shift at Resize start): Shift at Resize start keeps the current Map rect's ratio for the whole drag, Shift pressed later does not, and the top-left stays fixed | → UI-67, where main's PR 509 restated it |
+| 0173 (Shift at Resize start): release writes the previewed size and its displacement in one Resize Edit, and cancellation discards the draft | → UI-67 (amended: the Edit is named a Resize Edit writing size and displacement, pointing to MG-23 and MG-24) |
+| 0173 (Shift at Resize start): both Closed Size floors hold while scaling proportionally (400 × 300 → 260 × 195, 600 × 200 → 438 × 146) | → UI-68, where main's PR 509 restated it |
+| 0173 (Shift at Resize start): the ratio is the stored Map rect, and Shift on the control never changes selection | → UI-67; the selection side → NV-9 (amended to point here) |
+| 0173 (sqlx) | reviewed, no rule here: `sqlx` is the only migrator once PostgreSQL moves to Rust, and the Prisma Next migration packages go; restated in ST-125 and ST-126 |
+| 0122, 0155 and 0165, amended status blocks | reviewed, no rule here: each gained only a `Refined by` entry naming 0173, 0122's for 0173 (Shift at Resize start) and 0155's and 0165's for 0173 (sqlx); no decision changed |
+| Code since `3f6aa29`: PRs 508 and 509 (proportional Resize: `react-flow-adapter/src/proportional-resize.ts`, `ResourceNode.tsx`, their tests and `app/e2e/aspect-ratio-resizing.spec.ts`), 518 (triage of rust-host 15 and 16, 0173 (sqlx) and the mise ticket) and 519 (the SQLite restart proof starting its hosts by command: `test/support/restart-proof-host.ts`, `test/e2e/sqlite-persistence.spec.ts`, `conformance/http/host-process.ts`) | 508 and 509 → UI-67 and UI-68; the axis-driven size and whole canvas units in UI-67 restate `proportionalSize`, not the ADR; the interactive deviation PR 509 records in `app/stories/design-system-inventory.ts` is an engineering record under the `shadcn-first-ui` skill, no rule. 518 and 519: no behaviour this doc states; 519's restart proof addresses the chrome through `test/support/restart-proof.ts`, which it did not change |

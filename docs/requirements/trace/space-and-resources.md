@@ -419,3 +419,14 @@ The snapshot marker moved from `f6e01b9` to `3f6aa29` and to accepted ADRs throu
 | 0171 the Start window's New Space name is also the new Space's Title | reviewed, no rule here: the Space is written as `init` writes one (ST-11), titled with the name (ST-131), not by the browser's Create Space (SR-40, SR-41); a name is refused by the folder-name rules ST-131 states before any Title rule here applies |
 | 0172 | reviewed, no rule here: the shell's own pages are a second build of the browser application; restated in ST-131 |
 | Code since PR 503: PRs 513, 516, 522 and 526 (the install script, the preview builds and the updater), 517 and 524 (the desktop shell's windows and menus, and the asset client sending a picked file's bytes from memory, already in ST-121's evidence), 527 (the Start window, its page, and `@project/ui`'s `Item`, an icon and `Button`'s `link` variant), 525 (the CRAP gate), and 514, 523 and 515 (documentation) | no behaviour this doc states |
+
+## Refresh to `343a66c` (25 November 2026)
+
+The snapshot marker moved from `3f6aa29` to `343a66c` and to accepted ADRs through 0173; two accepted ADRs carry that number at that commit, and no ADR 0170 is on main. Each was read for rules this doc owns, and each change main merged since `3f6aa29` (PRs 508, 509, 518 and 519) was read for behaviour this doc states.
+
+| Source | Disposition |
+|---|---|
+| 0173 (sqlx is the only migrator) | reviewed, no rule here: from rust-host 16 `sqlx` is the only migrator, run by `infinity-cube migrate`, and no database Prisma Next migrated is adopted; restated in ST-125, ST-126 and ST-120 |
+| 0173 (Shift at Resize start keeps the Resource's proportions) | reviewed, no rule here: the host resizes every Resource alike (SR-18), and the gesture changes how, not who; restated in RD-2, UI-67 and UI-68 |
+| "Refined by: 0173" added to the status lines of ADRs 0122, 0155 and 0165 | no rule here; none of the three sources a rule in this doc that the refinement changes |
+| Code since `3f6aa29`: PRs 508 and 509 (proportional Resize in `react-flow-adapter`), 518 (ADR 0173, rust-host 15 and 16 triage, the mise ticket) and 519 (the SQLite restart proof's host started by command, `env` in the HTTP conformance host's JSON) | no behaviour this doc states |

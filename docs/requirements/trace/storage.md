@@ -275,14 +275,14 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 | 0172 the shell's `frontendDist` is `packages/app/dist-desktop-shell`, a second Vite build of `packages/app` whose entry is `start.html`, apart from `dist`, which the host serves to Space windows; the close question's files are copied into it; a window of the shell's own opens by label with a capability naming that label alone | → ST-131 (the Start window's page, build and capability, and every page holding an IPC permission served from that build, never from `dist`), ST-122 (the close question's one permission), ST-121 (Space windows hold no IPC permission) |
 | 0172 every build of the shell builds both first (the `rust` CI job, the desktop package's scripts, `release/build.sh --desktop`); a bare `cargo build` builds neither | process only → `AGENTS.md` (Rust), `docs/agents/build-tooling.md`; no storage rule |
 | 0172 rejected options | dropped: rejected alternatives |
-
-| 0167 the desktop application has no home window: it opens a folder named on the command line or chosen from File › Open…, and offers a new Space for a missing or empty folder, as File › New Space… writes one | → ST-121, restated after the marker's check |
-| 0168 the desktop application carries each platform's standard menus and opens its Help in the browser | → ST-121, restated after the marker's check; its menu shortcuts → UI-8 |
-| 0169 a preview build is a normal GitHub release, marked latest, and an installed build's updater reads the newest published release's `latest.json` | → ST-130, restated after the marker's check |
-| 0171 the Start window (New Space, Open Folder…, recent Spaces), New Space as a name-and-location form whose name is the Meta Space's Title and must be one folder name, reopening the Spaces open when the last quit began, Recent as a separate history of Spaces opened, both kept in the application's data directory, the last window (Space or Start) closing per platform, the Start window built from `@project/ui` holding its own commands | → ST-131 (the Start window, New Space and the last window closing **built**, ticket 02; reopening and Recent **not built**, ticket 03); ST-121 points to it. The Start window's layout → UI-111 |
-| 0171 rejected options | dropped: rejected alternatives |
-| 0173 from rust-host 16, `sqlx` is the only migrator for both databases, through `infinity-cube migrate`; the Prisma Next packages and the two equality tests are deleted; a database Prisma Next migrated is refused, not adopted; CI holds the contract to each migrated database with `prisma-next db verify --schema-only`; `migrate --store sqlite` refuses a blank `SQLITE_PATH` | → ST-125 and ST-126, as not built |
-| 0173 rejected options | dropped: rejected alternatives |
+| 0173 (sqlx is the only migrator) from rust-host 16, `sqlx` is the only migrator, for PostgreSQL and SQLite together; the plain-SQL files are the history and a schema change is a new file; the Prisma Next migration packages and the two equality tests are deleted | → ST-125, as **not built** (rust-host 16) |
+| 0173 (sqlx is the only migrator) `infinity-cube migrate --store <postgres\|sqlite>`, reaching `DATABASE_URL` or `SQLITE_PATH`, is run by every caller, the TypeScript databases' included; no host migrates on start | → ST-125 (the rule), ST-120 (the verb), the operations index; **not built** |
+| 0173 (sqlx is the only migrator) a database holding tables but no `_sqlx_migrations` is refused, saying to reset it; no database is adopted and no record seeded | → ST-125, **not built** |
+| 0173 (sqlx is the only migrator) the TypeScript runtime keeps its Prisma Next contract for queries until rust-host 20; CI holds it to each `sqlx`-migrated database with `prisma-next db verify --schema-only`, not `--strict`; the TypeScript integration suites are the second net | → ST-125, **not built** (CI today runs `prisma-next db verify` after Prisma Next migrates) |
+| 0173 (sqlx is the only migrator) `migrate --store sqlite` keeps ST-126's relative-path and parent rules, creates a missing file and refuses a blank `SQLITE_PATH` | → ST-126, **not built** |
+| 0173 (sqlx is the only migrator) consequences: contributors and the `postgres` and `sqlite` CI jobs need the Rust toolchain to migrate; `db:migrate`, `db:migrate:sqlite` and the `prisma-next.config*.ts` migration settings go unless a script stays as a thin name for the verb | → ST-125 (the scripts); the toolchain is process only → `AGENTS.md` when rust-host 16 lands. Which command ST-126's missing-file refusal names after 16 is open → conflicts/storage.md |
+| 0173 (sqlx is the only migrator) rejected options: two migrators seeding each other, PostgreSQL moving alone, `serve` migrating on start, adopting Prisma Next's databases, a test comparing the contract with `sqlx`'s schema | dropped: rejected alternatives |
+| 0173 (Shift at Resize start keeps the Resource's proportions) | reviewed, no rule here: a Resize gesture's ratio and floors; its one Resize Edit commits as any other (ST-16). Restated in RD-2, UI-67 and UI-68 |
 
 ## 2. Guides
 
@@ -544,3 +544,17 @@ Each change main merged between `f6e01b9`'s refresh (PR #503, merged as `46b0999
 | ST-121's sources named ADR 0168 twice and not 0171, whose Start window it points to | corrected (this refresh) |
 | The operations index's Desktop shell row named File › New Space… writing a Space and not the Start window's form or its refusals | corrected → ST-131 (this refresh) |
 
+## 10. Refresh to 343a66c (25 November 2026)
+
+The snapshot marker moved from `3f6aa29` to `343a66c` and to accepted ADRs through 0173, two of which carry that number. Each change main merged between them (PRs #508, #509, #518 and #519, first-parent) was read for behaviour this doc states. The ADRs among them have their rows in §1; main had appended 0173 (sqlx is the only migrator) to ST-125 and ST-126 and duplicate rows for 0167–0171 here without moving the marker, and this refresh reconciled both.
+
+| Source | Disposition |
+|---|---|
+| 0173 (sqlx is the only migrator) | → ST-125, ST-126, ST-120 and the operations index, as **not built** (§1). ST-125 now separates the two encodings, built, from the single migrator, not built, and states the rules main's restatement left out: every caller runs `migrate`, no host migrates on start, the contract is kept for queries until rust-host 20, and the scripts go with the packages (this refresh) |
+| 0173 (Shift at Resize start keeps the Resource's proportions) | reviewed, no rule here (§1) |
+| "Refined by: 0173" added to the status lines of ADRs 0122, 0155 and 0165 | no rule changes: each refinement is restated where 0173 is (ST-125, ST-126; 0122's in Rendering and UI) |
+| #508, #509 proportional Resize (ADR 0173, Shift at Resize start): `packages/react-flow-adapter/src/proportional-resize.ts`, `ResourceNode.tsx`, an E2E spec and a story inventory entry | no storage rule; the release writes one ordinary Resize commit |
+| #518 ADR 0173 (sqlx is the only migrator), triage of rust-host 15 and 16, the mise ticket (`.scratch/toolchain/issues/01-adopt-mise.md`) | ADR → ST-125, ST-126 (§1); the tickets and the toolchain proposal are process only, and rust-host 15 restates ST-126's path rules for a Rust host without changing them |
+| #519 the SQLite restart proof's host started by command (`INFINITY_CUBE_RESTART_PROOF_HOST`, `test/support/restart-proof-host.ts`, `test/support/run-with-cleanup.ts`), and `env` in the HTTP conformance host's JSON (`conformance/http/README.md`, `host-process.ts`, `node-host.ts`) | process only → `AGENTS.md` (E2E) and `conformance/http/README.md`; no storage rule names the test harness's host description, and ST-126–ST-128 hold for whichever host the proof starts |
+| `AGENTS.md` between the two commits | changed only in the E2E paragraph (#519, above) |
+| Duplicate §1 rows for 0167, 0168, 0169 and 0171 that main appended "restated after the marker's check" | removed: superseded by the detailed rows above them (this refresh) |

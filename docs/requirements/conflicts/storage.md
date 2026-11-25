@@ -4,7 +4,15 @@ These are conflicts for `storage.md`, open and closed. Paths are relative to `pa
 
 ## Open
 
-None.
+### S4. Which command ST-126's missing-file refusal names once Prisma Next stops migrating
+
+- **Rules affected.** ST-126 (built): the SQLite CLI refuses a `SQLITE_PATH` naming no file, naming `pnpm db:migrate:sqlite` (`src/sqlite/db.ts`: "Run pnpm db:migrate:sqlite first."). ST-125 (not built).
+- **Disagreement.** None today: ADR 0173 (sqlx is the only migrator) binds from rust-host 16, and until then `pnpm db:migrate:sqlite` is the command that migrates. But its Consequences delete `db:migrate` and `db:migrate:sqlite` with the Prisma Next packages "unless rust-host 16 keeps a script as a thin name for the verb", so from 16 the refusal may name a command that no longer exists. The ADR does not say what the refusal names; the rust-host 15 brief leaves it the TypeScript CLI's alone, naming `pnpm db:migrate:sqlite`, and gives the Rust host no such refusal (`.scratch/rust-host/issues/15-rust-sqlite-store.md`).
+- **Options.**
+  - (a) rust-host 16 keeps `db:migrate:sqlite` (and `db:migrate`) as thin names for `infinity-cube migrate --store sqlite`, and the message stands.
+  - (b) rust-host 16 deletes the scripts and changes the message to name `infinity-cube migrate --store sqlite`.
+- **Recommendation.** Either; whichever rust-host 16 chooses, the refusal names the command that migrates at that commit, changed with ST-126 in the same change. Nothing in the snapshot needs a ruling before rust-host 16 starts.
+- **Evidence.** `docs/adr/0173-sqlx-is-the-only-migrator-once-postgresql-moves-to-rust.md` (Consequences); `test/integration/sqlite-infinity-cube-cli.test.ts` › "refuses a SQLITE_PATH naming no file and creates nothing there"; `package.json` (`db:migrate`, `db:migrate:sqlite`).
 
 ## Closed
 

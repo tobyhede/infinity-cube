@@ -416,3 +416,14 @@ The snapshot marker moved from `f6e01b9` to `3f6aa29` and to accepted ADRs throu
 | 0171 | reviewed, no rule here: the desktop application's Start window, New Space, reopening and Recent; restated in ST-131 and UI-111 |
 | 0172 | reviewed, no rule here: the shell's own pages are a second build of the browser application; restated in ST-131 |
 | Code since PR 503: PRs 513, 516, 522 and 526 (the install script, the preview builds and the updater), 517 and 524 (the desktop shell's windows and menus, and the asset client sending a picked file's bytes from memory, already in ST-121's evidence), 527 (the Start window, its page, and `@project/ui`'s `Item`, an icon and `Button`'s `link` variant), 525 (the CRAP gate), and 514, 523 and 515 (documentation) | no behaviour this doc states |
+
+## Refresh to `343a66c` (25 November 2026)
+
+The snapshot marker moved from `3f6aa29` to `343a66c` and to accepted ADRs through 0173; two accepted ADRs carry 0173 at that commit, [Shift at Resize start keeps the Resource’s proportions](../../adr/0173-shift-at-resize-start-keeps-the-resources-proportions.md) and [sqlx is the only migrator once PostgreSQL moves to Rust](../../adr/0173-sqlx-is-the-only-migrator-once-postgresql-moves-to-rust.md), called here 0173 (Shift at Resize start) and 0173 (sqlx); no ADR 0170 is on main. Each ADR accepted or amended above the old marker was read for rules this doc owns, and each change main merged since `3f6aa29` (PRs 508, 509, 518 and 519) was read for behaviour this doc states.
+
+| Source | Disposition |
+|---|---|
+| 0173 (Shift at Resize start): the preview is a draft, and cancellation discards it | reviewed, no rule here: ED-24 already makes a drag a draft that cancels with no compensating Edit; the Resize gesture's cancellation is UI-67. ED-79 is unchanged: a proportional Resize ends through the same `onResizeEnd` |
+| 0173 (sqlx) | reviewed, no rule here: `sqlx` is the only migrator once PostgreSQL moves to Rust, and the Prisma Next migration packages go; restated in ST-125 and ST-126 |
+| 0122, 0155 and 0165, amended status blocks | reviewed, no rule here: each gained only a `Refined by` entry naming 0173, 0122's for 0173 (Shift at Resize start) and 0155's and 0165's for 0173 (sqlx); no decision changed |
+| Code since `3f6aa29`: PRs 508 and 509 (proportional Resize: `react-flow-adapter/src/proportional-resize.ts`, `ResourceNode.tsx`, their tests and `app/e2e/aspect-ratio-resizing.spec.ts`), 518 (triage of rust-host 15 and 16, 0173 (sqlx) and the mise ticket) and 519 (the SQLite restart proof starting its hosts by command: `test/support/restart-proof-host.ts`, `test/e2e/sqlite-persistence.spec.ts`, `conformance/http/host-process.ts`) | no behaviour this doc states |
