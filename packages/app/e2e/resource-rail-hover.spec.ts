@@ -6,6 +6,7 @@ import {
   selectResource,
   settled,
   viewportTransform,
+  zoomCamera,
 } from './graph';
 
 /**
@@ -125,14 +126,6 @@ async function zoomOf(page: Page): Promise<number> {
   return Number.parseFloat(scale);
 }
 
-/** Press a Dock zoom control and wait for the canvas to reach its new zoom. */
-async function zoom(page: Page, control: 'Zoom in' | 'Zoom out'): Promise<void> {
-  const before = await viewportTransform(page);
-  await page.getByRole('button', { name: control }).click();
-  await expect.poll(() => viewportTransform(page)).not.toBe(before);
-  await settled(page);
-}
-
 /**
  * Where the toolbar is drawn: above the Resource's top-right corner, outside the
  * Resource, clear of its top anchor, and at the Command Dock's 28px control size
@@ -186,12 +179,12 @@ test('the toolbar floats above its Resource’s top-right corner at a constant s
   await settled(page);
   await floats();
 
-  await zoom(page, 'Zoom out');
+  await zoomCamera(page, 'Zoom out');
   expect(await zoomOf(page)).toBeLessThan(1);
   await floats();
 
   for (let presses = 0; presses < 6 && (await zoomOf(page)) <= 1; presses += 1) {
-    await zoom(page, 'Zoom in');
+    await zoomCamera(page, 'Zoom in');
   }
   expect(await zoomOf(page)).toBeGreaterThan(1);
   await floats();

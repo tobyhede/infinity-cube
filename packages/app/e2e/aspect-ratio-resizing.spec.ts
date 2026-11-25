@@ -8,6 +8,7 @@ import {
   selectResource,
   openResourcePersisted,
   positionOf,
+  zoomCamera,
 } from './graph';
 
 test('Shift at resize start preserves the rect proportions after Shift is released', async ({
@@ -28,7 +29,7 @@ test('Shift at resize start preserves the rect proportions after Shift is releas
     width: Number.parseFloat(getComputedStyle(element).width),
     height: Number.parseFloat(getComputedStyle(element).height),
   }));
-  await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
+  await zoomCamera(page, 'Zoom in');
   const handle = await boxOf(
     resource.locator('.react-flow__resize-control.handle.bottom.right'),
     'resize control',
