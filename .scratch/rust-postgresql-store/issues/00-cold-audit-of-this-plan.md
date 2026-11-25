@@ -4,7 +4,7 @@
 
 **Blocked by:** None. Runs before any other ticket here, and before the user's answers are applied, so its findings can change the questions.
 
-**What to build:** A review by agents given only the repository at `fdb63a1` (#521's head), `main`, and this folder, and none of the reasoning or reviews behind it. Its output goes to the project's `reviews/rust-postgresql-plan-audit-<date>/`, with evidence beside the report, and the plan is corrected from it before 01 starts.
+**What to build:** A review by agents given only the repository at `fdb63a1` (#521's head before it was rebased and merged; the plan's citations are now at `ad4d2862`), `main`, and this folder, and none of the reasoning or reviews behind it. Its output goes to the project's `reviews/rust-postgresql-plan-audit-<date>/`, with evidence beside the report, and the plan is corrected from it before 01 starts.
 
 - [x] Every factual claim in `spec.md` and each ticket is checked by reading the cited `file:line` or running the cited command, and marked confirmed, wrong (with the correct fact and its evidence) or unverifiable. A claim with no citation is a finding.
 - [x] The case map is regenerated with `case-map.mjs` and compared with `case-map.md`: no TypeScript PostgreSQL case is missing, and none is assigned to a ticket that does not say it ports it.
