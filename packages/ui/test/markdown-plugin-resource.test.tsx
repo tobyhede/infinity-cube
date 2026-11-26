@@ -69,7 +69,7 @@ describe('a Markdown Resource drawn by the application', () => {
     expect(await screen.findByText('The whole text, on the Stage.')).toBeVisible();
     expect(screen.queryByRole('button')).toBeNull();
   });
-  it('measures its text for Opening once its images have loaded', async () => {
+  it('Opens at once, without waiting for its images to load (ADR 0178)', async () => {
     const complete = vi.spyOn(HTMLImageElement.prototype, 'complete', 'get').mockReturnValue(false);
     try {
       const commitMap = vi.fn(() => Promise.resolve<Answer>('completed'));
@@ -85,15 +85,8 @@ describe('a Markdown Resource drawn by the application', () => {
         </WithTexts>,
       );
       fireEvent.click(await screen.findByRole('button', { name: 'Open Resource Notes' }));
-      const image = await waitFor(() => {
-        const drawn = document.querySelector('[aria-hidden="true"] img');
-        if (drawn === null) throw new Error('The text was not drawn to be measured.');
-        return drawn;
-      });
-      await act(() => Promise.resolve());
-      expect(commitMap).not.toHaveBeenCalled();
-      fireEvent.load(image);
       await waitFor(() => expect(commitMap).toHaveBeenCalledTimes(1));
+      expect(commitMap).toHaveBeenCalledWith({ open: true }, undefined);
     } finally {
       complete.mockRestore();
     }
