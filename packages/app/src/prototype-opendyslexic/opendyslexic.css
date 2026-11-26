@@ -1,0 +1,65 @@
+/*
+ * PROTOTYPE, throwaway. Question: how does OpenDyslexic look and feel as the
+ * dark-mode typeface? Three variants, picked by `?font=` on any product URL:
+ *   A  control: dark mode keeps the system sans (what main does)
+ *   B  OpenDyslexic for everything drawn in dark mode, chrome included
+ *   C  OpenDyslexic for Resource content only (titles, Markdown, the Stage);
+ *      the Dock, menus and rails keep the system sans
+ * Light mode is never changed. Code and source stay monospace in every variant.
+ *
+ * The font files are OpenDyslexic 400/700 (normal and italic, Latin subset)
+ * from @fontsource/opendyslexic 5.3.0, bundled here rather than hot-linked.
+ * Licence: SIL Open Font License 1.1, Reserved Font Name "OpenDyslexic"
+ * (fonts/OFL.txt). Unmodified, so the name may be used.
+ */
+
+@font-face {
+  font-family: 'OpenDyslexic';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/opendyslexic-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'OpenDyslexic';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/opendyslexic-latin-400-italic.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'OpenDyslexic';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('./fonts/opendyslexic-latin-700-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'OpenDyslexic';
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+  src: url('./fonts/opendyslexic-latin-700-italic.woff2') format('woff2');
+}
+
+:root {
+  --prototype-dyslexic-font: 'OpenDyslexic', ui-sans-serif, system-ui, sans-serif;
+}
+
+/* B: everything. Form controls set their own font in some browsers. */
+:root[data-theme='dark'][data-prototype-font='B'] body,
+:root[data-theme='dark'][data-prototype-font='B'] :is(button, input, textarea, select) {
+  font-family: var(--prototype-dyslexic-font);
+}
+
+/* C: Resource content only. */
+:root[data-theme='dark'][data-prototype-font='C']
+  :is(.canvas-resource, .markdown-resource-body, .stage__body) {
+  font-family: var(--prototype-dyslexic-font);
+}
+
+/* OpenDyslexic is wide and tall; the variants keep the app's sizes so the
+   comparison is honest about overflow. Monospace stays monospace. */
+:root[data-theme='dark'][data-prototype-font] :is(code, pre, kbd, samp, .cm-editor) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
