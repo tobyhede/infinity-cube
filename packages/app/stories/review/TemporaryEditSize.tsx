@@ -18,10 +18,12 @@ interface MapSettings {
 
 // Map A has an edit size remembered and Map B has none, so the story shows
 // both the remembered size and the default.
-const initialMaps = (): Record<'A' | 'B', MapSettings> => ({
-  A: { size: COLLAPSED_RESOURCE_SIZE, editSize: { width: 640, height: 360 }, open: false },
-  B: { size: COLLAPSED_RESOURCE_SIZE, open: false },
-});
+type MapKey = 'A' | 'B';
+const initialMaps = () =>
+  ({
+    A: { size: COLLAPSED_RESOURCE_SIZE, editSize: { width: 640, height: 360 }, open: false },
+    B: { size: COLLAPSED_RESOURCE_SIZE, open: false },
+  }) satisfies Record<MapKey, MapSettings>;
 
 const sizeLabel = (size: ResourceSize) => `${size.width} × ${size.height}`;
 
@@ -42,8 +44,8 @@ const sizeLabel = (size: ResourceSize) => `${size.width} × ${size.height}`;
  */
 export function TemporaryEditSizeSpecimen({ initial }: { initial: string }) {
   const name = 'Temporary edit size';
-  const [shownMap, setShownMap] = useState<'A' | 'B'>('A');
-  const [maps, setMaps] = useState(initialMaps);
+  const [shownMap, setShownMap] = useState<MapKey>('A');
+  const [maps, setMaps] = useState<Record<MapKey, MapSettings>>(initialMaps);
   const current = maps[shownMap];
   const patch = (next: Partial<MapSettings>) =>
     setMaps((previous) => ({ ...previous, [shownMap]: { ...previous[shownMap], ...next } }));
