@@ -386,6 +386,8 @@ describe('the Mermaid plugin’s view', () => {
     });
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
     expect(rendered.commits.claims.taken).toBe(1);
+    // Its edit is drawn in place, at the Edit size the canvas keeps (ADR 0178).
+    expect(rendered.commits.claims.inPlace).toEqual([{}]);
     const editor = screen.getByRole('textbox', { name: 'Mermaid source of Notes' });
     expect(editor).toHaveValue('Old');
     fireEvent.change(editor, { target: { value: 'New\r\nline' } });
@@ -468,7 +470,7 @@ describe('the Mermaid plugin’s view', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cancel editing Resource Notes' }));
     expect(screen.queryByRole('textbox')).toBeNull();
     expect(rendered.commits.content).toEqual([]);
-    expect(rendered.commits.claims).toEqual({ taken: 2, released: 2 });
+    expect(rendered.commits.claims).toEqual({ taken: 2, released: 2, inPlace: [{}, {}] });
     fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Saved' } });
     fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter', metaKey: true });
@@ -678,7 +680,7 @@ describe('the Mermaid plugin’s view', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save Resource Notes' }));
     await screen.findByRole('button', { name: 'Edit Resource Notes' });
     expect(rendered.commits.content).toEqual([{ url: SAVED_REF }]);
-    expect(rendered.commits.claims).toEqual({ taken: 1, released: 1 });
+    expect(rendered.commits.claims).toEqual({ taken: 1, released: 1, inPlace: [{}] });
   });
 
   it('keeps its draft and Claim while authoring is withdrawn, and Saves once it returns', async () => {
@@ -701,7 +703,7 @@ describe('the Mermaid plugin’s view', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save Resource Notes' }));
     await screen.findByRole('button', { name: 'Edit Resource Notes' });
     expect(rendered.commits.content).toEqual([{ url: SAVED_REF }]);
-    expect(rendered.commits.claims).toEqual({ taken: 1, released: 1 });
+    expect(rendered.commits.claims).toEqual({ taken: 1, released: 1, inPlace: [{}] });
   });
   it('keeps focus on its Open command as it becomes Close, and back', async () => {
     renderPlugin(mermaidPluginView.View, {

@@ -1,7 +1,7 @@
 import type { JsonValue, ResourceKind, ResourceDocument, ResourceId } from '@project/core';
 import type { ObserverErrorReporter } from '@project/persistence';
 import type { Answer } from '@project/resource-api/domain';
-import type { Assets } from '@project/resource-api/view';
+import type { Assets, ClaimOptions } from '@project/resource-api/view';
 import type { ClaimHolder, PluginCommits, PluginHostClaim, PluginOperations } from '@project/ui';
 import { describeAuthoringRefusal } from '../authoring-refusal';
 import type { AuthoringResult, DrawnCompletion, Settle, SettledResult } from '../space-authoring';
@@ -198,11 +198,12 @@ export function pluginSurfaceOperations(
   // Authoring asks at `complete`; a plain one is not.
   const admitted: PluginHost['complete'] = (completion, settle) =>
     host.gate.admit(() => host.complete(completion, settle));
-  const claim = (drawing: symbol): PluginHostClaim | undefined => {
+  const claim = (drawing: symbol, options?: ClaimOptions): PluginHostClaim | undefined => {
     const held = host.gate.claim(
       [...embeddedIn, { resource: resourceId, key: drawing }],
       (running) =>
         commitsFor(host, resourceId, () => replaced() ?? (running() ? null : BUSY), admitted),
+      options?.inPlace,
     );
     if (held === undefined) return undefined;
     return {

@@ -13,6 +13,7 @@ import { createRailStore, ResourceHostProvider, type ResourceHost } from './host
 import {
   RAIL_BAND,
   type Assets,
+  type ClaimOptions,
   type EmbedProps,
   type Exclusive,
   type OwnClaim,
@@ -51,8 +52,15 @@ export interface Commits<C, M> {
   readonly exclusive: number;
   /** How many times the picker was opened. */
   readonly picked: number;
-  /** How many Claims were taken and released. */
-  readonly claims: { taken: number; released: number };
+  /**
+   * How many Claims were taken and released, and the `inPlace` opt-in each
+   * taken Claim carried, in order, `undefined` where it carried none.
+   */
+  readonly claims: {
+    taken: number;
+    released: number;
+    readonly inPlace: (NonNullable<ClaimOptions['inPlace']> | undefined)[];
+  };
 }
 
 export interface RenderPluginOptions<C, M> {
@@ -340,7 +348,7 @@ export function renderPlugin<C, M>(
     get picked() {
       return pickerOpenings;
     },
-    claims: { taken: 0, released: 0 },
+    claims: { taken: 0, released: 0, inPlace: [] },
   };
   const grants = options.grants ?? {};
   const answer: Answer = options.answer ?? 'completed';
@@ -457,10 +465,11 @@ export function renderPlugin<C, M>(
         map: plain(granted.map),
         claim:
           grants.claim === true && !running
-            ? () => {
+            ? (claimOptions?: ClaimOptions) => {
                 if (options.claimRefused === true) return undefined;
                 hold.take();
                 commits.claims.taken += 1;
+                commits.claims.inPlace.push(claimOptions?.inPlace);
                 return {
                   ...claim,
                   release: () => {

@@ -16,6 +16,7 @@ import type {
 } from '@project/resource-api/domain';
 import type {
   Assets,
+  ClaimOptions,
   Creation,
   CreationData,
   CreationHost,
@@ -89,9 +90,12 @@ export interface PluginOperations {
   readonly pick?: ((accept: string) => Promise<File[]>) | undefined;
   /**
    * A Claim for the drawing keyed `drawing`: a key the surface mints for its
-   * own lifetime, so two drawings of one Resource never share a Claim.
+   * own lifetime, so two drawings of one Resource never share a Claim. A
+   * Claim taken with `options.inPlace` edits in place (ADR 0178): the canvas
+   * draws the Resource at its Edit size while it is held.
    */
-  readonly claim?: ((drawing: symbol) => PluginHostClaim | undefined) | undefined;
+  readonly claim?:
+    ((drawing: symbol, options?: ClaimOptions) => PluginHostClaim | undefined) | undefined;
   /**
    * Who holds a Claim on this Resource, as the drawing keyed `drawing` reads it
    * when asked. A drawing whose Resource another drawing holds is offered no
@@ -347,8 +351,8 @@ export function pluginEntry<C, M>(
       () =>
         hostClaim === undefined
           ? undefined
-          : (): OwnClaim<C, M> | undefined => {
-              const held = hostClaim(drawing);
+          : (options?: ClaimOptions): OwnClaim<C, M> | undefined => {
+              const held = hostClaim(drawing, options);
               if (held === undefined) return undefined;
               onClaim(held);
               return {

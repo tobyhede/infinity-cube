@@ -338,7 +338,9 @@ function MermaidView({
 
   const beginEdit = useCallback(() => {
     if (!mayEdit || editing !== null) return;
-    const held = takeClaim();
+    // Taken to edit in place: the canvas draws the editor at the Edit size it
+    // keeps for this Map while the Claim is held (ADR 0178).
+    const held = takeClaim({ inPlace: {} });
     if (held === undefined) return;
     claim.current = held;
     setRefusal(null);

@@ -747,6 +747,33 @@ describe('Resize the editor writes an Edit size (ADR 0178)', () => {
     });
   });
 
+  it('writes the Edit size on the Map it is made on, and no other', () => {
+    const twoMaps: SpaceSnapshot = {
+      ...positionedSnapshot,
+      document: {
+        ...positionedSnapshot.document,
+        maps: [
+          ...(positionedSnapshot.document.maps ?? []),
+          {
+            id: OTHER_MAP_ID,
+            title: 'Map 2',
+            kind: 'positioned',
+            positions: { [RESOURCE_A]: { x: 0, y: 0, editSize: { width: 400, height: 300 } } },
+            graphs: [{ id: OTHER_GRAPH_ID, title: 'Other', edges: [] }],
+          },
+        ],
+      },
+    };
+    const { authoring, session } = open(twoMaps);
+    resizeEditor(authoring, RESOURCE_A);
+    const after = session.getState().working;
+    expect(mapOf(after, MAP_ID)?.positions[RESOURCE_A]?.editSize).toEqual({
+      width: 640,
+      height: 360,
+    });
+    expect(mapOf(after, OTHER_MAP_ID)).toEqual(mapOf(twoMaps, OTHER_MAP_ID));
+  });
+
   it('is unchanged at the Edit size the entry already stores', () => {
     const { authoring, session } = open();
     resizeEditor(authoring, RESOURCE_A);

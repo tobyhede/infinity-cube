@@ -242,7 +242,7 @@ function guarded(
     claim:
       claim === undefined
         ? undefined
-        : (drawing) => counted(lifetime.drawn() ? claim(drawing) : undefined),
+        : (drawing, options) => counted(lifetime.drawn() ? claim(drawing, options) : undefined),
   };
 
   /** A Claim whose release, however it comes, is counted once. */

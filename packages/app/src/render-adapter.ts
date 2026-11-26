@@ -50,9 +50,58 @@ export interface ResizeDraft {
   readonly resourceId: ResourceId;
   readonly size: { readonly width: number; readonly height: number };
   readonly placement: Placement;
+  /** The resize is of an editor, so it writes the Edit size (ADR 0178). */
+  readonly editor?: true | undefined;
 }
 
+/**
+ * A Resource edited in place on this canvas (ADR 0178), with the size hint its
+ * plugin took its Claim with.
+ */
+export interface InPlaceEditor {
+  readonly sizeHint?: { readonly width: number; readonly height: number } | undefined;
+}
+
+/**
+ * The placement a canvas draws while Resources are edited in place: each
+ * editor at its entry's Edit size, or at its size with none stored, from the
+ * entry's top-left (ADR 0178). Nothing here is stored. With no editor, the
+ * placement itself.
+ */
+export function editorPlacement(
+  placement: Placement,
+  editors: ReadonlyMap<ResourceId, InPlaceEditor>,
+): Placement {
+  let drawn = placement;
+  for (const resourceId of editors.keys()) {
+    const at = drawn.get(resourceId);
+    if (at?.editSize === undefined) continue;
+    drawn = Placement.place(drawn, resourceId, { ...at, size: at.editSize });
+  }
+  return drawn;
+}
+
+const sameEditors = (
+  a: ReadonlyMap<ResourceId, InPlaceEditor>,
+  b: ReadonlyMap<ResourceId, InPlaceEditor>,
+): boolean =>
+  a.size === b.size &&
+  [...a].every(([resourceId, editor]) => {
+    const other = b.get(resourceId);
+    return (
+      other !== undefined &&
+      other.sizeHint?.width === editor.sizeHint?.width &&
+      other.sizeHint?.height === editor.sizeHint?.height
+    );
+  });
+
 export interface ResourceResize {
+  /**
+   * The Resources edited in place on this canvas, which it draws at their Edit
+   * size and whose resize writes that size rather than their own (ADR 0178).
+   * The canvas tells it each time its plugins' Claims change.
+   */
+  drawEditors: (editors: ReadonlyMap<ResourceId, InPlaceEditor>) => void;
   beginResize: (resourceId: ResourceId) => void;
   previewResize: (
     resourceId: ResourceId,
@@ -215,6 +264,8 @@ export interface RenderAdapterState {
   selection: CanvasSelection;
   /** One transient resize layered over the authored Placement. */
   resizeDraft: ResizeDraft | null;
+  /** The Resources edited in place on this canvas (`ResourceResize.drawEditors`). */
+  editors: ReadonlyMap<ResourceId, InPlaceEditor>;
   /**
    * Whether some embedded Map on this canvas is running a Resource edit.
    *
@@ -454,16 +505,23 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
     dragOrigins: new Map(),
     selection: NO_SELECTION,
     resizeDraft: null,
+    editors: new Map(),
     editingEmbeddedMap: false,
 
     // Written once, here, and by nothing after: every `set` below merges a
     // partial, so this reference is what the canvas keeps holding.
     resourceResize: {
+      drawEditors: (editors) => {
+        if (!sameEditors(get().editors, editors)) set({ editors });
+      },
+
       beginResize: (resourceId) => {
-        const placement = authoring.mapPlacement();
+        const { editors } = get();
+        const placement = editorPlacement(authoring.mapPlacement(), editors);
         const at = placement.get(resourceId);
         if (at === undefined) return;
-        set({ resizeDraft: { resourceId, size: resourceSize(at), placement } });
+        const editor = editors.has(resourceId) ? true : undefined;
+        set({ resizeDraft: { resourceId, size: resourceSize(at), placement, editor } });
       },
 
       previewResize: (resourceId, size) => {
@@ -474,7 +532,7 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
         const proposed = { width: size.width, height: size.height };
         set({
           resizeDraft: {
-            resourceId,
+            ...draft,
             size: proposed,
             placement: Placement.place(draft.placement, resourceId, { ...at, size: proposed }),
           },
@@ -484,7 +542,11 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
       finishResize: (resourceId) => {
         const draft = get().resizeDraft;
         if (draft?.resourceId !== resourceId) return;
-        authoring.complete({ kind: 'resized-resource', resourceId, size: draft.size });
+        authoring.complete(
+          draft.editor === true
+            ? { kind: 'resized-editor', resourceId, editSize: draft.size }
+            : { kind: 'resized-resource', resourceId, size: draft.size },
+        );
         set({ resizeDraft: null });
       },
 

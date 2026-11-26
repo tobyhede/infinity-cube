@@ -1,5 +1,12 @@
 import type { Continuation } from './continuation';
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import {
   RESOURCE_TITLE_REQUIRED,
   resourceDocumentSchema,
@@ -26,7 +33,7 @@ import {
 import { decorateEmbedCommands, type EmbedCommandsContext } from './embed-commands';
 import type { Embedding } from './plugin-host/claim-chain';
 import type { PluginHost } from './plugin-host/plugin-commits';
-import type { PluginGate } from './plugin-host/plugin-gate';
+import { editorsOn, type PluginGate } from './plugin-host/plugin-gate';
 import { usePluginGate } from './plugin-host/plugin-gate-context';
 import type { MapEmbedEntry } from './map-embedding/map-embeddings';
 import type { MapEmbedding } from './map-embedding/map-embedding';
@@ -166,6 +173,25 @@ export function useCanvasResourceAuthoring({
     const drawing = held.at(-1);
     return drawing !== undefined && !lent.has(drawing.key);
   });
+  // A plugin that took its Claim to edit in place is drawn at its Edit size,
+  // and resized as an editor, until the Claim ends (ADR 0178). Told before
+  // paint, so the editor is never drawn a frame at its size.
+  const editingDrawings = useSyncExternalStore(pluginGate.subscribe, pluginGate.editors);
+  const embeddedIn = plugins?.embeddedIn;
+  const editors = useMemo(() => {
+    const editing = editorsOn(claimChain, editingDrawings, embeddedIn ?? []);
+    return new Map(
+      nodes.flatMap((node) => {
+        const edit = editing.get(node.data.resourceId);
+        return edit === undefined ? [] : [[node.data.resourceId, edit] as const];
+      }),
+    );
+  }, [claimChain, editingDrawings, embeddedIn, nodes]);
+  const drawEditors = resourceResize.drawEditors;
+  useLayoutEffect(() => {
+    drawEditors(editors);
+  }, [drawEditors, editors]);
+  useLayoutEffect(() => () => drawEditors(new Map()), [drawEditors]);
   // The Map embedding of the canvas this draws on, which a Space Resource's
   // host chooser writes a choice through (ADR 0142), and which keeps what the
   // canvas says about each embedding, and its rail editing, while it stands.

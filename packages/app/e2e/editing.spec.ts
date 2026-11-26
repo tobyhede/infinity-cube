@@ -1,10 +1,12 @@
 import {
   COLLAPSED_RESOURCE_SIZE,
   encodeCompactUuid,
+  resourcePlacementSchema,
   uuidSchema,
   type ResourcePlacement,
 } from '@project/core';
 import { productDestinationPath } from '@project/http';
+import { z } from 'zod';
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { markdownSource, PRIMARY_MODIFIER } from './markdown-source';
@@ -542,6 +544,96 @@ test('Opening an unresized Markdown Resource keeps the Closed Size and moves nob
   await settled(page);
   expect(await allPositions(page), 'Closing moved a Resource').toEqual(before);
   expect(await rect(), 'Closing changed the size').toEqual(COLLAPSED_RESOURCE_SIZE);
+});
+
+test('An edit draws a Markdown Resource at its Edit size, which a resize writes and the next edit keeps', async ({
+  page,
+}) => {
+  const SIZE = { width: 300, height: 200 };
+  const seeded = await seedPositionedMap(page, 'Edit Size Geometry', () => ({
+    [SUBJECT.id]: { x: 0, y: 300, size: SIZE, content: { open: true } },
+    [NEIGHBOUR.id]: { x: 900, y: 0 },
+  }));
+  await page.goto(`/spaces/${encodeCompactUuid(seeded.snapshot.id)}`);
+  await expect(selectedCanvas(page)).toContainText('Edit Size Geometry');
+  await settled(page);
+  const resource = seededNode(page, SUBJECT);
+  const rect = async () =>
+    resource.evaluate((element) => ({
+      width: Number.parseFloat(getComputedStyle(element).width),
+      height: Number.parseFloat(getComputedStyle(element).height),
+    }));
+  const stored = async () => {
+    const response = await page.request.get(`/api/spaces/${seeded.snapshot.id}`);
+    expect(response.ok()).toBe(true);
+    const loaded = z
+      .object({
+        snapshot: z.object({
+          document: z.object({
+            maps: z.array(z.object({ positions: z.record(resourcePlacementSchema) })),
+          }),
+        }),
+      })
+      .parse(await response.json());
+    return loaded.snapshot.document.maps[0]?.positions[SUBJECT.id];
+  };
+
+  const edit = async () => {
+    await (await controls(resource)).getByRole('button', { name: 'Edit Resource A' }).click();
+    await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toBeVisible();
+  };
+  const cancel = async () => {
+    await (
+      await controls(resource)
+    )
+      .getByRole('button', { name: 'Cancel editing Resource A' })
+      .click();
+    await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toHaveCount(0);
+  };
+  await expect.poll(rect).toEqual(SIZE);
+
+  // With no Edit size stored, the editor is drawn at the Resource's size.
+  await edit();
+  await expect.poll(rect).toEqual(SIZE);
+
+  // A resize while editing writes the Edit size, and leaves the size alone.
+  await selectResource(resource);
+  const handle = await boxOf(
+    resource.locator('.react-flow__resize-control.handle.bottom.right'),
+    'resize control',
+  );
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(handle.x + handle.width / 2 + 120, handle.y + handle.height / 2 + 90, {
+    steps: 5,
+  });
+  await page.mouse.up();
+  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+  await resource.evaluate(async (element) => {
+    await Promise.all(element.getAnimations().map((animation) => animation.finished));
+  });
+  const edited = await rect();
+  expect(edited.width).toBeGreaterThan(SIZE.width);
+  expect(edited.height).toBeGreaterThan(SIZE.height);
+  await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toBeVisible();
+  expect(await stored()).toMatchObject({ size: SIZE, editSize: edited });
+
+  // Cancel draws it at its size again; the next edit draws it at the Edit size.
+  await cancel();
+  await expect.poll(rect).toEqual(SIZE);
+  await edit();
+  await expect.poll(rect).toEqual(edited);
+  await cancel();
+
+  // The Edit size is the Map's, so it outlives a reload.
+  await page.reload();
+  await expect(selectedCanvas(page)).toContainText('Edit Size Geometry');
+  await settled(page);
+  await expect.poll(rect).toEqual(SIZE);
+  await edit();
+  await expect.poll(rect).toEqual(edited);
+  await cancel();
+  expect(await stored()).toMatchObject({ size: SIZE, editSize: edited });
 });
 
 /**

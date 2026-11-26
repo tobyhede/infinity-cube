@@ -23,7 +23,7 @@ import {
   pluginSurfaceOperations,
   type PluginHost,
 } from '../src/plugin-host/plugin-commits';
-import { createPluginGate } from '../src/plugin-host/plugin-gate';
+import { createPluginGate, editorsOn } from '../src/plugin-host/plugin-gate';
 import type { AuthoringResult, Settle } from '../src/space-authoring';
 
 const RESOURCE = uuidSchema.parse('00000000-0000-4000-8000-0000000000a1');
@@ -347,6 +347,64 @@ describe('the plugin gate', () => {
     expect(gate.exclusiveRunning()).toBe(true);
     finishAgain();
     await again;
+  });
+});
+
+describe('a Claim taken to edit in place (ADR 0178)', () => {
+  const HINT = { width: 640, height: 360 };
+
+  it('keeps the drawing an editor while its Claim is held, and drops it however the Claim ends', () => {
+    const gate = createPluginGate();
+    const held = gate.claim([A], () => null, { sizeHint: HINT });
+    expect(gate.editors()).toEqual(new Map([[A.key, { sizeHint: HINT }]]));
+    held?.release();
+    expect(gate.editors().size).toBe(0);
+    gate.claim([A], () => null, {});
+    expect(gate.editors()).toEqual(new Map([[A.key, {}]]));
+    gate.unmount(A.key);
+    expect(gate.editors().size).toBe(0);
+  });
+
+  it('makes no editor of a Claim that does not opt in, nor of one the chain refuses', () => {
+    const gate = createPluginGate();
+    gate.claim([A], () => null);
+    expect(gate.editors().size).toBe(0);
+    expect(gate.claim([B], () => null, {})).toBeUndefined();
+    expect(gate.editors().size).toBe(0);
+  });
+
+  it('keeps an editor whose release waits on a Claim inside it, until that one ends', () => {
+    const gate = createPluginGate();
+    const outer = gate.claim([A], () => null, {});
+    const inner = gate.claim([A, B], () => null);
+    outer?.release();
+    expect([...gate.editors().keys()]).toEqual([A.key]);
+    inner?.release();
+    expect(gate.editors().size).toBe(0);
+  });
+
+  it('keeps its answer while the editors are unchanged, so a reader re-renders only on a change', () => {
+    const gate = createPluginGate();
+    const listener = vi.fn();
+    gate.subscribe(listener);
+    const before = gate.editors();
+    gate.claim([A], () => null);
+    expect(gate.editors()).toBe(before);
+    gate.getState();
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('names the Resources a canvas draws as editors: its own drawings only', () => {
+    const gate = createPluginGate();
+    const outer = { resource: 'space', key: Symbol('space') };
+    gate.claim([outer], () => null);
+    const inside = { resource: 'note', key: Symbol('note') };
+    gate.claim([outer, inside], () => null, { sizeHint: HINT });
+    expect(editorsOn(gate.getState(), gate.editors(), [outer])).toEqual(
+      new Map([['note', { sizeHint: HINT }]]),
+    );
+    // The canvas the Space Resource is drawn on draws the note in no rect of its own.
+    expect(editorsOn(gate.getState(), gate.editors(), []).size).toBe(0);
   });
 });
 
@@ -806,5 +864,19 @@ describe('a plugin surface’s commits on the canvas', () => {
     expect(first.claimHolder?.(firstDrawing)).toBe('this-drawing');
     held?.unmount();
     expect(second.claimHolder?.(secondDrawing)).toBe('none');
+  });
+
+  it('takes a Claim to edit in place for the drawing on this canvas, with its size hint', () => {
+    const host = hostWith(() => ({ kind: 'completed' }));
+    const drawing = Symbol('drawing');
+    const held = pluginSurfaceOperations('markdown', RESOURCE, FACTS, host).claim?.(drawing, {
+      inPlace: { sizeHint: { width: 640, height: 360 } },
+    });
+    expect(editorsOn(host.gate.getState(), host.gate.editors(), [])).toEqual(
+      new Map([[RESOURCE, { sizeHint: { width: 640, height: 360 } }]]),
+    );
+    held?.release();
+    pluginSurfaceOperations('markdown', RESOURCE, FACTS, host).claim?.(drawing);
+    expect(host.gate.editors().size).toBe(0);
   });
 });

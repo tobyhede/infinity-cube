@@ -58,6 +58,17 @@ export interface Claim {
 }
 
 /**
+ * How a plugin takes its Claim. `inPlace` opts in to editing in place (ADR
+ * 0178): while the Claim is held, the canvas draws the Resource at its Edit
+ * size, and a resize writes that size rather than the Resource's own. A
+ * `sizeHint` is what the editor is drawn at, at least, while no Edit size is
+ * stored; it stores nothing.
+ */
+export interface ClaimOptions {
+  readonly inPlace?: { readonly sizeHint?: Size | undefined } | undefined;
+}
+
+/**
  * The commits and store the surface offered, live only while exclusive work
  * runs. Each writes only the calling plugin's Resource.
  */
@@ -122,7 +133,7 @@ export interface Surface<C, M> {
   readonly map: KeptMap<M>;
   readonly size: Size;
   readonly selected: boolean;
-  readonly claim?: (() => OwnClaim<C, M> | undefined) | undefined;
+  readonly claim?: ((options?: ClaimOptions) => OwnClaim<C, M> | undefined) | undefined;
   readonly assets: Assets;
   /** One component for the surface's lifetime: unmounting releases, so a new type per render would release every Claim inside it. */
   readonly Embed: ComponentType<EmbedProps>;
