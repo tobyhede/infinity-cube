@@ -5,9 +5,9 @@
 //! store reads no environment.
 //!
 //! The `.env` is read without writing the process environment, and nothing
-//! but `DATABASE_URL` is taken from it, as `sqlx-cli` reads one. TypeScript's
-//! search starts at its module's directory (`src/prisma/db.ts`), which a
-//! binary has not, so this one starts where it is run: an accepted difference.
+//! but `DATABASE_URL` is taken from it. TypeScript's search starts at its
+//! module's directory (`src/prisma/db.ts`), which a binary has not, so this
+//! one starts where it is run: an accepted difference.
 
 use std::path::{Path, PathBuf};
 

@@ -442,7 +442,9 @@ mod given_a_database_seeded_with_the_fixture {
     #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
     fn serves_it_without_reseeding() {
         let database = Database::fixture();
-        let (_directory, started) = database.serve(&[]);
+        let (_directory, mut started) = database.serve(&[]);
+        // Start-up runs after the announcement; read once it has run.
+        started.wait_for_stderr_line("Established the Meta Space.");
         let answer = get(started.port(), "/api/aggregate");
         assert_eq!(answer.status, 200, "the aggregate is read");
         let aggregate = json(&answer);

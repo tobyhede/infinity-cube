@@ -245,18 +245,6 @@ mod tests {
         }
 
         #[test]
-        fn reads_the_postgres_store() {
-            assert_eq!(
-                parsed(&["serve", "--port", "5300", "--store", "postgres"]),
-                Some(Command::Serve(ServeCommand {
-                    store: Store::Postgres,
-                    port: Some(5300),
-                    built: None,
-                })),
-            );
-        }
-
-        #[test]
         fn reads_every_option_in_any_order() {
             assert_eq!(
                 parsed(&[

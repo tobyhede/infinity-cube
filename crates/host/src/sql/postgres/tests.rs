@@ -1,7 +1,8 @@
 //! `classify` over constructed errors (ADR 0177): through the pool, a refused
 //! connection, `53300` and `57P03` arrive only as `PoolTimedOut`, so each
 //! SQLSTATE and socket failure is held here rather than against a server.
-//! And `connect_options`, one test per `sslmode` value, as `pg` reads it.
+//! And `connect_options`, one test per `sslmode` value, with the meaning ADR
+//! 0177 gives it.
 
 #![allow(
     clippy::unwrap_used,

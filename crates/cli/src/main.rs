@@ -69,10 +69,13 @@ fn main() -> anyhow::Result<ExitCode> {
             .build()
             .context("could not start the async runtime")?
             .block_on(run::run(command)),
-        Command::Serve(command) => tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .context("could not start the async runtime")?
-            .block_on(serve::serve(command)),
+        Command::Serve(command) => match serve::database(command.store) {
+            Err(refused) => refused,
+            Ok(database) => tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .context("could not start the async runtime")?
+                .block_on(serve::serve(command, database)),
+        },
     })
 }

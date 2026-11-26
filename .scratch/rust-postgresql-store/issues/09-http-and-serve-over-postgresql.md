@@ -24,12 +24,12 @@
 - The ports test holds the new adapter over `postgres_wire.rs` and `crates/cli/tests/serve_postgres.rs`, which carries the 421 case. It exempts the launch-secret cases, because `serve` takes no launch secret, and the directory cases, because `serve` has no directory. The TypeScript database host's own cases that the case map assigns here are marked `// TypeScript case:` in `serve_postgres.rs`, so the ports test does not read them as conformance cases.
 - CI's PostgreSQL step now also runs the ignored tests of `serve_postgres` (`binary(=serve_postgres)`). The `DATABASE_URL` refusals and the database that does not answer need no server, so they run in the plain step.
 - The test for an unmigrated database waits through both of start-up's retries, 5 s and then 10 s, asserting 500 throughout. It then checks that `serve` is still running, that standard error says start-up gave up, and that the database still holds no table. It takes about 20 s.
-- Named mutants. I checked these by reading the tests against each mutant, and ran none:
-  - Taking the port first: the refusal test holds the port `--port` names, so a `serve` that bound first would refuse naming the port instead.
-  - Migrating: the unmigrated test counts no table at the end.
-  - Opening SQLite: every server test reads PostgreSQL rows.
-  - Reseeding: the fixture test expects exactly the fixture's four Spaces.
-  - No `Host` check: the 421 test.
-  - Not trimming: the `.env` value is padded inside its quotes, so an untrimmed URL would be refused instead of announced.
-  - Announcing after start-up: the database that does not answer is announced and answered 503.
+- Named mutants. Seven were run on 2026-11-26 against `cargo test -p infinity-cube --test serve_postgres -- --include-ignored` on PostgreSQL 16.15:
+  - Taking the port before refusing a blank `DATABASE_URL`: killed by `refuses_an_unset_or_blank_database_url_before_taking_a_port` and `serves_on_the_port_port_names`.
+  - Migrating: killed by `gives_up_after_two_confirmed_invariant_failures_and_keeps_serving`.
+  - `--store postgres` opening SQLite: killed by all 12 tests.
+  - Reseeding an initialized database: killed by `serves_it_without_reseeding` once it waits for start-up. It survived while that test read before background start-up had run.
+  - No `Host` check: killed by `answers_421_to_a_request_naming_any_host_but_its_own`.
+  - Not trimming `DATABASE_URL`: survives `serve_postgres`, because the `url` crate strips surrounding spaces when it parses, so a padded value still connects. Killed by `crates/host/tests/postgres_url.rs` › `trims_the_value`.
+  - Announcing only after start-up: killed by `announces_and_answers_503_from_a_trimmed_database_url_in_the_nearest_env` and `announces_before_the_database_answers_and_initializes_it_once_it_does`.
 - `serve_postgres.rs` makes its own databases rather than going through 03's contract adapter. 03 is still blocked on #540.

@@ -16,7 +16,8 @@
 //! answering never delays the announcement: until the Meta Space is
 //! established each request is answered as the store answers it, 503 while
 //! the store is not answering or the root while it is uninitialized, and
-//! each failed attempt is said on standard error. Start-up that stops on a
+//! each failed attempt is said on standard error, as is start-up's success
+//! once the Meta Space is established. Start-up that stops on a
 //! failure no wait cures says so and leaves the host serving those answers,
 //! as the TypeScript database host does.
 //!
@@ -66,6 +67,26 @@ fn sqlite_file(value: Option<&OsStr>) -> Result<SqlitePath, String> {
     }
 }
 
+/// The database a `serve` names, read before the runtime starts: for
+/// PostgreSQL, its URL (ADR 0177).
+pub(crate) enum Database {
+    /// The SQLite file `SQLITE_PATH` names, which `serve` reads itself.
+    Sqlite,
+    /// The PostgreSQL database this URL names.
+    Postgres(DatabaseUrl),
+}
+
+/// The database `store` names, or the exit code of its refusal. `main` calls
+/// it before it starts the runtime.
+pub(crate) fn database(store: Store) -> Result<Database, ExitCode> {
+    match store {
+        Store::Sqlite => Ok(Database::Sqlite),
+        Store::Postgres => database_url()
+            .map(Database::Postgres)
+            .map_err(|message| refuse(&message)),
+    }
+}
+
 /// `DATABASE_URL` from the environment, then the nearest `.env` at or above
 /// where the process runs, trimmed and refused when blank.
 fn database_url() -> Result<DatabaseUrl, String> {
@@ -80,6 +101,9 @@ fn database_url() -> Result<DatabaseUrl, String> {
         .map_err(|error| format!("Could not read the directory to look for .env from: {error}"))?;
     DatabaseUrl::resolve(variable, &from).map_err(|error| error.to_string())
 }
+
+/// What start-up says once it has established the Meta Space.
+const ESTABLISHED: &str = "Established the Meta Space.";
 
 /// A store `serve` can close once it has drained.
 trait Closing: SpaceRepository {
@@ -98,47 +122,41 @@ impl Closing for PostgresSpaceRepository {
     }
 }
 
-/// Serve the store `command` names until a stop signal, answering the exit code.
-pub(crate) async fn serve(command: ServeCommand) -> ExitCode {
+/// Serve `database`, which `command` names, until a stop signal, answering
+/// the exit code.
+pub(crate) async fn serve(command: ServeCommand, database: Database) -> ExitCode {
     let signals = match Signals::install() {
         Ok(signals) => signals,
         Err(error) => return refuse(&format!("Could not take the stop signals: {error}")),
     };
-    match command.store {
-        Store::Sqlite => {
+    match database {
+        Database::Sqlite => {
             let variable = std::env::var_os("SQLITE_PATH");
             let path = match sqlite_file(variable.as_deref()) {
                 Ok(path) => path,
                 Err(message) => return refuse(&message),
             };
             let file = path.as_path().display().to_string();
-            serving(command, signals, &file, || {
-                SqliteSpaceRepository::open(&path)
-            })
-            .await
+            let store = SqliteSpaceRepository::open(&path);
+            serving(command, signals, &file, store).await
         }
-        Store::Postgres => {
-            let url = match database_url() {
-                Ok(url) => url,
-                Err(message) => return refuse(&message),
-            };
+        Database::Postgres(url) => {
             let store = match PostgresSpaceRepository::open(&url) {
                 Ok(store) => store,
                 Err(error) => return refuse(&error.to_string()),
             };
             let named = format!("the PostgreSQL database {DATABASE_URL} names");
-            serving(command, signals, &named, move || store).await
+            serving(command, signals, &named, store).await
         }
     }
 }
 
-/// Serve the store `open` opens, which `named` describes, once a port is
-/// taken.
+/// Serve `repository`, which `named` describes, once a port is taken.
 async fn serving<R: Closing>(
     command: ServeCommand,
     mut signals: Signals,
     named: &str,
-    open: impl FnOnce() -> R,
+    repository: R,
 ) -> ExitCode {
     let (shell, origin) = match built::load(command.built.as_deref()) {
         Ok(loaded) => loaded,
@@ -160,7 +178,7 @@ async fn serving<R: Closing>(
         return ExitCode::SUCCESS;
     }
 
-    let repository = Arc::new(open());
+    let repository = Arc::new(repository);
     let application = Arc::new(
         Application::new(Arc::clone(&repository), RandomIds, shell)
             .on_error(|context, error| say(&format!("{context}: {error}"))),
@@ -182,10 +200,11 @@ async fn serving<R: Closing>(
                     ))
                 })
                 .await;
-            if let Err(error) = established {
-                say(&format!(
+            match established {
+                Ok(_) => say(ESTABLISHED),
+                Err(error) => say(&format!(
                     "Gave up establishing the Meta Space; restart the host once it is fixable: {error}"
-                ));
+                )),
             }
         })
     };

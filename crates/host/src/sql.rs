@@ -449,7 +449,7 @@ impl<S: SqlStore> Shared<S> {
         let _ = step;
     }
 
-    /// A transaction begun as `access` asks, over the file first opened,
+    /// A transaction begun as `access` asks, over the database first opened,
     /// holding every table.
     async fn begin(&self, access: Access) -> Outcome<Transaction<'static, S::Database>> {
         if let Some(reason) = self.store.file_replaced() {

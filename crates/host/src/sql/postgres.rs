@@ -4,8 +4,8 @@
 //! COMMITTED` for every locking transaction and `REPEATABLE READ READ ONLY`
 //! for every unlocked read, no lock or statement timeout, a pool of ten with
 //! a two-second acquire timeout, failures classified by the TypeScript
-//! SQLSTATE allowlist, and `sslmode` read as `pg` reads it. Nothing here
-//! migrates.
+//! SQLSTATE allowlist, and `sslmode` read with the meaning ADR 0177 gives it.
+//! Nothing here migrates.
 
 use std::str::FromStr as _;
 use std::time::Duration;
@@ -69,7 +69,7 @@ pub enum PostgresUrlError {
     #[error("DATABASE_URL is not a PostgreSQL URL: {0}")]
     Invalid(String),
     /// `sslmode=verify-ca` under `uselibpqcompat` names no root certificate,
-    /// which `pg` refuses too.
+    /// which ADR 0177 refuses.
     #[error("DATABASE_URL's sslmode=verify-ca needs sslrootcert to name a CA certificate")]
     VerifyCaWithoutRoot,
 }
@@ -106,18 +106,19 @@ impl SqlSpaceRepository<PostgresStore> {
     }
 }
 
-/// The options `url` connects with, its `sslmode` read as `pg` 8.22 with
-/// `pg-connection-string` 2.14 reads it (ADR 0177):
+/// The options `url` connects with, its `sslmode` read with the meaning ADR
+/// 0177 gives each value:
 ///
-/// - no `sslmode`, `sslrootcert`, `sslcert`, `sslkey` or `ssl=true`: no TLS;
+/// - no `sslmode`, `sslrootcert`, `sslcert`, `sslkey`, `ssl=true` or `ssl=1`:
+///   no TLS;
 /// - `disable`: no TLS;
 /// - `no-verify`: TLS, the certificate not checked;
 /// - under `uselibpqcompat=true`, libpq's meanings, except that `prefer`
-///   never falls back to plaintext (`pg` never does): `prefer` and `require`
-///   encrypt without checking, `verify-ca` checks the CA and needs
-///   `sslrootcert`, and `verify-full` checks the host too;
-/// - any other value, or TLS asked for by a certificate parameter or
-///   `ssl=true`: TLS, the certificate and the host checked.
+///   never falls back to plaintext: `prefer` and `require` encrypt without
+///   checking, `require` with `sslrootcert` checks the CA, `verify-ca` checks
+///   the CA and needs `sslrootcert`, and `verify-full` checks the host too;
+/// - any other value, or TLS asked for by a certificate parameter, `ssl=true`
+///   or `ssl=1`: TLS, the certificate and the host checked.
 ///
 /// # Errors
 ///

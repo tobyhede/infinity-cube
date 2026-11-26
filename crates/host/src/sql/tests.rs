@@ -679,4 +679,62 @@ mod dropped_callers {
         )
         .await;
     }
+
+    #[tokio::test]
+    async fn at_the_complete_read() {
+        dropped_at(|step| *step == Step::CompleteRead, move_default_map).await;
+    }
+
+    #[tokio::test]
+    async fn at_the_replacements_truncation() {
+        let file = migrated().await;
+        let repository = seeded(&file).await;
+        let AggregateLoad::Loaded(aggregate) = repository.load_aggregate().await.unwrap() else {
+            panic!("the fixture is stored");
+        };
+        let spaces = aggregate
+            .spaces
+            .iter()
+            .map(|stored| {
+                let mut snapshot = stored.snapshot.clone();
+                if snapshot.id == space(PRESENTATION) {
+                    "Replaced".clone_into(&mut snapshot.document.title);
+                }
+                snapshot
+            })
+            .collect();
+        let input = crate::repository::AggregateInput {
+            meta_space_id: aggregate.meta_space_id,
+            spaces,
+        };
+        let (reached, release) = pausing(&repository, |step| *step == Step::Truncation);
+        {
+            let caller = repository.replace_aggregate(input, Some(meta()));
+            tokio::pin!(caller);
+            tokio::select! {
+                answer = &mut caller => panic!("answered before the pause: {answer:?}"),
+                () = reached.notified() => {}
+            }
+            // The caller is dropped here, at the pause.
+        }
+        repository.set_probe(None);
+        release.notify_one();
+        let after = tokio::time::timeout(
+            Duration::from_secs(10),
+            repository.load_space(space(PRESENTATION)),
+        )
+        .await
+        .expect("the next operation is not blocked")
+        .unwrap()
+        .unwrap();
+        assert_eq!(
+            after.snapshot.document.title, "Replaced",
+            "the replacement landed though its caller was gone"
+        );
+        assert_eq!(
+            repository.list_spaces().await.unwrap().len(),
+            4,
+            "the replacement is whole"
+        );
+    }
 }
