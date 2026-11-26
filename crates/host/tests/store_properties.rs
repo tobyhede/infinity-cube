@@ -7,7 +7,10 @@
 //!
 //! The two stores share `decide_commit`, so a defect in it is the same on
 //! both and passes here; the repository contract
-//! (`tests/repository_contract/`) holds TypeScript's answers.
+//! (`tests/repository_contract/`) holds TypeScript's answers. Stored
+//! revisions start at 0 and a case is short, so no step reaches the revision
+//! ceiling: `given_a_space_at_the_revision_ceiling` in `src/commit/tests.rs`
+//! and in `tests/sqlite.rs` holds it.
 
 #![allow(
     clippy::unwrap_used,
@@ -154,7 +157,6 @@ enum Expected {
     Current,
     Behind,
     Ahead,
-    NearCeiling(u64),
 }
 
 impl Expected {
@@ -164,7 +166,6 @@ impl Expected {
             Self::Current => value,
             Self::Behind => value.saturating_sub(1),
             Self::Ahead => value + 1,
-            Self::NearCeiling(below) => Revision::CEILING - below,
         })
         .unwrap()
     }
@@ -175,7 +176,6 @@ fn expected() -> impl Strategy<Value = Expected> {
         6 => Just(Expected::Current),
         1 => Just(Expected::Behind),
         1 => Just(Expected::Ahead),
-        1 => (0_u64..2).prop_map(Expected::NearCeiling),
     ]
 }
 
@@ -513,7 +513,7 @@ async fn the_generated_steps_reach_every_kind_of_answer() {
         },
         Step::Retitle {
             space: 0,
-            revision: Expected::NearCeiling(0),
+            revision: Expected::Ahead,
         },
         Step::Create {
             space: 2,
