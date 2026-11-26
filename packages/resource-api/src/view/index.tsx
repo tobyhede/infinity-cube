@@ -58,14 +58,18 @@ export interface Claim {
 }
 
 /**
- * How a plugin takes its Claim. `inPlace` opts in to editing in place (ADR
- * 0178): while the Claim is held, the canvas draws the Resource at its Edit
- * size, and a resize writes that size rather than the Resource's own. A
- * `sizeHint` is what the editor is drawn at, at least, while no Edit size is
- * stored; it stores nothing.
+ * A Claim taken to edit in place (ADR 0178): while it is held, the canvas
+ * draws the Resource at its Edit size, and a resize writes that size rather
+ * than the Resource's own. A `sizeHint` is what the editor is drawn at, at
+ * least, while no Edit size is stored; it stores nothing.
  */
+export interface InPlaceEdit {
+  readonly sizeHint?: Size | undefined;
+}
+
+/** How a plugin takes its Claim. `inPlace` opts in to editing in place. */
 export interface ClaimOptions {
-  readonly inPlace?: { readonly sizeHint?: Size | undefined } | undefined;
+  readonly inPlace?: InPlaceEdit | undefined;
 }
 
 /**

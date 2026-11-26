@@ -16,6 +16,7 @@ import {
   resourceSize,
 } from '@project/core';
 import { Placement } from '@project/graph';
+import type { InPlaceEdit } from '@project/resource-api/view';
 import {
   ROUTED_EDGE_TYPE,
   type ResourceFlowNode,
@@ -55,14 +56,6 @@ export interface ResizeDraft {
 }
 
 /**
- * A Resource edited in place on this canvas (ADR 0178), with the size hint its
- * plugin took its Claim with.
- */
-export interface InPlaceEditor {
-  readonly sizeHint?: { readonly width: number; readonly height: number } | undefined;
-}
-
-/**
  * The placement a canvas draws while Resources are edited in place: each
  * editor at its entry's Edit size, or at its size with none stored, from the
  * entry's top-left (ADR 0178). Nothing here is stored. With no editor, the
@@ -70,7 +63,7 @@ export interface InPlaceEditor {
  */
 export function editorPlacement(
   placement: Placement,
-  editors: ReadonlyMap<ResourceId, InPlaceEditor>,
+  editors: ReadonlyMap<ResourceId, InPlaceEdit>,
 ): Placement {
   let drawn = placement;
   for (const resourceId of editors.keys()) {
@@ -82,8 +75,8 @@ export function editorPlacement(
 }
 
 const sameEditors = (
-  a: ReadonlyMap<ResourceId, InPlaceEditor>,
-  b: ReadonlyMap<ResourceId, InPlaceEditor>,
+  a: ReadonlyMap<ResourceId, InPlaceEdit>,
+  b: ReadonlyMap<ResourceId, InPlaceEdit>,
 ): boolean =>
   a.size === b.size &&
   [...a].every(([resourceId, editor]) => {
@@ -101,7 +94,7 @@ export interface ResourceResize {
    * size and whose resize writes that size rather than their own (ADR 0178).
    * The canvas tells it each time its plugins' Claims change.
    */
-  drawEditors: (editors: ReadonlyMap<ResourceId, InPlaceEditor>) => void;
+  drawEditors: (editors: ReadonlyMap<ResourceId, InPlaceEdit>) => void;
   beginResize: (resourceId: ResourceId) => void;
   previewResize: (
     resourceId: ResourceId,
@@ -265,7 +258,7 @@ export interface RenderAdapterState {
   /** One transient resize layered over the authored Placement. */
   resizeDraft: ResizeDraft | null;
   /** The Resources edited in place on this canvas (`ResourceResize.drawEditors`). */
-  editors: ReadonlyMap<ResourceId, InPlaceEditor>;
+  editors: ReadonlyMap<ResourceId, InPlaceEdit>;
   /**
    * Whether some embedded Map on this canvas is running a Resource edit.
    *

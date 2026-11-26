@@ -636,6 +636,115 @@ test('An edit draws a Markdown Resource at its Edit size, which a resize writes 
   expect(await stored()).toMatchObject({ size: SIZE, editSize: edited });
 });
 
+test('an Edit size written on one Map is not drawn on another Map that places the same Resource', async ({
+  page,
+}) => {
+  const SIZE = { width: 300, height: 200 };
+  const OTHER_MAP = {
+    id: uuidSchema.parse('00000000-0000-4000-8000-000000000097'),
+    title: 'Edit Size Elsewhere',
+  };
+  const seeded = await seedPositionedMap(page, 'Edit Size Here', () => ({
+    [SUBJECT.id]: { x: 0, y: 300, size: SIZE, content: { open: true } },
+    [NEIGHBOUR.id]: { x: 900, y: 0 },
+  }));
+  // A second Map placing the same Resource at the same size, with no Edit size.
+  const committed = await page.request.post('/api/spaces', {
+    data: {
+      changes: [
+        {
+          kind: 'update',
+          spaceId: seeded.snapshot.id,
+          snapshot: {
+            ...seeded.snapshot,
+            document: {
+              ...seeded.snapshot.document,
+              maps: [
+                ...(seeded.snapshot.document.maps ?? []),
+                {
+                  id: OTHER_MAP.id,
+                  title: OTHER_MAP.title,
+                  kind: 'positioned',
+                  positions: {
+                    [SUBJECT.id]: { x: 0, y: 300, size: SIZE, content: { open: true } },
+                  },
+                  graphs: [
+                    {
+                      id: uuidSchema.parse('00000000-0000-4000-8000-000000000096'),
+                      title: 'Graph 1',
+                      edges: [],
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+          expectedRevision: seeded.revision,
+        },
+      ],
+    },
+  });
+  expect(committed.ok()).toBe(true);
+  await page.goto(`/spaces/${encodeCompactUuid(seeded.snapshot.id)}`);
+  await expect(selectedCanvas(page)).toContainText('Edit Size Here');
+  await settled(page);
+  const resource = seededNode(page, SUBJECT);
+  const rect = async () =>
+    resource.evaluate((element) => ({
+      width: Number.parseFloat(getComputedStyle(element).width),
+      height: Number.parseFloat(getComputedStyle(element).height),
+    }));
+  const edit = async () => {
+    await (await controls(resource)).getByRole('button', { name: 'Edit Resource A' }).click();
+    await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toBeVisible();
+  };
+  const cancel = async () => {
+    await (
+      await controls(resource)
+    )
+      .getByRole('button', { name: 'Cancel editing Resource A' })
+      .click();
+    await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toHaveCount(0);
+  };
+
+  // A resize while editing on this Map writes this Map's Edit size.
+  await edit();
+  await expect.poll(rect).toEqual(SIZE);
+  await selectResource(resource);
+  const handle = await boxOf(
+    resource.locator('.react-flow__resize-control.handle.bottom.right'),
+    'resize control',
+  );
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(handle.x + handle.width / 2 + 120, handle.y + handle.height / 2 + 90, {
+    steps: 5,
+  });
+  await page.mouse.up();
+  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+  await resource.evaluate(async (element) => {
+    await Promise.all(element.getAnimations().map((animation) => animation.finished));
+  });
+  const edited = await rect();
+  expect(edited.width).toBeGreaterThan(SIZE.width);
+  await cancel();
+
+  // On the other Map the same Resource has no Edit size, so its editor is
+  // drawn at its size there.
+  await selectCanvas(page, OTHER_MAP.title);
+  await settled(page);
+  await expect.poll(rect).toEqual(SIZE);
+  await edit();
+  await expect.poll(rect).toEqual(SIZE);
+  await cancel();
+
+  // Back on the first Map, the Edit size written there is drawn again.
+  await selectCanvas(page, 'Edit Size Here');
+  await settled(page);
+  await edit();
+  await expect.poll(rect).toEqual(edited);
+});
+
 /**
  * Dragging a resource writes its placement into the Map.
  *

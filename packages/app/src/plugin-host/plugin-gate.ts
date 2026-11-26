@@ -1,4 +1,4 @@
-import type { Size } from '@project/resource-api/domain';
+import type { InPlaceEdit } from '@project/resource-api/view';
 import {
   beginExclusive,
   claim as claimIn,
@@ -19,15 +19,6 @@ import {
  * exclusive work anywhere withdraws every surface's commits, which each commit
  * asks when it is called (`plugin-commits.ts`).
  */
-
-/**
- * A Claim taken to edit in place (ADR 0178): while it is held, the canvas draws
- * its drawing's Resource at the entry's Edit size, or, with none stored, at
- * least at `sizeHint`.
- */
-export interface InPlaceEdit {
-  readonly sizeHint?: Size | undefined;
-}
 
 /** A Claim a surface holds, as the host hands it out; `own` is built per run. */
 export interface HostClaim<Own> {
