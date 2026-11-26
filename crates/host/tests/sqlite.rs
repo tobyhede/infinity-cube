@@ -325,6 +325,8 @@ mod given_the_memory_store_and_a_sqlite_file {
         }
     }
 
+    // Reads of the tracked fixture, whose content no generator of
+    // `tests/store_properties.rs` produces; its commits are generated there.
     #[tokio::test]
     async fn read_the_same_aggregate_spaces_and_meta_identity() {
         let (memory, sqlite, _file) = both().await;
@@ -355,57 +357,7 @@ mod given_the_memory_store_and_a_sqlite_file {
         );
     }
 
-    #[tokio::test]
-    async fn answer_commits_the_same_and_keep_what_they_wrote() {
-        let (memory, sqlite, file) = both().await;
-        let loaded = memory.load_space(meta()).await.unwrap().unwrap();
-        for commit in [rename(&loaded, "Renamed"), rename(&loaded, "Stale")] {
-            assert_eq!(
-                sqlite.commit(commit.clone()).await,
-                memory.commit(commit).await,
-                "the commit's answer"
-            );
-        }
-        let mut orphaned = rename(&loaded, "Orphaned");
-        let other = memory
-            .load_space(SpaceId::parse(http_conformance::FIXTURE_SPACES[1]).unwrap())
-            .await
-            .unwrap()
-            .unwrap();
-        orphaned.changes = vec![SpaceChange::Delete {
-            space_id: meta(),
-            expected_revision: Revision::new(1).unwrap(),
-        }];
-        assert_eq!(
-            sqlite.commit(orphaned.clone()).await,
-            memory.commit(orphaned).await,
-            "a refused commit"
-        );
-        let create = SpaceCommit {
-            changes: vec![SpaceChange::Create {
-                space_id: other.snapshot.id,
-                snapshot: other.snapshot,
-            }],
-        };
-        assert_eq!(
-            sqlite.commit(create.clone()).await,
-            memory.commit(create).await,
-            "a create the store will not judge"
-        );
-        assert_eq!(
-            sqlite.load_aggregate().await,
-            memory.load_aggregate().await,
-            "what the commits left"
-        );
-        sqlite.close().await;
-        let reopened = open(&file.path());
-        assert_eq!(
-            reopened.load_aggregate().await,
-            memory.load_aggregate().await,
-            "what the commits left, read again from the file"
-        );
-    }
-
+    // Assets, which no generator of `tests/store_properties.rs` stores.
     #[tokio::test]
     async fn store_and_load_assets_the_same() {
         let (memory, sqlite, _file) = both().await;
@@ -448,6 +400,8 @@ mod given_the_memory_store_and_a_sqlite_file {
         );
     }
 
+    // The lifecycle doors and marking a Space exported, which no generator of
+    // `tests/store_properties.rs` produces: it commits only.
     #[tokio::test]
     async fn answer_the_lifecycle_doors_the_same() {
         let (memory, sqlite, _file) = both().await;
@@ -541,6 +495,8 @@ mod given_the_memory_store_and_a_sqlite_file {
         );
     }
 
+    // An uninitialized store, which no generator of `tests/store_properties.rs`
+    // starts from.
     #[tokio::test]
     async fn refuse_and_answer_an_uninitialized_store_the_same() {
         let file = Migrated::new().await;

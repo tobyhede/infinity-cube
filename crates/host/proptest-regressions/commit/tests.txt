@@ -1,0 +1,10 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc a23bfaf74c60f536ddb1c22fbea51e8b8f938827de48fa3b942ad83118803ac5 # shrinks to candidate = 8, meta_revision = 1, child_revision = 0, exported = None, expected_offset = 1, meta_known = false
+cc 13e646f937747be658ec9c071464bc97befd5d942ca32780bbaf265fa41998b0 # shrinks to candidate = 0, meta_revision = 0, child_revision = 0, exported = Some(0), expected_offset = 0, meta_known = true
+cc a1fcd571f55373ea7bd96d9e04f6ecc8f6ef6d585e6263df8af7a70a1cc6c4dc # shrinks to candidate = 0, meta_revision = 0, child_revision = 9223372036854775807, exported = None, expected_offset = 0, meta_known = true
+cc e5d223e24767b078125724b5730504bd7b603aaab89e13c95250de9a64e2fb21 # shrinks to candidate = 0, meta_revision = 0, child_revision = 0, exported = None, expected_offset = 2, meta_known = false

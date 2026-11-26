@@ -691,6 +691,96 @@ mod given_a_single_update_decided_against_its_own_space {
             "decide_commit refuses it"
         );
     }
+    /// Each update a generated case may commit, of the child, the Meta
+    /// Space or a Space no store holds: some move no boundary, some move one,
+    /// one fails its own intake.
+    fn candidates() -> Vec<SpaceSnapshot> {
+        let placed = format!(r#""positions":{{"{UNKNOWN_RESOURCE}":{{"x":0,"y":0}}}}"#);
+        let added = format!(
+            r#""resources":[{{"id":"{UNKNOWN_RESOURCE}","document":{{"title":"Note","kind":"ur","content":{{}}}}}}]"#
+        );
+        vec![
+            plain(CHILD, "Renamed"),
+            child_with("Child", "Child"),
+            child_with(r#""title":"M""#, r#""title":"Map renamed""#),
+            child_with("0002a1", "0002a9"),
+            child_with("0002b1", "0002b9"),
+            child_with(
+                r#""title":"Child","#,
+                r#""title":"Child","defaultMap":"00000000-0000-4000-8000-0000000002a1","#,
+            ),
+            child_with(r#""positions":{}"#, &placed),
+            child_with(r#""resources":[]"#, &added),
+            meta_holding(CHILD, "space"),
+            meta_holding(CHILD, "unlisted"),
+            meta_selecting("00000000-0000-4000-8000-0000000002b2"),
+            plain(OTHER, "Other"),
+        ]
+    }
+
+    /// A revision a generated case stores or expects: low, or at or near
+    /// the ceiling.
+    fn revision_value() -> impl proptest::strategy::Strategy<Value = u64> {
+        proptest::prop_oneof![
+            0_u64..4,
+            (0_u64..3).prop_map(|below| Revision::CEILING - below),
+        ]
+    }
+
+    use proptest::strategy::Strategy as _;
+
+    proptest::proptest! {
+        /// The single-Space path either hands an update on or answers it
+        /// exactly as `decide_commit` answers it over the whole stored
+        /// aggregate, when every stored Space can be read.
+        #[test]
+        fn hands_an_update_on_or_answers_it_as_decide_commit_does(
+            candidate in 0_usize..12,
+            meta_revision in revision_value(),
+            child_revision in revision_value(),
+            exported in proptest::option::of(revision_value()),
+            expected_offset in 0_usize..5,
+            meta_known: bool,
+        ) {
+            let mut stored = vec![
+                stored(meta_holding(CHILD, "space"), meta_revision),
+                stored(plain(CHILD, "Child"), child_revision),
+            ];
+            stored[1].exported_revision = exported.and_then(Revision::new);
+            let next = candidates().swap_remove(candidate);
+            let held = stored
+                .iter()
+                .find(|space| space.snapshot.id == next.id)
+                .map_or(0, |space| space.revision.get());
+            let expected = [
+                held,
+                held.saturating_add(1).min(Revision::CEILING),
+                held.saturating_sub(1),
+                0,
+                Revision::CEILING,
+            ][expected_offset];
+            let request = commit(vec![update(next, expected)]);
+            let meta_space_id = meta_known.then(|| id(META));
+            let current = single_update_space(&request)
+                .and_then(|space| stored.iter().find(|loaded| loaded.snapshot.id == space));
+            let aggregate = decide_commit(&request, meta_space_id, &stored);
+            match decide_single_space(&request, meta_space_id, current) {
+                SingleSpaceDecision::Aggregate => {}
+                SingleSpaceDecision::Answer(result) => {
+                    proptest::prop_assert_eq!(aggregate, CommitDecision::Answer(result));
+                }
+                SingleSpaceDecision::Write { result, written } => {
+                    proptest::prop_assert_eq!(
+                        aggregate,
+                        CommitDecision::Write { result, written: vec![written], deleted: vec![] }
+                    );
+                }
+                SingleSpaceDecision::Fail(failure) => {
+                    proptest::prop_assert_eq!(aggregate, CommitDecision::Fail(failure));
+                }
+            }
+        }
+    }
 }
 
 mod given_a_space_at_the_revision_ceiling {
