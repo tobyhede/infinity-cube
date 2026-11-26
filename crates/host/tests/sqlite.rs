@@ -215,6 +215,7 @@ mod given_a_migrated_file {
     // ST-128: the rollback journal in `delete` mode, set even over a file
     // another writer left in WAL mode, and `synchronous=FULL` on the
     // repository's own connections.
+    // Case: writes the file in rollback-journal delete mode with synchronous FULL
     #[tokio::test]
     async fn writes_in_rollback_journal_delete_mode_with_synchronous_full() {
         let file = Migrated::new().await;
@@ -841,6 +842,7 @@ mod given_an_edit_to_one_space {
 mod given_contention {
     use super::*;
 
+    // Case: answers the loser of a same-Space race as a conflict and writes nothing of it
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn answers_overlapping_edits_to_one_space_as_one_commit_and_conflicts() {
         let file = Migrated::new().await;
@@ -911,6 +913,7 @@ mod given_contention {
         );
     }
 
+    // Case: waits out a second process that lets go inside the busy timeout, then commits
     #[tokio::test]
     async fn waits_out_a_lock_let_go_inside_the_busy_timeout() {
         let file = Migrated::new().await;
