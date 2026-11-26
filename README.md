@@ -46,7 +46,7 @@ This takes you from a fresh clone to the desktop application open on a Space of 
 
    Done when `init` prints `Created a new aggregate` and the commit succeeds. It also names the browser command; ignore that unless you are [running it in the browser](#or-run-it-in-the-browser). That commit is the revision git restores if the first write is not what you wanted.
 
-4. **Build the desktop application.** Build the browser application and the desktop application's own pages (the Start window and the close question) first: the desktop build copies both in, and fails without them.
+4. **Build the desktop application.** Build the browser application and the desktop application's own pages (the Start window and the close question) first: the desktop build copies in `packages/app/dist` and `packages/app/dist-desktop-shell`, and fails if either is missing.
 
    ```sh
    pnpm --filter @project/app exec vite build
@@ -56,7 +56,7 @@ This takes you from a fresh clone to the desktop application open on a Space of 
 
    Done when Cargo prints `Finished` and `target/debug/infinity-cube-desktop` exists. After pulling changes, run `pnpm install` and all three commands again.
 
-5. **Open the Space.** `target/debug/infinity-cube-desktop ~/spaces/rust-async`. Done when one window, named after the folder, shows the Space's Map with `Resource 1` on it. **File › Open…** (Ctrl+O, or Command-O on macOS) opens another Space's folder in a window of its own. Started with no folder, the application shows the **Start window**, with **New Space** and **Open Folder…**. A folder that holds no Space yet is offered **Create Space**, which writes a new Space there as `pnpm cube init` does and opens it. **New Space**, or **File › New Space…** (Ctrl+N, or Command-N), asks for a name and a location, `Untitled Space` in Documents unless you change them, and writes and opens a new Space in that folder; a folder holding anything but dot-entries is refused and nothing is written there.
+5. **Open the Space.** `target/debug/infinity-cube-desktop ~/spaces/rust-async`. Done when one window, named after the folder, shows the Space's Map with `Resource 1` on it. **File › Open…** (Ctrl+O, or Command-O on macOS) opens another Space's folder in a window of its own. Started with no folder, the application shows the **Start window**, with **New Space** and **Open Folder…**. A folder that holds no Space yet is offered **Create Space**, which writes a new Space there as `pnpm cube init` does and opens it. **New Space**, or **File › New Space…** (Ctrl+N, or Command-N), asks for a name and a location, `Untitled Space` in Documents unless you change them, and writes and opens a new Space in `<location>/<name>`; a name that is not one folder name, a file of that name in the location, or a folder holding anything but dot-entries is refused and nothing is written.
 
 6. **Edit.** Pick a Graph in the Command Dock, the toolbar floating over the canvas; every Graph stays drawn, and the one you pick is emphasised. Select a Resource to reveal its toolbar, and use Edit to write its Title and Markdown. Drag a Resource to move it. Drag from one of a Resource's four handles to another Resource to add an Edge to the Active Graph; hold Option (macOS) or Alt and drop on empty canvas to create a new Resource and connect it in one go. Done when the save indicator reads `Persisted`.
 
