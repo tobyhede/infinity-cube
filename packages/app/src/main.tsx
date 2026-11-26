@@ -8,7 +8,7 @@ import {
   askedForPrototypeFont,
   installPrototypeFont,
 } from './prototype-opendyslexic/prototype-font';
-import { PrototypeFontSwitcher } from './prototype-opendyslexic/PrototypeFontSwitcher';
+import { PrototypeFontBar } from './prototype-opendyslexic/PrototypeFontBar';
 import { createSpaceStartup } from './space';
 import { Application } from './components/Application';
 import { createBrowserFullscreen } from './browser-fullscreen';
@@ -34,6 +34,6 @@ const spaceStartup = createSpaceStartup(
 root.render(
   <ColorSchemeContext.Provider value={colorScheme}>
     <Application resolve={() => spaceStartup.resolve(window.location.pathname)} />
-    {import.meta.env.DEV && askedForPrototypeFont() ? <PrototypeFontSwitcher /> : null}
+    {import.meta.env.DEV && askedForPrototypeFont() ? <PrototypeFontBar /> : null}
   </ColorSchemeContext.Provider>,
 );

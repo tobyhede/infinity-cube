@@ -10,37 +10,9 @@
  * The font files are OpenDyslexic 400/700 (normal and italic, Latin subset)
  * from @fontsource/opendyslexic 5.3.0, bundled here rather than hot-linked.
  * Licence: SIL Open Font License 1.1, Reserved Font Name "OpenDyslexic"
- * (fonts/OFL.txt). Unmodified, so the name may be used.
+ * (fonts/OFL.txt). Unmodified, so the name may be used. The faces are
+ * registered from prototype-font.ts through the FontFace API.
  */
-
-@font-face {
-  font-family: 'OpenDyslexic';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url('./fonts/opendyslexic-latin-400-normal.woff2') format('woff2');
-}
-@font-face {
-  font-family: 'OpenDyslexic';
-  font-style: italic;
-  font-weight: 400;
-  font-display: swap;
-  src: url('./fonts/opendyslexic-latin-400-italic.woff2') format('woff2');
-}
-@font-face {
-  font-family: 'OpenDyslexic';
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url('./fonts/opendyslexic-latin-700-normal.woff2') format('woff2');
-}
-@font-face {
-  font-family: 'OpenDyslexic';
-  font-style: italic;
-  font-weight: 700;
-  font-display: swap;
-  src: url('./fonts/opendyslexic-latin-700-italic.woff2') format('woff2');
-}
 
 :root {
   --prototype-dyslexic-font: 'OpenDyslexic', ui-sans-serif, system-ui, sans-serif;

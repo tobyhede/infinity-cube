@@ -1,17 +1,10 @@
 // PROTOTYPE, throwaway: the floating variant bar for the OpenDyslexic
 // dark-mode prototype (see opendyslexic.css). Not production UI.
 import { useEffect, useState } from 'react';
-import { readVariant, setPrototypeFont, VARIANTS, type VariantKey } from './prototype-font';
+import { readVariant, setPrototypeFont, VARIANTS, type VariantId } from './prototype-font';
 
-function isTyping(target: EventTarget | null): boolean {
-  return (
-    target instanceof HTMLElement &&
-    (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
-  );
-}
-
-export function PrototypeFontSwitcher() {
-  const [variant, setVariant] = useState<VariantKey>(readVariant);
+export function PrototypeFontBar() {
+  const [variant, setVariant] = useState<VariantId>(readVariant);
 
   useEffect(() => {
     setPrototypeFont(variant);
@@ -22,25 +15,15 @@ export function PrototypeFontSwitcher() {
 
   const step = (by: number) =>
     setVariant((current) => {
-      const at = VARIANTS.findIndex((each) => each.key === current);
+      const at = VARIANTS.findIndex((each) => each.id === current);
       const next = VARIANTS[(at + by + VARIANTS.length) % VARIANTS.length];
-      return next?.key ?? current;
+      return next?.id ?? current;
     });
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (!event.altKey || isTyping(event.target)) return;
-      if (event.key === 'ArrowLeft') step(-1);
-      if (event.key === 'ArrowRight') step(1);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
-
-  const current = VARIANTS.find((each) => each.key === variant);
+  const current = VARIANTS.find((each) => each.id === variant);
   return (
     <div
-      data-prototype-switcher
+      data-prototype-font-bar
       style={{
         position: 'fixed',
         bottom: 12,
@@ -61,7 +44,7 @@ export function PrototypeFontSwitcher() {
         ◀
       </button>
       <span>
-        PROTOTYPE font {current?.key} ({current?.name}) · dark mode only · Alt+←/→
+        PROTOTYPE font {current?.id} ({current?.name}) · dark mode only
       </span>
       <button type="button" aria-label="Next font variant" onClick={() => step(1)}>
         ▶
