@@ -253,6 +253,7 @@ mod given_the_script {
             memory.load_aggregate().await,
             "the aggregate"
         );
+        sqlite.close().await;
     }
 }
 
@@ -295,6 +296,7 @@ mod given_rows_the_typescript_host_wrote {
                 asset.hash
             );
         }
+        sqlite.close().await;
     }
 
     #[tokio::test]
@@ -319,5 +321,6 @@ mod given_rows_the_typescript_host_wrote {
             }),
             "the Edit lands"
         );
+        sqlite.close().await;
     }
 }

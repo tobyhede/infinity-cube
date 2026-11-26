@@ -225,6 +225,8 @@ trait CaseStore: Sized {
     type Store: SpaceRepository;
     async fn open() -> Self;
     fn store(&self) -> &Self::Store;
+    /// Let the store go, closing whatever it holds open.
+    async fn close(self) {}
 }
 
 struct Memory(MemorySpaceRepository);
@@ -253,6 +255,9 @@ impl CaseStore for Sqlite {
     }
     fn store(&self) -> &Self::Store {
         &self.store
+    }
+    async fn close(self) {
+        self.store.close().await;
     }
 }
 
@@ -304,9 +309,7 @@ async fn commit_cases<S: CaseStore>() {
         };
         if want != got {
             failures.push(format!("{name}: expected {want:#?}\ngot {got:#?}"));
-            continue;
-        }
-        if want.is_none() {
+        } else if want.is_none() {
             let _exported = export_aggregate(store, &TokioFilesystem, &directory)
                 .await
                 .unwrap();
@@ -315,6 +318,7 @@ async fn commit_cases<S: CaseStore>() {
                 failures.push(format!("{name}:\n{}", differences.join("\n")));
             }
         }
+        opened.close().await;
     }
     assert!(
         failures.is_empty(),

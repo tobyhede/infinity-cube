@@ -4,8 +4,9 @@ import ts from 'typescript';
 /*
  * What a test holding Rust ports to TypeScript cases reads: each case a
  * TypeScript file declares, by name, and the `// Case: <name>` lines in Rust
- * files. A case's name is the first argument of its `it`, `it.each(…)(…)` or
- * `it.skipIf(…)(…)` call, as written: a template literal's substitutions are
+ * files. A case's name is the first argument of its `it` or `test` call, of a
+ * member such as `it.skip(…)` or `it.concurrent(…)`, or of the call a curried
+ * member answers, such as `it.each(…)(…)` or `it.skipIf(…)(…)`, as written: a template literal's substitutions are
  * each written `*`, and an `it.each` name keeps its `%s`.
  */
 
@@ -14,7 +15,10 @@ export const readRepositoryFile = (file: string): string =>
   readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8');
 
 const isIt = (expression: ts.Expression): boolean =>
-  ts.isIdentifier(expression) && expression.text === 'it';
+  ts.isIdentifier(expression) && (expression.text === 'it' || expression.text === 'test');
+
+/** The `it` members that take a table or a condition and answer the call that names the case. */
+const CURRIED = new Set(['each', 'for', 'skipIf', 'runIf']);
 
 /** The name a case is written with, or `undefined` for an argument that is not text. */
 const caseName = (argument: ts.Expression | undefined): string | undefined => {
@@ -39,6 +43,9 @@ export const casesOf = (file: string): string[] => {
       const callee = node.expression;
       const declaresCase =
         isIt(callee) ||
+        (ts.isPropertyAccessExpression(callee) &&
+          isIt(callee.expression) &&
+          !CURRIED.has(callee.name.text)) ||
         (ts.isCallExpression(callee) &&
           ts.isPropertyAccessExpression(callee.expression) &&
           isIt(callee.expression.expression));
