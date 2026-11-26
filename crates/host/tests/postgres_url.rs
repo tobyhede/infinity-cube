@@ -133,7 +133,7 @@ mod given_the_environment {
 
 /// The `.env` read as Node's `dotenv` 17.4.2 reads it (its `parse`, which
 /// `src/prisma/db.ts` calls through `config()` with no `dotenv-expand`): no
-/// variable is expanded, and a line its pattern does not match is skipped.
+/// variable is substituted, and a line its pattern does not match is skipped.
 mod given_an_env_file_dotenv_reads {
     use super::*;
 

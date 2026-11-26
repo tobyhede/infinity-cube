@@ -8,7 +8,7 @@
 //! but `DATABASE_URL` is taken from it. It is parsed as Node's `dotenv`
 //! 17.4.2 parses one (`parse` in its `lib/main.js`, which `src/prisma/db.ts`
 //! reaches through `config()` with no `dotenv-expand`): no variable is
-//! expanded and a line it does not match is skipped, as
+//! substituted and a line it does not match is skipped, as
 //! `tests/postgres_url.rs` holds. TypeScript's search starts at its
 //! module's directory (`src/prisma/db.ts`), which a binary has not, so this
 //! one starts where it is run: an accepted difference.
