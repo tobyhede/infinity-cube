@@ -29,7 +29,8 @@ use std::cmp::Ordering;
 use intake::json::{JsonObject, JsonValue};
 use intake::text::compare_utf16;
 use intake::{
-    DOCUMENT_VERSION, Edge, Graph, Map, Placement, Resource, SpaceSnapshot, plugin_content_keys,
+    DOCUMENT_VERSION, Edge, Graph, Map, Placement, Resource, Size, SpaceSnapshot,
+    plugin_content_keys,
 };
 
 fn string(text: &str) -> JsonValue {
@@ -222,28 +223,20 @@ fn graph(graph: &Graph) -> JsonValue {
     ])
 }
 
+/// A size, its width before its height.
+fn size(size: Size) -> JsonValue {
+    object([
+        ("width", Some(JsonValue::Number(size.width))),
+        ("height", Some(JsonValue::Number(size.height))),
+    ])
+}
+
 fn placement(at: &Placement, order: Order) -> JsonValue {
     object([
         ("x", Some(JsonValue::Number(at.x))),
         ("y", Some(JsonValue::Number(at.y))),
-        (
-            "size",
-            at.size.map(|size| {
-                object([
-                    ("width", Some(JsonValue::Number(size.width))),
-                    ("height", Some(JsonValue::Number(size.height))),
-                ])
-            }),
-        ),
-        (
-            "editSize",
-            at.edit_size.map(|size| {
-                object([
-                    ("width", Some(JsonValue::Number(size.width))),
-                    ("height", Some(JsonValue::Number(size.height))),
-                ])
-            }),
-        ),
+        ("size", at.size.map(size)),
+        ("editSize", at.edit_size.map(size)),
         (
             "content",
             at.content.as_ref().map(|content| order.value(content)),

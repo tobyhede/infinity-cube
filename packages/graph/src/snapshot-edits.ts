@@ -33,9 +33,8 @@ import { Placement } from './placement';
  * small refusal union carrying codes and typed context only — wording stays in
  * `app`, which maps a code into `AuthoringRefusal` or `SpaceResourceRefusal`.
  *
- * Operations arrive with their first real caller rather than ahead of one,
- * except `resizeEditor`, which lands ahead of its caller, the canvas's editor
- * resize. Both callers create and delete through `createInMap` and `deleteFromSpace`;
+ * Operations arrive with their first real caller rather than ahead of one.
+ * Both callers create and delete through `createInMap` and `deleteFromSpace`;
  * `resize`, `resizeEditor`, `changeMapContent`, `addToMap` and
  * `removeFromMap` are Space Authoring's alone.
  */
@@ -287,6 +286,12 @@ const refused = (refusal: SnapshotEditRefusal): SnapshotEditOutcome => ({
 
 const UNCHANGED: SnapshotEditOutcome = { kind: 'unchanged' };
 
+/** Round each axis to a whole number and floor it at the Closed Size. */
+const flooredSize = (size: Extent): Extent => ({
+  width: Math.max(Math.round(size.width), COLLAPSED_RESOURCE_SIZE.width),
+  height: Math.max(Math.round(size.height), COLLAPSED_RESOURCE_SIZE.height),
+});
+
 /**
  * Resize a Resource in one Map, moving the Resources clear of it by the change
  * from the size it had (ADR 0084, ADR 0093). The size is written even when it
@@ -318,8 +323,7 @@ function resize(
  * draws it at while its plugin edits it in place. Its `size`, its Map content
  * and every other Resource are kept, so nothing is displaced. `unchanged` for
  * the Edit size it already stores. Each axis is rounded and floored at the
- * Closed Size, as `changeMapContent` floors a size hint, so a value below it is
- * written at the floor rather than refused.
+ * Closed Size, so a value below it is written at the floor rather than refused.
  */
 function resizeEditor(
   snapshot: SpaceSnapshot,
@@ -334,10 +338,7 @@ function resizeEditor(
   if (!snapshot.resources.some((resource) => resource.id === resourceId)) {
     return refused({ code: 'resource-not-found' });
   }
-  const floored = {
-    width: Math.max(Math.round(editSize.width), COLLAPSED_RESOURCE_SIZE.width),
-    height: Math.max(Math.round(editSize.height), COLLAPSED_RESOURCE_SIZE.height),
-  };
+  const floored = flooredSize(editSize);
   if (at.editSize?.width === floored.width && at.editSize.height === floored.height) {
     return UNCHANGED;
   }
@@ -387,10 +388,7 @@ function changeMapContent(
   if (sizeHint === undefined || at.size !== undefined || written.kind !== 'completed') {
     return written;
   }
-  const resized = resize(written.snapshot, mapId, resourceId, {
-    width: Math.max(Math.round(sizeHint.width), COLLAPSED_RESOURCE_SIZE.width),
-    height: Math.max(Math.round(sizeHint.height), COLLAPSED_RESOURCE_SIZE.height),
-  });
+  const resized = resize(written.snapshot, mapId, resourceId, flooredSize(sizeHint));
   return resized.kind === 'completed' ? resized : written;
 }
 

@@ -1261,3 +1261,30 @@ describe('SnapshotEdit across two Maps: addToMap, removeFromMap and deleteFromSp
     );
   });
 });
+
+describe('SnapshotEdit.resizeEditor refusals', () => {
+  const MEMBER = uuid('00000000-0000-4000-8000-000000000031');
+  const ORPHAN = uuid('00000000-0000-4000-8000-000000000032');
+  const STRANGER = uuid('00000000-0000-4000-8000-000000000033');
+  const EDIT_SIZE = { width: 640, height: 360 };
+
+  /** A Map placing `ORPHAN`, which the Space does not hold: a snapshot no intake accepts. */
+  const orphaned = baseSnapshot([MEMBER], {
+    [MEMBER]: { x: 0, y: 0 },
+    [ORPHAN]: { x: 400, y: 0 },
+  });
+
+  it('refuses a Resource the Map does not place before one the Space does not hold', () => {
+    expect(SnapshotEdit.resizeEditor(orphaned, MAP_ID, STRANGER, EDIT_SIZE)).toEqual({
+      kind: 'refused',
+      refusal: { code: 'resource-not-in-map' },
+    });
+  });
+
+  it('refuses a placed Resource the Space does not hold', () => {
+    expect(SnapshotEdit.resizeEditor(orphaned, MAP_ID, ORPHAN, EDIT_SIZE)).toEqual({
+      kind: 'refused',
+      refusal: { code: 'resource-not-found' },
+    });
+  });
+});
