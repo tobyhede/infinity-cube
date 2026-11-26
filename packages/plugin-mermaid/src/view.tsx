@@ -49,7 +49,7 @@ import { renderWithMermaid, type DiagramTheme, type RenderDiagram } from './merm
  * elsewhere leaves the draft up.
  */
 
-/** The width Mermaid lays a diagram out at, unseen, so it is drawn at a legible size. */
+/** The width Mermaid lays a diagram out at, unseen; the drawn diagram is scaled to the rect's width. */
 export const READING_WIDTH = 640;
 
 /** The inset the diagram and its notes are drawn at inside the rect. */

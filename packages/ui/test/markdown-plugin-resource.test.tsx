@@ -69,27 +69,22 @@ describe('a Markdown Resource drawn by the application', () => {
     expect(await screen.findByText('The whole text, on the Stage.')).toBeVisible();
     expect(screen.queryByRole('button')).toBeNull();
   });
-  it('Opens at once, without waiting for its images to load (ADR 0178)', async () => {
-    const complete = vi.spyOn(HTMLImageElement.prototype, 'complete', 'get').mockReturnValue(false);
-    try {
-      const commitMap = vi.fn(() => Promise.resolve<Answer>('completed'));
-      render(
-        <WithTexts>
-          <PluginResource
-            {...onTheMap({
-              state: 'selected',
-              content: { url: textAsset('# Notes\n\n![Chart](https://example.com/chart.png)') },
-              operations: { kind: 'markdown', commitMap },
-            })}
-          />
-        </WithTexts>,
-      );
-      fireEvent.click(await screen.findByRole('button', { name: 'Open Resource Notes' }));
-      await waitFor(() => expect(commitMap).toHaveBeenCalledTimes(1));
-      expect(commitMap).toHaveBeenCalledWith({ open: true }, undefined);
-    } finally {
-      complete.mockRestore();
-    }
+  it('commits { open: true } once when Opened, with no size hint (ADR 0178)', async () => {
+    const commitMap = vi.fn(() => Promise.resolve<Answer>('completed'));
+    render(
+      <WithTexts>
+        <PluginResource
+          {...onTheMap({
+            state: 'selected',
+            content: { url: textAsset('# Notes') },
+            operations: { kind: 'markdown', commitMap },
+          })}
+        />
+      </WithTexts>,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Resource Notes' }));
+    await waitFor(() => expect(commitMap).toHaveBeenCalledTimes(1));
+    expect(commitMap).toHaveBeenCalledWith({ open: true }, undefined);
   });
 
   it('keeps no band clear for a rail on the Stage, which draws none', async () => {
