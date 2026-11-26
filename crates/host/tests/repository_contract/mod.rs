@@ -483,6 +483,17 @@ macro_rules! repository_cases {
                 answers_a_stale_revision_on_the_aggregate_path_as_a_conflict,
                 adopts_a_resource_id_from_the_space_a_commit_deletes,
             }
+            broken {
+                replaces_an_invalid_space_document,
+                replaces_an_invalid_aggregate,
+                names_a_broken_document_broken_on_the_fast_path_and_load_space,
+                truncates_spaces_without_a_meta_identity_only_when_none_was_expected,
+                fails_a_stored_revision_that_is_not_canonical,
+                refuses_an_update_when_stored_spaces_have_no_meta_identity,
+                fails_a_stored_revision_above_the_ceiling,
+                fails_a_fast_path_commit_over_a_revision_that_is_not_canonical,
+                fails_a_stored_exported_revision_that_is_not_canonical,
+            }
             // table:end
         }
     };

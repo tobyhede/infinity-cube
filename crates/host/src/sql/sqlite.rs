@@ -176,6 +176,20 @@ const SQLITE_BUSY: i64 = 5;
 const SQLITE_LOCKED: i64 = 6;
 const SQLITE_CANTOPEN: i64 = 14;
 
+/// Whether SQLite's result `code` says the file is not answering now, read
+/// by its primary code (the low byte), so an extended code such as
+/// `SQLITE_BUSY_SNAPSHOT` reads as `SQLITE_BUSY`. A file that does not exist
+/// is not answering yet; one that exists and still cannot be opened, a
+/// directory or a file this process may not read, is a defect, so
+/// `file_exists` is asked only of `SQLITE_CANTOPEN`.
+fn unavailable_code(code: i64, file_exists: impl FnOnce() -> bool) -> bool {
+    match code & 0xff {
+        SQLITE_BUSY | SQLITE_LOCKED => true,
+        SQLITE_CANTOPEN => !file_exists(),
+        _ => false,
+    }
+}
+
 /// A row's document stored as something other than text, a BLOB among them,
 /// which the TypeScript host also fails to read: broken stored state.
 #[derive(Debug, thiserror::Error)]
@@ -510,13 +524,8 @@ impl SqlStore for SqliteStore {
             sqlx::Error::Database(database) => database
                 .code()
                 .and_then(|code| code.parse::<i64>().ok())
-                .is_some_and(|code| match code & 0xff {
-                    SQLITE_BUSY | SQLITE_LOCKED => true,
-                    // A file that does not exist is not answering yet; one
-                    // that exists and still cannot be opened, a directory or
-                    // a file this process may not read, is a defect.
-                    SQLITE_CANTOPEN => !matches!(self.path.try_exists(), Ok(true)),
-                    _ => false,
+                .is_some_and(|code| {
+                    unavailable_code(code, || matches!(self.path.try_exists(), Ok(true)))
                 }),
             sqlx::Error::Io(_)
             | sqlx::Error::PoolTimedOut
@@ -528,6 +537,60 @@ impl SqlStore for SqliteStore {
             RepositoryError::Unavailable(error.to_string())
         } else {
             RepositoryError::Unclassified(error.to_string())
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `SQLITE_ERROR`, the code a missing table or a malformed statement fails with.
+    const SQLITE_ERROR: i64 = 1;
+    /// `SQLITE_CONSTRAINT`, a constraint a write broke.
+    const SQLITE_CONSTRAINT: i64 = 19;
+
+    fn exists() -> bool {
+        true
+    }
+
+    fn missing() -> bool {
+        false
+    }
+
+    #[test]
+    fn reads_busy_and_locked_as_unavailable_by_their_primary_code() {
+        for code in [
+            SQLITE_BUSY,
+            SQLITE_BUSY | (1 << 8), // SQLITE_BUSY_RECOVERY
+            SQLITE_BUSY | (2 << 8), // SQLITE_BUSY_SNAPSHOT
+            SQLITE_LOCKED,
+            SQLITE_LOCKED | (1 << 8), // SQLITE_LOCKED_SHAREDCACHE
+        ] {
+            assert!(unavailable_code(code, exists), "code {code}");
+        }
+    }
+
+    #[test]
+    fn reads_a_file_it_cannot_open_as_unavailable_only_while_it_does_not_exist() {
+        for code in [
+            SQLITE_CANTOPEN,
+            SQLITE_CANTOPEN | (2 << 8), // SQLITE_CANTOPEN_ISDIR
+        ] {
+            assert!(unavailable_code(code, missing), "code {code}, no file");
+            assert!(!unavailable_code(code, exists), "code {code}, a file");
+        }
+    }
+
+    #[test]
+    fn reads_every_other_code_as_no_outage() {
+        for code in [
+            SQLITE_ERROR,
+            SQLITE_CONSTRAINT,
+            SQLITE_CONSTRAINT | (8 << 8), // SQLITE_CONSTRAINT_PRIMARYKEY
+            SQLITE_ERROR | (1 << 8),      // SQLITE_ERROR_MISSING_COLLSEQ
+        ] {
+            assert!(!unavailable_code(code, missing), "code {code}");
         }
     }
 }

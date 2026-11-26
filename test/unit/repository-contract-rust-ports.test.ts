@@ -62,7 +62,7 @@ const VALUES: Readonly<Record<string, readonly string[]>> = {
 };
 
 /** The tickets a pending case may name. */
-const TICKETS = ['05', '06', '10', '11', '12', '13'] as const;
+const TICKETS = ['06', '10', '11', '12', '13'] as const;
 type Ticket = (typeof TICKETS)[number];
 
 type Exemption =
@@ -77,30 +77,16 @@ const ROW_LOCK =
 
 const EXEMPT: Readonly<Record<string, Exemption>> = {
   // The contract.
-  'replaces * stored state through the destructive lifecycle door (invalid-space-document)':
-    pending('05'),
-  'replaces * stored state through the destructive lifecycle door (invalid-aggregate)':
-    pending('05'),
-  "names a broken stored document broken stored state on the single-Space fast path, and leaves loadSpace's answer narrower":
-    pending('05'),
-  'truncates stored Spaces without a Meta identity only when none was expected': pending('05'),
-  'raises an identifiable invariant failure for a stored Space whose revision is not canonical':
-    pending('05'),
   'stores and reloads an Image Resource unchanged': pending('12'),
   'stores and reloads an Ur Resource and a Reference Resource to it unchanged': pending('12'),
   'stores, renames and reloads a Resource whose plugin is missing unchanged': pending('12'),
   'carries a Resource whose plugin is missing through Import and Export byte-identical':
     pending('12'),
   'hands a Resource whose plugin is missing to that plugin when it returns': pending('12'),
-  'refuses a topology-preserving update when stored Spaces have no Meta identity': pending('05'),
   "keeps an Edge's Title and hidden flag through initialization, commit and load": pending('12'),
   "keeps a Graph's head shape through initialization, commit and load": pending('12'),
   "keeps every Resource's Map content through initialization, commit and load": pending('12'),
   "keeps each Space Resource's own selection across a later default Map change": pending('12'),
-  'raises an identifiable invariant failure for a stored Space whose revision exceeds the 2^63-1 ceiling':
-    pending('05'),
-  'raises an identifiable invariant failure for a commit whose fast-path candidate has a non-canonical stored revision':
-    pending('05'),
   'writes a moved Resource through the ownership check, which refuses it before its Space releases it':
     doesNotApply(
       "a commit's answer does not depend on the order of its changes (ADR 0176, Storage ST-20): the Rust repository commits the move this case has the TypeScript SQL writer refuse, which `commits_a_move_whichever_space_it_lists_first` in `crates/host/tests/repository_contract/commits.rs`, not a port, holds on the memory store and SQLite",
@@ -118,31 +104,15 @@ const EXEMPT: Readonly<Record<string, Exemption>> = {
   'keeps a stored asset across a fresh repository host': pending('06'),
 
   // test/integration/sqlite-space-repository.test.ts
-  'serves two overlapping aggregate reads through one client without waiting on each other':
-    pending('05'),
-  'settles two overlapping first initializations through one client as initialized and existing':
-    pending('05'),
-  'serialises overlapping operations across two repositories over one file handle': pending('05'),
   'serialises overlapping in-process commits at different Spaces well under the busy timeout':
     pending('13'),
   'serves loadSpace and listSpaces overlapping a * commit (*) well under the busy timeout':
     pending('13'),
-  'truncates a stored Space whose document is not JSON': pending('05'),
-  'truncates a stored Space whose Resource document is not JSON': pending('05'),
-  'refuses a Meta identity naming a Space the file does not store': pending('05'),
-  'names every operation on a closed database unavailable': pending('05'),
   'names a statement PostgreSQL aborted for contention unavailable': doesNotApply(
     'a PostgreSQL error code: the Rust host has no PostgreSQL store yet (rust-host 16), and SQLite raises no such code',
   ),
-  'leaves a statement failure that is a defect unclassified': pending('05'),
-  'keeps start-up trying through contention': pending('05'),
-  'names a Meta identity that keeps moving while it is locked unavailable': pending('05'),
-  'does not wrap a failure that already carries a name': pending('05'),
-  'names an outage during the post-rollback conflict reload unavailable': pending('05'),
   'refuses a %s-path commit whose row moved before the lock, writing no Resource':
     doesNotApply(ROW_LOCK),
-  'names an outage reading the Meta identity after a replacement conflict unavailable':
-    pending('05'),
 
   // test/integration/sqlite-contention.test.ts
   'recovers on the same runtime when its first read meets an exclusive lock': pending('10'),
@@ -176,6 +146,19 @@ const EXEMPT: Readonly<Record<string, Exemption>> = {
   'persists a POST Edit through GET and reopen, and answers a stale revision as 409': pending('11'),
   'answers a closed database as retryable 503 persistence-unavailable, not 409': pending('11'),
   'answers internal-error for a non-JSON stored Meta document': pending('11'),
+  'names a Meta identity that keeps moving while it is locked unavailable': doesNotApply(
+    'the TypeScript repository reads the Meta identity and then relocks its row, so a replacement can move it between the two; the Rust repository reads it inside the one `BEGIN IMMEDIATE` transaction that writes, so it cannot move under the read',
+  ),
+  'does not wrap a failure that already carries a name': doesNotApply(
+    'a Rust failure is named once, by the `RepositoryError` variant its producer chooses, and `Failure::Answered` (`crates/host/src/sql.rs`) carries a named one through unchanged; no later step reads a chain of causes to name it again',
+  ),
+  'names an outage during the post-rollback conflict reload unavailable': doesNotApply(
+    'the Rust repository decides a conflict from the rows it read inside its write transaction and answers it before rolling back, so it makes no read after the rollback for an outage to meet',
+  ),
+  'names an outage reading the Meta identity after a replacement conflict unavailable':
+    doesNotApply(
+      'the Rust replacement reads the Meta identity inside its one write transaction and relocks no row, so no read follows a conflict for an outage to meet',
+    ),
 };
 
 /** A contract case's name, the harness's store name dropped. */
@@ -276,7 +259,7 @@ describe('the port check', () => {
   const cases = ['ported', 'pending', 'inapplicable'];
   const clean: Marks = {
     marked: ['ported', 'an HTTP case'],
-    exempt: { pending: pending('05'), inapplicable: doesNotApply('why') },
+    exempt: { pending: pending('06'), inapplicable: doesNotApply('why') },
     elsewhere: ['an HTTP case'],
   };
 
@@ -301,7 +284,7 @@ describe('the port check', () => {
 
   it('finds an exemption naming no case', () => {
     expect(
-      findings(cases, { ...clean, exempt: { ...clean.exempt, gone: pending('05') } })
+      findings(cases, { ...clean, exempt: { ...clean.exempt, gone: pending('06') } })
         .unknownExemptions,
     ).toEqual(['gone']);
   });
@@ -314,7 +297,7 @@ describe('the port check', () => {
   });
 
   it('tells a pending exemption from one that does not apply', () => {
-    expect(pending('05')).toEqual({ kind: 'pending', ticket: '05' });
+    expect(pending('06')).toEqual({ kind: 'pending', ticket: '06' });
     expect(doesNotApply('why')).toEqual({ kind: 'does not apply', reason: 'why' });
   });
 });
