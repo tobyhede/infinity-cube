@@ -274,5 +274,33 @@ mod tests {
                 "none"
             );
         }
+
+        #[test]
+        fn names_every_extension_it_knows() {
+            for (path, media_type) in [
+                ("index.html", "text/html; charset=utf-8"),
+                ("a.js", "text/javascript; charset=utf-8"),
+                ("a.mjs", "text/javascript; charset=utf-8"),
+                ("a.css", "text/css; charset=utf-8"),
+                ("a.js.map", "application/json"),
+                ("a.json", "application/json"),
+                ("site.webmanifest", "application/manifest+json"),
+                ("a.wasm", "application/wasm"),
+                ("robots.txt", "text/plain; charset=utf-8"),
+                ("a.svg", "image/svg+xml"),
+                ("a.png", "image/png"),
+                ("a.jpg", "image/jpeg"),
+                ("a.jpeg", "image/jpeg"),
+                ("a.gif", "image/gif"),
+                ("a.webp", "image/webp"),
+                ("a.avif", "image/avif"),
+                ("favicon.ico", "image/x-icon"),
+                ("a.woff", "font/woff"),
+                ("a.woff2", "font/woff2"),
+                ("a.unknown", "application/octet-stream"),
+            ] {
+                assert_eq!(built_media_type(path), media_type, "{path}");
+            }
+        }
     }
 }

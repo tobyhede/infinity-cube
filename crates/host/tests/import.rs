@@ -49,7 +49,7 @@ impl SpaceRepository for FailingAssets {
     async fn store_asset(&self, asset: StoredAsset) -> Result<AssetStored, RepositoryError> {
         let failing = self
             .failures
-            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |left| {
+            .try_update(Ordering::SeqCst, Ordering::SeqCst, |left| {
                 left.checked_sub(1)
             })
             .is_ok();
