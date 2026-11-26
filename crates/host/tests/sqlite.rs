@@ -561,67 +561,6 @@ mod given_rows_the_typescript_host_reads {
     }
 }
 
-/// Rows the TypeScript host wrote (ST-125), importing the tracked fixture
-/// into a migrated file (`fixtures/typescript-sqlite-rows.sql`, written by
-/// `scripts/sqlite-rows-fixture.ts`), replayed over a freshly migrated file.
-mod given_rows_the_typescript_host_wrote {
-    use super::*;
-
-    async fn replayed() -> (SqliteSpaceRepository, Migrated) {
-        let file = Migrated::new().await;
-        execute(
-            &file.file,
-            include_str!("fixtures/typescript-sqlite-rows.sql"),
-        )
-        .await;
-        (open(&file.path()), file)
-    }
-
-    #[tokio::test]
-    async fn reads_the_aggregate_and_its_assets_as_this_host_imports_them() {
-        let (sqlite, _file) = replayed().await;
-        let memory = seeded(MemorySpaceRepository::new()).await;
-        assert_eq!(
-            sqlite.load_aggregate().await,
-            memory.load_aggregate().await,
-            "the aggregate"
-        );
-        assert_eq!(
-            sqlite.list_spaces().await,
-            memory.list_spaces().await,
-            "the Spaces listed"
-        );
-        let mut assets = 0;
-        for entry in std::fs::read_dir(http_conformance::fixture().join("assets")).unwrap() {
-            let name = entry.unwrap().file_name().into_string().unwrap();
-            let hash = AssetHash::parse(name.split('.').next().unwrap()).unwrap();
-            let stored = sqlite.load_asset(&hash).await.unwrap();
-            assert!(stored.is_some(), "asset {name}");
-            assert_eq!(
-                stored,
-                memory.load_asset(&hash).await.unwrap(),
-                "asset {name}"
-            );
-            assets += 1;
-        }
-        assert!(assets > 0, "the fixture has assets");
-    }
-
-    #[tokio::test]
-    async fn commits_an_edit_over_them() {
-        let (sqlite, _file) = replayed().await;
-        let loaded = sqlite.load_space(meta()).await.unwrap().unwrap();
-        assert_eq!(
-            sqlite.commit(rename(&loaded, "Renamed")).await,
-            Ok(CommitResult::Committed {
-                revisions: vec![(meta(), loaded.revision.next())],
-                deleted_space_ids: vec![],
-            }),
-            "the Edit lands"
-        );
-    }
-}
-
 /// An Edit to one Space (ST-3, `#commitTopologyPreservingUpdate` and
 /// `#writeUpdate` in `src/persistence/sql-space-repository.ts`): decided
 /// against that Space alone when it moves no snapshot boundary, and writing

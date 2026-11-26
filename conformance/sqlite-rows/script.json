@@ -1,0 +1,1120 @@
+{
+  "initialize": {
+    "metaSpaceId": "e0000000-0000-4000-8000-000000000001",
+    "spaces": [
+      {
+        "id": "e0000000-0000-4000-8000-000000000001",
+        "document": {
+          "version": 1,
+          "title": "New space",
+          "maps": [
+            {
+              "id": "e0000000-0000-4000-8000-000000000003",
+              "title": "Map 1",
+              "kind": "positioned",
+              "positions": {
+                "e0000000-0000-4000-8000-000000000002": {
+                  "x": 0,
+                  "y": 0
+                }
+              },
+              "graphs": [
+                {
+                  "id": "e0000000-0000-4000-8000-000000000004",
+                  "title": "Graph 1",
+                  "color": "#1f77b4",
+                  "headShape": "arrow",
+                  "edges": []
+                }
+              ],
+              "activeGraph": "e0000000-0000-4000-8000-000000000004"
+            }
+          ],
+          "defaultMap": "e0000000-0000-4000-8000-000000000003"
+        },
+        "resources": [
+          {
+            "id": "e0000000-0000-4000-8000-000000000002",
+            "document": {
+              "title": "Resource 1",
+              "kind": "markdown",
+              "content": {
+                "url": "/assets/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "steps": [
+    {
+      "asset": {
+        "mediaType": "text/markdown",
+        "text": "# Rows\n\nWritten by the rows script.\n",
+        "hash": "ShCjesGW_izkOLBpDas813liwHufFHoHz9koyWIIhE8"
+      }
+    },
+    {
+      "asset": {
+        "mediaType": "text/vnd.mermaid",
+        "text": "graph TD\n  A --> B\n",
+        "hash": "3SlK29ZHsbsi0iVnl8AiqN2HKH5FdhB5oN59qmyyLM4"
+      }
+    },
+    {
+      "asset": {
+        "mediaType": "image/svg+xml",
+        "text": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"4\" height=\"3\"/>\n",
+        "hash": "-QzQ-bb-hSyczdrHoTUIUntc0EF9W9EQrACsB1ncNgE"
+      }
+    },
+    {
+      "asset": {
+        "mediaType": "application/x-made-up",
+        "text": "bytes no plugin reads\n",
+        "hash": "zeS2_lTSbTYWCPNCX7jFe0jur7WWD0CZHRP1pmaSfZs"
+      }
+    },
+    {
+      "commit": {
+        "changes": [
+          {
+            "kind": "update",
+            "spaceId": "e0000000-0000-4000-8000-000000000001",
+            "snapshot": {
+              "id": "e0000000-0000-4000-8000-000000000001",
+              "document": {
+                "version": 1,
+                "title": "New space",
+                "maps": [
+                  {
+                    "id": "e0000000-0000-4000-8000-000000000003",
+                    "title": "Map 1",
+                    "kind": "positioned",
+                    "positions": {
+                      "e0000000-0000-4000-8000-000000000002": {
+                        "x": 0,
+                        "y": 0
+                      },
+                      "e0000000-0000-4000-8000-000000000005": {
+                        "x": 400,
+                        "y": 0,
+                        "content": {
+                          "shape": "diamond"
+                        }
+                      },
+                      "e0000000-0000-4000-8000-000000000006": {
+                        "x": 800,
+                        "y": 0,
+                        "content": {
+                          "open": true
+                        }
+                      },
+                      "e0000000-0000-4000-8000-000000000007": {
+                        "x": 0,
+                        "y": 300,
+                        "size": {
+                          "width": 320,
+                          "height": 180
+                        },
+                        "content": {
+                          "zoom": 2
+                        }
+                      },
+                      "e0000000-0000-4000-8000-000000000008": {
+                        "x": 400,
+                        "y": 300
+                      },
+                      "e0000000-0000-4000-8000-000000000009": {
+                        "x": 800,
+                        "y": 300
+                      }
+                    },
+                    "graphs": [
+                      {
+                        "id": "e0000000-0000-4000-8000-000000000004",
+                        "title": "Graph 1",
+                        "color": "#1f77b4",
+                        "headShape": "arrow",
+                        "edges": [
+                          {
+                            "from": "e0000000-0000-4000-8000-000000000002",
+                            "to": "e0000000-0000-4000-8000-000000000005"
+                          },
+                          {
+                            "from": "e0000000-0000-4000-8000-000000000005",
+                            "to": "e0000000-0000-4000-8000-000000000006",
+                            "title": "draws",
+                            "titleHidden": true
+                          },
+                          {
+                            "from": "e0000000-0000-4000-8000-000000000006",
+                            "to": "e0000000-0000-4000-8000-000000000007",
+                            "title": "charts"
+                          }
+                        ]
+                      }
+                    ],
+                    "activeGraph": "e0000000-0000-4000-8000-000000000004"
+                  }
+                ],
+                "defaultMap": "e0000000-0000-4000-8000-000000000003"
+              },
+              "resources": [
+                {
+                  "id": "e0000000-0000-4000-8000-000000000002",
+                  "document": {
+                    "title": "Resource 1",
+                    "kind": "markdown",
+                    "content": {
+                      "url": "/assets/ShCjesGW_izkOLBpDas813liwHufFHoHz9koyWIIhE8"
+                    }
+                  }
+                },
+                {
+                  "id": "e0000000-0000-4000-8000-000000000005",
+                  "document": {
+                    "title": "Ur",
+                    "kind": "ur",
+                    "content": {}
+                  }
+                },
+                {
+                  "id": "e0000000-0000-4000-8000-000000000006",
+                  "document": {
+                    "title": "Flow",
+                    "kind": "mermaid",
+                    "content": {
+                      "url": "/assets/3SlK29ZHsbsi0iVnl8AiqN2HKH5FdhB5oN59qmyyLM4"
+                    }
+                  }
+                },
+                {
+                  "id": "e0000000-0000-4000-8000-000000000007",
+                  "document": {
+                    "title": "Chart",
+                    "kind": "vnd.example.chart",
+                    "content": {
+                      "made": "/assets/zeS2_lTSbTYWCPNCX7jFe0jur7WWD0CZHRP1pmaSfZs",
+                      "series": [
+                        1,
+                        2.5,
+                        {
+                          "z": null,
+                          "a": true
+                        }
+                      ],
+                      "label": "é"
+                    }
+                  }
+                },
+                {
+                  "id": "e0000000-0000-4000-8000-000000000008",
+                  "document": {
+                    "title": "Picture",
+                    "kind": "image",
+                    "content": {
+                      "url": "/assets/-QzQ-bb-hSyczdrHoTUIUntc0EF9W9EQrACsB1ncNgE",
+                      "naturalSize": {
+                        "width": 4,
+                        "height": 3
+                      }
+                    }
+                  }
+                },
+                {
+                  "id": "e0000000-0000-4000-8000-000000000009",
+                  "document": {
+                    "title": "Resource 1 again",
+                    "kind": "reference",
+                    "content": {
+                      "target": "e0000000-0000-4000-8000-000000000002"
+                    }
+                  }
+                }
+              ]
+            },
+            "expectedRevision": "0"
+          }
+        ]
+      }
+    },
+    {
+      "commit": {
+        "changes": [
+          {
+            "kind": "create",
+            "spaceId": "e0000000-0000-4000-8000-000000000020",
+            "snapshot": {
+              "id": "e0000000-0000-4000-8000-000000000020",
+              "document": {
+                "version": 1,
+                "title": "Child",
+                "maps": [
+                  {
+                    "id": "e0000000-0000-4000-8000-000000000022",
+                    "title": "Map 1",
+                    "kind": "positioned",
+                    "positions": {
+                      "e0000000-0000-4000-8000-000000000021": {
+                        "x": 0,
+                        "y": 0
+                      }
+                    },
+                    "graphs": [
+                      {
+                        "id": "e0000000-0000-4000-8000-000000000023",
+                        "title": "Graph 1",
+                        "color": "#1f77b4",
+                        "headShape": "arrow",
+                        "edges": []
+                      }
+                    ],
+                    "activeGraph": "e0000000-0000-4000-8000-000000000023"
+                  }
+                ],
+                "defaultMap": "e0000000-0000-4000-8000-000000000022"
+              },
+              "resources": [
+                {
+                  "id": "e0000000-0000-4000-8000-000000000021",
+                  "document": {
+                    "title": "Inside",
+                    "kind": "markdown",
+                    "content": {
+                      "url": "/assets/ShCjesGW_izkOLBpDas813liwHufFHoHz9koyWIIhE8"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "kind": "update",
+            "spaceId": "e0000000-0000-4000-8000-000000000001",
+            "snapshot": {
+              "id": "e0000000-0000-4000-8000-000000000001",
+              "document": {
+                "version": 1,
+                "title": "New space",
+                "maps": [
+                  {
+                    "id": "e0000000-0000-4000-8000-000000000003",
+                    "title": "Map 1",
+                    "kind": "positioned",
+                    "positions": {
+                      "e0000000-0000-4000-8000-000000000002": {
+                        "x": 0,
+                        "y": 0
+                      },
+                      "e0000000-0000-4000-8000-000000000005": {
+                        "x": 400,
+                        "y": 0,
+                        "content": {
+                          "shape": "diamond"
+                        }
+                      },
+                      "e0000000-0000-4000-8000-000000000006": {
+                        "x": 800,
+                        "y": 0,
+                        "content": {
+                          "open": true
+                        }
+                      },
+                      "e0000000-0000-4000-8000-000000000007": {
+                        "x": 0,
+                        "y": 300,
+                        "size": {
+                          "width": 320,
+                          "height": 180
+                        },
+                        "content": {
+                          "zoom": 2
+                        }
+                      },
+                      "e0000000-0000-4000-8000-000000000008": {
+                        "x": 400,
+                        "y": 300
+                      },
+                      "e0000000-0000-4000-8000-000000000009": {
+                        "x": 800,
+                        "y": 300
+                      },
+                      "e0000000-0000-4000-8000-00000000000a": {
+                        "x": 0,
+                        "y": 600
+                      }
+                    },
+                    "graphs": [
+                      {
+                        "id": "e0000000-0000-4000-8000-000000000004",
+                        "title": "Graph 1",
+                        "color": "#1f77b4",
+                        "headShape": "arrow",
+                        "edges": [
+                          {
+                            "from": "e0000000-0000-4000-8000-000000000002",
+                            "to": "e0000000-0000-4000-8000-000000000005"
+                          },
+                          {
+                            "from": "e0000000-0000-4000-8000-000000000005",
+                            "to": "e0000000-0000-4000-8000-000000000006",
+                            "title": "draws",
+                            "titleHidden": true
+                          },
+                          {
+                            "from": "e0000000-0000-4000-8000-000000000006",
+                            "to": "e0000000-0000-4000-8000-000000000007",
+                            "title": "charts"
+                          }
+                        ]
+                      }
+                    ],
+                    "activeGraph": "e0000000-0000-4000-8000-000000000004"
+                  }
+                ],
+                "defaultMap": "e0000000-0000-4000-8000-000000000003"
+              },
+              "resources": [
+                {
+                  "id": "e0000000-0000-4000-8000-000000000002",
+                  "document": {
+                    "title": "Resource 1",
+                    "kind": "markdown",
+                    "content": {
+                      "url": "/assets/ShCjesGW_izkOLBpDas813liwHufFHoHz9koyWIIhE8"
+                    }
+                  }
+                },
+                {
+                  "id": "e0000000-0000-4000-8000-000000000005",
+                  "document": {
+                    "title": "Ur",
+                    "kind": "ur",
+                    "content": {}
+                  }
+                },
+                {
+                  "id": "e0000000-0000-4000-8000-000000000006",
+                  "document": {
+                    "title": "Flow",
+                    "kind": "mermaid",
+                    "content": {
+                      "url": "/assets/3SlK29ZHsbsi0iVnl8AiqN2HKH5FdhB5oN59qmyyLM4"
+                    }
+                  }
+                },
+                {
+                  "id": "e0000000-0000-4000-8000-000000000007",
+                  "document": {
+                    "title": "Chart",
+                    "kind": "vnd.example.chart",
+                    "content": {
+                      "made": "/assets/zeS2_lTSbTYWCPNCX7jFe0jur7WWD0CZHRP1pmaSfZs",
+                      "series": [
+                        1,
+                        2.5,
+                        {
+                          "z": null,
+                          "a": true
+                        }
+                      ],
+                      "label": "é"
+                    }
+                  }
+                },
+                {
+                  "id": "e0000000-0000-4000-8000-000000000008",
+                  "document": {
+                    "title": "Picture",
+                    "kind": "image",
+                    "content": {
+                      "url": "/assets/-QzQ-bb-hSyczdrHoTUIUntc0EF9W9EQrACsB1ncNgE",
+                      "naturalSize": {
+                        "width": 4,
+                        "height": 3
+                      }
+                    }
+                  }
+                },
+                {
+                  "id": "e0000000-0000-4000-8000-000000000009",
+                  "document": {
+                    "title": "Resource 1 again",
+                    "kind": "reference",
+                    "content": {
+                      "target": "e0000000-0000-4000-8000-000000000002"
+                    }
+                  }
+                },
+                {
+                  "id": "e0000000-0000-4000-8000-00000000000a",
+                  "document": {
+                    "title": "Child",
+                    "kind": "space",
+                    "content": {
+                      "spaceId": "e0000000-0000-4000-8000-000000000020",
+                      "map": "e0000000-0000-4000-8000-000000000022",
+                      "graph": "e0000000-0000-4000-8000-000000000023"
+                    }
+                  }
+                }
+              ]
+            },
+            "expectedRevision": "1"
+          }
+        ]
+      }
+    },
+    {
+      "commit": {
+        "changes": [
+          {
+            "kind": "create",
+            "spaceId": "e0000000-0000-4000-8000-000000000030",
+            "snapshot": {
+              "id": "e0000000-0000-4000-8000-000000000030",
+              "document": {
+                "version": 1,
+                "title": "Doomed",
+                "maps": [
+                  {
+                    "id": "e0000000-0000-4000-8000-000000000032",
+                    "title": "Map 1",
+                    "kind": "positioned",
+                    "positions": {
+                      "e0000000-0000-4000-8000-000000000031": {
+                        "x": 0,
+                        "y": 0
+                      }
+                    },
+                    "graphs": [
+                      {
+                        "id": "e0000000-0000-4000-8000-000000000033",
+                        "title": "Graph 1",
+                        "color": "#1f77b4",
+                        "headShape": "arrow",
+                        "edges": []
+                      }
+                    ],
+                    "activeGraph": "e0000000-0000-4000-8000-000000000033"
+                  }
+                ],
+                "defaultMap": "e0000000-0000-4000-8000-000000000032"
+              },
+              "resources": [
+                {
+                  "id": "e0000000-0000-4000-8000-000000000031",
+                  "document": {
+                    "title": "Gone soon",
+                    "kind": "markdown",
+                    "content": {
+                      "url": "/assets/ShCjesGW_izkOLBpDas813liwHufFHoHz9koyWIIhE8"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "kind": "update",
+            "spaceId": "e0000000-0000-4000-8000-000000000001",
+            "snapshot": {
+              "id": "e0000000-0000-4000-8000-000000000001",
+              "document": {
+                "version": 1,
+                "title": "New space",
+                "maps": [
+                  {
+                    "id": "e0000000-0000-4000-8000-000000000003",
+                    "title": "Map 1",
+                    "kind": "positioned",
+                    "positions": {
+                      "e0000000-0000-4000-8000-000000000002": {
+                        "x": 0,
+                        "y": 0
+                      },
+                      "e0000000-0000-4000-8000-000000000005": {
+                        "x": 400,
+                        "y": 0,
+                        "content": {
+                          "shape": "diamond"
+                        }
+                      },
+                      "e0000000-0000-4000-8000-000000000006": {
+                        "x": 800,
+                        "y": 0,
+                        "content": {
+                          "open": true
+                        }
+                      },
+                      "e0000000-0000-4000-8000-000000000007": {
+                        "x": 0,
+                        "y": 300,
+                        "size": {
+                          "width": 320,
+                          "height": 180
+                        },
+                        "content": {
+                          "zoom": 2
+                        }
+                      },
+                      "e0000000-0000-4000-8000-000000000008": {
+                        "x": 400,
+                        "y": 300
+                      },
+                      "e0000000-0000-4000-8000-000000000009": {
+                        "x": 800,
+                        "y": 300
+                      },
+                      "e0000000-0000-4000-8000-00000000000a": {
+                        "x": 0,
+                        "y": 600
+                      },
+                      "e0000000-0000-4000-8000-00000000000b": {
+                        "x": 400,
+                        "y": 600
+                      }
+                    },
+                    "graphs": [
+                      {
+                        "id": "e0000000-0000-4000-8000-000000000004",
+                        "title": "Graph 1",
+                        "color": "#1f77b4",
+                        "headShape": "arrow",
+                        "edges": [
+                          {
+                            "from": "e0000000-0000-4000-8000-000000000002",
+                            "to": "e0000000-0000-4000-8000-000000000005"
+                          },
+                          {
+                            "from": "e0000000-0000-4000-8000-000000000005",
+                            "to": "e0000000-0000-4000-8000-000000000006",
+                            "title": "draws",
+                            "titleHidden": true
+                          },
+                          {
+                            "from": "e0000000-0000-4000-8000-000000000006",
+                            "to": "e0000000-0000-4000-8000-000000000007",
+                            "title": "charts"
+                          }
+                        ]
+                      }
+                    ],
+                    "activeGraph": "e0000000-0000-4000-8000-000000000004"
+                  }
+                ],
+                "defaultMap": "e0000000-0000-4000-8000-000000000003"
+              },
+              "resources": [
+                {
+                  "id": "e0000000-0000-4000-8000-000000000002",
+                  "document": {
+                    "title": "Resource 1",
+                    "kind": "markdown",
+                    "content": {
+                      "url": "/assets/ShCjesGW_izkOLBpDas813liwHufFHoHz9koyWIIhE8"
+                    }
+                  }
+                },
+                {
+                  "id": "e0000000-0000-4000-8000-000000000005",
+                  "document": {
+                    "title": "Ur",
+                    "kind": "ur",
+                    "content": {}
+                  }
+                },
+                {
+                  "id": "e0000000-0000-4000-8000-000000000006",
+                  "document": {
+                    "title": "Flow",
+                    "kind": "mermaid",
+                    "content": {
+                      "url": "/assets/3SlK29ZHsbsi0iVnl8AiqN2HKH5FdhB5oN59qmyyLM4"
+                    }
+                  }
+                },
+                {
+                  "id": "e0000000-0000-4000-8000-000000000007",
+                  "document": {
+                    "title": "Chart",
+                    "kind": "vnd.example.chart",
+                    "content": {
+                      "made": "/assets/zeS2_lTSbTYWCPNCX7jFe0jur7WWD0CZHRP1pmaSfZs",
+                      "series": [
+                        1,
+                        2.5,
+                        {
+                          "z": null,
+                          "a": true
+                        }
+                      ],
+                      "label": "é"
+                    }
+                  }
+                },
+                {
+                  "id": "e0000000-0000-4000-8000-000000000008",
+                  "document": {
+                    "title": "Picture",
+                    "kind": "image",
+                    "content": {
+                      "url": "/assets/-QzQ-bb-hSyczdrHoTUIUntc0EF9W9EQrACsB1ncNgE",
+                      "naturalSize": {
+                        "width": 4,
+                        "height": 3
+                      }
+                    }
+                  }
+                },
+                {
+                  "id": "e0000000-0000-4000-8000-000000000009",
+                  "document": {
+                    "title": "Resource 1 again",
+                    "kind": "reference",
+                    "content": {
+                      "target": "e0000000-0000-4000-8000-000000000002"
+                    }
+                  }
+                },
+                {
+                  "id": "e0000000-0000-4000-8000-00000000000a",
+                  "document": {
+                    "title": "Child",
+                    "kind": "space",
+                    "content": {
+                      "spaceId": "e0000000-0000-4000-8000-000000000020",
+                      "map": "e0000000-0000-4000-8000-000000000022",
+                      "graph": "e0000000-0000-4000-8000-000000000023"
+                    }
+                  }
+                },
+                {
+                  "id": "e0000000-0000-4000-8000-00000000000b",
+                  "document": {
+                    "title": "Doomed",
+                    "kind": "space",
+                    "content": {
+                      "spaceId": "e0000000-0000-4000-8000-000000000030",
+                      "map": "e0000000-0000-4000-8000-000000000032",
+                      "graph": "e0000000-0000-4000-8000-000000000033"
+                    }
+                  }
+                }
+              ]
+            },
+            "expectedRevision": "2"
+          }
+        ]
+      }
+    },
+    {
+      "commit": {
+        "changes": [
+          {
+            "kind": "delete",
+            "spaceId": "e0000000-0000-4000-8000-000000000030",
+            "expectedRevision": "0"
+          },
+          {
+            "kind": "update",
+            "spaceId": "e0000000-0000-4000-8000-000000000001",
+            "snapshot": {
+              "id": "e0000000-0000-4000-8000-000000000001",
+              "document": {
+                "version": 1,
+                "title": "New space",
+                "maps": [
+                  {
+                    "id": "e0000000-0000-4000-8000-000000000003",
+                    "title": "Map 1",
+                    "kind": "positioned",
+                    "positions": {
+                      "e0000000-0000-4000-8000-000000000002": {
+                        "x": 0,
+                        "y": 0
+                      },
+                      "e0000000-0000-4000-8000-000000000005": {
+                        "x": 400,
+                        "y": 0,
+                        "content": {
+                          "shape": "diamond"
+                        }
+                      },
+                      "e0000000-0000-4000-8000-000000000006": {
+                        "x": 800,
+                        "y": 0,
+                        "content": {
+                          "open": true
+                        }
+                      },
+                      "e0000000-0000-4000-8000-000000000007": {
+                        "x": 0,
+                        "y": 300,
+                        "size": {
+                          "width": 320,
+                          "height": 180
+                        },
+                        "content": {
+                          "zoom": 2
+                        }
+                      },
+                      "e0000000-0000-4000-8000-000000000008": {
+                        "x": 400,
+                        "y": 300
+                      },
+                      "e0000000-0000-4000-8000-000000000009": {
+                        "x": 800,
+                        "y": 300
+                      },
+                      "e0000000-0000-4000-8000-00000000000a": {
+                        "x": 0,
+                        "y": 600
+                      }
+                    },
+                    "graphs": [
+                      {
+                        "id": "e0000000-0000-4000-8000-000000000004",
+                        "title": "Graph 1",
+                        "color": "#1f77b4",
+                        "headShape": "arrow",
+                        "edges": [
+                          {
+                            "from": "e0000000-0000-4000-8000-000000000002",
+                            "to": "e0000000-0000-4000-8000-000000000005"
+                          },
+                          {
+                            "from": "e0000000-0000-4000-8000-000000000005",
+                            "to": "e0000000-0000-4000-8000-000000000006",
+                            "title": "draws",
+                            "titleHidden": true
+                          },
+                          {
+                            "from": "e0000000-0000-4000-8000-000000000006",
+                            "to": "e0000000-0000-4000-8000-000000000007",
+                            "title": "charts"
+                          }
+                        ]
+                      }
+                    ],
+                    "activeGraph": "e0000000-0000-4000-8000-000000000004"
+                  }
+                ],
+                "defaultMap": "e0000000-0000-4000-8000-000000000003"
+              },
+              "resources": [
+                {
+                  "id": "e0000000-0000-4000-8000-000000000002",
+                  "document": {
+                    "title": "Resource 1",
+                    "kind": "markdown",
+                    "content": {
+                      "url": "/assets/ShCjesGW_izkOLBpDas813liwHufFHoHz9koyWIIhE8"
+                    }
+                  }
+                },
+                {
+                  "id": "e0000000-0000-4000-8000-000000000005",
+                  "document": {
+                    "title": "Ur",
+                    "kind": "ur",
+                    "content": {}
+                  }
+                },
+                {
+                  "id": "e0000000-0000-4000-8000-000000000006",
+                  "document": {
+                    "title": "Flow",
+                    "kind": "mermaid",
+                    "content": {
+                      "url": "/assets/3SlK29ZHsbsi0iVnl8AiqN2HKH5FdhB5oN59qmyyLM4"
+                    }
+                  }
+                },
+                {
+                  "id": "e0000000-0000-4000-8000-000000000007",
+                  "document": {
+                    "title": "Chart",
+                    "kind": "vnd.example.chart",
+                    "content": {
+                      "made": "/assets/zeS2_lTSbTYWCPNCX7jFe0jur7WWD0CZHRP1pmaSfZs",
+                      "series": [
+                        1,
+                        2.5,
+                        {
+                          "z": null,
+                          "a": true
+                        }
+                      ],
+                      "label": "é"
+                    }
+                  }
+                },
+                {
+                  "id": "e0000000-0000-4000-8000-000000000008",
+                  "document": {
+                    "title": "Picture",
+                    "kind": "image",
+                    "content": {
+                      "url": "/assets/-QzQ-bb-hSyczdrHoTUIUntc0EF9W9EQrACsB1ncNgE",
+                      "naturalSize": {
+                        "width": 4,
+                        "height": 3
+                      }
+                    }
+                  }
+                },
+                {
+                  "id": "e0000000-0000-4000-8000-000000000009",
+                  "document": {
+                    "title": "Resource 1 again",
+                    "kind": "reference",
+                    "content": {
+                      "target": "e0000000-0000-4000-8000-000000000002"
+                    }
+                  }
+                },
+                {
+                  "id": "e0000000-0000-4000-8000-00000000000a",
+                  "document": {
+                    "title": "Child",
+                    "kind": "space",
+                    "content": {
+                      "spaceId": "e0000000-0000-4000-8000-000000000020",
+                      "map": "e0000000-0000-4000-8000-000000000022",
+                      "graph": "e0000000-0000-4000-8000-000000000023"
+                    }
+                  }
+                }
+              ]
+            },
+            "expectedRevision": "3"
+          }
+        ]
+      }
+    },
+    {
+      "commit": {
+        "changes": [
+          {
+            "kind": "update",
+            "spaceId": "e0000000-0000-4000-8000-000000000001",
+            "snapshot": {
+              "id": "e0000000-0000-4000-8000-000000000001",
+              "document": {
+                "version": 1,
+                "title": "New space",
+                "maps": [
+                  {
+                    "id": "e0000000-0000-4000-8000-000000000003",
+                    "title": "Map 1",
+                    "kind": "positioned",
+                    "positions": {
+                      "e0000000-0000-4000-8000-000000000002": {
+                        "x": 0,
+                        "y": 0
+                      },
+                      "e0000000-0000-4000-8000-000000000005": {
+                        "x": 400,
+                        "y": 0,
+                        "content": {
+                          "shape": "diamond"
+                        }
+                      },
+                      "e0000000-0000-4000-8000-000000000006": {
+                        "x": 800,
+                        "y": 0,
+                        "content": {
+                          "open": true
+                        }
+                      },
+                      "e0000000-0000-4000-8000-000000000007": {
+                        "x": 0,
+                        "y": 300,
+                        "size": {
+                          "width": 320,
+                          "height": 180
+                        },
+                        "content": {
+                          "zoom": 2
+                        }
+                      },
+                      "e0000000-0000-4000-8000-000000000008": {
+                        "x": 400,
+                        "y": 300
+                      },
+                      "e0000000-0000-4000-8000-000000000009": {
+                        "x": 800,
+                        "y": 300
+                      },
+                      "e0000000-0000-4000-8000-00000000000a": {
+                        "x": 0,
+                        "y": 600
+                      }
+                    },
+                    "graphs": [
+                      {
+                        "id": "e0000000-0000-4000-8000-000000000004",
+                        "title": "Graph 1",
+                        "color": "#1f77b4",
+                        "headShape": "arrow",
+                        "edges": [
+                          {
+                            "from": "e0000000-0000-4000-8000-000000000002",
+                            "to": "e0000000-0000-4000-8000-000000000005"
+                          },
+                          {
+                            "from": "e0000000-0000-4000-8000-000000000005",
+                            "to": "e0000000-0000-4000-8000-000000000006",
+                            "title": "draws",
+                            "titleHidden": true
+                          },
+                          {
+                            "from": "e0000000-0000-4000-8000-000000000006",
+                            "to": "e0000000-0000-4000-8000-000000000007",
+                            "title": "charts"
+                          }
+                        ]
+                      }
+                    ],
+                    "activeGraph": "e0000000-0000-4000-8000-000000000004"
+                  }
+                ],
+                "defaultMap": "e0000000-0000-4000-8000-000000000003"
+              },
+              "resources": [
+                {
+                  "id": "e0000000-0000-4000-8000-000000000002",
+                  "document": {
+                    "title": "Resource one",
+                    "kind": "markdown",
+                    "content": {
+                      "url": "/assets/ShCjesGW_izkOLBpDas813liwHufFHoHz9koyWIIhE8"
+                    }
+                  }
+                },
+                {
+                  "id": "e0000000-0000-4000-8000-000000000005",
+                  "document": {
+                    "title": "Ur",
+                    "kind": "ur",
+                    "content": {}
+                  }
+                },
+                {
+                  "id": "e0000000-0000-4000-8000-000000000006",
+                  "document": {
+                    "title": "Flow",
+                    "kind": "mermaid",
+                    "content": {
+                      "url": "/assets/3SlK29ZHsbsi0iVnl8AiqN2HKH5FdhB5oN59qmyyLM4"
+                    }
+                  }
+                },
+                {
+                  "id": "e0000000-0000-4000-8000-000000000007",
+                  "document": {
+                    "title": "Chart",
+                    "kind": "vnd.example.chart",
+                    "content": {
+                      "made": "/assets/zeS2_lTSbTYWCPNCX7jFe0jur7WWD0CZHRP1pmaSfZs",
+                      "series": [],
+                      "label": "edited"
+                    }
+                  }
+                },
+                {
+                  "id": "e0000000-0000-4000-8000-000000000008",
+                  "document": {
+                    "title": "Picture",
+                    "kind": "image",
+                    "content": {
+                      "url": "/assets/-QzQ-bb-hSyczdrHoTUIUntc0EF9W9EQrACsB1ncNgE",
+                      "naturalSize": {
+                        "width": 4,
+                        "height": 3
+                      }
+                    }
+                  }
+                },
+                {
+                  "id": "e0000000-0000-4000-8000-000000000009",
+                  "document": {
+                    "title": "Resource 1 again",
+                    "kind": "reference",
+                    "content": {
+                      "target": "e0000000-0000-4000-8000-000000000002"
+                    }
+                  }
+                },
+                {
+                  "id": "e0000000-0000-4000-8000-00000000000a",
+                  "document": {
+                    "title": "Child",
+                    "kind": "space",
+                    "content": {
+                      "spaceId": "e0000000-0000-4000-8000-000000000020",
+                      "map": "e0000000-0000-4000-8000-000000000022",
+                      "graph": "e0000000-0000-4000-8000-000000000023"
+                    }
+                  }
+                }
+              ]
+            },
+            "expectedRevision": "4"
+          },
+          {
+            "kind": "update",
+            "spaceId": "e0000000-0000-4000-8000-000000000020",
+            "snapshot": {
+              "id": "e0000000-0000-4000-8000-000000000020",
+              "document": {
+                "version": 1,
+                "title": "Child",
+                "maps": [
+                  {
+                    "id": "e0000000-0000-4000-8000-000000000022",
+                    "title": "Map 1",
+                    "kind": "positioned",
+                    "positions": {
+                      "e0000000-0000-4000-8000-000000000021": {
+                        "x": 0,
+                        "y": 0
+                      }
+                    },
+                    "graphs": [
+                      {
+                        "id": "e0000000-0000-4000-8000-000000000023",
+                        "title": "Graph 1",
+                        "color": "#1f77b4",
+                        "headShape": "arrow",
+                        "edges": []
+                      }
+                    ],
+                    "activeGraph": "e0000000-0000-4000-8000-000000000023"
+                  }
+                ],
+                "defaultMap": "e0000000-0000-4000-8000-000000000022"
+              },
+              "resources": [
+                {
+                  "id": "e0000000-0000-4000-8000-000000000021",
+                  "document": {
+                    "title": "Inside, edited",
+                    "kind": "markdown",
+                    "content": {
+                      "url": "/assets/ShCjesGW_izkOLBpDas813liwHufFHoHz9koyWIIhE8"
+                    }
+                  }
+                }
+              ]
+            },
+            "expectedRevision": "0"
+          }
+        ]
+      }
+    }
+  ]
+}
