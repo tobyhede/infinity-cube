@@ -448,6 +448,30 @@ mod given_a_start_that_fails {
     }
 
     #[test]
+    fn named_at_launch_the_presenter_is_told_and_the_start_window_shows() {
+        let (_temporary, rust) = folder("rust");
+        let registry: Mutex<Registry<Server>> = Mutex::default();
+        let shell = Fake::new(&registry).starting([Start::Fail]);
+
+        open(
+            &shell,
+            &registry,
+            Origin::CommandLine,
+            std::slice::from_ref(&rust),
+        );
+
+        let calls = shell.calls.borrow().clone();
+        assert!(
+            matches!(
+                calls.as_slice(),
+                [Call::Start(started), Call::Error(_), Call::ShowStart] if *started == rust
+            ),
+            "a failed start at launch says why, then shows the Start window: {calls:?}"
+        );
+        assert!(lock(&registry).is_empty());
+    }
+
+    #[test]
     fn opening_its_window_stops_the_server_frees_the_folder_and_tells_the_presenter() {
         let (_temporary, rust) = folder("rust");
         let registry: Mutex<Registry<Server>> = Mutex::default();

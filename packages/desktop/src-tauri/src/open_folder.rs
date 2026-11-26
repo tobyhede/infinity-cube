@@ -6,8 +6,9 @@
 //! [`create_space`] for the Start window's New Space, the one request whose
 //! caller reads an answer. Both take one path: reserve the folder in the
 //! [`Registry`], start it, register its server and open its window, undoing
-//! what was done if a later step fails; offer a new Space in a folder that
-//! holds none; and decide whether the Start window closes or shows. A
+//! what was done if a later step fails, and decide whether the Start window
+//! closes or shows. Only [`open`] offers a new Space in a folder that holds
+//! none; [`create_space`] has just written one. A
 //! Space window that shows from the Start window closes it, and only a
 //! launch can be left with no window, so only a launch shows it, and never
 //! once a quit has begun (Storage ST-121).
