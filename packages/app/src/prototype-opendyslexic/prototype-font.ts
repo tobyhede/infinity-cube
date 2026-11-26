@@ -24,36 +24,33 @@ export function setPrototypeFont(variant: VariantId): void {
 }
 
 const FACES = [
-  { file: 'opendyslexic-latin-400-normal.woff2', weight: '400', style: 'normal' },
-  { file: 'opendyslexic-latin-400-italic.woff2', weight: '400', style: 'italic' },
-  { file: 'opendyslexic-latin-700-normal.woff2', weight: '700', style: 'normal' },
-  { file: 'opendyslexic-latin-700-italic.woff2', weight: '700', style: 'italic' },
-] as const;
-
-const FACE_URLS: Record<(typeof FACES)[number]['file'], string> = {
-  'opendyslexic-latin-400-normal.woff2': new URL(
-    './fonts/opendyslexic-latin-400-normal.woff2',
-    import.meta.url,
-  ).href,
-  'opendyslexic-latin-400-italic.woff2': new URL(
-    './fonts/opendyslexic-latin-400-italic.woff2',
-    import.meta.url,
-  ).href,
-  'opendyslexic-latin-700-normal.woff2': new URL(
-    './fonts/opendyslexic-latin-700-normal.woff2',
-    import.meta.url,
-  ).href,
-  'opendyslexic-latin-700-italic.woff2': new URL(
-    './fonts/opendyslexic-latin-700-italic.woff2',
-    import.meta.url,
-  ).href,
-};
+  {
+    url: new URL('./fonts/opendyslexic-latin-400-normal.woff2', import.meta.url).href,
+    weight: '400',
+    style: 'normal',
+  },
+  {
+    url: new URL('./fonts/opendyslexic-latin-400-italic.woff2', import.meta.url).href,
+    weight: '400',
+    style: 'italic',
+  },
+  {
+    url: new URL('./fonts/opendyslexic-latin-700-normal.woff2', import.meta.url).href,
+    weight: '700',
+    style: 'normal',
+  },
+  {
+    url: new URL('./fonts/opendyslexic-latin-700-italic.woff2', import.meta.url).href,
+    weight: '700',
+    style: 'italic',
+  },
+];
 
 /** Register the bundled faces and install the variant before the first frame. */
 export function installPrototypeFont(): void {
   for (const face of FACES) {
     document.fonts.add(
-      new FontFace('OpenDyslexic', `url(${FACE_URLS[face.file]}) format('woff2')`, {
+      new FontFace('OpenDyslexic', `url(${face.url}) format('woff2')`, {
         weight: face.weight,
         style: face.style,
         display: 'swap',
