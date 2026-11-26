@@ -7,11 +7,11 @@
  *      the Dock, menus and rails keep the system sans
  * Light mode is never changed. Code and source stay monospace in every variant.
  *
- * The font files are OpenDyslexic 400/700 (normal and italic, Latin subset)
- * from @fontsource/opendyslexic 5.3.0, bundled here rather than hot-linked.
- * Licence: SIL Open Font License 1.1, Reserved Font Name "OpenDyslexic"
- * (fonts/OFL.txt). Unmodified, so the name may be used. The faces are
- * registered from prototype-font.ts through the FontFace API.
+ * The font files are OpenDyslexic 3 (Version 1.000), Regular and Bold TTF, as
+ * the author distributes them on itch.io, unmodified and bundled here rather
+ * than hot-linked. It has no italic, so the browser slants Regular. Licence:
+ * SIL Open Font License 1.1, Reserved Font Name "OpenDyslexic" (fonts/OFL.txt).
+ * The faces are registered from prototype-font.ts through the FontFace API.
  */
 
 :root {

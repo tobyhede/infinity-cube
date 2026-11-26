@@ -25,24 +25,12 @@ export function setPrototypeFont(variant: VariantId): void {
 
 const FACES = [
   {
-    url: new URL('./fonts/opendyslexic-latin-400-normal.woff2', import.meta.url).href,
+    url: new URL('./fonts/OpenDyslexic3-Regular.ttf', import.meta.url).href,
     weight: '400',
-    style: 'normal',
   },
   {
-    url: new URL('./fonts/opendyslexic-latin-400-italic.woff2', import.meta.url).href,
-    weight: '400',
-    style: 'italic',
-  },
-  {
-    url: new URL('./fonts/opendyslexic-latin-700-normal.woff2', import.meta.url).href,
+    url: new URL('./fonts/OpenDyslexic3-Bold.ttf', import.meta.url).href,
     weight: '700',
-    style: 'normal',
-  },
-  {
-    url: new URL('./fonts/opendyslexic-latin-700-italic.woff2', import.meta.url).href,
-    weight: '700',
-    style: 'italic',
   },
 ];
 
@@ -50,9 +38,8 @@ const FACES = [
 export function installPrototypeFont(): void {
   for (const face of FACES) {
     document.fonts.add(
-      new FontFace('OpenDyslexic', `url(${face.url}) format('woff2')`, {
+      new FontFace('OpenDyslexic', `url(${face.url}) format('truetype')`, {
         weight: face.weight,
-        style: face.style,
         display: 'swap',
       }),
     );
