@@ -22,7 +22,7 @@ use sqlx::{Pool, Row, Sqlite, Transaction};
 
 use super::codec::{ResourceRow, SpaceRow};
 use super::path::SqlitePath;
-use super::{SqlSpaceRepository, SqlStore};
+use super::{Access, LockMode, SqlSpaceRepository, SqlStore};
 use crate::assets::StoredAsset;
 use crate::json_text::compact;
 use crate::repository::RepositoryError;
@@ -89,6 +89,32 @@ impl FileIdentity {
 /// ```
 pub type SqliteSpaceRepository = SqlSpaceRepository<SqliteStore>;
 
+impl SqliteStore {
+    /// The statements over the file `path` names, opened lazily.
+    pub(crate) fn at(path: &SqlitePath, busy_timeout: Duration) -> Self {
+        let options = SqliteConnectOptions::new()
+            .filename(path.as_path())
+            .create_if_missing(false)
+            .journal_mode(SqliteJournalMode::Delete)
+            .synchronous(SqliteSynchronous::Full)
+            .foreign_keys(true)
+            .busy_timeout(busy_timeout);
+        // One connection, kept: the repository runs one operation at a time,
+        // and no maintenance task outlives a closed pool.
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .min_connections(0)
+            .idle_timeout(None)
+            .max_lifetime(None)
+            .connect_lazy_with(options);
+        Self {
+            pool,
+            path: path.as_path().to_path_buf(),
+            opened: std::sync::Mutex::new(None),
+        }
+    }
+}
+
 /// The settings a repository's connection to its file has.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -116,26 +142,7 @@ impl SqlSpaceRepository<SqliteStore> {
     /// process holds before an operation fails as unavailable.
     #[must_use]
     pub fn open_with_busy_timeout(path: &SqlitePath, busy_timeout: Duration) -> Self {
-        let options = SqliteConnectOptions::new()
-            .filename(path.as_path())
-            .create_if_missing(false)
-            .journal_mode(SqliteJournalMode::Delete)
-            .synchronous(SqliteSynchronous::Full)
-            .foreign_keys(true)
-            .busy_timeout(busy_timeout);
-        // One connection, kept: the repository runs one operation at a time,
-        // and no maintenance task outlives a closed pool.
-        let pool = SqlitePoolOptions::new()
-            .max_connections(1)
-            .min_connections(0)
-            .idle_timeout(None)
-            .max_lifetime(None)
-            .connect_lazy_with(options);
-        Self::over(SqliteStore {
-            pool,
-            path: path.as_path().to_path_buf(),
-            opened: std::sync::Mutex::new(None),
-        })
+        Self::over(SqliteStore::at(path, busy_timeout))
     }
 
     /// The settings the repository's own connection has, read through it.
@@ -157,17 +164,18 @@ impl SqlSpaceRepository<SqliteStore> {
                 synchronous,
             })
         };
-        let _alone = self.serial.lock().await;
-        if let Some(reason) = self.store().file_replaced() {
-            return Err(RepositoryError::Unavailable(reason));
-        }
-        read.await.map_err(|error| self.store().classify(&error))
+        self.alone(async {
+            if let Some(reason) = self.store().file_replaced() {
+                return Err(RepositoryError::Unavailable(reason));
+            }
+            read.await.map_err(|error| self.store().classify(&error))
+        })
+        .await
     }
 
     /// Close the file once every operation under way has finished.
     pub async fn close(&self) {
-        let _alone = self.serial.lock().await;
-        self.store().pool.close().await;
+        self.close_store().await;
     }
 }
 
@@ -220,14 +228,64 @@ const NOW: &str = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
 impl SqlStore for SqliteStore {
     type Database = Sqlite;
 
-    async fn begin_read(&self) -> Result<Transaction<'static, Sqlite>, sqlx::Error> {
-        self.pool.begin().await
+    // SQLite has one writer, so the process runs one operation at a time
+    // (ST-127).
+    const SERIAL: bool = true;
+
+    async fn begin(&self, access: Access) -> Result<Transaction<'static, Sqlite>, sqlx::Error> {
+        match access {
+            Access::Read | Access::Locked { writes: false } => self.pool.begin().await,
+            // IMMEDIATE takes the write lock at once, so a file another
+            // process holds fails here, before anything is read or written.
+            Access::Write | Access::Locked { writes: true } => {
+                self.pool.begin_with("BEGIN IMMEDIATE").await
+            }
+        }
     }
 
-    async fn begin_write(&self) -> Result<Transaction<'static, Sqlite>, sqlx::Error> {
-        // IMMEDIATE takes the write lock at once, so a file another process
-        // holds fails here, before anything is read or written.
-        self.pool.begin_with("BEGIN IMMEDIATE").await
+    async fn lock_aggregate(
+        &self,
+        _connection: &mut SqliteConnection,
+        _mode: LockMode,
+    ) -> Result<(), sqlx::Error> {
+        // A writing transaction already holds the file's write lock from its
+        // `BEGIN IMMEDIATE`, and a reading one its snapshot, behind the
+        // process's one-at-a-time gate: nothing else to take.
+        Ok(())
+    }
+
+    async fn relock_meta(
+        &self,
+        connection: &mut SqliteConnection,
+        id: &str,
+    ) -> Result<bool, sqlx::Error> {
+        sqlx::query_scalar(
+            "SELECT EXISTS (SELECT 1 FROM repository_state \
+             WHERE singleton_id = 1 AND meta_space_id = $1)",
+        )
+        .bind(id)
+        .fetch_one(connection)
+        .await
+    }
+
+    async fn lock_space(
+        &self,
+        connection: &mut SqliteConnection,
+        id: &str,
+    ) -> Result<Option<String>, sqlx::Error> {
+        // The transaction's write lock already covers every row.
+        sqlx::query_scalar("SELECT revision FROM spaces WHERE id = $1")
+            .bind(id)
+            .fetch_optional(connection)
+            .await
+    }
+
+    async fn space_revisions(
+        connection: &mut SqliteConnection,
+    ) -> Result<Vec<(String, String)>, sqlx::Error> {
+        sqlx::query_as("SELECT id, revision FROM spaces ORDER BY id")
+            .fetch_all(connection)
+            .await
     }
 
     async fn meta_space_id(
@@ -321,13 +379,11 @@ impl SqlStore for SqliteStore {
         row: &SpaceRow,
     ) -> Result<bool, sqlx::Error> {
         let updated = sqlx::query(sqlx::AssertSqlSafe(format!(
-            "UPDATE spaces SET document = $2, revision = $3, exported_revision = $4, \
-             updated_at = {NOW} WHERE id = $1"
+            "UPDATE spaces SET document = $2, revision = $3, updated_at = {NOW} WHERE id = $1"
         )))
         .bind(&row.id)
         .bind(&row.document)
         .bind(&row.revision)
-        .bind(&row.exported_revision)
         .execute(connection)
         .await?;
         Ok(updated.rows_affected() > 0)
@@ -529,5 +585,9 @@ impl SqlStore for SqliteStore {
         } else {
             RepositoryError::Unclassified(error.to_string())
         }
+    }
+
+    async fn close(&self) {
+        self.pool.close().await;
     }
 }

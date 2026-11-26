@@ -107,9 +107,11 @@ pub use run::{
     Unset,
 };
 pub use shell::{BuiltFiles, Shell};
+#[cfg(feature = "test-support")]
+pub use sql::Probe;
 pub use sql::{
-    ConnectionSettings, SqlSpaceRepository, SqlitePath, SqlitePathError, SqliteSpaceRepository,
-    SqliteStore,
+    ConnectionSettings, LockMode, SqlSpaceRepository, SqlitePath, SqlitePathError,
+    SqliteSpaceRepository, SqliteStore, Step,
 };
 pub use startup::{
     ESTABLISH_RETRY_INITIAL_DELAY, ESTABLISH_RETRY_MAX_DELAY, EstablishError, establish_meta_space,

@@ -7,6 +7,12 @@ rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[features]
+# Test instrumentation: a probe each SQL repository operation waits on at its
+# named steps. Off by default; only `host`'s own tests turn it on, through the
+# dev-dependency on itself below.
+test-support = []
+
 [dependencies]
 bytes = { workspace = true }
 http = { workspace = true }
@@ -28,6 +34,7 @@ uuid = { version = "1", features = ["v4"] }
 rustix = { version = "1", features = ["fs"] }
 
 [dev-dependencies]
+host = { path = ".", features = ["test-support"] }
 http-conformance = { workspace = true }
 proptest = "1"
 serde_json = { workspace = true }

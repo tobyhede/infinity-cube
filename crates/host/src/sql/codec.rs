@@ -36,7 +36,7 @@ pub(crate) fn encode_revision(revision: Revision) -> String {
 
 /// A stored revision, if it is canonical decimal text no higher than the
 /// ceiling (`decodeStoredRevision`).
-fn decode_revision(text: &str) -> Option<Revision> {
+pub(crate) fn decode_revision(text: &str) -> Option<Revision> {
     let canonical = text == "0"
         || (!text.starts_with('0') && !text.is_empty() && text.bytes().all(|b| b.is_ascii_digit()));
     canonical
