@@ -45,7 +45,10 @@ const scriptSchema = z
       z.union([
         z
           .object({
-            asset: z.object({ mediaType: z.string(), text: z.string(), hash: z.string() }).strict(),
+            asset: z.union([
+              z.object({ mediaType: z.string(), text: z.string(), hash: z.string() }).strict(),
+              z.object({ mediaType: z.string(), hex: z.string(), hash: z.string() }).strict(),
+            ]),
           })
           .strict(),
         z.object({ commit: z.unknown() }).strict(),
@@ -65,7 +68,10 @@ export const scriptAssets = async (): Promise<readonly StoredAsset[]> =>
     script()
       .steps.flatMap((step) => ('asset' in step ? [step.asset] : []))
       .map(async (asset) => {
-        const admitted = await admitAsset(new TextEncoder().encode(asset.text), asset.mediaType);
+        const admitted = await admitAsset(
+          'text' in asset ? new TextEncoder().encode(asset.text) : Uint8Array.fromHex(asset.hex),
+          asset.mediaType,
+        );
         if (admitted.kind !== 'admitted') throw new Error(`the script's asset is refused`);
         if (admitted.asset.hash !== asset.hash) {
           throw new Error(

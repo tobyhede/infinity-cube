@@ -504,18 +504,23 @@ mod given_a_file_seeded_with_the_fixture {
         let migrated = Migrated::fixture();
         let mut started = serve_file(&migrated.file);
         let port = started.port();
-        // A request still arriving keeps the stop waiting for it.
+        // A request still arriving keeps the stop waiting for it. Its
+        // `100 Continue` is sent once the application reads the body, so the
+        // request is being answered, not a connection waiting idle for one,
+        // when the first signal lands.
         let mut slow = TcpStream::connect(("127.0.0.1", port)).unwrap();
         write!(
             slow,
-            "POST /api/spaces HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n{{"
+            "POST /api/spaces HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nContent-Type: application/json\r\nContent-Length: 100\r\nExpect: 100-continue\r\n\r\n"
         )
         .unwrap();
-        assert_eq!(
-            get(port, "/api/spaces").status,
-            200,
-            "a later request is answered once the slow connection is accepted"
+        let mut interim = String::new();
+        BufReader::new(&slow).read_line(&mut interim).unwrap();
+        assert!(
+            interim.starts_with("HTTP/1.1 100"),
+            "the body is being read: {interim:?}"
         );
+        write!(slow, "{{").unwrap();
         started.signal("INT");
         assert!(
             started.still_running_after(Duration::from_millis(300)),

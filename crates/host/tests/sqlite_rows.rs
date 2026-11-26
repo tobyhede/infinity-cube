@@ -78,17 +78,26 @@ fn meta() -> SpaceId {
     SpaceId::parse(text(field(&script(), "initialize"), "metaSpaceId")).unwrap()
 }
 
+/// An asset step's bytes: its `text` as UTF-8, or its `hex`.
+fn bytes_of(asset: &JsonValue) -> Bytes {
+    let object = asset.as_object().unwrap();
+    match (object.get("text"), object.get("hex")) {
+        (Some(JsonValue::String(text)), None) => Bytes::from(text.clone()),
+        (None, Some(JsonValue::String(hex))) => (0..hex.len())
+            .step_by(2)
+            .map(|at| u8::from_str_radix(&hex[at..at + 2], 16).unwrap())
+            .collect(),
+        _ => panic!("an asset step has its text or its hex"),
+    }
+}
+
 /// Each asset the script stores, as it stores it.
 fn assets() -> Vec<StoredAsset> {
     array(field(&script(), "steps"))
         .iter()
         .filter_map(|step| step.as_object().and_then(|step| step.get("asset")))
         .map(|asset| {
-            let stored = StoredAsset::admit(
-                Bytes::from(text(asset, "text").to_owned()),
-                text(asset, "mediaType"),
-            )
-            .unwrap();
+            let stored = StoredAsset::admit(bytes_of(asset), text(asset, "mediaType")).unwrap();
             assert_eq!(
                 stored.hash,
                 AssetHash::parse(text(asset, "hash")).unwrap(),
