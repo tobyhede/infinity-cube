@@ -9,6 +9,8 @@
 //! returning early, so it fails instead of passing having tested nothing.
 //! Migrating is test setup only: the repository never migrates.
 
+pub mod stand_in;
+
 use std::path::Path;
 use std::sync::OnceLock;
 

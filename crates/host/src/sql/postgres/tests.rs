@@ -20,13 +20,16 @@ use sqlx::postgres::PgSslMode;
 use super::{PostgresUrlError, classify, connect_options};
 use crate::repository::RepositoryError;
 
-/// A database error carrying one SQLSTATE.
+/// A database error: its SQLSTATE, if it carries one, and its words.
 #[derive(Debug)]
-struct Coded(&'static str);
+struct Coded {
+    code: Option<&'static str>,
+    message: &'static str,
+}
 
 impl std::fmt::Display for Coded {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(formatter, "SQLSTATE {}", self.0)
+        formatter.write_str(self.message)
     }
 }
 
@@ -34,11 +37,11 @@ impl StdError for Coded {}
 
 impl DatabaseError for Coded {
     fn message(&self) -> &str {
-        self.0
+        self.message
     }
 
     fn code(&self) -> Option<Cow<'_, str>> {
-        Some(Cow::Borrowed(self.0))
+        self.code.map(Cow::Borrowed)
     }
 
     fn as_error(&self) -> &(dyn StdError + Send + Sync + 'static) {
@@ -58,8 +61,23 @@ impl DatabaseError for Coded {
     }
 }
 
+/// A failure on a statement carrying `code`.
 fn database(code: &'static str) -> sqlx::Error {
-    sqlx::Error::Database(Box::new(Coded(code)))
+    sqlx::Error::Database(Box::new(Coded {
+        code: Some(code),
+        message: "failed",
+    }))
+}
+
+/// A socket failure of `kind`, as the operating system raises it.
+fn socket(kind: io::ErrorKind) -> sqlx::Error {
+    sqlx::Error::Io(io::Error::from(kind))
+}
+
+/// A socket failure of `kind` carrying words, as a driver that normalised
+/// it would.
+fn worded(kind: io::ErrorKind, words: &str) -> sqlx::Error {
+    sqlx::Error::Io(io::Error::new(kind, words.to_owned()))
 }
 
 fn named(error: &sqlx::Error) -> &'static str {
@@ -70,18 +88,142 @@ fn named(error: &sqlx::Error) -> &'static str {
     }
 }
 
+/// One test per value, each asserting what `classify` names it.
+macro_rules! each {
+    ($answer:literal: $($name:ident => $error:expr),+ $(,)?) => {
+        $(
+            #[test]
+            fn $name() {
+                assert_eq!(named(&$error), $answer);
+            }
+        )+
+    };
+}
+
 mod classify_a_failure {
     use super::*;
 
+    // A dropped connection reads `UnexpectedEof`; the driver's `transient`
+    // flag has no counterpart, and the words are not read.
+    // Case: recognises %s whatever its transient flag says
+    each!("unreachable":
+        recognises_a_connection_the_server_dropped =>
+            worded(io::ErrorKind::UnexpectedEof, "Connection terminated"),
+        recognises_a_refused_connection_with_its_words =>
+            worded(io::ErrorKind::ConnectionRefused, "connect ECONNREFUSED"),
+    );
+
+    // Case: recognises the socket failure %s the driver normalised
+    each!("unreachable":
+        recognises_econnrefused_with_its_words =>
+            worded(io::ErrorKind::ConnectionRefused, "connect ECONNREFUSED"),
+        recognises_econnreset_with_its_words =>
+            worded(io::ErrorKind::ConnectionReset, "connect ECONNRESET"),
+        recognises_etimedout_with_its_words =>
+            worded(io::ErrorKind::TimedOut, "connect ETIMEDOUT"),
+        recognises_ehostunreach_with_its_words =>
+            worded(io::ErrorKind::HostUnreachable, "connect EHOSTUNREACH"),
+    );
+
+    // A name that does not resolve reaches `sqlx` with no OS error.
+    // Case: leaves a host name that does not resolve unclassified when the driver normalised it
+    each!("unclassified":
+        leaves_a_host_name_that_does_not_resolve_unclassified => sqlx::Error::Io(io::Error::other(
+            "failed to lookup address information: Name or service not known"
+        )),
+    );
+
+    // Case: recognises SQLSTATE %s on a statement the driver normalised
+    each!("unreachable":
+        recognises_sqlstate_08000 => database("08000"),
+        recognises_sqlstate_08001 => database("08001"),
+        recognises_sqlstate_08003 => database("08003"),
+        recognises_sqlstate_08004 => database("08004"),
+        recognises_sqlstate_08006 => database("08006"),
+        recognises_sqlstate_40001 => database("40001"),
+        recognises_sqlstate_40p01 => database("40P01"),
+        recognises_sqlstate_53300 => database("53300"),
+        recognises_sqlstate_55p03 => database("55P03"),
+        recognises_sqlstate_57p01 => database("57P01"),
+        recognises_sqlstate_57p02 => database("57P02"),
+        recognises_sqlstate_57p03 => database("57P03"),
+    );
+
+    // Case: names the set ticket 31 records
     #[test]
-    fn answers_every_sqlstate_of_the_typescript_allowlist_unreachable() {
-        for code in [
-            "08000", "08001", "08003", "08004", "08006", "40001", "40P01", "53300", "55P03",
-            "57P01", "57P02", "57P03",
-        ] {
-            assert_eq!(named(&database(code)), "unreachable", "{code}");
-        }
+    fn names_the_set_the_typescript_store_names() {
+        let mut states = super::super::UNREACHABLE_STATES;
+        states.sort_unstable();
+        assert_eq!(
+            states,
+            [
+                "08000", "08001", "08003", "08004", "08006", "40001", "40P01", "53300", "55P03",
+                "57P01", "57P02", "57P03",
+            ]
+        );
     }
+
+    // Case: recognises the socket failure %s
+    each!("unreachable":
+        recognises_the_socket_failure_econnrefused => socket(io::ErrorKind::ConnectionRefused),
+        recognises_the_socket_failure_econnreset => socket(io::ErrorKind::ConnectionReset),
+        recognises_the_socket_failure_etimedout => socket(io::ErrorKind::TimedOut),
+        recognises_the_socket_failure_ehostunreach => socket(io::ErrorKind::HostUnreachable),
+        recognises_the_socket_failure_enetunreach => socket(io::ErrorKind::NetworkUnreachable),
+    );
+
+    // The accepted difference (ADR 0177): a resolver that failed for now
+    // (`EAI_AGAIN`) reaches `sqlx` as a name that does not resolve does, with
+    // no OS error, so Rust leaves it unclassified where TypeScript names it
+    // unreachable.
+    // Case: recognises the socket failure %s
+    each!("unclassified":
+        leaves_a_resolver_that_failed_for_now_unclassified => sqlx::Error::Io(io::Error::other(
+            "failed to lookup address information: Temporary failure in name resolution"
+        )),
+    );
+
+    // Case: leaves the error code %s unclassified
+    each!("unclassified":
+        leaves_enotfound_unclassified => sqlx::Error::Io(io::Error::other(
+            "failed to lookup address information: Name or service not known"
+        )),
+        leaves_eacces_unclassified => socket(io::ErrorKind::PermissionDenied),
+        leaves_eproto_unclassified => sqlx::Error::Io(io::Error::other("Protocol error")),
+        leaves_an_invalid_argument_unclassified => socket(io::ErrorKind::InvalidInput),
+    );
+
+    // `sqlx` keeps no cause chain: a failure is classified by itself, so an
+    // error nested inside another is never walked into, and there is no chain
+    // to loop on.
+    // Case: terminates on a cyclic cause chain
+    each!("unclassified":
+        reads_a_failure_by_itself_and_not_what_it_wraps => sqlx::Error::Io(io::Error::other(
+            io::Error::from(io::ErrorKind::ConnectionRefused)
+        )),
+    );
+
+    // Case: leaves a defect, an unknown code and a code named only in prose unclassified
+    each!("unclassified":
+        leaves_a_unique_violation_unclassified => database("23505"),
+        leaves_sqlites_catch_all_unclassified => database("HY000"),
+        leaves_a_cancelled_statement_unclassified => database("57014"),
+        leaves_an_unknown_sqlstate_unclassified => database("XX999"),
+        leaves_a_code_named_only_in_a_database_errors_words_unclassified =>
+            sqlx::Error::Database(Box::new(Coded {
+                code: None,
+                message: "deadlock detected (40P01)",
+            })),
+        leaves_a_code_named_in_words_beside_another_code_unclassified =>
+            sqlx::Error::Database(Box::new(Coded {
+                code: Some("XX999"),
+                message: "40P01",
+            })),
+        leaves_a_code_named_only_in_a_protocol_failure_unclassified =>
+            sqlx::Error::Protocol("deadlock detected (40P01)".into()),
+        leaves_a_socket_failure_named_only_in_words_unclassified =>
+            sqlx::Error::Io(io::Error::other("connect ECONNREFUSED 127.0.0.1:5432")),
+    );
 
     #[test]
     fn answers_a_rejected_password_a_missing_database_and_others_unclassified() {
@@ -110,36 +252,8 @@ mod classify_a_failure {
             io::ErrorKind::HostUnreachable,
             io::ErrorKind::NetworkUnreachable,
         ] {
-            assert_eq!(
-                named(&sqlx::Error::Io(io::Error::from(kind))),
-                "unreachable",
-                "{kind:?}"
-            );
+            assert_eq!(named(&socket(kind)), "unreachable", "{kind:?}");
         }
-    }
-
-    // A name that does not resolve, and a resolver that failed for now
-    // (`EAI_AGAIN`), both reach `sqlx` as an uncategorised failure with no
-    // OS error, so neither is Unreachable: the accepted difference.
-    #[test]
-    fn answers_other_io_failures_and_an_unresolved_name_unclassified() {
-        for kind in [
-            io::ErrorKind::PermissionDenied,
-            io::ErrorKind::InvalidData,
-            io::ErrorKind::Other,
-        ] {
-            assert_eq!(
-                named(&sqlx::Error::Io(io::Error::from(kind))),
-                "unclassified",
-                "{kind:?}"
-            );
-        }
-        assert_eq!(
-            named(&sqlx::Error::Io(io::Error::other(
-                "failed to lookup address information: Temporary failure in name resolution"
-            ))),
-            "unclassified"
-        );
     }
 
     #[test]
@@ -157,6 +271,14 @@ mod classify_a_failure {
             "unclassified"
         );
         assert_eq!(named(&sqlx::Error::RowNotFound), "unclassified");
+    }
+
+    #[test]
+    fn keeps_the_sqlstate_with_the_words() {
+        let RepositoryError::Unclassified(words) = classify(&database("28P01")) else {
+            panic!("unclassified");
+        };
+        assert!(words.contains("SQLSTATE 28P01"), "{words}");
     }
 }
 

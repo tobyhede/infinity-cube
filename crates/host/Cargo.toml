@@ -47,7 +47,7 @@ proptest = "1"
 serde_json = { workspace = true }
 sqlx = { workspace = true, features = ["migrate", "postgres", "runtime-tokio", "sqlite-bundled"] }
 tempfile = { workspace = true }
-tokio = { workspace = true, features = ["fs", "macros", "rt", "rt-multi-thread", "sync", "test-util", "time"] }
+tokio = { workspace = true, features = ["fs", "io-util", "macros", "net", "rt", "rt-multi-thread", "sync", "test-util", "time"] }
 url = { workspace = true }
 
 [lints]
