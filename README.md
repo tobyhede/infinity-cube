@@ -62,7 +62,7 @@ This takes you from a fresh clone to the desktop application open on a Space of 
 
 7. **Present.** Press **Present**: `→` follows an Edge, `←` goes back, `↑` / `↓` choose at a fork. Done when `Esc` returns you to the Map as you left it.
 
-8. **Close the window.** Closing the Space window writes every pending edit. If a write is still running after ten seconds, it asks whether to keep waiting, which is always safe, or close without saving, which loses the edits not yet written. If a write fails, a dialog says why, and those edits are not on disk. On Linux, closing the last window ends the application; on macOS it keeps running with no window until you quit it. Don't press Ctrl-C, close the terminal or send a signal while a Space window is open: any of them ends the application at once, and edits not yet written are lost. Done when the window has closed with no dialog and, on Linux, the terminal has its prompt back.
+8. **Close the window.** Closing the Space window writes every pending edit. If a write is still running after ten seconds, it asks whether to keep waiting, which is always safe, or close without saving, which loses the edits not yet written. If a write fails, a dialog says why, and those edits are not on disk. On Linux, closing the last window ends the application; on macOS it is meant to keep running with no window until you quit it, which has not been tried yet. Don't press Ctrl-C, close the terminal or send a signal while a Space window is open: any of them ends the application at once, and edits not yet written are lost. Done when the window has closed with no dialog and, on Linux, the terminal has its prompt back.
 
 9. **Commit.** `git -C ~/spaces/rust-async add -A && git -C ~/spaces/rust-async commit -m "First draft"`. Done when `git -C ~/spaces/rust-async status` is clean.
 
@@ -124,7 +124,18 @@ It checks the download and puts `infinity-cube` in `~/.local/bin`; then `infinit
 
 ### The desktop application on macOS
 
-Download `InfinityCube-<version>-aarch64-apple-darwin.dmg` from the newest release, open it and drag InfinityCube to Applications. It is not signed with an Apple Developer ID, so macOS refuses it the first time: open **System Settings › Privacy & Security**, choose **Open Anyway** beside the message about InfinityCube, and confirm, or run `xattr -dr com.apple.quarantine /Applications/InfinityCube.app` once. After that it opens as any application does, and offers each newer preview build when one is published. Make a Space with **New Space** in its Start window, keep its folder in git as [Getting started](#getting-started) step 3 does (without `pnpm cube init`, which the application has done), and carry on from step 6.
+Download `InfinityCube-<version>-aarch64-apple-darwin.dmg` from the newest release, open it and drag InfinityCube to Applications. It is not signed with an Apple Developer ID, so macOS refuses it the first time: open **System Settings › Privacy & Security**, choose **Open Anyway** beside the message about InfinityCube, and confirm, or run `xattr -dr com.apple.quarantine /Applications/InfinityCube.app` once. After that it opens as any application does. It is meant to offer each newer preview build when one is published, which has not been seen working yet.
+
+Make a Space with **New Space** in its Start window, which writes `~/Documents/Untitled Space` unless you change the name or location, then commit it before you edit, as [Getting started](#getting-started) step 3 does, using that folder:
+
+```sh
+git init ~/Documents/"Untitled Space"
+echo .infinity-cube.lock >> ~/Documents/"Untitled Space"/.gitignore
+git -C ~/Documents/"Untitled Space" add -A
+git -C ~/Documents/"Untitled Space" commit -m "New Space"
+```
+
+Then carry on from step 6, using that folder in place of `~/spaces/rust-async` in step 9.
 
 ### Building a preview build yourself
 
