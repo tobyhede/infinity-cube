@@ -39,6 +39,7 @@ const RUST_FILES = [
   ...filesUnder('crates/host/tests', (name) => /^sqlite.*\.rs$/u.test(name)).filter(
     (file) => !file.includes('/sqlite_support/'),
   ),
+  ...filesUnder('crates/host/tests/repository_contract', (name) => name.endsWith('.rs')),
   'crates/host/tests/startup.rs',
   ...filesUnder('crates/host/src', (name) => name.endsWith('.rs')),
   'crates/cli/tests/serve.rs',
@@ -61,7 +62,7 @@ const VALUES: Readonly<Record<string, readonly string[]>> = {
 };
 
 /** The tickets a pending case may name. */
-const TICKETS = ['04', '05', '06', '10', '11', '12', '13'] as const;
+const TICKETS = ['05', '06', '10', '11', '12', '13'] as const;
 type Ticket = (typeof TICKETS)[number];
 
 type Exemption =
@@ -76,8 +77,6 @@ const ROW_LOCK =
 
 const EXEMPT: Readonly<Record<string, Exemption>> = {
   // The contract.
-  'preserves the established aggregate across a fresh repository host': pending('04'),
-  'persists first-working-load initialization for a fresh repository host': pending('04'),
   'replaces * stored state through the destructive lifecycle door (invalid-space-document)':
     pending('05'),
   'replaces * stored state through the destructive lifecycle door (invalid-aggregate)':
@@ -85,28 +84,8 @@ const EXEMPT: Readonly<Record<string, Exemption>> = {
   "names a broken stored document broken stored state on the single-Space fast path, and leaves loadSpace's answer narrower":
     pending('05'),
   'truncates stored Spaces without a Meta identity only when none was expected': pending('05'),
-  'initializes and replaces only through explicit Meta-rooted aggregates': pending('04'),
-  'classifies canonical and different initialization proposals': pending('04'),
-  'refuses a replacement proposal naming a Meta Space it does not hold': pending('04'),
-  'ignores object-key insertion order when classifying initialization': pending('04'),
-  'lets only one different concurrent initialization establish state': pending('04'),
-  'rolls back a refused replacement': pending('04'),
-  'refuses replacement before initialization': pending('04'),
-  'reads the stored Meta identity as each lifecycle door leaves it': pending('04'),
-  'refuses a replacement expecting no Meta identity where one is stored': pending('04'),
-  'refuses a replacement authorized against a superseded Meta identity': pending('04'),
-  'refuses to record an exported revision for a Space it does not store': pending('04'),
-  'refuses an aggregate that repeats a Space identity, storing none of it': pending('04'),
-  'refuses an aggregate that repeats a Resource identity, storing none of it': pending('04'),
-  'refuses a replacement that repeats a * identity, keeping the stored aggregate (Space)':
-    pending('04'),
-  'refuses a replacement that repeats a * identity, keeping the stored aggregate (Resource)':
-    pending('04'),
-  'refuses an initialization that fails domain intake, storing none of it': pending('04'),
-  'replaces everything stored, freeing the Resource ids it clears': pending('04'),
   'raises an identifiable invariant failure for a stored Space whose revision is not canonical':
     pending('05'),
-  'becomes committable from an empty store': pending('04'),
   'stores and reloads an Image Resource unchanged': pending('12'),
   'stores and reloads an Ur Resource and a Reference Resource to it unchanged': pending('12'),
   'stores, renames and reloads a Resource whose plugin is missing unchanged': pending('12'),
@@ -114,47 +93,17 @@ const EXEMPT: Readonly<Record<string, Exemption>> = {
     pending('12'),
   'hands a Resource whose plugin is missing to that plugin when it returns': pending('12'),
   'refuses a topology-preserving update when stored Spaces have no Meta identity': pending('05'),
-  'stores an initialized Space, then lists, loads and commits it': pending('04'),
   "keeps an Edge's Title and hidden flag through initialization, commit and load": pending('12'),
   "keeps a Graph's head shape through initialization, commit and load": pending('12'),
   "keeps every Resource's Map content through initialization, commit and load": pending('12'),
-  "keeps every Resource through a topology-preserving commit's own delete": pending('04'),
-  'refuses to create a new unreachable Space by removing its last reference alone': pending('04'),
-  'atomically creates, links, reads, converges on, and deletes a Space': pending('04'),
-  'refuses an authored commit that deletes the Meta Space': pending('04'),
   "keeps each Space Resource's own selection across a later default Map change": pending('12'),
-  'reports every conflict and rolls back every refused aggregate': pending('04'),
-  'answers a stale expected revision with the current aggregate': pending('04'),
-  'refuses a commit that fails domain intake and stores nothing': pending('04'),
-  'refuses a commit for a Space it does not store': pending('04'),
-  'refuses a commit whose Space id differs from its snapshot id': pending('04'),
-  'refuses an update whose snapshot names another stored Space at a matching revision':
-    pending('04'),
-  "places a single update's failed intake at its Space's position in the aggregate": pending('04'),
-  'refuses a commit that names one Space more than once': pending('04'),
-  'refuses a commit claiming a Resource another Space owns': pending('04'),
-  'scopes Graph identities to their containing Space': pending('04'),
-  'refuses an unreferenced ordinary Space even when its Graph identity is reused': pending('04'),
-  'permits a Graph and Resource to share an identity': pending('04'),
-  'refuses two Maps in one Space that own the same Graph identity': pending('04'),
-  'keeps the Resources a commit names and drops the ones it omits': pending('04'),
-  'drops every Resource when a commit omits them all': pending('04'),
-  "returns a Space's Resources in ascending id order however they were supplied": pending('04'),
-  'records an exported revision and carries it across later commits': pending('04'),
-  'refuses to mark an exported revision above the storage ceiling': pending('04'),
-  'stores and commits a revision above Number.MAX_SAFE_INTEGER as canonical decimal text':
-    pending('04'),
   'raises an identifiable invariant failure for a stored Space whose revision exceeds the 2^63-1 ceiling':
     pending('05'),
   'raises an identifiable invariant failure for a commit whose fast-path candidate has a non-canonical stored revision':
     pending('05'),
-  'writes only the Resource a topology-preserving commit changed': pending('04'),
-  'writes only the new and changed Resources on the complete-aggregate path': pending('04'),
-  'writes no Resource for a commit at a stale revision': pending('04'),
-  'moves an unchanged Resource between Spaces in one commit': pending('04'),
   'writes a moved Resource through the ownership check, which refuses it before its Space releases it':
     doesNotApply(
-      "a commit's answer does not depend on the order of its changes (ADR 0176, Storage ST-20): the Rust repository commits the move this case has the TypeScript SQL writer refuse, which a Rust test that is not a port holds (rust-sqlite-test-coverage 04)",
+      "a commit's answer does not depend on the order of its changes (ADR 0176, Storage ST-20): the Rust repository commits the move this case has the TypeScript SQL writer refuse, which `commits_a_move_whichever_space_it_lists_first` in `crates/host/tests/repository_contract/commits.rs`, not a port, holds on the memory store and SQLite",
     ),
   "stores a * commit's whole snapshot over Resource rows recreated before its row lock (topology-preserving)":
     doesNotApply(ROW_LOCK),
@@ -288,6 +237,7 @@ describe('the repository cases the Rust SQLite repository is held to', () => {
   it('reads Rust files that exist', () => {
     expect(RUST_FILES).toContain('crates/host/tests/sqlite.rs');
     expect(RUST_FILES).toContain('crates/host/src/sql.rs');
+    expect(RUST_FILES).toContain('crates/host/tests/repository_contract/commits.rs');
     expect(RUST_FILES.filter((file) => file.includes('sqlite_support'))).toEqual([]);
   });
 });
@@ -326,7 +276,7 @@ describe('the port check', () => {
   const cases = ['ported', 'pending', 'inapplicable'];
   const clean: Marks = {
     marked: ['ported', 'an HTTP case'],
-    exempt: { pending: pending('04'), inapplicable: doesNotApply('why') },
+    exempt: { pending: pending('05'), inapplicable: doesNotApply('why') },
     elsewhere: ['an HTTP case'],
   };
 
@@ -351,7 +301,7 @@ describe('the port check', () => {
 
   it('finds an exemption naming no case', () => {
     expect(
-      findings(cases, { ...clean, exempt: { ...clean.exempt, gone: pending('04') } })
+      findings(cases, { ...clean, exempt: { ...clean.exempt, gone: pending('05') } })
         .unknownExemptions,
     ).toEqual(['gone']);
   });
@@ -364,7 +314,7 @@ describe('the port check', () => {
   });
 
   it('tells a pending exemption from one that does not apply', () => {
-    expect(pending('04')).toEqual({ kind: 'pending', ticket: '04' });
+    expect(pending('05')).toEqual({ kind: 'pending', ticket: '05' });
     expect(doesNotApply('why')).toEqual({ kind: 'does not apply', reason: 'why' });
   });
 });

@@ -38,7 +38,7 @@ impl State {
                 (
                     snapshot.id,
                     LoadedSpace {
-                        snapshot,
+                        snapshot: in_id_order(snapshot),
                         revision: Revision::FIRST,
                         exported_revision: None,
                     },
@@ -48,6 +48,13 @@ impl State {
         self.meta_space_id = Some(input.meta_space_id);
         self.aggregate(input.meta_space_id)
     }
+}
+
+/// `snapshot` with its Resources in ascending id order, the order every
+/// store answers them in (Storage ST-21).
+fn in_id_order(mut snapshot: SpaceSnapshot) -> SpaceSnapshot {
+    snapshot.resources.sort_by_key(|resource| resource.id);
+    snapshot
 }
 
 /// The in-process [`SpaceRepository`].
@@ -136,7 +143,8 @@ impl SpaceRepository for MemorySpaceRepository {
                 for id in &deleted {
                     state.spaces.remove(id);
                 }
-                for space in written {
+                for mut space in written {
+                    space.snapshot = in_id_order(space.snapshot);
                     state.spaces.insert(space.snapshot.id, space);
                 }
                 Ok(result)
