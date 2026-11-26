@@ -614,10 +614,16 @@ pub async fn refuses_two_maps_owning_one_graph_identity<H: Harness>(harness: &mu
         .unwrap();
     match &result {
         InitializeResult::AggregateRefused(refusals) => {
-            // Every refusal is the Space's own, at its position 0.
+            // The one refusal is the repeated Graph's, of the Space at its
+            // position 0. The TypeScript case asserts the position alone.
             let stage = refusals.space_stage().expect("the Space stage refuses");
+            let graph = intake::GraphId::parse(GRAPH_ID).unwrap();
             assert!(
-                matches!(stage.as_slice(), [(0, errors)] if !errors.is_empty()),
+                matches!(
+                    stage.as_slice(),
+                    [(0, [intake::Refusal::DuplicateGraphId { space, graph: repeated }])]
+                        if *space == id(SPACE_ID) && *repeated == graph
+                ),
                 "{stage:?}"
             );
         }

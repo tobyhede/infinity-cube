@@ -684,14 +684,9 @@ pub async fn keeps_what_the_fixture_lacks_as_committed<H: Harness>(harness: &mut
         "the Meta Space, read from its files"
     );
     assert_eq!(
-        sorted(read_other).document,
-        sorted(&changed_other).document,
-        "the Coloured Space's document, read from its files"
-    );
-    assert_eq!(
-        read_other.resources.len(),
-        1,
-        "the unread Resource, read from its file"
+        sorted(read_other),
+        sorted(&changed_other),
+        "the Coloured Space and its unread Resource, read from their files"
     );
     Ok(())
 }

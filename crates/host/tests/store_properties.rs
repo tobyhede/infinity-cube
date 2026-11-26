@@ -52,8 +52,9 @@ fn note_id(index: u8) -> String {
     format!("c2000000-0000-4000-8000-0000000001{:02x}", index % 8)
 }
 
-/// The Space Resource Meta links ordinary Space `index` through.
-fn link_id(index: usize) -> String {
+/// The id of the Space Resource through which Meta links ordinary Space
+/// `index`.
+fn link_resource_id(index: usize) -> String {
     format!("c2000000-0000-4000-8000-0000000002{index:02x}")
 }
 
@@ -67,13 +68,14 @@ fn link(index: usize) -> Resource {
     let holder = space_holding(
         SPACE_ID,
         "Holder",
-        vec![space_resource(&link_id(index), ORDINARY[index])],
+        vec![space_resource(&link_resource_id(index), ORDINARY[index])],
     );
     holder.resources.into_iter().next().unwrap()
 }
 
 /// `resources` in an order that is not ascending whenever there are two:
-/// rotated by `order`, and reversed when its top bit is set.
+/// rotated by `order` and reversed when its top bit is set, then rotated
+/// once more if that left them ascending.
 fn reordered(mut resources: Vec<Resource>, order: u8) -> Vec<Resource> {
     resources.sort_by(|left, right| left.id.as_str().cmp(right.id.as_str()));
     if resources.len() > 1 {
@@ -81,6 +83,12 @@ fn reordered(mut resources: Vec<Resource>, order: u8) -> Vec<Resource> {
         resources.rotate_left(by);
         if order & 0x80 != 0 {
             resources.reverse();
+        }
+        if resources
+            .windows(2)
+            .all(|pair| pair[0].id.as_str() < pair[1].id.as_str())
+        {
+            resources.rotate_left(1);
         }
     }
     resources
@@ -351,7 +359,7 @@ fn commit_for(step: &Step, stored: &[LoadedSpace], order: u8) -> Option<SpaceCom
                 .snapshot
                 .resources
                 .iter()
-                .filter(|held| held.id.as_str() != link_id(linked))
+                .filter(|held| held.id.as_str() != link_resource_id(linked))
                 .cloned()
                 .collect();
             in_order(
@@ -427,8 +435,8 @@ fn initial() -> Vec<SpaceSnapshot> {
         "Meta",
         vec![
             resource(&note_id(0), "Note"),
-            space_resource(&link_id(0), ORDINARY[0]),
-            space_resource(&link_id(1), ORDINARY[1]),
+            space_resource(&link_resource_id(0), ORDINARY[0]),
+            space_resource(&link_resource_id(1), ORDINARY[1]),
         ],
     );
     let mut spaces = vec![
@@ -554,4 +562,23 @@ async fn the_generated_steps_reach_every_kind_of_answer() {
         kinds.into_iter().collect::<Vec<_>>(),
         ["aggregate-refused", "committed", "conflict"]
     );
+}
+
+/// `reordered` lists two or more Resources out of ascending order for every
+/// `order`, so no generated snapshot reaches a store already sorted.
+#[test]
+fn reorders_every_snapshot_of_two_or_more_resources_out_of_ascending_order() {
+    for count in 2_u8..=4 {
+        let resources: Vec<Resource> = (0..count).map(note).collect();
+        for order in 0..=u8::MAX {
+            let ids: Vec<String> = reordered(resources.clone(), order)
+                .iter()
+                .map(|held| held.id.as_str().to_owned())
+                .collect();
+            assert!(
+                ids.windows(2).any(|pair| pair[0] > pair[1]),
+                "{count} Resources reordered by {order:#04x}: {ids:?}"
+            );
+        }
+    }
 }

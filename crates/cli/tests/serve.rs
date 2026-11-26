@@ -599,6 +599,38 @@ mod given_a_file_another_process_holds {
                     .is_some_and(|listed| listed.len() == 1)
         });
     }
+
+    /// `serve` opens the file waiting out another holder's lock (ST-127):
+    /// a read made while another process holds the file answers once it is
+    /// let go, a second later, rather than 503 at once.
+    #[test]
+    fn waits_out_a_lock_let_go_inside_the_busy_timeout() {
+        let migrated = Migrated::fixture();
+        let started = serve_file(&migrated.file);
+        let port = started.port();
+        assert_eq!(get(port, "/api/spaces").status, 200, "the file is served");
+        let held = runtime();
+        let lock = held.block_on(async {
+            let mut connection = sqlx::sqlite::SqliteConnectOptions::new()
+                .filename(&migrated.file)
+                .connect()
+                .await
+                .unwrap();
+            sqlx::raw_sql("BEGIN EXCLUSIVE")
+                .execute(&mut connection)
+                .await
+                .unwrap();
+            connection
+        });
+        let read = std::thread::spawn(move || get(port, "/api/spaces").status);
+        std::thread::sleep(Duration::from_secs(1));
+        held.block_on(sqlx::Connection::close(lock)).unwrap();
+        assert_eq!(
+            read.join().unwrap(),
+            200,
+            "the read made under the lock waits for it and answers"
+        );
+    }
 }
 
 mod given_a_file_whose_meta_document_is_not_json {

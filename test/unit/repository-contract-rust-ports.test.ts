@@ -1,15 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { casesOf, filesUnder, markedIn } from '../support/case-names';
+import { casesOf, filesUnder, markedIn, readRepositoryFile } from '../support/case-names';
 
 /*
  * The TypeScript repository contract (`test/support/repository-contract.ts`)
  * runs on SQLite, and so do the TypeScript SQLite files beside it. The Rust
  * SQLite repository is held to each of their cases by a Rust test carrying
  * the line `// Case: <name>` above it in one of the Rust files below, or by an
- * exemption here: **pending**, naming the ticket of
- * `.scratch/rust-sqlite-test-coverage/` that ports it, or **does not apply**,
- * saying why it cannot. TypeScript is the reference; nothing here changes it.
+ * exemption here saying why the case does not apply to it. TypeScript is the
+ * reference; nothing here changes it.
  *
  * A contract case's name is its `it`'s first argument with the leading
  * `${name} ` (the harness's store name) dropped and any other substitution
@@ -63,16 +62,12 @@ const VALUES = {
 
 const VALUES_BY_CASE = new Map(Object.entries(VALUES));
 
-/** The tickets a pending case may name: none is open, so no case may be pending. */
-const TICKETS: readonly string[] = [];
-type Ticket = string;
+/** Why a case does not apply to the Rust SQLite repository. */
+interface Exemption {
+  readonly reason: string;
+}
 
-type Exemption =
-  | { readonly kind: 'pending'; readonly ticket: Ticket }
-  | { readonly kind: 'does not apply'; readonly reason: string };
-
-const pending = (ticket: Ticket): Exemption => ({ kind: 'pending', ticket });
-const doesNotApply = (reason: string): Exemption => ({ kind: 'does not apply', reason });
+const doesNotApply = (reason: string): Exemption => ({ reason });
 
 const ROW_LOCK =
   'the TypeScript repository reads a Space and then takes its row lock, so another writer can change the rows between the two; the Rust repository reads and writes inside one `BEGIN IMMEDIATE` transaction holding the write lock from its start, so no row changes between its read and its write';
@@ -138,6 +133,68 @@ const CASES = [...CONTRACT_RUNS, ...Object.values(OUTSIDE_CASES).flat()];
 
 const HTTP_CASES = HTTP_CASE_FILES.flatMap(casesOf);
 
+/** The module whose `repository_cases!` table runs the contract's Rust cases. */
+const CONTRACT_TABLE = 'crates/host/tests/repository_contract/mod.rs';
+
+/** The contract's Rust case files, each a group of the table, by group. */
+const CONTRACT_GROUPS = filesUnder('crates/host/tests/repository_contract', (name) =>
+  name.endsWith('.rs'),
+)
+  .filter((file) => file !== CONTRACT_TABLE)
+  .map((file) => ({ group: file.replace(/^.*\/(.+)\.rs$/u, '$1'), file }));
+
+/** The cases a `repository_cases!` table in `source` runs, each `group::case`. */
+const tableOf = (source: string): string[] => {
+  const begin = source.indexOf('// table:begin');
+  const end = source.indexOf('// table:end');
+  if (begin === -1 || end < begin) return ['<no table between its markers>'];
+  let group = '';
+  return source
+    .slice(begin, end)
+    .split('\n')
+    .slice(1)
+    .flatMap((written) => {
+      const line = written.trim().replace(/,$/u, '');
+      if (line.endsWith(' {')) {
+        group = line.slice(0, -2);
+        return [];
+      }
+      return line === '' || line === '}' ? [] : [`${group}::${line}`];
+    });
+};
+
+/**
+ * The function each `// Case:` line in `source`, the file of `group`, sits
+ * above, each `group::function`, with only comment lines between them.
+ */
+const markedFunctionsOf = (group: string, source: string): string[] => {
+  const functions: string[] = [];
+  let marked = false;
+  for (const line of source.split('\n').map((written) => written.trim())) {
+    if (line.startsWith('// Case: ')) {
+      marked = true;
+    } else if (line.startsWith('//')) {
+      // a comment line between a mark and its function
+    } else if (marked) {
+      const name = /^pub async fn (\w+)/u.exec(line)?.[1];
+      functions.push(
+        name === undefined ? `<a mark in ${group} above no case>` : `${group}::${name}`,
+      );
+      marked = false;
+    }
+  }
+  return functions;
+};
+
+/** The marked functions of `groups` that `table` does not run. */
+const unrun = (
+  table: readonly string[],
+  groups: readonly { readonly group: string; readonly source: string }[],
+): string[] =>
+  groups
+    .flatMap(({ group, source }) => markedFunctionsOf(group, source))
+    .filter((name) => !table.includes(name));
+
 interface Marks {
   /** The case names the Rust files mark. */
   readonly marked: readonly string[];
@@ -202,25 +259,35 @@ describe('the Rust SQLite repository', () => {
     expect(found.exemptAndPorted).toEqual([]);
   });
 
-  it('gives each exemption a ticket that ports it or a reason it does not apply', () => {
-    const malformed = Object.entries(EXEMPT).filter(([, exemption]) =>
-      exemption.kind === 'pending'
-        ? !TICKETS.includes(exemption.ticket)
-        : exemption.reason.trim().length === 0,
+  it('runs every contract case it marks as a port, through the table', () => {
+    const table = tableOf(readRepositoryFile(CONTRACT_TABLE));
+    expect(table.length).toBeGreaterThan(70);
+    expect(CONTRACT_GROUPS.map(({ group }) => group)).toContain('commits');
+    expect(
+      unrun(
+        table,
+        CONTRACT_GROUPS.map(({ group, file }) => ({ group, source: readRepositoryFile(file) })),
+      ),
+    ).toEqual([]);
+  });
+
+  it('gives each exemption a reason it does not apply', () => {
+    const malformed = Object.entries(EXEMPT).filter(
+      ([, exemption]) => exemption.reason.trim().length === 0,
     );
     expect(malformed).toEqual([]);
   });
 });
 
 describe('the port check', () => {
-  const cases = ['ported', 'pending', 'inapplicable'];
+  const cases = ['ported', 'inapplicable'];
   const clean: Marks = {
     marked: ['ported', 'an HTTP case'],
-    exempt: { pending: pending('11'), inapplicable: doesNotApply('why') },
+    exempt: { inapplicable: doesNotApply('why') },
     elsewhere: ['an HTTP case'],
   };
 
-  it('finds nothing wrong with a case ported once, or exempted either way', () => {
+  it('finds nothing wrong with a case ported once, or exempted', () => {
     expect(findings(cases, clean)).toEqual({
       unported: [],
       unknownMarks: [],
@@ -241,7 +308,7 @@ describe('the port check', () => {
 
   it('finds an exemption naming no case', () => {
     expect(
-      findings(cases, { ...clean, exempt: { ...clean.exempt, gone: pending('11') } })
+      findings(cases, { ...clean, exempt: { ...clean.exempt, gone: doesNotApply('why') } })
         .unknownExemptions,
     ).toEqual(['gone']);
   });
@@ -253,8 +320,22 @@ describe('the port check', () => {
     ).toEqual(['ported']);
   });
 
-  it('tells a pending exemption from one that does not apply', () => {
-    expect(pending('11')).toEqual({ kind: 'pending', ticket: '11' });
-    expect(doesNotApply('why')).toEqual({ kind: 'does not apply', reason: 'why' });
+  it('finds a marked case the table does not run, and a mark above no case', () => {
+    const table = tableOf('// table:begin\n  commits {\n    listed,\n  }\n  // table:end');
+    expect(table).toEqual(['commits::listed']);
+    const source = [
+      '// Case: one',
+      '/// Its doc.',
+      'pub async fn listed<H: Harness>(harness: &mut H) -> Ran {',
+      '// Case: two',
+      'pub async fn dropped<H: Harness>(',
+      '// Case: three',
+      'fn helper() {}',
+      'pub async fn unmarked<H: Harness>(',
+    ].join('\n');
+    expect(unrun(table, [{ group: 'commits', source }])).toEqual([
+      'commits::dropped',
+      '<a mark in commits above no case>',
+    ]);
   });
 });

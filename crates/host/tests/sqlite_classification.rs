@@ -69,24 +69,10 @@ fn wire(named: Named) -> (u16, &'static str) {
 
 /// The status and problem code `GET <path>` answers over `store`.
 async fn served(store: &Arc<SqliteSpaceRepository>, path: &str) -> (u16, String) {
-    let application: Application<SqliteSpaceRepository, Counted, BTreeMap<String, Bytes>> =
-        Application::new(
-            Arc::clone(store),
-            Counted::default(),
-            Shell::new("", BTreeMap::new()),
-        );
     let request = Request::get(path)
         .body(http_body_util::Full::new(Bytes::new()))
         .unwrap();
-    let response = application.handle(request).await;
-    let status = response.status().as_u16();
-    let body: serde_json::Value = serde_json::from_slice(response.body()).unwrap_or_default();
-    let code = body["type"]
-        .as_str()
-        .and_then(|kind| kind.strip_prefix("urn:infinity-cube:problem:"))
-        .unwrap_or_default()
-        .to_owned();
-    (status, code)
+    sqlite_support::served(store, request).await
 }
 
 /// Assert `answer` is named `expected`, and that `GET <path>` over `store`
@@ -315,8 +301,11 @@ mod given_each_failure {
     // Case: answers a closed database as retryable 503 persistence-unavailable, not 409
     /// Each read and a commit at the revision read, over a store closed
     /// underneath the application, answer 503 `persistence-unavailable` as
-    /// problem JSON, never the 409 a stale revision earns. That the browser
-    /// retries it is the TypeScript client's, held by its own tests.
+    /// problem JSON, never the 409 a stale revision earns. The browser answers
+    /// it as a retryable failure (`packages/http/test/http-backend.test.ts` ›
+    /// `maps %s to retryable %s`) and retries only when asked
+    /// (`packages/persistence/test/session.test.ts` › `stops on retryable
+    /// failure and retries the latest working snapshot explicitly`).
     #[tokio::test]
     async fn answers_every_request_over_a_closed_store_503_never_409() {
         let file = seeded().await;
@@ -596,8 +585,14 @@ mod given_one_file {
 
     impl Clock for ReleasingClock {
         fn sleep(&self, _duration: Duration) -> impl Future<Output = ()> + Send {
-            drop(self.0.lock().unwrap().take());
-            std::future::ready(())
+            let held = self.0.lock().unwrap().take();
+            async move {
+                if let Some(connection) = held {
+                    sqlx::Connection::close(connection)
+                        .await
+                        .expect("the held connection closes");
+                }
+            }
         }
     }
 

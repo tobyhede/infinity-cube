@@ -290,19 +290,21 @@ pub async fn ignores_object_key_order_when_classifying_initialization<H: Harness
     harness: &mut H,
 ) -> Ran {
     let store = harness.store();
-    let first = snapshot(
-        SPACE_ID,
-        &serde_json::from_str(&format!(
-            r#"{{"id":"{SPACE_ID}","document":{{"version":1,"title":"Meta"}},"resources":[{{"id":"{RESOURCE_ID}","document":{{"title":"Resource","kind":"markdown","content":{{"url":"{EMPTY_ASSET_REF}"}}}}}}]}}"#
-        ))
-        .unwrap(),
-    );
-    let reordered = snapshot(
-        SPACE_ID,
-        &serde_json::from_str(&format!(
-            r#"{{"id":"{SPACE_ID}","document":{{"title":"Meta","version":1}},"resources":[{{"id":"{RESOURCE_ID}","document":{{"content":{{"url":"{EMPTY_ASSET_REF}"}},"kind":"markdown","title":"Resource"}}}}]}}"#
-        ))
-        .unwrap(),
+    // A Space's document decodes into fields, so only opaque content, a
+    // missing plugin's here, keeps the order its keys were written in.
+    let written = |content: &str| {
+        snapshot_text(
+            SPACE_ID,
+            &format!(
+                r#"{{"id":"{SPACE_ID}","document":{{"version":1,"title":"Meta"}},"resources":[{{"id":"{RESOURCE_ID}","document":{{"title":"Resource","kind":"vnd.example.unread","content":{content}}}}}]}}"#
+            ),
+        )
+    };
+    let first = written(r#"{"zeta":1,"alpha":{"y":2,"x":1}}"#);
+    let reordered = written(r#"{"alpha":{"x":1,"y":2},"zeta":1}"#);
+    assert_ne!(
+        first, reordered,
+        "the two proposals hold their content's keys in different orders"
     );
     assert!(matches!(
         store.initialize_aggregate(input(SPACE_ID, &[&first])).await,

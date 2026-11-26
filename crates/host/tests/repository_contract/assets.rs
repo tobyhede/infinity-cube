@@ -157,6 +157,18 @@ pub async fn holds_a_markdown_resource_from_its_file_and_its_text_as_one_value<H
         before,
         "the files Export writes back"
     );
+    // Export in place skips a file it would write unchanged, so only an
+    // Export into an empty directory shows it writes every file.
+    let fresh = temporary.path().join("fresh");
+    std::fs::create_dir_all(&fresh).unwrap();
+    let _exported = export_aggregate(store, &TokioFilesystem, &fresh)
+        .await
+        .unwrap();
+    assert_eq!(
+        read_tree(&fresh),
+        before,
+        "the files Export writes to an empty directory"
+    );
     Ok(())
 }
 

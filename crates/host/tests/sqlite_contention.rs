@@ -31,22 +31,20 @@ mod repository_contract;
 #[allow(dead_code, reason = "each test binary uses part of the support")]
 mod sqlite_support;
 
-use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use bytes::Bytes;
 use host::{
-    AggregateInput, AggregateLoad, Application, CommitResult, ReplaceResult, RepositoryError,
-    Shell, SpaceRepository, SqliteSpaceRepository,
+    AggregateInput, AggregateLoad, CommitResult, ReplaceResult, RepositoryError, SpaceRepository,
+    SqliteSpaceRepository,
 };
 use http::Request;
-use http_conformance::Counted;
 use repository_contract::{
     OTHER_SPACE_ID, RESOURCE_ID, SPACE_ID, commit, id, retitled, seed, space, space_value, update,
 };
-use sqlite_support::{Migrated, connect};
+use sqlite_support::{Migrated, connect, served};
 
 /// The busy timeout a test that waits it out sets.
 const SHORT: Duration = Duration::from_millis(200);
@@ -209,10 +207,12 @@ async fn fails_a_replacement_against_a_shared_lock_after_the_busy_timeout() {
 }
 
 // Case: fails * against a * lock as * BUSY, leaving the file unchanged and unlocked
-/// The TypeScript writer fails here at once, its transaction deferred; the
-/// Rust writer opens with `BEGIN IMMEDIATE`, so it waits for the write lock
-/// and fails only once the busy timeout has run out. A deferred `BEGIN`
-/// fails this test, answering at once.
+/// The TypeScript writer fails here at once, its transaction deferred
+/// (`test/integration/sqlite-contention.test.ts` › `fails commit against a
+/// reserved lock as immediate BUSY, leaving the file unchanged and
+/// unlocked`); the Rust writer opens with `BEGIN IMMEDIATE`, so it waits for
+/// the write lock and fails only once the busy timeout has run out. A
+/// deferred `BEGIN` fails this test, answering at once.
 #[tokio::test]
 async fn fails_a_commit_against_a_reserved_lock_after_the_busy_timeout() {
     fails_after_the_busy_timeout(Operation::Commit, Lock::Reserved).await;
@@ -263,34 +263,15 @@ async fn recovers_when_its_first_read_meets_an_exclusive_lock() {
     assert_eq!(store.list_spaces().await, Ok(expected));
 }
 
-/// The status and problem code `request` answers over `store`.
-async fn served(
-    store: &Arc<SqliteSpaceRepository>,
-    request: Request<http_body_util::Full<Bytes>>,
-) -> (u16, String) {
-    let application: Application<SqliteSpaceRepository, Counted, BTreeMap<String, Bytes>> =
-        Application::new(
-            Arc::clone(store),
-            Counted::default(),
-            Shell::new("", BTreeMap::new()),
-        );
-    let response = application.handle(request).await;
-    let status = response.status().as_u16();
-    let body: serde_json::Value = serde_json::from_slice(response.body()).unwrap_or_default();
-    let code = body["type"]
-        .as_str()
-        .and_then(|kind| kind.strip_prefix("urn:infinity-cube:problem:"))
-        .unwrap_or_default()
-        .to_owned();
-    (status, code)
-}
-
 // Case: answers HTTP as retryable 503 persistence-unavailable inside the client timeout, never 409
 /// A commit and a read against a holder committing each answer 503
 /// `persistence-unavailable` once the busy timeout has run out, never 409;
-/// let go, the same commit lands. That the browser retries a 503 and gives
-/// up on a request after ten seconds is the TypeScript client's, held by
-/// its own tests; the Rust host's longest wait is its five-second default
+/// let go, the same commit lands. The browser answers a 503
+/// `persistence-unavailable` as a retryable failure
+/// (`packages/http/test/http-backend.test.ts` › `maps %s to retryable %s`)
+/// and retries only when asked (`packages/persistence/test/session.test.ts`
+/// › `stops on retryable failure and retries the latest working snapshot
+/// explicitly`); the Rust host's longest wait is its five-second default
 /// busy timeout (`sql/sqlite.rs`'s `pins_the_default_busy_timeout`).
 #[tokio::test]
 async fn answers_http_as_503_persistence_unavailable_never_409() {

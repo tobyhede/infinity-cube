@@ -79,12 +79,13 @@ fn conflict(space_id: &str, current: Option<host::LoadedSpace>) -> CommitResult 
     }])
 }
 
-/// The Space `linked_id(index)` names, one of the Spaces Meta links.
-fn linked_id(index: usize) -> String {
+/// The id of linked Space `index`, one of the Spaces Meta links.
+fn linked_space_id(index: usize) -> String {
     format!("c1000000-0000-4000-8000-{index:012x}")
 }
 
-fn link_id(index: usize) -> String {
+/// The id of the Space Resource in Meta that links Space `index`.
+fn link_resource_id(index: usize) -> String {
     format!("c1000000-0000-4000-8000-{:012x}", 0x100 + index)
 }
 
@@ -115,10 +116,10 @@ async fn commits_overlapping_edits_to_different_spaces_each_at_its_next_revision
     let file = Migrated::new().await;
     let store = open(&file);
     let linked: Vec<intake::SpaceSnapshot> = (0..6)
-        .map(|index| target_space(&linked_id(index), &format!("Linked {index}"), &[]))
+        .map(|index| target_space(&linked_space_id(index), &format!("Linked {index}"), &[]))
         .collect();
     let links: Vec<(String, String)> = (0..6)
-        .map(|index| (link_id(index), linked_id(index)))
+        .map(|index| (link_resource_id(index), linked_space_id(index)))
         .collect();
     let meta = meta_linking("Meta", &[], &links);
     let mut seeded = vec![&meta];
@@ -160,10 +161,10 @@ async fn serves_reads_overlapping_a_commit(multi_space: bool, reads_first: bool)
     let file = Migrated::new().await;
     let store = open(&file);
     let linked: Vec<intake::SpaceSnapshot> = (0..8)
-        .map(|index| target_space(&linked_id(index), &format!("Linked {index}"), &[]))
+        .map(|index| target_space(&linked_space_id(index), &format!("Linked {index}"), &[]))
         .collect();
     let links: Vec<(String, String)> = (0..8)
-        .map(|index| (link_id(index), linked_id(index)))
+        .map(|index| (link_resource_id(index), linked_space_id(index)))
         .collect();
     let second = resource(SECOND_RESOURCE_ID, "Second meta resource");
     let meta = meta_linking("Meta", std::slice::from_ref(&second), &links);
@@ -731,11 +732,12 @@ async fn serialises_a_graph_deletion_before_a_map_internal_edit_that_arrives_aft
 }
 
 // Case: keeps a replacement that recreates a Space at revision 0 from landing between a fast-path read and its write
-/// The Edit, then the replacement over it: had the replacement landed
-/// between the Edit's read and its write, the Edit would have written A's
-/// old Map and Graph ids over the recreated A.
+/// An Edit to A arriving first, then a replacement recreating A at revision
+/// 0: the Edit lands at A's next revision, then the replacement recreates A
+/// over it. This holds the outcome of that arrival order only; the Rust
+/// repository has no seam between an Edit's read and its write.
 #[tokio::test]
-async fn keeps_a_replacement_recreating_a_space_from_landing_inside_an_edit() {
+async fn settles_an_edit_then_a_replacement_recreating_its_space_in_arrival_order() {
     let (file, store) = fast_path::seeded().await;
     let (moving, replacing) = tokio::join!(
         store.commit(fast_path::moving()),

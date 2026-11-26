@@ -745,29 +745,37 @@ mod given_contention {
         let loaded = store.load_space(meta()).await.unwrap().unwrap();
         let edits = (0..8).map(|index| {
             let store = Arc::clone(&store);
-            let commit = rename(&loaded, &format!("Edit {index}"));
-            tokio::spawn(async move { store.commit(commit).await })
+            let title = format!("Edit {index}");
+            let commit = rename(&loaded, &title);
+            tokio::spawn(async move { (title, store.commit(commit).await) })
         });
         // Every edit is spawned before the first is awaited, so they overlap.
         let edits: Vec<_> = edits.collect();
-        let mut committed = 0;
+        let mut winners = Vec::new();
         let mut conflicts = 0;
         for edit in edits {
             match edit.await.unwrap() {
-                Ok(CommitResult::Committed { .. }) => committed += 1,
-                Ok(CommitResult::Conflict(_)) => conflicts += 1,
-                other => panic!("an overlapping edit answers {other:?}"),
+                (title, Ok(CommitResult::Committed { .. })) => winners.push(title),
+                (_, Ok(CommitResult::Conflict(_))) => conflicts += 1,
+                (title, other) => panic!("the edit to {title:?} answers {other:?}"),
             }
         }
         assert_eq!(
-            (committed, conflicts),
+            (winners.len(), conflicts),
             (1, 7),
             "one lands, the rest conflict"
         );
+        let stored = store.load_space(meta()).await.unwrap().unwrap();
         assert_eq!(
-            store.load_space(meta()).await.unwrap().unwrap().revision,
+            stored.revision,
             Revision::new(1).unwrap(),
             "one revision was written"
+        );
+        let mut winner = loaded.snapshot.clone();
+        winners[0].clone_into(&mut winner.document.title);
+        assert_eq!(
+            stored.snapshot, winner,
+            "the stored Space is the winner's, holding nothing of a loser"
         );
     }
 
