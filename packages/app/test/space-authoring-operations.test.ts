@@ -677,6 +677,63 @@ describe('Resource size and Open', () => {
   });
 });
 
+describe('Resize the editor writes an Edit size (ADR 0178)', () => {
+  type Authoring = ReturnType<typeof open>['authoring'];
+  const resizeEditor = (authoring: Authoring, resourceId: UUID) =>
+    authoring.complete(CANVAS, {
+      kind: 'resized-editor',
+      resourceId,
+      editSize: { width: 640, height: 360 },
+    });
+
+  it('writes the Edit size and keeps the size, the Map content and every other Resource', () => {
+    const { authoring, session } = open();
+    authoring.complete(CANVAS, {
+      kind: 'changed-map-content',
+      resourceId: RESOURCE_A,
+      content: { open: true },
+    });
+    authoring.complete(CANVAS, {
+      kind: 'resized-resource',
+      resourceId: RESOURCE_A,
+      size: { width: 300, height: 200 },
+    });
+    const before = mapOf(session.getState().working, MAP_ID)?.positions;
+
+    expect(resizeEditor(authoring, RESOURCE_A)).toEqual({ kind: 'completed' });
+    expect(mapOf(session.getState().working, MAP_ID)?.positions).toEqual({
+      ...before,
+      [RESOURCE_A]: {
+        x: 10,
+        y: 20,
+        size: { width: 300, height: 200 },
+        editSize: { width: 640, height: 360 },
+        content: { open: true },
+      },
+    });
+  });
+
+  it('is unchanged at the Edit size the entry already stores', () => {
+    const { authoring, session } = open();
+    resizeEditor(authoring, RESOURCE_A);
+    const before = session.getState().working;
+
+    expect(resizeEditor(authoring, RESOURCE_A)).toEqual({ kind: 'unchanged' });
+    expect(session.getState().working).toBe(before);
+  });
+
+  it('refuses a Resource the Map does not place', () => {
+    const { authoring, session } = open();
+    const before = session.getState().working;
+
+    expect(resizeEditor(authoring, RESOURCE_C)).toEqual({
+      kind: 'refused',
+      refusal: { code: 'resource-not-in-map' },
+    });
+    expect(session.getState().working).toBe(before);
+  });
+});
+
 describe('Exclusive work withdraws every Edit (ADR 0142)', () => {
   /** A Space composed over the shared gate, as Open Spaces composes each one. */
   const openOn = (pluginGate: PluginGate) => {

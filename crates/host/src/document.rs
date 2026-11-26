@@ -236,6 +236,15 @@ fn placement(at: &Placement, order: Order) -> JsonValue {
             }),
         ),
         (
+            "editSize",
+            at.edit_size.map(|size| {
+                object([
+                    ("width", Some(JsonValue::Number(size.width))),
+                    ("height", Some(JsonValue::Number(size.height))),
+                ])
+            }),
+        ),
+        (
             "content",
             at.content.as_ref().map(|content| order.value(content)),
         ),

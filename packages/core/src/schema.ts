@@ -306,10 +306,13 @@ export const RESOURCE_SHAPES = OUTLINES;
 export const resourceShapeSchema = z.enum(RESOURCE_SHAPES);
 
 /**
- * What a Map stores for one Resource: its origin, and optionally its size and
- * its plugin's Map content (ADR 0142). An entry with no `size` is the Closed
- * Size (`resourceSize`), and one with no `content` gives its plugin the
- * plugin's declared default (`resolvedMapContent`). Whether a Resource is Open,
+ * What a Map stores for one Resource: its origin, and optionally its size, its
+ * Edit size and its plugin's Map content (ADR 0142, ADR 0178). An entry with no
+ * `size` is the Closed Size (`resourceSize`), and one with no `content` gives
+ * its plugin the plugin's declared default (`resolvedMapContent`). `editSize`
+ * is the size the canvas draws the Resource at while its plugin edits it in
+ * place; it has the floor `size` has, on an entry of any kind, and an entry
+ * with none draws the editor at its `size` (ADR 0178). Whether a Resource is Open,
  * and an Ur Resource's Shape, are its plugin's Map content, never the entry's.
  *
  * `content` is any JSON value here: which values a Resource may keep is its
@@ -320,6 +323,7 @@ export const resourceShapeSchema = z.enum(RESOURCE_SHAPES);
 export const resourcePlacementSchema = mapPositionSchema
   .extend({
     size: resourceSizeSchema.optional(),
+    editSize: resourceSizeSchema.optional(),
     content: jsonValueSchema.optional(),
   })
   .strict();

@@ -35,8 +35,8 @@ import { Placement } from './placement';
  *
  * Operations arrive with their first real caller rather than ahead of one.
  * Both callers create and delete through `createInMap` and `deleteFromSpace`;
- * `resize`, `changeMapContent`, `addToMap` and `removeFromMap` are Space
- * Authoring's alone.
+ * `resize`, `resizeEditor`, `changeMapContent`, `addToMap` and
+ * `removeFromMap` are Space Authoring's alone.
  */
 
 /** Why a `SnapshotEdit` operation refused, with the typed context a sentence needs. */
@@ -313,6 +313,38 @@ function resize(
 }
 
 /**
+ * Write a Resource's Edit size in one Map (ADR 0178): the size the canvas
+ * draws it at while its plugin edits it in place. Its `size`, its Map content
+ * and every other Resource are kept, so nothing is displaced. `unchanged` for
+ * the Edit size it already stores. The floor is the schema's, as `resize`'s is.
+ */
+function resizeEditor(
+  snapshot: SpaceSnapshot,
+  mapId: UUID,
+  resourceId: UUID,
+  editSize: Extent,
+): SnapshotEditOutcome {
+  const placed = placedIn(snapshot, mapId);
+  if ('code' in placed) return refused(placed);
+  const at = placed.placement.get(resourceId);
+  if (at === undefined) return refused({ code: 'resource-not-in-map' });
+  if (!snapshot.resources.some((resource) => resource.id === resourceId)) {
+    return refused({ code: 'resource-not-found' });
+  }
+  if (at.editSize?.width === editSize.width && at.editSize.height === editSize.height) {
+    return UNCHANGED;
+  }
+  return withPlacement(
+    snapshot,
+    mapId,
+    Placement.place(placed.placement, resourceId, {
+      ...at,
+      editSize: { width: editSize.width, height: editSize.height },
+    }),
+  );
+}
+
+/**
  * Write a Resource's Map content in one Map (ADR 0142): what its plugin keeps
  * for it there, as an Ur Resource keeps its Shape (ADR 0121). The plugin's own
  * schema decides what is accepted.
@@ -429,6 +461,7 @@ export const SnapshotEdit = {
   createInMap,
   deleteFromSpace,
   resize,
+  resizeEditor,
   changeMapContent,
   addToMap,
   removeFromMap,

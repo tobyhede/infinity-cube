@@ -188,6 +188,15 @@ fn placement_json(placement: &Placement) -> JsonValue {
                 ])
             }),
         ),
+        (
+            "editSize",
+            placement.edit_size.map(|size| {
+                object([
+                    ("width", Some(JsonValue::Number(size.width))),
+                    ("height", Some(JsonValue::Number(size.height))),
+                ])
+            }),
+        ),
         ("content", placement.content.clone()),
     ])
 }
