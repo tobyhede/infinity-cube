@@ -221,8 +221,12 @@ A Resource's drawn box on a Map: its stored position and its size, the Closed Si
 **Closed Size**:
 The size a Resource takes in a Map that stores no size for it, and the least size it may take there.
 
+**Edit size**:
+The size a Resource is drawn at on a Map while its plugin edits its content in place, and the size a resize writes then. It is kept for that Resource on that Map, apart from its size.
+_Avoid_: editor size, edit mode.
+
 **Size hint**:
-A size a Resource's plugin asks for with a Map content Edit made on an author's gesture. The canvas decides whether and how far it applies.
+A size a Resource's plugin asks the canvas for on an author's gesture, such as the room its content needs when an edit begins. The canvas decides whether and how far it applies.
 
 **Shape**:
 An Ur Resource's outline in a Map, kept as its Map content: rectangle, pill, ellipse or diamond.
@@ -371,7 +375,7 @@ A standing report in the canvas's one notice area, dismissible, and cleared by t
 ## Opening and navigating
 
 **Opening**:
-Showing a Resource's content on the Resource itself, within its Map placement. A Resource plugin may give its Resources an Open and a Closed state, kept in its Map content and independent of the Resource's size: a Markdown, Space or Reference Resource has one.
+Showing a Resource's content on the Resource itself, within its Map placement. A Resource plugin may give its Resources an Open and a Closed state, kept in its Map content and independent of the Resource's size: a Markdown, Mermaid, Space or Reference Resource has one.
 _Avoid_: Expanded, expansion, Open Size, preview, popup, modal, dialog, drill-down, view mode, edit mode.
 
 **Entering**:
