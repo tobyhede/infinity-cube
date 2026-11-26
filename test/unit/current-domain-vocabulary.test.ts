@@ -741,7 +741,10 @@ const CARGO_PACKAGE_TABLE_READERS: readonly string[] = [
   'scripts/check-rust-toolchain.ts',
   'test/unit/check-rust-toolchain.test.ts',
 ];
-const CARGO_PACKAGE_TABLE = new RegExp(`${RETIRED_LOOSE_NAME}\\.package`, 'g');
+const CARGO_PACKAGE_TABLE = new RegExp(
+  `(?<![\\w.-])${RETIRED_LOOSE_NAME}\\.package(?![\\w.-])`,
+  'g',
+);
 
 /**
  * The bare-word hits a file is answerable for.
@@ -824,6 +827,13 @@ describe('the name used loosely for a Space and its chrome is gone', () => {
       }),
       "no Cargo manifest still inherits from the root, which Cargo's rule exists for",
     ).not.toEqual([]);
+
+    const reader = CARGO_PACKAGE_TABLE_READERS[0] ?? '';
+    const table = `${RETIRED_LOOSE_NAME}.package`;
+    expect(reportableHits(reader, `x = '${table}';`)).toEqual([]);
+    for (const longer of [`${table}s`, `my${table}`, `${table}.extra`]) {
+      expect(reportableHits(reader, `x = '${longer}';`), longer).not.toEqual([]);
+    }
 
     for (const file of CARGO_PACKAGE_TABLE_READERS) {
       const source = readTracked(file) ?? '';
