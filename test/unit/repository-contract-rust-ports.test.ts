@@ -62,7 +62,7 @@ const VALUES: Readonly<Record<string, readonly string[]>> = {
 };
 
 /** The tickets a pending case may name. */
-const TICKETS = ['11', '13'] as const;
+const TICKETS = ['11'] as const;
 type Ticket = (typeof TICKETS)[number];
 
 type Exemption =
@@ -87,35 +87,16 @@ const EXEMPT: Readonly<Record<string, Exemption>> = {
     doesNotApply(ROW_LOCK),
 
   // test/integration/sqlite-space-repository.test.ts
-  'serialises overlapping in-process commits at different Spaces well under the busy timeout':
-    pending('13'),
-  'serves loadSpace and listSpaces overlapping a * commit (*) well under the busy timeout':
-    pending('13'),
   'names a statement PostgreSQL aborted for contention unavailable': doesNotApply(
     'a PostgreSQL error code: the Rust host has no PostgreSQL store yet (rust-host 16), and SQLite raises no such code',
   ),
   'refuses a %s-path commit whose row moved before the lock, writing no Resource':
     doesNotApply(ROW_LOCK),
 
-  // test/integration/sqlite-contention.test.ts
-  'refuses the loser of a Resource identity race and writes nothing of it': pending('13'),
-  'conflicts the loser of a same-id create race on both the new Space and Meta, and writes nothing of it':
-    pending('13'),
-  'settles a replacement racing a commit in arrival order, commit first': pending('13'),
-  'settles a replacement racing a commit in arrival order, replacement first': pending('13'),
-
   // test/support/fast-path-races.ts
-  'commits a Map-internal Edit under the shared aggregate lock only': pending('13'),
-  'serialises a Map-internal Edit that read first before a Graph deletion that reads after':
-    pending('13'),
-  'serialises a Graph deletion that read first before a Map-internal Edit that reads after':
-    pending('13'),
-  'keeps a replacement that recreates a Space at revision 0 from landing between a fast-path read and its write':
-    pending('13'),
-  'keeps a Space deletion from passing at a revision a written but uncommitted fast path has moved':
-    pending('13'),
-  'lets Map-internal Edits to different Spaces commit side by side where the store runs commits concurrently':
-    pending('13'),
+  'commits a Map-internal Edit under the shared aggregate lock only': doesNotApply(
+    'the Rust repository has one lock mode: every commit runs alone in the process inside one `BEGIN IMMEDIATE` transaction, so no commit takes a shared aggregate lock; that a Map-internal Edit is decided on the single-Space path and a Graph deletion handed on to the complete-aggregate decision is `hands_a_graph_deletion_on_to_the_complete_aggregate_decision` in `crates/host/tests/sqlite_races.rs`, not a port',
+  ),
 
   // test/integration/sqlite-http-runtime.test.ts
   'refuses to compose when SQLITE_PATH is %s': pending('11'),
