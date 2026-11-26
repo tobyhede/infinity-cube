@@ -34,8 +34,10 @@ fn plain(space: &str, title: &str) -> SpaceSnapshot {
 /// The Meta Space, holding one Space Resource that owns `target`.
 fn meta_holding(target: &str, kind: &str) -> SpaceSnapshot {
     let suffix = &target[32..];
+    // A Resource id is written in lower case (ADR 0178), whatever `target` is.
+    let resource = suffix.to_ascii_lowercase();
     snapshot(&format!(
-        r#"{{"id":"{META}","document":{{"version":1,"title":"Meta"}},"resources":[{{"id":"00000000-0000-4000-8000-000000{suffix}01","document":{{"title":"Child","kind":"{kind}","content":{{"spaceId":"{target}","map":"00000000-0000-4000-8000-000000{suffix}a1","graph":"00000000-0000-4000-8000-000000{suffix}b1"}}}}}}]}}"#
+        r#"{{"id":"{META}","document":{{"version":1,"title":"Meta"}},"resources":[{{"id":"00000000-0000-4000-8000-000000{resource}01","document":{{"title":"Child","kind":"{kind}","content":{{"spaceId":"{target}","map":"00000000-0000-4000-8000-000000{suffix}a1","graph":"00000000-0000-4000-8000-000000{suffix}b1"}}}}}}]}}"#
     ))
 }
 

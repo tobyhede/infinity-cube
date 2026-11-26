@@ -24,7 +24,9 @@ use sqlx::sqlite::SqliteConnection;
 use sqlx::{ConnectOptions as _, Sqlite, Transaction};
 
 use super::codec::{ResourceRow, SpaceRow};
-use super::{Access, LockMode, Probe, SqlSpaceRepository, SqlStore, SqliteStore, Step};
+use super::{
+    Access, LockMode, Probe, RevisionRow, SqlSpaceRepository, SqlStore, SqliteStore, Step,
+};
 use crate::assets::{AssetHash, StoredAsset};
 use crate::repository::{
     AggregateLoad, CommitResult, LoadedSpace, ReplaceResult, RepositoryError, Revision,
@@ -92,16 +94,24 @@ impl SqlStore for Scripted {
     async fn lock_space(
         &self,
         connection: &mut SqliteConnection,
-        id: &str,
-    ) -> Result<Option<String>, sqlx::Error> {
+        id: &[u8],
+    ) -> Result<Option<Vec<u8>>, sqlx::Error> {
         let stored = self.inner.lock_space(connection, id).await?;
         let scripted = self.prior_revision.lock().unwrap().take();
-        Ok(scripted.or(stored))
+        Ok(scripted.map(String::into_bytes).or(stored))
+    }
+
+    async fn hold_space(
+        &self,
+        connection: &mut SqliteConnection,
+        id: &str,
+    ) -> Result<(), sqlx::Error> {
+        self.inner.hold_space(connection, id).await
     }
 
     async fn space_revisions(
         connection: &mut SqliteConnection,
-    ) -> Result<Vec<(String, String)>, sqlx::Error> {
+    ) -> Result<Vec<RevisionRow>, sqlx::Error> {
         SqliteStore::space_revisions(connection).await
     }
 

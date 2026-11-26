@@ -90,6 +90,40 @@ mod given_the_environment {
         );
     }
 
+    // JavaScript's `String.prototype.trim`, which `src/prisma/db.ts` applies,
+    // removes U+FEFF and keeps U+0085; Rust's `str::trim` does the reverse.
+    #[test]
+    fn trims_what_javascript_trims_and_nothing_else() {
+        assert_eq!(
+            DatabaseUrl::parse(Some("\u{feff}postgresql://cube@host/db\u{feff}"))
+                .map(|url| url.as_str().to_owned()),
+            Ok("postgresql://cube@host/db".to_owned()),
+            "a byte order mark either side is trimmed, as JavaScript trims it"
+        );
+        assert_eq!(
+            DatabaseUrl::parse(Some("\u{feff}")),
+            Err(DatabaseUrlError::Unset),
+            "a byte order mark alone is blank, as JavaScript reads it"
+        );
+        assert_eq!(
+            DatabaseUrl::parse(Some("\u{85}postgresql://cube@host/db\u{85}"))
+                .map(|url| url.as_str().to_owned()),
+            Ok("\u{85}postgresql://cube@host/db\u{85}".to_owned()),
+            "U+0085 is kept, as JavaScript keeps it"
+        );
+        let root = tempfile::tempdir().unwrap();
+        fs::write(
+            root.path().join(".env"),
+            "DATABASE_URL=\"\u{feff}postgresql://cube@host/db\"\n",
+        )
+        .unwrap();
+        assert_eq!(
+            DatabaseUrl::resolve(None, root.path()).map(|url| url.as_str().to_owned()),
+            Ok("postgresql://cube@host/db".to_owned()),
+            "a byte order mark inside a quoted .env value is trimmed too"
+        );
+    }
+
     #[test]
     fn refuses_an_unset_or_blank_value_naming_database_url() {
         for value in [None, Some(""), Some("   ")] {

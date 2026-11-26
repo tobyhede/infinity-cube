@@ -1,0 +1,13 @@
+{
+  "description": "A Resource whose id is written in upper case, placed on a Map and an Edge's endpoint in that spelling (ADR 0178).",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "invalid-resource-file",
+        "file": "10000000-0000-4000-8000-000000000001/resources/00000000-0000-4000-8000-00000000010A.json",
+        "field": "id"
+      }
+    ]
+  }
+}

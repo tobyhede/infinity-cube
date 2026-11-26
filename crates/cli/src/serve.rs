@@ -23,12 +23,15 @@
 //!
 //! The first stop signal stops accepting and lets each open connection finish
 //! the request it is answering for at most [`listener::DRAIN_BOUND`]; every
-//! commit is already in the store, so the host closes it and exits zero. Any
-//! signal after the first exits at once, one.
+//! commit is already in the store, so the host closes it and exits zero. The
+//! close waits for the operations still under way for at most
+//! [`CLOSE_BOUND`], then the host says it stopped without them and exits zero
+//! all the same. Any signal after the first exits at once, one.
 
 use std::ffi::OsStr;
 use std::process::ExitCode;
 use std::sync::Arc;
+use std::time::Duration;
 
 use host::{
     Application, DATABASE_URL, DatabaseUrl, PostgresSpaceRepository, RandomIds, SpaceRepository,
@@ -104,6 +107,13 @@ fn database_url() -> Result<DatabaseUrl, String> {
 
 /// What start-up says once it has established the Meta Space.
 const ESTABLISHED: &str = "Established the Meta Space.";
+
+/// How long the stop waits for the store to close once the connections have
+/// drained. Closing waits for every operation under way, and an operation
+/// waiting on a database that does not answer, or on a lock another session
+/// holds, has no bound of its own; ST-120 lets such a database delay neither
+/// the announcement nor the stop.
+const CLOSE_BOUND: Duration = Duration::from_secs(5);
 
 /// A store `serve` can close once it has drained.
 trait Closing: SpaceRepository {
@@ -219,7 +229,15 @@ async fn serving<R: Closing>(
     if !draining.finish(listener::DRAIN_BOUND).await {
         say("Dropped the connections still open after waiting for them.");
     }
-    repository.shut().await;
+    if tokio::time::timeout(CLOSE_BOUND, repository.shut())
+        .await
+        .is_err()
+    {
+        say(&format!(
+            "Stopped without waiting for the operations still under way on {named}."
+        ));
+        return ExitCode::SUCCESS;
+    }
     say(&format!("Stopped; {named} holds every edit."));
     ExitCode::SUCCESS
 }

@@ -28,7 +28,7 @@ use host::{
     PostgresSpaceRepository, Probe, ReplaceResult, Revision, SpaceChange, SpaceCommit,
     SpaceConflict, SpaceRepository, Step,
 };
-use intake::{RefusalKind, SpaceId, SpaceSnapshot};
+use intake::{SpaceId, SpaceSnapshot};
 use postgres_support::Fresh;
 use sqlx::{Connection as _, PgConnection};
 use tokio::sync::Notify;
@@ -335,6 +335,25 @@ async fn joined<R>(handle: JoinHandle<R>) -> R {
     handle.await.unwrap()
 }
 
+/// `task` once it has reached the probe `reached` signals, failing with its
+/// result if it finishes first, or if it gets there in no less than
+/// [`PATIENCE`].
+async fn rendezvous<R: std::fmt::Debug>(
+    reached: &Notify,
+    mut task: JoinHandle<R>,
+) -> JoinHandle<R> {
+    tokio::select! {
+        () = reached.notified() => task,
+        finished = &mut task => {
+            panic!("the task finished before it reached its probe: {finished:?}")
+        }
+        () = tokio::time::sleep(PATIENCE) => {
+            task.abort();
+            panic!("the task did not reach its probe within {PATIENCE:?}")
+        }
+    }
+}
+
 /// A raw statement's failure, as `(SQLSTATE, message)`.
 async fn refused(database: &Fresh, statement: &str) -> (String, String) {
     let mut connection = database.connect().await;
@@ -456,7 +475,7 @@ mod given_the_lock_key {
     ) -> String {
         let (reached, release) = pause_once(store, |step| matches!(step, Step::Locked(_)));
         let running = operation(Arc::clone(store));
-        reached.notified().await;
+        let running = rendezvous(&reached, running).await;
         let held = database
             .scalar(
                 "SELECT string_agg(concat_ws(' ', classid, objid, objsubid, mode), '; ') \
@@ -775,6 +794,56 @@ mod given_a_writer_outside_the_lock {
             store.load_space(space(SPACE_ID)).await.unwrap(),
             Some(moved.at(revision(1))),
             "the writer that committed is the one still standing"
+        );
+        store.close().await;
+    }
+
+    // ST-17: a conflict carries the current Space from one stored state. The
+    // writer moves the Space row before the edit starts, uncommitted, and
+    // holds the Resource table, so the edit can read the Space row only
+    // before the writer commits and its Resource rows only after.
+    #[tokio::test]
+    #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+    async fn conflicts_a_stale_single_space_edit_with_the_space_and_resources_of_one_stored_state()
+    {
+        let database = Fresh::new().await;
+        let store = seeded(&database, SPACE_ID, &[repository_space()]).await;
+        let mut blocker = Blocker::begin(&database).await;
+        blocker
+            .run(&format!(
+                "LOCK TABLE resources IN ACCESS EXCLUSIVE MODE; \
+                 UPDATE spaces SET document = '{}'::jsonb, revision = '1' WHERE id = '{SPACE_ID}'; \
+                 UPDATE resources SET document = '{}'::jsonb WHERE id = '{RESOURCE_ID}';",
+                plain("Moved by the other writer"),
+                markdown("Changed by the other writer")
+            ))
+            .await;
+        let committing = spawn(&store, |store| async move {
+            store
+                .commit(commit(vec![update(
+                    &repository_space().titled("Written against a revision never stored"),
+                    revision(7),
+                )]))
+                .await
+        });
+        waiting(&database, 1).await;
+        assert!(!committing.is_finished(), "the edit waits for the writer");
+        blocker.commit().await;
+        let moved = Fixture {
+            id: SPACE_ID,
+            document: plain("Moved by the other writer"),
+            resources: vec![
+                (RESOURCE_ID, markdown("Changed by the other writer")),
+                (OMITTED_RESOURCE_ID, markdown("Resource to remove")),
+            ],
+        };
+        assert_eq!(
+            joined(committing).await.unwrap(),
+            CommitResult::Conflict(vec![SpaceConflict {
+                space_id: space(SPACE_ID),
+                current: Some(moved.at(revision(1))),
+            }]),
+            "the conflict carries the Space row and the Resource rows the writer committed"
         );
         store.close().await;
     }
@@ -1294,11 +1363,11 @@ mod given_an_operation_before_initialization {
     }
 
     fn spaces_read(step: &Step) -> bool {
-        matches!(step, Step::CompleteRead)
+        matches!(step, Step::FoundEmpty)
     }
 
     fn meta_delete(step: &Step) -> bool {
-        matches!(step, Step::Truncation)
+        matches!(step, Step::Cleared)
     }
 
     fn first_meta() -> Fixture {
@@ -1318,6 +1387,75 @@ mod given_an_operation_before_initialization {
         })
     }
 
+    /// Whether a session on `database` other than the asking one holds a
+    /// granted `mode` lock on `table`.
+    async fn held_elsewhere(database: &Fresh, table: &str, mode: &str) -> bool {
+        let mut watcher = database.connect().await;
+        let held: bool = sqlx::query_scalar(
+            "SELECT EXISTS (SELECT 1 FROM pg_locks AS held \
+             JOIN pg_class AS class ON class.oid = held.relation \
+             WHERE held.database = (SELECT oid FROM pg_database WHERE datname = current_database()) \
+             AND class.relname = $1 AND held.mode = $2 AND held.granted \
+             AND held.pid <> pg_backend_pid())",
+        )
+        .bind(table)
+        .bind(mode)
+        .fetch_one(&mut watcher)
+        .await
+        .unwrap();
+        watcher.close().await.unwrap();
+        held
+    }
+
+    /// Stop an initialization at the first step `at` accepts, answer whether
+    /// it holds a `mode` lock on `table` there, then let it finish.
+    async fn held_at(at: fn(&Step) -> bool, table: &str, mode: &str) -> bool {
+        let overlap = overlap(at).await;
+        let first = initializing(&overlap.first, first_meta());
+        let first = rendezvous(&overlap.reached, first).await;
+        let held = held_elsewhere(&overlap.database, table, mode).await;
+        overlap.release.notify_one();
+        assert!(
+            matches!(joined(first).await, InitializeResult::Initialized(_)),
+            "the stopped initialization finishes once released"
+        );
+        overlap.close().await;
+        held
+    }
+
+    // `meta-read` in the TypeScript file pauses once the Meta identity has
+    // been read.
+    #[tokio::test]
+    #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+    async fn stops_at_the_meta_read_having_read_the_meta_identity() {
+        assert!(
+            held_at(meta_read, "repository_state", "AccessShareLock").await,
+            "at meta_read the Meta identity has been read"
+        );
+    }
+
+    // `spaces-read` in the TypeScript file pauses once an initializer has
+    // read the stored Spaces, before it writes any.
+    #[tokio::test]
+    #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+    async fn stops_at_the_spaces_read_before_writing_anything() {
+        assert!(
+            !held_at(spaces_read, "spaces", "RowExclusiveLock").await,
+            "at spaces_read the initializer has written nothing"
+        );
+    }
+
+    // `meta-delete` in the TypeScript file pauses once the Meta identity row
+    // has been deleted, its transaction still open.
+    #[tokio::test]
+    #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+    async fn stops_at_the_meta_delete_having_deleted_the_meta_identity() {
+        assert!(
+            held_at(meta_delete, "repository_state", "RowExclusiveLock").await,
+            "at meta_delete the Meta identity row has been deleted"
+        );
+    }
+
     // Case: preserves the successful proposal when another initializer already read an empty aggregate
     #[tokio::test]
     #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
@@ -1325,7 +1463,7 @@ mod given_an_operation_before_initialization {
      {
         let overlap = overlap(spaces_read).await;
         let first = initializing(&overlap.first, first_meta());
-        overlap.reached.notified().await;
+        let first = rendezvous(&overlap.reached, first).await;
         let second = initializing(&overlap.second, second_meta());
         overlap.release_once_waiting().await;
         let (first, second) = (joined(first).await, joined(second).await);
@@ -1356,7 +1494,7 @@ mod given_an_operation_before_initialization {
                 .await
                 .unwrap()
         });
-        overlap.reached.notified().await;
+        let replacing = rendezvous(&overlap.reached, replacing).await;
         let second = initializing(&overlap.second, second_meta());
         overlap.release_once_waiting().await;
         assert_eq!(joined(replacing).await, ReplaceResult::Uninitialized);
@@ -1379,7 +1517,7 @@ mod given_an_operation_before_initialization {
         let loading = spawn(&overlap.first, |store| async move {
             store.load_aggregate().await.unwrap()
         });
-        overlap.reached.notified().await;
+        let loading = rendezvous(&overlap.reached, loading).await;
         let second = initializing(&overlap.second, second_meta());
         overlap.release_once_waiting().await;
         assert_eq!(joined(loading).await, AggregateLoad::Uninitialized);
@@ -1401,7 +1539,7 @@ mod given_an_operation_before_initialization {
      {
         let overlap = overlap(spaces_read).await;
         let first = initializing(&overlap.first, second_meta());
-        overlap.reached.notified().await;
+        let first = rendezvous(&overlap.reached, first).await;
         let committing = spawn(&overlap.second, |store| async move {
             store
                 .commit(commit(vec![SpaceChange::Create {
@@ -1421,13 +1559,11 @@ mod given_an_operation_before_initialization {
             panic!("expected the commit refused, got {refused:?}");
         };
         assert_eq!(
-            refusal
-                .refusals
-                .iter()
-                .map(intake::Refusal::kind)
-                .collect::<Vec<_>>(),
-            [RefusalKind::OrdinarySpaceUnreferenced],
-            "{refusal:?}"
+            refusal.refusals,
+            [intake::Refusal::OrdinarySpaceUnreferenced {
+                space: space(FIRST_META_ID)
+            }],
+            "the commit is refused for the Space it creates, which nothing references"
         );
         assert_eq!(
             overlap.second.load_aggregate().await.unwrap(),
@@ -1443,7 +1579,7 @@ mod given_an_operation_before_initialization {
     ) {
         let overlap = overlap(at).await;
         let first = initializing(&overlap.first, first_meta());
-        overlap.reached.notified().await;
+        let first = rendezvous(&overlap.reached, first).await;
         let second = initializing(&overlap.second, competing);
         overlap.release_once_waiting().await;
         let (first, second) = (joined(first).await, joined(second).await);

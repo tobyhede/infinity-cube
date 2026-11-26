@@ -22,7 +22,7 @@ use sqlx::{Pool, Row, Sqlite, Transaction};
 
 use super::codec::{ResourceRow, SpaceRow};
 use super::path::SqlitePath;
-use super::{Access, LockMode, SqlSpaceRepository, SqlStore};
+use super::{Access, LockMode, RevisionRow, SqlSpaceRepository, SqlStore};
 use crate::assets::StoredAsset;
 use crate::json_text::compact;
 use crate::repository::RepositoryError;
@@ -292,19 +292,29 @@ impl SqlStore for SqliteStore {
     async fn lock_space(
         &self,
         connection: &mut SqliteConnection,
-        id: &str,
-    ) -> Result<Option<String>, sqlx::Error> {
-        // The transaction's write lock already covers every row.
-        sqlx::query_scalar("SELECT revision FROM spaces WHERE id = $1")
+        id: &[u8],
+    ) -> Result<Option<Vec<u8>>, sqlx::Error> {
+        // The transaction's write lock already covers every row. A BLOB never
+        // equals TEXT, so the id is compared as bytes.
+        sqlx::query_scalar("SELECT CAST(revision AS BLOB) FROM spaces WHERE CAST(id AS BLOB) = $1")
             .bind(id)
             .fetch_optional(connection)
             .await
     }
 
+    async fn hold_space(
+        &self,
+        _connection: &mut SqliteConnection,
+        _id: &str,
+    ) -> Result<(), sqlx::Error> {
+        // The transaction's write lock already covers every row.
+        Ok(())
+    }
+
     async fn space_revisions(
         connection: &mut SqliteConnection,
-    ) -> Result<Vec<(String, String)>, sqlx::Error> {
-        sqlx::query_as("SELECT id, revision FROM spaces ORDER BY id")
+    ) -> Result<Vec<RevisionRow>, sqlx::Error> {
+        sqlx::query_as("SELECT CAST(id AS BLOB), CAST(revision AS BLOB) FROM spaces ORDER BY id")
             .fetch_all(connection)
             .await
     }

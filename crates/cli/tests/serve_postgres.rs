@@ -6,7 +6,10 @@
 //!
 //! The refusals and the unreachable database need no server. The rest need
 //! the server `INFINITY_CUBE_POSTGRES_TEST_URL` names, whose role may create
-//! databases, and are ignored by default. Each makes a database of its own,
+//! databases, and are ignored by default. These need no more of the role;
+//! the host's PostgreSQL tests, which CI runs against the same variable, also
+//! need it to create roles and own the template it clones
+//! (`crates/host/tests/postgres_support/mod.rs`). Each makes a database of its own,
 //! migrated by `sqlx`'s migrator from `migrations-sql/postgres/` as test
 //! setup, standing in for `pnpm db:migrate`; `serve` migrates nothing.
 //!
@@ -397,6 +400,84 @@ impl Drop for Proxy {
         if let Some(runtime) = self.runtime.take() {
             runtime.shutdown_background();
         }
+    }
+}
+
+mod given_a_database_holding_the_aggregate_lock {
+    use super::*;
+
+    /// How long the stop may take once a store operation is stuck: the bound
+    /// on the store's close, with room for the process to exit.
+    const STOP_PATIENCE: Duration = Duration::from_secs(15);
+
+    // Another session holds the aggregate's advisory lock and never lets it
+    // go, so start-up's operation waits on it with no bound (ADR 0177). The
+    // first signal still stops `serve`, zero (ST-120: a database that does
+    // not answer delays neither the announcement nor the stop).
+    #[test]
+    #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+    fn exits_zero_on_the_first_signal_while_an_operation_waits_on_the_database() {
+        let database = Database::migrated();
+        let holding = runtime();
+        let mut holder = holding.block_on(async {
+            let mut holder = PgConnection::connect(database.url.as_str()).await.unwrap();
+            sqlx::raw_sql("BEGIN").execute(&mut holder).await.unwrap();
+            sqlx::query("SELECT pg_advisory_xact_lock($1, $2)::text")
+                .bind(host::AGGREGATE_LOCK_KEY.0)
+                .bind(host::AGGREGATE_LOCK_KEY.1)
+                .execute(&mut holder)
+                .await
+                .unwrap();
+            holder
+        });
+        let (_directory, mut started) = database.serve(&[]);
+        let _port = started.port();
+        wait_until(
+            "start-up waits on the aggregate lock",
+            common::PATIENCE,
+            || {
+                holding.block_on(async {
+                    let waiting: i64 = sqlx::query_scalar(
+                        "SELECT count(*) FROM pg_locks l JOIN pg_database d ON d.oid = l.database \
+                         WHERE l.locktype = 'advisory' AND NOT l.granted AND d.datname = $1",
+                    )
+                    .bind(&database.name)
+                    .fetch_one(&mut holder)
+                    .await
+                    .unwrap();
+                    waiting > 0
+                })
+            },
+        );
+        started.signal("INT");
+        let deadline = std::time::Instant::now() + STOP_PATIENCE;
+        let status = loop {
+            if let Some(status) = started.child.try_wait().unwrap() {
+                break Some(status);
+            }
+            if std::time::Instant::now() >= deadline {
+                break None;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        };
+        if status.is_none() {
+            // Standard error ends only once the process does.
+            let _killed = started.child.kill();
+            let _reaped = started.child.wait();
+        }
+        // Standard error is read once: the read takes it to its end.
+        let said = started.stderr();
+        assert_eq!(
+            status.and_then(|status| status.code()),
+            Some(0),
+            "the first signal stops serve within {STOP_PATIENCE:?}, zero, though an operation \
+             still waits on the database: {said}"
+        );
+        assert!(
+            said.contains("Stopped without waiting for the operations still under way"),
+            "serve says it stopped without the operation still waiting: {said}"
+        );
+        holding.block_on(async { holder.close().await.unwrap() });
     }
 }
 

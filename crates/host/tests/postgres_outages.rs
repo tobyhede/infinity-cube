@@ -42,8 +42,8 @@ use http::Request;
 use http_conformance::Counted;
 use http_conformance::support::json_of;
 use intake::SpaceId;
-use postgres_support::Fresh;
 use postgres_support::stand_in::{Behaviour, REFUSING, StandIn};
+use postgres_support::{Fresh, rendezvous};
 use sqlx::{ConnectOptions as _, PgConnection};
 use tokio::sync::Notify;
 
@@ -613,12 +613,36 @@ mod given_start_up_over_a_server_that_refuses_this_client {
     }
 }
 
-/// `database`'s URL with a password its server will not accept.
+/// `database`'s URL with a password its server will not accept. A query
+/// `password` would override the authority's, so it is dropped.
 fn wrong_password(database: &Fresh) -> DatabaseUrl {
-    let mut url = database.url.clone();
-    let password = format!("{}-not-the-password", url.password().unwrap_or_default());
-    url.set_password(Some(&password)).unwrap();
+    let mut url = without_query(&database.url, &["password"]);
+    let known = database
+        .url
+        .query_pairs()
+        .find(|(key, _)| key == "password")
+        .map(|(_, value)| value.into_owned())
+        .or_else(|| database.url.password().map(str::to_owned))
+        .unwrap_or_default();
+    url.set_password(Some(&format!("{known}-not-the-password")))
+        .unwrap();
     DatabaseUrl::parse(Some(url.as_str())).unwrap()
+}
+
+/// `url` without the query pairs named `names`, every other pair kept.
+fn without_query(url: &url::Url, names: &[&str]) -> url::Url {
+    let mut kept = url.clone();
+    let pairs: Vec<(String, String)> = url
+        .query_pairs()
+        .filter(|(key, _)| !names.contains(&key.as_ref()))
+        .map(|(key, value)| (key.into_owned(), value.into_owned()))
+        .collect();
+    if pairs.is_empty() {
+        kept.set_query(None);
+    } else {
+        kept.query_pairs_mut().clear().extend_pairs(pairs);
+    }
+    kept
 }
 
 /// The server's URL naming a database it does not have.
@@ -784,18 +808,17 @@ mod given_a_real_server {
     #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
     async fn reaches_the_database_on_the_next_read_rather_than_repeating_the_first_failure() {
         let database = Fresh::new().await;
-        let server = format!(
-            "{}:{}",
-            database.url.host_str().unwrap(),
-            database.url.port().unwrap_or(5432)
-        );
-        let upstream = tokio::net::lookup_host(server)
+        // The server the URL reaches, a query `host`, `hostaddr` or `port`
+        // overriding its authority, as the driver reads it.
+        let options = postgres_connect_options(database.url.as_str(), None).unwrap();
+        let upstream = tokio::net::lookup_host((options.get_host(), options.get_port()))
             .await
             .unwrap()
             .next()
             .unwrap();
         let stand_in = StandIn::start(Behaviour::ResetFirstThenPass(upstream)).await;
-        let mut through = database.url.clone();
+        // Those endpoint pairs would override the stand-in's, so they go.
+        let mut through = without_query(&database.url, &["host", "hostaddr", "port"]);
         through.set_host(Some("127.0.0.1")).unwrap();
         through.set_port(Some(stand_in.port())).unwrap();
         let store = open(&url(through.as_str()));
@@ -870,7 +893,7 @@ mod given_a_real_server {
             let commit = rename(&current, "Never landed");
             tokio::spawn(async move { store.commit(commit).await })
         };
-        reached.notified().await;
+        let committing = rendezvous(&reached, committing).await;
         let ended = database
             .scalar(
                 "SELECT count(pg_terminate_backend(pid))::text FROM pg_stat_activity \

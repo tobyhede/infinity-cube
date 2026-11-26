@@ -283,7 +283,7 @@ mod given_a_change_the_application_judges_before_the_store {
     use std::pin::Pin;
     use std::task::{Context, Poll};
 
-    use host::{AssetHash, MAX_COMMIT_BODY_BYTES};
+    use host::AssetHash;
     use http_body::Frame;
     use http_conformance::support::assertions::not_found;
     use http_conformance::support::revision;
@@ -336,6 +336,11 @@ mod given_a_change_the_application_judges_before_the_store {
         vec![Bytes::copy_from_slice(left), Bytes::copy_from_slice(right)]
     }
 
+    /// ST-77's limit on a commit body, 1 MiB, written out rather than read
+    /// from the host, so the body sent is one byte over the requirement's
+    /// limit whatever the host's own constant says.
+    const COMMIT_BODY_LIMIT: usize = 1 << 20;
+
     // Case: commits a chunked body that declares no length
     // Case: answers 413 payload-too-large to a chunked body of * bytes that declares no length
     #[tokio::test]
@@ -348,7 +353,7 @@ mod given_a_change_the_application_judges_before_the_store {
         assert_eq!(response.status(), 200, "joined and committed");
         let committed = load(&over).await;
         let mut padded = rename_text(&committed, "Too big").into_bytes();
-        padded.resize(MAX_COMMIT_BODY_BYTES + 1, b' ');
+        padded.resize(COMMIT_BODY_LIMIT + 1, b' ');
         problem(
             &send(&over, "/api/spaces", &json, halves(&padded)).await,
             "payload-too-large",

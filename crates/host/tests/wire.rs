@@ -237,6 +237,11 @@ mod given_a_commit {
         );
     }
 
+    /// ST-77's limit on a commit body, 1 MiB, written out rather than read
+    /// from the host, so the body sent is one byte over the requirement's
+    /// limit whatever the host's own constant says.
+    const COMMIT_BODY_LIMIT: usize = 1 << 20;
+
     // Case: commits a chunked body that declares no length
     // Case: answers 413 payload-too-large to a chunked body of * bytes that declares no length
     #[tokio::test]
@@ -262,7 +267,7 @@ mod given_a_commit {
         // A valid commit padded to one byte over the limit, as the case sends it.
         let committed = load(&host, META).await;
         let mut padded = rename_text(&committed, "Too big").into_bytes();
-        padded.resize(MAX_COMMIT_BODY_BYTES + 1, b' ');
+        padded.resize(COMMIT_BODY_LIMIT + 1, b' ');
         let (left, right) = padded.split_at(padded.len() / 2);
         let request = Request::builder()
             .method("POST")
@@ -447,6 +452,32 @@ mod given_a_change_from_another_site {
             0,
             "no frame of the body is read"
         );
+    }
+
+    // ST-123: an `Origin` naming another authority than `Host` is refused as
+    // a cross-site change is, before the body is read.
+    #[tokio::test]
+    async fn refuses_a_change_from_another_origin_before_reading_its_body() {
+        let host = open().await;
+        for (path, content_type) in [
+            ("/api/spaces", "application/json"),
+            ("/assets", "text/plain"),
+        ] {
+            let read = Arc::new(AtomicUsize::new(0));
+            let request = Request::post(path)
+                .header("content-type", content_type)
+                .header("host", "127.0.0.1:4173")
+                .header("origin", "http://attacker.example")
+                .body(Counting(Arc::clone(&read)))
+                .unwrap();
+            let response = host.handle(request).await;
+            assert_eq!(response.status(), 403, "{path}: refused");
+            assert_eq!(
+                read.load(Ordering::SeqCst),
+                0,
+                "{path}: no frame of the body is read"
+            );
+        }
     }
 }
 

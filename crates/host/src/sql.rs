@@ -92,7 +92,8 @@ pub enum LockMode {
 pub enum Step {
     /// The aggregate lock was taken in this mode.
     Locked(LockMode),
-    /// About to read the Meta identity under the exclusive lock.
+    /// Read the Meta identity under the exclusive lock, about to lock its
+    /// row.
     MetaRead,
     /// About to read every stored Space.
     CompleteRead,
@@ -105,6 +106,12 @@ pub enum Step {
     SpaceRead(SpaceId),
     /// About to empty the store for an initialization or a replacement.
     Truncation,
+    /// Emptied the store for an initialization or a replacement, the Meta
+    /// identity deleted, about to write the aggregate.
+    Cleared,
+    /// An initialization found no Meta identity and no stored Space, about to
+    /// write.
+    FoundEmpty,
     /// The fast path's transaction has ended, and the aggregate decision's
     /// has not begun.
     HandOff,
@@ -114,6 +121,10 @@ pub enum Step {
 #[cfg(any(test, feature = "test-support"))]
 pub type Probe =
     Arc<dyn Fn(Step) -> std::pin::Pin<Box<dyn Future<Output = ()> + Send>> + Send + Sync>;
+
+/// The bytes of a Space row's id and of its revision, neither decoded as
+/// text.
+pub(crate) type RevisionRow = (Vec<u8>, Vec<u8>);
 
 /// What a database supplies the one SQL repository: how to open a
 /// transaction, each statement the repository runs, and what a failure means.
@@ -149,19 +160,29 @@ pub(crate) trait SqlStore: Send + Sync + 'static {
         id: &str,
     ) -> impl Future<Output = Result<bool, sqlx::Error>> + Send;
 
-    /// Lock one Space's row, answering the revision it carried when the lock
-    /// was granted, or `None` when there is no such row.
+    /// Lock the Space row whose id has these bytes, answering the bytes of
+    /// the revision it carried when the lock was granted, or `None` when
+    /// there is no such row. Neither is decoded as text, so a row holding
+    /// any bytes is locked.
     fn lock_space(
         &self,
         connection: &mut Connection<Self>,
-        id: &str,
-    ) -> impl Future<Output = Result<Option<String>, sqlx::Error>> + Send;
+        id: &[u8],
+    ) -> impl Future<Output = Result<Option<Vec<u8>>, sqlx::Error>> + Send;
 
-    /// Every Space row's id and revision, ascending by id, reading no
-    /// document.
+    /// Lock the Space row with this id for the rest of the transaction, as
+    /// [`lock_space`](Self::lock_space) does, reading nothing from it.
+    fn hold_space(
+        &self,
+        connection: &mut Connection<Self>,
+        id: &str,
+    ) -> impl Future<Output = Result<(), sqlx::Error>> + Send;
+
+    /// The bytes of every Space row's id and revision, ascending by id,
+    /// reading no document and decoding neither as text.
     fn space_revisions(
         connection: &mut Connection<Self>,
-    ) -> impl Future<Output = Result<Vec<(String, String)>, sqlx::Error>> + Send;
+    ) -> impl Future<Output = Result<Vec<RevisionRow>, sqlx::Error>> + Send;
 
     /// The stored Meta identity, as text.
     fn meta_space_id(
@@ -483,9 +504,12 @@ impl<S: SqlStore> Shared<S> {
     /// answering the identity the second read locks, and Unreachable if it
     /// moved again.
     async fn lock_meta_identity(&self, connection: &mut Connection<S>) -> Outcome<Option<SpaceId>> {
-        self.reached(Step::MetaRead).await;
-        for _ in 0..2 {
-            let Some(meta_space_id) = stored_meta_space_id::<S>(connection).await? else {
+        for attempt in 0..2 {
+            let stored = stored_meta_space_id::<S>(connection).await?;
+            if attempt == 0 {
+                self.reached(Step::MetaRead).await;
+            }
+            let Some(meta_space_id) = stored else {
                 return Ok(None);
             };
             if self
@@ -555,6 +579,7 @@ impl<S: SqlStore> Shared<S> {
     ) -> Outcome<LoadedAggregate> {
         self.reached(Step::Truncation).await;
         S::clear(connection).await?;
+        self.reached(Step::Cleared).await;
         let mut spaces: Vec<LoadedSpace> = input
             .spaces
             .into_iter()
@@ -624,14 +649,22 @@ impl<S: SqlStore> Shared<S> {
             .collect();
         for (id, _, _) in encoded.iter().filter(|(_, created, _)| !created) {
             self.reached(Step::RowLock(*id)).await;
-            let prior = self.store.lock_space(connection, id.as_str()).await?;
+            let prior = self
+                .store
+                .lock_space(connection, id.as_str().as_bytes())
+                .await?;
             let prior = match prior {
                 None => None,
-                Some(text) => Some(decode_revision(&text).ok_or_else(|| {
-                    broken(format!(
-                        "stored Space {id} has a revision that is not canonical"
-                    ))
-                })?),
+                Some(bytes) => Some(
+                    std::str::from_utf8(&bytes)
+                        .ok()
+                        .and_then(decode_revision)
+                        .ok_or_else(|| {
+                            broken(format!(
+                                "stored Space {id} has a revision that is not canonical"
+                            ))
+                        })?,
+                ),
             };
             if prior.is_none() || prior != expected.get(id).copied() {
                 return Ok(Err(Landing::Stale(*id)));
@@ -742,6 +775,11 @@ impl<S: SqlStore> Shared<S> {
         space_id: SpaceId,
     ) -> Outcome<Option<CommitResult>> {
         let mut transaction = self.begin_locked(LockMode::Shared, true).await?;
+        // The row lock first, so the Space row and its Resource rows, read in
+        // two statements, are those of one stored state (ST-17).
+        self.store
+            .hold_space(&mut transaction, space_id.as_str())
+            .await?;
         let current = one_space::<S>(&mut transaction, space_id).await?;
         let meta_space_id = stored_meta_space_id::<S>(&mut transaction).await?;
         match decide_single_space(request, meta_space_id, current.as_ref()) {
@@ -828,6 +866,7 @@ impl<S: SqlStore> Shared<S> {
             if S::holds_spaces(&mut transaction).await? {
                 return Err(broken("stored Spaces exist without a Meta Space"));
             }
+            self.reached(Step::FoundEmpty).await;
             let installed = self.install(&mut transaction, input.clone()).await?;
             transaction.commit().await?;
             Ok(InitializeResult::Initialized(installed))
@@ -867,7 +906,7 @@ impl<S: SqlStore> Shared<S> {
             });
         }
         for (id, revision) in &rows {
-            if let Some(space_id) = SpaceId::parse(id) {
+            if let Some(space_id) = std::str::from_utf8(id).ok().and_then(SpaceId::parse) {
                 self.reached(Step::RowLock(space_id)).await;
             }
             let current = self.store.lock_space(&mut transaction, id).await?;

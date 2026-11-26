@@ -355,6 +355,32 @@ mod read_sslmode_as_pg_does {
         }
     }
 
+    // pg-connection-string 2.14 turns `ssl=true` and `ssl=1` into `true`,
+    // `ssl=0` into `false`, and `sslnegotiation=direct` with no `ssl` into
+    // `true`; pg 8.22's `ConnectionParameters` turns `ssl=no-verify` into
+    // `{ rejectUnauthorized: false }`, and any other non-empty string stays a
+    // truthy `ssl`, which connects with TLS and checks the certificate.
+    #[test]
+    fn reads_every_ssl_value_and_direct_negotiation_as_pg_does() {
+        let cases = [
+            ("ssl=no-verify", PgSslMode::Require),
+            ("ssl=false", PgSslMode::VerifyFull),
+            ("ssl=require", PgSslMode::VerifyFull),
+            ("ssl=yes", PgSslMode::VerifyFull),
+            ("sslnegotiation=direct", PgSslMode::VerifyFull),
+            ("ssl=0", PgSslMode::Disable),
+            ("ssl=", PgSslMode::Disable),
+        ];
+        for (query, expected) in cases {
+            let read = mode(&format!("{BASE}?{query}"));
+            assert_eq!(
+                format!("{read:?}"),
+                format!("{expected:?}"),
+                "{query} should connect as pg connects"
+            );
+        }
+    }
+
     #[test]
     fn reads_libpq_meanings_under_uselibpqcompat_without_a_plaintext_fallback() {
         let compat = |rest: &str| mode(&format!("{BASE}?uselibpqcompat=true&{rest}"));
@@ -438,6 +464,34 @@ mod read_sslmode_as_pg_does {
                 .unwrap()
                 .get_ssl_mode();
             assert_eq!(format!("{read:?}"), format!("{:?}", mode(&url)), "{query}");
+        }
+    }
+
+    // Storage ST-120: `serve --store postgres` refuses a URL that is not a
+    // PostgreSQL URL before it takes a port.
+    #[test]
+    fn refuses_a_url_whose_scheme_is_not_postgres() {
+        for url in [
+            "https://db.example/cube",
+            "mysql://cube@127.0.0.1/cube",
+            "file:///cube",
+        ] {
+            assert!(
+                matches!(
+                    connect_options(url, None),
+                    Err(PostgresUrlError::Invalid(_))
+                ),
+                "{url} should be refused as not a PostgreSQL URL"
+            );
+        }
+        for url in [
+            "postgres://cube@127.0.0.1/cube",
+            "postgresql://cube@127.0.0.1/cube",
+        ] {
+            assert!(
+                connect_options(url, None).is_ok(),
+                "{url} should be read as a PostgreSQL URL"
+            );
         }
     }
 

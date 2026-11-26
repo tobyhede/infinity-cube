@@ -77,11 +77,13 @@ impl StandIn {
         self.connections.load(Ordering::SeqCst)
     }
 
-    /// A URL naming it, as a misconfigured `DATABASE_URL` would.
+    /// A URL naming it, as a misconfigured `DATABASE_URL` would. It asks for
+    /// no TLS, so a `PGSSLMODE` in the environment cannot stop the client at
+    /// the stand-in declining TLS before it meets the behaviour.
     #[must_use]
     pub fn url(&self) -> DatabaseUrl {
         DatabaseUrl::parse(Some(&format!(
-            "postgres://cube:wrong@127.0.0.1:{}/cube",
+            "postgres://cube:wrong@127.0.0.1:{}/cube?sslmode=disable",
             self.port
         )))
         .unwrap()

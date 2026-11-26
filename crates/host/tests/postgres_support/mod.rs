@@ -3,7 +3,9 @@
 //! `migrations-sql/postgres/`, and dropped when the test ends.
 //!
 //! The server is the one `INFINITY_CUBE_POSTGRES_TEST_URL` names, whose role
-//! may create databases. Every PostgreSQL test is `#[ignore]`d, so a plain
+//! may create databases and roles (one test runs `CREATE ROLE`), and owns
+//! the template it clones, which it creates on first use; a superuser has
+//! all three. Every PostgreSQL test is `#[ignore]`d, so a plain
 //! `cargo nextest run` skips them; CI runs them with `--run-ignored only`.
 //! A test run that way with the variable unset **panics** rather than
 //! returning early, so it fails instead of passing having tested nothing.
@@ -13,9 +15,12 @@ pub mod stand_in;
 
 use std::path::Path;
 use std::sync::OnceLock;
+use std::time::Duration;
 
 use host::{DatabaseUrl, PoolSettings, PostgresSpaceRepository};
 use sqlx::{Connection as _, PgConnection};
+use tokio::sync::Notify;
+use tokio::task::JoinHandle;
 
 /// The variable naming the test server.
 pub const SERVER: &str = "INFINITY_CUBE_POSTGRES_TEST_URL";
@@ -24,22 +29,81 @@ pub const SERVER: &str = "INFINITY_CUBE_POSTGRES_TEST_URL";
 #[must_use]
 pub fn server() -> url::Url {
     let Ok(value) = std::env::var(SERVER) else {
-        panic!("{SERVER} must name a PostgreSQL server whose role may create databases");
+        panic!("{SERVER} must name a PostgreSQL server whose role may create databases and roles");
     };
     let trimmed = value.trim();
     assert!(
         !trimmed.is_empty(),
-        "{SERVER} must name a PostgreSQL server whose role may create databases"
+        "{SERVER} must name a PostgreSQL server whose role may create databases and roles"
     );
     url::Url::parse(trimmed).unwrap()
 }
 
-/// `server` with its database replaced by `database`.
+/// `server` with its database replaced by `database`. A query `dbname`
+/// would override the path, so it is dropped; every other query pair stays.
 #[must_use]
 pub fn naming(server: &url::Url, database: &str) -> url::Url {
     let mut url = server.clone();
     url.set_path(&format!("/{database}"));
+    let kept: Vec<(String, String)> = server
+        .query_pairs()
+        .filter(|(key, _)| key != "dbname")
+        .map(|(key, value)| (key.into_owned(), value.into_owned()))
+        .collect();
+    if kept.is_empty() {
+        url.set_query(None);
+    } else {
+        url.query_pairs_mut().clear().extend_pairs(kept);
+    }
     url
+}
+
+/// How long a test waits for a task to reach a probe, or for a session to
+/// wait on a lock, before it fails rather than hangs.
+pub const PATIENCE: Duration = Duration::from_secs(30);
+
+/// Wait for `task` to reach the probe that notifies `reached`, for at most
+/// [`PATIENCE`], answering the task still running. A task that finishes
+/// first, having failed before its probe, fails the test with its result.
+pub async fn rendezvous<R: std::fmt::Debug>(
+    reached: &Notify,
+    mut task: JoinHandle<R>,
+) -> JoinHandle<R> {
+    tokio::select! {
+        () = reached.notified() => task,
+        finished = &mut task => {
+            panic!("the task finished before it reached its probe: {finished:?}")
+        }
+        () = tokio::time::sleep(PATIENCE) => {
+            task.abort();
+            panic!("the task did not reach its probe within {PATIENCE:?}")
+        }
+    }
+}
+
+/// Wait until at least `count` sessions of `database` wait for a lock, for
+/// at most [`PATIENCE`].
+pub async fn waiting(database: &Fresh, count: i64) {
+    let mut watcher = database.connect().await;
+    let deadline = tokio::time::Instant::now() + PATIENCE;
+    loop {
+        let waiters: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM pg_stat_activity \
+             WHERE datname = current_database() AND wait_event_type = 'Lock'",
+        )
+        .fetch_one(&mut watcher)
+        .await
+        .unwrap();
+        if waiters >= count {
+            break;
+        }
+        assert!(
+            tokio::time::Instant::now() < deadline,
+            "{count} session(s) never waited for a lock; {waiters} did"
+        );
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    watcher.close().await.unwrap();
 }
 
 /// A connection to the server's own database, for creating and dropping.

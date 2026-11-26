@@ -3,7 +3,9 @@
 //! A UUID is held as its 36 characters, not as 128 bits, because the
 //! TypeScript intake compares ids as strings: `z.string().uuid()` accepts upper
 //! and lower case alike, and a reference spelled in one case does not name an
-//! entity spelled in the other.
+//! entity spelled in the other. Where an entity is named, the schema asks more:
+//! a Space directory's name and a Resource's own id are written in lower case
+//! (ADR 0178).
 
 use std::fmt;
 
@@ -31,7 +33,8 @@ impl Uuid {
         std::str::from_utf8(&self.0).unwrap_or_default()
     }
 
-    /// Whether it is written in lower case, as Export writes a Space's id.
+    /// Whether it is written in lower case, as a Space directory's name and a
+    /// Resource's own id are (ADR 0178).
     #[must_use]
     pub fn is_lower_case(&self) -> bool {
         !self.0.iter().any(u8::is_ascii_uppercase)

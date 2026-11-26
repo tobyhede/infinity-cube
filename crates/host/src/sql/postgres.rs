@@ -15,7 +15,7 @@ use sqlx::{Pool, Postgres, Row, Transaction};
 
 use super::codec::{ResourceRow, SpaceRow};
 use super::database_url::DatabaseUrl;
-use super::{Access, LockMode, SqlSpaceRepository, SqlStore};
+use super::{Access, LockMode, RevisionRow, SqlSpaceRepository, SqlStore};
 use crate::assets::StoredAsset;
 use crate::repository::RepositoryError;
 
@@ -68,7 +68,7 @@ impl Default for PoolSettings {
 /// Why a database URL cannot be connected to.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum PostgresUrlError {
-    /// It is not a URL `sqlx` reads.
+    /// It is not a `postgres:` or `postgresql:` URL `sqlx` reads.
     #[error("DATABASE_URL is not a PostgreSQL URL: {0}")]
     Invalid(String),
     /// `sslmode=verify-ca` under `uselibpqcompat` names no root certificate,
@@ -114,28 +114,34 @@ impl SqlSpaceRepository<PostgresStore> {
 /// The options `url` connects with, its `sslmode` read with the meaning ADR
 /// 0177 gives each value, as `pg` 8.22 reads it:
 ///
-/// - no `sslmode`, `sslrootcert`, `sslcert`, `sslkey` or `ssl` parameter:
-///   what `pgsslmode`, the value of `PGSSLMODE`, asks for: no TLS when it is
-///   absent, `disable` or a value `pg` does not know; TLS, the certificate
-///   not checked, for `no-verify`; and TLS, the certificate and the host
-///   checked, for `prefer`, `require`, `verify-ca` and `verify-full`;
-/// - `disable`: no TLS;
-/// - `no-verify`, without `uselibpqcompat=true`: TLS, the certificate not
-///   checked;
+/// - no `sslmode`, `sslrootcert`, `sslcert`, `sslkey` or `ssl` parameter,
+///   and no `sslnegotiation=direct`: what `pgsslmode`, the value of
+///   `PGSSLMODE`, asks for: no TLS when it is absent, `disable` or a value
+///   `pg` does not know; TLS, the certificate not checked, for `no-verify`;
+///   and TLS, the certificate and the host checked, for `prefer`, `require`,
+///   `verify-ca` and `verify-full`;
+/// - no `sslmode`: TLS, the certificate and the host checked, for a
+///   certificate parameter; otherwise, by `ssl`: no TLS for `0` or an empty
+///   value, TLS with the certificate not checked for `no-verify`, and TLS
+///   with the certificate and the host checked for any other value, or for
+///   `sslnegotiation=direct` with no `ssl`;
+/// - `sslmode=disable`: no TLS;
+/// - `sslmode=no-verify`, without `uselibpqcompat=true`: TLS, the
+///   certificate not checked;
 /// - under `uselibpqcompat=true`, libpq's meanings, except that `prefer`
 ///   never falls back to plaintext: `prefer` and `require` encrypt without
 ///   checking, `require` with `sslrootcert` checks the CA, `verify-ca` checks
 ///   the CA and needs `sslrootcert`, and `verify-full` checks the host too;
 ///   `no-verify`, which libpq does not have, checks as `verify-full` does;
-/// - any other value, or TLS asked for by a certificate parameter, `ssl=true`
-///   or `ssl=1`: TLS, the certificate and the host checked.
+/// - any other `sslmode`: TLS, the certificate and the host checked.
 ///
 /// Where the URL is silent, the other connection settings come from `PG*`
 /// variables and the password file, as `sqlx` reads them.
 ///
 /// # Errors
 ///
-/// [`PostgresUrlError`] when `url` is not one `sqlx` reads, or asks for
+/// [`PostgresUrlError`] when `url` is not a `postgres:` or `postgresql:` URL
+/// `sqlx` reads, or asks for
 /// `verify-ca` under `uselibpqcompat` with no root certificate.
 pub fn connect_options(
     url: &str,
@@ -143,6 +149,12 @@ pub fn connect_options(
 ) -> Result<PgConnectOptions, PostgresUrlError> {
     let invalid = |reason: String| PostgresUrlError::Invalid(reason);
     let mut parsed = url::Url::parse(url).map_err(|error| invalid(error.to_string()))?;
+    if !matches!(parsed.scheme(), "postgres" | "postgresql") {
+        return Err(invalid(format!(
+            "its scheme is {}, not postgres or postgresql",
+            parsed.scheme()
+        )));
+    }
     let pairs: Vec<(String, String)> = parsed
         .query_pairs()
         .map(|(key, value)| (key.into_owned(), value.into_owned()))
@@ -156,13 +168,17 @@ pub fn connect_options(
     };
     let libpq = value("uselibpqcompat") == Some("true");
     let root = value("sslrootcert").is_some();
-    let asks_tls = root
-        || value("sslcert").is_some()
-        || value("sslkey").is_some()
-        || matches!(value("ssl"), Some("true" | "1"));
+    let certificate = root || value("sslcert").is_some() || value("sslkey").is_some();
+    let direct = value("sslnegotiation") == Some("direct");
     let mode = match (value("sslmode"), libpq) {
-        (None, _) if !asks_tls && value("ssl").is_none() => environment_mode(pgsslmode),
-        (None, _) if !asks_tls => PgSslMode::Disable,
+        (None, _) if certificate => PgSslMode::VerifyFull,
+        (None, _) => match value("ssl") {
+            None if direct => PgSslMode::VerifyFull,
+            None => environment_mode(pgsslmode),
+            Some("0" | "") => PgSslMode::Disable,
+            Some("no-verify") => PgSslMode::Require,
+            Some(_) => PgSslMode::VerifyFull,
+        },
         (Some("disable"), _) => PgSslMode::Disable,
         (Some("no-verify"), false) => PgSslMode::Require,
         (Some("prefer"), true) => PgSslMode::Require,
@@ -174,7 +190,12 @@ pub fn connect_options(
     };
     let kept: Vec<(String, String)> = pairs
         .iter()
-        .filter(|(key, _)| !matches!(key.as_str(), "sslmode" | "uselibpqcompat" | "ssl"))
+        .filter(|(key, _)| {
+            !matches!(
+                key.as_str(),
+                "sslmode" | "uselibpqcompat" | "ssl" | "sslnegotiation"
+            )
+        })
         .cloned()
         .collect();
     if kept.is_empty() {
@@ -315,22 +336,39 @@ impl SqlStore for PostgresStore {
     async fn lock_space(
         &self,
         connection: &mut PgConnection,
-        id: &str,
-    ) -> Result<Option<String>, sqlx::Error> {
+        id: &[u8],
+    ) -> Result<Option<Vec<u8>>, sqlx::Error> {
         // Under READ COMMITTED, a row lock that waited answers the row as the
         // holder left it: the revision it carried when the lock was granted.
-        sqlx::query_scalar("SELECT revision FROM spaces WHERE id = $1::uuid FOR UPDATE")
+        sqlx::query_scalar(
+            "SELECT convert_to(revision, 'UTF8') FROM spaces \
+             WHERE id = convert_from($1, 'UTF8')::uuid FOR UPDATE",
+        )
+        .bind(id)
+        .fetch_optional(connection)
+        .await
+    }
+
+    async fn hold_space(&self, connection: &mut PgConnection, id: &str) -> Result<(), sqlx::Error> {
+        // `FOR UPDATE`, not `FOR SHARE`: the write that may follow locks the
+        // row for update, and two holders of a share lock each waiting to
+        // upgrade it would deadlock.
+        sqlx::query("SELECT 1 FROM spaces WHERE id = $1::uuid FOR UPDATE")
             .bind(id)
-            .fetch_optional(connection)
+            .execute(connection)
             .await
+            .map(drop)
     }
 
     async fn space_revisions(
         connection: &mut PgConnection,
-    ) -> Result<Vec<(String, String)>, sqlx::Error> {
-        sqlx::query_as("SELECT id::text, revision FROM spaces ORDER BY id")
-            .fetch_all(connection)
-            .await
+    ) -> Result<Vec<RevisionRow>, sqlx::Error> {
+        sqlx::query_as(
+            "SELECT convert_to(id::text, 'UTF8'), convert_to(revision, 'UTF8') \
+             FROM spaces ORDER BY id",
+        )
+        .fetch_all(connection)
+        .await
     }
 
     async fn meta_space_id(connection: &mut PgConnection) -> Result<Option<String>, sqlx::Error> {

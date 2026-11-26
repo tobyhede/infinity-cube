@@ -65,13 +65,13 @@ impl DatabaseUrl {
         Self::parse(value.as_deref())
     }
 
-    /// The URL `value` names, trimmed.
+    /// The URL `value` names, trimmed as JavaScript's `trim` trims it.
     ///
     /// # Errors
     ///
     /// [`DatabaseUrlError::Unset`] when `value` is absent or blank.
     pub fn parse(value: Option<&str>) -> Result<Self, DatabaseUrlError> {
-        match value.map(str::trim) {
+        match value.map(|text| text.trim_matches(is_space)) {
             Some(trimmed) if !trimmed.is_empty() => Ok(Self(trimmed.to_owned())),
             _ => Err(DatabaseUrlError::Unset),
         }

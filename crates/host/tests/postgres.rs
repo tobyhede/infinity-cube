@@ -23,7 +23,8 @@ use host::{
 };
 use http_conformance::Counted;
 use intake::SpaceId;
-use postgres_support::Fresh;
+use postgres_support::stand_in::{Behaviour, StandIn};
+use postgres_support::{Fresh, rendezvous, waiting};
 use tokio::sync::Notify;
 
 /// The Presentation Space, which has two Maps.
@@ -325,7 +326,7 @@ mod given_its_transactions {
                 answer
             })
         };
-        reached.notified().await;
+        let winning = rendezvous(&reached, winning).await;
         let losing = {
             let commit = rename(&current, "Second");
             tokio::spawn(async move {
@@ -334,8 +335,8 @@ mod given_its_transactions {
                 answer
             })
         };
-        // The second waits on the first's row lock.
-        tokio::time::sleep(Duration::from_millis(300)).await;
+        // The second waits on the first's row lock before the first goes on.
+        waiting(&database, 1).await;
         release.notify_one();
         let (won, lost) = (winning.await.unwrap(), losing.await.unwrap());
         assert!(committed(&won.unwrap()), "the first commits");
@@ -388,7 +389,7 @@ mod given_its_transactions {
             reader.close().await;
             answer
         });
-        reached.notified().await;
+        let reading = rendezvous(&reached, reading).await;
         let mut snapshot = before.snapshot.clone();
         "Renamed".clone_into(&mut snapshot.document.title);
         "Retitled".clone_into(&mut snapshot.resources[0].title);
@@ -405,9 +406,18 @@ mod given_its_transactions {
 mod given_its_connection {
     use super::*;
 
-    fn with_query(database: &Fresh, query: &str) -> DatabaseUrl {
+    /// `database`'s URL with its `sslmode` set to `mode`, every other query
+    /// pair kept: a dropped `port` or `host` would name another server.
+    fn with_sslmode(database: &Fresh, mode: &str) -> DatabaseUrl {
         let mut url = database.url.clone();
-        url.set_query(Some(query));
+        let mut pairs: Vec<(String, String)> = database
+            .url
+            .query_pairs()
+            .filter(|(key, _)| key != "sslmode")
+            .map(|(key, value)| (key.into_owned(), value.into_owned()))
+            .collect();
+        pairs.push(("sslmode".to_owned(), mode.to_owned()));
+        url.query_pairs_mut().clear().extend_pairs(pairs);
         DatabaseUrl::parse(Some(url.as_str())).unwrap()
     }
 
@@ -415,30 +425,40 @@ mod given_its_connection {
     #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
     async fn serves_with_sslmode_disable_and_with_no_sslmode() {
         let database = Fresh::new().await;
-        for url in [
-            database.database_url(),
-            with_query(&database, "sslmode=disable"),
-        ] {
+        for url in [database.database_url(), with_sslmode(&database, "disable")] {
             let store = PostgresSpaceRepository::open(&url).unwrap();
             assert_eq!(store.load_meta_space_id().await, Ok(None));
             store.close().await;
         }
     }
 
-    // `pg` reads `require` as `verify-full`, so against a server with no TLS
-    // it is refused, not served in plaintext or unverified.
+    // `pg` reads `require` as `verify-full`, so against a server that
+    // declines TLS it is refused, not served in plaintext. The server is the
+    // loopback stand-in, which declines TLS and, were the client to go on in
+    // plaintext, refuses its startup with a code of its own.
     #[tokio::test]
     #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
     async fn refuses_sslmode_require_against_a_server_without_tls_unclassified() {
-        let database = Fresh::new().await;
-        let store =
-            PostgresSpaceRepository::open(&with_query(&database, "sslmode=require")).unwrap();
+        let server = StandIn::start(Behaviour::Refuse("28000", "reached in plaintext")).await;
+        let url = DatabaseUrl::parse(Some(&format!(
+            "postgres://cube:unused@127.0.0.1:{}/cube?sslmode=require",
+            server.port()
+        )))
+        .unwrap();
+        let store = PostgresSpaceRepository::open(&url).unwrap();
         let answer = store.load_meta_space_id().await;
-        assert!(
-            matches!(answer, Err(RepositoryError::Unclassified(_))),
-            "{answer:?}"
-        );
         store.close().await;
+        let Err(RepositoryError::Unclassified(words)) = &answer else {
+            panic!("unclassified: {answer:?}");
+        };
+        assert!(
+            words.to_lowercase().contains("tls"),
+            "the refusal is the server declining TLS: {words}"
+        );
+        assert!(
+            !words.contains("reached in plaintext"),
+            "the client never goes on in plaintext: {words}"
+        );
     }
 }
 

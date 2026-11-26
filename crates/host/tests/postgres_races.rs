@@ -31,7 +31,7 @@ use host::{
     SpaceChange, SpaceCommit, SpaceConflict, SpaceRepository, Step,
 };
 use intake::{SpaceId, SpaceSnapshot};
-use postgres_support::Fresh;
+use postgres_support::{Fresh, rendezvous, waiting};
 use tokio::sync::{Barrier, Notify};
 use tokio::task::JoinHandle;
 
@@ -321,30 +321,6 @@ async fn joined<R>(handle: JoinHandle<R>) -> R {
     handle.await.unwrap()
 }
 
-/// Wait until at least `count` sessions of `database` wait for a lock.
-async fn waiting(database: &Fresh, count: i64) {
-    let mut watcher = database.connect().await;
-    let deadline = tokio::time::Instant::now() + PATIENCE;
-    loop {
-        let waiters: i64 = sqlx::query_scalar(
-            "SELECT count(*) FROM pg_stat_activity \
-             WHERE datname = current_database() AND wait_event_type = 'Lock'",
-        )
-        .fetch_one(&mut watcher)
-        .await
-        .unwrap();
-        if waiters >= count {
-            break;
-        }
-        assert!(
-            tokio::time::Instant::now() < deadline,
-            "{count} session(s) never waited for a lock; {waiters} did"
-        );
-        tokio::time::sleep(Duration::from_millis(10)).await;
-    }
-    sqlx::Connection::close(watcher).await.unwrap();
-}
-
 /// A probe stopping `store`'s first operation to reach a step `at` accepts
 /// until released, telling the test it got there; later steps pass.
 fn pause_once(
@@ -426,7 +402,7 @@ mod given_the_fast_path_beside_the_exclusive_lock {
         let (reached, release) = pause_once(&store, move |step| *step == Step::RowLock(a));
         let change = commit(vec![update(&fixtures.moved_a, 0)]);
         let moving = spawn(&store, |store| async move { store.commit(change).await });
-        reached.notified().await;
+        let moving = rendezvous(&reached, moving).await;
         let change = commit(vec![
             update(&fixtures.without_selected_graph, 0),
             update(&fixtures.meta_selecting_second_graph, 0),
@@ -471,7 +447,7 @@ mod given_the_fast_path_beside_the_exclusive_lock {
             update(&fixtures.meta_selecting_second_graph, 0),
         ]);
         let deleting = spawn(&store, |store| async move { store.commit(change).await });
-        reached.notified().await;
+        let deleting = rendezvous(&reached, deleting).await;
         let change = commit(vec![update(&fixtures.moved_a, 0)]);
         let moving = spawn(&store, |store| async move { store.commit(change).await });
         waiting(&database, 1).await;
@@ -509,7 +485,7 @@ mod given_the_fast_path_beside_the_exclusive_lock {
         let (reached, release) = pause_once(&store, move |step| *step == Step::RowLock(a));
         let change = commit(vec![update(&fixtures.moved_a, 0)]);
         let moving = spawn(&store, |store| async move { store.commit(change).await });
-        reached.notified().await;
+        let moving = rendezvous(&reached, moving).await;
         let input = AggregateInput {
             meta_space_id: space(&fixtures.ids.meta),
             spaces: vec![
@@ -561,7 +537,7 @@ mod given_the_fast_path_beside_the_exclusive_lock {
         let (reached, release) = pause_once(&store, move |step| *step == Step::ResourceReread(a));
         let change = commit(vec![update(&fixtures.moved_a, 0)]);
         let moving = spawn(&store, |store| async move { store.commit(change).await });
-        reached.notified().await;
+        let moving = rendezvous(&reached, moving).await;
         let change = commit(vec![
             SpaceChange::Delete {
                 space_id: a,
@@ -607,7 +583,7 @@ mod given_the_fast_path_beside_the_exclusive_lock {
         let (reached, release) = pause_once(&store, move |step| *step == Step::RowLock(a));
         let change = commit(vec![update(&fixtures.moved_a, 0)]);
         let moving_a = spawn(&store, |store| async move { store.commit(change).await });
-        reached.notified().await;
+        let moving_a = rendezvous(&reached, moving_a).await;
         let change = commit(vec![update(&space_b(&fixtures.ids, 480), 0)]);
         let moving_b = spawn(&store, |store| async move { store.commit(change).await });
         let moved_b = tokio::time::timeout(PATIENCE, moving_b).await;
