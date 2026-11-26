@@ -1,0 +1,43 @@
+# Fails when the Rust toolchain pin is two or more minor releases behind the
+# stable release Rust publishes (ADR 0179), naming both and the bump steps.
+#
+# A signal, not a gate: it is kept out of `ci.yml`, so `CI passed` never
+# depends on it and a Rust release never blocks a merge. It runs weekly, on
+# demand from the Actions tab, and on a pull request that changes the check
+# itself or `package.json`, which defines its script, so a change that breaks
+# the check is seen where it is made. The offline half, that the two pins
+# agree, runs in `verify` (`test/unit/check-rust-toolchain.test.ts`).
+name: Rust toolchain
+
+on:
+  schedule:
+    - cron: '17 21 * * 1'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - scripts/check-rust-toolchain.ts
+      - package.json
+      - .github/workflows/rust-toolchain.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-toolchain-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  stale:
+    name: Rust pin is current
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm toolchain:rust:stale

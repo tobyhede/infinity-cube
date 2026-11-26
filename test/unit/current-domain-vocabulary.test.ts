@@ -689,7 +689,9 @@ const isAuthoredSource = (file: string): boolean =>
  * the shared database Vite config, the mount build's Vite config and the HTTP
  * server and desktop sidecar build configs that import it, the plugin alias
  * test and its support module, which import the alias table to resolve every
- * plugin through it, and the toolchain check that reads the package list plus its test. Cargo's
+ * plugin through it, the toolchain check that reads the package list plus its test, and the
+ * Rust toolchain check, which reads `rust-version` from the root `Cargo.toml`'s inherited package table, plus
+ * its test. Cargo's
  * inheritance keys are forgiven by line instead (`CARGO_INHERITANCE`). The two
  * target-specific Vite configs delegate to that one shared owner and carry no
  * exemption.
@@ -707,6 +709,8 @@ const MONOREPO_VOCABULARY: readonly string[] = [
   'test/unit/plugin-aliases.test.ts',
   'scripts/check-typescript-toolchain.ts',
   'test/unit/check-typescript-toolchain.test.ts',
+  'scripts/check-rust-toolchain.ts',
+  'test/unit/check-rust-toolchain.test.ts',
 ];
 
 /** A package manifest, anchored at a package root rather than by filename. */
