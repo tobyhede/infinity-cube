@@ -501,64 +501,47 @@ test('the opened Resource draws Markdown and its editor on the same paper surfac
 });
 
 /**
- * A Markdown Resource Opens like a note unfolded to be read: never resized, it
- * grows to its content and the Resources its growth passes make room. Editing
- * and Closing then move nothing, and Closing keeps the size, so a second Open
- * changes only what the Resource draws.
+ * Opening never changes a size (ADR 0178): an unresized Markdown Resource
+ * Opens at the Closed Size, its content clipped to that rect, and its
+ * neighbour stays where the Map put it. Closing keeps both, and an Edit
+ * Saved while Open moves nobody. The authored-size case is "Open and Close
+ * move nobody and keep the size" below.
  */
-test('Opening an unresized Markdown Resource grows it to its content, and Closing keeps that size', async ({
+test('Opening an unresized Markdown Resource keeps the Closed Size and moves nobody', async ({
   page,
 }) => {
-  await page.goto('/');
-  await selectCanvas(page, 'Collection 1');
-  const resource = nodeByTitle(page, 'A').first();
-  // The node's width is a placement transition, so a size is read once it ends.
-  const restingWidth = () =>
-    resource.evaluate(async (element) => {
-      await Promise.all(element.getAnimations().map((animation) => animation.finished));
-      return element.getBoundingClientRect().width;
-    });
-  await expect(resource).toBeVisible();
+  await seedGeometry(page, 'Closed Size Geometry', {
+    [SUBJECT.id]: { x: 0, y: 0 },
+    [NEIGHBOUR.id]: { x: 320, y: 0 },
+  });
+  const resource = seededNode(page, SUBJECT);
+  const rect = async () =>
+    resource.evaluate((element) => ({
+      width: Number.parseFloat(getComputedStyle(element).width),
+      height: Number.parseFloat(getComputedStyle(element).height),
+    }));
   await settled(page);
   const before = await allPositions(page);
-  const closedBox = await resource.boundingBox();
-  const openedId = await resource.getAttribute('data-id');
-  expect(openedId).not.toBeNull();
+  expect(await rect()).toEqual(COLLAPSED_RESOURCE_SIZE);
 
-  await openResource(resource, 'A');
+  await openResourcePersisted(resource, SUBJECT.title);
   await expect(resource.locator('.canvas-resource__plugin [data-open="true"]')).toHaveCount(1);
   await settled(page);
-  const opened = await allPositions(page);
-  const openWidth = await restingWidth();
-  expect(openWidth).toBeGreaterThan(closedBox?.width ?? 0);
-  // It grows from its own top-left corner; what its growth passes moves.
-  expect(opened[openedId ?? '']).toEqual(before[openedId ?? '']);
-  expect(opened).not.toEqual(before);
+  expect(await allPositions(page), 'Opening moved a Resource').toEqual(before);
+  expect(await rect(), 'Opening changed the size').toEqual(COLLAPSED_RESOURCE_SIZE);
 
   await (await controls(resource)).getByRole('button', { name: 'Edit Resource A' }).click();
   await page.getByRole('textbox', { name: 'Markdown source of A' }).fill('# Edited\n\nNew source');
   await (await controls(resource)).getByRole('button', { name: 'Save Resource A' }).click();
-
   await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toHaveCount(0);
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
-  expect(await allPositions(page)).toEqual(opened);
+  expect(await allPositions(page)).toEqual(before);
 
   await (await controls(resource)).getByRole('button', { name: 'Close Resource A' }).click();
   await expect(resource.locator('.canvas-resource__plugin [data-open="true"]')).toHaveCount(0);
-  expect(await allPositions(page)).toEqual(opened);
-  expect(await restingWidth()).toBeCloseTo(openWidth, 0);
-
-  // Sized now, so Opening again changes what it draws and no rect.
-  await openResource(resource, 'A');
-  await expect(resource.locator('.canvas-resource__plugin [data-open="true"]')).toHaveCount(1);
-  expect(await allPositions(page)).toEqual(opened);
-
-  await page.reload();
-  const persisted = nodeByTitle(page, 'A').first();
-  await (await controls(persisted)).getByRole('button', { name: 'Edit Resource A' }).click();
-  const persistedSource = page.getByRole('textbox', { name: 'Markdown source of A' });
-  await expect(persistedSource).toContainText('# Edited');
-  await expect(persistedSource).toContainText('New source');
+  await settled(page);
+  expect(await allPositions(page), 'Closing moved a Resource').toEqual(before);
+  expect(await rect(), 'Closing changed the size').toEqual(COLLAPSED_RESOURCE_SIZE);
 });
 
 /**
@@ -624,7 +607,7 @@ test(
     const resource = nodeByTitle(page, 'A').first();
     await expect(resource).toBeVisible();
     await openResourcePersisted(resource, 'A');
-    // Opening grows the Resource through a transition, so its rect is still moving
+    // A Resource's rect is drawn through a transition, so it may still be moving
     // for a moment: a drag started inside it would be measuring the animation.
     await resource.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
@@ -1126,7 +1109,7 @@ test(
     const openedRevision = await openResourcePersisted(resource, 'A');
     const persistence = page.getByTestId('persistence-status');
     const beforePosition = await positionOf(resource);
-    // Opening grows the Resource through a CSS transition, so its rect is still
+    // A Resource's rect is drawn through a CSS transition, so it may still be
     // moving for a moment after the Edit persists. Settling it first is what
     // makes the mid-gesture growth below evidence of the drag rather than of
     // an animation that had not finished.
@@ -1362,7 +1345,7 @@ test.describe('resizing by touch', () => {
     const openedRevision = await openResourcePersisted(resource, 'A');
     const persistence = page.getByTestId('persistence-status');
     const beforePosition = await positionOf(resource);
-    // Opening grows the Resource through a CSS transition, so its rect is still
+    // A Resource's rect is drawn through a CSS transition, so it may still be
     // moving for a moment after the Edit persists — settling it first is what
     // makes the growth below evidence of the drag.
     await resource.evaluate(async (element) => {
@@ -1483,7 +1466,7 @@ test.describe('resizing by touch', () => {
     const openedRevision = await openResourcePersisted(resource, 'A');
     const persistence = page.getByTestId('persistence-status');
     const beforePosition = await positionOf(resource);
-    // Opening grows the Resource through a CSS transition, so its rect is still
+    // A Resource's rect is drawn through a CSS transition, so it may still be
     // moving for a moment after the Edit persists — settling it first is what
     // makes this the authored rect the cancellation has to restore.
     await resource.evaluate(async (element) => {
@@ -3673,7 +3656,6 @@ test('the Resource menu groups Create Reference, Connect, Full View and Present 
   await expectMenuGroups(menu, [
     ['Create Reference'],
     ['Connect to Resource'],
-    // A Markdown Resource Opens with its plugin's size hint (A29).
     ['Read in Full View', 'Present from Here'],
     ['Copy link to Resource in Map', 'Copy link to Resource'],
     ['Remove from Map', 'Delete from Space'],
@@ -3697,7 +3679,6 @@ test(
     const groups = [
       ['Create Reference'],
       ['Connect to Resource'],
-      // A Markdown Resource Opens with its plugin's size hint (A29).
       ['Read in Full View', 'Present from Here'],
       ['Copy link to Resource in Map', 'Copy link to Resource'],
       ['Remove from Map', 'Delete from Space'],

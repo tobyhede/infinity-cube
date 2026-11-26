@@ -210,10 +210,10 @@ export async function persistedAt(page: Page, revision: number): Promise<void> {
  * Open a Closed Resource and wait for its one Open Edit to persist, answering
  * the revision it persisted at.
  *
- * A Markdown Resource's Open commit carries a size hint measured from its text
+ * A Markdown Resource's Open commits at once, before its text is read
  * (`packages/plugin-markdown/test/markdown-plugin.test.tsx` › "Opens with one
- * Map content commit carrying a size hint at least the reading width"), so it
- * follows the read of that text rather than the click.
+ * Map content commit carrying no size hint, before its text is read"), but
+ * persisting it is still asynchronous, so the revision is awaited.
  */
 export async function openResourcePersisted(node: Locator, title: string): Promise<number> {
   const closedRevision = await persistedRevision(node.page());
