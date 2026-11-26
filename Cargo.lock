@@ -1742,6 +1742,7 @@ name = "host"
 version = "0.1.0-preview.1"
 dependencies = [
  "bytes",
+ "dotenvy",
  "host",
  "http",
  "http-body",
@@ -4128,6 +4129,8 @@ dependencies = [
  "log",
  "memchr",
  "percent-encoding",
+ "rustls",
+ "rustls-native-certs",
  "serde",
  "serde_json",
  "sha2 0.11.1",

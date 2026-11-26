@@ -15,6 +15,7 @@ test-support = []
 
 [dependencies]
 bytes = { workspace = true }
+dotenvy = { workspace = true }
 http = { workspace = true }
 http-body = "1"
 http-body-util = { workspace = true }
@@ -25,9 +26,15 @@ intake = { workspace = true }
 # so their versions move together and one bundled SQLite is compiled.
 rusqlite = { version = "0.43", default-features = false, features = ["bundled"] }
 sha2 = { workspace = true }
-sqlx = { workspace = true, features = ["runtime-tokio", "sqlite-bundled"] }
+sqlx = { workspace = true, features = [
+    "postgres",
+    "runtime-tokio",
+    "sqlite-bundled",
+    "tls-rustls-ring-native-roots",
+] }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["fs", "io-util", "macros", "rt", "sync", "time"] }
+url = { workspace = true }
 uuid = { version = "1", features = ["v4"] }
 
 [target.'cfg(unix)'.dependencies]

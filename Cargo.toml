@@ -20,6 +20,7 @@ host = { path = "crates/host" }
 http-conformance = { path = "crates/http-conformance" }
 intake = { path = "crates/intake" }
 bytes = "1"
+dotenvy = "0.15"
 http = "1"
 http-body-util = "0.1"
 serde_json = "1"

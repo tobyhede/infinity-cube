@@ -728,11 +728,19 @@ jobs:
             echo "POSTGRES_PASSWORD=$password"
             echo "POSTGRES_PORT=55432"
             echo "INFINITY_CUBE_MIGRATIONS_DATABASE_URL=$database_url"
+            echo "INFINITY_CUBE_POSTGRES_TEST_URL=$database_url"
           } >> "$GITHUB_ENV"
       - name: Start PostgreSQL
         run: pnpm postgres:up
       - name: Shared migrations produce the schema Prisma Next produces
         run: cargo nextest run -p host --test shared_migrations --run-ignored only --locked
+      # The PostgreSQL store's tests (ADR 0177), ignored by the run above
+      # because they need a server: every ignored test of a `postgres*` test
+      # binary, each on a database of its own cloned from a template the
+      # tests migrate. Their support panics without the server variable, and
+      # `--no-tests=fail` fails the step if the filter finds none.
+      - name: The PostgreSQL store's tests
+        run: cargo nextest run --workspace --exclude infinity-cube-desktop --run-ignored only --no-tests=fail -E 'binary(/^postgres/)' --locked
       - name: Stop PostgreSQL
         if: always() && steps.postgres-env.outcome == 'success'
         run: pnpm postgres:down
@@ -804,9 +812,31 @@ jobs:
           command -v cargo-nextest || cargo install cargo-nextest --locked --version "$NEXTEST_VERSION"
           command -v cargo-llvm-cov || cargo install cargo-llvm-cov --locked --version "$CARGO_LLVM_COV_VERSION"
           command -v cargo-crap || cargo install cargo-crap --locked --version "$CARGO_CRAP_VERSION"
+      # The PostgreSQL store's tests run under coverage too, or the store
+      # would score as uncovered: PostgreSQL started as the `rust` job starts
+      # it.
+      - name: Configure ephemeral PostgreSQL
+        id: postgres-env
+        run: |
+          password="$(openssl rand -hex 32)"
+          database_url="postgresql://infinity_cube_ci:${password}@127.0.0.1:55432/infinity_cube_ci"
+          echo "::add-mask::$password"
+          echo "::add-mask::$database_url"
+          {
+            echo "POSTGRES_DB=infinity_cube_ci"
+            echo "POSTGRES_USER=infinity_cube_ci"
+            echo "POSTGRES_PASSWORD=$password"
+            echo "POSTGRES_PORT=55432"
+            echo "INFINITY_CUBE_POSTGRES_TEST_URL=$database_url"
+          } >> "$GITHUB_ENV"
+      - name: Start PostgreSQL
+        run: pnpm postgres:up
       - id: rust-coverage
         name: Run the crates' tests under coverage
-        run: pnpm crap:rust:coverage
+        run: pnpm crap:rust:coverage:postgres
+      - name: Stop PostgreSQL
+        if: always() && steps.postgres-env.outcome == 'success'
+        run: pnpm postgres:down
       - name: CRAP gate (Rust)
         run: pnpm crap:rust:report --fail-above --format github
       # The summary is written whether or not the gate passed, so a failing

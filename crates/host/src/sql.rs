@@ -20,7 +20,9 @@
 //! the wait, never an operation part-way between its two transactions.
 
 mod codec;
+mod database_url;
 mod path;
+mod postgres;
 mod sqlite;
 #[cfg(test)]
 mod tests;
@@ -47,7 +49,12 @@ use codec::{
     encode_space, same_document,
 };
 
+pub use database_url::{DATABASE_URL, DatabaseUrl, DatabaseUrlError, nearest_env_file};
 pub use path::{SqlitePath, SqlitePathError};
+pub use postgres::{
+    AGGREGATE_LOCK_KEY, PoolSettings, PostgresSpaceRepository, PostgresStore, PostgresUrlError,
+    classify as classify_postgres, connect_options as postgres_connect_options,
+};
 pub use sqlite::{ConnectionSettings, SqliteSpaceRepository, SqliteStore};
 
 /// A connection of `S`'s database, as a transaction lends it.
@@ -93,6 +100,9 @@ pub enum Step {
     RowLock(SpaceId),
     /// Holding this Space's row lock, about to read its Resource rows again.
     ResourceReread(SpaceId),
+    /// Read this Space's row in a read of one Space, about to read its
+    /// Resource rows.
+    SpaceRead(SpaceId),
     /// About to empty the store for an initialization or a replacement.
     Truncation,
     /// The fast path's transaction has ended, and the aggregate decision's
@@ -515,9 +525,17 @@ impl<S: SqlStore> Shared<S> {
     /// answers it once the commit's transaction has rolled back.
     async fn read_space(&self, id: SpaceId) -> Outcome<Option<LoadedSpace>> {
         let mut transaction = self.begin(Access::Read).await?;
-        let loaded = one_space::<S>(&mut transaction, id).await;
+        let Some(row) = S::space(&mut transaction, id.as_str()).await? else {
+            transaction.commit().await?;
+            return Ok(None);
+        };
+        self.reached(Step::SpaceRead(id)).await;
+        let resources = S::resources_of(&mut transaction, id.as_str()).await?;
         transaction.commit().await?;
-        loaded
+        let owned: Vec<&ResourceRow> = resources.iter().collect();
+        decode_space(&row, &owned)
+            .map(Some)
+            .map_err(Failure::Broken)
     }
 
     /// The Meta identity read afresh in a transaction of its own.
