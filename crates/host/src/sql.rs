@@ -27,8 +27,8 @@ use crate::commit::{
 };
 use crate::repository::{
     AggregateInput, AggregateLoad, AssetStored, CommitResult, InitializeResult, LoadedAggregate,
-    LoadedSpace, ReplaceResult, RepositoryError, Revision, SpaceCommit, SpaceRepository,
-    SpaceSummary, authored, checked_input,
+    LoadedSpace, ReplaceResult, RepositoryError, Revision, SpaceChange, SpaceCommit,
+    SpaceRepository, SpaceSummary, authored, checked_input,
 };
 use codec::{
     ResourceRow, SpaceRow, decode_space, decode_title, encode_revision, encode_space, same_document,
@@ -90,17 +90,25 @@ pub(crate) trait SqlStore: Send + Sync + 'static {
         space_id: &str,
     ) -> impl Future<Output = Result<Vec<ResourceRow>, sqlx::Error>> + Send;
 
-    /// Insert a Space row, or overwrite the one with its id.
-    fn write_space(
+    /// Insert a Space row, failing on a row already holding its id.
+    fn insert_space(
         connection: &mut Connection<Self>,
         row: &SpaceRow,
     ) -> impl Future<Output = Result<(), sqlx::Error>> + Send;
 
-    /// Delete a Space row and its Resource rows.
+    /// Overwrite the Space row with its id, answering whether there was
+    /// one.
+    fn update_space(
+        connection: &mut Connection<Self>,
+        row: &SpaceRow,
+    ) -> impl Future<Output = Result<bool, sqlx::Error>> + Send;
+
+    /// Delete a Space row and its Resource rows, answering whether a Space
+    /// row was removed.
     fn delete_space(
         connection: &mut Connection<Self>,
         id: &str,
-    ) -> impl Future<Output = Result<(), sqlx::Error>> + Send;
+    ) -> impl Future<Output = Result<bool, sqlx::Error>> + Send;
 
     /// Delete every Resource row of one Space whose id `keep` does not name
     /// (`deleteExcept`).
@@ -117,11 +125,12 @@ pub(crate) trait SqlStore: Send + Sync + 'static {
     ) -> impl Future<Output = Result<(), sqlx::Error>> + Send;
 
     /// Insert a Resource row, or overwrite the document of the one with its
-    /// id, keeping when that row was created (`upsert`).
+    /// id, keeping when that row was created and which Space owns it
+    /// (`upsert`), answering the id of the Space that owns the row now.
     fn upsert_resource(
         connection: &mut Connection<Self>,
         row: &ResourceRow,
-    ) -> impl Future<Output = Result<(), sqlx::Error>> + Send;
+    ) -> impl Future<Output = Result<String, sqlx::Error>> + Send;
 
     /// Delete the Meta identity, every Resource row and every Space row.
     fn clear(
@@ -356,57 +365,160 @@ async fn authoritative<S: SqlStore>(
     })
 }
 
-/// Write `space` into a store that holds none of its rows.
+/// Write `space` into a store that holds none of its rows, failing on a
+/// row already there.
 async fn insert<S: SqlStore>(connection: &mut Connection<S>, space: &LoadedSpace) -> Outcome<()> {
     let (row, resources) = encode_space(space);
-    S::write_space(connection, &row).await?;
+    S::insert_space(connection, &row).await?;
     for resource in &resources {
         S::insert_resource(connection, resource).await?;
     }
     Ok(())
 }
 
-/// Remove `deleted` and write `written` as a commit leaves them, writing
-/// the rows `#writeUpdate` writes: each written Space's row, and only the
-/// Resource rows it adds or changes, judged against its rows as stored;
-/// the Resources a written Space drops are deleted first, every written
-/// Space's before any is written, so a Resource one Space releases and
-/// another takes is never held twice. The commit was decided against
-/// these rows inside this transaction, so a Resource a written Space
-/// does not hold is held by no Space but one it was released from.
+/// Why a decided commit's write was refused, in words: a row it met that
+/// a writer outside the decision changed.
+struct Refused(String);
+
+/// Remove `deleted` and write `written` as a commit leaves them, in the
+/// order `written` holds them: each Space in `created` inserted with every Resource row it holds, and each
+/// other written Space's row updated with only the Resource rows it adds
+/// or changes, judged against its rows as stored. The Resources an
+/// updated Space drops are deleted first, every updated Space's before
+/// any is written, so a Resource one Space releases and another takes is
+/// never held twice. The commit was decided against these rows inside
+/// this transaction, so a row that is not as the decision read it was
+/// changed by a writer outside the decision: a deleted or updated Space
+/// with no row fails the commit, and a Resource row a created or updated
+/// Space meets owned by another Space refuses it.
 async fn write_changes<S: SqlStore>(
     connection: &mut Connection<S>,
     deleted: &[SpaceId],
+    created: &[SpaceId],
     written: &[LoadedSpace],
-) -> Outcome<()> {
+) -> Outcome<Result<(), Refused>> {
     for id in deleted {
-        S::delete_space(connection, id.as_str()).await?;
+        if !S::delete_space(connection, id.as_str()).await? {
+            return Err(vanished(format!("Space {id} disappeared during commit")));
+        }
     }
-    let encoded: Vec<_> = written.iter().map(encode_space).collect();
-    for (row, resources) in &encoded {
+    let encoded: Vec<_> = written
+        .iter()
+        .map(|space| (created.contains(&space.snapshot.id), encode_space(space)))
+        .collect();
+    for (_, (row, resources)) in encoded.iter().filter(|(created, _)| !created) {
         let keep: Vec<&str> = resources
             .iter()
             .map(|resource| resource.id.as_str())
             .collect();
         S::delete_resources_except(connection, &row.id, &keep).await?;
     }
-    for (row, resources) in &encoded {
-        S::write_space(connection, row).await?;
-        let stored: BTreeMap<String, String> = S::resources_of(connection, &row.id)
-            .await?
-            .into_iter()
-            .map(|resource| (resource.id, resource.document))
-            .collect();
-        for resource in resources {
-            let unchanged = stored
-                .get(&resource.id)
-                .is_some_and(|document| same_document(document, &resource.document));
-            if !unchanged {
-                S::upsert_resource(connection, resource).await?;
-            }
+    for (created, (row, resources)) in &encoded {
+        let written = if *created {
+            write_created::<S>(connection, row, resources).await?
+        } else {
+            write_updated::<S>(connection, row, resources).await?
+        };
+        if let Err(refused) = written {
+            return Ok(Err(refused));
         }
     }
-    Ok(())
+    Ok(Ok(()))
+}
+
+/// A failure naming a row a writer outside the decision removed.
+fn vanished(message: String) -> Failure {
+    Failure::Answered(RepositoryError::Unclassified(message))
+}
+
+/// Insert a created Space's row and every Resource row it holds, refusing
+/// a Resource whose id a row already holds.
+async fn write_created<S: SqlStore>(
+    connection: &mut Connection<S>,
+    row: &SpaceRow,
+    resources: &[ResourceRow],
+) -> Outcome<Result<(), Refused>> {
+    S::insert_space(connection, row).await?;
+    for resource in resources {
+        match S::insert_resource(connection, resource).await {
+            Ok(()) => {}
+            Err(error)
+                if error
+                    .as_database_error()
+                    .is_some_and(|database| database.is_unique_violation()) =>
+            {
+                return Ok(Err(Refused(format!(
+                    "Resource {} already belongs to another space",
+                    resource.id
+                ))));
+            }
+            Err(error) => return Err(error.into()),
+        }
+    }
+    Ok(Ok(()))
+}
+
+/// Update an existing Space's row and write the Resource rows it adds or
+/// changes, refusing a Resource row another Space owns.
+async fn write_updated<S: SqlStore>(
+    connection: &mut Connection<S>,
+    row: &SpaceRow,
+    resources: &[ResourceRow],
+) -> Outcome<Result<(), Refused>> {
+    if !S::update_space(connection, row).await? {
+        return Err(vanished(format!(
+            "Space {} disappeared under its row lock",
+            row.id
+        )));
+    }
+    let stored: BTreeMap<String, String> = S::resources_of(connection, &row.id)
+        .await?
+        .into_iter()
+        .map(|resource| (resource.id, resource.document))
+        .collect();
+    for resource in resources {
+        let unchanged = stored
+            .get(&resource.id)
+            .is_some_and(|document| same_document(document, &resource.document));
+        if unchanged {
+            continue;
+        }
+        let owner = S::upsert_resource(connection, resource).await?;
+        if owner != row.id {
+            return Ok(Err(Refused(format!(
+                "Resource {} belongs to space {owner}, not {}",
+                resource.id, row.id
+            ))));
+        }
+    }
+    Ok(Ok(()))
+}
+
+/// Write a decided commit's changes and end `transaction`: committed with
+/// `result` answered, or rolled back with the refusal the write met.
+async fn land<S: SqlStore>(
+    mut transaction: Transaction<'static, S::Database>,
+    request: &SpaceCommit,
+    deleted: &[SpaceId],
+    written: &[LoadedSpace],
+    result: CommitResult,
+) -> Outcome<CommitResult> {
+    let created: Vec<SpaceId> = request
+        .changes
+        .iter()
+        .filter(|change| matches!(change, SpaceChange::Create { .. }))
+        .map(SpaceChange::space_id)
+        .collect();
+    match write_changes::<S>(&mut transaction, deleted, &created, written).await? {
+        Ok(()) => {
+            transaction.commit().await?;
+            Ok(result)
+        }
+        Err(Refused(message)) => {
+            transaction.rollback().await?;
+            Ok(CommitResult::Rejected { message })
+        }
+    }
 }
 
 /// Empty the store and write `input` as the whole aggregate.
@@ -495,9 +607,7 @@ impl<S: SqlStore> SpaceRepository for SqlSpaceRepository<S> {
                         return Ok(result);
                     }
                     SingleSpaceDecision::Write { result, written } => {
-                        write_changes::<S>(&mut transaction, &[], &[written]).await?;
-                        transaction.commit().await?;
-                        return Ok(result);
+                        return land::<S>(transaction, &request, &[], &[written], result).await;
                     }
                     SingleSpaceDecision::Fail(failure) => {
                         transaction.rollback().await?;
@@ -520,11 +630,7 @@ impl<S: SqlStore> SpaceRepository for SqlSpaceRepository<S> {
                     result,
                     written,
                     deleted,
-                } => {
-                    write_changes::<S>(&mut transaction, &deleted, &written).await?;
-                    transaction.commit().await?;
-                    Ok(result)
-                }
+                } => land::<S>(transaction, &request, &deleted, &written, result).await,
             }
         })
         .await
