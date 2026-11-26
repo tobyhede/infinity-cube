@@ -797,6 +797,41 @@ describe('render adapter', () => {
       ]);
     });
 
+    it('drops a resize under way when its Resource stops being edited in place', () => {
+      const spy = authoringSpy({ mapPlacement: authored });
+      const store = createRenderAdapter(spy.authoring);
+      store.getState().resourceResize.drawEditors(new Map([[RESOURCE_A, {}]]));
+      store.getState().resourceResize.beginResize(RESOURCE_A);
+      store.getState().resourceResize.previewResize(RESOURCE_A, { width: 700, height: 400 });
+      store.getState().resourceResize.drawEditors(new Map());
+      expect(store.getState().resizeDraft).toBeNull();
+      store.getState().resourceResize.finishResize(RESOURCE_A);
+      expect(spy.completions).toEqual([]);
+    });
+
+    it('drops a resize under way when its Resource starts being edited in place', () => {
+      const spy = authoringSpy({ mapPlacement: authored });
+      const store = createRenderAdapter(spy.authoring);
+      store.getState().resourceResize.beginResize(RESOURCE_A);
+      store.getState().resourceResize.previewResize(RESOURCE_A, { width: 320, height: 220 });
+      store.getState().resourceResize.drawEditors(new Map([[RESOURCE_A, {}]]));
+      expect(store.getState().resizeDraft).toBeNull();
+      store.getState().resourceResize.finishResize(RESOURCE_A);
+      expect(spy.completions).toEqual([]);
+    });
+
+    it('keeps a resize under way when another Resource starts being edited in place', () => {
+      const spy = authoringSpy({ mapPlacement: authored });
+      const store = createRenderAdapter(spy.authoring);
+      store.getState().resourceResize.beginResize(RESOURCE_A);
+      store.getState().resourceResize.previewResize(RESOURCE_A, { width: 320, height: 220 });
+      store.getState().resourceResize.drawEditors(new Map([[RESOURCE_B, {}]]));
+      store.getState().resourceResize.finishResize(RESOURCE_A);
+      expect(spy.completions).toEqual([
+        { kind: 'resized-resource', resourceId: RESOURCE_A, size: { width: 320, height: 220 } },
+      ]);
+    });
+
     it('keeps the editors it holds when told the same ones again', () => {
       const store = createRenderAdapter(authoringSpy({ mapPlacement: authored }).authoring);
       store.getState().resourceResize.drawEditors(new Map([[RESOURCE_A, {}]]));

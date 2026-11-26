@@ -512,7 +512,14 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
     // partial, so this reference is what the canvas keeps holding.
     resourceResize: {
       drawEditors: (editors) => {
-        if (!sameEditors(get().editors, editors)) set({ editors });
+        const held = get();
+        if (sameEditors(held.editors, editors)) return;
+        // A draft started at the rect drawn before would write the other size
+        // from it, so a change to whether its Resource is edited ends it.
+        const draft = held.resizeDraft;
+        const ended =
+          draft !== null && held.editors.has(draft.resourceId) !== editors.has(draft.resourceId);
+        set(ended ? { editors, resizeDraft: null } : { editors });
       },
 
       beginResize: (resourceId) => {

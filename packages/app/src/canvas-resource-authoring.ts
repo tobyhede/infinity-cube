@@ -174,8 +174,8 @@ export function useCanvasResourceAuthoring({
     return drawing !== undefined && !lent.has(drawing.key);
   });
   // A plugin that took its Claim to edit in place is drawn at its Edit size,
-  // and resized as an editor, until the Claim ends (ADR 0178). Told before
-  // paint, so the editor is never drawn a frame at its size.
+  // and resized as an editor, until the Claim ends (ADR 0178). The render
+  // adapter is told in a layout effect, before the browser paints this render.
   const editingDrawings = useSyncExternalStore(pluginGate.subscribe, pluginGate.editors);
   const embeddedIn = plugins?.embeddedIn;
   const editors = useMemo(() => {
