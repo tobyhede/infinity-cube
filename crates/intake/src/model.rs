@@ -93,7 +93,8 @@ pub struct Placement {
     /// Its size, absent for the Closed Size.
     pub size: Option<Size>,
     /// Its Edit size, the size the canvas draws it at while its plugin edits
-    /// it in place (ADR 0178); absent, the editor draws at `size`.
+    /// it in place (ADR 0178); absent, the editor draws at the larger of its
+    /// plugin's size hint and `size` on each axis, or at `size` with no hint.
     pub edit_size: Option<Size>,
     /// Its plugin's Map content, absent for the plugin's default.
     pub content: Option<JsonValue>,

@@ -82,7 +82,7 @@
           }
         },
         "editSize": {
-          "description": "The Edit size: the size the canvas draws this Resource at while its plugin edits it in place (ADR 0178). It has the floor size has, on an entry of any kind. Absent, the editor draws at the Resource's size.",
+          "description": "The Edit size: the size the canvas draws this Resource at while its plugin edits it in place (ADR 0178). It has the floor size has, on an entry of any kind. Absent, nothing is stored and the editor draws at the larger of its plugin's size hint and the Resource's size on each axis, or at the Resource's size with no hint.",
           "type": "object",
           "required": ["width", "height"],
           "additionalProperties": false,

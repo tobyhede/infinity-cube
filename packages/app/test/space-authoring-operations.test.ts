@@ -713,6 +713,40 @@ describe('Resize the editor writes an Edit size (ADR 0178)', () => {
     });
   });
 
+  it('writes an Edit size that differs from the stored one only in height', () => {
+    const { authoring, session } = open();
+    resizeEditor(authoring, RESOURCE_A);
+
+    expect(
+      authoring.complete(CANVAS, {
+        kind: 'resized-editor',
+        resourceId: RESOURCE_A,
+        editSize: { width: 640, height: 400 },
+      }),
+    ).toEqual({ kind: 'completed' });
+    expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]?.editSize).toEqual({
+      width: 640,
+      height: 400,
+    });
+  });
+
+  it('keeps the Edit size through a later Resize', () => {
+    const { authoring, session } = open();
+    resizeEditor(authoring, RESOURCE_A);
+
+    expect(
+      authoring.complete(CANVAS, {
+        kind: 'resized-resource',
+        resourceId: RESOURCE_A,
+        size: { width: 300, height: 200 },
+      }),
+    ).toEqual({ kind: 'completed' });
+    expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toMatchObject({
+      size: { width: 300, height: 200 },
+      editSize: { width: 640, height: 360 },
+    });
+  });
+
   it('is unchanged at the Edit size the entry already stores', () => {
     const { authoring, session } = open();
     resizeEditor(authoring, RESOURCE_A);
@@ -721,6 +755,24 @@ describe('Resize the editor writes an Edit size (ADR 0178)', () => {
     expect(resizeEditor(authoring, RESOURCE_A)).toEqual({ kind: 'unchanged' });
     expect(session.getState().working).toBe(before);
   });
+
+  it.each([
+    { editSize: { width: 100, height: 50 }, floored: { width: 260, height: 146 } },
+    { editSize: { width: 100, height: 400 }, floored: { width: 260, height: 400 } },
+    { editSize: { width: 640, height: 50 }, floored: { width: 640, height: 146 } },
+  ])(
+    'floors an Edit size of $editSize at the Closed Size on each axis',
+    ({ editSize, floored }) => {
+      const { authoring, session } = open();
+      const complete = () =>
+        authoring.complete(CANVAS, { kind: 'resized-editor', resourceId: RESOURCE_A, editSize });
+
+      expect(complete).not.toThrow();
+      expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]?.editSize).toEqual(
+        floored,
+      );
+    },
+  );
 
   it('refuses a Resource the Map does not place', () => {
     const { authoring, session } = open();

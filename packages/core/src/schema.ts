@@ -311,8 +311,9 @@ export const resourceShapeSchema = z.enum(RESOURCE_SHAPES);
  * `size` is the Closed Size (`resourceSize`), and one with no `content` gives
  * its plugin the plugin's declared default (`resolvedMapContent`). `editSize`
  * is the size the canvas draws the Resource at while its plugin edits it in
- * place; it has the floor `size` has, on an entry of any kind, and an entry
- * with none draws the editor at its `size` (ADR 0178). Whether a Resource is Open,
+ * place; it has the floor `size` has, on an entry of any kind. An entry with
+ * none draws the editor at the larger of its plugin's size hint and its `size`
+ * on each axis, or at its `size` with no hint (ADR 0178). Whether a Resource is Open,
  * and an Ur Resource's Shape, are its plugin's Map content, never the entry's.
  *
  * `content` is any JSON value here: which values a Resource may keep is its

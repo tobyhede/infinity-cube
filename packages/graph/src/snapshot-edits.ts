@@ -33,8 +33,9 @@ import { Placement } from './placement';
  * small refusal union carrying codes and typed context only — wording stays in
  * `app`, which maps a code into `AuthoringRefusal` or `SpaceResourceRefusal`.
  *
- * Operations arrive with their first real caller rather than ahead of one.
- * Both callers create and delete through `createInMap` and `deleteFromSpace`;
+ * Operations arrive with their first real caller rather than ahead of one,
+ * except `resizeEditor`, which lands ahead of its caller, the canvas's editor
+ * resize. Both callers create and delete through `createInMap` and `deleteFromSpace`;
  * `resize`, `resizeEditor`, `changeMapContent`, `addToMap` and
  * `removeFromMap` are Space Authoring's alone.
  */
@@ -316,7 +317,9 @@ function resize(
  * Write a Resource's Edit size in one Map (ADR 0178): the size the canvas
  * draws it at while its plugin edits it in place. Its `size`, its Map content
  * and every other Resource are kept, so nothing is displaced. `unchanged` for
- * the Edit size it already stores. The floor is the schema's, as `resize`'s is.
+ * the Edit size it already stores. Each axis is rounded and floored at the
+ * Closed Size, as `changeMapContent` floors a size hint, so a value below it is
+ * written at the floor rather than refused.
  */
 function resizeEditor(
   snapshot: SpaceSnapshot,
@@ -331,16 +334,17 @@ function resizeEditor(
   if (!snapshot.resources.some((resource) => resource.id === resourceId)) {
     return refused({ code: 'resource-not-found' });
   }
-  if (at.editSize?.width === editSize.width && at.editSize.height === editSize.height) {
+  const floored = {
+    width: Math.max(Math.round(editSize.width), COLLAPSED_RESOURCE_SIZE.width),
+    height: Math.max(Math.round(editSize.height), COLLAPSED_RESOURCE_SIZE.height),
+  };
+  if (at.editSize?.width === floored.width && at.editSize.height === floored.height) {
     return UNCHANGED;
   }
   return withPlacement(
     snapshot,
     mapId,
-    Placement.place(placed.placement, resourceId, {
-      ...at,
-      editSize: { width: editSize.width, height: editSize.height },
-    }),
+    Placement.place(placed.placement, resourceId, { ...at, editSize: floored }),
   );
 }
 
