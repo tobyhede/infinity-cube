@@ -341,6 +341,8 @@ Of a command: not offered for a target at all, and so not drawn. An absent comma
 
 **Unavailable**:
 Of a command: drawn in place, focusable, and refusing to run because Availability withholds it. Nothing was attempted, so it is not a refusal.
+Of a Repository: it cannot answer now. The database is down, busy or closed, its file does not exist yet, or the file it opened was replaced or deleted. HTTP answers it 503, which the browser retries, and start-up keeps retrying. Beside Invariant failure and Unclassified failure, one of a Repository's three failures.
+The two senses share the word and nothing else: an unavailable command was never attempted, and an unavailable Repository was asked and could not answer.
 
 **Replacement epoch**:
 The identity of the working Space against which local drafts and pending work were made, invalidated by accepting the stored Space. A coordinated Accept stored replaces every Space the save covered, advancing each one's epoch and discarding its drafts and pending work.
@@ -455,6 +457,14 @@ Where the live Aggregate is kept: PostgreSQL, SQLite or memory. Also called a st
 
 **Default Content**:
 The generated Aggregate a new Repository, or a new Aggregate directory, starts from.
+
+**Invariant failure**:
+A Repository's answer when its stored state contradicts itself: Spaces with no Meta identity, a document or revision that cannot be read, a missing table. HTTP answers it 500. No retry cures it, so start-up stops once a second attempt confirms it.
+_Avoid_: corruption, migration error, unclassified failure.
+
+**Unclassified failure**:
+Any other failure of a Repository, neither an invariant failure nor Unavailable (its Repository sense): a defect, or a failure nobody anticipated. HTTP answers it 500, and start-up stops once a second attempt confirms it.
+_Avoid_: unknown error, internal error (the wire's name for every 500).
 
 **Source**:
 What the directory reader reads an Aggregate directory's files from: the filesystem, files held in memory, or GitHub. A source names itself, lists one directory and reads one file.
