@@ -183,6 +183,7 @@ const markedFunctionsOf = (group: string, source: string): string[] => {
       marked = false;
     }
   }
+  if (marked) functions.push(`<a mark in ${group} above no case>`);
   return functions;
 };
 
@@ -335,6 +336,9 @@ describe('the port check', () => {
     ].join('\n');
     expect(unrun(table, [{ group: 'commits', source }])).toEqual([
       'commits::dropped',
+      '<a mark in commits above no case>',
+    ]);
+    expect(unrun(table, [{ group: 'commits', source: '// Case: last' }])).toEqual([
       '<a mark in commits above no case>',
     ]);
   });

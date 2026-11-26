@@ -17,13 +17,13 @@
 mod common;
 
 use std::ffi::OsStr;
-use std::io::{BufRead as _, BufReader, Write as _};
+use std::io::{BufRead as _, BufReader, Read as _, Write as _};
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::time::Duration;
 
-use common::{Announcement, Started, corpus, exchange, get, start_from, start_in};
+use common::{Announcement, PATIENCE, Started, corpus, exchange, get, start_from, start_in};
 use host::{RandomIds, SqlitePath, SqliteSpaceRepository, TokioFilesystem, import_directory};
 use serde_json::Value;
 use sqlx::ConnectOptions as _;
@@ -509,6 +509,7 @@ mod given_a_file_seeded_with_the_fixture {
         // request is being answered, not a connection waiting idle for one,
         // when the first signal lands.
         let mut slow = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        slow.set_read_timeout(Some(PATIENCE)).unwrap();
         write!(
             slow,
             "POST /api/spaces HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nContent-Type: application/json\r\nContent-Length: 100\r\nExpect: 100-continue\r\n\r\n"
@@ -601,8 +602,9 @@ mod given_a_file_another_process_holds {
     }
 
     /// `serve` opens the file waiting out another holder's lock (ST-127):
-    /// a read made while another process holds the file answers once it is
-    /// let go, a second later, rather than 503 at once.
+    /// a read made while another process holds the file has no answer while
+    /// the lock is held, and answers 200 once it is let go, rather than 503
+    /// at once.
     #[test]
     fn waits_out_a_lock_let_go_inside_the_busy_timeout() {
         let migrated = Migrated::fixture();
@@ -622,13 +624,28 @@ mod given_a_file_another_process_holds {
                 .unwrap();
             connection
         });
-        let read = std::thread::spawn(move || get(port, "/api/spaces").status);
-        std::thread::sleep(Duration::from_secs(1));
+        let mut read = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        write!(
+            read,
+            "GET /api/spaces HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n"
+        )
+        .unwrap();
+        read.set_read_timeout(Some(Duration::from_secs(1))).unwrap();
+        let waiting = read.read(&mut [0_u8; 1]).unwrap_err();
+        assert!(
+            matches!(
+                waiting.kind(),
+                std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+            ),
+            "the read made under the lock has no answer while it is held: {waiting}"
+        );
         held.block_on(sqlx::Connection::close(lock)).unwrap();
-        assert_eq!(
-            read.join().unwrap(),
-            200,
-            "the read made under the lock waits for it and answers"
+        read.set_read_timeout(Some(PATIENCE)).unwrap();
+        let mut answer = String::new();
+        read.read_to_string(&mut answer).unwrap();
+        assert!(
+            answer.starts_with("HTTP/1.1 200"),
+            "the read made under the lock waits for it and answers: {answer:?}"
         );
     }
 }
