@@ -1,5 +1,6 @@
-//! The Tauri adapter of [`Shell`], and the shell's requests to open a
-//! folder: the platform's folder chooser, a list of folders, and New Space.
+//! The Tauri adapter of [`OpenFolderPort`], and the shell's requests for a
+//! folder to open: the platform's folder chooser, a list of folders, and
+//! New Space.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -8,7 +9,7 @@ use std::thread;
 use tauri::{AppHandle, Manager, WebviewUrl};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 
-use super::{Origin, Shell};
+use super::{OpenFolderPort, Origin};
 use crate::server::{AggregateServer, OpenError, SpaceWindows, Started};
 use crate::start::{self, NotCreated};
 use crate::{Aggregates, open_window, show_error_and_wait, stop_server};
@@ -16,7 +17,7 @@ use crate::{Aggregates, open_window, show_error_and_wait, stop_server};
 /// The shell's windows, servers and dialogs, through the application.
 pub struct TauriShell<'a>(pub &'a AppHandle);
 
-impl Shell for TauriShell<'_> {
+impl OpenFolderPort for TauriShell<'_> {
     type Server = AggregateServer;
     type Window = (WebviewUrl, Arc<SpaceWindows>);
 

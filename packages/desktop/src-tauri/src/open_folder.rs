@@ -1,4 +1,4 @@
-//! Opening a folder as an Aggregate, from wherever it was asked for: named
+//! A folder opens as an Aggregate here, wherever it was asked for: named
 //! on the command line, chosen from the Start window (Open Folder…, a recent
 //! Space, New Space) or from File › Open… (Storage ST-121, ST-131).
 //!
@@ -9,21 +9,22 @@
 //! what was done if a later step fails; offer a new Space in a folder that
 //! holds none; and decide whether the Start window closes or shows. A
 //! Space window that shows from the Start window closes it, and only a
-//! launch can be left with no window, so only a launch shows it.
+//! launch can be left with no window, so only a launch shows it, and never
+//! once a quit has begun (Storage ST-121).
 //!
 //! What the shell does with windows, servers and dialogs crosses the
-//! [`Shell`] port, which the Tauri adapter ([`tauri_shell`]) and the tests'
+//! [`OpenFolderPort`], which the Tauri adapter ([`tauri_shell`]) and the tests'
 //! recording fake implement. Both entry points block until the presenter
 //! has answered every dialog they show, and so are called off the thread
 //! the event loop runs on.
 
 use std::future::Future;
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, MutexGuard, PoisonError};
+use std::sync::Mutex;
 
 use host::{NEW_SPACE_TITLE, RandomIds, TokioFilesystem};
 
-use crate::aggregates::{Registry, Reserved};
+use crate::aggregates::{Registry, Reserved, lock};
 use crate::new_space;
 use crate::new_space_folder::{FolderListing, Platform};
 use crate::not_opened::NotOpened;
@@ -53,12 +54,15 @@ pub enum Opened {
     /// Another request (a File › Open… of the same folder, say) is still
     /// starting it, so no window shows yet, and that start may yet fail.
     Starting,
+    /// A close or a quit took it while it started: nothing is said, and
+    /// nothing is left for the Start window to stay open for.
+    Overtaken,
 }
 
-/// What opening a folder does to the shell's windows and servers. Each
+/// What a folder's open does to the shell's windows and servers. Each
 /// method returns once its work is done, a dialog's once the presenter has
 /// answered it.
-pub trait Shell {
+pub trait OpenFolderPort {
     /// What serves one Aggregate, held by the [`Registry`] while it is open.
     type Server;
     /// What a Space window is opened on, taken from its server before the
@@ -102,18 +106,12 @@ pub trait Shell {
     fn close_start(&self);
 }
 
-/// The data behind `mutex`, even if a thread panicked holding it: a map of
-/// servers stays valid whatever panicked, and losing one would lose its edits.
-pub fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
-    mutex.lock().unwrap_or_else(PoisonError::into_inner)
-}
-
 /// Open each of `folders`, asked for from `origin`, offering a new Space in
 /// one that holds none and saying why one did not open. A Space window that
 /// shows from the Start window closes it. After a launch, the Start window
-/// shows if a folder named is still unopened, or none was named, and no
-/// Aggregate is open, starting or closing.
-pub fn open<S: Shell>(
+/// shows if a folder named is still unopened, or none was named, no
+/// Aggregate is open, starting or closing, and no quit has begun.
+pub fn open<S: OpenFolderPort>(
     shell: &S,
     registry: &Mutex<Registry<S::Server>>,
     origin: Origin,
@@ -131,7 +129,11 @@ pub fn open<S: Shell>(
             for reason in unopened {
                 still_unopened |= answer(shell, registry, reason).is_none();
             }
-            if still_unopened && lock(registry).is_empty() {
+            let nothing_open = {
+                let registry = lock(registry);
+                registry.is_empty() && !registry.is_quitting()
+            };
+            if still_unopened && nothing_open {
                 shell.show_start();
             }
         }
@@ -158,7 +160,7 @@ pub fn open<S: Shell>(
 ///
 /// [`NotCreated`], as the Start window's page draws it: the name or the
 /// folder refused, the write failed, or the Space written did not open.
-pub fn create_space<S: Shell>(
+pub fn create_space<S: OpenFolderPort>(
     shell: &S,
     registry: &Mutex<Registry<S::Server>>,
     location: &Path,
@@ -199,12 +201,12 @@ pub fn create_space<S: Shell>(
 /// the Start window showing, so a start that fails leaves the presenter a
 /// window to go on from.
 fn closes_start(origin: Origin, opened: Option<Opened>) -> bool {
-    origin == Origin::StartWindow && opened == Some(Opened::Shown)
+    origin == Origin::StartWindow && matches!(opened, Some(Opened::Shown | Opened::Overtaken))
 }
 
 /// Write a new Space, titled as `init` titles one, to `directory` and open
 /// it: the offer made for a folder that holds no Space.
-fn create_and_open<S: Shell>(
+fn create_and_open<S: OpenFolderPort>(
     shell: &S,
     registry: &Mutex<Registry<S::Server>>,
     directory: &Path,
@@ -231,7 +233,7 @@ fn one_write_at_a_time<T>(write: impl Future<Output = T>) -> T {
 /// how it came to open after all, or `None` while it is still unopened. A
 /// folder holding no Space is offered a new one; declining, the folder stays
 /// unopened. A close or a quit that took the Aggregate is not answered.
-fn answer<S: Shell>(
+fn answer<S: OpenFolderPort>(
     shell: &S,
     registry: &Mutex<Registry<S::Server>>,
     reason: NotOpened,
@@ -250,15 +252,13 @@ fn answer<S: Shell>(
             shell.show_error(&reason.to_string());
             None
         }
-        // A close or a quit took it: nothing to answer, and nothing more for
-        // the Start window to stay open for.
-        _ => Some(Opened::Shown),
+        _ => Some(Opened::Overtaken),
     }
 }
 
 /// Open `folder` as an Aggregate in a window of its own, or focus the window
 /// that already has it, answering how it opened, or why it did not.
-fn open_aggregate_at<S: Shell>(
+fn open_aggregate_at<S: OpenFolderPort>(
     shell: &S,
     registry: &Mutex<Registry<S::Server>>,
     folder: &Path,
@@ -296,7 +296,7 @@ fn open_aggregate_at<S: Shell>(
 
 /// Start `directory`'s server and open its window as `label`, answering why
 /// if the Aggregate did not open.
-fn start_aggregate<S: Shell>(
+fn start_aggregate<S: OpenFolderPort>(
     shell: &S,
     registry: &Mutex<Registry<S::Server>>,
     directory: &Path,

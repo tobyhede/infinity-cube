@@ -1,4 +1,4 @@
-//! Opening a folder through its two entry points, with a recording fake of
+//! A folder's open through the two entry points, with a recording fake of
 //! the shell, the real [`Registry`], and real folders for new Spaces.
 
 #![allow(
@@ -92,7 +92,7 @@ impl<'r> Fake<'r> {
     }
 }
 
-impl Shell for Fake<'_> {
+impl OpenFolderPort for Fake<'_> {
     type Server = Server;
     type Window = ();
 
@@ -236,6 +236,50 @@ mod given_a_folder_that_opens {
         assert!(shell.asked(&Call::Focus("space-0".to_owned())));
         // Focused from the Start window, a Space window shows from it.
         assert_eq!(shell.calls().last(), Some(&Call::CloseStart));
+    }
+}
+
+mod given_a_new_space {
+    use super::*;
+
+    #[test]
+    fn it_is_written_opened_and_the_start_window_closes() {
+        let (_temporary, location) = folder("spaces");
+        let registry: Mutex<Registry<Server>> = Mutex::default();
+        let shell = Fake::new(&registry);
+
+        let created = create_space(&shell, &registry, &location, "Rust");
+
+        assert_eq!(created, Ok(()));
+        let written = location.join("Rust");
+        assert!(written.join("aggregate.json").is_file());
+        assert_eq!(
+            shell.calls(),
+            [
+                Call::Start(written),
+                Call::OpenWindow {
+                    label: "space-0".to_owned(),
+                    title: "Rust".to_owned(),
+                },
+                Call::CloseStart,
+            ]
+        );
+    }
+
+    #[test]
+    fn a_name_that_is_no_folder_name_writes_and_opens_nothing() {
+        let (_temporary, location) = folder("spaces");
+        let registry: Mutex<Registry<Server>> = Mutex::default();
+        let shell = Fake::new(&registry);
+
+        let created = create_space(&shell, &registry, &location, "..");
+
+        assert!(
+            matches!(created, Err(NotCreated::Name { .. })),
+            "{created:?}"
+        );
+        assert_eq!(shell.calls(), []);
+        assert_eq!(std::fs::read_dir(&location).unwrap().count(), 0);
     }
 }
 
@@ -454,7 +498,37 @@ mod given_a_quit {
 
         open(&shell, &registry, Origin::StartWindow, &[rust]);
 
-        assert!(shell.calls().iter().all(|call| *call == Call::CloseStart));
+        // Nothing starts, nothing is said, and nothing is left for the
+        // Start window to stay open for.
+        assert_eq!(shell.calls(), [Call::CloseStart]);
+    }
+
+    #[test]
+    fn begun_before_a_launch_naming_no_folder_the_start_window_does_not_show() {
+        let registry: Mutex<Registry<Server>> = Mutex::default();
+        let _taken = lock(&registry).take_all();
+        let shell = Fake::new(&registry);
+
+        open(&shell, &registry, Origin::CommandLine, &[]);
+
+        assert_eq!(shell.calls(), []);
+    }
+
+    #[test]
+    fn begun_while_a_new_space_starts_it_is_written_and_nothing_is_said() {
+        let (_temporary, location) = folder("spaces");
+        let registry: Mutex<Registry<Server>> = Mutex::default();
+        let shell = Fake {
+            quit_while_starting: true,
+            ..Fake::new(&registry)
+        };
+
+        let created = create_space(&shell, &registry, &location, "Rust");
+
+        assert_eq!(created, Ok(()));
+        assert!(location.join("Rust").join("aggregate.json").is_file());
+        assert!(!shell.asked(&Call::CloseStart));
+        assert!(shell.errors().is_empty());
     }
 }
 

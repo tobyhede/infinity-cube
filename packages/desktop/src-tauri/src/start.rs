@@ -417,7 +417,7 @@ pub fn start_open_folder(app: AppHandle) {
 /// would.
 #[tauri::command]
 pub fn start_open_recent(app: AppHandle, folder: String) {
-    let _opening = thread::spawn(move || {
+    let _open = thread::spawn(move || {
         tauri_shell::open(&app, Origin::StartWindow, &[PathBuf::from(folder)]);
     });
 }

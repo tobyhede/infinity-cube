@@ -57,9 +57,9 @@ use tokio::sync::mpsc::{self, UnboundedSender};
 use url::Url;
 
 use crate::address::{AggregateKey, SCHEME, SchemeStyle};
-use crate::aggregates::{Close, Registry, SPACE_WINDOW_PREFIX};
+use crate::aggregates::{Close, Registry, SPACE_WINDOW_PREFIX, lock};
 use crate::launch::LastWindow;
-use crate::open_folder::{Origin, lock};
+use crate::open_folder::Origin;
 use crate::scheme::{OpenAggregates, VIEW_WINDOW_PREFIX};
 use crate::server::{
     AggregateServer, Navigation, RegisteredSchemes, SharedAggregates, SpaceWindows,
@@ -566,10 +566,16 @@ fn main() {
             // chosen from File › Open… would; with none named, the shell
             // shows the Start window.
             let folders = launch::launch(std::env::args_os().skip(1));
-            let handle = app.handle().clone();
-            thread::spawn(move || {
-                open_folder::tauri_shell::open(&handle, Origin::CommandLine, &folders);
-            });
+            if folders.is_empty() {
+                // Nothing to start, so the Start window shows here, before
+                // the event loop can begin a quit or show it itself.
+                open_folder::tauri_shell::open(app.handle(), Origin::CommandLine, &[]);
+            } else {
+                let handle = app.handle().clone();
+                thread::spawn(move || {
+                    open_folder::tauri_shell::open(&handle, Origin::CommandLine, &folders);
+                });
+            }
             Ok(())
         })
         .on_window_event(|window, event| {
