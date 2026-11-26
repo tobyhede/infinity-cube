@@ -4,7 +4,10 @@ import '@xyflow/react/dist/style.css';
 import './styles.css';
 import './theme-dark.css';
 import './prototype-opendyslexic/opendyslexic.css';
-import { installPrototypeFont } from './prototype-opendyslexic/prototype-font';
+import {
+  askedForPrototypeFont,
+  installPrototypeFont,
+} from './prototype-opendyslexic/prototype-font';
 import { PrototypeFontSwitcher } from './prototype-opendyslexic/PrototypeFontSwitcher';
 import { createSpaceStartup } from './space';
 import { Application } from './components/Application';
@@ -31,6 +34,6 @@ const spaceStartup = createSpaceStartup(
 root.render(
   <ColorSchemeContext.Provider value={colorScheme}>
     <Application resolve={() => spaceStartup.resolve(window.location.pathname)} />
-    {import.meta.env.DEV ? <PrototypeFontSwitcher /> : null}
+    {import.meta.env.DEV && askedForPrototypeFont() ? <PrototypeFontSwitcher /> : null}
   </ColorSchemeContext.Provider>,
 );

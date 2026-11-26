@@ -9,7 +9,7 @@ export type VariantKey = (typeof VARIANTS)[number]['key'];
 
 export function readVariant(): VariantKey {
   const asked = new URLSearchParams(window.location.search).get('font');
-  return VARIANTS.find((variant) => variant.key === asked)?.key ?? 'B';
+  return VARIANTS.find((variant) => variant.key === asked)?.key ?? 'A';
 }
 
 /** Install the variant before the first frame, so a screenshot never catches the control. */
@@ -19,4 +19,9 @@ export function installPrototypeFont(): void {
 
 export function setPrototypeFont(variant: VariantKey): void {
   document.documentElement.setAttribute('data-prototype-font', variant);
+}
+
+/** The bar shows only on a URL that asks for a variant, so the e2e suite never meets it. */
+export function askedForPrototypeFont(): boolean {
+  return new URLSearchParams(window.location.search).has('font');
 }
