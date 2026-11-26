@@ -6,9 +6,68 @@ InfinityCube is for technical ideas that connect as a graph rather than a single
 
 Your Space is a directory of plain files, an [Aggregate directory](docs/aggregate-directory.md), kept in its own git repository.
 
-## Getting started
+## Install
 
-This takes you from a fresh clone to the desktop application open on a Space of your own, built from source; the first build takes a few minutes. These steps have been followed on Linux, not yet on macOS, and Windows is not built yet. To skip the build, [install a preview build](#installing-a-preview-build): the `infinity-cube` command on macOS or Linux, or the desktop application on a Mac with Apple silicon.
+Each preview build on the [releases page](https://github.com/tobyhede/infinity-cube/releases) ships the desktop application for macOS on Apple silicon, and the `infinity-cube` command for macOS (Apple silicon and Intel) and Linux (x86_64 and arm64). There is no Windows build, and no desktop download for Linux: [build that from source](#building-from-source). A preview build makes no compatibility promise, so keep each Space's folder in git and open it with the build that wrote it.
+
+### The desktop application on macOS
+
+1. **Install it.** Download `InfinityCube-<version>-aarch64-apple-darwin.dmg` from the newest release, open it and drag InfinityCube to Applications. It is not signed with an Apple Developer ID, so macOS refuses it the first time: open **System Settings › Privacy & Security**, choose **Open Anyway** beside the message about InfinityCube, and confirm, or run `xattr -dr com.apple.quarantine /Applications/InfinityCube.app` once. After that it opens as any application does. It is meant to offer each newer preview build when one is published, which has not been seen working yet.
+
+2. **Make a Space.** InfinityCube opens to its **Start window**. Choose **New Space**, accept the name and location or change them, and choose **Create Space**: it writes the Space to `~/Documents/Untitled Space` by default and opens it in a window of its own. **Open Folder…** in the Start window, or **File › Open…** (Command-O), opens a Space's folder you already have; a folder that holds no Space yet is offered **Create Space**. **File › New Space…** (Command-N) makes another.
+
+3. **Put it in git before you edit**, so git can restore the Space as it was first written. Use the folder you chose in step 2:
+
+   ```sh
+   git init ~/Documents/"Untitled Space"
+   echo .infinity-cube.lock >> ~/Documents/"Untitled Space"/.gitignore
+   git -C ~/Documents/"Untitled Space" add -A
+   git -C ~/Documents/"Untitled Space" commit -m "New Space"
+   ```
+
+Then [use the Space](#use-a-space).
+
+### The `infinity-cube` command on macOS or Linux
+
+The command runs a Space in your browser, with no clone, Node or pnpm. It has no Start window: you make a Space with `init` and open it with `run`.
+
+1. **Install it.**
+
+   ```sh
+   curl -fsSL https://raw.githubusercontent.com/tobyhede/infinity-cube/main/release/install.sh | sh
+   ```
+
+   It checks the download against the release's `SHA256SUMS` and puts `infinity-cube` in `~/.local/bin`, printing the line to add if that folder is not on your `PATH`. Done when `infinity-cube --version` names the build.
+
+2. **Make a Space in its own git repository.** The folder must be empty apart from dot-entries such as `.git`.
+
+   ```sh
+   git init ~/spaces/my-space
+   infinity-cube init ~/spaces/my-space
+   echo .infinity-cube.lock >> ~/spaces/my-space/.gitignore
+   git -C ~/spaces/my-space add -A
+   git -C ~/spaces/my-space commit -m "New Space"
+   ```
+
+3. **Run it.** `infinity-cube run ~/spaces/my-space` opens your browser on the Space and writes your edits back to the folder. Stop it with Ctrl-C, which writes every pending edit first: see [Stopping and lost edits](#stopping-and-lost-edits).
+
+Then [use the Space](#use-a-space). [`release/README.md`](release/README.md) covers pinning a version, upgrading and uninstalling.
+
+## Use a Space
+
+However you opened it, a Space works the same way. In the commands below, `<dir>` is the Space's folder.
+
+1. **Edit.** Pick a Graph in the Command Dock, the toolbar floating over the canvas; every Graph stays drawn, and the one you pick is emphasised. Select a Resource to reveal its toolbar, and use Edit to write its Title and Markdown. Drag a Resource to move it. Drag from one of a Resource's four handles to another Resource to add an Edge to the Active Graph; hold Option (macOS) or Alt and drop on empty canvas to create a new Resource and connect it in one go. Done when the save indicator reads `Persisted`.
+
+2. **Present.** Press **Present**: `→` follows an Edge, `←` goes back, `↑` / `↓` choose at a fork. Done when `Esc` returns you to the Map as you left it.
+
+3. **Close the window, or stop the run.** In the desktop application, closing the Space window writes every pending edit. If a write is still running after ten seconds, it asks whether to keep waiting, which is always safe, or close without saving, which loses the edits not yet written. If a write fails, a dialog says why, and those edits are not on disk. On Linux, closing the last window ends the application; on macOS it is meant to keep running with no window until you quit it, which has not been tried yet. If you started it from a terminal, don't press Ctrl-C, close the terminal or send a signal while a Space window is open: any of them ends the application at once, and edits not yet written are lost. Done when the window has closed with no dialog. Under `infinity-cube run` or `pnpm cube run`, press Ctrl-C instead, as [Stopping and lost edits](#stopping-and-lost-edits) says.
+
+4. **Commit.** `git -C <dir> add -A && git -C <dir> commit -m "First draft"`. Done when `git -C <dir> status` is clean.
+
+## Building from source
+
+This takes you from a fresh clone to the desktop application open on a Space of your own, built from source; the first build takes a few minutes. It is how you get the desktop application on Linux. These steps have been followed on Linux, not yet on macOS, and Windows is not built yet. To skip the build, [install a preview build](#install).
 
 1. **Install the tools.**
    - Node ≥ 26.8.1 and pnpm 9. Node no longer bundles corepack, so install pnpm with `npm install -g pnpm@9` if `pnpm --version` does not print `9.x`.
@@ -56,86 +115,15 @@ This takes you from a fresh clone to the desktop application open on a Space of 
 
    Done when Cargo prints `Finished` and `target/debug/infinity-cube-desktop` exists. After pulling changes, run `pnpm install` and all three commands again.
 
-5. **Open the Space.** `target/debug/infinity-cube-desktop ~/spaces/rust-async`. Done when one window, named after the folder, shows the Space's Map with `Resource 1` on it. **File › Open…** (Ctrl+O, or Command-O on macOS) opens another Space's folder in a window of its own. Started with no folder, the application shows the **Start window**, with **New Space** and **Open Folder…**. A folder that holds no Space yet is offered **Create Space**, which writes a new Space there as `pnpm cube init` does and opens it. **New Space**, or **File › New Space…** (Ctrl+N, or Command-N), asks for a name and a location, `Untitled Space` in Documents unless you change them, and writes and opens a new Space in `<location>/<name>`; a name that is not one folder name, a file of that name in the location, or a folder holding anything but dot-entries is refused and nothing is written.
-
-6. **Edit.** Pick a Graph in the Command Dock, the toolbar floating over the canvas; every Graph stays drawn, and the one you pick is emphasised. Select a Resource to reveal its toolbar, and use Edit to write its Title and Markdown. Drag a Resource to move it. Drag from one of a Resource's four handles to another Resource to add an Edge to the Active Graph; hold Option (macOS) or Alt and drop on empty canvas to create a new Resource and connect it in one go. Done when the save indicator reads `Persisted`.
-
-7. **Present.** Press **Present**: `→` follows an Edge, `←` goes back, `↑` / `↓` choose at a fork. Done when `Esc` returns you to the Map as you left it.
-
-8. **Close the window.** Closing the Space window writes every pending edit. If a write is still running after ten seconds, it asks whether to keep waiting, which is always safe, or close without saving, which loses the edits not yet written. If a write fails, a dialog says why, and those edits are not on disk. On Linux, closing the last window ends the application; on macOS it is meant to keep running with no window until you quit it, which has not been tried yet. Don't press Ctrl-C, close the terminal or send a signal while a Space window is open: any of them ends the application at once, and edits not yet written are lost. Done when the window has closed with no dialog and, on Linux, the terminal has its prompt back.
-
-9. **Commit.** `git -C ~/spaces/rust-async add -A && git -C ~/spaces/rust-async commit -m "First draft"`. Done when `git -C ~/spaces/rust-async status` is clean.
+5. **Open the Space.** `target/debug/infinity-cube-desktop ~/spaces/rust-async`. Done when one window, named after the folder, shows the Space's Map with `Resource 1` on it. **File › Open…** (Ctrl+O, or Command-O on macOS) opens another Space's folder in a window of its own. Started with no folder, the application shows the **Start window**, with **New Space** and **Open Folder…**. A folder that holds no Space yet is offered **Create Space**, which writes a new Space there as `pnpm cube init` does and opens it. **New Space**, or **File › New Space…** (Ctrl+N, or Command-N), asks for a name and a location, `Untitled Space` in Documents unless you change them, and writes and opens a new Space in `<location>/<name>`; a name that is not one folder name, a file of that name in the location, or a folder holding anything but dot-entries is refused and nothing is written. Then [use the Space](#use-a-space), with `~/spaces/rust-async` as its folder.
 
 To build an installable bundle instead (a `.deb` on Linux), see [`packages/desktop/README.md`](packages/desktop/README.md).
 
 ### Or run it in the browser
 
-`pnpm cube run ~/spaces/rust-async` serves the same Space in your browser and needs no Rust: install Node and pnpm (the first item of step 1), do steps 2 and 3, run it, then follow steps 6, 7 and 9. It prints the address it serves and opens your browser. Stop it with Ctrl-C, which writes every pending edit and ends with `Stopped; <dir> holds every edit.`, where `<dir>` is the directory's absolute path. Any other last line means some edits were not written: see [Stopping and lost edits](#stopping-and-lost-edits).
+`pnpm cube run ~/spaces/rust-async` serves the same Space in your browser and needs no Rust: install Node and pnpm (the first item of step 1), do steps 2 and 3, run it, then [use the Space](#use-a-space). It prints the address it serves and opens your browser. Stop it with Ctrl-C, which writes every pending edit and ends with `Stopped; <dir> holds every edit.`, where `<dir>` is the directory's absolute path. Any other last line means some edits were not written: see [Stopping and lost edits](#stopping-and-lost-edits).
 
 Run every `pnpm cube` verb from the InfinityCube clone, pointing at whichever directory you are working on. A relative path is relative to where you ran pnpm. `pnpm cube help` lists the verbs.
-
-## On the canvas
-
-- **Every place has a link.** The Space, a Map, a Resource, a Graph and each Active Resource reached while Presenting have durable URLs. The Command Dock and the presenting chrome offer **Copy link**, browser Back and Forward follow them, and a pasted link reopens the same place.
-- **Markdown, Mermaid, Reference and Space Resources are Closed or Open.** A Closed Markdown Resource shows its Title; Open, it shows its text and may grow to fit. Editing its source is a separate action. An Image Resource is always its picture, and an Ur Resource has no Open.
-- **A Resource's size is authored, never measured.** Its default and smallest size is 260×146, and its content adapts to it.
-- **Edges between the same two Resources run in parallel lanes.** In each direction one Edge runs full length, the Active Graph's where it has one there, and the others stop shorter, so switching Graphs changes which Edge leads, never where the Resources sit.
-
-The [Rendering](docs/requirements/rendering.md) and [Maps and Graphs](docs/requirements/maps-and-graphs.md) requirements hold the full rules for Edges, handles, sizes and Open.
-
-## Running a Space
-
-The desktop application and `pnpm cube run <dir>` both **run** a Space's directory: InfinityCube reads it into memory, serves it, and writes it back as you edit. While it runs, **the directory is your work**; nothing else is kept. The [Storage requirements' Running rules](docs/requirements/storage.md#running) hold every refusal and write rule behind this section.
-
-- **Edits are written about a second after you stop editing**, so `git status` shows what you changed. InfinityCube writes only the files whose content changed.
-- **Git is your undo and your history.** InfinityCube keeps no history of its own and does not watch the directory. Edit files by hand, `git pull` or check out an earlier version with InfinityCube stopped, since a running one's next write replaces what is on disk with what it holds.
-- **One run per directory.** A run locks the directory, through the empty file `.infinity-cube.lock` it leaves there, so a second run of the same directory, from another copy of the desktop application or a terminal, is refused, naming it, until the first stops. The lock ends when the process does, however it ends. Keep the file out of git with a `.gitignore` entry.
-- **InfinityCube writes only its own files: `aggregate.json`, each Space's `space.json` and Resource files, and `assets/`**, which holds the Resources' text (Markdown and Mermaid source) and uploaded image files. Anything else, such as `.git`, a README or `notes/`, and any `*.md` outside `assets/`, is left alone; [`docs/aggregate-directory.md`](docs/aggregate-directory.md) describes the format.
-- **Starting.** Both serve an existing Aggregate directory only, as `cube init` writes it. A missing or empty directory is never made a Space unasked: `pnpm cube run` refuses it, naming the `pnpm cube init` command that creates one, and the desktop application asks whether to create a Space there, writing nothing unless you choose Create Space. A directory that is not valid is refused with its problems listed; fix the files and start again. A run with no edits leaves the directory as it was, beside its empty lock file. Opening a Space never writes the directory.
-- **Ports and the browser.** Under `pnpm cube run`, InfinityCube serves on port 4173, or the next free port. `--port <port>` picks the port and fails if it is taken. `--no-open` leaves the browser alone, for running headless or from an agent.
-
-### Stopping and lost edits
-
-This section is about `pnpm cube run`; the desktop application writes pending edits when its window closes ([Getting started](#getting-started), step 8). Stopping (Ctrl-C, closing the terminal, or SIGTERM) writes every pending edit and ends with `Stopped; <dir> holds every edit.` Treat the directory as complete only after that line.
-
-- **A kill loses the last second.** `kill -9`, a power cut, or a second Ctrl-C exits at once, and edits not yet written are lost.
-- **A failed write is retried.** While running, InfinityCube prints `Could not write the directory:` with the reason (a full disk, or a symbolic link it refuses to write through) and tries again a second later.
-- **A failed final write exits 1.** `Stopped, but the last edits were not written:` names the reason, and those edits are lost.
-- **A crash mid-write can leave some files new and some old.** Git restores them.
-
-### Other ways to open a Space
-
-- **`pnpm cube check <dir>`** reads a directory as a run would and reports, writing nothing. It is how you or an agent checks files written by hand.
-- **`pnpm cube mcp <dir>`** serves a local MCP server whose tools edit and check the directory's files, for an agent with no shell: see [Editing over MCP](docs/aggregate-directory.md#editing-over-mcp).
-- **The `infinity-cube` command**, a single Rust binary, runs and checks a directory as `pnpm cube` does, with no Node; [`release/README.md`](release/README.md) describes its preview builds.
-- **Mounting** opens a Space on the web, straight from its public GitHub repository. You can edit it in the page, but nothing is written back to GitHub, and today a reload loses those edits. [Deploying to Cloudflare](docs/deploy-cloudflare.md) says how to deploy the page and point a domain at a Space.
-
-## Installing a preview build
-
-Each preview build on the [releases page](https://github.com/tobyhede/infinity-cube/releases) ships the `infinity-cube` command for Linux (x86_64 and arm64) and macOS (Apple silicon and Intel), and the desktop application for macOS on Apple silicon. There is no Windows build, and no desktop download for Linux: build that from source, as in [Getting started](#getting-started).
-
-To run a Space without a clone, Node or pnpm, install the `infinity-cube` command on macOS or Linux:
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/tobyhede/infinity-cube/main/release/install.sh | sh
-```
-
-It checks the download and puts `infinity-cube` in `~/.local/bin`; then `infinity-cube init my-space` and `infinity-cube run my-space`. A preview build makes no compatibility promise, so keep your directory in git. [`release/README.md`](release/README.md) covers pinning a version, upgrading and uninstalling.
-
-### The desktop application on macOS
-
-Download `InfinityCube-<version>-aarch64-apple-darwin.dmg` from the newest release, open it and drag InfinityCube to Applications. It is not signed with an Apple Developer ID, so macOS refuses it the first time: open **System Settings › Privacy & Security**, choose **Open Anyway** beside the message about InfinityCube, and confirm, or run `xattr -dr com.apple.quarantine /Applications/InfinityCube.app` once. After that it opens as any application does. It is meant to offer each newer preview build when one is published, which has not been seen working yet.
-
-Make a Space with **New Space** in its Start window, which writes `~/Documents/Untitled Space` unless you change the name or location, then commit it before you edit, as [Getting started](#getting-started) step 3 does, using that folder:
-
-```sh
-git init ~/Documents/"Untitled Space"
-echo .infinity-cube.lock >> ~/Documents/"Untitled Space"/.gitignore
-git -C ~/Documents/"Untitled Space" add -A
-git -C ~/Documents/"Untitled Space" commit -m "New Space"
-```
-
-Then carry on from step 6, using that folder in place of `~/spaces/rust-async` in step 9.
 
 ### Building a preview build yourself
 
@@ -148,6 +136,42 @@ pnpm release:build
 It installs the JavaScript dependencies, builds the browser application, builds the release `infinity-cube` binary with that application embedded, runs it once (`--version`, `init`, `check`), and packs `target/preview-build/infinity-cube-<version>-<target>.tar.gz` with a `SHA256SUMS`. It needs Node (the version in `.node-version`), pnpm 9 and [rustup](https://rustup.rs); on Linux it builds the static musl binary, which needs `musl-gcc` (`apt-get install musl-tools`). `--target <triple>` picks another target and `--out <dir>` another folder. It prints the line that installs the archive with the install script; the binary alone is `target/<target>/release/infinity-cube`. Each build job in `.github/workflows/release.yml` runs this same script (`release/build.sh`).
 
 On a Mac, `pnpm release:build --desktop` builds the desktop application instead: `InfinityCube-<version>-<target>.dmg`, ad-hoc signed, which it installs from the disk image and opens once with a Space. With the updater's key in `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` it also writes the signed update bundle and the `latest.json` that offers it. The release workflow's `desktop` job runs the same command.
+
+## On the canvas
+
+- **Every place has a link.** The Space, a Map, a Resource, a Graph and each Active Resource reached while Presenting have durable URLs. The Command Dock and the presenting chrome offer **Copy link**, browser Back and Forward follow them, and a pasted link reopens the same place.
+- **Markdown, Mermaid, Reference and Space Resources are Closed or Open.** A Closed Markdown Resource shows its Title; Open, it shows its text and may grow to fit. Editing its source is a separate action. An Image Resource is always its picture, and an Ur Resource has no Open.
+- **A Resource's size is authored, never measured.** Its default and smallest size is 260×146, and its content adapts to it.
+- **Edges between the same two Resources run in parallel lanes.** In each direction one Edge runs full length, the Active Graph's where it has one there, and the others stop shorter, so switching Graphs changes which Edge leads, never where the Resources sit.
+
+The [Rendering](docs/requirements/rendering.md) and [Maps and Graphs](docs/requirements/maps-and-graphs.md) requirements hold the full rules for Edges, handles, sizes and Open.
+
+## Running a Space
+
+The desktop application, `infinity-cube run <dir>` and `pnpm cube run <dir>` all **run** a Space's directory: InfinityCube reads it into memory, serves it, and writes it back as you edit. While it runs, **the directory is your work**; nothing else is kept. The [Storage requirements' Running rules](docs/requirements/storage.md#running) hold every refusal and write rule behind this section.
+
+- **Edits are written about a second after you stop editing**, so `git status` shows what you changed. InfinityCube writes only the files whose content changed.
+- **Git is your undo and your history.** InfinityCube keeps no history of its own and does not watch the directory. Edit files by hand, `git pull` or check out an earlier version with InfinityCube stopped, since a running one's next write replaces what is on disk with what it holds.
+- **One run per directory.** A run locks the directory, through the empty file `.infinity-cube.lock` it leaves there, so a second run of the same directory, from another copy of the desktop application or a terminal, is refused, naming it, until the first stops. The lock ends when the process does, however it ends. Keep the file out of git with a `.gitignore` entry.
+- **InfinityCube writes only its own files: `aggregate.json`, each Space's `space.json` and Resource files, and `assets/`**, which holds the Resources' text (Markdown and Mermaid source) and uploaded image files. Anything else, such as `.git`, a README or `notes/`, and any `*.md` outside `assets/`, is left alone; [`docs/aggregate-directory.md`](docs/aggregate-directory.md) describes the format.
+- **Starting.** Both serve an existing Aggregate directory only, as `cube init` writes it. A missing or empty directory is never made a Space unasked: `pnpm cube run` refuses it, naming the `pnpm cube init` command that creates one, and the desktop application asks whether to create a Space there, writing nothing unless you choose Create Space. A directory that is not valid is refused with its problems listed; fix the files and start again. A run with no edits leaves the directory as it was, beside its empty lock file. Opening a Space never writes the directory.
+- **Ports and the browser.** Under `pnpm cube run`, InfinityCube serves on port 4173, or the next free port. `--port <port>` picks the port and fails if it is taken. `--no-open` leaves the browser alone, for running headless or from an agent.
+
+### Stopping and lost edits
+
+This section is about `infinity-cube run` and `pnpm cube run`; the desktop application writes pending edits when its window closes ([Use a Space](#use-a-space), step 3). Stopping (Ctrl-C, closing the terminal, or SIGTERM) writes every pending edit and ends with `Stopped; <dir> holds every edit.` Treat the directory as complete only after that line.
+
+- **A kill loses the last second.** `kill -9`, a power cut, or a second Ctrl-C exits at once, and edits not yet written are lost.
+- **A failed write is retried.** While running, InfinityCube prints `Could not write the directory:` with the reason (a full disk, or a symbolic link it refuses to write through) and tries again a second later.
+- **A failed final write exits 1.** `Stopped, but the last edits were not written:` names the reason, and those edits are lost.
+- **A crash mid-write can leave some files new and some old.** Git restores them.
+
+### Other ways to open a Space
+
+- **`pnpm cube check <dir>`** reads a directory as a run would and reports, writing nothing. It is how you or an agent checks files written by hand.
+- **`pnpm cube mcp <dir>`** serves a local MCP server whose tools edit and check the directory's files, for an agent with no shell: see [Editing over MCP](docs/aggregate-directory.md#editing-over-mcp).
+- **The `infinity-cube` command**, a single Rust binary, runs and checks a directory as `pnpm cube` does, with no Node: [install it](#the-infinity-cube-command-on-macos-or-linux) from a preview build.
+- **Mounting** opens a Space on the web, straight from its public GitHub repository. You can edit it in the page, but nothing is written back to GitHub, and today a reload loses those edits. [Deploying to Cloudflare](docs/deploy-cloudflare.md) says how to deploy the page and point a domain at a Space.
 
 ## Using InfinityCube with agents
 

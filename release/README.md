@@ -12,12 +12,12 @@ curl -fsSL https://raw.githubusercontent.com/tobyhede/infinity-cube/main/release
 
 Set `INFINITY_CUBE_VERSION` (say `v0.1.0-preview.1`) on `sh` to install a particular build, and `INFINITY_CUBE_INSTALL_DIR` to install somewhere else. If the folder is not on your `PATH`, the script prints the line to add. Running it again replaces the binary, which is how you upgrade; a later build may refuse a directory an earlier one wrote, so read a directory with the build that wrote it. To uninstall, delete the binary: `rm ~/.local/bin/infinity-cube`.
 
-There are builds for Linux on x86_64 and arm64 and macOS on Apple silicon and Intel. There is no Windows build yet.
+There are builds for Linux on x86_64 and arm64 and macOS on Apple silicon and Intel. There is no Windows build yet. This archive holds the command only. On a Mac with Apple silicon, the release's `.dmg` is the desktop application, which opens to a Start window whose New Space makes a Space for you; the [InfinityCube README](https://github.com/tobyhede/infinity-cube#install) says how to install it.
 
 ## Start
 
 1. If you did not use the install script, put `infinity-cube` somewhere on your `PATH`, or run it from where you unpacked it as `./infinity-cube`.
-2. Make a new Space in an empty folder: `infinity-cube init my-space`
+2. Make a new Space in an empty folder, and commit it before you edit: `git init my-space`, `infinity-cube init my-space`, `echo .infinity-cube.lock >> my-space/.gitignore`, then `git -C my-space add -A && git -C my-space commit -m "New Space"`
 3. Run it: `infinity-cube run my-space`
 
 Your browser opens on the Space. Edits are written back to `my-space` about a second after you stop editing. Stop the run with Ctrl-C, which writes any Edit not yet on disk before it exits.
