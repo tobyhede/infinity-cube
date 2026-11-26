@@ -90,3 +90,29 @@ pub async fn hold_exclusive_lock(file: &Path) -> sqlx::SqliteConnection {
         .unwrap();
     connection
 }
+
+/// The status and problem code the HTTP application answers `request` with
+/// over `store`.
+pub async fn served(
+    store: &std::sync::Arc<host::SqliteSpaceRepository>,
+    request: http::Request<http_body_util::Full<bytes::Bytes>>,
+) -> (u16, String) {
+    let application: host::Application<
+        host::SqliteSpaceRepository,
+        http_conformance::Counted,
+        std::collections::BTreeMap<String, bytes::Bytes>,
+    > = host::Application::new(
+        std::sync::Arc::clone(store),
+        http_conformance::Counted::default(),
+        host::Shell::new("", std::collections::BTreeMap::new()),
+    );
+    let response = application.handle(request).await;
+    let status = response.status().as_u16();
+    let body: serde_json::Value = serde_json::from_slice(response.body()).unwrap_or_default();
+    let code = body["type"]
+        .as_str()
+        .and_then(|kind| kind.strip_prefix("urn:infinity-cube:problem:"))
+        .unwrap_or_default()
+        .to_owned();
+    (status, code)
+}

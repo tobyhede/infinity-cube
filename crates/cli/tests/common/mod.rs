@@ -169,7 +169,19 @@ pub fn start_with(args: &[&str], path: Option<&std::ffi::OsStr>) -> Started {
 /// Start the binary with `args`, each variable of `environment` set to its
 /// value or, for `None`, removed, and wait for its announcement.
 pub fn start_in(args: &[&str], environment: &[(&str, Option<&std::ffi::OsStr>)]) -> Started {
+    start_from(None, args, environment)
+}
+
+/// [`start_in`], with `directory` as the working directory when given.
+pub fn start_from(
+    directory: Option<&Path>,
+    args: &[&str],
+    environment: &[(&str, Option<&std::ffi::OsStr>)],
+) -> Started {
     let mut command = Command::new(BINARY);
+    if let Some(directory) = directory {
+        command.current_dir(directory);
+    }
     command
         .args(args)
         .stdin(Stdio::null())

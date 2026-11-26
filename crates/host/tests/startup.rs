@@ -146,6 +146,9 @@ impl Recorded {
 struct Scripted {
     failures: Mutex<VecDeque<RepositoryError>>,
     store: MemorySpaceRepository,
+    // Whether initializing answers that Default Content is refused, as a
+    // build whose Default Content intake refuses would.
+    refuses_initialization: bool,
 }
 
 impl Scripted {
@@ -153,6 +156,16 @@ impl Scripted {
         Self {
             failures: Mutex::new(failures.into_iter().collect()),
             store: MemorySpaceRepository::new(),
+            refuses_initialization: false,
+        }
+    }
+
+    /// A store that answers as `failures` says, then refuses every
+    /// initialization as an aggregate intake refuses.
+    fn refusing(failures: impl IntoIterator<Item = RepositoryError>) -> Self {
+        Self {
+            refuses_initialization: true,
+            ..Self::new(failures)
         }
     }
 
@@ -187,6 +200,11 @@ impl SpaceRepository for Scripted {
         &self,
         input: AggregateInput,
     ) -> Result<InitializeResult, RepositoryError> {
+        if self.refuses_initialization {
+            let mut refused = input;
+            refused.spaces.clear();
+            return self.store.initialize_aggregate(refused).await;
+        }
         self.store.initialize_aggregate(input).await
     }
     async fn load_meta_space_id(&self) -> Result<Option<SpaceId>, RepositoryError> {
@@ -210,6 +228,10 @@ fn unavailable() -> RepositoryError {
 
 fn broken() -> RepositoryError {
     RepositoryError::BrokenStoredState("broken".to_owned())
+}
+
+fn unclassified() -> RepositoryError {
+    RepositoryError::Unclassified("failed".to_owned())
 }
 
 /// Every failure `keep_establishing` reports, and what it answers.
@@ -243,6 +265,25 @@ mod given_an_unreachable_store {
             clock.waits(),
             [5, 10, 20, 40, 60, 60, 60],
             "the wait doubles from five seconds and holds at a minute"
+        );
+    }
+
+    #[tokio::test]
+    async fn keeps_trying_through_forty_unreachable_attempts_at_the_bound() {
+        let store = Scripted::new((0..40).map(|_| unavailable()));
+        let clock = Recorded::default();
+        let (reported, answer) = kept(&store, &clock).await;
+        assert_eq!(
+            answer.unwrap().as_str(),
+            FIRST_ID,
+            "established once it answers"
+        );
+        assert_eq!(reported.len(), 40, "each failed attempt is reported");
+        let waits = clock.waits();
+        assert_eq!(waits.len(), 40, "a wait before each retry");
+        assert!(
+            waits[4..].iter().all(|wait| *wait == 60),
+            "every wait from the fifth holds at a minute: {waits:?}"
         );
     }
 
@@ -330,5 +371,151 @@ mod given_stored_state_that_cannot_be_read {
             Ok(None),
             "no Meta identity was written"
         );
+    }
+}
+
+/// Failures no wait cures (ST-10, `test/unit/database-startup.test.ts`):
+/// unclassified failures and invariant failures alike, counted together, two
+/// retries running stopping the retry and an outage between them resetting
+/// the count. The first attempt, made as the host composes, is not one of
+/// the retries, so each script below opens with an outage and its retries
+/// follow.
+mod given_failures_no_wait_cures {
+    use super::*;
+
+    #[tokio::test]
+    async fn stops_at_an_unclassified_failure_once_a_second_retry_confirms_it() {
+        let store = Scripted::new(
+            [unavailable()]
+                .into_iter()
+                .chain((0..9).map(|_| unclassified())),
+        );
+        let clock = Recorded::default();
+        let (reported, answer) = kept(&store, &clock).await;
+        assert!(
+            matches!(
+                answer,
+                Err(EstablishError::Repository(RepositoryError::Unclassified(_)))
+            ),
+            "a defect fails the same way every time: {answer:?}"
+        );
+        assert_eq!(reported.len(), 3, "the outage, then two confirming retries");
+        assert_eq!(clock.waits(), [5, 10], "a wait before each retry");
+    }
+
+    #[tokio::test]
+    async fn stops_at_a_directory_where_the_sqlite_file_should_be() {
+        let directory = tempfile::tempdir().unwrap();
+        let folder = directory.path().join("cube.db");
+        std::fs::create_dir(&folder).unwrap();
+        let store =
+            SqliteSpaceRepository::open(&host::SqlitePath::from_variable(folder.to_str()).unwrap());
+        let clock = Recorded::default();
+        let mut reported = 0;
+        let answer =
+            keep_establishing(&store, &Counted::default(), &clock, |_| reported += 1).await;
+        assert!(
+            matches!(
+                answer,
+                Err(EstablishError::Repository(RepositoryError::Unclassified(_)))
+            ),
+            "no wait makes a directory a database: {answer:?}"
+        );
+        assert_eq!(
+            reported, 3,
+            "the first attempt, then two retries in a row that confirm it"
+        );
+        assert_eq!(clock.waits(), [5, 10], "a wait before each retry");
+    }
+
+    #[tokio::test]
+    async fn keeps_trying_through_one_unclassified_failure_the_next_attempt_does_not_repeat() {
+        let store = Scripted::new([unavailable(), unclassified()]);
+        let (reported, answer) = kept(&store, &Recorded::default()).await;
+        assert_eq!(
+            answer.unwrap().as_str(),
+            FIRST_ID,
+            "a one-off is not a verdict"
+        );
+        assert_eq!(reported.len(), 2, "the outage and the one-off");
+    }
+
+    #[tokio::test]
+    async fn keeps_trying_through_one_invariant_failure_the_next_attempt_does_not_repeat() {
+        let store = Scripted::new([unavailable(), broken()]);
+        let (reported, answer) = kept(&store, &Recorded::default()).await;
+        assert_eq!(
+            answer.unwrap().as_str(),
+            FIRST_ID,
+            "a one-off is not a verdict"
+        );
+        assert_eq!(reported.len(), 2, "the outage and the one-off");
+    }
+
+    #[tokio::test]
+    async fn counts_an_unclassified_and_an_invariant_failure_in_a_row_together() {
+        let store = Scripted::new([unavailable(), unclassified(), broken()]);
+        let (reported, answer) = kept(&store, &Recorded::default()).await;
+        assert!(
+            matches!(
+                answer,
+                Err(EstablishError::Repository(
+                    RepositoryError::BrokenStoredState(_)
+                ))
+            ),
+            "each confirms the other: {answer:?}"
+        );
+        assert_eq!(reported.len(), 3, "stopped at the second in a row");
+
+        let store = Scripted::new([unavailable(), broken(), unclassified()]);
+        let (_, answer) = kept(&store, &Recorded::default()).await;
+        assert!(
+            matches!(
+                answer,
+                Err(EstablishError::Repository(RepositoryError::Unclassified(_)))
+            ),
+            "in either order: {answer:?}"
+        );
+    }
+
+    // `test/unit/database-startup.test.ts` › "counts invariant failures
+    // consecutively, so an outage between them resets": the retries here are
+    // broken, unavailable, broken, then success. A start-up that kept the
+    // count across the outage would stop at the second broken retry.
+    #[tokio::test]
+    async fn counts_failures_consecutively_so_an_outage_between_them_resets() {
+        for (what, second) in [("invariant", broken()), ("unclassified", unclassified())] {
+            let store = Scripted::new([unavailable(), broken(), unavailable(), second]);
+            let (reported, answer) = kept(&store, &Recorded::default()).await;
+            assert_eq!(
+                answer.map(|id| id.as_str().to_owned()),
+                Ok(FIRST_ID.to_owned()),
+                "an outage between an invariant and an {what} failure resets the count"
+            );
+            assert_eq!(reported.len(), 4, "every failure is reported");
+        }
+    }
+
+    #[tokio::test]
+    async fn stops_at_once_when_default_content_is_refused() {
+        let store = Scripted::refusing([]);
+        let clock = Recorded::default();
+        let (reported, answer) = kept(&store, &clock).await;
+        assert!(
+            matches!(answer, Err(EstablishError::DefaultContentInvalid(_))),
+            "no attempt can cure the build: {answer:?}"
+        );
+        assert_eq!(reported.len(), 1, "one attempt, with no confirming retry");
+        assert!(clock.waits().is_empty(), "no wait");
+
+        let store = Scripted::refusing([unavailable()]);
+        let clock = Recorded::default();
+        let (reported, answer) = kept(&store, &clock).await;
+        assert!(
+            matches!(answer, Err(EstablishError::DefaultContentInvalid(_))),
+            "met on a retry: {answer:?}"
+        );
+        assert_eq!(reported.len(), 2, "the outage, then the refusal");
+        assert_eq!(clock.waits(), [5], "no wait after the refusal");
     }
 }

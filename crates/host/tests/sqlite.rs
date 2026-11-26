@@ -215,6 +215,7 @@ mod given_a_migrated_file {
     // ST-128: the rollback journal in `delete` mode, set even over a file
     // another writer left in WAL mode, and `synchronous=FULL` on the
     // repository's own connections.
+    // Case: writes the file in rollback-journal delete mode with synchronous FULL
     #[tokio::test]
     async fn writes_in_rollback_journal_delete_mode_with_synchronous_full() {
         let file = Migrated::new().await;
@@ -324,6 +325,8 @@ mod given_the_memory_store_and_a_sqlite_file {
         }
     }
 
+    // Reads of the tracked fixture, whose content no generator of
+    // `tests/store_properties.rs` produces; its commits are generated there.
     #[tokio::test]
     async fn read_the_same_aggregate_spaces_and_meta_identity() {
         let (memory, sqlite, _file) = both().await;
@@ -354,57 +357,7 @@ mod given_the_memory_store_and_a_sqlite_file {
         );
     }
 
-    #[tokio::test]
-    async fn answer_commits_the_same_and_keep_what_they_wrote() {
-        let (memory, sqlite, file) = both().await;
-        let loaded = memory.load_space(meta()).await.unwrap().unwrap();
-        for commit in [rename(&loaded, "Renamed"), rename(&loaded, "Stale")] {
-            assert_eq!(
-                sqlite.commit(commit.clone()).await,
-                memory.commit(commit).await,
-                "the commit's answer"
-            );
-        }
-        let mut orphaned = rename(&loaded, "Orphaned");
-        let other = memory
-            .load_space(SpaceId::parse(http_conformance::FIXTURE_SPACES[1]).unwrap())
-            .await
-            .unwrap()
-            .unwrap();
-        orphaned.changes = vec![SpaceChange::Delete {
-            space_id: meta(),
-            expected_revision: Revision::new(1).unwrap(),
-        }];
-        assert_eq!(
-            sqlite.commit(orphaned.clone()).await,
-            memory.commit(orphaned).await,
-            "a refused commit"
-        );
-        let create = SpaceCommit {
-            changes: vec![SpaceChange::Create {
-                space_id: other.snapshot.id,
-                snapshot: other.snapshot,
-            }],
-        };
-        assert_eq!(
-            sqlite.commit(create.clone()).await,
-            memory.commit(create).await,
-            "a create the store will not judge"
-        );
-        assert_eq!(
-            sqlite.load_aggregate().await,
-            memory.load_aggregate().await,
-            "what the commits left"
-        );
-        sqlite.close().await;
-        let reopened = open(&file.path());
-        assert_eq!(
-            reopened.load_aggregate().await,
-            memory.load_aggregate().await,
-            "what the commits left, read again from the file"
-        );
-    }
-
+    // Assets, which no generator of `tests/store_properties.rs` stores.
     #[tokio::test]
     async fn store_and_load_assets_the_same() {
         let (memory, sqlite, _file) = both().await;
@@ -447,6 +400,8 @@ mod given_the_memory_store_and_a_sqlite_file {
         );
     }
 
+    // The lifecycle doors and marking a Space exported, which no generator of
+    // `tests/store_properties.rs` produces: it commits only.
     #[tokio::test]
     async fn answer_the_lifecycle_doors_the_same() {
         let (memory, sqlite, _file) = both().await;
@@ -540,6 +495,8 @@ mod given_the_memory_store_and_a_sqlite_file {
         );
     }
 
+    // An uninitialized store, which no generator of `tests/store_properties.rs`
+    // starts from.
     #[tokio::test]
     async fn refuse_and_answer_an_uninitialized_store_the_same() {
         let file = Migrated::new().await;
@@ -600,67 +557,6 @@ mod given_rows_the_typescript_host_reads {
             .as_deref(),
             Some(META),
             "the Meta identity as stored"
-        );
-    }
-}
-
-/// Rows the TypeScript host wrote (ST-125), importing the tracked fixture
-/// into a migrated file (`fixtures/typescript-sqlite-rows.sql`, written by
-/// `scripts/sqlite-rows-fixture.ts`), replayed over a freshly migrated file.
-mod given_rows_the_typescript_host_wrote {
-    use super::*;
-
-    async fn replayed() -> (SqliteSpaceRepository, Migrated) {
-        let file = Migrated::new().await;
-        execute(
-            &file.file,
-            include_str!("fixtures/typescript-sqlite-rows.sql"),
-        )
-        .await;
-        (open(&file.path()), file)
-    }
-
-    #[tokio::test]
-    async fn reads_the_aggregate_and_its_assets_as_this_host_imports_them() {
-        let (sqlite, _file) = replayed().await;
-        let memory = seeded(MemorySpaceRepository::new()).await;
-        assert_eq!(
-            sqlite.load_aggregate().await,
-            memory.load_aggregate().await,
-            "the aggregate"
-        );
-        assert_eq!(
-            sqlite.list_spaces().await,
-            memory.list_spaces().await,
-            "the Spaces listed"
-        );
-        let mut assets = 0;
-        for entry in std::fs::read_dir(http_conformance::fixture().join("assets")).unwrap() {
-            let name = entry.unwrap().file_name().into_string().unwrap();
-            let hash = AssetHash::parse(name.split('.').next().unwrap()).unwrap();
-            let stored = sqlite.load_asset(&hash).await.unwrap();
-            assert!(stored.is_some(), "asset {name}");
-            assert_eq!(
-                stored,
-                memory.load_asset(&hash).await.unwrap(),
-                "asset {name}"
-            );
-            assets += 1;
-        }
-        assert!(assets > 0, "the fixture has assets");
-    }
-
-    #[tokio::test]
-    async fn commits_an_edit_over_them() {
-        let (sqlite, _file) = replayed().await;
-        let loaded = sqlite.load_space(meta()).await.unwrap().unwrap();
-        assert_eq!(
-            sqlite.commit(rename(&loaded, "Renamed")).await,
-            Ok(CommitResult::Committed {
-                revisions: vec![(meta(), loaded.revision.next())],
-                deleted_space_ids: vec![],
-            }),
-            "the Edit lands"
         );
     }
 }
@@ -841,6 +737,7 @@ mod given_an_edit_to_one_space {
 mod given_contention {
     use super::*;
 
+    // Case: answers the loser of a same-Space race as a conflict and writes nothing of it
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn answers_overlapping_edits_to_one_space_as_one_commit_and_conflicts() {
         let file = Migrated::new().await;
@@ -848,29 +745,37 @@ mod given_contention {
         let loaded = store.load_space(meta()).await.unwrap().unwrap();
         let edits = (0..8).map(|index| {
             let store = Arc::clone(&store);
-            let commit = rename(&loaded, &format!("Edit {index}"));
-            tokio::spawn(async move { store.commit(commit).await })
+            let title = format!("Edit {index}");
+            let commit = rename(&loaded, &title);
+            tokio::spawn(async move { (title, store.commit(commit).await) })
         });
         // Every edit is spawned before the first is awaited, so they overlap.
         let edits: Vec<_> = edits.collect();
-        let mut committed = 0;
+        let mut winners = Vec::new();
         let mut conflicts = 0;
         for edit in edits {
             match edit.await.unwrap() {
-                Ok(CommitResult::Committed { .. }) => committed += 1,
-                Ok(CommitResult::Conflict(_)) => conflicts += 1,
-                other => panic!("an overlapping edit answers {other:?}"),
+                (title, Ok(CommitResult::Committed { .. })) => winners.push(title),
+                (_, Ok(CommitResult::Conflict(_))) => conflicts += 1,
+                (title, other) => panic!("the edit to {title:?} answers {other:?}"),
             }
         }
         assert_eq!(
-            (committed, conflicts),
+            (winners.len(), conflicts),
             (1, 7),
             "one lands, the rest conflict"
         );
+        let stored = store.load_space(meta()).await.unwrap().unwrap();
         assert_eq!(
-            store.load_space(meta()).await.unwrap().unwrap().revision,
+            stored.revision,
             Revision::new(1).unwrap(),
             "one revision was written"
+        );
+        let mut winner = loaded.snapshot.clone();
+        winners[0].clone_into(&mut winner.document.title);
+        assert_eq!(
+            stored.snapshot, winner,
+            "the stored Space is the winner's, holding nothing of a loser"
         );
     }
 
@@ -911,6 +816,7 @@ mod given_contention {
         );
     }
 
+    // Case: waits out a second process that lets go inside the busy timeout, then commits
     #[tokio::test]
     async fn waits_out_a_lock_let_go_inside_the_busy_timeout() {
         let file = Migrated::new().await;

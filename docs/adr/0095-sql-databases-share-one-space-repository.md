@@ -2,7 +2,7 @@
 
 Status: accepted
 Refines: 0078
-Refined by: 0155
+Refined by: 0155, 0176
 Related: 0030, 0054, 0062, 0094
 
 PostgreSQL and SQLite are served by one Space repository implementation. It owns row mapping, the Meta lifecycle, the commit procedure and the mapping of a stale revision or a Thing owned by another Space to a commit outcome. Each database supplies only a small `SqlStore` value: access to its generated tables, a handle for reads and writes outside a transaction, how it runs a transaction, how it reads a stored document, how it recognises a duplicate key, whether it serialises operations, and how it closes. A member added to that value is a place the two databases have begun to differ again, and needs a reason.
