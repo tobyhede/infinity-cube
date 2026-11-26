@@ -41,6 +41,10 @@ export const uncataloguedComponents = [
       'Isolated single-Space mounting adapter, reached only by `packages/app/test/space-mounting.ts`. Startup mounts `OpenSpacesApplication` for every host, so no story renders this and an import edge would be the only evidence catalogue coverage could rest on.',
   },
   {
+    module: 'packages/app/src/prototype-opendyslexic/PrototypeFontSwitcher.tsx',
+    reason: 'A throwaway prototype control drawn only in a dev build, on a do-not-merge branch.',
+  },
+  {
     module: 'packages/app/src/main.tsx',
     reason: 'The browser entry point: one `createRoot` call and startup composition.',
   },

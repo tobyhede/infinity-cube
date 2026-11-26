@@ -60,6 +60,6 @@
 
 /* OpenDyslexic is wide and tall; the variants keep the app's sizes so the
    comparison is honest about overflow. Monospace stays monospace. */
-:root[data-theme='dark'][data-prototype-font] :is(code, pre, kbd, samp, .cm-editor) {
+:root[data-theme='dark'][data-prototype-font] :is(code, pre, kbd, samp) {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
