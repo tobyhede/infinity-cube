@@ -97,6 +97,9 @@ pub struct ConnectionSettings {
     pub journal_mode: String,
     /// `PRAGMA synchronous`, as SQLite numbers it: 2 is `FULL`.
     pub synchronous: i64,
+    /// `PRAGMA busy_timeout`, in milliseconds: how long an operation waits
+    /// on a lock another holder has before it fails as unavailable.
+    pub busy_timeout_ms: i64,
 }
 
 impl SqlSpaceRepository<SqliteStore> {
@@ -152,9 +155,13 @@ impl SqlSpaceRepository<SqliteStore> {
             let synchronous: i64 = sqlx::query_scalar("PRAGMA synchronous")
                 .fetch_one(&mut *connection)
                 .await?;
+            let busy_timeout_ms: i64 = sqlx::query_scalar("PRAGMA busy_timeout")
+                .fetch_one(&mut *connection)
+                .await?;
             Ok::<_, sqlx::Error>(ConnectionSettings {
                 journal_mode,
                 synchronous,
+                busy_timeout_ms,
             })
         };
         let _alone = self.serial.lock().await;
@@ -603,11 +610,8 @@ mod tests {
         std::fs::File::create(&file).unwrap();
         let path = SqlitePath::from_variable(file.to_str()).unwrap();
         let repository = SqlSpaceRepository::open(&path);
-        let busy_timeout: i64 = sqlx::query_scalar("PRAGMA busy_timeout")
-            .fetch_one(&repository.store.pool)
-            .await
-            .unwrap();
-        assert_eq!(busy_timeout, 5_000);
-        repository.store.pool.close().await;
+        let settings = repository.connection_settings().await.unwrap();
+        assert_eq!(settings.busy_timeout_ms, 5_000);
+        repository.close().await;
     }
 }

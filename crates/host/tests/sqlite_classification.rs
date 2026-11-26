@@ -312,6 +312,67 @@ mod given_each_failure {
         );
     }
 
+    // Case: answers a closed database as retryable 503 persistence-unavailable, not 409
+    /// Each read and a commit at the revision read, over a store closed
+    /// underneath the application, answer 503 `persistence-unavailable` as
+    /// problem JSON, never the 409 a stale revision earns. That the browser
+    /// retries it is the TypeScript client's, held by its own tests.
+    #[tokio::test]
+    async fn answers_every_request_over_a_closed_store_503_never_409() {
+        let file = seeded().await;
+        let store = open(&file.path());
+        let application: Application<SqliteSpaceRepository, Counted, BTreeMap<String, Bytes>> =
+            Application::new(
+                Arc::clone(&store),
+                Counted::default(),
+                Shell::new("", BTreeMap::new()),
+            );
+        let body = serde_json::json!({
+            "changes": [{
+                "kind": "update",
+                "spaceId": SPACE_ID,
+                "snapshot": repository_contract::space_value(SPACE_ID, "Never stored", &[RESOURCE_ID]),
+                "expectedRevision": "0",
+            }],
+        })
+        .to_string();
+        store.close().await;
+
+        let get = |path: String| {
+            Request::get(path)
+                .body(http_body_util::Full::new(Bytes::new()))
+                .unwrap()
+        };
+        let requests = [
+            get("/api/spaces".to_owned()),
+            get(space_path()),
+            get("/api/aggregate".to_owned()),
+            Request::post("/api/spaces")
+                .header("content-type", "application/json")
+                .body(http_body_util::Full::new(Bytes::from(body)))
+                .unwrap(),
+        ];
+        for request in requests {
+            let target = format!("{} {}", request.method(), request.uri());
+            let response = application.handle(request).await;
+            assert_eq!(response.status().as_u16(), 503, "{target}");
+            assert_eq!(
+                response
+                    .headers()
+                    .get("content-type")
+                    .and_then(|value| value.to_str().ok()),
+                Some("application/problem+json"),
+                "{target}"
+            );
+            let problem: serde_json::Value = serde_json::from_slice(response.body()).unwrap();
+            assert_eq!(
+                problem["type"], "urn:infinity-cube:problem:persistence-unavailable",
+                "{target}"
+            );
+            assert_eq!(problem["status"], 503, "{target}");
+        }
+    }
+
     #[tokio::test]
     async fn names_a_file_that_does_not_exist_unreachable() {
         let directory = tempfile::tempdir().unwrap();

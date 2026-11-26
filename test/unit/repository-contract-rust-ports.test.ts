@@ -61,9 +61,9 @@ const VALUES: Readonly<Record<string, readonly string[]>> = {
   ],
 };
 
-/** The tickets a pending case may name. */
-const TICKETS = ['11'] as const;
-type Ticket = (typeof TICKETS)[number];
+/** The tickets a pending case may name: none is open, so no case may be pending. */
+const TICKETS: readonly string[] = [];
+type Ticket = string;
 
 type Exemption =
   | { readonly kind: 'pending'; readonly ticket: Ticket }
@@ -99,12 +99,6 @@ const EXEMPT: Readonly<Record<string, Exemption>> = {
   ),
 
   // test/integration/sqlite-http-runtime.test.ts
-  'refuses to compose when SQLITE_PATH is %s': pending('11'),
-  'refuses to compose when SQLITE_PATH is relative': pending('11'),
-  'leaves an already-initialized file alone and still serves it after reopen': pending('11'),
-  'persists a POST Edit through GET and reopen, and answers a stale revision as 409': pending('11'),
-  'answers a closed database as retryable 503 persistence-unavailable, not 409': pending('11'),
-  'answers internal-error for a non-JSON stored Meta document': pending('11'),
   'names a Meta identity that keeps moving while it is locked unavailable': doesNotApply(
     'the TypeScript repository reads the Meta identity and then relocks its row, so a replacement can move it between the two; the Rust repository reads it inside the one `BEGIN IMMEDIATE` transaction that writes, so it cannot move under the read',
   ),

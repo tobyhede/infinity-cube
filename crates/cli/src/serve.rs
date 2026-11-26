@@ -59,6 +59,12 @@ fn sqlite_file(value: Option<&OsStr>) -> Result<SqlitePath, String> {
     }
 }
 
+/// The repository `serve` opens over `path`: the host's, waiting five
+/// seconds on another holder's lock (ST-127).
+fn repository(path: &SqlitePath) -> SqliteSpaceRepository {
+    SqliteSpaceRepository::open(path)
+}
+
 /// Serve the store `command` names until a stop signal, answering the exit code.
 pub(crate) async fn serve(command: ServeCommand) -> ExitCode {
     let Store::Sqlite = command.store;
@@ -93,7 +99,7 @@ pub(crate) async fn serve(command: ServeCommand) -> ExitCode {
         return ExitCode::SUCCESS;
     }
 
-    let repository = Arc::new(SqliteSpaceRepository::open(&path));
+    let repository = Arc::new(repository(&path));
     let application = Arc::new(
         Application::new(Arc::clone(&repository), RandomIds, shell)
             .on_error(|context, error| say(&format!("{context}: {error}"))),
@@ -136,4 +142,21 @@ pub(crate) async fn serve(command: ServeCommand) -> ExitCode {
     repository.close().await;
     say(&format!("Stopped; {file} holds every edit."));
     ExitCode::SUCCESS
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn opens_the_file_waiting_five_seconds_on_another_holders_lock() {
+        let directory = tempfile::tempdir().unwrap();
+        let file = directory.path().join("cube.db");
+        std::fs::File::create(&file).unwrap();
+        let path = SqlitePath::from_variable(file.to_str()).unwrap();
+        let repository = repository(&path);
+        let settings = repository.connection_settings().await.unwrap();
+        assert_eq!(settings.busy_timeout_ms, 5_000);
+        repository.close().await;
+    }
 }
