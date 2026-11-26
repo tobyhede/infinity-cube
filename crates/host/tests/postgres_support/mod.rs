@@ -49,6 +49,15 @@ async fn administer() -> PgConnection {
 
 /// The template's name: one per set of migrations, so a changed migration
 /// gets a fresh template.
+/// PostgreSQL's `object_in_use` (55006), which two clones of one template
+/// at the same moment can meet.
+fn is_object_in_use(error: &sqlx::Error) -> bool {
+    error
+        .as_database_error()
+        .and_then(sqlx::error::DatabaseError::code)
+        .is_some_and(|code| code == "55006")
+}
+
 fn template_name() -> &'static str {
     static NAME: OnceLock<String> = OnceLock::new();
     NAME.get_or_init(|| {
@@ -159,7 +168,8 @@ impl Fresh {
         };
         let mut admin = administer().await;
         // Two clones of one template at the same moment can meet as "being
-        // accessed by other users" (55006); asking again succeeds.
+        // accessed by other users" (55006); asking again succeeds. Any other
+        // refusal is answered at once.
         let mut attempts = 0;
         loop {
             match sqlx::raw_sql(sqlx::AssertSqlSafe(statement.clone()))
@@ -167,9 +177,8 @@ impl Fresh {
                 .await
             {
                 Ok(_) => break,
-                Err(error) if attempts < 20 => {
+                Err(error) if attempts < 20 && is_object_in_use(&error) => {
                     attempts += 1;
-                    let _ = error;
                     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                 }
                 Err(error) => panic!("could not create {name}: {error}"),

@@ -15,7 +15,6 @@ test-support = []
 
 [dependencies]
 bytes = { workspace = true }
-dotenvy = { workspace = true }
 http = { workspace = true }
 http-body = "1"
 http-body-util = { workspace = true }

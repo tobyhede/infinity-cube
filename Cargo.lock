@@ -1742,7 +1742,6 @@ name = "host"
 version = "0.1.0-preview.1"
 dependencies = [
  "bytes",
- "dotenvy",
  "host",
  "http",
  "http-body",

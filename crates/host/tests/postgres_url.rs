@@ -130,3 +130,86 @@ mod given_the_environment {
         assert!(!format!("{url:?}").contains("secret"));
     }
 }
+
+/// The `.env` read as Node's `dotenv` 17.4.2 reads it (its `parse`, which
+/// `src/prisma/db.ts` calls through `config()` with no `dotenv-expand`): no
+/// variable is expanded, and a line its pattern does not match is skipped.
+mod given_an_env_file_dotenv_reads {
+    use super::*;
+
+    fn resolved(contents: &str) -> Result<DatabaseUrl, DatabaseUrlError> {
+        let root = tempfile::tempdir().unwrap();
+        fs::write(root.path().join(".env"), contents).unwrap();
+        DatabaseUrl::resolve(None, root.path())
+    }
+
+    #[test]
+    fn expands_no_variable_in_an_unquoted_value() {
+        assert_eq!(
+            resolved("DATABASE_URL=postgresql://u:pa$word@host/db\n")
+                .unwrap()
+                .as_str(),
+            "postgresql://u:pa$word@host/db"
+        );
+    }
+
+    #[test]
+    fn expands_no_variable_in_a_double_quoted_value() {
+        assert_eq!(
+            resolved("DATABASE_URL=\"postgresql://u:${PASS}@host/db\"\n")
+                .unwrap()
+                .as_str(),
+            "postgresql://u:${PASS}@host/db"
+        );
+    }
+
+    #[test]
+    fn skips_a_line_that_does_not_parse() {
+        assert_eq!(
+            resolved("FOO BAR\nDATABASE_URL=postgresql://u:p@host/db\n")
+                .unwrap()
+                .as_str(),
+            "postgresql://u:p@host/db"
+        );
+    }
+
+    #[test]
+    fn skips_an_unterminated_quote_on_another_line() {
+        assert_eq!(
+            resolved("OTHER=\"never closed\nDATABASE_URL=postgresql://u:p@host/db\n")
+                .unwrap()
+                .as_str(),
+            "postgresql://u:p@host/db"
+        );
+    }
+
+    #[test]
+    fn reads_an_export_prefix_and_drops_a_trailing_comment() {
+        assert_eq!(
+            resolved("export DATABASE_URL=postgresql://u:p@host/db # the local one\n")
+                .unwrap()
+                .as_str(),
+            "postgresql://u:p@host/db"
+        );
+    }
+
+    #[test]
+    fn takes_a_single_quoted_value_literally() {
+        assert_eq!(
+            resolved("DATABASE_URL='postgresql://u:$p@host/db'\n")
+                .unwrap()
+                .as_str(),
+            "postgresql://u:$p@host/db"
+        );
+    }
+
+    #[test]
+    fn takes_the_last_of_two_entries() {
+        assert_eq!(
+            resolved("DATABASE_URL=first\nDATABASE_URL=second\n")
+                .unwrap()
+                .as_str(),
+            "second"
+        );
+    }
+}
