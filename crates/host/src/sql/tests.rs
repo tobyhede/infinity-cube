@@ -81,7 +81,7 @@ impl SqlStore for Scripted {
     ) -> Result<bool, sqlx::Error> {
         let missed = self
             .relock_misses
-            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |left| {
+            .try_update(Ordering::SeqCst, Ordering::SeqCst, |left| {
                 left.checked_sub(1)
             })
             .is_ok();
