@@ -576,8 +576,8 @@ mod read_sslmode_as_pg_does {
     // `pg` never reads `PGSSLROOTCERT`; `sqlx` 0.9.1 reads it as a CA file
     // (`PgConnectOptions::new_without_pgpass`) and would add it to the
     // system's trusted roots, so the options name an empty PEM, which adds
-    // no CA, in its place. Setting a variable is `unsafe`, which the
-    // workspace forbids, and would race the other tests in this binary, so
+    // no CA, in its place. Setting a variable is `unsafe`, which `unsafe_code`
+    // = "forbid" rules out, and would race the other tests in this binary, so
     // the test runs itself again as a child process with the variable set.
     #[test]
     fn ignores_pgsslrootcert_as_pg_does() {
