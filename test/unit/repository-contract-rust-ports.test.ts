@@ -62,7 +62,7 @@ const VALUES: Readonly<Record<string, readonly string[]>> = {
 };
 
 /** The tickets a pending case may name. */
-const TICKETS = ['10', '11', '13'] as const;
+const TICKETS = ['11', '13'] as const;
 type Ticket = (typeof TICKETS)[number];
 
 type Exemption =
@@ -98,16 +98,11 @@ const EXEMPT: Readonly<Record<string, Exemption>> = {
     doesNotApply(ROW_LOCK),
 
   // test/integration/sqlite-contention.test.ts
-  'recovers on the same runtime when its first read meets an exclusive lock': pending('10'),
   'refuses the loser of a Resource identity race and writes nothing of it': pending('13'),
   'conflicts the loser of a same-id create race on both the new Space and Meta, and writes nothing of it':
     pending('13'),
   'settles a replacement racing a commit in arrival order, commit first': pending('13'),
   'settles a replacement racing a commit in arrival order, replacement first': pending('13'),
-  'serves loadSpace beside a * lock without waiting': pending('10'),
-  'fails * against a * lock as * BUSY, leaving the file unchanged and unlocked': pending('10'),
-  'answers HTTP as retryable 503 persistence-unavailable inside the client timeout, never 409':
-    pending('10'),
 
   // test/support/fast-path-races.ts
   'commits a Map-internal Edit under the shared aggregate lock only': pending('13'),
@@ -242,7 +237,7 @@ describe('the port check', () => {
   const cases = ['ported', 'pending', 'inapplicable'];
   const clean: Marks = {
     marked: ['ported', 'an HTTP case'],
-    exempt: { pending: pending('10'), inapplicable: doesNotApply('why') },
+    exempt: { pending: pending('11'), inapplicable: doesNotApply('why') },
     elsewhere: ['an HTTP case'],
   };
 
@@ -267,7 +262,7 @@ describe('the port check', () => {
 
   it('finds an exemption naming no case', () => {
     expect(
-      findings(cases, { ...clean, exempt: { ...clean.exempt, gone: pending('10') } })
+      findings(cases, { ...clean, exempt: { ...clean.exempt, gone: pending('11') } })
         .unknownExemptions,
     ).toEqual(['gone']);
   });
@@ -280,7 +275,7 @@ describe('the port check', () => {
   });
 
   it('tells a pending exemption from one that does not apply', () => {
-    expect(pending('10')).toEqual({ kind: 'pending', ticket: '10' });
+    expect(pending('11')).toEqual({ kind: 'pending', ticket: '11' });
     expect(doesNotApply('why')).toEqual({ kind: 'does not apply', reason: 'why' });
   });
 });

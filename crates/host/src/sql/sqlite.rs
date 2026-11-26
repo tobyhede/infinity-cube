@@ -593,4 +593,21 @@ mod tests {
             assert!(!unavailable_code(code, missing), "code {code}");
         }
     }
+
+    /// `open` waits five seconds on another holder's lock, read from the
+    /// setting on the connection it opens rather than by waiting.
+    #[tokio::test]
+    async fn pins_the_default_busy_timeout() {
+        let directory = tempfile::tempdir().unwrap();
+        let file = directory.path().join("cube.db");
+        std::fs::File::create(&file).unwrap();
+        let path = SqlitePath::from_variable(file.to_str()).unwrap();
+        let repository = SqlSpaceRepository::open(&path);
+        let busy_timeout: i64 = sqlx::query_scalar("PRAGMA busy_timeout")
+            .fetch_one(&repository.store.pool)
+            .await
+            .unwrap();
+        assert_eq!(busy_timeout, 5_000);
+        repository.store.pool.close().await;
+    }
 }
