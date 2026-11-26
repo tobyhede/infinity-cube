@@ -46,7 +46,7 @@ const RUST_FILES = [
 ];
 
 /** Each contract case written once and run for several values, with its values. */
-const VALUES: Readonly<Record<string, readonly string[]>> = {
+const VALUES = {
   'replaces * stored state through the destructive lifecycle door': [
     'invalid-space-document',
     'invalid-aggregate',
@@ -59,7 +59,9 @@ const VALUES: Readonly<Record<string, readonly string[]>> = {
     'topology-preserving',
     'complete-aggregate',
   ],
-};
+} satisfies Readonly<Record<string, readonly string[]>>;
+
+const VALUES_BY_CASE = new Map(Object.entries(VALUES));
 
 /** The tickets a pending case may name: none is open, so no case may be pending. */
 const TICKETS: readonly string[] = [];
@@ -75,7 +77,7 @@ const doesNotApply = (reason: string): Exemption => ({ kind: 'does not apply', r
 const ROW_LOCK =
   'the TypeScript repository reads a Space and then takes its row lock, so another writer can change the rows between the two; the Rust repository reads and writes inside one `BEGIN IMMEDIATE` transaction holding the write lock from its start, so no row changes between its read and its write';
 
-const EXEMPT: Readonly<Record<string, Exemption>> = {
+const EXEMPT = {
   // The contract.
   'writes a moved Resource through the ownership check, which refuses it before its Space releases it':
     doesNotApply(
@@ -112,7 +114,7 @@ const EXEMPT: Readonly<Record<string, Exemption>> = {
     doesNotApply(
       'the Rust replacement reads the Meta identity inside its one write transaction and relocks no row, so no read follows a conflict for an outage to meet',
     ),
-};
+} satisfies Readonly<Record<string, Exemption>>;
 
 /** A contract case's name, the harness's store name dropped. */
 const contractName = (written: string): string =>
@@ -125,7 +127,9 @@ const CONTRACT_CASES = casesOf(CONTRACT).map(contractName);
 
 /** The contract's cases as they run: each value of a looped case named apart. */
 const CONTRACT_RUNS = CONTRACT_CASES.flatMap((name) =>
-  (VALUES[name] ?? [undefined]).map((value) => (value === undefined ? name : `${name} (${value})`)),
+  (VALUES_BY_CASE.get(name) ?? [undefined]).map((value) =>
+    value === undefined ? name : `${name} (${value})`,
+  ),
 );
 
 const OUTSIDE_CASES = Object.fromEntries(OUTSIDE.map((file) => [file, casesOf(file)]));
