@@ -3,6 +3,7 @@
 Status: accepted
 Date: 2026-11-24
 Refines: 0155, 0165
+Refined by: 0177
 Related: 0085, 0095
 
 ADR 0155 moves migration ownership to Rust when PostgreSQL moves, and ADR 0165 keeps the schema history in two encodings until then, adding a Prisma Next package and its plain-SQL file together. Neither says how ownership is carried out while the TypeScript hosts still run: until rust-host 19 they serve `pnpm dev`, `pnpm dev:sqlite` and both restart proofs, and their databases are migrated by Prisma Next. Each tool records what it has applied in its own table (`_sqlx_migrations`; Prisma Next's marker and ledger), so either one meeting a database the other migrated would apply every migration again. The maintainer ruled on 24 November 2026, in triage of rust-host 16.
