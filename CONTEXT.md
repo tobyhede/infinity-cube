@@ -455,6 +455,18 @@ _Avoid_: catalog, bundle, export root.
 **Repository**:
 Where the live Aggregate is kept: PostgreSQL, SQLite or memory. Also called a store.
 
+**Invariant failure**:
+A Repository holding something InfinityCube cannot read an Aggregate from: stored state that contradicts itself, such as Meta naming a Space the Repository does not hold, or a Repository missing what an Aggregate is kept in. It is not expected to clear on its own, so a failure the next read does not repeat was not one.
+_Avoid_: corruption, unavailable.
+
+**Unreachable**:
+Of a Repository: unable to answer for now, so asking again may succeed.
+_Avoid_: unavailable (a command state), down, offline.
+
+**Unclassified failure**:
+A Repository failure known to be neither an Invariant failure nor Unreachable. Nothing is known about whether asking again would clear it.
+_Avoid_: internal error, unknown error.
+
 **Default Content**:
 The generated Aggregate a new Repository, or a new Aggregate directory, starts from.
 
