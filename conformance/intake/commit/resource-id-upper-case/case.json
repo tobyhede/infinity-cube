@@ -1,5 +1,5 @@
 {
-  "description": "An update adding a Resource whose id is written in upper case, placed on the Map and an Edge's endpoint in that spelling (ADR 0178).",
+  "description": "An update adding a Resource whose id is written in upper case, placed on the Map and an Edge's endpoint in that spelling (ADR 0180).",
   "base": "accepted-ur",
   "expect": {
     "outcome": "refused",

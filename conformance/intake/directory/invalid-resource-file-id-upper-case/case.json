@@ -1,5 +1,5 @@
 {
-  "description": "A Resource whose id is written in upper case, placed on a Map and an Edge's endpoint in that spelling (ADR 0178).",
+  "description": "A Resource whose id is written in upper case, placed on a Map and an Edge's endpoint in that spelling (ADR 0180).",
   "expect": {
     "outcome": "refused",
     "refusals": [

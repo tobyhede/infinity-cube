@@ -5,7 +5,7 @@
 //! and lower case alike, and a reference spelled in one case does not name an
 //! entity spelled in the other. Where an entity is named, the schema asks more:
 //! a Space directory's name and a Resource's own id are written in lower case
-//! (ADR 0178).
+//! (ADR 0180).
 
 use std::fmt;
 
@@ -34,7 +34,7 @@ impl Uuid {
     }
 
     /// Whether it is written in lower case, as a Space directory's name and a
-    /// Resource's own id are (ADR 0178).
+    /// Resource's own id are (ADR 0180).
     #[must_use]
     pub fn is_lower_case(&self) -> bool {
         !self.0.iter().any(u8::is_ascii_uppercase)

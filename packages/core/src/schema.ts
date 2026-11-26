@@ -33,11 +33,11 @@ export { newUuid, uuidSchema } from './uuid';
 
 const idSchema = uuidSchema;
 
-/** The refusal a Resource id written with an upper-case letter meets (ADR 0178). */
+/** The refusal a Resource id written with an upper-case letter meets (ADR 0180). */
 const RESOURCE_ID_LOWER_CASE = 'A Resource id must be written in lower case';
 
 /**
- * A Resource's own id: a UUID written in lower case (ADR 0178). Only where a
+ * A Resource's own id: a UUID written in lower case (ADR 0180). Only where a
  * Resource is named, in its file, its snapshot entry and the Resource itself; a
  * reference to one is any UUID, and one spelled in upper case names no
  * Resource. The case is asked only of a UUID, so a value that is not one meets

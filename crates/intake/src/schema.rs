@@ -497,7 +497,7 @@ pub(crate) fn resource(json: &JsonValue, envelope: Envelope) -> Result<Resource,
 }
 
 /// A Resource's id (in the file envelope only), Title, kind and content.
-/// A Resource's own id: a UUID written in lower case (ADR 0178), as
+/// A Resource's own id: a UUID written in lower case (ADR 0180), as
 /// `resourceIdSchema` reads it. A reference to a Resource is any UUID; one
 /// spelled in upper case names no Resource. The case is asked only of a UUID,
 /// so a value that is not one meets the one refusal it met before.
