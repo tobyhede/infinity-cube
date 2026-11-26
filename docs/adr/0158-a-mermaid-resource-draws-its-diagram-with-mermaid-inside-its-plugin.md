@@ -3,6 +3,7 @@
 Status: accepted
 Date: 2026-11-17
 Refines: 0142
+Refined by: 0178
 Related: 0063, 0064, 0067, 0101, 0118
 
 A **Mermaid Resource** is a bundled kind, `mermaid`, whose content is Mermaid source that its plugin draws as a diagram. It is the Markdown Resource in every way but what it draws: its content is `{ url }` naming its source, an asset (ADR 0142); its Map content is `{ open }`, Closed where a Map stores nothing and Open where there is no Map; it is created empty from the Command Dock; Opening carries a size hint measured at the reading width, or none where Mermaid has not drawn the diagram within the load wait that bounds Opening, so a slow or stalled fetch of Mermaid never holds Open back; and Edit is the same mode, under a Claim, in the host's source editor, with Save storing the source with `\n` line endings as a new asset and committing its URL. It may be a Target.

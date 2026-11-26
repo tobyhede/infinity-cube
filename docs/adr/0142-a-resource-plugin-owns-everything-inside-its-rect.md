@@ -3,7 +3,7 @@
 Status: accepted
 Supersedes: 0137
 Refines: 0020, 0051, 0056, 0064, 0070, 0079, 0084, 0093, 0106, 0113, 0114, 0118, 0119, 0120, 0121, 0122, 0123, 0125, 0128, 0134, 0135, 0139
-Refined by: 0158
+Refined by: 0158, 0178
 Related: 0057, 0074, 0082, 0089, 0126, 0140
 
 A Resource is drawn and authored by its **Resource plugin**. The canvas owns the rect and what connects rects: position, size, Resize, which Resource is selected, Edges, and the actions that change the Map. The plugin owns every pixel inside its outline and every way its content is authored. The application keeps no shared drawing of a Resource that a plugin fills a region of. An Image Resource is its picture, because the Image plugin draws nothing else.

@@ -1,6 +1,6 @@
 # 01: Rethink and design how a plugin's Open and Edit work
 
-**Status:** needs-triage
+**Status:** resolved
 
 **Blocked by:** None (can start immediately).
 
@@ -52,13 +52,14 @@ These hold today and a design has to keep them or replace them in a new ADR:
 
 ## Acceptance
 
-- [ ] The current behaviour of Open, Edit and Resize is described for each plugin that offers them (Markdown, Mermaid, Space, Reference), checked against the code.
-- [ ] Each constraint above is either kept or replaced, with the reason.
-- [ ] Each complication above has an answer in the design.
-- [ ] The maintainer agrees the design.
-- [ ] The agreed design is recorded as an ADR that names the ADRs it supersedes or refines.
-- [ ] Follow-up implementation tickets are cut from the ADR.
+- [x] The current behaviour of Open, Edit and Resize is described for each plugin that offers them (Markdown, Mermaid, Space, Reference), checked against the code.
+- [x] Each constraint above is either kept or replaced, with the reason.
+- [x] Each complication above has an answer in the design.
+- [x] The maintainer agrees the design.
+- [x] The agreed design is recorded as an ADR that names the ADRs it supersedes or refines.
+- [x] Follow-up implementation tickets are cut from the ADR.
 
 ## Comments
 
 - 2026-11-26: A proposed answer is [`../spec.md`](../spec.md), drawn from the Ladle prototype (Review → Markdown prototype → Temporary Edit Size). Its open questions go to the maintainer before the ADR is written.
+- 2026-11-26: The maintainer settled the spec's open questions in the project thread. The design is recorded as [ADR 0178](../../../docs/adr/0178-opening-keeps-a-resources-size-and-an-in-place-editor-draws-at-an-edit-size-the-map-stores.md), and tickets 02–07 are cut from it. The remaining acceptance item is implementing them.
