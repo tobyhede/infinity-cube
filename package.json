@@ -32,6 +32,8 @@
     "postgres:up": "docker compose up -d --wait",
     "postgres:down": "docker compose down",
     "typecheck:toolchain": "tsx scripts/check-typescript-toolchain.ts",
+    "toolchain:rust:check": "tsx scripts/check-rust-toolchain.ts",
+    "toolchain:rust:stale": "tsx scripts/check-rust-toolchain.ts --stale",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:packages": "pnpm -r typecheck",
     "lint": "node --max-old-space-size=6144 node_modules/eslint/bin/eslint.js . --max-warnings=0 --prune-suppressions",
