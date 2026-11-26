@@ -1,86 +1,19 @@
 //! What the shell opens when it starts, and what it does when its last
-//! window closes (Storage ST-131). A directory named on the command line
-//! opens at once; with none named, or none that opens, the Start window
-//! shows. `tauri.conf.json` declares no window, so Tauri opens nothing by
-//! itself.
+//! window closes (Storage ST-131). Each directory named on the command line
+//! opens at once, and with none named, or none that opens, the Start window
+//! shows ([`crate::open_folder`]). `tauri.conf.json` declares no window, so
+//! Tauri opens nothing by itself.
 
 use std::ffi::OsString;
 use std::path::PathBuf;
 
 use crate::menu::Platform;
 
-/// What to open on starting.
-#[derive(Debug, PartialEq, Eq)]
-pub enum Launch {
-    /// No directory was named: show the Start window.
-    Start,
-    /// Open each of these directories, and show the Start window only if
-    /// none of them opens.
-    Folders(Vec<PathBuf>),
-}
-
-/// Where a folder that did not open was asked for, which decides what comes
-/// after it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Opening {
-    /// Named on the command line.
-    CommandLine,
-    /// From the Start window's Open Folder… or a recent Space.
-    StartWindow,
-    /// From File › Open….
-    Menu,
-}
-
-/// What comes after a folder that did not open.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Next {
-    /// Show the Start window: nothing else is open.
-    ShowStart,
-    /// Leave the windows as they are, having said why the folder did not open.
-    Stay,
-}
-
-/// What comes after a folder asked for from `opening` that did not open,
-/// while `any_aggregate` (one open, starting or closing). Only a launch can
-/// be left with no window, so only a launch shows the Start window.
+/// The folders a launch names, given the arguments after the program's
+/// name; with none, the Start window shows ([`crate::open_folder::open`]).
 #[must_use]
-pub fn after(opening: Opening, any_aggregate: bool) -> Next {
-    match (opening, any_aggregate) {
-        (Opening::CommandLine, false) => Next::ShowStart,
-        (Opening::CommandLine, true) | (Opening::StartWindow | Opening::Menu, _) => Next::Stay,
-    }
-}
-
-/// How a folder that opened came to: its window shows, or another request
-/// is still starting it and opens its window when it has.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Opened {
-    /// Its Space window shows: opened now, or already open and focused.
-    Shown,
-    /// Another request (a File › Open… of the same folder, say) is still
-    /// starting it, so no window shows yet, and that start may yet fail.
-    Starting,
-}
-
-/// Whether the Start window closes once a folder asked for from `opening`
-/// has `opened`. It closes when a Space window opens from it (ST-131); a
-/// folder another request is still starting has no window yet, and leaves
-/// the Start window showing, so a start that fails leaves the person a
-/// window to go on from.
-#[must_use]
-pub fn closes_start(opening: Opening, opened: Opened) -> bool {
-    opening == Opening::StartWindow && opened == Opened::Shown
-}
-
-/// What to open, given the arguments after the program's name.
-#[must_use]
-pub fn launch(arguments: impl IntoIterator<Item = OsString>) -> Launch {
-    let folders: Vec<PathBuf> = arguments.into_iter().map(PathBuf::from).collect();
-    if folders.is_empty() {
-        Launch::Start
-    } else {
-        Launch::Folders(folders)
-    }
+pub fn launch(arguments: impl IntoIterator<Item = OsString>) -> Vec<PathBuf> {
+    arguments.into_iter().map(PathBuf::from).collect()
 }
 
 /// What the application does when its last window, a Space window or the
@@ -121,80 +54,12 @@ pub fn activating_shows_start(any_window_showing: bool) -> bool {
 mod tests {
     use super::*;
 
-    mod given_a_launch {
-        use super::*;
-
-        #[test]
-        fn shows_the_start_window_when_no_folder_is_named() {
-            assert_eq!(launch(Vec::new()), Launch::Start);
-        }
-
-        #[test]
-        fn opens_each_named_directory() {
-            assert_eq!(
-                launch([OsString::from("/a"), OsString::from("b")]),
-                Launch::Folders(vec![PathBuf::from("/a"), PathBuf::from("b")]),
-            );
-        }
-    }
-
-    mod given_a_folder_that_opened {
-        use super::*;
-
-        #[test]
-        fn the_start_window_closes_once_a_space_window_shows_from_it() {
-            assert!(closes_start(Opening::StartWindow, Opened::Shown));
-        }
-
-        #[test]
-        fn the_start_window_stays_while_another_request_still_starts_the_folder() {
-            assert!(!closes_start(Opening::StartWindow, Opened::Starting));
-        }
-
-        #[test]
-        fn a_folder_from_elsewhere_leaves_the_start_window_as_it_is() {
-            for opening in [Opening::CommandLine, Opening::Menu] {
-                for opened in [Opened::Shown, Opened::Starting] {
-                    assert!(!closes_start(opening, opened), "{opening:?} {opened:?}");
-                }
-            }
-        }
-    }
-
-    mod given_a_folder_that_did_not_open {
-        use super::*;
-
-        #[test]
-        fn a_folder_named_at_launch_with_nothing_open_shows_the_start_window() {
-            assert_eq!(after(Opening::CommandLine, false), Next::ShowStart);
-        }
-
-        #[test]
-        fn a_folder_named_at_launch_leaves_a_space_that_did_open() {
-            assert_eq!(after(Opening::CommandLine, true), Next::Stay);
-        }
-
-        #[test]
-        fn a_folder_from_the_start_window_leaves_it_showing() {
-            for any_aggregate in [false, true] {
-                assert_eq!(
-                    after(Opening::StartWindow, any_aggregate),
-                    Next::Stay,
-                    "any Aggregate {any_aggregate}"
-                );
-            }
-        }
-
-        #[test]
-        fn a_folder_from_the_menu_changes_nothing_else() {
-            for any_aggregate in [false, true] {
-                assert_eq!(
-                    after(Opening::Menu, any_aggregate),
-                    Next::Stay,
-                    "any Aggregate {any_aggregate}"
-                );
-            }
-        }
+    #[test]
+    fn a_launch_opens_each_named_directory() {
+        assert_eq!(
+            launch([OsString::from("/a"), OsString::from("b")]),
+            vec![PathBuf::from("/a"), PathBuf::from("b")],
+        );
     }
 
     mod given_the_last_window_closed {

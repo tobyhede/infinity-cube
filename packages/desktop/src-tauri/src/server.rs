@@ -52,11 +52,11 @@ pub fn built_shell(
     Ok(Shell::new(page, files))
 }
 
-/// What starting an Aggregate came to.
+/// What starting an Aggregate came to, served by `S`.
 #[derive(Debug)]
-pub enum Started {
+pub enum Started<S = AggregateServer> {
     /// The Aggregate is served; open its window at [`AggregateServer::window_url`].
-    Serving(AggregateServer),
+    Serving(S),
     /// The folder is missing or holds nothing but dot-entries: there is no
     /// Space to run, and a new one can be written there.
     Empty,

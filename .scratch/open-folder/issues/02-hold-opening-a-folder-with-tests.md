@@ -1,6 +1,6 @@
 # 02 — Hold opening a folder with tests at its interface
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 **Blocked by:** 01.
 
@@ -19,3 +19,5 @@
 - [ ] The table tests of `after` and `closes_start` are gone, their cases (ST-131 among them) held by the tests above.
 
 ## Comments
+
+- 2026-11-27: built in `open_folder/tests.rs`, 16 tests. Each of these changes to `open_folder.rs` fails at least one of them: closing the Start window for any open from it, not showing it for a launch naming no folder, not refusing a folder still writing, and not stopping a server whose window failed. The case 'the Registry refusing `opened` stops the server silently' is `given_a_quit::begun_while_a_folder_starts_its_server_is_stopped_and_nothing_is_said`, since a quit is the only way the Registry refuses it.

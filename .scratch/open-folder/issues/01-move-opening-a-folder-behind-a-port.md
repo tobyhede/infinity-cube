@@ -1,6 +1,6 @@
 # 01 — Move opening a folder behind a port
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 **Blocked by:** none.
 
@@ -14,3 +14,5 @@
 - [ ] Existing tests pass unchanged except where a renamed item moves; `cargo clippy --workspace --all-targets --locked -- -D warnings` is clean.
 
 ## Comments
+
+- 2026-11-27: built. `open_folder.rs` holds the rules and the `Shell` port, `open_folder/tauri_shell.rs` the Tauri adapter, the folder chooser and the two calls `main.rs` and `start.rs` make. `server::Started` takes the server type as a parameter, defaulting to `AggregateServer`, so the fake starts its own. `lock` moved from `main.rs` to `open_folder.rs`. The Start window's and the launch's evidence citations in Storage ST-121 and ST-131 and the desktop skill's Open line point at the new module.
