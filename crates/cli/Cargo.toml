@@ -25,7 +25,9 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
 
 [dev-dependencies]
-sqlx = { workspace = true, features = ["migrate", "runtime-tokio", "sqlite-bundled"] }
+sqlx = { workspace = true, features = ["migrate", "postgres", "runtime-tokio", "sqlite-bundled"] }
+tokio = { workspace = true, features = ["io-util", "macros", "net", "rt"] }
+url = { workspace = true }
 tempfile = { workspace = true }
 
 [lints]

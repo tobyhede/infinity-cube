@@ -13,6 +13,8 @@
 //! - `serve --store sqlite [--port <port>] [--built <dir>]` serves the
 //!   migrated SQLite file `SQLITE_PATH` names on `127.0.0.1`, announcing
 //!   itself as `run` does; it Imports, Exports and migrates nothing.
+//!   `serve --store postgres` serves the migrated PostgreSQL database
+//!   `DATABASE_URL` names alike.
 //!
 //! - `version` names the version and the commit the binary was built from.
 //!
