@@ -1,31 +1,43 @@
-//! `serve --store sqlite`: serve the SQLite file `SQLITE_PATH` names, as
-//! `pnpm dev:sqlite` serves it, on `127.0.0.1` behind the listener and `Host`
+//! `serve --store <sqlite|postgres>`: serve a database, as `pnpm dev:sqlite`
+//! and `pnpm dev` serve it, on `127.0.0.1` behind the listener and `Host`
 //! check `run` uses, announcing itself as `run` does. It runs no Import and
-//! no Export, takes no directory lock, and migrates nothing: the file is one
-//! `pnpm db:migrate:sqlite` has migrated.
+//! no Export, takes no directory lock, and migrates nothing: the database is
+//! one `pnpm db:migrate:sqlite` or `pnpm db:migrate` has migrated.
 //!
-//! `SQLITE_PATH` is refused before any port is taken, by the host's rules
-//! (Storage ST-126) and by the CLI's own: a file that does not exist is
-//! refused, naming the migration, and nothing is created there.
+//! `--store sqlite` serves the file `SQLITE_PATH` names, which is refused
+//! before any port is taken, by the host's rules (Storage ST-126) and by the
+//! CLI's own: a file that does not exist is refused, naming the migration,
+//! and nothing is created there. `--store postgres` serves the database
+//! `DATABASE_URL` names, read from the environment and then from the nearest
+//! `.env` (ADR 0177), trimmed, and refused before any port is taken when
+//! unset or blank; the URL is never written out.
 //!
 //! Start-up (ST-10) runs once the host is announced, so a store that is not
 //! answering never delays the announcement: until the Meta Space is
 //! established each request is answered as the store answers it, 503 while
-//! the file is held or the root while it is uninitialized, and each failed
-//! attempt is said on standard error. Start-up that stops on a failure no
-//! wait cures says so and leaves the host serving those answers, as the
-//! TypeScript database host does.
+//! the store is not answering or the root while it is uninitialized, and
+//! each failed attempt is said on standard error, as is start-up's success
+//! once the Meta Space is established. Start-up that stops on a
+//! failure no wait cures says so and leaves the host serving those answers,
+//! as the TypeScript database host does.
 //!
 //! The first stop signal stops accepting and lets each open connection finish
 //! the request it is answering for at most [`listener::DRAIN_BOUND`]; every
-//! commit is already in the file, so the host closes it and exits zero. Any
-//! signal after the first exits at once, one.
+//! commit is already in the store, so the host closes it and exits zero. The
+//! close waits for the operations still under way until [`STOP_BOUND`] after
+//! the first signal, which the drain shares (ADR 0177), then the host says it
+//! stopped without them and exits zero all the same. Any signal after the
+//! first exits at once, one.
 
 use std::ffi::OsStr;
 use std::process::ExitCode;
 use std::sync::Arc;
+use std::time::Duration;
 
-use host::{Application, RandomIds, SqlitePath, SqliteSpaceRepository, TokioClock};
+use host::{
+    Application, DATABASE_URL, DatabaseUrl, PostgresSpaceRepository, RandomIds, SpaceRepository,
+    SqlitePath, SqliteSpaceRepository, TokioClock,
+};
 
 use crate::arguments::{ServeCommand, Store};
 use crate::built;
@@ -59,41 +71,130 @@ fn sqlite_file(value: Option<&OsStr>) -> Result<SqlitePath, String> {
     }
 }
 
-/// Serve the store `command` names until a stop signal, answering the exit code.
-pub(crate) async fn serve(command: ServeCommand) -> ExitCode {
-    let Store::Sqlite = command.store;
-    let mut signals = match Signals::install() {
+/// The database a `serve` names, read before the runtime starts: for
+/// PostgreSQL, its URL (ADR 0177).
+pub(crate) enum Database {
+    /// The SQLite file `SQLITE_PATH` names, which `serve` reads itself.
+    Sqlite,
+    /// The PostgreSQL database this URL names.
+    Postgres(DatabaseUrl),
+}
+
+/// The database `store` names, or the exit code of its refusal. `main` calls
+/// it before it starts the runtime.
+pub(crate) fn database(store: Store) -> Result<Database, ExitCode> {
+    match store {
+        Store::Sqlite => Ok(Database::Sqlite),
+        Store::Postgres => database_url()
+            .map(Database::Postgres)
+            .map_err(|message| refuse(&message)),
+    }
+}
+
+/// `DATABASE_URL` from the environment, then the nearest `.env` at or above
+/// where the process runs, trimmed and refused when blank.
+fn database_url() -> Result<DatabaseUrl, String> {
+    let resolved = match std::env::var(DATABASE_URL) {
+        Ok(value) => DatabaseUrl::parse(Some(&value)),
+        Err(std::env::VarError::NotPresent) => {
+            // Only the `.env` fallback asks where the process runs.
+            let from = std::env::current_dir().map_err(|error| {
+                format!("Could not read the directory to look for .env from: {error}")
+            })?;
+            DatabaseUrl::resolve(None, &from)
+        }
+        Err(std::env::VarError::NotUnicode(_)) => {
+            return Err(format!("{DATABASE_URL} must be UTF-8"));
+        }
+    };
+    resolved.map_err(|error| error.to_string())
+}
+
+/// What start-up says once it has established the Meta Space.
+const ESTABLISHED: &str = "Established the Meta Space.";
+
+/// How long after the first stop signal the stop may take: the connections'
+/// drain, within its own [`listener::DRAIN_BOUND`], and then the store's
+/// close share it (ADR 0177). Closing waits for every operation under way,
+/// and an operation waiting on a database that does not answer, or on a lock
+/// another session holds, has no bound of its own; ST-120 lets such a
+/// database delay neither the announcement nor the stop.
+const STOP_BOUND: Duration = Duration::from_secs(5);
+
+/// A store `serve` can close once it has drained.
+trait Closing: SpaceRepository {
+    fn shut(&self) -> impl Future<Output = ()> + Send;
+}
+
+impl Closing for SqliteSpaceRepository {
+    fn shut(&self) -> impl Future<Output = ()> + Send {
+        self.close()
+    }
+}
+
+impl Closing for PostgresSpaceRepository {
+    fn shut(&self) -> impl Future<Output = ()> + Send {
+        self.close()
+    }
+}
+
+/// Serve `database`, which `command` names, until a stop signal, answering
+/// the exit code.
+pub(crate) async fn serve(command: ServeCommand, database: Database) -> ExitCode {
+    let signals = match Signals::install() {
         Ok(signals) => signals,
         Err(error) => return refuse(&format!("Could not take the stop signals: {error}")),
     };
-    let variable = std::env::var_os("SQLITE_PATH");
-    let path = match sqlite_file(variable.as_deref()) {
-        Ok(path) => path,
-        Err(message) => return refuse(&message),
-    };
+    match database {
+        Database::Sqlite => {
+            let variable = std::env::var_os("SQLITE_PATH");
+            let path = match sqlite_file(variable.as_deref()) {
+                Ok(path) => path,
+                Err(message) => return refuse(&message),
+            };
+            let file = path.as_path().display().to_string();
+            let store = SqliteSpaceRepository::open(&path);
+            serving(command, signals, &file, store).await
+        }
+        Database::Postgres(url) => {
+            let store = match PostgresSpaceRepository::open(&url) {
+                Ok(store) => store,
+                Err(error) => return refuse(&error.to_string()),
+            };
+            let named = format!("the PostgreSQL database {DATABASE_URL} names");
+            serving(command, signals, &named, store).await
+        }
+    }
+}
+
+/// Serve `repository`, which `named` describes, once a port is taken.
+async fn serving<R: Closing>(
+    command: ServeCommand,
+    mut signals: Signals,
+    named: &str,
+    repository: R,
+) -> ExitCode {
     let (shell, origin) = match built::load(command.built.as_deref()) {
         Ok(loaded) => loaded,
         Err(error) => return refuse(&format!("Could not serve the built application: {error}")),
     };
-    let file = path.as_path().display().to_string();
-
     let listener = match bind(command.port).await {
         Ok(listener) => listener,
         Err(error) => {
             let tried = listener::ports_tried(command.port);
-            return refuse(&format!("Could not serve {file} on {tried}: {error}"));
+            return refuse(&format!("Could not serve {named} on {tried}: {error}"));
         }
     };
     let port = match listener.local_addr() {
         Ok(address) => address.port(),
-        Err(error) => return refuse(&format!("Could not serve {file}: {error}")),
+        Err(error) => return refuse(&format!("Could not serve {named}: {error}")),
     };
     if signals.pending().await {
-        say(&format!("Stopped before serving {file}."));
+        say(&format!("Stopped before serving {named}."));
         return ExitCode::SUCCESS;
     }
 
-    let repository = Arc::new(SqliteSpaceRepository::open(&path));
+    let repository = Arc::new(repository);
     let application = Arc::new(
         Application::new(Arc::clone(&repository), RandomIds, shell)
             .on_error(|context, error| say(&format!("{context}: {error}"))),
@@ -102,7 +203,7 @@ pub(crate) async fn serve(command: ServeCommand) -> ExitCode {
     let own = own_host(port);
     built::say_if_placeholder(&origin);
     say(&format!(
-        "Serving {file} at http://{own}/\nPress Ctrl-C to stop."
+        "Serving {named} at http://{own}/\nPress Ctrl-C to stop."
     ));
 
     let establishing = {
@@ -115,25 +216,37 @@ pub(crate) async fn serve(command: ServeCommand) -> ExitCode {
                     ))
                 })
                 .await;
-            if let Err(error) = established {
-                say(&format!(
+            match established {
+                Ok(_) => say(ESTABLISHED),
+                Err(error) => say(&format!(
                     "Gave up establishing the Meta Space; restart the host once it is fixable: {error}"
-                ));
+                )),
             }
         })
     };
 
     let draining = serve_on(listener, application, own, signals.next()).await;
+    let deadline = tokio::time::Instant::now() + STOP_BOUND;
     drop(tokio::spawn(async move {
         signals.next().await;
         say("Exiting without waiting for open requests.");
         std::process::exit(1);
     }));
     establishing.abort();
-    if !draining.finish(listener::DRAIN_BOUND).await {
+    let drain =
+        listener::DRAIN_BOUND.min(deadline.saturating_duration_since(tokio::time::Instant::now()));
+    if !draining.finish(drain).await {
         say("Dropped the connections still open after waiting for them.");
     }
-    repository.close().await;
-    say(&format!("Stopped; {file} holds every edit."));
+    if tokio::time::timeout_at(deadline, repository.shut())
+        .await
+        .is_err()
+    {
+        say(&format!(
+            "Stopped without waiting for the operations still under way on {named}."
+        ));
+        return ExitCode::SUCCESS;
+    }
+    say(&format!("Stopped; {named} holds every edit."));
     ExitCode::SUCCESS
 }

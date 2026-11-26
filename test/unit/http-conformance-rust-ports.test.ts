@@ -4,9 +4,10 @@ import { describe, expect, it } from 'vitest';
 
 /*
  * The HTTP conformance cases are written once, in TypeScript, and ported by
- * hand to Rust for three adapters: the Rust host's application and run
+ * hand to Rust for four adapters: the Rust host's application and run
  * (`crates/host/tests/`), the same application over the SQLite repository
- * (`crates/host/tests/sqlite_wire.rs`) and the desktop scheme handler
+ * (`crates/host/tests/sqlite_wire.rs`), over the PostgreSQL repository
+ * (`crates/host/tests/postgres_wire.rs`) and the desktop scheme handler
  * (`packages/desktop/src-tauri/src/scheme/tests.rs`). A case every adapter runs
  * is written once, in the table `crates/http-conformance/src/cases.rs`, which
  * each adapter runs by invoking `http_conformance::cases!`; a case only one
@@ -130,6 +131,12 @@ const NO_LAUNCH_SECRET =
 const NO_DIRECTORY =
   'a process case runs a host over a `{directory}` and checks its Export; `infinity-cube serve --store sqlite` serves a store, with no directory to run or Export';
 
+const NO_POSTGRES_LAUNCH_SECRET =
+  '`serve --store postgres` takes no launch secret and keeps no session cookie: it announces as a restart-proof host does (`test/support/restart-proof-host.ts`), and the cookie is the desktop sidecar’s';
+
+const NO_POSTGRES_DIRECTORY =
+  'a process case runs a host over a `{directory}` and checks its Export; `serve --store postgres` serves a database and has neither';
+
 const PORTS: readonly Port[] = [
   {
     name: 'the Rust host',
@@ -200,6 +207,27 @@ const PORTS: readonly Port[] = [
       'initializes the Space again on a second run over the directory the first run left unchanged (ST-65)':
         NO_DIRECTORY,
       'writes the initialization with the next Edit (ST-65)': NO_DIRECTORY,
+    },
+  },
+  {
+    name: 'the Rust host over the PostgreSQL repository',
+    files: ['crates/host/tests/postgres_wire.rs', 'crates/cli/tests/serve_postgres.rs'],
+    exempt: {
+      'answers 403 to a request without the session cookie, and to a wrong launch secret':
+        NO_POSTGRES_LAUNCH_SECRET,
+      'trades the launch secret for an HttpOnly, SameSite=Strict session cookie by a redirect':
+        NO_POSTGRES_LAUNCH_SECRET,
+      'refuses a missing directory, announcing why and exiting non-zero': NO_POSTGRES_DIRECTORY,
+      'writes an edit once edits have been quiet, and keeps it on SIGINT': NO_POSTGRES_DIRECTORY,
+      'writes an edit not yet written when stopped by SIGINT, and exits zero':
+        NO_POSTGRES_DIRECTORY,
+      'writes an edit not yet written when its standard input closes, and exits zero':
+        NO_POSTGRES_DIRECTORY,
+      'leaves the directory byte for byte unchanged when opening a Space initializes it (ST-65)':
+        NO_POSTGRES_DIRECTORY,
+      'initializes the Space again on a second run over the directory the first run left unchanged (ST-65)':
+        NO_POSTGRES_DIRECTORY,
+      'writes the initialization with the next Edit (ST-65)': NO_POSTGRES_DIRECTORY,
     },
   },
 ];

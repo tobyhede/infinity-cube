@@ -141,6 +141,37 @@ impl Started {
         self.child.try_wait().unwrap().is_none()
     }
 
+    /// Read standard error until a line is `wanted`, failing after
+    /// [`PATIENCE`], answering every line read. Standard error is consumed,
+    /// so [`stderr`](Self::stderr) answers nothing afterwards.
+    pub fn wait_for_stderr_line(&mut self, wanted: &str) -> String {
+        let stderr = self.child.stderr.take().expect("standard error is unread");
+        let (sender, lines) = mpsc::channel();
+        std::thread::spawn(move || {
+            for line in BufReader::new(stderr).lines() {
+                let Ok(line) = line else { break };
+                if sender.send(line).is_err() {
+                    break;
+                }
+            }
+        });
+        let deadline = Instant::now() + PATIENCE;
+        let mut read = String::new();
+        loop {
+            let left = deadline.saturating_duration_since(Instant::now());
+            match lines.recv_timeout(left) {
+                Ok(line) => {
+                    read.push_str(&line);
+                    read.push('\n');
+                    if line == wanted {
+                        return read;
+                    }
+                }
+                Err(_) => panic!("standard error never said {wanted:?}; it said:\n{read}"),
+            }
+        }
+    }
+
     pub fn stderr(&mut self) -> String {
         let mut text = String::new();
         if let Some(stderr) = self.child.stderr.as_mut() {

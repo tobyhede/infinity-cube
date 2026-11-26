@@ -19,14 +19,16 @@ pub(crate) enum Command {
     Serve(ServeCommand),
 }
 
-/// The store `serve --store` names. PostgreSQL is not yet one (rust-host 16).
+/// The store `serve --store` names.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Store {
     /// The SQLite file `SQLITE_PATH` names.
     Sqlite,
+    /// The PostgreSQL database `DATABASE_URL` names.
+    Postgres,
 }
 
-/// `serve --store sqlite [--port <port>] [--built <dir>]`.
+/// `serve --store <sqlite|postgres> [--port <port>] [--built <dir>]`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ServeCommand {
     pub(crate) store: Store,
@@ -69,6 +71,8 @@ Usage: infinity-cube <verb> [arguments]
       Import an Aggregate directory as run does, serving and writing nothing
   serve --store sqlite [--port <port>] [--built <dir>]
       Serve the migrated SQLite file SQLITE_PATH names
+  serve --store postgres [--port <port>] [--built <dir>]
+      Serve the migrated PostgreSQL database DATABASE_URL names
   version
       Show the version and the commit this build was made from
   help
@@ -170,6 +174,7 @@ fn serve(args: &[OsString]) -> Option<ServeCommand> {
                 }
                 store = match rest.next()?.to_str()? {
                     "sqlite" => Some(Store::Sqlite),
+                    "postgres" => Some(Store::Postgres),
                     _ => return None,
                 };
             }
@@ -357,6 +362,18 @@ mod tests {
         }
 
         #[test]
+        fn reads_the_postgres_store() {
+            assert_eq!(
+                parsed(&["serve", "--port", "5300", "--store", "postgres"]),
+                Some(Command::Serve(ServeCommand {
+                    store: Store::Postgres,
+                    port: Some(5300),
+                    built: None,
+                })),
+            );
+        }
+
+        #[test]
         fn reads_every_option_in_any_order() {
             assert_eq!(
                 parsed(&[
@@ -376,8 +393,8 @@ mod tests {
             for args in [
                 &["serve"][..],
                 &["serve", "--store"],
-                &["serve", "--store", "postgres"],
                 &["serve", "--store", "memory"],
+                &["serve", "--store", "sqlite", "--store", "postgres"],
                 &["serve", "--store", "sqlite", "--store", "sqlite"],
                 &["serve", "--store", "sqlite", "space"],
                 &["serve", "--store", "sqlite", "--port", "0"],

@@ -497,6 +497,22 @@ pub(crate) fn resource(json: &JsonValue, envelope: Envelope) -> Result<Resource,
 }
 
 /// A Resource's id (in the file envelope only), Title, kind and content.
+/// A Resource's own id: a UUID written in lower case (ADR 0180), as
+/// `resourceIdSchema` reads it. A reference to a Resource is any UUID; one
+/// spelled in upper case names no Resource. The case is asked only of a UUID,
+/// so a value that is not one meets the one refusal it met before.
+fn resource_id<'a>(checker: &mut Checker<'a>, value: Option<&'a JsonValue>) -> Parsed<ResourceId> {
+    match checker.uuid(value, ResourceId::parse) {
+        Parsed::Valid(id) if !id.uuid().is_lower_case() => {
+            checker.issue(ShapeProblem::Custom(
+                "A Resource id must be written in lower case",
+            ));
+            Parsed::Dirty
+        }
+        parsed => parsed,
+    }
+}
+
 type ResourceBody = (Option<ResourceId>, String, Kind, JsonValue);
 
 fn resource_with<'a>(
@@ -513,7 +529,7 @@ fn resource_with<'a>(
         let id = match envelope {
             Envelope::File => {
                 let value = object.get("id");
-                let parsed = checker.key("id", |c| c.uuid(value, ResourceId::parse));
+                let parsed = checker.key("id", |c| resource_id(c, value));
                 object.take(parsed).map(Some)
             }
             Envelope::Document => Some(None),
@@ -594,7 +610,7 @@ fn space_snapshot_with<'a>(
                 return Parsed::Aborted;
             };
             let id = entry.get("id");
-            let parsed = c.key("id", |c| c.uuid(id, ResourceId::parse));
+            let parsed = c.key("id", |c| resource_id(c, id));
             let id = entry.take(parsed);
             let body = entry.get("document");
             let parsed = c.key("document", |c| match body {

@@ -179,7 +179,8 @@ jobs:
     needs: reuse-pr-ci
     if: ${{ !cancelled() && needs.reuse-pr-ci.outputs.should_skip != 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # A cold cache compiles the Rust CLI before its restart proof.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
@@ -236,6 +237,33 @@ jobs:
         run: pnpm exec playwright install chromium
 
       - name: Prove a PostgreSQL edit survives a fresh host
+        run: pnpm e2e:postgres
+
+      # The same proof again, its two hosts now the Rust CLI's
+      # `serve --store postgres` over the database the steps above migrated
+      # with Prisma Next, so it also proves the Rust host serves that database
+      # with no migration of its own. The proof clears the database's content
+      # before it seeds, so it needs no reset between the two runs. Built and
+      # cached as the `sqlite` job builds it, under a key of its own.
+      - name: Install the pinned Rust toolchain
+        run: rustup toolchain install
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: cargo-${{ runner.os }}-postgres-cli-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-postgres-cli-${{ hashFiles('rust-toolchain.toml') }}-
+      - name: Build the browser application and the Rust CLI
+        run: |
+          pnpm --filter @project/app exec vite build
+          cargo build -p infinity-cube --locked
+
+      - name: Prove a PostgreSQL edit survives a fresh Rust host
+        env:
+          INFINITY_CUBE_RESTART_PROOF_HOST: '{"name":"Rust CLI","argv":["target/debug/infinity-cube","serve","--store","postgres","--port","{port}","--built","packages/app/dist"]}'
         run: pnpm e2e:postgres
 
       # Its own artifact name, for the reason the `e2e` job below records:
@@ -728,11 +756,21 @@ jobs:
             echo "POSTGRES_PASSWORD=$password"
             echo "POSTGRES_PORT=55432"
             echo "INFINITY_CUBE_MIGRATIONS_DATABASE_URL=$database_url"
+            echo "INFINITY_CUBE_POSTGRES_TEST_URL=$database_url"
           } >> "$GITHUB_ENV"
       - name: Start PostgreSQL
         run: pnpm postgres:up
       - name: Shared migrations produce the schema Prisma Next produces
         run: cargo nextest run -p host --test shared_migrations --run-ignored only --locked
+      # The PostgreSQL store's tests (ADR 0177), ignored by the run above
+      # because they need a server: every ignored test of a `postgres*` test
+      # binary, each on a database of its own cloned from a template the
+      # tests migrate, and of `serve_postgres`, which drives
+      # `infinity-cube serve --store postgres` as a process. Their support
+      # panics without the server variable, and `--no-tests=fail` fails the
+      # step if the filter finds none.
+      - name: The PostgreSQL store's tests
+        run: cargo nextest run --workspace --exclude infinity-cube-desktop --run-ignored only --no-tests=fail -E 'binary(/^postgres/) | binary(=serve_postgres)' --locked
       - name: Stop PostgreSQL
         if: always() && steps.postgres-env.outcome == 'success'
         run: pnpm postgres:down
@@ -804,9 +842,31 @@ jobs:
           command -v cargo-nextest || cargo install cargo-nextest --locked --version "$NEXTEST_VERSION"
           command -v cargo-llvm-cov || cargo install cargo-llvm-cov --locked --version "$CARGO_LLVM_COV_VERSION"
           command -v cargo-crap || cargo install cargo-crap --locked --version "$CARGO_CRAP_VERSION"
+      # The PostgreSQL store's tests run under coverage too, or the store
+      # would score as uncovered: PostgreSQL started as the `rust` job starts
+      # it.
+      - name: Configure ephemeral PostgreSQL
+        id: postgres-env
+        run: |
+          password="$(openssl rand -hex 32)"
+          database_url="postgresql://infinity_cube_ci:${password}@127.0.0.1:55432/infinity_cube_ci"
+          echo "::add-mask::$password"
+          echo "::add-mask::$database_url"
+          {
+            echo "POSTGRES_DB=infinity_cube_ci"
+            echo "POSTGRES_USER=infinity_cube_ci"
+            echo "POSTGRES_PASSWORD=$password"
+            echo "POSTGRES_PORT=55432"
+            echo "INFINITY_CUBE_POSTGRES_TEST_URL=$database_url"
+          } >> "$GITHUB_ENV"
+      - name: Start PostgreSQL
+        run: pnpm postgres:up
       - id: rust-coverage
         name: Run the crates' tests under coverage
-        run: pnpm crap:rust:coverage
+        run: pnpm crap:rust:coverage:postgres
+      - name: Stop PostgreSQL
+        if: always() && steps.postgres-env.outcome == 'success'
+        run: pnpm postgres:down
       - name: CRAP gate (Rust)
         run: pnpm crap:rust:report --fail-above --format github
       # The summary is written whether or not the gate passed, so a failing

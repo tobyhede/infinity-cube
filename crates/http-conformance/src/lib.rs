@@ -50,6 +50,14 @@ pub trait Adapter: Sized {
     /// handler's name none.
     fn own_address(&self) -> Vec<(&'static str, String)>;
 
+    /// The order the host's store holds an object's keys in, given the order
+    /// a commit wrote them: as written, unless the store orders them itself,
+    /// as PostgreSQL's `jsonb` does.
+    #[must_use]
+    fn stored_key_order(written: Vec<String>) -> Vec<String> {
+        written
+    }
+
     /// Stop the host once a case has passed.
     fn close(self) -> impl Future<Output = ()>;
 }
@@ -119,11 +127,12 @@ impl IdSource for Counted {
 
 /// One test per case of [`cases`], in a module `conformance`, each opening a
 /// fresh `$adapter` (an [`Adapter`] named as the invoking module names it),
-/// running the case and closing it.
+/// running the case and closing it. Attributes after the adapter, such as
+/// `#[ignore = "…"]` for an adapter that needs a server, go on every test.
 #[macro_export]
 macro_rules! cases {
-    ($adapter:ty) => {
-        $crate::__cases! { $adapter;
+    ($adapter:ty $(, #[$attribute:meta])* $(,)?) => {
+        $crate::__cases! { $adapter; [$(#[$attribute])*];
             // table:begin
             given_a_space_api_request {
                 lists_every_space_of_the_directory_with_its_title,
@@ -196,7 +205,7 @@ macro_rules! cases {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __cases {
-    ($adapter:ty; $($group:ident { $($case:ident),* $(,)? })*) => {
+    ($adapter:ty; $attributes:tt; $($group:ident { $($case:ident),* $(,)? })*) => {
         mod conformance {
             #[allow(unused_imports, reason = "the adapter may be named by a path")]
             use super::*;
@@ -206,15 +215,24 @@ macro_rules! __cases {
             $(
                 mod $group {
                     $(
-                        #[tokio::test]
-                        async fn $case() {
-                            let subject = <super::Subject as $crate::Adapter>::open().await;
-                            $crate::cases::$group::$case(&subject).await;
-                            <super::Subject as $crate::Adapter>::close(subject).await;
-                        }
+                        $crate::__case! { $attributes $group $case }
                     )*
                 }
             )*
+        }
+    };
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __case {
+    ([$(#[$attribute:meta])*] $group:ident $case:ident) => {
+        #[tokio::test]
+        $(#[$attribute])*
+        async fn $case() {
+            let subject = <super::Subject as $crate::Adapter>::open().await;
+            $crate::cases::$group::$case(&subject).await;
+            <super::Subject as $crate::Adapter>::close(subject).await;
         }
     };
 }

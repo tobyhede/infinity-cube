@@ -33,6 +33,21 @@ export { newUuid, uuidSchema } from './uuid';
 
 const idSchema = uuidSchema;
 
+/** The refusal a Resource id written with an upper-case letter meets (ADR 0180). */
+const RESOURCE_ID_LOWER_CASE = 'A Resource id must be written in lower case';
+
+/**
+ * A Resource's own id: a UUID written in lower case (ADR 0180). Only where a
+ * Resource is named, in its file, its snapshot entry and the Resource itself; a
+ * reference to one is any UUID, and one spelled in upper case names no
+ * Resource. The case is asked only of a UUID, so a value that is not one meets
+ * the one refusal it met before.
+ */
+const resourceIdSchema = uuidSchema.refine(
+  (id) => !uuidSchema.safeParse(id).success || id === id.toLowerCase(),
+  RESOURCE_ID_LOWER_CASE,
+);
+
 /**
  * A Resource's Title: one or more Title Lines, normalized here (ADR 0083).
  *
@@ -142,7 +157,12 @@ const enveloped = <Envelope extends object>(
 
 /** A Resource: the envelope, and the content its kind's module parses. */
 export const resourceSchema: z.ZodType<Resource, z.ZodTypeDef, unknown> = enveloped(
-  z.object({ id: idSchema, title: resourceTitleSchema, kind: z.string(), content: z.unknown() }),
+  z.object({
+    id: resourceIdSchema,
+    title: resourceTitleSchema,
+    kind: z.string(),
+    content: z.unknown(),
+  }),
 );
 
 /**
@@ -155,7 +175,12 @@ export const resourceSchema: z.ZodType<Resource, z.ZodTypeDef, unknown> = envelo
  */
 export const resourceFileSchema: z.ZodType<ResourceFileDocument, z.ZodTypeDef, unknown> = enveloped(
   z
-    .object({ id: idSchema, title: resourceTitleSchema, kind: z.string(), content: z.unknown() })
+    .object({
+      id: resourceIdSchema,
+      title: resourceTitleSchema,
+      kind: z.string(),
+      content: z.unknown(),
+    })
     .strict(),
 );
 
@@ -436,7 +461,7 @@ export const resourceDocumentSchema: z.ZodType<ResourceDocument, z.ZodTypeDef, u
 export const spaceSnapshotSchema = z.object({
   id: uuidSchema,
   document: spaceDocumentSchema,
-  resources: z.array(z.object({ id: uuidSchema, document: resourceDocumentSchema })),
+  resources: z.array(z.object({ id: resourceIdSchema, document: resourceDocumentSchema })),
 });
 
 /**

@@ -321,11 +321,12 @@ pub mod given_a_commit {
         );
         let committed = post_commit(subject, body.clone(), "application/json").await;
         assert_eq!(committed.status(), 200, "committed: {:?}", committed.body());
+        let order = A::stored_key_order(order);
         let answered = text_of(&get(subject, &format!("/api/spaces/{META}")).await);
         assert_eq!(
             first_map_positions(answered.as_object().unwrap().get("snapshot").unwrap()),
             order,
-            "the positions in the order the commit wrote them"
+            "the positions in the order the commit wrote them, as the store holds them"
         );
         let stale = post_commit(subject, body, "application/json").await;
         assert_eq!(stale.status(), 409, "a conflict");

@@ -8,10 +8,12 @@ import {
 import { hostCommandOf, hostCommandSchema } from '../../conformance/http/node-host';
 
 /**
- * Which host the SQLite restart proof (`test/e2e/sqlite-persistence.spec.ts`)
- * starts, twice in sequence, against the file `SQLITE_PATH` names: the Vite
- * host by default, or a host process started by command, so the same proof
- * runs against another runtime's host unchanged.
+ * Which host a restart proof starts, twice in sequence: the SQLite proof
+ * (`test/e2e/sqlite-persistence.spec.ts`) against the file `SQLITE_PATH`
+ * names, and the PostgreSQL proof (`test/e2e/postgres-persistence.spec.ts`)
+ * against the database `DATABASE_URL` names. The Vite host by default, or a
+ * host process started by command, so the same proof runs against another
+ * runtime's host unchanged.
  */
 
 /**
@@ -19,7 +21,7 @@ import { hostCommandOf, hostCommandSchema } from '../../conformance/http/node-ho
  * `{ "name", "argv", "cwd"?, "env"? }`. `argv` is the program and its
  * arguments, in which `{port}` is replaced with a free loopback port; `env`
  * sets variables over the proof's own environment, which the host otherwise
- * inherits (`SQLITE_PATH` among them). The host announces itself on standard
+ * inherits (`SQLITE_PATH` or `DATABASE_URL` among them). The host announces itself on standard
  * output as the HTTP conformance suite's hosts do
  * (`conformance/http/README.md`), with no launch secret, and stops on SIGINT,
  * exiting zero.
@@ -63,7 +65,7 @@ export interface StartedRestartProofHost {
   readonly baseURL: string;
   /**
    * Stop the host and answer once its process is gone, so nothing holds the
-   * SQLite file when the proof opens it next. Fails when the host exits
+   * store when the proof opens it next. Fails when the host exits
    * non-zero, or has to be killed.
    */
   readonly stop: () => Promise<void>;
@@ -123,3 +125,20 @@ export const startCommandHost = async (
   };
   return { baseURL: host.origin, stop };
 };
+
+/**
+ * Start the host `host` names: `startVite` for the Vite host, and otherwise
+ * the command, handing `onSpawn` its kill. Both restart proofs start their
+ * hosts through this, so neither can start Vite when a command is named.
+ */
+export const startRestartProofHost = (
+  host: RestartProofHost,
+  {
+    startVite,
+    onSpawn,
+  }: {
+    readonly startVite: () => Promise<StartedRestartProofHost>;
+    readonly onSpawn: (kill: () => void) => void;
+  },
+): Promise<StartedRestartProofHost> =>
+  host.kind === 'vite' ? startVite() : startCommandHost(host.command, { onSpawn });

@@ -13,3 +13,7 @@
 - [ ] Each looped name (`repository-contract.ts:530`, `:889`, `:2444`) is one case per value.
 
 **Named mutants (on SQLite, each killed by a table case; the PR records which):** aggregate write path replaced by `abort()`; the Space row not deleted on the aggregate path; `delete_resources_except` a no-op; the expected revision ignored on the aggregate path; the revision not advanced on the aggregate path; deletes interleaved with writes (#528's m05a); `clear` leaves Space rows; `exported_revision` dropped when a row is rewritten.
+
+## Comments
+
+**2026-11-26.** Built on PR #540 as #528's 04, 05, 06 and 12, written in this ticket's table shape by agreement with that PR's thread (01's Comments). This plan's 03 and 06 build on the table once #540 merges; this ticket resolves when it does, after checking each box and named mutant against what landed.

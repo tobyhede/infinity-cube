@@ -46,6 +46,7 @@
     "crap:ts": "tsx scripts/crap.ts",
     "crap:rust": "pnpm crap:rust:coverage && pnpm crap:rust:report --fail-above",
     "crap:rust:coverage": "cargo llvm-cov nextest -p intake -p host -p http-conformance -p infinity-cube --locked --lcov --output-path target/rust-lcov.info",
+    "crap:rust:coverage:postgres": "cargo llvm-cov nextest -p intake -p host -p http-conformance -p infinity-cube --locked --run-ignored all -E 'not binary(=shared_migrations)' --lcov --output-path target/rust-lcov.info",
     "crap:rust:report": "cargo crap -p intake -p host -p infinity-cube --lcov target/rust-lcov.info",
     "mutate:session": "stryker run --mutate packages/persistence/src/session.ts --testFiles packages/persistence/test/session.test.ts",
     "mutate:graph": "stryker run --mutate packages/graph/src/space.ts --testFiles packages/graph/test/space-intake.test.ts,packages/graph/test/space.test.ts,packages/graph/test/space.property.test.ts,packages/graph/test/graph.property.test.ts,packages/graph/test/space-snapshot.test.ts",

@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { expect, test, type BrowserContext } from '@playwright/test';
 import { newUuid } from '@project/core';
-import { createServer, type ViteDevServer } from 'vite';
+import { createServer } from 'vite';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import { postgresSqlStore } from '../../src/prisma/sql-store';
 import { clearInfinityCubeContent } from '../support/clear-infinity-cube-content';
@@ -13,12 +13,19 @@ import {
   openStoredSpace,
   restartProofFixture,
 } from '../support/restart-proof';
+import {
+  RESTART_PROOF_HOST_VARIABLE,
+  restartProofHostFromEnvironment,
+  startRestartProofHost,
+  type StartedRestartProofHost,
+} from '../support/restart-proof-host';
+import { runWithCleanup } from '../support/run-with-cleanup';
 import { POSTGRES_E2E_PORT } from '../../packages/app/e2e/projects';
 
 const appRoot = fileURLToPath(new URL('../../packages/app', import.meta.url));
 const configFile = fileURLToPath(new URL('../../packages/app/vite.config.ts', import.meta.url));
 
-const startHost = async (): Promise<{ server: ViteDevServer; baseURL: string }> => {
+const startViteHost = async (): Promise<StartedRestartProofHost> => {
   const server = await createServer({
     root: appRoot,
     configFile,
@@ -33,7 +40,7 @@ const startHost = async (): Promise<{ server: ViteDevServer; baseURL: string }> 
     await server.listen();
     const baseURL = server.resolvedUrls?.local[0];
     if (baseURL === undefined) throw new Error('Vite did not publish a loopback URL');
-    return { server, baseURL };
+    return { baseURL, stop: () => server.close() };
   } catch (error) {
     // The caller only learns of a server it can close on success, so a failure
     // between here and the return would strand one holding the fixed port —
@@ -43,7 +50,25 @@ const startHost = async (): Promise<{ server: ViteDevServer; baseURL: string }> 
   }
 };
 
-test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) => {
+// The Vite host unless `INFINITY_CUBE_RESTART_PROOF_HOST` names a command
+// (`test/support/restart-proof-host.ts`), so the same proof runs against
+// another runtime's host over the same database, as the SQLite proof does.
+const host = restartProofHostFromEnvironment(process.env[RESTART_PROOF_HOST_VARIABLE]);
+
+// Every host process this test has spawned, killed after it however it ended,
+// for the reason `sqlite-persistence.spec.ts` gives.
+const spawnedHosts: (() => void)[] = [];
+test.afterEach(() => {
+  for (const kill of spawnedHosts.splice(0)) kill();
+});
+
+const startHost = (): Promise<StartedRestartProofHost> =>
+  startRestartProofHost(host, {
+    startVite: startViteHost,
+    onSpawn: (kill) => spawnedHosts.push(kill),
+  });
+
+test('a PostgreSQL-backed edit survives a fresh host', async ({ browser }) => {
   // The same handle `clearInfinityCubeContent` holds, not a second one beside it.
   // That module opens its client at import, so a client of this spec's own
   // would leave that one live after the `finally` below closed only its own —
@@ -55,13 +80,13 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
   const mapId = newUuid();
   const graphId = newUuid();
   const title = `HTTP restart ${spaceId}`;
-  let firstHost: ViteDevServer | undefined;
-  let secondHost: ViteDevServer | undefined;
+  let firstHost: StartedRestartProofHost | undefined;
+  let secondHost: StartedRestartProofHost | undefined;
   let firstContext: BrowserContext | undefined;
   let secondContext: BrowserContext | undefined;
   let spaceRemains: boolean | undefined;
 
-  try {
+  const proof = async (): Promise<void> => {
     // Before the fixture, not only after it. `initializeAggregate` establishes
     // first state and leaves an initialized repository exactly as it is (ADR
     // 0078), so on a developer's database that already holds a Meta Space it
@@ -95,7 +120,7 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
     }
 
     const first = await startHost();
-    firstHost = first.server;
+    firstHost = first;
     const openedFirst = await openStoredSpace(browser, first.baseURL, spaceId, title);
     firstContext = openedFirst.context;
     const durablePosition = await dragResourceAndCapturePosition(
@@ -108,14 +133,17 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
 
     await firstContext.close();
     firstContext = undefined;
-    await firstHost.close();
+    // Cleared before it is stopped, so a stop that fails is not tried again
+    // below on a host that has already exited. A host started by command has
+    // exited, its process gone, before `stop` answers.
     firstHost = undefined;
+    await first.stop();
 
     const stored = await repository.loadSpace(spaceId);
     expect(stored?.revision).toBe(1n);
 
     const second = await startHost();
-    secondHost = second.server;
+    secondHost = second;
     const openedSecond = await openStoredSpace(browser, second.baseURL, spaceId, title);
     secondContext = openedSecond.context;
     await expectResourceRestoredAt(openedSecond.page, 'Restart resource', durablePosition, '1');
@@ -127,35 +155,46 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
     // projected revision: `markExported` runs after the bytes land, and 1n is
     // what says it recorded the edit rather than the fixture.
     await expectRestartProofExport(repository, fixture);
-  } finally {
-    await secondContext?.close();
-    await firstContext?.close();
-    await secondHost?.close();
-    await firstHost?.close();
-    // Cleanup records what it observed rather than asserting it. An assertion
-    // here throws over whatever failure sent us into this block, and would also
-    // strand the connection below unclosed.
-    try {
-      // Not a per-Space delete, because this Space *is* the Meta Space: the
-      // fixture above names it as the root of the aggregate it establishes.
-      // `repository_state_meta_space_id_fkey` is `Restrict`, so deleting the
-      // Space row while repository state still names it fails — which the
-      // integration suite asserts on purpose, in *prevents direct deletion of
-      // the Meta Space while repository state names it*.
-      //
-      // The reset runs before the fixture as well as after it, so this Space
-      // is Meta on every machine and there is no second branch to fall into.
-      //
-      // `clearInfinityCubeContent` drops the repository-state row first, which is what
-      // releases the key, and it is the same reset the integration suite runs.
-      // Safe here for the reason it is safe there: `workers: 1` and one test, so
-      // nothing else holds this `DATABASE_URL`.
-      await clearInfinityCubeContent();
-      spaceRemains = (await repository.loadSpace(spaceId)) !== undefined;
-    } finally {
-      await postgresTestDatabase.close();
-    }
-  }
+  };
+
+  // Every step runs whatever failed before it, and the failure reported is the
+  // proof's own or else the first step's (`test/support/run-with-cleanup.ts`).
+  await runWithCleanup(proof, [
+    async () => {
+      await secondContext?.close();
+    },
+    async () => {
+      await firstContext?.close();
+    },
+    async () => {
+      await secondHost?.stop();
+    },
+    async () => {
+      await firstHost?.stop();
+    },
+    // Cleanup records what it observed rather than asserting it, so it
+    // neither hides the proof's own failure nor strands the connection below.
+    //
+    // Not a per-Space delete, because this Space *is* the Meta Space: the
+    // fixture above names it as the root of the aggregate it establishes.
+    // `repository_state_meta_space_id_fkey` is `Restrict`, so deleting the
+    // Space row while repository state still names it fails — which the
+    // integration suite asserts on purpose, in *prevents direct deletion of
+    // the Meta Space while repository state names it*.
+    //
+    // `clearInfinityCubeContent` drops the repository-state row first, which
+    // is what releases the key, and it is the same reset the integration suite
+    // runs. Safe here for the reason it is safe there: `workers: 1` and one
+    // test, so nothing else holds this `DATABASE_URL`.
+    async () => {
+      try {
+        await clearInfinityCubeContent();
+        spaceRemains = (await repository.loadSpace(spaceId)) !== undefined;
+      } finally {
+        await postgresTestDatabase.close();
+      }
+    },
+  ]);
 
   expect(spaceRemains).toBe(false);
 });

@@ -40,7 +40,11 @@ const RUST_FILES = [
   ),
   ...filesUnder('crates/host/tests/repository_contract', (name) => name.endsWith('.rs')),
   'crates/host/tests/startup.rs',
-  ...filesUnder('crates/host/src', (name) => name.endsWith('.rs')),
+  // The PostgreSQL store's own tests port the TypeScript PostgreSQL files,
+  // which this test does not read; rust-postgresql-store 03 holds them.
+  ...filesUnder('crates/host/src', (name) => name.endsWith('.rs')).filter(
+    (file) => !file.includes('/sql/postgres/'),
+  ),
   'crates/cli/tests/serve.rs',
 ];
 

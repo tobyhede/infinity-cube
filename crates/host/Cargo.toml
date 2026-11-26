@@ -7,6 +7,12 @@ rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[features]
+# Test instrumentation: a probe each SQL repository operation waits on at its
+# named steps. Off by default; only `host`'s own tests turn it on, through the
+# dev-dependency on itself below.
+test-support = []
+
 [dependencies]
 bytes = { workspace = true }
 http = { workspace = true }
@@ -19,21 +25,23 @@ intake = { workspace = true }
 # so their versions move together and one bundled SQLite is compiled.
 rusqlite = { version = "0.43", default-features = false, features = ["bundled"] }
 sha2 = { workspace = true }
-sqlx = { workspace = true, features = ["runtime-tokio", "sqlite-bundled"] }
+sqlx = { workspace = true, features = ["postgres", "runtime-tokio", "sqlite-bundled", "tls-rustls-ring-native-roots"] }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["fs", "io-util", "macros", "rt", "sync", "time"] }
+url = { workspace = true }
 uuid = { version = "1", features = ["v4"] }
 
 [target.'cfg(unix)'.dependencies]
 rustix = { version = "1", features = ["fs"] }
 
 [dev-dependencies]
+host = { path = ".", features = ["test-support"] }
 http-conformance = { workspace = true }
 proptest = "1"
 serde_json = { workspace = true }
 sqlx = { workspace = true, features = ["migrate", "postgres", "runtime-tokio", "sqlite-bundled"] }
 tempfile = { workspace = true }
-tokio = { workspace = true, features = ["fs", "macros", "rt", "rt-multi-thread", "sync", "test-util", "time"] }
+tokio = { workspace = true, features = ["fs", "io-util", "macros", "net", "rt", "rt-multi-thread", "sync", "test-util", "time"] }
 url = { workspace = true }
 
 [lints]

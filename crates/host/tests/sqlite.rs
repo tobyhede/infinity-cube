@@ -1082,6 +1082,40 @@ mod given_a_file_that_is_not_the_database {
         );
     }
 
+    // ST-12, ADR 0094: replacement replaces stored state whatever it holds,
+    // a revision or an id that is not text included.
+    #[tokio::test]
+    async fn replaces_spaces_whose_revisions_are_not_text() {
+        for (what, statement) in [
+            (
+                "revisions stored as invalid UTF-8",
+                "UPDATE spaces SET revision = CAST(X'ff' AS TEXT)",
+            ),
+            (
+                "revisions stored as a BLOB",
+                "UPDATE spaces SET revision = CAST(revision AS BLOB)",
+            ),
+            (
+                "a Space id stored as invalid UTF-8",
+                "INSERT INTO spaces (id, document, revision, updated_at) \
+                 VALUES (CAST(X'ff' AS TEXT), '{}', '0', datetime('now'))",
+            ),
+        ] {
+            let (file, _, input) = seeded_file().await;
+            execute(&file.file, statement).await;
+            let store = open(&file.path());
+            let answer = store.replace_aggregate(input, Some(meta())).await;
+            assert!(
+                matches!(answer, Ok(ReplaceResult::Replaced(_))),
+                "{what} is replaced: {answer:?}"
+            );
+            assert!(
+                matches!(store.load_aggregate().await, Ok(AggregateLoad::Loaded(_))),
+                "and with {what} the aggregate reads again"
+            );
+        }
+    }
+
     #[tokio::test]
     async fn answers_a_directory_at_the_path_as_unclassified() {
         let directory = tempfile::tempdir().unwrap();

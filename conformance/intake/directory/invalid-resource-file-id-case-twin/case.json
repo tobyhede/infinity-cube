@@ -1,0 +1,13 @@
+{
+  "description": "Two Resources whose ids differ only in case, which a store keeping ids in a uuid column holds as one: the upper-case one is refused. Its file is not named for its id, so the two files do not collide on a file system that ignores case (ADR 0180).",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "invalid-resource-file",
+        "file": "10000000-0000-4000-8000-000000000001/resources/third.json",
+        "field": "id"
+      }
+    ]
+  }
+}
