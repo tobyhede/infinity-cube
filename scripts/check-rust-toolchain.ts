@@ -3,7 +3,7 @@
  *
  * The release is written twice: exactly as `rust-toolchain.toml`'s channel, which
  * rustup, cargo and every CI job that builds Rust read, and as `major.minor` in
- * the workspace `rust-version`, which every crate inherits. Two checks share this
+ * the root `Cargo.toml`'s inherited `rust-version`, which every crate takes. Two checks share this
  * module:
  *
  * - **Agreement** (offline, `pnpm toolchain:rust:check`, and a unit test in
@@ -12,8 +12,7 @@
  *   `.github/workflows/rust-toolchain.yml`): the pin is fewer than `STALE_AT`
  *   minor releases behind the stable release Rust's stable channel file names.
  *
- * Each file is read by a fixed pattern rather than a TOML parser, which no
- * dependency of this repository provides. A pattern that matches nothing is a
+ * Each file is read by a fixed pattern. A pattern that matches nothing is a
  * failure, never a pass, so a reshaped file cannot read as up to date.
  */
 import { readFileSync, realpathSync } from 'node:fs';
@@ -71,8 +70,12 @@ const readTableValue = (text: string, table: string, key: string): string | null
       continue;
     }
     if (!inTable) continue;
-    const entry = new RegExp(`^\\s*${key.replace(/[.-]/g, '\\$&')}\\s*=\\s*"([^"]*)"`).exec(line);
-    if (entry?.[1] !== undefined) return entry[1];
+    // A basic string ("…") or a literal one ('…'), both of which TOML allows.
+    const entry = new RegExp(
+      `^\\s*${key.replace(/[.-]/g, '\\$&')}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`,
+    ).exec(line);
+    const value = entry?.[1] ?? entry?.[2];
+    if (value !== undefined) return value;
   }
   return null;
 };
@@ -175,18 +178,30 @@ export const judgeStaleness = (inputs: {
   const gap = minorGap(pin, stable);
   if (gap >= STALE_AT) {
     return fail(
-      `The Rust pin ${format(pin)} is ${gap} minor releases behind stable ${format(stable)}; ` +
+      `The Rust pin ${format(pin)} is ${describeGap(pin, stable)} stable ${format(stable)}; ` +
         `ADR 0179 allows ${STALE_AT - 1}. Bump ${TOOLCHAIN_FILE} to ${format(stable)} and ${CARGO_FILE} rust-version to ` +
         `${stable.major}.${stable.minor}, and fix the lints it raises, as ${BUMP_STEPS} sets out.`,
     );
   }
-  const position =
-    gap === 0
-      ? 'current'
-      : gap < 0
-        ? `${-gap} minor release${gap === -1 ? '' : 's'} ahead of stable, which rustup cannot install until it is published`
-        : `${gap} minor release behind, within the ${STALE_AT - 1} ADR 0179 allows`;
-  return pass(`The Rust pin ${format(pin)} is ${position} (stable is ${format(stable)}).`);
+  return pass(`The Rust pin ${format(pin)} is ${describePosition(pin, stable)}.`);
+};
+
+const plural = (count: number, noun: string): string => `${count} ${noun}${count === 1 ? '' : 's'}`;
+
+/** How far `pinned` is behind `stable`, for a pin that is behind. */
+const describeGap = (pinned: Release, stable: Release): string =>
+  stable.major === pinned.major
+    ? `${plural(stable.minor - pinned.minor, 'minor release')} behind`
+    : `${plural(stable.major - pinned.major, 'major release')} behind`;
+
+/** Where a passing pin stands against the stable channel file. */
+const describePosition = (pinned: Release, stable: Release): string => {
+  const gap = minorGap(pinned, stable);
+  const named = `stable ${format(stable)}`;
+  if (gap === 0) return `current (${named})`;
+  if (gap > 0) return `${describeGap(pinned, stable)} ${named}, which ADR 0179 allows`;
+  // During a release the stable channel file can lag the published release.
+  return `ahead of the stable channel file, which names ${format(stable)}`;
 };
 
 const report = (verdict: Verdict): void => {
@@ -198,9 +213,8 @@ const report = (verdict: Verdict): void => {
 };
 
 const entryPoint = process.argv[1];
-// `realpathSync`, as in check-typescript-toolchain.ts: under a symlinked
-// checkout `resolve` alone leaves the two unequal and the body is skipped,
-// which would exit 0 having checked nothing.
+// `realpathSync`: under a symlinked checkout `resolve` alone leaves the two
+// unequal and the body is skipped, which would exit 0 having checked nothing.
 if (entryPoint !== undefined && import.meta.url === pathToFileURL(realpathSync(entryPoint)).href) {
   const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
   const toolchain = readFileSync(resolve(root, TOOLCHAIN_FILE), 'utf8');

@@ -3,9 +3,9 @@
 #
 # A signal, not a gate: it is kept out of `ci.yml`, so `CI passed` never
 # depends on it and a Rust release never blocks a merge. It runs weekly, on
-# demand from the Actions tab, and on a pull request that changes the check
-# itself or `package.json`, which defines its script, so a change that breaks
-# the check is seen where it is made. The offline half, that the two pins
+# demand from the Actions tab, and on a pull request that changes the pins or
+# the check, so a bump to a release already behind stable, or a change that
+# breaks the check, is seen where it is made. The offline half, that the two pins
 # agree, runs in `verify` (`test/unit/check-rust-toolchain.test.ts`).
 name: Rust toolchain
 
@@ -15,8 +15,9 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
+      - rust-toolchain.toml
+      - Cargo.toml
       - scripts/check-rust-toolchain.ts
-      - package.json
       - .github/workflows/rust-toolchain.yml
 
 permissions:

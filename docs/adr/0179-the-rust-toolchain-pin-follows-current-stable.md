@@ -1,7 +1,9 @@
 # The Rust toolchain pin follows current stable
 
 Status: proposed
-Related: 0155, 0156
+Date: 2026-11-26
+Refines: 0155
+Related: 0156
 
 ADR 0155 brought in a Rust host and ADR 0156 a Rust intake, and the Cargo workspace that holds them pins one toolchain in `rust-toolchain.toml`, which rustup, cargo and every CI job that builds Rust read. The workspace also names a `rust-version` in `Cargo.toml`, which every crate inherits. Neither ADR said which release to pin. The workspace's pull request (482, 19 November 2026) pinned 1.97.0 because that was the version its build environment had installed, and the pin was three stable releases behind (1.100.0) a week later, when the maintainer found it by accident (pull request 550). Nothing said what the pin should be, nothing noticed it falling behind, and nothing held its two copies in step.
 

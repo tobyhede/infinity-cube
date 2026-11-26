@@ -17,9 +17,8 @@ const toolchainFile = (channel: string) =>
 
 const cargoFile = (rustVersion: string) =>
   [
-    '[workspace]',
-    'resolver = "3"',
-    'members = ["crates/intake"]',
+    '[package]',
+    'name = "intake"',
     '',
     '[workspace.package]',
     'version = "0.1.0-preview.1"',
@@ -48,20 +47,24 @@ describe('reading the pins', () => {
     expect(readToolchainChannel(toolchainFile('1.100.0'))).toBe('1.100.0');
   });
 
-  it('reads rust-version from the workspace package table only', () => {
+  it('reads rust-version from the inherited package table only', () => {
     const text = `[package]\nrust-version = "1.80"\n\n${cargoFile('1.100')}`;
     expect(readCargoRustVersion(text)).toBe('1.100');
   });
 
   it('ends a table at an array-of-tables header or a header with a comment', () => {
     const afterComment =
-      '[workspace.package]\nedition = "2024"\n[workspace.metadata.x] # note\nrust-version = "1.80"\n';
+      '[workspace.package]\nedition = "2024"\n[package.metadata.x] # note\nrust-version = "1.80"\n';
     const afterArray = '[workspace.package]\nedition = "2024"\n[[bin]]\nrust-version = "1.80"\n';
     expect(readCargoRustVersion(afterComment)).toBeNull();
     expect(readCargoRustVersion(afterArray)).toBeNull();
     expect(readCargoRustVersion('[workspace.package] # shared\nrust-version = "1.100"\n')).toBe(
       '1.100',
     );
+  });
+
+  it('reads a literal string as well as a basic one', () => {
+    expect(readToolchainChannel("[toolchain]\nchannel = '1.100.0'\n")).toBe('1.100.0');
   });
 
   it('reads nothing when the value is missing', () => {
@@ -174,13 +177,15 @@ describe('judgeStaleness', () => {
     ).toBe(true);
   });
 
-  it('passes a pin one minor release behind', () => {
-    expect(
-      judgeStaleness({
-        toolchain: toolchainFile('1.99.0'),
-        stableChannel: stableChannel('1.100.1'),
-      }).ok,
-    ).toBe(true);
+  it('passes a pin one minor release behind, saying ADR 0179 allows it', () => {
+    const verdict = judgeStaleness({
+      toolchain: toolchainFile('1.99.0'),
+      stableChannel: stableChannel('1.100.1'),
+    });
+    expect(verdict.ok).toBe(true);
+    expect(verdict.message).toBe(
+      'The Rust pin 1.99.0 is 1 minor release behind stable 1.100.1, which ADR 0179 allows.',
+    );
   });
 
   it('fails a pin two or more minor releases behind, naming both versions, the gap and the bump steps', () => {
@@ -201,8 +206,9 @@ describe('judgeStaleness', () => {
       stableChannel: stableChannel('1.100.0'),
     });
     expect(verdict.ok).toBe(true);
-    expect(verdict.message).toContain('1 minor release ahead of stable');
-    expect(verdict.message).not.toContain('current');
+    expect(verdict.message).toBe(
+      'The Rust pin 1.101.0 is ahead of the stable channel file, which names 1.100.0.',
+    );
   });
 
   it('fails a stable channel file it cannot read, never passing it as up to date', () => {
@@ -271,6 +277,17 @@ describe('minorGap', () => {
           expect(verdict.ok).toBe(gap < STALE_AT);
         },
       ),
+    );
+  });
+
+  it('names a newer major as major releases behind, not as a count of minor releases', () => {
+    const verdict = judgeStaleness({
+      toolchain: toolchainFile('1.200.0'),
+      stableChannel: stableChannel('2.0.0'),
+    });
+    expect(verdict.ok).toBe(false);
+    expect(verdict.message).toContain(
+      'The Rust pin 1.200.0 is 1 major release behind stable 2.0.0',
     );
   });
 
