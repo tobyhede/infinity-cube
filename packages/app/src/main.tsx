@@ -4,10 +4,8 @@ import '@xyflow/react/dist/style.css';
 import './styles.css';
 import './theme-dark.css';
 import './prototype-opendyslexic/opendyslexic.css';
-import {
-  installPrototypeFont,
-  PrototypeFontSwitcher,
-} from './prototype-opendyslexic/PrototypeFontSwitcher';
+import { installPrototypeFont } from './prototype-opendyslexic/prototype-font';
+import { PrototypeFontSwitcher } from './prototype-opendyslexic/PrototypeFontSwitcher';
 import { createSpaceStartup } from './space';
 import { Application } from './components/Application';
 import { createBrowserFullscreen } from './browser-fullscreen';

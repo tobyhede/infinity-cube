@@ -1,24 +1,7 @@
 // PROTOTYPE, throwaway: the floating variant bar for the OpenDyslexic
 // dark-mode prototype (see opendyslexic.css). Not production UI.
 import { useEffect, useState } from 'react';
-
-const VARIANTS = [
-  { key: 'A', name: 'System sans (control)' },
-  { key: 'B', name: 'OpenDyslexic everywhere' },
-  { key: 'C', name: 'OpenDyslexic on content' },
-] as const;
-
-type VariantKey = (typeof VARIANTS)[number]['key'];
-
-function readVariant(): VariantKey {
-  const asked = new URLSearchParams(window.location.search).get('font');
-  return VARIANTS.find((variant) => variant.key === asked)?.key ?? 'B';
-}
-
-/** Install the variant before the first frame, so a screenshot never catches the control. */
-export function installPrototypeFont(): void {
-  document.documentElement.dataset.prototypeFont = readVariant();
-}
+import { readVariant, setPrototypeFont, VARIANTS, type VariantKey } from './prototype-font';
 
 function isTyping(target: EventTarget | null): boolean {
   return (
@@ -31,7 +14,7 @@ export function PrototypeFontSwitcher() {
   const [variant, setVariant] = useState<VariantKey>(readVariant);
 
   useEffect(() => {
-    document.documentElement.dataset.prototypeFont = variant;
+    setPrototypeFont(variant);
     const url = new URL(window.location.href);
     url.searchParams.set('font', variant);
     window.history.replaceState(window.history.state, '', url);
