@@ -4,7 +4,8 @@
 //! with `export/` (or with `aggregate/`); and every commit case decoded as
 //! `POST /api/spaces` is, decided by the store, its refusals compared as a
 //! multiset of (kind, file, id, field, edge), and an accepted one Exported
-//! and compared with `next/`.
+//! and compared with `next/`, on the memory store and again on a migrated
+//! SQLite file of the case's own.
 
 #![allow(
     clippy::unwrap_used,
@@ -13,13 +14,16 @@
     reason = "a test fails by panicking"
 )]
 
+#[allow(dead_code, reason = "each test binary uses part of the support")]
+mod sqlite_support;
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use host::{
-    CommitResult, DecodeError, IdSource, MemorySpaceRepository, SpaceRepository, TokioFilesystem,
-    decode_commit, export_aggregate, import_directory,
+    CommitResult, DecodeError, IdSource, MemorySpaceRepository, SpaceRepository,
+    SqliteSpaceRepository, TokioFilesystem, decode_commit, export_aggregate, import_directory,
 };
 use intake::{Refusal, Uuid};
 use serde_json::Value;
@@ -162,14 +166,23 @@ fn cases(kind: &str) -> Vec<(String, PathBuf)> {
 
 /// Import a fresh copy of `aggregate` into a fresh store, answering both.
 async fn imported(aggregate: &Path) -> (tempfile::TempDir, PathBuf, MemorySpaceRepository) {
+    let store = MemorySpaceRepository::new();
+    let (temporary, directory) = imported_into(&store, aggregate).await;
+    (temporary, directory, store)
+}
+
+/// Import a fresh copy of `aggregate` into `store`, answering the copy.
+async fn imported_into<R: SpaceRepository>(
+    store: &R,
+    aggregate: &Path,
+) -> (tempfile::TempDir, PathBuf) {
     let temporary = tempfile::tempdir().unwrap();
     let directory = temporary.path().join("space");
     copy_tree(aggregate, &directory);
-    let store = MemorySpaceRepository::new();
-    import_directory(&store, &TokioFilesystem, &directory, &NoIds)
+    import_directory(store, &TokioFilesystem, &directory, &NoIds)
         .await
         .unwrap();
-    (temporary, directory, store)
+    (temporary, directory)
 }
 
 #[tokio::test]
@@ -207,16 +220,71 @@ async fn every_accepted_directory_case_exports_the_recorded_bytes() {
     );
 }
 
+/// A store a commit case runs on, and whatever must outlive it.
+trait CaseStore: Sized {
+    type Store: SpaceRepository;
+    async fn open() -> Self;
+    fn store(&self) -> &Self::Store;
+    /// Let the store go, closing whatever it holds open.
+    async fn close(self) {}
+}
+
+struct Memory(MemorySpaceRepository);
+
+impl CaseStore for Memory {
+    type Store = MemorySpaceRepository;
+    async fn open() -> Self {
+        Self(MemorySpaceRepository::new())
+    }
+    fn store(&self) -> &Self::Store {
+        &self.0
+    }
+}
+
+struct Sqlite {
+    _file: sqlite_support::Migrated,
+    store: SqliteSpaceRepository,
+}
+
+impl CaseStore for Sqlite {
+    type Store = SqliteSpaceRepository;
+    async fn open() -> Self {
+        let file = sqlite_support::Migrated::new().await;
+        let store = SqliteSpaceRepository::open(&file.path());
+        Self { _file: file, store }
+    }
+    fn store(&self) -> &Self::Store {
+        &self.store
+    }
+    async fn close(self) {
+        self.store.close().await;
+    }
+}
+
 #[tokio::test]
 async fn every_commit_case_gets_its_expected_answer_and_exports_the_recorded_bytes() {
+    commit_cases::<Memory>().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn every_commit_case_gets_its_expected_answer_on_sqlite_and_exports_the_recorded_bytes() {
+    commit_cases::<Sqlite>().await;
+}
+
+async fn commit_cases<S: CaseStore>() {
     let mut failures = Vec::new();
     let cases = cases("commit");
     assert!(!cases.is_empty(), "the corpus should hold commit cases");
     for (name, case) in &cases {
         let description = case_json(case);
         let base = description["base"].as_str().unwrap();
-        let (_temporary, directory, store) =
-            imported(&corpus().join("directory").join(base).join("aggregate")).await;
+        let opened = S::open().await;
+        let store = opened.store();
+        let (_temporary, directory) = imported_into(
+            store,
+            &corpus().join("directory").join(base).join("aggregate"),
+        )
+        .await;
         let body = fs::read(case.join("commit.json")).unwrap();
         let got = match decode_commit(&body) {
             Err(DecodeError::Invalid {
@@ -241,10 +309,8 @@ async fn every_commit_case_gets_its_expected_answer_and_exports_the_recorded_byt
         };
         if want != got {
             failures.push(format!("{name}: expected {want:#?}\ngot {got:#?}"));
-            continue;
-        }
-        if want.is_none() {
-            let _exported = export_aggregate(&store, &TokioFilesystem, &directory)
+        } else if want.is_none() {
+            let _exported = export_aggregate(store, &TokioFilesystem, &directory)
                 .await
                 .unwrap();
             let differences = differences(&directory, &case.join("next"));
@@ -252,6 +318,7 @@ async fn every_commit_case_gets_its_expected_answer_and_exports_the_recorded_byt
                 failures.push(format!("{name}:\n{}", differences.join("\n")));
             }
         }
+        opened.close().await;
     }
     assert!(
         failures.is_empty(),

@@ -31,7 +31,7 @@ use std::net::{TcpListener, TcpStream};
 use std::path::Path;
 use std::time::Duration;
 
-use common::{Announcement, Started, exchange, get, start_at};
+use common::{Announcement, Started, exchange, get, start_from};
 use host::{DatabaseUrl, PostgresSpaceRepository, RandomIds, TokioFilesystem, import_directory};
 use serde_json::Value;
 use sqlx::{Connection as _, PgConnection};
@@ -50,10 +50,10 @@ fn runtime() -> tokio::runtime::Runtime {
 fn serve_in(directory: &Path, url: Option<&str>, extra: &[&str]) -> Started {
     let mut args = vec!["serve", "--store", "postgres"];
     args.extend_from_slice(extra);
-    start_at(
+    start_from(
+        Some(directory),
         &args,
         &[("DATABASE_URL", url.map(OsStr::new))],
-        Some(directory),
     )
 }
 

@@ -90,6 +90,11 @@ interface Port {
   readonly files: readonly [string, ...string[]];
   /** Each case that cannot run against the port, with why. */
   readonly exempt: Readonly<Record<string, string>>;
+  /**
+   * Files whose cases the adapter's own files may mark too, ported for
+   * another ports test (`test/unit/repository-contract-rust-ports.test.ts`).
+   */
+  readonly elsewhere?: readonly string[];
 }
 
 interface Marks {
@@ -98,14 +103,16 @@ interface Marks {
   /** The cases the adapter's own files mark. */
   readonly own: readonly string[];
   readonly exempt: Readonly<Record<string, string>>;
+  /** Names a mark may carry that are another ports test's cases. */
+  readonly elsewhere?: readonly string[];
 }
 
 /** What is wrong with an adapter's marks and exemptions against `cases`. */
-const findings = (cases: readonly string[], { table, own, exempt }: Marks) => {
+const findings = (cases: readonly string[], { table, own, exempt, elsewhere = [] }: Marks) => {
   const marked = [...table, ...own];
   return {
     unported: cases.filter((name) => !marked.includes(name) && !(name in exempt)),
-    unknownMarks: marked.filter((name) => !cases.includes(name)),
+    unknownMarks: marked.filter((name) => !cases.includes(name) && !elsewhere.includes(name)),
     unknownExemptions: Object.keys(exempt).filter((name) => !cases.includes(name)),
     exemptAndPorted: Object.keys(exempt).filter((name) => marked.includes(name)),
     inTableAndOwn: own.filter((name) => table.includes(name)),
@@ -118,11 +125,11 @@ const LISTENER =
 const NO_LOCK =
   'the scheme handler has no port, Host check or launch secret (Storage ST-121); the window that made a request and its page admit it';
 
-const NO_SQLITE_LISTENER =
-  "a listener's, and the host library has none; no verb serves the SQLite repository behind one yet (rust-host 15), so CI runs no process case against it";
+const NO_LAUNCH_SECRET =
+  '`infinity-cube serve --store sqlite` announces no launch secret and sets no cookie, as `infinity-cube run` does not: its `Host` check is its only lock (Storage ST-120), and the process case skips itself for a host announcing no secret';
 
 const NO_DIRECTORY =
-  'a process case runs a host over a `{directory}` and checks its Export; the SQLite repository serves a store and has neither (rust-host 15), so CI runs no process case against it';
+  'a process case runs a host over a `{directory}` and checks its Export; `infinity-cube serve --store sqlite` serves a store, with no directory to run or Export';
 
 const NO_LAUNCH_SECRET =
   '`serve --store postgres` takes no launch secret and keeps no session cookie: it announces as a restart-proof host does (`test/support/restart-proof-host.ts`), and the cookie is the desktop sidecar’s';
@@ -184,13 +191,13 @@ const PORTS: readonly Port[] = [
   },
   {
     name: 'the Rust host over the SQLite repository',
-    files: ['crates/host/tests/sqlite_wire.rs'],
+    files: ['crates/host/tests/sqlite_wire.rs', 'crates/cli/tests/serve.rs'],
+    elsewhere: ['test/integration/sqlite-http-runtime.test.ts'],
     exempt: {
-      'answers 421 to a request naming any Host but its own': NO_SQLITE_LISTENER,
       'answers 403 to a request without the session cookie, and to a wrong launch secret':
-        NO_SQLITE_LISTENER,
+        NO_LAUNCH_SECRET,
       'trades the launch secret for an HttpOnly, SameSite=Strict session cookie by a redirect':
-        NO_SQLITE_LISTENER,
+        NO_LAUNCH_SECRET,
       'refuses a missing directory, announcing why and exiting non-zero': NO_DIRECTORY,
       'writes an edit once edits have been quiet, and keeps it on SIGINT': NO_DIRECTORY,
       'writes an edit not yet written when stopped by SIGINT, and exits zero': NO_DIRECTORY,
@@ -235,8 +242,13 @@ describe('the HTTP conformance cases', () => {
   });
 });
 
-describe.each(PORTS)('$name', ({ files, exempt }) => {
-  const found = findings(CASES, { table: markedIn([TABLE]), own: markedIn(files), exempt });
+describe.each(PORTS)('$name', ({ files, exempt, elsewhere = [] }) => {
+  const found = findings(CASES, {
+    table: markedIn([TABLE]),
+    own: markedIn(files),
+    exempt,
+    elsewhere: elsewhere.flatMap(casesOf),
+  });
 
   it('runs the table', () => {
     expect(runsTable(read(files[0]))).toBe(true);
@@ -283,6 +295,13 @@ describe('the port check', () => {
       exemptAndPorted: [],
       inTableAndOwn: [],
     });
+  });
+
+  it("lets a mark name another ports test's case", () => {
+    expect(
+      findings(cases, { ...clean, own: ['own', 'theirs'], elsewhere: ['theirs'] }).unknownMarks,
+    ).toEqual([]);
+    expect(findings(cases, { ...clean, own: ['own', 'theirs'] }).unknownMarks).toEqual(['theirs']);
   });
 
   it('finds a case with no port and no exemption', () => {
