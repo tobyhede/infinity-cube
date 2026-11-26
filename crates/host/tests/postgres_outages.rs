@@ -809,13 +809,22 @@ mod given_a_real_server {
     async fn reaches_the_database_on_the_next_read_rather_than_repeating_the_first_failure() {
         let database = Fresh::new().await;
         // The server the URL reaches, a query `host`, `hostaddr` or `port`
-        // overriding its authority, as the driver reads it.
+        // overriding its authority, as the driver reads it: the driver dials
+        // `hostaddr` when there is one and resolves the host only otherwise.
         let options = postgres_connect_options(database.url.as_str(), None).unwrap();
-        let upstream = tokio::net::lookup_host((options.get_host(), options.get_port()))
-            .await
-            .unwrap()
-            .next()
-            .unwrap();
+        let hostaddr = options
+            .to_url_lossy()
+            .query_pairs()
+            .find(|(name, _)| name == "hostaddr")
+            .map(|(_, address)| address.parse::<std::net::IpAddr>().unwrap());
+        let upstream = match hostaddr {
+            Some(address) => std::net::SocketAddr::new(address, options.get_port()),
+            None => tokio::net::lookup_host((options.get_host(), options.get_port()))
+                .await
+                .unwrap()
+                .next()
+                .unwrap(),
+        };
         let stand_in = StandIn::start(Behaviour::ResetFirstThenPass(upstream)).await;
         // Those endpoint pairs would override the stand-in's, so they go.
         let mut through = without_query(&database.url, &["host", "hostaddr", "port"]);

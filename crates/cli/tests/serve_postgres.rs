@@ -60,9 +60,11 @@ fn serve_in(directory: &Path, url: Option<&str>, extra: &[&str]) -> Started {
     )
 }
 
-/// `serve` in a directory of its own, with no `.env` at or above it.
+/// `serve` in a directory of its own holding an empty `.env`, which is the
+/// nearest, so no `.env` above it is read.
 fn serve(url: Option<&str>, extra: &[&str]) -> (tempfile::TempDir, Started) {
     let directory = tempfile::tempdir().unwrap();
+    std::fs::write(directory.path().join(".env"), "").unwrap();
     let started = serve_in(directory.path(), url, extra);
     (directory, started)
 }
@@ -175,6 +177,51 @@ mod given_a_database_that_does_not_answer {
         );
         assert!(!said.contains("secret"), "the URL is never written: {said}");
     }
+
+    // The environment's DATABASE_URL needs no `.env`, so where the process
+    // runs is not asked.
+    #[test]
+    fn serves_the_environments_database_url_from_a_directory_it_cannot_name() {
+        let url = format!("postgres://cube@127.0.0.1:{}/cube", free_port());
+        let (mut child, first) = serve_from_a_removed_directory(&url);
+        let _killed = child.kill();
+        let _reaped = child.wait();
+        let announced: Value = serde_json::from_str(first.trim()).unwrap_or(Value::Null);
+        assert_eq!(
+            announced["kind"], "listening",
+            "announces it is listening: {first}"
+        );
+    }
+}
+
+/// `serve --store postgres` with `DATABASE_URL` set to `url`, run from a
+/// working directory that is removed before the binary starts, so it cannot
+/// say where it runs. A shell removes it and then runs the binary in its
+/// place. Answers the process and its first line of standard output.
+fn serve_from_a_removed_directory(url: &str) -> (std::process::Child, String) {
+    use std::io::BufRead as _;
+    let parent = tempfile::tempdir().unwrap();
+    let directory = parent.path().join("removed");
+    std::fs::create_dir(&directory).unwrap();
+    let mut child = std::process::Command::new("sh")
+        .args([
+            "-c",
+            r#"cd "$1" && rmdir "$1" && exec "$2" serve --store postgres"#,
+            "sh",
+        ])
+        .arg(&directory)
+        .arg(common::BINARY)
+        .env("DATABASE_URL", url)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .unwrap();
+    let mut first = String::new();
+    std::io::BufReader::new(child.stdout.take().unwrap())
+        .read_line(&mut first)
+        .unwrap();
+    (child, first)
 }
 
 /// The variable naming the test server.
@@ -479,6 +526,75 @@ mod given_a_database_holding_the_aggregate_lock {
         );
         holding.block_on(async { holder.close().await.unwrap() });
     }
+
+    /// The bound ADR 0177 sets on the stop: the store's close waits at most
+    /// five seconds after the first stop signal (ST-120).
+    const STOP_BOUND: Duration = Duration::from_secs(5);
+
+    // The connection drain and the store's close each have a bound; together
+    // they still stop within the one bound on the stop, though a request
+    // stalls the drain and an operation waiting on the database stalls the
+    // close.
+    #[test]
+    #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+    fn stops_within_five_seconds_of_the_first_signal_while_a_request_and_an_operation_stall() {
+        let database = Database::migrated();
+        let holding = runtime();
+        let mut holder = holding.block_on(async {
+            let mut holder = PgConnection::connect(database.url.as_str()).await.unwrap();
+            sqlx::raw_sql("BEGIN").execute(&mut holder).await.unwrap();
+            sqlx::query("SELECT pg_advisory_xact_lock($1, $2)::text")
+                .bind(host::AGGREGATE_LOCK_KEY.0)
+                .bind(host::AGGREGATE_LOCK_KEY.1)
+                .execute(&mut holder)
+                .await
+                .unwrap();
+            holder
+        });
+        let (_directory, mut started) = database.serve(&[]);
+        let port = started.port();
+        wait_until(
+            "start-up waits on the aggregate lock",
+            common::PATIENCE,
+            || {
+                holding.block_on(async {
+                    let waiting: i64 = sqlx::query_scalar(
+                        "SELECT count(*) FROM pg_locks l JOIN pg_database d ON d.oid = l.database \
+                         WHERE l.locktype = 'advisory' AND NOT l.granted AND d.datname = $1",
+                    )
+                    .bind(&database.name)
+                    .fetch_one(&mut holder)
+                    .await
+                    .unwrap();
+                    waiting > 0
+                })
+            },
+        );
+        // A client that sends one byte of a 100-byte body and then nothing.
+        let mut stalled = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        write!(
+            stalled,
+            "POST /api/spaces HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n{{"
+        )
+        .unwrap();
+        // Connections are accepted in order, so an answer on a later one
+        // means the stalled one is accepted.
+        let _answered = get(port, "/api/spaces");
+        let signalled = std::time::Instant::now();
+        started.signal("INT");
+        let status = started.exited();
+        let took = signalled.elapsed();
+        let said = started.stderr();
+        assert_eq!(status.code(), Some(0), "exits zero: {said}");
+        // A second of room for the process to exit.
+        assert!(
+            took < STOP_BOUND + Duration::from_secs(1),
+            "the stop ends within {STOP_BOUND:?} of the first signal, the drain and the close \
+             sharing it; it took {took:?}: {said}"
+        );
+        drop(stalled);
+        holding.block_on(async { holder.close().await.unwrap() });
+    }
 }
 
 mod given_an_unmigrated_database {
@@ -508,9 +624,25 @@ mod given_an_unmigrated_database {
         started.signal("INT");
         assert_eq!(started.exited().code(), Some(0));
         let stderr = started.stderr();
-        assert!(
-            stderr.contains("Gave up establishing the Meta Space"),
-            "{stderr}"
+        let gave_up = stderr
+            .find("Gave up establishing the Meta Space")
+            .unwrap_or_else(|| panic!("start-up says it gave up: {stderr}"));
+        assert_eq!(
+            stderr
+                .get(..gave_up)
+                .unwrap_or_default()
+                .matches("Failed to establish the Meta Space at startup")
+                .count(),
+            3,
+            "the first attempt and its two confirming retries each fail before start-up \
+             gives up: {stderr}"
+        );
+        assert_eq!(
+            stderr
+                .matches("Failed to establish the Meta Space at startup")
+                .count(),
+            3,
+            "start-up tries no more once it has given up: {stderr}"
         );
         assert_eq!(database.tables(), 0, "serve migrates nothing");
     }

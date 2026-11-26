@@ -930,20 +930,23 @@ mod given_overlapping_replacements {
         waiting(&database, 2).await;
         blocker.commit().await;
         let results = [joined(first).await.unwrap(), joined(second).await.unwrap()];
+        // The first holds the exclusive lock while it waits on the blocked
+        // row, so it installs first and the second finds its Meta.
         assert!(
-            results
-                .iter()
-                .any(|result| matches!(result, ReplaceResult::Replaced(_))),
-            "{results:?}"
+            matches!(results[0], ReplaceResult::Replaced(_)),
+            "the first replacement wins: {results:?}"
         );
-        let loaded = store.load_aggregate().await.unwrap();
-        assert!(
-            [
-                aggregate(SPACE_ID, vec![replacement().at(Revision::FIRST)]),
-                aggregate(OTHER_SPACE_ID, vec![other_space().at(Revision::FIRST)]),
-            ]
-            .contains(&loaded),
-            "{loaded:?}"
+        assert_eq!(
+            results[1],
+            ReplaceResult::Conflict {
+                current_meta_space_id: Some(space(SPACE_ID))
+            },
+            "the second names the winner's Meta Space"
+        );
+        assert_eq!(
+            store.load_aggregate().await.unwrap(),
+            aggregate(SPACE_ID, vec![replacement().at(Revision::FIRST)]),
+            "the winner's Aggregate is stored"
         );
         store.close().await;
     }

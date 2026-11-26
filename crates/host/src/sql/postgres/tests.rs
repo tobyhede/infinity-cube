@@ -347,7 +347,7 @@ mod read_sslmode_as_pg_does {
 
     #[test]
     fn asks_for_tls_when_a_certificate_or_ssl_true_is_named() {
-        for query in ["ssl=true", "ssl=1", "sslrootcert=/ca.pem"] {
+        for query in ["ssl=true", "ssl=1", "sslcert=/client.pem"] {
             assert!(
                 matches!(mode(&format!("{BASE}?{query}")), PgSslMode::VerifyFull),
                 "{query}"
@@ -355,19 +355,17 @@ mod read_sslmode_as_pg_does {
         }
     }
 
-    // pg-connection-string 2.14 turns `ssl=true` and `ssl=1` into `true`,
-    // `ssl=0` into `false`, and `sslnegotiation=direct` with no `ssl` into
-    // `true`; pg 8.22's `ConnectionParameters` turns `ssl=no-verify` into
+    // pg-connection-string 2.14 turns `ssl=true` and `ssl=1` into `true`
+    // and `ssl=0` into `false`; pg 8.22's `ConnectionParameters` turns `ssl=no-verify` into
     // `{ rejectUnauthorized: false }`, and any other non-empty string stays a
     // truthy `ssl`, which connects with TLS and checks the certificate.
     #[test]
-    fn reads_every_ssl_value_and_direct_negotiation_as_pg_does() {
+    fn reads_every_ssl_value_as_pg_does() {
         let cases = [
             ("ssl=no-verify", PgSslMode::Require),
             ("ssl=false", PgSslMode::VerifyFull),
             ("ssl=require", PgSslMode::VerifyFull),
             ("ssl=yes", PgSslMode::VerifyFull),
-            ("sslnegotiation=direct", PgSslMode::VerifyFull),
             ("ssl=0", PgSslMode::Disable),
             ("ssl=", PgSslMode::Disable),
         ];
@@ -388,14 +386,6 @@ mod read_sslmode_as_pg_does {
         assert!(matches!(compat("sslmode=prefer"), PgSslMode::Require));
         assert!(matches!(compat("sslmode=require"), PgSslMode::Require));
         assert!(matches!(
-            compat("sslmode=require&sslrootcert=/ca.pem"),
-            PgSslMode::VerifyCa
-        ));
-        assert!(matches!(
-            compat("sslmode=verify-ca&sslrootcert=/ca.pem"),
-            PgSslMode::VerifyCa
-        ));
-        assert!(matches!(
             compat("sslmode=verify-full"),
             PgSslMode::VerifyFull
         ));
@@ -408,7 +398,7 @@ mod read_sslmode_as_pg_does {
                 None
             )
             .err(),
-            Some(PostgresUrlError::VerifyCaWithoutRoot)
+            Some(PostgresUrlError::VerifyCa)
         );
     }
 
@@ -421,6 +411,7 @@ mod read_sslmode_as_pg_does {
         .unwrap();
         assert_eq!(options.get_database(), Some("cube"));
         assert_eq!(options.get_host(), "127.0.0.1");
+        assert_eq!(options.get_application_name(), Some("cube"));
     }
 
     // `pg` reads `PGSSLMODE` when the URL names no TLS setting (pg 8.22
@@ -457,7 +448,7 @@ mod read_sslmode_as_pg_does {
             "sslmode=disable",
             "ssl=0",
             "ssl=true",
-            "sslrootcert=/ca.pem",
+            "sslcert=/client.pem",
         ] {
             let url = format!("{BASE}?{query}");
             let read = connect_options(&url, Some("no-verify"))
@@ -493,6 +484,154 @@ mod read_sslmode_as_pg_does {
                 "{url} should be read as a PostgreSQL URL"
             );
         }
+    }
+
+    // `sqlx` 0.9.1 adds a named CA file to the system's trusted roots
+    // (`sqlx-core` `net/tls/tls_rustls.rs`, `import_root_certs` then
+    // `cert_store.add`) rather than trusting it alone, as `pg` does, so a
+    // certificate from any system-trusted CA would pass for a server pinned
+    // to a private one. The URL is refused before the server takes a port,
+    // under `pg`'s name and under `sqlx`'s two aliases, which `sqlx` reads
+    // as the same file.
+    #[test]
+    fn refuses_a_named_root_certificate_in_every_mode() {
+        for parameter in ["sslrootcert", "ssl-root-cert", "ssl-ca"] {
+            for query in [
+                format!("{parameter}=/ca.pem"),
+                format!("sslmode=disable&{parameter}=/ca.pem"),
+                format!("sslmode=verify-full&{parameter}=/ca.pem"),
+                format!("uselibpqcompat=true&sslmode=require&{parameter}=/ca.pem"),
+                format!("uselibpqcompat=true&sslmode=verify-ca&{parameter}=/ca.pem"),
+                format!("{parameter}=/ca.pem&{parameter}="),
+            ] {
+                let read = connect_options(&format!("{BASE}?{query}"), None);
+                assert_eq!(
+                    read.as_ref().err(),
+                    Some(&PostgresUrlError::RootCertificate(parameter.to_owned())),
+                    "{query} should be refused naming {parameter}, not read as {read:?}"
+                );
+                let refusal = read.err().map(|refusal| refusal.to_string());
+                assert!(
+                    refusal
+                        .as_deref()
+                        .is_some_and(|words| words.contains(parameter)),
+                    "{query}: the refusal names {parameter}: {refusal:?}"
+                );
+            }
+        }
+    }
+
+    // With a named root certificate refused, libpq's `verify-ca` cannot be
+    // met at all, so its refusal points to `verify-full` rather than asking
+    // for the `sslrootcert` that would itself be refused.
+    #[test]
+    fn refuses_verify_ca_under_uselibpqcompat_pointing_to_verify_full() {
+        let read = connect_options(
+            &format!("{BASE}?uselibpqcompat=true&sslmode=verify-ca"),
+            None,
+        );
+        let Err(refusal) = &read else {
+            panic!("verify-ca should be refused, not read as {read:?}");
+        };
+        assert!(
+            refusal.to_string().contains("verify-full"),
+            "the refusal points to verify-full: {refusal}"
+        );
+    }
+
+    // `pg` reads an empty `sslrootcert` as absent (pg-connection-string
+    // 2.14 tests `if (config.sslrootcert)`), so it names no CA, asks for no
+    // TLS by itself and is not refused as a named one; `sqlx`'s aliases,
+    // empty, are left out as well.
+    #[test]
+    fn reads_an_empty_root_certificate_as_absent() {
+        for parameter in ["sslrootcert", "ssl-root-cert", "ssl-ca"] {
+            let read = connect_options(&format!("{BASE}?{parameter}="), None)
+                .expect("an empty CA file parameter is not refused");
+            assert!(
+                matches!(read.get_ssl_mode(), PgSslMode::Disable),
+                "an empty {parameter} asks for no TLS: {:?}",
+                read.get_ssl_mode()
+            );
+            assert!(
+                format!("{read:?}").contains("ssl_root_cert: Some(Inline([]))"),
+                "an empty {parameter} names no file to sqlx: {read:?}"
+            );
+        }
+        assert_eq!(
+            connect_options(
+                &format!("{BASE}?uselibpqcompat=true&sslmode=verify-ca&sslrootcert="),
+                None
+            )
+            .err(),
+            connect_options(
+                &format!("{BASE}?uselibpqcompat=true&sslmode=verify-ca"),
+                None
+            )
+            .err(),
+            "verify-ca with an empty sslrootcert is refused as with none"
+        );
+    }
+
+    // `pg` never reads `PGSSLROOTCERT`; `sqlx` 0.9.1 reads it as a CA file
+    // (`PgConnectOptions::new_without_pgpass`) and would add it to the
+    // system's trusted roots, so the options name an empty PEM, which adds
+    // no CA, in its place. Setting a variable is `unsafe`, which the
+    // workspace forbids, and would race the other tests in this binary, so
+    // the test runs itself again as a child process with the variable set.
+    #[test]
+    fn ignores_pgsslrootcert_as_pg_does() {
+        const NAME: &str =
+            "sql::postgres::tests::read_sslmode_as_pg_does::ignores_pgsslrootcert_as_pg_does";
+        match std::env::var_os("PGSSLROOTCERT") {
+            Some(_) => {
+                for url in [BASE.to_owned(), format!("{BASE}?sslmode=verify-full")] {
+                    let read = connect_options(&url, None).unwrap();
+                    assert!(
+                        format!("{read:?}").contains("ssl_root_cert: Some(Inline([]))"),
+                        "PGSSLROOTCERT names no CA to sqlx for {url}: {read:?}"
+                    );
+                }
+            }
+            None => {
+                let child = std::process::Command::new(std::env::current_exe().unwrap())
+                    .args(["--exact", NAME, "--nocapture"])
+                    .env("PGSSLROOTCERT", "/ca.pem")
+                    .output()
+                    .unwrap();
+                let stdout = String::from_utf8_lossy(&child.stdout);
+                assert!(
+                    child.status.success() && stdout.contains("1 passed"),
+                    "the child with PGSSLROOTCERT set passes: {stdout}{}",
+                    String::from_utf8_lossy(&child.stderr)
+                );
+            }
+        }
+    }
+
+    // `sqlx` 0.9.1 always sends `SSLRequest` first and has no direct TLS,
+    // so a URL asking for `sslnegotiation=direct` is refused before the
+    // server takes a port rather than negotiated another way; PostgreSQL's
+    // own negotiation is still read.
+    #[test]
+    fn refuses_direct_negotiation_and_keeps_postgres_negotiation() {
+        for query in [
+            "sslnegotiation=direct",
+            "sslmode=require&sslnegotiation=direct",
+        ] {
+            let read = connect_options(&format!("{BASE}?{query}"), None);
+            let Err(refusal) = &read else {
+                panic!("{query} should be refused, not read as {read:?}");
+            };
+            assert!(
+                refusal.to_string().contains("sslnegotiation"),
+                "{query}: the refusal names sslnegotiation: {refusal}"
+            );
+        }
+        assert!(matches!(
+            mode(&format!("{BASE}?sslmode=require&sslnegotiation=postgres")),
+            PgSslMode::VerifyFull
+        ));
     }
 
     #[test]

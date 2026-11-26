@@ -415,8 +415,9 @@ impl<S> SqlSpaceRepository<S> {
     }
 
     /// Run `operation` in a task of its own, holding the gate as the store
-    /// asks, and name a failure by [`SqlStore::classify`]. Dropping the
-    /// returned future stops only the wait for its answer.
+    /// asks from before the task is spawned, and name a failure by
+    /// [`SqlStore::classify`]. Dropping the returned future once the task is
+    /// spawned stops only the wait for its answer.
     async fn run<T, F, Fut>(&self, operation: F) -> Result<T, RepositoryError>
     where
         S: SqlStore,
@@ -426,12 +427,15 @@ impl<S> SqlSpaceRepository<S> {
     {
         let shared = Arc::clone(&self.shared);
         let gate = Arc::clone(&self.gate);
+        // Held before the task is spawned, so closing waits for an operation
+        // whose task has not started yet.
+        let held: Box<dyn Send> = if S::SERIAL {
+            Box::new(gate.write_owned().await)
+        } else {
+            Box::new(gate.read_owned().await)
+        };
         let task = tokio::spawn(async move {
-            let _held: Box<dyn Send> = if S::SERIAL {
-                Box::new(gate.write_owned().await)
-            } else {
-                Box::new(gate.read_owned().await)
-            };
+            let _held = held;
             let naming = Arc::clone(&shared);
             operation(shared)
                 .await

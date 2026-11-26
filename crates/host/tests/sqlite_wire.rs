@@ -336,6 +336,10 @@ mod given_a_change_the_application_judges_before_the_store {
         let response = send(&over, "/api/spaces", &json, halves(text.as_bytes())).await;
         assert_eq!(response.status(), 200, "joined and committed");
         let committed = load(&over).await;
+        assert_eq!(
+            committed["snapshot"]["document"]["title"], "Chunked",
+            "the joined body is what was committed"
+        );
         let mut padded = rename_text(&committed, "Too big").into_bytes();
         padded.resize(COMMIT_BODY_LIMIT + 1, b' ');
         problem(

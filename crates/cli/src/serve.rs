@@ -24,9 +24,10 @@
 //! The first stop signal stops accepting and lets each open connection finish
 //! the request it is answering for at most [`listener::DRAIN_BOUND`]; every
 //! commit is already in the store, so the host closes it and exits zero. The
-//! close waits for the operations still under way for at most
-//! [`CLOSE_BOUND`], then the host says it stopped without them and exits zero
-//! all the same. Any signal after the first exits at once, one.
+//! close waits for the operations still under way until [`STOP_BOUND`] after
+//! the first signal, which the drain shares (ADR 0177), then the host says it
+//! stopped without them and exits zero all the same. Any signal after the
+//! first exits at once, one.
 
 use std::ffi::OsStr;
 use std::process::ExitCode;
@@ -93,27 +94,32 @@ pub(crate) fn database(store: Store) -> Result<Database, ExitCode> {
 /// `DATABASE_URL` from the environment, then the nearest `.env` at or above
 /// where the process runs, trimmed and refused when blank.
 fn database_url() -> Result<DatabaseUrl, String> {
-    let variable = match std::env::var(DATABASE_URL) {
-        Ok(value) => Some(value),
-        Err(std::env::VarError::NotPresent) => None,
+    let resolved = match std::env::var(DATABASE_URL) {
+        Ok(value) => DatabaseUrl::parse(Some(&value)),
+        Err(std::env::VarError::NotPresent) => {
+            // Only the `.env` fallback asks where the process runs.
+            let from = std::env::current_dir().map_err(|error| {
+                format!("Could not read the directory to look for .env from: {error}")
+            })?;
+            DatabaseUrl::resolve(None, &from)
+        }
         Err(std::env::VarError::NotUnicode(_)) => {
             return Err(format!("{DATABASE_URL} must be UTF-8"));
         }
     };
-    let from = std::env::current_dir()
-        .map_err(|error| format!("Could not read the directory to look for .env from: {error}"))?;
-    DatabaseUrl::resolve(variable, &from).map_err(|error| error.to_string())
+    resolved.map_err(|error| error.to_string())
 }
 
 /// What start-up says once it has established the Meta Space.
 const ESTABLISHED: &str = "Established the Meta Space.";
 
-/// How long the stop waits for the store to close once the connections have
-/// drained. Closing waits for every operation under way, and an operation
-/// waiting on a database that does not answer, or on a lock another session
-/// holds, has no bound of its own; ST-120 lets such a database delay neither
-/// the announcement nor the stop.
-const CLOSE_BOUND: Duration = Duration::from_secs(5);
+/// How long after the first stop signal the stop may take: the connections'
+/// drain, within its own [`listener::DRAIN_BOUND`], and then the store's
+/// close share it (ADR 0177). Closing waits for every operation under way,
+/// and an operation waiting on a database that does not answer, or on a lock
+/// another session holds, has no bound of its own; ST-120 lets such a
+/// database delay neither the announcement nor the stop.
+const STOP_BOUND: Duration = Duration::from_secs(5);
 
 /// A store `serve` can close once it has drained.
 trait Closing: SpaceRepository {
@@ -220,16 +226,19 @@ async fn serving<R: Closing>(
     };
 
     let draining = serve_on(listener, application, own, signals.next()).await;
+    let deadline = tokio::time::Instant::now() + STOP_BOUND;
     drop(tokio::spawn(async move {
         signals.next().await;
         say("Exiting without waiting for open requests.");
         std::process::exit(1);
     }));
     establishing.abort();
-    if !draining.finish(listener::DRAIN_BOUND).await {
+    let drain =
+        listener::DRAIN_BOUND.min(deadline.saturating_duration_since(tokio::time::Instant::now()));
+    if !draining.finish(drain).await {
         say("Dropped the connections still open after waiting for them.");
     }
-    if tokio::time::timeout(CLOSE_BOUND, repository.shut())
+    if tokio::time::timeout_at(deadline, repository.shut())
         .await
         .is_err()
     {

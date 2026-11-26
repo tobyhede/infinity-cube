@@ -45,6 +45,25 @@ impl IdSource for Counted {
     }
 }
 
+/// A row hold or a Space read the scripted store saw, in order.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum RowEvent {
+    Held(String),
+    Read(String),
+}
+
+thread_local! {
+    // The holds and Space reads on this thread: a `#[tokio::test]` runs its
+    // spawned operations on its own one thread, and `SqlStore::space` has no
+    // `self` to record into.
+    static ROW_EVENTS: std::cell::RefCell<Vec<RowEvent>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+fn row_event(event: RowEvent) {
+    ROW_EVENTS.with_borrow_mut(|events| events.push(event));
+}
+
 /// SQLite's statements, with the locking ones scripted.
 #[derive(Debug)]
 struct Scripted {
@@ -106,6 +125,7 @@ impl SqlStore for Scripted {
         connection: &mut SqliteConnection,
         id: &str,
     ) -> Result<(), sqlx::Error> {
+        row_event(RowEvent::Held(id.to_owned()));
         self.inner.hold_space(connection, id).await
     }
 
@@ -133,6 +153,7 @@ impl SqlStore for Scripted {
         connection: &mut SqliteConnection,
         id: &str,
     ) -> Result<Option<SpaceRow>, sqlx::Error> {
+        row_event(RowEvent::Read(id.to_owned()));
         SqliteStore::space(connection, id).await
     }
 
@@ -361,10 +382,21 @@ mod statement_order {
         let repository = seeded(&file).await;
         let before = loaded(&repository, PRESENTATION).await;
         let steps = recording(&repository);
+        ROW_EVENTS.with_borrow_mut(Vec::clear);
         let answer = repository.commit(rename(&before, "Renamed")).await.unwrap();
         assert!(
             matches!(answer, CommitResult::Committed { .. }),
             "{answer:?}"
+        );
+        assert_eq!(
+            ROW_EVENTS.with_borrow(|events| events.first().cloned()),
+            Some(RowEvent::Held(PRESENTATION.to_owned())),
+            "the row is held before the Space is read"
+        );
+        assert!(
+            ROW_EVENTS
+                .with_borrow(|events| events.contains(&RowEvent::Read(PRESENTATION.to_owned()))),
+            "the Space is read under the hold"
         );
         assert_eq!(
             *steps.lock().unwrap(),
@@ -641,7 +673,9 @@ mod dropped_callers {
             tokio::pin!(caller);
             tokio::select! {
                 answer = &mut caller => panic!("answered before the pause: {answer:?}"),
-                () = reached.notified() => {}
+                reached = tokio::time::timeout(Duration::from_secs(10), reached.notified()) => {
+                    reached.expect("the operation reaches the pause");
+                }
             }
             // The caller is dropped here, at the pause.
         }
@@ -723,7 +757,9 @@ mod dropped_callers {
             tokio::pin!(caller);
             tokio::select! {
                 answer = &mut caller => panic!("answered before the pause: {answer:?}"),
-                () = reached.notified() => {}
+                reached = tokio::time::timeout(Duration::from_secs(10), reached.notified()) => {
+                    reached.expect("the operation reaches the pause");
+                }
             }
             // The caller is dropped here, at the pause.
         }
@@ -746,5 +782,115 @@ mod dropped_callers {
             4,
             "the replacement is whole"
         );
+    }
+}
+
+/// Closing waits for every operation under way, including one spawned that
+/// has not started yet.
+mod closing {
+    use super::*;
+    use std::future::Future as _;
+    use std::task::Poll;
+
+    #[tokio::test]
+    async fn waits_for_an_operation_spawned_but_not_yet_started() {
+        let file = migrated().await;
+        let repository = seeded(&file).await;
+        let before = loaded(&repository, PRESENTATION).await;
+        {
+            let caller = repository.commit(rename(&before, "Landed"));
+            tokio::pin!(caller);
+            // One poll spawns the operation; on this test's one thread the
+            // spawned task cannot start before the caller is dropped.
+            std::future::poll_fn(|context| {
+                assert!(
+                    caller.as_mut().poll(context).is_pending(),
+                    "the commit waits for its task"
+                );
+                Poll::Ready(())
+            })
+            .await;
+        }
+        tokio::time::timeout(Duration::from_secs(10), repository.close_store())
+            .await
+            .expect("closing finishes");
+        let reopened =
+            SqlSpaceRepository::over(SqliteStore::at(&file.path, Duration::from_secs(5)));
+        let after = loaded(&reopened, PRESENTATION).await;
+        assert_eq!(
+            after.revision,
+            before.revision.next(),
+            "the commit landed before the store closed"
+        );
+    }
+}
+
+/// SQLite's row lock finds its row by the primary key's index, byte for
+/// byte.
+mod sqlite_row_lock {
+    use super::super::sqlite::LOCK_SPACE;
+    use super::*;
+    use sqlx::Row as _;
+
+    async fn connection(file: &File) -> SqliteConnection {
+        sqlx::sqlite::SqliteConnectOptions::new()
+            .filename(file.path.as_path())
+            .connect()
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn searches_the_primary_key_rather_than_scanning_every_space() {
+        let file = migrated().await;
+        let mut connection = connection(&file).await;
+        // The statement is this crate's own constant, not input.
+        let plan = sqlx::query(sqlx::AssertSqlSafe(format!(
+            "EXPLAIN QUERY PLAN {LOCK_SPACE}"
+        )))
+        .bind(META.as_bytes())
+        .fetch_all(&mut connection)
+        .await
+        .unwrap()
+        .iter()
+        .map(|row| row.get::<String, _>("detail"))
+        .collect::<Vec<_>>();
+        assert!(
+            plan.iter().all(|detail| !detail.starts_with("SCAN")),
+            "{LOCK_SPACE} scans: {plan:?}"
+        );
+        assert!(
+            plan.iter()
+                .any(|detail| detail.contains("USING") && detail.contains("INDEX")),
+            "{LOCK_SPACE} uses no index: {plan:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn finds_an_id_stored_as_text_or_as_a_blob_and_only_in_its_own_case() {
+        let file = migrated().await;
+        let store = SqliteStore::at(&file.path, Duration::from_secs(5));
+        let mut connection = connection(&file).await;
+        sqlx::query(
+            "INSERT INTO spaces (document, id, revision, updated_at) VALUES \
+             ('{}', 'abc', '1', 'now'), ('{}', CAST('xyz' AS BLOB), '2', 'now')",
+        )
+        .execute(&mut connection)
+        .await
+        .unwrap();
+        for (id, expected) in [
+            (&b"abc"[..], Some(b"1".to_vec())),
+            (b"ABC", None),
+            (b"xyz", Some(b"2".to_vec())),
+            (b"XYZ", None),
+        ] {
+            assert_eq!(
+                store.lock_space(&mut connection, id).await.unwrap(),
+                expected,
+                "{}",
+                String::from_utf8_lossy(id)
+            );
+        }
+        store.close().await;
     }
 }

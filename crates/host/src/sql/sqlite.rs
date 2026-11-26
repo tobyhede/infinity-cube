@@ -186,6 +186,13 @@ impl SqlSpaceRepository<SqliteStore> {
     }
 }
 
+/// The statement [`SqliteStore`] locks a Space row with. The transaction's
+/// write lock already covers every row, so it only reads the revision. A
+/// BLOB never equals TEXT, so the id's bytes are matched both as TEXT and as
+/// a BLOB, each compared byte for byte by the primary key's index.
+pub(super) const LOCK_SPACE: &str =
+    "SELECT CAST(revision AS BLOB) FROM spaces WHERE id IN (CAST($1 AS TEXT), $1)";
+
 /// SQLite's primary result codes a failure is read by.
 const SQLITE_BUSY: i64 = 5;
 const SQLITE_LOCKED: i64 = 6;
@@ -294,9 +301,7 @@ impl SqlStore for SqliteStore {
         connection: &mut SqliteConnection,
         id: &[u8],
     ) -> Result<Option<Vec<u8>>, sqlx::Error> {
-        // The transaction's write lock already covers every row. A BLOB never
-        // equals TEXT, so the id is compared as bytes.
-        sqlx::query_scalar("SELECT CAST(revision AS BLOB) FROM spaces WHERE CAST(id AS BLOB) = $1")
+        sqlx::query_scalar(LOCK_SPACE)
             .bind(id)
             .fetch_optional(connection)
             .await

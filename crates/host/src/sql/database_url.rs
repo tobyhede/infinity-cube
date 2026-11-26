@@ -132,13 +132,19 @@ fn dotenv_entries(source: &str) -> Vec<(String, String)> {
     let mut entries = Vec::new();
     let mut at = 0;
     while at <= text.len() {
-        if starts_line(&text, at)
-            && let Some((key, raw, end)) = entry_at(&text, at)
-        {
+        if !starts_line(&text, at) {
+            at += 1;
+            continue;
+        }
+        if let Some((key, raw, end)) = entry_at(&text, at) {
             entries.push((key, value_of(&raw)));
             at = end;
         } else {
-            at += 1;
+            // A match starting anywhere in the whitespace `\s*` skips from
+            // here would skip to the same character and fail as this one
+            // did, so the scan goes on from that character: each run of
+            // whitespace is skipped once, which keeps the scan linear.
+            at = skip_space(&text, at).max(at + 1);
         }
     }
     entries

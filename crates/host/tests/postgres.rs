@@ -482,6 +482,18 @@ mod given_where_its_tables_are {
             ))
             .await;
         let mut url = database.url.clone();
+        // `sqlx` applies a query `user` or `password` after the authority,
+        // so either would override the role's.
+        let kept: Vec<(String, String)> = url
+            .query_pairs()
+            .filter(|(key, _)| key != "user" && key != "password")
+            .map(|(key, value)| (key.into_owned(), value.into_owned()))
+            .collect();
+        if kept.is_empty() {
+            url.set_query(None);
+        } else {
+            url.query_pairs_mut().clear().extend_pairs(kept);
+        }
         url.set_username(&role).unwrap();
         url.set_password(Some("granted-nothing")).unwrap();
         let store = PostgresSpaceRepository::open(&DatabaseUrl::parse(Some(url.as_str())).unwrap())

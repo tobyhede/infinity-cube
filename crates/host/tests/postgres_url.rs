@@ -151,9 +151,11 @@ mod given_the_environment {
             "INFINITY_CUBE_UNRELATED=leaked\nDATABASE_URL=postgresql://cube@host/db\n",
         )
         .unwrap();
+        let before = std::env::var_os("INFINITY_CUBE_UNRELATED");
         assert!(DatabaseUrl::resolve(None, root.path()).is_ok());
-        assert!(
-            std::env::var("INFINITY_CUBE_UNRELATED").is_err(),
+        assert_eq!(
+            std::env::var_os("INFINITY_CUBE_UNRELATED"),
+            before,
             "the process environment is not written"
         );
     }
@@ -235,6 +237,26 @@ mod given_an_env_file_dotenv_reads {
                 .as_str(),
             "postgresql://u:$p@host/db"
         );
+    }
+
+    // Each line's start is tried once and the scan moves on: a run of blank
+    // lines after a line that does not parse is read in time proportional to
+    // its length, not its square. Read quadratically, this input outruns the
+    // ten-second bound below.
+    #[test]
+    fn reads_a_long_run_of_blank_lines_after_a_line_that_does_not_parse_in_linear_time() {
+        let contents = format!(
+            "DATABASE_URL=postgresql://u:p@host/db\n!!!\n{}",
+            "\n".repeat(400_000)
+        );
+        let (sender, answer) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let _sent = sender.send(resolved(&contents).map(|url| url.as_str().to_owned()));
+        });
+        let read = answer
+            .recv_timeout(std::time::Duration::from_secs(10))
+            .expect("the .env is read within ten seconds");
+        assert_eq!(read, Ok("postgresql://u:p@host/db".to_owned()));
     }
 
     #[test]

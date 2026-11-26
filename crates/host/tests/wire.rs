@@ -266,6 +266,10 @@ mod given_a_commit {
         );
         // A valid commit padded to one byte over the limit, as the case sends it.
         let committed = load(&host, META).await;
+        assert_eq!(
+            committed["snapshot"]["document"]["title"], "Chunked",
+            "the joined body is what was committed"
+        );
         let mut padded = rename_text(&committed, "Too big").into_bytes();
         padded.resize(COMMIT_BODY_LIMIT + 1, b' ');
         let (left, right) = padded.split_at(padded.len() / 2);

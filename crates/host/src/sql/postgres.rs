@@ -71,11 +71,30 @@ pub enum PostgresUrlError {
     /// It is not a `postgres:` or `postgresql:` URL `sqlx` reads.
     #[error("DATABASE_URL is not a PostgreSQL URL: {0}")]
     Invalid(String),
-    /// `sslmode=verify-ca` under `uselibpqcompat` names no root certificate,
-    /// which ADR 0177 refuses.
-    #[error("DATABASE_URL's sslmode=verify-ca needs sslrootcert to name a CA certificate")]
-    VerifyCaWithoutRoot,
+    /// It names a CA file (`sslrootcert`, or `sqlx`'s `ssl-root-cert` or
+    /// `ssl-ca`), which `sqlx` would add to the system's trusted roots rather
+    /// than trust alone, as `pg` does (ADR 0177).
+    #[error(
+        "DATABASE_URL's {0} is refused: sqlx would add the CA it names to the system's trusted CAs rather than trust it alone; install the CA in the system's trust store and use sslmode=verify-full"
+    )]
+    RootCertificate(String),
+    /// `sslmode=verify-ca` under `uselibpqcompat`, which needs the
+    /// `sslrootcert` that is itself refused (ADR 0177).
+    #[error(
+        "DATABASE_URL's sslmode=verify-ca under uselibpqcompat=true is refused: it needs sslrootcert, which is refused; use sslmode=verify-full"
+    )]
+    VerifyCa,
+    /// `sslnegotiation=direct`, which `sqlx` cannot do: it always asks for
+    /// TLS with an `SSLRequest` first (ADR 0177).
+    #[error(
+        "DATABASE_URL's sslnegotiation=direct is refused: sqlx always negotiates TLS through PostgreSQL's SSLRequest and cannot start TLS directly"
+    )]
+    DirectNegotiation,
 }
+
+/// The parameters `sqlx` reads as a CA file: `pg`'s, and `sqlx`'s own two
+/// aliases, which `pg` ignores.
+const ROOT_CERTIFICATE_PARAMETERS: [&str; 3] = ["sslrootcert", "ssl-root-cert", "ssl-ca"];
 
 impl SqlSpaceRepository<PostgresStore> {
     /// The repository over the database `url` names, with the default pool.
@@ -114,26 +133,31 @@ impl SqlSpaceRepository<PostgresStore> {
 /// The options `url` connects with, its `sslmode` read with the meaning ADR
 /// 0177 gives each value, as `pg` 8.22 reads it:
 ///
-/// - no `sslmode`, `sslrootcert`, `sslcert`, `sslkey` or `ssl` parameter,
-///   and no `sslnegotiation=direct`: what `pgsslmode`, the value of
-///   `PGSSLMODE`, asks for: no TLS when it is absent, `disable` or a value
-///   `pg` does not know; TLS, the certificate not checked, for `no-verify`;
-///   and TLS, the certificate and the host checked, for `prefer`, `require`,
-///   `verify-ca` and `verify-full`;
+/// - no `sslmode`, `sslcert`, `sslkey` or `ssl` parameter: what `pgsslmode`,
+///   the value of `PGSSLMODE`, asks for: no TLS when it is absent, `disable`
+///   or a value `pg` does not know; TLS, the certificate not checked, for
+///   `no-verify`; and TLS, the certificate and the host checked, for
+///   `prefer`, `require`, `verify-ca` and `verify-full`;
 /// - no `sslmode`: TLS, the certificate and the host checked, for a
 ///   certificate parameter; otherwise, by `ssl`: no TLS for `0` or an empty
 ///   value, TLS with the certificate not checked for `no-verify`, and TLS
-///   with the certificate and the host checked for any other value, or for
-///   `sslnegotiation=direct` with no `ssl`;
+///   with the certificate and the host checked for any other value;
 /// - `sslmode=disable`: no TLS;
 /// - `sslmode=no-verify`, without `uselibpqcompat=true`: TLS, the
 ///   certificate not checked;
 /// - under `uselibpqcompat=true`, libpq's meanings, except that `prefer`
 ///   never falls back to plaintext: `prefer` and `require` encrypt without
-///   checking, `require` with `sslrootcert` checks the CA, `verify-ca` checks
-///   the CA and needs `sslrootcert`, and `verify-full` checks the host too;
-///   `no-verify`, which libpq does not have, checks as `verify-full` does;
+///   checking, `verify-ca` is refused, and `verify-full` checks the host
+///   too; `no-verify`, which libpq does not have, checks as `verify-full`
+///   does;
 /// - any other `sslmode`: TLS, the certificate and the host checked.
+///
+/// A CA file is never trusted alone, so a non-empty `sslrootcert`,
+/// `ssl-root-cert` or `ssl-ca` is refused, an empty one is read as absent,
+/// as `pg` reads it, and `PGSSLROOTCERT`, which `pg` ignores, is ignored:
+/// a certificate is checked against the system's trusted CAs only.
+/// `sslnegotiation=direct` is refused; any other `sslnegotiation` is left
+/// out, PostgreSQL's own negotiation being the only one `sqlx` does.
 ///
 /// Where the URL is silent, the other connection settings come from `PG*`
 /// variables and the password file, as `sqlx` reads them.
@@ -141,8 +165,8 @@ impl SqlSpaceRepository<PostgresStore> {
 /// # Errors
 ///
 /// [`PostgresUrlError`] when `url` is not a `postgres:` or `postgresql:` URL
-/// `sqlx` reads, or asks for
-/// `verify-ca` under `uselibpqcompat` with no root certificate.
+/// `sqlx` reads, names a CA file, asks for `sslnegotiation=direct`, or asks
+/// for `verify-ca` under `uselibpqcompat`.
 pub fn connect_options(
     url: &str,
     pgsslmode: Option<&str>,
@@ -166,14 +190,20 @@ pub fn connect_options(
             .find(|(key, _)| key == name)
             .map(|(_, value)| value.as_str())
     };
+    // Every value, not only the last, since `sqlx` applies each in turn.
+    if let Some((key, _)) = pairs.iter().find(|(key, value)| {
+        ROOT_CERTIFICATE_PARAMETERS.contains(&key.as_str()) && !value.is_empty()
+    }) {
+        return Err(PostgresUrlError::RootCertificate(key.clone()));
+    }
+    if value("sslnegotiation") == Some("direct") {
+        return Err(PostgresUrlError::DirectNegotiation);
+    }
     let libpq = value("uselibpqcompat") == Some("true");
-    let root = value("sslrootcert").is_some();
-    let certificate = root || value("sslcert").is_some() || value("sslkey").is_some();
-    let direct = value("sslnegotiation") == Some("direct");
+    let certificate = value("sslcert").is_some() || value("sslkey").is_some();
     let mode = match (value("sslmode"), libpq) {
         (None, _) if certificate => PgSslMode::VerifyFull,
         (None, _) => match value("ssl") {
-            None if direct => PgSslMode::VerifyFull,
             None => environment_mode(pgsslmode),
             Some("0" | "") => PgSslMode::Disable,
             Some("no-verify") => PgSslMode::Require,
@@ -182,10 +212,8 @@ pub fn connect_options(
         (Some("disable"), _) => PgSslMode::Disable,
         (Some("no-verify"), false) => PgSslMode::Require,
         (Some("prefer"), true) => PgSslMode::Require,
-        (Some("require"), true) if root => PgSslMode::VerifyCa,
         (Some("require"), true) => PgSslMode::Require,
-        (Some("verify-ca"), true) if root => PgSslMode::VerifyCa,
-        (Some("verify-ca"), true) => return Err(PostgresUrlError::VerifyCaWithoutRoot),
+        (Some("verify-ca"), true) => return Err(PostgresUrlError::VerifyCa),
         _ => PgSslMode::VerifyFull,
     };
     let kept: Vec<(String, String)> = pairs
@@ -194,7 +222,7 @@ pub fn connect_options(
             !matches!(
                 key.as_str(),
                 "sslmode" | "uselibpqcompat" | "ssl" | "sslnegotiation"
-            )
+            ) && !ROOT_CERTIFICATE_PARAMETERS.contains(&key.as_str())
         })
         .cloned()
         .collect();
@@ -205,7 +233,9 @@ pub fn connect_options(
     }
     let options =
         PgConnectOptions::from_str(parsed.as_str()).map_err(|error| invalid(error.to_string()))?;
-    Ok(options.ssl_mode(mode))
+    // `sqlx` takes `PGSSLROOTCERT` as a CA file and has no way to unset
+    // one, so an empty PEM, which adds no CA, replaces it.
+    Ok(options.ssl_mode(mode).ssl_root_cert_from_pem(Vec::new()))
 }
 
 /// What `PGSSLMODE` asks for when the URL names no TLS setting, as `pg`
