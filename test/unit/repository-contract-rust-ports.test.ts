@@ -62,7 +62,7 @@ const VALUES: Readonly<Record<string, readonly string[]>> = {
 };
 
 /** The tickets a pending case may name. */
-const TICKETS = ['10', '11', '12', '13'] as const;
+const TICKETS = ['10', '11', '13'] as const;
 type Ticket = (typeof TICKETS)[number];
 
 type Exemption =
@@ -77,16 +77,6 @@ const ROW_LOCK =
 
 const EXEMPT: Readonly<Record<string, Exemption>> = {
   // The contract.
-  'stores and reloads an Image Resource unchanged': pending('12'),
-  'stores and reloads an Ur Resource and a Reference Resource to it unchanged': pending('12'),
-  'stores, renames and reloads a Resource whose plugin is missing unchanged': pending('12'),
-  'carries a Resource whose plugin is missing through Import and Export byte-identical':
-    pending('12'),
-  'hands a Resource whose plugin is missing to that plugin when it returns': pending('12'),
-  "keeps an Edge's Title and hidden flag through initialization, commit and load": pending('12'),
-  "keeps a Graph's head shape through initialization, commit and load": pending('12'),
-  "keeps every Resource's Map content through initialization, commit and load": pending('12'),
-  "keeps each Space Resource's own selection across a later default Map change": pending('12'),
   'writes a moved Resource through the ownership check, which refuses it before its Space releases it':
     doesNotApply(
       "a commit's answer does not depend on the order of its changes (ADR 0176, Storage ST-20): the Rust repository commits the move this case has the TypeScript SQL writer refuse, which `commits_a_move_whichever_space_it_lists_first` in `crates/host/tests/repository_contract/commits.rs`, not a port, holds on the memory store and SQLite",

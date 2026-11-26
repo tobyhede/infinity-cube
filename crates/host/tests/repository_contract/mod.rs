@@ -144,6 +144,14 @@ pub fn snapshot(space_id: &str, value: &Value) -> SpaceSnapshot {
         .unwrap_or_else(|refusals| panic!("the fixture decodes: {refusals:?}"))
 }
 
+/// A snapshot of Space `space_id` from JSON text written out, every object's
+/// keys in the order written, as intake decodes it.
+pub fn snapshot_text(space_id: &str, text: &str) -> SpaceSnapshot {
+    let parsed = intake::json::parse(text).unwrap();
+    intake::decode_space_snapshot(&parsed, id(space_id))
+        .unwrap_or_else(|refusals| panic!("the fixture decodes: {refusals:?}"))
+}
+
 /// `space`'s JSON text, each Resource's content keys in its plugin's order
 /// and every other object's as `serde_json` keeps them.
 fn in_plugin_order(space: &Value) -> String {
@@ -502,6 +510,18 @@ macro_rules! repository_cases {
                 holds_the_asset_of_zero_bytes_already,
                 keeps_stored_assets_outside_the_aggregate_the_doors_replace,
                 keeps_a_stored_asset_across_a_fresh_host,
+            }
+            content {
+                stores_and_reloads_an_image_resource_unchanged,
+                stores_and_reloads_an_ur_resource_and_a_reference_to_it,
+                stores_renames_and_reloads_a_resource_whose_plugin_is_missing,
+                carries_a_missing_plugin_resource_through_import_and_export,
+                hands_a_missing_plugin_resource_to_its_plugin_when_it_returns,
+                keeps_an_edges_title_and_hidden_flag,
+                keeps_a_graphs_head_shape,
+                keeps_every_resources_map_content,
+                keeps_each_space_resources_selection_across_a_default_map_change,
+                keeps_what_the_fixture_lacks_as_committed,
             }
             // table:end
         }
