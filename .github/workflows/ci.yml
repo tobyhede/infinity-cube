@@ -179,7 +179,8 @@ jobs:
     needs: reuse-pr-ci
     if: ${{ !cancelled() && needs.reuse-pr-ci.outputs.should_skip != 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # A cold cache compiles the Rust CLI before its restart proof.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
@@ -236,6 +237,33 @@ jobs:
         run: pnpm exec playwright install chromium
 
       - name: Prove a PostgreSQL edit survives a fresh host
+        run: pnpm e2e:postgres
+
+      # The same proof again, its two hosts now the Rust CLI's
+      # `serve --store postgres` over the database the steps above migrated
+      # with Prisma Next, so it also proves the Rust host serves that database
+      # with no migration of its own. The proof clears the database's content
+      # before it seeds, so it needs no reset between the two runs. Built and
+      # cached as the `sqlite` job builds it, under a key of its own.
+      - name: Install the pinned Rust toolchain
+        run: rustup toolchain install
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: cargo-${{ runner.os }}-postgres-cli-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-postgres-cli-${{ hashFiles('rust-toolchain.toml') }}-
+      - name: Build the browser application and the Rust CLI
+        run: |
+          pnpm --filter @project/app exec vite build
+          cargo build -p infinity-cube --locked
+
+      - name: Prove a PostgreSQL edit survives a fresh Rust host
+        env:
+          INFINITY_CUBE_RESTART_PROOF_HOST: '{"name":"Rust CLI","argv":["target/debug/infinity-cube","serve","--store","postgres","--port","{port}","--built","packages/app/dist"]}'
         run: pnpm e2e:postgres
 
       # Its own artifact name, for the reason the `e2e` job below records:

@@ -6,6 +6,7 @@ import type { HostCommand } from '../../conformance/http/host-process';
 import {
   restartProofHostFromEnvironment,
   startCommandHost,
+  startRestartProofHost,
   type StartedRestartProofHost,
 } from '../support/restart-proof-host';
 
@@ -17,9 +18,10 @@ afterAll(async () => {
 });
 
 /**
- * How the SQLite restart proof (`test/e2e/sqlite-persistence.spec.ts`) is told
- * which host to start: the Vite host by default, or the command
- * `INFINITY_CUBE_RESTART_PROOF_HOST` names.
+ * How the restart proofs (`test/e2e/sqlite-persistence.spec.ts`,
+ * `test/e2e/postgres-persistence.spec.ts`) are told which host to start: the
+ * Vite host by default, or the command `INFINITY_CUBE_RESTART_PROOF_HOST`
+ * names.
  */
 
 describe('naming the restart proof host', () => {
@@ -247,5 +249,38 @@ describe('starting a restart proof host by command', () => {
     expect(kill).toBeTypeOf('function');
     kill?.();
     await expect.poll(() => isAlive(pid)).toBe(false);
+  });
+});
+
+describe('starting the host a restart proof names', () => {
+  const vite: StartedRestartProofHost = {
+    baseURL: 'http://127.0.0.1:1/',
+    stop: () => Promise.resolve(),
+  };
+
+  it('starts the Vite host when no command is named', async () => {
+    let started = 0;
+    const host = await startRestartProofHost(restartProofHostFromEnvironment(undefined), {
+      startVite: () => {
+        started += 1;
+        return Promise.resolve(vite);
+      },
+      onSpawn: (kill) => spawnedHostKills.push(kill),
+    });
+    expect(host).toBe(vite);
+    expect(started).toBe(1);
+  });
+
+  it('starts the command named, and never the Vite host', async () => {
+    const command = nodeHost({ answer: "'by command'" });
+    const host = await startRestartProofHost(
+      restartProofHostFromEnvironment(JSON.stringify({ name: command.name, argv: command.argv })),
+      {
+        startVite: () => Promise.reject(new Error('the Vite host was started')),
+        onSpawn: (kill) => spawnedHostKills.push(kill),
+      },
+    );
+    expect(await (await fetch(host.baseURL)).text()).toBe('by command');
+    await host.stop();
   });
 });

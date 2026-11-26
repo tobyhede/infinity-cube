@@ -16,7 +16,7 @@ import {
 import {
   RESTART_PROOF_HOST_VARIABLE,
   restartProofHostFromEnvironment,
-  startCommandHost,
+  startRestartProofHost,
   type StartedRestartProofHost,
 } from '../support/restart-proof-host';
 import { runWithCleanup } from '../support/run-with-cleanup';
@@ -66,9 +66,10 @@ test.afterEach(() => {
 });
 
 const startHost = (): Promise<StartedRestartProofHost> =>
-  host.kind === 'vite'
-    ? startViteHost()
-    : startCommandHost(host.command, { onSpawn: (kill) => spawnedHosts.push(kill) });
+  startRestartProofHost(host, {
+    startVite: startViteHost,
+    onSpawn: (kill) => spawnedHosts.push(kill),
+  });
 
 test('a SQLite-backed edit survives a fresh host', async ({ browser }) => {
   // `SQLITE_PATH` as the job (or a developer's own export) provides it —
