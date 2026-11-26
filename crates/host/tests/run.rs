@@ -62,7 +62,7 @@ impl Filesystem for Flaky {
     async fn create_new(&self, path: &Path, bytes: &[u8]) -> io::Result<()> {
         let failing = self
             .failures
-            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |left| {
+            .try_update(Ordering::SeqCst, Ordering::SeqCst, |left| {
                 left.checked_sub(1)
             })
             .is_ok();
