@@ -176,8 +176,9 @@ function retiredSpaceGraphs(document: unknown): SpaceError | null {
  * **This docblock is where that argument is written out** — the index clause
  * and the importer point here rather than restating it.
  *
- * Three doors ask it: the two intakes below, and `readSingleSpace`, which parses
- * against import schemas that run ahead of intake (ADR 0030). The snapshot
+ * Three doors ask it: the two intakes below, and the Aggregate directory
+ * reader's `parseSingleSpace` in `@project/aggregate`, which parses against
+ * import schemas that run ahead of intake (ADR 0030). The snapshot
  * decoders do not — they parse `spaceSnapshotSchema` first, so they refuse a
  * version 2 snapshot by cascade rather than by name. Deliberate, not an
  * oversight: there are no version 2 documents, and a directory is the only one a

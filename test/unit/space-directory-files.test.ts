@@ -6,7 +6,7 @@ import {
   type SpaceSnapshot,
 } from '@project/core';
 import { describe, expect, it } from 'vitest';
-import { spaceDirectoryFiles } from '../../src/aggregate-directory/write-space-directory';
+import { spaceDirectoryFiles } from '../../src/aggregate-directory/space-directory-files';
 
 const SPACE_ID = uuidSchema.parse('50000000-0000-4000-8000-000000000001');
 const TARGET_ID = uuidSchema.parse('50000000-0000-4000-8000-000000000002');

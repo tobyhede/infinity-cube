@@ -11,6 +11,7 @@ import {
   type AggregateSource,
 } from '@project/aggregate';
 import { uuidSchema, type UUID } from '@project/core';
+import { loadSpace } from '@project/graph';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   directorySource,
@@ -31,6 +32,38 @@ const OTHER_SPACE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
 const RESOURCE_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
 /** A Space id spelled with hex letters, so upper-casing its name changes it. */
 const LETTERED_SPACE_ID = uuidSchema.parse('abcdefab-cdef-4abc-8def-abcdefabcdef');
+/** Ordered after `RESOURCE_ID` by its Resource file's path. */
+const LATER_RESOURCE_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
+const NESTED_RESOURCE_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
+const GRAPH_ID = uuidSchema.parse('66666666-6666-4666-8666-666666666666');
+const MAP_ID = uuidSchema.parse('77777777-7777-4777-8777-777777777777');
+
+/**
+ * The disposable pre-release shape: graphs declared beside the maps rather
+ * than owned by them (ADR 0040). Under version 1 each of its maps is missing
+ * the graphs it now owns and carries a key the schema does not recognise, so a
+ * shape check reached on its own answers a cascade in which nothing says which
+ * version arrived.
+ */
+const versionTwoDocument = (id: UUID) => ({
+  version: 2,
+  id,
+  title: 'Pre-release space',
+  graphs: [{ id: GRAPH_ID, title: 'Main', edges: [] }],
+  maps: [{ id: MAP_ID, title: 'Working', positions: {} }],
+});
+
+/**
+ * A version 1 document carrying the retired space-level `graphs`, so it holds
+ * both shapes at once. Its version is current, so nothing answers it before
+ * the key itself does.
+ */
+const retiredGraphsDocument = (id: UUID) => ({
+  version: 1,
+  id,
+  title: 'Space',
+  graphs: [{ id: GRAPH_ID, title: 'Main', edges: [] }],
+});
 
 const countingIds = (): (() => UUID) => {
   let next = 0;
@@ -323,6 +356,90 @@ describe.each(READERS)('$name', ({ read }) => {
     const aggregate = await read(root, countingIds());
 
     expect(aggregate.spaces.map(({ id }) => id)).toEqual([META_SPACE_ID]);
+  });
+
+  it('reads only the Resource files directly in resources/, in ordinal order of their paths', async () => {
+    const root = await makeTemporaryDirectory();
+    await writeAggregateFile(root, META_SPACE_ID);
+    const directory = await writeSpace(
+      root,
+      META_SPACE_ID,
+      JSON.stringify({ version: 1, id: META_SPACE_ID, title: 'Meta' }),
+    );
+    // Written out of path order, so the expectation shows the sort.
+    await writeResources(directory, {
+      ...resourceFiles({ id: LATER_RESOURCE_ID, title: 'Later', kind: 'ur', content: {} }),
+      ...resourceFiles({ id: RESOURCE_ID, title: 'Earlier', kind: 'ur', content: {} }),
+    });
+    // Not read: a Resource file is found only directly in resources/ (ST-32).
+    await mkdir(join(directory, 'resources', 'nested'), { recursive: true });
+    await writeFile(
+      join(directory, 'resources', 'nested', `${NESTED_RESOURCE_ID}.json`),
+      'not a Resource file Import reads',
+    );
+
+    const aggregate = await read(root, countingIds());
+
+    expect(aggregate.spaces[0]?.resources.map(({ id }) => id)).toEqual([
+      RESOURCE_ID,
+      LATER_RESOURCE_ID,
+    ]);
+  });
+
+  it('answers a space file of a version it cannot read once, ahead of every key that moved', async () => {
+    const root = await makeTemporaryDirectory();
+    await writeAggregateFile(root, META_SPACE_ID);
+    await writeSpace(root, META_SPACE_ID, JSON.stringify(versionTwoDocument(META_SPACE_ID)));
+
+    const thrown = await captureError(() => read(root, countingIds()));
+
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
+    expect(thrown.kind).toBe('parsing');
+    expect(thrown.diagnostics).toHaveLength(1);
+    expect(thrown.diagnostics[0]).toContain(`${META_SPACE_ID}/space.json`);
+    expect(thrown.diagnostics[0]).toContain('version 2');
+  });
+
+  it('refuses a retired space-level graphs key once, naming it, rather than stripping it', async () => {
+    // `importSpaceFileSchema` is strict, so an undeclared key is already
+    // refused rather than dropped. This check runs ahead of it to name the one
+    // that matters: a space-level `graphs` carried the whole topology
+    // (ADR 0040), and a generic unrecognized-key refusal does not say so.
+    const root = await makeTemporaryDirectory();
+    await writeAggregateFile(root, META_SPACE_ID);
+    await writeSpace(root, META_SPACE_ID, JSON.stringify(retiredGraphsDocument(META_SPACE_ID)));
+
+    const thrown = await captureError(() => read(root, countingIds()));
+
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
+    expect(thrown.kind).toBe('parsing');
+    expect(thrown.diagnostics).toHaveLength(1);
+    expect(thrown.diagnostics[0]).toContain(`${META_SPACE_ID}/space.json`);
+    expect(thrown.diagnostics[0]).toContain('`graphs`');
+  });
+
+  // The two doors ask one composed `documentRefusal`, so neither can come to
+  // know about a refusal the other does not: a document domain intake refuses
+  // before parsing is refused here in the same words.
+  it.each([
+    ['a version it cannot read', versionTwoDocument],
+    ['a retired space-level graphs key', retiredGraphsDocument],
+  ])('says of %s exactly what domain intake says', async (_case, document) => {
+    const root = await makeTemporaryDirectory();
+    await writeAggregateFile(root, META_SPACE_ID);
+    await writeSpace(root, META_SPACE_ID, JSON.stringify(document(META_SPACE_ID)));
+
+    const thrown = await captureError(() => read(root, countingIds()));
+    const intake = loadSpace(document(META_SPACE_ID), []);
+
+    expect(intake.ok).toBe(false);
+    if (intake.ok) return;
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
+    expect(intake.errors).toHaveLength(1);
+    expect(thrown.diagnostics[0]).toContain(intake.errors[0]?.message);
   });
 
   it('does not descend past the immediate children', async () => {

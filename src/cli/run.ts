@@ -86,7 +86,7 @@ const mcp = async (
   try {
     isDirectory = (await stat(directory)).isDirectory();
   } catch (error) {
-    const { isMissingFile } = await import('../aggregate-directory/space-directory');
+    const { isMissingFile } = await import('../aggregate-directory/missing-file');
     if (isMissingFile(error)) {
       io.stderr(
         `${directory} does not exist. To create an aggregate there: pnpm cube init ${shellWord(directory)}\n`,

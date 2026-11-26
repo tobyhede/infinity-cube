@@ -14,7 +14,7 @@ import { describeRunRefusal } from '../../src/cli/run-refusal';
 import { startRun } from '../../src/run/run';
 import type { DatabaseTarget } from '../../src/database/database-target';
 import { type SpaceRepository, AGGREGATE_FILE_NAME } from '@project/aggregate';
-import { readSingleSpace } from '../../src/aggregate-directory';
+import { readAggregateSpace } from '../support/read-aggregate-space';
 import {
   filesUnder,
   markdownResourceFiles,
@@ -588,7 +588,7 @@ describe('runInfinityCube', () => {
     expect(positionsJson.indexOf(`"${RESOURCE_ID}"`)).toBeLessThan(
       positionsJson.indexOf(`"${THIRD_SPACE_ID}"`),
     );
-    await expect(readSingleSpace(join(destination, SPACE_ID))).resolves.toEqual({
+    await expect(readAggregateSpace(destination, SPACE_ID)).resolves.toEqual({
       id: snapshot.id,
       document: snapshot.document,
       resources: [...snapshot.resources].reverse(),

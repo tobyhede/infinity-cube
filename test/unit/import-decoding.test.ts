@@ -228,8 +228,8 @@ describe('import decoding', () => {
    *
    * Both schemas, although only `spaceSnapshotSchema` is behind the two doors
    * above: `describeSchemaFailure` folds `importSpaceSchema`'s failures too,
-   * `read-single-space` parsing a `space.json` with that one before the importer
-   * identifies it.
+   * the Aggregate directory reader's `parseSingleSpace` parsing a `space.json`
+   * with that one before the importer identifies it.
    *
    * Zod's wording is deliberately not pinned here — it is version-dependent, and
    * the rest of this file pins our shape rather than its prose. What is pinned is

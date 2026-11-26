@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { aggregateFileSchema, newUuid } from '@project/core';
 import { HttpSpaceBackend } from '@project/http';
 import { afterEach, describe, expect, it } from 'vitest';
-import { readSingleSpace } from '../../src/aggregate-directory';
+import { readAggregateSpace } from '../support/read-aggregate-space';
 import { initAggregate } from '../../src/run/run';
 import { runCommand } from '../support/infinity-cube-command';
 
@@ -164,7 +164,7 @@ const startRunning = async (via: 'pnpm' | 'launcher', existing?: string) => {
     expect(committed.kind).toBe('committed');
   };
   const writtenTitle = async (): Promise<string> =>
-    (await readSingleSpace(join(directory, metaSpaceId))).document.title;
+    (await readAggregateSpace(directory, metaSpaceId)).document.title;
 
   return {
     child,
@@ -201,9 +201,7 @@ describe('pnpm cube init', () => {
       const { metaSpaceId } = aggregateFileSchema.parse(
         JSON.parse(await readFile(join(directory, 'aggregate.json'), 'utf8')),
       );
-      expect((await readSingleSpace(join(directory, metaSpaceId))).document.title).toBe(
-        'New space',
-      );
+      expect((await readAggregateSpace(directory, metaSpaceId)).document.title).toBe('New space');
     },
     START_TIMEOUT_MS,
   );

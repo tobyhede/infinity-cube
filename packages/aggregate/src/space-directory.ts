@@ -99,9 +99,9 @@ const refuseDocument = (
 /**
  * Refuse a space file's text whose document this version cannot read, and do
  * nothing for any other text, an unparseable one included. The aggregate
- * reader and `readSingleSpace` ask it when one of a Space directory's files
- * could not be read, so that a document refused outright is reported as that
- * rather than as the read failure.
+ * reader asks it when one of a Space directory's files could not be read, so
+ * that a document refused outright is reported as that rather than as the read
+ * failure.
  */
 export const refuseSpaceDocument = (
   spaceFile: string,

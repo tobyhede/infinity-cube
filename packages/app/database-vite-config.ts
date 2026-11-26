@@ -31,9 +31,7 @@ export const sqliteViteTarget: ViteDatabaseTarget = {
 
 /** The memory catalog an isolated runtime imports in place of the database. */
 type MemoryCatalog =
-  | { readonly catalog: 'empty' }
-  | { readonly catalog: 'fixture'; readonly aggregate?: string }
-  | { readonly catalog: 'directory'; readonly directory: string };
+  { readonly catalog: 'empty' } | { readonly catalog: 'fixture'; readonly aggregate?: string };
 
 const hostViteConfig = (
   target: ViteDatabaseTarget,
@@ -64,8 +62,8 @@ export const databaseViteConfig = (target: ViteDatabaseTarget, { mode }: ConfigE
         ? { catalog: 'empty' as const }
         : target === postgresViteTarget && mode === 'roadmap'
           ? {
-              catalog: 'directory' as const,
-              directory: repositoryFile('../../.scratch/v1-release/roadmap-space'),
+              catalog: 'fixture' as const,
+              aggregate: repositoryFile('../../.scratch/v1-release/roadmap-space'),
             }
           : undefined;
   return hostViteConfig(target, memoryCatalog);

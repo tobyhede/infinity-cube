@@ -14,7 +14,7 @@ import { AGGREGATE_FILE_VERSION, type AggregateFile, type UUID } from '@project/
 import type { LoadedAggregate, StoredAsset } from '@project/persistence';
 import { directorySource } from './directory-source';
 import { writeInPlace, type DirectoryFiles } from './write-in-place';
-import { spaceDirectoryFiles } from './write-space-directory';
+import { spaceDirectoryFiles } from './space-directory-files';
 
 /**
  * Read a canonical aggregate directory from disk into the complete Meta-rooted

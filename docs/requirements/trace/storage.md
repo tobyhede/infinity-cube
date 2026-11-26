@@ -456,7 +456,7 @@ The rule ids in `../storage.md` are append-only from this version on. ST-99 was 
 - ST-103: export status derives from acknowledged revisions (received from ED).
 - ST-110: what `cube check` prints and that it names a missing asset's file (AGENTS.md states the verb).
 - ST-111, ST-112: the MCP server, its tools, path confinement and asset writer. AGENTS.md names the server; 0141, which describes it, is proposed.
-- ST-35 (Map content sorting): every Map content is written in canonical key order (`src/aggregate-directory/write-space-directory.ts`); 0142 and the guide name only a missing kind's.
+- ST-35 (Map content sorting): every Map content is written in canonical key order (`src/aggregate-directory/space-directory-files.ts`); 0142 and the guide name only a missing kind's.
 - ST-76: the served-type rule and `X-Asset-Media-Type` come from the guide; the sandboxing Content Security Policy on a served asset is code only.
 - ST-113–ST-116: the desktop sidecar, its announcement, lock-down, routing, fallback and stop. ADR 0155 decides it; the rules restate `src/desktop/` and its tests. ST-63's sentence on the sidecar's stop and five-second kill comes from the same code.
 - ST-117: located refusals, the order a commit's candidate aggregate is judged in, the code unit cycle walk and the intake conformance corpus. ADR 0156 decides the corpus; the rule restates `packages/aggregate/src/intake-refusal.ts`, `packages/graph/src/intake-location.ts`, `decideCommit` and `conformance/intake/README.md`, and their tests.

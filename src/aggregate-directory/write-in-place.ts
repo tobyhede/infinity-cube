@@ -1,7 +1,7 @@
 import { lstat, mkdir, open, readFile, rename, rm, rmdir, type FileHandle } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { compareOrdinal } from '@project/aggregate';
-import { isMissingFile } from './space-directory';
+import { isMissingFile } from './missing-file';
 
 /**
  * The files a directory should hold, by path relative to it with `/` between

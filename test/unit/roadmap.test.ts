@@ -5,10 +5,10 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
-import { spaceFileSchema, spaceSnapshotSchema } from '@project/core';
+import { aggregateFileSchema, spaceFileSchema, spaceSnapshotSchema } from '@project/core';
 import { isOfKind } from '@project/plugins/testing';
 import { loadSpaceSnapshot } from '@project/graph';
-import { readSingleSpace } from '../../src/aggregate-directory';
+import { readAggregateSpace } from '../support/read-aggregate-space';
 import {
   buildRoadmap,
   planRelease,
@@ -22,6 +22,11 @@ import {
 } from '../../scripts/roadmap';
 
 const REPOSITORY_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+/** The Meta Space id of the Aggregate directory a generated release Space was written as. */
+const metaSpaceIdOf = (aggregate: string): string =>
+  aggregateFileSchema.parse(JSON.parse(readFileSync(join(aggregate, 'aggregate.json'), 'utf8')))
+    .metaSpaceId;
 
 const roots: string[] = [];
 
@@ -492,7 +497,7 @@ describe('release scope', () => {
     const html = renderRoadmapHtml(roadmap, release);
     expect(html).toContain('<h3>Critical subgraph<span class="tally">3</span></h3>');
     expect(html).toContain('<h3>Parallel work<span class="tally">1</span></h3>');
-    expect(html).toContain('href="release/roadmap-space/space.json"');
+    expect(html).toContain('href="release/roadmap-space/aggregate.json"');
   });
 
   it('includes every tied longest dependency path in the critical subgraph', () => {
@@ -635,8 +640,9 @@ describe('release scope', () => {
     const destination = writeReleaseSpace(root, buildRoadmap(root), release);
     if (destination === null) throw new Error('Expected a generated Space.');
     // One Resource: its Resource file, and its text as an asset (ADR 0142).
-    expect(readdirSync(join(destination, 'resources'))).toHaveLength(1);
-    expect(readdirSync(join(destination, 'resources'))[0]).toMatch(/\.json$/u);
+    const spaceDirectory = join(destination, metaSpaceIdOf(destination));
+    expect(readdirSync(join(spaceDirectory, 'resources'))).toHaveLength(1);
+    expect(readdirSync(join(spaceDirectory, 'resources'))[0]).toMatch(/\.json$/u);
     expect(readdirSync(join(destination, 'assets'))).toHaveLength(1);
     expect(readdirSync(join(destination, 'assets'))[0]).toMatch(/\.md$/u);
 
@@ -650,9 +656,9 @@ describe('release scope', () => {
     );
     const emptied = writeReleaseSpace(root, buildRoadmap(root), release);
     if (emptied === null) throw new Error('Expected a generated Space.');
-    expect(readdirSync(join(emptied, 'resources'))).toHaveLength(0);
+    expect(readdirSync(join(emptied, metaSpaceIdOf(emptied), 'resources'))).toHaveLength(0);
 
-    const imported = await readSingleSpace(emptied);
+    const imported = await readAggregateSpace(emptied, metaSpaceIdOf(emptied));
     const intake = loadSpaceSnapshot(
       spaceSnapshotSchema.parse({
         id: imported.id,
@@ -693,18 +699,19 @@ describe('release scope', () => {
     if (destination === null) throw new Error('Expected a generated Space.');
 
     // A Resource file for each of the three issues, and its text as an asset.
-    const files = readdirSync(join(destination, 'resources'));
+    const spaceDirectory = join(destination, metaSpaceIdOf(destination));
+    const files = readdirSync(join(spaceDirectory, 'resources'));
     expect(files.filter((name) => name.endsWith('.json'))).toHaveLength(3);
     expect(files.filter((name) => name.endsWith('.md'))).toHaveLength(0);
     expect(readdirSync(join(destination, 'assets'))).toHaveLength(3);
-    const written: unknown = JSON.parse(readFileSync(join(destination, 'space.json'), 'utf8'));
+    const written: unknown = JSON.parse(readFileSync(join(spaceDirectory, 'space.json'), 'utf8'));
     const file = spaceFileSchema.parse(written);
     expect(file.maps?.[0]?.graphs.map(({ edges }) => edges)).toEqual([
       [expect.any(Object), expect.any(Object)],
       [],
     ]);
 
-    const imported = await readSingleSpace(destination);
+    const imported = await readAggregateSpace(destination, metaSpaceIdOf(destination));
     const parallel = imported.resources.find(
       ({ document }) => document.title === 'parallel/01 — Reference Resource',
     );

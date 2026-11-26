@@ -8,7 +8,7 @@ import { uuidSchema } from '@project/core';
 import { HttpSpaceBackend } from '@project/http';
 import { build } from 'vite';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { readSingleSpace } from '../../src/aggregate-directory';
+import { readAggregateSpace } from '../support/read-aggregate-space';
 import {
   sidecarAnnouncementSchema,
   type SidecarAnnouncement,
@@ -124,7 +124,7 @@ const sidecarWithAnEdit = async (entry?: readonly string[]) => {
 };
 
 const writtenTitle = async (directory: string): Promise<string> =>
-  (await readSingleSpace(join(directory, META_SPACE_ID))).document.title;
+  (await readAggregateSpace(directory, META_SPACE_ID)).document.title;
 
 describe('The desktop sidecar', () => {
   it(

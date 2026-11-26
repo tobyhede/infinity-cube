@@ -10,16 +10,14 @@ import {
 } from '@project/core';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AGGREGATE_FILE_NAME } from '@project/aggregate';
-import {
-  readSingleSpace,
-  writeSpaceDirectory as writeLoadedSpaceDirectory,
-} from '../../src/aggregate-directory';
+import { writeAggregateDirectory } from '../../src/aggregate-directory';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import { postgresSqlStore } from '../../src/prisma/sql-store';
 import { postgresTestDatabase } from '../support/postgres-database';
 import { clearInfinityCubeContent } from '../support/clear-infinity-cube-content';
 import { runInfinityCubeScript } from '../support/infinity-cube-command';
 import { markdownResourceFiles, textAssetRef } from '../support/aggregate-directory';
+import { readAggregateSpace } from '../support/read-aggregate-space';
 import { admitted, pngBytes, showing } from '../support/stored-assets';
 
 const IMPORTED_SPACE_ID = uuidSchema.parse('d1111111-1111-4111-8111-111111111111');
@@ -103,22 +101,9 @@ describe('infinity-cube CLI', () => {
   };
 
   /**
-   * One Space of an aggregate, in the directory named for its own Id, with a
-   * `resources/` directory for a test to write hand-authored Resources into.
-   */
-  const writeSpaceDirectory = async (
-    aggregate: string,
-    snapshot: SpaceSnapshot,
-  ): Promise<string> => {
-    const directory = join(aggregate, snapshot.id);
-    await writeLoadedSpaceDirectory({ snapshot, revision: 0n, exportedRevision: null }, directory);
-    await mkdir(join(directory, 'resources'), { recursive: true });
-    return directory;
-  };
-
-  /**
    * A canonical aggregate directory: a versioned `aggregate.json` naming Meta, plus
-   * one `<space-uuid>/` child per Space.
+   * one `<space-uuid>/` child per Space, each with a `resources/` directory for
+   * a test to write hand-authored Resources into.
    *
    * A bare Space directory is not what the public command takes, so every
    * fixture here is built through this — a directory with no aggregate file is a
@@ -129,11 +114,16 @@ describe('infinity-cube CLI', () => {
     snapshots: readonly SpaceSnapshot[],
   ): Promise<string> => {
     const directory = await temporaryDirectory('infinity-cube-cli-integration-');
-    await writeFile(
-      join(directory, AGGREGATE_FILE_NAME),
-      `${JSON.stringify({ version: AGGREGATE_FILE_VERSION, metaSpaceId }, null, 2)}\n`,
+    await writeAggregateDirectory(
+      {
+        metaSpaceId,
+        spaces: snapshots.map((snapshot) => ({ snapshot, revision: 0n, exportedRevision: null })),
+      },
+      directory,
     );
-    for (const snapshot of snapshots) await writeSpaceDirectory(directory, snapshot);
+    for (const snapshot of snapshots) {
+      await mkdir(join(directory, snapshot.id, 'resources'), { recursive: true });
+    }
     return directory;
   };
 
@@ -325,10 +315,9 @@ describe('infinity-cube CLI', () => {
       version: AGGREGATE_FILE_VERSION,
       metaSpaceId: IMPORTED_SPACE_ID,
     });
-    // Read back through the ordinary single-Space reader, from the child named
-    // for the Space. The directory name is where a Space Id is written down, so
-    // addressing it by that name is also the assertion that it was.
-    await expect(readSingleSpace(join(destination, IMPORTED_SPACE_ID))).resolves.toEqual({
+    // Read back through Import's reader, which reads each Space from the child
+    // named for it: the directory name is where a Space Id is written down.
+    await expect(readAggregateSpace(destination, IMPORTED_SPACE_ID)).resolves.toEqual({
       id: snapshot.id,
       document: snapshot.document,
       resources: snapshot.resources,

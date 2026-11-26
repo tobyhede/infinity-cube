@@ -441,7 +441,7 @@
         "src/cli/database-command.ts",
         "src/cli/run-lifecycle.ts",
         "src/cli/run-process.ts",
-        "src/aggregate-directory/space-directory.ts"
+        "src/aggregate-directory/missing-file.ts"
       ],
       "rules": {
         "anti-slop/no-unknown-parameters": "off"

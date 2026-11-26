@@ -2,15 +2,11 @@ import { newUuid } from '@project/core';
 import { establishMetaSpace } from '../../src/startup/database-startup';
 import { createSpaceHost, type SpaceHostApplication } from '@project/aggregate';
 import { E2eMemorySpaceRepository } from './e2e-memory-space-repository';
-import { importFixture, importSpaceDirectory } from './import-fixture';
+import { importFixture } from './import-fixture';
 
 export type E2eHttpRuntimeOptions = {
   startup?: boolean;
-} & (
-  | { catalog: 'empty' }
-  | { catalog: 'fixture'; aggregate?: string }
-  | { catalog: 'directory'; directory: string }
-);
+} & ({ catalog: 'empty' } | { catalog: 'fixture'; aggregate?: string });
 
 const importCatalog = (repository: E2eMemorySpaceRepository, options: E2eHttpRuntimeOptions) => {
   if (options.catalog === 'fixture') {
@@ -18,7 +14,6 @@ const importCatalog = (repository: E2eMemorySpaceRepository, options: E2eHttpRun
       ? importFixture(repository)
       : importFixture(repository, { directory: options.aggregate });
   }
-  if (options.catalog === 'directory') return importSpaceDirectory(repository, options.directory);
   return Promise.resolve(undefined);
 };
 

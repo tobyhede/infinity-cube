@@ -18,7 +18,7 @@ import { HttpSpaceBackend, productDestinationPath } from '@project/http';
 import { afterEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { AGGREGATE_FILE_NAME } from '@project/aggregate';
-import { readSingleSpace } from '../../src/aggregate-directory';
+import { readAggregateSpace } from '../support/read-aggregate-space';
 import { LOCK_FILE_NAME, lockDirectory } from '../../src/run/directory-lock';
 import {
   RUN_QUIET_MILLISECONDS,
@@ -91,9 +91,9 @@ const filesUnder = async (directory: string): Promise<Record<string, string>> =>
   return files;
 };
 
-/** The Space's title as the ordinary Space directory reader reads it back. */
+/** The Space's title as Import's reader reads it back. */
 const spaceTitle = async (directory: string, spaceId: string): Promise<string> =>
-  (await readSingleSpace(join(directory, spaceId))).document.title;
+  (await readAggregateSpace(directory, spaceId)).document.title;
 
 /** A started run, the clock driving it and every event it has reported. */
 const started = async (directory: string) => {
@@ -381,7 +381,7 @@ describe('Running an Aggregate directory', () => {
     await run.stop();
 
     expect(await spaceTitle(directory, META_SPACE_ID)).toBe('Edited after opening another Space');
-    const written = await readSingleSpace(join(directory, AUTHORING_SPACE_ID));
+    const written = await readAggregateSpace(directory, AUTHORING_SPACE_ID);
     expect(written.document.defaultMap).toBe(defaultMap);
   });
 
@@ -408,7 +408,7 @@ describe('Running an Aggregate directory', () => {
     expect(await spaceTitle(directory, AUTHORING_SPACE_ID)).toBe(
       'Edited after reading a Space with no Map',
     );
-    const written = await readSingleSpace(join(directory, META_SPACE_ID));
+    const written = await readAggregateSpace(directory, META_SPACE_ID);
     expect(written.document.defaultMap).toBe(initializedMap?.id);
     expect(
       (written.document.maps ?? []).map(({ id, graphs }) => ({

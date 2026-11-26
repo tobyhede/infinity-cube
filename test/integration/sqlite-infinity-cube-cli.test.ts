@@ -9,7 +9,7 @@ import {
   type UUID,
 } from '@project/core';
 import { afterEach, describe, expect, it } from 'vitest';
-import { writeSpaceDirectory as writeLoadedSpaceDirectory } from '../../src/aggregate-directory';
+import { writeAggregateDirectory } from '../../src/aggregate-directory';
 import { runInfinityCube } from '../../src/cli/run';
 import type { DatabaseTarget } from '../../src/database/database-target';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
@@ -106,16 +106,13 @@ describe('infinity-cube CLI --store sqlite', () => {
     snapshots: readonly SpaceSnapshot[],
   ): Promise<string> => {
     const directory = await temporaryDirectory('infinity-cube-sqlite-cli-aggregate-');
-    await writeFile(
-      join(directory, AGGREGATE_FILE_NAME),
-      `${JSON.stringify({ version: AGGREGATE_FILE_VERSION, metaSpaceId }, null, 2)}\n`,
+    await writeAggregateDirectory(
+      {
+        metaSpaceId,
+        spaces: snapshots.map((snapshot) => ({ snapshot, revision: 0n, exportedRevision: null })),
+      },
+      directory,
     );
-    for (const snapshot of snapshots) {
-      await writeLoadedSpaceDirectory(
-        { snapshot, revision: 0n, exportedRevision: null },
-        join(directory, snapshot.id),
-      );
-    }
     return directory;
   };
 

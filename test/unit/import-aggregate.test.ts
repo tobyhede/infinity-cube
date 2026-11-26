@@ -187,7 +187,7 @@ describe('importAggregate', () => {
     // intake, so it asks `documentRefusal` before that schema can answer for the
     // keys that moved — the same composed gate `loadSpace` asks, so the CLI says
     // of a version 2 directory exactly what intake says, once. What that gate is
-    // and where it lives is pinned in `read-single-space.test.ts`; what matters
+    // and where it lives is pinned in `read-aggregate.test.ts`; what matters
     // here is that the version is the whole of the refusal and nothing reaches
     // the repository.
     const root = await writeAggregate(META_SPACE_ID, [

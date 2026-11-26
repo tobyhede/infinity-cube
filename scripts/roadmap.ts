@@ -11,7 +11,7 @@ import {
 } from 'node:fs';
 import { basename, join, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { resourceSchema } from '@project/core';
+import { AGGREGATE_FILE_VERSION, resourceSchema } from '@project/core';
 import { serializeResource } from '@project/graph';
 
 /**
@@ -720,7 +720,12 @@ const markdownResource = (id: string, planned: PlannedReleaseIssue) => {
   return { resource, text, hash };
 };
 
-/** Generate one ordinary Space that dogfoods the open release dependency graph. */
+/**
+ * Generate an Aggregate directory whose one Space, its Meta Space, dogfoods
+ * the open release dependency graph: `aggregate.json`, the Space's directory
+ * named for its id, and its Resources' text in `assets/` (ADR 0142). Answers
+ * the Aggregate directory.
+ */
 export const writeReleaseSpace = (
   root: string,
   roadmap: Roadmap,
@@ -746,19 +751,21 @@ export const writeReleaseSpace = (
     return id;
   };
 
-  const resourcesDirectory = join(destination, 'resources');
+  const spaceId = stableRoadmapUuid(`space:${release.tag}`);
+  const spaceDirectory = join(destination, spaceId);
   const assetsDirectory = join(destination, 'assets');
-  for (const directory of [resourcesDirectory, assetsDirectory]) {
+  for (const directory of [spaceDirectory, assetsDirectory]) {
     rmSync(directory, { recursive: true, force: true });
-    mkdirSync(directory, { recursive: true });
   }
+  mkdirSync(join(spaceDirectory, 'resources'), { recursive: true });
+  mkdirSync(assetsDirectory, { recursive: true });
   // Each issue as its Resource file, at the path `serializeResource` gives it
   // relative to the Space directory (ADR 0128), and its text as an asset in
-  // `assets/` beside it (ADR 0142).
+  // the aggregate's `assets/` (ADR 0142).
   for (const planned of issues) {
     const { resource, text, hash } = markdownResource(resourceId(planned.reference), planned);
     for (const file of serializeResource(resource)) {
-      writeFileSync(join(destination, file.path), file.text);
+      writeFileSync(join(spaceDirectory, file.path), file.text);
     }
     writeFileSync(join(assetsDirectory, `${hash}.md`), text);
   }
@@ -797,7 +804,7 @@ export const writeReleaseSpace = (
   const parallelGraphId = stableRoadmapUuid(`graph:${release.tag}:parallel`);
   const space = {
     version: 1,
-    id: stableRoadmapUuid(`space:${release.tag}`),
+    id: spaceId,
     title: `${release.title} roadmap`,
     maps: [
       {
@@ -824,8 +831,11 @@ export const writeReleaseSpace = (
     ],
     defaultMap: mapId,
   };
-  mkdirSync(destination, { recursive: true });
-  writeFileSync(join(destination, 'space.json'), `${JSON.stringify(space, null, 2)}\n`);
+  writeFileSync(join(spaceDirectory, 'space.json'), `${JSON.stringify(space, null, 2)}\n`);
+  writeFileSync(
+    join(destination, 'aggregate.json'),
+    `${JSON.stringify({ version: AGGREGATE_FILE_VERSION, metaSpaceId: spaceId }, null, 2)}\n`,
+  );
   return destination;
 };
 
@@ -915,7 +925,7 @@ const htmlReleaseScope = (roadmap: Roadmap, release: ReleaseScope): string => {
   const space =
     release.space === null
       ? ''
-      : `<p><a href="${escapeHtml(`${release.space}/space.json`)}">Dogfood roadmap Space</a></p>`;
+      : `<p><a href="${escapeHtml(`${release.space}/aggregate.json`)}">Dogfood roadmap Space</a></p>`;
   // As in `renderRoadmap`: an empty critical subgraph is a release with no gate
   // declared or one whose gate has been reached, and neither has a graph to draw.
   const issueLists =

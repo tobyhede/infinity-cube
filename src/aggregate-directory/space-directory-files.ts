@@ -1,5 +1,3 @@
-import { stat } from 'node:fs/promises';
-import { relative } from 'node:path';
 import {
   SPACE_FILE_VERSION,
   canonicalJsonValue,
@@ -10,18 +8,6 @@ import {
 import { Placement, serializeResource } from '@project/graph';
 import type { LoadedSpace } from '@project/persistence';
 import { compareOrdinal } from '@project/aggregate';
-import { discoverResourceFiles, isMissingFile } from './space-directory';
-import { writeInPlace } from './write-in-place';
-
-const exists = async (path: string): Promise<boolean> => {
-  try {
-    await stat(path);
-    return true;
-  } catch (error) {
-    if (isMissingFile(error)) return false;
-    throw error;
-  }
-};
 
 /** Full literals, so the exported key order is fixed and an absent Title writes no key. */
 const canonicalEdge = (edge: GraphEdge): GraphEdge => {
@@ -125,36 +111,4 @@ export const spaceDirectoryFiles = (stored: LoadedSpace): ReadonlyMap<string, st
     }
   }
   return files;
-};
-
-/**
- * The files Import reads in a Space directory, by path relative to it, or none
- * when the directory does not exist.
- */
-export const scannedSpaceFiles = async (directory: string): Promise<readonly string[]> => {
-  if (!(await exists(directory))) return [];
-  const resources = await discoverResourceFiles(directory);
-  return ['space.json', ...resources.map((path) => relative(directory, path))];
-};
-
-/**
- * Write one Space's canonical files into a directory, in place, replacing
- * whatever the reader would have discovered there and leaving everything else
- * alone.
- *
- * What it removes is exactly what `readSingleSpace` scans — `resources/*.json`
- * and `space.json` — so a Resource deleted since the last export leaves no
- * Resource file behind to be read back, and every other Resource's file stays.
- * Anything the reader would not have looked at survives, a `README.md` or any
- * other `*.md` included (ADR 0119, ADR 0142), which is what lets a Space
- * directory carry notes across a round trip.
- */
-export const writeSpaceDirectory = async (
-  stored: LoadedSpace,
-  directory: string,
-): Promise<void> => {
-  const files = new Map(
-    [...spaceDirectoryFiles(stored)].map(([path, text]) => [path, Buffer.from(text)] as const),
-  );
-  await writeInPlace(directory, files, await scannedSpaceFiles(directory));
 };

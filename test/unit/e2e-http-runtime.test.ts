@@ -1,6 +1,5 @@
 import { readFileSync } from 'node:fs';
 import { encodeCompactUuid, uuidSchema } from '@project/core';
-import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { HttpSpaceBackend } from '@project/http';
 import { createApp, type E2eHttpRuntimeOptions } from '../support/e2e-http-runtime';
@@ -9,7 +8,6 @@ const FIXTURE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
 const PRESENTATION_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000060');
 const DEEP_DIVE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000070');
 const NOTES_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000080');
-const EXAMPLE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000041');
 const FIXTURE_SPACES = [
   { id: FIXTURE_ID, title: 'Map fixture' },
   { id: PRESENTATION_ID, title: 'Presentation' },
@@ -92,15 +90,6 @@ describe('e2e HTTP runtime', () => {
     const backend = await startRuntime({ catalog: 'empty' });
 
     await expect(backend.listSpaces()).resolves.toEqual([]);
-  });
-
-  it('imports an explicit Space directory for generated catalogues', async () => {
-    const directory = fileURLToPath(new URL('../../packages/app/example', import.meta.url));
-    const backend = await startRuntime({ catalog: 'directory', directory });
-
-    await expect(backend.listSpaces()).resolves.toEqual([
-      { id: EXAMPLE_ID, title: 'Graph-Native Technical Presentations' },
-    ]);
   });
 
   it('initializes an empty catalog from Default Content when hosting the browser', async () => {

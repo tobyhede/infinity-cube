@@ -2,7 +2,7 @@ import type { Dirent } from 'node:fs';
 import { lstat, readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { AggregateSource } from '@project/aggregate';
-import { isMissingFile } from './space-directory';
+import { isMissingFile } from './missing-file';
 
 /** How many files Import reads at once, well under a process's descriptor limit. */
 const READ_CONCURRENCY = 32;
