@@ -131,7 +131,7 @@ const NO_LAUNCH_SECRET =
 const NO_DIRECTORY =
   'a process case runs a host over a `{directory}` and checks its Export; `infinity-cube serve --store sqlite` serves a store, with no directory to run or Export';
 
-const NO_LAUNCH_SECRET =
+const NO_POSTGRES_LAUNCH_SECRET =
   '`serve --store postgres` takes no launch secret and keeps no session cookie: it announces as a restart-proof host does (`test/support/restart-proof-host.ts`), and the cookie is the desktop sidecar’s';
 
 const NO_POSTGRES_DIRECTORY =
@@ -214,9 +214,9 @@ const PORTS: readonly Port[] = [
     files: ['crates/host/tests/postgres_wire.rs', 'crates/cli/tests/serve_postgres.rs'],
     exempt: {
       'answers 403 to a request without the session cookie, and to a wrong launch secret':
-        NO_LAUNCH_SECRET,
+        NO_POSTGRES_LAUNCH_SECRET,
       'trades the launch secret for an HttpOnly, SameSite=Strict session cookie by a redirect':
-        NO_LAUNCH_SECRET,
+        NO_POSTGRES_LAUNCH_SECRET,
       'refuses a missing directory, announcing why and exiting non-zero': NO_POSTGRES_DIRECTORY,
       'writes an edit once edits have been quiet, and keeps it on SIGINT': NO_POSTGRES_DIRECTORY,
       'writes an edit not yet written when stopped by SIGINT, and exits zero':
