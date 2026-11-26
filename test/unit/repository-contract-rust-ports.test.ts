@@ -62,7 +62,7 @@ const VALUES: Readonly<Record<string, readonly string[]>> = {
 };
 
 /** The tickets a pending case may name. */
-const TICKETS = ['06', '10', '11', '12', '13'] as const;
+const TICKETS = ['10', '11', '12', '13'] as const;
 type Ticket = (typeof TICKETS)[number];
 
 type Exemption =
@@ -95,13 +95,6 @@ const EXEMPT: Readonly<Record<string, Exemption>> = {
     doesNotApply(ROW_LOCK),
   "stores a * commit's whole snapshot over Resource rows recreated before its row lock (complete-aggregate)":
     doesNotApply(ROW_LOCK),
-  'stores an asset of any type and loads its bytes and media type unchanged': pending('06'),
-  'holds a Markdown Resource decoded from its file, and its text, as the same value': pending('06'),
-  'stores the same bytes once, keeping the first media type': pending('06'),
-  'answers an asset it does not store as absent': pending('06'),
-  'holds the asset of zero bytes already, under the type it always has': pending('06'),
-  'keeps stored assets outside the aggregate its lifecycle doors replace': pending('06'),
-  'keeps a stored asset across a fresh repository host': pending('06'),
 
   // test/integration/sqlite-space-repository.test.ts
   'serialises overlapping in-process commits at different Spaces well under the busy timeout':
@@ -259,7 +252,7 @@ describe('the port check', () => {
   const cases = ['ported', 'pending', 'inapplicable'];
   const clean: Marks = {
     marked: ['ported', 'an HTTP case'],
-    exempt: { pending: pending('06'), inapplicable: doesNotApply('why') },
+    exempt: { pending: pending('10'), inapplicable: doesNotApply('why') },
     elsewhere: ['an HTTP case'],
   };
 
@@ -284,7 +277,7 @@ describe('the port check', () => {
 
   it('finds an exemption naming no case', () => {
     expect(
-      findings(cases, { ...clean, exempt: { ...clean.exempt, gone: pending('06') } })
+      findings(cases, { ...clean, exempt: { ...clean.exempt, gone: pending('10') } })
         .unknownExemptions,
     ).toEqual(['gone']);
   });
@@ -297,7 +290,7 @@ describe('the port check', () => {
   });
 
   it('tells a pending exemption from one that does not apply', () => {
-    expect(pending('06')).toEqual({ kind: 'pending', ticket: '06' });
+    expect(pending('10')).toEqual({ kind: 'pending', ticket: '10' });
     expect(doesNotApply('why')).toEqual({ kind: 'does not apply', reason: 'why' });
   });
 });

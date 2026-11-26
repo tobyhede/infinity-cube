@@ -494,6 +494,15 @@ macro_rules! repository_cases {
                 fails_a_fast_path_commit_over_a_revision_that_is_not_canonical,
                 fails_a_stored_exported_revision_that_is_not_canonical,
             }
+            assets {
+                stores_an_asset_of_any_type_and_loads_it_unchanged,
+                holds_a_markdown_resource_from_its_file_and_its_text_as_one_value,
+                stores_the_same_bytes_once_keeping_the_first_media_type,
+                answers_an_asset_it_does_not_store_as_absent,
+                holds_the_asset_of_zero_bytes_already,
+                keeps_stored_assets_outside_the_aggregate_the_doors_replace,
+                keeps_a_stored_asset_across_a_fresh_host,
+            }
             // table:end
         }
     };
