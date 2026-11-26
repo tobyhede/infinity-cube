@@ -119,7 +119,7 @@ fn assert_unclassified_at_once(error: &RepositoryError, took: Duration, code: &s
 
 /// What one direct connection to `url`, outside any pool, fails with.
 async fn connecting(url: &DatabaseUrl) -> sqlx::Error {
-    let options = postgres_connect_options(url.as_str()).unwrap();
+    let options = postgres_connect_options(url.as_str(), None).unwrap();
     options
         .connect()
         .await

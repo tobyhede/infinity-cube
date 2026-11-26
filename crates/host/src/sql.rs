@@ -267,7 +267,8 @@ pub(crate) trait SqlStore: Send + Sync + 'static {
         hash: &str,
     ) -> impl Future<Output = Result<Option<(String, Vec<u8>)>, sqlx::Error>> + Send;
 
-    /// The name of every table the database holds.
+    /// The name of every table the database holds, or at least of each of
+    /// `TABLES` its statements would reach.
     fn tables(
         connection: &mut Connection<Self>,
     ) -> impl Future<Output = Result<Vec<String>, sqlx::Error>> + Send;

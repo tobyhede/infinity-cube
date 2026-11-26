@@ -150,18 +150,29 @@ mod classify_a_failure {
         recognises_sqlstate_57p03 => database("57P03"),
     );
 
+    /// The SQLSTATEs `UNAVAILABLE_SQLSTATES` lists in `source`.
+    fn typescript_allowlist(source: &str) -> Vec<String> {
+        let start = source
+            .find("export const UNAVAILABLE_SQLSTATES = [")
+            .expect("the TypeScript store declares UNAVAILABLE_SQLSTATES");
+        let rest = &source[start..];
+        let list = &rest[rest.find('[').unwrap() + 1..rest.find(']').unwrap()];
+        list.split(',')
+            .map(|entry| entry.trim().trim_matches('\'').to_owned())
+            .filter(|entry| !entry.is_empty())
+            .collect()
+    }
+
     // Case: names the set ticket 31 records
     #[test]
     fn names_the_set_the_typescript_store_names() {
-        let mut states = super::super::UNREACHABLE_STATES;
+        let path =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../src/prisma/sql-store.ts");
+        let mut typescript = typescript_allowlist(&std::fs::read_to_string(&path).unwrap());
+        typescript.sort_unstable();
+        let mut states = super::super::UNREACHABLE_STATES.map(str::to_owned).to_vec();
         states.sort_unstable();
-        assert_eq!(
-            states,
-            [
-                "08000", "08001", "08003", "08004", "08006", "40001", "40P01", "53300", "55P03",
-                "57P01", "57P02", "57P03",
-            ]
-        );
+        assert_eq!(states, typescript);
     }
 
     // Case: recognises the socket failure %s
@@ -287,7 +298,7 @@ mod read_sslmode_as_pg_does {
     use super::*;
 
     fn mode(url: &str) -> PgSslMode {
-        connect_options(url).unwrap().get_ssl_mode()
+        connect_options(url, None).unwrap().get_ssl_mode()
     }
 
     const BASE: &str = "postgresql://cube:secret@127.0.0.1:55432/cube";
@@ -362,26 +373,78 @@ mod read_sslmode_as_pg_does {
             compat("sslmode=verify-full"),
             PgSslMode::VerifyFull
         ));
+        // libpq has no `no-verify`, and `pg` leaves it checked under
+        // `uselibpqcompat`.
+        assert!(matches!(compat("sslmode=no-verify"), PgSslMode::VerifyFull));
         assert_eq!(
-            connect_options(&format!("{BASE}?uselibpqcompat=true&sslmode=verify-ca")).err(),
+            connect_options(
+                &format!("{BASE}?uselibpqcompat=true&sslmode=verify-ca"),
+                None
+            )
+            .err(),
             Some(PostgresUrlError::VerifyCaWithoutRoot)
         );
     }
 
     #[test]
     fn keeps_every_other_parameter_and_the_database() {
-        let options = connect_options(&format!(
-            "{BASE}?sslmode=disable&application_name=cube&uselibpqcompat=false"
-        ))
+        let options = connect_options(
+            &format!("{BASE}?sslmode=disable&application_name=cube&uselibpqcompat=false"),
+            None,
+        )
         .unwrap();
         assert_eq!(options.get_database(), Some("cube"));
         assert_eq!(options.get_host(), "127.0.0.1");
     }
 
+    // `pg` reads `PGSSLMODE` when the URL names no TLS setting (pg 8.22
+    // `lib/connection-parameters.js`, `readSSLConfigFromEnvironment`):
+    // `disable` and any value it does not know connect without TLS,
+    // `no-verify` encrypts without checking, and `prefer`, `require`,
+    // `verify-ca` and `verify-full` verify the certificate and host.
+    #[test]
+    fn follows_pgsslmode_when_the_url_names_no_tls() {
+        let cases = [
+            ("disable", PgSslMode::Disable),
+            ("allow", PgSslMode::Disable),
+            ("no-verify", PgSslMode::Require),
+            ("prefer", PgSslMode::VerifyFull),
+            ("require", PgSslMode::VerifyFull),
+            ("verify-ca", PgSslMode::VerifyFull),
+            ("verify-full", PgSslMode::VerifyFull),
+        ];
+        for (value, expected) in cases {
+            for url in [BASE.to_owned(), format!("{BASE}?uselibpqcompat=true")] {
+                let read = connect_options(&url, Some(value)).unwrap().get_ssl_mode();
+                assert_eq!(
+                    format!("{read:?}"),
+                    format!("{expected:?}"),
+                    "PGSSLMODE={value} with {url}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn leaves_pgsslmode_unread_when_the_url_names_tls() {
+        for query in [
+            "sslmode=disable",
+            "ssl=0",
+            "ssl=true",
+            "sslrootcert=/ca.pem",
+        ] {
+            let url = format!("{BASE}?{query}");
+            let read = connect_options(&url, Some("no-verify"))
+                .unwrap()
+                .get_ssl_mode();
+            assert_eq!(format!("{read:?}"), format!("{:?}", mode(&url)), "{query}");
+        }
+    }
+
     #[test]
     fn refuses_what_is_not_a_url() {
         assert!(matches!(
-            connect_options("not a url"),
+            connect_options("not a url", None),
             Err(PostgresUrlError::Invalid(_))
         ));
     }

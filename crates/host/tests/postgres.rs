@@ -441,3 +441,56 @@ mod given_its_connection {
         store.close().await;
     }
 }
+
+/// Where the store finds its tables: through the role's `search_path`, as
+/// its statements do, whatever the role may do with them, as the TypeScript
+/// store, which checks for no table, finds them.
+mod given_where_its_tables_are {
+    use super::*;
+
+    // A role granted nothing on the tables still sees that they exist, so
+    // its read is refused by the server (`42501`), unclassified as the
+    // TypeScript store leaves it, not answered as a database missing tables.
+    #[tokio::test]
+    #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+    async fn leaves_a_role_granted_nothing_on_the_tables_unclassified_naming_42501() {
+        let database = Fresh::new().await;
+        let role = format!("cube_role_{}", uuid::Uuid::new_v4().simple());
+        database
+            .execute(&format!(
+                "CREATE ROLE {role} LOGIN PASSWORD 'granted-nothing'"
+            ))
+            .await;
+        let mut url = database.url.clone();
+        url.set_username(&role).unwrap();
+        url.set_password(Some("granted-nothing")).unwrap();
+        let store = PostgresSpaceRepository::open(&DatabaseUrl::parse(Some(url.as_str())).unwrap())
+            .unwrap();
+        let answer = store.load_aggregate().await;
+        store.close().await;
+        database.execute(&format!("DROP ROLE {role}")).await;
+        let Err(RepositoryError::Unclassified(words)) = &answer else {
+            panic!("unclassified: {answer:?}");
+        };
+        assert!(words.contains("42501"), "names 42501: {words}");
+    }
+
+    // Tables in a schema the database's `search_path` names are the ones
+    // its statements reach, so the store serves over them.
+    #[tokio::test]
+    #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+    async fn serves_over_tables_in_a_schema_its_search_path_names() {
+        let database = Fresh::new().await;
+        database
+            .execute(&format!(
+                "ALTER SCHEMA public RENAME TO app; CREATE SCHEMA public; \
+                 ALTER DATABASE {} SET search_path = app",
+                database.name
+            ))
+            .await;
+        let store = database.open();
+        let answer = store.load_meta_space_id().await;
+        store.close().await;
+        assert_eq!(answer, Ok(None));
+    }
+}

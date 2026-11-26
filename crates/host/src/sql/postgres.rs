@@ -20,12 +20,15 @@ use crate::assets::StoredAsset;
 use crate::repository::RepositoryError;
 
 /// The aggregate lock's key: InfinityCube's namespace and its singleton, the
-/// TypeScript store's pair (`src/prisma/sql-store.ts`), so a TypeScript and a
-/// Rust host on one database exclude each other.
+/// TypeScript store's pair (`src/prisma/sql-store.ts`, held by
+/// `is_the_key_the_typescript_store_names_in_each_mode` in
+/// `tests/postgres_concurrency.rs`), so a TypeScript and a Rust host on one
+/// database exclude each other.
 pub const AGGREGATE_LOCK_KEY: (i32, i32) = (1_213_812_818, 1);
 
 /// SQLSTATEs that may clear on asking again: the TypeScript allowlist
-/// (`src/prisma/sql-store.ts`), exactly.
+/// (`UNAVAILABLE_SQLSTATES` in `src/prisma/sql-store.ts`), exactly, held by
+/// `names_the_set_the_typescript_store_names`.
 const UNREACHABLE_STATES: [&str; 12] = [
     "08000", "08001", "08003", "08004", "08006", "40001", "40P01", "53300", "55P03", "57P01",
     "57P02", "57P03",
@@ -85,13 +88,15 @@ impl SqlSpaceRepository<PostgresStore> {
         Self::open_with(url, PoolSettings::default())
     }
 
-    /// [`open`](Self::open), with the pool `settings` describes.
+    /// [`open`](Self::open), with the pool `settings` describes. `PGSSLMODE`
+    /// is read here, once, for a URL that names no TLS setting.
     ///
     /// # Errors
     ///
     /// [`PostgresUrlError`] when `url` cannot be connected to as written.
     pub fn open_with(url: &DatabaseUrl, settings: PoolSettings) -> Result<Self, PostgresUrlError> {
-        let options = connect_options(url.as_str())?;
+        let pgsslmode = std::env::var("PGSSLMODE").ok();
+        let options = connect_options(url.as_str(), pgsslmode.as_deref())?;
         let pool = PgPoolOptions::new()
             .max_connections(settings.max_connections)
             .min_connections(0)
@@ -107,24 +112,35 @@ impl SqlSpaceRepository<PostgresStore> {
 }
 
 /// The options `url` connects with, its `sslmode` read with the meaning ADR
-/// 0177 gives each value:
+/// 0177 gives each value, as `pg` 8.22 reads it:
 ///
-/// - no `sslmode`, `sslrootcert`, `sslcert`, `sslkey`, `ssl=true` or `ssl=1`:
-///   no TLS;
+/// - no `sslmode`, `sslrootcert`, `sslcert`, `sslkey` or `ssl` parameter:
+///   what `pgsslmode`, the value of `PGSSLMODE`, asks for: no TLS when it is
+///   absent, `disable` or a value `pg` does not know; TLS, the certificate
+///   not checked, for `no-verify`; and TLS, the certificate and the host
+///   checked, for `prefer`, `require`, `verify-ca` and `verify-full`;
 /// - `disable`: no TLS;
-/// - `no-verify`: TLS, the certificate not checked;
+/// - `no-verify`, without `uselibpqcompat=true`: TLS, the certificate not
+///   checked;
 /// - under `uselibpqcompat=true`, libpq's meanings, except that `prefer`
 ///   never falls back to plaintext: `prefer` and `require` encrypt without
 ///   checking, `require` with `sslrootcert` checks the CA, `verify-ca` checks
 ///   the CA and needs `sslrootcert`, and `verify-full` checks the host too;
+///   `no-verify`, which libpq does not have, checks as `verify-full` does;
 /// - any other value, or TLS asked for by a certificate parameter, `ssl=true`
 ///   or `ssl=1`: TLS, the certificate and the host checked.
+///
+/// Where the URL is silent, the other connection settings come from `PG*`
+/// variables and the password file, as `sqlx` reads them.
 ///
 /// # Errors
 ///
 /// [`PostgresUrlError`] when `url` is not one `sqlx` reads, or asks for
 /// `verify-ca` under `uselibpqcompat` with no root certificate.
-pub fn connect_options(url: &str) -> Result<PgConnectOptions, PostgresUrlError> {
+pub fn connect_options(
+    url: &str,
+    pgsslmode: Option<&str>,
+) -> Result<PgConnectOptions, PostgresUrlError> {
     let invalid = |reason: String| PostgresUrlError::Invalid(reason);
     let mut parsed = url::Url::parse(url).map_err(|error| invalid(error.to_string()))?;
     let pairs: Vec<(String, String)> = parsed
@@ -145,6 +161,7 @@ pub fn connect_options(url: &str) -> Result<PgConnectOptions, PostgresUrlError> 
         || value("sslkey").is_some()
         || matches!(value("ssl"), Some("true" | "1"));
     let mode = match (value("sslmode"), libpq) {
+        (None, _) if !asks_tls && value("ssl").is_none() => environment_mode(pgsslmode),
         (None, _) if !asks_tls => PgSslMode::Disable,
         (Some("disable"), _) => PgSslMode::Disable,
         (Some("no-verify"), false) => PgSslMode::Require,
@@ -168,6 +185,17 @@ pub fn connect_options(url: &str) -> Result<PgConnectOptions, PostgresUrlError> 
     let options =
         PgConnectOptions::from_str(parsed.as_str()).map_err(|error| invalid(error.to_string()))?;
     Ok(options.ssl_mode(mode))
+}
+
+/// What `PGSSLMODE` asks for when the URL names no TLS setting, as `pg`
+/// 8.22's `readSSLConfigFromEnvironment` reads it, whether or not the URL
+/// names `uselibpqcompat`.
+fn environment_mode(pgsslmode: Option<&str>) -> PgSslMode {
+    match pgsslmode {
+        Some("prefer" | "require" | "verify-ca" | "verify-full") => PgSslMode::VerifyFull,
+        Some("no-verify") => PgSslMode::Require,
+        _ => PgSslMode::Disable,
+    }
 }
 
 /// What a PostgreSQL failure means to a caller (ADR 0177): Unreachable for
@@ -529,10 +557,13 @@ impl SqlStore for PostgresStore {
     }
 
     async fn tables(connection: &mut PgConnection) -> Result<Vec<String>, sqlx::Error> {
+        // Each name resolved as the statements resolve it, through the
+        // role's `search_path` and whatever the role may do with the table,
+        // so a role granted nothing meets the server's own refusal.
         sqlx::query_scalar(
-            "SELECT table_name::text FROM information_schema.tables \
-             WHERE table_schema = 'public' AND table_type = 'BASE TABLE'",
+            "SELECT name FROM unnest($1::text[]) AS name WHERE to_regclass(name) IS NOT NULL",
         )
+        .bind(super::TABLES.as_slice())
         .fetch_all(connection)
         .await
     }
