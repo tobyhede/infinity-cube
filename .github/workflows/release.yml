@@ -183,6 +183,10 @@ jobs:
           name: infinity-cube-${{ matrix.target }}
           path: ${{ steps.pack.outputs.archive }}
           if-no-files-found: error
+          # The `release` job reads it in this same run and attaches it to the
+          # draft release, so it only has to outlive the run, with room to
+          # re-run a failed job or download a dry run's build.
+          retention-days: 3
 
   # The same entry point with --desktop: it builds the bundle, installs the
   # disk image it made, opens a Space with it, and captures the screen.
@@ -235,12 +239,15 @@ jobs:
             ${{ runner.temp }}/desktop/InfinityCube-*
             ${{ runner.temp }}/desktop/latest.json
           if-no-files-found: error
+          # As the CLI archives above: the `release` job reads it in this run.
+          retention-days: 3
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: desktop-screenshot
           path: ${{ runner.temp }}/desktop-screenshot.png
           if-no-files-found: error
+          retention-days: 3
 
   install-script:
     name: Check the install script
