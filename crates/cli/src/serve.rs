@@ -26,8 +26,9 @@
 //! commit is already in the store, so the host closes it and exits zero. The
 //! close waits for the operations still under way until [`STOP_BOUND`] after
 //! the first signal, which the drain shares (ADR 0177), then the host says it
-//! stopped without them and exits zero all the same. Any signal after the
-//! first exits at once, one.
+//! stopped without them and exits zero all the same. The runtime's shutdown,
+//! which waits for blocking work such as a hostname lookup, keeps to the
+//! same deadline. Any signal after the first exits at once, one.
 
 use std::ffi::OsStr;
 use std::process::ExitCode;
@@ -139,18 +140,27 @@ impl Closing for PostgresSpaceRepository {
 }
 
 /// Serve `database`, which `command` names, until a stop signal, answering
-/// the exit code.
-pub(crate) async fn serve(command: ServeCommand, database: Database) -> ExitCode {
+/// the exit code and, once a stop signal has come, the deadline the stop,
+/// the runtime's shutdown among it, keeps to.
+pub(crate) async fn serve(
+    command: ServeCommand,
+    database: Database,
+) -> (ExitCode, Option<std::time::Instant>) {
     let signals = match Signals::install() {
         Ok(signals) => signals,
-        Err(error) => return refuse(&format!("Could not take the stop signals: {error}")),
+        Err(error) => {
+            return (
+                refuse(&format!("Could not take the stop signals: {error}")),
+                None,
+            );
+        }
     };
     match database {
         Database::Sqlite => {
             let variable = std::env::var_os("SQLITE_PATH");
             let path = match sqlite_file(variable.as_deref()) {
                 Ok(path) => path,
-                Err(message) => return refuse(&message),
+                Err(message) => return (refuse(&message), None),
             };
             let file = path.as_path().display().to_string();
             let store = SqliteSpaceRepository::open(&path);
@@ -159,7 +169,7 @@ pub(crate) async fn serve(command: ServeCommand, database: Database) -> ExitCode
         Database::Postgres(url) => {
             let store = match PostgresSpaceRepository::open(&url) {
                 Ok(store) => store,
-                Err(error) => return refuse(&error.to_string()),
+                Err(error) => return (refuse(&error.to_string()), None),
             };
             let named = format!("the PostgreSQL database {DATABASE_URL} names");
             serving(command, signals, &named, store).await
@@ -167,31 +177,43 @@ pub(crate) async fn serve(command: ServeCommand, database: Database) -> ExitCode
     }
 }
 
-/// Serve `repository`, which `named` describes, once a port is taken.
+/// Serve `repository`, which `named` describes, once a port is taken,
+/// answering as [`serve`] does.
 async fn serving<R: Closing>(
     command: ServeCommand,
     mut signals: Signals,
     named: &str,
     repository: R,
-) -> ExitCode {
+) -> (ExitCode, Option<std::time::Instant>) {
     let (shell, origin) = match built::load(command.built.as_deref()) {
         Ok(loaded) => loaded,
-        Err(error) => return refuse(&format!("Could not serve the built application: {error}")),
+        Err(error) => {
+            return (
+                refuse(&format!("Could not serve the built application: {error}")),
+                None,
+            );
+        }
     };
     let listener = match bind(command.port).await {
         Ok(listener) => listener,
         Err(error) => {
             let tried = listener::ports_tried(command.port);
-            return refuse(&format!("Could not serve {named} on {tried}: {error}"));
+            return (
+                refuse(&format!("Could not serve {named} on {tried}: {error}")),
+                None,
+            );
         }
     };
     let port = match listener.local_addr() {
         Ok(address) => address.port(),
-        Err(error) => return refuse(&format!("Could not serve {named}: {error}")),
+        Err(error) => return (refuse(&format!("Could not serve {named}: {error}")), None),
     };
     if signals.pending().await {
         say(&format!("Stopped before serving {named}."));
-        return ExitCode::SUCCESS;
+        return (
+            ExitCode::SUCCESS,
+            Some(std::time::Instant::now() + STOP_BOUND),
+        );
     }
 
     let repository = Arc::new(repository);
@@ -245,8 +267,49 @@ async fn serving<R: Closing>(
         say(&format!(
             "Stopped without waiting for the operations still under way on {named}."
         ));
-        return ExitCode::SUCCESS;
+        return (ExitCode::SUCCESS, Some(deadline.into_std()));
     }
     say(&format!("Stopped; {named} holds every edit."));
-    ExitCode::SUCCESS
+    (ExitCode::SUCCESS, Some(deadline.into_std()))
+}
+
+/// Shut `runtime` down once `serve` has answered, by the stop's `deadline`
+/// when it names one: dropping a runtime waits for every blocking task, and
+/// a hostname lookup still running on the blocking pool has no bound of its
+/// own (ADR 0177, ST-120).
+pub(crate) fn shut_down(runtime: tokio::runtime::Runtime, deadline: Option<std::time::Instant>) {
+    match deadline {
+        Some(deadline) => {
+            runtime.shutdown_timeout(deadline.saturating_duration_since(std::time::Instant::now()));
+        }
+        None => drop(runtime),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ADR 0177, ST-120: the stop is bounded. Dropping a runtime waits for
+    // every blocking task, a hostname lookup among them, without a bound.
+    #[test]
+    fn shuts_the_runtime_down_by_the_deadline_however_long_a_blocking_task_runs() {
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .build()
+            .unwrap();
+        let (started, running) = std::sync::mpsc::channel();
+        drop(runtime.spawn_blocking(move || {
+            started.send(()).unwrap();
+            std::thread::sleep(Duration::from_secs(30));
+        }));
+        running.recv().unwrap();
+        let begun = std::time::Instant::now();
+        shut_down(runtime, Some(begun + Duration::from_millis(200)));
+        let took = begun.elapsed();
+        assert!(
+            took < Duration::from_secs(1),
+            "the shutdown took {took:?}, past the deadline"
+        );
+    }
 }

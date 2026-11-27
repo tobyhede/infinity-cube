@@ -35,7 +35,10 @@ use std::path::Path;
 use std::time::Duration;
 
 use common::{Announcement, Started, exchange, get, start_from};
-use host::{DatabaseUrl, PostgresSpaceRepository, RandomIds, TokioFilesystem, import_directory};
+use host::{
+    DatabaseUrl, PostgresSpaceRepository, RandomIds, TokioFilesystem, import_directory,
+    postgres_connect_options,
+};
 use serde_json::Value;
 use sqlx::{Connection as _, PgConnection};
 
@@ -197,7 +200,9 @@ mod given_a_database_that_does_not_answer {
 /// `serve --store postgres` with `DATABASE_URL` set to `url`, run from a
 /// working directory that is removed before the binary starts, so it cannot
 /// say where it runs. A shell removes it and then runs the binary in its
-/// place. Answers the process and its first line of standard output.
+/// place. Answers the process and its first line of standard output, or
+/// kills and reaps it and fails when no line comes within
+/// [`common::PATIENCE`].
 fn serve_from_a_removed_directory(url: &str) -> (std::process::Child, String) {
     use std::io::BufRead as _;
     let parent = tempfile::tempdir().unwrap();
@@ -217,11 +222,21 @@ fn serve_from_a_removed_directory(url: &str) -> (std::process::Child, String) {
         .stderr(std::process::Stdio::null())
         .spawn()
         .unwrap();
-    let mut first = String::new();
-    std::io::BufReader::new(child.stdout.take().unwrap())
-        .read_line(&mut first)
-        .unwrap();
-    (child, first)
+    let stdout = child.stdout.take().unwrap();
+    let (sender, line) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let mut first = String::new();
+        let read = std::io::BufReader::new(stdout).read_line(&mut first);
+        let _gone = sender.send(read.map(|_| first));
+    });
+    match line.recv_timeout(common::PATIENCE) {
+        Ok(Ok(first)) => (child, first),
+        answered => {
+            let _killed = child.kill();
+            let _reaped = child.wait();
+            panic!("the binary did not announce itself: {answered:?}");
+        }
+    }
 }
 
 /// The variable naming the test server.
@@ -251,7 +266,10 @@ impl Database {
                 .unwrap()
                 .as_nanos()
         );
-        let mut url = server.clone();
+        // A `dbname` pair would name a database in place of the path, so the
+        // test's own database is named by the path alone; `server` keeps it
+        // for the administrative connections.
+        let mut url = without_query(&server, &["dbname"]);
         url.set_path(&format!("/{name}"));
         let database = Self { name, server, url };
         database.administer(&format!("CREATE DATABASE {}", database.name));
@@ -384,18 +402,18 @@ mod given_a_migrated_database_holding_nothing {
     fn announces_before_the_database_answers_and_initializes_it_once_it_does() {
         let database = Database::migrated();
         let port_of_database = free_port();
-        let mut through = database.url.clone();
-        through.set_host(Some("127.0.0.1")).unwrap();
+        // The driver dials the proxy by `hostaddr` and its port, which a
+        // query `hostaddr` or `port` would override, so those go, and still
+        // verifies TLS against the host the URL names, which stays.
+        let mut through = without_query(&database.url, &["hostaddr", "port"]);
         through.set_port(Some(port_of_database)).unwrap();
+        through
+            .query_pairs_mut()
+            .append_pair("hostaddr", "127.0.0.1");
         let (_directory, started) = serve(Some(through.as_str()), &[]);
         let port = started.port();
         assert_eq!(get(port, "/api/spaces").status, 503, "not answering yet");
-        let upstream = format!(
-            "{}:{}",
-            database.url.host_str().unwrap(),
-            database.url.port().unwrap_or(5432)
-        );
-        let _proxy = Proxy::start(port_of_database, upstream);
+        let _proxy = Proxy::start(port_of_database, upstream(&database.url));
         wait_until(
             "start-up initializes the database once it answers",
             common::PATIENCE,
@@ -410,6 +428,44 @@ mod given_a_migrated_database_holding_nothing {
     }
 }
 
+/// The server `url` reaches, a query `host`, `hostaddr` or `port` overriding
+/// its authority, as the driver reads it: the driver dials `hostaddr` when
+/// there is one and resolves the host only otherwise.
+fn upstream(url: &url::Url) -> std::net::SocketAddr {
+    use sqlx::ConnectOptions as _;
+    use std::net::ToSocketAddrs as _;
+    let options = postgres_connect_options(url.as_str(), None).unwrap();
+    let hostaddr = options
+        .to_url_lossy()
+        .query_pairs()
+        .find(|(name, _)| name == "hostaddr")
+        .map(|(_, address)| address.parse::<std::net::IpAddr>().unwrap());
+    match hostaddr {
+        Some(address) => std::net::SocketAddr::new(address, options.get_port()),
+        None => (options.get_host(), options.get_port())
+            .to_socket_addrs()
+            .unwrap()
+            .next()
+            .unwrap(),
+    }
+}
+
+/// `url` without any query pair named in `names`.
+fn without_query(url: &url::Url, names: &[&str]) -> url::Url {
+    let mut kept = url.clone();
+    let pairs: Vec<(String, String)> = url
+        .query_pairs()
+        .filter(|(key, _)| !names.contains(&key.as_ref()))
+        .map(|(key, value)| (key.into_owned(), value.into_owned()))
+        .collect();
+    if pairs.is_empty() {
+        kept.set_query(None);
+    } else {
+        kept.query_pairs_mut().clear().extend_pairs(pairs);
+    }
+    kept
+}
+
 /// A TCP proxy on `port` passing every connection to `upstream`, stopped
 /// when dropped.
 struct Proxy {
@@ -417,7 +473,7 @@ struct Proxy {
 }
 
 impl Proxy {
-    fn start(port: u16, upstream: String) -> Self {
+    fn start(port: u16, upstream: std::net::SocketAddr) -> Self {
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(1)
             .enable_all()
@@ -428,7 +484,6 @@ impl Proxy {
             .unwrap();
         runtime.spawn(async move {
             while let Ok((mut socket, _)) = listener.accept().await {
-                let upstream = upstream.clone();
                 tokio::spawn(async move {
                     if let Ok(mut server) = tokio::net::TcpStream::connect(upstream).await {
                         let _ = tokio::io::copy_bidirectional(&mut socket, &mut server).await;

@@ -573,6 +573,76 @@ mod read_sslmode_as_pg_does {
         );
     }
 
+    // pg-connection-string 2.14's `parse` (`index.js`, the `if
+    // (config.sslcert || config.sslkey || …)` and `if (config.sslcert)`
+    // branches) asks for TLS and reads a file only for a truthy `sslcert` or
+    // `sslkey`, so an empty one is absent: `ssl=0`, the URL's silence and
+    // `PGSSLMODE` decide, and `sqlx` is handed no file.
+    #[test]
+    fn reads_an_empty_client_certificate_or_key_as_absent() {
+        for parameter in ["sslcert", "sslkey"] {
+            for (rest, pgsslmode, expected) in [
+                ("&ssl=0", None, PgSslMode::Disable),
+                ("", None, PgSslMode::Disable),
+                ("", Some("no-verify"), PgSslMode::Require),
+            ] {
+                let url = format!("{BASE}?{parameter}={rest}");
+                let read = connect_options(&url, pgsslmode)
+                    .expect("an empty client certificate parameter is not refused");
+                assert_eq!(
+                    format!("{:?}", read.get_ssl_mode()),
+                    format!("{expected:?}"),
+                    "{url} with PGSSLMODE={pgsslmode:?} connects as pg connects"
+                );
+                let described = format!("{read:?}");
+                assert!(
+                    described.contains("ssl_client_cert: None")
+                        && described.contains("ssl_client_key: None"),
+                    "{url} names no client file to sqlx: {described}"
+                );
+            }
+        }
+    }
+
+    // `pg` reads the last of a repeated parameter, so an empty last
+    // `sslcert` or `sslkey` is absent however many came before it, and
+    // `sqlx`, which applies each in turn, is handed none of them.
+    #[test]
+    fn reads_a_client_certificate_or_key_absent_when_its_last_value_is_empty() {
+        for parameter in ["sslcert", "sslkey"] {
+            let url = format!("{BASE}?{parameter}=/a.pem&{parameter}=");
+            let read = connect_options(&url, None).unwrap();
+            assert!(
+                matches!(read.get_ssl_mode(), PgSslMode::Disable),
+                "{url} asks for no TLS: {:?}",
+                read.get_ssl_mode()
+            );
+            let described = format!("{read:?}");
+            assert!(
+                described.contains("ssl_client_cert: None")
+                    && described.contains("ssl_client_key: None"),
+                "{url} names no client file to sqlx: {described}"
+            );
+        }
+    }
+
+    // `sqlx` 0.9.1 keeps a `hostaddr` apart from the host: it dials the
+    // address and verifies TLS against the host, which the recovery proxies
+    // in the PostgreSQL tests depend on.
+    #[test]
+    fn keeps_the_host_apart_from_a_hostaddr() {
+        let read = connect_options(
+            "postgresql://cube@db.example:5432/cube?sslmode=verify-full&hostaddr=127.0.0.1",
+            None,
+        )
+        .unwrap();
+        assert_eq!(read.get_host(), "db.example");
+        assert!(
+            format!("{read:?}").contains("hostaddr: Some(127.0.0.1)"),
+            "the address is dialled: {read:?}"
+        );
+    }
+
     // `pg` never reads `PGSSLROOTCERT`; `sqlx` 0.9.1 reads it as a CA file
     // (`PgConnectOptions::new_without_pgpass`) and would add it to the
     // system's trusted roots, so the options name an empty PEM, which adds

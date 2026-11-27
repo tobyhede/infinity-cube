@@ -43,19 +43,26 @@ pub fn server() -> url::Url {
 /// would override the path, so it is dropped; every other query pair stays.
 #[must_use]
 pub fn naming(server: &url::Url, database: &str) -> url::Url {
-    let mut url = server.clone();
+    let mut url = without_query(server, &["dbname"]);
     url.set_path(&format!("/{database}"));
-    let kept: Vec<(String, String)> = server
+    url
+}
+
+/// `url` without the query pairs named `names`, every other pair kept.
+#[must_use]
+pub fn without_query(url: &url::Url, names: &[&str]) -> url::Url {
+    let mut kept = url.clone();
+    let pairs: Vec<(String, String)> = url
         .query_pairs()
-        .filter(|(key, _)| key != "dbname")
+        .filter(|(key, _)| !names.contains(&key.as_ref()))
         .map(|(key, value)| (key.into_owned(), value.into_owned()))
         .collect();
-    if kept.is_empty() {
-        url.set_query(None);
+    if pairs.is_empty() {
+        kept.set_query(None);
     } else {
-        url.query_pairs_mut().clear().extend_pairs(kept);
+        kept.query_pairs_mut().clear().extend_pairs(pairs);
     }
-    url
+    kept
 }
 
 /// How long a test waits for a task to reach a probe, or for a session to
