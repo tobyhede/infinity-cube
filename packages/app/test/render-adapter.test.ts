@@ -820,6 +820,20 @@ describe('render adapter', () => {
       expect(spy.completions).toEqual([]);
     });
 
+    it('writes nothing on release when the editors it holds no longer match the draft', () => {
+      const spy = authoringSpy({ mapPlacement: authored });
+      const store = createRenderAdapter(spy.authoring);
+      store.getState().resourceResize.drawEditors(new Map([[RESOURCE_A, {}]]));
+      store.getState().resourceResize.beginResize(RESOURCE_A);
+      store.getState().resourceResize.previewResize(RESOURCE_A, { width: 700, height: 400 });
+      // The editors change without `drawEditors`, which would end the draft
+      // itself, so the release alone decides what is written.
+      store.setState({ editors: new Map() });
+      store.getState().resourceResize.finishResize(RESOURCE_A);
+      expect(spy.completions).toEqual([]);
+      expect(store.getState().resizeDraft).toBeNull();
+    });
+
     it('keeps a resize under way when another Resource starts being edited in place', () => {
       const spy = authoringSpy({ mapPlacement: authored });
       const store = createRenderAdapter(spy.authoring);

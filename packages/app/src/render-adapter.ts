@@ -540,8 +540,15 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
       },
 
       finishResize: (resourceId) => {
-        const draft = get().resizeDraft;
+        const { resizeDraft: draft, editors } = get();
         if (draft?.resourceId !== resourceId) return;
+        // Which size a release writes follows whether the Resource is edited
+        // in place now, not when the drag began: a draft that no longer
+        // matches writes nothing.
+        if ((draft.editor === true) !== editors.has(resourceId)) {
+          set({ resizeDraft: null });
+          return;
+        }
         authoring.complete(
           draft.editor === true
             ? { kind: 'resized-editor', resourceId, editSize: draft.size }
