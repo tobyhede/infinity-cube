@@ -140,17 +140,14 @@ const CONTRACT_TABLE = 'crates/host/tests/repository_contract/mod.rs';
 const SQLITE_HARNESS = 'crates/host/tests/sqlite_contract.rs';
 
 /**
- * The places `source`, a store's `Harness`, answers that it cannot provide a
- * member. A case needing such a member reports a skip rather than running, so
- * its `// Case:` line ports nothing on that store: while this finds none on
- * SQLite, every marked case runs there, and a member SQLite cannot provide
- * must list the cases needing it as exemptions before it may answer so.
+ * Whether `source`, a store's `Harness`, runs the table in the form that
+ * fails a case its harness cannot provide a member for, rather than reporting
+ * a skip. Only then does every `// Case:` line port a case that runs on that
+ * store: a member SQLite cannot provide fails the case at run time, whichever
+ * way the member answers so, until the cases needing it are exemptions.
  */
-const unprovidedIn = (source: string): string[] =>
-  source
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => /\bErr\(|\bUnprovided\(/u.test(line));
+const runsEveryMember = (source: string): boolean =>
+  /^repository_cases!\([^,()]+,\s*every_member\s*\);$/mu.test(source);
 
 /** The contract's Rust case files, each a group of the table, by group. */
 const CONTRACT_GROUPS = filesUnder('crates/host/tests/repository_contract', (name) =>
@@ -290,8 +287,7 @@ describe('the Rust SQLite repository', () => {
 
   it('runs every case it marks, its harness providing every member the table asks of it', () => {
     const harness = readRepositoryFile(SQLITE_HARNESS);
-    expect(harness).toContain('repository_cases!(');
-    expect(unprovidedIn(harness)).toEqual([]);
+    expect(runsEveryMember(harness)).toBe(true);
   });
 
   it('gives each exemption a reason it does not apply', () => {
@@ -343,21 +339,10 @@ describe('the port check', () => {
     ).toEqual(['ported']);
   });
 
-  it('finds a harness member answering that it is not provided', () => {
-    const source = [
-      'async fn reopen(&mut self) -> Result<(), Unprovided> {',
-      '    Ok(())',
-      '}',
-      'const NO_ROWS: Unprovided = Unprovided("no rows");',
-      'async fn take_resource_writes(&mut self) -> Result<Vec<String>, Unprovided> {',
-      '    Err(NO_ROWS)',
-      '}',
-    ].join('\n');
-    expect(unprovidedIn(source)).toEqual([
-      'const NO_ROWS: Unprovided = Unprovided("no rows");',
-      'Err(NO_ROWS)',
-    ]);
-    expect(unprovidedIn(source.split('\n').slice(0, 3).join('\n'))).toEqual([]);
+  it('finds a table run in the form that fails a case its harness cannot provide for', () => {
+    expect(runsEveryMember('repository_cases!(super::Sqlite, every_member);')).toBe(true);
+    expect(runsEveryMember('repository_cases!(super::Sqlite);')).toBe(false);
+    expect(runsEveryMember('// repository_cases!(super::Sqlite, every_member);')).toBe(false);
   });
 
   it('finds a marked case the table does not run, and a mark above no case', () => {
