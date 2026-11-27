@@ -21,7 +21,7 @@ _Avoid_: talk, catalog, tree, bundle, collection; aggregate for a single Space; 
 
 **Space window**:
 A window the desktop application opens on an Aggregate directory, showing its Spaces.
-_Avoid_: talk window, Aggregate window.
+_Avoid_: talk window, Aggregate window; Opening as the name of a folder's open, in code or a heading (Opening is a Resource's).
 
 **Start window**:
 The desktop application's window for creating a new Space, opening a folder, or reopening a recent Space, shown at launch when nothing else opens, and when a new Space is asked for. It is not a Space window.

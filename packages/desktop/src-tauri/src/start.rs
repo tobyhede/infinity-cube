@@ -14,18 +14,18 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::thread;
 
-use host::{Filesystem, IdSource, RandomIds, TokioFilesystem};
+use host::{Filesystem, IdSource};
 use serde_json::{Value, json};
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_dialog::DialogExt;
 use tokio::sync::oneshot;
 
-use crate::launch::{self, Opening};
 use crate::new_space;
 use crate::new_space_folder::{
     FolderListing, Listing, Platform, Refused, UNTITLED, default_name, is_free, new_space_folder,
 };
 use crate::not_opened::NotOpened;
+use crate::open_folder::{Origin, tauri_shell};
 
 /// The Start window's label, the one its capability names.
 pub const START_WINDOW_LABEL: &str = "start";
@@ -381,7 +381,7 @@ pub async fn start_browse(app: AppHandle, location: String) -> Option<Value> {
 }
 
 /// New Space's Create Space: write `<location>/<name>` and open it, closing
-/// the Start window once its window shows ([`launch::closes_start`]).
+/// the Start window once its window shows ([`crate::open_folder::create_space`]).
 /// Answers nothing then, or why not ([`NotCreated`], as the page reads it):
 /// a refusal is an answer the page draws, not a failed invoke. A folder
 /// another request is still starting has no window to close on, so it comes
@@ -389,33 +389,7 @@ pub async fn start_browse(app: AppHandle, location: String) -> Option<Value> {
 #[tauri::command]
 pub async fn start_create_space(app: AppHandle, location: String, name: String) -> Option<Value> {
     let created = tauri::async_runtime::spawn_blocking(move || {
-        let written = crate::one_write_at_a_time(create_new_space(
-            &FolderListing,
-            &TokioFilesystem,
-            &RandomIds,
-            Path::new(&location),
-            &name,
-            Platform::CURRENT,
-        ))?;
-        match crate::open_aggregate_at(&app, &written) {
-            Ok(opened) if launch::closes_start(Opening::StartWindow, opened) => {
-                close(&app);
-                Ok(())
-            }
-            Ok(_still_starting) => Err(NotCreated::NotOpened {
-                detail: format!(
-                    "{} is still being opened by another request.",
-                    written.display()
-                ),
-                folder: written,
-            }),
-            Err(reason) if reason.tells_the_presenter() => Err(NotCreated::NotOpened {
-                detail: reason.to_string(),
-                folder: written,
-            }),
-            // A quit took it: nothing more to say.
-            Err(_) => Ok(()),
-        }
+        tauri_shell::create_space(&app, Path::new(&location), &name)
     })
     .await;
     match created {
@@ -435,7 +409,7 @@ pub async fn start_create_space(app: AppHandle, location: String, name: String) 
 /// Open Folder…: the platform's folder chooser, as File › Open… asks.
 #[tauri::command]
 pub fn start_open_folder(app: AppHandle) {
-    crate::choose_folder(&app, Opening::StartWindow);
+    tauri_shell::choose_folder(&app, Origin::StartWindow);
 }
 
 /// Open a recent Space's folder, or the folder of a new Space that was
@@ -443,8 +417,8 @@ pub fn start_open_folder(app: AppHandle) {
 /// would.
 #[tauri::command]
 pub fn start_open_recent(app: AppHandle, folder: String) {
-    let _opening = thread::spawn(move || {
-        crate::open_from(&app, Path::new(&folder), Opening::StartWindow);
+    let _open = thread::spawn(move || {
+        tauri_shell::open(&app, Origin::StartWindow, &[PathBuf::from(folder)]);
     });
 }
 

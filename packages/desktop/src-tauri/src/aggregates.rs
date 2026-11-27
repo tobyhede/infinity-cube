@@ -7,9 +7,16 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, MutexGuard, PoisonError};
 
 /// The prefix every Space window's label starts with.
 pub const SPACE_WINDOW_PREFIX: &str = "space-";
+
+/// The data behind `mutex`, even if a thread panicked holding it: a map of
+/// servers stays valid whatever panicked, and losing one would lose its edits.
+pub fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(PoisonError::into_inner)
+}
 
 /// Each Aggregate by its window's label.
 #[derive(Debug)]
@@ -149,6 +156,13 @@ impl<S> Registry<S> {
         self.aggregates
             .get(label)
             .is_some_and(|aggregate| matches!(aggregate.state, State::Closing))
+    }
+
+    /// Whether a quit has begun ([`Self::take_all`]), after which nothing
+    /// opens.
+    #[must_use]
+    pub fn is_quitting(&self) -> bool {
+        self.quitting
     }
 
     /// Whether no Aggregate is starting, open or closing.

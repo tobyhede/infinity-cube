@@ -26,6 +26,7 @@ mod menu;
 mod new_space;
 mod new_space_folder;
 mod not_opened;
+mod open_folder;
 mod question;
 mod saving;
 mod scheme;
@@ -40,10 +41,9 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, TryRecvError};
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
 
-use host::{NEW_SPACE_TITLE, RandomIds, TokioFilesystem};
 use menu::{Command, Platform, Predefined};
 use tauri::menu::{AboutMetadata, IsMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::webview::NewWindowResponse;
@@ -51,21 +51,18 @@ use tauri::{
     AppHandle, Manager, RunEvent, UriSchemeContext, UriSchemeResponder, WebviewUrl,
     WebviewWindowBuilder, WindowEvent, Wry,
 };
-use tauri_plugin_dialog::{
-    DialogExt, MessageDialogBuilder, MessageDialogButtons, MessageDialogKind,
-};
+use tauri_plugin_dialog::{DialogExt, MessageDialogBuilder, MessageDialogKind};
 use tauri_plugin_opener::OpenerExt;
 use tokio::sync::mpsc::{self, UnboundedSender};
 use url::Url;
 
 use crate::address::{AggregateKey, SCHEME, SchemeStyle};
-use crate::aggregates::{Close, Registry, Reserved, SPACE_WINDOW_PREFIX};
-use crate::launch::{LastWindow, Launch, Next, Opened, Opening};
-use crate::not_opened::NotOpened;
+use crate::aggregates::{Close, Registry, SPACE_WINDOW_PREFIX, lock};
+use crate::launch::LastWindow;
+use crate::open_folder::Origin;
 use crate::scheme::{OpenAggregates, VIEW_WINDOW_PREFIX};
 use crate::server::{
-    AggregateServer, Navigation, OpenError, RegisteredSchemes, SharedAggregates, SpaceWindows,
-    Started,
+    AggregateServer, Navigation, RegisteredSchemes, SharedAggregates, SpaceWindows,
 };
 use crate::waiting::{Choice, Effect, Event};
 
@@ -90,12 +87,6 @@ impl Closings {
         // The decision runs as long as the application does.
         let _sent = self.events.send(event);
     }
-}
-
-/// The data behind `mutex`, even if a thread panicked holding it: a map of
-/// servers stays valid whatever panicked, and losing one would lose its edits.
-fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
-    mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
 impl Aggregates {
@@ -318,7 +309,7 @@ fn answer_menu(app: &AppHandle, command: Command) {
     match command {
         Command::Quit => app.exit(0),
         Command::NewSpace => start::show(app, start::Screen::NewSpace),
-        Command::Open => choose_folder(app, Opening::Menu),
+        Command::Open => open_folder::tauri_shell::choose_folder(app, Origin::Menu),
         // Closed as its own control closes it, so a Space window's close
         // waits for its last write, and a close's question keeps waiting.
         Command::CloseWindow => {
@@ -360,187 +351,6 @@ fn focused_window(app: &AppHandle) -> Option<tauri::WebviewWindow> {
     app.webview_windows()
         .into_values()
         .find(|window| window.is_focused().unwrap_or(false))
-}
-
-/// Ask for a folder with the platform's chooser, and open it as an
-/// Aggregate. Cancelling does nothing; a folder that does not open is said
-/// why. One asked for from the Start window closes it once its Space window
-/// opens ([`open_from`]).
-fn choose_folder(app: &AppHandle, opening: Opening) {
-    let handle = app.clone();
-    app.dialog()
-        .file()
-        .set_title("Open a Space")
-        .pick_folder(move |folder| {
-            let Some(path) = folder.and_then(|folder| folder.into_path().ok()) else {
-                return;
-            };
-            // Starting a run reads the whole directory, so it stays off the
-            // thread the dialog answered on.
-            thread::spawn(move || {
-                open_from(&handle, &path, opening);
-            });
-        });
-}
-
-/// Open `folder`, asked for from `opening`, offering a new Space in one that
-/// holds none and saying why one did not open, returning once the presenter
-/// has answered. A Space window that shows from the Start window closes it
-/// ([`launch::closes_start`]). Only a launch is left with no window, and a
-/// launch opens through [`open_from_command_line`], so a folder that did
-/// not open here leaves the windows as they are.
-fn open_from(app: &AppHandle, folder: &Path, opening: Opening) {
-    let opened = match open_aggregate_at(app, folder) {
-        Ok(opened) => Some(opened),
-        Err(reason) => answer(app, reason),
-    };
-    if opened.is_some_and(|opened| launch::closes_start(opening, opened)) {
-        start::close(app);
-    }
-}
-
-/// Write a new Space, titled as `init` titles one, to `directory` and open
-/// it: the offer made for a folder that holds no Space.
-fn create_and_open(app: &AppHandle, directory: &Path) -> Result<Opened, NotOpened> {
-    one_write_at_a_time(new_space::create_space(
-        &TokioFilesystem,
-        directory,
-        NEW_SPACE_TITLE,
-        &RandomIds,
-    ))?;
-    open_aggregate_at(app, directory)
-}
-
-/// Run `write`, a new Space's write, to its end on this thread, one at a
-/// time: two asked for at once cannot both find a folder empty and both
-/// write to it, since the second finds the first's files and is refused.
-/// Held by [`create_and_open`] and the Start window's New Space.
-fn one_write_at_a_time<T>(write: impl Future<Output = T>) -> T {
-    static CREATING: Mutex<()> = Mutex::new(());
-    let _creating = lock(&CREATING);
-    tauri::async_runtime::block_on(write)
-}
-
-/// Answer why a folder did not open, returning once the presenter has, with
-/// how it came to open after all, or `None` while it is still unopened. A folder holding no Space is offered a new
-/// one; declining, the folder stays unopened. A close or a quit that took
-/// the Aggregate is not answered.
-fn answer(app: &AppHandle, reason: NotOpened) -> Option<Opened> {
-    match reason {
-        NotOpened::Empty(directory) => {
-            let create = app
-                .dialog()
-                .message(format!(
-                    "{} holds no Space yet. Create a new Space in it?",
-                    directory.display()
-                ))
-                .title("InfinityCube")
-                .kind(MessageDialogKind::Info)
-                .buttons(MessageDialogButtons::OkCancelCustom(
-                    "Create Space".to_owned(),
-                    "Cancel".to_owned(),
-                ))
-                .blocking_show();
-            if !create {
-                return None;
-            }
-            match create_and_open(app, &directory) {
-                Ok(opened) => Some(opened),
-                Err(reason) => answer(app, reason),
-            }
-        }
-        reason if reason.tells_the_presenter() => {
-            show_error_and_wait(app, &reason.to_string());
-            None
-        }
-        // A close or a quit took it: nothing to answer, and nothing more for
-        // the Start window to stay open for.
-        _ => Some(Opened::Shown),
-    }
-}
-
-/// What comes after a folder asked for from `opening` that did not open.
-fn next(app: &AppHandle, opening: Opening) -> Next {
-    let any_aggregate = !app.state::<Aggregates>().registry().is_empty();
-    launch::after(opening, any_aggregate)
-}
-
-/// Open each folder named on the command line, then answer each that did
-/// not, showing the Start window if nothing else is open.
-fn open_from_command_line(app: &AppHandle, folders: &[PathBuf]) {
-    let unopened: Vec<NotOpened> = folders
-        .iter()
-        .filter_map(|folder| open_aggregate_at(app, folder).err())
-        .collect();
-    let mut still_unopened = false;
-    for reason in unopened {
-        still_unopened |= answer(app, reason).is_none();
-    }
-    if still_unopened && next(app, Opening::CommandLine) == Next::ShowStart {
-        start::show(app, start::Screen::Start);
-    }
-}
-
-/// Open `folder` as an Aggregate in a window of its own, or focus the window
-/// that already has it, answering how it opened, or why it did not.
-fn open_aggregate_at(app: &AppHandle, folder: &Path) -> Result<Opened, NotOpened> {
-    // Two spellings of one directory are one Aggregate; a path that cannot be
-    // resolved is passed on as given, for the run to refuse.
-    let directory = std::fs::canonicalize(folder).unwrap_or_else(|_| folder.to_path_buf());
-    let aggregates = app.state::<Aggregates>();
-    let reserved = aggregates.registry().reserve(&directory);
-    let label = match reserved {
-        Reserved::New(label) => label,
-        // A quit has begun: say nothing, as for any open a quit overtakes.
-        Reserved::Quitting => return Err(NotOpened::Abandoned(directory)),
-        Reserved::Existing(label) => {
-            // Still starting, there is no window yet, and it shows when it
-            // opens. Closing without saving, its window is gone while its
-            // last write runs on.
-            if let Some(window) = app.get_webview_window(&label) {
-                let _ = window.set_focus();
-                return Ok(Opened::Shown);
-            }
-            if aggregates.registry().is_closing(&label) {
-                return Err(NotOpened::StillWriting(directory));
-            }
-            return Ok(Opened::Starting);
-        }
-    };
-    let opened = start_aggregate(app, &directory, &label).map(|()| Opened::Shown);
-    if opened.is_err() {
-        let abandoned = aggregates.registry().abandon(&label);
-        if let Some(server) = abandoned {
-            stop_server(app, server, &directory);
-        }
-    }
-    opened
-}
-
-/// Start `directory`'s server and open its window as `label`, answering why
-/// if the Aggregate did not open.
-fn start_aggregate(app: &AppHandle, directory: &Path, label: &str) -> Result<(), NotOpened> {
-    let could_not = |source: OpenError| NotOpened::Failed {
-        directory: directory.to_path_buf(),
-        source,
-    };
-    let server = match AggregateServer::start(app, directory, label).map_err(could_not)? {
-        Started::Empty => return Err(NotOpened::Empty(directory.to_path_buf())),
-        Started::Refused { message } => return Err(NotOpened::Refused(message)),
-        Started::Serving(server) => server,
-    };
-    let url = server.window_url();
-    let title = directory.file_name().map_or_else(
-        || directory.display().to_string(),
-        |name| name.to_string_lossy().into_owned(),
-    );
-    let windows = server.windows();
-    let opened = app.state::<Aggregates>().registry().opened(label, server);
-    if let Err(server) = opened {
-        stop_server(app, server, directory);
-        return Err(NotOpened::Abandoned(directory.to_path_buf()));
-    }
-    open_window(app, label, url, &title, windows).map_err(|error| could_not(error.into()))
 }
 
 /// Open a window of an Aggregate, held to what `windows` admits.
@@ -755,12 +565,16 @@ fn main() {
             // A directory named on the command line opens at once, as one
             // chosen from File › Open… would; with none named, the shell
             // shows the Start window.
-            match launch::launch(std::env::args_os().skip(1)) {
-                Launch::Start => start::show(app.handle(), start::Screen::Start),
-                Launch::Folders(folders) => {
-                    let handle = app.handle().clone();
-                    thread::spawn(move || open_from_command_line(&handle, &folders));
-                }
+            let folders = launch::launch(std::env::args_os().skip(1));
+            if folders.is_empty() {
+                // Nothing to start, so the Start window shows here, before
+                // the event loop can begin a quit or show it itself.
+                open_folder::tauri_shell::open(app.handle(), Origin::CommandLine, &[]);
+            } else {
+                let handle = app.handle().clone();
+                thread::spawn(move || {
+                    open_folder::tauri_shell::open(&handle, Origin::CommandLine, &folders);
+                });
             }
             Ok(())
         })

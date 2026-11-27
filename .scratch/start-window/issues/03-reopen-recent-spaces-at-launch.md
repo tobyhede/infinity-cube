@@ -15,3 +15,5 @@
 - [ ] Decided by a pure function beside `launch::after`, with its cases in `launch.rs`; seen in a live webview.
 
 ## Comments
+
+- 2026-11-26: `.scratch/open-folder/` moves `launch::after` and `closes_start` into `open_folder.rs`, whose `open(origin, folders)` is the one place an open succeeds. Once it lands, reopening is one more `Origin` and Recent is recorded there, so "a pure function beside `launch::after`, with its cases in `launch.rs`" reads as "a rule in `open_folder.rs`, with its cases at its interface".
