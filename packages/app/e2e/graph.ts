@@ -212,7 +212,7 @@ export async function persistedAt(page: Page, revision: number): Promise<void> {
  *
  * A Markdown Resource's Open commits at once, before its text is read
  * (`packages/plugin-markdown/test/markdown-plugin.test.tsx` › "Opens with one
- * Map content commit carrying no size hint, before its text is read"), but
+ * Map content commit, before its text is read"), but
  * persisting it is still asynchronous, so the revision is awaited.
  */
 export async function openResourcePersisted(node: Locator, title: string): Promise<number> {

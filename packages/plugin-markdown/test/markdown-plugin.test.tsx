@@ -92,7 +92,7 @@ describe('the Markdown plugin’s view', () => {
     expect(screen.getByRole('button', { name: 'Close Resource Notes' })).toBeEnabled();
   });
 
-  it('Opens with one Map content commit carrying no size hint, before its text is read', async () => {
+  it('Opens with one Map content commit, before its text is read', async () => {
     const rendered = renderPlugin(markdownPluginView.View, {
       content,
       map: closed,
@@ -104,12 +104,10 @@ describe('the Markdown plugin’s view', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Open Resource Notes' }));
     expect(rendered.commits.map).toEqual([open]);
-    expect(rendered.commits.hints).toEqual([undefined]);
     await screen.findByRole('button', { name: 'Close Resource Notes' });
     fireEvent.click(screen.getByRole('button', { name: 'Close Resource Notes' }));
     await screen.findByRole('button', { name: 'Open Resource Notes' });
     expect(rendered.commits.map).toEqual([open, closed]);
-    expect(rendered.commits.hints).toEqual([undefined, undefined]);
   });
 
   it('Saves by storing the text with `\\n` endings, then committing its URL, and releases its Claim', async () => {
@@ -323,7 +321,7 @@ describe('the Markdown plugin’s view', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
     expect(await screen.findByRole('textbox')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).toBeNull();
-    expect(rendered.commits.hints).toEqual([undefined, undefined, undefined]);
+    expect(rendered.commits.map).toEqual([open, closed, open]);
   });
 
   it('keeps editing what was typed while a Save was under way', async () => {
@@ -392,7 +390,6 @@ describe('the Markdown plugin’s view', () => {
       'Old',
     );
     expect(rendered.commits.map).toEqual([open]);
-    expect(rendered.commits.hints).toEqual([undefined]);
     expect(rendered.commits.claims.taken).toBe(1);
   });
 

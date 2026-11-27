@@ -69,7 +69,7 @@ describe('a Markdown Resource drawn by the application', () => {
     expect(await screen.findByText('The whole text, on the Stage.')).toBeVisible();
     expect(screen.queryByRole('button')).toBeNull();
   });
-  it('commits { open: true } once when Opened, with no size hint (ADR 0178)', async () => {
+  it('commits { open: true } once when Opened (ADR 0178)', async () => {
     const commitMap = vi.fn(() => Promise.resolve<Answer>('completed'));
     render(
       <WithTexts>
@@ -84,7 +84,7 @@ describe('a Markdown Resource drawn by the application', () => {
     );
     fireEvent.click(await screen.findByRole('button', { name: 'Open Resource Notes' }));
     await waitFor(() => expect(commitMap).toHaveBeenCalledTimes(1));
-    expect(commitMap).toHaveBeenCalledWith({ open: true }, undefined);
+    expect(commitMap).toHaveBeenCalledWith({ open: true });
   });
 
   it('keeps no band clear for a rail on the Stage, which draws none', async () => {

@@ -51,8 +51,6 @@ export interface Commits<C, M> {
   readonly exclusive: number;
   /** How many times the picker was opened. */
   readonly picked: number;
-  /** The size hint each Map content commit carried, in order, `undefined` where it carried none. */
-  readonly hints: (Size | undefined)[];
   /** How many Claims were taken and released. */
   readonly claims: { taken: number; released: number };
 }
@@ -342,7 +340,6 @@ export function renderPlugin<C, M>(
     get picked() {
       return pickerOpenings;
     },
-    hints: [],
     claims: { taken: 0, released: 0 },
   };
   const grants = options.grants ?? {};
@@ -372,13 +369,9 @@ export function renderPlugin<C, M>(
   const mapChanges = new Set<(next: M) => void>();
   /** A commit answering refused when `live` says it is not, as the host's withdrawn and ended commits do. */
   const guarded =
-    <T, O, A>(
-      commit: (next: T, options?: O) => Promise<A>,
-      live: () => boolean,
-      refusal: { refused: string },
-    ) =>
-    (next: T, options?: O): Promise<A | { readonly refused: string }> =>
-      live() ? commit(next, options) : Promise.resolve(refusal);
+    <T, A>(commit: (next: T) => Promise<A>, live: () => boolean, refusal: { refused: string }) =>
+    (next: T): Promise<A | { readonly refused: string }> =>
+      live() ? commit(next) : Promise.resolve(refusal);
 
   function Harness() {
     const [title, setTitle] = useState(options.title ?? 'Resource');
@@ -423,11 +416,7 @@ export function renderPlugin<C, M>(
         };
       const titleCommit = settle(commits.title, setTitle);
       const contentCommit = settle(commits.content, setContent);
-      const mapSettle = settle(commits.map, setMapValue);
-      const mapCommit = (next: M, hint?: { readonly sizeHint?: Size }) => {
-        commits.hints.push(hint?.sizeHint);
-        return mapSettle(next);
-      };
+      const mapCommit = settle(commits.map, setMapValue);
       const granted = {
         title: grants.title === true ? titleCommit : undefined,
         content: grants.content === true ? contentCommit : undefined,
@@ -436,7 +425,7 @@ export function renderPlugin<C, M>(
       };
       const idle = () => !gate.running();
       const offered = <T,>(commit: T | undefined) => (running ? undefined : commit);
-      const plain = <T, O, A>(commit: ((next: T, options?: O) => Promise<A>) | undefined) =>
+      const plain = <T, A>(commit: ((next: T) => Promise<A>) | undefined) =>
         offered(commit === undefined ? undefined : guarded(commit, idle, WITHDRAWN));
       const claim: OwnClaim<C, M> = {
         release: () => hold.release(),
@@ -444,9 +433,8 @@ export function renderPlugin<C, M>(
           if (!hold.held()) return Promise.resolve('busy' as const);
           return gate.exclusively((live) => {
             exclusiveRuns += 1;
-            const ownCommit = <T, O, A>(
-              commit: ((next: T, options?: O) => Promise<A>) | undefined,
-            ) => (commit === undefined ? undefined : guarded(commit, live, ENDED));
+            const ownCommit = <T, A>(commit: ((next: T) => Promise<A>) | undefined) =>
+              commit === undefined ? undefined : guarded(commit, live, ENDED);
             const own: Exclusive<C, M> = {
               title: ownCommit(granted.title),
               content: ownCommit(granted.content),

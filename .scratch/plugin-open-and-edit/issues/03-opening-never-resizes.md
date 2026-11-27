@@ -12,4 +12,4 @@
 - [ ] `app/e2e/editing.spec.ts` › "Opening an unresized Markdown Resource grows it to its content, and Closing keeps that size" is replaced by an e2e showing an Open at the Closed Size and at an authored size keeps the rect and a neighbour's position.
 - [ ] e2e tests that wait for an Open's revision (PR 490) still pass.
 - [ ] The Open and Close control uses a new glyph on every plugin that offers it, chosen through the `shadcn-first-ui` skill (Lucide), with its Ladle story evidence updated.
-- [ ] The size-hint seam (`MapCommit`'s `sizeHint`, MG-88) stays in the Resource API; nothing removes it.
+- [ ] The size hint on a Map content commit (`MapCommit`'s `sizeHint`, MG-88) is removed, with the canvas's cap on it, the Edit's handling of it and the test host's record of it: no plugin sends one after this ticket. ADR 0178 keeps a size hint in the Resource API as the default Edit size; ticket 05 adds it where an edit begins, not on the Map content commit.

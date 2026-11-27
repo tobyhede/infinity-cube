@@ -6,7 +6,6 @@ import {
   uuidSchema,
   type ResourceId,
 } from '@project/core';
-import type { Size } from '@project/resource-api/domain';
 import type { ObserverErrorReporter, SpaceSession } from '@project/persistence';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import { usePluginAssets, type EntityActionGroup } from '@project/ui';
@@ -108,12 +107,6 @@ export interface CanvasResourceAuthoringInput {
    * one the canvas around it provides.
    */
   readonly mapEmbedding?: MapEmbedding | undefined;
-  /**
-   * A plugin's size hint capped at what this canvas shows. Only the canvas's
-   * own Map offers it, because it knows its viewport; absent, a hint is
-   * ignored.
-   */
-  readonly capSizeHint?: ((hint: Size) => Size | undefined) | undefined;
 }
 
 export interface CanvasResourceAuthoring {
@@ -144,7 +137,6 @@ export function useCanvasResourceAuthoring({
   spaceResourceTargets = NO_SPACE_RESOURCE_TARGETS,
   resourceEntityActions,
   plugins,
-  capSizeHint,
   mapEmbedding: ownMapEmbedding,
 }: CanvasResourceAuthoringInput): CanvasResourceAuthoring {
   const spaces = useOpenSpaces();
@@ -240,7 +232,6 @@ export function useCanvasResourceAuthoring({
       document: (resourceId) =>
         spaceSession.getState().working.resources.find(({ id }) => id === resourceId)?.document,
       assets: { store: pluginAssets.store, pick: pluginAssets.pick },
-      capSizeHint,
       embeddedIn: plugins?.embeddedIn,
     }),
     [
@@ -250,7 +241,6 @@ export function useCanvasResourceAuthoring({
       claimChain,
       spaceSession,
       pluginAssets,
-      capSizeHint,
       plugins?.embeddedIn,
     ],
   );

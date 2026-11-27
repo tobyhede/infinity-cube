@@ -362,7 +362,6 @@ describe('a plugin surface’s commits on the canvas', () => {
     epoch: { value: number } = { value: 0 },
     report: ObserverErrorReporter = () => undefined,
     assets: PluginHost['assets'] = {},
-    capSizeHint?: PluginHost['capSizeHint'],
   ): PluginHost => {
     const gate = createPluginGate();
     return {
@@ -376,7 +375,6 @@ describe('a plugin surface’s commits on the canvas', () => {
       report,
       document: (resourceId) => (resourceId === RESOURCE ? DOCUMENT : undefined),
       assets,
-      capSizeHint,
     };
   };
 
@@ -504,35 +502,6 @@ describe('a plugin surface’s commits on the canvas', () => {
     expect(store).toHaveBeenCalledTimes(2);
     expect(pick).toHaveBeenCalledTimes(1);
     held?.release();
-  });
-
-  it('carries a size hint capped at what the canvas shows, and drops one it cannot cap', async () => {
-    const complete = vi.fn((): AuthoringResult => ({ kind: 'completed' }));
-    const capped = pluginSurfaceOperations(
-      'markdown',
-      RESOURCE,
-      FACTS,
-      hostWith(complete, { value: 0 }, undefined, undefined, (hint) => ({
-        width: Math.min(hint.width, 800),
-        height: Math.min(hint.height, 600),
-      })),
-    );
-    await capped.commitMap?.({ open: true }, { sizeHint: { width: 640, height: 2000 } });
-    expect(complete).toHaveBeenLastCalledWith(
-      {
-        kind: 'changed-map-content',
-        resourceId: RESOURCE,
-        content: { open: true },
-        size: { width: 640, height: 600 },
-      },
-      expect.any(Function),
-    );
-    const uncapped = pluginSurfaceOperations('markdown', RESOURCE, FACTS, hostWith(complete));
-    await uncapped.commitMap?.({ open: true }, { sizeHint: { width: 640, height: 2000 } });
-    expect(complete).toHaveBeenLastCalledWith(
-      { kind: 'changed-map-content', resourceId: RESOURCE, content: { open: true } },
-      expect.any(Function),
-    );
   });
 
   it('withdraws every plain commit while exclusive work runs, and keeps that work’s own live', async () => {

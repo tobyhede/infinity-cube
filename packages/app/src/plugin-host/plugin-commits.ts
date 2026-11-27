@@ -1,6 +1,6 @@
 import type { JsonValue, ResourceKind, ResourceDocument, ResourceId } from '@project/core';
 import type { ObserverErrorReporter } from '@project/persistence';
-import type { Answer, Size } from '@project/resource-api/domain';
+import type { Answer } from '@project/resource-api/domain';
 import type { Assets } from '@project/resource-api/view';
 import type { ClaimHolder, PluginCommits, PluginHostClaim, PluginOperations } from '@project/ui';
 import { describeAuthoringRefusal } from '../authoring-refusal';
@@ -97,11 +97,6 @@ export interface PluginHost {
   /** A Resource's stored document now, which a Title commit rewrites the Title of. */
   readonly document: (resourceId: ResourceId) => ResourceDocument | undefined;
   /**
-   * A plugin's size hint capped at what this canvas shows (`visibleCanvasCap`),
-   * a canvas fact; absent, or answering `undefined`, the hint is ignored.
-   */
-  readonly capSizeHint?: ((hint: Size) => Size | undefined) | undefined;
-  /**
    * The drawings whose Map embedding this canvas draws inside, outermost
    * first: a drawing here is embedded in each, so its Claim nests under one
    * they hold (ADR 0142). Empty, or absent, on a canvas drawn in no embedding.
@@ -140,15 +135,8 @@ function commitsFor(
     if (document === undefined) return undefined;
     return { kind: 'edited-resource', resourceId, document: { ...document, title } };
   };
-  const changeMapContent = (
-    content: JsonValue,
-    options?: { readonly sizeHint?: Size },
-  ): Promise<Answer> =>
-    run(() => {
-      const hint = options?.sizeHint;
-      const size = hint === undefined ? undefined : host.capSizeHint?.(hint);
-      return { kind: 'changed-map-content', resourceId, content, size };
-    });
+  const changeMapContent = (content: JsonValue): Promise<Answer> =>
+    run(() => ({ kind: 'changed-map-content', resourceId, content }));
   const store = host.assets?.store;
   return {
     title: (next) => run(retitled(next)),

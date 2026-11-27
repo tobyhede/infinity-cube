@@ -50,8 +50,7 @@ export type PluginStore = (bytes: Blob) => Promise<AssetRef | { readonly refused
 export interface PluginCommits {
   readonly title?: ((next: string) => Promise<Answer>) | undefined;
   readonly content?: ((next: JsonValue) => Promise<Answer>) | undefined;
-  readonly map?:
-    ((next: JsonValue, options?: { readonly sizeHint?: Size }) => Promise<Answer>) | undefined;
+  readonly map?: ((next: JsonValue) => Promise<Answer>) | undefined;
   readonly store?: PluginStore | undefined;
 }
 
@@ -323,10 +322,7 @@ export function pluginEntry<C, M>(
       title,
       store,
       content: content === undefined ? undefined : asJson(content),
-      map:
-        ownMap === undefined
-          ? undefined
-          : (next, options) => asJson((value) => ownMap(value, options))(next),
+      map: ownMap === undefined ? undefined : asJson(ownMap),
     };
   };
   /**
@@ -340,11 +336,7 @@ export function pluginEntry<C, M>(
     const { operations, onClaim, drawing } = input;
     const { commitTitle, commitContent, commitMap, claim: hostClaim } = operations;
     const mapCommit = useMemo(
-      () =>
-        commitMap === undefined
-          ? undefined
-          : (next: M, options?: { readonly sizeHint?: Size }) =>
-              asJson((value) => commitMap(value, options))(next),
+      () => (commitMap === undefined ? undefined : asJson(commitMap)),
       [commitMap],
     );
     const contentCommit = useMemo(

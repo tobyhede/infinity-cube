@@ -20,8 +20,8 @@ import { useResourceHost } from './host';
  * capabilities are present.
  */
 
-/** A Map content commit, which may carry a size hint on an author's gesture. */
-export type MapCommit<M> = (next: M, options?: { readonly sizeHint?: Size }) => Promise<Answer>;
+/** A Map content commit. */
+export type MapCommit<M> = (next: M) => Promise<Answer>;
 
 /** A Map content value and its commit, when the surface offers one. */
 export interface KeptMap<M> {
