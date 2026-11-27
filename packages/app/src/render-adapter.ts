@@ -63,8 +63,10 @@ const sameSize = (a: ResourceSize | undefined, b: ResourceSize | undefined): boo
  * The placement a canvas draws while Resources are edited in place: each
  * editor from its entry's top-left at its entry's Edit size, or, with none
  * stored, at the larger of its size hint and its size on each axis; each
- * capped at `cap`, the visible canvas (ADR 0178).
- * Nothing here is stored. With no editor drawn otherwise, the placement itself.
+ * capped at `cap`, the visible canvas (ADR 0178). The Resources an editor's
+ * drawn rect passes are drawn displaced as a Resize from its size to that rect
+ * would place them. Nothing here is stored. With no editor drawn otherwise,
+ * the placement itself.
  */
 export function editorPlacement(
   placement: Placement,
@@ -89,7 +91,12 @@ export function editorPlacement(
         ? wanted
         : { width: Math.min(wanted.width, cap.width), height: Math.min(wanted.height, cap.height) };
     if (capped.width === size.width && capped.height === size.height) continue;
-    drawn = Placement.place(drawn, resourceId, { ...at, size: capped });
+    // The Resources the drawn rect passes are drawn aside by the rule a Resize
+    // applies, and none of it is stored.
+    drawn = Placement.place(Placement.displace(drawn, resourceId, size, capped), resourceId, {
+      ...at,
+      size: capped,
+    });
   }
   return drawn;
 }

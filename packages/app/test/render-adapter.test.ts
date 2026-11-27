@@ -778,6 +778,30 @@ describe('render adapter', () => {
       ).toEqual({ width: 640, height: 360 });
     });
 
+    it('draws the Resources it passes aside, by the Resize rule, and stores none of it', () => {
+      const withNeighbours = Placement.fromEntries([...authored, [RESOURCE_C, { x: 400, y: 20 }]]);
+      const drawn = editorPlacement(withNeighbours, new Map([[RESOURCE_A, {}]]));
+      // The same displacement a Resize from the size to the Edit size makes.
+      const resized = Placement.displace(
+        withNeighbours,
+        RESOURCE_A,
+        { width: 300, height: 200 },
+        { width: 640, height: 360 },
+      );
+      expect(drawn.get(RESOURCE_C)).toEqual(resized.get(RESOURCE_C));
+      expect(drawn.get(RESOURCE_C)).toMatchObject({ x: 740, y: 20 });
+      // A capped editor passes only as far as it is drawn.
+      expect(
+        editorPlacement(withNeighbours, new Map([[RESOURCE_A, {}]]), {
+          width: 500,
+          height: 300,
+        }).get(RESOURCE_C),
+      ).toMatchObject({ x: 600, y: 20 });
+      // The Map's own placement is untouched, and with no editor it is drawn.
+      expect(withNeighbours.get(RESOURCE_C)).toMatchObject({ x: 400, y: 20 });
+      expect(editorPlacement(withNeighbours, new Map())).toBe(withNeighbours);
+    });
+
     it('is drawn capped at the visible canvas, which stores nothing', () => {
       const drawn = editorPlacement(authored, new Map([[RESOURCE_A, {}]]), {
         width: 500,

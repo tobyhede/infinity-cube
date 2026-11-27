@@ -183,7 +183,9 @@ function equals(a: Placement | null, b: Placement | null): boolean {
  * Map's positions and the canvas — displacement is applied by the Edit that
  * causes it (ADR 0084), so a canvas coordinate already is an authored one and
  * there is no derivation to invert. A settled drag therefore authors the drop
- * point exactly, wherever it sits.
+ * point exactly, wherever it sits. The one drawn-only displacement, the
+ * Resources an in-place editor passes (ADR 0178), is never inverted either: a
+ * Resource the author drags then authors where it was dropped.
  *
  * The resource's own size and Map content survive the merge: a
  * renderer reports React Flow node positions and nothing else, so only `x` and
@@ -298,8 +300,10 @@ function roomAxis(at: MapPosition, subject: MapPosition, before: Extent): 'x' | 
  * This is the whole of displacement (ADR 0084, ADR 0093). Resizing a Resource
  * applies it as part of the Resize Edit, and the coordinates it writes are
  * authored ones with the same standing as any other. Between Edits nothing
- * derives anything: the Map's positions are what the canvas draws. Open, Close,
- * a Shape and removal change no size, so they displace nobody.
+ * derives anything: the Map's positions are what the canvas draws, except that
+ * while a Resource is edited in place the canvas draws the Resources its drawn
+ * rect passes displaced by this rule, storing none of it (ADR 0178). Open,
+ * Close, a Shape and removal change no size, so they displace nobody.
  *
  * Which Resources move, and on which one axis, is {@link roomAxis}. The subject is
  * never clear of itself, so it never moves, and its own entry is not written
