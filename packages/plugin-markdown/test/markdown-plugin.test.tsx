@@ -380,7 +380,8 @@ describe('the Markdown plugin’s view', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
     expect(await screen.findByRole('textbox')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).toBeNull();
-    expect(rendered.commits.map).toEqual([open, closed, open]);
+    // Open and Close were committed; the Edit commits nothing (ADR 0178).
+    expect(rendered.commits.map).toEqual([open, closed]);
   });
 
   it('keeps editing what was typed while a Save was under way', async () => {
@@ -438,7 +439,7 @@ describe('the Markdown plugin’s view', () => {
     expect(screen.getByRole('textbox')).toHaveValue('Draft');
   });
 
-  it('offers Edit when Closed, which Opens it and then begins editing', async () => {
+  it('begins an edit from Closed with no Open, and every exit leaves it Closed (ADR 0178)', async () => {
     const rendered = renderPlugin(markdownPluginView.View, {
       editSize: STORED_EDIT_SIZE,
       content,
@@ -447,15 +448,43 @@ describe('the Markdown plugin’s view', () => {
       grants: editable,
       assets: { ...reading({ [TEXT_REF]: 'Old' }), store: () => Promise.resolve(SAVED_REF) },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
-    expect(await screen.findByRole('textbox', { name: 'Markdown source of Notes' })).toHaveValue(
-      'Old',
-    );
-    expect(rendered.commits.map).toEqual([open]);
-    expect(rendered.commits.claims.taken).toBe(1);
+    const view = () => document.querySelector('[data-open]');
+    const source = () => screen.queryByRole('textbox', { name: 'Markdown source of Notes' });
+    const edit = async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
+      expect(await screen.findByRole('textbox', { name: 'Markdown source of Notes' })).toHaveValue(
+        'Old',
+      );
+      // Still Closed: the Open control keeps its place, unavailable.
+      expect(view()).toHaveAttribute('data-open', 'false');
+      expect(screen.getByRole('button', { name: 'Open Resource Notes' })).toBeDisabled();
+    };
+
+    await edit();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel editing Resource Notes' }));
+    expect(source()).toBeNull();
+    expect(view()).toHaveAttribute('data-open', 'false');
+    expect(screen.getByRole('img', { name: markdownPlugin.name })).toBeInTheDocument();
+
+    await edit();
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Escape' });
+    expect(source()).toBeNull();
+    expect(view()).toHaveAttribute('data-open', 'false');
+
+    await edit();
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'New' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Resource Notes' }));
+    await waitFor(() => expect(source()).toBeNull());
+    expect(view()).toHaveAttribute('data-open', 'false');
+    expect(rendered.commits.content).toEqual([{ url: SAVED_REF }]);
+
+    // No exit and no beginning committed Open or Close.
+    expect(rendered.commits.map).toEqual([]);
+    expect(rendered.commits.claims.taken).toBe(3);
+    expect(rendered.commits.claims.released).toBe(3);
   });
 
-  it('Opens but begins no edit from Closed when its text cannot be read', async () => {
+  it('begins no edit from Closed, and commits nothing, when its text cannot be read', async () => {
     const rendered = renderPlugin(markdownPluginView.View, {
       editSize: STORED_EDIT_SIZE,
       content,
@@ -465,14 +494,14 @@ describe('the Markdown plugin’s view', () => {
       assets: reading({}),
     });
     fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
-    expect(await screen.findByRole('note')).toBeInTheDocument();
-    expect(rendered.commits.map).toEqual([open]);
-    expect(rendered.commits.claims.taken).toBe(0);
-    expect(screen.queryByRole('textbox')).toBeNull();
     // The Edit pressed is answered, not dropped.
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'This text cannot be read, so it cannot be edited.',
     );
+    expect(rendered.commits.map).toEqual([]);
+    expect(rendered.commits.claims.taken).toBe(0);
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(document.querySelector('[data-open]')).toHaveAttribute('data-open', 'false');
   });
 
   it('Saves a draft whose content changed meanwhile to text it cannot read', async () => {

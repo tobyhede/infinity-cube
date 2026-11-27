@@ -440,12 +440,6 @@ interface CanvasResourceNodeSpecimenBaseProps {
    */
   readonly mapContent?: JsonValue | undefined;
   readonly commitMap?: ((next: JsonValue) => Promise<Answer>) | undefined;
-  /**
-   * The whole operations a Markdown fixture's plugin is given, in place of the
-   * ones this specimen builds from `open` and `onOpenChange`. `commitMap` and
-   * `commitTitle` still apply on top of it, each replacing its own commit.
-   */
-  readonly operations?: PluginOperations | undefined;
   readonly commitTitle?: ((next: string) => Promise<Answer>) | undefined;
 }
 
@@ -486,7 +480,6 @@ export function CanvasResourceNodeSpecimen({
   mapContent,
   commitMap,
   commitTitle,
-  operations,
 }: CanvasResourceNodeSpecimenProps) {
   const drawnSpace = drawn.space;
   const selectedMap = drawnSpace.maps.find((candidate) => candidate.id === drawn.mapId);
@@ -546,7 +539,6 @@ export function CanvasResourceNodeSpecimen({
       commitMap === undefined ? { kind: 'markdown' } : { kind: 'markdown', commitMap };
     Object.assign(data, { ownContent: own, mapContent: { open: open === true }, kindOperations });
   }
-  if (operations !== undefined) data.kindOperations = operations;
   if (mapContent !== undefined) data.mapContent = mapContent;
   if (commitMap !== undefined) data.kindOperations = { ...data.kindOperations, commitMap };
   if (commitTitle !== undefined) data.kindOperations = { ...data.kindOperations, commitTitle };

@@ -207,7 +207,9 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
   const url = surface.content.value.url;
   const [known] = useState(createKnownText);
   const open = surface.map.value.open;
-  const text = useText(url, surface.assets, known, open);
+  // An Edit asked for while Closed reads the text for that edit only.
+  const [editFromClosed, setEditFromClosed] = useState(false);
+  const text = useText(url, surface.assets, known, open || editFromClosed);
   const mapCommit = surface.map.commit;
   const contentCommit = surface.content.commit;
   const store = surface.assets.store;
@@ -234,11 +236,10 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
 
   const readable = text.state === 'read' ? text.text : null;
   const mayAuthor = contentCommit !== undefined && store !== undefined && takeClaim !== undefined;
-  const mayEdit = open && readable !== null && mayAuthor;
-  // Edit on a Closed Resource Opens it and then begins editing (ADR 0064):
-  // what it Opens to is read only once it is Open, so the text decides then.
-  const mayEditClosed = !open && mayAuthor && mapCommit !== undefined;
-  const editWhenOpen = useRef(false);
+  const mayEdit = readable !== null && mayAuthor;
+  // Edit on a Closed Resource begins editing without Opening it (ADR 0178):
+  // its text is read for that edit, so the text decides once it is read.
+  const mayEditClosed = !open && mayAuthor;
 
   const startEdit = useCallback(
     (sizeHint?: Size) => {
@@ -292,22 +293,24 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
     return () => measured.abort();
   }, [measuring]);
 
-  const end = useCallback(() => setEditing(null), []);
+  const end = useCallback(() => {
+    setEditing(null);
+    setEditFromClosed(false);
+  }, []);
 
-  // A Resource Closed elsewhere while its draft was up has nowhere to draw it.
-  if (editing !== null && !open) setEditing(null);
-
-  // An Edit asked for while Closed begins once the Open it caused has landed
-  // and the text is read, and where the text cannot be read says it cannot.
+  // An Edit asked for while Closed begins once the text is read, and where
+  // the text cannot be read says it cannot, beginning nothing.
+  const editWhenRead = useRef(false);
   useEffect(() => {
-    if (text.state === 'refused' && editWhenOpen.current) {
-      editWhenOpen.current = false;
+    if (text.state === 'refused' && editWhenRead.current) {
+      editWhenRead.current = false;
+      setEditFromClosed(false);
       setRefusal(UNEDITABLE);
     }
-    if (!editWhenOpen.current || !open || text.state !== 'read') return;
-    editWhenOpen.current = false;
+    if (!editWhenRead.current || text.state !== 'read') return;
+    editWhenRead.current = false;
     beginEdit();
-  }, [open, text.state, beginEdit]);
+  }, [editFromClosed, text.state, beginEdit]);
 
   const save = useCallback(() => {
     if (editing === null || editing.saving) return;
@@ -357,13 +360,9 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
       void committed.then(
         (answer) => {
           const refused = refusalOf(answer);
-          if (refused === null) return;
-          setRefusal(refused);
-          editWhenOpen.current = false;
+          if (refused !== null) setRefusal(refused);
         },
-        () => {
-          editWhenOpen.current = false;
-        },
+        () => undefined,
       );
     },
     [mapCommit],
@@ -403,11 +402,11 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
           disabled: editing.saving,
           keyshortcuts: 'Escape',
         },
-        // Closing mid-edit would take the draft's box away; the control keeps
-        // its place and says it is unavailable.
+        // Open and Close are not offered mid-edit, Open or Closed: the control
+        // keeps its place and says it is unavailable.
         ...(mapCommit === undefined
           ? []
-          : [{ ...openClose(false), run: () => undefined, disabled: true }]),
+          : [{ ...openClose(!open), run: () => undefined, disabled: true }]),
       ];
     }
     const edit: RailCommand[] =
@@ -422,8 +421,8 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
                 ? beginEdit
                 : () => {
                     setRefusal(null);
-                    editWhenOpen.current = true;
-                    commitMap({ open: true });
+                    editWhenRead.current = true;
+                    setEditFromClosed(true);
                   },
             },
           ]
@@ -462,6 +461,10 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
     commitMap,
   ]);
 
+  // A running edit draws its editor whatever the stored Open state; once it
+  // ends, a Closed Resource is drawn Closed again (ADR 0178).
+  const drawnOpen = open || editing !== null;
+
   // Like the disabled Cancel, Escape waits for a Save under way: a Save that
   // is refused leaves its draft up.
   const escape = (): void => {
@@ -473,21 +476,24 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
       // Closed, the Title sits at the foot of the rect, as every Closed
       // Resource's does.
       style={
-        !open
-          ? { ...fill, height: '100%', justifyContent: 'flex-end' }
-          : editing !== null
-            ? { ...fill, height: '100%' }
+        editing !== null
+          ? { ...fill, height: '100%' }
+          : !open
+            ? { ...fill, height: '100%', justifyContent: 'flex-end' }
             : fill
       }
       data-open={open}
       data-editing={editing !== null}
     >
       <div
-        style={{ padding: `${railBand}px ${INSET}px ${open ? 0 : CLOSED_FOOT}px`, minHeight: 0 }}
+        style={{
+          padding: `${railBand}px ${INSET}px ${drawnOpen ? 0 : CLOSED_FOOT}px`,
+          minHeight: 0,
+        }}
       >
         <Title />
       </div>
-      {!open && (
+      {!drawnOpen && (
         // The kind glyph sits in the band along the top, at its right, as
         // every Closed Resource's does; an Open one draws none.
         <span
@@ -498,7 +504,7 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
           <MarkdownGlyph />
         </span>
       )}
-      {open && (
+      {drawnOpen && (
         <div
           style={{
             position: 'relative',
