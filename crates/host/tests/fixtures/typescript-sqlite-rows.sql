@@ -1,4 +1,4 @@
--- The rows the TypeScript host wrote running conformance/sqlite-rows/script.json
+-- The rows the TypeScript host wrote running conformance/rows/script.json
 -- on a migrated SQLite file, each timestamp written as one fixed value, written
 -- by scripts/sqlite-rows-fixture.ts. Regenerate them with:
 --   pnpm exec tsx scripts/sqlite-rows-fixture.ts

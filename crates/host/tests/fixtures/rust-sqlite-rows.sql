@@ -1,4 +1,4 @@
--- The rows the Rust host wrote running conformance/sqlite-rows/script.json on
+-- The rows the Rust host wrote running conformance/rows/script.json on
 -- a migrated SQLite file, each timestamp written as one fixed value, written
 -- by crates/host/tests/sqlite_rows.rs. Regenerate them with:
 --   INFINITY_CUBE_WRITE_ROWS=1 cargo nextest run -p host --test sqlite_rows
