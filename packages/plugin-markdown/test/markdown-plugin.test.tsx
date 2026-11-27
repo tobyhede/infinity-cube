@@ -551,6 +551,27 @@ describe('the Markdown plugin’s view', () => {
     expect(reads).toEqual([TEXT_REF]);
   });
 
+  it('keeps editing when a Close from elsewhere arrives mid-edit (ADR 0178)', async () => {
+    const rendered = renderPlugin(markdownPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
+      content,
+      map: open,
+      title: 'Notes',
+      grants: editable,
+      assets: { ...reading({ [TEXT_REF]: 'Old' }), store: () => Promise.resolve(SAVED_REF) },
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Draft' } });
+    act(() => rendered.changeMap(closed));
+    // Editing is not stored, so a stored Close does not end it.
+    expect(screen.getByRole('textbox', { name: 'Markdown source of Notes' })).toHaveValue('Draft');
+    expect(rendered.commits.claims.released).toBe(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Save Resource Notes' }));
+    await waitFor(() => expect(screen.queryByRole('textbox')).toBeNull());
+    expect(rendered.commits.content).toEqual([{ url: SAVED_REF }]);
+    expect(document.querySelector('[data-open]')).toHaveAttribute('data-open', 'false');
+  });
+
   it('Saves a draft whose content changed meanwhile to text it cannot read', async () => {
     const rendered = renderPlugin(markdownPluginView.View, {
       editSize: STORED_EDIT_SIZE,
