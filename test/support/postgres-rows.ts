@@ -9,6 +9,16 @@
  * it, so neither the integration database nor a person's own content is
  * touched; the role `DATABASE_URL` names must be allowed to create
  * databases, as Compose's is.
+ *
+ * Creating, migrating, replaying into and dumping a database go through
+ * `pg`, the driver the facade itself runs on, rather than the database
+ * facade (`@prisma-next/postgres`). Prisma Next 0.16.0's facade builds query
+ * plans over the contract's tables and offers raw SQL only as an expression
+ * inside one (as `src/prisma/sql-store.ts` notes), so it cannot run `CREATE
+ * DATABASE` or `DROP DATABASE`, a migration file or a dump of several
+ * statements, or a read of `information_schema`. The repository under test
+ * is still reached through the facade (`withRepository`).
+ * `docs/agents/build-tooling.md` records the exception.
  */
 import { randomBytes } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
