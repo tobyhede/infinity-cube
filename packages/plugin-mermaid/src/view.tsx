@@ -86,7 +86,7 @@ const UNREAD = 'Reading it failed.';
 /** What the status says where a Save failed rather than being refused. */
 const UNSAVED = 'The source could not be saved. Your draft is kept; Save again to retry.';
 
-/** What the status says where Edit was pressed while Closed and the source it Opened to cannot be read. */
+/** What the status says where Edit was pressed while Closed and the source cannot be read for that edit. */
 const UNEDITABLE = 'This source cannot be read, so it cannot be edited.';
 
 /** What is drawn in place of the diagram where its source is empty. */
@@ -98,7 +98,7 @@ const EMPTY_TO_EDIT = `${EMPTY_DIAGRAM} Edit it to write its Mermaid source.`;
 /**
  * Read the text an asset holds, once per URL, starting from text this view
  * already knows. Nothing is read until the text is `wanted`: a Closed
- * Resource draws none of it.
+ * Resource draws none of it, and reads it only for an Edit.
  */
 function useText(url: AssetRef, assets: Assets, known: KnownText, wanted: boolean): Text {
   const [read, setRead] = useState<{ readonly url: string; readonly text: Text }>(() => ({
@@ -527,8 +527,9 @@ function MermaidView({
     (next: MermaidMapContent) => {
       if (mapCommit === undefined) return;
       const committed = mapCommit(next);
-      // What an earlier gesture was refused is cleared by the next press, not
-      // by this answer, which may land after an Edit from Closed is answered.
+      // This answer only says it was refused and clears nothing: it may land
+      // after a later press, an Edit from Closed among them, has cleared what
+      // was refused before.
       void committed.then(
         (answer) => {
           const refused = refusalOf(answer);
