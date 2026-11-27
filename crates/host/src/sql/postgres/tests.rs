@@ -573,9 +573,11 @@ mod read_sslmode_as_pg_does {
         );
     }
 
-    // pg-connection-string 2.14 asks for TLS and reads a file only for a
-    // truthy `sslcert` or `sslkey`, so an empty one is absent: `ssl=0`, the
-    // URL's silence and `PGSSLMODE` decide, and `sqlx` is handed no file.
+    // pg-connection-string 2.14's `parse` (`index.js`, the `if
+    // (config.sslcert || config.sslkey || …)` and `if (config.sslcert)`
+    // branches) asks for TLS and reads a file only for a truthy `sslcert` or
+    // `sslkey`, so an empty one is absent: `ssl=0`, the URL's silence and
+    // `PGSSLMODE` decide, and `sqlx` is handed no file.
     #[test]
     fn reads_an_empty_client_certificate_or_key_as_absent() {
         for parameter in ["sslcert", "sslkey"] {

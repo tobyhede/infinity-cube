@@ -122,11 +122,23 @@ pub enum Step {
 pub type Probe =
     Arc<dyn Fn(Step) -> std::pin::Pin<Box<dyn Future<Output = ()> + Send>> + Send + Sync>;
 
-/// The bytes of a Space row's id, whether the id is stored as a BLOB, and
-/// the bytes of its revision, neither decoded as text. Only SQLite keeps a
-/// value's storage class, so only there can a BLOB id and a TEXT id with the
-/// same bytes be two rows.
-pub(crate) type RevisionRow = (Vec<u8>, bool, Vec<u8>);
+/// How a Space row's id is stored. Only SQLite keeps a value's storage
+/// class, so only there can a BLOB id and a TEXT id with the same bytes be
+/// two rows; every other id is text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum IdStorage {
+    Text,
+    Blob,
+}
+
+/// A Space row's id and revision, as bytes neither decoded as text, and how
+/// the id is stored.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RevisionRow {
+    pub(crate) id: Vec<u8>,
+    pub(crate) storage: IdStorage,
+    pub(crate) revision: Vec<u8>,
+}
 
 /// What a database supplies the one SQL repository: how to open a
 /// transaction, each statement the repository runs, and what a failure means.
@@ -162,15 +174,15 @@ pub(crate) trait SqlStore: Send + Sync + 'static {
         id: &str,
     ) -> impl Future<Output = Result<bool, sqlx::Error>> + Send;
 
-    /// Lock the Space row whose id has these bytes, stored as a BLOB when
-    /// `blob` and as text otherwise, answering the bytes of the revision it
-    /// carried when the lock was granted, or `None` when there is no such
-    /// row. Neither is decoded as text, so a row holding any bytes is locked.
+    /// Lock the Space row whose id has these bytes, stored as `storage`
+    /// says, answering the bytes of the revision it carried when the lock was
+    /// granted, or `None` when there is no such row. Neither is decoded as
+    /// text, so a row holding any bytes is locked.
     fn lock_space(
         &self,
         connection: &mut Connection<Self>,
         id: &[u8],
-        blob: bool,
+        storage: IdStorage,
     ) -> impl Future<Output = Result<Option<Vec<u8>>, sqlx::Error>> + Send;
 
     /// Lock the Space row with this id for the rest of the transaction, as
@@ -181,9 +193,8 @@ pub(crate) trait SqlStore: Send + Sync + 'static {
         id: &str,
     ) -> impl Future<Output = Result<(), sqlx::Error>> + Send;
 
-    /// The bytes of every Space row's id and revision, and whether its id is
-    /// stored as a BLOB, ascending by id, reading no document and decoding
-    /// neither as text.
+    /// Every Space row's id and revision, and how its id is stored, ascending
+    /// by id, reading no document and decoding neither as text.
     fn space_revisions(
         connection: &mut Connection<Self>,
     ) -> impl Future<Output = Result<Vec<RevisionRow>, sqlx::Error>> + Send;
@@ -659,7 +670,7 @@ impl<S: SqlStore> Shared<S> {
             self.reached(Step::RowLock(*id)).await;
             let prior = self
                 .store
-                .lock_space(connection, id.as_str().as_bytes(), false)
+                .lock_space(connection, id.as_str().as_bytes(), IdStorage::Text)
                 .await?;
             let prior = match prior {
                 None => None,
@@ -913,14 +924,17 @@ impl<S: SqlStore> Shared<S> {
                 current_meta_space_id: meta_space_id,
             });
         }
-        for (id, blob, revision) in &rows {
-            if let Some(space_id) = std::str::from_utf8(id).ok().and_then(SpaceId::parse) {
+        for row in &rows {
+            if let Some(space_id) = std::str::from_utf8(&row.id).ok().and_then(SpaceId::parse) {
                 self.reached(Step::RowLock(space_id)).await;
             }
             // Each row by its own storage class, so a BLOB id and a TEXT id
             // with the same bytes are each locked and compared alone.
-            let current = self.store.lock_space(&mut transaction, id, *blob).await?;
-            if current.as_ref() != Some(revision) {
+            let current = self
+                .store
+                .lock_space(&mut transaction, &row.id, row.storage)
+                .await?;
+            if current.as_ref() != Some(&row.revision) {
                 transaction.rollback().await?;
                 return Ok(ReplaceResult::Conflict {
                     current_meta_space_id: self.read_meta_space_id().await?,

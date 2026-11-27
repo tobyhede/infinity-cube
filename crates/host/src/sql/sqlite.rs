@@ -22,7 +22,7 @@ use sqlx::{Pool, Row, Sqlite, Transaction};
 
 use super::codec::{ResourceRow, SpaceRow};
 use super::path::SqlitePath;
-use super::{Access, LockMode, RevisionRow, SqlSpaceRepository, SqlStore};
+use super::{Access, IdStorage, LockMode, RevisionRow, SqlSpaceRepository, SqlStore};
 use crate::assets::StoredAsset;
 use crate::json_text::compact;
 use crate::repository::RepositoryError;
@@ -303,12 +303,11 @@ impl SqlStore for SqliteStore {
         &self,
         connection: &mut SqliteConnection,
         id: &[u8],
-        blob: bool,
+        storage: IdStorage,
     ) -> Result<Option<Vec<u8>>, sqlx::Error> {
-        sqlx::query_scalar(if blob {
-            LOCK_BLOB_SPACE
-        } else {
-            LOCK_TEXT_SPACE
+        sqlx::query_scalar(match storage {
+            IdStorage::Text => LOCK_TEXT_SPACE,
+            IdStorage::Blob => LOCK_BLOB_SPACE,
         })
         .bind(id)
         .fetch_optional(connection)
@@ -327,12 +326,24 @@ impl SqlStore for SqliteStore {
     async fn space_revisions(
         connection: &mut SqliteConnection,
     ) -> Result<Vec<RevisionRow>, sqlx::Error> {
-        sqlx::query_as(
+        let rows: Vec<(Vec<u8>, bool, Vec<u8>)> = sqlx::query_as(
             "SELECT CAST(id AS BLOB), typeof(id) = 'blob', CAST(revision AS BLOB) \
              FROM spaces ORDER BY id",
         )
         .fetch_all(connection)
-        .await
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|(id, blob, revision)| RevisionRow {
+                id,
+                storage: if blob {
+                    IdStorage::Blob
+                } else {
+                    IdStorage::Text
+                },
+                revision,
+            })
+            .collect())
     }
 
     async fn meta_space_id(

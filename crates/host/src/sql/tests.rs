@@ -25,7 +25,8 @@ use sqlx::{ConnectOptions as _, Sqlite, Transaction};
 
 use super::codec::{ResourceRow, SpaceRow};
 use super::{
-    Access, LockMode, Probe, RevisionRow, SqlSpaceRepository, SqlStore, SqliteStore, Step,
+    Access, IdStorage, LockMode, Probe, RevisionRow, SqlSpaceRepository, SqlStore, SqliteStore,
+    Step,
 };
 use crate::assets::{AssetHash, StoredAsset};
 use crate::repository::{
@@ -120,9 +121,9 @@ impl SqlStore for Scripted {
         &self,
         connection: &mut SqliteConnection,
         id: &[u8],
-        blob: bool,
+        storage: IdStorage,
     ) -> Result<Option<Vec<u8>>, sqlx::Error> {
-        let stored = self.inner.lock_space(connection, id, blob).await?;
+        let stored = self.inner.lock_space(connection, id, storage).await?;
         let scripted = self.prior_revision.lock().unwrap().take();
         Ok(scripted.map(String::into_bytes).or(stored))
     }
@@ -887,20 +888,23 @@ mod sqlite_row_lock {
         .execute(&mut connection)
         .await
         .unwrap();
-        for (id, blob, expected) in [
-            (&b"abc"[..], false, Some(b"1".to_vec())),
-            (b"abc", true, None),
-            (b"ABC", false, None),
-            (b"xyz", true, Some(b"2".to_vec())),
-            (b"xyz", false, None),
-            (b"XYZ", true, None),
-            (b"dup", false, Some(b"3".to_vec())),
-            (b"dup", true, Some(b"4".to_vec())),
+        for (id, storage, expected) in [
+            (&b"abc"[..], IdStorage::Text, Some(b"1".to_vec())),
+            (b"abc", IdStorage::Blob, None),
+            (b"ABC", IdStorage::Text, None),
+            (b"xyz", IdStorage::Blob, Some(b"2".to_vec())),
+            (b"xyz", IdStorage::Text, None),
+            (b"XYZ", IdStorage::Blob, None),
+            (b"dup", IdStorage::Text, Some(b"3".to_vec())),
+            (b"dup", IdStorage::Blob, Some(b"4".to_vec())),
         ] {
             assert_eq!(
-                store.lock_space(&mut connection, id, blob).await.unwrap(),
+                store
+                    .lock_space(&mut connection, id, storage)
+                    .await
+                    .unwrap(),
                 expected,
-                "{} stored as a BLOB: {blob}",
+                "{} stored as {storage:?}",
                 String::from_utf8_lossy(id)
             );
         }

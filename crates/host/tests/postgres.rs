@@ -424,23 +424,10 @@ mod given_its_connection {
     /// `database`'s URL with every TLS selector left out, so only
     /// `PGSSLMODE` can choose the transport.
     fn without_tls_selectors(database: &Fresh) -> DatabaseUrl {
-        let mut url = database.url.clone();
-        let pairs: Vec<(String, String)> = database
-            .url
-            .query_pairs()
-            .filter(|(key, _)| {
-                !matches!(
-                    key.as_ref(),
-                    "sslmode" | "ssl" | "sslcert" | "sslkey" | "uselibpqcompat"
-                )
-            })
-            .map(|(key, value)| (key.into_owned(), value.into_owned()))
-            .collect();
-        if pairs.is_empty() {
-            url.set_query(None);
-        } else {
-            url.query_pairs_mut().clear().extend_pairs(pairs);
-        }
+        let url = postgres_support::without_query(
+            &database.url,
+            &["sslmode", "ssl", "sslcert", "sslkey", "uselibpqcompat"],
+        );
         DatabaseUrl::parse(Some(url.as_str())).unwrap()
     }
 

@@ -15,7 +15,7 @@ use sqlx::{Pool, Postgres, Row, Transaction};
 
 use super::codec::{ResourceRow, SpaceRow};
 use super::database_url::DatabaseUrl;
-use super::{Access, LockMode, RevisionRow, SqlSpaceRepository, SqlStore};
+use super::{Access, IdStorage, LockMode, RevisionRow, SqlSpaceRepository, SqlStore};
 use crate::assets::StoredAsset;
 use crate::repository::RepositoryError;
 
@@ -378,9 +378,9 @@ impl SqlStore for PostgresStore {
         &self,
         connection: &mut PgConnection,
         id: &[u8],
-        _blob: bool,
+        _storage: IdStorage,
     ) -> Result<Option<Vec<u8>>, sqlx::Error> {
-        // `id` is a uuid column, which holds no BLOB.
+        // `id` is a uuid column, so every id is text.
         // Under READ COMMITTED, a row lock that waited answers the row as the
         // holder left it: the revision it carried when the lock was granted.
         sqlx::query_scalar(
@@ -406,12 +406,21 @@ impl SqlStore for PostgresStore {
     async fn space_revisions(
         connection: &mut PgConnection,
     ) -> Result<Vec<RevisionRow>, sqlx::Error> {
-        sqlx::query_as(
-            "SELECT convert_to(id::text, 'UTF8'), false, convert_to(revision, 'UTF8') \
+        let rows: Vec<(Vec<u8>, Vec<u8>)> = sqlx::query_as(
+            "SELECT convert_to(id::text, 'UTF8'), convert_to(revision, 'UTF8') \
              FROM spaces ORDER BY id",
         )
         .fetch_all(connection)
-        .await
+        .await?;
+        // `id` is a uuid column, so every id is text.
+        Ok(rows
+            .into_iter()
+            .map(|(id, revision)| RevisionRow {
+                id,
+                storage: IdStorage::Text,
+                revision,
+            })
+            .collect())
     }
 
     async fn meta_space_id(connection: &mut PgConnection) -> Result<Option<String>, sqlx::Error> {

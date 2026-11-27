@@ -616,7 +616,7 @@ mod given_start_up_over_a_server_that_refuses_this_client {
 /// `database`'s URL with a password its server will not accept. A query
 /// `password` would override the authority's, so it is dropped.
 fn wrong_password(database: &Fresh) -> DatabaseUrl {
-    let mut url = without_query(&database.url, &["password"]);
+    let mut url = postgres_support::without_query(&database.url, &["password"]);
     let known = database
         .url
         .query_pairs()
@@ -627,22 +627,6 @@ fn wrong_password(database: &Fresh) -> DatabaseUrl {
     url.set_password(Some(&format!("{known}-not-the-password")))
         .unwrap();
     DatabaseUrl::parse(Some(url.as_str())).unwrap()
-}
-
-/// `url` without the query pairs named `names`, every other pair kept.
-fn without_query(url: &url::Url, names: &[&str]) -> url::Url {
-    let mut kept = url.clone();
-    let pairs: Vec<(String, String)> = url
-        .query_pairs()
-        .filter(|(key, _)| !names.contains(&key.as_ref()))
-        .map(|(key, value)| (key.into_owned(), value.into_owned()))
-        .collect();
-    if pairs.is_empty() {
-        kept.set_query(None);
-    } else {
-        kept.query_pairs_mut().clear().extend_pairs(pairs);
-    }
-    kept
 }
 
 /// The server's URL naming a database it does not have.
@@ -828,7 +812,7 @@ mod given_a_real_server {
         let stand_in = StandIn::start(Behaviour::ResetFirstThenPass(upstream)).await;
         // The driver dials the stand-in by `hostaddr` and its port, and
         // still verifies TLS against the host the URL names, which stays.
-        let mut through = without_query(&database.url, &["hostaddr", "port"]);
+        let mut through = postgres_support::without_query(&database.url, &["hostaddr", "port"]);
         through.set_port(Some(stand_in.port())).unwrap();
         through
             .query_pairs_mut()

@@ -269,18 +269,8 @@ impl Database {
         // A `dbname` pair would name a database in place of the path, so the
         // test's own database is named by the path alone; `server` keeps it
         // for the administrative connections.
-        let mut url = server.clone();
+        let mut url = without_query(&server, &["dbname"]);
         url.set_path(&format!("/{name}"));
-        let kept: Vec<(String, String)> = server
-            .query_pairs()
-            .filter(|(key, _)| key != "dbname")
-            .map(|(key, value)| (key.into_owned(), value.into_owned()))
-            .collect();
-        if kept.is_empty() {
-            url.set_query(None);
-        } else {
-            url.query_pairs_mut().clear().extend_pairs(kept);
-        }
         let database = Self { name, server, url };
         database.administer(&format!("CREATE DATABASE {}", database.name));
         database
