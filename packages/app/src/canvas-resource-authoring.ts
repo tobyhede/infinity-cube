@@ -175,7 +175,10 @@ export function useCanvasResourceAuthoring({
   });
   // A plugin that took its Claim to edit in place is drawn at its Edit size,
   // and resized as an editor, until the Claim ends (ADR 0178). The render
-  // adapter is told in a layout effect, before the browser paints this render.
+  // adapter is told in a layout effect. The canvas then lays the new placement
+  // out through `usePlacementRendering`, an effect and a microtask later, so a
+  // frame may still show the Resource at its size before it is drawn at its
+  // Edit size.
   const editingDrawings = useSyncExternalStore(pluginGate.subscribe, pluginGate.editors);
   const embeddedIn = plugins?.embeddedIn;
   const editors = useMemo(() => {
