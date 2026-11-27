@@ -721,7 +721,8 @@ mod given_content_jsonb_reorders {
     use super::*;
     use repository_contract::content::holding_a_missing_plugin;
     use repository_contract::{
-        EMPTY_ASSET_REF, InKeyOrder as _, RESOURCE_ID, SECOND_RESOURCE_ID, SPACE_ID, seed,
+        EMPTY_ASSET_REF, InKeyOrder as _, RESOURCE_ID, SECOND_RESOURCE_ID, SPACE_ID,
+        commit as commit_of, seed, update as update_at,
     };
 
     const KIND: &str = "vnd.example.chart";
@@ -737,6 +738,18 @@ mod given_content_jsonb_reorders {
                 r#"{{"source":"{EMPTY_ASSET_REF}","legend":"a longer value","options":{{"direction":"TD","at":[1,2.5,null,{{"nested":true,"id":7}}]}}}}"#
             ),
             Some(r#"{"zoom":2,"at":["ink",{"label":"x","id":7}]}"#),
+        )
+    }
+
+    /// The Space before the commit: other content and Map content, so the
+    /// commit rewrites the Space row and the missing plugin's Resource row.
+    fn before() -> SpaceSnapshot {
+        holding_a_missing_plugin(
+            "Chart",
+            KIND,
+            "Flow",
+            &format!(r#"{{"source":"{EMPTY_ASSET_REF}","legend":"before"}}"#),
+            Some(r#"{"zoom":1}"#),
         )
     }
 
@@ -762,13 +775,42 @@ mod given_content_jsonb_reorders {
         seed(&writer, &[&committed()]).await;
         writer.close().await;
 
+        assert_stored_in_jsonb_order(&database, 0).await;
+    }
+
+    // The commit path writes the Space row and upserts the Resource rows
+    // through statements of its own, so content committed there is held to
+    // the order and bytes of content initialization installs.
+    #[tokio::test]
+    #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+    async fn commits_a_missing_plugins_content_then_loads_it_in_jsonb_order_and_exports_it() {
+        assert!(!intake::is_plugin_kind(KIND), "no plugin draws {KIND}");
+        let database = Fresh::new().await;
+        let writer = database.open();
+        seed(&writer, &[&before()]).await;
+        let answer = writer
+            .commit(commit_of(vec![update_at(&committed(), 0)]))
+            .await
+            .unwrap();
+        writer.close().await;
+        assert!(super::committed(&answer), "the update commits: {answer:?}");
+
+        assert_stored_in_jsonb_order(&database, 1).await;
+    }
+
+    /// The Space the Fresh `database` holds, read through a new pool: it
+    /// comes back at `revision` in `jsonb`'s key order, holding the values
+    /// committed, and Exports the bytes a memory store holding the Space as
+    /// committed Exports.
+    async fn assert_stored_in_jsonb_order(database: &Fresh, revision: u64) {
         let store = database.open();
-        let loaded = store
+        let stored = store
             .load_space(space(SPACE_ID))
             .await
             .unwrap()
-            .expect("the Space is stored")
-            .snapshot;
+            .expect("the Space is stored");
+        assert_eq!(stored.revision.get(), revision, "the Space's revision");
+        let loaded = stored.snapshot;
         assert_eq!(
             loaded,
             in_jsonb_order(),
