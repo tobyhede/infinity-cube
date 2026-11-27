@@ -536,12 +536,36 @@ impl<S: SqlStore> Shared<S> {
     }
 
     /// Record that the store is asked to write `resource`'s row, where a test
-    /// records Resource writes.
+    /// records Resource writes. Only [`Self::insert_resource`] and
+    /// [`Self::upsert_resource`] call it.
     fn writing_resource(&self, resource: &ResourceRow) {
         #[cfg(any(test, feature = "test-support"))]
         self.instruments().resource_writes.push(resource.id.clone());
         #[cfg(not(any(test, feature = "test-support")))]
         let _ = resource;
+    }
+
+    /// Insert `resource`'s row, recording the write. Every repository insert
+    /// of a Resource row goes through here.
+    async fn insert_resource(
+        &self,
+        connection: &mut Connection<S>,
+        resource: &ResourceRow,
+    ) -> Result<(), sqlx::Error> {
+        self.writing_resource(resource);
+        S::insert_resource(connection, resource).await
+    }
+
+    /// Insert or update `resource`'s row, recording the write, and answer
+    /// the Space the row then belongs to. Every repository upsert of a
+    /// Resource row goes through here.
+    async fn upsert_resource(
+        &self,
+        connection: &mut Connection<S>,
+        resource: &ResourceRow,
+    ) -> Result<String, sqlx::Error> {
+        self.writing_resource(resource);
+        S::upsert_resource(connection, resource).await
     }
 
     /// Replace Space `id`'s Resource rows on `connection` with those a test
@@ -700,8 +724,7 @@ impl<S: SqlStore> Shared<S> {
             let (row, resources) = encode_space(space);
             S::insert_space(connection, &row).await?;
             for resource in &resources {
-                self.writing_resource(resource);
-                S::insert_resource(connection, resource).await?;
+                self.insert_resource(connection, resource).await?;
             }
         }
         S::insert_meta_space_id(connection, input.meta_space_id.as_str()).await?;
@@ -827,8 +850,7 @@ impl<S: SqlStore> Shared<S> {
             if unchanged {
                 continue;
             }
-            self.writing_resource(resource);
-            let owner = S::upsert_resource(connection, resource).await?;
+            let owner = self.upsert_resource(connection, resource).await?;
             if owner != row.id {
                 return Ok(Err(Landing::Refused(format!(
                     "Resource {} belongs to space {owner}, not {}",
@@ -1139,8 +1161,7 @@ impl<S: SqlStore> Shared<S> {
     ) -> Outcome<Result<(), Landing>> {
         S::insert_space(connection, row).await?;
         for resource in resources {
-            self.writing_resource(resource);
-            match S::insert_resource(connection, resource).await {
+            match self.insert_resource(connection, resource).await {
                 Ok(()) => {}
                 Err(error) if unique_violation(&error) => {
                     return Ok(Err(Landing::Refused(format!(
