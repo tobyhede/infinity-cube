@@ -177,6 +177,12 @@ const laidOut = (element: HTMLElement, signal: AbortSignal): Promise<void> => {
 };
 
 /**
+ * Where an Edit asked for while Closed is: none asked for, its text being
+ * read, or begun and not yet ended.
+ */
+type ClosedEdit = 'idle' | 'reading' | 'editing';
+
+/**
  * A running edit: the draft, the text it is measured against, which is the
  * text the edit began from or last Saved, and whether a Save is under way.
  */
@@ -207,9 +213,11 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
   const url = surface.content.value.url;
   const [known] = useState(createKnownText);
   const open = surface.map.value.open;
-  // An Edit asked for while Closed reads the text for that edit only.
-  const [editFromClosed, setEditFromClosed] = useState(false);
-  const text = useText(url, surface.assets, known, open || editFromClosed);
+  // An Edit asked for while Closed reads the text for that edit only: it
+  // is wanted while `reading` it for the edit and while that edit is
+  // `editing`, which runs from its beginning, measuring included, to its end.
+  const [closedEdit, setClosedEdit] = useState<ClosedEdit>('idle');
+  const text = useText(url, surface.assets, known, open || closedEdit !== 'idle');
   const mapCommit = surface.map.commit;
   const contentCommit = surface.content.commit;
   const store = surface.assets.store;
@@ -293,24 +301,28 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
     return () => measured.abort();
   }, [measuring]);
 
-  const end = useCallback(() => {
-    setEditing(null);
-    setEditFromClosed(false);
-  }, []);
+  const end = useCallback(() => setEditing(null), []);
 
-  // An Edit asked for while Closed begins once the text is read, and where
-  // the text cannot be read says it cannot, beginning nothing.
-  const editWhenRead = useRef(false);
+  // An Edit asked for while Closed begins once the text is read, with the
+  // begin as last drawn, as `beginning` is kept; where the text cannot be
+  // read it says it cannot, beginning nothing.
+  const beginClosedEdit = useRef<() => void>(() => undefined);
   useEffect(() => {
-    if (text.state === 'refused' && editWhenRead.current) {
-      editWhenRead.current = false;
-      setEditFromClosed(false);
-      setRefusal(UNEDITABLE);
-    }
-    if (!editWhenRead.current || text.state !== 'read') return;
-    editWhenRead.current = false;
-    beginEdit();
-  }, [editFromClosed, text.state, beginEdit]);
+    beginClosedEdit.current = () => {
+      setClosedEdit('editing');
+      beginEdit();
+    };
+  }, [beginEdit]);
+  useEffect(() => {
+    if (closedEdit === 'reading' && text.state === 'read') beginClosedEdit.current();
+  }, [closedEdit, text.state]);
+  if (closedEdit === 'reading' && text.state === 'refused') {
+    setClosedEdit('idle');
+    setRefusal(UNEDITABLE);
+  }
+  // However the edit ends, by any of its four ways out or a Claim refused as it
+  // begins, it is over once nothing is measured and no draft is up.
+  if (closedEdit === 'editing' && editing === null && !measuring) setClosedEdit('idle');
 
   const save = useCallback(() => {
     if (editing === null || editing.saving) return;
@@ -417,12 +429,14 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
               id: 'edit',
               label: `Edit Resource ${name}`,
               icon: <Pencil size={14} />,
-              run: mayEdit
+              // Closed, an edit is asked for through `reading` even where the
+              // text is known, so it stays wanted until the edit ends.
+              run: open
                 ? beginEdit
                 : () => {
+                    if (closedEdit !== 'idle') return;
                     setRefusal(null);
-                    editWhenRead.current = true;
-                    setEditFromClosed(true);
+                    setClosedEdit('reading');
                   },
             },
           ]
@@ -458,6 +472,7 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
     mayEditClosed,
     beginEdit,
     open,
+    closedEdit,
     commitMap,
   ]);
 

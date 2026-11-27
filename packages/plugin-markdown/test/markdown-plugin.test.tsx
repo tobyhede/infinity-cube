@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { EMPTY_ASSET, lineFeedText, type AssetRef } from '@project/resource-api/domain';
 import { renderPlugin } from '@project/resource-api/view/testing';
 import {
@@ -502,6 +502,53 @@ describe('the Markdown plugin’s view', () => {
     expect(rendered.commits.claims.taken).toBe(0);
     expect(screen.queryByRole('textbox')).toBeNull();
     expect(document.querySelector('[data-open]')).toHaveAttribute('data-open', 'false');
+  });
+
+  it('measures again for a second Edit from Closed where the Map stores no Edit size', async () => {
+    const rendered = renderPlugin(markdownPluginView.View, {
+      content,
+      map: closed,
+      title: 'Notes',
+      grants: editable,
+      assets: reading({ [TEXT_REF]: 'Old' }),
+    });
+    for (let edit = 0; edit < 2; edit += 1) {
+      fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
+      await screen.findByRole('textbox', { name: 'Markdown source of Notes' });
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel editing Resource Notes' }));
+    }
+    const hints = rendered.commits.claims.inPlace.map((inPlace) => inPlace?.sizeHint?.width);
+    expect(hints).toEqual([READING_WIDTH, READING_WIDTH]);
+    expect(rendered.commits.map).toEqual([]);
+  });
+
+  it('reads nothing more for an edit from Closed once its Save lands', async () => {
+    const reads: AssetRef[] = [];
+    const texts = reading({ [TEXT_REF]: 'Old' });
+    const rendered = renderPlugin(markdownPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
+      content,
+      map: closed,
+      title: 'Notes',
+      grants: editable,
+      assets: {
+        read: (ref: AssetRef) => {
+          reads.push(ref);
+          return texts.read(ref);
+        },
+        store: () => Promise.resolve(SAVED_REF),
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
+    fireEvent.change(await screen.findByRole('textbox'), { target: { value: 'New' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Resource Notes' }));
+    await waitFor(() => expect(screen.queryByRole('textbox')).toBeNull());
+    // Closed again, a text changed elsewhere is not read.
+    act(() => rendered.changeContent({ url: UNREAD_REF }));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(reads).toEqual([TEXT_REF]);
   });
 
   it('Saves a draft whose content changed meanwhile to text it cannot read', async () => {
