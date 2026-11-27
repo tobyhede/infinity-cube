@@ -1,0 +1,21 @@
+# One Closing module between the shell's events and the close-wait decision
+
+Candidate 3 of the desktop shell's architecture review (26 November 2026). The design was settled in the project thread on 28 November 2026.
+
+## The problem
+
+What a close, a quit and a Dock Quit do is spread across `main.rs`, where no test reaches it: `on_window_event` begins a window's close, `RunEvent::ExitRequested` begins a quit and decides whether the application may end, `RunEvent::Exit` stops servers on threads of its own for a Dock Quit, `spawn_stop` reports a failed write and frees the folder, `apply` carries out the close-wait decision's effects, and `waiting::drive` runs that decision on a channel. `waiting.rs` and `aggregates.rs` are tested; the wiring between them, and between them and Tauri, is not. ST-122 says so.
+
+## What was settled
+
+- **A `closing` module owns the handling.** `closing.rs` handles a window's close request, a quit request, the application's exit, the question's answer, a timer that elapsed, and a stop that ended. It reaches the `Registry` and `Waiting` directly. `Waiting`'s interface is unchanged. `main.rs` forwards Tauri's events to it and does what it answers.
+- **What the shell does crosses a `ClosingPort`.** Stopping a server, reporting a failed write (in a dialog or on standard error), starting a timer, asking or dismissing the question, closing a window, closing an Aggregate's window with the windows its page opened, and ending the application. Its Tauri adapter is `closing/tauri_shell.rs`; its tests drive a recording fake. A stop begun through the port ends when the adapter calls back, so the fake holds stops and the tests end them in the order they choose.
+- **The decision runs where the event arrives.** `Waiting` sits behind a lock, and its effects go to the port while that lock is held, so they reach the shell in the order they were decided. Every port method called under the lock returns at once and never calls back into the module: the Tauri adapter hands window work to one task that does it in order, off the event loop's thread, as `drive`'s task did. Reporting a failed write may wait for a dialog, so it is never called under the lock. The lock order is `Waiting`, then the `Registry`; nothing takes `Waiting` while holding the `Registry`. `waiting::drive` goes; `waiting::ask_after` is the ten seconds a timer waits, tested on tokio's paused clock.
+- **One stop path.** A window's close, a quit and a Dock Quit begin each stop the same way: the write signal is stored in the Registry, then the port stops the server, then the module records that the write has landed, reports a failure where the Registry says, frees the folder and tells `Waiting`. A Dock Quit takes every open Aggregate, as a quit does, stops each through that path, then waits on the write signal of every close not abandoned, which the Registry hands over with `take_writing` in place of `take_for_exit`. The threads `RunEvent::Exit` started of its own go.
+- **A failure reported on standard error is said before the exit stops waiting.** When the Registry says standard error, the stop reports before it signals the write landed, so a Dock Quit does not end the process mid-report; when it says a dialog, it signals first, since the dialog needs the event loop an exit holds.
+- **The module decides whether the application may end.** `exit_requested(code, last_window) -> Exit::{Allow, Prevent}`: allowed once `Waiting` has ended the application; prevented, beginning nothing, for the last window closing on a platform that runs on (macOS, ST-131); otherwise prevented while a quit begins. `main.rs` obeys.
+- **Tests drive the wiring.** `closing/tests.rs` drives the module with the real `Registry` and `Waiting` and the fake, end to end: a close ending in time, a close asking and then closing without saving, a failure after a window close in a dialog and after Close without saving on standard error, a close and then a quit and then Close without saving, the last window on macOS, and a Dock Quit waiting for every write but an abandoned one.
+
+## Out of scope
+
+The question window's page (`ui/closing.html`), `Waiting`'s internals, `question.rs` beyond the Tauri adapter calling it, and opening a folder.
