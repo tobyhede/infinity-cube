@@ -187,7 +187,11 @@ mod given_rows_the_typescript_host_wrote {
 
     /// A revision past what a double holds exactly (2⁵³ + 1), as the
     /// TypeScript host stores one: canonical decimal text, which this host
-    /// reads and writes back as text, one more.
+    /// reads and writes back as decimal text, one more. Only the stored value
+    /// is checked: `revision` is a `text` column, so its type says nothing
+    /// about what this host binds, and an `int8` bound to it is stored as the
+    /// same text, so binding the revision as an integer is not told apart
+    /// here.
     #[tokio::test]
     #[ignore = "needs the PostgreSQL server INFINITY_CUBE_POSTGRES_TEST_URL names"]
     async fn writes_the_next_revision_as_the_decimal_text_typescript_reads() {
@@ -223,12 +227,12 @@ mod given_rows_the_typescript_host_wrote {
         assert_eq!(
             database
                 .scalar(&format!(
-                    "SELECT revision || ' ' || pg_typeof(revision)::text FROM spaces WHERE id = '{}'",
+                    "SELECT revision FROM spaces WHERE id = '{}'",
                     meta()
                 ))
                 .await
                 .as_deref(),
-            Some("9007199254740994 text"),
+            Some("9007199254740994"),
             "the next revision, stored as decimal text"
         );
         postgres.close().await;
