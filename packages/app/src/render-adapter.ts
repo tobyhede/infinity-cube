@@ -536,7 +536,13 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
           if (draft !== null && now.editors.has(draft.resourceId) !== editors.has(draft.resourceId))
             next.resizeDraft = null;
         }
-        if (!sameSize(now.editorCap, cap)) next.editorCap = cap;
+        if (!sameSize(now.editorCap, cap)) {
+          next.editorCap = cap;
+          // The cap draws an editor at another rect, so it ends a draft of an
+          // editor for the same reason; a Resource not edited in place is
+          // drawn uncapped, and its draft goes on.
+          if (now.resizeDraft?.editor === true) next.resizeDraft = null;
+        }
         if (Object.keys(next).length > 0) set(next);
       },
 

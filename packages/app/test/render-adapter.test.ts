@@ -897,6 +897,33 @@ describe('render adapter', () => {
       expect(store.getState().resizeDraft?.size).toEqual({ width: 500, height: 300 });
     });
 
+    it('drops a resize under way when the cap changes', () => {
+      const spy = authoringSpy({ mapPlacement: authored });
+      const store = createRenderAdapter(spy.authoring);
+      const editors = new Map([[RESOURCE_A, {}]]);
+      store.getState().resourceResize.drawEditors(editors, { width: 500, height: 300 });
+      store.getState().resourceResize.beginResize(RESOURCE_A);
+      store.getState().resourceResize.previewResize(RESOURCE_A, { width: 520, height: 320 });
+      store.getState().resourceResize.drawEditors(editors, { width: 400, height: 250 });
+      expect(store.getState().resizeDraft).toBeNull();
+      store.getState().resourceResize.finishResize(RESOURCE_A);
+      expect(spy.completions).toEqual([]);
+    });
+
+    it('keeps a resize of a Resource not edited in place when the cap changes', () => {
+      const spy = authoringSpy({ mapPlacement: authored });
+      const store = createRenderAdapter(spy.authoring);
+      const editors = new Map([[RESOURCE_A, {}]]);
+      store.getState().resourceResize.drawEditors(editors, { width: 500, height: 300 });
+      store.getState().resourceResize.beginResize(RESOURCE_B);
+      store.getState().resourceResize.previewResize(RESOURCE_B, { width: 320, height: 220 });
+      store.getState().resourceResize.drawEditors(editors, { width: 400, height: 250 });
+      store.getState().resourceResize.finishResize(RESOURCE_B);
+      expect(spy.completions).toEqual([
+        { kind: 'resized-resource', resourceId: RESOURCE_B, size: { width: 320, height: 220 } },
+      ]);
+    });
+
     it('resizes a capped editor from the rect it draws, and stores what it draws', () => {
       const large = Placement.fromEntries([
         [
