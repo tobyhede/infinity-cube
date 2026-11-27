@@ -26,9 +26,11 @@ pub mod lifecycle;
 use std::sync::Arc;
 
 use host::{
-    AggregateInput, CommitResult, InitializeResult, LoadedSpace, Revision, SpaceChange,
-    SpaceCommit, SpaceRepository,
+    AggregateInput, AggregateLoad, AssetStored, CommitResult, InitializeResult, LoadedAggregate,
+    LoadedSpace, ReplaceResult, RepositoryError, Revision, SpaceChange, SpaceCommit, SpaceConflict,
+    SpaceRepository,
 };
+use intake::json::JsonValue;
 use intake::{SpaceId, SpaceSnapshot};
 use serde_json::{Value, json};
 
@@ -393,6 +395,204 @@ pub fn update(snapshot: &SpaceSnapshot, expected: u64) -> SpaceChange {
     }
 }
 
+/// A value as the contract compares it: with every JSON object in it, each
+/// Resource's content and each placement's Map content, in ascending key
+/// order. The TypeScript contract compares with `toEqual`, which ignores
+/// object-key order, so a store may answer content in its own key order
+/// (PostgreSQL's `jsonb` sorts keys by length, then by bytes) and still
+/// answer the value written. Everything else a store answers is typed, so it
+/// compares as it is.
+pub trait InKeyOrder {
+    /// This value, every JSON object in it in ascending key order.
+    #[must_use]
+    fn in_key_order(&self) -> Self;
+}
+
+/// `InKeyOrder` for values holding no JSON object, each itself.
+macro_rules! as_itself {
+    ($($type:ty),* $(,)?) => {
+        $(
+            impl InKeyOrder for $type {
+                fn in_key_order(&self) -> Self {
+                    self.clone()
+                }
+            }
+        )*
+    };
+}
+
+as_itself!(
+    bool,
+    u64,
+    usize,
+    &str,
+    String,
+    SpaceId,
+    Revision,
+    RepositoryError,
+    AssetStored,
+    host::SpaceSummary,
+    host::StoredAsset,
+    host::AssetHash,
+    serde_json::Value,
+    (),
+    bytes::Bytes,
+    Vec<u8>,
+);
+
+impl InKeyOrder for JsonValue {
+    fn in_key_order(&self) -> Self {
+        match self {
+            Self::Array(items) => Self::Array(items.iter().map(Self::in_key_order).collect()),
+            Self::Object(object) => {
+                let mut entries: Vec<(String, Self)> = object
+                    .iter()
+                    .map(|(key, value)| (key.to_owned(), value.in_key_order()))
+                    .collect();
+                entries.sort_by(|left, right| left.0.cmp(&right.0));
+                Self::Object(entries.into_iter().collect())
+            }
+            other => other.clone(),
+        }
+    }
+}
+
+impl InKeyOrder for SpaceSnapshot {
+    fn in_key_order(&self) -> Self {
+        let mut snapshot = self.clone();
+        for resource in &mut snapshot.resources {
+            resource.content = resource.content.in_key_order();
+        }
+        for map in snapshot.document.maps.iter_mut().flatten() {
+            for (_, placement) in &mut map.positions {
+                placement.content = placement.content.in_key_order();
+            }
+        }
+        snapshot
+    }
+}
+
+impl InKeyOrder for LoadedSpace {
+    fn in_key_order(&self) -> Self {
+        Self {
+            snapshot: self.snapshot.in_key_order(),
+            ..self.clone()
+        }
+    }
+}
+
+impl InKeyOrder for LoadedAggregate {
+    fn in_key_order(&self) -> Self {
+        Self {
+            meta_space_id: self.meta_space_id,
+            spaces: self.spaces.in_key_order(),
+        }
+    }
+}
+
+impl InKeyOrder for AggregateLoad {
+    fn in_key_order(&self) -> Self {
+        match self {
+            Self::Loaded(aggregate) => Self::Loaded(aggregate.in_key_order()),
+            Self::Uninitialized => Self::Uninitialized,
+        }
+    }
+}
+
+impl InKeyOrder for SpaceConflict {
+    fn in_key_order(&self) -> Self {
+        Self {
+            space_id: self.space_id,
+            current: self.current.in_key_order(),
+        }
+    }
+}
+
+impl InKeyOrder for CommitResult {
+    fn in_key_order(&self) -> Self {
+        match self {
+            Self::Conflict(conflicts) => Self::Conflict(conflicts.in_key_order()),
+            other => other.clone(),
+        }
+    }
+}
+
+impl InKeyOrder for InitializeResult {
+    fn in_key_order(&self) -> Self {
+        match self {
+            Self::Initialized(aggregate) => Self::Initialized(aggregate.in_key_order()),
+            Self::Existing(aggregate) => Self::Existing(aggregate.in_key_order()),
+            Self::AlreadyInitialized(aggregate) => {
+                Self::AlreadyInitialized(aggregate.in_key_order())
+            }
+            other => other.clone(),
+        }
+    }
+}
+
+impl InKeyOrder for ReplaceResult {
+    fn in_key_order(&self) -> Self {
+        match self {
+            Self::Replaced(aggregate) => Self::Replaced(aggregate.in_key_order()),
+            other => other.clone(),
+        }
+    }
+}
+
+impl<T: InKeyOrder> InKeyOrder for Option<T> {
+    fn in_key_order(&self) -> Self {
+        self.as_ref().map(T::in_key_order)
+    }
+}
+
+impl<T: InKeyOrder> InKeyOrder for Vec<T> {
+    fn in_key_order(&self) -> Self {
+        self.iter().map(T::in_key_order).collect()
+    }
+}
+
+impl<T: InKeyOrder, const N: usize> InKeyOrder for [T; N] {
+    fn in_key_order(&self) -> Self {
+        std::array::from_fn(|index| self[index].in_key_order())
+    }
+}
+
+impl<T: InKeyOrder, E: InKeyOrder> InKeyOrder for Result<T, E> {
+    fn in_key_order(&self) -> Self {
+        match self {
+            Ok(value) => Ok(value.in_key_order()),
+            Err(error) => Err(error.in_key_order()),
+        }
+    }
+}
+
+impl<A: InKeyOrder, B: InKeyOrder> InKeyOrder for (A, B) {
+    fn in_key_order(&self) -> Self {
+        (self.0.in_key_order(), self.1.in_key_order())
+    }
+}
+
+/// `assert_eq!` as the TypeScript contract's `toEqual` compares: both sides
+/// [`InKeyOrder::in_key_order`], so content a store answers in its own key
+/// order equals the content written.
+macro_rules! assert_same {
+    ($left:expr, $right:expr $(,)?) => {
+        assert_eq!(
+            $crate::repository_contract::InKeyOrder::in_key_order(&$left),
+            $crate::repository_contract::InKeyOrder::in_key_order(&$right)
+        )
+    };
+    ($left:expr, $right:expr, $($message:tt)+) => {
+        assert_eq!(
+            $crate::repository_contract::InKeyOrder::in_key_order(&$left),
+            $crate::repository_contract::InKeyOrder::in_key_order(&$right),
+            $($message)+
+        )
+    };
+}
+
+pub(crate) use assert_same;
+
 /// A commit of `changes`.
 pub fn commit(changes: Vec<SpaceChange>) -> SpaceCommit {
     SpaceCommit { changes }
@@ -435,10 +635,12 @@ pub fn refused_kinds(result: &CommitResult) -> Vec<&'static str> {
 
 /// One test per case of the table, in a module `contract`, each opening a
 /// fresh `$harness`, running the case, and closing it. A case that needs
-/// what the harness cannot provide says it was skipped and why.
+/// what the harness cannot provide says it was skipped and why. Attributes
+/// after the harness go on every test, as `#[ignore = "…"]` does for a store
+/// whose tests need a server.
 macro_rules! repository_cases {
-    ($harness:ty) => {
-        repository_cases! { @emit $harness;
+    ($harness:ty $(, #[$attribute:meta])* $(,)?) => {
+        repository_cases! { @emit $harness; [$(#[$attribute])*];
             // table:begin
             lifecycle {
                 preserves_the_established_aggregate_across_a_fresh_host,
@@ -504,9 +706,12 @@ macro_rules! repository_cases {
                 replaces_an_invalid_space_document,
                 replaces_an_invalid_aggregate,
                 names_a_broken_document_broken_on_the_fast_path_and_load_space,
+                lists_every_space_when_one_fails_intake,
+                lists_a_space_without_a_title_by_its_id,
                 truncates_spaces_without_a_meta_identity_only_when_none_was_expected,
                 fails_a_stored_revision_that_is_not_canonical,
                 refuses_an_update_when_stored_spaces_have_no_meta_identity,
+                refuses_to_store_a_revision_above_the_ceiling,
                 fails_a_stored_revision_above_the_ceiling,
                 fails_a_fast_path_commit_over_a_revision_that_is_not_canonical,
                 fails_a_stored_exported_revision_that_is_not_canonical,
@@ -535,7 +740,7 @@ macro_rules! repository_cases {
             // table:end
         }
     };
-    (@emit $harness:ty; $($group:ident { $($case:ident),* $(,)? })*) => {
+    (@emit $harness:ty; $attributes:tt; $($group:ident { $($case:ident),* $(,)? })*) => {
         mod contract {
             #[allow(unused_imports, reason = "the harness may be named by a path")]
             use super::*;
@@ -545,21 +750,26 @@ macro_rules! repository_cases {
             $(
                 mod $group {
                     $(
-                        #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-                        #[allow(clippy::print_stderr, reason = "a skipped case says so")]
-                        async fn $case() {
-                            use $crate::repository_contract::Harness as _;
-                            let mut harness = <super::Subject>::open().await;
-                            let ran =
-                                $crate::repository_contract::$group::$case(&mut harness).await;
-                            harness.close().await;
-                            if let Err($crate::repository_contract::Unprovided(why)) = ran {
-                                eprintln!("skipped: {why}");
-                            }
+                        $crate::repository_contract::repository_cases! {
+                            @case $attributes $group $case
                         }
                     )*
                 }
             )*
+        }
+    };
+    (@case [$(#[$attribute:meta])*] $group:ident $case:ident) => {
+        #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+        #[allow(clippy::print_stderr, reason = "a skipped case says so")]
+        $(#[$attribute])*
+        async fn $case() {
+            use $crate::repository_contract::Harness as _;
+            let mut harness = <super::Subject>::open().await;
+            let ran = $crate::repository_contract::$group::$case(&mut harness).await;
+            harness.close().await;
+            if let Err($crate::repository_contract::Unprovided(why)) = ran {
+                eprintln!("skipped: {why}");
+            }
         }
     };
 }

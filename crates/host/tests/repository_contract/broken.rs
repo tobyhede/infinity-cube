@@ -42,7 +42,7 @@ async fn replaces_broken_state<H: Harness>(harness: &mut H, state: BrokenState) 
         "{replaced:?}"
     );
     let store = reopened(harness).await;
-    assert_eq!(
+    assert_same!(
         store.load_aggregate().await,
         Ok(AggregateLoad::Loaded(LoadedAggregate {
             meta_space_id: id(SPACE_ID),
@@ -84,6 +84,58 @@ pub async fn names_a_broken_document_broken_on_the_fast_path_and_load_space<H: H
     Ok(())
 }
 
+/// Not a port: one Space failing intake does not hide the others from the
+/// listing (#528's 01, Storage ST-7). Each is listed, by its title where its
+/// document holds a string one and by its id otherwise, beside the Spaces
+/// that pass, while the aggregate read fails as broken stored state.
+pub async fn lists_every_space_when_one_fails_intake<H: Harness>(harness: &mut H) -> Ran {
+    harness
+        .arrange_broken_state(
+            BrokenState::InvalidAggregate,
+            id(SPACE_ID),
+            id(OTHER_SPACE_ID),
+        )
+        .await?;
+    let store = reopened(harness).await;
+    let aggregate = store.load_aggregate().await;
+    assert!(is_broken(&aggregate), "{aggregate:?}");
+    assert_same!(
+        store.list_spaces().await,
+        Ok(vec![
+            host::SpaceSummary {
+                id: id(SPACE_ID),
+                title: "Meta".to_owned(),
+            },
+            host::SpaceSummary {
+                id: id(OTHER_SPACE_ID),
+                title: "Unreferenced".to_owned(),
+            },
+        ]),
+        "the unreferenced Space is listed beside Meta"
+    );
+    Ok(())
+}
+
+/// Not a port: a Space whose document has no title is listed by its id.
+pub async fn lists_a_space_without_a_title_by_its_id<H: Harness>(harness: &mut H) -> Ran {
+    harness
+        .arrange_broken_state(
+            BrokenState::InvalidSpaceDocument,
+            id(SPACE_ID),
+            id(OTHER_SPACE_ID),
+        )
+        .await?;
+    let store = reopened(harness).await;
+    assert_same!(
+        store.list_spaces().await,
+        Ok(vec![host::SpaceSummary {
+            id: id(SPACE_ID),
+            title: SPACE_ID.to_owned(),
+        }])
+    );
+    Ok(())
+}
+
 // Case: truncates stored Spaces without a Meta identity only when none was expected
 pub async fn truncates_spaces_without_a_meta_identity_only_when_none_was_expected<H: Harness>(
     harness: &mut H,
@@ -96,7 +148,7 @@ pub async fn truncates_spaces_without_a_meta_identity_only_when_none_was_expecte
 
     let loaded = store.load_aggregate().await;
     assert!(is_broken(&loaded), "{loaded:?}");
-    assert_eq!(
+    assert_same!(
         store
             .replace_aggregate(replacing_with(&replacement), Some(id(OTHER_SPACE_ID)))
             .await,
@@ -112,7 +164,7 @@ pub async fn truncates_spaces_without_a_meta_identity_only_when_none_was_expecte
         "{replaced:?}"
     );
     let store = reopened(harness).await;
-    assert_eq!(
+    assert_same!(
         store.load_aggregate().await,
         Ok(AggregateLoad::Loaded(LoadedAggregate {
             meta_space_id: id(SPACE_ID),
@@ -143,16 +195,42 @@ pub async fn refuses_an_update_when_stored_spaces_have_no_meta_identity<H: Harne
     seed(harness.store().as_ref(), &[&first]).await;
     harness.remove_meta_identity().await?;
     let store = harness.store().as_ref();
-    assert_eq!(
+    assert_same!(
         commit_update(store, &retitled(&first, "Changed"), 0).await,
         CommitResult::Rejected {
             message: "The repository has no Meta Space".to_owned()
         }
     );
     let store = reopened(harness).await;
-    assert_eq!(
+    assert_same!(
         store.load_space(id(SPACE_ID)).await,
         Ok(Some(stored(&first, 0, None)))
+    );
+    Ok(())
+}
+
+// Case: refuses to store a revision above the 2^63-1 ceiling
+/// An update adds one to the revision, so a Space stored at the ceiling
+/// cannot be updated: the commit fails as broken stored state (#528's 01)
+/// and the Space stands as it was.
+pub async fn refuses_to_store_a_revision_above_the_ceiling<H: Harness>(harness: &mut H) -> Ran {
+    let first = space(SPACE_ID, "One", &[RESOURCE_ID]);
+    seed(harness.store().as_ref(), &[&first]).await;
+    harness
+        .write_raw_revision(id(SPACE_ID), &CEILING.to_string(), None)
+        .await?;
+    let store = harness.store().as_ref();
+    let committed = store
+        .commit(commit(vec![update(
+            &retitled(&first, "Past the ceiling"),
+            CEILING,
+        )]))
+        .await;
+    assert!(is_broken(&committed), "{committed:?}");
+    let store = reopened(harness).await;
+    assert_same!(
+        store.load_space(id(SPACE_ID)).await,
+        Ok(Some(stored(&first, CEILING, None)))
     );
     Ok(())
 }

@@ -80,22 +80,22 @@ async fn stores_then_commits<H: Harness>(
     let store = harness.store().as_ref();
     seed(store, &[first]).await;
     let store = reopened(harness).await;
-    assert_eq!(
+    assert_same!(
         store.load_space(first.id).await,
         Ok(Some(stored(first, 0, None))),
         "what was initialized"
     );
-    assert_eq!(
+    assert_same!(
         commit_update(store, then, 0).await,
         committed_one(&first.id.to_string(), 1)
     );
     let store = reopened(harness).await;
-    assert_eq!(
+    assert_same!(
         store.load_space(then.id).await,
         Ok(Some(stored(then, 1, None))),
         "what was committed"
     );
-    assert_eq!(
+    assert_same!(
         store.load_aggregate().await,
         Ok(AggregateLoad::Loaded(LoadedAggregate {
             meta_space_id: then.id,
@@ -169,7 +169,7 @@ pub async fn stores_and_reloads_an_ur_resource_and_a_reference_to_it<H: Harness>
 /// A Space holding a Markdown Resource and a Resource of `kind`, which no
 /// plugin in this build lists, holding `content`, placed on its one Map
 /// with `map_content` where given.
-fn holding_a_missing_plugin(
+pub fn holding_a_missing_plugin(
     title: &str,
     kind: &str,
     resource_title: &str,
@@ -243,7 +243,7 @@ fn asset_files(directory: &Path) -> Vec<(String, Vec<u8>)> {
 /// Export `snapshot` and `asset` from a memory store into `directory`.
 async fn exported_from_memory(snapshot: &SpaceSnapshot, asset: &StoredAsset, directory: &Path) {
     let writer = MemorySpaceRepository::new();
-    assert_eq!(
+    assert_same!(
         writer.store_asset(asset.clone()).await,
         Ok(AssetStored::Stored)
     );
@@ -305,18 +305,18 @@ pub async fn carries_a_missing_plugin_resource_through_import_and_export<H: Harn
         .await
         .unwrap();
 
-    assert_eq!(
+    assert_same!(
         read_files(&exported, &files),
         written,
         "space.json and the Resource file"
     );
-    assert_eq!(
+    assert_same!(
         asset_files(&exported),
         assets,
         "the asset, by name and bytes"
     );
     let reread = reread(&exported).await;
-    assert_eq!(
+    assert_same!(
         reread
             .load_space(id(SPACE_ID))
             .await
@@ -324,7 +324,7 @@ pub async fn carries_a_missing_plugin_resource_through_import_and_export<H: Harn
             .map(|loaded| sorted(&loaded.snapshot)),
         Some(sorted(&snapshot))
     );
-    assert_eq!(reread.load_asset(&asset.hash).await, Ok(Some(asset)));
+    assert_same!(reread.load_asset(&asset.hash).await, Ok(Some(asset)));
     Ok(())
 }
 
@@ -372,7 +372,7 @@ pub async fn hands_a_missing_plugin_resource_to_its_plugin_when_it_returns<H: Ha
             snapshot
         })
         .collect();
-    assert_eq!(in_place, vec![restored.clone()]);
+    assert_same!(in_place, vec![restored.clone()]);
     assert!(
         intake::load_aggregate(id(SPACE_ID), &in_place).is_ok(),
         "the Image plugin reads the Resource it held"
@@ -389,7 +389,7 @@ pub async fn hands_a_missing_plugin_resource_to_its_plugin_when_it_returns<H: Ha
         .join(format!("{SECOND_RESOURCE_ID}.json"));
     let written = std::fs::read_to_string(&file).unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&written).unwrap();
-    assert_eq!(
+    assert_same!(
         parsed,
         serde_json::json!({
             "id": SECOND_RESOURCE_ID,
@@ -400,7 +400,7 @@ pub async fn hands_a_missing_plugin_resource_to_its_plugin_when_it_returns<H: Ha
     );
     std::fs::write(&file, written.replace(&format!("\"{kind}\""), "\"image\"")).unwrap();
     let reread = reread(&exported).await;
-    assert_eq!(
+    assert_same!(
         reread
             .load_space(id(SPACE_ID))
             .await
@@ -408,7 +408,7 @@ pub async fn hands_a_missing_plugin_resource_to_its_plugin_when_it_returns<H: Ha
             .map(|loaded| loaded.snapshot),
         Some(restored)
     );
-    assert_eq!(
+    assert_same!(
         reread
             .load_asset(&asset.hash)
             .await
@@ -563,12 +563,12 @@ pub async fn keeps_each_space_resources_selection_across_a_default_map_change<H:
 
     // The target changes the Map it opens on, and nothing else changes.
     let retargeted = target(SECOND_MAP_ID);
-    assert_eq!(
+    assert_same!(
         commit_update(store, &retargeted, 0).await,
         committed_one(OTHER_SPACE_ID, 1)
     );
     let store = reopened(harness).await;
-    assert_eq!(
+    assert_same!(
         store.load_aggregate().await,
         Ok(AggregateLoad::Loaded(LoadedAggregate {
             meta_space_id: id(SPACE_ID),
@@ -622,11 +622,11 @@ pub async fn keeps_what_the_fixture_lacks_as_committed<H: Harness>(harness: &mut
     let store = harness.store().as_ref();
     seed(store, &[&meta, &other]).await;
     let store = reopened(harness).await;
-    assert_eq!(
+    assert_same!(
         store.load_space(id(OTHER_SPACE_ID)).await,
         Ok(Some(stored(&other, 0, None)))
     );
-    assert_eq!(
+    assert_same!(
         store.load_space(id(SPACE_ID)).await,
         Ok(Some(stored(&meta, 0, None)))
     );
@@ -638,7 +638,7 @@ pub async fn keeps_what_the_fixture_lacks_as_committed<H: Harness>(harness: &mut
         r#"{"zeta":[null,2.5],"alpha":{"y":3,"x":0}}"#,
         r#"{"zoom":3,"layers":[{"id":7}]}"#,
     );
-    assert_eq!(
+    assert_same!(
         store
             .commit(commit(vec![
                 update(&changed_meta, 0),
@@ -648,7 +648,7 @@ pub async fn keeps_what_the_fixture_lacks_as_committed<H: Harness>(harness: &mut
         Ok(committed(&[(SPACE_ID, 1), (OTHER_SPACE_ID, 1)], &[]))
     );
     let store = reopened(harness).await;
-    assert_eq!(
+    assert_same!(
         store.load_aggregate().await,
         Ok(AggregateLoad::Loaded(LoadedAggregate {
             meta_space_id: id(SPACE_ID),
@@ -678,12 +678,12 @@ pub async fn keeps_what_the_fixture_lacks_as_committed<H: Harness>(harness: &mut
     let [read_meta, read_other] = held.as_slice() else {
         panic!("two Spaces");
     };
-    assert_eq!(
+    assert_same!(
         sorted(read_meta),
         sorted(&changed_meta),
         "the Meta Space, read from its files"
     );
-    assert_eq!(
+    assert_same!(
         sorted(read_other),
         sorted(&changed_other),
         "the Coloured Space and its unread Resource, read from their files"

@@ -32,7 +32,7 @@ pub async fn stores_an_asset_of_any_type_and_loads_it_unchanged<H: Harness>(
         asset(BINARY, "application/x-made-up"),
     ];
     for stored in &assets {
-        assert_eq!(
+        assert_same!(
             harness.store().store_asset(stored.clone()).await,
             Ok(AssetStored::Stored)
         );
@@ -43,7 +43,7 @@ pub async fn stores_an_asset_of_any_type_and_loads_it_unchanged<H: Harness>(
         (&assets[1], TEXT, "text/markdown"),
         (&assets[2], BINARY, "application/x-made-up"),
     ] {
-        assert_eq!(
+        assert_same!(
             store.load_asset(&stored.hash).await,
             Ok(Some(StoredAsset {
                 hash: AssetHash::of(bytes),
@@ -135,8 +135,8 @@ pub async fn holds_a_markdown_resource_from_its_file_and_its_text_as_one_value<H
     let [resource] = loaded.snapshot.resources.as_slice() else {
         panic!("the one Resource: {:?}", loaded.snapshot.resources);
     };
-    assert_eq!(resource.title, "Resource 1");
-    assert_eq!(resource.kind.as_str(), "markdown");
+    assert_same!(resource.title, "Resource 1");
+    assert_same!(resource.kind.as_str(), "markdown");
     assert_eq!(
         resource
             .content
@@ -147,12 +147,12 @@ pub async fn holds_a_markdown_resource_from_its_file_and_its_text_as_one_value<H
             text.hash
         )))
     );
-    assert_eq!(store.load_asset(&text.hash).await, Ok(Some(text)));
+    assert_same!(store.load_asset(&text.hash).await, Ok(Some(text)));
 
     let _exported = export_aggregate(store, &TokioFilesystem, &directory)
         .await
         .unwrap();
-    assert_eq!(
+    assert_same!(
         read_tree(&directory),
         before,
         "the files Export writes back"
@@ -164,7 +164,7 @@ pub async fn holds_a_markdown_resource_from_its_file_and_its_text_as_one_value<H
     let _exported = export_aggregate(store, &TokioFilesystem, &fresh)
         .await
         .unwrap();
-    assert_eq!(
+    assert_same!(
         read_tree(&fresh),
         before,
         "the files Export writes to an empty directory"
@@ -178,22 +178,22 @@ pub async fn stores_the_same_bytes_once_keeping_the_first_media_type<H: Harness>
 ) -> Ran {
     let first = asset(PNG, "image/png");
     let store = harness.store().as_ref();
-    assert_eq!(
+    assert_same!(
         store.store_asset(first.clone()).await,
         Ok(AssetStored::Stored)
     );
-    assert_eq!(
+    assert_same!(
         store.store_asset(asset(PNG, "text/plain")).await,
         Ok(AssetStored::Existing)
     );
     let store = reopened(harness).await;
-    assert_eq!(store.load_asset(&first.hash).await, Ok(Some(first)));
+    assert_same!(store.load_asset(&first.hash).await, Ok(Some(first)));
     Ok(())
 }
 
 // Case: answers an asset it does not store as absent
 pub async fn answers_an_asset_it_does_not_store_as_absent<H: Harness>(harness: &mut H) -> Ran {
-    assert_eq!(
+    assert_same!(
         harness.store().load_asset(&AssetHash::of(PNG)).await,
         Ok(None)
     );
@@ -204,12 +204,12 @@ pub async fn answers_an_asset_it_does_not_store_as_absent<H: Harness>(harness: &
 pub async fn holds_the_asset_of_zero_bytes_already<H: Harness>(harness: &mut H) -> Ran {
     let store = harness.store().as_ref();
     let empty = StoredAsset::empty();
-    assert_eq!(store.load_asset(&empty.hash).await, Ok(Some(empty.clone())));
+    assert_same!(store.load_asset(&empty.hash).await, Ok(Some(empty.clone())));
     let declared = StoredAsset::admit(Bytes::new(), "text/plain").unwrap();
-    assert_eq!(declared.hash, empty.hash);
-    assert_eq!(store.store_asset(declared).await, Ok(AssetStored::Existing));
+    assert_same!(declared.hash, empty.hash);
+    assert_same!(store.store_asset(declared).await, Ok(AssetStored::Existing));
     let store = reopened(harness).await;
-    assert_eq!(store.load_asset(&empty.hash).await, Ok(Some(empty)));
+    assert_same!(store.load_asset(&empty.hash).await, Ok(Some(empty)));
     Ok(())
 }
 
@@ -235,7 +235,7 @@ pub async fn keeps_stored_assets_outside_the_aggregate_the_doors_replace<H: Harn
         "{replaced:?}"
     );
     let store = reopened(harness).await;
-    assert_eq!(
+    assert_same!(
         store.load_asset(&stored_asset.hash).await,
         Ok(Some(stored_asset))
     );
@@ -251,7 +251,7 @@ pub async fn keeps_a_stored_asset_across_a_fresh_host<H: Harness>(harness: &mut 
         .await
         .unwrap();
     harness.reopen().await?;
-    assert_eq!(
+    assert_same!(
         harness.store().load_asset(&stored_asset.hash).await,
         Ok(Some(stored_asset))
     );

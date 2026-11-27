@@ -84,7 +84,7 @@ pub async fn preserves_the_established_aggregate_across_a_fresh_host<H: Harness>
     let first = space(SPACE_ID, "Durable", &[RESOURCE_ID]);
     seed(harness.store().as_ref(), &[&first]).await;
     harness.reopen().await?;
-    assert_eq!(
+    assert_same!(
         harness.store().load_aggregate().await,
         Ok(AggregateLoad::Loaded(loaded(SPACE_ID, &[(&first, 0)]))),
         "the fresh host reads what the first stored"
@@ -140,7 +140,7 @@ pub async fn persists_first_working_load_initialization_for_a_fresh_host<H: Harn
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(
+    assert_same!(
         first.revision,
         revision(1),
         "the initialization is committed once"
@@ -149,9 +149,9 @@ pub async fn persists_first_working_load_initialization_for_a_fresh_host<H: Harn
     let map = maps
         .first()
         .expect("the working read gives the Space a Map");
-    assert_eq!(map.id.as_str(), MAP_ID, "the first id minted names the Map");
+    assert_same!(map.id.as_str(), MAP_ID, "the first id minted names the Map");
     assert!(map.positions.is_empty(), "the Map places nothing yet");
-    assert_eq!(
+    assert_same!(
         map.active_graph.map(|graph| graph.as_str().to_owned()),
         Some(GRAPH_ID.to_owned()),
         "its Graph is active"
@@ -159,11 +159,12 @@ pub async fn persists_first_working_load_initialization_for_a_fresh_host<H: Harn
 
     harness.reopen().await?;
     let again = working_read(harness.store(), Listed::of(&[]), SPACE_ID).await;
-    assert_eq!(
-        again, first_body,
+    assert_same!(
+        again,
+        first_body,
         "a fresh host reads the initialized Space as it was answered"
     );
-    assert_eq!(
+    assert_same!(
         harness.store().load_space(id(SPACE_ID)).await,
         Ok(Some(first)),
         "and initializes nothing again"
@@ -177,11 +178,11 @@ pub async fn initializes_and_replaces_only_through_meta_rooted_aggregates<H: Har
 ) -> Ran {
     let store = harness.store();
     let first = space(SPACE_ID, "One", &[RESOURCE_ID]);
-    assert_eq!(
+    assert_same!(
         store.load_aggregate().await,
         Ok(AggregateLoad::Uninitialized)
     );
-    assert_eq!(
+    assert_same!(
         store.initialize_aggregate(input(SPACE_ID, &[&first])).await,
         Ok(InitializeResult::Initialized(loaded(
             SPACE_ID,
@@ -198,7 +199,7 @@ pub async fn initializes_and_replaces_only_through_meta_rooted_aggregates<H: Har
         "the same aggregate again is existing"
     );
     let replacement = retitled(&first, "Replacement");
-    assert_eq!(
+    assert_same!(
         store
             .replace_aggregate(input(SPACE_ID, &[&replacement]), Some(id(OTHER_SPACE_ID)))
             .await,
@@ -206,7 +207,7 @@ pub async fn initializes_and_replaces_only_through_meta_rooted_aggregates<H: Har
             current_meta_space_id: Some(id(SPACE_ID))
         }),
     );
-    assert_eq!(
+    assert_same!(
         store
             .replace_aggregate(input(SPACE_ID, &[&replacement]), Some(id(SPACE_ID)))
             .await,
@@ -216,7 +217,7 @@ pub async fn initializes_and_replaces_only_through_meta_rooted_aggregates<H: Har
         ))),
     );
     harness.reopen().await.ok();
-    assert_eq!(
+    assert_same!(
         harness.store().load_aggregate().await,
         Ok(AggregateLoad::Loaded(loaded(
             SPACE_ID,
@@ -245,7 +246,7 @@ pub async fn classifies_canonical_and_different_initialization_proposals<H: Harn
     kinds.sort_unstable();
     harness.reopen().await.ok();
     let store = harness.store();
-    assert_eq!(
+    assert_same!(
         kinds,
         ["existing", "initialized"],
         "one installs, the other is the same"
@@ -340,7 +341,7 @@ pub async fn lets_only_one_different_concurrent_initialization_establish_state<H
         kind_of_initialize(&right.unwrap()),
     ];
     kinds.sort_unstable();
-    assert_eq!(
+    assert_same!(
         kinds,
         ["already-initialized", "initialized"],
         "one establishes state"
@@ -349,7 +350,7 @@ pub async fn lets_only_one_different_concurrent_initialization_establish_state<H
     let Ok(AggregateLoad::Loaded(aggregate)) = harness.store().load_aggregate().await else {
         panic!("an aggregate is stored");
     };
-    assert_eq!(aggregate.spaces.len(), 1, "one of the two, never both");
+    assert_same!(aggregate.spaces.len(), 1, "one of the two, never both");
     Ok(())
 }
 
@@ -368,7 +369,7 @@ pub async fn rolls_back_a_refused_replacement<H: Harness>(harness: &mut H) -> Ra
         Ok(ReplaceResult::AggregateRefused(_))
     ));
     harness.reopen().await.ok();
-    assert_eq!(
+    assert_same!(
         harness.store().load_aggregate().await,
         Ok(AggregateLoad::Loaded(loaded(SPACE_ID, &[(&initial, 0)]))),
     );
@@ -380,7 +381,7 @@ pub async fn refuses_replacement_before_initialization<H: Harness>(harness: &mut
     let store = harness.store();
     let meta = space(SPACE_ID, "Meta", &[RESOURCE_ID]);
     for expected in [Some(id(SPACE_ID)), None] {
-        assert_eq!(
+        assert_same!(
             store
                 .replace_aggregate(input(SPACE_ID, &[&meta]), expected)
                 .await,
@@ -390,7 +391,7 @@ pub async fn refuses_replacement_before_initialization<H: Harness>(harness: &mut
     }
     harness.reopen().await.ok();
     let store = harness.store();
-    assert_eq!(
+    assert_same!(
         store.load_aggregate().await,
         Ok(AggregateLoad::Uninitialized)
     );
@@ -400,9 +401,9 @@ pub async fn refuses_replacement_before_initialization<H: Harness>(harness: &mut
 // Case: reads the stored Meta identity as each lifecycle door leaves it
 pub async fn reads_the_meta_identity_as_each_door_leaves_it<H: Harness>(harness: &mut H) -> Ran {
     let store = harness.store();
-    assert_eq!(store.load_meta_space_id().await, Ok(None));
+    assert_same!(store.load_meta_space_id().await, Ok(None));
     seed(store.as_ref(), &[&space(SPACE_ID, "Meta", &[RESOURCE_ID])]).await;
-    assert_eq!(store.load_meta_space_id().await, Ok(Some(id(SPACE_ID))));
+    assert_same!(store.load_meta_space_id().await, Ok(Some(id(SPACE_ID))));
     store
         .replace_aggregate(
             input(OTHER_SPACE_ID, &[&space(OTHER_SPACE_ID, "Other", &[])]),
@@ -412,7 +413,7 @@ pub async fn reads_the_meta_identity_as_each_door_leaves_it<H: Harness>(harness:
         .unwrap();
     harness.reopen().await.ok();
     let store = harness.store();
-    assert_eq!(
+    assert_same!(
         store.load_meta_space_id().await,
         Ok(Some(id(OTHER_SPACE_ID)))
     );
@@ -429,7 +430,7 @@ pub async fn refuses_a_replacement_expecting_no_meta_identity_where_one_is_store
         &[&space(SPACE_ID, "Initial", &[RESOURCE_ID])],
     )
     .await;
-    assert_eq!(
+    assert_same!(
         store
             .replace_aggregate(
                 input(OTHER_SPACE_ID, &[&space(OTHER_SPACE_ID, "Other", &[])]),
@@ -442,7 +443,7 @@ pub async fn refuses_a_replacement_expecting_no_meta_identity_where_one_is_store
     );
     harness.reopen().await.ok();
     let store = harness.store();
-    assert_eq!(store.load_meta_space_id().await, Ok(Some(id(SPACE_ID))));
+    assert_same!(store.load_meta_space_id().await, Ok(Some(id(SPACE_ID))));
     Ok(())
 }
 
@@ -467,7 +468,7 @@ pub async fn refuses_a_replacement_authorized_against_a_superseded_meta_identity
     ));
     harness.reopen().await.ok();
     let store = harness.store();
-    assert_eq!(
+    assert_same!(
         store
             .replace_aggregate(input(MISSING_SPACE_ID, &[&second]), Some(id(SPACE_ID)))
             .await,
@@ -475,7 +476,7 @@ pub async fn refuses_a_replacement_authorized_against_a_superseded_meta_identity
             current_meta_space_id: Some(id(OTHER_SPACE_ID))
         }),
     );
-    assert_eq!(
+    assert_same!(
         store.load_aggregate().await,
         Ok(AggregateLoad::Loaded(loaded(
             OTHER_SPACE_ID,
@@ -489,7 +490,7 @@ pub async fn refuses_a_replacement_authorized_against_a_superseded_meta_identity
 pub async fn refuses_to_record_an_exported_revision_for_a_space_it_does_not_store<H: Harness>(
     harness: &mut H,
 ) -> Ran {
-    assert_eq!(
+    assert_same!(
         harness
             .store()
             .mark_exported(id(MISSING_SPACE_ID), revision(0))
@@ -520,7 +521,7 @@ pub async fn refuses_an_aggregate_repeating_a_space_identity<H: Harness>(harness
         initialize_refusals(&result).contains(&"duplicate-space-id"),
         "{result:?}"
     );
-    assert_eq!(store.list_spaces().await, Ok(vec![]), "nothing is stored");
+    assert_same!(store.list_spaces().await, Ok(vec![]), "nothing is stored");
     Ok(())
 }
 
@@ -545,7 +546,7 @@ pub async fn refuses_an_aggregate_repeating_a_resource_identity<H: Harness>(
         initialize_refusals(&result).contains(&"duplicate-resource-id"),
         "{result:?}"
     );
-    assert_eq!(store.list_spaces().await, Ok(vec![]), "nothing is stored");
+    assert_same!(store.list_spaces().await, Ok(vec![]), "nothing is stored");
     Ok(())
 }
 
@@ -563,7 +564,7 @@ async fn refuses_a_repeating_replacement<H: Harness>(
         .unwrap();
     assert!(replace_refusals(&result).contains(&kind), "{result:?}");
     harness.reopen().await.ok();
-    assert_eq!(
+    assert_same!(
         harness.store().load_aggregate().await,
         Ok(AggregateLoad::Loaded(loaded(SPACE_ID, &[(&existing, 0)]))),
         "the stored aggregate is kept"
@@ -612,7 +613,7 @@ pub async fn refuses_an_initialization_failing_domain_intake<H: Harness>(harness
     ));
     harness.reopen().await.ok();
     let store = harness.store();
-    assert_eq!(
+    assert_same!(
         store.list_spaces().await,
         Ok(vec![]),
         "not even the valid Space"
@@ -630,7 +631,7 @@ pub async fn replaces_everything_stored_freeing_the_resource_ids_it_clears<H: Ha
     )
     .await;
     let replacement = space(OTHER_SPACE_ID, "Replacement", &[RESOURCE_ID]);
-    assert_eq!(
+    assert_same!(
         harness
             .store()
             .replace_aggregate(input(OTHER_SPACE_ID, &[&replacement]), Some(id(SPACE_ID)))
@@ -642,8 +643,8 @@ pub async fn replaces_everything_stored_freeing_the_resource_ids_it_clears<H: Ha
     );
     harness.reopen().await.ok();
     let store = harness.store();
-    assert_eq!(store.load_space(id(SPACE_ID)).await, Ok(None));
-    assert_eq!(
+    assert_same!(store.load_space(id(SPACE_ID)).await, Ok(None));
+    assert_same!(
         store.list_spaces().await,
         Ok(vec![SpaceSummary {
             id: id(OTHER_SPACE_ID),
@@ -660,11 +661,11 @@ pub async fn becomes_committable_from_an_empty_store<H: Harness>(harness: &mut H
     seed(store.as_ref(), &[&first]).await;
     harness.reopen().await.ok();
     let store = harness.store();
-    assert_eq!(
+    assert_same!(
         store.load_aggregate().await,
         Ok(AggregateLoad::Loaded(loaded(SPACE_ID, &[(&first, 0)]))),
     );
-    assert_eq!(
+    assert_same!(
         commit_update(store.as_ref(), &retitled(&first, "Changed"), 0).await,
         committed(&[(SPACE_ID, 1)], &[]),
     );
@@ -686,7 +687,7 @@ pub async fn leaves_no_dropped_space_after_a_replacement_across_a_reopen<H: Harn
         .unwrap();
     harness.reopen().await?;
     let store = harness.store();
-    assert_eq!(
+    assert_same!(
         store.load_aggregate().await,
         Ok(AggregateLoad::Loaded(loaded(
             MISSING_SPACE_ID,
@@ -695,7 +696,7 @@ pub async fn leaves_no_dropped_space_after_a_replacement_across_a_reopen<H: Harn
         "only the replacement is stored"
     );
     for dropped in [SPACE_ID, OTHER_SPACE_ID] {
-        assert_eq!(
+        assert_same!(
             store.load_space(id(dropped)).await,
             Ok(None),
             "Space {dropped}"
