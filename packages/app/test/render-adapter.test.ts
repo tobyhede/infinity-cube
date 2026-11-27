@@ -824,6 +824,22 @@ describe('render adapter', () => {
       expect(drawn.get(RESOURCE_C)).toMatchObject({ x: 0, y: 560 });
     });
 
+    it('stores a dragged neighbour it draws aside at its Map position moved by the drag', () => {
+      const withNeighbour = Placement.fromEntries([...authored, [RESOURCE_C, { x: 400, y: 20 }]]);
+      const spy = authoringSpy({ mapPlacement: withNeighbour });
+      const store = createRenderAdapter(spy.authoring);
+      store.getState().resourceResize.drawEditors(new Map([[RESOURCE_A, {}]]));
+      const drawn = editorPlacement(withNeighbour, store.getState().editors);
+      expect(drawn.get(RESOURCE_C)).toMatchObject({ x: 740, y: 20 });
+      store.getState().syncProjection([node(RESOURCE_A, 10, 20), node(RESOURCE_C, 740, 20)], []);
+
+      completeDrag(store, RESOURCE_C, 745, 20);
+
+      expect(spy.completions).toEqual([
+        { kind: 'settled-resource-movement', moved: new Map([[RESOURCE_C, { x: 405, y: 20 }]]) },
+      ]);
+    });
+
     it('is drawn capped at the visible canvas, which stores nothing', () => {
       const drawn = editorPlacement(authored, new Map([[RESOURCE_A, {}]]), {
         width: 500,

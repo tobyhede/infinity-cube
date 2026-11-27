@@ -179,13 +179,14 @@ function equals(a: Placement | null, b: Placement | null): boolean {
  * a drag still in progress. A resource that really moved arrives in `placed`, so
  * nothing legitimate needs the wider read.
  *
- * What the report says is taken **as it stands**. Nothing sits between the
- * Map's positions and the canvas — displacement is applied by the Edit that
- * causes it (ADR 0084), so a canvas coordinate already is an authored one and
- * there is no derivation to invert. A settled drag therefore authors the drop
- * point exactly, wherever it sits. The one drawn-only displacement, the
- * Resources an in-place editor passes (ADR 0178), is never inverted either: a
- * Resource the author drags then authors where it was dropped.
+ * What the report says is taken **as it stands**: nothing here inverts a
+ * derivation, and a reported point is authored exactly. A Resize's
+ * displacement is applied by its Edit (ADR 0084), so it leaves nothing to
+ * invert. The one displacement that is drawn and not stored, the Resources an
+ * in-place editor passes (ADR 0178), is taken out before the report is made:
+ * the render adapter reports a drag of such a Resource as its Map position
+ * moved by the drag (`packages/app/test/render-adapter.test.ts` › "stores a
+ * dragged neighbour it draws aside at its Map position moved by the drag").
  *
  * The resource's own size and Map content survive the merge: a
  * renderer reports React Flow node positions and nothing else, so only `x` and

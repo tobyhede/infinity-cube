@@ -392,13 +392,16 @@ function trackDragOrigins(
 }
 
 /**
- * The moved Resources' own drop points, exactly: which settled changes actually
- * ended somewhere other than where the drag began, and where.
+ * Which settled changes actually ended somewhere other than where the drag
+ * began, and where each is stored: its Map position moved by the drag, so a
+ * Resource drawn aside by an in-place editor (ADR 0178) is stored where the Map
+ * had it plus the drag, never where it was drawn. A Resource with no Map
+ * position is stored at its drop point.
  *
  * Each change is keyed through `owned`, the identities of the canvas Map's own
  * nodes, so a change for a node this store does not draw contributes nothing.
  *
- * Answers the drop points directly rather than a list of ids — Authoring
+ * Answers the stored points directly rather than a list of ids — Authoring
  * merges these over the Map's own positions at derivation, so there is no
  * second lookup back into `nodes` for a caller to get wrong.
  */
@@ -408,6 +411,7 @@ function consumeSettledMoves(
   dragOrigins: globalThis.Map<string, MapPosition>,
   beforeById: ReadonlyMap<string, MapPosition>,
   afterById: ReadonlyMap<string, MapPosition>,
+  authored: Placement,
 ): ReadonlyMap<ResourceId, MapPosition> {
   const moved = new Map<ResourceId, MapPosition>();
   for (const change of settled) {
@@ -421,7 +425,13 @@ function consumeSettledMoves(
       after !== undefined &&
       (origin.x !== after.x || origin.y !== after.y)
     ) {
-      moved.set(resourceId, after);
+      const stored = authored.get(resourceId);
+      moved.set(
+        resourceId,
+        stored === undefined
+          ? after
+          : { x: stored.x + after.x - origin.x, y: stored.y + after.y - origin.y },
+      );
     }
   }
   return moved;
@@ -759,7 +769,14 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
       // Only a settled drag compares its last position to the gesture origin.
       // Intermediate pointer frames publish above without paying for this map.
       const afterById = new Map(nodes.map((node) => [node.id, node.position]));
-      const moved = consumeSettledMoves(settled, owned, dragOrigins, beforeById, afterById);
+      const moved = consumeSettledMoves(
+        settled,
+        owned,
+        dragOrigins,
+        beforeById,
+        afterById,
+        authoring.mapPlacement(),
+      );
 
       if (moved.size === 0) {
         set({ projection: { ...projection, nodes }, dragOrigins, selection });
