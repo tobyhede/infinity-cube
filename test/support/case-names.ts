@@ -89,8 +89,123 @@ const describeOf = (call: ts.CallExpression): { readonly each: boolean } | undef
   return undefined;
 };
 
-/** A name that substitutes a value: `%s` and its kin, or an object member's `$name`. */
-const SUBSTITUTES = /%[sdifjo]|\$\w/u;
+/** A name that substitutes a value: `%s` and its kin, the row index `%#` or `%$`, or an object member's `$name`. */
+const SUBSTITUTES = /%[sdifjo#$]|\$\w/u;
+
+/**
+ * A row of a table a case runs over: its cells written as text (a string,
+ * template or number), keyed by position in an array row (a lone string is
+ * position 0) and by member name in an object row. A cell written any other
+ * way is absent.
+ */
+export type Row = Readonly<Record<string, string>>;
+
+/** The table a case runs over, and the name that substitutes each row's values. */
+export interface CaseTable {
+  readonly title: string;
+  /** The table's rows, or `undefined` where it is not an array written in the file. */
+  readonly rows: readonly Row[] | undefined;
+}
+
+const unwrapped = (expression: ts.Expression): ts.Expression =>
+  ts.isAsExpression(expression) ||
+  ts.isSatisfiesExpression(expression) ||
+  ts.isParenthesizedExpression(expression)
+    ? unwrapped(expression.expression)
+    : expression;
+
+const cellText = (expression: ts.Expression): string | undefined => {
+  const cell = unwrapped(expression);
+  if (
+    ts.isStringLiteral(cell) ||
+    ts.isNoSubstitutionTemplateLiteral(cell) ||
+    ts.isNumericLiteral(cell)
+  ) {
+    return cell.text;
+  }
+  return undefined;
+};
+
+/** Each cell of a row as written, keyed, its text `undefined` where it is not written as text. */
+const writtenCells = (row: ts.Expression): (readonly [string, string | undefined])[] => {
+  if (ts.isArrayLiteralExpression(row)) {
+    return row.elements.map((element, index) => [String(index), cellText(element)] as const);
+  }
+  if (ts.isObjectLiteralExpression(row)) {
+    return row.properties
+      .filter(ts.isPropertyAssignment)
+      .flatMap(({ name, initializer }) =>
+        ts.isIdentifier(name) || ts.isStringLiteral(name)
+          ? [[name.text, cellText(initializer)] as const]
+          : [],
+      );
+  }
+  return [['0', cellText(row)]];
+};
+
+const rowOf = (expression: ts.Expression) =>
+  Object.fromEntries(
+    writtenCells(unwrapped(expression)).flatMap(([key, text]) =>
+      text === undefined ? [] : [[key, text] as const],
+    ),
+  );
+
+/**
+ * The rows of `table`: an array written there, or one a top-level `const` of
+ * `source` declares, as itself or as the one array argument of a call
+ * (`targetCases([…])`).
+ */
+const rowsOf = (table: ts.Expression | undefined, source: ts.SourceFile): Row[] | undefined => {
+  if (table === undefined) return undefined;
+  let written = unwrapped(table);
+  if (ts.isIdentifier(written)) {
+    const name = written.text;
+    const declared = source.statements
+      .filter(ts.isVariableStatement)
+      .flatMap((statement) => statement.declarationList.declarations)
+      .find((declaration) => ts.isIdentifier(declaration.name) && declaration.name.text === name);
+    if (declared?.initializer === undefined) return undefined;
+    written = unwrapped(declared.initializer);
+    if (ts.isCallExpression(written) && written.arguments.length === 1) {
+      const [argument] = written.arguments;
+      if (argument !== undefined) written = unwrapped(argument);
+    }
+  }
+  return ts.isArrayLiteralExpression(written) ? written.elements.map(rowOf) : undefined;
+};
+
+/** The table a curried call (`it.each(table)(…)`, `describe.for(table)(…)`) runs over, if it takes one. */
+const tableArgument = (call: ts.CallExpression): ts.Expression | undefined => {
+  const callee = call.expression;
+  if (
+    ts.isCallExpression(callee) &&
+    ts.isPropertyAccessExpression(callee.expression) &&
+    (callee.expression.name.text === 'each' || callee.expression.name.text === 'for')
+  ) {
+    return callee.arguments[0];
+  }
+  return undefined;
+};
+
+/**
+ * The values of `row` that `title` substitutes, joined by `, `: each `%s` and
+ * its kin takes the next position, each `$name` that member, and a cell not
+ * written as text is `*`. The row index (`%#`, `%$`) is no value of the row.
+ */
+export const substitutedValue = (title: string, row: Row): string => {
+  let position = 0;
+  const values: string[] = [];
+  for (const match of title.matchAll(/%([sdifjo#$%])|\$(\w+)/gu)) {
+    const [, specifier, member] = match;
+    if (member !== undefined) {
+      values.push(row[member] ?? '*');
+    } else if (specifier !== '#' && specifier !== '$' && specifier !== '%') {
+      values.push(row[String(position)] ?? '*');
+      position += 1;
+    }
+  }
+  return values.join(', ');
+};
 
 /** A case as written, with the describe blocks around it. */
 export interface DescribedCase {
@@ -101,33 +216,49 @@ export interface DescribedCase {
   readonly describes: readonly string[];
   /** Whether it runs once per value: its name substitutes one, or a describe block around it runs per value. */
   readonly perValue: boolean;
+  /** The table it runs over: its own, or else the nearest describe block's around it. */
+  readonly table?: CaseTable | undefined;
 }
 
 /** Every case `text`, the source of `file`, declares, in the order written. */
 export const describedCasesIn = (file: string, text: string): DescribedCase[] => {
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
   const cases: DescribedCase[] = [];
-  const visit = (node: ts.Node, describes: readonly string[], each: boolean): void => {
+  const visit = (
+    node: ts.Node,
+    describes: readonly string[],
+    each: boolean,
+    around: CaseTable | undefined,
+  ): void => {
     if (ts.isCallExpression(node)) {
       const line = source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
+      const table = tableArgument(node);
       const block = describeOf(node);
       if (block !== undefined) {
         const title = caseName(node.arguments[0]) ?? `<untitled describe at ${file}:${line}>`;
+        const inner = table === undefined ? around : { title, rows: rowsOf(table, source) };
         node.arguments.forEach((argument) => {
-          visit(argument, [...describes, title], each || block.each);
+          visit(argument, [...describes, title], each || block.each, inner);
         });
         return;
       }
       if (declaresCase(node)) {
         const name = caseName(node.arguments[0]) ?? `<unnamed case at ${file}:${line}>`;
-        cases.push({ name, line, describes, perValue: each || SUBSTITUTES.test(name) });
+        const own = table === undefined ? around : { title: name, rows: rowsOf(table, source) };
+        cases.push({
+          name,
+          line,
+          describes,
+          perValue: each || SUBSTITUTES.test(name),
+          table: own,
+        });
       }
     }
     ts.forEachChild(node, (child) => {
-      visit(child, describes, each);
+      visit(child, describes, each, around);
     });
   };
-  visit(source, [], false);
+  visit(source, [], false, undefined);
   return cases;
 };
 
