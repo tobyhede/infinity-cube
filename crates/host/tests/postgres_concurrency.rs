@@ -25,7 +25,7 @@ use std::time::Duration;
 
 use host::{
     AggregateInput, AggregateLoad, CommitResult, InitializeResult, LoadedAggregate, LoadedSpace,
-    PostgresSpaceRepository, Probe, ReplaceResult, Revision, SpaceChange, SpaceCommit,
+    LockMode, PostgresSpaceRepository, Probe, ReplaceResult, Revision, SpaceChange, SpaceCommit,
     SpaceConflict, SpaceRepository, Step,
 };
 use intake::{SpaceId, SpaceSnapshot};
@@ -1269,17 +1269,25 @@ mod given_concurrent_commits {
             proposing(&first_linked, &first_target),
             proposing(&second_linked, &second_target),
         );
-        let results = [
+        // The first holds the exclusive lock until the second is seen
+        // waiting for it, so the two overlap rather than run in turn.
+        let (reached, release) = pause_once(&first, |step| {
+            matches!(step, Step::Locked(LockMode::Exclusive))
+        });
+        let first_result = rendezvous(
+            &reached,
             spawn(
                 &first,
                 |store| async move { store.commit(first_commit).await },
             ),
-            spawn(
-                &second,
-                |store| async move { store.commit(second_commit).await },
-            ),
-        ];
-        let [first_result, second_result] = results;
+        )
+        .await;
+        let second_result = spawn(
+            &second,
+            |store| async move { store.commit(second_commit).await },
+        );
+        waiting(&database, 1).await;
+        release.notify_one();
         let results = [
             joined(first_result).await.unwrap(),
             joined(second_result).await.unwrap(),

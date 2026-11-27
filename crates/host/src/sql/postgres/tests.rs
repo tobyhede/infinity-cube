@@ -573,6 +573,35 @@ mod read_sslmode_as_pg_does {
         );
     }
 
+    // pg-connection-string 2.14 asks for TLS and reads a file only for a
+    // truthy `sslcert` or `sslkey`, so an empty one is absent: `ssl=0`, the
+    // URL's silence and `PGSSLMODE` decide, and `sqlx` is handed no file.
+    #[test]
+    fn reads_an_empty_client_certificate_or_key_as_absent() {
+        for parameter in ["sslcert", "sslkey"] {
+            for (rest, pgsslmode, expected) in [
+                ("&ssl=0", None, PgSslMode::Disable),
+                ("", None, PgSslMode::Disable),
+                ("", Some("no-verify"), PgSslMode::Require),
+            ] {
+                let url = format!("{BASE}?{parameter}={rest}");
+                let read = connect_options(&url, pgsslmode)
+                    .expect("an empty client certificate parameter is not refused");
+                assert_eq!(
+                    format!("{:?}", read.get_ssl_mode()),
+                    format!("{expected:?}"),
+                    "{url} with PGSSLMODE={pgsslmode:?} connects as pg connects"
+                );
+                let described = format!("{read:?}");
+                assert!(
+                    described.contains("ssl_client_cert: None")
+                        && described.contains("ssl_client_key: None"),
+                    "{url} names no client file to sqlx: {described}"
+                );
+            }
+        }
+    }
+
     // `pg` never reads `PGSSLROOTCERT`; `sqlx` 0.9.1 reads it as a CA file
     // (`PgConnectOptions::new_without_pgpass`) and would add it to the
     // system's trusted roots, so the options name an empty PEM, which adds

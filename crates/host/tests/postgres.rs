@@ -421,15 +421,86 @@ mod given_its_connection {
         DatabaseUrl::parse(Some(url.as_str())).unwrap()
     }
 
+    /// `database`'s URL with every TLS selector left out, so only
+    /// `PGSSLMODE` can choose the transport.
+    fn without_tls_selectors(database: &Fresh) -> DatabaseUrl {
+        let mut url = database.url.clone();
+        let pairs: Vec<(String, String)> = database
+            .url
+            .query_pairs()
+            .filter(|(key, _)| {
+                !matches!(
+                    key.as_ref(),
+                    "sslmode" | "ssl" | "sslcert" | "sslkey" | "uselibpqcompat"
+                )
+            })
+            .map(|(key, value)| (key.into_owned(), value.into_owned()))
+            .collect();
+        if pairs.is_empty() {
+            url.set_query(None);
+        } else {
+            url.query_pairs_mut().clear().extend_pairs(pairs);
+        }
+        DatabaseUrl::parse(Some(url.as_str())).unwrap()
+    }
+
     #[tokio::test]
     #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
-    async fn serves_with_sslmode_disable_and_with_no_sslmode() {
+    async fn serves_with_sslmode_disable() {
         let database = Fresh::new().await;
-        for url in [database.database_url(), with_sslmode(&database, "disable")] {
-            let store = PostgresSpaceRepository::open(&url).unwrap();
-            assert_eq!(store.load_meta_space_id().await, Ok(None));
-            store.close().await;
+        let store = PostgresSpaceRepository::open(&with_sslmode(&database, "disable")).unwrap();
+        assert_eq!(store.load_meta_space_id().await, Ok(None));
+        store.close().await;
+    }
+
+    /// Set in the child [`serves_in_plaintext_with_no_tls_selector_and_no_pgsslmode`]
+    /// runs itself as, whose `PGSSLMODE` is unset.
+    const PGSSLMODE_UNSET: &str = "INFINITY_CUBE_TEST_PGSSLMODE_UNSET";
+
+    // A URL naming no TLS selector takes `PGSSLMODE`, and with it unset
+    // connects without TLS (ADR 0177). Setting or removing a variable is
+    // `unsafe`, which `unsafe_code = "forbid"` rules out, so the test runs
+    // itself again as a child process with `PGSSLMODE` removed. The stand-in
+    // declines TLS and refuses a plaintext startup with words of its own, so
+    // reaching it in plaintext shows the transport chosen whether or not the
+    // configured server also offers TLS; the configured server then serves.
+    #[tokio::test]
+    #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+    async fn serves_in_plaintext_with_no_tls_selector_and_no_pgsslmode() {
+        const NAME: &str =
+            "given_its_connection::serves_in_plaintext_with_no_tls_selector_and_no_pgsslmode";
+        if std::env::var_os(PGSSLMODE_UNSET).is_none() {
+            let child = std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", NAME, "--include-ignored", "--nocapture"])
+                .env(PGSSLMODE_UNSET, "1")
+                .env_remove("PGSSLMODE")
+                .output()
+                .unwrap();
+            let stdout = String::from_utf8_lossy(&child.stdout);
+            assert!(
+                child.status.success() && stdout.contains("1 passed"),
+                "the child with PGSSLMODE unset passes: {stdout}{}",
+                String::from_utf8_lossy(&child.stderr)
+            );
+            return;
         }
+        let server = StandIn::start(Behaviour::Refuse("28000", "reached in plaintext")).await;
+        let silent = DatabaseUrl::parse(Some(&format!(
+            "postgres://cube:unused@127.0.0.1:{}/cube",
+            server.port()
+        )))
+        .unwrap();
+        let store = PostgresSpaceRepository::open(&silent).unwrap();
+        let answer = store.load_meta_space_id().await;
+        store.close().await;
+        assert!(
+            format!("{answer:?}").contains("reached in plaintext"),
+            "the client starts up in plaintext: {answer:?}"
+        );
+        let database = Fresh::new().await;
+        let store = PostgresSpaceRepository::open(&without_tls_selectors(&database)).unwrap();
+        assert_eq!(store.load_meta_space_id().await, Ok(None));
+        store.close().await;
     }
 
     // `pg` reads `require` as `verify-full`, so against a server that

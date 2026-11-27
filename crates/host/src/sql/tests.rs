@@ -45,15 +45,17 @@ impl IdSource for Counted {
     }
 }
 
-/// A row hold or a Space read the scripted store saw, in order.
+/// An aggregate lock, a row hold or a Space read the scripted store saw, in
+/// order.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum RowEvent {
+    Locked(LockMode),
     Held(String),
     Read(String),
 }
 
 thread_local! {
-    // The holds and Space reads on this thread: a `#[tokio::test]` runs its
+    // The aggregate locks, holds and Space reads on this thread: a `#[tokio::test]` runs its
     // spawned operations on its own one thread, and `SqlStore::space` has no
     // `self` to record into.
     static ROW_EVENTS: std::cell::RefCell<Vec<RowEvent>> =
@@ -90,7 +92,11 @@ impl SqlStore for Scripted {
         mode: LockMode,
     ) -> Result<(), sqlx::Error> {
         self.locks.lock().unwrap().push(mode);
-        self.inner.lock_aggregate(connection, mode).await
+        let locked = self.inner.lock_aggregate(connection, mode).await;
+        if locked.is_ok() {
+            row_event(RowEvent::Locked(mode));
+        }
+        locked
     }
 
     async fn relock_meta(
@@ -114,8 +120,9 @@ impl SqlStore for Scripted {
         &self,
         connection: &mut SqliteConnection,
         id: &[u8],
+        blob: bool,
     ) -> Result<Option<Vec<u8>>, sqlx::Error> {
-        let stored = self.inner.lock_space(connection, id).await?;
+        let stored = self.inner.lock_space(connection, id, blob).await?;
         let scripted = self.prior_revision.lock().unwrap().take();
         Ok(scripted.map(String::into_bytes).or(stored))
     }
@@ -389,14 +396,13 @@ mod statement_order {
             "{answer:?}"
         );
         assert_eq!(
-            ROW_EVENTS.with_borrow(|events| events.first().cloned()),
-            Some(RowEvent::Held(PRESENTATION.to_owned())),
-            "the row is held before the Space is read"
-        );
-        assert!(
-            ROW_EVENTS
-                .with_borrow(|events| events.contains(&RowEvent::Read(PRESENTATION.to_owned()))),
-            "the Space is read under the hold"
+            ROW_EVENTS.with_borrow(|events| events.iter().take(3).cloned().collect::<Vec<_>>()),
+            [
+                RowEvent::Locked(LockMode::Shared),
+                RowEvent::Held(PRESENTATION.to_owned()),
+                RowEvent::Read(PRESENTATION.to_owned()),
+            ],
+            "the shared lock is granted, then the row is held, then the Space is read"
         );
         assert_eq!(
             *steps.lock().unwrap(),
@@ -826,9 +832,9 @@ mod closing {
 }
 
 /// SQLite's row lock finds its row by the primary key's index, byte for
-/// byte.
+/// byte, in the id's own storage class.
 mod sqlite_row_lock {
-    use super::super::sqlite::LOCK_SPACE;
+    use super::super::sqlite::{LOCK_BLOB_SPACE, LOCK_TEXT_SPACE};
     use super::*;
     use sqlx::Row as _;
 
@@ -844,53 +850,103 @@ mod sqlite_row_lock {
     async fn searches_the_primary_key_rather_than_scanning_every_space() {
         let file = migrated().await;
         let mut connection = connection(&file).await;
-        // The statement is this crate's own constant, not input.
-        let plan = sqlx::query(sqlx::AssertSqlSafe(format!(
-            "EXPLAIN QUERY PLAN {LOCK_SPACE}"
-        )))
-        .bind(META.as_bytes())
-        .fetch_all(&mut connection)
-        .await
-        .unwrap()
-        .iter()
-        .map(|row| row.get::<String, _>("detail"))
-        .collect::<Vec<_>>();
-        assert!(
-            plan.iter().all(|detail| !detail.starts_with("SCAN")),
-            "{LOCK_SPACE} scans: {plan:?}"
-        );
-        assert!(
-            plan.iter()
-                .any(|detail| detail.contains("USING") && detail.contains("INDEX")),
-            "{LOCK_SPACE} uses no index: {plan:?}"
-        );
+        for statement in [LOCK_TEXT_SPACE, LOCK_BLOB_SPACE] {
+            // The statement is this crate's own constant, not input.
+            let plan = sqlx::query(sqlx::AssertSqlSafe(format!(
+                "EXPLAIN QUERY PLAN {statement}"
+            )))
+            .bind(META.as_bytes())
+            .fetch_all(&mut connection)
+            .await
+            .unwrap()
+            .iter()
+            .map(|row| row.get::<String, _>("detail"))
+            .collect::<Vec<_>>();
+            assert!(
+                plan.iter().all(|detail| !detail.starts_with("SCAN")),
+                "{statement} scans: {plan:?}"
+            );
+            assert!(
+                plan.iter()
+                    .any(|detail| detail.contains("USING") && detail.contains("INDEX")),
+                "{statement} uses no index: {plan:?}"
+            );
+        }
     }
 
     #[tokio::test]
-    async fn finds_an_id_stored_as_text_or_as_a_blob_and_only_in_its_own_case() {
+    async fn finds_an_id_only_in_its_own_storage_class_and_its_own_case() {
         let file = migrated().await;
         let store = SqliteStore::at(&file.path, Duration::from_secs(5));
         let mut connection = connection(&file).await;
         sqlx::query(
             "INSERT INTO spaces (document, id, revision, updated_at) VALUES \
-             ('{}', 'abc', '1', 'now'), ('{}', CAST('xyz' AS BLOB), '2', 'now')",
+             ('{}', 'abc', '1', 'now'), ('{}', CAST('xyz' AS BLOB), '2', 'now'), \
+             ('{}', 'dup', '3', 'now'), ('{}', CAST('dup' AS BLOB), '4', 'now')",
         )
         .execute(&mut connection)
         .await
         .unwrap();
-        for (id, expected) in [
-            (&b"abc"[..], Some(b"1".to_vec())),
-            (b"ABC", None),
-            (b"xyz", Some(b"2".to_vec())),
-            (b"XYZ", None),
+        for (id, blob, expected) in [
+            (&b"abc"[..], false, Some(b"1".to_vec())),
+            (b"abc", true, None),
+            (b"ABC", false, None),
+            (b"xyz", true, Some(b"2".to_vec())),
+            (b"xyz", false, None),
+            (b"XYZ", true, None),
+            (b"dup", false, Some(b"3".to_vec())),
+            (b"dup", true, Some(b"4".to_vec())),
         ] {
             assert_eq!(
-                store.lock_space(&mut connection, id).await.unwrap(),
+                store.lock_space(&mut connection, id, blob).await.unwrap(),
                 expected,
-                "{}",
+                "{} stored as a BLOB: {blob}",
                 String::from_utf8_lossy(id)
             );
         }
         store.close().await;
+    }
+
+    // A TEXT id and a BLOB id with the same bytes are two rows; replacement
+    // replaces stored state whether or not it can be read (ADR 0094), so it
+    // locks each row by its own storage class rather than meeting the
+    // other's revision and conflicting with no writer about.
+    #[tokio::test]
+    async fn a_replacement_locks_a_text_id_and_a_blob_id_with_the_same_bytes_apart() {
+        let file = migrated().await;
+        let repository = seeded(&file).await;
+        let AggregateLoad::Loaded(aggregate) = repository.load_aggregate().await.unwrap() else {
+            panic!("the fixture is stored");
+        };
+        let input = crate::repository::AggregateInput {
+            meta_space_id: aggregate.meta_space_id,
+            spaces: aggregate
+                .spaces
+                .iter()
+                .map(|space| space.snapshot.clone())
+                .collect(),
+        };
+        let mut connection = connection(&file).await;
+        sqlx::query(
+            "INSERT INTO spaces (document, id, revision, updated_at) \
+             VALUES ('{}', CAST($1 AS BLOB), '7', 'now')",
+        )
+        .bind(PRESENTATION)
+        .execute(&mut connection)
+        .await
+        .unwrap();
+        sqlx::Connection::close(connection).await.unwrap();
+        assert!(
+            matches!(
+                repository.replace_aggregate(input, Some(meta())).await,
+                Ok(ReplaceResult::Replaced(_))
+            ),
+            "both rows are locked and replaced"
+        );
+        assert_eq!(
+            repository.list_spaces().await.unwrap().len(),
+            4,
+            "the BLOB row is replaced with the rest"
+        );
     }
 }

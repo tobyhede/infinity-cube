@@ -826,10 +826,13 @@ mod given_a_real_server {
                 .unwrap(),
         };
         let stand_in = StandIn::start(Behaviour::ResetFirstThenPass(upstream)).await;
-        // Those endpoint pairs would override the stand-in's, so they go.
-        let mut through = without_query(&database.url, &["host", "hostaddr", "port"]);
-        through.set_host(Some("127.0.0.1")).unwrap();
+        // The driver dials the stand-in by `hostaddr` and its port, and
+        // still verifies TLS against the host the URL names, which stays.
+        let mut through = without_query(&database.url, &["hostaddr", "port"]);
         through.set_port(Some(stand_in.port())).unwrap();
+        through
+            .query_pairs_mut()
+            .append_pair("hostaddr", "127.0.0.1");
         let store = open(&url(through.as_str()));
         let first = store.list_spaces().await;
         assert!(

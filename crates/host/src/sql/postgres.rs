@@ -133,13 +133,14 @@ impl SqlSpaceRepository<PostgresStore> {
 /// The options `url` connects with, its `sslmode` read with the meaning ADR
 /// 0177 gives each value, as `pg` 8.22 reads it:
 ///
-/// - no `sslmode`, `sslcert`, `sslkey` or `ssl` parameter: what `pgsslmode`,
+/// - no `sslmode` or `ssl` parameter and no non-empty `sslcert` or `sslkey`
+///   (an empty one is absent, and is not handed to `sqlx`): what `pgsslmode`,
 ///   the value of `PGSSLMODE`, asks for: no TLS when it is absent, `disable`
 ///   or a value `pg` does not know; TLS, the certificate not checked, for
 ///   `no-verify`; and TLS, the certificate and the host checked, for
 ///   `prefer`, `require`, `verify-ca` and `verify-full`;
 /// - no `sslmode`: TLS, the certificate and the host checked, for a
-///   certificate parameter; otherwise, by `ssl`: no TLS for `0` or an empty
+///   non-empty certificate parameter; otherwise, by `ssl`: no TLS for `0` or an empty
 ///   value, TLS with the certificate not checked for `no-verify`, and TLS
 ///   with the certificate and the host checked for any other value;
 /// - `sslmode=disable`: no TLS;
@@ -200,7 +201,10 @@ pub fn connect_options(
         return Err(PostgresUrlError::DirectNegotiation);
     }
     let libpq = value("uselibpqcompat") == Some("true");
-    let certificate = value("sslcert").is_some() || value("sslkey").is_some();
+    // An empty `sslcert` or `sslkey` is absent, as `pg` reads it.
+    let certificate = [value("sslcert"), value("sslkey")]
+        .into_iter()
+        .any(|named| named.is_some_and(|file| !file.is_empty()));
     let mode = match (value("sslmode"), libpq) {
         (None, _) if certificate => PgSslMode::VerifyFull,
         (None, _) => match value("ssl") {
@@ -218,11 +222,12 @@ pub fn connect_options(
     };
     let kept: Vec<(String, String)> = pairs
         .iter()
-        .filter(|(key, _)| {
+        .filter(|(key, value)| {
             !matches!(
                 key.as_str(),
                 "sslmode" | "uselibpqcompat" | "ssl" | "sslnegotiation"
             ) && !ROOT_CERTIFICATE_PARAMETERS.contains(&key.as_str())
+                && !(matches!(key.as_str(), "sslcert" | "sslkey") && value.is_empty())
         })
         .cloned()
         .collect();
@@ -367,7 +372,9 @@ impl SqlStore for PostgresStore {
         &self,
         connection: &mut PgConnection,
         id: &[u8],
+        _blob: bool,
     ) -> Result<Option<Vec<u8>>, sqlx::Error> {
+        // `id` is a uuid column, which holds no BLOB.
         // Under READ COMMITTED, a row lock that waited answers the row as the
         // holder left it: the revision it carried when the lock was granted.
         sqlx::query_scalar(
@@ -394,7 +401,7 @@ impl SqlStore for PostgresStore {
         connection: &mut PgConnection,
     ) -> Result<Vec<RevisionRow>, sqlx::Error> {
         sqlx::query_as(
-            "SELECT convert_to(id::text, 'UTF8'), convert_to(revision, 'UTF8') \
+            "SELECT convert_to(id::text, 'UTF8'), false, convert_to(revision, 'UTF8') \
              FROM spaces ORDER BY id",
         )
         .fetch_all(connection)

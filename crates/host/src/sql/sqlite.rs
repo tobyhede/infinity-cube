@@ -186,12 +186,15 @@ impl SqlSpaceRepository<SqliteStore> {
     }
 }
 
-/// The statement [`SqliteStore`] locks a Space row with. The transaction's
-/// write lock already covers every row, so it only reads the revision. A
-/// BLOB never equals TEXT, so the id's bytes are matched both as TEXT and as
-/// a BLOB, each compared byte for byte by the primary key's index.
-pub(super) const LOCK_SPACE: &str =
-    "SELECT CAST(revision AS BLOB) FROM spaces WHERE id IN (CAST($1 AS TEXT), $1)";
+/// The statements [`SqliteStore`] locks a Space row with, its id stored as
+/// TEXT and as a BLOB. The transaction's write lock already covers every
+/// row, so each only reads the revision. A BLOB never equals TEXT, so each
+/// matches the id's bytes in one storage class alone, compared byte for byte
+/// by the primary key's index: the bytes bound as a BLOB, which the column's
+/// TEXT affinity leaves a BLOB, or cast to TEXT.
+pub(super) const LOCK_TEXT_SPACE: &str =
+    "SELECT CAST(revision AS BLOB) FROM spaces WHERE id = CAST($1 AS TEXT)";
+pub(super) const LOCK_BLOB_SPACE: &str = "SELECT CAST(revision AS BLOB) FROM spaces WHERE id = $1";
 
 /// SQLite's primary result codes a failure is read by.
 const SQLITE_BUSY: i64 = 5;
@@ -300,11 +303,16 @@ impl SqlStore for SqliteStore {
         &self,
         connection: &mut SqliteConnection,
         id: &[u8],
+        blob: bool,
     ) -> Result<Option<Vec<u8>>, sqlx::Error> {
-        sqlx::query_scalar(LOCK_SPACE)
-            .bind(id)
-            .fetch_optional(connection)
-            .await
+        sqlx::query_scalar(if blob {
+            LOCK_BLOB_SPACE
+        } else {
+            LOCK_TEXT_SPACE
+        })
+        .bind(id)
+        .fetch_optional(connection)
+        .await
     }
 
     async fn hold_space(
@@ -319,9 +327,12 @@ impl SqlStore for SqliteStore {
     async fn space_revisions(
         connection: &mut SqliteConnection,
     ) -> Result<Vec<RevisionRow>, sqlx::Error> {
-        sqlx::query_as("SELECT CAST(id AS BLOB), CAST(revision AS BLOB) FROM spaces ORDER BY id")
-            .fetch_all(connection)
-            .await
+        sqlx::query_as(
+            "SELECT CAST(id AS BLOB), typeof(id) = 'blob', CAST(revision AS BLOB) \
+             FROM spaces ORDER BY id",
+        )
+        .fetch_all(connection)
+        .await
     }
 
     async fn meta_space_id(
