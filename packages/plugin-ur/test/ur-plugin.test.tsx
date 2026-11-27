@@ -39,8 +39,7 @@ describe('the Ur plugin’s view', () => {
       content: [],
       map: [],
       stored: [],
-      hints: [],
-      claims: { taken: 0, released: 0 },
+      claims: { taken: 0, released: 0, inPlace: [] },
       exclusive: 0,
       picked: 0,
     });

@@ -4,7 +4,7 @@
 
 **Blocked by:** 03, 04
 
-**What to build:** the default Edit size and keeping the editor visible ([ADR 0178](../../../docs/adr/0178-opening-keeps-a-resources-size-and-an-in-place-editor-draws-at-an-edit-size-the-map-stores.md)). When a plugin opts in on an entry with no `editSize`, it sends a size hint measured as its Open measured before ticket 03, and the canvas draws the editor at the larger of the hint and `size` on each axis, storing nothing; each edit measures again until an Edit size is stored. The canvas caps the drawn editor at the visible canvas at the current zoom, less a margin, as `visible-canvas-cap.ts` caps a hint today, without changing a stored `editSize`. If the capped editor reaches past the visible canvas, the camera pans the least distance that shows it, which is not an Edit.
+**What to build:** the default Edit size and keeping the editor visible ([ADR 0178](../../../docs/adr/0178-opening-keeps-a-resources-size-and-an-in-place-editor-draws-at-an-edit-size-the-map-stores.md)). When a plugin opts in on an entry with no `editSize`, it sends a size hint measured as its Open measured before ticket 03, and the canvas draws the editor at the larger of the hint and `size` on each axis, storing nothing; each edit measures again until an Edit size is stored. The canvas caps the drawn editor at the visible canvas at the current zoom, less a margin, as `packages/app/src/visible-canvas-cap.ts` capped an Open's hint until ticket 03 removed it (it is in git history), without changing a stored `editSize`. If the capped editor reaches past the visible canvas, the camera pans the least distance that shows it, which is not an Edit.
 
 ## Acceptance
 

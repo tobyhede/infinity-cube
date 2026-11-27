@@ -1,6 +1,13 @@
 import { expect, test } from './fixtures';
 import { PRIMARY_MODIFIER } from './markdown-source';
-import { createResource, nodeByTitle, resourceControls, settled } from './graph';
+import {
+  boxOf,
+  createResource,
+  nodeByTitle,
+  resourceControls,
+  selectResource,
+  settled,
+} from './graph';
 
 /**
  * A Mermaid Resource drawn by the Mermaid library itself (ADR 0158), which no
@@ -116,4 +123,72 @@ test('a Mermaid source that cannot be drawn is refused in Mermaid’s words, nam
   await expect(broken.getByRole('note')).toContainText('Parse error on line 3', {
     timeout: 20_000,
   });
+});
+
+test('an edit draws a Mermaid Resource at its Edit size, which a resize writes and the next edit keeps', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await settled(page);
+  await createResource(page, 'Mermaid Resource');
+  const title = page.getByRole('textbox', { name: 'Resource title' });
+  await expect(title).toBeFocused();
+  await title.fill('Sized');
+  await title.press('Enter');
+
+  const sized = nodeByTitle(page, 'Sized').first();
+  const rect = async () =>
+    sized.evaluate((element) => ({
+      width: Number.parseFloat(getComputedStyle(element).width),
+      height: Number.parseFloat(getComputedStyle(element).height),
+    }));
+  const source = page.getByRole('textbox', { name: 'Mermaid source of Sized' });
+  const edit = async () => {
+    await (
+      await resourceControls(page, sized)
+    )
+      .getByRole('button', { name: 'Edit Resource Sized' })
+      .click();
+    await expect(source).toBeVisible();
+  };
+  const cancel = async () => {
+    await (
+      await resourceControls(page, sized)
+    )
+      .getByRole('button', { name: 'Cancel editing Resource Sized' })
+      .click();
+    await expect(source).toHaveCount(0);
+  };
+  const size = await rect();
+
+  // With no Edit size stored, the editor is drawn at the Resource's size.
+  await edit();
+  await expect.poll(rect).toEqual(size);
+
+  // A resize while editing writes the Edit size, and leaves the size alone.
+  await selectResource(sized);
+  const handle = await boxOf(
+    sized.locator('.react-flow__resize-control.handle.bottom.right'),
+    'resize control',
+  );
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(handle.x + handle.width / 2 + 120, handle.y + handle.height / 2 + 90, {
+    steps: 5,
+  });
+  await page.mouse.up();
+  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+  await sized.evaluate(async (element) => {
+    await Promise.all(element.getAnimations().map((animation) => animation.finished));
+  });
+  const edited = await rect();
+  expect(edited.width).toBeGreaterThan(size.width);
+  expect(edited.height).toBeGreaterThan(size.height);
+  await expect(source).toBeVisible();
+
+  // Cancel draws it at its size again; the next edit draws it at the Edit size.
+  await cancel();
+  await expect.poll(rect).toEqual(size);
+  await edit();
+  await expect.poll(rect).toEqual(edited);
 });

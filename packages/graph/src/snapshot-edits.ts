@@ -354,20 +354,15 @@ function resizeEditor(
  * for it there, as an Ur Resource keeps its Shape (ADR 0121). The plugin's own
  * schema decides what is accepted.
  *
- * Alone it changes no rect, so no neighbour moves and the Resource's size is
- * kept. A size hint, which a plugin's gesture may carry (ADR 0142), is applied
- * in this same Edit only on an entry with no stored size: floored at the Closed
- * Size and applied as a Resize is, moving the Resources its growth passes. An
- * entry with a stored size ignores it. `unchanged` for the value the plugin is
- * already given there, whatever the hint, so the plugin's default is
- * `unchanged` on an entry that stores none.
+ * It changes no rect, so no neighbour moves and the Resource's size is kept.
+ * `unchanged` for the value the plugin is already given there, so the plugin's
+ * default is `unchanged` on an entry that stores none.
  */
 function changeMapContent(
   snapshot: SpaceSnapshot,
   mapId: UUID,
   resourceId: UUID,
   content: JsonValue,
-  sizeHint?: Extent,
 ): SnapshotEditOutcome {
   const placed = placedIn(snapshot, mapId);
   if ('code' in placed) return refused(placed);
@@ -380,16 +375,11 @@ function changeMapContent(
     return refused({ code: 'map-content-invalid' });
   }
   if (sameJsonValue(resolvedMapContent(kind, at.content), content)) return UNCHANGED;
-  const written = withPlacement(
+  return withPlacement(
     snapshot,
     mapId,
     Placement.place(placed.placement, resourceId, { ...at, content }),
   );
-  if (sizeHint === undefined || at.size !== undefined || written.kind !== 'completed') {
-    return written;
-  }
-  const resized = resize(written.snapshot, mapId, resourceId, flooredSize(sizeHint));
-  return resized.kind === 'completed' ? resized : written;
 }
 
 /**
