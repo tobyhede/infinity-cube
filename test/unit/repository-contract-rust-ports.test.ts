@@ -82,10 +82,6 @@ const EXEMPT = {
     doesNotApply(
       "a commit's answer does not depend on the order of its changes (ADR 0176, Storage ST-20): the Rust repository commits the move this case has the TypeScript SQL writer refuse, which `commits_a_move_whichever_space_it_lists_first` in `crates/host/tests/repository_contract/commits.rs`, not a port, holds on the memory store and SQLite",
     ),
-  "stores a * commit's whole snapshot over Resource rows recreated before its row lock (topology-preserving)":
-    doesNotApply(ROW_LOCK),
-  "stores a * commit's whole snapshot over Resource rows recreated before its row lock (complete-aggregate)":
-    doesNotApply(ROW_LOCK),
 
   // test/integration/sqlite-space-repository.test.ts
   'names a statement PostgreSQL aborted for contention unavailable': doesNotApply(
@@ -139,6 +135,22 @@ const HTTP_CASES = HTTP_CASE_FILES.flatMap(casesOf);
 
 /** The module whose `repository_cases!` table runs the contract's Rust cases. */
 const CONTRACT_TABLE = 'crates/host/tests/repository_contract/mod.rs';
+
+/** The SQLite store's `Harness`, which runs the table on SQLite. */
+const SQLITE_HARNESS = 'crates/host/tests/sqlite_contract.rs';
+
+/**
+ * The places `source`, a store's `Harness`, answers that it cannot provide a
+ * member. A case needing such a member reports a skip rather than running, so
+ * its `// Case:` line ports nothing on that store: while this finds none on
+ * SQLite, every marked case runs there, and a member SQLite cannot provide
+ * must list the cases needing it as exemptions before it may answer so.
+ */
+const unprovidedIn = (source: string): string[] =>
+  source
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => /\bErr\(|\bUnprovided\(/u.test(line));
 
 /** The contract's Rust case files, each a group of the table, by group. */
 const CONTRACT_GROUPS = filesUnder('crates/host/tests/repository_contract', (name) =>
@@ -276,6 +288,12 @@ describe('the Rust SQLite repository', () => {
     ).toEqual([]);
   });
 
+  it('runs every case it marks, its harness providing every member the table asks of it', () => {
+    const harness = readRepositoryFile(SQLITE_HARNESS);
+    expect(harness).toContain('repository_cases!(');
+    expect(unprovidedIn(harness)).toEqual([]);
+  });
+
   it('gives each exemption a reason it does not apply', () => {
     const malformed = Object.entries(EXEMPT).filter(
       ([, exemption]) => exemption.reason.trim().length === 0,
@@ -323,6 +341,23 @@ describe('the port check', () => {
       findings(cases, { ...clean, exempt: { ...clean.exempt, ported: doesNotApply('why') } })
         .exemptAndPorted,
     ).toEqual(['ported']);
+  });
+
+  it('finds a harness member answering that it is not provided', () => {
+    const source = [
+      'async fn reopen(&mut self) -> Result<(), Unprovided> {',
+      '    Ok(())',
+      '}',
+      'const NO_ROWS: Unprovided = Unprovided("no rows");',
+      'async fn take_resource_writes(&mut self) -> Result<Vec<String>, Unprovided> {',
+      '    Err(NO_ROWS)',
+      '}',
+    ].join('\n');
+    expect(unprovidedIn(source)).toEqual([
+      'const NO_ROWS: Unprovided = Unprovided("no rows");',
+      'Err(NO_ROWS)',
+    ]);
+    expect(unprovidedIn(source.split('\n').slice(0, 3).join('\n'))).toEqual([]);
   });
 
   it('finds a marked case the table does not run, and a mark above no case', () => {

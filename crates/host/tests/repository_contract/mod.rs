@@ -121,6 +121,13 @@ pub trait Harness: Sized {
     /// call, in the order written.
     async fn take_resource_writes(&mut self) -> Result<Vec<String>, Unprovided>;
 
+    /// Replace `snapshot`'s Space's Resource rows with `snapshot`'s inside
+    /// the next commit that writes that Space, after the commit's read and
+    /// before its row lock, in the commit's own transaction
+    /// (`recreateBeforeRowLock`).
+    async fn recreate_before_row_lock(&mut self, snapshot: SpaceSnapshot)
+    -> Result<(), Unprovided>;
+
     /// Close the store.
     async fn close(self);
 }
@@ -490,6 +497,8 @@ macro_rules! repository_cases {
                 keeps_an_exported_revision_through_an_aggregate_commit,
                 answers_a_stale_revision_on_the_aggregate_path_as_a_conflict,
                 adopts_a_resource_id_from_the_space_a_commit_deletes,
+                stores_a_topology_preserving_commits_whole_snapshot_over_recreated_resource_rows,
+                stores_a_complete_aggregate_commits_whole_snapshot_over_recreated_resource_rows,
             }
             broken {
                 replaces_an_invalid_space_document,

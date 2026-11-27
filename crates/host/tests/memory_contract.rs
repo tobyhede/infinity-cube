@@ -2,7 +2,8 @@
 //! memory store (rust-sqlite-test-coverage 04). The memory store keeps
 //! nothing past its own lifetime and has no rows to write past, so the
 //! cases needing a fresh host over what it kept, a stored state no write
-//! produces, or its row writes say they were skipped.
+//! produces, its row writes, or rows recreated before a row lock say they
+//! were skipped.
 
 #![allow(
     clippy::unwrap_used,
@@ -16,7 +17,7 @@ mod repository_contract;
 use std::sync::Arc;
 
 use host::MemorySpaceRepository;
-use intake::SpaceId;
+use intake::{SpaceId, SpaceSnapshot};
 use repository_contract::{BrokenState, Harness, Unprovided, repository_cases};
 
 const NOTHING_KEPT: Unprovided =
@@ -24,6 +25,8 @@ const NOTHING_KEPT: Unprovided =
 const NO_RAW_STATE: Unprovided =
     Unprovided("the memory store holds no stored form to write past its codec");
 const NO_ROWS: Unprovided = Unprovided("the memory store writes no rows");
+const NO_ROW_LOCK: Unprovided =
+    Unprovided("the memory store has no rows and no row lock for a commit to meet them under");
 
 struct Memory {
     store: Arc<MemorySpaceRepository>,
@@ -70,6 +73,13 @@ impl Harness for Memory {
 
     async fn take_resource_writes(&mut self) -> Result<Vec<String>, Unprovided> {
         Err(NO_ROWS)
+    }
+
+    async fn recreate_before_row_lock(
+        &mut self,
+        _snapshot: SpaceSnapshot,
+    ) -> Result<(), Unprovided> {
+        Err(NO_ROW_LOCK)
     }
 
     async fn close(self) {}
