@@ -114,15 +114,8 @@ export function editorPlacement(
     [...placement].map(([resourceId, at]) => {
       const offset = offsets.get(resourceId) ?? { x: 0, y: 0 };
       const size = drawnSizes.get(resourceId);
-      return [
-        resourceId,
-        {
-          ...at,
-          x: at.x + offset.x,
-          y: at.y + offset.y,
-          ...(size === undefined ? {} : { size }),
-        },
-      ] as const;
+      const moved = { ...at, x: at.x + offset.x, y: at.y + offset.y };
+      return [resourceId, size === undefined ? moved : { ...moved, size }] as const;
     }),
   );
 }
