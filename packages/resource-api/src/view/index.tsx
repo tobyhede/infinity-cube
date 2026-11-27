@@ -366,7 +366,9 @@ export const RAIL_BAND = 30;
  *
  * Lucide's `AlignJustify` artwork, three full lines, drawn here rather than
  * imported because the Resource API depends on no icon library and its pair,
- * `CloseIcon`, is not a Lucide glyph. Both are 14px, as every rail glyph is.
+ * `CloseIcon`, is not a Lucide glyph; the deviation is recorded in
+ * `interactiveDeviations` (`packages/app/stories/design-system-inventory.ts`).
+ * Both are 14px, as every rail glyph is.
  */
 export const OpenIcon = () => <ResourceLines middle />;
 
