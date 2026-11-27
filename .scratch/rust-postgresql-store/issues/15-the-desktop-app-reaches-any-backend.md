@@ -1,6 +1,6 @@
 # 15 — The desktop application opens a Space from any backend
 
-**Status:** needs-decision (an ADR first)
+**Status:** ready-for-agent (ADR 0181 accepted 28 November 2026)
 
 **Blocked by:** none for the ADR. The build waits on 06, so the PostgreSQL repository it opens holds the whole contract.
 
