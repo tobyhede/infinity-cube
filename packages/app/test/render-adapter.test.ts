@@ -802,6 +802,28 @@ describe('render adapter', () => {
       expect(editorPlacement(withNeighbours, new Map())).toBe(withNeighbours);
     });
 
+    it('draws no Resource nearer on an axis where it is drawn smaller than its size', () => {
+      // Drawn narrower than its size on x and taller on y: B, right of it, is
+      // not pulled in, and C, below it, is pushed down by the growth.
+      const placement = Placement.fromEntries([
+        [
+          RESOURCE_A,
+          {
+            x: 0,
+            y: 0,
+            size: { width: 640, height: 200 },
+            editSize: { width: 300, height: 360 },
+          },
+        ],
+        [RESOURCE_B, { x: 700, y: 0 }],
+        [RESOURCE_C, { x: 0, y: 400 }],
+      ]);
+      const drawn = editorPlacement(placement, new Map([[RESOURCE_A, {}]]));
+      expect(drawn.get(RESOURCE_A)?.size).toEqual({ width: 300, height: 360 });
+      expect(drawn.get(RESOURCE_B)).toMatchObject({ x: 700, y: 0 });
+      expect(drawn.get(RESOURCE_C)).toMatchObject({ x: 0, y: 560 });
+    });
+
     it('is drawn capped at the visible canvas, which stores nothing', () => {
       const drawn = editorPlacement(authored, new Map([[RESOURCE_A, {}]]), {
         width: 500,
