@@ -66,17 +66,22 @@ const sameSize = (a: ResourceSize | undefined, b: ResourceSize | undefined): boo
  * capped at `cap`, the visible canvas (ADR 0178). The Resources an editor's
  * drawn rect passes are drawn displaced as a Resize from its size to that rect
  * would place them, on each axis the rect is larger than its size on; on an
- * axis it is smaller on, nothing is drawn nearer. Nothing here is stored. With
- * no editor drawn otherwise, the placement itself.
+ * axis it is smaller on, nothing is drawn nearer. Each editor displaces from
+ * the Map's positions and the displacements add up, so the drawing does not
+ * depend on the order the edits began in. Nothing here is stored. With no
+ * editor drawn otherwise, the placement itself.
  */
 export function editorPlacement(
   placement: Placement,
   editors: ReadonlyMap<ResourceId, InPlaceEdit>,
   cap?: ResourceSize,
 ): Placement {
-  let drawn = placement;
-  for (const [resourceId, editor] of editors) {
-    const at = drawn.get(resourceId);
+  const drawnSizes = new Map<ResourceId, ResourceSize>();
+  const offsets = new Map<ResourceId, MapPosition>();
+  // Ordered by id, so even the sum's rounding does not follow the edits' order.
+  const ordered = [...editors].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  for (const [resourceId, editor] of ordered) {
+    const at = placement.get(resourceId);
     if (at === undefined) continue;
     const size = resourceSize(at);
     const hint = editor.sizeHint;
@@ -92,18 +97,34 @@ export function editorPlacement(
         ? wanted
         : { width: Math.min(wanted.width, cap.width), height: Math.min(wanted.height, cap.height) };
     if (capped.width === size.width && capped.height === size.height) continue;
-    // The Resources the drawn rect passes are drawn aside by the rule a Resize
-    // applies, and none of it is stored.
+    drawnSizes.set(resourceId, capped);
     const grown = {
       width: Math.max(capped.width, size.width),
       height: Math.max(capped.height, size.height),
     };
-    drawn = Placement.place(Placement.displace(drawn, resourceId, size, grown), resourceId, {
-      ...at,
-      size: capped,
-    });
+    for (const [moved, to] of Placement.displace(placement, resourceId, size, grown)) {
+      const from = placement.get(moved);
+      if (from === undefined || (from.x === to.x && from.y === to.y)) continue;
+      const offset = offsets.get(moved) ?? { x: 0, y: 0 };
+      offsets.set(moved, { x: offset.x + to.x - from.x, y: offset.y + to.y - from.y });
+    }
   }
-  return drawn;
+  if (drawnSizes.size === 0) return placement;
+  return Placement.fromEntries(
+    [...placement].map(([resourceId, at]) => {
+      const offset = offsets.get(resourceId) ?? { x: 0, y: 0 };
+      const size = drawnSizes.get(resourceId);
+      return [
+        resourceId,
+        {
+          ...at,
+          x: at.x + offset.x,
+          y: at.y + offset.y,
+          ...(size === undefined ? {} : { size }),
+        },
+      ] as const;
+    }),
+  );
 }
 
 const sameEditors = (

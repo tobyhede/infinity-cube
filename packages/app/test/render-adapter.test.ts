@@ -824,6 +824,45 @@ describe('render adapter', () => {
       expect(drawn.get(RESOURCE_C)).toMatchObject({ x: 0, y: 560 });
     });
 
+    it('draws two editors the same whichever edit began first', () => {
+      // Drawn after A, B sits above C's displaced position; drawn from the
+      // Map, it does not. The drawing must not depend on which is applied first.
+      const placement = Placement.fromEntries([
+        [
+          RESOURCE_A,
+          { x: 0, y: 0, size: { width: 300, height: 200 }, editSize: { width: 300, height: 350 } },
+        ],
+        [
+          RESOURCE_B,
+          {
+            x: 700,
+            y: 200,
+            size: { width: 300, height: 200 },
+            editSize: { width: 300, height: 400 },
+          },
+        ],
+        [RESOURCE_C, { x: 50, y: 250 }],
+      ]);
+      const aFirst = editorPlacement(
+        placement,
+        new Map([
+          [RESOURCE_A, {}],
+          [RESOURCE_B, {}],
+        ]),
+      );
+      const bFirst = editorPlacement(
+        placement,
+        new Map([
+          [RESOURCE_B, {}],
+          [RESOURCE_A, {}],
+        ]),
+      );
+      expect([...aFirst]).toEqual([...bFirst]);
+      // Each editor displaces from the Map's positions, and the two add up.
+      expect(aFirst.get(RESOURCE_C)).toMatchObject({ x: 50, y: 400 });
+      expect(aFirst.get(RESOURCE_B)).toMatchObject({ x: 700, y: 200 });
+    });
+
     it('stores a dragged neighbour it draws aside at its Map position moved by the drag', () => {
       const withNeighbour = Placement.fromEntries([...authored, [RESOURCE_C, { x: 400, y: 20 }]]);
       const spy = authoringSpy({ mapPlacement: withNeighbour });
