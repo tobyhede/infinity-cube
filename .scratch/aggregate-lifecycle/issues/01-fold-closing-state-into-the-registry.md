@@ -16,3 +16,4 @@
 ## Comments
 
 - 2026-11-27: built. `Registry`'s `Closing` state holds `by` (a window close or a quit), `written` and `abandoned`; `stopping`, `stopped`, `abandon_close` and `take_for_exit` are its new transitions, tested in `given_a_close_whose_last_write_ends` and `given_a_dock_quit`. Breaking `stopped`'s abandoned check, or leaving an abandoned close's write signal in place, each fails a test. `scheme::is_view_of` reads the label `open_view` builds. `main.rs` lost the two side maps and `spawn_stop`'s flag.
+- 2026-11-27: review found two older faults the Registry now holds tests for: a window close a quit overtook kept its failure dialog (`a_failure_of_a_window_close_a_quit_overtook_goes_to_standard_error`), and `abandon` freed a folder a quit's stop was still writing (`given_a_quit_that_took_an_aggregate_whose_window_then_failed`). Both fixed in the Registry.

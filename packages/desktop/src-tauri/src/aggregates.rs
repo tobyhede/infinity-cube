@@ -173,7 +173,13 @@ impl<S> Registry<S> {
     }
 
     /// Forget Aggregate `label`, which did not open, answering its server if it had one.
+    /// One a quit has already taken to close stays until its stop has ended
+    /// ([`Self::closed`]), since that stop is still writing.
     pub fn abandon(&mut self, label: &str) -> Option<S> {
+        let aggregate = self.aggregates.get(label)?;
+        if matches!(aggregate.state, State::Closing(_)) {
+            return None;
+        }
         match self.aggregates.remove(label)?.state {
             State::Open(server) => Some(server),
             State::Starting | State::Closing(_) => None,
@@ -202,7 +208,8 @@ impl<S> Registry<S> {
     }
 
     /// Window `label`'s stop answers `written` once its last write lands.
-    /// A close that has already ended keeps nothing.
+    /// A close that has already ended, or was abandoned, keeps nothing; one
+    /// whose write landed before this call keeps a signal already answered.
     pub fn stopping(&mut self, label: &str, written: Receiver<()>) {
         if let Some(closing) = self.closing_mut(label)
             && !closing.abandoned
@@ -272,11 +279,16 @@ impl<S> Registry<S> {
 
     /// Begin closing every open Aggregate, answering each window's label, its
     /// directory and its server. A quit calls it, and from then on nothing
-    /// opens, so nothing opens that the quit does not wait for.
+    /// opens, so nothing opens that the quit does not wait for. A window close
+    /// already under way is reported as the quit's are, since a quit waits
+    /// for every write and never for a dialog.
     pub fn take_all(&mut self) -> Vec<(String, PathBuf, S)> {
         self.quitting = true;
         let mut taken = Vec::new();
         for (label, aggregate) in &mut self.aggregates {
+            if let State::Closing(closing) = &mut aggregate.state {
+                closing.by = ClosedBy::Quit;
+            }
             if matches!(aggregate.state, State::Open(_))
                 && let State::Open(server) = std::mem::replace(
                     &mut aggregate.state,
@@ -502,6 +514,18 @@ mod tests {
         }
 
         #[test]
+        fn a_failure_of_a_window_close_a_quit_overtook_goes_to_standard_error() {
+            let (mut registry, label) = open("/spaces/rust", "server");
+            let _ = registry.begin_close(&label);
+            let _taken = registry.take_all();
+            assert_eq!(
+                registry.stopped(&label),
+                ReportIn::StandardError,
+                "once a quit has begun, it waits for every write and never for a dialog"
+            );
+        }
+
+        #[test]
         fn its_directory_stays_refused_until_the_report_is_done() {
             let (mut registry, label) = open("/spaces/rust", "server");
             let _ = registry.begin_close(&label);
@@ -587,6 +611,34 @@ mod tests {
             assert!(
                 registry.take_for_exit().writing.is_empty(),
                 "a close already over has nothing left to wait for"
+            );
+        }
+    }
+
+    mod given_a_quit_that_took_an_aggregate_whose_window_then_failed {
+        use super::*;
+        use std::sync::mpsc::channel;
+
+        #[test]
+        fn abandoning_it_keeps_the_close_its_stop_is_writing() {
+            let (mut registry, label) = open("/spaces/rust", "server");
+            let _taken = registry.take_all();
+            let (_landed, written) = channel();
+            registry.stopping(&label, written);
+
+            assert_eq!(
+                registry.abandon(&label),
+                None,
+                "the quit already took its server"
+            );
+            assert_eq!(
+                registry.take_for_exit().writing.len(),
+                1,
+                "an exit still waits for the write its stop is making"
+            );
+            assert!(
+                registry.is_closing(&label),
+                "its directory stays taken until the stop has ended"
             );
         }
     }
