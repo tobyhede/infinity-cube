@@ -61,9 +61,9 @@ const sameSize = (a: ResourceSize | undefined, b: ResourceSize | undefined): boo
 
 /**
  * The placement a canvas draws while Resources are edited in place: each
- * editor at its entry's Edit size, or at its size with none stored, from the
- * entry's top-left, or, with none stored, at the larger of its size hint and
- * its size on each axis; each capped at `cap`, the visible canvas (ADR 0178).
+ * editor from its entry's top-left at its entry's Edit size, or, with none
+ * stored, at the larger of its size hint and its size on each axis; each
+ * capped at `cap`, the visible canvas (ADR 0178).
  * Nothing here is stored. With no editor drawn otherwise, the placement itself.
  */
 export function editorPlacement(
