@@ -14,9 +14,9 @@ Each preview build on the [releases page](https://github.com/tobyhede/infinity-c
 
 1. **Install it.** Download `InfinityCube-<version>-aarch64-apple-darwin.dmg` from the newest release, open it and drag InfinityCube to Applications. It is not signed with an Apple Developer ID, so macOS refuses it the first time: open **System Settings › Privacy & Security**, choose **Open Anyway** beside the message about InfinityCube, and confirm, or run `xattr -dr com.apple.quarantine /Applications/InfinityCube.app` once. After that it opens as any application does. It is meant to offer each newer preview build when one is published, which has not been seen working yet.
 
-2. **Make a Space.** InfinityCube opens to its **Start window**. Choose **New Space**, accept the name and location or change them, and choose **Create Space**: it writes the Space to `~/Documents/Untitled Space` by default and opens it in a window of its own. **Open Folder…** in the Start window, or **File › Open…** (Command-O), opens a Space's folder you already have; a folder that holds no Space yet is offered **Create Space**. **File › New Space…** (Command-N) makes another.
+2. **Make a Space.** InfinityCube opens to its **Start window**. Choose **New Space**, accept the name and location or change them, and choose **Create Space**: it writes the Space to `~/Documents/Untitled Space` by default, or to the first free name after it, such as `Untitled Space 2`, if that folder is taken, and opens it in a window named after the folder. **Open Folder…** in the Start window, or **File › Open…** (Command-O), opens a Space's folder you already have; a folder that holds no Space yet is offered **Create Space**. **File › New Space…** (Command-N) makes another.
 
-3. **Put it in git before you edit**, so git can restore the Space as it was first written. Use the folder you chose in step 2:
+3. **Put it in git before you edit**, so git can restore the Space as it was first written. Use the folder the window is named after; the commands below are for the default, `~/Documents/Untitled Space`:
 
    ```sh
    git init ~/Documents/"Untitled Space"
@@ -55,7 +55,7 @@ Then [use the Space](#use-a-space). [`release/README.md`](release/README.md) cov
 
 ## Use a Space
 
-However you opened it, a Space works the same way. In the commands below, `<dir>` is the Space's folder.
+However you opened it, a Space works the same way. In the commands below, `<dir>` is the Space's folder; keep the quotes, since a desktop Space's folder name such as `Untitled Space` holds a space.
 
 1. **Edit.** Pick a Graph in the Command Dock, the toolbar floating over the canvas; every Graph stays drawn, and the one you pick is emphasised. Select a Resource to reveal its toolbar, and use Edit to write its Title and Markdown. Drag a Resource to move it. Drag from one of a Resource's four handles to another Resource to add an Edge to the Active Graph; hold Option (macOS) or Alt and drop on empty canvas to create a new Resource and connect it in one go. Done when the save indicator reads `Persisted`.
 
@@ -63,11 +63,11 @@ However you opened it, a Space works the same way. In the commands below, `<dir>
 
 3. **Close the window, or stop the run.** In the desktop application, closing the Space window writes every pending edit. If a write is still running after ten seconds, it asks whether to keep waiting, which is always safe, or close without saving, which loses the edits not yet written. If a write fails, a dialog says why, and those edits are not on disk. On Linux, closing the last window ends the application; on macOS it is meant to keep running with no window until you quit it, which has not been tried yet. If you started it from a terminal, don't press Ctrl-C, close the terminal or send a signal while a Space window is open: any of them ends the application at once, and edits not yet written are lost. Done when the window has closed with no dialog. Under `infinity-cube run` or `pnpm cube run`, press Ctrl-C instead, as [Stopping and lost edits](#stopping-and-lost-edits) says.
 
-4. **Commit.** `git -C <dir> add -A && git -C <dir> commit -m "First draft"`. Done when `git -C <dir> status` is clean.
+4. **Commit.** `git -C "<dir>" add -A && git -C "<dir>" commit -m "First draft"`. Done when `git -C "<dir>" status` is clean.
 
 ## Building from source
 
-This takes you from a fresh clone to the desktop application open on a Space of your own, built from source; the first build takes a few minutes. It is how you get the desktop application on Linux. These steps have been followed on Linux, not yet on macOS, and Windows is not built yet. To skip the build, [install a preview build](#install).
+This takes you from a fresh clone to the desktop application open on a Space of your own, built from source; the first build takes a few minutes. It is how you get the desktop application on Linux. These steps have been followed on Linux, not yet on macOS, and Windows is not built yet. To skip the build, [install a preview build](#install): the desktop application on a Mac with Apple silicon, or the `infinity-cube` command on macOS or Linux.
 
 1. **Install the tools.**
    - Node ≥ 26.8.1 and pnpm 9. Node no longer bundles corepack, so install pnpm with `npm install -g pnpm@9` if `pnpm --version` does not print `9.x`.
