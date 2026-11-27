@@ -133,6 +133,7 @@ export function canvasProjection(space: Space, resolved: ResolvedMap): PendingCa
           resourceIds,
           resourceShape: drawnResourceShape,
           mapContent: storedMapContent,
+          editSize: (resourceId) => entry(resourceId).editSize,
           resourceEmphasis: emphasisUnder(activeGraphId),
         }),
         edges: projectGraphEdges(edges, colors, { activeGraphId, headShapes }),

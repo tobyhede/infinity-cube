@@ -67,6 +67,8 @@ function TwoDrawings({ onComplete }: { readonly onComplete: (c: DrawnCompletion)
     title: { title: 'Notes', readOnly: false, onReturnFocus: () => undefined },
     content: { url: TEXT },
     mapContent: { open },
+    // An Edit size the Map stores, so the edit begins at once (ADR 0178).
+    editSize: { width: 640, height: 360 },
     outline: 'rectangle',
     state: 'selected',
     graphColor: '#ffc53d',

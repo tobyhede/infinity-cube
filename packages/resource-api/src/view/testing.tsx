@@ -70,6 +70,8 @@ export interface RenderPluginOptions<C, M> {
   readonly title?: string;
   readonly kind?: string;
   readonly size?: Size;
+  /** The Edit size the Map stores, which the surface offers as it is. */
+  readonly editSize?: Size;
   readonly selected?: boolean;
   /** What every commit answers; `completed` also applies the value, as a host would. */
   readonly answer?: Answer;
@@ -488,6 +490,7 @@ export function renderPlugin<C, M>(
       content: { value: content, commit: offeredNow.content },
       map: { value: mapValue, commit: offeredNow.map },
       size: options.size ?? DEFAULT_SIZE,
+      editSize: options.editSize,
       selected: options.selected ?? false,
       claim: offeredNow.claim,
       assets: offeredNow.assets,

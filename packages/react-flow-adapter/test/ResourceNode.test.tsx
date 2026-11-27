@@ -772,7 +772,10 @@ describe("ResourceNode floats a Resource's commands in React Flow's NodeToolbar"
     expect(toolbar()).toBeNull();
   });
 
-  /** An Open Markdown Resource its plugin can edit: it may commit and take a Claim. */
+  /**
+   * An Open Markdown Resource its plugin can edit: it may commit and take a
+   * Claim, and its Map stores an Edit size, so an edit begins at once.
+   */
   const editable = (selected: boolean): NodeProps<ResourceFlowNode> => {
     const node = props({ kind: 'markdown', open: true, source: 'Body', selected });
     return {
@@ -780,6 +783,7 @@ describe("ResourceNode floats a Resource's commands in React Flow's NodeToolbar"
       data: {
         ...node.data,
         kind: 'markdown',
+        editSize: { width: 640, height: 360 },
         kindOperations: {
           kind: 'markdown',
           commitContent: () => Promise.resolve('completed'),

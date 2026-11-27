@@ -112,6 +112,7 @@ import {
   type NavigationDirection,
 } from '../graph-navigation';
 import { FullView } from './FullView';
+import { leastPanToShow, visibleCanvasCap } from '../visible-canvas-cap';
 import type { CommandOutcomes } from '../command-outcomes';
 import type { DeleteConfirmation } from '../delete-confirmation';
 import {
@@ -372,6 +373,7 @@ export function SpaceCanvas({
     selectEdge,
     resourceResize,
     reportEmbeddedMapEditing,
+    editors,
   } = canvasRendering;
   const nodes = useMemo(() => liveProjection?.nodes ?? [], [liveProjection]);
   const edges = useMemo(() => liveProjection?.edges ?? [], [liveProjection]);
@@ -399,7 +401,7 @@ export function SpaceCanvas({
   const { visibleGraphs: graphs, colors: colorByGraphId } = view.projection;
   const { createOnCanvas, dropExistingResource, dropSpace, createFromData } = placement;
   const addCanvasResource = useCallback(() => createOnCanvas(ADD_KIND), [createOnCanvas]);
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, getViewport, setViewport } = useReactFlow();
 
   const spaces = useOpenSpaces();
   const thisSpaceId = spaceSession.getState().working.id;
@@ -563,6 +565,61 @@ export function SpaceCanvas({
     connecting === null || connectingFrom === undefined
       ? null
       : { from: connectingFrom, anchor: connecting.anchor };
+  /**
+   * The most an editor is drawn at: the visible canvas at the current zoom,
+   * less a margin (ADR 0178). It follows the zoom, so zooming out draws more
+   * of a large Edit size; a canvas not yet measured caps nothing.
+   */
+  const flowWidth = useStore((flow) => flow.width);
+  const flowHeight = useStore((flow) => flow.height);
+  const flowZoom = useStore((flow) => flow.transform[2]);
+  const editorCap = useMemo(
+    () =>
+      flowWidth === 0 || flowHeight === 0
+        ? undefined
+        : visibleCanvasCap({ width: flowWidth, height: flowHeight }, flowZoom),
+    [flowWidth, flowHeight, flowZoom],
+  );
+  /**
+   * The rect an editor is drawn at, in Map coordinates. The camera pans the
+   * least distance that shows it when it is drawn or its rect changes, and
+   * not when the camera moves (ADR 0178); a pan is not an Edit.
+   */
+  // A canvas draws at most one editor: Claims nest, so one holder at most sits
+  // at this canvas's own depth (`editorsOn`).
+  const editorNode = nodes.find((drawn) => editors.has(drawn.data.resourceId));
+  const editorX = editorNode?.position.x;
+  const editorY = editorNode?.position.y;
+  const editorWidth = editorNode?.width;
+  const editorHeight = editorNode?.height;
+  useEffect(() => {
+    if (
+      editorX === undefined ||
+      editorY === undefined ||
+      editorWidth === undefined ||
+      editorHeight === undefined ||
+      flowWidth === 0 ||
+      flowHeight === 0
+    )
+      return;
+    const viewport = getViewport();
+    const pan = leastPanToShow(
+      { x: editorX, y: editorY, width: editorWidth, height: editorHeight },
+      viewport,
+      { width: flowWidth, height: flowHeight },
+    );
+    if (pan.x === 0 && pan.y === 0) return;
+    void setViewport({ x: viewport.x + pan.x, y: viewport.y + pan.y, zoom: viewport.zoom });
+  }, [
+    editorX,
+    editorY,
+    editorWidth,
+    editorHeight,
+    flowWidth,
+    flowHeight,
+    getViewport,
+    setViewport,
+  ]);
   /** Present from Here, on the canvas's own Map: what `P` and the rail item both run. */
   const presentFromHere = useMemo(
     () => presentFromHereCommand({ presentFrom, mayPresent: availability.present }),
@@ -634,6 +691,7 @@ export function SpaceCanvas({
     onSelectResource: selectResource,
     spaceResourceTargets,
     resourceEntityActions: resourceActions,
+    editorCap,
     mapEmbedding,
   });
   const { bodyEditing, beginTitleEditing } = resourceAuthoring;

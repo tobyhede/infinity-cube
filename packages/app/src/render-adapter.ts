@@ -13,6 +13,7 @@ import {
   type GraphEdge,
   type GraphId,
   type MapPosition,
+  type ResourceSize,
   resourceSize,
 } from '@project/core';
 import { Placement } from '@project/graph';
@@ -55,21 +56,40 @@ export interface ResizeDraft {
   readonly editor?: true | undefined;
 }
 
+const sameSize = (a: ResourceSize | undefined, b: ResourceSize | undefined): boolean =>
+  a?.width === b?.width && a?.height === b?.height;
+
 /**
  * The placement a canvas draws while Resources are edited in place: each
  * editor at its entry's Edit size, or at its size with none stored, from the
- * entry's top-left (ADR 0178). Nothing here is stored. With no editor, the
- * placement itself.
+ * entry's top-left, or, with none stored, at the larger of its size hint and
+ * its size on each axis; each capped at `cap`, the visible canvas (ADR 0178).
+ * Nothing here is stored. With no editor drawn otherwise, the placement itself.
  */
 export function editorPlacement(
   placement: Placement,
   editors: ReadonlyMap<ResourceId, InPlaceEdit>,
+  cap?: ResourceSize,
 ): Placement {
   let drawn = placement;
-  for (const resourceId of editors.keys()) {
+  for (const [resourceId, editor] of editors) {
     const at = drawn.get(resourceId);
-    if (at?.editSize === undefined) continue;
-    drawn = Placement.place(drawn, resourceId, { ...at, size: at.editSize });
+    if (at === undefined) continue;
+    const size = resourceSize(at);
+    const hint = editor.sizeHint;
+    // A stored Edit size; with none, the larger of the hint and the size on
+    // each axis, storing nothing.
+    const wanted =
+      at.editSize ??
+      (hint === undefined
+        ? size
+        : { width: Math.max(size.width, hint.width), height: Math.max(size.height, hint.height) });
+    const capped =
+      cap === undefined
+        ? wanted
+        : { width: Math.min(wanted.width, cap.width), height: Math.min(wanted.height, cap.height) };
+    if (capped.width === size.width && capped.height === size.height) continue;
+    drawn = Placement.place(drawn, resourceId, { ...at, size: capped });
   }
   return drawn;
 }
@@ -81,20 +101,18 @@ const sameEditors = (
   a.size === b.size &&
   [...a].every(([resourceId, editor]) => {
     const other = b.get(resourceId);
-    return (
-      other !== undefined &&
-      other.sizeHint?.width === editor.sizeHint?.width &&
-      other.sizeHint?.height === editor.sizeHint?.height
-    );
+    return other !== undefined && sameSize(other.sizeHint, editor.sizeHint);
   });
 
 export interface ResourceResize {
   /**
    * The Resources edited in place on this canvas, which it draws at their Edit
-   * size and whose resize writes that size rather than their own (ADR 0178).
-   * The canvas tells it each time its plugins' Claims change.
+   * size and whose resize writes that size rather than their own (ADR 0178),
+   * capped at `cap`, the visible canvas at the current zoom, where the canvas
+   * knows one. The canvas tells it each time its plugins' Claims, its zoom or
+   * its size change.
    */
-  drawEditors: (editors: ReadonlyMap<ResourceId, InPlaceEdit>) => void;
+  drawEditors: (editors: ReadonlyMap<ResourceId, InPlaceEdit>, cap?: ResourceSize) => void;
   beginResize: (resourceId: ResourceId) => void;
   previewResize: (
     resourceId: ResourceId,
@@ -259,6 +277,8 @@ export interface RenderAdapterState {
   resizeDraft: ResizeDraft | null;
   /** The Resources edited in place on this canvas (`ResourceResize.drawEditors`). */
   editors: ReadonlyMap<ResourceId, InPlaceEdit>;
+  /** The most an editor is drawn at (`ResourceResize.drawEditors`). */
+  editorCap: ResourceSize | undefined;
   /**
    * Whether some embedded Map on this canvas is running a Resource edit.
    *
@@ -499,25 +519,30 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
     selection: NO_SELECTION,
     resizeDraft: null,
     editors: new Map(),
+    editorCap: undefined,
     editingEmbeddedMap: false,
 
     // Written once, here, and by nothing after: every `set` below merges a
     // partial, so this reference is what the canvas keeps holding.
     resourceResize: {
-      drawEditors: (editors) => {
-        const held = get();
-        if (sameEditors(held.editors, editors)) return;
-        // A draft started at the rect drawn before would write the other size
-        // from it, so a change to whether its Resource is edited ends it.
-        const draft = held.resizeDraft;
-        const ended =
-          draft !== null && held.editors.has(draft.resourceId) !== editors.has(draft.resourceId);
-        set(ended ? { editors, resizeDraft: null } : { editors });
+      drawEditors: (editors, cap) => {
+        const now = get();
+        const next: Partial<RenderAdapterState> = {};
+        if (!sameEditors(now.editors, editors)) {
+          next.editors = editors;
+          // A draft started at the rect drawn before would write the other
+          // size from it, so a change to whether its Resource is edited ends it.
+          const draft = now.resizeDraft;
+          if (draft !== null && now.editors.has(draft.resourceId) !== editors.has(draft.resourceId))
+            next.resizeDraft = null;
+        }
+        if (!sameSize(now.editorCap, cap)) next.editorCap = cap;
+        if (Object.keys(next).length > 0) set(next);
       },
 
       beginResize: (resourceId) => {
-        const { editors } = get();
-        const placement = editorPlacement(authoring.mapPlacement(), editors);
+        const { editors, editorCap } = get();
+        const placement = editorPlacement(authoring.mapPlacement(), editors, editorCap);
         const at = placement.get(resourceId);
         if (at === undefined) return;
         const editor = editors.has(resourceId) ? true : undefined;

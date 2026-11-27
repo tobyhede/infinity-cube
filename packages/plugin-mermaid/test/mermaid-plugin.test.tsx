@@ -10,6 +10,7 @@ import {
 import {
   mermaidPluginView as builtView,
   mermaidPluginViewWith,
+  READING_WIDTH,
   type DiagramTheme,
   type RenderDiagram,
 } from '@project/plugin-mermaid/view';
@@ -70,6 +71,8 @@ const reading = (texts: Record<string, string>) => ({
     ),
 });
 
+/** An Edit size the Map stores, so an edit begins at once, measuring nothing (ADR 0178). */
+const STORED_EDIT_SIZE = { width: 640, height: 360 };
 const editable = { content: true, map: true, claim: true, store: true } as const;
 
 describe('the Mermaid plugin’s domain half', () => {
@@ -107,6 +110,7 @@ describe('the Mermaid plugin’s domain half', () => {
 describe('the Mermaid plugin’s view', () => {
   it('draws its Title and nothing else when Closed, offering nothing with every capability absent', async () => {
     const rendered = renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: closed,
       title: 'Notes',
@@ -121,6 +125,7 @@ describe('the Mermaid plugin’s view', () => {
 
   it('draws its diagram when Open with no commit, as on the Stage', async () => {
     renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -133,6 +138,7 @@ describe('the Mermaid plugin’s view', () => {
 
   it('draws nothing while Closed, and its diagram once per source when Open', async () => {
     const rendered = renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: closed,
       title: 'Notes',
@@ -156,6 +162,7 @@ describe('the Mermaid plugin’s view', () => {
 
   it('says why a source cannot be drawn, in Mermaid’s words, and still offers Edit', async () => {
     renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -169,9 +176,51 @@ describe('the Mermaid plugin’s view', () => {
     expect(screen.getByRole('button', { name: 'Edit Resource Notes' })).toBeEnabled();
   });
 
+  it('measures its drawn diagram at a reading width for the Claim where the Map stores no Edit size (ADR 0178)', async () => {
+    const rendered = renderPlugin(mermaidPluginView.View, {
+      content,
+      map: open,
+      title: 'Notes',
+      grants: editable,
+      size: { width: 300, height: 200 },
+      assets: reading({ [TEXT_REF]: 'graph TD' }),
+    });
+    await screen.findByTestId('mermaid-diagram');
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
+    await screen.findByRole('textbox', { name: 'Mermaid source of Notes' });
+    const [inPlace, ...others] = rendered.commits.claims.inPlace;
+    expect(others).toEqual([]);
+    expect(inPlace?.sizeHint?.width).toBe(READING_WIDTH);
+    expect(inPlace?.sizeHint?.height).toBeGreaterThan(0);
+    expect(rendered.commits.map).toEqual([]);
+  });
+
+  it('begins an edit without a size hint when Mermaid has not drawn the diagram in time', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const stalled = mermaidPluginViewWith(() => new Promise<never>(() => undefined));
+      const rendered = renderPlugin(stalled.View, {
+        content,
+        map: open,
+        title: 'Notes',
+        grants: editable,
+        assets: reading({ [TEXT_REF]: 'graph TD' }),
+      });
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      await screen.findByRole('textbox', { name: 'Mermaid source of Notes' });
+      expect(rendered.commits.claims.inPlace).toEqual([{}]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('says a failure Mermaid gives no words for in its own', async () => {
     const silent = mermaidPluginViewWith(() => Promise.reject(new Error(' ')));
     renderPlugin(silent.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -184,6 +233,7 @@ describe('the Mermaid plugin’s view', () => {
 
   it('draws an empty source as an empty diagram to edit, asking Mermaid for nothing', async () => {
     renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content: { url: EMPTY_ASSET },
       map: open,
       title: 'Notes',
@@ -200,6 +250,7 @@ describe('the Mermaid plugin’s view', () => {
   it('draws its diagram in the canvas’s colour scheme, again when that changes', async () => {
     document.documentElement.dataset['scheme'] = 'dark';
     renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -216,6 +267,7 @@ describe('the Mermaid plugin’s view', () => {
 
   it('lays its diagram out in an unseen element of its own, never the document body', async () => {
     renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -231,6 +283,7 @@ describe('the Mermaid plugin’s view', () => {
 
   it('draws again neither on Cancel nor on a Save that changes nothing', async () => {
     renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -257,6 +310,7 @@ describe('the Mermaid plugin’s view', () => {
         : drawText(id, source, theme, container);
     });
     renderPlugin(flaky.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -272,6 +326,7 @@ describe('the Mermaid plugin’s view', () => {
 
   it('draws nothing while Closed, even when the colour scheme changes', async () => {
     renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -299,6 +354,7 @@ describe('the Mermaid plugin’s view', () => {
       ),
     );
     renderPlugin(lined.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -309,6 +365,7 @@ describe('the Mermaid plugin’s view', () => {
 
   it('draws a blank source as an empty diagram, asking Mermaid for nothing', async () => {
     renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -323,6 +380,7 @@ describe('the Mermaid plugin’s view', () => {
 
   it('names no Edit in the empty note where Edit is not offered, as on the Stage', async () => {
     renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content: { url: EMPTY_ASSET },
       map: open,
       title: 'Notes',
@@ -333,6 +391,7 @@ describe('the Mermaid plugin’s view', () => {
 
   it('draws a note and offers no Edit when its text cannot be read', async () => {
     renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -346,6 +405,7 @@ describe('the Mermaid plugin’s view', () => {
 
   it('Opens with one Map content commit, before its source is read', async () => {
     const rendered = renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: closed,
       title: 'Notes',
@@ -365,6 +425,7 @@ describe('the Mermaid plugin’s view', () => {
   it('Saves by storing the text with `\\n` endings, then committing its URL, and releases its Claim', async () => {
     const stored: string[] = [];
     const rendered = renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -402,6 +463,7 @@ describe('the Mermaid plugin’s view', () => {
   it('Saves nothing for an unchanged draft of a text stored with `\\r\\n` endings', async () => {
     const store = vi.fn(() => Promise.resolve(SAVED_REF));
     const rendered = renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -417,6 +479,7 @@ describe('the Mermaid plugin’s view', () => {
 
   it('keeps the draft up when the store is refused, and commits nothing', async () => {
     const rendered = renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -437,6 +500,7 @@ describe('the Mermaid plugin’s view', () => {
 
   it('keeps the draft up when the content commit is refused', async () => {
     const rendered = renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -454,6 +518,7 @@ describe('the Mermaid plugin’s view', () => {
 
   it('Saves on Mod-Enter, and Cancel and Escape abandon the draft without committing', async () => {
     const rendered = renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -479,6 +544,7 @@ describe('the Mermaid plugin’s view', () => {
 
   it('begins an edit from a press on its selected body', async () => {
     renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -492,6 +558,7 @@ describe('the Mermaid plugin’s view', () => {
   it('keeps the draft up and Save available again when the store rejects', async () => {
     let stores = 0;
     const rendered = renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -518,6 +585,7 @@ describe('the Mermaid plugin’s view', () => {
 
   it('draws a note, and still Opens, when reading its text rejects', async () => {
     const rendered = renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: closed,
       title: 'Notes',
@@ -532,6 +600,7 @@ describe('the Mermaid plugin’s view', () => {
   it('reads its text again on a later Open after an earlier read failed', async () => {
     let readable = false;
     const rendered = renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: closed,
       title: 'Notes',
@@ -556,6 +625,7 @@ describe('the Mermaid plugin’s view', () => {
   it('begins an Edit from Closed, after an earlier read failed, once its text reads', async () => {
     let readable = false;
     const rendered = renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: closed,
       title: 'Notes',
@@ -581,6 +651,7 @@ describe('the Mermaid plugin’s view', () => {
   it('keeps editing what was typed while a Save was under way', async () => {
     let finish: (ref: AssetRef) => void = () => undefined;
     const rendered = renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -609,6 +680,7 @@ describe('the Mermaid plugin’s view', () => {
   it('ignores Escape while a Save is under way, so a refused Save keeps its draft', async () => {
     let finish: (answer: { readonly refused: string }) => void = () => undefined;
     renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -633,6 +705,7 @@ describe('the Mermaid plugin’s view', () => {
 
   it('offers Edit when Closed, which Opens it and then begins editing', async () => {
     const rendered = renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: closed,
       title: 'Notes',
@@ -649,6 +722,7 @@ describe('the Mermaid plugin’s view', () => {
 
   it('Opens but begins no edit from Closed when its text cannot be read', async () => {
     const rendered = renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: closed,
       title: 'Notes',
@@ -668,6 +742,7 @@ describe('the Mermaid plugin’s view', () => {
 
   it('Saves a draft whose content changed meanwhile to text it cannot read', async () => {
     const rendered = renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -685,6 +760,7 @@ describe('the Mermaid plugin’s view', () => {
 
   it('keeps its draft and Claim while authoring is withdrawn, and Saves once it returns', async () => {
     const rendered = renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -707,6 +783,7 @@ describe('the Mermaid plugin’s view', () => {
   });
   it('keeps focus on its Open command as it becomes Close, and back', async () => {
     renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: closed,
       title: 'Notes',
@@ -723,6 +800,7 @@ describe('the Mermaid plugin’s view', () => {
 
   it('draws its kind glyph, named for a screen reader, only while Closed', async () => {
     renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: closed,
       title: 'Notes',

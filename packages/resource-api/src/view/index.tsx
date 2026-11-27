@@ -136,6 +136,12 @@ export interface Surface<C, M> {
   readonly content: Kept<C>;
   readonly map: KeptMap<M>;
   readonly size: Size;
+  /**
+   * The Edit size the Map stores for this Resource, if any (ADR 0178): a plugin
+   * that edits in place sends a size hint with its Claim only where there is
+   * none, and the canvas draws its editor at it.
+   */
+  readonly editSize?: Size | undefined;
   readonly selected: boolean;
   readonly claim?: ((options?: ClaimOptions) => OwnClaim<C, M> | undefined) | undefined;
   readonly assets: Assets;

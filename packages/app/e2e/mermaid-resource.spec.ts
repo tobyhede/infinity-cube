@@ -161,9 +161,12 @@ test('an edit draws a Mermaid Resource at its Edit size, which a resize writes a
   };
   const size = await rect();
 
-  // With no Edit size stored, the editor is drawn at the Resource's size.
+  // With no Edit size stored, the editor is drawn at the larger of the
+  // plugin's hint and the size on each axis (ADR 0178): the reading width.
   await edit();
-  await expect.poll(rect).toEqual(size);
+  await expect.poll(async () => (await rect()).width).toBe(READING_WIDTH);
+  expect((await rect()).height).toBeGreaterThanOrEqual(size.height);
+  const measured = await rect();
 
   // A resize while editing writes the Edit size, and leaves the size alone.
   await selectResource(sized);
@@ -182,8 +185,8 @@ test('an edit draws a Mermaid Resource at its Edit size, which a resize writes a
     await Promise.all(element.getAnimations().map((animation) => animation.finished));
   });
   const edited = await rect();
-  expect(edited.width).toBeGreaterThan(size.width);
-  expect(edited.height).toBeGreaterThan(size.height);
+  expect(edited.width).toBeGreaterThan(measured.width);
+  expect(edited.height).toBeGreaterThan(measured.height);
   await expect(source).toBeVisible();
 
   // Cancel draws it at its size again; the next edit draws it at the Edit size.
@@ -192,3 +195,6 @@ test('an edit draws a Mermaid Resource at its Edit size, which a resize writes a
   await edit();
   await expect.poll(rect).toEqual(edited);
 });
+
+/** The width the Mermaid plugin's size hint asks for. */
+const READING_WIDTH = 640;

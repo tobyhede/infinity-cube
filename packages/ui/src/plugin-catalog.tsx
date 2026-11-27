@@ -133,6 +133,8 @@ export interface PluginSurfaceInput {
   /** The Map content the plugin is given, or its own value on a surface with no Map. */
   readonly mapContent: JsonValue;
   readonly size: Size;
+  /** The Edit size the Map stores for the Resource, on a surface with a Map. */
+  readonly editSize?: Size | undefined;
   readonly selected: boolean;
   readonly operations: PluginOperations;
   /** The key the surface minted for its lifetime, which a Claim taken through it is granted to. */
@@ -387,6 +389,7 @@ export function pluginEntry<C, M>(
       content: { value: content.data, commit: contentCommit },
       map: { value: mapContent.data, commit: mapCommit },
       size: input.size,
+      editSize: input.editSize,
       selected: input.selected,
       claim,
       assets: input.assets,

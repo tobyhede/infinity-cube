@@ -33,6 +33,8 @@ export interface CanvasRendering {
    * canvas in one render.
    */
   readonly editingEmbeddedMap: boolean;
+  /** The Resources edited in place on this canvas's Map (ADR 0178). */
+  readonly editors: RenderAdapterState['editors'];
   /** What the placed Map projects to, or `null` while no strategy has resolved. */
   readonly projected: CanvasNodesAndEdges | null;
   readonly canvas: CanvasContent;
@@ -62,6 +64,7 @@ export function useCanvasRendering(
 ): CanvasRendering {
   const resizeDraft = useRenderAdapter((s) => s.resizeDraft);
   const editors = useRenderAdapter((s) => s.editors);
+  const editorCap = useRenderAdapter((s) => s.editorCap);
   const selection = useRenderAdapter((s) => s.selection);
   const liveProjection = useRenderAdapter((s) => s.projection);
   const editingEmbeddedMap = useRenderAdapter((s) => s.editingEmbeddedMap);
@@ -74,8 +77,8 @@ export function useCanvasRendering(
 
   // A Resource edited in place is drawn at its Edit size (ADR 0178).
   const drawnPlacement = useMemo(
-    () => editorPlacement(mapPlacement, editors),
-    [mapPlacement, editors],
+    () => editorPlacement(mapPlacement, editors, editorCap),
+    [mapPlacement, editors, editorCap],
   );
   const placement = usePlacementRendering(
     projection.strategyGraph,
@@ -118,6 +121,7 @@ export function useCanvasRendering(
     liveProjection,
     hasResourcesOnCanvas,
     editingEmbeddedMap,
+    editors,
     projected,
     canvas: canvasContent(placement, hasResourcesOnCanvas),
     changeNodes,

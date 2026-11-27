@@ -763,6 +763,32 @@ describe('render adapter', () => {
       expect(editorPlacement(authored, new Map())).toBe(authored);
     });
 
+    it('is drawn at the larger of its hint and its size on each axis, with no Edit size stored', () => {
+      const drawn = editorPlacement(
+        authored,
+        new Map([[RESOURCE_B, { sizeHint: { width: 640, height: 120 } }]]),
+      );
+      expect(drawn.get(RESOURCE_B)?.size).toEqual({ width: 640, height: 200 });
+      // A stored Edit size wins over a hint.
+      expect(
+        editorPlacement(
+          authored,
+          new Map([[RESOURCE_A, { sizeHint: { width: 900, height: 900 } }]]),
+        ).get(RESOURCE_A)?.size,
+      ).toEqual({ width: 640, height: 360 });
+    });
+
+    it('is drawn capped at the visible canvas, which stores nothing', () => {
+      const drawn = editorPlacement(authored, new Map([[RESOURCE_A, {}]]), {
+        width: 500,
+        height: 300,
+      });
+      expect(drawn.get(RESOURCE_A)).toMatchObject({
+        size: { width: 500, height: 300 },
+        editSize: { width: 640, height: 360 },
+      });
+    });
+
     it('resizes from its Edit size and writes it, never its size', () => {
       const spy = authoringSpy({ mapPlacement: authored });
       const store = createRenderAdapter(spy.authoring);
@@ -852,6 +878,23 @@ describe('render adapter', () => {
       const held = store.getState().editors;
       store.getState().resourceResize.drawEditors(new Map([[RESOURCE_A, {}]]));
       expect(store.getState().editors).toBe(held);
+    });
+
+    it('holds the cap the canvas tells it, and keeps it while it is the same', () => {
+      const store = createRenderAdapter(authoringSpy({ mapPlacement: authored }).authoring);
+      store.getState().resourceResize.drawEditors(new Map([[RESOURCE_A, {}]]), {
+        width: 500,
+        height: 300,
+      });
+      const cap = store.getState().editorCap;
+      expect(cap).toEqual({ width: 500, height: 300 });
+      store.getState().resourceResize.drawEditors(new Map([[RESOURCE_A, {}]]), {
+        width: 500,
+        height: 300,
+      });
+      expect(store.getState().editorCap).toBe(cap);
+      store.getState().resourceResize.beginResize(RESOURCE_A);
+      expect(store.getState().resizeDraft?.size).toEqual({ width: 500, height: 300 });
     });
   });
 

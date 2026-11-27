@@ -13,6 +13,7 @@ import {
   uuidSchema,
   type ResourceId,
 } from '@project/core';
+import type { Size } from '@project/resource-api/domain';
 import type { ObserverErrorReporter, SpaceSession } from '@project/persistence';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import { usePluginAssets, type EntityActionGroup } from '@project/ui';
@@ -114,6 +115,12 @@ export interface CanvasResourceAuthoringInput {
    * one the canvas around it provides.
    */
   readonly mapEmbedding?: MapEmbedding | undefined;
+  /**
+   * The most an editor on this canvas is drawn at: the visible canvas at the
+   * current zoom, less a margin (ADR 0178). Only the canvas's own Map offers
+   * it; absent, an editor is drawn uncapped.
+   */
+  readonly editorCap?: Size | undefined;
 }
 
 export interface CanvasResourceAuthoring {
@@ -144,6 +151,7 @@ export function useCanvasResourceAuthoring({
   spaceResourceTargets = NO_SPACE_RESOURCE_TARGETS,
   resourceEntityActions,
   plugins,
+  editorCap,
   mapEmbedding: ownMapEmbedding,
 }: CanvasResourceAuthoringInput): CanvasResourceAuthoring {
   const spaces = useOpenSpaces();
@@ -192,8 +200,8 @@ export function useCanvasResourceAuthoring({
   }, [claimChain, editingDrawings, embeddedIn, nodes]);
   const drawEditors = resourceResize.drawEditors;
   useLayoutEffect(() => {
-    drawEditors(editors);
-  }, [drawEditors, editors]);
+    drawEditors(editors, editorCap);
+  }, [drawEditors, editors, editorCap]);
   useLayoutEffect(() => () => drawEditors(new Map()), [drawEditors]);
   // The Map embedding of the canvas this draws on, which a Space Resource's
   // host chooser writes a choice through (ADR 0142), and which keeps what the

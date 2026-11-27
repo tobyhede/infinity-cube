@@ -96,6 +96,7 @@ export function canvasReading(
       reportEmbeddedMapEditing: ignore,
       selectResource: ignore,
       selectEdge: ignore,
+      editors: new Map(),
       ...rendering,
       editingEmbeddedMap,
       liveProjection: projection,
