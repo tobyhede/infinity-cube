@@ -1262,6 +1262,32 @@ describe('SnapshotEdit across two Maps: addToMap, removeFromMap and deleteFromSp
   });
 });
 
+describe('SnapshotEdit.resizeEditor against the Edit size the entry stores', () => {
+  const MEMBER = uuid('00000000-0000-4000-8000-000000000031');
+  const STORED = { width: 640, height: 360 };
+  const stored = baseSnapshot([MEMBER], { [MEMBER]: { x: 0, y: 0, editSize: STORED } });
+  const editSizeAfter = (outcome: SnapshotEditOutcome) =>
+    outcome.kind === 'completed'
+      ? outcome.snapshot.document.maps?.find((m) => m.id === MAP_ID)?.positions[MEMBER]?.editSize
+      : undefined;
+
+  it('is unchanged at the Edit size the entry already stores', () => {
+    expect(SnapshotEdit.resizeEditor(stored, MAP_ID, MEMBER, { ...STORED })).toEqual({
+      kind: 'unchanged',
+    });
+  });
+
+  it.each([
+    { axis: 'width', editSize: { width: 641, height: 360 } },
+    { axis: 'height', editSize: { width: 640, height: 361 } },
+  ])('writes an Edit size that differs in $axis alone', ({ editSize }) => {
+    const outcome = SnapshotEdit.resizeEditor(stored, MAP_ID, MEMBER, editSize);
+
+    expect(outcome.kind).toBe('completed');
+    expect(editSizeAfter(outcome)).toEqual(editSize);
+  });
+});
+
 describe('SnapshotEdit.resizeEditor refusals', () => {
   const MEMBER = uuid('00000000-0000-4000-8000-000000000031');
   const ORPHAN = uuid('00000000-0000-4000-8000-000000000032');
