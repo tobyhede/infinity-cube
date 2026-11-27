@@ -1,12 +1,16 @@
 //! Which Aggregate directories are open, in which window, and how far each
 //! has got: starting its server, open, or closing while the server writes
-//! its last edit.
+//! its last edit. A closing Aggregate keeps how its close began, whether the
+//! presenter gave up waiting for it, and word of when its last write lands,
+//! so how a failed write is reported and what a quit waits for are decided
+//! here.
 //!
 //! The registry is generic over what serves an Aggregate, so its transitions are
 //! tested without starting a process.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::mpsc::Receiver;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
 /// The prefix every Space window's label starts with.
@@ -36,7 +40,57 @@ struct Aggregate<S> {
 enum State<S> {
     Starting,
     Open(S),
-    Closing,
+    Closing(Closing),
+}
+
+/// A close under way: its server is writing its last edit.
+#[derive(Debug)]
+struct Closing {
+    by: ClosedBy,
+    /// Answered once the last write lands; gone once nothing waits for it.
+    written: Option<Receiver<()>>,
+    /// The presenter closed without saving.
+    abandoned: bool,
+}
+
+impl Closing {
+    fn by(by: ClosedBy) -> Self {
+        Self {
+            by,
+            written: None,
+            abandoned: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ClosedBy {
+    Window,
+    Quit,
+}
+
+/// Where a closed Aggregate's failed last write is reported.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReportIn {
+    /// A dialog, and standard error: the presenter closed the window and
+    /// waited.
+    Dialog,
+    /// Standard error only: a quit, which waits for the write and never for
+    /// a dialog, or a close the presenter gave up waiting for (Storage
+    /// ST-122).
+    StandardError,
+}
+
+/// What an exit the application was not asked about must finish before the
+/// process ends ([`Registry::take_for_exit`]).
+#[derive(Debug)]
+pub struct Exit<S> {
+    /// Every Aggregate still open, by directory, whose server is to be
+    /// stopped.
+    pub open: Vec<(PathBuf, S)>,
+    /// Word of the last write of every close under way that the presenter
+    /// did not give up on.
+    pub writing: Vec<Receiver<()>>,
 }
 
 /// What asking to open a directory came to.
@@ -122,7 +176,7 @@ impl<S> Registry<S> {
     pub fn abandon(&mut self, label: &str) -> Option<S> {
         match self.aggregates.remove(label)?.state {
             State::Open(server) => Some(server),
-            State::Starting | State::Closing => None,
+            State::Starting | State::Closing(_) => None,
         }
     }
 
@@ -131,16 +185,61 @@ impl<S> Registry<S> {
         let Some(aggregate) = self.aggregates.get_mut(label) else {
             return Close::NotOpen;
         };
-        match std::mem::replace(&mut aggregate.state, State::Closing) {
-            State::Open(server) => Close::Stop {
-                server,
-                directory: aggregate.directory.clone(),
-            },
-            State::Closing => Close::StillClosing,
-            State::Starting => {
-                aggregate.state = State::Starting;
-                Close::NotOpen
+        match std::mem::replace(&mut aggregate.state, State::Starting) {
+            State::Open(server) => {
+                aggregate.state = State::Closing(Closing::by(ClosedBy::Window));
+                Close::Stop {
+                    server,
+                    directory: aggregate.directory.clone(),
+                }
             }
+            closing @ State::Closing(_) => {
+                aggregate.state = closing;
+                Close::StillClosing
+            }
+            State::Starting => Close::NotOpen,
+        }
+    }
+
+    /// Window `label`'s stop answers `written` once its last write lands.
+    /// A close that has already ended keeps nothing.
+    pub fn stopping(&mut self, label: &str, written: Receiver<()>) {
+        if let Some(closing) = self.closing_mut(label)
+            && !closing.abandoned
+        {
+            closing.written = Some(written);
+        }
+    }
+
+    /// The presenter closed window `label` without saving: nothing waits for
+    /// its last write, and a failure of it goes to standard error only.
+    pub fn abandon_close(&mut self, label: &str) {
+        if let Some(closing) = self.closing_mut(label) {
+            closing.abandoned = true;
+            closing.written = None;
+        }
+    }
+
+    /// Window `label`'s last write has landed or failed, answering where a
+    /// failure is reported. Its directory stays taken until [`Self::closed`].
+    pub fn stopped(&mut self, label: &str) -> ReportIn {
+        match self.closing_mut(label) {
+            Some(closing) => {
+                closing.written = None;
+                if closing.by == ClosedBy::Window && !closing.abandoned {
+                    ReportIn::Dialog
+                } else {
+                    ReportIn::StandardError
+                }
+            }
+            None => ReportIn::StandardError,
+        }
+    }
+
+    fn closing_mut(&mut self, label: &str) -> Option<&mut Closing> {
+        match &mut self.aggregates.get_mut(label)?.state {
+            State::Closing(closing) => Some(closing),
+            State::Starting | State::Open(_) => None,
         }
     }
 
@@ -155,7 +254,7 @@ impl<S> Registry<S> {
     pub fn is_closing(&self, label: &str) -> bool {
         self.aggregates
             .get(label)
-            .is_some_and(|aggregate| matches!(aggregate.state, State::Closing))
+            .is_some_and(|aggregate| matches!(aggregate.state, State::Closing(_)))
     }
 
     /// Whether a quit has begun ([`Self::take_all`]), after which nothing
@@ -179,12 +278,36 @@ impl<S> Registry<S> {
         let mut taken = Vec::new();
         for (label, aggregate) in &mut self.aggregates {
             if matches!(aggregate.state, State::Open(_))
-                && let State::Open(server) = std::mem::replace(&mut aggregate.state, State::Closing)
+                && let State::Open(server) = std::mem::replace(
+                    &mut aggregate.state,
+                    State::Closing(Closing::by(ClosedBy::Quit)),
+                )
             {
                 taken.push((label.clone(), aggregate.directory.clone(), server));
             }
         }
         taken
+    }
+
+    /// Everything an exit the application was not asked about (on macOS,
+    /// Quit from the Dock, or logging out) finishes before the process
+    /// ends: every open Aggregate's server, taken as [`Self::take_all`]
+    /// takes it, and word of every close's last write but an abandoned one.
+    pub fn take_for_exit(&mut self) -> Exit<S> {
+        let writing = self
+            .aggregates
+            .values_mut()
+            .filter_map(|aggregate| match &mut aggregate.state {
+                State::Closing(closing) => closing.written.take(),
+                State::Starting | State::Open(_) => None,
+            })
+            .collect();
+        let open = self
+            .take_all()
+            .into_iter()
+            .map(|(_label, directory, server)| (directory, server))
+            .collect();
+        Exit { open, writing }
     }
 }
 
@@ -337,6 +460,133 @@ mod tests {
                 registry.begin_close("closing-0"),
                 Close::NotOpen,
                 "a question window should close at once"
+            );
+        }
+    }
+
+    mod given_a_close_whose_last_write_ends {
+        use super::*;
+
+        #[test]
+        fn a_failure_after_a_window_close_is_shown_in_a_dialog() {
+            let (mut registry, label) = open("/spaces/rust", "server");
+            let _ = registry.begin_close(&label);
+            assert_eq!(
+                registry.stopped(&label),
+                ReportIn::Dialog,
+                "the presenter who closed the window should hear its last write failed"
+            );
+        }
+
+        #[test]
+        fn a_failure_after_a_quit_goes_to_standard_error() {
+            let (mut registry, label) = open("/spaces/rust", "server");
+            let _taken = registry.take_all();
+            assert_eq!(
+                registry.stopped(&label),
+                ReportIn::StandardError,
+                "a quit waits for the write, never for a dialog reporting it"
+            );
+        }
+
+        #[test]
+        fn a_failure_after_close_without_saving_goes_to_standard_error() {
+            let (mut registry, label) = open("/spaces/rust", "server");
+            let _ = registry.begin_close(&label);
+            registry.abandon_close(&label);
+            assert_eq!(
+                registry.stopped(&label),
+                ReportIn::StandardError,
+                "a write the presenter gave up on is reported on standard error only (ST-122)"
+            );
+        }
+
+        #[test]
+        fn its_directory_stays_refused_until_the_report_is_done() {
+            let (mut registry, label) = open("/spaces/rust", "server");
+            let _ = registry.begin_close(&label);
+            let _report = registry.stopped(&label);
+            assert_eq!(
+                registry.reserve(Path::new("/spaces/rust")),
+                Reserved::Existing(label.clone()),
+                "the directory opens again only once its close has ended"
+            );
+            registry.closed(&label);
+            assert!(
+                matches!(
+                    registry.reserve(Path::new("/spaces/rust")),
+                    Reserved::New(_)
+                ),
+                "a closed directory should open again"
+            );
+        }
+    }
+
+    mod given_a_dock_quit {
+        use super::*;
+        use std::sync::mpsc::channel;
+
+        #[test]
+        fn it_takes_every_open_server_and_waits_for_every_close_under_way() {
+            let (mut registry, closing) = open("/spaces/rust", "first");
+            let second = label_of(registry.reserve(Path::new("/spaces/go")));
+            registry.opened(&second, "second").unwrap();
+            let _ = registry.begin_close(&closing);
+            let (landed, written) = channel();
+            registry.stopping(&closing, written);
+
+            let exit = registry.take_for_exit();
+
+            let open: Vec<_> = exit.open.iter().map(|(_, server)| *server).collect();
+            assert_eq!(
+                open,
+                vec!["second"],
+                "the open Aggregate is stopped by the exit"
+            );
+            assert_eq!(
+                exit.writing.len(),
+                1,
+                "the closing one's write is waited for"
+            );
+            landed.send(()).unwrap();
+            assert_eq!(
+                exit.writing[0].try_recv(),
+                Ok(()),
+                "the signal waited for is the one its stop sends on"
+            );
+            assert_eq!(
+                registry.reserve(Path::new("/spaces/zig")),
+                Reserved::Quitting,
+                "nothing opens once the exit has collected what it waits for"
+            );
+        }
+
+        #[test]
+        fn it_does_not_wait_for_a_close_without_saving() {
+            let (mut registry, label) = open("/spaces/rust", "server");
+            let _ = registry.begin_close(&label);
+            let (_landed, written) = channel();
+            registry.stopping(&label, written);
+            registry.abandon_close(&label);
+
+            assert!(
+                registry.take_for_exit().writing.is_empty(),
+                "the presenter gave up on that write, so the exit does not wait for it"
+            );
+        }
+
+        #[test]
+        fn a_stop_that_ended_before_its_signal_was_kept_is_not_waited_for() {
+            let (mut registry, label) = open("/spaces/rust", "server");
+            let _ = registry.begin_close(&label);
+            let _report = registry.stopped(&label);
+            registry.closed(&label);
+            let (_landed, written) = channel();
+            registry.stopping(&label, written);
+
+            assert!(
+                registry.take_for_exit().writing.is_empty(),
+                "a close already over has nothing left to wait for"
             );
         }
     }
