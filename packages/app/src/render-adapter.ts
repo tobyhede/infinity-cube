@@ -570,12 +570,12 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
     resourceResize: {
       drawEditors: (editors, cap) => {
         const now = get();
+        const draft = now.resizeDraft;
         const next: Partial<RenderAdapterState> = {};
         if (!sameEditors(now.editors, editors)) {
           next.editors = editors;
           // A draft started at the rect drawn before would write the other
           // size from it, so a change to whether its Resource is edited ends it.
-          const draft = now.resizeDraft;
           if (draft !== null && now.editors.has(draft.resourceId) !== editors.has(draft.resourceId))
             next.resizeDraft = null;
         }
@@ -584,7 +584,24 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
           // The cap draws an editor at another rect, so it ends a draft of an
           // editor for the same reason; a Resource not edited in place is
           // drawn uncapped, and its draft goes on.
-          if (now.resizeDraft?.editor === true) next.resizeDraft = null;
+          if (draft?.editor === true) next.resizeDraft = null;
+        }
+        if (draft !== null && !('resizeDraft' in next) && Object.keys(next).length > 0) {
+          // A draft that goes on is drawn from the editors and cap now held,
+          // so no editor's displacement outlives its edit.
+          const base = editorPlacement(
+            authoring.mapPlacement(),
+            next.editors ?? now.editors,
+            'editorCap' in next ? next.editorCap : now.editorCap,
+          );
+          const at = base.get(draft.resourceId);
+          next.resizeDraft =
+            at === undefined
+              ? null
+              : {
+                  ...draft,
+                  placement: Placement.place(base, draft.resourceId, { ...at, size: draft.size }),
+                };
         }
         if (Object.keys(next).length > 0) set(next);
       },
