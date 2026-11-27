@@ -25,10 +25,12 @@ const closed: MermaidMapContent = { open: false };
 
 /**
  * What draws a diagram under jsdom, which has no layout for Mermaid: its source
- * as the text of an SVG, and a source that begins `bad` refused as Mermaid
- * refuses one it cannot parse.
+ * as the text of an SVG declaring its size as Mermaid's does, and a source that
+ * begins `bad` refused as Mermaid refuses one it cannot parse.
  */
 const drawn: string[] = [];
+/** The size the stand-in's SVG declares. */
+const DRAWN = { width: 1232, height: 616 };
 const themes: DiagramTheme[] = [];
 const containers: HTMLElement[] = [];
 const drawText: RenderDiagram = (id, source, theme, container) => {
@@ -39,7 +41,9 @@ const drawText: RenderDiagram = (id, source, theme, container) => {
     return Promise.reject(new Error('Parse error on line 1: expecting a diagram type.'));
   }
   const text = source.replaceAll('&', '&amp;').replaceAll('<', '&lt;');
-  return Promise.resolve(`<svg id="${id}" role="img"><text>${text}</text></svg>`);
+  return Promise.resolve(
+    `<svg id="${id}" width="100%" style="max-width: ${DRAWN.width}px;" viewBox="0 0 ${DRAWN.width} ${DRAWN.height}" role="img"><text>${text}</text></svg>`,
+  );
 };
 const mermaidPluginView = mermaidPluginViewWith(drawText);
 
@@ -191,8 +195,57 @@ describe('the Mermaid plugin’s view', () => {
     const [inPlace, ...others] = rendered.commits.claims.inPlace;
     expect(others).toEqual([]);
     expect(inPlace?.sizeHint?.width).toBe(READING_WIDTH);
-    expect(inPlace?.sizeHint?.height).toBeGreaterThan(0);
+    // jsdom lays out no Title, so the hint is the diagram at the reading width
+    // less its inset, at its own aspect, inside its inset and the rect's.
+    const inset = 12;
+    const diagramHeight = (DRAWN.height * (READING_WIDTH - 2 * inset)) / DRAWN.width;
+    expect(inPlace?.sizeHint?.height).toBe(Math.round(diagramHeight + 4 * inset));
     expect(rendered.commits.map).toEqual([]);
+  });
+
+  it('measures its diagram without drawing a second copy of its SVG (ADR 0178)', async () => {
+    renderPlugin(mermaidPluginView.View, {
+      content,
+      map: open,
+      title: 'Notes',
+      grants: editable,
+      assets: reading({ [TEXT_REF]: 'graph TD' }),
+    });
+    const diagram = await screen.findByTestId('mermaid-diagram');
+    const id = diagram.querySelector('svg')?.id ?? '';
+    expect(id).not.toBe('');
+    const added: Element[] = [];
+    const watch = new MutationObserver((records) => {
+      for (const record of records)
+        for (const node of record.addedNodes) if (node instanceof Element) added.push(node);
+    });
+    watch.observe(document.body, { childList: true, subtree: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
+    await screen.findByRole('textbox', { name: 'Mermaid source of Notes' });
+    for (const record of watch.takeRecords())
+      for (const node of record.addedNodes) if (node instanceof Element) added.push(node);
+    watch.disconnect();
+    const copies = added.filter(
+      (node) => node.id === id || node.querySelector(`[id="${id}"]`) !== null,
+    );
+    expect(copies).toEqual([]);
+  });
+
+  it('begins an edit without a size hint when the drawn SVG declares no size', async () => {
+    const sizeless = mermaidPluginViewWith((id) =>
+      Promise.resolve(`<svg id="${id}" role="img"><text>graph TD</text></svg>`),
+    );
+    const rendered = renderPlugin(sizeless.View, {
+      content,
+      map: open,
+      title: 'Notes',
+      grants: editable,
+      assets: reading({ [TEXT_REF]: 'graph TD' }),
+    });
+    await screen.findByTestId('mermaid-diagram');
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
+    await screen.findByRole('textbox', { name: 'Mermaid source of Notes' });
+    expect(rendered.commits.claims.inPlace).toEqual([{}]);
   });
 
   it('begins an edit without a size hint when Mermaid has not drawn the diagram in time', async () => {

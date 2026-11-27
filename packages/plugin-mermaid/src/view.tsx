@@ -39,6 +39,7 @@ import {
   type MermaidContent,
   type MermaidMapContent,
 } from './domain';
+import { diagramExtent, diagramHeightAt } from './diagram-extent';
 import { renderWithMermaid, type DiagramTheme, type RenderDiagram } from './mermaid';
 
 /**
@@ -398,10 +399,17 @@ function MermaidView({
     else setMeasuring(true);
   }, [mayEdit, editing, measuring, editSize, startEdit]);
   const width = Math.max(surface.size.width, READING_WIDTH);
-  const beginning = useRef({ startEdit, width });
+  // A drawn diagram is measured from the size its SVG declares rather than
+  // from a second copy in the measurer, which would put each id Mermaid gives
+  // the SVG in the document twice.
+  const extent = useMemo(
+    () => (diagram.state === 'drawn' ? diagramExtent(diagram.svg) : undefined),
+    [diagram],
+  );
+  const beginning = useRef({ startEdit, width, extent });
   useEffect(() => {
-    beginning.current = { startEdit, width };
-  }, [startEdit, width]);
+    beginning.current = { startEdit, width, extent };
+  }, [startEdit, width, extent]);
   const diagramState = diagram.state;
   const awaitingDiagram = diagramState === 'drawing' && !drawWaited;
   useEffect(() => {
@@ -422,13 +430,22 @@ function MermaidView({
       setMeasuring(false);
       setDrawWaited(false);
       const now = beginning.current;
-      if (element === null || diagramState === 'drawing') {
+      if (
+        element === null ||
+        diagramState === 'drawing' ||
+        (diagramState === 'drawn' && now.extent === undefined)
+      ) {
         now.startEdit();
         return;
       }
-      // The measurer draws the Title as an Open one is drawn, above the
-      // diagram, both at the width the hint asks for.
-      const height = element.scrollHeight + 2 * INSET;
+      // The measurer draws the Title as an Open one is drawn, at the width the
+      // hint asks for, above a note where there is one; a drawn diagram below
+      // it is as high as its SVG at that width, inside its inset.
+      const diagramHeight =
+        now.extent === undefined
+          ? 0
+          : diagramHeightAt(now.extent, now.width - 2 * INSET) + 2 * INSET;
+      const height = element.scrollHeight + diagramHeight + 2 * INSET;
       now.startEdit({ width: Math.round(now.width), height: Math.round(height) });
     });
     return () => measured.abort();
@@ -717,7 +734,7 @@ function MermaidView({
           <div style={{ padding: `${railBand}px ${INSET}px 0` }}>
             <Title />
           </div>
-          <DrawnDiagram diagram={diagram} mayEdit={mayEdit} />
+          {diagram.state !== 'drawn' && <DrawnDiagram diagram={diagram} mayEdit={mayEdit} />}
         </div>
       )}
       <Rail commands={commands} />
