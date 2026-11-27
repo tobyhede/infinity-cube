@@ -541,6 +541,9 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
       },
 
       beginResize: (resourceId) => {
+        // The draft starts from the rect drawn, capped or not, and a release
+        // stores what it then draws: a resize of a capped editor replaces a
+        // larger stored Edit size with one derived from the cap.
         const { editors, editorCap } = get();
         const placement = editorPlacement(authoring.mapPlacement(), editors, editorCap);
         const at = placement.get(resourceId);

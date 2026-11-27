@@ -896,6 +896,33 @@ describe('render adapter', () => {
       store.getState().resourceResize.beginResize(RESOURCE_A);
       expect(store.getState().resizeDraft?.size).toEqual({ width: 500, height: 300 });
     });
+
+    it('resizes a capped editor from the rect it draws, and stores what it draws', () => {
+      const large = Placement.fromEntries([
+        [
+          RESOURCE_A,
+          {
+            x: 10,
+            y: 20,
+            size: { width: 300, height: 200 },
+            editSize: { width: 6000, height: 4000 },
+          },
+        ],
+      ]);
+      const spy = authoringSpy({ mapPlacement: large });
+      const store = createRenderAdapter(spy.authoring);
+      store.getState().resourceResize.drawEditors(new Map([[RESOURCE_A, {}]]), {
+        width: 900,
+        height: 700,
+      });
+      store.getState().resourceResize.beginResize(RESOURCE_A);
+      expect(store.getState().resizeDraft?.size).toEqual({ width: 900, height: 700 });
+      store.getState().resourceResize.previewResize(RESOURCE_A, { width: 905, height: 705 });
+      store.getState().resourceResize.finishResize(RESOURCE_A);
+      expect(spy.completions).toEqual([
+        { kind: 'resized-editor', resourceId: RESOURCE_A, editSize: { width: 905, height: 705 } },
+      ]);
+    });
   });
 
   it('previews and completes a resize of a Closed Resource, keeping it Closed', () => {
