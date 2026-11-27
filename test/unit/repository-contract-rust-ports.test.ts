@@ -544,84 +544,7 @@ const CHANGE_ORDER =
   "a commit's answer does not depend on the order of its changes (ADR 0176, Storage ST-20; carried over from #528)";
 
 const POSTGRES_EXEMPT = {
-  // The contract: the table (02), run on PostgreSQL by 06.
-  ...exemptEach(
-    [
-      'preserves the established aggregate across a fresh repository host',
-      'persists first-working-load initialization for a fresh repository host',
-      'replaces * stored state through the destructive lifecycle door',
-      "names a broken stored document broken stored state on the single-Space fast path, and leaves loadSpace's answer narrower",
-      'truncates stored Spaces without a Meta identity only when none was expected',
-      'initializes and replaces only through explicit Meta-rooted aggregates',
-      'classifies canonical and different initialization proposals',
-      'refuses a replacement proposal naming a Meta Space it does not hold',
-      'ignores object-key insertion order when classifying initialization',
-      'lets only one different concurrent initialization establish state',
-      'rolls back a refused replacement',
-      'refuses replacement before initialization',
-      'reads the stored Meta identity as each lifecycle door leaves it',
-      'refuses a replacement expecting no Meta identity where one is stored',
-      'refuses a replacement authorized against a superseded Meta identity',
-      'refuses to record an exported revision for a Space it does not store',
-      'refuses an aggregate that repeats a Space identity, storing none of it',
-      'refuses an aggregate that repeats a Resource identity, storing none of it',
-      'refuses a replacement that repeats a * identity, keeping the stored aggregate',
-      'refuses an initialization that fails domain intake, storing none of it',
-      'replaces everything stored, freeing the Resource ids it clears',
-      'raises an identifiable invariant failure for a stored Space whose revision is not canonical',
-      'becomes committable from an empty store',
-      'stores and reloads an Image Resource unchanged',
-      'stores and reloads an Ur Resource and a Reference Resource to it unchanged',
-      'stores, renames and reloads a Resource whose plugin is missing unchanged',
-      'carries a Resource whose plugin is missing through Import and Export byte-identical',
-      'hands a Resource whose plugin is missing to that plugin when it returns',
-      'refuses a topology-preserving update when stored Spaces have no Meta identity',
-      'stores an initialized Space, then lists, loads and commits it',
-      "keeps an Edge's Title and hidden flag through initialization, commit and load",
-      "keeps a Graph's head shape through initialization, commit and load",
-      "keeps every Resource's Map content through initialization, commit and load",
-      "keeps every Resource through a topology-preserving commit's own delete",
-      'refuses to create a new unreachable Space by removing its last reference alone',
-      'atomically creates, links, reads, converges on, and deletes a Space',
-      'refuses an authored commit that deletes the Meta Space',
-      "keeps each Space Resource's own selection across a later default Map change",
-      'reports every conflict and rolls back every refused aggregate',
-      'answers a stale expected revision with the current aggregate',
-      'refuses a commit that fails domain intake and stores nothing',
-      'refuses a commit for a Space it does not store',
-      'refuses a commit whose Space id differs from its snapshot id',
-      'refuses an update whose snapshot names another stored Space at a matching revision',
-      "places a single update's failed intake at its Space's position in the aggregate",
-      'refuses a commit that names one Space more than once',
-      'refuses a commit claiming a Resource another Space owns',
-      'scopes Graph identities to their containing Space',
-      'refuses an unreferenced ordinary Space even when its Graph identity is reused',
-      'permits a Graph and Resource to share an identity',
-      'refuses two Maps in one Space that own the same Graph identity',
-      'keeps the Resources a commit names and drops the ones it omits',
-      'drops every Resource when a commit omits them all',
-      "returns a Space's Resources in ascending id order however they were supplied",
-      'records an exported revision and carries it across later commits',
-      'refuses to mark an exported revision above the storage ceiling',
-      'stores and commits a revision above Number.MAX_SAFE_INTEGER as canonical decimal text',
-      'refuses to store a revision above the 2^63-1 ceiling',
-      'raises an identifiable invariant failure for a stored Space whose revision exceeds the 2^63-1 ceiling',
-      'raises an identifiable invariant failure for a commit whose fast-path candidate has a non-canonical stored revision',
-      'writes only the Resource a topology-preserving commit changed',
-      'writes only the new and changed Resources on the complete-aggregate path',
-      'writes no Resource for a commit at a stale revision',
-      'moves an unchanged Resource between Spaces in one commit',
-      "stores a * commit's whole snapshot over Resource rows recreated before its row lock",
-      'stores an asset of any type and loads its bytes and media type unchanged',
-      'holds a Markdown Resource decoded from its file, and its text, as the same value',
-      'stores the same bytes once, keeping the first media type',
-      'answers an asset it does not store as absent',
-      'holds the asset of zero bytes already, under the type it always has',
-      'keeps stored assets outside the aggregate its lifecycle doors replace',
-      'keeps a stored asset across a fresh repository host',
-    ],
-    pending('06'),
-  ),
+  // The contract: the table (02), run on PostgreSQL by `crates/host/tests/postgres.rs`.
   'writes a moved Resource through the ownership check, which refuses it before its Space releases it':
     acceptedDifference(CHANGE_ORDER),
 
@@ -665,15 +588,6 @@ const POSTGRES_EXEMPT = {
       'gives up once a second attempt confirms the refusal',
     ],
     pending('08'),
-  ),
-
-  // test/integration/prisma-postgres.test.ts
-  ...exemptEach(
-    [
-      'writes and reads a typed space document with its resource',
-      'advances updatedAt when a space is updated',
-    ],
-    pending('05'),
   ),
 
   // test/unit/postgres-unreachable.test.ts
@@ -767,7 +681,6 @@ const POSTGRES_EXEMPT = {
   'composes an application when the repository cannot be reached': pending('09'),
 
   // test/unit/prisma-foundation.test.ts
-  'advances %s.updatedAt when a record is updated': pending('05'),
   ...exemptEach(
     [
       'omits a database connection when DATABASE_URL is blank',
@@ -804,6 +717,20 @@ const POSTGRES_EXEMPT = {
   ),
 } satisfies Readonly<Record<string, PostgresExemption>>;
 
+/** The PostgreSQL store's test binary, whose `Harness` runs the table on PostgreSQL. */
+const POSTGRES_HARNESS = 'crates/host/tests/postgres.rs';
+
+/**
+ * The `Harness` implementation in `source`: from its `impl Harness for` line
+ * to the line invoking the table, so the binary's other tests, which match
+ * on `Err(` of their own, are not read as a member it cannot provide.
+ */
+const harnessImplIn = (source: string): string => {
+  const begin = source.indexOf('impl Harness for ');
+  const end = source.indexOf(`\n${RUNS_REPOSITORY_TABLE}`, begin);
+  return begin === -1 || end === -1 ? '<no harness before the table>' : source.slice(begin, end);
+};
+
 /** An adapter: the table, and the files its own ports are written in. */
 interface Port {
   readonly name: string;
@@ -819,7 +746,7 @@ const POSTGRES: Port = {
   table: filesUnder('crates/host/tests/repository_contract', (name) => name.endsWith('.rs')),
   // Each ticket adds the files it creates: `crates/host/tests/postgres*.rs`
   // from 05, `crates/cli/tests/serve_postgres.rs` from 09.
-  files: [],
+  files: [POSTGRES_HARNESS],
   exempt: POSTGRES_EXEMPT,
 };
 
@@ -960,12 +887,31 @@ describe('the Rust PostgreSQL repository', () => {
     expect(found.exemptAndPorted).toEqual([]);
   });
 
-  it('runs no table case yet, so every case not otherwise exempt is pending', () => {
+  it('runs the table, its harness providing every member the table asks of it', () => {
+    const harness = readRepositoryFile(POSTGRES_HARNESS);
+    expect(runsRepositoryCases(harness)).toBe(true);
+    expect(harnessImplIn(harness)).toContain('impl Harness for Postgres');
+    expect(unprovidedIn(harnessImplIn(harness))).toEqual([]);
+  });
+
+  it('ports every contract case but the one exempt for change order', () => {
+    const exemptContractRuns = POSTGRES_RUNS.filter(
+      (run) => CONTRACT_CASES.includes(run.name) && exemptionOf(run, POSTGRES.exempt) !== undefined,
+    );
+    expect(exemptContractRuns).toEqual([
+      {
+        name: 'writes a moved Resource through the ownership check, which refuses it before its Space releases it',
+        run: 'writes a moved Resource through the ownership check, which refuses it before its Space releases it',
+      },
+    ]);
+  });
+
+  it('ports the table and its own cases, every other case exempt', () => {
     expect(
       postgresTally(POSTGRES_RUNS, { marked: POSTGRES_MARKED, exempt: POSTGRES.exempt }),
     ).toEqual({
-      ported: 0,
-      pending: 179,
+      ported: 79,
+      pending: 100,
       'does not apply': 0,
       'owned elsewhere': 10,
       'accepted difference': 4,

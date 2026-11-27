@@ -1,5 +1,6 @@
-//! The PostgreSQL store (Storage ST-3, ADR 0177): its rows, its timestamps,
-//! its isolation, its pool and its TLS, each on a database of its own. Every
+//! The PostgreSQL store (Storage ST-3, ADR 0177): the repository contract's
+//! table (`repository_contract`), then its rows, its timestamps, its
+//! isolation, its pool and its TLS, each on a database of its own. Every
 //! test needs the server `INFINITY_CUBE_POSTGRES_TEST_URL` names, so each is
 //! ignored by default and fails, rather than passes, when run without one.
 
@@ -12,19 +13,21 @@
 
 #[allow(dead_code, reason = "each test binary uses part of the support")]
 mod postgres_support;
+mod repository_contract;
 
 use std::sync::Arc;
 use std::time::Duration;
 
 use host::{
-    CommitResult, DatabaseUrl, LoadedSpace, PoolSettings, PostgresSpaceRepository, Probe,
-    RepositoryError, SpaceChange, SpaceCommit, SpaceRepository, Step, TokioFilesystem,
+    AggregateLoad, CommitResult, DatabaseUrl, LoadedSpace, PoolSettings, PostgresSpaceRepository,
+    Probe, RepositoryError, SpaceChange, SpaceCommit, SpaceRepository, Step, TokioFilesystem,
     import_directory,
 };
 use http_conformance::Counted;
-use intake::SpaceId;
+use intake::{SpaceId, SpaceSnapshot};
 use postgres_support::stand_in::{Behaviour, StandIn};
 use postgres_support::{Fresh, rendezvous, waiting};
+use repository_contract::{BrokenState, Harness, Unprovided, repository_cases};
 use tokio::sync::Notify;
 
 /// The Presentation Space, which has two Maps.
@@ -115,6 +118,130 @@ fn pausing(store: &PostgresSpaceRepository, at: fn(&Step) -> bool) -> (Arc<Notif
     store.set_probe(Some(probe));
     (reached, release)
 }
+
+/// The contract's harness: a fresh migrated database per case, reopened as
+/// a fresh host through a new pool, as the TypeScript harness reopens
+/// through a new client (`test/integration/postgres-space-repository.test.ts`).
+struct Postgres {
+    database: Fresh,
+    store: Arc<PostgresSpaceRepository>,
+    /// The Resource writes a store closed by a reopen recorded and no call
+    /// has taken yet.
+    written: Vec<String>,
+}
+
+/// `value` as an SQL string literal.
+fn quoted(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "''"))
+}
+
+/// A Space row holding `document`, at revision 0, written past the codec.
+fn space_row(id: SpaceId, document: &str) -> String {
+    format!(
+        r#"INSERT INTO "spaces" ("id", "document", "revision", "updated_at") VALUES ({}, {}::jsonb, '0', now());"#,
+        quoted(&id.to_string()),
+        quoted(document)
+    )
+}
+
+impl Harness for Postgres {
+    type Store = PostgresSpaceRepository;
+
+    async fn open() -> Self {
+        let database = Fresh::new().await;
+        let store = Arc::new(database.open());
+        Self {
+            database,
+            store,
+            written: Vec::new(),
+        }
+    }
+
+    fn store(&self) -> &Arc<Self::Store> {
+        &self.store
+    }
+
+    async fn reopen(&mut self) -> Result<(), Unprovided> {
+        self.store.close().await;
+        self.written.extend(self.store.take_resource_writes());
+        self.store = Arc::new(self.database.open());
+        Ok(())
+    }
+
+    async fn arrange_broken_state(
+        &mut self,
+        state: BrokenState,
+        space: SpaceId,
+        other: SpaceId,
+    ) -> Result<SpaceId, Unprovided> {
+        let spaces = match state {
+            BrokenState::InvalidSpaceDocument => space_row(space, r#"{"version":1}"#),
+            BrokenState::InvalidAggregate => format!(
+                "{}{}",
+                space_row(space, r#"{"version":1,"title":"Meta"}"#),
+                space_row(other, r#"{"version":1,"title":"Unreferenced"}"#)
+            ),
+        };
+        self.database
+            .execute(&format!(
+                r#"{spaces} INSERT INTO "repository_state" ("singleton_id", "meta_space_id") VALUES (1, {});"#,
+                quoted(&space.to_string())
+            ))
+            .await;
+        Ok(space)
+    }
+
+    async fn remove_meta_identity(&mut self) -> Result<(), Unprovided> {
+        self.database
+            .execute(r#"DELETE FROM "repository_state" WHERE "singleton_id" = 1;"#)
+            .await;
+        Ok(())
+    }
+
+    async fn write_raw_revision(
+        &mut self,
+        space: SpaceId,
+        revision: &str,
+        exported: Option<Option<&str>>,
+    ) -> Result<(), Unprovided> {
+        let exported = match exported {
+            None => String::new(),
+            Some(None) => r#", "exported_revision" = NULL"#.to_owned(),
+            Some(Some(value)) => format!(r#", "exported_revision" = {}"#, quoted(value)),
+        };
+        self.database
+            .execute(&format!(
+                r#"UPDATE "spaces" SET "revision" = {}{exported} WHERE "id" = {};"#,
+                quoted(revision),
+                quoted(&space.to_string())
+            ))
+            .await;
+        Ok(())
+    }
+
+    async fn take_resource_writes(&mut self) -> Result<Vec<String>, Unprovided> {
+        let mut written = std::mem::take(&mut self.written);
+        written.extend(self.store.take_resource_writes());
+        Ok(written)
+    }
+
+    async fn recreate_before_row_lock(
+        &mut self,
+        snapshot: SpaceSnapshot,
+    ) -> Result<(), Unprovided> {
+        self.store.recreate_before_row_lock(snapshot);
+        Ok(())
+    }
+
+    async fn close(self) {
+        self.store.close().await;
+    }
+}
+
+repository_cases!(
+    super::Postgres,
+    #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+);
 
 mod given_rows_it_writes {
     use super::*;
@@ -582,5 +709,210 @@ mod given_where_its_tables_are {
         let answer = store.load_meta_space_id().await;
         store.close().await;
         assert_eq!(answer, Ok(None));
+    }
+}
+
+/// `jsonb` stores an object's keys sorted by length, then by bytes, so the
+/// content a Resource or a placement holds comes back in that order rather
+/// than the order committed. The contract compares content whatever its key
+/// order (`repository_contract::InKeyOrder`), as TypeScript's `toEqual`
+/// does; this pins the order PostgreSQL answers and what Export writes of it.
+mod given_content_jsonb_reorders {
+    use super::*;
+    use repository_contract::content::holding_a_missing_plugin;
+    use repository_contract::{
+        EMPTY_ASSET_REF, InKeyOrder as _, RESOURCE_ID, SECOND_RESOURCE_ID, SPACE_ID, seed,
+    };
+
+    const KIND: &str = "vnd.example.chart";
+
+    /// The Space committed: the missing plugin's content and its Map content
+    /// each with keys out of `jsonb`'s order, at every depth.
+    fn committed() -> SpaceSnapshot {
+        holding_a_missing_plugin(
+            "Chart",
+            KIND,
+            "Flow",
+            &format!(
+                r#"{{"source":"{EMPTY_ASSET_REF}","legend":"a longer value","options":{{"direction":"TD","at":[1,2.5,null,{{"nested":true,"id":7}}]}}}}"#
+            ),
+            Some(r#"{"zoom":2,"at":["ink",{"label":"x","id":7}]}"#),
+        )
+    }
+
+    /// The same Space with every object's keys in `jsonb`'s order.
+    fn in_jsonb_order() -> SpaceSnapshot {
+        holding_a_missing_plugin(
+            "Chart",
+            KIND,
+            "Flow",
+            &format!(
+                r#"{{"legend":"a longer value","source":"{EMPTY_ASSET_REF}","options":{{"at":[1,2.5,null,{{"id":7,"nested":true}}],"direction":"TD"}}}}"#
+            ),
+            Some(r#"{"at":["ink",{"id":7,"label":"x"}],"zoom":2}"#),
+        )
+    }
+
+    #[tokio::test]
+    #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+    async fn loads_a_missing_plugins_content_in_jsonb_order_and_exports_it_as_any_store_does() {
+        assert!(!intake::is_plugin_kind(KIND), "no plugin draws {KIND}");
+        let database = Fresh::new().await;
+        let writer = database.open();
+        seed(&writer, &[&committed()]).await;
+        writer.close().await;
+
+        let store = database.open();
+        let loaded = store
+            .load_space(space(SPACE_ID))
+            .await
+            .unwrap()
+            .expect("the Space is stored")
+            .snapshot;
+        assert_eq!(
+            loaded,
+            in_jsonb_order(),
+            "the content and Map content come back in jsonb's key order"
+        );
+        assert_eq!(
+            loaded.in_key_order(),
+            committed().in_key_order(),
+            "and hold the values committed"
+        );
+
+        let scratch = tempfile::tempdir().unwrap();
+        let from_postgres = scratch.path().join("postgres");
+        let _exported = host::export_aggregate(&store, &TokioFilesystem, &from_postgres)
+            .await
+            .unwrap();
+        store.close().await;
+        let memory = host::MemorySpaceRepository::new();
+        seed(&memory, &[&committed()]).await;
+        let from_memory = scratch.path().join("memory");
+        let _exported = host::export_aggregate(&memory, &TokioFilesystem, &from_memory)
+            .await
+            .unwrap();
+
+        let resource_file = format!("{SPACE_ID}/resources/{SECOND_RESOURCE_ID}.json");
+        for file in [
+            format!("{SPACE_ID}/space.json"),
+            format!("{SPACE_ID}/resources/{RESOURCE_ID}.json"),
+            resource_file.clone(),
+        ] {
+            assert_eq!(
+                std::fs::read(from_postgres.join(&file)).unwrap(),
+                std::fs::read(from_memory.join(&file)).unwrap(),
+                "{file}: the bytes a memory store holding the Space as committed exports"
+            );
+        }
+        assert_eq!(
+            std::fs::read_to_string(from_postgres.join(&resource_file)).unwrap(),
+            format!(
+                "{{\n  \"id\": \"{SECOND_RESOURCE_ID}\",\n  \"title\": \"Flow\",\n  \"kind\": \"{KIND}\",\n  \"content\": {{\n    \"legend\": \"a longer value\",\n    \"options\": {{\n      \"at\": [\n        1,\n        2.5,\n        null,\n        {{\n          \"id\": 7,\n          \"nested\": true\n        }}\n      ],\n      \"direction\": \"TD\"\n    }},\n    \"source\": \"{EMPTY_ASSET_REF}\"\n  }}\n}}\n"
+            ),
+            "the content no plugin owns, written in ascending key order"
+        );
+        let space_file =
+            std::fs::read_to_string(from_postgres.join(format!("{SPACE_ID}/space.json"))).unwrap();
+        assert!(
+            space_file.contains(
+                "\"content\": {\n            \"at\": [\n              \"ink\",\n              {\n                \"id\": 7,\n                \"label\": \"x\"\n              }\n            ],\n            \"zoom\": 2\n          }"
+            ),
+            "the Map content, written in ascending key order: {space_file}"
+        );
+    }
+}
+
+/// `spaces` is read in id order whatever order its rows sit in the heap.
+mod given_rows_out_of_id_order {
+    use super::*;
+    use repository_contract::{
+        commit as commit_of, retitled, seed, space_holding, space_resource, target_space,
+        update as update_at,
+    };
+
+    const META: &str = "c0000000-0000-4000-8000-0000000000f9";
+    /// The Spaces Meta links, highest id first: the order they are created,
+    /// each with the id of the Space Resource linking it.
+    const CHILDREN: [(&str, &str); 3] = [
+        (
+            "c0000000-0000-4000-8000-0000000000f8",
+            "c0000000-0000-4000-8000-0000000001f8",
+        ),
+        (
+            "c0000000-0000-4000-8000-0000000000f7",
+            "c0000000-0000-4000-8000-0000000001f7",
+        ),
+        (
+            "c0000000-0000-4000-8000-0000000000f6",
+            "c0000000-0000-4000-8000-0000000001f6",
+        ),
+    ];
+
+    #[tokio::test]
+    #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+    async fn loads_and_lists_spaces_in_ascending_id_order_whatever_their_heap_order() {
+        let database = Fresh::new().await;
+        let store = database.open();
+        seed(&store, &[&space_holding(META, "Meta", vec![])]).await;
+        let mut links = Vec::new();
+        for (expected, (child, link)) in (0..).zip(CHILDREN) {
+            links.push(space_resource(link, child));
+            let answer = store
+                .commit(commit_of(vec![
+                    update_at(&space_holding(META, "Meta", links.clone()), expected),
+                    SpaceChange::Create {
+                        space_id: space(child),
+                        snapshot: target_space(child, "Child", &[]),
+                    },
+                ]))
+                .await
+                .unwrap();
+            assert!(committed(&answer), "creating {child}: {answer:?}");
+        }
+        let lowest = CHILDREN[2].0;
+        let answer = store
+            .commit(commit_of(vec![update_at(
+                &retitled(&target_space(lowest, "Child", &[]), "Moved"),
+                0,
+            )]))
+            .await
+            .unwrap();
+        assert!(committed(&answer), "updating {lowest}: {answer:?}");
+        store.close().await;
+
+        let heap = database
+            .scalar("SELECT string_agg(id::text, ',' ORDER BY ctid) FROM spaces")
+            .await
+            .unwrap();
+        let ascending = [CHILDREN[2].0, CHILDREN[1].0, CHILDREN[0].0, META];
+        assert_ne!(
+            heap,
+            ascending.join(","),
+            "the rows sit in the heap out of id order, so a read without ORDER BY would answer them so"
+        );
+        let store = database.open();
+        let AggregateLoad::Loaded(aggregate) = store.load_aggregate().await.unwrap() else {
+            panic!("the store holds an aggregate");
+        };
+        let listed = store.list_spaces().await.unwrap();
+        store.close().await;
+        assert_eq!(
+            aggregate
+                .spaces
+                .iter()
+                .map(|loaded| loaded.snapshot.id.to_string())
+                .collect::<Vec<_>>(),
+            ascending,
+            "load_aggregate answers in ascending id order"
+        );
+        assert_eq!(
+            listed
+                .iter()
+                .map(|summary| summary.id.to_string())
+                .collect::<Vec<_>>(),
+            ascending,
+            "list_spaces answers in ascending id order"
+        );
     }
 }
