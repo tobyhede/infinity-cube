@@ -567,20 +567,7 @@ test('An edit draws a Markdown Resource at its Edit size, which a resize writes 
       width: Number.parseFloat(getComputedStyle(element).width),
       height: Number.parseFloat(getComputedStyle(element).height),
     }));
-  const stored = async () => {
-    const response = await page.request.get(`/api/spaces/${seeded.snapshot.id}`);
-    expect(response.ok()).toBe(true);
-    const loaded = z
-      .object({
-        snapshot: z.object({
-          document: z.object({
-            maps: z.array(z.object({ positions: z.record(resourcePlacementSchema) })),
-          }),
-        }),
-      })
-      .parse(await response.json());
-    return loaded.snapshot.document.maps[0]?.positions[SUBJECT.id];
-  };
+  const stored = async () => (await storedPositions(page, seeded.snapshot.id))?.[SUBJECT.id];
 
   const edit = async () => {
     await (await controls(resource)).getByRole('button', { name: 'Edit Resource A' }).click();
@@ -818,18 +805,7 @@ test('An Edit size larger than the canvas draws capped and in view, and stays st
 
   // Neither the cap nor the pan is an Edit: the Edit size stays as stored.
   await expect(persistence).toHaveAttribute('data-revision', revision);
-  const response = await page.request.get(`/api/spaces/${seeded.snapshot.id}`);
-  expect(response.ok()).toBe(true);
-  const loaded = z
-    .object({
-      snapshot: z.object({
-        document: z.object({
-          maps: z.array(z.object({ positions: z.record(resourcePlacementSchema) })),
-        }),
-      }),
-    })
-    .parse(await response.json());
-  expect(loaded.snapshot.document.maps[0]?.positions[SUBJECT.id]).toMatchObject({
+  expect((await storedPositions(page, seeded.snapshot.id))?.[SUBJECT.id]).toMatchObject({
     size: SIZE,
     editSize: EDIT_SIZE,
   });
@@ -926,18 +902,7 @@ test('An editor draws its neighbours aside without storing it, and they return w
   await expect.poll(() => positionOf(neighbour)).toEqual(stored);
   await settled(page);
   expect(await edgeEnd()).toBeCloseTo(restingEdgeEnd, 0);
-  const response = await page.request.get(`/api/spaces/${seeded.snapshot.id}`);
-  expect(response.ok()).toBe(true);
-  const loaded = z
-    .object({
-      snapshot: z.object({
-        document: z.object({
-          maps: z.array(z.object({ positions: z.record(resourcePlacementSchema) })),
-        }),
-      }),
-    })
-    .parse(await response.json());
-  expect(loaded.snapshot.document.maps[0]?.positions[NEIGHBOUR.id]).toMatchObject(stored);
+  expect((await storedPositions(page, seeded.snapshot.id))?.[NEIGHBOUR.id]).toMatchObject(stored);
 });
 
 /**
@@ -1099,6 +1064,25 @@ async function seedGeometry(
 /** The node React Flow drew for one seeded Resource. */
 const seededNode = (page: Page, resource: { readonly id: string }): Locator =>
   page.locator(`.react-flow__node[data-id="${resource.id}"]`);
+
+/** The positions a seeded Space's first Map stores, read back from the server. */
+async function storedPositions(
+  page: Page,
+  spaceId: string,
+): Promise<Record<string, z.infer<typeof resourcePlacementSchema>> | undefined> {
+  const response = await page.request.get(`/api/spaces/${spaceId}`);
+  expect(response.ok()).toBe(true);
+  const loaded = z
+    .object({
+      snapshot: z.object({
+        document: z.object({
+          maps: z.array(z.object({ positions: z.record(resourcePlacementSchema) })),
+        }),
+      }),
+    })
+    .parse(await response.json());
+  return loaded.snapshot.document.maps[0]?.positions;
+}
 
 /**
  * One seeded Resource's position out of a frame `allPositions` read.
