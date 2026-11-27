@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { diagramExtent, diagramHeightAt } from '../src/diagram-extent';
+import { diagramExtent, diagramHeightAt } from '../src/svg-size';
 
 describe('the size a drawn diagram declares', () => {
   it('reads the viewBox and the max-width Mermaid sets', () => {

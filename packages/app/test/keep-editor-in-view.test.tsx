@@ -19,7 +19,7 @@ function camera() {
   const viewport = { x: 0, y: 0, zoom: 1 };
   return {
     getViewport: () => viewport,
-    setViewport: vi.fn((_next: { x: number; y: number; zoom: number }) => undefined),
+    setViewport: vi.fn((_next: { x: number; y: number; zoom: number }) => Promise.resolve(true)),
   };
 }
 

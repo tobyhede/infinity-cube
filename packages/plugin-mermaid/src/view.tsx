@@ -39,7 +39,7 @@ import {
   type MermaidContent,
   type MermaidMapContent,
 } from './domain';
-import { diagramExtent, diagramHeightAt } from './diagram-extent';
+import { diagramExtent, diagramHeightAt } from './svg-size';
 import { renderWithMermaid, type DiagramTheme, type RenderDiagram } from './mermaid';
 
 /**

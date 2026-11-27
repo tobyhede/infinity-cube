@@ -42,6 +42,12 @@ export function editorToShow(
   return undefined;
 }
 
+/** What `panToEditor` decides: what the camera now shows, and the pan, if any. */
+export interface EditorPan {
+  readonly shown: EditorShown | undefined;
+  readonly pan?: { readonly x: number; readonly y: number };
+}
+
 /**
  * Whether the camera pans to an editor, and by how much (ADR 0178): only when
  * an edit begins or the cap changes, so a resize or a drag of the editor,
@@ -54,7 +60,7 @@ export function panToEditor(
   cap: ResourceSize | undefined,
   viewport: Viewport,
   area: { readonly width: number; readonly height: number },
-): { readonly shown: EditorShown | undefined; readonly pan?: { x: number; y: number } } {
+): EditorPan {
   if (editor === undefined || cap === undefined) return { shown: undefined };
   if (
     shown?.resourceId === editor.resourceId &&
@@ -83,7 +89,7 @@ export function useKeepEditorInView({
   readonly cap: ResourceSize | undefined;
   readonly area: { readonly width: number; readonly height: number };
   readonly getViewport: () => Viewport;
-  readonly setViewport: (viewport: Viewport) => unknown;
+  readonly setViewport: (viewport: Viewport) => Promise<boolean>;
 }): void {
   const shown = useRef<EditorShown | undefined>(undefined);
   useEffect(() => {
