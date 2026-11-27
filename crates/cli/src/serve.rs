@@ -210,7 +210,10 @@ async fn serving<R: Closing>(
     };
     if signals.pending().await {
         say(&format!("Stopped before serving {named}."));
-        return (ExitCode::SUCCESS, None);
+        return (
+            ExitCode::SUCCESS,
+            Some(std::time::Instant::now() + STOP_BOUND),
+        );
     }
 
     let repository = Arc::new(repository);
@@ -305,7 +308,7 @@ mod tests {
         shut_down(runtime, Some(begun + Duration::from_millis(200)));
         let took = begun.elapsed();
         assert!(
-            took < Duration::from_secs(5),
+            took < Duration::from_secs(1),
             "the shutdown took {took:?}, past the deadline"
         );
     }

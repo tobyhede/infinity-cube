@@ -201,10 +201,15 @@ pub fn connect_options(
         return Err(PostgresUrlError::DirectNegotiation);
     }
     let libpq = value("uselibpqcompat") == Some("true");
-    // An empty `sslcert` or `sslkey` is absent, as `pg` reads it.
-    let certificate = [value("sslcert"), value("sslkey")]
+    // An empty `sslcert` or `sslkey` is absent, as `pg` reads it, which
+    // reads the last of a repeated parameter; an absent one is handed to
+    // `sqlx` in none of its pairs.
+    let named = |name: &str| value(name).is_some_and(|file| !file.is_empty());
+    let certificate = named("sslcert") || named("sslkey");
+    let absent: Vec<&str> = ["sslcert", "sslkey"]
         .into_iter()
-        .any(|named| named.is_some_and(|file| !file.is_empty()));
+        .filter(|name| !named(name))
+        .collect();
     let mode = match (value("sslmode"), libpq) {
         (None, _) if certificate => PgSslMode::VerifyFull,
         (None, _) => match value("ssl") {
@@ -227,6 +232,7 @@ pub fn connect_options(
                 key.as_str(),
                 "sslmode" | "uselibpqcompat" | "ssl" | "sslnegotiation"
             ) && !ROOT_CERTIFICATE_PARAMETERS.contains(&key.as_str())
+                && !absent.contains(&key.as_str())
                 && !(matches!(key.as_str(), "sslcert" | "sslkey") && value.is_empty())
         })
         .cloned()
