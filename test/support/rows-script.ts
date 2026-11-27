@@ -35,6 +35,13 @@ const scriptSchema = z
           })
           .strict(),
         z.object({ commit: z.unknown() }).strict(),
+        z
+          .object({
+            markExported: z
+              .object({ spaceId: uuidSchema, revision: z.string().regex(/^(0|[1-9][0-9]*)$/) })
+              .strict(),
+          })
+          .strict(),
       ]),
     ),
   })
@@ -91,6 +98,9 @@ export const runRowsScript = async (repository: SpaceRepository): Promise<void> 
       if (asset.done === true) throw new Error('an asset for each asset step');
       const stored = await repository.storeAsset(asset.value);
       if (stored !== 'stored') throw new Error(`step ${index} stores its asset: ${stored}`);
+    } else if ('markExported' in step) {
+      const { spaceId, revision } = step.markExported;
+      await repository.markExported(spaceId, BigInt(revision));
     } else {
       const answer = await repository.commit(decodeCommitRequest(step.commit));
       if (answer.kind !== 'committed') {

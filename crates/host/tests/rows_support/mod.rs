@@ -7,8 +7,8 @@ use std::path::{Path, PathBuf};
 use bytes::Bytes;
 use host::{
     AggregateInput, AggregateLoad, AssetHash, AssetStored, CommitResult, InitializeResult,
-    MemorySpaceRepository, RepositoryError, SpaceChange, SpaceCommit, SpaceRepository, StoredAsset,
-    decode_commit,
+    MemorySpaceRepository, RepositoryError, Revision, SpaceChange, SpaceCommit, SpaceRepository,
+    StoredAsset, decode_commit,
 };
 use intake::SpaceId;
 use intake::json::{JsonValue, parse};
@@ -112,6 +112,10 @@ pub async fn run_script<R: SpaceRepository>(store: &R) {
         if step.get("asset").is_some() {
             let stored = store.store_asset(assets.next().unwrap()).await.unwrap();
             assert_eq!(stored, AssetStored::Stored, "step {index} stores its asset");
+        } else if let Some(exported) = step.get("markExported") {
+            let space_id = SpaceId::parse(text(exported, "spaceId")).unwrap();
+            let revision = Revision::new(text(exported, "revision").parse().unwrap()).unwrap();
+            store.mark_exported(space_id, revision).await.unwrap();
         } else {
             let commit = commit_of(&step.get("commit").unwrap().to_string());
             let answer = store.commit(commit).await.unwrap();
