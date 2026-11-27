@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
+import { UNAVAILABLE_SQLSTATES } from '../../src/prisma/sql-store';
 import {
   casesOf,
   describedCasesIn,
   filesUnder,
   markedIn,
   readRepositoryFile,
+  substitutedValue,
   type DescribedCase,
 } from '../support/case-names';
 
@@ -331,6 +333,58 @@ const unvalued = (
   ),
 });
 
+/** How a case's values are read from the table it runs over, where its title alone does not say. */
+interface ValueRules {
+  /** The cell of each row that is its value, where it is not what the title substitutes. */
+  readonly cells: Readonly<Record<string, string>>;
+  /** The values of a table shared by stores that another store's adapter runs. */
+  readonly otherStores: Readonly<Record<string, readonly string[]>>;
+  /** The values of a table not written in its file, read from the module that builds it. */
+  readonly runtime: Readonly<Record<string, readonly string[]>>;
+}
+
+/** The values the table of `written`, a case run once per value, holds. */
+const tableValues = (
+  written: Pick<DescribedCase, 'name' | 'table'>,
+  rules: ValueRules,
+): string[] => {
+  const given = rules.runtime[written.name];
+  if (given !== undefined) return [...given];
+  const { table } = written;
+  if (table?.rows === undefined) return ['<a table this test cannot read>'];
+  const cell = rules.cells[written.name];
+  return table.rows.map((row) =>
+    cell === undefined ? substitutedValue(table.title, row) : (row[cell] ?? '*'),
+  );
+};
+
+/**
+ * The cases run once per value whose listed values are not the values their
+ * table holds, less those another store's adapter runs: a value added to a
+ * table, or dropped from one, reaches the listed values or this answers it.
+ */
+const misvalued = (
+  cases: readonly Pick<DescribedCase, 'name' | 'perValue' | 'table'>[],
+  values: Readonly<Record<string, readonly string[]>>,
+  rules: ValueRules,
+) =>
+  cases
+    .filter(({ perValue }) => perValue)
+    .flatMap((written) => {
+      const all = tableValues(written, rules);
+      const others = rules.otherStores[written.name] ?? [];
+      const read = [
+        ...all.filter((value) => !others.includes(value)),
+        ...others
+          .filter((value) => !all.includes(value))
+          .map((value) => `<another store's value not in the table: ${value}>`),
+      ];
+      const listed = values[written.name] ?? [];
+      return read.length === listed.length && read.every((value, index) => value === listed[index])
+        ? []
+        : [{ name: written.name, listed, read }];
+    });
+
 interface PostgresMarks {
   /** The runs the adapter's files mark. */
   readonly marked: readonly string[];
@@ -428,7 +482,6 @@ const POSTGRES_SOURCES: readonly CaseSource[] = [
     file: 'test/unit/database-startup.test.ts',
     describe: 'retryMetaSpaceEstablishment over a PostgreSQL server that refuses this client',
   },
-  // Found by the plan's cold audit (00).
   { file: 'test/integration/aggregate-commit-differential.test.ts' },
   { file: 'test/integration/database-http-runtime.test.ts' },
   { file: 'test/unit/vite-hono-host.test.ts', describe: 'Database HTTP runtime' },
@@ -537,6 +590,28 @@ const POSTGRES_VALUES = {
   // test/integration/database-cli-targets.test.ts, the PostgreSQL arm of its `describe.each`
   'imports and exports the same aggregate through the store --store names': ['PostgreSQL'],
 } satisfies Readonly<Record<string, readonly string[]>>;
+
+/**
+ * How the values of the sources' per-value cases are read from their tables.
+ * The contract's loops are not tables the reader reads: the count of
+ * `CONTRACT_RUNS` pins their values.
+ */
+const POSTGRES_VALUE_RULES: ValueRules = {
+  cells: {
+    // Each row of its `describe.each` is a label, then the SQLSTATE that is its value.
+    'leaves the transactional aggregate read unclassified with the raw handshake refusal': '1',
+    'leaves a direct read unclassified with the normalised refusal': '1',
+  },
+  otherStores: Object.fromEntries(
+    [
+      'establishes Default Content and serves the collection and Meta Space',
+      'recovers through the shared retry after a transient startup failure',
+      'gives up through the shared retry after two confirmed invariant failures',
+      'imports and exports the same aggregate through the store --store names',
+    ].map((name) => [name, ['SQLite']]),
+  ),
+  runtime: { 'recognises SQLSTATE %s on a statement the driver normalised': UNAVAILABLE_SQLSTATES },
+};
 
 const POSTGRES_RUNS = runsOf(POSTGRES_CASES, POSTGRES_VALUES);
 
@@ -935,6 +1010,16 @@ describe('the repository cases the Rust PostgreSQL repository is held to', () =>
     expect(unvalued(POSTGRES_CASES, POSTGRES_VALUES)).toEqual({ unlisted: [], unknown: [] });
   });
 
+  it('lists, for each case of a source run once per value, the values its table holds', () => {
+    expect(
+      misvalued(
+        POSTGRES_SOURCE_CASES.flatMap(({ cases }) => cases),
+        POSTGRES_VALUES,
+        POSTGRES_VALUE_RULES,
+      ),
+    ).toEqual([]);
+  });
+
   it('give the adapter 193 runs, one per value of each case run once per value', () => {
     expect(POSTGRES_RUNS).toHaveLength(193);
   });
@@ -1090,10 +1175,22 @@ describe('the case reader', () => {
 
   it('reads every case with the describe blocks around it, outermost first', () => {
     expect(describedCasesIn('example.ts', source)).toEqual([
-      { name: 'names %s', line: 2, describes: ['postgres'], perValue: true },
+      {
+        name: 'names %s',
+        line: 2,
+        describes: ['postgres'],
+        perValue: true,
+        table: { title: 'names %s', rows: [{ 0: 'a' }, { 0: 'b' }] },
+      },
       { name: 'shared name', line: 3, describes: ['postgres'], perValue: false },
       { name: 'shared name', line: 6, describes: ['sqlite'], perValue: false },
-      { name: 'runs per value', line: 10, describes: ['given %s', 'inner'], perValue: true },
+      {
+        name: 'runs per value',
+        line: 10,
+        describes: ['given %s', 'inner'],
+        perValue: true,
+        table: { title: 'given %s', rows: [{ 0: 'x' }] },
+      },
       { name: 'top', line: 14, describes: [], perValue: false },
     ]);
   });
@@ -1111,6 +1208,55 @@ describe('the case reader', () => {
     expect(
       describedCasesIn('example.ts', "it.each([{ a: 1 }])('after $a', () => {});")[0]?.perValue,
     ).toBe(true);
+  });
+
+  it('runs a case once per value when its name takes only the row index', () => {
+    expect(
+      describedCasesIn('example.ts', "it.each(['a'])('case %#', () => {});")[0]?.perValue,
+    ).toBe(true);
+    expect(
+      describedCasesIn('example.ts', "it.each(['a'])('case %$', () => {});")[0]?.perValue,
+    ).toBe(true);
+  });
+
+  it("reads the table a case runs over, with the name that substitutes each row's values", () => {
+    const tables = describedCasesIn(
+      'example.ts',
+      [
+        "import { CODES } from './codes';",
+        "const arms = targetCases([{ name: 'PostgreSQL', open }, { name: 'SQLite', open }]);",
+        "it.each([['a', 1, value], ['b', 2, value]] as const)('pairs %s with %d', () => {});",
+        "it.each(['x', `y`])('names %s', () => {});",
+        "describe.each(arms)('given $name', () => { it('runs per arm', () => {}); });",
+        "it.each(CODES)('recognises %s', () => {});",
+      ].join('\n'),
+    ).map(({ name, table }) => [name, table]);
+    expect(tables).toEqual([
+      [
+        'pairs %s with %d',
+        {
+          title: 'pairs %s with %d',
+          rows: [
+            { 0: 'a', 1: '1' },
+            { 0: 'b', 1: '2' },
+          ],
+        },
+      ],
+      ['names %s', { title: 'names %s', rows: [{ 0: 'x' }, { 0: 'y' }] }],
+      [
+        'runs per arm',
+        { title: 'given $name', rows: [{ name: 'PostgreSQL' }, { name: 'SQLite' }] },
+      ],
+      ['recognises %s', { title: 'recognises %s', rows: undefined }],
+    ]);
+  });
+
+  it('fills a name with the values of each row it substitutes', () => {
+    expect(substitutedValue('pairs %s with %d', { 0: 'a', 1: '1' })).toBe('a, 1');
+    expect(
+      substitutedValue('after $boundary with $expected', { boundary: 'b', expected: 'e' }),
+    ).toBe('b, e');
+    expect(substitutedValue('names %s', { 1: 'unread' })).toBe('*');
   });
 });
 
@@ -1147,6 +1293,57 @@ describe('the PostgreSQL port check', () => {
       unlisted: [],
       unknown: ['ported', 'gone'],
     });
+  });
+
+  it("finds a case whose listed values are not its table's", () => {
+    const read = describedCasesIn(
+      'example.ts',
+      [
+        "it.each(['53300', '57P03', '57P04'])('names %s', () => {});",
+        "describe.each([['a label', '28P01']])('given %s', () => { it('refuses', () => {}); });",
+        "describe.each([{ name: 'PostgreSQL' }, { name: 'SQLite' }, { name: 'MySQL' }])('($name)', () => { it('serves', () => {}); });",
+        "it.each(CODES)('recognises %s', () => {});",
+        "it.each(['a'])('listed right %s', () => {});",
+      ].join('\n'),
+    );
+    const values = {
+      'names %s': ['53300', '57P03'],
+      refuses: ['28P01'],
+      serves: ['PostgreSQL'],
+      'recognises %s': ['08000'],
+      'listed right %s': ['a'],
+    };
+    const rules: ValueRules = {
+      cells: { refuses: '1' },
+      otherStores: { serves: ['SQLite'] },
+      runtime: { 'recognises %s': ['08000', '08001'] },
+    };
+    expect(misvalued(read, values, rules)).toEqual([
+      { name: 'names %s', listed: ['53300', '57P03'], read: ['53300', '57P03', '57P04'] },
+      { name: 'serves', listed: ['PostgreSQL'], read: ['PostgreSQL', 'MySQL'] },
+      { name: 'recognises %s', listed: ['08000'], read: ['08000', '08001'] },
+    ]);
+    expect(
+      misvalued(read, values, { ...rules, cells: {}, otherStores: { serves: ['SQLite', 'Gone'] } }),
+    ).toEqual([
+      { name: 'names %s', listed: ['53300', '57P03'], read: ['53300', '57P03', '57P04'] },
+      { name: 'refuses', listed: ['28P01'], read: ['a label'] },
+      {
+        name: 'serves',
+        listed: ['PostgreSQL'],
+        read: ['PostgreSQL', 'MySQL', "<another store's value not in the table: Gone>"],
+      },
+      { name: 'recognises %s', listed: ['08000'], read: ['08000', '08001'] },
+    ]);
+  });
+
+  it('finds a case run once per value whose table is neither read nor given', () => {
+    const read = describedCasesIn('example.ts', "it.each(CODES)('recognises %s', () => {});");
+    expect(
+      misvalued(read, { 'recognises %s': ['08000'] }, { cells: {}, otherStores: {}, runtime: {} }),
+    ).toEqual([
+      { name: 'recognises %s', listed: ['08000'], read: ['<a table this test cannot read>'] },
+    ]);
   });
 
   it('finds the values of every case under a describe.each unlisted when they are dropped', () => {
