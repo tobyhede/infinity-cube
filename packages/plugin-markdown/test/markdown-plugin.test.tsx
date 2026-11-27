@@ -522,6 +522,26 @@ describe('the Markdown plugin’s view', () => {
     expect(rendered.commits.map).toEqual([]);
   });
 
+  it('Saves from Closed on Mod-Enter, leaving it Closed', async () => {
+    const rendered = renderPlugin(markdownPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
+      content,
+      map: closed,
+      title: 'Notes',
+      grants: editable,
+      assets: { ...reading({ [TEXT_REF]: 'Old' }), store: () => Promise.resolve(SAVED_REF) },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
+    const source = await screen.findByRole('textbox', { name: 'Markdown source of Notes' });
+    fireEvent.change(source, { target: { value: 'New' } });
+    fireEvent.keyDown(source, { key: 'Enter', ctrlKey: true });
+    await waitFor(() => expect(screen.queryByRole('textbox')).toBeNull());
+    expect(rendered.commits.content).toEqual([{ url: SAVED_REF }]);
+    expect(rendered.commits.map).toEqual([]);
+    expect(document.querySelector('[data-open]')).toHaveAttribute('data-open', 'false');
+    expect(rendered.commits.claims.released).toBe(1);
+  });
+
   it('reads nothing more for an edit from Closed once its Save lands', async () => {
     const reads: AssetRef[] = [];
     const texts = reading({ [TEXT_REF]: 'Old' });
