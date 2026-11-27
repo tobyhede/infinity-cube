@@ -81,6 +81,31 @@ impl MemorySpaceRepository {
         Self::default()
     }
 
+    /// A store holding `aggregate` as given, each Space at its own revision
+    /// and exported revision, as the TypeScript memory backend is built from
+    /// the Spaces it holds (`MemorySpaceBackend`). Its Resources are held in
+    /// ascending id order (Storage ST-21), and nothing else is checked: it
+    /// is how a test puts a Space at a revision no sequence of commits
+    /// reaches, such as the ceiling.
+    #[must_use]
+    pub fn holding(aggregate: LoadedAggregate) -> Self {
+        let spaces = aggregate
+            .spaces
+            .into_iter()
+            .map(|mut space| {
+                space.snapshot = in_id_order(space.snapshot);
+                (space.snapshot.id, space)
+            })
+            .collect();
+        Self {
+            state: Mutex::new(State {
+                spaces,
+                meta_space_id: Some(aggregate.meta_space_id),
+                assets: HashMap::new(),
+            }),
+        }
+    }
+
     fn state(&self) -> MutexGuard<'_, State> {
         // No code holding the lock can panic part-way through a change, so a
         // poisoned lock still guards consistent state.
