@@ -3,6 +3,8 @@ import './tailwind.css';
 import '@xyflow/react/dist/style.css';
 import './styles.css';
 import './theme-dark.css';
+import { askedForPrototypeFont } from './prototype-opendyslexic/prototype-font';
+import { PrototypeFontBar } from './prototype-opendyslexic/PrototypeFontBar';
 import { createSpaceStartup } from './space';
 import { Application } from './components/Application';
 import { createBrowserFullscreen } from './browser-fullscreen';
@@ -13,6 +15,12 @@ import { ColorSchemeContext } from './color-scheme';
 const rootElement = document.getElementById('root');
 if (!rootElement) throw new Error('Root element #root not found');
 
+const prototypeFont = import.meta.env.DEV && askedForPrototypeFont();
+if (prototypeFont) {
+  void import('./prototype-opendyslexic/install').then(({ installPrototypeFont }) => {
+    installPrototypeFont();
+  });
+}
 const colorScheme = createBrowserColorScheme(window);
 const root = createRoot(rootElement);
 const spaceStartup = createSpaceStartup(
@@ -27,5 +35,6 @@ const spaceStartup = createSpaceStartup(
 root.render(
   <ColorSchemeContext.Provider value={colorScheme}>
     <Application resolve={() => spaceStartup.resolve(window.location.pathname)} />
+    {prototypeFont ? <PrototypeFontBar /> : null}
   </ColorSchemeContext.Provider>,
 );

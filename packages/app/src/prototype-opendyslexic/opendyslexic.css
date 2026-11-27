@@ -1,0 +1,61 @@
+/*
+ * PROTOTYPE, throwaway. Question: how does OpenDyslexic look and feel as the
+ * dark-mode typeface? Three variants, picked by `?font=` on any product URL in a dev
+ * build and remembered for the tab (install.ts loads this file only then):
+ *   A  control: dark mode keeps the system sans (what main does)
+ *   B  OpenDyslexic for everything drawn in dark mode, chrome included
+ *   C  OpenDyslexic for Resource content only (titles, Markdown, the Stage);
+ *      the Dock, menus and rails keep the system sans
+ * Light mode is never changed. Code and source stay monospace in every variant.
+ *
+ * The font files are OpenDyslexic 3 (Version 1.000), Regular and Bold TTF, as
+ * the author distributes them on itch.io, unmodified and bundled here rather
+ * than hot-linked. It has no italic, so the browser slants Regular. Licence:
+ * SIL Open Font License 1.1, Reserved Font Name "OpenDyslexic" (fonts/OFL.txt).
+ * The faces are registered from prototype-font.ts through the FontFace API.
+ */
+
+:root {
+  --prototype-dyslexic-font: 'OpenDyslexic', ui-sans-serif, system-ui, sans-serif;
+}
+
+/* B: everything. Form controls set their own font in some browsers.
+   opendyslexic.org sets two things beside the family: 0.07rem of tracking on
+   body, and a 1.75rem line height on its article text. B and C match it; the
+   `*` arms reach text whose own rule sets a tracking, such as canvas titles. */
+:root[data-theme='dark'][data-prototype-font='B'] body,
+:root[data-theme='dark'][data-prototype-font='B'] body *,
+:root[data-theme='dark'][data-prototype-font='B'] :is(button, input, textarea, select) {
+  font-family: var(--prototype-dyslexic-font);
+  letter-spacing: 0.07rem;
+}
+
+/* C: Resource content only. */
+:root[data-theme='dark'][data-prototype-font='C']
+  :is(.canvas-resource, .markdown-resource-body, .stage__body),
+:root[data-theme='dark'][data-prototype-font='C']
+  :is(.canvas-resource, .markdown-resource-body, .stage__body)
+  * {
+  font-family: var(--prototype-dyslexic-font);
+  letter-spacing: 0.07rem;
+}
+
+/* The site's article line height, 1.75rem on its 1rem text, as a ratio so the
+   Stage's larger text keeps the same proportion. */
+:root[data-theme='dark']:is([data-prototype-font='B'], [data-prototype-font='C'])
+  :is(.markdown-resource-body, .stage__body) {
+  line-height: 1.75;
+}
+
+/* OpenDyslexic is wide and tall; the variants keep the app's sizes so the
+   comparison is honest about overflow. Monospace stays monospace. */
+:root[data-theme='dark']:is([data-prototype-font='B'], [data-prototype-font='C'])
+  :is(code, pre, kbd, samp) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: normal;
+}
+
+/* The prototype's own bar keeps the app's tracking. */
+:root[data-theme='dark'][data-prototype-font] [data-prototype-font-bar] * {
+  letter-spacing: normal;
+}
