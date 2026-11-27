@@ -17,3 +17,5 @@
 ## Comments
 
 **2026-11-26.** Built on PR #540 as #528's 04, 05, 06 and 12, written in this ticket's table shape by agreement with that PR's thread (01's Comments). This plan's 03 and 06 build on the table once #540 merges; this ticket resolves when it does, after checking each box and named mutant against what landed.
+
+**2026-11-28, implement-tickets run.** Built on PR #557 (`feat/rust-postgresql-store-02-one-rust-repository-contract`, based on `main`, head `08468cdd`). Every acceptance criterion is met by the build's own account, and `CI passed` is green. The independent review found three issues, fixed in round 1 and confirmed by the audit: Resource writes are recorded through `Shared::insert_resource` and `Shared::upsert_resource` (`a759283b`); `repository_cases!` gains an `every_member` mode that SQLite's harness uses, so a member that cannot be provided fails (`08468cdd`); and the `take_resource_writes` doc matches `sql.rs`. Nothing is open. What remains is the maintainer's: mark the PR ready and merge it. Do not rebuild this ticket. #559 (03) is based on this branch.
