@@ -276,8 +276,6 @@ type PostgresExemption =
   | { readonly kind: 'owned elsewhere'; readonly ticket: string }
   | { readonly kind: 'accepted difference'; readonly decision: string };
 
-type ExemptionKind = PostgresExemption['kind'];
-
 const pending = (ticket: PlanTicket): PostgresExemption => ({ kind: 'pending', ticket });
 
 const doesNotApplyOnPostgres = (reason: keyof typeof DOES_NOT_APPLY): PostgresExemption => ({
@@ -364,11 +362,19 @@ const postgresFindings = (runs: readonly Run[], { marked, exempt, elsewhere }: P
 });
 
 /** How many runs are ported, and how many each kind of exemption holds. */
+interface Tally {
+  ported: number;
+  pending: number;
+  'does not apply': number;
+  'owned elsewhere': number;
+  'accepted difference': number;
+}
+
 const postgresTally = (
   runs: readonly Run[],
   { marked, exempt }: Pick<PostgresMarks, 'marked' | 'exempt'>,
-): Record<'ported' | ExemptionKind, number> => {
-  const tally: Record<'ported' | ExemptionKind, number> = {
+): Tally => {
+  const tally: Tally = {
     ported: 0,
     pending: 0,
     'does not apply': 0,
@@ -537,7 +543,7 @@ const POSTGRES_RUNS = runsOf(POSTGRES_CASES, POSTGRES_VALUES);
 const CHANGE_ORDER =
   "a commit's answer does not depend on the order of its changes (ADR 0176, Storage ST-20; carried over from #528)";
 
-const POSTGRES_EXEMPT: Readonly<Record<string, PostgresExemption>> = {
+const POSTGRES_EXEMPT = {
   // The contract: the table (02), run on PostgreSQL by 06.
   ...exemptEach(
     [
@@ -796,7 +802,7 @@ const POSTGRES_EXEMPT: Readonly<Record<string, PostgresExemption>> = {
     ],
     ownedElsewhere('rust-host 17 and 26: the CLI’s import and export against a store'),
   ),
-};
+} satisfies Readonly<Record<string, PostgresExemption>>;
 
 /** An adapter: the table, and the files its own ports are written in. */
 interface Port {
