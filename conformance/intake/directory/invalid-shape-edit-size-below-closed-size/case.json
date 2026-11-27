@@ -1,0 +1,18 @@
+{
+  "description": "An Edit size one below the Closed Size (260 by 146) on each axis in turn: each is one refusal at that axis, as for size; the Closed Size itself is accepted on the other.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "invalid-shape",
+        "file": "10000000-0000-4000-8000-000000000001/space.json",
+        "field": "maps.0.positions.00000000-0000-4000-8000-000000000101.editSize.width"
+      },
+      {
+        "kind": "invalid-shape",
+        "file": "10000000-0000-4000-8000-000000000001/space.json",
+        "field": "maps.0.positions.00000000-0000-4000-8000-000000000102.editSize.height"
+      }
+    ]
+  }
+}

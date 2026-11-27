@@ -140,6 +140,16 @@ export type AuthoringCompletion =
       readonly size: { readonly width: number; readonly height: number };
     }
   /**
+   * Resize the editor: the Edit size the canvas draws one Resource at while
+   * its plugin edits it in place (ADR 0178). Its `size` is kept and nothing is
+   * displaced.
+   */
+  | {
+      readonly kind: 'resized-editor';
+      readonly resourceId: ResourceId;
+      readonly editSize: { readonly width: number; readonly height: number };
+    }
+  /**
    * Change Map content: what one Resource's plugin keeps for it on the Map the
    * Edit is written into (ADR 0142), as an Ur Resource keeps its Shape (ADR
    * 0121). Its plugin's schema decides what is accepted; the value the plugin is
@@ -291,6 +301,7 @@ type MapRequiredOperation = Extract<
   | { readonly kind: 'added-resource-to-map' }
   | { readonly kind: 'removed-resource-from-map' }
   | { readonly kind: 'resized-resource' }
+  | { readonly kind: 'resized-editor' }
   | { readonly kind: 'changed-map-content' }
   | { readonly kind: 'renamed-map' }
   | { readonly kind: 'renamed-graph' }
@@ -1265,6 +1276,15 @@ export function createSpaceAuthoring({
       snapshot = { ...snapshot, resources };
     } else if (completion.kind === 'resized-resource') {
       const outcome = SnapshotEdit.resize(snapshot, mapId, completion.resourceId, completion.size);
+      if (outcome.kind !== 'completed') return notCompleted(outcome);
+      snapshot = outcome.snapshot;
+    } else if (completion.kind === 'resized-editor') {
+      const outcome = SnapshotEdit.resizeEditor(
+        snapshot,
+        mapId,
+        completion.resourceId,
+        completion.editSize,
+      );
       if (outcome.kind !== 'completed') return notCompleted(outcome);
       snapshot = outcome.snapshot;
     } else if (completion.kind === 'changed-map-content') {

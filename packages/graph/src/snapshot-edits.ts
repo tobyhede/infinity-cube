@@ -35,8 +35,8 @@ import { Placement } from './placement';
  *
  * Operations arrive with their first real caller rather than ahead of one.
  * Both callers create and delete through `createInMap` and `deleteFromSpace`;
- * `resize`, `changeMapContent`, `addToMap` and `removeFromMap` are Space
- * Authoring's alone.
+ * `resize`, `resizeEditor`, `changeMapContent`, `addToMap` and
+ * `removeFromMap` are Space Authoring's alone.
  */
 
 /** Why a `SnapshotEdit` operation refused, with the typed context a sentence needs. */
@@ -286,6 +286,12 @@ const refused = (refusal: SnapshotEditRefusal): SnapshotEditOutcome => ({
 
 const UNCHANGED: SnapshotEditOutcome = { kind: 'unchanged' };
 
+/** Round each axis to a whole number and floor it at the Closed Size. */
+const flooredSize = (size: Extent): Extent => ({
+  width: Math.max(Math.round(size.width), COLLAPSED_RESOURCE_SIZE.width),
+  height: Math.max(Math.round(size.height), COLLAPSED_RESOURCE_SIZE.height),
+});
+
 /**
  * Resize a Resource in one Map, moving the Resources clear of it by the change
  * from the size it had (ADR 0084, ADR 0093). The size is written even when it
@@ -310,6 +316,37 @@ function resize(
     size: { width: size.width, height: size.height },
   });
   return withPlacement(snapshot, mapId, Placement.displace(resized, resourceId, before, size));
+}
+
+/**
+ * Write a Resource's Edit size in one Map (ADR 0178): the size the canvas
+ * draws it at while its plugin edits it in place. Its `size`, its Map content
+ * and every other Resource are kept, so nothing is displaced. `unchanged` for
+ * the Edit size it already stores. Each axis is rounded and floored at the
+ * Closed Size, so a value below it is written at the floor rather than refused.
+ */
+function resizeEditor(
+  snapshot: SpaceSnapshot,
+  mapId: UUID,
+  resourceId: UUID,
+  editSize: Extent,
+): SnapshotEditOutcome {
+  const placed = placedIn(snapshot, mapId);
+  if ('code' in placed) return refused(placed);
+  const at = placed.placement.get(resourceId);
+  if (at === undefined) return refused({ code: 'resource-not-in-map' });
+  if (!snapshot.resources.some((resource) => resource.id === resourceId)) {
+    return refused({ code: 'resource-not-found' });
+  }
+  const floored = flooredSize(editSize);
+  if (at.editSize?.width === floored.width && at.editSize.height === floored.height) {
+    return UNCHANGED;
+  }
+  return withPlacement(
+    snapshot,
+    mapId,
+    Placement.place(placed.placement, resourceId, { ...at, editSize: floored }),
+  );
 }
 
 /**
@@ -351,10 +388,7 @@ function changeMapContent(
   if (sizeHint === undefined || at.size !== undefined || written.kind !== 'completed') {
     return written;
   }
-  const resized = resize(written.snapshot, mapId, resourceId, {
-    width: Math.max(Math.round(sizeHint.width), COLLAPSED_RESOURCE_SIZE.width),
-    height: Math.max(Math.round(sizeHint.height), COLLAPSED_RESOURCE_SIZE.height),
-  });
+  const resized = resize(written.snapshot, mapId, resourceId, flooredSize(sizeHint));
   return resized.kind === 'completed' ? resized : written;
 }
 
@@ -429,6 +463,7 @@ export const SnapshotEdit = {
   createInMap,
   deleteFromSpace,
   resize,
+  resizeEditor,
   changeMapContent,
   addToMap,
   removeFromMap,
