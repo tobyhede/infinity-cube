@@ -95,8 +95,9 @@ impl Aggregates {
 /// directory and tell the close-wait decision the write has ended.
 fn spawn_stop(app: &AppHandle, label: String, directory: PathBuf, server: AggregateServer) {
     let handle = app.clone();
-    let kept = label.clone();
     let (written, ended) = std::sync::mpsc::channel();
+    // Kept before the stop can end, so it is never kept for a close already over.
+    app.state::<Aggregates>().registry().stopping(&label, ended);
     let _stop = thread::spawn(move || {
         let failed = server.stop();
         // An exit waits for this, never for the dialog below, which needs
@@ -110,7 +111,6 @@ fn spawn_stop(app: &AppHandle, label: String, directory: PathBuf, server: Aggreg
         aggregates.registry().closed(&label);
         handle.state::<Closings>().send(Event::WriteFinished(label));
     });
-    app.state::<Aggregates>().registry().stopping(&kept, ended);
 }
 
 /// Do what the close-wait decision decided.

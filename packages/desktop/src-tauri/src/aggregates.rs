@@ -208,8 +208,7 @@ impl<S> Registry<S> {
     }
 
     /// Window `label`'s stop answers `written` once its last write lands.
-    /// A close that has already ended, or was abandoned, keeps nothing; one
-    /// whose write landed before this call keeps a signal already answered.
+    /// A close that has already ended, or was abandoned, keeps nothing.
     pub fn stopping(&mut self, label: &str, written: Receiver<()>) {
         if let Some(closing) = self.closing_mut(label)
             && !closing.abandoned
@@ -596,6 +595,20 @@ mod tests {
             assert!(
                 registry.take_for_exit().writing.is_empty(),
                 "the presenter gave up on that write, so the exit does not wait for it"
+            );
+        }
+
+        #[test]
+        fn a_signal_kept_after_close_without_saving_is_not_waited_for() {
+            let (mut registry, label) = open("/spaces/rust", "server");
+            let _ = registry.begin_close(&label);
+            registry.abandon_close(&label);
+            let (_landed, written) = channel();
+            registry.stopping(&label, written);
+
+            assert!(
+                registry.take_for_exit().writing.is_empty(),
+                "the presenter gave up on that write before its signal came"
             );
         }
 
