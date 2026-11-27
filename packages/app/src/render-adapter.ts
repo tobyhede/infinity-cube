@@ -755,9 +755,11 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
       // the proposed rect on (`ResourceNode`), so that change is never produced and
       // this store never has a split frame to refuse. The draft is what makes
       // the resized Resource, its handles and its Edges one publication — and only
-      // those: its neighbours are drawn from the authored placement and do not
-      // move until the Edit lands (ADR 0084). `SpaceCanvas.test.tsx` drives the
-      // real control and holds the whole gesture to proposing nothing here.
+      // those: its neighbours are drawn where the draft began them, at the Map's
+      // positions or aside from them by an in-place editor (ADR 0178), and the
+      // resize moves none of them until the Edit lands (ADR 0084).
+      // `SpaceCanvas.test.tsx` drives the real control and holds the whole
+      // gesture to proposing nothing here.
       const relevant = changes.filter((change) => !('id' in change) || owned.has(change.id));
       if (relevant.length === 0) return;
 

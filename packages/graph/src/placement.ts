@@ -301,10 +301,11 @@ function roomAxis(at: MapPosition, subject: MapPosition, before: Extent): 'x' | 
  * This is the whole of displacement (ADR 0084, ADR 0093). Resizing a Resource
  * applies it as part of the Resize Edit, and the coordinates it writes are
  * authored ones with the same standing as any other. Between Edits nothing
- * derives anything: the Map's positions are what the canvas draws, except that
- * while a Resource is edited in place the canvas draws the Resources its drawn
- * rect passes displaced by this rule, storing none of it (ADR 0178). Open,
- * Close, a Shape and removal change no size, so they displace nobody.
+ * here derives anything. The app's canvas also applies this rule to draw the
+ * Resources an in-place editor passes aside, storing none of it (ADR 0178;
+ * `packages/app/test/render-adapter.test.ts` › "draws the Resources it passes
+ * aside, by the Resize rule, and stores none of it"). Open, Close, a Shape and
+ * removal change no size, so they displace nobody.
  *
  * Which Resources move, and on which one axis, is {@link roomAxis}. The subject is
  * never clear of itself, so it never moves, and its own entry is not written

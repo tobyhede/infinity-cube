@@ -903,14 +903,17 @@ test('An editor draws its neighbours aside without storing it, and they return w
     resource.locator('.react-flow__resize-control.handle.bottom.right'),
     'resize control',
   );
+  // The status reads Persisted at the revision seeded before the resize, and
+  // the resize adds exactly one revision.
+  await expect(persistence).toHaveText('Persisted');
+  await expect(persistence).toHaveAttribute('data-revision', revision);
   await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
   await page.mouse.down();
   await page.mouse.move(handle.x + handle.width / 2 + 100, handle.y + handle.height / 2 + 40, {
     steps: 5,
   });
   await page.mouse.up();
-  // The resize is one revision; the status read Persisted before it began.
-  await expect(persistence).not.toHaveAttribute('data-revision', revision);
+  await expect(persistence).toHaveAttribute('data-revision', String(Number(revision) + 1));
   await expect(persistence).toHaveText('Persisted');
   await expect.poll(async () => (await positionOf(neighbour)).x).toBeGreaterThan(740);
   await expect(textbox).toBeVisible();
