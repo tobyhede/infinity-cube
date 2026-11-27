@@ -125,6 +125,8 @@ describe('the view entry a plugin draws with', () => {
     const view = Object.keys(await import('@project/resource-api/view'));
     const host = Object.keys(await import('@project/resource-api/view/host'));
     expect(view.sort()).toEqual([
+      'CloseIcon',
+      'OpenIcon',
       'Own',
       'RAIL_BAND',
       'Rail',

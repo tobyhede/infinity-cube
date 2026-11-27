@@ -361,6 +361,45 @@ export interface SourceEditorProps {
  */
 export const RAIL_BAND = 30;
 
+/**
+ * The glyph of the rail command that Opens a Resource: show its detail.
+ *
+ * Lucide's `AlignJustify` artwork, three full lines, drawn here rather than
+ * imported because the Resource API depends on no icon library and its pair,
+ * `CloseIcon`, is not a Lucide glyph. Both are 14px, as every rail glyph is.
+ */
+export const OpenIcon = () => <ResourceLines middle />;
+
+/**
+ * The glyph of the rail command that Closes a Resource: back to its summary.
+ *
+ * `OpenIcon` without its middle line. No Lucide glyph says "this Resource's
+ * summary, not its detail", a meaning only InfinityCube's Open and Closed
+ * Resources have, so this is a custom glyph by UI-3.
+ */
+export const CloseIcon = () => <ResourceLines middle={false} />;
+
+function ResourceLines({ middle }: { readonly middle: boolean }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={14}
+      height={14}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3 5h18" />
+      {middle ? <path d="M3 12h18" /> : null}
+      <path d="M3 19h18" />
+    </svg>
+  );
+}
+
 /** The words of a settled commit's refusal, or `null` where it completed or changed nothing. */
 export const refusalOf = (answer: Answer): string | null =>
   answer === 'completed' || answer === 'unchanged' ? null : answer.refused;

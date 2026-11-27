@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
-import { Box, Check, Eye, EyeOff, Pencil } from 'lucide-react';
+import { Box, Check, Pencil } from 'lucide-react';
 import { titleName, type Answer, type Kept } from '@project/resource-api/domain';
 import {
+  CloseIcon,
   definePluginView,
+  OpenIcon,
   Rail,
   refusalOf,
   Title,
@@ -148,7 +150,7 @@ function SpacePluginView({ surface }: PluginViewProps<SpaceContent, SpaceMapCont
             kind: 'action',
             id: 'open-close',
             label: `Close Resource ${name}`,
-            icon: <EyeOff size={14} />,
+            icon: <CloseIcon />,
             run: () => {
               // A Closed face draws no Done, so Close ends the Edit first.
               setHeld(null);
@@ -159,7 +161,7 @@ function SpacePluginView({ surface }: PluginViewProps<SpaceContent, SpaceMapCont
             kind: 'action',
             id: 'open-close',
             label: `Open Resource ${name}`,
-            icon: <Eye size={14} />,
+            icon: <OpenIcon />,
             run: () => toggle({ open: true }),
           },
     ];

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { z } from 'zod';
-import { Check, Eye, EyeOff, Pencil, StickyNote, X } from 'lucide-react';
+import { Check, Pencil, StickyNote, X } from 'lucide-react';
 import {
   isStoredAsset,
   lineFeedText,
@@ -8,7 +8,9 @@ import {
   type AssetRef,
 } from '@project/resource-api/domain';
 import {
+  CloseIcon,
   definePluginView,
+  OpenIcon,
   Own,
   Rail,
   refusalOf,
@@ -292,7 +294,7 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
         kind: 'action',
         id: 'open-close',
         label: `${opens ? 'Open' : 'Close'} Resource ${name}`,
-        icon: opens ? <Eye size={14} /> : <EyeOff size={14} />,
+        icon: opens ? <OpenIcon /> : <CloseIcon />,
       }) as const;
     if (editing !== null) {
       return [

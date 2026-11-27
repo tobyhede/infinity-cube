@@ -1,8 +1,10 @@
 import { useMemo, useState, type CSSProperties } from 'react';
-import { Link, Eye, EyeOff } from 'lucide-react';
+import { Link } from 'lucide-react';
 import { titleName } from '@project/resource-api/domain';
 import {
+  CloseIcon,
   definePluginView,
+  OpenIcon,
   Rail,
   refusalOf,
   Title,
@@ -56,14 +58,14 @@ function ReferenceView({ surface }: PluginViewProps<ReferenceContent, ReferenceM
             kind: 'action',
             id: 'open-close',
             label: `Close Resource ${name}`,
-            icon: <EyeOff size={14} />,
+            icon: <CloseIcon />,
             run: () => toggle({ open: false }),
           }
         : {
             kind: 'action',
             id: 'open-close',
             label: `Open Resource ${name}`,
-            icon: <Eye size={14} />,
+            icon: <OpenIcon />,
             run: () => toggle({ open: true }),
           },
     ];
