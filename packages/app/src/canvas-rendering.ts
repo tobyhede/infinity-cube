@@ -35,6 +35,10 @@ export interface CanvasRendering {
   readonly editingEmbeddedMap: boolean;
   /** The Resources edited in place on this canvas's Map (ADR 0178). */
   readonly editors: RenderAdapterState['editors'];
+  /** The most an editor is drawn at (`ResourceResize.drawEditors`). */
+  readonly editorCap: RenderAdapterState['editorCap'];
+  /** The Map's placement with each editor at the rect it is drawn at (`editorPlacement`). */
+  readonly drawnPlacement: Placement;
   /** What the placed Map projects to, or `null` while no strategy has resolved. */
   readonly projected: CanvasNodesAndEdges | null;
   readonly canvas: CanvasContent;
@@ -122,6 +126,8 @@ export function useCanvasRendering(
     hasResourcesOnCanvas,
     editingEmbeddedMap,
     editors,
+    editorCap,
+    drawnPlacement,
     projected,
     canvas: canvasContent(placement, hasResourcesOnCanvas),
     changeNodes,
