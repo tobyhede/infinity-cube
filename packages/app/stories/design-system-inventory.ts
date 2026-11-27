@@ -42,7 +42,7 @@ export const uncataloguedComponents = [
   },
   {
     module: 'packages/app/src/prototype-opendyslexic/PrototypeFontBar.tsx',
-    reason: 'A throwaway prototype control drawn only in a dev build, on a do-not-merge branch.',
+    reason: 'A throwaway prototype control drawn only in a dev build on a URL naming `?font=`.',
   },
   {
     module: 'packages/app/src/main.tsx',

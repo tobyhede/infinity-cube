@@ -8,9 +8,6 @@ export function PrototypeFontBar() {
 
   useEffect(() => {
     setPrototypeFont(variant);
-    const url = new URL(window.location.href);
-    url.searchParams.set('font', variant);
-    window.history.replaceState(window.history.state, '', url);
   }, [variant]);
 
   const step = (by: number) =>

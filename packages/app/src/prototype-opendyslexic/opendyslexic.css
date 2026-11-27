@@ -1,6 +1,7 @@
 /*
  * PROTOTYPE, throwaway. Question: how does OpenDyslexic look and feel as the
- * dark-mode typeface? Three variants, picked by `?font=` on any product URL (none asked: A):
+ * dark-mode typeface? Three variants, picked by `?font=` on any product URL in a dev
+ * build and remembered for the tab (install.ts loads this file only then):
  *   A  control: dark mode keeps the system sans (what main does)
  *   B  OpenDyslexic for everything drawn in dark mode, chrome included
  *   C  OpenDyslexic for Resource content only (titles, Markdown, the Stage);
@@ -32,6 +33,7 @@
 
 /* OpenDyslexic is wide and tall; the variants keep the app's sizes so the
    comparison is honest about overflow. Monospace stays monospace. */
-:root[data-theme='dark'][data-prototype-font] :is(code, pre, kbd, samp) {
+:root[data-theme='dark']:is([data-prototype-font='B'], [data-prototype-font='C'])
+  :is(code, pre, kbd, samp) {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }

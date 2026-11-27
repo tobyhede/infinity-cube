@@ -8,41 +8,37 @@ export const VARIANTS = [
 export type VariantId = (typeof VARIANTS)[number]['id'];
 
 const CONTROL: VariantId = VARIANTS[0].id;
+const REMEMBERED = 'prototype-opendyslexic-font';
 
-export function readVariant(): VariantId {
-  const asked = new URLSearchParams(window.location.search).get('font');
-  return VARIANTS.find((variant) => variant.id === asked)?.id ?? CONTROL;
+function asked(): string | null {
+  return new URLSearchParams(window.location.search).get('font');
 }
 
-/** The bar shows only on a URL that asks for a variant, so the e2e suite never meets it. */
+// The variant is kept in sessionStorage because navigation rewrites the URL
+// without its query, which would drop `?font=`.
+function remembered(): string | null {
+  try {
+    return window.sessionStorage.getItem(REMEMBERED);
+  } catch {
+    return null;
+  }
+}
+
+export function readVariant(): VariantId {
+  const wanted = asked() ?? remembered();
+  return VARIANTS.find((variant) => variant.id === wanted)?.id ?? CONTROL;
+}
+
+/** The prototype runs only when a URL in this tab asked for a variant, so the e2e suite never meets it. */
 export function askedForPrototypeFont(): boolean {
-  return new URLSearchParams(window.location.search).has('font');
+  return asked() !== null || remembered() !== null;
 }
 
 export function setPrototypeFont(variant: VariantId): void {
   document.documentElement.setAttribute('data-prototype-font', variant);
-}
-
-const FACES = [
-  {
-    url: new URL('./fonts/OpenDyslexic3-Regular.ttf', import.meta.url).href,
-    weight: '400',
-  },
-  {
-    url: new URL('./fonts/OpenDyslexic3-Bold.ttf', import.meta.url).href,
-    weight: '700',
-  },
-];
-
-/** Register the bundled faces and install the variant before the first frame. */
-export function installPrototypeFont(): void {
-  for (const face of FACES) {
-    document.fonts.add(
-      new FontFace('OpenDyslexic', `url(${face.url}) format('truetype')`, {
-        weight: face.weight,
-        display: 'swap',
-      }),
-    );
+  try {
+    window.sessionStorage.setItem(REMEMBERED, variant);
+  } catch {
+    // Without storage the variant lasts until the next navigation.
   }
-  setPrototypeFont(readVariant());
 }
