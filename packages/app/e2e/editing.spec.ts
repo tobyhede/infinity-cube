@@ -812,8 +812,12 @@ test('An Edit size larger than the canvas draws capped and in view, and stays st
 
   // Zooming out draws more of the Edit size.
   await zoomCamera(page, 'Zoom out');
-  await expect.poll(async () => (await rect()).width).toBeGreaterThan(drawn.width);
-  expect((await rect()).height).toBeGreaterThan(drawn.height);
+  await expect
+    .poll(async () => {
+      const now = await rect();
+      return now.width > drawn.width && now.height > drawn.height;
+    })
+    .toBe(true);
   await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toBeVisible();
 
   // Neither the cap nor the pan is an Edit: the Edit size stays as stored.
