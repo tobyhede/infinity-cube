@@ -106,22 +106,26 @@ mod classify_a_failure {
 
     // A dropped connection reads `UnexpectedEof`; the driver's `transient`
     // flag has no counterpart, and the words are not read.
-    // Case: recognises %s whatever its transient flag says
     each!("unreachable":
+        // Case: recognises %s whatever its transient flag says (a connection the server dropped)
         recognises_a_connection_the_server_dropped =>
             worded(io::ErrorKind::UnexpectedEof, "Connection terminated"),
+        // Case: recognises %s whatever its transient flag says (a refused connection the driver normalised)
         recognises_a_refused_connection_with_its_words =>
             worded(io::ErrorKind::ConnectionRefused, "connect ECONNREFUSED"),
     );
 
-    // Case: recognises the socket failure %s the driver normalised
     each!("unreachable":
+        // Case: recognises the socket failure %s the driver normalised (ECONNREFUSED)
         recognises_econnrefused_with_its_words =>
             worded(io::ErrorKind::ConnectionRefused, "connect ECONNREFUSED"),
+        // Case: recognises the socket failure %s the driver normalised (ECONNRESET)
         recognises_econnreset_with_its_words =>
             worded(io::ErrorKind::ConnectionReset, "connect ECONNRESET"),
+        // Case: recognises the socket failure %s the driver normalised (ETIMEDOUT)
         recognises_etimedout_with_its_words =>
             worded(io::ErrorKind::TimedOut, "connect ETIMEDOUT"),
+        // Case: recognises the socket failure %s the driver normalised (EHOSTUNREACH)
         recognises_ehostunreach_with_its_words =>
             worded(io::ErrorKind::HostUnreachable, "connect EHOSTUNREACH"),
     );
@@ -134,19 +138,30 @@ mod classify_a_failure {
         )),
     );
 
-    // Case: recognises SQLSTATE %s on a statement the driver normalised
     each!("unreachable":
+        // Case: recognises SQLSTATE %s on a statement the driver normalised (08000)
         recognises_sqlstate_08000 => database("08000"),
+        // Case: recognises SQLSTATE %s on a statement the driver normalised (08001)
         recognises_sqlstate_08001 => database("08001"),
+        // Case: recognises SQLSTATE %s on a statement the driver normalised (08003)
         recognises_sqlstate_08003 => database("08003"),
+        // Case: recognises SQLSTATE %s on a statement the driver normalised (08004)
         recognises_sqlstate_08004 => database("08004"),
+        // Case: recognises SQLSTATE %s on a statement the driver normalised (08006)
         recognises_sqlstate_08006 => database("08006"),
+        // Case: recognises SQLSTATE %s on a statement the driver normalised (40001)
         recognises_sqlstate_40001 => database("40001"),
+        // Case: recognises SQLSTATE %s on a statement the driver normalised (40P01)
         recognises_sqlstate_40p01 => database("40P01"),
+        // Case: recognises SQLSTATE %s on a statement the driver normalised (53300)
         recognises_sqlstate_53300 => database("53300"),
+        // Case: recognises SQLSTATE %s on a statement the driver normalised (55P03)
         recognises_sqlstate_55p03 => database("55P03"),
+        // Case: recognises SQLSTATE %s on a statement the driver normalised (57P01)
         recognises_sqlstate_57p01 => database("57P01"),
+        // Case: recognises SQLSTATE %s on a statement the driver normalised (57P02)
         recognises_sqlstate_57p02 => database("57P02"),
+        // Case: recognises SQLSTATE %s on a statement the driver normalised (57P03)
         recognises_sqlstate_57p03 => database("57P03"),
     );
 
@@ -175,12 +190,16 @@ mod classify_a_failure {
         assert_eq!(states, typescript);
     }
 
-    // Case: recognises the socket failure %s
     each!("unreachable":
+        // Case: recognises the socket failure %s (ECONNREFUSED)
         recognises_the_socket_failure_econnrefused => socket(io::ErrorKind::ConnectionRefused),
+        // Case: recognises the socket failure %s (ECONNRESET)
         recognises_the_socket_failure_econnreset => socket(io::ErrorKind::ConnectionReset),
+        // Case: recognises the socket failure %s (ETIMEDOUT)
         recognises_the_socket_failure_etimedout => socket(io::ErrorKind::TimedOut),
+        // Case: recognises the socket failure %s (EHOSTUNREACH)
         recognises_the_socket_failure_ehostunreach => socket(io::ErrorKind::HostUnreachable),
+        // Case: recognises the socket failure %s (ENETUNREACH)
         recognises_the_socket_failure_enetunreach => socket(io::ErrorKind::NetworkUnreachable),
     );
 
@@ -188,20 +207,22 @@ mod classify_a_failure {
     // (`EAI_AGAIN`) reaches `sqlx` as a name that does not resolve does, with
     // no OS error, so Rust leaves it unclassified where TypeScript names it
     // unreachable.
-    // Case: recognises the socket failure %s
     each!("unclassified":
         leaves_a_resolver_that_failed_for_now_unclassified => sqlx::Error::Io(io::Error::other(
             "failed to lookup address information: Temporary failure in name resolution"
         )),
     );
 
-    // Case: leaves the error code %s unclassified
     each!("unclassified":
+        // Case: leaves the error code %s unclassified (ENOTFOUND)
         leaves_enotfound_unclassified => sqlx::Error::Io(io::Error::other(
             "failed to lookup address information: Name or service not known"
         )),
+        // Case: leaves the error code %s unclassified (EACCES)
         leaves_eacces_unclassified => socket(io::ErrorKind::PermissionDenied),
+        // Case: leaves the error code %s unclassified (EPROTO)
         leaves_eproto_unclassified => sqlx::Error::Io(io::Error::other("Protocol error")),
+        // Case: leaves the error code %s unclassified (ERR_INVALID_ARG_TYPE)
         leaves_an_invalid_argument_unclassified => socket(io::ErrorKind::InvalidInput),
     );
 

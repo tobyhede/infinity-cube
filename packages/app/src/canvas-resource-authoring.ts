@@ -1,12 +1,18 @@
 import type { Continuation } from './continuation';
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import {
   RESOURCE_TITLE_REQUIRED,
   resourceDocumentSchema,
   uuidSchema,
   type ResourceId,
 } from '@project/core';
-import type { Size } from '@project/resource-api/domain';
 import type { ObserverErrorReporter, SpaceSession } from '@project/persistence';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import { usePluginAssets, type EntityActionGroup } from '@project/ui';
@@ -27,7 +33,7 @@ import {
 import { decorateEmbedCommands, type EmbedCommandsContext } from './embed-commands';
 import type { Embedding } from './plugin-host/claim-chain';
 import type { PluginHost } from './plugin-host/plugin-commits';
-import type { PluginGate } from './plugin-host/plugin-gate';
+import { editorsOn, type PluginGate } from './plugin-host/plugin-gate';
 import { usePluginGate } from './plugin-host/plugin-gate-context';
 import type { MapEmbedEntry } from './map-embedding/map-embeddings';
 import type { MapEmbedding } from './map-embedding/map-embedding';
@@ -108,12 +114,6 @@ export interface CanvasResourceAuthoringInput {
    * one the canvas around it provides.
    */
   readonly mapEmbedding?: MapEmbedding | undefined;
-  /**
-   * A plugin's size hint capped at what this canvas shows. Only the canvas's
-   * own Map offers it, because it knows its viewport; absent, a hint is
-   * ignored.
-   */
-  readonly capSizeHint?: ((hint: Size) => Size | undefined) | undefined;
 }
 
 export interface CanvasResourceAuthoring {
@@ -144,7 +144,6 @@ export function useCanvasResourceAuthoring({
   spaceResourceTargets = NO_SPACE_RESOURCE_TARGETS,
   resourceEntityActions,
   plugins,
-  capSizeHint,
   mapEmbedding: ownMapEmbedding,
 }: CanvasResourceAuthoringInput): CanvasResourceAuthoring {
   const spaces = useOpenSpaces();
@@ -174,6 +173,28 @@ export function useCanvasResourceAuthoring({
     const drawing = held.at(-1);
     return drawing !== undefined && !lent.has(drawing.key);
   });
+  // A plugin that took its Claim to edit in place is drawn at its Edit size,
+  // and resized as an editor, until the Claim ends (ADR 0178). The render
+  // adapter is told in a layout effect. The canvas then lays the new placement
+  // out through `usePlacementRendering`, an effect and a microtask later, so a
+  // frame may still show the Resource at its size before it is drawn at its
+  // Edit size.
+  const editingDrawings = useSyncExternalStore(pluginGate.subscribe, pluginGate.editors);
+  const embeddedIn = plugins?.embeddedIn;
+  const editors = useMemo(() => {
+    const editing = editorsOn(claimChain, editingDrawings, embeddedIn ?? []);
+    return new Map(
+      nodes.flatMap((node) => {
+        const edit = editing.get(node.data.resourceId);
+        return edit === undefined ? [] : [[node.data.resourceId, edit] as const];
+      }),
+    );
+  }, [claimChain, editingDrawings, embeddedIn, nodes]);
+  const drawEditors = resourceResize.drawEditors;
+  useLayoutEffect(() => {
+    drawEditors(editors);
+  }, [drawEditors, editors]);
+  useLayoutEffect(() => () => drawEditors(new Map()), [drawEditors]);
   // The Map embedding of the canvas this draws on, which a Space Resource's
   // host chooser writes a choice through (ADR 0142), and which keeps what the
   // canvas says about each embedding, and its rail editing, while it stands.
@@ -240,7 +261,6 @@ export function useCanvasResourceAuthoring({
       document: (resourceId) =>
         spaceSession.getState().working.resources.find(({ id }) => id === resourceId)?.document,
       assets: { store: pluginAssets.store, pick: pluginAssets.pick },
-      capSizeHint,
       embeddedIn: plugins?.embeddedIn,
     }),
     [
@@ -250,7 +270,6 @@ export function useCanvasResourceAuthoring({
       claimChain,
       spaceSession,
       pluginAssets,
-      capSizeHint,
       plugins?.embeddedIn,
     ],
   );

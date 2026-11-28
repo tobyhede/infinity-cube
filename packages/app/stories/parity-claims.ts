@@ -30,6 +30,13 @@ export const parityClaims: readonly ParityClaim[] = [
       'A Resource at rest draws no toolbar; selected, its commands are drawn with Open last, while its kind glyph stays on the Resource at its top-right corner.',
   },
   {
+    id: 'resource-open-and-close-draw-their-own-glyphs',
+    storyFile: 'components/resource.stories.tsx',
+    storyExport: 'OpenAndClose',
+    claim:
+      "Open and Close each draw a glyph of their own on the Resource's rail, unlike each other's and unlike every other command the rail draws beside them.",
+  },
+  {
     id: 'canvas-resource-actions-menu',
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'RailActions',

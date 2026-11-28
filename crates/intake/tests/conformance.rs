@@ -236,6 +236,15 @@ fn placement_json(placement: &Placement) -> Value {
                 ])
             }),
         ),
+        (
+            "editSize",
+            placement.edit_size.map(|size| {
+                object(vec![
+                    ("width", Some(size.width.into())),
+                    ("height", Some(size.height.into())),
+                ])
+            }),
+        ),
         ("content", placement.content.as_ref().map(from_intake)),
     ])
 }

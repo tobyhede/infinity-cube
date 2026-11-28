@@ -354,6 +354,9 @@ describe('Present from Here, by key and on the rail', () => {
   it('greys the item with the reason while an edit is in progress, and leaves the key alone', async () => {
     const { initial } = await openPresentable();
     fireEvent.click(await screen.findByRole('button', { name: 'Open Resource First Resource' }));
+    // The Open lands at once and the text is read after it (ADR 0178), so Edit
+    // is the Open Resource's once its rail has redrawn.
+    await screen.findByRole('button', { name: 'Close Resource First Resource' });
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource First Resource' }));
     await screen.findByRole('textbox', { name: 'Markdown source of First Resource' });
 
