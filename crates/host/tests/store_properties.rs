@@ -31,8 +31,8 @@ mod sqlite_support;
 use std::collections::BTreeSet;
 
 use commit_sequences::{
-    Case, Expected, KeyOrder, Start, Step, compare_final, compare_steps, initial, memory_at,
-    reordered, revision_statement, start_revisions,
+    Case, Expected, KeyOrder, Start, Step, Unlinking, compare_final, compare_steps, initial,
+    memory_at, reordered, revision_statement, start_revisions,
 };
 use host::{SpaceRepository, SqliteSpaceRepository};
 use intake::{Resource, SpaceSnapshot};
@@ -112,8 +112,8 @@ async fn the_generated_steps_reach_every_kind_of_answer() {
         },
         Step::Delete {
             space: 1,
-            unlinked: true,
-            meta_first: false,
+            unlinking: Unlinking::Dropped,
+            updates_first: false,
             revision: Expected::Current,
         },
         Step::Twice {
@@ -186,6 +186,51 @@ async fn the_map_internal_and_ceiling_steps_reach_the_answers_they_exist_for() {
             "conflict"
         ],
         "a Resource of no plugin added at CEILING − 1 takes the Space to the ceiling, past which an update fails"
+    );
+}
+
+/// The linking and deletion steps make the answers the TypeScript
+/// differential's deletion scenarios exist to reach: an ordinary Space links
+/// another; deleting a Space two Spaces link, alone, is a conflict
+/// ("partial-deletion"); deleting it while each Space linking it changes but
+/// keeps its link is refused ("incomplete-deletion-proposal"); deleting it
+/// while each drops its link, Meta and an ordinary Space both, commits
+/// ("complete-deletion"); and a link to a Space no longer stored is refused.
+#[tokio::test]
+async fn the_linking_and_deletion_steps_reach_the_answers_they_exist_for() {
+    let memory = memory_at(&[Start::First, Start::First, Start::First]);
+    let delete = |unlinking| Step::Delete {
+        space: 1,
+        unlinking,
+        updates_first: true,
+        revision: Expected::Current,
+    };
+    let steps = [
+        Step::Link { from: 2, to: 0 },
+        delete(Unlinking::Untouched),
+        delete(Unlinking::Retitled),
+        delete(Unlinking::Dropped),
+        Step::Link { from: 0, to: 0 },
+    ];
+    let mut answered = Vec::new();
+    for step in steps {
+        let held = commit_sequences::stored_spaces(
+            "the memory store",
+            &memory.load_aggregate().await.unwrap(),
+        );
+        let request = commit_sequences::commit_for(&step, &held, 0x81).unwrap();
+        answered.push(commit_sequences::kind_of(&memory.commit(request).await));
+    }
+    assert_eq!(
+        answered,
+        [
+            "committed",
+            "conflict",
+            "aggregate-refused",
+            "committed",
+            "aggregate-refused"
+        ],
+        "a Space two Spaces link is deleted only with both links dropped"
     );
 }
 

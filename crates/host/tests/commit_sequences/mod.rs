@@ -10,23 +10,29 @@
 //! Resources added or dropped at a current, stale or ahead revision; a
 //! Resource moved between Spaces, the receiver listed first or last; a Space
 //! created, linked from Meta or not, one already stored among them; a Space
-//! deleted, Meta among them, unlinked or not; a Graph Meta selects removed or
-//! one added; Resources placed and an Edge drawn (a Map-internal Edit); one
-//! Space changed twice in a commit; and an update whose snapshot names
-//! another Space. Some Resources belong to no plugin and hold content whose
-//! keys are out of `jsonb`'s order (by length, then by bytes) and out of
-//! ascending order, as do their placements' Map content.
+//! linked from another, stored or not; a Space deleted, Meta among them, the
+//! Spaces linking it left alone, changed but still linking, or unlinked, the
+//! delete listed first or last; a Graph Meta selects removed or one added;
+//! Resources placed and an Edge drawn (a Map-internal Edit); one Space
+//! changed twice in a commit; and an update whose snapshot names another
+//! Space. Some Resources belong to no plugin and hold content whose keys are
+//! out of `jsonb`'s order (by length, then by bytes) and out of ascending
+//! order, as do their placements' Map content, and a Map's positions are
+//! listed out of Resource id order.
 //!
 //! **Resource order is normalised by neither side of a comparison.** Every
 //! snapshot a step commits lists its Resources out of ascending id order, and
 //! each store must answer them ascending (Storage ST-21): each answer and
 //! each stored Space is asserted ascending on each store before the two are
-//! compared. **Content key order** is the durable store's to keep or not: a
-//! store that keeps it ([`KeyOrder::Kept`], SQLite's text column) is compared
+//! compared. **Key order** is the durable store's to keep or not: a store
+//! that keeps it ([`KeyOrder::Kept`], SQLite's text column) is compared
 //! exactly; one that reorders it ([`KeyOrder::Reordered`], PostgreSQL's
 //! `jsonb`) is compared as the TypeScript contract's `toEqual` compares, with
 //! every JSON object on both sides put in ascending key order
-//! (`repository_contract::InKeyOrder`), so the values must still agree.
+//! (`repository_contract::InKeyOrder`): each Resource's content, each
+//! placement's Map content and each Map's positions, keyed by Resource id.
+//! The values must still agree, and the memory store's side is normalised
+//! the same way, so neither side's order decides the comparison.
 //!
 //! The stores share `decide_commit`, so a defect in it is the same on both
 //! and passes here; the repository contract (`tests/repository_contract/`)
@@ -119,6 +125,26 @@ fn link(index: usize) -> Resource {
     holder.resources.into_iter().next().unwrap()
 }
 
+/// The Space Resource through which stored Space `from` links ordinary
+/// Space `to`: its id names both.
+fn link_from(from: SpaceId, to: usize) -> Resource {
+    let from = position(from.as_str()).map_or(0, |at| at + 1);
+    let id = format!("c2000000-0000-4000-8000-0000000005{from:x}{to:x}");
+    let holder = space_holding(SPACE_ID, "Holder", vec![space_resource(&id, ORDINARY[to])]);
+    holder.resources.into_iter().next().unwrap()
+}
+
+/// Whether `resource` is a Space Resource showing `space`.
+fn links_to(resource: &Resource, space: SpaceId) -> bool {
+    resource.kind.as_str() == "space"
+        && resource
+            .content
+            .as_object()
+            .and_then(|content| content.get("spaceId"))
+            .and_then(JsonValue::as_str)
+            == Some(space.as_str())
+}
+
 /// `resources` in an order that is not ascending whenever there are two:
 /// rotated by `order` and reversed when its top bit is set, then rotated
 /// once more if that left them ascending.
@@ -201,11 +227,16 @@ pub enum Step {
         linked: bool,
         meta_first: bool,
     },
-    /// Delete a stored Space, Meta among them, unlinking it from Meta or not.
+    /// Link an ordinary Space, stored or not, from a stored Space through a
+    /// Space Resource of its own.
+    Link { from: usize, to: usize },
+    /// Delete a stored Space, Meta among them, and update every other stored
+    /// Space linking it as `unlinking` says, those updates listed before the
+    /// delete or after it.
     Delete {
         space: usize,
-        unlinked: bool,
-        meta_first: bool,
+        unlinking: Unlinking,
+        updates_first: bool,
         revision: Expected,
     },
     /// Remove the Graph Meta's Space Resource selects from an ordinary Space.
@@ -220,6 +251,19 @@ pub enum Step {
     Twice { space: usize, delete_first: bool },
     /// Update a stored Space with another stored Space's snapshot.
     Mismatched { space: usize, other: usize },
+}
+
+/// What a deletion does to the other stored Spaces linking the Space it
+/// deletes: the TypeScript differential's "partial-deletion",
+/// "incomplete-deletion-proposal" and "complete-deletion".
+#[derive(Debug, Clone, Copy)]
+pub enum Unlinking {
+    /// Leaves them alone.
+    Untouched,
+    /// Retitles each, keeping its links.
+    Retitled,
+    /// Drops each one's links to it.
+    Dropped,
 }
 
 /// The revision a change expects, against what is stored.
@@ -278,6 +322,14 @@ fn expected() -> impl Strategy<Value = Expected> {
     ]
 }
 
+fn unlinking() -> impl Strategy<Value = Unlinking> {
+    prop_oneof![
+        Just(Unlinking::Untouched),
+        Just(Unlinking::Retitled),
+        Just(Unlinking::Dropped),
+    ]
+}
+
 fn start() -> impl Strategy<Value = Start> {
     prop_oneof![
         3 => Just(Start::First),
@@ -316,19 +368,22 @@ fn step() -> impl Strategy<Value = Step> {
                 meta_first,
             }
         }),
-        (0_usize..8, any::<bool>(), any::<bool>(), expected()).prop_map(
-            |(space, unlinked, meta_first, revision)| Step::Delete {
+        (0_usize..8, 0_usize..4).prop_map(|(from, to)| Step::Link { from, to }),
+        (0_usize..8, unlinking(), any::<bool>(), expected()).prop_map(
+            |(space, unlinking, updates_first, revision)| Step::Delete {
                 space,
-                unlinked,
-                meta_first,
+                unlinking,
+                updates_first,
                 revision
             }
         ),
         (0_usize..4).prop_map(|space| Step::DropGraph { space }),
         (0_usize..4).prop_map(|space| Step::AddGraph { space }),
         (0_usize..8, any::<u8>()).prop_map(|(space, x)| Step::Arrange { space, x }),
-        (0_usize..8, any::<bool>())
-            .prop_map(|(space, delete_first)| Step::Twice { space, delete_first }),
+        (0_usize..8, any::<bool>()).prop_map(|(space, delete_first)| Step::Twice {
+            space,
+            delete_first
+        }),
         (0_usize..8, 1_usize..8).prop_map(|(space, other)| Step::Mismatched { space, other }),
     ]
 }
@@ -480,10 +535,27 @@ pub fn commit_for(step: &Step, stored: &[LoadedSpace], order: u8) -> Option<Spac
                 *meta_first,
             )
         }
+        Step::Link { from, to } => {
+            let linking = pick(*from);
+            let link = link_from(linking.snapshot.id, *to);
+            if linking
+                .snapshot
+                .resources
+                .iter()
+                .any(|held| held.id == link.id)
+            {
+                return None;
+            }
+            let mut resources = linking.snapshot.resources.clone();
+            resources.push(link);
+            SpaceCommit {
+                changes: vec![update(with(linking, resources), linking.revision)],
+            }
+        }
         Step::Delete {
             space,
-            unlinked,
-            meta_first,
+            unlinking,
+            updates_first,
             revision,
         } => {
             let deleted = pick(*space);
@@ -491,23 +563,41 @@ pub fn commit_for(step: &Step, stored: &[LoadedSpace], order: u8) -> Option<Spac
                 space_id: deleted.snapshot.id,
                 expected_revision: revision.of(deleted.revision),
             };
-            let Some(linked) = position(deleted.snapshot.id.as_str()).filter(|_| *unlinked) else {
-                return Some(SpaceCommit {
-                    changes: vec![delete],
-                });
-            };
-            let resources = meta
-                .snapshot
-                .resources
+            let updates: Vec<SpaceChange> = stored
                 .iter()
-                .filter(|held| held.id.as_str() != link_resource_id(linked))
-                .cloned()
+                .filter(|_| !matches!(unlinking, Unlinking::Untouched))
+                .filter(|held| held.snapshot.id != deleted.snapshot.id)
+                .filter(|held| {
+                    held.snapshot
+                        .resources
+                        .iter()
+                        .any(|resource| links_to(resource, deleted.snapshot.id))
+                })
+                .map(|held| {
+                    let resources = held
+                        .snapshot
+                        .resources
+                        .iter()
+                        .filter(|resource| {
+                            matches!(unlinking, Unlinking::Retitled)
+                                || !links_to(resource, deleted.snapshot.id)
+                        })
+                        .cloned()
+                        .collect();
+                    let mut next = with(held, resources);
+                    if matches!(unlinking, Unlinking::Retitled) {
+                        next.document.title.push('~');
+                    }
+                    update(next, held.revision)
+                })
                 .collect();
-            in_order(
-                delete,
-                update(with(meta, resources), meta.revision),
-                *meta_first,
-            )
+            let mut changes = vec![delete];
+            if *updates_first {
+                changes.splice(0..0, updates);
+            } else {
+                changes.extend(updates);
+            }
+            SpaceCommit { changes }
         }
         Step::DropGraph { space } => {
             let target = ordinary_stored(*space)?;

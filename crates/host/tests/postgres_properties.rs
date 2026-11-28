@@ -7,11 +7,12 @@
 //!
 //! **Which side normalises what.** PostgreSQL's `jsonb` stores an object's
 //! keys sorted by length, then by bytes, so it answers the content of a
-//! Resource of no plugin, and its Map content, in that order rather than the
-//! order committed, which the memory store keeps; the comparison therefore
-//! puts every JSON object on both sides in ascending key order
-//! ([`KeyOrder::Reordered`]), as the TypeScript differential's `toEqual`
-//! ignores key order, and the values must agree. Resource order is
+//! Resource of no plugin, its Map content and a Map's positions (an object
+//! keyed by Resource id) in that order rather than the order committed,
+//! which the memory store keeps; the comparison therefore puts every JSON
+//! object on both sides in ascending key order ([`KeyOrder::Reordered`]), as
+//! the TypeScript differential's `toEqual` ignores key order, and the values
+//! must agree. Resource order is
 //! normalised by neither side: every snapshot committed lists its Resources
 //! out of id order, and each store's answers and stored Spaces are asserted
 //! ascending by id (Storage ST-21) before the two are compared. The order
@@ -44,10 +45,10 @@ mod repository_contract;
 use std::collections::BTreeSet;
 
 use commit_sequences::{
-    Case, Expected, KeyOrder, Start, Step, compare_final, compare_steps, initial, memory_at,
-    revision_statement, start_revisions,
+    Case, Expected, KeyOrder, Start, Step, Unlinking, compare_final, compare_steps, initial,
+    memory_at, revision_statement, start_revisions,
 };
-use host::{PostgresSpaceRepository, SpaceRepository};
+use host::PostgresSpaceRepository;
 use intake::SpaceSnapshot;
 use postgres_support::Fresh;
 use proptest::prelude::*;
@@ -56,7 +57,7 @@ use repository_contract::seed;
 /// How many generated cases run. Each clones a database from the migrated
 /// template and runs up to eleven commits, so this bounds the `rust` job's
 /// PostgreSQL step.
-const CASES: u32 = 32;
+const CASES: u32 = 64;
 
 /// A database holding the initial aggregate at the revisions `start` puts
 /// it at, and a repository over it.
@@ -161,8 +162,8 @@ async fn answers_every_kind_of_answer_as_the_memory_store_does() {
         Step::DropGraph { space: 0 },
         Step::Delete {
             space: 2,
-            unlinked: true,
-            meta_first: true,
+            unlinking: Unlinking::Dropped,
+            updates_first: true,
             revision: Expected::Current,
         },
     ];
