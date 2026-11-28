@@ -39,6 +39,74 @@ A23	SURVIVED	Summary [  51.900s] 403 tests run: 403 passed, 62 skipped
 A24	SURVIVED	Summary [  51.405s] 403 tests run: 403 passed, 62 skipped	
 ```
 
+## A02 probe
+
+A test written to check whether A02 is equivalent, added for the run to `crates/host/tests/postgres_concurrency.rs` › `given_overlapping_replacements` and deleted afterwards. It is the A01 killer `judges_a_complete_aggregate_commit_against_an_identity_a_concurrent_replacement_retired` with the probe pausing the commit at `Step::MetaRead`, after the identity read and before the relock, instead of an outside session holding the Meta row. It ran on a throwaway PostgreSQL 14.19 cluster, deleted afterwards, at `ec61218f`, whose `crates/` is `32d316f3`'s.
+
+```rust
+#[tokio::test]
+#[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+async fn audit_probe_a02_replacement_committed_between_read_and_relock() {
+    let database = Fresh::new().await;
+    let linked_other = other_space().with(
+        RACE_LINK_RESOURCE_ID,
+        space_link(
+            "To the race child",
+            RACE_CHILD_SPACE_ID,
+            RACE_CHILD_MAP_ID,
+            RACE_CHILD_GRAPH_ID,
+        ),
+    );
+    let race_child = Fixture {
+        id: RACE_CHILD_SPACE_ID,
+        document: mapped("Race child", RACE_CHILD_MAP_ID, RACE_CHILD_GRAPH_ID),
+        resources: vec![],
+    };
+    let store = seeded(&database, SPACE_ID, &[repository_space()]).await;
+    let (reached, release) = pause_once(&store, |step| matches!(step, Step::MetaRead));
+    let racing = {
+        let (linked_other, race_child) = (linked_other.clone(), race_child.clone());
+        spawn(&store, |store| async move {
+            store
+                .commit(commit(vec![
+                    update(&linked_other.titled("Retitled after race"), Revision::FIRST),
+                    update(&race_child.titled("Retitled child"), Revision::FIRST),
+                ]))
+                .await
+        })
+    };
+    let racing = rendezvous(&reached, racing).await;
+    let mut blocker = Blocker::begin(&database).await;
+    blocker
+        .run(&retiring(
+            OTHER_SPACE_ID,
+            &[linked_other.clone(), race_child.clone()],
+        ))
+        .await;
+    blocker.commit().await;
+    release.notify_one();
+    let answer = joined(racing).await;
+    assert!(
+        matches!(answer, Ok(CommitResult::Committed { .. })),
+        "judged against the identity the replacement established: {answer:?}"
+    );
+    store.close().await;
+}
+```
+
+Unmutated:
+
+```text
+PASS [   2.214s] host::postgres_concurrency given_overlapping_replacements::audit_probe_a02_replacement_committed_between_read_and_relock
+```
+
+With A02 applied:
+
+```text
+FAIL [   1.651s] host::postgres_concurrency given_overlapping_replacements::audit_probe_a02_replacement_committed_between_read_and_relock
+judged against the identity the replacement established: Ok(AggregateRefused(CommitRefusal { refusals: [MetaSpaceMissing { meta: SpaceId(11111111-1111-4111-8111-111111111111) }], errors: [Aggregate(MetaSpaceMissing { meta: SpaceId(11111111-1111-4111-8111-111111111111) })] }))
+```
+
 ## The ports test with every PostgreSQL file listed
 
 A copy of `test/unit/repository-contract-rust-ports.test.ts` whose `POSTGRES.files` (`:820`) also lists `postgres_concurrency.rs`, `postgres_outages.rs`, `postgres_races.rs`, `postgres_url.rs`, `postgres_wire.rs`, `postgres_rows.rs`, `crates/host/src/sql/postgres/tests.rs` and `crates/cli/tests/serve_postgres.rs`, run with `pnpm exec vitest run <copy> -t "the Rust PostgreSQL repository"` and then deleted.
