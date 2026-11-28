@@ -24,11 +24,11 @@ A window the desktop application opens on an Aggregate directory, showing its Sp
 _Avoid_: talk window, Aggregate window; Opening as the name of a folder's open, in code or a heading (Opening is a Resource's).
 
 **Start window**:
-The desktop application's window for creating a new Space, opening a folder, or reopening a recent Space, shown at launch when nothing else opens, and when a new Space is asked for. It is not a Space window.
+The desktop application's window for creating a Space, opening a folder or reopening a recent Space. See [desktop shell requirements](docs/requirements/storage.md#the-desktop-shell) for when it appears.
 _Avoid_: home window, launcher, welcome window.
 
 **Recent**:
-The desktop application's history of the Spaces opened by any route, which the Start window lists. It is distinct from the set to reopen, the Spaces open when the last quit began, which a launch naming no folder reopens.
+The history of opened Spaces that the Start window lists. The set to reopen records which Spaces were open when the last quit began.
 _Avoid_: recent files, history, the set to reopen.
 
 **Space snapshot**:
@@ -48,10 +48,10 @@ What answers a Working read, running a Space's first working read when the Space
 A Space the browser holds live, because Open Spaces lists it or one of its Maps is drawn.
 
 **Resource N**:
-A neutral Title for a new Resource, numbered one past the highest already used.
+A default numbered Title for a new Resource. See [Space and Resources](docs/requirements/space-and-resources.md) for allocation.
 
 **Space N**:
-A neutral name for a new Space, numbered one past the highest already used.
+A default numbered name for a new Space. See [Space and Resources](docs/requirements/space-and-resources.md) for allocation.
 
 **Id**:
 The durable identifier of a Space, Resource, Map or Graph. Space and Resource Ids are global; Map and Graph Ids are scoped to their owning Space.
@@ -88,11 +88,11 @@ _Avoid_: heading, label, caption, description, subtitle as separate fields.
 The first Title Line, followed by “…” when more lines follow, used when a sentence quotes a Title, including questions, notices and Edge labels. Controls, list rows and chrome use the first line alone.
 
 **Resource kind**:
-What a Resource's content is and does, and the name that selects its Resource plugin. Six are bundled: Markdown, Mermaid, Image, Space, Reference and Ur. A content kind adds content of its own: Markdown, Mermaid or Image.
+A name that selects a Resource plugin. The plugin defines the Resource's content and behaviour. The six bundled kinds are Markdown, Space, Image, Ur, Reference, and Mermaid. See [Space and Resources](docs/requirements/space-and-resources.md#kinds).
 _Avoid_: MIME type, content type, file type, format; a bare "kind" where another sort of kind could be meant.
 
 **Content kind**:
-A Resource kind whose Resource content names bytes: Markdown, Mermaid or Image. Ur, Reference and Space are kinds but not content kinds.
+A Resource kind whose Resource content names bytes. Markdown, Mermaid, and Image are Content kinds. Ur, Reference, and Space are Resource kinds but not Content kinds.
 
 **Missing kind**:
 A well-formed Resource kind that no Resource plugin in this build draws. Its Resources are drawn by the Default plugin.
@@ -362,6 +362,12 @@ _Avoid_: Active Edge (Active Graph names the Graph; Active Resource names Presen
 A named action on the canvas, reached by a key, by an item on a Resource's toolbar or menu, or by both, which can be available, unavailable with a reason, or absent for a target.
 _Avoid_: shortcut (the key bound to it), action (the toolbar's word for its items), Command Dock, handler, hotkey.
 
+**Shortcut**:
+A key bound to a named command.
+
+**Keymap**:
+The data that names each command's key presses and the context in which they are answered.
+
 **Toolbar**:
 A Selected Resource's commands, floated beside it. The host draws it; the commands in its kind group are the Resource plugin's.
 _Avoid_: rail, except as the code's name for it.
@@ -455,7 +461,7 @@ The on-disk form of an Aggregate, suitable for review, version control and shari
 _Avoid_: catalog, bundle, export root.
 
 **Repository**:
-Where the live Aggregate is kept: PostgreSQL, SQLite or memory. Also called a store.
+The store for the live Aggregate. The Repository serves reads and commits using PostgreSQL, SQLite, or memory.
 
 **Invariant failure**:
 A Repository holding something InfinityCube cannot read an Aggregate from: stored state that contradicts itself, such as Meta naming a Space the Repository does not hold, or a Repository missing what an Aggregate is kept in. It is not expected to clear on its own, so a failure the next read does not repeat was not one.
