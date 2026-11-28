@@ -799,6 +799,54 @@ describe('the Mermaid plugin’s view', () => {
     expect(drawn).toEqual([]);
   });
 
+  it('finishes one Closed edit read using the Edit size supplied while it was pending', async () => {
+    const pending = Promise.withResolvers<Blob>();
+    const read = vi.fn(() => pending.promise);
+    let sizeStored = false;
+    const rendered = renderPlugin<MermaidContent, MermaidMapContent>(
+      ({ surface }) => (
+        <mermaidPluginView.View
+          surface={{ ...surface, editSize: sizeStored ? STORED_EDIT_SIZE : undefined }}
+        />
+      ),
+      { content, map: closed, title: 'Notes', grants: editable, assets: { read } },
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
+    sizeStored = true;
+    rendered.changeMap({ ...closed });
+    expect(read).toHaveBeenCalledTimes(1);
+
+    pending.resolve(new Blob(['Requested source']));
+    expect(await screen.findByRole('textbox')).toHaveValue('Requested source');
+    expect(rendered.commits.claims.editors).toEqual([{}]);
+  });
+
+  it('drops a pending Closed edit when authoring is withdrawn and later granted again', async () => {
+    const pending = Promise.withResolvers<Blob>();
+    const read = vi.fn(() => pending.promise);
+    const rendered = renderPlugin(mermaidPluginView.View, {
+      content,
+      map: closed,
+      title: 'Notes',
+      grants: editable,
+      assets: { read },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
+    expect(read).toHaveBeenCalledTimes(1);
+    rendered.withdraw(true);
+    rendered.withdraw(false);
+    await act(async () => {
+      pending.resolve(new Blob(['Requested source']));
+      await pending.promise;
+    });
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(rendered.commits.claims.taken).toBe(0);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
+    expect(await screen.findByRole('textbox')).toHaveValue('Requested source');
+    expect(rendered.commits.claims.taken).toBe(1);
+  });
+
   it('discards a Closed edit request when the Resource changes source during its read', async () => {
     const pending = Promise.withResolvers<Blob>();
     const read = vi.fn((url: AssetRef) =>
@@ -847,6 +895,9 @@ describe('the Mermaid plugin’s view', () => {
       });
       fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
       await waitFor(() => expect(asked).toBe(1));
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Another change is still being made. Try again when it ends.',
+      );
       expect(screen.queryByRole('textbox')).toBeNull();
       expect(document.querySelector('[data-open]')).toHaveAttribute('data-open', 'false');
       expect(screen.getByRole('button', { name: 'Open Resource Notes' })).toBeEnabled();
@@ -855,6 +906,7 @@ describe('the Mermaid plugin’s view', () => {
       expect(await screen.findByRole('textbox', { name: 'Mermaid source of Notes' })).toHaveValue(
         'graph TD',
       );
+      expect(screen.queryByRole('alert')).toBeNull();
       expect(rendered.commits.claims.taken).toBe(1);
       expect(rendered.commits.map).toEqual([]);
       rendered.unmount();

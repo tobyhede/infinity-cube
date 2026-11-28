@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react';
 import { z } from 'zod';
 import { Check, Pencil, StickyNote, X } from 'lucide-react';
 import {
@@ -66,11 +74,9 @@ const UNSAVED = 'The text could not be saved. Your draft is kept; Save again to 
 /** The refusal when Edit cannot read the source of a Closed Resource. */
 const UNEDITABLE = 'This text cannot be read, so it cannot be edited.';
 
-/**
- * Read the text an asset holds, once per URL, starting from text this view
- * already knows. Nothing is read until the text is `wanted`: a Closed
- * Resource draws none of it.
- */
+const BUSY = 'Another change is still being made. Try again when it ends.';
+
+/** Read source for display while Open or for editing while Closed, reusing known text. */
 function useText(
   url: AssetRef,
   assets: Assets,
@@ -79,6 +85,10 @@ function useText(
   answerEdit?: (answer: TextAnswer) => void,
 ): Text {
   const wanted = open || answerEdit !== undefined;
+  const currentEdit = useRef(answerEdit);
+  useLayoutEffect(() => {
+    currentEdit.current = answerEdit;
+  }, [answerEdit]);
   const [read, setRead] = useState<{ readonly url: string; readonly text: Text }>(() => ({
     url,
     text: READING,
@@ -87,14 +97,14 @@ function useText(
   // A refusal answers the read that was wanted: once the text is not wanted,
   // the next time it is reads again rather than answering with that refusal.
   if (!wanted && read.text.state === 'refused') setRead({ url, text: READING });
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!wanted || known.text(url) !== undefined) return undefined;
     let live = true;
     const finish = (text: TextAnswer): void => {
       if (!live) return;
       if (text.state === 'read') known.remember(url, text.text);
       setRead({ url, text });
-      answerEdit?.(text);
+      currentEdit.current?.(text);
     };
     void readAsset(url)
       .then(async (answer): Promise<TextAnswer> =>
@@ -106,7 +116,7 @@ function useText(
     return () => {
       live = false;
     };
-  }, [url, readAsset, known, wanted, answerEdit]);
+  }, [url, readAsset, known, wanted]);
   const already = known.text(url);
   if (already !== undefined) return { state: 'read', text: already };
   return read.url === url ? read.text : READING;
@@ -215,7 +225,10 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
     (source: string) => {
       if (!mayAuthor || editing !== null) return;
       const held = surface.editSize === undefined ? undefined : takeClaim({ editor: {} });
-      if (surface.editSize !== undefined && held === undefined) return;
+      if (surface.editSize !== undefined && held === undefined) {
+        setRefusal(BUSY);
+        return;
+      }
       setRefusal(null);
       setEditing({ draft: source, base: lineFeedText(source), saving: false, claim: held });
     },
@@ -248,7 +261,12 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
   const suggestEditorSize = (source: Size) => {
     const suggestedSize = editorSizeWithTitle(source, titleRow.current, surface.size);
     const held = takeClaim?.({ editor: { suggestedSize } });
-    setEditing((now) => (now === null || held === undefined ? null : { ...now, claim: held }));
+    if (held === undefined) {
+      setRefusal(BUSY);
+      setEditing(null);
+      return;
+    }
+    setEditing((now) => (now === null ? null : { ...now, claim: held }));
   };
 
   const end = useCallback(() => setEditing(null), []);
