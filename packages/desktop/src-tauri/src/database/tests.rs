@@ -147,8 +147,8 @@ mod given_a_postgresql_url {
     #[test]
     fn is_titled_by_its_database_name() {
         assert_eq!(
-            Database::Postgres(postgres("postgres://cube@db.example.com/talks")).title(),
-            "talks"
+            Database::Postgres(postgres("postgres://cube@db.example.com/slides")).title(),
+            "slides"
         );
     }
 
