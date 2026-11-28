@@ -249,6 +249,8 @@ Local PostgreSQL is opt-in; `pnpm verify` and `pnpm e2e` do not need it.
 
    Done when the integration test passes and `postgres:down` exits zero. The test emits the Prisma Next contract, applies pending migrations, and writes and reads a Space. For the schema steps alone: `pnpm contract:emit` and `pnpm db:migrate`.
 
+   The role `DATABASE_URL` names must be allowed to create databases, as the one Compose creates from `POSTGRES_USER` is: `test/integration/postgres-rows-across-runtimes.test.ts` creates a database of its own beside the one `DATABASE_URL` names, replays rows into it and drops it.
+
 `pnpm postgres:down` keeps the named data volume. `docker compose down --volumes` deletes local database state.
 
 ### Local SQLite

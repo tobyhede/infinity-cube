@@ -970,6 +970,18 @@
       }
     },
     {
+      "markExported": {
+        "spaceId": "e0000000-0000-4000-8000-000000000001",
+        "revision": "4"
+      }
+    },
+    {
+      "markExported": {
+        "spaceId": "e0000000-0000-4000-8000-000000000020",
+        "revision": "0"
+      }
+    },
+    {
       "commit": {
         "changes": [
           {
