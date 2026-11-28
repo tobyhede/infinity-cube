@@ -14,7 +14,7 @@ import { delimiter, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const release = resolve(import.meta.dirname, '../../release');
-const version = '9.9.9-test.1';
+const manifest = resolve(release, '../Cargo.toml');
 const temporaryDirectories: string[] = [];
 
 afterEach(async () => {
@@ -30,6 +30,9 @@ async function executable(directory: string, name: string, body: string): Promis
 }
 
 async function desktopBuild(arch: 'arm64' | 'x86_64', codesign: string) {
+  const version = /^version = "([^"]+)"$/m.exec(await readFile(manifest, 'utf8'))?.[1];
+  if (!version) throw new Error('Cargo.toml does not declare a release version');
+
   const root = await mkdtemp(join(tmpdir(), 'infinity-cube-release-build-'));
   temporaryDirectories.push(root);
   const tools = join(root, 'bin');
@@ -53,7 +56,7 @@ async function desktopBuild(arch: 'arm64' | 'x86_64', codesign: string) {
   );
   await copyFile(join(release, 'install.sh'), join(scripts, 'install.sh'));
   await writeFile(join(root, '.node-version'), process.version.slice(1));
-  await writeFile(join(root, 'Cargo.toml'), `[workspace.package]\nversion = "${version}"\n`);
+  await copyFile(manifest, join(root, 'Cargo.toml'));
   await writeFile(join(bundle, 'dmg', `InfinityCube_${version}_test.dmg`), 'disk image');
   await executable(
     app,
