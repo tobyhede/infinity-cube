@@ -70,6 +70,7 @@ mod given_the_environment {
         );
     }
 
+    // Case: trims a configured DATABASE_URL
     #[test]
     fn trims_the_value() {
         assert_eq!(
