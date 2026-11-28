@@ -254,6 +254,9 @@ const beginEmbeddedEdit = async (): Promise<void> => {
   fireEvent.click(
     within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Open Resource/ }),
   );
+  // The Open lands at once and its text is read after (ADR 0178): Edit is
+  // offered on the Open Resource once that text is drawn.
+  await within(controlsOf(embeddedNode(DRAWN_A))).findByRole('button', { name: /Close Resource/ });
   fireEvent.click(
     await within(controlsOf(embeddedNode(DRAWN_A))).findByRole('button', { name: /Edit Resource/ }),
   );

@@ -136,4 +136,4 @@ impl Harness for Sqlite {
     }
 }
 
-repository_cases!(super::Sqlite);
+repository_cases!(super::Sqlite, every_member);

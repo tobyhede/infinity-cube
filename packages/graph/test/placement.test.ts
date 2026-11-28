@@ -596,6 +596,19 @@ describe('Placement.equals', () => {
       false,
     );
   });
+
+  it('notices a Resource given another Edit size, on either axis', () => {
+    const withEditSize = (editSize?: { width: number; height: number }) =>
+      Placement.fromEntries([
+        [RESOURCE_A, editSize === undefined ? { x: 10, y: 20 } : { x: 10, y: 20, editSize }],
+      ]);
+    const stored = withEditSize({ width: 640, height: 360 });
+
+    expect(Placement.equals(stored, withEditSize({ width: 640, height: 360 }))).toBe(true);
+    expect(Placement.equals(stored, withEditSize({ width: 641, height: 360 }))).toBe(false);
+    expect(Placement.equals(stored, withEditSize({ width: 640, height: 361 }))).toBe(false);
+    expect(Placement.equals(stored, withEditSize())).toBe(false);
+  });
 });
 
 describe('Placement.toPositions', () => {

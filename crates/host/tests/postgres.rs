@@ -240,6 +240,7 @@ impl Harness for Postgres {
 
 repository_cases!(
     super::Postgres,
+    every_member,
     #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
 );
 
@@ -800,8 +801,8 @@ mod given_content_jsonb_reorders {
 
     /// The Space the Fresh `database` holds, read through a new pool: it
     /// comes back at `revision` in `jsonb`'s key order, holding the values
-    /// committed, and Exports the bytes a memory store holding the Space as
-    /// committed Exports.
+    /// committed, and an Export of the aggregate writes the bytes an Export
+    /// of a memory store holding the Space as committed writes.
     async fn assert_stored_in_jsonb_order(database: &Fresh, revision: u64) {
         let store = database.open();
         let stored = store

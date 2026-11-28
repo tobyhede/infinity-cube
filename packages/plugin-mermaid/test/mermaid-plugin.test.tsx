@@ -10,7 +10,6 @@ import {
 import {
   mermaidPluginView as builtView,
   mermaidPluginViewWith,
-  READING_WIDTH,
   type DiagramTheme,
   type RenderDiagram,
 } from '@project/plugin-mermaid/view';
@@ -332,65 +331,6 @@ describe('the Mermaid plugin’s view', () => {
     expect(await screen.findByRole('note')).toHaveTextContent(/^This diagram is empty\.$/u);
   });
 
-  it('Opens without a size hint once Mermaid has kept it waiting too long', async () => {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-    try {
-      const asks: string[] = [];
-      const stalled = mermaidPluginViewWith((_id, source) => {
-        asks.push(source);
-        return new Promise<string>(() => undefined);
-      });
-      const rendered = renderPlugin(stalled.View, {
-        content,
-        map: closed,
-        title: 'Notes',
-        grants: { map: true },
-        assets: reading({ [TEXT_REF]: 'graph TD' }),
-      });
-      fireEvent.click(screen.getByRole('button', { name: 'Open Resource Notes' }));
-      // The source is read, then Mermaid is asked, and never answers.
-      for (let tick = 0; tick < 20 && asks.length === 0; tick += 1) {
-        await act(() => vi.advanceTimersByTimeAsync(10));
-      }
-      expect(asks).toEqual(['graph TD']);
-      await act(() => vi.advanceTimersByTimeAsync(1000));
-      expect(rendered.commits.map).toEqual([]);
-      await act(() => vi.advanceTimersByTimeAsync(5000));
-      expect(rendered.commits.map).toEqual([open]);
-      expect(rendered.commits.hints).toEqual([undefined]);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('measures its Open size only once its diagram is drawn', async () => {
-    let finish: (svg: string) => void = () => undefined;
-    let asked = false;
-    const later = mermaidPluginViewWith(
-      () =>
-        new Promise<string>((resolve) => {
-          asked = true;
-          finish = resolve;
-        }),
-    );
-    const rendered = renderPlugin(later.View, {
-      content,
-      map: closed,
-      title: 'Notes',
-      grants: { map: true },
-      assets: reading({ [TEXT_REF]: 'graph TD' }),
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Open Resource Notes' }));
-    // The diagram is being drawn, unseen, at the width the hint asks for.
-    await waitFor(() => expect(asked).toBe(true));
-    await Promise.resolve();
-    expect(rendered.commits.map).toEqual([]);
-    finish('<svg><text>drawn</text></svg>');
-    await screen.findByRole('button', { name: 'Close Resource Notes' });
-    expect(rendered.commits.map).toEqual([open]);
-    expect(rendered.commits.hints[0]?.width).toBe(READING_WIDTH);
-  });
-
   it('draws a note and offers no Edit when its text cannot be read', async () => {
     renderPlugin(mermaidPluginView.View, {
       content,
@@ -404,28 +344,22 @@ describe('the Mermaid plugin’s view', () => {
     expect(screen.getByRole('button', { name: 'Close Resource Notes' })).toBeEnabled();
   });
 
-  it('Opens with one Map content commit carrying a size hint at least the reading width', async () => {
+  it('Opens with one Map content commit, before its source is read', async () => {
     const rendered = renderPlugin(mermaidPluginView.View, {
       content,
       map: closed,
       title: 'Notes',
       grants: { map: true },
       size: { width: 260, height: 146 },
-      assets: reading({ [TEXT_REF]: 'Text' }),
+      // A read that never answers: Opening waits for nothing (ADR 0178).
+      assets: { read: () => new Promise<never>(() => undefined) },
     });
-    await waitFor(() => expect(rendered.container.dataset).toBeDefined());
-    // Wait for the text, so Open has something to measure.
-    await Promise.resolve();
-    await Promise.resolve();
     fireEvent.click(screen.getByRole('button', { name: 'Open Resource Notes' }));
-    await screen.findByRole('button', { name: 'Close Resource Notes' });
     expect(rendered.commits.map).toEqual([open]);
-    expect(rendered.commits.hints).toHaveLength(1);
-    expect(rendered.commits.hints[0]?.width).toBe(READING_WIDTH);
+    await screen.findByRole('button', { name: 'Close Resource Notes' });
     fireEvent.click(screen.getByRole('button', { name: 'Close Resource Notes' }));
     await screen.findByRole('button', { name: 'Open Resource Notes' });
     expect(rendered.commits.map).toEqual([open, closed]);
-    expect(rendered.commits.hints[1]).toBeUndefined();
   });
 
   it('Saves by storing the text with `\\n` endings, then committing its URL, and releases its Claim', async () => {
@@ -452,6 +386,8 @@ describe('the Mermaid plugin’s view', () => {
     });
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
     expect(rendered.commits.claims.taken).toBe(1);
+    // Its edit is drawn in place, at the Edit size the canvas keeps (ADR 0178).
+    expect(rendered.commits.claims.inPlace).toEqual([{}]);
     const editor = screen.getByRole('textbox', { name: 'Mermaid source of Notes' });
     expect(editor).toHaveValue('Old');
     fireEvent.change(editor, { target: { value: 'New\r\nline' } });
@@ -534,7 +470,7 @@ describe('the Mermaid plugin’s view', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cancel editing Resource Notes' }));
     expect(screen.queryByRole('textbox')).toBeNull();
     expect(rendered.commits.content).toEqual([]);
-    expect(rendered.commits.claims).toEqual({ taken: 2, released: 2 });
+    expect(rendered.commits.claims).toEqual({ taken: 2, released: 2, inPlace: [{}, {}] });
     fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Saved' } });
     fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter', metaKey: true });
@@ -593,7 +529,7 @@ describe('the Mermaid plugin’s view', () => {
     expect(rendered.commits.map).toEqual([open]);
   });
 
-  it('reads its text again on a later Open, and hints at its size, after an earlier read failed', async () => {
+  it('reads its text again on a later Open after an earlier read failed', async () => {
     let readable = false;
     const rendered = renderPlugin(mermaidPluginView.View, {
       content,
@@ -615,8 +551,6 @@ describe('the Mermaid plugin’s view', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open Resource Notes' }));
     expect(await screen.findByTestId('mermaid-diagram')).toHaveTextContent('Text');
     expect(rendered.commits.map).toEqual([open, closed, open]);
-    // The failed read had no size to hint at; the later one, read, does.
-    expect(rendered.commits.hints[2]?.width).toBe(READING_WIDTH);
   });
 
   it('begins an Edit from Closed, after an earlier read failed, once its text reads', async () => {
@@ -641,7 +575,7 @@ describe('the Mermaid plugin’s view', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
     expect(await screen.findByRole('textbox')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).toBeNull();
-    expect(rendered.commits.hints[2]?.width).toBe(READING_WIDTH);
+    expect(rendered.commits.map).toEqual([open, closed, open]);
   });
 
   it('keeps editing what was typed while a Save was under way', async () => {
@@ -710,7 +644,6 @@ describe('the Mermaid plugin’s view', () => {
       'Old',
     );
     expect(rendered.commits.map).toEqual([open]);
-    expect(rendered.commits.hints).toHaveLength(1);
     expect(rendered.commits.claims.taken).toBe(1);
   });
 
@@ -747,39 +680,7 @@ describe('the Mermaid plugin’s view', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save Resource Notes' }));
     await screen.findByRole('button', { name: 'Edit Resource Notes' });
     expect(rendered.commits.content).toEqual([{ url: SAVED_REF }]);
-    expect(rendered.commits.claims).toEqual({ taken: 1, released: 1 });
-  });
-
-  it('hints the height of its Title and text drawn together at the width it hints', async () => {
-    // jsdom lays nothing out: the measured box answers 100px for the text and
-    // 50px more where the Title is drawn inside it, at the width it was given.
-    const widths: string[] = [];
-    const scrollHeight = vi
-      .spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
-      .mockImplementation(function (this: HTMLElement) {
-        widths.push(this.style.width);
-        return 100 + (this.querySelector('[data-testid="plugin-title"]') === null ? 0 : 50);
-      });
-    try {
-      const rendered = renderPlugin(mermaidPluginView.View, {
-        content,
-        map: closed,
-        title: 'Notes',
-        grants: { map: true },
-        size: { width: 260, height: 146 },
-        assets: reading({ [TEXT_REF]: 'Text' }),
-      });
-      fireEvent.click(screen.getByRole('button', { name: 'Open Resource Notes' }));
-      await screen.findByRole('button', { name: 'Close Resource Notes' });
-      // The Title's 50px and the text's 100px, measured together, and the inset twice.
-      expect(rendered.commits.hints[0]).toEqual({
-        width: READING_WIDTH,
-        height: 50 + 100 + 2 * 12,
-      });
-      expect(widths).toContain(`${READING_WIDTH}px`);
-    } finally {
-      scrollHeight.mockRestore();
-    }
+    expect(rendered.commits.claims).toEqual({ taken: 1, released: 1, inPlace: [{}] });
   });
 
   it('keeps its draft and Claim while authoring is withdrawn, and Saves once it returns', async () => {
@@ -802,7 +703,7 @@ describe('the Mermaid plugin’s view', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save Resource Notes' }));
     await screen.findByRole('button', { name: 'Edit Resource Notes' });
     expect(rendered.commits.content).toEqual([{ url: SAVED_REF }]);
-    expect(rendered.commits.claims).toEqual({ taken: 1, released: 1 });
+    expect(rendered.commits.claims).toEqual({ taken: 1, released: 1, inPlace: [{}] });
   });
   it('keeps focus on its Open command as it becomes Close, and back', async () => {
     renderPlugin(mermaidPluginView.View, {
