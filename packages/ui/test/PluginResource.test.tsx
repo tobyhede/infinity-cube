@@ -231,7 +231,7 @@ describe('the Map host a plugin draws inside (ADR 0142)', () => {
     const kept = surfaces.at(-1)?.map.commit;
     expect(kept).toBeDefined();
     await expect(kept?.({ n: 2 })).resolves.toBe('completed');
-    expect(commitMap).toHaveBeenLastCalledWith({ n: 2 }, undefined);
+    expect(commitMap).toHaveBeenLastCalledWith({ n: 2 });
     unmount();
     await expect(kept?.({ n: 3 })).resolves.toEqual({
       refused: 'This Resource is no longer drawn here.',

@@ -37,6 +37,18 @@ pub type AggregateApplication =
 /// The prefix of the label of every window an Aggregate's page opens.
 pub const VIEW_WINDOW_PREFIX: &str = "view-";
 
+/// Whether `label` names a window the page of the Aggregate with `key`
+/// opened, as [`OpenAggregates::open_view`] names one. Read from the label
+/// alone, so it holds once the Aggregate has begun closing and is forgotten
+/// here.
+pub fn is_view_of(label: &str, key: &AggregateKey) -> bool {
+    label.starts_with(&views_prefix(key))
+}
+
+fn views_prefix(key: &AggregateKey) -> String {
+    format!("{VIEW_WINDOW_PREFIX}{}-", key.as_str())
+}
+
 /// Every open Aggregate, by the key its address carries.
 #[derive(Debug)]
 pub struct OpenAggregates {
@@ -227,8 +239,8 @@ impl OpenAggregates {
         let mut aggregates = self.aggregates_mut();
         let served = aggregates.get_mut(key)?;
         let label = format!(
-            "{VIEW_WINDOW_PREFIX}{}-{}",
-            key.as_str(),
+            "{}{}",
+            views_prefix(key),
             self.views.fetch_add(1, Ordering::Relaxed)
         );
         let _new = served.windows.insert(label.clone());
