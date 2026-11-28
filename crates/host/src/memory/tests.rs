@@ -96,6 +96,7 @@ mod given_spaces_held_at_revisions_of_their_own {
                 exported_revision: Some(Revision::new(7).unwrap()),
             }],
         })
+        .unwrap()
     }
 
     #[test]
@@ -145,6 +146,48 @@ mod given_spaces_held_at_revisions_of_their_own {
                 "got {answer:?}"
             );
         });
+    }
+}
+
+mod given_spaces_a_store_cannot_hold {
+    use super::*;
+
+    const OTHER: &str = "10000000-0000-4000-8000-000000000002";
+
+    fn at_first(snapshot: SpaceSnapshot) -> LoadedSpace {
+        LoadedSpace {
+            snapshot,
+            revision: Revision::FIRST,
+            exported_revision: None,
+        }
+    }
+
+    #[test]
+    fn refuses_two_spaces_of_one_id() {
+        let held = MemorySpaceRepository::holding(LoadedAggregate {
+            meta_space_id: SpaceId::parse(META).unwrap(),
+            spaces: vec![at_first(meta("First")), at_first(meta("Second"))],
+        });
+        assert_eq!(
+            held.err(),
+            Some(HoldingRefused::DuplicateSpace(
+                SpaceId::parse(META).unwrap()
+            )),
+            "two Spaces of one id are refused, not collapsed into one"
+        );
+    }
+
+    #[test]
+    fn refuses_a_meta_id_naming_no_space_held() {
+        let held = MemorySpaceRepository::holding(LoadedAggregate {
+            meta_space_id: SpaceId::parse(OTHER).unwrap(),
+            spaces: vec![at_first(meta("Meta"))],
+        });
+        assert_eq!(
+            held.err(),
+            Some(HoldingRefused::MetaNotHeld(SpaceId::parse(OTHER).unwrap())),
+            "a Meta id naming no Space held is refused"
+        );
     }
 }
 
