@@ -293,11 +293,11 @@ const unrun = (
  *
  * Every case is in the adapter, ported or exempt. An exemption is keyed by a
  * case's name, covering each of its values, or by one value, `<name> (<value>)`,
- * which then decides that value alone. It is one of four kinds: pending, naming
- * the ticket of the plan that ports it; does not apply, naming the reason the
- * plan's spec gives; owned elsewhere, naming the ticket that ports it outside
- * the Rust store's own tests, of rust-host or of this plan;
- * and accepted difference, naming the decision.
+ * which then decides that value alone. It is one of four kinds: does not
+ * apply, naming the reason the plan's spec gives; owned elsewhere, naming the
+ * ticket that ports it outside the Rust store's own tests, of rust-host or of
+ * this plan; accepted difference, naming the decision; and TypeScript half,
+ * naming the Rust file that is the other half of a check run across runtimes.
  *
  * The adapter's own files are where its ports are written, and a file the
  * HTTP ports test also reads marks them `// TypeScript case: <name>`. The
@@ -305,9 +305,6 @@ const unrun = (
  * it by invoking `repository_cases!(`: the table runs no case on PostgreSQL
  * until then.
  */
-
-/** A ticket of the rust-postgresql-store plan, as `case-map.md` assigns them. */
-type PlanTicket = '05' | '06' | '07' | '08' | '09' | '10' | '11' | '12';
 
 /** Why a case cannot run on PostgreSQL, in the words of the plan's spec ("Does not apply on PostgreSQL"). */
 const DOES_NOT_APPLY = {
@@ -320,12 +317,10 @@ const DOES_NOT_APPLY = {
 } as const;
 
 type PostgresExemption =
-  | { readonly kind: 'pending'; readonly ticket: PlanTicket }
   | { readonly kind: 'does not apply'; readonly reason: string }
   | { readonly kind: 'owned elsewhere'; readonly ticket: string }
-  | { readonly kind: 'accepted difference'; readonly decision: string };
-
-const pending = (ticket: PlanTicket): PostgresExemption => ({ kind: 'pending', ticket });
+  | { readonly kind: 'accepted difference'; readonly decision: string }
+  | { readonly kind: 'TypeScript half'; readonly rustHalf: string };
 
 const doesNotApplyOnPostgres = (reason: keyof typeof DOES_NOT_APPLY): PostgresExemption => ({
   kind: 'does not apply',
@@ -346,17 +341,39 @@ const acceptedDifference = (decision: string): PostgresExemption => ({
   decision,
 });
 
+/**
+ * A case of a check run across runtimes: the TypeScript half, whose Rust half
+ * is the adapter's file `rustHalf`, which names the TypeScript half's file
+ * and marks the test that pairs with each case `// TypeScript half: <name>`.
+ */
+const typescriptHalf = (rustHalf: string): PostgresExemption => ({
+  kind: 'TypeScript half',
+  rustHalf,
+});
+
+/**
+ * A Rust test's `// TypeScript half: <name>` line, naming the TypeScript case
+ * it pairs with, counted only where a test attribute follows its run of such
+ * lines, so the mark goes with the test.
+ */
+const TYPESCRIPT_HALF =
+  /^\s*\/\/ TypeScript half: (.+)$(?=(?:\n\s*\/\/ TypeScript half: .+$)*\n\s*#\[(?:tokio::)?test\])/gmu;
+
+/** The TypeScript cases the tests of the Rust file `file` mark as their pairs. */
+const typescriptHalvesIn = (file: string): string[] =>
+  [...readRepositoryFile(file).matchAll(TYPESCRIPT_HALF)].map((match) => match[1] ?? '');
+
 /** Whether `exemption` carries its ticket, reason or decision. */
 const isExplained = (exemption: PostgresExemption): boolean => {
   switch (exemption.kind) {
-    case 'pending':
-      return true;
     case 'does not apply':
       return Object.values<string>(DOES_NOT_APPLY).includes(exemption.reason);
     case 'owned elsewhere':
       return /^(?:rust-host|rust-postgresql-store) \d+/u.test(exemption.ticket);
     case 'accepted difference':
       return exemption.decision.trim().length > 0;
+    case 'TypeScript half':
+      return /^crates\/.+\.rs$/u.test(exemption.rustHalf);
   }
 };
 
@@ -462,10 +479,10 @@ const findings = <E>(runs: readonly Run[], { marked, exempt, elsewhere }: Marks<
 /** How many runs are ported, and how many each kind of exemption holds. */
 interface Tally {
   ported: number;
-  pending: number;
   'does not apply': number;
   'owned elsewhere': number;
   'accepted difference': number;
+  'TypeScript half': number;
 }
 
 const postgresTally = (
@@ -474,10 +491,10 @@ const postgresTally = (
 ): Tally => {
   const tally: Tally = {
     ported: 0,
-    pending: 0,
     'does not apply': 0,
     'owned elsewhere': 0,
     'accepted difference': 0,
+    'TypeScript half': 0,
   };
   for (const run of runs) {
     const exemption = exemptionOf(run, exempt);
@@ -533,6 +550,7 @@ const POSTGRES_SOURCES: readonly CaseSource[] = [
   { file: 'test/e2e/postgres-persistence.spec.ts' },
   { file: 'test/integration/infinity-cube-cli.test.ts' },
   { file: 'test/integration/database-cli-targets.test.ts' },
+  { file: 'test/integration/postgres-rows-across-runtimes.test.ts' },
 ];
 
 /** The cases `source` holds, as written. */
@@ -709,6 +727,17 @@ const POSTGRES_EXEMPT = {
     ],
     ownedElsewhere('rust-host 17 and 26: the CLI’s import and export against a store'),
   ),
+
+  // test/integration/postgres-rows-across-runtimes.test.ts: the TypeScript host
+  // reading the Rust host's rows, where the Rust half reads the TypeScript host's.
+  ...exemptEach(
+    [
+      'holds the checked-in TypeScript rows to what the script writes now',
+      'holds the Rust rows to the rows this host writes',
+      'reads the rows the Rust host wrote as the memory store runs the script',
+    ],
+    typescriptHalf('crates/host/tests/postgres_rows.rs'),
+  ),
 } satisfies Readonly<Record<string, PostgresExemption>>;
 
 /** The PostgreSQL store's test binary, whose `Harness` runs the table on PostgreSQL. */
@@ -729,19 +758,27 @@ interface Port {
   readonly exempt: Readonly<Record<string, PostgresExemption>>;
 }
 
+/**
+ * The PostgreSQL files whose `// Case:` lines are the HTTP ports test's
+ * (`test/unit/http-conformance-rust-ports.test.ts`).
+ */
+const POSTGRES_SHARED_FILES = [
+  'crates/host/tests/postgres_wire.rs',
+  'crates/cli/tests/serve_postgres.rs',
+];
+
 const POSTGRES: Port = {
   name: 'the Rust PostgreSQL repository',
   table: filesUnder('crates/host/tests/repository_contract', (name) => name.endsWith('.rs')),
+  // Every `postgres*.rs` test binary and every file of the store's own module
+  // directory is read, so a new one needs no edit here.
   files: [
-    POSTGRES_HARNESS,
-    'crates/host/tests/postgres_concurrency.rs',
-    'crates/host/tests/postgres_outages.rs',
-    'crates/host/tests/postgres_properties.rs',
-    'crates/host/tests/postgres_races.rs',
-    'crates/host/tests/postgres_url.rs',
-    'crates/host/src/sql/postgres/tests.rs',
+    ...filesUnder('crates/host/tests', (name) => /^postgres.*\.rs$/u.test(name)).filter(
+      (file) => !file.includes('/postgres_support/') && !POSTGRES_SHARED_FILES.includes(file),
+    ),
+    ...filesUnder('crates/host/src/sql/postgres', (name) => name.endsWith('.rs')),
   ],
-  sharedFiles: ['crates/cli/tests/serve_postgres.rs'],
+  sharedFiles: POSTGRES_SHARED_FILES,
   exempt: POSTGRES_EXEMPT,
 };
 
@@ -837,8 +874,8 @@ describe('the Rust SQLite repository', () => {
 });
 
 describe('the repository cases the Rust PostgreSQL repository is held to', () => {
-  it('give the adapter 150 names: 130 of the first case map and the 20 the cold audit found', () => {
-    expect(POSTGRES_NAMES).toHaveLength(150);
+  it('give the adapter 153 names: 130 of the first case map, the 20 the cold audit found and the 3 of the rows across runtimes', () => {
+    expect(POSTGRES_NAMES).toHaveLength(153);
     expect(POSTGRES_NAMES.filter((name) => name.startsWith('<'))).toEqual([]);
   });
 
@@ -854,6 +891,13 @@ describe('the repository cases the Rust PostgreSQL repository is held to', () =>
       expect(cases.length).toBeGreaterThan(0);
     },
   );
+
+  it('reads every TypeScript test file named for PostgreSQL', () => {
+    const sources = POSTGRES_SOURCES.map(({ file }) => file);
+    const named = filesUnder('test', (name) => /postgres.*\.(?:test|spec)\.ts$/u.test(name));
+    expect(named).toContain('test/integration/postgres-rows-across-runtimes.test.ts');
+    expect(named.filter((file) => !sources.includes(file))).toEqual([]);
+  });
 
   it('reads one case of vite-hono-host.test.ts and two of database-startup.test.ts', () => {
     const counts = Object.fromEntries(
@@ -878,8 +922,8 @@ describe('the repository cases the Rust PostgreSQL repository is held to', () =>
     ).toEqual([]);
   });
 
-  it('give the adapter 193 runs, one per value of each case run once per value', () => {
-    expect(POSTGRES_RUNS).toHaveLength(193);
+  it('give the adapter 196 runs, one per value of each case run once per value', () => {
+    expect(POSTGRES_RUNS).toHaveLength(196);
   });
 });
 
@@ -901,6 +945,22 @@ describe('the Rust PostgreSQL repository', () => {
 
   it('exempts no case or value it ports', () => {
     expect(found.exemptAndPorted).toEqual([]);
+  });
+
+  it('reads every Rust test file named for PostgreSQL, each once', () => {
+    const read = [...POSTGRES.files, ...POSTGRES.sharedFiles];
+    const named = [
+      ...filesUnder('crates', (name) => /postgres.*\.rs$/u.test(name)).filter((file) =>
+        /^crates\/[^/]+\/tests\/[^/]+$/u.test(file),
+      ),
+      ...filesUnder('crates/host/src/sql/postgres', (name) => name.endsWith('.rs')),
+    ];
+    expect(named).toContain('crates/host/src/sql/postgres/tests.rs');
+    expect(named).toContain('crates/host/tests/postgres_wire.rs');
+    expect(named).toContain('crates/host/tests/postgres_rows.rs');
+    expect(named).toContain('crates/cli/tests/serve_postgres.rs');
+    expect(named.filter((file) => !read.includes(file))).toEqual([]);
+    expect(read.filter((file, index) => read.indexOf(file) !== index)).toEqual([]);
   });
 
   it('runs the table, its harness providing every member the table asks of it', () => {
@@ -927,11 +987,31 @@ describe('the Rust PostgreSQL repository', () => {
       postgresTally(POSTGRES_RUNS, { marked: POSTGRES_MARKED, exempt: POSTGRES.exempt }),
     ).toEqual({
       ported: 178,
-      pending: 0,
       'does not apply': 0,
       'owned elsewhere': 11,
       'accepted difference': 4,
+      'TypeScript half': 3,
     });
+  });
+
+  it('gives each case of a TypeScript half a Rust half the adapter reads, naming its source back', () => {
+    const halves = POSTGRES_SOURCE_CASES.flatMap(({ source, cases }) =>
+      cases.flatMap(({ name }) => {
+        const exemption: PostgresExemption | undefined = POSTGRES.exempt[name];
+        return exemption?.kind === 'TypeScript half'
+          ? [{ name, file: source.file, rustHalf: exemption.rustHalf }]
+          : [];
+      }),
+    );
+    expect(halves.map(({ name }) => name)).toHaveLength(3);
+    expect(
+      halves.filter(
+        ({ name, file, rustHalf }) =>
+          !POSTGRES.files.includes(rustHalf) ||
+          !readRepositoryFile(rustHalf).includes(file) ||
+          !typescriptHalvesIn(rustHalf).includes(name),
+      ),
+    ).toEqual([]);
   });
 
   it('gives each exemption its ticket, reason or decision', () => {
@@ -1163,7 +1243,7 @@ describe('the case reader', () => {
 describe('the PostgreSQL port check', () => {
   const cases: readonly DescribedCase[] = [
     { name: 'ported', line: 1, describes: [], perValue: false },
-    { name: 'pending', line: 2, describes: [], perValue: false },
+    { name: 'exempt', line: 2, describes: [], perValue: false },
     { name: 'per %s', line: 3, describes: [], perValue: true },
   ];
   const values = { 'per %s': ['a', 'b'] };
@@ -1171,7 +1251,7 @@ describe('the PostgreSQL port check', () => {
   const clean: Marks<PostgresExemption> = {
     marked: ['ported', 'per %s (a)', 'an HTTP case'],
     exempt: {
-      pending: pending('06'),
+      exempt: ownedElsewhere('rust-host 16'),
       'per %s (b)': acceptedDifference('Q5'),
     },
     elsewhere: ['an HTTP case'],
@@ -1180,7 +1260,7 @@ describe('the PostgreSQL port check', () => {
   it('names each value of a case that runs once per value', () => {
     expect(runs).toEqual([
       { name: 'ported', run: 'ported' },
-      { name: 'pending', run: 'pending' },
+      { name: 'exempt', run: 'exempt' },
       { name: 'per %s', run: 'per %s (a)' },
       { name: 'per %s', run: 'per %s (b)' },
     ]);
@@ -1281,7 +1361,7 @@ describe('the PostgreSQL port check', () => {
   it('finds an exempt case left out of the adapter: its name dropped from the exemptions', () => {
     expect(
       findings(runs, { ...clean, exempt: { 'per %s (b)': acceptedDifference('Q5') } }).unported,
-    ).toEqual(['pending']);
+    ).toEqual(['exempt']);
   });
 
   it('finds a value with neither port nor exemption', () => {
@@ -1298,25 +1378,29 @@ describe('the PostgreSQL port check', () => {
     expect(
       findings(runs, {
         ...clean,
-        exempt: { ...clean.exempt, gone: pending('07'), 'per %s (c)': pending('08') },
+        exempt: {
+          ...clean.exempt,
+          gone: ownedElsewhere('rust-host 16'),
+          'per %s (c)': acceptedDifference('Q5'),
+        },
       }).unknownExemptions,
     ).toEqual(['gone', 'per %s (c)']);
   });
 
   it('finds a case or value both ported and exempt, an accepted difference among them', () => {
     expect(
-      findings(runs, { ...clean, marked: [...clean.marked, 'pending', 'per %s (b)'] })
+      findings(runs, { ...clean, marked: [...clean.marked, 'exempt', 'per %s (b)'] })
         .exemptAndPorted,
-    ).toEqual(['pending', 'per %s (b)']);
+    ).toEqual(['exempt', 'per %s (b)']);
   });
 
   it('counts an accepted difference as an exemption, never as a port', () => {
     expect(postgresTally(runs, clean)).toEqual({
       ported: 2,
-      pending: 1,
       'does not apply': 0,
-      'owned elsewhere': 0,
+      'owned elsewhere': 1,
       'accepted difference': 1,
+      'TypeScript half': 0,
     });
   });
 
@@ -1326,17 +1410,17 @@ describe('the PostgreSQL port check', () => {
         marked: [],
         exempt: {
           ported: doesNotApplyOnPostgres('uuid'),
-          pending: ownedElsewhere('rust-host 16'),
+          exempt: ownedElsewhere('rust-host 16'),
           'per %s': acceptedDifference('Q5'),
-          'per %s (a)': pending('08'),
+          'per %s (a)': typescriptHalf('crates/host/tests/postgres_rows.rs'),
         },
       }),
     ).toEqual({
       ported: 0,
-      pending: 1,
       'does not apply': 1,
       'owned elsewhere': 1,
       'accepted difference': 1,
+      'TypeScript half': 1,
     });
   });
 
