@@ -662,10 +662,6 @@ const POSTGRES_EXEMPT = {
     'Q5: a temporary resolver failure and a name that does not resolve reach Rust alike, as `Io(Uncategorized)` with no OS error, so Rust leaves both unclassified',
   ),
 
-  // test/integration/aggregate-commit-differential.test.ts
-  'gives memory and PostgreSQL the same public outcome over generated aggregate changes':
-    pending('11'),
-
   // test/unit/prisma-foundation.test.ts
   ...exemptEach(
     [
@@ -720,6 +716,7 @@ const POSTGRES: Port = {
     POSTGRES_HARNESS,
     'crates/host/tests/postgres_concurrency.rs',
     'crates/host/tests/postgres_outages.rs',
+    'crates/host/tests/postgres_properties.rs',
     'crates/host/tests/postgres_races.rs',
     'crates/host/tests/postgres_url.rs',
     'crates/host/src/sql/postgres/tests.rs',
@@ -909,8 +906,8 @@ describe('the Rust PostgreSQL repository', () => {
     expect(
       postgresTally(POSTGRES_RUNS, { marked: POSTGRES_MARKED, exempt: POSTGRES.exempt }),
     ).toEqual({
-      ported: 177,
-      pending: 2,
+      ported: 178,
+      pending: 1,
       'does not apply': 0,
       'owned elsewhere': 10,
       'accepted difference': 4,

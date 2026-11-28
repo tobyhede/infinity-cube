@@ -413,9 +413,21 @@ pub enum KeyOrder {
     Reordered,
 }
 
+impl KeyOrder {
+    /// `value` as a store keeping this key order is compared: itself, or
+    /// every JSON object in it in ascending key order.
+    pub fn compared<T: InKeyOrder + Clone>(self, value: &T) -> T {
+        match self {
+            Self::Kept => value.clone(),
+            Self::Reordered => value.in_key_order(),
+        }
+    }
+}
+
 /// A value as a store that reorders keys is compared: with every JSON
-/// object in it, each Resource's content and each placement's Map content,
-/// in ascending key order. Everything else a store answers is typed, so it
+/// object in it, each Resource's content, each placement's Map content and
+/// each Map's positions, in ascending key order. Everything else a store
+/// answers is typed, so it
 /// compares as it is.
 pub trait InKeyOrder {
     /// This value, every JSON object in it in ascending key order.
@@ -482,6 +494,10 @@ impl InKeyOrder for SpaceSnapshot {
             for (_, placement) in &mut map.positions {
                 placement.content = placement.content.in_key_order();
             }
+            // A Map's positions are a JSON object keyed by Resource id, all
+            // of one length, so ascending id order is its key order.
+            map.positions
+                .sort_by(|left, right| left.0.as_str().cmp(right.0.as_str()));
         }
         snapshot
     }
