@@ -176,8 +176,8 @@ describe('the Mermaid plugin’s view', () => {
   });
 
   it.each([open, closed])(
-    'suggests the source editor’s dimensions once per edit without a stored Edit size, map %j',
-    async (map) => {
+    'suggests the source editor’s dimensions once per edit without a stored Edit size, Map content %j',
+    async (mapContent) => {
       const width = vi
         .spyOn(HTMLTextAreaElement.prototype, 'offsetWidth', 'get')
         .mockReturnValue(431);
@@ -188,7 +188,7 @@ describe('the Mermaid plugin’s view', () => {
         const pendingDiagram = mermaidPluginViewWith(() => new Promise<string>(() => undefined));
         const rendered = renderPlugin(pendingDiagram.View, {
           content,
-          map,
+          map: mapContent,
           title: 'Notes',
           grants: editable,
           assets: reading({ [TEXT_REF]: 'Old' }),

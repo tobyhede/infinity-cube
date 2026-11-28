@@ -113,8 +113,8 @@ describe('the Markdown plugin’s view', () => {
   });
 
   it.each([open, closed])(
-    'suggests the source editor’s dimensions once per edit without a stored Edit size, map %j',
-    async (map) => {
+    'suggests the source editor’s dimensions once per edit without a stored Edit size, Map content %j',
+    async (mapContent) => {
       const width = vi
         .spyOn(HTMLTextAreaElement.prototype, 'offsetWidth', 'get')
         .mockReturnValue(431);
@@ -124,7 +124,7 @@ describe('the Markdown plugin’s view', () => {
       try {
         const rendered = renderPlugin(markdownPluginView.View, {
           content,
-          map,
+          map: mapContent,
           title: 'Notes',
           grants: editable,
           assets: reading({ [TEXT_REF]: 'Old' }),
