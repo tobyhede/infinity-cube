@@ -88,4 +88,39 @@ describe('the Start window’s shell over invoke', () => {
     expect(await shell.browse('/home/ada/Documents')).toBeNull();
     expect(calls).toEqual([{ command: 'start_browse', args: { location: '/home/ada/Documents' } }]);
   });
+
+  it('asks for the SQLite file chooser', () => {
+    const { shell, calls } = invoking({});
+
+    shell.openSqliteFile();
+
+    expect(calls).toEqual([{ command: 'start_open_sqlite_file', args: undefined }]);
+  });
+
+  it('hands the shell a PostgreSQL URL and password, answering why it did not open or nothing', async () => {
+    const refused = invoking({
+      start_connect_postgres: () =>
+        Promise.resolve('The URL is not one InfinityCube can connect to.'),
+    });
+    expect(await refused.shell.connectPostgres('postgres://x', 'pw')).toBe(
+      'The URL is not one InfinityCube can connect to.',
+    );
+    expect(refused.calls).toEqual([
+      { command: 'start_connect_postgres', args: { url: 'postgres://x', password: 'pw' } },
+    ]);
+
+    const opened = invoking({ start_connect_postgres: () => Promise.resolve(null) });
+    expect(await opened.shell.connectPostgres('postgres://x', '')).toBeNull();
+  });
+
+  it('answers a PostgreSQL connect the shell refused to take as why, in its words', async () => {
+    const { shell } = invoking({
+      start_connect_postgres: () =>
+        Promise.reject(new Error('command start_connect_postgres not allowed')),
+    });
+
+    expect(await shell.connectPostgres('postgres://x', '')).toBe(
+      'command start_connect_postgres not allowed',
+    );
+  });
 });

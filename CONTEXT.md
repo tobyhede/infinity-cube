@@ -20,11 +20,11 @@ All Spaces together, rooted at the Meta Space through Space Resource references.
 _Avoid_: talk, catalog, tree, bundle, collection; aggregate for a single Space; Aggregate in anything a person is shown, which says Space.
 
 **Space window**:
-A window the desktop application opens on an Aggregate directory, showing its Spaces.
+A window the desktop application opens on an Aggregate directory, a SQLite file or a PostgreSQL database, showing its Spaces.
 _Avoid_: talk window, Aggregate window; Opening as the name of a folder's open, in code or a heading (Opening is a Resource's).
 
 **Start window**:
-The desktop application's window for creating a Space, opening a folder or reopening a recent Space. See [desktop shell requirements](docs/requirements/storage.md#the-desktop-shell) for when it appears.
+The desktop application's window for creating a Space, opening a folder or a SQLite file, connecting to a PostgreSQL database, or reopening a recent Space. See [desktop shell requirements](docs/requirements/storage.md#the-desktop-shell) for when it appears.
 _Avoid_: home window, launcher, welcome window.
 
 **Recent**:

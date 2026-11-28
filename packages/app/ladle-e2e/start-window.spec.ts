@@ -33,6 +33,37 @@ test(
 );
 
 test(
+  'Connect to PostgreSQL Database… asks for a URL and a hidden password, and keeps the URL when refused',
+  { tag: '@parity:start-window-connects-to-a-postgresql-database' },
+  async ({ page }) => {
+    await page.goto(story('first-launch'));
+    await expect(page.getByRole('button', { name: 'Open SQLite File…' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Connect to PostgreSQL Database…' }).click();
+    const form = page.getByRole('form', { name: 'Connect to a PostgreSQL Database' });
+    const url = form.getByRole('textbox', { name: 'URL' });
+    await expect(url).toBeFocused();
+    const password = form.getByLabel('Password');
+    await expect(password).toHaveAttribute('type', 'password');
+
+    await url.fill('postgres://ada@db.example/unmigrated');
+    await password.fill('hunter2');
+    await form.getByRole('button', { name: 'Connect' }).click();
+    await expect(page.getByRole('alert')).toContainText('could not be opened');
+    await expect(page.getByRole('alert')).not.toContainText('hunter2');
+    await expect(url).toHaveValue('postgres://ada@db.example/unmigrated');
+
+    await url.fill('postgres://ada@db.example/slides');
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    await form.getByRole('button', { name: 'Connect' }).click();
+    await expect(page.getByRole('status')).toHaveText('Connecting to the PostgreSQL database…');
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('button', { name: 'New Space' })).toBeVisible();
+  },
+);
+
+test(
   'a name that is not one folder name is refused beside the field',
   { tag: '@parity:start-window-refuses-a-name-beside-the-field' },
   async ({ page }) => {

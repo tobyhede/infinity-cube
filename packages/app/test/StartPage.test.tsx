@@ -15,6 +15,8 @@ type Asked =
   | { readonly kind: 'browse'; readonly location: string }
   | { readonly kind: 'open-folder' }
   | { readonly kind: 'open-recent'; readonly folder: string }
+  | { readonly kind: 'open-sqlite-file' }
+  | { readonly kind: 'connect-postgres'; readonly url: string; readonly password: string }
   | { readonly kind: 'close' };
 
 /** A shell that answers as told and records what it was asked. */
@@ -26,10 +28,13 @@ function fakeShell(
     readonly browse?: NewSpaceDefaults | null;
     /** Hold each answer to `view` until `answerView` gives it. */
     readonly holdViews?: boolean;
+    /** Why a database did not open; held until `finishConnect` when not given. */
+    readonly connect?: (url: string, password: string) => string | null;
   } = {},
 ) {
   const asked: Asked[] = [];
   let finishCreate: ((answer: NotCreated | null) => void) | undefined;
+  let finishConnect: ((answer: string | null) => void) | undefined;
   const view = { recents: options.recents ?? [], newSpace: options.defaults ?? DOCUMENTS };
   const heldViews: { readonly answer: () => void; readonly fail: () => void }[] = [];
   const shell: StartShell = {
@@ -55,12 +60,26 @@ function fakeShell(
     },
     openFolder: () => asked.push({ kind: 'open-folder' }),
     openRecent: (folder) => asked.push({ kind: 'open-recent', folder }),
+    openSqliteFile: () => asked.push({ kind: 'open-sqlite-file' }),
+    connectPostgres: (url, password) => {
+      asked.push({ kind: 'connect-postgres', url, password });
+      if (options.connect !== undefined) return Promise.resolve(options.connect(url, password));
+      return new Promise((resolve) => {
+        finishConnect = resolve;
+      });
+    },
     close: () => asked.push({ kind: 'close' }),
   };
   return {
     shell,
     asked,
     finishCreate: (answer: NotCreated | null) => finishCreate?.(answer),
+    finishConnect: async (answer: string | null) => {
+      await act(async () => {
+        finishConnect?.(answer);
+        await Promise.resolve();
+      });
+    },
     /** Give the oldest held answer to `view`, or the newest. */
     answerView: async (which: 'oldest' | 'newest' = 'oldest') => {
       await act(async () => {
@@ -141,6 +160,15 @@ describe('the Start window', () => {
     const retry = await screen.findByRole('button', { name: /^Try again/u });
     expect(retry.textContent).toBe('Try again');
     expect(screen.getByText('One of its files could not be read.')).toBeTruthy();
+  });
+
+  it('asks the shell for its file chooser from Open SQLite File…', async () => {
+    const { shell, asked } = fakeShell();
+    render(<StartPage shell={shell} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open SQLite File…' }));
+
+    expect(asked).toEqual([{ kind: 'open-sqlite-file' }]);
   });
 
   it('asks the shell for its folder chooser from Open Folder…', async () => {
@@ -541,5 +569,117 @@ describe('New Space', () => {
     });
 
     expect(await screen.findByRole('form', { name: 'New Space' })).toBeTruthy();
+  });
+});
+
+describe('Connect to a PostgreSQL database', () => {
+  const urlField = () => screen.getByRole('textbox', { name: 'URL' });
+  const passwordField = () => screen.getByLabelText('Password');
+  const connectButton = () => screen.getByRole('button', { name: 'Connect' });
+
+  async function openForm(shell: StartShell): Promise<void> {
+    render(<StartPage shell={shell} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Connect to PostgreSQL Database…' }));
+    await screen.findByRole('form', { name: 'Connect to a PostgreSQL Database' });
+  }
+
+  it('asks for a URL, focused, and a separate password field that hides what is typed', async () => {
+    await openForm(fakeShell().shell);
+
+    expect(document.activeElement).toBe(urlField());
+    expect(passwordField()).toHaveProperty('type', 'password');
+    expect(screen.getByText(/keeps the URL without its password/u, { exact: false })).toBeTruthy();
+  });
+
+  it('hands the shell the URL and the password, and shows one status while it connects', async () => {
+    const { shell, asked } = fakeShell();
+    await openForm(shell);
+
+    fireEvent.change(urlField(), { target: { value: 'postgres://ada@db.example/slides' } });
+    fireEvent.change(passwordField(), { target: { value: 'hunter2' } });
+    fireEvent.click(connectButton());
+
+    expect(asked).toEqual([
+      { kind: 'connect-postgres', url: 'postgres://ada@db.example/slides', password: 'hunter2' },
+    ]);
+    expect((await screen.findByRole('status')).textContent).toContain(
+      'Connecting to the PostgreSQL database…',
+    );
+    expect(screen.queryByText(/hunter2/u)).toBeNull();
+  });
+
+  it('asks the shell once however often Connect is pressed while it connects', async () => {
+    const { shell, asked } = fakeShell();
+    await openForm(shell);
+    fireEvent.change(urlField(), { target: { value: 'postgres://ada@db.example/slides' } });
+
+    fireEvent.click(connectButton());
+    fireEvent.click(connectButton());
+
+    expect(asked).toHaveLength(1);
+  });
+
+  it('shows why the database did not open above the buttons, the URL and password kept', async () => {
+    const { shell, finishConnect } = fakeShell();
+    await openForm(shell);
+    fireEvent.change(urlField(), { target: { value: 'postgres://ada@db.example/slides' } });
+    fireEvent.change(passwordField(), { target: { value: 'hunter2' } });
+    fireEvent.click(connectButton());
+
+    await finishConnect(
+      'The PostgreSQL database postgres://ada@db.example/slides could not be opened: it has not been migrated.',
+    );
+
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'could not be opened: it has not been migrated.',
+    );
+    expect(urlField()).toHaveProperty('value', 'postgres://ada@db.example/slides');
+    expect(passwordField()).toHaveProperty('value', 'hunter2');
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('clears a refusal once the URL changes', async () => {
+    await openForm(fakeShell({ connect: () => 'Name the PostgreSQL database by its URL.' }).shell);
+    fireEvent.click(connectButton());
+    await screen.findByRole('alert');
+
+    fireEvent.change(urlField(), { target: { value: 'postgres://ada@db.example/slides' } });
+
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('returns to the start screen on Cancel or Escape', async () => {
+    await openForm(fakeShell().shell);
+
+    fireEvent.keyDown(urlField(), { key: 'Escape' });
+    fireEvent.click(await screen.findByRole('button', { name: 'Connect to PostgreSQL Database…' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
+
+    expect(await screen.findByRole('button', { name: 'New Space' })).toBeTruthy();
+  });
+
+  it('opens on the form File › Connect to PostgreSQL Database… asks for, where Cancel closes the window', async () => {
+    window.history.replaceState(null, '', '/start.html#postgres');
+    const { shell, asked } = fakeShell();
+    render(<StartPage shell={shell} />);
+
+    await screen.findByRole('form', { name: 'Connect to a PostgreSQL Database' });
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(asked).toEqual([{ kind: 'close' }]);
+  });
+
+  it('moves to the form when the shell asks for it while the start screen shows', async () => {
+    render(<StartPage shell={fakeShell().shell} />);
+    await screen.findByRole('button', { name: 'New Space' });
+
+    act(() => {
+      window.location.hash = 'postgres';
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    });
+
+    expect(
+      await screen.findByRole('form', { name: 'Connect to a PostgreSQL Database' }),
+    ).toBeTruthy();
   });
 });

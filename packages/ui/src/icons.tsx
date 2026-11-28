@@ -7,10 +7,12 @@ import {
   Circle,
   CircleAlert,
   Copy,
+  Database,
   Ellipsis,
   ExternalLink,
   Eye,
   EyeOff,
+  FileBox,
   FolderOpen,
   Image as ImageGlyph,
   LayoutGrid,
@@ -349,6 +351,18 @@ export const CloseIcon = () => <X size={14} strokeWidth={3} />;
  * asks with the platform's folder chooser.
  */
 export const FolderOpenIcon = () => <FolderOpen size={14} />;
+
+/**
+ * Open a SQLite file from disk: the desktop Start window's Open SQLite File…,
+ * which asks with the platform's file chooser (ADR 0181).
+ */
+export const SqliteFileIcon = () => <FileBox size={14} />;
+
+/**
+ * Connect to a PostgreSQL database named by its URL: the desktop Start
+ * window's Connect to PostgreSQL Database… (ADR 0181).
+ */
+export const DatabaseIcon = () => <Database size={14} />;
 
 /**
  * Open an entity's actions menu, where the menu does not primarily serve one action.

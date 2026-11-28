@@ -82,6 +82,15 @@ export interface StartShell {
   openFolder(): void;
   /** Open a recent Space's folder, or a new Space's that did not open. */
   openRecent(folder: string): void;
+  /** Open SQLite File…: the platform's file chooser (ADR 0181). */
+  openSqliteFile(): void;
+  /**
+   * Open the PostgreSQL database `url` names, connected with `password` when
+   * it is not empty, answering `null` once its window has opened (the shell
+   * then closes this one), or why not, naming the database without its
+   * password (ADR 0181).
+   */
+  connectPostgres(url: string, password: string): Promise<string | null>;
   /** Close the Start window. */
   close(): void;
 }
@@ -123,6 +132,19 @@ export function tauriStartShell(tauri: TauriInvoke): StartShell {
     },
     openFolder: () => invokeIgnoringRefusal('start_open_folder'),
     openRecent: (folder) => invokeIgnoringRefusal('start_open_recent', { folder }),
+    openSqliteFile: () => invokeIgnoringRefusal('start_open_sqlite_file'),
+    connectPostgres: async (url, password) => {
+      try {
+        return z
+          .string()
+          .nullable()
+          .parse(await tauri.invoke('start_connect_postgres', { url, password }));
+      } catch (error) {
+        // An invoke the shell refused, or an answer the schema does not
+        // read: either way the page shows it as why nothing opened.
+        return error instanceof Error ? error.message : String(error);
+      }
+    },
     close: () => invokeIgnoringRefusal('start_close'),
   };
 }

@@ -4,6 +4,7 @@ import {
   AlertDescription,
   AlertIcon,
   Badge,
+  DatabaseIcon,
   Button,
   Collapsible,
   CollapsibleContent,
@@ -34,6 +35,7 @@ import {
   PlusIcon,
   Separator,
   SpaceIcon,
+  SqliteFileIcon,
   StatusBusy,
 } from '@project/ui';
 import { newSpaceFolder, type NewSpaceForm } from './start-form';
@@ -42,14 +44,26 @@ import type { RecentSpace } from '../start-shell';
 
 /**
  * The desktop application's Start window (Storage ST-131, UI-111), drawn
- * from what it is handed: the start screen (New Space, Open Folder… and
- * Recent Spaces), the New Space form, and the one status shown while a new
- * Space opens. `StartPage` holds its state and asks the shell.
+ * from what it is handed: the start screen (New Space, Open Folder…, Open
+ * SQLite File…, Connect to PostgreSQL Database… and Recent Spaces), the New
+ * Space form, the PostgreSQL form (ADR 0181), and the one status shown while
+ * a new Space opens. `StartPage` holds its state and asks the shell.
  */
+
+/** The PostgreSQL form: what is typed, and why the last Connect opened nothing. */
+export interface PostgresForm {
+  readonly url: string;
+  readonly password: string;
+  /** The shell's sentence, naming the database without its password. */
+  readonly refusal: string | null;
+  /** Connect was pressed and the shell has not answered. */
+  readonly connecting: boolean;
+}
 
 export type StartScreen =
   | { readonly screen: 'start' }
   | { readonly screen: 'new'; readonly form: NewSpaceForm }
+  | { readonly screen: 'postgres'; readonly form: PostgresForm }
   | { readonly screen: 'opening'; readonly title: string; readonly folder: string };
 
 export interface StartWindowProps {
@@ -57,6 +71,11 @@ export interface StartWindowProps {
   readonly recents: readonly RecentSpace[];
   readonly onNewSpace: () => void;
   readonly onOpenFolder: () => void;
+  readonly onOpenSqliteFile: () => void;
+  /** Connect to PostgreSQL Database…: shows the PostgreSQL form. */
+  readonly onShowPostgres: () => void;
+  readonly onPostgresChange: (next: Pick<PostgresForm, 'url' | 'password'>) => void;
+  readonly onConnect: () => void;
   readonly onOpenRecent: (recent: RecentSpace) => void;
   /** Remove is offered only when the shell keeps a history to remove from. */
   readonly onRemoveRecent?: ((recent: RecentSpace) => void) | undefined;
@@ -83,6 +102,14 @@ export function StartWindow(props: StartWindowProps) {
           onCancel={props.onCancel}
         />
       ) : null}
+      {view.screen === 'postgres' ? (
+        <PostgresScreen
+          form={view.form}
+          onChange={props.onPostgresChange}
+          onConnect={props.onConnect}
+          onCancel={props.onCancel}
+        />
+      ) : null}
       {view.screen === 'opening' ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-1 p-8 text-center">
           <StatusBusy label={`Opening ${view.title}…`} className="p-0" />
@@ -97,6 +124,8 @@ function StartScreenView({
   recents,
   onNewSpace,
   onOpenFolder,
+  onOpenSqliteFile,
+  onShowPostgres,
   onOpenRecent,
   onRemoveRecent,
 }: StartWindowProps) {
@@ -122,6 +151,14 @@ function StartScreenView({
           <Button variant="secondary" className="justify-start gap-2" onClick={onOpenFolder}>
             <FolderOpenIcon />
             Open Folder…
+          </Button>
+          <Button variant="secondary" className="justify-start gap-2" onClick={onOpenSqliteFile}>
+            <SqliteFileIcon />
+            Open SQLite File…
+          </Button>
+          <Button variant="secondary" className="justify-start gap-2" onClick={onShowPostgres}>
+            <DatabaseIcon />
+            Connect to PostgreSQL Database…
           </Button>
         </div>
       </aside>
@@ -427,6 +464,108 @@ function NewSpaceScreen({
           onClick={onLocation === null ? undefined : onCreate}
         >
           Create Space
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+/**
+ * The form naming a PostgreSQL database (ADR 0181): its URL, and a separate
+ * Password field for one the URL leaves out. Connect hands both to the shell,
+ * which keeps neither; while it connects one status shows, and why it opened
+ * nothing comes back as a notice above the buttons with the fields kept.
+ */
+function PostgresScreen({
+  form,
+  onChange,
+  onConnect,
+  onCancel,
+}: {
+  form: PostgresForm;
+  onChange: (next: Pick<PostgresForm, 'url' | 'password'>) => void;
+  onConnect: () => void;
+  onCancel: () => void;
+}) {
+  const headingId = useId();
+  const urlId = useId();
+  const passwordId = useId();
+  const passwordHelpId = useId();
+  const urlInput = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    urlInput.current?.focus();
+  }, []);
+  const submit = (event: FormEvent<HTMLFormElement>): void => {
+    event.preventDefault();
+    if (!form.connecting) onConnect();
+  };
+  return (
+    <form
+      aria-labelledby={headingId}
+      noValidate
+      onSubmit={submit}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') onCancel();
+      }}
+      className="m-auto flex w-full max-w-md flex-col gap-5 px-8 py-6"
+    >
+      <div className="flex flex-col gap-1">
+        <h1 id={headingId} className="text-chrome-sm font-semibold text-foreground">
+          Connect to a PostgreSQL Database
+        </h1>
+        <p className="text-chrome-xs text-muted-foreground">
+          Open a Space kept in a PostgreSQL database that has been migrated for InfinityCube.
+        </p>
+      </div>
+      <FieldGroup>
+        <Field>
+          <FieldLabel htmlFor={urlId}>URL</FieldLabel>
+          <Input
+            ref={urlInput}
+            id={urlId}
+            value={form.url}
+            placeholder="postgres://user@host:5432/database"
+            autoComplete="off"
+            spellCheck={false}
+            readOnly={form.connecting}
+            onChange={(event) => onChange({ url: event.target.value, password: form.password })}
+          />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor={passwordId}>Password</FieldLabel>
+          <Input
+            id={passwordId}
+            type="password"
+            value={form.password}
+            autoComplete="off"
+            readOnly={form.connecting}
+            aria-describedby={passwordHelpId}
+            onChange={(event) => onChange({ url: form.url, password: event.target.value })}
+          />
+          <FieldDescription id={passwordHelpId}>
+            InfinityCube keeps the URL without its password. Leave Password empty to use PGPASSWORD
+            or your password file.
+          </FieldDescription>
+        </Field>
+      </FieldGroup>
+      {form.refusal === null ? null : (
+        <Alert variant="destructive">
+          <AlertIcon />
+          <AlertDescription className="break-all">{form.refusal}</AlertDescription>
+        </Alert>
+      )}
+      {form.connecting ? (
+        <StatusBusy label="Connecting to the PostgreSQL database…" className="p-0" />
+      ) : null}
+      <Separator />
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="ghost" onClick={onCancel}>
+          Cancel
+        </Button>
+        {/* Not disabled while connecting, so focus stays in the form and
+            Escape still answers; a second submit is ignored. */}
+        <Button type="submit" variant="default">
+          Connect
         </Button>
       </div>
     </form>

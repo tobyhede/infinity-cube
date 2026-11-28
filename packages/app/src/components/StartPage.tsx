@@ -1,22 +1,29 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { StatusFailure } from '@project/ui';
-import { StartWindow, type StartScreen } from './StartWindow';
+import { StartWindow, type PostgresForm, type StartScreen } from './StartWindow';
 import { newSpaceFolder, type NewSpaceForm } from './start-form';
 import type { NewSpaceDefaults, RecentSpace, StartShell } from '../start-shell';
 
 /**
  * The desktop shell's Start window page (`start.html`, Storage ST-131): it
  * asks the shell for the recent Spaces and New Space's defaults, and hands
- * it New Space, Open Folder…, Browse…, a recent Space, and Cancel on a form
- * File › New Space… opened.
+ * it New Space, Open Folder…, Open SQLite File…, a PostgreSQL URL and
+ * password (ADR 0181), Browse…, a recent Space, and Cancel on a form a menu
+ * item opened.
  *
- * The shell asks for the form with the fragment `#new-space`: at load (a
- * window opened by File › New Space…, whose Cancel closes it), or later by
- * setting it (File › New Space… while the start screen shows).
+ * The shell asks for a form with a fragment, `#new-space` for New Space or
+ * `#postgres` for the PostgreSQL form: at load (a window opened by File ›
+ * New Space… or File › Connect to PostgreSQL Database…, whose Cancel closes
+ * it), or later by setting it (the menu item while the start screen shows).
  */
 
 /** The fragment that asks for the New Space form. */
 export const NEW_SPACE_FRAGMENT = '#new-space';
+
+/** The fragment that asks for the PostgreSQL form. */
+export const POSTGRES_FRAGMENT = '#postgres';
+
+const EMPTY_POSTGRES: PostgresForm = { url: '', password: '', refusal: null, connecting: false };
 
 const formFrom = (defaults: NewSpaceDefaults): NewSpaceForm => ({
   ...defaults,
@@ -24,6 +31,8 @@ const formFrom = (defaults: NewSpaceDefaults): NewSpaceForm => ({
 });
 
 const asksForForm = (): boolean => window.location.hash === NEW_SPACE_FRAGMENT;
+
+const asksForPostgres = (): boolean => window.location.hash === POSTGRES_FRAGMENT;
 
 /** Forget the fragment, so the shell setting it again is a change the page hears. */
 const forgetFragment = (): void => {
@@ -39,10 +48,14 @@ type Loaded =
 
 export function StartPage({ shell }: { readonly shell: StartShell }) {
   const [loaded, setLoaded] = useState<Loaded>({ state: 'loading' });
-  const [view, setView] = useState<StartScreen>({ screen: 'start' });
+  const [view, setView] = useState<StartScreen>(() =>
+    asksForPostgres() ? { screen: 'postgres', form: EMPTY_POSTGRES } : { screen: 'start' },
+  );
   // A form the window opened on closes the window on Cancel; one reached
   // from the start screen returns to it.
-  const cancelCloses = useRef(asksForForm());
+  const cancelCloses = useRef(asksForForm() || asksForPostgres());
+  // Whether the window opened on the New Space form, which waits for the defaults.
+  const opensOnNewSpace = useRef(asksForForm());
   // Whether the person has typed a name, which Browse… then keeps.
   const nameTyped = useRef(false);
   // The latest request for the form. A newer request, Cancel and Create
@@ -76,7 +89,7 @@ export function StartPage({ shell }: { readonly shell: StartShell }) {
   const showForm = useCallback(() => void load(true), [load]);
 
   useEffect(() => {
-    void load(cancelCloses.current);
+    void load(opensOnNewSpace.current);
   }, [load]);
 
   // What the hash listener reads, kept current after each render.
@@ -87,7 +100,9 @@ export function StartPage({ shell }: { readonly shell: StartShell }) {
 
   useEffect(() => {
     const heard = (): void => {
-      if (asksForForm() && shown.current.screen === 'start') showForm();
+      if (shown.current.screen !== 'start') return;
+      if (asksForForm()) showForm();
+      if (asksForPostgres()) setView({ screen: 'postgres', form: EMPTY_POSTGRES });
     };
     window.addEventListener('hashchange', heard);
     return () => window.removeEventListener('hashchange', heard);
@@ -147,6 +162,21 @@ export function StartPage({ shell }: { readonly shell: StartShell }) {
     );
   };
 
+  const connect = (): void => {
+    if (view.screen !== 'postgres') return;
+    const { url, password } = view.form;
+    setView({ screen: 'postgres', form: { ...view.form, refusal: null, connecting: true } });
+    void shell.connectPostgres(url, password).then((refusal) => {
+      // Answered nothing: its window opened, and the shell closes this one.
+      if (refusal === null) return;
+      setView((current) =>
+        current.screen === 'postgres' && current.form.connecting
+          ? { screen: 'postgres', form: { ...current.form, refusal, connecting: false } }
+          : current,
+      );
+    });
+  };
+
   const create = (): void => {
     if (form === null) return;
     forgetFormRequests();
@@ -163,6 +193,16 @@ export function StartPage({ shell }: { readonly shell: StartShell }) {
       recents={loaded.recents}
       onNewSpace={showForm}
       onOpenFolder={() => shell.openFolder()}
+      onOpenSqliteFile={() => shell.openSqliteFile()}
+      onShowPostgres={() => setView({ screen: 'postgres', form: EMPTY_POSTGRES })}
+      onPostgresChange={(next) =>
+        setView((current) =>
+          current.screen === 'postgres'
+            ? { screen: 'postgres', form: { ...current.form, ...next, refusal: null } }
+            : current,
+        )
+      }
+      onConnect={connect}
       onOpenRecent={(recent) => shell.openRecent(recent.folder)}
       onNameChange={(name) => {
         nameTyped.current = true;
