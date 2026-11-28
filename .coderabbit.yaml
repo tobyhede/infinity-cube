@@ -33,7 +33,6 @@ reviews:
     narrate what the code does.
   collapse_walkthrough: true
   changed_files_summary: true
-  sequence_maps: true
   estimate_code_review_effort: true
 
   # The issue tracker is markdown under `.scratch/`, not GitHub Issues, and the

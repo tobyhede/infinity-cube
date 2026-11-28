@@ -4,7 +4,7 @@
 
 **Blocked by:** 03, 04
 
-**What to build:** Implement the sizing contract in [proposed ADR 0182](../../../docs/adr/0182-a-plugin-chooses-the-size-it-suggests-for-its-editor.md). A plugin identifies the editor it draws and may suggest dimensions. It chooses how to obtain them. Markdown and Mermaid use the real source editor. With no Edit size stored, they lay it out hidden, read its width and height once, then show the same editor. A stored Edit size skips measurement.
+**What to build:** Implement the sizing contract in [ADR 0182](../../../docs/adr/0182-a-plugin-chooses-the-size-it-suggests-for-its-editor.md). A plugin identifies the editor it draws and may suggest dimensions. It chooses how to obtain them. Markdown and Mermaid use the real source editor. With no Edit size stored, they lay it out hidden, read its width and height once, then show the same editor. A stored Edit size skips measurement.
 
 ## Acceptance
 

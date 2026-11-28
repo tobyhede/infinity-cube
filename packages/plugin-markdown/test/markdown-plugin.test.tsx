@@ -112,6 +112,26 @@ describe('the Markdown plugin’s view', () => {
     expect(rendered.commits.map).toEqual([open, closed]);
   });
 
+  it.each([{}, { editSize: STORED_EDIT_SIZE }])(
+    'explains a refused editor Claim with Edit size %s',
+    async (sizing) => {
+      renderPlugin(markdownPluginView.View, {
+        content,
+        map: open,
+        title: 'Notes',
+        grants: editable,
+        assets: reading({ [TEXT_REF]: 'Old' }),
+        claimRefused: true,
+        ...sizing,
+      });
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Another change is still being made. Try again when it ends.',
+      );
+      expect(screen.queryByRole('textbox')).toBeNull();
+    },
+  );
+
   it('suggests the source editor’s dimensions once per edit without a stored Edit size', async () => {
     const width = vi
       .spyOn(HTMLTextAreaElement.prototype, 'offsetWidth', 'get')

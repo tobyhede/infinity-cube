@@ -58,6 +58,8 @@ const DIAGRAM_WIDTH = 640;
 /** The inset the diagram and its notes are drawn at inside the rect. */
 const INSET = 12;
 
+const BUSY = 'Another change is still being made. Try again when it ends.';
+
 /** The room a Closed Title keeps below it, which an Open one does not. */
 const CLOSED_FOOT = 8;
 
@@ -351,15 +353,24 @@ function MermaidView({
   const beginEdit = useCallback(() => {
     if (!mayEdit || editing !== null) return;
     const held = surface.editSize === undefined ? undefined : takeClaim({ editor: {} });
-    if (surface.editSize !== undefined && held === undefined) return;
+    if (surface.editSize !== undefined && held === undefined) {
+      setRefusal(BUSY);
+      return;
+    }
     setRefusal(null);
+    // Compare with the editor’s LF line endings so an unchanged CRLF source stays untouched.
     setEditing({ draft: readable, base: lineFeedText(readable), saving: false, claim: held });
   }, [mayEdit, editing, takeClaim, readable, surface.editSize]);
 
   const suggestEditorSize = (source: Size) => {
     const suggestedSize = editorSizeWithTitle(source, titleRow.current, surface.size);
     const held = takeClaim?.({ editor: { suggestedSize } });
-    setEditing((now) => (now === null || held === undefined ? null : { ...now, claim: held }));
+    if (held === undefined) {
+      setRefusal(BUSY);
+      setEditing(null);
+      return;
+    }
+    setEditing((now) => (now === null ? null : { ...now, claim: held }));
   };
 
   const end = useCallback(() => setEditing(null), []);

@@ -50,10 +50,10 @@ export interface Projection {
 
 export interface ResizeDraft {
   readonly resourceId: ResourceId;
-  readonly requestedSize?: ResourceSize;
+  readonly requestedSize?: ResourceSize | undefined;
   readonly placement: Placement;
   /** The resize is of an editor, so it writes the Edit size (ADR 0178). */
-  readonly editor?: true | undefined;
+  readonly editor?: { readonly initial: ResourceSize; readonly uncapped: ResourceSize } | undefined;
 }
 
 const sameSize = (a: ResourceSize | undefined, b: ResourceSize | undefined): boolean =>
@@ -63,6 +63,18 @@ function cappedSize(size: ResourceSize, cap?: ResourceSize): ResourceSize {
   return cap === undefined
     ? size
     : { width: Math.min(size.width, cap.width), height: Math.min(size.height, cap.height) };
+}
+
+/** Preserve the uncapped size on each axis the gesture leaves visibly unchanged. */
+function resizedEditorSize(
+  editor: NonNullable<ResizeDraft['editor']>,
+  drawn: ResourceSize,
+): ResourceSize | undefined {
+  if (sameSize(drawn, editor.initial)) return undefined;
+  return {
+    width: drawn.width === editor.initial.width ? editor.uncapped.width : drawn.width,
+    height: drawn.height === editor.initial.height ? editor.uncapped.height : drawn.height,
+  };
 }
 
 /**
@@ -533,18 +545,38 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
           // The cap draws an editor at another rect, so it ends a draft of an
           // editor for the same reason; a Resource not edited is
           // drawn uncapped, and its draft goes on.
-          if (now.resizeDraft?.editor === true) next.resizeDraft = null;
+          if (now.resizeDraft?.editor !== undefined) next.resizeDraft = null;
         }
-        if (Object.keys(next).length > 0) set(next);
+        if (Object.keys(next).length === 0) return;
+        const draft = now.resizeDraft;
+        if (draft !== null && next.resizeDraft !== null && draft.editor === undefined) {
+          const placement = editorPlacement(authoring.mapPlacement(), editors, cap);
+          const current = draft.placement.get(draft.resourceId);
+          if (current !== undefined)
+            next.resizeDraft = {
+              ...draft,
+              placement: Placement.place(placement, draft.resourceId, current),
+            };
+        }
+        set(next);
       },
 
       beginResize: (resourceId) => {
         // Pointer movement starts from the rect the author sees.
         const { editors, editorCap } = get();
-        const placement = editorPlacement(authoring.mapPlacement(), editors, editorCap);
+        const authored = authoring.mapPlacement();
+        const placement = editorPlacement(authored, editors, editorCap);
         const at = placement.get(resourceId);
         if (at === undefined) return;
-        const editor = editors.has(resourceId) ? true : undefined;
+        const sizing = editors.get(resourceId);
+        const original = authored.get(resourceId);
+        const editor =
+          sizing === undefined || original === undefined
+            ? undefined
+            : {
+                initial: resourceSize(at),
+                uncapped: original.editSize ?? sizing.suggestedSize ?? resourceSize(original),
+              };
         set({ resizeDraft: { resourceId, placement, editor } });
       },
 
@@ -557,7 +589,8 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
         set({
           resizeDraft: {
             ...draft,
-            requestedSize: size,
+            requestedSize:
+              draft.editor === undefined ? size : resizedEditorSize(draft.editor, drawn),
             placement: Placement.place(draft.placement, resourceId, { ...at, size: drawn }),
           },
         });

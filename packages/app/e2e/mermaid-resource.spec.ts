@@ -169,12 +169,24 @@ test('an edit draws a Mermaid Resource at its Edit size, which a resize writes a
   await edit();
   await expect.poll(rect).not.toEqual(size);
   const initial = await rect();
-  await source.fill('flowchart LR\n  Short --> A_longer_destination');
+  await source.fill(
+    [
+      'flowchart LR',
+      '  Short --> A_longer_destination',
+      '  A --> B',
+      '  B --> C',
+      '  C --> D',
+      '  D --> E',
+      '  E --> F',
+      '  F --> G',
+    ].join('\n'),
+  );
   expect(await rect()).toEqual(initial);
   await source.press(`${PRIMARY_MODIFIER}+Enter`);
   await expect(source).toHaveCount(0);
   await edit();
   await expect.poll(async () => (await rect()).width).toBeGreaterThan(initial.width);
+  await expect.poll(async () => (await rect()).height).toBeGreaterThan(initial.height);
   const measured = await rect();
 
   // A resize while editing writes the Edit size, and leaves the size alone.
