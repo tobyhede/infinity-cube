@@ -654,10 +654,8 @@ fn main() {
         RunEvent::Reopen {
             has_visible_windows,
             ..
-        } => {
-            if launch::activating_shows_start(has_visible_windows) {
-                start::show(app, start::Screen::Start);
-            }
+        } if launch::activating_shows_start(has_visible_windows) => {
+            start::show(app, start::Screen::Start);
         }
         _ => {}
     });
