@@ -1169,6 +1169,48 @@ mod given_a_row_changed_outside_the_decision {
         store.close().await;
     }
 
+    // A unique violation means a colliding row committed, so initialization
+    // reads the store again to classify it. Here no such row exists: the
+    // trigger raises `23505` itself, standing in for a colliding row deleted
+    // before the read again, which no writer of either runtime does. The
+    // store reads uninitialized, so there is nothing to classify and the
+    // driver's failure is answered, unclassified, not unavailable.
+    #[tokio::test]
+    #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+    async fn fails_an_initialization_whose_collision_is_gone_when_read_again_unclassified() {
+        let database = Fresh::new().await;
+        let store = database.open();
+        after(
+            &database,
+            "INSERT",
+            "spaces",
+            "RAISE unique_violation USING MESSAGE = 'a collision no row is left of'",
+        )
+        .await;
+        let answer = store
+            .initialize_aggregate(host::AggregateInput {
+                meta_space_id: space(META),
+                spaces: vec![meta(false)],
+            })
+            .await;
+        // The words name the server's own source line, which differs
+        // between servers.
+        let Err(RepositoryError::Unclassified(message)) = &answer else {
+            panic!("expected the driver's failure, unclassified, got {answer:?}");
+        };
+        assert!(
+            message.contains("a collision no row is left of")
+                && message.ends_with("(SQLSTATE 23505)"),
+            "the driver's failure is answered: {message}"
+        );
+        assert_eq!(
+            store.load_aggregate().await,
+            Ok(AggregateLoad::Uninitialized),
+            "nothing the initialization wrote is kept"
+        );
+        store.close().await;
+    }
+
     /// A stored Space holding a Resource, and another stored Space.
     async fn owner_and_other(store: &PostgresSpaceRepository) -> (LoadedSpace, LoadedSpace) {
         let AggregateLoad::Loaded(loaded) = aggregate(store).await else {
