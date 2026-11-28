@@ -1217,6 +1217,127 @@ mod given_overlapping_replacements {
 mod given_concurrent_commits {
     use super::*;
 
+    /// Return `task` once a session on `database` waits for a row lock, as
+    /// `pg_locks` shows it, failing with its result if it finishes first.
+    async fn waiting_on_a_row_lock<R: std::fmt::Debug>(
+        database: &Fresh,
+        mut task: JoinHandle<R>,
+    ) -> JoinHandle<R> {
+        let mut watcher = database.connect().await;
+        let deadline = tokio::time::Instant::now() + PATIENCE;
+        loop {
+            // A row lock is waited for on the holder's transaction id, or
+            // on the tuple while another waiter is queued for it.
+            let waiters: i64 = sqlx::query_scalar(
+                "SELECT count(*) FROM pg_locks \
+                 WHERE NOT granted AND locktype IN ('transactionid', 'tuple') \
+                 AND pid IN (SELECT pid FROM pg_stat_activity \
+                 WHERE datname = current_database())",
+            )
+            .fetch_one(&mut watcher)
+            .await
+            .unwrap();
+            if waiters > 0 {
+                break;
+            }
+            if task.is_finished() {
+                panic!(
+                    "the second Edit finished without waiting for a row lock: {:?}",
+                    (&mut task).await
+                );
+            }
+            assert!(
+                tokio::time::Instant::now() < deadline,
+                "no session waited for a row lock within {PATIENCE:?}"
+            );
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        watcher.close().await.unwrap();
+        task
+    }
+
+    // A05 and A04 in the parity audit: the fast path holds its Space's row
+    // `FOR UPDATE` before it reads the Space, so a second single-Space Edit
+    // to that Space waits there rather than beside it. Under `FOR SHARE`
+    // both would hold the row, each then wait in `lock_space` to update it,
+    // and PostgreSQL would abort one as a deadlock (40P01), answered
+    // Unavailable; with no row lock the second would not wait at all.
+    #[tokio::test]
+    #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+    async fn conflicts_a_single_space_edit_that_waited_on_the_row_another_holds_for_update() {
+        let database = Fresh::new().await;
+        seeded(&database, SPACE_ID, &[repository_space()])
+            .await
+            .close()
+            .await;
+        let first: Store = Arc::new(database.open());
+        let second: Store = Arc::new(database.open());
+        let (reached, release) = pause_once(&first, |step| *step == Step::RowLock(space(SPACE_ID)));
+        let second_reached_row_lock = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&second_reached_row_lock);
+        let probe: Probe = Arc::new(move |step| {
+            if matches!(step, Step::RowLock(_)) {
+                flag.store(true, Ordering::SeqCst);
+            }
+            Box::pin(async {})
+        });
+        second.set_probe(Some(probe));
+
+        let first_edit = repository_space().titled("First edit");
+        let first_change = commit(vec![update(&first_edit, Revision::FIRST)]);
+        let first_result = rendezvous(
+            &reached,
+            spawn(
+                &first,
+                |store| async move { store.commit(first_change).await },
+            ),
+        )
+        .await;
+        let second_change = commit(vec![update(
+            &repository_space().titled("Second edit"),
+            Revision::FIRST,
+        )]);
+        let second_result = waiting_on_a_row_lock(
+            &database,
+            spawn(
+                &second,
+                |store| async move { store.commit(second_change).await },
+            ),
+        )
+        .await;
+        assert!(
+            !second_reached_row_lock.load(Ordering::SeqCst),
+            "the second Edit waits on the row before it reads the Space, \
+             not at the update lock beside the first"
+        );
+        release.notify_one();
+
+        let first_result = joined(first_result).await;
+        let second_result = joined(second_result).await;
+        assert_eq!(
+            first_result.unwrap(),
+            CommitResult::Committed {
+                revisions: vec![(space(SPACE_ID), revision(1))],
+                deleted_space_ids: vec![],
+            },
+            "the Edit holding the row commits"
+        );
+        assert_eq!(
+            second_result.unwrap(),
+            CommitResult::Conflict(vec![SpaceConflict {
+                space_id: space(SPACE_ID),
+                current: Some(first_edit.at(revision(1))),
+            }]),
+            "the Edit that waited conflicts with the first's write, never Unavailable"
+        );
+        assert_eq!(
+            first.load_space(space(SPACE_ID)).await.unwrap(),
+            Some(first_edit.at(revision(1)))
+        );
+        first.close().await;
+        second.close().await;
+    }
+
     // Case: serializes concurrent topology commits so the loser observes the complete winner
     #[tokio::test]
     #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
