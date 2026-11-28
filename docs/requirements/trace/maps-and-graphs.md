@@ -339,7 +339,7 @@ The rule ids in `../maps-and-graphs.md` are append-only from this version on.
 
 - **Auto-arrange (MG-71)** is to live in `graph`. Building it moves the render-time engine ban in `eslint.config.js` (the `elkjs` paths and patterns) rather than obeying it.
 - **Resolvers.** Every reader resolves an entry's size through `resourceSize`, its Map content through `resolvedMapContent` (the plugin's declared default where it stores none), and a Graph's head shape through `graphHeadShape` (`@project/core`). `resourceOpen` and `resourceShape` are retired with the entry's `open` and `shape` keys.
-- **Size hints (MG-88).** The cap is `visibleCanvasCap` and `capSizeHint` in `app/src/visible-canvas-cap.ts` (a 48-pixel margin each side); the floor and the Resize are applied in `changeMapContent` in `graph/src/snapshot-edits.ts`; the canvas hands the capped hint to the `changed-map-content` completion in `app/src/plugin-host/plugin-commits.ts`.
+- **Size hints (MG-88).** No code carries a size hint on a Map content commit: `MapCommit` (`resource-api/src/view/index.tsx`) takes the Map content alone, and `changeMapContent` in `graph/src/snapshot-edits.ts` writes no size. ADR 0178, pending, moves the hint to the beginning of an edit.
 - **`Placement.drawn` and `Placement.authoredPoint`** must not return (0084). MG-21 states the behaviour.
 - **One point type (0038).** The code has `MapPosition`, while `LayoutStrategyResource` declares its own `x?`/`y?`. Whether that breaks 0038 is a PROC question.
 - **Map `kind`.** Every Map stores `kind: 'positioned'`, the only kind (`core/src/schema.ts` `mapSchema`). This is a format matter for ST.

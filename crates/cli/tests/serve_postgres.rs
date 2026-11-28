@@ -16,7 +16,8 @@
 //! `// Case:` marks an HTTP conformance case, which
 //! `test/unit/http-conformance-rust-ports.test.ts` holds to the case lists;
 //! `// TypeScript case:` marks a case of the TypeScript database host's own
-//! tests that `.scratch/rust-postgresql-store/case-map.md` assigns here.
+//! tests, which `test/unit/repository-contract-rust-ports.test.ts` holds to
+//! its PostgreSQL adapter.
 
 #![cfg(unix)]
 #![allow(
@@ -367,7 +368,7 @@ impl Drop for Database {
 mod given_a_migrated_database_holding_nothing {
     use super::*;
 
-    // TypeScript case: establishes Default Content and serves the collection and Meta Space
+    // TypeScript case: establishes Default Content and serves the collection and Meta Space (PostgreSQL)
     #[test]
     #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
     fn initializes_it_from_default_content_and_serves_it() {
@@ -396,7 +397,7 @@ mod given_a_migrated_database_holding_nothing {
 
     // The database does not answer when `serve` starts; start-up retries it
     // after its first wait and initializes it once it does.
-    // TypeScript case: recovers through the shared retry after a transient startup failure
+    // TypeScript case: recovers through the shared retry after a transient startup failure (PostgreSQL)
     #[test]
     #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
     fn announces_before_the_database_answers_and_initializes_it_once_it_does() {
@@ -657,7 +658,7 @@ mod given_an_unmigrated_database {
 
     // A missing table is an invariant failure (ADR 0177): start-up stops once
     // a second retry confirms it, says so, and `serve` keeps serving.
-    // TypeScript case: gives up through the shared retry after two confirmed invariant failures
+    // TypeScript case: gives up through the shared retry after two confirmed invariant failures (PostgreSQL)
     #[test]
     #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
     fn gives_up_after_two_confirmed_invariant_failures_and_keeps_serving() {

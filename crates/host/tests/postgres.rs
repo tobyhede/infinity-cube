@@ -240,6 +240,7 @@ impl Harness for Postgres {
 
 repository_cases!(
     super::Postgres,
+    every_member,
     #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
 );
 

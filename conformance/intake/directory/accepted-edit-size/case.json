@@ -1,0 +1,6 @@
+{
+  "description": "An Edit size on a Markdown entry beside its size and Map content, and on an Ur entry with neither, at the Closed Size (ADR 0178). Export writes it after size and before content.",
+  "expect": {
+    "outcome": "accepted"
+  }
+}

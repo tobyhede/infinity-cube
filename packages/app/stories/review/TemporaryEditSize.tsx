@@ -33,9 +33,7 @@ const sizeLabel = (size: ResourceSize) => `${size.width} × ${size.height}`;
  *
  * - The Markdown plugin still commits Open before an Edit from Closed begins
  *   (UI-54; `plugin-markdown/test/markdown-plugin.test.tsx` › "offers Edit
- *   when Closed, which Opens it and then begins editing"), with its size hint
- *   ("Opens with one Map content commit carrying a size hint at least the
- *   reading width"), which `commitMap` here drops. The harness
+ *   when Closed, which Opens it and then begins editing"). The harness
  *   puts the earlier Open or Closed state back when the Claim is released, a
  *   second commit a real host would count as its own Edit. The spec has Edit
  *   commit nothing (open question 3).

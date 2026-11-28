@@ -220,7 +220,12 @@ export interface DescribedCase {
   readonly table?: CaseTable | undefined;
 }
 
-/** Every case `text`, the source of `file`, declares, in the order written. */
+/**
+ * Every case `text`, the source of `file`, declares, in the order written. A
+ * case that runs over a table of its own (`it.each`, `test.for`) and whose
+ * name substitutes no value of it is refused by throwing, naming the file,
+ * line and case: it would otherwise be read as one run.
+ */
 export const describedCasesIn = (file: string, text: string): DescribedCase[] => {
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
   const cases: DescribedCase[] = [];
@@ -244,6 +249,11 @@ export const describedCasesIn = (file: string, text: string): DescribedCase[] =>
       }
       if (declaresCase(node)) {
         const name = caseName(node.arguments[0]) ?? `<unnamed case at ${file}:${line}>`;
+        if (table !== undefined && !SUBSTITUTES.test(name)) {
+          throw new Error(
+            `${file}:${String(line)}: '${name}' runs over a table and substitutes no value of it, so its runs cannot be named apart`,
+          );
+        }
         const own = table === undefined ? around : { title: name, rows: rowsOf(table, source) };
         cases.push({
           name,
@@ -277,12 +287,18 @@ export const casesOf = (file: string): string[] => {
   return names;
 };
 
-const MARKER = /^\s*\/\/ Case: (.+)$/gmu;
+/** The comment that marks a port: `// Case: <name>`, or `// TypeScript case: <name>`. */
+export type Marker = 'Case' | 'TypeScript case';
 
-/** The case names `files` mark, in the order written. */
-export const markedIn = (files: readonly string[]): string[] =>
+const MARKERS = {
+  Case: /^\s*\/\/ Case: (.+)$/gmu,
+  'TypeScript case': /^\s*\/\/ TypeScript case: (.+)$/gmu,
+} satisfies Readonly<Record<Marker, RegExp>>;
+
+/** The case names `files` mark with `marker`, in the order written. */
+export const markedIn = (files: readonly string[], marker: Marker = 'Case'): string[] =>
   files.flatMap((file) =>
-    [...readRepositoryFile(file).matchAll(MARKER)].map((match) => match[1] ?? ''),
+    [...readRepositoryFile(file).matchAll(MARKERS[marker])].map((match) => match[1] ?? ''),
   );
 
 /** Every file under `directory`, a path from the repository root, whose name `keep` admits. */

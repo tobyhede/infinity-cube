@@ -1,7 +1,9 @@
+import type { InPlaceEdit } from '@project/resource-api/view';
 import {
   beginExclusive,
   claim as claimIn,
   endExclusive,
+  holds,
   NO_CLAIMS,
   release as releaseIn,
   unmount as unmountIn,
@@ -46,7 +48,14 @@ export interface PluginGate {
   readonly claim: <Own>(
     embedding: Embedding,
     own: (live: () => boolean) => Own,
+    inPlace?: InPlaceEdit,
   ) => HostClaim<Own> | undefined;
+  /**
+   * The drawings whose Claim was taken to edit in place, each until its Claim
+   * is released or unmounted, however long that release waits. The same
+   * value while they are unchanged.
+   */
+  readonly editors: () => ReadonlyMap<DrawingKey, InPlaceEdit>;
   /** The drawing is gone: its Claim and every Claim inside it are released. */
   readonly unmount: (drawing: DrawingKey) => void;
   /**
@@ -58,6 +67,28 @@ export interface PluginGate {
   readonly lent: () => ReadonlySet<DrawingKey>;
   /** This drawing's Claim is passed to a Map embedding until the answer is called. */
   readonly lend: (drawing: DrawingKey) => () => void;
+}
+
+/**
+ * The Resources a canvas drawn inside `embeddedIn` draws as editors: those
+ * whose editing drawing is one of that canvas's own, embedded in exactly
+ * `embeddedIn`, and not a drawing inside another Resource's rect.
+ */
+export function editorsOn(
+  chain: ClaimChain,
+  editors: ReadonlyMap<DrawingKey, InPlaceEdit>,
+  embeddedIn: Embedding,
+): ReadonlyMap<string, InPlaceEdit> {
+  const drawn = new Map<string, InPlaceEdit>();
+  for (const embedding of chain.holders) {
+    const drawing = embedding.at(-1);
+    const edit = drawing === undefined ? undefined : editors.get(drawing.key);
+    if (drawing === undefined || edit === undefined) continue;
+    if (embedding.length !== embeddedIn.length + 1) continue;
+    if (embeddedIn.every((outer, index) => embedding[index]?.key === outer.key))
+      drawn.set(drawing.resource, edit);
+  }
+  return drawn;
 }
 
 export function createPluginGate(): PluginGate {
@@ -72,6 +103,7 @@ export function createPluginGate(): PluginGate {
   let admitting = 0;
   const lentCounts = new Map<DrawingKey, number>();
   let lentDrawings: ReadonlySet<DrawingKey> = new Set();
+  let editing: ReadonlyMap<DrawingKey, InPlaceEdit> = new Map();
   const listeners = new Set<() => void>();
   const changeLent = (drawing: DrawingKey, by: 1 | -1): void => {
     const count = (lentCounts.get(drawing) ?? 0) + by;
@@ -87,16 +119,23 @@ export function createPluginGate(): PluginGate {
     if (next === chain) return;
     chain = next;
     if (chain.exclusive === null) liveRun = null;
+    if ([...editing.keys()].some((drawing) => !holds(chain, drawing)))
+      editing = new Map([...editing].filter(([drawing]) => holds(chain, drawing)));
     for (const listener of [...listeners]) listener();
   };
 
   const claim = <Own>(
     embedding: Embedding,
     own: (live: () => boolean) => Own,
+    inPlace?: InPlaceEdit,
   ): HostClaim<Own> | undefined => {
     const drawing = embedding.at(-1)?.key;
     const next = claimIn(chain, embedding);
     if (drawing === undefined || next === undefined) return undefined;
+    // Asked again by the drawing that holds, the chain answers the Claim it
+    // holds: the opt-in it was taken with stands.
+    if (inPlace !== undefined && !holds(chain, drawing))
+      editing = new Map([...editing, [drawing, inPlace]]);
     install(next);
     return {
       release: () => install(releaseIn(chain, drawing)),
@@ -134,6 +173,7 @@ export function createPluginGate(): PluginGate {
       }
     },
     claim,
+    editors: () => editing,
     unmount: (drawing) => install(unmountIn(chain, drawing)),
     lent: () => lentDrawings,
     lend: (drawing) => {

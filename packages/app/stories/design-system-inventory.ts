@@ -225,6 +225,21 @@ export const interactiveDeviations = [
       '`packages/plugin-mermaid/test/mermaid-plugin.test.tsx` (begins an edit from a press on its selected body).',
   },
   {
+    subject: 'packages/resource-api/src/view/index.tsx — the Open and Close glyphs',
+    existingInfinityCubeComponentConsidered:
+      "`@project/ui`'s icon module (`packages/ui/src/icons.tsx`), which wraps Lucide; a plugin draws its rail with `@project/resource-api` alone (ADR 0142), and the Resource API depends on nothing but zod, so neither `@project/ui` nor `lucide-react` is reachable from the four plugins that offer Open and Close.",
+    shadcnOrBaseUiConsidered:
+      "Lucide, the registry's icon set (UI-3): `AlignJustify` is Open's artwork. No Lucide glyph says a Resource's summary rather than its detail, so Close has no Lucide glyph to import even where Lucide is reachable.",
+    productRequirement:
+      'ADR 0178: the Open and Close rail control gets its own glyph, so it no longer reads as Resize, and every plugin that offers Open and Close draws the same one.',
+    whyCompositionIsInsufficient:
+      'A plugin can import no icon component, so the shared glyph has to live in the Resource API, which can import no icon library; a glyph there is SVG written out.',
+    customBehaviour:
+      "`OpenIcon` is Lucide's `AlignJustify` path data drawn as an inline 14px SVG, hidden from assistive technology as every rail glyph is; `CloseIcon` is the same SVG without its middle line, a custom glyph by UI-3. Neither adds behaviour: the rail command around them is the host's.",
+    tests:
+      '`packages/resource-api/test/icons.test.tsx` (the lines each draws, its size and that it is hidden from assistive technology), `packages/app/ladle-e2e/resource-open.spec.ts` and `packages/app/e2e/resource-rail-hover.spec.ts` (`@parity:resource-open-and-close-draw-their-own-glyphs`).',
+  },
+  {
     subject: 'packages/app/src/browser-file-picker.ts — the browser file picker',
     existingInfinityCubeComponentConsidered:
       '`@project/ui`\'s `Input` with `type="file"`, which `ImageFilePicker` was. A component is mounted by a surface, so Create Image Resource and Replace image each mounted one and the app had two pickers.',

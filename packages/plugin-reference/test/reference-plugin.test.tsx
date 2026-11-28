@@ -76,7 +76,7 @@ describe('the Reference plugin’s view', () => {
     expect(rendered.commits.title).toEqual(['A′′']);
   });
 
-  it('Opens and Closes through its Map content, with no size hint', async () => {
+  it('Opens and Closes through its Map content', async () => {
     const rendered = renderPlugin(referencePluginView.View, {
       content,
       map: closed,
@@ -88,7 +88,6 @@ describe('the Reference plugin’s view', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close Resource A′' }));
     await screen.findByTestId('plugin-title');
     expect(rendered.commits.map).toEqual([open, closed]);
-    expect(rendered.commits.hints).toEqual([undefined, undefined]);
   });
 
   it('shows a refused Open as the host worded it, staying Closed', async () => {
