@@ -6,9 +6,11 @@
   "permissions": [
     "allow-start-browse",
     "allow-start-close",
+    "allow-start-connect-postgres",
     "allow-start-create-space",
     "allow-start-open-folder",
     "allow-start-open-recent",
+    "allow-start-open-sqlite-file",
     "allow-start-window-view"
   ]
 }

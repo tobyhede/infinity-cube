@@ -29,8 +29,12 @@ url = { workspace = true }
 [dev-dependencies]
 http-conformance = { workspace = true }
 serde_json = { workspace = true }
+# Test setup only: a migrated SQLite file and a migrated PostgreSQL database for
+# the scheme's tests over each repository. The shell migrates nothing (ADR 0181).
+sqlx = { workspace = true, features = ["migrate", "postgres", "runtime-tokio", "sqlite-bundled"] }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["fs", "macros", "rt", "rt-multi-thread", "sync", "test-util", "time"] }
+uuid = { version = "1", features = ["v4"] }
 
 [lints]
 workspace = true

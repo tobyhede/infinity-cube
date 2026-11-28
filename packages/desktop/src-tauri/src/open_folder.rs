@@ -26,6 +26,7 @@ use std::sync::Mutex;
 use host::{NEW_SPACE_TITLE, RandomIds, TokioFilesystem};
 
 use crate::aggregates::{Registry, Reserved, lock};
+use crate::database::{Database, capitalized};
 use crate::new_space;
 use crate::new_space_folder::{FolderListing, Platform};
 use crate::not_opened::NotOpened;
@@ -76,6 +77,18 @@ pub trait OpenFolderPort {
     ///
     /// The server could not be started.
     fn start(&self, directory: &Path, label: &str) -> Result<Started<Self::Server>, OpenError>;
+
+    /// Start serving `database` for the Space window `label` (ADR 0181).
+    ///
+    /// # Errors
+    ///
+    /// The server could not be started; a database the shell cannot serve
+    /// is [`Started::Refused`].
+    fn start_database(
+        &self,
+        database: &Database,
+        label: &str,
+    ) -> Result<Started<Self::Server>, OpenError>;
 
     /// What `server`'s Space window opens on.
     fn window_of(server: &Self::Server) -> Self::Window;
@@ -321,6 +334,89 @@ fn start_aggregate<S: OpenFolderPort>(
     shell
         .open_window(label, window, &title_of(directory))
         .map_err(could_not)
+}
+
+/// Open `database`, asked for from `origin`, in a Space window of its own,
+/// or focus the window that already has it (ADR 0181). A Space window that
+/// shows from the Start window closes it. It holds no Import, Export or
+/// lock, so the registry's claim on its place is all that keeps two windows
+/// from serving it in this process.
+///
+/// # Errors
+///
+/// Why it did not open, naming it without a password, for the caller to
+/// show: the Start window's form beside its fields, a dialog otherwise.
+/// Nothing is said when a quit took it.
+pub fn open_database<S: OpenFolderPort>(
+    shell: &S,
+    registry: &Mutex<Registry<S::Server>>,
+    origin: Origin,
+    database: &Database,
+) -> Result<(), String> {
+    let place = database.place();
+    let reserved = lock(registry).reserve(&place);
+    let opened = match reserved {
+        Reserved::New(label) => {
+            let started = start_database(shell, registry, database, &label);
+            if started.is_err() {
+                let abandoned = lock(registry).abandon(&label);
+                if let Some(server) = abandoned {
+                    shell.stop(server, &place);
+                }
+            }
+            started?
+        }
+        // A quit has begun: say nothing, as for any open a quit overtakes.
+        Reserved::Quitting => Opened::Overtaken,
+        Reserved::Existing(label) => {
+            if shell.focus(&label) {
+                Opened::Shown
+            } else if lock(registry).is_closing(&label) {
+                return Err(format!(
+                    "{} is still closing. Open it again once its close has ended.",
+                    capitalized(&database.named())
+                ));
+            } else {
+                Opened::Starting
+            }
+        }
+    };
+    if closes_start(origin, Some(opened)) {
+        shell.close_start();
+    }
+    Ok(())
+}
+
+/// Start `database`'s server and open its window as `label`, answering how
+/// it opened, or why it did not.
+fn start_database<S: OpenFolderPort>(
+    shell: &S,
+    registry: &Mutex<Registry<S::Server>>,
+    database: &Database,
+    label: &str,
+) -> Result<Opened, String> {
+    let could_not = |source: OpenError| format!("Could not open {}: {source}", database.named());
+    let server = match shell.start_database(database, label).map_err(could_not)? {
+        Started::Serving(server) => server,
+        Started::Refused { message } => return Err(message),
+        // A folder's answer alone: a database is never offered a new Space.
+        Started::Empty => {
+            return Err(format!(
+                "{} holds no Space.",
+                capitalized(&database.named())
+            ));
+        }
+    };
+    let window = S::window_of(&server);
+    let opened = lock(registry).opened(label, server);
+    if let Err(server) = opened {
+        shell.stop(server, &database.place());
+        return Ok(Opened::Overtaken);
+    }
+    shell
+        .open_window(label, window, &database.title())
+        .map_err(could_not)?;
+    Ok(Opened::Shown)
 }
 
 /// A Space window's title: its folder's name.

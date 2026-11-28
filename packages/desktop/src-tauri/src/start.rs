@@ -1,7 +1,8 @@
 //! The Start window (Storage ST-131, ADR 0171): a window of the shell's own,
 //! under the label [`START_WINDOW_LABEL`], drawn by the page `packages/app`
 //! builds as `start.html` into the shell's `frontendDist` (ADR 0172). It
-//! offers New Space, Open Folder… and the recent Spaces, and its capability
+//! offers New Space, Open Folder…, Open SQLite File…, a form naming a
+//! PostgreSQL database (ADR 0181) and the recent Spaces, and its capability
 //! (`capabilities/start.json`) grants its window alone the `start_*`
 //! commands here. It shows at launch when nothing else opens and for File ›
 //! New Space…, and closes when a Space window opens from it.
@@ -37,15 +38,19 @@ pub enum Screen {
     Start,
     /// The New Space form, as File › New Space… opens it.
     NewSpace,
+    /// The form naming a PostgreSQL database, as File › Connect to
+    /// PostgreSQL Database… opens it (ADR 0181).
+    Postgres,
 }
 
-/// The page in `frontendDist` the Start window opens on `screen`: the form
-/// is the fragment `#new-space`, which the page reads.
+/// The page in `frontendDist` the Start window opens on `screen`: each form
+/// is a fragment, `#new-space` or `#postgres`, which the page reads.
 #[must_use]
 pub fn page(screen: Screen) -> &'static str {
     match screen {
         Screen::Start => "start.html",
         Screen::NewSpace => "start.html#new-space",
+        Screen::Postgres => "start.html#postgres",
     }
 }
 
@@ -317,9 +322,15 @@ pub async fn create_new_space<L: Listing, F: Filesystem, I: IdSource>(
 pub fn show(app: &AppHandle, screen: Screen) {
     if let Some(window) = app.get_webview_window(START_WINDOW_LABEL) {
         let _ = window.set_focus();
-        if screen == Screen::NewSpace {
-            // The page moves to the form when its fragment becomes `#new-space`.
-            let _ = window.eval("window.location.hash = 'new-space';");
+        // The page moves to a form when its fragment becomes the form's.
+        match screen {
+            Screen::Start => {}
+            Screen::NewSpace => {
+                let _ = window.eval("window.location.hash = 'new-space';");
+            }
+            Screen::Postgres => {
+                let _ = window.eval("window.location.hash = 'postgres';");
+            }
         }
         return;
     }
@@ -420,6 +431,35 @@ pub fn start_open_recent(app: AppHandle, folder: String) {
     let _open = thread::spawn(move || {
         tauri_shell::open(&app, Origin::StartWindow, &[PathBuf::from(folder)]);
     });
+}
+
+/// Open SQLite File…: the platform's file chooser, as File › Open SQLite
+/// File… asks (ADR 0181).
+#[tauri::command]
+pub fn start_open_sqlite_file(app: AppHandle) {
+    tauri_shell::choose_sqlite_file(&app, Origin::StartWindow);
+}
+
+/// The PostgreSQL form's Connect: open the database `url` names, connected
+/// with `password` when one is given, closing the Start window once its
+/// window shows (ADR 0181). Answers nothing then, or why not, naming the
+/// database without its password, for the page to show beside the form.
+/// The URL reaches the shell only through this command, which only the
+/// Start window holds; neither it nor the password is kept or written out.
+#[tauri::command]
+pub async fn start_connect_postgres(
+    app: AppHandle,
+    url: String,
+    password: String,
+) -> Option<String> {
+    let connected = tauri::async_runtime::spawn_blocking(move || {
+        tauri_shell::connect_postgres(&app, &url, &password)
+    })
+    .await;
+    match connected {
+        Ok(result) => result.err(),
+        Err(error) => Some(format!("Could not connect to the database: {error}")),
+    }
 }
 
 /// Close the Start window: Cancel on the form File › New Space… opened.

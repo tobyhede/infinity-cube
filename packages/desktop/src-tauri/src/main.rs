@@ -21,6 +21,7 @@
 
 mod address;
 mod aggregates;
+mod database;
 mod launch;
 mod menu;
 mod new_space;
@@ -267,6 +268,11 @@ fn answer_menu(app: &AppHandle, command: Command) {
         Command::Quit => app.exit(0),
         Command::NewSpace => start::show(app, start::Screen::NewSpace),
         Command::Open => open_folder::tauri_shell::choose_folder(app, Origin::Menu),
+        Command::OpenSqliteFile => {
+            open_folder::tauri_shell::choose_sqlite_file(app, Origin::Menu);
+        }
+        // A URL reaches the shell only from the Start window's form (ADR 0181).
+        Command::ConnectPostgres => start::show(app, start::Screen::Postgres),
         // Closed as its own control closes it, so a Space window's close
         // waits for its last write, and a close's question keeps waiting.
         Command::CloseWindow => {
@@ -498,6 +504,8 @@ fn main() {
             start::start_create_space,
             start::start_open_folder,
             start::start_open_recent,
+            start::start_open_sqlite_file,
+            start::start_connect_postgres,
             start::start_close,
         ])
         .on_menu_event(|app, event| {

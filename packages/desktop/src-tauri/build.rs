@@ -20,6 +20,8 @@ fn main() {
             "start_create_space",
             "start_open_folder",
             "start_open_recent",
+            "start_open_sqlite_file",
+            "start_connect_postgres",
             "start_close",
         ]));
     if let Err(error) = tauri_build::try_build(attributes) {

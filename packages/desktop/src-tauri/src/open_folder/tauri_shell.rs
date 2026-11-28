@@ -10,6 +10,7 @@ use tauri::{AppHandle, Manager, WebviewUrl};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 
 use super::{OpenFolderPort, Origin};
+use crate::database::{Database, PostgresDatabase};
 use crate::server::{AggregateServer, OpenError, SpaceWindows, Started};
 use crate::start::{self, NotCreated};
 use crate::{Aggregates, open_window, show_error_and_wait, stop_server};
@@ -23,6 +24,10 @@ impl OpenFolderPort for TauriShell<'_> {
 
     fn start(&self, directory: &Path, label: &str) -> Result<Started, OpenError> {
         AggregateServer::start(self.0, directory, label)
+    }
+
+    fn start_database(&self, database: &Database, label: &str) -> Result<Started, OpenError> {
+        AggregateServer::start_database(self.0, database, label)
     }
 
     fn window_of(server: &AggregateServer) -> Self::Window {
@@ -103,6 +108,54 @@ pub fn create_space(app: &AppHandle, location: &Path, name: &str) -> Result<(), 
         location,
         name,
     )
+}
+
+/// Open `database`, asked for from `origin` ([`super::open_database`]). Off
+/// the event loop's thread.
+///
+/// # Errors
+///
+/// Why it did not open, naming it without a password.
+pub fn open_database(app: &AppHandle, origin: Origin, database: &Database) -> Result<(), String> {
+    super::open_database(
+        &TauriShell(app),
+        &app.state::<Aggregates>().registry,
+        origin,
+        database,
+    )
+}
+
+/// Ask for a SQLite file with the platform's chooser, and open it, saying
+/// in a dialog why it did not open. Cancelling does nothing.
+pub fn choose_sqlite_file(app: &AppHandle, origin: Origin) {
+    let handle = app.clone();
+    app.dialog()
+        .file()
+        .set_title("Open a SQLite File")
+        .pick_file(move |file| {
+            let Some(path) = file.and_then(|file| file.into_path().ok()) else {
+                return;
+            };
+            // Opening reads the file and establishes its Meta Space, so it
+            // stays off the thread the dialog answered on.
+            thread::spawn(move || {
+                let database = Database::sqlite_file(&path);
+                if let Err(message) = open_database(&handle, origin, &database) {
+                    show_error_and_wait(&handle, &message);
+                }
+            });
+        });
+}
+
+/// The Start window's PostgreSQL form: open the database `url` names,
+/// connected with `password` when one is given. Off the event loop's thread.
+///
+/// # Errors
+///
+/// Why it did not open, naming it without a password.
+pub fn connect_postgres(app: &AppHandle, url: &str, password: &str) -> Result<(), String> {
+    let database = PostgresDatabase::from_form(url, password).map_err(|error| error.to_string())?;
+    open_database(app, Origin::StartWindow, &Database::Postgres(database))
 }
 
 /// Ask for a folder with the platform's chooser, and open it as an

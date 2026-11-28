@@ -61,6 +61,34 @@ fn no_two_commands_share_an_accelerator() {
     assert_eq!(distinct.len(), accelerators.len(), "{accelerators:?}");
 }
 
+// ADR 0181: a SQLite file and a PostgreSQL database are offered where a
+// folder is, after Open… in File, with no accelerator of their own.
+#[test]
+fn file_offers_a_sqlite_file_and_a_postgresql_database_after_open() {
+    for platform in PLATFORMS {
+        let file = menu(platform, "File").items;
+        let open = file
+            .iter()
+            .position(|item| *item == Item::Command(Command::Open))
+            .unwrap();
+        assert_eq!(
+            file[open + 1..open + 3],
+            [
+                Item::Command(Command::OpenSqliteFile),
+                Item::Command(Command::ConnectPostgres),
+            ],
+            "{platform:?}"
+        );
+    }
+    assert_eq!(Command::OpenSqliteFile.label(), "Open SQLite File…");
+    assert_eq!(
+        Command::ConnectPostgres.label(),
+        "Connect to PostgreSQL Database…"
+    );
+    assert_eq!(Command::OpenSqliteFile.accelerator(), None);
+    assert_eq!(Command::ConnectPostgres.accelerator(), None);
+}
+
 #[test]
 fn every_platform_offers_new_open_close_quit_help_and_report_once() {
     for platform in PLATFORMS {

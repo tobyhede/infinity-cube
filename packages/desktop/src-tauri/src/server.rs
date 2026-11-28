@@ -13,17 +13,21 @@ use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 
+use bytes::Bytes;
 use host::{
-    BuiltApplicationDirectory, BuiltApplicationError, BuiltFiles, ImportError, RandomIds, Run,
-    RunEvent, RunStopped, Shell, TokioClock,
+    Application, BuiltApplicationDirectory, BuiltApplicationError, BuiltFiles, EstablishError,
+    ImportError, PostgresSpaceRepository, RandomIds, RepositoryError, Run, RunEvent, RunStopped,
+    Shell, SqlitePath, SqliteSpaceRepository, TokioClock,
 };
+use http_body_util::Full;
 use tauri::{AppHandle, Manager as _, WebviewUrl};
 use tauri_plugin_dialog::{DialogExt as _, MessageDialogKind};
 use url::Url;
 
 use crate::address::{AggregateAddress, AggregateKey, SchemeStyle};
+use crate::database::{Database, capitalized};
 use crate::saving::{SaveNotice, SaveStreak};
-use crate::scheme::{Closed, OpenAggregates};
+use crate::scheme::{AggregateApplication, Closed, OpenAggregates};
 
 /// Why an Aggregate could not be opened.
 #[derive(Debug, thiserror::Error)]
@@ -90,6 +94,139 @@ pub async fn close_aggregate<B: BuiltFiles>(
         None => Vec::new(),
     };
     (windows, run.stop().await)
+}
+
+/// The repository a database's Space window is served over, which its close
+/// closes.
+#[derive(Debug, Clone)]
+pub enum Repository {
+    /// A SQLite file's.
+    Sqlite(Arc<SqliteSpaceRepository>),
+    /// A PostgreSQL database's.
+    Postgres(Arc<PostgresSpaceRepository>),
+}
+
+impl Repository {
+    /// Release its connections once every operation under way has finished.
+    pub async fn close(&self) {
+        match self {
+            Self::Sqlite(repository) => repository.close().await,
+            Self::Postgres(repository) => repository.close().await,
+        }
+    }
+}
+
+/// Close a database's Aggregate (ADR 0181): stop serving it, so no change
+/// arrives after the close, wait for every change still being answered,
+/// however long a server or another host's lock keeps it, then close the
+/// repository. Every change answered was committed before its answer, so
+/// nothing waits to be written. Answers the windows that could reach it.
+pub async fn close_database(
+    open_aggregates: &OpenAggregates,
+    key: &AggregateKey,
+    repository: &Repository,
+) -> Vec<String> {
+    let windows = match open_aggregates.close(key) {
+        Some(Closed { windows, in_flight }) => {
+            in_flight.settled().await;
+            windows
+        }
+        None => Vec::new(),
+    };
+    repository.close().await;
+    windows
+}
+
+/// The application over `database`'s repository, serving `shell`, once its
+/// Meta Space is established from Default Content where it holds no
+/// aggregate (Storage ST-10), as `serve` establishes it; or why it is not
+/// served, in words naming the database without a password. Nothing is
+/// created or migrated: a SQLite file that does not exist is refused, and so
+/// is a database the repository cannot read, naming the migration to run.
+/// A store failure the application answers later is said on standard error.
+///
+/// # Errors
+///
+/// Why the database is not served, as a presenter reads it.
+#[expect(
+    clippy::print_stderr,
+    reason = "a store failure the application answers is reported on standard error"
+)]
+pub async fn open_database(
+    database: &Database,
+    shell: Shell<BuiltApplicationDirectory>,
+) -> Result<(AggregateApplication, Repository), String> {
+    let named = database.named();
+    let reported = named.clone();
+    let report = move |failed: &str, error: &RepositoryError| {
+        eprintln!("{failed} for {reported}: {error}");
+    };
+    let (application, repository) = match database {
+        Database::SqliteFile(path) => {
+            if !std::fs::metadata(path).is_ok_and(|metadata| metadata.is_file()) {
+                return Err(format!(
+                    "{} is not a SQLite file that exists.",
+                    capitalized(&named)
+                ));
+            }
+            let Some(text) = path.to_str() else {
+                return Err(format!(
+                    "{} has a path that is not UTF-8.",
+                    capitalized(&named)
+                ));
+            };
+            let path = SqlitePath::from_variable(Some(text)).map_err(|error| error.to_string())?;
+            let repository = Arc::new(SqliteSpaceRepository::open(&path));
+            (
+                AggregateApplication::Sqlite(
+                    Application::new(Arc::clone(&repository), RandomIds, shell).on_error(report),
+                ),
+                Repository::Sqlite(repository),
+            )
+        }
+        Database::Postgres(postgres) => {
+            let repository = PostgresSpaceRepository::open(postgres.connect_url())
+                .map_err(|error| error.to_string().replacen("DATABASE_URL", "The URL", 1))?;
+            let repository = Arc::new(repository);
+            (
+                AggregateApplication::Postgres(
+                    Application::new(Arc::clone(&repository), RandomIds, shell).on_error(report),
+                ),
+                Repository::Postgres(repository),
+            )
+        }
+    };
+    let established = match &repository {
+        Repository::Sqlite(store) => host::establish_meta_space(store.as_ref(), &RandomIds).await,
+        Repository::Postgres(store) => host::establish_meta_space(store.as_ref(), &RandomIds).await,
+    };
+    match established {
+        Ok(_meta_space_id) => Ok((application, repository)),
+        Err(error) => {
+            repository.close().await;
+            Err(not_established(database, &error))
+        }
+    }
+}
+
+/// Why `database`'s Meta Space could not be established, naming the
+/// migration to run where the database may not have been migrated: any
+/// failure but one of a store that did not answer.
+fn not_established(database: &Database, error: &EstablishError) -> String {
+    let named = capitalized(&database.named());
+    if matches!(
+        error,
+        EstablishError::Repository(RepositoryError::Unavailable(_))
+    ) {
+        return format!("{named} did not answer: {error}.");
+    }
+    let migration = match database {
+        Database::SqliteFile(_) => "pnpm db:migrate:sqlite, with SQLITE_PATH naming the file",
+        Database::Postgres(_) => "pnpm db:migrate, with DATABASE_URL naming the database",
+    };
+    format!(
+        "{named} could not be opened: {error}. InfinityCube migrates nothing: if it has not been migrated, run {migration}, then open it again."
+    )
 }
 
 /// Start a run of `directory` with the built application `shell`. A failed
@@ -192,10 +329,17 @@ fn unrun(directory: &Path, error: &ImportError) -> Option<Started> {
 #[derive(Debug)]
 pub struct AggregateServer {
     app: AppHandle,
-    run: Run<RandomIds, BuiltApplicationDirectory>,
+    served: Served,
     /// Set once the Aggregate begins closing, which silences its save notices.
     closing: Arc<AtomicBool>,
     windows: Arc<SpaceWindows>,
+}
+
+/// What serves an Aggregate: a folder's run, or a database's repository.
+#[derive(Debug)]
+enum Served {
+    Folder(Run<RandomIds, BuiltApplicationDirectory>),
+    Database(Repository),
 }
 
 /// The address an Aggregate's window opens at: where its root address redirects,
@@ -204,10 +348,8 @@ pub struct AggregateServer {
 /// The shell follows the root's redirect itself and opens the window there,
 /// since WebKitGTK was seen not to follow one a custom scheme answers a
 /// navigation with (`.scratch/rust-host/issues/13-swap-the-sidecar-for-the-rust-host.md`).
-pub async fn first_address<B: BuiltFiles>(
-    application: &host::RunApplication<RandomIds, B>,
-) -> String {
-    let request = http::Request::get("/").body(String::new());
+pub async fn first_address(application: &AggregateApplication) -> String {
+    let request = http::Request::get("/").body(Full::new(Bytes::new()));
     let Ok(request) = request else {
         return "/".to_owned();
     };
@@ -352,24 +494,76 @@ impl AggregateServer {
             }
         };
         let address = AggregateAddress::new(AggregateKey::of(directory), SchemeStyle::CURRENT);
+        let application = AggregateApplication::from(Arc::clone(run.application()));
+        Self::serve(
+            app,
+            address,
+            application,
+            Served::Folder(run),
+            closing,
+            label,
+        )
+    }
+
+    /// Start serving `database` (ADR 0181), whose window will have the label
+    /// `label`: its repository, with no Import, Export or lock, once its Meta
+    /// Space is established ([`open_database`]).
+    ///
+    /// # Errors
+    ///
+    /// [`OpenError`] when the shell cannot serve it at all; a database it
+    /// cannot open is [`Started::Refused`].
+    pub fn start_database(
+        app: &AppHandle,
+        database: &Database,
+        label: &str,
+    ) -> Result<Started, OpenError> {
+        let shell =
+            built_shell(&app.path().resource_dir()?.join("app")).map_err(OpenError::Built)?;
+        let (application, repository) =
+            match tauri::async_runtime::block_on(open_database(database, shell)) {
+                Ok(opened) => opened,
+                Err(message) => return Ok(Started::Refused { message }),
+            };
+        let address = AggregateAddress::new(database.key(), SchemeStyle::CURRENT);
+        let closing = Arc::new(AtomicBool::new(false));
+        Self::serve(
+            app,
+            address,
+            application,
+            Served::Database(repository),
+            closing,
+            label,
+        )
+    }
+
+    /// Serve `application` at `address` to the window `label`, closing
+    /// `served` again if that fails.
+    fn serve(
+        app: &AppHandle,
+        address: AggregateAddress,
+        application: AggregateApplication,
+        served: Served,
+        closing: Arc<AtomicBool>,
+        label: &str,
+    ) -> Result<Started, OpenError> {
         let open_aggregates = Arc::clone(app.state::<SharedAggregates>().inner());
-        if let Err(error) = register_aggregate_scheme(app, &address) {
-            let _stopped = tauri::async_runtime::block_on(run.stop());
-            return Err(OpenError::Tauri(error));
-        }
-        open_aggregates.open(address.clone(), Arc::clone(run.application()), label);
-        let first = tauri::async_runtime::block_on(first_address(run.application()));
-        let url = match address.window_url().and_then(|root| root.join(&first)) {
+        let first = tauri::async_runtime::block_on(first_address(&application));
+        let url = register_aggregate_scheme(app, &address)
+            .map_err(OpenError::Tauri)
+            .and_then(|()| Ok(address.window_url()?.join(&first)?));
+        let url = match url {
             Ok(url) => url,
             Err(error) => {
-                drop(open_aggregates.close(address.key()));
-                let _stopped = tauri::async_runtime::block_on(run.stop());
-                return Err(OpenError::Url(error));
+                let _stopped =
+                    tauri::async_runtime::block_on(served.stop(&open_aggregates, &address));
+                return Err(error);
             }
         };
+        open_aggregates.open(address.clone(), application, label);
         Ok(Started::Serving(Self {
             app: app.clone(),
-            run,
+            served,
             closing,
             windows: Arc::new(SpaceWindows::new(address, url, open_aggregates)),
         }))
@@ -393,11 +587,10 @@ impl AggregateServer {
     pub fn stop(self) -> Option<String> {
         // How the last write ends is reported by the caller, not as news.
         self.closing.store(true, Ordering::SeqCst);
-        let (opened, stopped) = tauri::async_runtime::block_on(close_aggregate(
-            &self.windows.open_aggregates,
-            self.windows.address.key(),
-            self.run,
-        ));
+        let (opened, unwritten) = tauri::async_runtime::block_on(
+            self.served
+                .stop(&self.windows.open_aggregates, &self.windows.address),
+        );
         for label in opened
             .iter()
             .filter(|label| label.starts_with(crate::scheme::VIEW_WINDOW_PREFIX))
@@ -406,10 +599,34 @@ impl AggregateServer {
                 let _ = window.destroy();
             }
         }
-        match stopped {
-            RunStopped::Stopped => None,
-            RunStopped::Unwritten(error) => Some(format!("the last write failed: {error}")),
-            other => Some(format!("the run stopped as {other:?}")),
+        unwritten
+    }
+}
+
+impl Served {
+    /// Stop serving the Aggregate at `address` and close what serves it,
+    /// answering the windows that could reach it and why its last edit may
+    /// not be on disk, or `None` when it is. A database has no last write:
+    /// every change answered was committed first.
+    async fn stop(
+        self,
+        open_aggregates: &OpenAggregates,
+        address: &AggregateAddress,
+    ) -> (Vec<String>, Option<String>) {
+        match self {
+            Self::Folder(run) => {
+                let (windows, stopped) = close_aggregate(open_aggregates, address.key(), run).await;
+                let unwritten = match stopped {
+                    RunStopped::Stopped => None,
+                    RunStopped::Unwritten(error) => Some(format!("the last write failed: {error}")),
+                    other => Some(format!("the run stopped as {other:?}")),
+                };
+                (windows, unwritten)
+            }
+            Self::Database(repository) => (
+                close_database(open_aggregates, address.key(), &repository).await,
+                None,
+            ),
         }
     }
 }

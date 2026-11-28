@@ -1,6 +1,8 @@
 //! The scheme handler: every request a Space window makes, answered by the
-//! run of the Aggregate its address names, with no port, `Host` check or launch
-//! secret (ADR 0155, spec decision 4).
+//! application serving the Aggregate its address names (the run of a folder,
+//! or the host's application over a SQLite file or a PostgreSQL database,
+//! ADR 0181), with no port, `Host` check or launch secret (ADR 0155, spec
+//! decision 4).
 //!
 //! It is the shell's trust boundary, and it admits a request only when
 //!
@@ -30,9 +32,41 @@ use url::Url;
 
 use crate::address::{AggregateAddress, AggregateKey, SchemeStyle};
 
-/// The application an Aggregate's run answers with.
-pub type AggregateApplication =
-    host::RunApplication<host::RandomIds, host::BuiltApplicationDirectory>;
+/// The application a folder's run answers with.
+pub type FolderApplication = host::RunApplication<host::RandomIds, host::BuiltApplicationDirectory>;
+
+/// The application over a database's repository `R`, as `serve` composes it.
+pub type DatabaseApplication<R> =
+    host::Application<R, host::RandomIds, host::BuiltApplicationDirectory>;
+
+/// The application an Aggregate is answered by: a folder's run, or the
+/// host's application over the SQLite or the PostgreSQL repository.
+#[derive(Debug)]
+pub enum AggregateApplication {
+    /// A folder's run, over its Import into memory.
+    Folder(Arc<FolderApplication>),
+    /// A SQLite file.
+    Sqlite(DatabaseApplication<host::SqliteSpaceRepository>),
+    /// A PostgreSQL database.
+    Postgres(DatabaseApplication<host::PostgresSpaceRepository>),
+}
+
+impl AggregateApplication {
+    /// The application's answer to `request`.
+    pub async fn handle(&self, request: Request<Full<Bytes>>) -> Response<Bytes> {
+        match self {
+            Self::Folder(application) => application.handle(request).await,
+            Self::Sqlite(application) => application.handle(request).await,
+            Self::Postgres(application) => application.handle(request).await,
+        }
+    }
+}
+
+impl From<Arc<FolderApplication>> for AggregateApplication {
+    fn from(application: Arc<FolderApplication>) -> Self {
+        Self::Folder(application)
+    }
+}
 
 /// The prefix of the label of every window an Aggregate's page opens.
 pub const VIEW_WINDOW_PREFIX: &str = "view-";
@@ -94,9 +128,12 @@ impl Drop for Answering {
 }
 
 impl InFlight {
-    /// Wait until no change is being answered. A change waits on nothing
-    /// outside the process: the webview hands the handler its whole body,
-    /// and the run's store is in memory.
+    /// Wait until no change is being answered. A folder's change waits on
+    /// nothing outside the process: the webview hands the handler its whole
+    /// body, and the run's store is in memory. A database's change may wait
+    /// on its server, or on a lock another host holds, without bound (ADR
+    /// 0177), so a close's wait for it is one ADR 0163's ten-second question
+    /// asks the presenter about (ADR 0181).
     pub async fn settled(&self) {
         loop {
             let notified = self.settled.notified();
@@ -217,7 +254,7 @@ impl OpenAggregates {
     pub fn open(
         &self,
         address: AggregateAddress,
-        application: Arc<AggregateApplication>,
+        application: impl Into<AggregateApplication>,
         window: &str,
     ) {
         let key = address.key().clone();
@@ -225,7 +262,7 @@ impl OpenAggregates {
             key,
             ServedAggregate {
                 address,
-                application,
+                application: Arc::new(application.into()),
                 windows: HashSet::from([window.to_owned()]),
                 in_flight: Arc::default(),
             },

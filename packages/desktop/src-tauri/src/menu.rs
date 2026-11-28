@@ -31,6 +31,11 @@ impl Platform {
 pub enum Command {
     NewSpace,
     Open,
+    /// The platform's file chooser for a SQLite file (ADR 0181).
+    OpenSqliteFile,
+    /// The Start window's form naming a PostgreSQL database by its URL, the
+    /// one place a URL reaches the shell from (ADR 0181).
+    ConnectPostgres,
     /// Closes the focused window as its own control would, so a Space
     /// window's close waits for its last write (ST-122).
     CloseWindow,
@@ -46,9 +51,11 @@ pub enum Command {
 }
 
 impl Command {
-    const ALL: [Self; 8] = [
+    const ALL: [Self; 10] = [
         Self::NewSpace,
         Self::Open,
+        Self::OpenSqliteFile,
+        Self::ConnectPostgres,
         Self::CloseWindow,
         Self::Quit,
         Self::FullScreen,
@@ -62,6 +69,8 @@ impl Command {
         match self {
             Self::NewSpace => "new",
             Self::Open => "open",
+            Self::OpenSqliteFile => "open-sqlite-file",
+            Self::ConnectPostgres => "connect-postgres",
             Self::CloseWindow => "close-window",
             Self::Quit => "quit",
             Self::FullScreen => "full-screen",
@@ -80,6 +89,8 @@ impl Command {
         match self {
             Self::NewSpace => "New Space…",
             Self::Open => "Open…",
+            Self::OpenSqliteFile => "Open SQLite File…",
+            Self::ConnectPostgres => "Connect to PostgreSQL Database…",
             Self::CloseWindow => "Close Window",
             Self::Quit => "Quit InfinityCube",
             Self::FullScreen => "Toggle Full Screen",
@@ -96,7 +107,11 @@ impl Command {
             Self::CloseWindow => Some("CmdOrCtrl+W"),
             Self::Quit => Some("CmdOrCtrl+Q"),
             Self::FullScreen => Some("F11"),
-            Self::Help | Self::ReportIssue | Self::CheckForUpdates => None,
+            Self::OpenSqliteFile
+            | Self::ConnectPostgres
+            | Self::Help
+            | Self::ReportIssue
+            | Self::CheckForUpdates => None,
         }
     }
 
@@ -191,6 +206,8 @@ pub fn layout(platform: Platform, updates: bool) -> Vec<Submenu> {
                 [
                     C(Command::NewSpace),
                     C(Command::Open),
+                    C(Command::OpenSqliteFile),
+                    C(Command::ConnectPostgres),
                     Separator,
                     P(Predefined::CloseWindow),
                 ],
@@ -232,6 +249,8 @@ pub fn layout(platform: Platform, updates: bool) -> Vec<Submenu> {
                 [
                     C(Command::NewSpace),
                     C(Command::Open),
+                    C(Command::OpenSqliteFile),
+                    C(Command::ConnectPostgres),
                     Separator,
                     C(Command::CloseWindow),
                     C(Command::Quit),

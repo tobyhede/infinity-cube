@@ -185,7 +185,7 @@ mod given_a_space_window {
         let (temporary, directory) = fixture_copy();
         let (open_aggregates, key, run) = open(&directory, &stand_in_build(&temporary)).await;
         assert_eq!(
-            first_address(run.application()).await,
+            first_address(&Arc::clone(run.application()).into()).await,
             crate::test_support::META_ADDRESS,
             "the root's redirect, followed by the shell"
         );
