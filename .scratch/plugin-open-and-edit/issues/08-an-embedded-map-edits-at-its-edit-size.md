@@ -10,4 +10,6 @@
 
 - [ ] The embedded Map draws the child editor at its stored Edit size, then falls back to its plugin’s suggestion, then to its Display size.
 - [ ] Use the visible bounds and zoom for the embedded editor. Apply the cap and least pan there and leave the parent’s Display size intact.
-- [ ] A browser test edits and resizes an embedded Markdown Resource, ends the edit and edits again. It checks where the child’s Edit size was stored and that the parent’s size and the child’s Display size survived.
+- [ ] A browser test edits and cancels an embedded Markdown Resource with an oversized stored Edit size. It checks the child fits the visible window, its position returns to the authored framing, and neither Space gains a revision.
+
+The local application test in `packages/app/e2e/space-resource.spec.ts`, “an embedded editor fits its window and restores the authored framing”, exercises the saved Edit size and both Spaces’ revisions. The fallback order is covered in `packages/app/test/render-adapter.test.ts`, “uses the suggested width and height when no Edit size is stored”.

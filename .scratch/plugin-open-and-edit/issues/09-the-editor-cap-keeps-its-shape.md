@@ -11,3 +11,5 @@
 - [ ] Cover a viewport too narrow, one too short and one smaller than the Closed Size on both axes. The drawn dimensions fit the available area.
 - [ ] A change of zoom updates the drawn cap and leaves the stored sizes alone.
 - [ ] A completed resize starts from the drawn rect and stores an Edit size that meets the Closed Size floor.
+
+Local tests in `packages/app/test/visible-canvas-cap.test.ts` cover the margin at two zoom levels and a canvas smaller than the Closed Size. In `packages/app/test/render-adapter.test.ts`, “caps the preview while storing the size the author requests” covers the drawn preview and stored size separately.
