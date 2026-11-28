@@ -68,6 +68,7 @@ export function useCanvasRendering(
 ): CanvasRendering {
   const resizeDraft = useRenderAdapter((s) => s.resizeDraft);
   const editors = useRenderAdapter((s) => s.editors);
+  const editorNeighbours = useRenderAdapter((s) => s.editorNeighbours);
   const editorCap = useRenderAdapter((s) => s.editorCap);
   const selection = useRenderAdapter((s) => s.selection);
   const liveProjection = useRenderAdapter((s) => s.projection);
@@ -81,8 +82,8 @@ export function useCanvasRendering(
 
   // A Resource edited is drawn at its Edit size (ADR 0178).
   const drawnPlacement = useMemo(
-    () => editorPlacement(mapPlacement, editors, editorCap),
-    [mapPlacement, editors, editorCap],
+    () => editorPlacement(mapPlacement, editors, editorCap, editorNeighbours),
+    [mapPlacement, editors, editorCap, editorNeighbours],
   );
   const placement = usePlacementRendering(
     projection.strategyGraph,
