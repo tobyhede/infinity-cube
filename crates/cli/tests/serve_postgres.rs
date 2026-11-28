@@ -396,7 +396,14 @@ mod given_a_migrated_database_holding_nothing {
     }
 
     // The database does not answer when `serve` starts; start-up retries it
-    // after its first wait and initializes it once it does.
+    // after its first wait and initializes it once it does. It asserts the
+    // 503 before and the listing of one Space after, but not the one report
+    // of the transient failure that the TypeScript case asserts: the outage
+    // here is real, so how many attempts fail before the database answers
+    // depends on timing, and `serve` reports each to standard error, which
+    // this test does not read. That each failed attempt is reported once is
+    // held at the host's seam by `crates/host/tests/startup.rs` ›
+    // `given_an_unreachable_store` › `backs_off_up_to_a_bound_it_then_holds`.
     // TypeScript case: recovers through the shared retry after a transient startup failure (PostgreSQL)
     #[test]
     #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
