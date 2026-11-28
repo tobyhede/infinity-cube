@@ -227,6 +227,7 @@ The current statement of these decisions is [UI](../requirements/ui.md), with Op
 | [0149](0149-open-content-is-clipped-on-the-canvas.md) | Open content that does not fit its rect is clipped on the canvas: Markdown does not scroll there, and a drawn Map with no framing is placed at authored scale, not fitted; presenting still scrolls Markdown (refines 0122). |
 | [0173](0173-shift-at-resize-start-keeps-the-resources-proportions.md) | Shift held at Resize start preserves the current Map rect’s starting ratio for the whole drag, with a fixed top-left and both Closed Size floors; the gesture commits one Resize Edit on release (refines 0122). |
 | [0178](0178-opening-keeps-a-resources-size-and-an-in-place-editor-draws-at-an-edit-size-the-map-stores.md) | Opening and Closing never change a size and send no size hint; a plugin that edits in place opts in on its Claim, and the canvas then draws the Resource at the Edit size the Map entry stores as `editSize` (else the larger of a size hint and `size`), capped at the visible canvas, with neighbours displaced only while it is drawn, and a resize writes `editSize`; Edit no longer commits Open, and editing is not stored (refines 0064, 0084, 0122, 0142, 0158). |
+| [0182](0182-a-plugin-chooses-the-size-it-suggests-for-its-editor.md) | Each plugin owns its editor size hint. The canvas fits the chosen size to the visible Map, saves changed visible dimensions on Resize, and honours deliberate drops during editing (refines 0178). |
 
 ## Toolchain
 

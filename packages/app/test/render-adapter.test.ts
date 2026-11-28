@@ -1083,6 +1083,10 @@ describe('render adapter', () => {
       store.getState().resourceResize.beginResize(RESOURCE_B);
       store.getState().resourceResize.previewResize(RESOURCE_B, { width: 320, height: 220 });
       store.getState().resourceResize.drawEditors(editors, { width: 400, height: 250 });
+      expect(store.getState().resizeDraft?.placement.get(RESOURCE_A)?.size).toEqual({
+        width: 400,
+        height: 250,
+      });
       store.getState().resourceResize.finishResize(RESOURCE_B);
       expect(spy.completions).toEqual([
         { kind: 'resized-resource', resourceId: RESOURCE_B, size: { width: 320, height: 220 } },
@@ -1100,7 +1104,45 @@ describe('render adapter', () => {
       expect(spy.completions).toEqual([]);
     });
 
-    it('caps the preview while storing the size the author requests', () => {
+    it.each([
+      { resource: RESOURCE_A, suggestedSize: undefined, height: 360 },
+      { resource: RESOURCE_B, suggestedSize: { width: 500, height: 600 }, height: 600 },
+      { resource: RESOURCE_B, suggestedSize: undefined, height: 200 },
+    ])(
+      'retains the uncapped height $height when only the drawn width changes',
+      ({ resource, suggestedSize, height }) => {
+        const spy = authoringSpy({ mapPlacement: authored });
+        const resize = createRenderAdapter(spy.authoring).getState().resourceResize;
+        resize.drawEditors(new Map([[resource, suggestedSize ? { suggestedSize } : {}]]), {
+          width: 280,
+          height: 160,
+        });
+        resize.beginResize(resource);
+        resize.previewResize(resource, { width: 265, height: 170 });
+        resize.finishResize(resource);
+        expect(spy.completions).toEqual([
+          { kind: 'resized-editor', resourceId: resource, editSize: { width: 265, height } },
+        ]);
+      },
+    );
+
+    it.each([400, 200])(
+      'retains the suggested width on a first height-only resize in a %i-wide viewport',
+      (width) => {
+        const spy = authoringSpy({ mapPlacement: authored });
+        const resize = createRenderAdapter(spy.authoring).getState().resourceResize;
+        const suggestedSize = { width: 600, height: 300 };
+        resize.drawEditors(new Map([[RESOURCE_B, { suggestedSize }]]), { width, height: 500 });
+        resize.beginResize(RESOURCE_B);
+        resize.previewResize(RESOURCE_B, { width: Math.max(width, 260), height: 350 });
+        resize.finishResize(RESOURCE_B);
+        expect(spy.completions).toEqual([
+          { kind: 'resized-editor', resourceId: RESOURCE_B, editSize: { width: 600, height: 350 } },
+        ]);
+      },
+    );
+
+    it('stores nothing when an outward resize cannot change the drawn editor', () => {
       const large = Placement.fromEntries([
         [
           RESOURCE_A,
@@ -1129,9 +1171,7 @@ describe('render adapter', () => {
         height: 700,
       });
       store.getState().resourceResize.finishResize(RESOURCE_A);
-      expect(spy.completions).toEqual([
-        { kind: 'resized-editor', resourceId: RESOURCE_A, editSize: { width: 905, height: 705 } },
-      ]);
+      expect(spy.completions).toEqual([]);
     });
   });
 

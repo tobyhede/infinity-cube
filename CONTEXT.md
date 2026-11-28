@@ -216,16 +216,16 @@ The mapping of Resources to their positions, sizes and Map content within a Map.
 _Avoid_: arrangement, layer.
 
 **Rect**:
-A Resource's drawn box on a Map.
+A Resource’s drawn position and size on a Map.
 
 **Closed Size**:
 The default Display size of a Resource on a Map and the minimum for either size stored on a Map entry.
 
 **Display size**:
-The size at which a Map draws a Resource outside its editor. The Map entry stores it as `size`.
+The size at which a Map draws a Resource outside its editor.
 
 **Edit size**:
-The size stored as `editSize` when the author resizes a Resource's editor on a Map. The canvas fits the editor to the visible area.
+The size an author chooses for a Resource’s editor on a particular Map.
 _Avoid_: edit mode.
 
 **Size hint**:
