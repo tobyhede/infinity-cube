@@ -334,7 +334,12 @@ impl SqlStore for PostgresStore {
 
     async fn begin(&self, access: Access) -> Result<Transaction<'static, Postgres>, sqlx::Error> {
         // The isolation level is set, never inherited from the server's
-        // default, and must be the transaction's first statement.
+        // default, and must be the transaction's first statement. An unlocked
+        // write (`mark_exported`, `store_asset`) runs `READ COMMITTED` too, so
+        // one waiting on another writer's row writes it once that writer
+        // commits rather than failing `40001`
+        // (`tests/postgres_concurrency.rs` ›
+        // `given_an_unlocked_write_beside_another_writer`).
         let statement = match access {
             Access::Read => "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY",
             Access::Write | Access::Locked { .. } => "BEGIN ISOLATION LEVEL READ COMMITTED",

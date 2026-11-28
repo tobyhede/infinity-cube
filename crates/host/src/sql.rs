@@ -1011,6 +1011,10 @@ impl<S: SqlStore> Shared<S> {
         match attempt.await {
             // State a writer outside the aggregate lock established collided
             // with this one; it is read after the rollback and classified.
+            // Read uninitialized, the colliding row is gone and there is
+            // nothing to classify, so the driver's failure is answered
+            // (`tests/postgres.rs` ›
+            // `fails_an_initialization_whose_collision_is_gone_when_read_again_unclassified`).
             Err(Failure::Database(error)) if unique_violation(&error) => {
                 match self.load_aggregate().await? {
                     AggregateLoad::Uninitialized => Err(Failure::Database(error)),

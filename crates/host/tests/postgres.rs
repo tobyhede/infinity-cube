@@ -1168,6 +1168,104 @@ mod given_a_row_changed_outside_the_decision {
         );
         store.close().await;
     }
+
+    // A unique violation means a colliding row committed, so initialization
+    // reads the store again to classify it. Here no such row exists: the
+    // trigger raises `23505` itself, standing in for a colliding row deleted
+    // before the read again, which no writer of either runtime does. The
+    // store reads uninitialized, so there is nothing to classify and the
+    // driver's failure is answered, unclassified, not unavailable.
+    #[tokio::test]
+    #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+    async fn fails_an_initialization_whose_collision_is_gone_when_read_again_unclassified() {
+        let database = Fresh::new().await;
+        let store = database.open();
+        after(
+            &database,
+            "INSERT",
+            "spaces",
+            "RAISE unique_violation USING MESSAGE = 'a collision no row is left of'",
+        )
+        .await;
+        let answer = store
+            .initialize_aggregate(host::AggregateInput {
+                meta_space_id: space(META),
+                spaces: vec![meta(false)],
+            })
+            .await;
+        // The words name the server's own source line, which differs
+        // between servers.
+        let Err(RepositoryError::Unclassified(message)) = &answer else {
+            panic!("expected the driver's failure, unclassified, got {answer:?}");
+        };
+        assert!(
+            message.contains("a collision no row is left of")
+                && message.ends_with("(SQLSTATE 23505)"),
+            "the driver's failure is answered: {message}"
+        );
+        assert_eq!(
+            store.load_aggregate().await,
+            Ok(AggregateLoad::Uninitialized),
+            "nothing the initialization wrote is kept"
+        );
+        store.close().await;
+    }
+
+    /// A stored Space holding a Resource, and another stored Space.
+    async fn owner_and_other(store: &PostgresSpaceRepository) -> (LoadedSpace, LoadedSpace) {
+        let AggregateLoad::Loaded(loaded) = aggregate(store).await else {
+            panic!("the store holds an aggregate");
+        };
+        let owner = loaded
+            .spaces
+            .iter()
+            .find(|space| !space.snapshot.resources.is_empty())
+            .expect("the fixture has a Space holding a Resource")
+            .clone();
+        let other = loaded
+            .spaces
+            .iter()
+            .find(|space| space.snapshot.id != owner.snapshot.id)
+            .expect("the fixture has a second Space")
+            .clone();
+        (owner, other)
+    }
+
+    // The update writes the owner's row under its row lock, and the trigger
+    // then moves the owner's Resource row to the other Space, as a writer
+    // outside the decision could leave it, before the Resource rows are read
+    // again. As SQLite's `refuses_an_update_writing_a_resource_another_space_owns`
+    // (`crates/host/tests/sqlite.rs`) and TypeScript's `#upsertResources`.
+    #[tokio::test]
+    #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+    async fn refuses_an_update_writing_a_resource_another_space_owns() {
+        let database = Fresh::new().await;
+        let store = seeded(database.open()).await;
+        let (owner, other) = owner_and_other(&store).await;
+        let before = aggregate(&store).await;
+        let resource = owner.snapshot.resources[0].id.as_str().to_owned();
+        let (owner_id, other_id) = (owner.snapshot.id.as_str(), other.snapshot.id.as_str());
+        after(
+            &database,
+            "UPDATE",
+            "spaces",
+            &format!("UPDATE resources SET space_id = '{other_id}' WHERE id = '{resource}'"),
+        )
+        .await;
+        assert_eq!(
+            store.commit(rename(&owner, "Renamed")).await,
+            Ok(CommitResult::Rejected {
+                message: format!("Resource {resource} belongs to space {other_id}, not {owner_id}")
+            }),
+            "the update is refused rather than taking the other Space's Resource row"
+        );
+        assert_eq!(
+            store.load_aggregate().await,
+            Ok(before),
+            "nothing the commit wrote is kept: the owner keeps its title and its Resource"
+        );
+        store.close().await;
+    }
 }
 
 /// Every operation needs every table the migrations make, however few it

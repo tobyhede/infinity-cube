@@ -3,6 +3,7 @@
 Status: accepted
 Date: 2026-11-26
 Refines: 0174
+Refined by: 0183
 Related: 0095, 0155, 0162
 
 Rust-host 16 puts PostgreSQL beneath the one Rust SQL repository (Storage ST-3, ST-119) and serves it with `infinity-cube serve --store postgres`. The TypeScript PostgreSQL store (`src/prisma/sql-store.ts`, `src/persistence/sql-space-repository.ts`) is the frozen reference: the Rust store is at least as good as it wherever it is right. The Rust SQL repository serialises every operation behind a process mutex, which is right for SQLite's single writer and is not enough for two hosts on one database. The maintainer settled seventeen questions on 25 November 2026, after a cold audit of the plan and probes against PostgreSQL 16; `.scratch/rust-postgresql-store/spec.md` (Decisions for PostgreSQL) carries each with its evidence. This ADR records them.
