@@ -1206,7 +1206,7 @@ mod given_a_file_that_is_not_the_database {
 }
 
 /// ST-6: each update adds one to the revision, so a Space stored at the
-/// ceiling can be deleted but not updated.
+/// ceiling cannot be updated.
 mod given_a_space_at_the_revision_ceiling {
     use super::*;
 
