@@ -138,6 +138,26 @@ const createKnownText = (): KnownText => {
 };
 
 /**
+ * Size a source editor with a Title row above it. The plugin's root fills
+ * the inside of the Resource frame. Measure its Title at the width the
+ * source needs, before the canvas changes the Resource's rect.
+ */
+function editorSizeWithTitle(source: Size, titleRow: HTMLElement | null, rect: Size): Size {
+  const inside = titleRow?.parentElement;
+  if (!titleRow || !inside) return source;
+  const width = inside.clientWidth;
+  const height = inside.clientHeight;
+  const previousWidth = titleRow.style.width;
+  titleRow.style.width = `${source.width}px`;
+  const titleHeight = titleRow.scrollHeight;
+  titleRow.style.width = previousWidth;
+  return {
+    width: source.width + (width > 0 ? rect.width - width : 0),
+    height: source.height + titleHeight + (height > 0 ? rect.height - height : 0),
+  };
+}
+
+/**
  * A running edit: the draft, the text it is measured against, which is the
  * text the edit began from or last Saved, and whether a Save is under way.
  */
@@ -199,10 +219,7 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
   }, [mayEdit, editing, takeClaim, readable, surface.editSize]);
 
   const suggestEditorSize = (source: Size) => {
-    const suggestedSize = {
-      width: source.width,
-      height: source.height + (titleRow.current?.offsetHeight ?? 0),
-    };
+    const suggestedSize = editorSizeWithTitle(source, titleRow.current, surface.size);
     const held = takeClaim?.({ editor: { suggestedSize } });
     setEditing((now) => (now === null || held === undefined ? null : { ...now, claim: held }));
   };
