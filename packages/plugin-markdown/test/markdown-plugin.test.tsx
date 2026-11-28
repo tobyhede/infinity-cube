@@ -537,6 +537,36 @@ describe('the Markdown plugin’s view', () => {
     expect(reads).toEqual([TEXT_REF]);
   });
 
+  it('discards a Closed edit request when the Resource changes source during its read', async () => {
+    const pending = Promise.withResolvers<Blob>();
+    const read = vi.fn((url: AssetRef) =>
+      url === TEXT_REF ? pending.promise : Promise.resolve(new Blob(['New source'])),
+    );
+    const rendered = renderPlugin(markdownPluginView.View, {
+      content,
+      map: closed,
+      editSize: STORED_EDIT_SIZE,
+      title: 'Notes',
+      grants: editable,
+      assets: { read },
+    });
+    const edit = screen.getByRole('button', { name: 'Edit Resource Notes' });
+    fireEvent.click(edit);
+    expect(read).toHaveBeenCalledWith(TEXT_REF);
+    act(() => rendered.changeContent({ url: UNREAD_REF }));
+    await act(async () => {
+      pending.resolve(new Blob(['Stale source']));
+      await pending.promise;
+    });
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(rendered.commits.claims.taken).toBe(0);
+    expect(screen.queryByRole('textbox')).toBeNull();
+
+    fireEvent.click(edit);
+    expect(await screen.findByRole('textbox')).toHaveValue('New source');
+    expect(rendered.commits.claims.taken).toBe(1);
+  });
+
   it('ends an Edit from Closed whose Claim is refused as it begins, so a later Edit begins', async () => {
     for (const sized of [{ editSize: STORED_EDIT_SIZE }, {}]) {
       let refusing = true;

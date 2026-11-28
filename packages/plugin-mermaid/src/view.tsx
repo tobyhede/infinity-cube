@@ -15,6 +15,7 @@ import {
   lineFeedText,
   titleName,
   type AssetRef,
+  type ResourceId,
   type Size,
 } from '@project/resource-api/domain';
 import {
@@ -62,10 +63,11 @@ const INSET = 12;
 const CLOSED_FOOT = 8;
 
 /** The text of the asset at a URL, as far as it has been read. */
-type Text =
-  | { readonly state: 'reading' }
+type TextAnswer =
   | { readonly state: 'read'; readonly text: string }
   | { readonly state: 'refused'; readonly refused: string };
+
+type Text = TextAnswer | { readonly state: 'reading' };
 
 const READING: Text = { state: 'reading' };
 
@@ -89,7 +91,14 @@ const EMPTY_TO_EDIT = `${EMPTY_DIAGRAM} Edit it to write its Mermaid source.`;
  * already knows. Nothing is read until the text is `wanted`: a Closed
  * Resource draws none of it.
  */
-function useText(url: AssetRef, assets: Assets, known: KnownText, wanted: boolean): Text {
+function useText(
+  url: AssetRef,
+  assets: Assets,
+  known: KnownText,
+  open: boolean,
+  answerEdit?: (answer: TextAnswer) => void,
+): Text {
+  const wanted = open || answerEdit !== undefined;
   const [read, setRead] = useState<{ readonly url: string; readonly text: Text }>(() => ({
     url,
     text: READING,
@@ -101,27 +110,23 @@ function useText(url: AssetRef, assets: Assets, known: KnownText, wanted: boolea
   useEffect(() => {
     if (!wanted || known.text(url) !== undefined) return undefined;
     let live = true;
-    const stillLive = (): boolean => live;
+    const finish = (text: TextAnswer): void => {
+      if (!live) return;
+      if (text.state === 'read') known.remember(url, text.text);
+      setRead({ url, text });
+      answerEdit?.(text);
+    };
     void readAsset(url)
-      .then(async (answer) => {
-        if (!stillLive()) return;
-        if (answer instanceof Blob) {
-          const text = await textOf(answer);
-          known.remember(url, text);
-          if (stillLive()) setRead({ url, text: { state: 'read', text } });
-        } else {
-          setRead({ url, text: { state: 'refused', refused: answer.refused } });
-        }
-      })
-      // A read that fails outright, as a network failure or a timeout does,
-      // is refused like any other: the text is drawn as a note, never awaited.
-      .catch(() => {
-        if (stillLive()) setRead({ url, text: { state: 'refused', refused: UNREAD } });
-      });
+      .then(async (answer): Promise<TextAnswer> =>
+        answer instanceof Blob
+          ? { state: 'read', text: await textOf(answer) }
+          : { state: 'refused', refused: answer.refused },
+      )
+      .then(finish, () => finish({ state: 'refused', refused: UNREAD }));
     return () => {
       live = false;
     };
-  }, [url, readAsset, known, wanted]);
+  }, [url, readAsset, known, wanted, answerEdit]);
   const already = known.text(url);
   if (already !== undefined) return { state: 'read', text: already };
   return read.url === url ? read.text : READING;
@@ -321,8 +326,10 @@ function MermaidView({
   const url = surface.content.value.url;
   const [known] = useState(createKnownText);
   const open = surface.map.value.open;
-  const [readingForEdit, setReadingForEdit] = useState(false);
-  const text = useText(url, surface.assets, known, open || readingForEdit);
+  const [editRead, setEditRead] = useState<{
+    readonly resourceId: ResourceId;
+    readonly url: AssetRef;
+  } | null>(null);
   const mapCommit = surface.map.commit;
   const contentCommit = surface.content.commit;
   const store = surface.assets.store;
@@ -338,21 +345,43 @@ function MermaidView({
   const claim = editing?.claim;
   useEffect(() => () => claim?.release(), [claim]);
 
+  const mayAuthor = contentCommit !== undefined && store !== undefined && takeClaim !== undefined;
+  const startEdit = useCallback(
+    (source: string) => {
+      if (!mayAuthor || editing !== null) return;
+      const held = surface.editSize === undefined ? undefined : takeClaim({ editor: {} });
+      if (surface.editSize !== undefined && held === undefined) return;
+      setRefusal(null);
+      setEditing({ draft: source, base: lineFeedText(source), saving: false, claim: held });
+    },
+    [mayAuthor, editing, takeClaim, surface.editSize],
+  );
+
+  const answerEdit = useCallback(
+    (answer: TextAnswer) => {
+      setEditRead(null);
+      if (answer.state === 'refused') setRefusal(UNEDITABLE);
+      else startEdit(answer.text);
+    },
+    [startEdit],
+  );
+  const resourceId = surface.resource.id;
+  const readingForEdit = editRead?.url === url && editRead.resourceId === resourceId && mayAuthor;
+  if (editRead !== null && !readingForEdit) setEditRead(null);
+  const text = useText(url, surface.assets, known, open, readingForEdit ? answerEdit : undefined);
   const readable = text.state === 'read' ? text.text : null;
   // The diagram is drawn while it is Open, and not while the draft replaces it.
   const drawable = editing === null && open ? readable : null;
   const diagram = useDiagram(drawable, scheme, render, scratch);
-  const mayAuthor = contentCommit !== undefined && store !== undefined && takeClaim !== undefined;
   const mayEdit = readable !== null && mayAuthor;
   const mayEditClosed = !open && mayAuthor;
-
   const beginEdit = useCallback(() => {
-    if (!mayEdit || editing !== null) return;
-    const held = surface.editSize === undefined ? undefined : takeClaim({ editor: {} });
-    if (surface.editSize !== undefined && held === undefined) return;
-    setRefusal(null);
-    setEditing({ draft: readable, base: lineFeedText(readable), saving: false, claim: held });
-  }, [mayEdit, editing, takeClaim, readable, surface.editSize]);
+    if (readable !== null) startEdit(readable);
+    else {
+      setRefusal(null);
+      setEditRead({ resourceId, url });
+    }
+  }, [readable, startEdit, resourceId, url]);
 
   const suggestEditorSize = (source: Size) => {
     const suggestedSize = editorSizeWithTitle(source, titleRow.current, surface.size);
@@ -361,13 +390,6 @@ function MermaidView({
   };
 
   const end = useCallback(() => setEditing(null), []);
-
-  useEffect(() => {
-    if (!readingForEdit || text.state === 'reading') return;
-    setReadingForEdit(false);
-    if (text.state === 'refused') setRefusal(UNEDITABLE);
-    else beginEdit();
-  }, [readingForEdit, text.state, beginEdit]);
 
   const save = useCallback(() => {
     if (editing?.claim === undefined || editing.saving) return;
@@ -470,12 +492,7 @@ function MermaidView({
               id: 'edit',
               label: `Edit Resource ${name}`,
               icon: <Pencil size={14} />,
-              run: mayEdit
-                ? beginEdit
-                : () => {
-                    setRefusal(null);
-                    setReadingForEdit(true);
-                  },
+              run: beginEdit,
             },
           ]
         : [];
