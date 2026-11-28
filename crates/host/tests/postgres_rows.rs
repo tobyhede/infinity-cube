@@ -103,6 +103,8 @@ async fn dump(database: &Fresh, header: &[&str]) -> String {
 mod given_the_script {
     use super::*;
 
+    // TypeScript half: holds the Rust rows to the rows this host writes
+    // TypeScript half: reads the rows the Rust host wrote as the memory store runs the script
     #[tokio::test]
     #[ignore = "needs the PostgreSQL server INFINITY_CUBE_POSTGRES_TEST_URL names"]
     async fn writes_the_rows_checked_in() {
@@ -149,6 +151,7 @@ mod given_rows_the_typescript_host_wrote {
         database
     }
 
+    // TypeScript half: holds the checked-in TypeScript rows to what the script writes now
     #[tokio::test]
     #[ignore = "needs the PostgreSQL server INFINITY_CUBE_POSTGRES_TEST_URL names"]
     async fn reads_the_aggregate_and_its_assets_as_this_host_runs_the_script() {

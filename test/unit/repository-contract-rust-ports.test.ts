@@ -343,12 +343,25 @@ const acceptedDifference = (decision: string): PostgresExemption => ({
 
 /**
  * A case of a check run across runtimes: the TypeScript half, whose Rust half
- * is the adapter's file `rustHalf`, which names the TypeScript half back.
+ * is the adapter's file `rustHalf`, which names the TypeScript half's file
+ * and marks the test that pairs with each case `// TypeScript half: <name>`.
  */
 const typescriptHalf = (rustHalf: string): PostgresExemption => ({
   kind: 'TypeScript half',
   rustHalf,
 });
+
+/**
+ * A Rust test's `// TypeScript half: <name>` line, naming the TypeScript case
+ * it pairs with, counted only where a test attribute follows its run of such
+ * lines, so the mark goes with the test.
+ */
+const TYPESCRIPT_HALF =
+  /^\s*\/\/ TypeScript half: (.+)$(?=(?:\n\s*\/\/ TypeScript half: .+$)*\n\s*#\[(?:tokio::)?test\])/gmu;
+
+/** The TypeScript cases the tests of the Rust file `file` mark as their pairs. */
+const typescriptHalvesIn = (file: string): string[] =>
+  [...readRepositoryFile(file).matchAll(TYPESCRIPT_HALF)].map((match) => match[1] ?? '');
 
 /** Whether `exemption` carries its ticket, reason or decision. */
 const isExplained = (exemption: PostgresExemption): boolean => {
@@ -757,12 +770,13 @@ const POSTGRES_SHARED_FILES = [
 const POSTGRES: Port = {
   name: 'the Rust PostgreSQL repository',
   table: filesUnder('crates/host/tests/repository_contract', (name) => name.endsWith('.rs')),
-  // Every `postgres*.rs` test binary is read, so a new one needs no edit here.
+  // Every `postgres*.rs` test binary and every file of the store's own module
+  // directory is read, so a new one needs no edit here.
   files: [
     ...filesUnder('crates/host/tests', (name) => /^postgres.*\.rs$/u.test(name)).filter(
       (file) => !file.includes('/postgres_support/') && !POSTGRES_SHARED_FILES.includes(file),
     ),
-    'crates/host/src/sql/postgres/tests.rs',
+    ...filesUnder('crates/host/src/sql/postgres', (name) => name.endsWith('.rs')),
   ],
   sharedFiles: POSTGRES_SHARED_FILES,
   exempt: POSTGRES_EXEMPT,
@@ -939,8 +953,9 @@ describe('the Rust PostgreSQL repository', () => {
       ...filesUnder('crates', (name) => /postgres.*\.rs$/u.test(name)).filter((file) =>
         /^crates\/[^/]+\/tests\/[^/]+$/u.test(file),
       ),
-      'crates/host/src/sql/postgres/tests.rs',
+      ...filesUnder('crates/host/src/sql/postgres', (name) => name.endsWith('.rs')),
     ];
+    expect(named).toContain('crates/host/src/sql/postgres/tests.rs');
     expect(named).toContain('crates/host/tests/postgres_wire.rs');
     expect(named).toContain('crates/host/tests/postgres_rows.rs');
     expect(named).toContain('crates/cli/tests/serve_postgres.rs');
@@ -991,8 +1006,10 @@ describe('the Rust PostgreSQL repository', () => {
     expect(halves.map(({ name }) => name)).toHaveLength(3);
     expect(
       halves.filter(
-        ({ file, rustHalf }) =>
-          !POSTGRES.files.includes(rustHalf) || !readRepositoryFile(rustHalf).includes(file),
+        ({ name, file, rustHalf }) =>
+          !POSTGRES.files.includes(rustHalf) ||
+          !readRepositoryFile(rustHalf).includes(file) ||
+          !typescriptHalvesIn(rustHalf).includes(name),
       ),
     ).toEqual([]);
   });
