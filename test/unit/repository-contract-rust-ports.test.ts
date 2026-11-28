@@ -81,12 +81,22 @@ const OUTSIDE_VALUES = {
   ],
 } satisfies Readonly<Record<string, readonly string[]>>;
 
-const VALUES_BY_CASE = new Map(Object.entries({ ...VALUES, ...OUTSIDE_VALUES }));
+/** One run of a case: its name, and the name a port of it marks. */
+interface Run {
+  readonly name: string;
+  readonly run: string;
+}
 
-/** A case as it runs: each value of a looped case named apart. */
-const runsOf = (name: string): string[] =>
-  (VALUES_BY_CASE.get(name) ?? [undefined]).map((value) =>
-    value === undefined ? name : `${name} (${value})`,
+/** Each case's runs: one per listed value, `<name> (<value>)`, or the case alone. */
+const runsOf = (
+  cases: readonly Pick<DescribedCase, 'name'>[],
+  values: Readonly<Record<string, readonly string[]>>,
+): Run[] =>
+  cases.flatMap(({ name }) =>
+    (values[name] ?? [undefined]).map((value) => ({
+      name,
+      run: value === undefined ? name : `${name} (${value})`,
+    })),
   );
 
 /** Why a case does not apply to the Rust SQLite repository. */
@@ -139,21 +149,27 @@ const contractName = (written: string): string =>
 const CONTRACT_CASES = casesOf(CONTRACT).map(contractName);
 
 /** The contract's cases as they run: each value of a looped case named apart. */
-const CONTRACT_RUNS = CONTRACT_CASES.flatMap(runsOf);
+const CONTRACT_RUNS = runsOf(
+  CONTRACT_CASES.map((name) => ({ name })),
+  VALUES,
+);
 
 /** The cases outside the contract, by file, as they run. */
 const OUTSIDE_CASES = Object.fromEntries(
-  OUTSIDE.map((file) => [file, casesOf(file).flatMap(runsOf)]),
+  OUTSIDE.map((file) => [
+    file,
+    runsOf(
+      casesOf(file).map((name) => ({ name })),
+      OUTSIDE_VALUES,
+    ),
+  ]),
 );
 
-const CASES = [...CONTRACT_RUNS, ...Object.values(OUTSIDE_CASES).flat()];
+/** The SQLite adapter's runs: the contract's, then each outside file's. */
+const SQLITE_RUNS = [...CONTRACT_RUNS, ...Object.values(OUTSIDE_CASES).flat()];
 
-/**
- * The SQLite adapter's runs. Each is marked, and exempted, by the one name it
- * runs under: a value of a contract case is a run of its own, and a case of
- * the other files is one run as written.
- */
-const SQLITE_RUNS = CASES.map((name) => ({ name, run: name }));
+/** The name each of those runs is marked by. */
+const CASES = SQLITE_RUNS.map(({ run }) => run);
 
 const HTTP_CASES = HTTP_CASE_FILES.flatMap(casesOf);
 
@@ -330,24 +346,6 @@ const exemptEach = (
   names: readonly string[],
   exemption: PostgresExemption,
 ): Record<string, PostgresExemption> => Object.fromEntries(names.map((name) => [name, exemption]));
-
-/** One run of a case: its name, and the name a port of it marks. */
-interface Run {
-  readonly name: string;
-  readonly run: string;
-}
-
-/** Each case's runs: one per listed value, `<name> (<value>)`, or the case alone. */
-const runsOf = (
-  cases: readonly Pick<DescribedCase, 'name'>[],
-  values: Readonly<Record<string, readonly string[]>>,
-): Run[] =>
-  cases.flatMap(({ name }) =>
-    (values[name] ?? [undefined]).map((value) => ({
-      name,
-      run: value === undefined ? name : `${name} (${value})`,
-    })),
-  );
 
 /** The cases run once per value whose values are not listed, and listed values naming no such case. */
 const unvalued = (
@@ -531,7 +529,7 @@ const POSTGRES_SOURCE_CASES = POSTGRES_SOURCES.map((source) => ({
 
 /** The PostgreSQL adapter's cases: the contract's (each run per value by its loop), then each source's. */
 const POSTGRES_CASES: readonly Pick<DescribedCase, 'name' | 'perValue'>[] = [
-  ...CONTRACT_CASES.map((name) => ({ name, perValue: VALUES_BY_CASE.has(name) })),
+  ...CONTRACT_CASES.map((name) => ({ name, perValue: name in VALUES })),
   ...POSTGRES_SOURCE_CASES.flatMap(({ cases }) => cases),
 ];
 
