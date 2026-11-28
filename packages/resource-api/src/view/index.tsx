@@ -60,8 +60,10 @@ export interface Claim {
 /**
  * A Claim taken to edit in place (ADR 0178): while it is held, the canvas
  * draws the Resource at its Edit size, and a resize writes that size rather
- * than the Resource's own. A `sizeHint` is what the editor is drawn at, at
- * least, while no Edit size is stored; it stores nothing.
+ * than the Resource's own. While no Edit size is stored, the editor is drawn
+ * at the larger of its `sizeHint` and its size on each axis, capped at the
+ * visible canvas; the hint stores nothing. The app's
+ * `render-adapter.test.ts` holds both, under "a Resource edited in place".
  */
 export interface InPlaceEdit {
   readonly sizeHint?: Size | undefined;
@@ -139,7 +141,9 @@ export interface Surface<C, M> {
   /**
    * The Edit size the Map stores for this Resource, if any (ADR 0178): a plugin
    * that edits in place sends a size hint with its Claim only where there is
-   * none, and the canvas draws its editor at it.
+   * none, and the canvas draws its editor at it, capped at the visible canvas
+   * (the app's `render-adapter.test.ts`, "is drawn capped at the visible
+   * canvas, which stores nothing").
    */
   readonly editSize?: Size | undefined;
   readonly selected: boolean;

@@ -77,8 +77,6 @@ export function editorPlacement(
     if (at === undefined) continue;
     const size = resourceSize(at);
     const hint = editor.sizeHint;
-    // A stored Edit size; with none, the larger of the hint and the size on
-    // each axis, storing nothing.
     const wanted =
       at.editSize ??
       (hint === undefined

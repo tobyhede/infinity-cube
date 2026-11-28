@@ -245,7 +245,8 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
       if (!mayEdit || editing !== null) return;
       // Taken to edit in place: the canvas draws the editor at the Edit size it
       // keeps for this Map while the Claim is held, or, with none stored, at
-      // least at the hint (ADR 0178).
+      // the larger of the hint and its size, capped at the visible canvas
+      // (ADR 0178; the app's `render-adapter.test.ts` holds it).
       const held = takeClaim(sizeHint === undefined ? { inPlace: {} } : { inPlace: { sizeHint } });
       if (held === undefined) return;
       claim.current = held;
