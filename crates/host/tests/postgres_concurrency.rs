@@ -289,26 +289,48 @@ impl Blocker {
 
 /// Return once at least `count` sessions on `database` wait for a lock.
 async fn waiting(database: &Fresh, count: i64) {
+    polled(
+        database,
+        "SELECT count(*) FROM pg_stat_activity \
+         WHERE datname = current_database() AND wait_event_type = 'Lock'",
+        count,
+        "waited for a lock",
+        || false,
+    )
+    .await;
+}
+
+/// Poll `query`, which counts sessions on `database`, every 10ms until it
+/// reaches `count`, answering true; answer false as soon as `given_up` holds
+/// between polls, and fail if neither happens within [`PATIENCE`].
+async fn polled(
+    database: &Fresh,
+    query: &'static str,
+    count: i64,
+    what: &str,
+    mut given_up: impl FnMut() -> bool,
+) -> bool {
     let mut watcher = database.connect().await;
     let deadline = tokio::time::Instant::now() + PATIENCE;
-    loop {
-        let waiters: i64 = sqlx::query_scalar(
-            "SELECT count(*) FROM pg_stat_activity \
-             WHERE datname = current_database() AND wait_event_type = 'Lock'",
-        )
-        .fetch_one(&mut watcher)
-        .await
-        .unwrap();
-        if waiters >= count {
-            break;
+    let reached = loop {
+        let counted: i64 = sqlx::query_scalar(query)
+            .fetch_one(&mut watcher)
+            .await
+            .unwrap();
+        if counted >= count {
+            break true;
+        }
+        if given_up() {
+            break false;
         }
         assert!(
             tokio::time::Instant::now() < deadline,
-            "{count} session(s) never waited for a lock; {waiters} did"
+            "{count} session(s) never {what} within {PATIENCE:?}; {counted} did"
         );
         tokio::time::sleep(Duration::from_millis(10)).await;
-    }
+    };
     watcher.close().await.unwrap();
+    reached
 }
 
 /// A probe stopping `store`'s first operation to reach a step `at` accepts
@@ -1216,6 +1238,115 @@ mod given_overlapping_replacements {
 
 mod given_concurrent_commits {
     use super::*;
+
+    /// Return `task` once a session on `database` waits for a row lock, as
+    /// `pg_locks` shows it, failing with its result if it finishes first.
+    async fn waiting_on_a_row_lock<R: std::fmt::Debug>(
+        database: &Fresh,
+        mut task: JoinHandle<R>,
+    ) -> JoinHandle<R> {
+        // A row lock is waited for on the holder's transaction id, or on
+        // the tuple while another waiter is queued for it.
+        let waited = polled(
+            database,
+            "SELECT count(*) FROM pg_locks \
+             WHERE NOT granted AND locktype IN ('transactionid', 'tuple') \
+             AND pid IN (SELECT pid FROM pg_stat_activity \
+             WHERE datname = current_database())",
+            1,
+            "waited for a row lock",
+            || task.is_finished(),
+        )
+        .await;
+        if !waited {
+            panic!(
+                "the second Edit finished without waiting for a row lock: {:?}",
+                (&mut task).await
+            );
+        }
+        task
+    }
+
+    // The fast path holds its Space's row `FOR UPDATE` before it reads the
+    // Space, so a second single-Space Edit to that Space waits there rather
+    // than beside it. Under `FOR SHARE` both would hold the row and each
+    // then wait in `lock_space` to update it, a deadlock.
+    #[tokio::test]
+    #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+    async fn conflicts_a_single_space_edit_that_waited_on_the_row_another_holds_for_update() {
+        let database = Fresh::new().await;
+        seeded(&database, SPACE_ID, &[repository_space()])
+            .await
+            .close()
+            .await;
+        let first: Store = Arc::new(database.open());
+        let second: Store = Arc::new(database.open());
+        let (reached, release) = pause_once(&first, |step| *step == Step::RowLock(space(SPACE_ID)));
+        let second_reached_row_lock = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&second_reached_row_lock);
+        let probe: Probe = Arc::new(move |step| {
+            if matches!(step, Step::RowLock(_)) {
+                flag.store(true, Ordering::SeqCst);
+            }
+            Box::pin(async {})
+        });
+        second.set_probe(Some(probe));
+
+        let first_edit = repository_space().titled("First edit");
+        let first_change = commit(vec![update(&first_edit, Revision::FIRST)]);
+        let first_result = rendezvous(
+            &reached,
+            spawn(
+                &first,
+                |store| async move { store.commit(first_change).await },
+            ),
+        )
+        .await;
+        let second_change = commit(vec![update(
+            &repository_space().titled("Second edit"),
+            Revision::FIRST,
+        )]);
+        let second_result = waiting_on_a_row_lock(
+            &database,
+            spawn(
+                &second,
+                |store| async move { store.commit(second_change).await },
+            ),
+        )
+        .await;
+        assert!(
+            !second_reached_row_lock.load(Ordering::SeqCst),
+            "the second Edit waits on the row before it reads the Space, \
+             not at the update lock beside the first"
+        );
+        release.notify_one();
+
+        let first_result = joined(first_result).await;
+        let second_result = joined(second_result).await;
+        assert_eq!(
+            first_result.unwrap(),
+            CommitResult::Committed {
+                revisions: vec![(space(SPACE_ID), revision(1))],
+                deleted_space_ids: vec![],
+            },
+            "the Edit holding the row commits"
+        );
+        assert_eq!(
+            second_result.unwrap(),
+            CommitResult::Conflict(vec![SpaceConflict {
+                space_id: space(SPACE_ID),
+                current: Some(first_edit.at(revision(1))),
+            }]),
+            "the Edit that waited conflicts with the first's write, never Unavailable"
+        );
+        assert_eq!(
+            first.load_space(space(SPACE_ID)).await.unwrap(),
+            Some(first_edit.at(revision(1))),
+            "the stored Space is the first Edit's write"
+        );
+        first.close().await;
+        second.close().await;
+    }
 
     // Case: serializes concurrent topology commits so the loser observes the complete winner
     #[tokio::test]
