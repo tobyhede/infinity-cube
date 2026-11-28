@@ -7,7 +7,7 @@ This is a **preview build** of InfinityCube: one `infinity-cube` binary that run
 On macOS or Linux, the install script picks this platform's archive from the newest published preview build, checks it against the release's `SHA256SUMS`, and puts `infinity-cube` in `~/.local/bin`, with no `sudo`:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/tobyhede/infinity-cube/main/release/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/tobyhede/infinity-cube/main/release/install.sh | sh -s -- --cli
 ```
 
 Set `INFINITY_CUBE_VERSION` (say `v0.1.0-preview.1`) on `sh` to install a particular build, and `INFINITY_CUBE_INSTALL_DIR` to install somewhere else. If the folder is not on your `PATH`, the script prints the line to add. Running it again replaces the binary, which is how you upgrade; a later build may refuse a directory an earlier one wrote, so read a directory with the build that wrote it. To uninstall, delete the binary: `rm ~/.local/bin/infinity-cube`.
