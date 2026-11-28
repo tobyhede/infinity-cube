@@ -5,7 +5,7 @@
 use crate::ids::SpaceId;
 use crate::json::{JsonObject, JsonValue};
 use crate::model::{
-    DOCUMENT_VERSION, Edge, Graph, Map, Placement, Resource, SpaceDocument, SpaceSnapshot,
+    DOCUMENT_VERSION, Edge, Graph, Map, Placement, Resource, Size, SpaceDocument, SpaceSnapshot,
 };
 use crate::refusal::{Refusal, Refusals, ShapeProblem};
 use crate::schema::{locate_snapshot_issue, space_snapshot};
@@ -175,19 +175,20 @@ fn map_json(map: &Map) -> JsonValue {
     ])
 }
 
+/// A size, its width before its height.
+fn size_json(size: Size) -> JsonValue {
+    object([
+        ("width", Some(JsonValue::Number(size.width))),
+        ("height", Some(JsonValue::Number(size.height))),
+    ])
+}
+
 fn placement_json(placement: &Placement) -> JsonValue {
     object([
         ("x", Some(JsonValue::Number(placement.x))),
         ("y", Some(JsonValue::Number(placement.y))),
-        (
-            "size",
-            placement.size.map(|size| {
-                object([
-                    ("width", Some(JsonValue::Number(size.width))),
-                    ("height", Some(JsonValue::Number(size.height))),
-                ])
-            }),
-        ),
+        ("size", placement.size.map(size_json)),
+        ("editSize", placement.edit_size.map(size_json)),
         ("content", placement.content.clone()),
     ])
 }

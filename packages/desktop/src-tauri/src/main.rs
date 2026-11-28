@@ -37,10 +37,8 @@ mod test_support;
 mod update;
 mod waiting;
 
-use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{Receiver, TryRecvError};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
 
@@ -57,7 +55,7 @@ use tokio::sync::mpsc::{self, UnboundedSender};
 use url::Url;
 
 use crate::address::{AggregateKey, SCHEME, SchemeStyle};
-use crate::aggregates::{Close, Registry, SPACE_WINDOW_PREFIX, lock};
+use crate::aggregates::{Close, Registry, ReportIn, SPACE_WINDOW_PREFIX, lock};
 use crate::launch::LastWindow;
 use crate::open_folder::Origin;
 use crate::scheme::{OpenAggregates, VIEW_WINDOW_PREFIX};
@@ -66,13 +64,10 @@ use crate::server::{
 };
 use crate::waiting::{Choice, Effect, Event};
 
-/// Every Aggregate, the stops still under way for Aggregates already closing, by
-/// window label, and the Aggregates whose last write the presenter abandoned.
+/// Every Aggregate, from starting until its close has ended.
 #[derive(Default)]
 struct Aggregates {
     registry: Mutex<Registry<AggregateServer>>,
-    stopping: Mutex<HashMap<String, Receiver<()>>>,
-    abandoned: Mutex<HashSet<String>>,
 }
 
 /// Where the shell tells the close-wait decision ([`waiting::drive`]) what
@@ -93,64 +88,29 @@ impl Aggregates {
     fn registry(&self) -> MutexGuard<'_, Registry<AggregateServer>> {
         lock(&self.registry)
     }
-
-    /// Keep word of when a closing Aggregate's last write ends, so quitting
-    /// waits for the write, and never for a dialog reporting it, which
-    /// needs the event loop quitting holds.
-    fn keep_stopping(&self, label: String, written: Receiver<()>) {
-        let mut stopping = lock(&self.stopping);
-        stopping.retain(|_, written| matches!(written.try_recv(), Err(TryRecvError::Empty)));
-        let _replaced = stopping.insert(label, written);
-    }
-
-    fn take_stopping(&self) -> Vec<Receiver<()>> {
-        lock(&self.stopping)
-            .drain()
-            .map(|(_, written)| written)
-            .collect()
-    }
-
-    /// The presenter gave up on window `label`'s last write: nothing waits
-    /// for its stop any more, and a failure is reported on standard error
-    /// only.
-    fn abandon(&self, label: &str) {
-        let _detached = lock(&self.stopping).remove(label);
-        let _new = lock(&self.abandoned).insert(label.to_owned());
-    }
-
-    /// Whether window `label`'s last write was abandoned, forgetting it.
-    fn take_abandoned(&self, label: &str) -> bool {
-        lock(&self.abandoned).remove(label)
-    }
 }
 
 /// Stop window `label`'s Aggregate on a thread of its own, reporting a failed
-/// write on standard error, and in a dialog when `dialog` and the write was
-/// not abandoned; then free its directory and tell the close-wait decision
-/// the write has ended.
-fn spawn_stop(
-    app: &AppHandle,
-    label: String,
-    directory: PathBuf,
-    server: AggregateServer,
-    dialog: bool,
-) {
+/// write where the Registry says ([`aggregates::ReportIn`]); then free its
+/// directory and tell the close-wait decision the write has ended.
+fn spawn_stop(app: &AppHandle, label: String, directory: PathBuf, server: AggregateServer) {
     let handle = app.clone();
     let kept = label.clone();
     let (written, ended) = std::sync::mpsc::channel();
     let _stop = thread::spawn(move || {
         let failed = server.stop();
-        // Quitting waits for this, not for the dialog below.
+        // An exit waits for this, never for the dialog below, which needs
+        // the event loop the exit holds.
         let _told = written.send(());
         let aggregates = handle.state::<Aggregates>();
-        let abandoned = aggregates.take_abandoned(&label);
+        let report = aggregates.registry().stopped(&label);
         if let Some(reason) = failed {
-            report_unwritten(&handle, &directory, &reason, dialog && !abandoned);
+            report_unwritten(&handle, &directory, &reason, report == ReportIn::Dialog);
         }
         aggregates.registry().closed(&label);
         handle.state::<Closings>().send(Event::WriteFinished(label));
     });
-    app.state::<Aggregates>().keep_stopping(kept, ended);
+    app.state::<Aggregates>().registry().stopping(&kept, ended);
 }
 
 /// Do what the close-wait decision decided.
@@ -166,15 +126,12 @@ fn apply(app: &AppHandle, effect: Effect<String>) {
         Effect::Abandon(abandoned) => {
             let aggregates = app.state::<Aggregates>();
             for (label, directory) in abandoned {
-                aggregates.abandon(&label);
+                aggregates.registry().abandon_close(&label);
                 // The windows its page opened go with it, as a stop that
                 // ends takes them.
-                let views = format!(
-                    "{VIEW_WINDOW_PREFIX}{}-",
-                    AggregateKey::of(&directory).as_str()
-                );
+                let key = AggregateKey::of(&directory);
                 for (other, window) in app.webview_windows() {
-                    if other == label || other.starts_with(&views) {
+                    if other == label || scheme::is_view_of(&other, &key) {
                         let _ = window.destroy();
                     }
                 }
@@ -615,7 +572,7 @@ fn main() {
                         aggregate: label.clone(),
                         folder: directory.clone(),
                     });
-                    spawn_stop(window.app_handle(), label, directory, server, true);
+                    spawn_stop(window.app_handle(), label, directory, server);
                 }
             }
         })
@@ -648,7 +605,7 @@ fn main() {
             let mut writing = Vec::with_capacity(open.len());
             for (label, directory, server) in open {
                 writing.push((label.clone(), directory.clone()));
-                spawn_stop(app, label, directory, server, false);
+                spawn_stop(app, label, directory, server);
             }
             closings.send(Event::QuitRequested { writing });
         }
@@ -662,11 +619,11 @@ fn main() {
             if app.state::<Closings>().exit_allowed.load(Ordering::SeqCst) {
                 return;
             }
-            let aggregates = app.state::<Aggregates>();
-            let open = aggregates.registry().take_all();
-            let stopping: Vec<_> = open
+            let exit = app.state::<Aggregates>().registry().take_for_exit();
+            let stopping: Vec<_> = exit
+                .open
                 .into_iter()
-                .map(|(_label, directory, server)| {
+                .map(|(directory, server)| {
                     thread::spawn(move || {
                         if let Some(reason) = server.stop() {
                             eprintln!("{}", unwritten_message(&directory, &reason));
@@ -674,7 +631,7 @@ fn main() {
                     })
                 })
                 .collect();
-            for written in aggregates.take_stopping() {
+            for written in exit.writing {
                 // Answered once the write ends, or at once if its stop
                 // ended without saying so.
                 let _ = written.recv();

@@ -195,12 +195,12 @@ test('Space reads a Resource in Full View, walks the Active Graph and leaves', a
 });
 
 /**
- * Opening D, the fixture's long Markdown Resource, grows it to fit its content
- * in one Edit, by the size hint its plugin carries: its text no longer
- * overflows and A′ to its right makes room. Shift+Enter Opens nothing: every
- * Open is a plugin's rail command (resource-plugins issues 05 and 10).
+ * Opening D, the fixture's long Markdown Resource, is one Edit that keeps its
+ * size (ADR 0178): its text is clipped to its rect and A′ to its right stays
+ * put. Shift+Enter Opens nothing: every Open is a plugin's rail command
+ * (resource-plugins issues 05 and 10).
  */
-test('Opening a Markdown Resource grows it to fit its content, and Shift+Enter Opens nothing', async ({
+test('Opening a Markdown Resource keeps its size, and Shift+Enter Opens nothing', async ({
   page,
 }) => {
   await page.goto('/');
@@ -228,13 +228,9 @@ test('Opening a Markdown Resource grows it to fit its content, and Shift+Enter O
   await settled(page);
   const body = d.locator('.markdown-resource-body__rendered');
   await expect(body).toContainText('fifteen');
-  expect(
-    await body.evaluate((element) => element.scrollHeight - element.clientHeight),
-  ).toBeLessThanOrEqual(1);
   const open = await gapOf();
-  expect(open.left.width).toBeGreaterThan(closed.left.width);
-  expect(open.left.height).toBeGreaterThan(closed.left.height);
-  // A′ took the width change, so the room between them is what it was.
+  expect(Math.abs(open.left.width - closed.left.width)).toBeLessThanOrEqual(1);
+  expect(Math.abs(open.left.height - closed.left.height)).toBeLessThanOrEqual(1);
   expect(Math.abs(open.gap - closed.gap)).toBeLessThanOrEqual(1);
 });
 

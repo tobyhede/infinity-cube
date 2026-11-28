@@ -955,72 +955,6 @@ describe('SnapshotEdit.resize and Map content properties', () => {
     );
   });
 
-  /** The entries with the subject a Closed Markdown Resource storing no size. */
-  const markdownSubject = (entries: readonly GeneratedEntry[], at: number) =>
-    with_(entries, at, { kind: 'markdown', size: undefined, shape: undefined });
-
-  /** A size hint as a plugin might ask: any size, some below the Closed Size, some fractional. */
-  const hintArb = fc.record({
-    width: fc.double({ min: 0, max: 1200, noNaN: true }),
-    height: fc.double({ min: 0, max: 1200, noNaN: true }),
-  });
-
-  /** The Resize's answer, read as the completed Open it follows when it changed nothing. */
-  const settledOutcome = (
-    snapshot: SpaceSnapshot,
-    outcome: SnapshotEditOutcome,
-  ): SnapshotEditOutcome =>
-    outcome.kind === 'unchanged' ? { kind: 'completed', snapshot } : outcome;
-
-  it('applies a Map content Edit’s size hint as a Resize does, floored at the Closed Size', () => {
-    fc.assert(
-      fc.property(entriesArb, subjectArb, hintArb, (generated, subjectIndex, hint) => {
-        const subjectId = RESOURCE_IDS[subjectIndex];
-        if (subjectId === undefined) return;
-        const start = snapshotOf(markdownSubject(generated, subjectIndex));
-        const opened = completed(
-          SnapshotEdit.changeMapContent(start, MAP_ID, subjectId, { open: true }),
-        );
-        const floored = {
-          width: Math.max(Math.round(hint.width), COLLAPSED_RESOURCE_SIZE.width),
-          height: Math.max(Math.round(hint.height), COLLAPSED_RESOURCE_SIZE.height),
-        };
-        // One Edit: the content, then the size it hints at with the displacement
-        // that size causes, exactly as the Resize it stands for.
-        expect(
-          SnapshotEdit.changeMapContent(start, MAP_ID, subjectId, { open: true }, hint),
-        ).toEqual(settledOutcome(opened, SnapshotEdit.resize(opened, MAP_ID, subjectId, floored)));
-      }),
-      { seed: SEED, numRuns: RUNS },
-    );
-  });
-
-  it('ignores a size hint on an entry that already stores a size, and on content that is unchanged', () => {
-    fc.assert(
-      fc.property(
-        entriesArb,
-        subjectArb,
-        sizeArb,
-        hintArb,
-        (generated, subjectIndex, stored, hint) => {
-          const subjectId = RESOURCE_IDS[subjectIndex];
-          if (subjectId === undefined) return;
-          const sized = snapshotOf(
-            with_(markdownSubject(generated, subjectIndex), subjectIndex, { size: stored }),
-          );
-          expect(
-            SnapshotEdit.changeMapContent(sized, MAP_ID, subjectId, { open: true }, hint),
-          ).toEqual(SnapshotEdit.changeMapContent(sized, MAP_ID, subjectId, { open: true }));
-          const closed = snapshotOf(markdownSubject(generated, subjectIndex));
-          expect(
-            SnapshotEdit.changeMapContent(closed, MAP_ID, subjectId, { open: false }, hint),
-          ).toEqual({ kind: 'unchanged' });
-        },
-      ),
-      { seed: SEED, numRuns: RUNS },
-    );
-  });
-
   it('keeps the Map content its plugin accepts and refuses what it refuses, whichever plugin it is', () => {
     fc.assert(
       fc.property(entriesArb, subjectArb, (generated, subjectIndex) => {
@@ -1259,5 +1193,58 @@ describe('SnapshotEdit across two Maps: addToMap, removeFromMap and deleteFromSp
         },
       ),
     );
+  });
+});
+
+describe('SnapshotEdit.resizeEditor against the Edit size the entry stores', () => {
+  const MEMBER = uuid('00000000-0000-4000-8000-000000000031');
+  const STORED = { width: 640, height: 360 };
+  const stored = baseSnapshot([MEMBER], { [MEMBER]: { x: 0, y: 0, editSize: STORED } });
+  const editSizeAfter = (outcome: SnapshotEditOutcome) =>
+    outcome.kind === 'completed'
+      ? outcome.snapshot.document.maps?.find((m) => m.id === MAP_ID)?.positions[MEMBER]?.editSize
+      : undefined;
+
+  it('is unchanged at the Edit size the entry already stores', () => {
+    expect(SnapshotEdit.resizeEditor(stored, MAP_ID, MEMBER, { ...STORED })).toEqual({
+      kind: 'unchanged',
+    });
+  });
+
+  it.each([
+    { axis: 'width', editSize: { width: 641, height: 360 } },
+    { axis: 'height', editSize: { width: 640, height: 361 } },
+  ])('writes an Edit size that differs in $axis alone', ({ editSize }) => {
+    const outcome = SnapshotEdit.resizeEditor(stored, MAP_ID, MEMBER, editSize);
+
+    expect(outcome.kind).toBe('completed');
+    expect(editSizeAfter(outcome)).toEqual(editSize);
+  });
+});
+
+describe('SnapshotEdit.resizeEditor refusals', () => {
+  const MEMBER = uuid('00000000-0000-4000-8000-000000000031');
+  const ORPHAN = uuid('00000000-0000-4000-8000-000000000032');
+  const STRANGER = uuid('00000000-0000-4000-8000-000000000033');
+  const EDIT_SIZE = { width: 640, height: 360 };
+
+  /** A Map placing `ORPHAN`, which the Space does not hold: a snapshot no intake accepts. */
+  const orphaned = baseSnapshot([MEMBER], {
+    [MEMBER]: { x: 0, y: 0 },
+    [ORPHAN]: { x: 400, y: 0 },
+  });
+
+  it('refuses a Resource the Map does not place before one the Space does not hold', () => {
+    expect(SnapshotEdit.resizeEditor(orphaned, MAP_ID, STRANGER, EDIT_SIZE)).toEqual({
+      kind: 'refused',
+      refusal: { code: 'resource-not-in-map' },
+    });
+  });
+
+  it('refuses a placed Resource the Space does not hold', () => {
+    expect(SnapshotEdit.resizeEditor(orphaned, MAP_ID, ORPHAN, EDIT_SIZE)).toEqual({
+      kind: 'refused',
+      refusal: { code: 'resource-not-found' },
+    });
   });
 });
