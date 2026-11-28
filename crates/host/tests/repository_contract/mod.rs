@@ -88,6 +88,10 @@ pub trait Harness: Sized {
     /// The store.
     type Store: SpaceRepository;
 
+    /// Whether the store keeps the key order of the content it is given,
+    /// which decides how [`assert_same!`] compares what it answers.
+    const KEY_ORDER: KeyOrder = KeyOrder::Kept;
+
     /// A fresh, empty store.
     async fn open() -> Self;
 
@@ -119,8 +123,10 @@ pub trait Harness: Sized {
         exported: Option<Option<&str>>,
     ) -> Result<(), Unprovided>;
 
-    /// Every Resource id the store has written a row for since the last
-    /// call, in the order written.
+    /// Every Resource id the repository has asked the store to write a row
+    /// for (to insert or upsert) since the last call, in the order asked,
+    /// including a write its transaction later rolled back
+    /// (`recordResourceWrites`).
     async fn take_resource_writes(&mut self) -> Result<Vec<String>, Unprovided>;
 
     /// Replace `snapshot`'s Space's Resource rows with `snapshot`'s inside
@@ -395,12 +401,33 @@ pub fn update(snapshot: &SpaceSnapshot, expected: u64) -> SpaceChange {
     }
 }
 
-/// A value as the contract compares it: with every JSON object in it, each
-/// Resource's content, each placement's Map content and each Map's
-/// positions, in ascending key order. The TypeScript contract compares with `toEqual`, which ignores
-/// object-key order, so a store may answer content in its own key order
-/// (PostgreSQL's `jsonb` sorts keys by length, then by bytes) and still
-/// answer the value written. Everything else a store answers is typed, so it
+/// Whether a store keeps the key order of the content it is given.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KeyOrder {
+    /// It answers content as committed, so it is compared exactly.
+    Kept,
+    /// It answers content in an order of its own (PostgreSQL's `jsonb` sorts
+    /// keys by length, then by bytes), so both sides are compared with every
+    /// JSON object in ascending key order, as the TypeScript contract's
+    /// `toEqual` compares.
+    Reordered,
+}
+
+impl KeyOrder {
+    /// `value` as a store keeping this key order is compared: itself, or
+    /// every JSON object in it in ascending key order.
+    pub fn compared<T: InKeyOrder + Clone>(self, value: &T) -> T {
+        match self {
+            Self::Kept => value.clone(),
+            Self::Reordered => value.in_key_order(),
+        }
+    }
+}
+
+/// A value as a store that reorders keys is compared: with every JSON
+/// object in it, each Resource's content, each placement's Map content and
+/// each Map's positions, in ascending key order. Everything else a store
+/// answers is typed, so it
 /// compares as it is.
 pub trait InKeyOrder {
     /// This value, every JSON object in it in ascending key order.
@@ -576,23 +603,30 @@ impl<A: InKeyOrder, B: InKeyOrder> InKeyOrder for (A, B) {
     }
 }
 
-/// `assert_eq!` as the TypeScript contract's `toEqual` compares: both sides
-/// [`InKeyOrder::in_key_order`], so content a store answers in its own key
+/// `assert_eq!` as harness `$harness`'s [`Harness::KEY_ORDER`] says: exactly
+/// for a store that keeps key order, and for one that reorders it with both
+/// sides [`InKeyOrder::in_key_order`], so content it answers in its own key
 /// order equals the content written.
 macro_rules! assert_same {
-    ($left:expr, $right:expr $(,)?) => {
-        assert_eq!(
-            $crate::repository_contract::InKeyOrder::in_key_order(&$left),
-            $crate::repository_contract::InKeyOrder::in_key_order(&$right)
+    ($harness:ty, $left:expr, $right:expr $(,)?) => {
+        $crate::repository_contract::assert_same!(@compare $harness, $left, $right, [])
+    };
+    ($harness:ty, $left:expr, $right:expr, $($message:tt)+) => {
+        $crate::repository_contract::assert_same!(
+            @compare $harness, $left, $right, [, $($message)+]
         )
     };
-    ($left:expr, $right:expr, $($message:tt)+) => {
-        assert_eq!(
-            $crate::repository_contract::InKeyOrder::in_key_order(&$left),
-            $crate::repository_contract::InKeyOrder::in_key_order(&$right),
-            $($message)+
-        )
-    };
+    (@compare $harness:ty, $left:expr, $right:expr, [$($message:tt)*]) => {{
+        let (left, right) = (&$left, &$right);
+        match <$harness as $crate::repository_contract::Harness>::KEY_ORDER {
+            $crate::repository_contract::KeyOrder::Kept => assert_eq!(left, right $($message)*),
+            $crate::repository_contract::KeyOrder::Reordered => assert_eq!(
+                $crate::repository_contract::InKeyOrder::in_key_order(left),
+                $crate::repository_contract::InKeyOrder::in_key_order(right)
+                $($message)*
+            ),
+        }
+    }};
 }
 
 pub(crate) use assert_same;
@@ -639,12 +673,26 @@ pub fn refused_kinds(result: &CommitResult) -> Vec<&'static str> {
 
 /// One test per case of the table, in a module `contract`, each opening a
 /// fresh `$harness`, running the case, and closing it. A case that needs
-/// what the harness cannot provide says it was skipped and why. Attributes
-/// after the harness go on every test, as `#[ignore = "…"]` does for a store
-/// whose tests need a server.
+/// what the harness cannot provide says it was skipped and why; under
+/// `repository_cases!($harness, every_member)` it fails instead, for a store
+/// whose every `// Case:` line must port a case that runs on it. Attributes
+/// after the harness (and `every_member`) go on every test, as
+/// `#[ignore = "…"]` does for a store whose tests need a server.
 macro_rules! repository_cases {
+    ($harness:ty, every_member $(, #[$attribute:meta])* $(,)?) => {
+        repository_cases! { @table $harness; every_member; [$(#[$attribute])*] }
+    };
     ($harness:ty $(, #[$attribute:meta])* $(,)?) => {
-        repository_cases! { @emit $harness; [$(#[$attribute])*];
+        repository_cases! { @table $harness; skip; [$(#[$attribute])*] }
+    };
+    (@unprovided skip, $why:expr) => {
+        eprintln!("skipped: {}", $why)
+    };
+    (@unprovided every_member, $why:expr) => {
+        panic!("the harness must provide every member, but: {}", $why)
+    };
+    (@table $harness:ty; $mode:ident; $attributes:tt) => {
+        repository_cases! { @emit $harness; $mode; $attributes;
             // table:begin
             lifecycle {
                 preserves_the_established_aggregate_across_a_fresh_host,
@@ -716,6 +764,7 @@ macro_rules! repository_cases {
                 fails_a_stored_revision_that_is_not_canonical,
                 refuses_an_update_when_stored_spaces_have_no_meta_identity,
                 refuses_to_store_a_revision_above_the_ceiling,
+                deletes_a_space_at_the_ceiling,
                 fails_a_stored_revision_above_the_ceiling,
                 fails_a_fast_path_commit_over_a_revision_that_is_not_canonical,
                 fails_a_stored_exported_revision_that_is_not_canonical,
@@ -744,7 +793,7 @@ macro_rules! repository_cases {
             // table:end
         }
     };
-    (@emit $harness:ty; $attributes:tt; $($group:ident { $($case:ident),* $(,)? })*) => {
+    (@emit $harness:ty; $mode:ident; $attributes:tt; $($group:ident { $($case:ident),* $(,)? })*) => {
         mod contract {
             #[allow(unused_imports, reason = "the harness may be named by a path")]
             use super::*;
@@ -755,14 +804,14 @@ macro_rules! repository_cases {
                 mod $group {
                     $(
                         $crate::repository_contract::repository_cases! {
-                            @case $attributes $group $case
+                            @case $mode $attributes $group $case
                         }
                     )*
                 }
             )*
         }
     };
-    (@case [$(#[$attribute:meta])*] $group:ident $case:ident) => {
+    (@case $mode:ident [$(#[$attribute:meta])*] $group:ident $case:ident) => {
         #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
         #[allow(clippy::print_stderr, reason = "a skipped case says so")]
         $(#[$attribute])*
@@ -772,7 +821,7 @@ macro_rules! repository_cases {
             let ran = $crate::repository_contract::$group::$case(&mut harness).await;
             harness.close().await;
             if let Err($crate::repository_contract::Unprovided(why)) = ran {
-                eprintln!("skipped: {why}");
+                $crate::repository_contract::repository_cases!(@unprovided $mode, why);
             }
         }
     };

@@ -73,13 +73,15 @@ const brand = (positions: ReadonlyMap<ResourceId, Readonly<ResourcePlacement>>):
 
 /**
  * A copy of an entry, keeping exactly the optional fields it stores: an absent
- * `size` or `content` stays absent, so the default is read for it
+ * `size`, `editSize` or `content` stays absent, so the default is read for it
  * (`resourceSize`, `resolvedMapContent`) rather than written.
  */
 const point = (at: ResourcePlacement): ResourcePlacement => {
   let entry: ResourcePlacement = { x: at.x, y: at.y };
   if (at.size !== undefined)
     entry = { ...entry, size: { width: at.size.width, height: at.size.height } };
+  if (at.editSize !== undefined)
+    entry = { ...entry, editSize: { width: at.editSize.width, height: at.editSize.height } };
   if (at.content !== undefined) entry = { ...entry, content: at.content };
   return entry;
 };
@@ -134,7 +136,10 @@ function fromEntries(entries: Iterable<readonly [ResourceId, ResourcePlacement]>
 const sameStoredContent = (a: JsonValue | undefined, b: JsonValue | undefined): boolean =>
   a === undefined || b === undefined ? a === b : sameJsonValue(a, b);
 
-/** Value equality: the same resources, each with the same coordinates, size and Map content. */
+/**
+ * Value equality: the same resources, each with the same coordinates, size,
+ * Edit size and Map content.
+ */
 function equals(a: Placement | null, b: Placement | null): boolean {
   if (a === b) return true;
   if (a === null || b === null) return false;
@@ -145,6 +150,8 @@ function equals(a: Placement | null, b: Placement | null): boolean {
     if (other.x !== at.x || other.y !== at.y) return false;
     if (other.size?.width !== at.size?.width) return false;
     if (other.size?.height !== at.size?.height) return false;
+    if (other.editSize?.width !== at.editSize?.width) return false;
+    if (other.editSize?.height !== at.editSize?.height) return false;
     if (!sameStoredContent(other.content, at.content)) return false;
   }
   return true;

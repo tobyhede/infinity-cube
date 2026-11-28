@@ -1,4 +1,4 @@
-import { expect, test, type Page } from './fixtures';
+import { expect, test, type Locator, type Page } from './fixtures';
 import {
   boxOf,
   nodeByTitle,
@@ -115,6 +115,44 @@ test(
     // Drawn by React Flow's NodeToolbar, outside the Resource's own element.
     await expect(toolbar).toHaveClass(/\breact-flow__node-toolbar\b/);
     await expect(resource.getByTestId('canvas-resource-actions')).toHaveCount(0);
+  },
+);
+
+/** A control's glyph as it is drawn: its SVG's markup. */
+const glyphOf = (control: Locator): Promise<string> =>
+  control.locator('svg').evaluate((svg) => svg.innerHTML);
+
+test(
+  'Open and Close each draw a glyph of their own on the rail',
+  { tag: '@parity:resource-open-and-close-draw-their-own-glyphs' },
+  async ({ page }) => {
+    await page.goto('/');
+    const resource = nodeByTitle(page, 'A');
+    await expect(resource).toBeVisible();
+    await settled(page);
+    await selectResource(resource);
+    const commands = (await resourceToolbar(page, resource)).getByTestId('canvas-resource-actions');
+    const command = (name: string) => commands.getByRole('button', { name, exact: true });
+    // Every other command the rail draws, and the canvas's Fit view.
+    const others = async (except: string): Promise<string[]> => {
+      const glyphs = [await glyphOf(page.getByRole('button', { name: 'Fit view', exact: true }))];
+      for (const button of await commands.getByRole('button').all()) {
+        if ((await button.getAttribute('aria-label')) !== except) {
+          glyphs.push(await glyphOf(button));
+        }
+      }
+      return glyphs;
+    };
+
+    const openGlyph = await glyphOf(command('Open Resource A'));
+    expect(openGlyph).not.toBe('');
+    expect(await others('Open Resource A')).not.toContain(openGlyph);
+
+    await command('Open Resource A').click();
+    const closeGlyph = await glyphOf(command('Close Resource A'));
+    expect(closeGlyph).not.toBe('');
+    expect(closeGlyph).not.toBe(openGlyph);
+    expect(await others('Close Resource A')).not.toContain(closeGlyph);
   },
 );
 

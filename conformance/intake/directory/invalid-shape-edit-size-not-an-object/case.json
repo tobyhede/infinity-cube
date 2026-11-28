@@ -1,0 +1,13 @@
+{
+  "description": "An Edit size that is a number rather than a { width, height } object is one refusal at the key.",
+  "expect": {
+    "outcome": "refused",
+    "refusals": [
+      {
+        "kind": "invalid-shape",
+        "file": "10000000-0000-4000-8000-000000000001/space.json",
+        "field": "maps.0.positions.00000000-0000-4000-8000-000000000101.editSize"
+      }
+    ]
+  }
+}

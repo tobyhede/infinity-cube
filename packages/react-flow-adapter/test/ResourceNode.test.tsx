@@ -471,7 +471,7 @@ describe('ResourceNode canvas Resource state adapter', () => {
 
     expect(screen.getByRole('button', { name: 'Map: Overview' })).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Close Resource Elsewhere' }));
-    expect(commitMap).toHaveBeenCalledWith({ open: false }, undefined);
+    expect(commitMap).toHaveBeenCalledWith({ open: false });
   });
 
   it('draws an Ur Resource through its plugin host, its Shape choice committing Map content', () => {
@@ -835,7 +835,7 @@ describe('ResourceNode Open authoring', () => {
     screen.getByRole('button', { name: 'Open Resource A' }).click();
 
     expect(operations.commitMap).toHaveBeenCalledOnce();
-    expect(operations.commitMap).toHaveBeenCalledWith({ open: true }, undefined);
+    expect(operations.commitMap).toHaveBeenCalledWith({ open: true });
     expect(onBeginTitleEditing).not.toHaveBeenCalled();
   });
 

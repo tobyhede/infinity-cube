@@ -238,11 +238,11 @@ fn positions_record<'a>(
     status.parsed(positions)
 }
 
-/// A placement: a strict `{ x, y, size?, content? }`.
+/// A placement: a strict `{ x, y, size?, editSize?, content? }`.
 fn placement<'a>(checker: &mut Checker<'a>, value: &'a JsonValue) -> Parsed<Placement> {
     let Some(mut object) = checker.object(
         Some(value),
-        &["x", "y", "size", "content"],
+        &["x", "y", "size", "editSize", "content"],
         Strictness::Strict,
     ) else {
         return Parsed::Aborted;
@@ -256,6 +256,9 @@ fn placement<'a>(checker: &mut Checker<'a>, value: &'a JsonValue) -> Parsed<Plac
     let size = object.get("size");
     let parsed = checker.key("size", |c| optional(c, size, resource_size));
     let size = object.take(parsed);
+    let edit_size = object.get("editSize");
+    let parsed = checker.key("editSize", |c| optional(c, edit_size, resource_size));
+    let edit_size = object.take(parsed);
     let content = object.get("content");
     let parsed = checker.key("content", |c| {
         optional(c, content, |c, value| {
@@ -268,6 +271,7 @@ fn placement<'a>(checker: &mut Checker<'a>, value: &'a JsonValue) -> Parsed<Plac
             x: x?,
             y: y?,
             size: size?,
+            edit_size: edit_size?,
             content: content?,
         })
     })

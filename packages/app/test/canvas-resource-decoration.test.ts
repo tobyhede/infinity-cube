@@ -85,6 +85,7 @@ const context = (overrides: Partial<DecorationContext> = {}): DecorationContext 
   beginTitleEditing: () => undefined,
   onSelectResource: () => undefined,
   resourceResize: {
+    drawEditors: () => undefined,
     beginResize: () => undefined,
     previewResize: () => undefined,
     finishResize: () => undefined,
@@ -178,6 +179,7 @@ describe('decorateSharedResourceNode', () => {
       node,
       context({
         resourceResize: {
+          drawEditors: () => undefined,
           beginResize: () => undefined,
           previewResize,
           finishResize: () => undefined,

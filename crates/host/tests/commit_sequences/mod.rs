@@ -52,8 +52,9 @@ use intake::{Edge, GraphId, Placement, Resource, ResourceId, SpaceId, SpaceSnaps
 use proptest::prelude::*;
 use serde_json::Value;
 
+pub use crate::repository_contract::KeyOrder;
 use crate::repository_contract::{
-    EMPTY_ASSET_REF, InKeyOrder, SPACE_ID, id, resource, snapshot, snapshot_text, space_holding,
+    EMPTY_ASSET_REF, SPACE_ID, id, resource, snapshot, snapshot_text, space_holding,
     space_json, space_resource, target_document,
 };
 
@@ -786,6 +787,7 @@ pub fn commit_for(step: &Step, stored: &[LoadedSpace], order: u8) -> Option<Spac
                             x: f64::from(at) * 300.0,
                             y: f64::from(*x),
                             size: None,
+                            edit_size: None,
                             content: of_no_plugin.then(chart_map_content),
                         },
                     )
@@ -940,26 +942,6 @@ pub fn memory_at(start: &[Start; 3]) -> MemorySpaceRepository {
             })
             .collect(),
     })
-}
-
-/// Whether a durable store keeps the key order of the content it is given.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum KeyOrder {
-    /// It answers content as committed, so it is compared exactly.
-    Kept,
-    /// It answers content in an order of its own, so both sides are
-    /// compared with every JSON object in ascending key order.
-    Reordered,
-}
-
-impl KeyOrder {
-    /// `value` as this store's comparison sees it.
-    fn compared<T: InKeyOrder + Clone>(self, value: &T) -> T {
-        match self {
-            Self::Kept => value.clone(),
-            Self::Reordered => value.in_key_order(),
-        }
-    }
 }
 
 /// What kind of answer a commit made, by name.

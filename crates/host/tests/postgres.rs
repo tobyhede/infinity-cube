@@ -27,7 +27,7 @@ use http_conformance::Counted;
 use intake::{SpaceId, SpaceSnapshot};
 use postgres_support::stand_in::{Behaviour, StandIn};
 use postgres_support::{Fresh, rendezvous, waiting};
-use repository_contract::{BrokenState, Harness, Unprovided, repository_cases};
+use repository_contract::{BrokenState, Harness, KeyOrder, Unprovided, repository_cases};
 use tokio::sync::Notify;
 
 /// The Presentation Space, which has two Maps.
@@ -147,6 +147,9 @@ fn space_row(id: SpaceId, document: &str) -> String {
 impl Harness for Postgres {
     type Store = PostgresSpaceRepository;
 
+    /// `jsonb` keeps an object's keys sorted by length, then by bytes.
+    const KEY_ORDER: KeyOrder = KeyOrder::Reordered;
+
     async fn open() -> Self {
         let database = Fresh::new().await;
         let store = Arc::new(database.open());
@@ -240,6 +243,7 @@ impl Harness for Postgres {
 
 repository_cases!(
     super::Postgres,
+    every_member,
     #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
 );
 
@@ -800,8 +804,8 @@ mod given_content_jsonb_reorders {
 
     /// The Space the Fresh `database` holds, read through a new pool: it
     /// comes back at `revision` in `jsonb`'s key order, holding the values
-    /// committed, and Exports the bytes a memory store holding the Space as
-    /// committed Exports.
+    /// committed, and an Export of the aggregate writes the bytes an Export
+    /// of a memory store holding the Space as committed writes.
     async fn assert_stored_in_jsonb_order(database: &Fresh, revision: u64) {
         let store = database.open();
         let stored = store
@@ -874,8 +878,8 @@ mod given_rows_out_of_id_order {
     };
 
     const META: &str = "c0000000-0000-4000-8000-0000000000f9";
-    /// The Spaces Meta links, highest id first: the order they are created,
-    /// each with the id of the Space Resource linking it.
+    /// The Spaces Meta's Space Resources show, highest id first: the order
+    /// they are created, each with the id of the Space Resource showing it.
     const CHILDREN: [(&str, &str); 3] = [
         (
             "c0000000-0000-4000-8000-0000000000f8",
@@ -897,12 +901,15 @@ mod given_rows_out_of_id_order {
         let database = Fresh::new().await;
         let store = database.open();
         seed(&store, &[&space_holding(META, "Meta", vec![])]).await;
-        let mut links = Vec::new();
-        for (expected, (child, link)) in (0..).zip(CHILDREN) {
-            links.push(space_resource(link, child));
+        let mut space_resources = Vec::new();
+        for (expected, (child, space_resource_id)) in (0..).zip(CHILDREN) {
+            space_resources.push(space_resource(space_resource_id, child));
             let answer = store
                 .commit(commit_of(vec![
-                    update_at(&space_holding(META, "Meta", links.clone()), expected),
+                    update_at(
+                        &space_holding(META, "Meta", space_resources.clone()),
+                        expected,
+                    ),
                     SpaceChange::Create {
                         space_id: space(child),
                         snapshot: target_space(child, "Child", &[]),

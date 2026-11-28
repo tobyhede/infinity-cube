@@ -1,8 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import type { Space } from '@project/graph';
-// Through the package's own subpath imports, as `#components/*` already is: a
-// story sits two directories above `src`, and climbing there by relative path is
-// how a package boundary gets crossed without naming one (AGENTS.md).
+// App stories reach source through package subpaths (docs/agents/architecture.md, "Import enforcement").
 import { createNavigation, type Navigation, type NavigationState } from '#src/navigation';
 import { requireDefaultMap } from '#src/map-resolution';
 

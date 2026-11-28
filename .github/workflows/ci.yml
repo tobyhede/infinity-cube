@@ -117,6 +117,10 @@ jobs:
       # an ADR the requirements have not yet restated is a warning
       # annotation, never a failure, so an ADR pull request edits no
       # requirements doc. It needs nothing installed, so it runs first.
+      - name: Check agent instructions and guide links
+        run: |
+          python3 scripts/check-agent-instructions.py
+          python3 .scratch/requirements-rewrite/check-links.py --agent-docs
       - name: Check requirements snapshot
         run: python3 scripts/adr_snapshot.py check --github
       # No `version:` input on purpose — the action then reads `packageManager`

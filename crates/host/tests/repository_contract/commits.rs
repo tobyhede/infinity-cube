@@ -87,6 +87,7 @@ pub async fn stores_an_initialized_space_then_lists_loads_and_commits_it<H: Harn
     let store = harness.store().as_ref();
     let first = space(SPACE_ID, "One", &[RESOURCE_ID]);
     assert_same!(
+        H,
         store
             .initialize_aggregate(AggregateInput {
                 meta_space_id: id(SPACE_ID),
@@ -99,22 +100,32 @@ pub async fn stores_an_initialized_space_then_lists_loads_and_commits_it<H: Harn
         }))
     );
     assert_same!(
+        H,
         store.list_spaces().await,
         Ok(vec![SpaceSummary {
             id: id(SPACE_ID),
             title: "One".to_owned(),
         }])
     );
-    assert_same!(load(store, SPACE_ID).await, Some(stored(&first, 0, None)));
-    assert_same!(load(store, MISSING_SPACE_ID).await, None);
+    assert_same!(
+        H,
+        load(store, SPACE_ID).await,
+        Some(stored(&first, 0, None))
+    );
+    assert_same!(H, load(store, MISSING_SPACE_ID).await, None);
 
     let changed = retitled(&first, "Changed");
     assert_same!(
+        H,
         commit_update(store, &changed, 0).await,
         committed(&[(SPACE_ID, 1)], &[])
     );
     let store = reopened(harness).await;
-    assert_same!(load(store, SPACE_ID).await, Some(stored(&changed, 1, None)));
+    assert_same!(
+        H,
+        load(store, SPACE_ID).await,
+        Some(stored(&changed, 1, None))
+    );
     Ok(())
 }
 
@@ -131,11 +142,16 @@ pub async fn keeps_every_resource_through_a_topology_preserving_commits_own_dele
     seed(store, &[&first]).await;
     let changed = retitled(&first, "Renamed, same Resources");
     assert_same!(
+        H,
         commit_update(store, &changed, 0).await,
         committed(&[(SPACE_ID, 1)], &[])
     );
     let store = reopened(harness).await;
-    assert_same!(load(store, SPACE_ID).await, Some(stored(&changed, 1, None)));
+    assert_same!(
+        H,
+        load(store, SPACE_ID).await,
+        Some(stored(&changed, 1, None))
+    );
     Ok(())
 }
 
@@ -155,9 +171,14 @@ pub async fn refuses_to_create_an_unreachable_space_by_removing_its_last_referen
     );
     let result = commit_update(store, &unlinked, 0).await;
     let store = reopened(harness).await;
-    assert_same!(refused_kinds(&result), ["ordinary-space-unreferenced"]);
-    assert_same!(load(store, SPACE_ID).await, Some(stored(&linked, 0, None)));
+    assert_same!(H, refused_kinds(&result), ["ordinary-space-unreferenced"]);
     assert_same!(
+        H,
+        load(store, SPACE_ID).await,
+        Some(stored(&linked, 0, None))
+    );
+    assert_same!(
+        H,
         load(store, OTHER_SPACE_ID).await,
         Some(stored(&target, 0, None))
     );
@@ -184,10 +205,12 @@ pub async fn atomically_creates_links_reads_converges_on_and_deletes_a_space<H: 
     );
 
     assert_same!(
+        H,
         commit_changes(store, vec![update(&linked, 0), create(&child)]).await,
         committed(&[(SPACE_ID, 1), (OTHER_SPACE_ID, 0)], &[])
     );
     assert_same!(
+        H,
         store.load_aggregate().await,
         Ok(AggregateLoad::Loaded(LoadedAggregate {
             meta_space_id: id(SPACE_ID),
@@ -196,6 +219,7 @@ pub async fn atomically_creates_links_reads_converges_on_and_deletes_a_space<H: 
     );
 
     assert_same!(
+        H,
         commit_changes(store, vec![delete(OTHER_SPACE_ID, 0)]).await,
         CommitResult::Conflict(vec![conflict(
             OTHER_SPACE_ID,
@@ -222,15 +246,17 @@ pub async fn atomically_creates_links_reads_converges_on_and_deletes_a_space<H: 
     let store = reopened(harness).await;
     assert!(is_refused(&result), "{result:?}");
     assert_same!(
+        H,
         load(store, OTHER_SPACE_ID).await,
         Some(stored(&child, 0, None))
     );
 
     assert_same!(
+        H,
         commit_changes(store, vec![update(&meta, 1), delete(OTHER_SPACE_ID, 0)]).await,
         committed(&[(SPACE_ID, 2)], &[OTHER_SPACE_ID])
     );
-    assert_same!(load(store, OTHER_SPACE_ID).await, None);
+    assert_same!(H, load(store, OTHER_SPACE_ID).await, None);
     Ok(())
 }
 
@@ -243,8 +269,9 @@ pub async fn refuses_an_authored_commit_deleting_the_meta_space<H: Harness>(
     seed(store, &[&meta]).await;
     let result = commit_changes(store, vec![delete(SPACE_ID, 0)]).await;
     let store = reopened(harness).await;
-    assert_same!(refused_kinds(&result), ["meta-space-missing"]);
+    assert_same!(H, refused_kinds(&result), ["meta-space-missing"]);
     assert_same!(
+        H,
         store.load_aggregate().await,
         Ok(AggregateLoad::Loaded(LoadedAggregate {
             meta_space_id: id(SPACE_ID),
@@ -266,9 +293,10 @@ pub async fn reports_every_conflict_and_rolls_back_every_refused_aggregate<H: Ha
     let result = commit_changes(store, vec![create(&orphan)]).await;
     let store = reopened(harness).await;
     assert!(is_refused(&result), "{result:?}");
-    assert_same!(load(store, OTHER_SPACE_ID).await, None);
+    assert_same!(H, load(store, OTHER_SPACE_ID).await, None);
 
     assert_same!(
+        H,
         commit_changes(
             store,
             vec![
@@ -282,7 +310,7 @@ pub async fn reports_every_conflict_and_rolls_back_every_refused_aggregate<H: Ha
             conflict(MISSING_SPACE_ID, None),
         ])
     );
-    assert_same!(load(store, SPACE_ID).await, Some(stored(&meta, 0, None)));
+    assert_same!(H, load(store, SPACE_ID).await, Some(stored(&meta, 0, None)));
     Ok(())
 }
 
@@ -297,6 +325,7 @@ pub async fn answers_a_stale_expected_revision_with_the_current_space<H: Harness
     commit_update(store, &committed_space, 0).await;
 
     assert_same!(
+        H,
         commit_update(store, &retitled(&first, "Stale"), 0).await,
         CommitResult::Conflict(vec![conflict(
             SPACE_ID,
@@ -305,6 +334,7 @@ pub async fn answers_a_stale_expected_revision_with_the_current_space<H: Harness
     );
     let store = reopened(harness).await;
     assert_same!(
+        H,
         load(store, SPACE_ID).await,
         Some(stored(&committed_space, 1, None))
     );
@@ -322,7 +352,11 @@ pub async fn refuses_a_commit_failing_domain_intake_storing_nothing<H: Harness>(
     let result = commit_update(store, &dangling, 0).await;
     let store = reopened(harness).await;
     assert!(is_refused(&result), "{result:?}");
-    assert_same!(load(store, SPACE_ID).await, Some(stored(&first, 0, None)));
+    assert_same!(
+        H,
+        load(store, SPACE_ID).await,
+        Some(stored(&first, 0, None))
+    );
     Ok(())
 }
 
@@ -331,11 +365,12 @@ pub async fn refuses_a_commit_for_a_space_it_does_not_store<H: Harness>(harness:
     let store = harness.store().as_ref();
     let absent = space(MISSING_SPACE_ID, "Absent", &[]);
     assert_same!(
+        H,
         commit_update(store, &absent, 0).await,
         CommitResult::Conflict(vec![conflict(MISSING_SPACE_ID, None)])
     );
     let store = reopened(harness).await;
-    assert_same!(load(store, MISSING_SPACE_ID).await, None);
+    assert_same!(H, load(store, MISSING_SPACE_ID).await, None);
     Ok(())
 }
 
@@ -357,7 +392,11 @@ pub async fn refuses_a_commit_whose_space_id_differs_from_its_snapshot_id<H: Har
     .await;
     let store = reopened(harness).await;
     assert!(is_rejected(&result), "{result:?}");
-    assert_same!(load(store, SPACE_ID).await, Some(stored(&first, 0, None)));
+    assert_same!(
+        H,
+        load(store, SPACE_ID).await,
+        Some(stored(&first, 0, None))
+    );
     Ok(())
 }
 
@@ -384,8 +423,13 @@ pub async fn refuses_an_update_naming_another_stored_space_at_a_matching_revisio
     .await;
     let store = reopened(harness).await;
     assert!(is_rejected(&result), "{result:?}");
-    assert_same!(load(store, SPACE_ID).await, Some(stored(&linked, 0, None)));
     assert_same!(
+        H,
+        load(store, SPACE_ID).await,
+        Some(stored(&linked, 0, None))
+    );
+    assert_same!(
+        H,
         load(store, OTHER_SPACE_ID).await,
         Some(stored(&target, 0, None))
     );
@@ -427,6 +471,7 @@ pub async fn places_a_single_updates_failed_intake_at_its_position<H: Harness>(
     }
     let store = reopened(harness).await;
     assert_same!(
+        H,
         load(store, OTHER_SPACE_ID).await,
         Some(stored(&target, 0, None))
     );
@@ -448,7 +493,11 @@ pub async fn refuses_a_commit_naming_one_space_more_than_once<H: Harness>(harnes
     .await;
     let store = reopened(harness).await;
     assert!(is_rejected(&result), "{result:?}");
-    assert_same!(load(store, SPACE_ID).await, Some(stored(&first, 0, None)));
+    assert_same!(
+        H,
+        load(store, SPACE_ID).await,
+        Some(stored(&first, 0, None))
+    );
     Ok(())
 }
 
@@ -478,8 +527,13 @@ pub async fn refuses_a_commit_claiming_a_resource_another_space_owns<H: Harness>
     let result = commit_update(store, &claiming, 0).await;
     let store = reopened(harness).await;
     assert!(is_refused(&result), "{result:?}");
-    assert_same!(load(store, SPACE_ID).await, Some(stored(&linked, 0, None)));
     assert_same!(
+        H,
+        load(store, SPACE_ID).await,
+        Some(stored(&linked, 0, None))
+    );
+    assert_same!(
+        H,
         load(store, OTHER_SPACE_ID).await,
         Some(stored(&other, 0, None))
     );
@@ -517,8 +571,9 @@ pub async fn scopes_graph_identities_to_their_space<H: Harness>(harness: &mut H)
 
     seed(store, &[&meta, &child]).await;
     let store = reopened(harness).await;
-    assert_same!(load(store, SPACE_ID).await, Some(stored(&meta, 0, None)));
+    assert_same!(H, load(store, SPACE_ID).await, Some(stored(&meta, 0, None)));
     assert_same!(
+        H,
         load(store, OTHER_SPACE_ID).await,
         Some(stored(&child, 0, None))
     );
@@ -545,6 +600,7 @@ pub async fn refuses_an_unreferenced_space_even_reusing_a_graph_identity<H: Harn
         .unwrap();
     match &result {
         InitializeResult::AggregateRefused(refusals) => assert_same!(
+            H,
             refusals
                 .as_slice()
                 .iter()
@@ -556,6 +612,7 @@ pub async fn refuses_an_unreferenced_space_even_reusing_a_graph_identity<H: Harn
     }
     let store = reopened(harness).await;
     assert_same!(
+        H,
         store.load_aggregate().await,
         Ok(AggregateLoad::Uninitialized)
     );
@@ -580,7 +637,11 @@ pub async fn permits_a_graph_and_a_resource_to_share_an_identity<H: Harness>(
     );
     seed(store, &[&shared]).await;
     let store = reopened(harness).await;
-    assert_same!(load(store, SPACE_ID).await, Some(stored(&shared, 0, None)));
+    assert_same!(
+        H,
+        load(store, SPACE_ID).await,
+        Some(stored(&shared, 0, None))
+    );
     Ok(())
 }
 
@@ -631,6 +692,7 @@ pub async fn refuses_two_maps_owning_one_graph_identity<H: Harness>(harness: &mu
     }
     let store = reopened(harness).await;
     assert_same!(
+        H,
         store.load_aggregate().await,
         Ok(AggregateLoad::Uninitialized)
     );
@@ -649,6 +711,7 @@ pub async fn keeps_the_resources_a_commit_names_and_drops_the_rest<H: Harness>(
     let store = reopened(harness).await;
     assert!(is_committed(&result), "{result:?}");
     assert_same!(
+        H,
         load(store, SPACE_ID).await,
         Some(stored(&narrowed, 1, None))
     );
@@ -664,7 +727,11 @@ pub async fn drops_every_resource_when_a_commit_omits_them_all<H: Harness>(harne
     let result = commit_update(store, &empty, 0).await;
     let store = reopened(harness).await;
     assert!(is_committed(&result), "{result:?}");
-    assert_same!(load(store, SPACE_ID).await, Some(stored(&empty, 1, None)));
+    assert_same!(
+        H,
+        load(store, SPACE_ID).await,
+        Some(stored(&empty, 1, None))
+    );
     Ok(())
 }
 
@@ -684,6 +751,7 @@ pub async fn answers_resources_in_ascending_id_order_however_supplied<H: Harness
         &[RESOURCE_ID, SECOND_RESOURCE_ID, OTHER_RESOURCE_ID],
     );
     assert_same!(
+        H,
         store
             .initialize_aggregate(AggregateInput {
                 meta_space_id: id(SPACE_ID),
@@ -696,6 +764,7 @@ pub async fn answers_resources_in_ascending_id_order_however_supplied<H: Harness
         }))
     );
     assert_same!(
+        H,
         load(store, SPACE_ID).await,
         Some(stored(&ascending, 0, None))
     );
@@ -704,6 +773,7 @@ pub async fn answers_resources_in_ascending_id_order_however_supplied<H: Harness
     let store = reopened(harness).await;
     assert!(is_committed(&result), "{result:?}");
     assert_same!(
+        H,
         load(store, SPACE_ID).await,
         Some(stored(&ascending, 1, None))
     );
@@ -726,6 +796,7 @@ pub async fn records_an_exported_revision_and_carries_it_across_commits<H: Harne
     let store = reopened(harness).await;
     assert!(is_committed(&result), "{result:?}");
     assert_same!(
+        H,
         load(store, SPACE_ID).await,
         Some(stored(&changed, 1, Some(0)))
     );
@@ -741,13 +812,14 @@ pub async fn refuses_to_mark_an_exported_revision_above_the_ceiling<H: Harness>(
     seed(store, &[&first]).await;
     // `mark_exported` takes a `Revision`, and no `Revision` stands above the
     // ceiling: the refusal is the type's, before the store is reached.
-    assert_same!(host::Revision::new(CEILING + 1), None);
+    assert_same!(H, host::Revision::new(CEILING + 1), None);
     store
         .mark_exported(id(SPACE_ID), revision(CEILING))
         .await
         .unwrap();
     let store = reopened(harness).await;
     assert_same!(
+        H,
         load(store, SPACE_ID).await,
         Some(stored(&first, 0, Some(CEILING))),
         "the ceiling itself is a revision a store records"
@@ -767,17 +839,20 @@ pub async fn stores_and_commits_a_revision_above_the_largest_safe_integer<H: Har
         .await?;
     let store = harness.store().as_ref();
     assert_same!(
+        H,
         load(store, SPACE_ID).await,
         Some(stored(&first, above_safe, None))
     );
 
     let changed = retitled(&first, "Above safe");
     assert_same!(
+        H,
         commit_update(store, &changed, above_safe).await,
         committed(&[(SPACE_ID, above_safe + 1)], &[])
     );
     let store = reopened(harness).await;
     assert_same!(
+        H,
         load(store, SPACE_ID).await,
         Some(stored(&changed, above_safe + 1, None))
     );
@@ -796,6 +871,7 @@ pub async fn writes_only_the_resource_a_topology_preserving_commit_changed<H: Ha
     );
     seed(harness.store().as_ref(), &[&first]).await;
     assert_same!(
+        H,
         harness.take_resource_writes().await?,
         [RESOURCE_ID, SECOND_RESOURCE_ID, OTHER_RESOURCE_ID]
     );
@@ -811,8 +887,13 @@ pub async fn writes_only_the_resource_a_topology_preserving_commit_changed<H: Ha
     );
     let result = commit_update(harness.store().as_ref(), &renamed, 0).await;
     assert!(is_committed(&result), "{result:?}");
-    assert_same!(harness.take_resource_writes().await?, [SECOND_RESOURCE_ID]);
     assert_same!(
+        H,
+        harness.take_resource_writes().await?,
+        [SECOND_RESOURCE_ID]
+    );
+    assert_same!(
+        H,
         load(harness.store().as_ref(), SPACE_ID).await,
         Some(stored(&renamed, 1, None))
     );
@@ -821,8 +902,13 @@ pub async fn writes_only_the_resource_a_topology_preserving_commit_changed<H: Ha
     let retitled_space = retitled(&renamed, "Retitled");
     let result = commit_update(harness.store().as_ref(), &retitled_space, 1).await;
     assert!(is_committed(&result), "{result:?}");
-    assert_same!(harness.take_resource_writes().await?, Vec::<String>::new());
     assert_same!(
+        H,
+        harness.take_resource_writes().await?,
+        Vec::<String>::new()
+    );
+    assert_same!(
+        H,
         load(harness.store().as_ref(), SPACE_ID).await,
         Some(stored(&retitled_space, 2, None))
     );
@@ -859,10 +945,12 @@ pub async fn writes_only_the_new_and_changed_resources_on_the_aggregate_path<H: 
     let result = commit_update(harness.store().as_ref(), &grown, 0).await;
     assert!(is_committed(&result), "{result:?}");
     assert_same!(
+        H,
         harness.take_resource_writes().await?,
         [SECOND_RESOURCE_ID, OTHER_RESOURCE_ID]
     );
     assert_same!(
+        H,
         load(harness.store().as_ref(), SPACE_ID).await,
         Some(stored(&grown, 1, None))
     );
@@ -883,8 +971,13 @@ pub async fn writes_no_resource_for_a_commit_at_a_stale_revision<H: Harness>(
     let stale = space_holding(SPACE_ID, "One", vec![resource(RESOURCE_ID, "Stale")]);
     let result = commit_update(harness.store().as_ref(), &stale, 0).await;
     assert!(matches!(result, CommitResult::Conflict(_)), "{result:?}");
-    assert_same!(harness.take_resource_writes().await?, Vec::<String>::new());
     assert_same!(
+        H,
+        harness.take_resource_writes().await?,
+        Vec::<String>::new()
+    );
+    assert_same!(
+        H,
         load(harness.store().as_ref(), SPACE_ID).await,
         Some(stored(&committed_space, 1, None))
     );
@@ -922,6 +1015,7 @@ pub async fn moves_an_unchanged_resource_between_spaces_in_one_commit<H: Harness
     let moving = moving();
     seed(store, &[&moving.releasing, &moving.receiving]).await;
     assert_same!(
+        H,
         commit_changes(
             store,
             vec![update(&moving.released, 0), update(&moving.received, 0)]
@@ -931,10 +1025,12 @@ pub async fn moves_an_unchanged_resource_between_spaces_in_one_commit<H: Harness
     );
     let store = reopened(harness).await;
     assert_same!(
+        H,
         load(store, SPACE_ID).await,
         Some(stored(&moving.released, 1, None))
     );
     assert_same!(
+        H,
         load(store, OTHER_SPACE_ID).await,
         Some(stored(&moving.received, 1, None))
     );
@@ -1007,17 +1103,20 @@ pub async fn commits_a_move_whichever_space_it_lists_first<H: Harness>(harness: 
                 })
                 .collect();
             assert_same!(
+                H,
                 commit_changes(store, changes).await,
                 committed(&revisions, &[]),
                 "moving {direction}, receiving first: {receiving_first}"
             );
             let store = reopened(harness).await;
             assert_same!(
+                H,
                 load(store, &moving.released.id.to_string()).await,
                 Some(stored(&moving.released, 1, None)),
                 "moving {direction}, receiving first: {receiving_first}"
             );
             assert_same!(
+                H,
                 load(store, &moving.received.id.to_string()).await,
                 Some(stored(&moving.received, 1, None)),
                 "moving {direction}, receiving first: {receiving_first}"
@@ -1034,11 +1133,12 @@ pub async fn answers_a_create_of_a_stored_space_as_a_conflict<H: Harness>(harnes
     let meta = space(SPACE_ID, "Meta", &[RESOURCE_ID]);
     seed(store, &[&meta]).await;
     assert_same!(
+        H,
         commit_changes(store, vec![create(&retitled(&meta, "Created again"))]).await,
         CommitResult::Conflict(vec![conflict(SPACE_ID, Some(stored(&meta, 0, None)))])
     );
     let store = reopened(harness).await;
-    assert_same!(load(store, SPACE_ID).await, Some(stored(&meta, 0, None)));
+    assert_same!(H, load(store, SPACE_ID).await, Some(stored(&meta, 0, None)));
     Ok(())
 }
 
@@ -1058,15 +1158,18 @@ pub async fn keeps_an_exported_revision_through_an_aggregate_commit<H: Harness>(
     let child = target();
     let linked = linked_meta(SECOND_RESOURCE_ID);
     assert_same!(
+        H,
         commit_changes(store, vec![update(&linked, 0), create(&child)]).await,
         committed(&[(SPACE_ID, 1), (OTHER_SPACE_ID, 0)], &[])
     );
     let store = reopened(harness).await;
     assert_same!(
+        H,
         load(store, SPACE_ID).await,
         Some(stored(&linked, 1, Some(0)))
     );
     assert_same!(
+        H,
         load(store, OTHER_SPACE_ID).await,
         Some(stored(&child, 0, None))
     );
@@ -1087,6 +1190,7 @@ pub async fn answers_a_stale_revision_on_the_aggregate_path_as_a_conflict<H: Har
     let child = target();
     let linked = linked_meta(SECOND_RESOURCE_ID);
     assert_same!(
+        H,
         commit_changes(store, vec![update(&linked, 0), create(&child)]).await,
         CommitResult::Conflict(vec![conflict(
             SPACE_ID,
@@ -1095,10 +1199,11 @@ pub async fn answers_a_stale_revision_on_the_aggregate_path_as_a_conflict<H: Har
     );
     let store = reopened(harness).await;
     assert_same!(
+        H,
         load(store, SPACE_ID).await,
         Some(stored(&committed_meta, 1, None))
     );
-    assert_same!(load(store, OTHER_SPACE_ID).await, None);
+    assert_same!(H, load(store, OTHER_SPACE_ID).await, None);
     Ok(())
 }
 
@@ -1121,15 +1226,17 @@ pub async fn adopts_a_resource_id_from_the_space_a_commit_deletes<H: Harness>(
         ],
     );
     assert_same!(
+        H,
         commit_changes(store, vec![update(&adopting, 0), delete(OTHER_SPACE_ID, 0)]).await,
         committed(&[(SPACE_ID, 1)], &[OTHER_SPACE_ID])
     );
     let store = reopened(harness).await;
     assert_same!(
+        H,
         load(store, SPACE_ID).await,
         Some(stored(&adopting, 1, None))
     );
-    assert_same!(load(store, OTHER_SPACE_ID).await, None);
+    assert_same!(H, load(store, OTHER_SPACE_ID).await, None);
     Ok(())
 }
 
@@ -1164,7 +1271,7 @@ async fn commit_over_recreation<H: Harness>(harness: &mut H, next: &SpaceSnapsho
     let result = commit_update(harness.store().as_ref(), next, 0).await;
     assert!(is_committed(&result), "{result:?}");
     let store = reopened(harness).await;
-    assert_same!(load(store, SPACE_ID).await, Some(stored(next, 1, None)));
+    assert_same!(H, load(store, SPACE_ID).await, Some(stored(next, 1, None)));
     Ok(())
 }
 

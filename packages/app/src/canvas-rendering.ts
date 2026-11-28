@@ -5,6 +5,7 @@ import { canvasContent, type CanvasContent } from './canvas-content';
 import type { CanvasNodesAndEdges, PendingCanvasProjection } from './canvas-projection';
 import { usePlacementRendering } from './placement-rendering';
 import {
+  editorPlacement,
   selectedResourceOf,
   type CanvasSelection,
   type EdgeSubject,
@@ -46,7 +47,8 @@ export interface CanvasRendering {
 /**
  * The drawn Map through the placement strategy and into the render adapter.
  *
- * A resize draft's placement stands in for the Map's own while it runs. Nothing
+ * A resize draft's placement stands in for the Map's own while it runs, and a
+ * Resource edited in place is drawn at its Edit size. Nothing
  * is worth projecting before a strategy resolves — every Resource would sit at
  * the origin — and `project` will not take a null `LayoutStrategyGraph`, so the
  * `projected` gate is the whole of that rule. The complete projection reaches
@@ -59,6 +61,7 @@ export function useCanvasRendering(
   { projection, mapPlacement, activeGraphId }: CanvasRenderingInput,
 ): CanvasRendering {
   const resizeDraft = useRenderAdapter((s) => s.resizeDraft);
+  const editors = useRenderAdapter((s) => s.editors);
   const selection = useRenderAdapter((s) => s.selection);
   const liveProjection = useRenderAdapter((s) => s.projection);
   const editingEmbeddedMap = useRenderAdapter((s) => s.editingEmbeddedMap);
@@ -69,9 +72,14 @@ export function useCanvasRendering(
   const reportEmbeddedMapEditing = useRenderAdapter((s) => s.reportEmbeddedMapEditing);
   const selectedResourceId = selectedResourceOf(selection);
 
+  // A Resource edited in place is drawn at its Edit size (ADR 0178).
+  const drawnPlacement = useMemo(
+    () => editorPlacement(mapPlacement, editors),
+    [mapPlacement, editors],
+  );
   const placement = usePlacementRendering(
     projection.strategyGraph,
-    resizeDraft?.placement ?? mapPlacement,
+    resizeDraft?.placement ?? drawnPlacement,
   );
   const laidOut = placement.kind === 'ready' ? placement.strategyGraph : null;
   const projected = useMemo(

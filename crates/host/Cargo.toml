@@ -8,8 +8,10 @@ license.workspace = true
 publish.workspace = true
 
 [features]
-# Test instrumentation: a probe each SQL repository operation waits on at its
-# named steps. Off by default; only `host`'s own tests turn it on, through the
+# Test instrumentation of the SQL repository: a probe each operation waits on
+# at its named steps, a record of the Resource rows it asks the store to
+# write, and the recreation of a Space's Resource rows before a commit's row
+# lock. Off by default; only `host`'s own tests turn it on, through the
 # dev-dependency on itself below.
 test-support = []
 

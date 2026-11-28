@@ -5,7 +5,7 @@
 
 use host::{
     AggregateInput, AggregateLoad, CommitResult, LoadedAggregate, ReplaceResult, RepositoryError,
-    SpaceRepository,
+    SpaceChange, SpaceRepository,
 };
 
 use super::*;
@@ -43,6 +43,7 @@ async fn replaces_broken_state<H: Harness>(harness: &mut H, state: BrokenState) 
     );
     let store = reopened(harness).await;
     assert_same!(
+        H,
         store.load_aggregate().await,
         Ok(AggregateLoad::Loaded(LoadedAggregate {
             meta_space_id: id(SPACE_ID),
@@ -85,7 +86,7 @@ pub async fn names_a_broken_document_broken_on_the_fast_path_and_load_space<H: H
 }
 
 /// Not a port: one Space failing intake does not hide the others from the
-/// listing (#528's 01, Storage ST-7). Each is listed, by its title where its
+/// listing (Storage ST-7). Each is listed, by its title where its
 /// document holds a string one and by its id otherwise, beside the Spaces
 /// that pass, while the aggregate read fails as broken stored state.
 pub async fn lists_every_space_when_one_fails_intake<H: Harness>(harness: &mut H) -> Ran {
@@ -100,6 +101,7 @@ pub async fn lists_every_space_when_one_fails_intake<H: Harness>(harness: &mut H
     let aggregate = store.load_aggregate().await;
     assert!(is_broken(&aggregate), "{aggregate:?}");
     assert_same!(
+        H,
         store.list_spaces().await,
         Ok(vec![
             host::SpaceSummary {
@@ -127,11 +129,13 @@ pub async fn lists_a_space_without_a_title_by_its_id<H: Harness>(harness: &mut H
         .await?;
     let store = reopened(harness).await;
     assert_same!(
+        H,
         store.list_spaces().await,
         Ok(vec![host::SpaceSummary {
             id: id(SPACE_ID),
             title: SPACE_ID.to_owned(),
-        }])
+        }]),
+        "a Space with no title is listed by its id"
     );
     Ok(())
 }
@@ -149,6 +153,7 @@ pub async fn truncates_spaces_without_a_meta_identity_only_when_none_was_expecte
     let loaded = store.load_aggregate().await;
     assert!(is_broken(&loaded), "{loaded:?}");
     assert_same!(
+        H,
         store
             .replace_aggregate(replacing_with(&replacement), Some(id(OTHER_SPACE_ID)))
             .await,
@@ -165,6 +170,7 @@ pub async fn truncates_spaces_without_a_meta_identity_only_when_none_was_expecte
     );
     let store = reopened(harness).await;
     assert_same!(
+        H,
         store.load_aggregate().await,
         Ok(AggregateLoad::Loaded(LoadedAggregate {
             meta_space_id: id(SPACE_ID),
@@ -196,6 +202,7 @@ pub async fn refuses_an_update_when_stored_spaces_have_no_meta_identity<H: Harne
     harness.remove_meta_identity().await?;
     let store = harness.store().as_ref();
     assert_same!(
+        H,
         commit_update(store, &retitled(&first, "Changed"), 0).await,
         CommitResult::Rejected {
             message: "The repository has no Meta Space".to_owned()
@@ -203,6 +210,7 @@ pub async fn refuses_an_update_when_stored_spaces_have_no_meta_identity<H: Harne
     );
     let store = reopened(harness).await;
     assert_same!(
+        H,
         store.load_space(id(SPACE_ID)).await,
         Ok(Some(stored(&first, 0, None)))
     );
@@ -211,8 +219,8 @@ pub async fn refuses_an_update_when_stored_spaces_have_no_meta_identity<H: Harne
 
 // Case: refuses to store a revision above the 2^63-1 ceiling
 /// An update adds one to the revision, so a Space stored at the ceiling
-/// cannot be updated: the commit fails as broken stored state (#528's 01)
-/// and the Space stands as it was.
+/// cannot be updated: the commit fails as broken stored state (Storage ST-6,
+/// ST-7) and the Space stands as it was.
 pub async fn refuses_to_store_a_revision_above_the_ceiling<H: Harness>(harness: &mut H) -> Ran {
     let first = space(SPACE_ID, "One", &[RESOURCE_ID]);
     seed(harness.store().as_ref(), &[&first]).await;
@@ -229,8 +237,56 @@ pub async fn refuses_to_store_a_revision_above_the_ceiling<H: Harness>(harness: 
     assert!(is_broken(&committed), "{committed:?}");
     let store = reopened(harness).await;
     assert_same!(
+        H,
         store.load_space(id(SPACE_ID)).await,
-        Ok(Some(stored(&first, CEILING, None)))
+        Ok(Some(stored(&first, CEILING, None))),
+        "the Space stands at the ceiling as it was"
+    );
+    Ok(())
+}
+
+/// Not a port: a delete writes no next revision, so a Space stored at the
+/// ceiling can still be deleted (Storage ST-6): the commit removing its last
+/// reference and deleting it commits, and the Space is no longer stored.
+pub async fn deletes_a_space_at_the_ceiling<H: Harness>(harness: &mut H) -> Ran {
+    let meta = space_holding(
+        SPACE_ID,
+        "Meta",
+        vec![
+            resource(RESOURCE_ID, "Meta resource"),
+            space_resource(SECOND_RESOURCE_ID, OTHER_SPACE_ID),
+        ],
+    );
+    let target = target_space(OTHER_SPACE_ID, "Target", &[OTHER_RESOURCE_ID]);
+    seed(harness.store().as_ref(), &[&meta, &target]).await;
+    harness
+        .write_raw_revision(id(OTHER_SPACE_ID), &CEILING.to_string(), None)
+        .await?;
+    let without_target = space(SPACE_ID, "Meta", &[RESOURCE_ID]);
+    let store = harness.store().as_ref();
+    assert_same!(
+        H,
+        store
+            .commit(commit(vec![
+                update(&without_target, 0),
+                SpaceChange::Delete {
+                    space_id: id(OTHER_SPACE_ID),
+                    expected_revision: revision(CEILING),
+                },
+            ]))
+            .await,
+        Ok(committed(&[(SPACE_ID, 1)], &[OTHER_SPACE_ID])),
+        "the delete at the ceiling commits"
+    );
+    let store = reopened(harness).await;
+    assert_same!(
+        H,
+        store.load_aggregate().await,
+        Ok(AggregateLoad::Loaded(LoadedAggregate {
+            meta_space_id: id(SPACE_ID),
+            spaces: vec![stored(&without_target, 1, None)],
+        })),
+        "the Space at the ceiling is no longer stored"
     );
     Ok(())
 }
